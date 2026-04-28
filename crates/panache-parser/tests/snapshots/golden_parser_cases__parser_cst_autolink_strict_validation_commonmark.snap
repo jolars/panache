@@ -1,0 +1,35 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..79
+  PARAGRAPH@0..22
+    AUTO_LINK@0..21
+      AUTO_LINK_MARKER@0..1
+        AUTO_LINK_MARKER@0..1 "<"
+      TEXT@1..20 "https://example.com"
+      AUTO_LINK_MARKER@20..21
+        AUTO_LINK_MARKER@20..21 ">"
+    NEWLINE@21..22 "\n"
+  BLANK_LINE@22..23
+    BLANK_LINE@22..23 "\n"
+  PARAGRAPH@23..31
+    TEXT@23..30 "<m:abc>"
+    NEWLINE@30..31 "\n"
+  BLANK_LINE@31..32
+    BLANK_LINE@31..32 "\n"
+  PARAGRAPH@32..56
+    TEXT@32..36 "<foo"
+    ESCAPED_CHAR@36..38 "\\+"
+    TEXT@38..55 "@bar.example.com>"
+    NEWLINE@55..56 "\n"
+  BLANK_LINE@56..57
+    BLANK_LINE@56..57 "\n"
+  PARAGRAPH@57..79
+    AUTO_LINK@57..78
+      AUTO_LINK_MARKER@57..58
+        AUTO_LINK_MARKER@57..58 "<"
+      TEXT@58..77 "foo@bar.example.com"
+      AUTO_LINK_MARKER@77..78
+        AUTO_LINK_MARKER@77..78 ">"
+    NEWLINE@78..79 "\n"

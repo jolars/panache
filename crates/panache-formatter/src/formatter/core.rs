@@ -951,8 +951,28 @@ impl Formatter {
                     }
                 }
 
-                // Output HTML block exactly as written
-                let text = node.text().to_string();
+                // Walk descendants and skip BLOCK_QUOTE_MARKER + the immediately
+                // following WHITESPACE; the parser keeps those tokens inside
+                // HTML_BLOCK_CONTENT for losslessness but the BLOCK_QUOTE
+                // handler is the source of truth for marker re-emission.
+                let mut text = String::new();
+                let mut skip_next_ws = false;
+                for el in node.descendants_with_tokens() {
+                    if let NodeOrToken::Token(t) = el {
+                        match t.kind() {
+                            SyntaxKind::BLOCK_QUOTE_MARKER => {
+                                skip_next_ws = true;
+                            }
+                            SyntaxKind::WHITESPACE if skip_next_ws => {
+                                skip_next_ws = false;
+                            }
+                            _ => {
+                                skip_next_ws = false;
+                                text.push_str(t.text());
+                            }
+                        }
+                    }
+                }
                 self.output.push_str(&text);
                 if !text.ends_with('\n') {
                     self.output.push('\n');
@@ -1244,6 +1264,27 @@ impl Formatter {
                                 &content_prefix,
                                 &blank_prefix,
                                 Some(&code_block_leading_indent),
+                            );
+                            if let Some(ctx) = self.blockquote_context.as_mut() {
+                                ctx.in_list_continuation = false;
+                            }
+                        }
+                        SyntaxKind::HTML_BLOCK => {
+                            // Format HTML block contents (BLOCK_QUOTE_MARKER tokens
+                            // are stripped by the HTML_BLOCK handler) and re-emit
+                            // the blockquote prefix per line so the output stays
+                            // lossless.
+                            let saved_output = self.output.clone();
+                            self.output.clear();
+                            self.format_node_sync(child, indent);
+                            let html_output = self.output.clone();
+                            self.output = saved_output;
+
+                            self.append_blockquote_prefixed_block(
+                                &html_output,
+                                &content_prefix,
+                                &blank_prefix,
+                                None,
                             );
                             if let Some(ctx) = self.blockquote_context.as_mut() {
                                 ctx.in_list_continuation = false;

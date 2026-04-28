@@ -4,7 +4,7 @@ use crate::parser::inlines::inline_html::{parse_close_tag, parse_open_tag};
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
-use super::blockquotes::count_blockquote_markers;
+use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
 use crate::parser::utils::helpers::{strip_leading_spaces, strip_newline};
 
 /// HTML block-level tags as defined by CommonMark spec.
@@ -295,16 +295,22 @@ pub(crate) fn parse_html_block(
     let first_line = lines[start_pos];
     let blank_terminated = ends_at_blank_line(&block_type);
 
+    // The block dispatcher has already emitted BLOCK_QUOTE_MARKER + WHITESPACE
+    // tokens for the first line's blockquote prefix; emit only the inner
+    // content as TEXT to keep the CST byte-equal to the source.
+    let first_inner = if bq_depth > 0 {
+        strip_n_blockquote_markers(first_line, bq_depth)
+    } else {
+        first_line
+    };
+
     // Emit opening line
     builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
 
-    // Split off trailing newline if present
-    let (line_without_newline, newline_str) = strip_newline(first_line);
-
+    let (line_without_newline, newline_str) = strip_newline(first_inner);
     if !line_without_newline.is_empty() {
         builder.token(SyntaxKind::TEXT.into(), line_without_newline);
     }
-
     if !newline_str.is_empty() {
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
@@ -314,7 +320,7 @@ pub(crate) fn parse_html_block(
     // Check if opening line also contains closing marker. Blank-line-terminated
     // blocks (CommonMark types 6 & 7) ignore inline close markers — they only
     // end at a blank line or end of input.
-    if !blank_terminated && is_closing_marker(first_line, &block_type) {
+    if !blank_terminated && is_closing_marker(first_inner, &block_type) {
         log::trace!(
             "HTML block at line {} opens and closes on same line",
             start_pos + 1
@@ -330,7 +336,7 @@ pub(crate) fn parse_html_block(
     // Parse content until we find the closing marker
     while current_pos < lines.len() {
         let line = lines[current_pos];
-        let (line_bq_depth, _inner_content) = count_blockquote_markers(line);
+        let (line_bq_depth, inner) = count_blockquote_markers(line);
 
         // Only process lines at the same or deeper blockquote depth
         if line_bq_depth < bq_depth {
@@ -339,53 +345,27 @@ pub(crate) fn parse_html_block(
 
         // Blank-line-terminated blocks (types 6/7) end before the blank line.
         // The blank line itself is not part of the block.
-        if blank_terminated {
-            // After stripping any container blockquote markers, the content
-            // is blank if it's only whitespace.
-            let (_, inner) = count_blockquote_markers(line);
-            if inner.trim().is_empty() {
-                break;
-            }
+        if blank_terminated && inner.trim().is_empty() {
+            break;
         }
 
-        // Check for closing marker
-        if is_closing_marker(line, &block_type) {
+        // Check for closing marker. Match against the inner content so a `>`-
+        // prefixed continuation line still recognises e.g. `</div>`.
+        if is_closing_marker(inner, &block_type) {
             log::trace!("Found HTML block closing at line {}", current_pos + 1);
             found_closing = true;
 
-            // Emit content
             if !content_lines.is_empty() {
                 builder.start_node(SyntaxKind::HTML_BLOCK_CONTENT.into());
                 for content_line in &content_lines {
-                    // Split off trailing newline if present
-                    let (line_without_newline, newline_str) = strip_newline(content_line);
-
-                    if !line_without_newline.is_empty() {
-                        builder.token(SyntaxKind::TEXT.into(), line_without_newline);
-                    }
-
-                    if !newline_str.is_empty() {
-                        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-                    }
+                    emit_html_block_line(builder, content_line, bq_depth);
                 }
-                builder.finish_node(); // HtmlBlockContent
+                builder.finish_node();
             }
 
-            // Emit closing line
             builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
-
-            // Split off trailing newline if present
-            let (line_without_newline, newline_str) = strip_newline(line);
-
-            if !line_without_newline.is_empty() {
-                builder.token(SyntaxKind::TEXT.into(), line_without_newline);
-            }
-
-            if !newline_str.is_empty() {
-                builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-            }
-
-            builder.finish_node(); // HtmlBlockTag
+            emit_html_block_line(builder, line, bq_depth);
+            builder.finish_node();
 
             current_pos += 1;
             break;
@@ -402,23 +382,45 @@ pub(crate) fn parse_html_block(
         if !content_lines.is_empty() {
             builder.start_node(SyntaxKind::HTML_BLOCK_CONTENT.into());
             for content_line in &content_lines {
-                // Split off trailing newline if present
-                let (line_without_newline, newline_str) = strip_newline(content_line);
-
-                if !line_without_newline.is_empty() {
-                    builder.token(SyntaxKind::TEXT.into(), line_without_newline);
-                }
-
-                if !newline_str.is_empty() {
-                    builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-                }
+                emit_html_block_line(builder, content_line, bq_depth);
             }
-            builder.finish_node(); // HtmlBlockContent
+            builder.finish_node();
         }
     }
 
     builder.finish_node(); // HtmlBlock
     current_pos
+}
+
+/// Emit one continuation line of an HTML block, preserving any blockquote
+/// markers as structural tokens (so the CST stays byte-equal to the source
+/// and downstream consumers can strip them per-context).
+fn emit_html_block_line(builder: &mut GreenNodeBuilder<'static>, line: &str, bq_depth: usize) {
+    let inner = if bq_depth > 0 {
+        let stripped = strip_n_blockquote_markers(line, bq_depth);
+        let prefix_len = line.len() - stripped.len();
+        if prefix_len > 0 {
+            for ch in line[..prefix_len].chars() {
+                if ch == '>' {
+                    builder.token(SyntaxKind::BLOCK_QUOTE_MARKER.into(), ">");
+                } else {
+                    let mut buf = [0u8; 4];
+                    builder.token(SyntaxKind::WHITESPACE.into(), ch.encode_utf8(&mut buf));
+                }
+            }
+        }
+        stripped
+    } else {
+        line
+    };
+
+    let (line_without_newline, newline_str) = strip_newline(inner);
+    if !line_without_newline.is_empty() {
+        builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+    }
+    if !newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+    }
 }
 
 #[cfg(test)]

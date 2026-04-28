@@ -463,6 +463,7 @@ fn code_block_content(node: &SyntaxNode) -> String {
     let is_fenced = node
         .children()
         .any(|c| c.kind() == SyntaxKind::CODE_FENCE_OPEN);
+    let bq_depth = blockquote_depth(node);
     let mut content = String::new();
     if is_fenced {
         // Per CommonMark §4.5: if the opening fence is indented, content lines
@@ -472,6 +473,11 @@ fn code_block_content(node: &SyntaxNode) -> String {
         for child in node.children() {
             if child.kind() == SyntaxKind::CODE_CONTENT {
                 let raw = child.text().to_string();
+                let raw = if bq_depth > 0 {
+                    strip_blockquote_prefix_per_line(&raw, bq_depth)
+                } else {
+                    raw
+                };
                 if opener_indent == 0 {
                     content.push_str(&raw);
                 } else {
@@ -496,6 +502,11 @@ fn code_block_content(node: &SyntaxNode) -> String {
         for child in node.children() {
             if child.kind() == SyntaxKind::CODE_CONTENT {
                 let raw = child.text().to_string();
+                let raw = if bq_depth > 0 {
+                    strip_blockquote_prefix_per_line(&raw, bq_depth)
+                } else {
+                    raw
+                };
                 for line in raw.split_inclusive('\n') {
                     if let Some(rest) = line.strip_prefix('\t') {
                         content.push_str(rest);
@@ -533,9 +544,65 @@ fn code_block_content(node: &SyntaxNode) -> String {
 
 fn render_html_block(node: &SyntaxNode, out: &mut String) {
     let text = node.text().to_string();
-    let trimmed = text.trim_end_matches('\n');
+    let depth = blockquote_depth(node);
+    let stripped = if depth > 0 {
+        strip_blockquote_prefix_per_line(&text, depth)
+    } else {
+        text
+    };
+    let trimmed = stripped.trim_end_matches('\n');
     out.push_str(trimmed);
     out.push('\n');
+}
+
+/// Count `BLOCK_QUOTE` ancestors so the renderer can strip the equivalent
+/// number of `> ` prefixes from raw block content (HTML blocks, code-block
+/// content). The parser preserves blockquote markers inside these nodes for
+/// losslessness; the spec output excludes them.
+fn blockquote_depth(node: &SyntaxNode) -> usize {
+    let mut depth = 0;
+    let mut current = node.parent();
+    while let Some(parent) = current {
+        if parent.kind() == SyntaxKind::BLOCK_QUOTE {
+            depth += 1;
+        }
+        current = parent.parent();
+    }
+    depth
+}
+
+fn strip_blockquote_prefix_per_line(text: &str, depth: usize) -> String {
+    let mut out = String::with_capacity(text.len());
+    for line in text.split_inclusive('\n') {
+        let (line_body, newline) = if let Some(stripped) = line.strip_suffix('\n') {
+            (stripped, "\n")
+        } else {
+            (line, "")
+        };
+        out.push_str(strip_blockquote_prefix(line_body, depth));
+        out.push_str(newline);
+    }
+    out
+}
+
+fn strip_blockquote_prefix(line: &str, depth: usize) -> &str {
+    let mut remaining = line;
+    for _ in 0..depth {
+        let bytes = remaining.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() && i < 3 && bytes[i] == b' ' {
+            i += 1;
+        }
+        if i >= bytes.len() || bytes[i] != b'>' {
+            break;
+        }
+        i += 1;
+        if i < bytes.len() && bytes[i] == b' ' {
+            i += 1;
+        }
+        remaining = &remaining[i..];
+    }
+    remaining
 }
 
 fn render_inlines(parent: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut String) {

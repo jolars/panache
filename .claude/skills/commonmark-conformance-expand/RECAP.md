@@ -13,171 +13,147 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-28 (i)
+## Latest session — 2026-04-28 (k)
 
-**Pass count: 458 → 475 / 652 (72.9%, +17)**
+**Pass count: 479 → 483 / 652 (74.1%, +4)**
 
-Targeted HTML blocks (the prior recap's #1 target), which had 17 failing
-examples driven by three shared root causes in §4.6 detection. Implementing
-all three under a single `Dialect::CommonMark` gate cleared 15 of those (the
-remaining 2 — #148, #174 — are renderer-shape gaps, not detection gaps),
-plus two incidental unlocks via type-7 inline raw HTML on a line by itself
-(#21 in Backslash escapes, #31 in Entity references).
+Targeted the prior recap's #3 group: HR-interrupts-paragraph in containers
+(#234, #246, plus the list variants #57, #60, #61). The two blockquote cases
+(#234 setext-underline-crosses-blockquote, #246 lazy-paragraph-not-interrupted-
+by-HR) shared a single root cause: the parser was letting paragraph
+continuation rules cross blockquote boundaries. Two small dialect-gated checks
+fix both, and they incidentally unlock #92 and #101 (same setext-underline
+shape with different inputs). The list cases (#57, #60, #61) need separate
+parser surgery in the LIST/HR interaction and were intentionally deferred —
+see "Don't redo" for the trap.
 
 ### Targets and root causes
 
-- **HTML blocks #151, #152, #155, #161, #166, #167, #186, #188, #190, #191
-  (10)** — type 6 end condition: under CommonMark, type-6 blocks end at a
-  blank line, not at a matching `</tag>`. The legacy implementation treated
-  any block-tag start as "open until matching close tag", so `<div>...</div>`
-  on consecutive lines was always one block and `<div>\n\n*md*\n\n</div>`
-  was wrapped as one HTML block instead of HTML / paragraph / HTML. Fix:
-  `closed_by_blank_line` flag on the `BlockTag` variant, set true when the
-  dialect is CommonMark and the tag is non-verbatim.
-- **HTML blocks #151, #165 (2)** — type 6 also accepts a *closing* tag
-  (`</div>`, `</ins>`) at the start of the block line. The legacy tag-name
-  extractor rejected `</...` outright. Fix: `extract_block_tag_name` now
-  accepts the closing form when `accept_closing` (CommonMark) is true.
-- **HTML blocks #162, #163, #164, #165, #166, #167, #184 (7)** — type 7
-  detection was missing entirely: a complete open or close tag whose name
-  isn't in the type-1 verbatim list, on a line by itself, opens a block
-  that ends at a blank line. Reused the existing inline-HTML
-  `parse_open_tag` / `parse_close_tag` recognizers (made `pub(crate)`)
-  and added a tail-only-whitespace check, plus a "tag-name is not pre /
-  script / style / textarea" guard so the type-1 starts above keep
-  priority. Type 7 is the only HTML-block type that **cannot** interrupt
-  a paragraph — wired in the dispatcher by returning `None` (instead of
-  `YesCanInterrupt`) when no blank line precedes a Type7 candidate.
-- **Backslash escapes #21, Entity references #31 (2 incidental)** —
-  `<a href="\*">` and `<a href="&ouml;...">` are now type-7 HTML blocks
-  on a line by itself. Renderer emits the verbatim bytes (no escape /
-  entity decoding, same as inline raw HTML) and that matches spec
-  expected output. No special handling needed.
-
-  Verified with pandoc: `pandoc -f commonmark -t native` and
-  `pandoc -f markdown -t native` disagree on every probed case (Pandoc-
-  markdown turns `<DIV>` into a fenced div, sees `</div>` as a paragraph,
-  treats `<a href="x">` as inline raw HTML in a paragraph), so this is a
-  **dialect divergence**. The new behavior is gated on
-  `config.dialect == Dialect::CommonMark`; Pandoc keeps the legacy
-  matching-close-tag semantics for type 6 and rejects type-7 starts.
+- **Block quotes #234, Setext headings #92, #101 (3)** — setext-underline-
+  crosses-blockquote-boundary. `> foo\n---\n` was being parsed as a blockquote
+  containing a setext H2 (with `> foo` as the heading text). CommonMark §4.3
+  requires the underline to be in the same container as the text — the
+  underline at depth 0 cannot underline a paragraph at depth 1. Fix:
+  `SetextHeadingParser::detect_prepared` now rejects when
+  `count_blockquote_markers(next_line).0 != ctx.blockquote_depth`, gated on
+  `Dialect::CommonMark`. Pandoc keeps the historical behavior (Pandoc actually
+  treats `> foo\n---\n` as a top-level setext H2 with text `> foo` — neither
+  matches CommonMark, but Pandoc's pre-existing behavior is its own thing).
+- **Block quotes #246 (1)** — HR doesn't interrupt lazy paragraph
+  continuation. `> aaa\n***\n> bbb\n` was being collapsed into a single
+  blockquote paragraph because lazy continuation appended `***` as plain
+  paragraph text instead of recognizing it as a thematic break. Per
+  CommonMark §5.1, lazy continuation only applies if the line wouldn't
+  otherwise be parsed as a different block. Fix: in `core.rs` lazy paragraph
+  continuation path (the `bq_depth < current_bq_depth && bq_depth == 0`
+  branch, around line 1416), skip the `append_paragraph_line` and fall
+  through to normal close+dispatch when `try_parse_horizontal_rule(line)`
+  matches, gated on `Dialect::CommonMark`. The fall-through then closes the
+  paragraph + blockquote and the regular dispatch emits the HR.
 
 ### Files changed
 
-- **Parser (dialect divergence + missing feature)**:
-  - `crates/panache-parser/src/parser/blocks/html_blocks.rs` —
-    `HtmlBlockType` gained a `closed_by_blank_line` field on `BlockTag`
-    and a new `Type7` variant. `try_parse_html_block_start` now takes
-    `is_commonmark: bool`; under CommonMark it accepts closing-tag
-    starts for type 6 and matches type 7 via the inline-HTML
-    open/close recognizers. `parse_html_block` short-circuits the
-    matching-close-tag scan for blank-line-terminated types and
-    instead breaks at the first blank line (after stripping any
-    blockquote markers, so types 6/7 inside `> ` end correctly when
-    the blockquote ends).
-  - `crates/panache-parser/src/parser/inlines/inline_html.rs` —
-    `parse_open_tag` and `parse_close_tag` are now `pub(crate)` so
-    the HTML-block recognizer can reuse the §6.6 grammar without
-    duplicating attribute/quote logic.
-  - `crates/panache-parser/src/parser/block_dispatcher.rs` — passes
-    the new `is_commonmark` flag, and gates Type7 to "cannot
-    interrupt a paragraph" by returning `None` when there's no blank
-    line before.
-  - `crates/panache-parser/src/parser/utils/continuation.rs` — pass
-    the dialect flag to `try_parse_html_block_start` from the
-    paragraph-continuation check (this is the lookahead that decides
-    whether a paragraph line is interruptible).
+- **Parser (dialect divergence × 2)**:
+  - `crates/panache-parser/src/parser/block_dispatcher.rs` —
+    `SetextHeadingParser::detect_prepared` adds the container-depth gate
+    described above.
+  - `crates/panache-parser/src/parser/core.rs` — lazy paragraph
+    continuation in the close-blockquote branch checks
+    `try_parse_horizontal_rule` first under CommonMark; on match it skips
+    the lazy append so the line dispatches as an HR after the blockquote
+    closes. New import:
+    `use super::blocks::horizontal_rules::try_parse_horizontal_rule;`.
 - **Parser fixtures (paired CST snapshots via insta)**:
-  - `crates/panache-parser/tests/fixtures/cases/html_block_commonmark_type6_type7_{commonmark,pandoc}/`
-    pin the divergent CST shape for an input that exercises type-6
-    blank-line termination, `</tag>` start, type-7 open/close, and
-    type-6 with internal markdown-paragraph between blank lines.
-    Registered in `crates/panache-parser/tests/golden_parser_cases.rs`.
-- **Formatter golden**:
-  - `tests/fixtures/cases/html_block_commonmark_type6_type7/` —
-    `flavor = "commonmark"`. Same input as the parser fixture; expected
-    output is byte-identical (HTML blocks emit verbatim and round-trip
-    cleanly under the new shape). Different block sequence than
-    Pandoc-default (where `</div>` and `<a>` collapse into paragraphs
-    with inline raw HTML and reflowed lines), so a dedicated CommonMark
-    case is needed. Registered in `tests/golden_cases.rs`.
+  - `crates/panache-parser/tests/fixtures/cases/setext_underline_crosses_blockquote_commonmark/`
+    pins the new shape: `BLOCK_QUOTE > PARAGRAPH("foo")` followed by
+    `HORIZONTAL_RULE`. **No paired Pandoc fixture** — Pandoc's parse of the
+    same input hits a pre-existing losslessness bug (HEADING_CONTENT TEXT
+    contains the literal `> foo`, and the BLOCK_QUOTE wrapper has already
+    emitted its marker, so the CST text becomes `> > foo\n---\n`). That bug
+    is its own session; do not fix it as a side effect here.
+  - `crates/panache-parser/tests/fixtures/cases/hr_interrupts_lazy_blockquote_paragraph_{commonmark,pandoc}/`
+    pin the divergent CST: under CommonMark the `***` line is a top-level
+    `HORIZONTAL_RULE` between two `BLOCK_QUOTE` nodes; under Pandoc all
+    three lines collapse into one `BLOCK_QUOTE > PARAGRAPH` (the `> bbb`
+    line's marker becomes a `BLOCK_QUOTE_MARKER` token *inside* the
+    paragraph, courtesy of Pandoc's lazy-continuation semantics).
+  - All three registered in
+    `crates/panache-parser/tests/golden_parser_cases.rs`.
+- **Formatter goldens**: none. Verified that the formatter output for
+  `> foo\n---\n` under both dialects is byte-identical (`> foo\n\n` + 80-dash
+  HR), even though the CSTs diverge — Pandoc's setext-in-blockquote
+  formatter path coincidentally renders the same two-block sequence the
+  CommonMark parser produces structurally. Per the formatter rule, no
+  paired CommonMark golden is needed when output matches.
 - **Allowlist additions**: `tests/commonmark/allowlist.txt`
-  - Backslash escapes: +#21
-  - Entity and numeric character references: +#31
-  - HTML blocks: +#151, +#152, +#155, +#161, +#162, +#163, +#164, +#165,
-    +#166, +#167, +#184, +#186, +#188, +#190, +#191
+  - Block quotes: +#234, +#246
+  - Setext headings: +#92, +#101
 
 ### Don't redo
 
-- The CommonMark dialect gate is load-bearing for both call sites
-  (`block_dispatcher` and `continuation`). The continuation lookahead has
-  to use the same dialect flag, otherwise paragraphs swallow lines that
-  should start a fresh HTML block. Don't drop one and keep the other.
-- `closed_by_blank_line` is set on the `BlockTag` payload at *detection*
-  time and read inside `parse_html_block`. Don't compute it from
-  `is_verbatim` alone — the same `is_verbatim: false` BlockTag means
-  different things under CommonMark vs Pandoc, which is exactly what the
-  flag captures.
-- The Type 7 recognizer rejects when the tag name is in the type-1
-  verbatim set (`pre`/`script`/`style`/`textarea`). Don't drop that guard
-  — without it, an opening `<pre/>` (self-closing) on a line by itself
-  would be detected as type 7 and end at a blank line, but the *type-1*
-  start condition for `<pre` (substring match, no full-tag requirement)
-  would normally have grabbed it first. Keeping the guard means a
-  surprising self-closing pre falls through to type 7 cleanly.
-- The blank-line check inside `parse_html_block` strips blockquote
-  markers via `count_blockquote_markers` before testing the inner
-  content. This is intentional: a `>` line with only whitespace after
-  the marker is a blank line *inside the blockquote* and ends a type-6
-  block there, not at the outer document level.
-- #148 (`<table><tr><td>\n<pre>\n**Hello**,\n\n_world_.\n</pre>\n...`)
-  is **not** unlocked by this work. Expected output requires the
-  paragraph that starts at `_world_.` to be wrapped `<p>...</p>` and
-  the `</pre></p></td></tr></table>` tail to be emitted as raw text
-  from the same HTML block. Our renderer wraps the paragraph correctly
-  but the HTML block boundary detection consumes the trailing `</pre>`
-  + table close lines as part of the block, and the renderer emits
-  them on separate lines. This is a renderer-shape interaction with
-  type 1 (`<pre>`) embedded inside type 6 (`<table>`); the spec's
-  expected HTML is genuinely odd and worth tackling as its own micro-
-  task, not bundled into the bulk fix.
-- #174 (`> <div>\n> foo\n\nbar`) is a **renderer gap**, not a detection
-  gap. The parser correctly closes the type-6 HTML block at the blank
-  line after stripping blockquote markers. But the rendered HTML block
-  text still contains the literal `> ` prefix on each content line
-  because the renderer prints `node.text()` verbatim. Same shape as the
-  blockquote-prefix bug from the prior session's #128 follow-up. Fix
-  lives in `render_html_block` in
-  `crates/panache-parser/tests/commonmark/html_renderer.rs`: strip the
-  blockquote marker prefix when rendering an HTML block whose
-  containing context includes one. See #128 don't-redo from session (g).
+- The setext container-depth gate uses `count_blockquote_markers(next_line).0`
+  (the *raw* depth from the next line bytes), compared against
+  `ctx.blockquote_depth` (the *active container* depth from the parser
+  stack). These are equal only when the underline line has the same
+  blockquote prefix shape as the text line. Don't accidentally compare to
+  `ctx.content`'s depth (it's already stripped) or to the raw text-line
+  depth (the dispatcher has already consumed those markers from the
+  current line by the time `detect_prepared` runs).
+- The HR-interrupts-lazy gate currently checks *only* horizontal rules.
+  Per CommonMark §5.1, the full set of paragraph-interrupting blocks
+  (ATX heading, fenced code, blockquote start, list-item with non-empty
+  marker content, HR) all *should* break lazy continuation. We only added
+  HR because that's what the targets exercise; expanding the check is the
+  natural follow-up. Don't generalize prematurely without a failing-spec
+  example to anchor each addition — it's easy to over-interrupt and
+  regress Pandoc-flavored docs.
+- #57, #60, #61 (list HR interactions) are **not** unlocked by this work
+  and are *deeper* than the lazy-continuation fix:
+  - #57/#60: parser correctly recognizes `***` as HR, but emits it
+    *inside* the open list item rather than closing the list. The fix
+    is in the LIST item-content dispatch, not the lazy-paragraph path.
+  - #61: parser sees `- * * *` as a new list item with text `* * *`
+    rather than as a list item containing an HR. The HR detection
+    needs to fire on item content, which currently goes straight to
+    paragraph/PLAIN.
+  Both require touching LIST_ITEM emission — different code path.
+- Pandoc has a pre-existing losslessness bug for setext heading inside
+  blockquote (`> foo\n---\n` parses to a BLOCK_QUOTE containing a HEADING
+  whose HEADING_CONTENT TEXT contains `> foo`, double-counting the marker
+  bytes). Same shape as the HTML-block-in-blockquote bug fixed in session
+  (j); the fix would mirror `parse_html_block`'s
+  `strip_n_blockquote_markers` + `emit_html_block_line` pattern, but this
+  time in the setext heading emission. Out of scope for HR work.
 
 ### Suggested next targets, ranked
 
-1. **Lists (5/21) + List items (17/31)** — biggest absolute pass-rate
-   gap (52 fails). Shares root causes with thematic-break #57, #60, #61
-   (HR-interrupts-list) and blockquote #234, #246 (HR-interrupts-
-   blockquote). #115 (Indented code blocks) chains on the same
-   paragraph-vs-block-interruption refactor. High leverage but bigger
-   surgery than HTML blocks.
-2. **Emphasis and strong emphasis (85/47)** — largest remaining absolute
-   failure count; flanking-rule and autolink-precedence edge cases
-   (#480, #481 are autolink-vs-emphasis precedence).
-3. **#128 (Block quotes / fenced code in blockquote)** + **#174 (HTML
-   block in blockquote)** — both are the same renderer-prefix-stripping
-   gap. One small fix in `html_renderer.rs` should unlock both, plus
-   any similar containment cases.
-4. **Link reference definitions (15/12)** — #194 (label with `\]`),
-   #195 (multiline title), #196, #198 (multiline destination), #208,
-   #213, #216, #217: the LRD parser currently captures the whole line(s)
-   as raw TEXT instead of structured nodes. Bigger refactor.
-5. **Tabs (6/5)** — #2, #4, #5, #6, #7 all need tab→space expansion
-   with column alignment in indented-code, list, and blockquote
-   contexts. Spec §2.2. One shared fix across most of these.
-6. **Setext heading multi-line content (#81, #82, #95)** + **#115
-   (`# Heading\n    foo`)** — paragraph parser refactor: needs to
-   recognize indented-code-after-heading without a blank line, plus
-   retroactive setext conversion of accumulated paragraph lines. These
-   are interrelated.
-7. **#148 (HTML blocks)** — the `<table>` containing `<pre>` containing
-   markdown paragraph; renderer interaction. One-off, low priority.
+1. **Lists HR interaction (#57, #60, #61)** — three failing examples in
+   §Thematic breaks, all involving HR inside a list. Different code
+   paths from the lazy-paragraph fix above. #57 / #60 need the HR
+   detection to close the list (not just the item); #61 needs HR
+   detection inside list-item content. Likely a single session, fixes
+   the three plus possibly a few more in §Lists / §List items.
+2. **Lists (5/21) + List items (17/31)** — biggest absolute pass-rate
+   gap (52 fails). Some will fall to the #1 fix above; the rest need
+   separate looks at list-item paragraph parsing, loose vs tight, and
+   indented continuation.
+3. **Emphasis and strong emphasis (85/47)** — largest remaining
+   absolute failure count; flanking-rule and autolink-precedence edge
+   cases (#480, #481 are autolink-vs-emphasis precedence).
+4. **Generalize the lazy-continuation interrupter check** — currently
+   only HR breaks lazy paragraph continuation. ATX heading, fenced
+   code, blockquote-start, and list-marker-with-content should also.
+   Each needs a failing-spec example to anchor it; check report.txt
+   for §Block quotes failures that look like
+   `> para\n# heading\n` shapes.
+5. **Tabs (5 fails)** — #2, #4, #5, #6, #7 all need tab→space
+   expansion with column alignment. Mechanical but its own session.
+6. **Link reference definitions (12 fails)** — bigger refactor;
+   currently captures whole line(s) as raw TEXT.
+7. **Setext heading multi-line content (#81, #82, #95)** + **#115**.
+8. **Pandoc setext-in-blockquote losslessness** — pre-existing parser
+   bug surfaced while writing fixtures this session. Not a spec
+   unlock, but worth fixing for correctness; mirrors the
+   `parse_html_block` fix from session (j).
+9. **#342 (code-span/link precedence)**, **#148 (table-pre nesting)** —
+   one-offs.

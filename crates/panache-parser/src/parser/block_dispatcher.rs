@@ -2091,6 +2091,19 @@ impl BlockParser for SetextHeadingParser {
             {
                 return None;
             }
+            // CommonMark §4.3: the underline must be in the same container as
+            // the text. If the text line is inside a blockquote (or nested
+            // blockquotes) and the underline line is at a shallower depth,
+            // the construct can't be a setext heading — the underline closes
+            // the blockquote and (for `---` after a non-empty paragraph)
+            // becomes a thematic break instead. Pandoc disagrees: it treats
+            // `> foo\n---\n` as a top-level setext H2 with text `> foo`, so
+            // gate on dialect.
+            if ctx.config.dialect == crate::options::Dialect::CommonMark
+                && count_blockquote_markers(next_line).0 != ctx.blockquote_depth
+            {
+                return None;
+            }
             Some((BlockDetectionResult::Yes, None))
         } else {
             None

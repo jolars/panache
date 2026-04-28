@@ -168,39 +168,131 @@ pub fn emit_inline_image(
 
 /// Try to parse an automatic link starting at the current position.
 ///
-/// Automatic links have the form `<url>` or `<email@example.com>`.
-/// Returns Some((length, url_content)) if a valid automatic link is found.
-pub fn try_parse_autolink(text: &str) -> Option<(usize, &str)> {
+/// Automatic links have the form `<url>` (URI autolink) or `<email>`
+/// (email autolink) per CommonMark §6.4. Under `Dialect::CommonMark` the
+/// scheme/email grammar is enforced strictly (e.g. scheme must be 2-32
+/// ASCII chars; email local parts cannot contain backslashes). Pandoc
+/// markdown is laxer — it accepts Unicode in email addresses, for
+/// example — so non-CommonMark callers fall back to the heuristic
+/// "contains `:` or `@`" check that the parser used historically.
+pub fn try_parse_autolink(text: &str, is_commonmark: bool) -> Option<(usize, &str)> {
     if !text.starts_with('<') {
         return None;
     }
 
-    // Find the closing >
     let close_pos = text[1..].find('>')?;
     let content = &text[1..1 + close_pos];
 
-    // Automatic links cannot contain spaces or newlines
+    if content.is_empty() {
+        return None;
+    }
     if content.contains(|c: char| c.is_whitespace()) {
         return None;
     }
 
-    // Must contain at least one character
-    if content.is_empty() {
+    if is_commonmark {
+        if !is_valid_uri_autolink(content) && !is_valid_email_autolink(content) {
+            return None;
+        }
+    } else if !content.contains(':') && !content.contains('@') {
         return None;
     }
 
-    // Basic validation: should look like a URL or email
-    // URL: contains :// or starts with scheme:
-    // Email: contains @
-    let is_url = content.contains("://") || content.contains(':');
-    let is_email = content.contains('@');
-
-    if !is_url && !is_email {
-        return None;
-    }
-
-    // Total length includes < and >
     Some((close_pos + 2, content))
+}
+
+/// CommonMark §6.4 URI autolink:
+/// scheme = 2-32 chars, ASCII letter then `[a-zA-Z0-9+.-]`, followed by `:`,
+/// followed by URI body (any char except control, space, `<`, `>`).
+fn is_valid_uri_autolink(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    if bytes.is_empty() || !bytes[0].is_ascii_alphabetic() {
+        return false;
+    }
+    let mut i = 1;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b.is_ascii_alphanumeric() || b == b'+' || b == b'-' || b == b'.' {
+            i += 1;
+        } else {
+            break;
+        }
+    }
+    if !(2..=32).contains(&i) {
+        return false;
+    }
+    if i >= bytes.len() || bytes[i] != b':' {
+        return false;
+    }
+    for &b in &bytes[i + 1..] {
+        if b < 0x20 || b == 0x7f || b == b'<' || b == b'>' {
+            return false;
+        }
+    }
+    true
+}
+
+/// CommonMark §6.4 email autolink, matching the HTML5 non-normative regex:
+/// `^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?
+///  (?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$`.
+fn is_valid_email_autolink(s: &str) -> bool {
+    let Some(at) = s.find('@') else {
+        return false;
+    };
+    let local = &s[..at];
+    let domain = &s[at + 1..];
+    if local.is_empty() || !local.bytes().all(is_email_local_byte) {
+        return false;
+    }
+    if domain.is_empty() {
+        return false;
+    }
+    domain.split('.').all(is_valid_email_label)
+}
+
+fn is_email_local_byte(b: u8) -> bool {
+    matches!(
+        b,
+        b'a'..=b'z'
+            | b'A'..=b'Z'
+            | b'0'..=b'9'
+            | b'.'
+            | b'!'
+            | b'#'
+            | b'$'
+            | b'%'
+            | b'&'
+            | b'\''
+            | b'*'
+            | b'+'
+            | b'/'
+            | b'='
+            | b'?'
+            | b'^'
+            | b'_'
+            | b'`'
+            | b'{'
+            | b'|'
+            | b'}'
+            | b'~'
+            | b'-'
+    )
+}
+
+fn is_valid_email_label(label: &str) -> bool {
+    let bytes = label.as_bytes();
+    if bytes.is_empty() || bytes.len() > 63 {
+        return false;
+    }
+    if !bytes[0].is_ascii_alphanumeric() {
+        return false;
+    }
+    if !bytes[bytes.len() - 1].is_ascii_alphanumeric() {
+        return false;
+    }
+    bytes[1..bytes.len() - 1]
+        .iter()
+        .all(|b| b.is_ascii_alphanumeric() || *b == b'-')
 }
 
 /// Emit an automatic link node to the builder.
@@ -864,36 +956,67 @@ mod tests {
     #[test]
     fn test_parse_autolink_url() {
         let input = "<https://example.com>";
-        let result = try_parse_autolink(input);
-        assert_eq!(result, Some((21, "https://example.com")));
+        assert_eq!(
+            try_parse_autolink(input, false),
+            Some((21, "https://example.com"))
+        );
+        assert_eq!(
+            try_parse_autolink(input, true),
+            Some((21, "https://example.com"))
+        );
     }
 
     #[test]
     fn test_parse_autolink_email() {
         let input = "<user@example.com>";
-        let result = try_parse_autolink(input);
-        assert_eq!(result, Some((18, "user@example.com")));
+        assert_eq!(
+            try_parse_autolink(input, false),
+            Some((18, "user@example.com"))
+        );
+        assert_eq!(
+            try_parse_autolink(input, true),
+            Some((18, "user@example.com"))
+        );
     }
 
     #[test]
     fn test_parse_autolink_no_close() {
         let input = "<https://example.com";
-        let result = try_parse_autolink(input);
-        assert_eq!(result, None);
+        assert_eq!(try_parse_autolink(input, false), None);
+        assert_eq!(try_parse_autolink(input, true), None);
     }
 
     #[test]
     fn test_parse_autolink_with_space() {
         let input = "<https://example.com >";
-        let result = try_parse_autolink(input);
-        assert_eq!(result, None);
+        assert_eq!(try_parse_autolink(input, false), None);
+        assert_eq!(try_parse_autolink(input, true), None);
     }
 
     #[test]
     fn test_parse_autolink_not_url_or_email() {
         let input = "<notaurl>";
-        let result = try_parse_autolink(input);
-        assert_eq!(result, None);
+        assert_eq!(try_parse_autolink(input, false), None);
+        assert_eq!(try_parse_autolink(input, true), None);
+    }
+
+    #[test]
+    fn test_parse_autolink_commonmark_strict_scheme() {
+        // Scheme too short (1 char) — invalid under CommonMark, lax-accepted
+        // under Pandoc dialect (matches historical behavior).
+        let input = "<m:abc>";
+        assert_eq!(try_parse_autolink(input, true), None);
+        assert_eq!(try_parse_autolink(input, false), Some((7, "m:abc")));
+    }
+
+    #[test]
+    fn test_parse_autolink_commonmark_email_disallows_backslash() {
+        let input = "<foo\\+@bar.example.com>";
+        assert_eq!(try_parse_autolink(input, true), None);
+        assert_eq!(
+            try_parse_autolink(input, false),
+            Some((23, "foo\\+@bar.example.com"))
+        );
     }
 
     #[test]

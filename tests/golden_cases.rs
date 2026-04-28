@@ -155,6 +155,7 @@ golden_test_cases!(
     alerts_disabled,
     blankline_concatenation,
     blockquote_depth_change,
+    blockquote_html_block,
     blockquote_list_blanks,
     blockquote_list_blockquote,
     blockquotes,

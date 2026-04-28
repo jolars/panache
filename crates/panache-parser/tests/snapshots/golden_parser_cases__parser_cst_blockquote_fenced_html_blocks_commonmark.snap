@@ -1,0 +1,35 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..33
+  BLOCK_QUOTE@0..18
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    CODE_BLOCK@2..18
+      CODE_FENCE_OPEN@2..6
+        CODE_FENCE_MARKER@2..5 "```"
+        NEWLINE@5..6 "\n"
+      CODE_CONTENT@6..18
+        BLOCK_QUOTE_MARKER@6..7 ">"
+        WHITESPACE@7..8 " "
+        TEXT@8..11 "aaa"
+        NEWLINE@11..12 "\n"
+        BLOCK_QUOTE_MARKER@12..13 ">"
+        WHITESPACE@13..14 " "
+        TEXT@14..17 "bbb"
+        NEWLINE@17..18 "\n"
+  BLANK_LINE@18..19
+    BLANK_LINE@18..19 "\n"
+  BLOCK_QUOTE@19..33
+    BLOCK_QUOTE_MARKER@19..20 ">"
+    WHITESPACE@20..21 " "
+    HTML_BLOCK@21..33
+      HTML_BLOCK_TAG@21..27
+        TEXT@21..26 "<div>"
+        NEWLINE@26..27 "\n"
+      HTML_BLOCK_CONTENT@27..33
+        BLOCK_QUOTE_MARKER@27..28 ">"
+        WHITESPACE@28..29 " "
+        TEXT@29..32 "foo"
+        NEWLINE@32..33 "\n"

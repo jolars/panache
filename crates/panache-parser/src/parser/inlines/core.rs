@@ -1596,7 +1596,10 @@ fn parse_inline_range_impl(
         // Try autolinks: <url> or <email>
         if byte == b'<'
             && config.extensions.autolinks
-            && let Some((len, url)) = try_parse_autolink(&text[pos..])
+            && let Some((len, url)) = try_parse_autolink(
+                &text[pos..],
+                config.dialect == crate::options::Dialect::CommonMark,
+            )
         {
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);

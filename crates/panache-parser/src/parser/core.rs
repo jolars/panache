@@ -11,6 +11,7 @@ use super::blocks::code_blocks;
 use super::blocks::definition_lists;
 use super::blocks::fenced_divs;
 use super::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
+use super::blocks::horizontal_rules::try_parse_horizontal_rule;
 use super::blocks::line_blocks;
 use super::blocks::lists;
 use super::blocks::paragraphs;
@@ -1414,14 +1415,25 @@ impl<'a> Parser<'a> {
             if bq_depth == 0 {
                 // Check for lazy paragraph continuation
                 if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                    paragraphs::append_paragraph_line(
-                        &mut self.containers,
-                        &mut self.builder,
-                        line,
-                        self.config,
-                    );
-                    self.pos += 1;
-                    return true;
+                    // CommonMark §5.1: lazy continuation does *not* fire if
+                    // the line would itself be a paragraph-interrupting block
+                    // (e.g. a thematic break) — instead the paragraph closes,
+                    // any open blockquotes close, and the line opens that
+                    // block at the outer level. Pandoc keeps the lazy text
+                    // append in this case.
+                    let is_commonmark = self.config.dialect == crate::options::Dialect::CommonMark;
+                    let interrupts_via_hr =
+                        is_commonmark && try_parse_horizontal_rule(line).is_some();
+                    if !interrupts_via_hr {
+                        paragraphs::append_paragraph_line(
+                            &mut self.containers,
+                            &mut self.builder,
+                            line,
+                            self.config,
+                        );
+                        self.pos += 1;
+                        return true;
+                    }
                 }
 
                 // Check for lazy list continuation - if we're in a list item and
