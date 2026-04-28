@@ -189,3 +189,5 @@ FRK4
 DFF7
 # Comment line inside a multi-line flow sequence is dropped from projected scalar text.
 7TMG
+# Flow map with URL-like plain value (`http://foo.com`) — colon needs whitespace to split.
+4ABK

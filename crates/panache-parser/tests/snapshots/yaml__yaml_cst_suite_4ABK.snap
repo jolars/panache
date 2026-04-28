@@ -1,0 +1,40 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: 4ABK
+input: "{\nunquoted : \"separate\",\nhttp://foo.com,\nomitted value:,\n}\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..59
+  YAML_METADATA_CONTENT@0..59
+    YAML_STREAM@0..59
+      YAML_DOCUMENT@0..59
+        YAML_BLOCK_MAP@0..59
+          YAML_FLOW_MAP@0..58
+            YAML_SCALAR@0..1 "{"
+            YAML_SCALAR@1..2 "\n"
+            YAML_FLOW_MAP_ENTRY@2..23
+              YAML_FLOW_MAP_KEY@2..12
+                YAML_KEY@2..11 "unquoted "
+                YAML_COLON@11..12 ":"
+              YAML_FLOW_MAP_VALUE@12..23
+                YAML_SCALAR@12..23 " \"separate\""
+            YAML_SCALAR@23..24 ","
+            YAML_SCALAR@24..25 "\n"
+            YAML_FLOW_MAP_ENTRY@25..39
+              YAML_FLOW_MAP_KEY@25..39
+                YAML_SCALAR@25..39 "http://foo.com"
+              YAML_FLOW_MAP_VALUE@39..39
+            YAML_SCALAR@39..40 ","
+            YAML_SCALAR@40..41 "\n"
+            YAML_FLOW_MAP_ENTRY@41..55
+              YAML_FLOW_MAP_KEY@41..55
+                YAML_KEY@41..54 "omitted value"
+                YAML_COLON@54..55 ":"
+              YAML_FLOW_MAP_VALUE@55..55
+            YAML_SCALAR@55..56 ","
+            YAML_SCALAR@56..57 "\n"
+            YAML_SCALAR@57..58 "}"
+          NEWLINE@58..59 "\n"

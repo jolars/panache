@@ -1,7 +1,7 @@
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
-use super::lexer::{lex_mapping_tokens_with_diagnostic, split_once_unquoted};
+use super::lexer::{lex_mapping_tokens_with_diagnostic, split_once_unquoted_key_colon};
 use super::model::{
     ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
     YamlParseReport, YamlToken, YamlTokenSpan, diagnostic_codes,
@@ -325,7 +325,7 @@ fn emit_flow_map_entry<'a>(
                 | YamlToken::Anchor
                 | YamlToken::Alias => break,
                 YamlToken::Scalar => {
-                    if split_once_unquoted(tokens[j].text, ':').is_some() {
+                    if split_once_unquoted_key_colon(tokens[j].text).is_some() {
                         found = Some(j);
                         break;
                     }
@@ -347,7 +347,7 @@ fn emit_flow_map_entry<'a>(
         }
         let scalar = tokens[target];
         *i += 1;
-        let (key_text, rest_text) = split_once_unquoted(scalar.text, ':')
+        let (key_text, rest_text) = split_once_unquoted_key_colon(scalar.text)
             .expect("implicit-key scan promised a colon in this scalar");
         if !key_text.is_empty() {
             builder.token(SyntaxKind::YAML_KEY.into(), key_text);

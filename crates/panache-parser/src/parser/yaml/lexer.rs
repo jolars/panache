@@ -70,6 +70,35 @@ pub(crate) fn split_once_unquoted(text: &str, separator: char) -> Option<(&str, 
     Some((&text[..idx], &text[rhs_start..]))
 }
 
+/// Like [`split_once_unquoted`] for `:`, but only matches a colon that is a
+/// valid YAML key/value separator: after a *plain* implicit key the colon
+/// must be followed by whitespace, EOL, or a flow-collection terminator
+/// (`,`, `}`, `]`). After a *quoted* implicit key (closing `"` or `'`
+/// immediately precedes the colon) any following character is permitted, so
+/// `"key"::value` still splits at the first colon. Protects URL-like plain
+/// scalars (`http://foo`) from being mis-split as `key:value` pairs.
+pub(crate) fn split_once_unquoted_key_colon(text: &str) -> Option<(&str, &str)> {
+    let mut state = LexerState::default();
+    let mut search_from = 0usize;
+    while let Some(rel) = find_unquoted_char_with_state(&text[search_from..], ':', &mut state) {
+        let idx = search_from + rel;
+        let after = idx + ':'.len_utf8();
+        let prev = text[..idx].chars().next_back();
+        let next = text[after..].chars().next();
+        let after_quoted_key = matches!(prev, Some('"' | '\''));
+        let is_separator = after_quoted_key
+            || match next {
+                None => true,
+                Some(c) => c.is_whitespace() || matches!(c, ',' | '}' | ']'),
+            };
+        if is_separator {
+            return Some((&text[..idx], &text[after..]));
+        }
+        search_from = after;
+    }
+    None
+}
+
 fn parse_raw_mapping_line(line: &str) -> Option<(&str, &str)> {
     let (raw_key, raw_value) = split_once_unquoted(line, ':')?;
     if raw_key.trim().is_empty() || raw_value.trim().is_empty() {
