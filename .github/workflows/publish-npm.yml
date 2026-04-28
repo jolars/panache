@@ -151,7 +151,8 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
-      - run: npm --version
+      - name: Upgrade npm (OIDC trusted publishing requires >=11.5.1)
+        run: npm install -g npm@latest
 
       - name: Download binary
         uses: actions/download-artifact@v6
@@ -164,8 +165,6 @@ jobs:
         run: |
           version=$(node -p "require('./npm/panache-cli/package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - run: npm --version
 
       - name: Assemble package
         run: |
@@ -232,10 +231,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
+
+      - name: Upgrade npm (OIDC trusted publishing requires >=11.5.1)
+        run: npm install -g npm@latest
 
       - name: Assemble main package
         run: |
