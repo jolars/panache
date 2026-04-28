@@ -21,6 +21,32 @@ specific failing spec example, or pick "the next best section" to work on.
 - The renderer at `crates/panache-parser/tests/commonmark/html_renderer.rs`
   is test-only. Do not promote it to a public API as part of this work.
 
+## Related rules to read first
+
+These project rules apply directly to this skill's work; read them before
+starting if you haven't already loaded them this session:
+
+- `.claude/rules/commonmark.md` — conformance-harness invariants
+  (byte-equal HTML, allowlist discipline, paired-fixture pattern,
+  passing-by-accident exception).
+- `.claude/rules/parser.md` — `Dialect` vs `Extensions` split, dialect
+  pandoc-verification requirement, CST losslessness, parser-policy
+  separation from formatter.
+- `.claude/rules/integration-tests.md` — formatter golden cases live
+  under top-level `tests/fixtures/cases/` and are wired in
+  `tests/golden_cases.rs`; parser-only cases live under
+  `crates/panache-parser/tests/fixtures/cases/` and wire into
+  `crates/panache-parser/tests/golden_parser_cases.rs`. Do not mix them.
+
+## Harness noise to ignore inside this skill
+
+The runtime occasionally injects a `system-reminder` nudging you to use
+`TaskCreate` / `TaskUpdate` for tracking. **Inside this skill, the
+workflow below is already linear (probe → classify → fix → fixture →
+allowlist → recap), so task tools add overhead without value.** Skip
+them for conformance sessions unless the user explicitly asks for a
+task list.
+
 ## Key files
 
 - `crates/panache-parser/tests/commonmark.rs` — runner. Two real tests:
@@ -148,9 +174,36 @@ between sessions — short, judgment-call-only, not a duplicate of
    ```
    printf '<markdown here>' | cargo run -- parse        # CST
    ```
-   Compare the rendered output to the expected HTML by hand or with a
-   throwaway `#[ignore]` test inside `commonmark.rs` that prints both
-   sides. Remove the probe before finishing.
+
+   For triage across several failing example numbers at once, the
+   load-bearing tool is a throwaway `#[ignore]`-d `probe_examples` test
+   inside `commonmark.rs`. It prints markdown / expected HTML / actual
+   rendered HTML / match-status side-by-side so you can classify the
+   failure bucket in seconds. Drop it in temporarily, edit the example
+   numbers as you triage, then **delete it before finishing** — it is
+   not a permanent fixture. Template:
+
+   ```rust
+   #[test]
+   #[ignore = "probe specific examples"]
+   fn probe_examples() {
+       let examples = read_spec(&manifest_path(SPEC_FIXTURE_REL));
+       let by_number: std::collections::HashMap<u32, &SpecExample> =
+           examples.iter().map(|e| (e.number, e)).collect();
+       for n in [/* failing example numbers */] {
+           let example = by_number[&n];
+           let rendered = render_example(example);
+           eprintln!("=== #{n} ({}) ===", example.section);
+           eprintln!("MD: {:?}", example.markdown);
+           eprintln!("EXPECTED:\n{}", example.expected_html);
+           eprintln!("GOT:\n{}", rendered);
+           eprintln!("MATCH: {}", matches_expected(example, &rendered));
+       }
+   }
+   ```
+
+   Run with `cargo test -p panache-parser --test commonmark
+   probe_examples -- --ignored --nocapture`.
 
 4. **Classify the fix** before editing — and **verify with pandoc** when
    the construct could plausibly differ between dialects:
@@ -221,6 +274,18 @@ between sessions — short, judgment-call-only, not a duplicate of
    `tests/commonmark/allowlist.txt`. Group new entries under their
    section header comment. Do not allowlist examples whose pass status
    is fragile or dependent on side behavior — only crisp wins.
+
+   Before adding any number, **verify it against the just-regenerated
+   `report.txt`** so a stale memory of "this was passing" can't drift
+   into the allowlist. Quick check:
+   ```
+   grep -E '^(N1|N2|N3)$' \
+     crates/panache-parser/tests/commonmark/report.txt
+   ```
+   Each number must appear (twice — once in the flat passing list, once
+   in its section block). If a number doesn't show up there, the
+   allowlist guard would later flip red as a regression for the wrong
+   reason; do not add it.
 
 8. **Validate**:
    - `cargo test -p panache-parser --test commonmark commonmark_allowlist`

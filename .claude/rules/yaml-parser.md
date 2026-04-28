@@ -2,10 +2,18 @@
 paths:
   - "crates/panache-parser/src/parser/yaml.rs"
   - "crates/panache-parser/src/parser/yaml/**/*.rs"
-  - "crates/panache-parser/src/parser/**/*.rs"
-  - "crates/panache-parser/src/syntax/**/*.rs"
+  - "crates/panache-parser/src/parser/blocks/metadata.rs"
+  - "crates/panache-parser/src/syntax/yaml.rs"
   - "crates/panache-parser/tests/**/*yaml*"
+  - "crates/panache-parser/tests/fixtures/yaml-test-suite/**"
+  - "crates/panache-parser/tests/fixtures/cases/*yaml*/**"
+  - "crates/panache-parser/tests/fixtures/cases/crlf_yaml_metadata/**"
 ---
+
+This rule applies only when editing the YAML parser, its CST/syntax,
+its test harness, or YAML-tagged fixtures. Skip it for non-YAML parser
+work (other block/inline parsers, formatter, linter, conformance harness)
+even though they live in the same crate.
 
 YAML parser work is incremental and parser-crate scoped.
 
