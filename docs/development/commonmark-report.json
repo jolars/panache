@@ -1,8 +1,8 @@
 {
   "blocked": 12,
-  "failing": 282,
-  "pass_pct": 56.7,
-  "passing": 370,
+  "failing": 281,
+  "pass_pct": 56.9,
+  "passing": 371,
   "passing_numbers": [
     1,
     3,
@@ -53,6 +53,7 @@
     75,
     76,
     77,
+    78,
     80,
     84,
     85,
@@ -377,9 +378,9 @@
   ],
   "sections": [
     {
-      "fail": 2,
+      "fail": 1,
       "name": "ATX headings",
-      "pass": 16
+      "pass": 17
     },
     {
       "fail": 4,

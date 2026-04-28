@@ -244,7 +244,16 @@ impl BlockParser for AtxHeadingParser {
         }
 
         let level = try_parse_atx_heading(ctx.content)?;
-        Some((BlockDetectionResult::Yes, Some(Box::new(level))))
+        // CommonMark §4.2: an ATX heading can interrupt a paragraph (no blank
+        // line required between the paragraph and the heading). Pandoc-markdown
+        // disagrees: without a blank line, `# foo` inside a paragraph stays
+        // text. Branch on dialect — `YesCanInterrupt` triggers the dispatcher
+        // path that closes an open paragraph before emitting the heading.
+        let detection = match ctx.config.dialect {
+            crate::options::Dialect::CommonMark => BlockDetectionResult::YesCanInterrupt,
+            crate::options::Dialect::Pandoc => BlockDetectionResult::Yes,
+        };
+        Some((detection, Some(Box::new(level))))
     }
 
     fn parse_prepared(
