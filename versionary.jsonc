@@ -34,7 +34,7 @@
         {
           "type": "json",
           "path": "package.json",
-          "jsonpath": "$.dependencies.@panache-cli/panache"
+          "jsonpath": "$.dependencies[\"@panache-cli/panache\"]"
         }
       ]
     },
