@@ -1,0 +1,107 @@
+# CommonMark spec.txt v0.31.2 conformance allowlist.
+#
+# Each line is the integer example number from spec.txt that panache passes
+# under `Flavor::CommonMark` (markdown -> HTML, normalized via the same
+# `<li>` whitespace rule commonmark-hs uses).
+#
+# Add an example to this list only after running:
+#   cargo test -p panache-parser --test commonmark commonmark_full_report \
+#       -- --ignored --nocapture
+# and copying its number from the "Passing example numbers" section of
+# tests/commonmark/report.txt.
+#
+# Comments and blank lines are ignored. One example number per line.
+
+# Tabs
+1
+3
+8
+9
+10
+11
+
+# Backslash escapes
+18
+
+# Entity and numeric character references
+36
+
+# Precedence
+42
+
+# Thematic breaks
+47
+48
+50
+51
+52
+53
+54
+
+# ATX headings
+62
+66
+68
+69
+71
+72
+73
+74
+75
+76
+77
+
+# Setext headings
+85
+100
+
+# Indented code blocks
+107
+110
+112
+116
+117
+118
+
+# Fenced code blocks
+134
+
+# HTML blocks
+150
+153
+154
+156
+157
+158
+159
+160
+171
+173
+178
+181
+183
+189
+
+# Block quotes
+231
+239
+240
+
+# List items
+257
+265
+267
+268
+282
+289
+294
+295
+
+# Lists
+308
+310
+322
+323
+
+# Hard line breaks
+646

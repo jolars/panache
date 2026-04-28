@@ -1,0 +1,122 @@
+---
+title: "CommonMark conformance"
+---
+
+```{ojs}
+//| label: load-data
+//| echo: false
+
+data = FileAttachment("commonmark-report.json").json()
+```
+
+Panache's parser is shared across all flavors (Pandoc, Quarto, RMarkdown, GFM,
+CommonMark, MultiMarkdown). Each flavor selects a baseline set of extensions
+through `Extensions::for_flavor()`. Under `Flavor::CommonMark`, almost every
+Pandoc-specific extension is disabled, leaving only constructs that appear in
+the [CommonMark specification](https://spec.commonmark.org/).
+
+Conformance to the spec is tracked by running every example in `spec.txt`
+through the parser and comparing the rendered HTML against the expected HTML
+from the spec.
+
+## Harness layout
+
+  | Path                                                            | Purpose                                                         |
+  | --------------------------------------------------------------- | --------------------------------------------------------------- |
+  | `crates/panache-parser/tests/fixtures/commonmark-spec/spec.txt` | Vendored CommonMark spec.                                       |
+  | `crates/panache-parser/tests/commonmark.rs`                     | Test runner (`commonmark_allowlist`, `commonmark_full_report`). |
+  | `crates/panache-parser/tests/commonmark/spec_parser.rs`         | Parses spec.txt into example records.                           |
+  | `crates/panache-parser/tests/commonmark/html_renderer.rs`       | Test-only CST → HTML renderer (not a public API).               |
+  | `crates/panache-parser/tests/commonmark/allowlist.txt`          | Example numbers currently passing. CI fails on regression.      |
+  | `crates/panache-parser/tests/commonmark/blocked.txt`            | Examples we deliberately do not target yet, with reasons.       |
+
+The renderer mirrors the byte-equality comparison commonmark-hs uses: the output
+is normalized via `<li>\n` → `<li>` and `\n</li>` → `</li>` before comparison.
+
+## Baseline
+
+```{ojs}
+//| label: headline
+//| echo: false
+
+html`<p>
+Panache passes
+<strong>${data.passing} / ${data.total_examples} examples (${data.pass_pct.toFixed(1)} %)</strong>
+under <code>Flavor::CommonMark</code> against
+<code>spec.txt</code> v${data.spec_version}.
+${data.failing} failing, ${data.blocked} blocked.
+</p>`
+```
+
+```{ojs}
+//| label: section-table
+//| echo: false
+
+Inputs.table(
+  data.sections.map(s => ({
+    Section: s.name,
+    Pass: s.pass,
+    Fail: s.fail,
+    "Pass %": s.pass + s.fail === 0 ? "" : `${(100 * s.pass / (s.pass + s.fail)).toFixed(0)} %`
+  })),
+  {
+    sort: "Section",
+    rows: data.sections.length,
+    align: { Pass: "right", Fail: "right", "Pass %": "right" }
+  }
+)
+```
+
+The table and headline above are regenerated from
+`docs/development/commonmark-report.json`, which is written by the harness when
+you run `commonmark_full_report`. To refresh the page, run that test and
+re-render the docs.
+
+## Workflow
+
+### Updating the spec fixture
+
+```bash
+task update-commonmark-fixtures
+# or specify a different ref
+./crates/panache-parser/scripts/update-commonmark-spec-fixtures.sh 0.31.2
+```
+
+This clones `commonmark/commonmark-spec` at the given tag, copies `spec.txt`
+into `tests/fixtures/commonmark-spec/`, and writes a `.panache-source` record of
+the upstream commit.
+
+### Running the harness
+
+```bash
+# Regression guard: every allowlisted example must still pass.
+cargo test -p panache-parser --test commonmark commonmark_allowlist
+
+# Full report: writes tests/commonmark/report.txt with per-section
+# counts and a list of every passing example number. Use this output
+# to grow the allowlist after fixing parser/renderer bugs.
+cargo test -p panache-parser --test commonmark commonmark_full_report \
+    -- --ignored --nocapture
+```
+
+### Growing the allowlist
+
+1. Fix a parser or renderer bug (with a focused test reproducing the bug).
+2. Run `commonmark_full_report` and inspect `report.txt`.
+3. Add the newly-passing example numbers to `allowlist.txt`, ideally grouped
+   under their section header for readability.
+4. Run `commonmark_allowlist` to confirm the additions pass.
+
+If an example is intentionally not targeted (e.g. a construct we choose not to
+support under `Flavor::CommonMark`), add the number to `blocked.txt` with a
+comment explaining the reason.
+
+## Why an HTML renderer?
+
+The CommonMark spec defines conformance as markdown-input → HTML-output
+byte-equality. Panache's primary output is formatted markdown, not HTML, so the
+conformance harness needs a renderer to bridge the gap. The renderer in
+`tests/commonmark/html_renderer.rs` is **test code only** --- it is not part of
+the public crate surface, and it covers only the constructs spec.txt exercises.
+If a public `--to html` mode is wanted later, the renderer can graduate from
+test-only to a real module; until then it intentionally stays narrow.

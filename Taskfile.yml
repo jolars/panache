@@ -83,6 +83,11 @@ tasks:
     cmds:
       - ./crates/panache-parser/scripts/update-yaml-test-suite-fixtures.sh data-2022-01-17
 
+  update-commonmark-fixtures:
+    desc: Download and refresh CommonMark spec.txt fixture (default 0.31.2)
+    cmds:
+      - ./crates/panache-parser/scripts/update-commonmark-spec-fixtures.sh 0.31.2
+
   coverage:
     desc: Generate code coverage report
     cmds:

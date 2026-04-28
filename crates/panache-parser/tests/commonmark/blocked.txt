@@ -1,0 +1,5 @@
+# CommonMark spec.txt v0.31.2 examples we deliberately do not target yet.
+#
+# Format: one example number per line. Add a comment line above each entry
+# explaining why we are not targeting it. This file is informational; the
+# allowlist is what gates regression.

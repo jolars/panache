@@ -1,0 +1,100 @@
+CommonMark spec.txt v0.31.2 conformance report
+66 / 652 examples passing (10.1%)
+586 failing
+0 blocked-list entries
+
+=== Per-section pass / fail ===
+  ATX headings: 11 pass / 7 fail
+  Autolinks: 0 pass / 19 fail
+  Backslash escapes: 1 pass / 12 fail
+  Blank lines: 0 pass / 1 fail
+  Block quotes: 3 pass / 22 fail
+  Code spans: 0 pass / 22 fail
+  Emphasis and strong emphasis: 0 pass / 132 fail
+  Entity and numeric character references: 1 pass / 16 fail
+  Fenced code blocks: 1 pass / 28 fail
+  HTML blocks: 14 pass / 30 fail
+  Hard line breaks: 1 pass / 14 fail
+  Images: 0 pass / 22 fail
+  Indented code blocks: 6 pass / 6 fail
+  Inlines: 0 pass / 1 fail
+  Link reference definitions: 0 pass / 27 fail
+  Links: 0 pass / 90 fail
+  List items: 8 pass / 40 fail
+  Lists: 4 pass / 22 fail
+  Paragraphs: 0 pass / 8 fail
+  Precedence: 1 pass / 0 fail
+  Raw HTML: 0 pass / 20 fail
+  Setext headings: 2 pass / 25 fail
+  Soft line breaks: 0 pass / 2 fail
+  Tabs: 6 pass / 5 fail
+  Textual content: 0 pass / 3 fail
+  Thematic breaks: 7 pass / 12 fail
+
+=== Passing example numbers (allowlist candidates) ===
+1
+3
+8
+9
+10
+11
+18
+36
+42
+47
+48
+50
+51
+52
+53
+54
+62
+66
+68
+69
+71
+72
+73
+74
+75
+76
+77
+85
+100
+107
+110
+112
+116
+117
+118
+134
+150
+153
+154
+156
+157
+158
+159
+160
+171
+173
+178
+181
+183
+189
+231
+239
+240
+257
+265
+267
+268
+282
+289
+294
+295
+308
+310
+322
+323
+646

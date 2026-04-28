@@ -1,0 +1,208 @@
+{
+  "blocked": 0,
+  "failing": 586,
+  "pass_pct": 10.1,
+  "passing": 66,
+  "passing_numbers": [
+    1,
+    3,
+    8,
+    9,
+    10,
+    11,
+    18,
+    36,
+    42,
+    47,
+    48,
+    50,
+    51,
+    52,
+    53,
+    54,
+    62,
+    66,
+    68,
+    69,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    85,
+    100,
+    107,
+    110,
+    112,
+    116,
+    117,
+    118,
+    134,
+    150,
+    153,
+    154,
+    156,
+    157,
+    158,
+    159,
+    160,
+    171,
+    173,
+    178,
+    181,
+    183,
+    189,
+    231,
+    239,
+    240,
+    257,
+    265,
+    267,
+    268,
+    282,
+    289,
+    294,
+    295,
+    308,
+    310,
+    322,
+    323,
+    646
+  ],
+  "sections": [
+    {
+      "fail": 7,
+      "name": "ATX headings",
+      "pass": 11
+    },
+    {
+      "fail": 19,
+      "name": "Autolinks",
+      "pass": 0
+    },
+    {
+      "fail": 12,
+      "name": "Backslash escapes",
+      "pass": 1
+    },
+    {
+      "fail": 1,
+      "name": "Blank lines",
+      "pass": 0
+    },
+    {
+      "fail": 22,
+      "name": "Block quotes",
+      "pass": 3
+    },
+    {
+      "fail": 22,
+      "name": "Code spans",
+      "pass": 0
+    },
+    {
+      "fail": 132,
+      "name": "Emphasis and strong emphasis",
+      "pass": 0
+    },
+    {
+      "fail": 16,
+      "name": "Entity and numeric character references",
+      "pass": 1
+    },
+    {
+      "fail": 28,
+      "name": "Fenced code blocks",
+      "pass": 1
+    },
+    {
+      "fail": 30,
+      "name": "HTML blocks",
+      "pass": 14
+    },
+    {
+      "fail": 14,
+      "name": "Hard line breaks",
+      "pass": 1
+    },
+    {
+      "fail": 22,
+      "name": "Images",
+      "pass": 0
+    },
+    {
+      "fail": 6,
+      "name": "Indented code blocks",
+      "pass": 6
+    },
+    {
+      "fail": 1,
+      "name": "Inlines",
+      "pass": 0
+    },
+    {
+      "fail": 27,
+      "name": "Link reference definitions",
+      "pass": 0
+    },
+    {
+      "fail": 90,
+      "name": "Links",
+      "pass": 0
+    },
+    {
+      "fail": 40,
+      "name": "List items",
+      "pass": 8
+    },
+    {
+      "fail": 22,
+      "name": "Lists",
+      "pass": 4
+    },
+    {
+      "fail": 8,
+      "name": "Paragraphs",
+      "pass": 0
+    },
+    {
+      "fail": 0,
+      "name": "Precedence",
+      "pass": 1
+    },
+    {
+      "fail": 20,
+      "name": "Raw HTML",
+      "pass": 0
+    },
+    {
+      "fail": 25,
+      "name": "Setext headings",
+      "pass": 2
+    },
+    {
+      "fail": 2,
+      "name": "Soft line breaks",
+      "pass": 0
+    },
+    {
+      "fail": 5,
+      "name": "Tabs",
+      "pass": 6
+    },
+    {
+      "fail": 3,
+      "name": "Textual content",
+      "pass": 0
+    },
+    {
+      "fail": 12,
+      "name": "Thematic breaks",
+      "pass": 7
+    }
+  ],
+  "spec_version": "0.31.2",
+  "total_examples": 652
+}

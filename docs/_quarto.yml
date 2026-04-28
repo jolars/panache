@@ -114,6 +114,8 @@ website:
           contents:
             - href: development/lsp.qmd
               text: Language Server
+            - href: development/commonmark-conformance.qmd
+              text: CommonMark conformance
             - href: development/contributing.md
               text: Contributing
 

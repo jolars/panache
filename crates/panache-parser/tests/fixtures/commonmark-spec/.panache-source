@@ -1,0 +1,4 @@
+repo=https://github.com/commonmark/commonmark-spec
+ref=0.31.2
+commit=9103e341a973013013bb1a80e13567007c5cef6f
+source=git-tag
