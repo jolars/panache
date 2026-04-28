@@ -594,7 +594,20 @@ impl BlockParser for ListParser {
             }
         };
         if marker_match.spaces_after_cols == 0 {
-            return None;
+            // The marker parser allows two cases with zero trailing whitespace:
+            // a bare marker (no content after on this line) or a
+            // task-checkbox immediately following the marker. Only the bare
+            // marker is a real list opener; reject the task-checkbox case.
+            // (Trailing CR/LF is not "content" for this check.)
+            if !after_marker_text.trim_end_matches(['\r', '\n']).is_empty() {
+                return None;
+            }
+            // CommonMark: an empty list item cannot interrupt a paragraph at
+            // document level. Inside an existing list a bare marker still
+            // opens a sibling list item.
+            if !ctx.at_document_start && !ctx.has_blank_before && !ctx.in_list {
+                return None;
+            }
         }
         if !ctx.has_blank_before
             && ctx.in_list

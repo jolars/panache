@@ -252,6 +252,7 @@ golden_test_cases!(
     line_ending_crlf,
     line_ending_lf,
     links,
+    list_item_bare_marker_empty_commonmark,
     list_item_blank_line_inside,
     list_item_fenced_code_first_line_commonmark,
     list_item_indented_code,

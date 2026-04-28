@@ -13,153 +13,147 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-28 (p)
+## Latest session — 2026-04-28 (q)
 
-**Pass count: 516 → 518 / 652 (79.4%, +2)**
+**Pass count: 518 → 521 / 652 (79.9%, +3)**
 
-Targeted prior recap's #1 (Fenced code blocks inside list items: #318,
-#321, #324). One coupled root cause unlocked #318 and #324; #321 still
-fails for a different reason (fence on continuation inside a blockquote
-inside a list item — separate bucket).
+Targeted prior recap's #5 (empty list items: #266, #278, #280, #281,
+#283, #284). One small parser-shape gap unlocked #281, #283, #284.
+#280 still fails — different problem: empty list-item with one
+intervening blank line should close the list before subsequent
+content. #278 unchanged. #266 is unrelated (10-digit ordered marker
+acceptance — should be 9-digit max in CommonMark).
 
-**Two coupled gaps for fence-on-first-line of a list item:**
+### Single root cause: bare list markers were not recognized
 
-1. **Parser-shape gap.** When a list item opens with `- \`\`\`...` the
-   post-marker text was buffered into `ListItemBuffer` and later emitted
-   as PLAIN, where the inline parser matched the backticks as
-   INLINE_CODE. The block dispatcher's fence detection never ran on
-   that first-line content because it sits *inside* the list-item
-   container handler (`handle_list_open_effect`), which always buffers.
-   Fix: after `add_list_item` (and friends), peek at the buffer's first
-   text segment. If it parses as a fence opener and the dispatcher's
-   gating clears (has info string, OR has a matching closer below at
-   the list-item content column, OR CommonMark dialect; plus the
-   `backtick_code_blocks`/`fenced_code_blocks` extension flags), clear
-   the buffer and call `parse_fenced_code_block` with
-   `first_line_override = Some(buffered_text)` and
-   `base_indent = content_col`. Compensate `self.pos` by `new_pos - 1`
-   so the dispatcher's outer `pos += lines_consumed` (=1) lands on
-   `new_pos`.
-2. **Renderer gap.** `parse_fenced_code_block` was called with
-   `base_indent = content_col`, which preserves the list-item
-   indentation inside CODE_CONTENT for losslessness. The renderer's
-   fenced branch only stripped `fenced_opener_indent` (the WS *before*
-   `CODE_FENCE_OPEN` inside the CODE_BLOCK), which is 0 here. Fix: in
-   the fenced branch, run `strip_leading_spaces_per_line(raw, li_indent)`
-   *before* applying the opener-indent rule. Mirrors what the indented
-   path already does. Reuses the existing
-   `enclosing_list_item_content_column` helper from the previous
-   session.
+The marker parser at
+`crates/panache-parser/src/parser/blocks/lists.rs:158`
+accepted `is_empty()` after-marker-text but not when the line ended
+with a newline (`*\n` → `after_marker = "\n"`, none of the gates
+matched). That alone made bare markers fall through to paragraph
+parsing.
 
-### Targets and root causes
-
-- **Coupled parser+renderer (parser-shape × 1, renderer × 1)**: 2
-  unlocks (#318, #324) — both opened a fenced code block on the same
-  line as the list marker. After the parser fix, the block produced
-  was structurally correct but the rendered HTML still leaked the
-  list-item indent; the renderer fix closed that.
-- **Not yet fixed**: #321 (fence on continuation line inside `> b`
-  blockquote inside list item) — different shape, different root cause.
-  See "Suggested next targets" below.
+Even after fixing the marker parser, the dispatcher gate at
+`crates/panache-parser/src/parser/block_dispatcher.rs:596` rejected
+*every* `spaces_after_cols == 0` match. That gate exists to reject
+the task-checkbox-without-space case (`-[ ] foo`), so it must remain
+— but needs to allow bare markers and refuse interrupting a
+document-level paragraph (CommonMark §5.2: "An empty list item cannot
+interrupt a paragraph"). #285 (`foo\n*\n` → `<p>foo *</p>`) keeps
+passing thanks to the `!at_document_start && !has_blank_before
+&& !in_list` clause.
 
 ### Files changed
 
-- **Parser (parser-shape gap × 1)**:
-  - `crates/panache-parser/src/parser/utils/list_item_buffer.rs`:
-    new `first_text(&self) -> Option<&str>` accessor.
-  - `crates/panache-parser/src/parser/core.rs`:
-    new `Parser::maybe_open_fenced_code_in_new_list_item` helper plus
-    `has_matching_fence_closer` (mirrors the dispatcher's gating).
-    Helper is called after every `add_list_item` /
-    `add_list_item_with_nested_empty_list` / `start_nested_list` site
-    inside `handle_list_open_effect` (4 sites). Other list-item
-    creation paths in the parser (lazy continuation in/out of
-    blockquote, document-start branches in `handle_definition_list_effect`)
-    were left alone — none of the failing examples reach them, and
-    the helper is intentionally narrow: it short-circuits when the
-    buffer has more than one segment, when the first text isn't a
-    fence opener, or when the dispatcher's gating wouldn't fire.
-- **Renderer (renderer gap × 1)**:
-  - `crates/panache-parser/tests/commonmark/html_renderer.rs`:
-    fenced branch of `code_block_content` now strips `li_indent`
-    leading spaces per line *before* applying the opener-indent rule.
+- **Parser (parser-shape gap × 2)**:
+  - `crates/panache-parser/src/parser/blocks/lists.rs`:
+    `try_parse_list_marker` now strips trailing `\r`/`\n` from the
+    line at entry, so trailing-newline bare markers are recognized.
+  - `crates/panache-parser/src/parser/block_dispatcher.rs`:
+    `ListParser::detect_prepared` accepts `spaces_after_cols == 0`
+    when (a) `after_marker_text.trim_end_matches(['\r','\n'])` is
+    empty (bare marker, not task-without-space) and (b) the bare
+    marker is at document start, after a blank line, or already
+    inside a list. Preserves the prior gate's intent (reject
+    `-[ ] foo`) while allowing CommonMark/Pandoc empty list items.
 - **Parser fixture (pins the CST shape)**:
-  - `crates/panache-parser/tests/fixtures/cases/list_item_fenced_code_first_line_commonmark/`
-    — pins the CST for `- \`\`\`\n  foo\n  \`\`\`\n` (LIST_ITEM contains
-    LIST_MARKER + WHITESPACE + CODE_BLOCK with CODE_FENCE_OPEN +
-    CODE_CONTENT preserving the 2-space list-item indent +
-    CODE_FENCE_CLOSE). `flavor = "commonmark"`. Wired into
-    `golden_parser_cases.rs`. No paired Pandoc fixture — pandoc agrees
-    on the parse here, and adding a duplicate fixture would be churn.
-- **Allowlist additions** (Lists):
-  - +#318, +#324
+  - `crates/panache-parser/tests/fixtures/cases/list_item_bare_marker_empty_commonmark/`
+    — pins the CST for `- foo\n-\n- bar\n` (single LIST with three
+    LIST_ITEM children; middle item is bare LIST_MARKER + PLAIN
+    containing only NEWLINE). `flavor = "commonmark"`. Wired into
+    `golden_parser_cases.rs`. No paired Pandoc fixture — pandoc
+    `-f markdown` produces the same shape (verified), so a duplicate
+    would be churn.
+- **Allowlist additions** (List items):
+  - +#281, +#283, +#284
+
+No formatter golden case added: pandoc-default and CommonMark produce
+the same formatted output (`- foo\n- \n- bar\n`, idempotent). Per the
+rule, only add a CommonMark formatter case when the dialects diverge
+structurally on the new shape.
 
 ### Don't redo
 
-- Don't move the fence detection into `add_list_item` itself. The
-  helper deliberately runs *after* the list-item is opened so that
-  task-checkbox handling (which already strips `[ ] `/`[x] ` from the
-  buffered text) and the empty-buffer fast-path stay simple. Reading
-  `buffer.first_text()` after the fact is the cheapest place.
-- Don't drop the `has_matching_fence_closer` gate. CommonMark dialect
-  always opens a fence (even without a closer), but Pandoc-markdown
-  needs `bare_fence_in_list_with_closer`. Removing the gate would
-  divert Pandoc-flavored cases like `- \`\`\`` followed by paragraph
-  text into a code block that runs to EOF, regressing Pandoc-only
-  goldens.
-- The `pos` math is `self.pos = new_pos.saturating_sub(1)` because
-  `parse_inner_content` does `self.pos += lines_consumed` after
-  `handle_list_open_effect` returns, and `lines_consumed = 1` from the
-  list parser. If the dispatcher path ever changes that constant, this
-  helper's compensation needs to be revisited.
-- Don't extend the renderer fix to also tweak `fenced_opener_indent`.
-  The opener_indent helper still measures the indent of `\`\`\`` *within
-  the CODE_BLOCK*; it has no list-item awareness on purpose. The
-  list-item strip happens *before* opener_indent stripping so the two
-  rules compose without double-counting.
-- Don't widen `first_text` to peek into `BlockquoteMarker` segments.
-  By construction, when a list item is freshly opened the buffer is
-  either empty or has a single Text segment (the post-marker remainder).
-  The `segment_count() != 1` short-circuit is what keeps later
-  continuation-line state from triggering the helper accidentally.
+- Don't drop the `in_list` clause from the dispatcher gate. Without
+  it, a bare marker on a continuation line of a top-level paragraph
+  (#285's `foo\n*\n`) would interrupt the paragraph and open a list,
+  regressing the spec. Keep all three: at_document_start OR
+  has_blank_before OR in_list.
+- Don't move the `\r\n` strip out of `try_parse_list_marker`.
+  Several callers pass synthetic bare-marker lookahead lines without
+  newlines (e.g. unit tests at lines 632–642). Stripping at entry
+  keeps both call shapes working without churn at every callsite.
+- Don't reuse `after_marker_text.is_empty()` directly in the
+  dispatcher. `ctx.content` retains its trailing newline, so
+  `after_marker_text` is `"\n"` for `*\n`. Use
+  `trim_end_matches(['\r', '\n']).is_empty()` to accept that case
+  while still rejecting `-[ ] foo` (`after_marker_text = "[ ] foo"`
+  ≠ empty after trimming).
+- The new fixture pins the empty item as `LIST_MARKER + PLAIN(NEWLINE)`,
+  not as `LIST_MARKER` alone. That's deliberate — list-item children
+  always include a tail node (PLAIN/PARAGRAPH) for whitespace
+  bookkeeping in the formatter. Don't try to "tighten" by removing
+  the PLAIN.
 
 ### Suggested next targets, ranked
 
-1. **Fence inside blockquote inside list item (#321)** — markdown is
+1. **Empty list item closes the list when followed by blank line
+   (#280)** — markdown `-\n\n  foo\n` should produce
+   `<ul><li></li></ul><p>foo</p>` (the empty item closes after the
+   blank, foo is *outside* the list). Currently produces
+   `<ul><li><p></p><p>foo</p></li></ul>` because the blank-line +
+   indented-content rule keeps the foo inside the empty item. Likely
+   needs a list-blank-handling branch: when the list item has *no*
+   non-newline content and the next line after a blank doesn't
+   strictly belong to a sibling marker, close the list. Possibly in
+   `core.rs` blank-line handling or in
+   `list_postprocessor.rs`. Verify the spec expects this for both
+   bullet and ordered (#283/#284 cousins are siblings, this is the
+   "blank line empties out" sibling).
+2. **Multi-empty-marker with subsequent indented content (#278)** —
+   `-\n  foo\n-\n  ```\n  bar\n  ```\n-\n      baz\n`. Three bare
+   markers each followed by indented content (or blank) on next
+   line. Currently parses chaotically. Once #280 is solved this may
+   partially come along. Verify behavior shape before touching.
+3. **10-digit ordered marker rejection (#266)** — markdown
+   `1234567890. not ok\n`. CommonMark spec restricts ordered-list
+   markers to 1–9 digits. Current parser accepts arbitrary digit
+   counts. Fix in marker parser's ordered branch; tighten under
+   `Dialect::CommonMark` only (Pandoc may agree, verify with pandoc
+   first). Single-example fix.
+4. **Fence inside blockquote inside list item (#321)** — markdown
    `- a\n  > b\n  \`\`\`\n  c\n  \`\`\`\n- d\n`. The fence is on a
-   continuation line of the list item *outside* the blockquote (column
-   2 = list-item content column). Current parse buries everything in a
-   blockquote and never recognizes the fence. The dispatcher's
-   continuation-line fence detection in `parse_line` (lines ~1614-1620)
-   only fires when `bq_depth > 0`; this case has the list-item ending
-   the blockquote on the prior line. Likely needs a similar
-   "list-item continuation can be interrupted by a fence at content
-   column" branch in the non-blockquote list-item continuation path.
-2. **Loose-vs-tight nested loose lists (#312, #326)** — top-level loose
-   list with tight inner lists; renderer over-wraps inner items in
-   `<p>` or splits at the wrong level. Mixed parser/renderer shape.
-3. **Lazy / nested marker continuation (#296, #297, #305)** — `10) foo\n
-   - bar` should produce nested list; currently parses as a paragraph.
-   Parser issue: ordered-list-with-paren-marker doesn't accept a nested
-   bullet without a blank line. Probably also covers #305.
-4. **Multi-block content in `1.     code` items (#273, #274)** — `1.`
-   followed by 5+ spaces should open a list item whose first block is
-   an indented code block (content column = `1.` + 1 = 3, indented code
-   needs +4 = 7+). Currently parser falls through to plain text.
-5. **Empty list items (#266, #278, #280, #281, #283, #284)** — `*\n`,
-   `- foo\n-\n- bar\n`. Parser currently treats a bare marker as a
-   paragraph or bleeds into the next item. Needs explicit empty
-   list-item recognition.
-6. **Setext-in-list-item (#300)** — `- # Foo\n- Bar\n  ---\n  baz\n`
+   continuation line of the list item *outside* the blockquote
+   (column 2 = list-item content column). Current parse buries
+   everything in a blockquote and never recognizes the fence.
+   Dispatcher's continuation-line fence detection in `parse_line`
+   (~lines 1614-1620) only fires when `bq_depth > 0`; this case has
+   the list-item ending the blockquote on the prior line. Likely
+   needs a "list-item continuation can be interrupted by a fence at
+   content column" branch in the non-blockquote continuation path.
+5. **Loose-vs-tight nested loose lists (#312, #326)** — top-level
+   loose list with tight inner lists; renderer over-wraps inner
+   items in `<p>` or splits at the wrong level. Mixed parser/renderer
+   shape.
+6. **Lazy / nested marker continuation (#296, #297, #305)** —
+   `10) foo\n  - bar` should produce nested list; currently parses
+   as a paragraph. Parser issue: ordered-list-with-paren-marker
+   doesn't accept a nested bullet without a blank line.
+7. **Multi-block content in `1.     code` items (#273, #274)** —
+   `1.` followed by 5+ spaces should open a list item whose first
+   block is an indented code block. Currently parser falls through
+   to plain text.
+8. **Setext-in-list-item (#300)** — `- # Foo\n- Bar\n  ---\n  baz\n`
    needs `<h2>Bar</h2>` inside the second item; currently produces
    `<hr />` because the setext underline isn't recognized at the
    list-item content column.
-7. **Marker-on-same-line nesting (#298, #299)** — `- - foo\n` should be
-   nested lists; parser flattens.
-8. **Emphasis and strong emphasis (47 fails)** — flanking-rule and
-   autolink-precedence edge cases (#480, #481 are autolink-vs-emphasis).
-9. **Tabs (4 fails)** — #2, #5, #6, #7 all need tab→space expansion
-   with column alignment.
-10. **Link reference definitions (12 fails)**, **Setext heading
+9. **Marker-on-same-line nesting (#298, #299)** — `- - foo\n`
+   should be nested lists; parser flattens.
+10. **Emphasis and strong emphasis (47 fails)** — flanking-rule and
+    autolink-precedence edge cases (#480, #481 are
+    autolink-vs-emphasis).
+11. **Tabs (4 fails)** — #2, #5, #6, #7 all need tab→space expansion
+    with column alignment.
+12. **Link reference definitions (12 fails)**, **Setext heading
     multi-line content** (#81, #82, #95) + **#115**, **Pandoc
     setext-in-blockquote losslessness**, **#342 / #148**.

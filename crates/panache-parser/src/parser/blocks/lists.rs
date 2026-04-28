@@ -156,6 +156,9 @@ fn try_parse_roman_numeral(text: &str, uppercase: bool) -> Option<(String, usize
 }
 
 pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Option<ListMarkerMatch> {
+    // Trailing newlines should not block bare-marker detection; the line `*\n`
+    // is a bare bullet marker and the post-marker text is logically empty.
+    let line = line.trim_end_matches(['\r', '\n']);
     let (_indent_cols, indent_bytes) = leading_indent(line);
     let trimmed = &line[indent_bytes..];
 
