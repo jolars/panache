@@ -96,11 +96,14 @@ pub fn parse_inline_text_recursive(
     log::trace!("Recursive inline parsing complete");
 }
 
-/// Parse inline elements from text content.
-/// This is a standalone function used for recursive inline parsing within blocks.
+/// Parse inline elements from text content nested inside a link/image/span.
 ///
-/// The `allow_reference_links` parameter is accepted for compatibility but not currently used.
-/// Set to `false` in nested contexts (inside link text, image alt, spans) to prevent recursive parsing.
+/// Used for recursive inline parsing of link text, image alt, span content, etc.
+/// Suppresses constructs that would create nested links (CommonMark §6.3 forbids
+/// links inside links), notably extended bare-URI autolinks under GFM.
+///
+/// The `_allow_reference_links` parameter is accepted for compatibility and is
+/// currently unused.
 pub fn parse_inline_text(
     builder: &mut GreenNodeBuilder,
     text: &str,
@@ -108,13 +111,12 @@ pub fn parse_inline_text(
     _allow_reference_links: bool,
 ) {
     log::trace!(
-        "Parsing inline text (recursive): {:?} ({} bytes)",
+        "Parsing inline text (nested in link): {:?} ({} bytes)",
         &text[..text.len().min(40)],
         text.len()
     );
 
-    // Use recursive parsing with Pandoc's algorithm for emphasis
-    parse_inline_text_recursive(builder, text, config);
+    parse_inline_range_impl(text, 0, text.len(), config, builder, false, true);
 }
 
 /// Try to parse emphasis starting at the given position.
@@ -1082,7 +1084,7 @@ fn parse_inline_range(
     config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) {
-    parse_inline_range_impl(text, start, end, config, builder, false)
+    parse_inline_range_impl(text, start, end, config, builder, false, false)
 }
 
 /// Same as `parse_inline_range` but bypasses opener validity checks for emphasis.
@@ -1094,7 +1096,7 @@ fn parse_inline_range_nested(
     config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) {
-    parse_inline_range_impl(text, start, end, config, builder, true)
+    parse_inline_range_impl(text, start, end, config, builder, true, false)
 }
 
 fn is_emoji_boundary(text: &str, pos: usize) -> bool {
@@ -1126,6 +1128,7 @@ fn parse_inline_range_impl(
     config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
     nested_emphasis: bool,
+    nested_in_link: bool,
 ) {
     log::trace!(
         "parse_inline_range: start={}, end={}, text={:?}",
@@ -1611,7 +1614,8 @@ fn parse_inline_range_impl(
             continue;
         }
 
-        if config.extensions.autolink_bare_uris
+        if !nested_in_link
+            && config.extensions.autolink_bare_uris
             && let Some((len, url)) = try_parse_bare_uri(&text[pos..])
         {
             if pos > text_start {

@@ -317,6 +317,7 @@ golden_test_cases!(
     issue_197_gfm_non_idempotent_bare_uri_escape,
     issue_209_definition_list_blockquote_continuation,
     issue_224_simple_table_short_header_losslessness,
+    issue_235_gfm_bare_uri_in_link_text,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,
