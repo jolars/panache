@@ -103,6 +103,27 @@ workspace root). When designing a new `Extensions` flag default, check
 that file for `getDefaultExtensions Markdown / CommonMark / GFM` to keep
 panache aligned.
 
+## Session recap (`RECAP.md`)
+
+This skill keeps a rolling recap at
+`.claude/skills/commonmark-conformance-expand/RECAP.md`. It is the handoff
+between sessions — short, judgment-call-only, not a duplicate of
+`report.txt`.
+
+- **At the start of a session**: read `RECAP.md` first. The "Suggested next
+  targets" section is the recommended starting point, and the "Don't redo"
+  list keeps you from reinventing fixes that already landed. If the user
+  named a specific target, prefer that, but still skim the recap so you
+  don't redo prior work.
+- **At the end of a session**: rewrite the **Latest session** entry in
+  `RECAP.md` with: pass count before → after, the targets and shared root
+  causes, files changed (classified by bucket), what *not* to redo, and
+  ranked next targets. Keep it terse — a fresh session should be able to
+  pick up from this entry plus `report.txt` without scrolling the prior
+  conversation.
+- Treat `RECAP.md` as the canonical handoff. Only echo a recap into the
+  conversation if the user asks for one explicitly.
+
 ## Workflow
 
 1. **Regenerate the report**:
