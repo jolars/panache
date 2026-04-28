@@ -6,7 +6,7 @@ This section contains information for developers interested in contributing to
 Panache or learning about the inner workings of the project.
 
 - If you are looking to contribute to Panache, check out the [Contributing
-  Guide](contributing.qmd).
+  Guide](contributing.html).
 - [Language Server](./lsp.qmd) covers the architecture and implementation of the
   Panache Language Server.
 - [CommonMark conformance](./commonmark-conformance.qmd) describes the spec
