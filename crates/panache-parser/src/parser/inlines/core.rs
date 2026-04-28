@@ -1228,10 +1228,18 @@ fn parse_inline_range_impl(
                         // formatter emits as escapes for pipe-table separators
                         // and strikethrough delimiters. Recognising those here
                         // keeps round-trips idempotent in flavors that don't
-                        // enable all_symbols_escapable (notably GFM/CommonMark,
-                        // which per spec allow any ASCII punctuation anyway).
+                        // enable all_symbols_escapable.
+                        //
+                        // Under CommonMark dialect, the spec (§2.4) explicitly
+                        // allows ANY ASCII punctuation to be backslash-escaped,
+                        // independent of the all_symbols_escapable extension
+                        // (which also widens to whitespace, a Pandoc-only
+                        // construct).
                         const BASE_ESCAPABLE: &str = "\\`*_{}[]()>#+-.!|~";
-                        BASE_ESCAPABLE.contains(ch) || config.extensions.all_symbols_escapable
+                        BASE_ESCAPABLE.contains(ch)
+                            || config.extensions.all_symbols_escapable
+                            || (config.dialect == crate::Dialect::CommonMark
+                                && ch.is_ascii_punctuation())
                     }
                 };
                 if !escape_enabled {

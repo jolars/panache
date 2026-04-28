@@ -151,6 +151,8 @@ macro_rules! golden_test_cases {
 golden_test_cases!(
     alerts,
     alerts_disabled,
+    all_punctuation_escapes_commonmark,
+    all_punctuation_escapes_pandoc,
     atx_interrupts_paragraph_commonmark,
     atx_interrupts_paragraph_pandoc,
     blankline_concatenation,
