@@ -13,7 +13,117 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-28 (l)
+## Latest session — 2026-04-28 (m)
+
+**Pass count: 487 → 488 / 652 (74.8%, +1)**
+
+Picked up the prior recap's #1 target: #61 (Thematic breaks — HR as the sole
+content of a list item, e.g. `- Foo\n- * * *\n`). Single root cause across
+two layers: parser was buffering `* * *` as PLAIN text in `ListItemBuffer`,
+and the formatter had no path to render an HR child of LIST_ITEM. Pandoc
+agrees with CommonMark on this construct, so the fix is dialect-agnostic.
+
+### Targets and root causes
+
+- **Thematic breaks #61 (1)** — `- * * *` should produce `<li><hr/></li>`.
+  Two unrelated layers needed touching:
+  1. **Parser-shape gap**: `ListItemBuffer::emit_as_block` already detects a
+     single-line buffer that's an ATX heading and emits HEADING. Extended it
+     to detect `try_parse_horizontal_rule` and emit HORIZONTAL_RULE the same
+     way. Unconditional (no dialect gate) — pandoc and commonmark both want
+     this shape.
+  2. **Formatter gap**: with the parser fix, the LIST_ITEM now has a
+     HORIZONTAL_RULE child but no PLAIN/PARAGRAPH content_node. The list
+     wrapping pass emits nothing (no `lines`), so the marker was never
+     written; the children loop's `_` arm formatted the HR as a top-level
+     80-dash rule via `format_node_sync`, which broke out of the list and
+     ruined idempotency. Added a HORIZONTAL_RULE arm in
+     `format_list_item`'s children loop that, when `lines.is_empty()` &
+     `content_node.is_none()` & HR is the first real child, emits
+     `<marker><space><source HR bytes><\n>` (e.g. `- * * *`). Other paths
+     (HR after a paragraph, etc.) still flow through `format_node_sync`.
+
+### Files changed
+
+- **Parser (parser-shape gap × 1)**:
+  - `crates/panache-parser/src/parser/utils/list_item_buffer.rs` — adds an
+    HR detection branch alongside the existing ATX-heading branch in
+    `emit_as_block`; emits HORIZONTAL_RULE for single-line buffers whose
+    content matches `try_parse_horizontal_rule`.
+- **Formatter**:
+  - `crates/panache-formatter/src/formatter/lists.rs` — adds
+    `SyntaxKind::HORIZONTAL_RULE` arm in the `format_list_item` children
+    loop. When no content was emitted (no PLAIN/PARAGRAPH content_node, no
+    preserve/sentence/empty-nested cases) and HR is the first non-trivial
+    child, inlines marker + source HR text. Falls back to
+    `format_node_sync` otherwise.
+- **Parser fixtures (paired CST snapshots via insta)**:
+  - `crates/panache-parser/tests/fixtures/cases/hr_as_list_item_content_{commonmark,pandoc}/`
+    pin the same CST shape for `- Foo\n- * * *\n`: second LIST_ITEM contains
+    HORIZONTAL_RULE (not PLAIN). Both registered in `golden_parser_cases.rs`.
+- **Formatter golden (Pandoc default — no flavor specified)**:
+  - `tests/fixtures/cases/hr_as_list_item_content/` — input `- Foo\n- * * *\n`
+    formats unchanged and is idempotent. No `panache.toml` because the
+    behavior is dialect-agnostic. Wired into `tests/golden_cases.rs`. **No
+    paired CommonMark formatter case** — both dialects produce the same
+    output.
+- **Allowlist additions**: Thematic breaks: +#61.
+
+### Don't redo
+
+- The formatter inlines the HR with **source bytes** (`* * *`, `***`, `___`,
+  …) rather than the canonical 80-dash form. This is intentional: with the
+  canonical 80-dash HR, `- ----` re-parses as a top-level
+  `HORIZONTAL_RULE@0..6 "- ----"` (because runs of `-` with spaces are
+  themselves HR text), which would break round-trip when the marker is `-`.
+  Source bytes preserve user intent and avoid the conflict for any marker.
+  Don't switch to canonical form without solving the marker/HR-char
+  collision.
+- The HR-inline path is gated on `lines.is_empty()` AND
+  `content_node.is_none()` AND HR being the first non-paragraph block child.
+  Without this gate, items like `- Foo\n\n  ***` (paragraph + trailing HR)
+  would double-emit the marker. The current spec failure list does not
+  exercise that multi-block shape; defer until a failing example anchors it.
+- The parser fix lives in `ListItemBuffer::emit_as_block` next to the
+  existing ATX-heading detection — single-line, no inner newlines. Don't
+  extend to multi-line buffers; the buffer is concatenated text and parsing
+  inner-line transitions (paragraph → HR) requires a different pass outside
+  this helper's scope.
+- `heading_with_remainder` is a `(String, String)` tuple; the body of
+  `format_list_item` partially moves it before the children loop. The new
+  no-content gate uses `content_node.is_none()` instead, which is implied by
+  `heading_with_remainder.is_none()` (heading_with_remainder requires a
+  content_node) and avoids the post-move borrow error.
+
+### Suggested next targets, ranked
+
+Mostly unchanged from session (l), since this was a small +1 unlock:
+
+1. **Lists / List items (5/21, 17/31)** — biggest absolute pass-rate gap (52
+   fails combined). Triage by shape: lazy continuation, loose-vs-tight,
+   indented continuation, blank-line-between-items. Look for shared root
+   causes before picking sub-targets.
+2. **Emphasis and strong emphasis (85/47)** — flanking-rule and
+   autolink-precedence edge cases (#480, #481 are autolink-vs-emphasis
+   precedence).
+3. **Generalize the lazy-continuation interrupter check from session (k)**
+   — currently only HR breaks lazy paragraph continuation in blockquotes.
+   Per CommonMark §5.1 the full set (ATX heading, fenced code,
+   blockquote-start, list-marker-with-content, HR) should also break it.
+   Anchor each addition on a failing-spec example.
+4. **Tabs (5 fails)** — #2, #4, #5, #6, #7 all need tab→space expansion
+   with column alignment. Mechanical but its own session.
+5. **Link reference definitions (12 fails)** — bigger refactor; currently
+   captures whole line(s) as raw TEXT.
+6. **Setext heading multi-line content (#81, #82, #95)** + **#115**.
+7. **Pandoc setext-in-blockquote losslessness** — pre-existing parser bug
+   from session (k). Not a spec unlock, but worth fixing for correctness.
+8. **#342 (code-span/link precedence)**, **#148 (table-pre nesting)** —
+   one-offs.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-28 (l)
 
 **Pass count: 483 → 487 / 652 (74.7%, +4)**
 

@@ -214,6 +214,8 @@ golden_test_cases!(
     footnote_def_paragraph,
     footnote_definition_list,
     headings,
+    hr_as_list_item_content_commonmark,
+    hr_as_list_item_content_pandoc,
     hr_closes_list_commonmark,
     hr_closes_list_pandoc,
     hr_interrupts_lazy_blockquote_paragraph_commonmark,

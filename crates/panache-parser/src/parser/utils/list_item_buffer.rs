@@ -5,6 +5,7 @@
 
 use crate::options::ParserOptions;
 use crate::parser::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
+use crate::parser::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use crate::parser::utils::inline_emission;
 use crate::parser::utils::text_buffer::ParagraphBuffer;
 use crate::syntax::SyntaxKind;
@@ -135,10 +136,15 @@ impl ListItemBuffer {
             if let Some(line) = line_without_newline
                 && !line.contains('\n')
                 && !line.contains('\r')
-                && let Some(level) = try_parse_atx_heading(line)
             {
-                emit_atx_heading(builder, &text, level, config);
-                return;
+                if let Some(level) = try_parse_atx_heading(line) {
+                    emit_atx_heading(builder, &text, level, config);
+                    return;
+                }
+                if try_parse_horizontal_rule(line).is_some() {
+                    emit_horizontal_rule(builder, &text);
+                    return;
+                }
             }
         }
 

@@ -215,6 +215,7 @@ golden_test_cases!(
     setext_headings,
     setext_text_thematic_break_commonmark,
     thematic_break_interrupts_paragraph_commonmark,
+    hr_as_list_item_content,
     hr_closes_list_commonmark,
     headerless_table,
     horizontal_rules,

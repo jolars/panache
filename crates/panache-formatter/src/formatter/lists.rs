@@ -794,6 +794,55 @@ impl Formatter {
                         self.format_node_sync(&child, content_indent);
                     }
                 }
+                SyntaxKind::HORIZONTAL_RULE => {
+                    // CommonMark/Pandoc allow a thematic break as a list item's
+                    // sole content (e.g. `- * * *`). The wrapping pass above
+                    // emits nothing for an item with no PLAIN/PARAGRAPH
+                    // content_node, so emit the marker here and inline the HR
+                    // text on the same line. We re-emit the source HR bytes
+                    // rather than the canonical 80-dash form because `- ----`
+                    // would re-parse as a top-level HR; the source bytes
+                    // (`* * *`, `***`, `___`, …) round-trip safely with any
+                    // bullet/ordered marker.
+                    let no_content_emitted = lines.is_empty()
+                        && preserve_lines.is_none()
+                        && sentence_lines.is_none()
+                        && content_node.is_none()
+                        && !has_only_empty_nested_list;
+                    let prev_kind = child.prev_sibling().map(|s| s.kind());
+                    let is_first_real_child = !matches!(
+                        prev_kind,
+                        Some(SyntaxKind::PLAIN)
+                            | Some(SyntaxKind::PARAGRAPH)
+                            | Some(SyntaxKind::HEADING)
+                            | Some(SyntaxKind::CODE_BLOCK)
+                            | Some(SyntaxKind::BLOCK_QUOTE)
+                            | Some(SyntaxKind::LIST)
+                            | Some(SyntaxKind::HORIZONTAL_RULE)
+                    );
+                    if no_content_emitted && is_first_real_child {
+                        self.output.push_str(&" ".repeat(total_indent));
+                        self.output
+                            .push_str(&" ".repeat(list_indent.marker_padding));
+                        self.output.push_str(&marker);
+                        self.output.push_str(&" ".repeat(list_indent.spaces_after));
+                        if let Some(ref cb) = checkbox {
+                            self.output.push_str(cb);
+                            self.output.push(' ');
+                        }
+                        let hr_text: String = child
+                            .children_with_tokens()
+                            .filter_map(|el| el.into_token())
+                            .filter(|t| t.kind() == SyntaxKind::HORIZONTAL_RULE)
+                            .map(|t| t.text().to_string())
+                            .collect();
+                        self.output.push_str(hr_text.trim());
+                        self.output.push('\n');
+                    } else {
+                        let content_indent = list_indent.hanging_indent(total_indent);
+                        self.format_node_sync(&child, content_indent);
+                    }
+                }
                 SyntaxKind::BLANK_LINE => {
                     // Normalize consecutive blank lines within list-item continuation content.
                     if !self.output.ends_with("\n\n") {
