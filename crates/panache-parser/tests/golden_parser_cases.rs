@@ -244,6 +244,7 @@ golden_test_cases!(
     mmd_header_identifiers,
     pandoc_title_block,
     paragraph_continuation,
+    paragraph_leading_whitespace,
     paragraph_plain_mixed,
     paragraph_wrapping,
     paragraphs,

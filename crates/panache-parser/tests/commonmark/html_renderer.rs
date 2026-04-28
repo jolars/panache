@@ -201,9 +201,44 @@ fn render_paragraph(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut
     if trailing_backslash {
         inner.push('\\');
     }
+    inner = strip_paragraph_line_indent(&inner);
     out.push_str("<p>");
     out.push_str(&inner);
     out.push_str("</p>\n");
+}
+
+/// CommonMark §4.8: a paragraph's raw content is built by concatenating its
+/// lines and stripping leading/trailing whitespace from each line. The parser
+/// preserves those bytes inside paragraph TEXT tokens (CST is lossless), so
+/// the renderer trims them here. We only trim ASCII spaces and tabs at line
+/// starts; whitespace inside inline constructs is unaffected because their
+/// render output never contains a bare leading space at line start (links/
+/// images/code spans render as inline tags, and code-span newlines are
+/// already turned into spaces during normalization).
+fn strip_paragraph_line_indent(inner: &str) -> String {
+    let mut out = String::with_capacity(inner.len());
+    let mut at_line_start = true;
+    for ch in inner.chars() {
+        if at_line_start && (ch == ' ' || ch == '\t') {
+            continue;
+        }
+        if ch == '\n' {
+            // Trim trailing whitespace before pushing the newline.
+            while let Some(c) = out.chars().last() {
+                if c == ' ' || c == '\t' {
+                    out.pop();
+                } else {
+                    break;
+                }
+            }
+            out.push(ch);
+            at_line_start = true;
+            continue;
+        }
+        out.push(ch);
+        at_line_start = false;
+    }
+    out
 }
 
 fn paragraph_ends_with_backslash_hard_break(node: &SyntaxNode) -> bool {
