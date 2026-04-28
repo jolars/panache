@@ -7,6 +7,9 @@ Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/bad
 VSX](https://img.shields.io/open-vsx/v/jolars/panache)](https://open-vsx.org/extension/jolars/panache)
 [![VS
 Code](https://vsmarketplacebadges.dev/version-short/jolars.panache.svg)](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
+[![PyPI](https://badge.fury.io/py/panache-cli.svg)](https://badge.fury.io/py/panache-cli)
+[![npm
+version](https://badge.fury.io/js/@panache-cli%2Fpanache.svg)](https://badge.fury.io/js/@panache-cli%2Fpanache)
 [![codecov](https://codecov.io/gh/jolars/panache/graph/badge.svg?token=uaBVOBfILv)](https://codecov.io/gh/jolars/panache)
 
 A language server, formatter, and linter for Markdown, Quarto, and R Markdown,
