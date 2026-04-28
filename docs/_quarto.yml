@@ -5,9 +5,9 @@ project:
     port: 4200
 
 website:
-  title: "Panache: Language Server, Formatter, and Linter for Pandoc, Quarto, and R Markdown"
+  title: "Panache: Language Server, Formatter, and Linter for Markdown, Quarto, and R Markdown"
   description: >-
-    Panache provides authoring tools for Pandoc, Quarto, and R Markdown: a
+    Panache provides authoring tools for Markdown, Quarto, and R Markdown: a
     language server, formatter, and linter to help you write better documents,
     more efficiently.
 

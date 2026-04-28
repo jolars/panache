@@ -79,6 +79,33 @@ to your system configuration, include it in the `environment.systemPackages`:
 }
 ```
 
+### From PyPI (via uv or pipx)
+
+Install with [uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/):
+
+```bash
+# One-shot run, no install:
+uvx --from panache-cli panache format path/to/file.qmd
+
+# Persistent install:
+uv tool install panache-cli
+# or
+pipx install panache-cli
+```
+
+### From NPM (via npmx)
+
+Install with [npx](https://www.npmjs.com/package/npx) or
+[npmx](https://www.npmjs.com/package/npmx):
+
+```bash
+# One-shot run, no install:
+npx panache-cli format path/to/file.qmd
+
+# Persistent install:
+npm install -g panache-cli
+```
+
 ### VS Code Extension
 
 If you are running VS Code or an editor that supports VS Code extensions (like
@@ -195,28 +222,9 @@ r = "jarl" # R linter with JSON output
 ### Language Server
 
 Panache implements the language server protocol (LSP) to provide editor features
-like formatting, diagnostics, code actions, and more.
-
-Most users should configure their editor to start the language server
-automatically when editing. See [the language server
-documentation](https://panache.bz/guide/lsp) for guides on configuring your
-editor. For VS Code and related editors such as Positron, there is a [VS Code
-Marketplace
-extension](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
-and [Open VSX extension](https://open-vsx.org/extension/jolars/panache) that
-provides an LSP client and additional features.
-
-If you need to run the server manually (for debugging), use:
-
-```bash
-panache lsp
-```
-
-The server communicates over stdin/stdout and provides document formatting
-capabilities. For Quarto projects, the LSP also reads `_quarto.yml`,
-per-directory `_metadata.yml`, and `metadata-files` includes to supply
-project-level metadata to bibliography-aware features. For Bookdown,
-`_bookdown.yml`, `_output.yml`, and `index.Rmd` frontmatter are also considered.
+like formatting, diagnostics, code actions, and more. See [the language server
+documentation](https://panache.bz/guide/lsp) for guides on how to connect
+Panache to your editor and configure LSP features.
 
 The list of LSP features supported by Panache includes, among others:
 
@@ -228,6 +236,7 @@ The list of LSP features supported by Panache includes, among others:
 - Document symbols/outline
 - Folding ranges
 - Go to definition for references and footnotes
+- Quaro and Bookdown project awareness
 
 ## Configuration
 
@@ -263,7 +272,8 @@ prepend-args = ["--print-width=100"]
 
 # External code linters
 [linters]
-r = "jarl" # Enable R linting
+r = "jarl"      # Enable R linting
+python = "ruff"
 ```
 
 See [examples/panache.toml](./examples/panache.toml) for a complete

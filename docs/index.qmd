@@ -1,8 +1,8 @@
 ---
 title: "Panache"
-title-meta: "Panache: Language Server, Formatter, and Linter for Pandoc, Quarto, and R Markdown"
+title-meta: "Panache: Language Server, Formatter, and Linter for Markdown, Quarto, and R Markdown"
 description-meta: >
-  Panache provides authoring tools for Pandoc, Quarto, and R Markdown: a
+  Panache provides authoring tools for Markdown, Quarto, and R Markdown: a
   language server, formatter, and linter to help you write better documents,
   more efficiently.
 title-prefix: ""
@@ -11,10 +11,10 @@ image: images/og.png
 image-alt: "Panache logo"
 
 open-graph:
-  title: "Panache: Language Server, Formatter, and Linter for Pandoc, Quarto, and R Markdown"
+  title: "Panache: Language Server, Formatter, and Linter for Markdown, Quarto, and R Markdown"
 
 twitter-card:
-  title: "Panache: Language Server, Formatter, and Linter for Pandoc, Quarto, and R Markdown"
+  title: "Panache: Language Server, Formatter, and Linter for Markdown, Quarto, and R Markdown"
 
 format:
   html:
@@ -24,13 +24,16 @@ format:
 <img src="images/logo.svg" alt="Panache logo" class="float-end ms-3"
 style="max-width: 20%; height: auto;">
 
-Panache is a language server, formatter, and linter for Pandoc, Quarto, and R
-Markdown. It is built for fast, reliable formatting and robust parsing across
-syntax that many generic Markdown tools struggle with, including fenced divs,
-grid tables, definition lists, citations, and inline footnotes.
+Panache is a language server, formatter, and linter for Markdown, Quarto, and R
+Markdown. It is built for fast, reliable formatting, linting, and language
+services across syntax that many generic Markdown tools struggle with, including
+fenced divs, grid tables, definition lists, citations, and inline footnotes.
 
-Panache is designed to be used in your editor, on the command line, and in CI,
-with consistent behavior across all environments.
+Panache is designed to follow Pandoc's syntax closely and cover its full range
+of Markdown dialects (flavors) and extensions, to be able to handle anything
+from simple CommonMark to complex Quarto documents with embedded code chunks and
+fenced divs. It is flexible and can be used in your editor, on the command line,
+and in CI, with consistent behavior across all environments.
 
 <div style="clear: both;"></div>
 
@@ -44,6 +47,10 @@ with consistent behavior across all environments.
   match your project.
 - **External tool support**: plug in external formatters and linters for code
   blocks to enable language-aware formatting and linting of embedded code.
+- **Fast and reliable**: built in Rust for speed and stability, with a focus on
+  correctness and consistent formatting. See the
+  [Comparisons](guide/comparisons.qmd) and [Performance](guide/performance.qmd)
+  articles for comparisons and benchmarks against other tools.
 
 ## Quick Start
 

@@ -16,24 +16,6 @@ Install `panache` with Cargo:
 cargo install panache
 ```
 
-### From PyPI (via uv or pipx)
-
-Install with [uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/):
-
-```bash
-# One-shot run, no install:
-uvx --from panache-cli panache format path/to/file.qmd
-
-# Persistent install:
-uv tool install panache-cli
-# or
-pipx install panache-cli
-```
-
-The PyPI package is named `panache-cli` because `panache` was already taken on
-PyPI; the installed command is still `panache`. The wheel ships only the binary
---- the same Rust executable as the Cargo and pre-built distributions.
-
 ### Pre-built Binaries
 
 Download platform-specific binaries from the [releases
@@ -86,6 +68,36 @@ to your system configuration, include it in the `environment.systemPackages`:
     pkgs.panache
   ];
 }
+```
+
+### From PyPI (via uv or pipx)
+
+Install with [uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/):
+
+```bash
+# One-shot run, no install:
+uvx --from panache-cli panache format path/to/file.qmd
+
+# Persistent install:
+uv tool install panache-cli
+# or
+pipx install panache-cli
+```
+
+The PyPI package is named `panache-cli` because `panache` was already taken on
+PyPI; the installed command is still `panache`.
+
+### From NPM (via npmx)
+
+Install with [npx](https://www.npmjs.com/package/npx) or
+[npmx](https://www.npmjs.com/package/npmx):
+
+```bash
+# One-shot run, no install:
+npx panache-cli format path/to/file.qmd
+
+# Persistent install:
+npm install -g panache-cli
 ```
 
 ### Verify Installation
