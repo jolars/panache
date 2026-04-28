@@ -4,9 +4,9 @@
 Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jolars/panache/actions/workflows/build-and-test.yml)
 [![Crates.io](https://img.shields.io/crates/v/panache.svg?logo=rust)](https://crates.io/crates/panache)
 [![Open
-VSX](https://img.shields.io/open-vsx/v/jolars/panache)](https://open-vsx.org/extension/jolars/panache)
+VSX](https://img.shields.io/open-vsx/v/jolars/panache?logo=vsix)](https://open-vsx.org/extension/jolars/panache)
 [![VS
-Code](https://vsmarketplacebadges.dev/version-short/jolars.panache.svg)](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
+Code](https://vsmarketplacebadges.dev/version-short/jolars.panache.svg?logo=vsix)](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
 [![PyPI
 version](https://badge.fury.io/py/panache-cli.svg?icon=si%3Apython)](https://badge.fury.io/py/panache-cli)
 [![npm
