@@ -375,6 +375,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34aa73646ffb006b8f5147f3dc182bd4bcb190227ce861fc4a4844bf8e3cb2c0"
 
 [[package]]
+name = "entities"
+version = "1.0.2-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6ff9a251416ff2d42d7be09d6ed9c88d23e965b0f5163e2fc9b361fe47967c0"
+
+[[package]]
 name = "env_filter"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -896,6 +902,7 @@ dependencies = [
 name = "panache-parser"
 version = "0.5.1"
 dependencies = [
+ "entities",
  "insta",
  "log",
  "rowan",

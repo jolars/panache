@@ -1,0 +1,51 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..125
+  PARAGRAPH@0..35
+    TEXT@0..34 "&copy; &nbsp; &amp; & ..."
+    NEWLINE@34..35 "\n"
+  BLANK_LINE@35..36
+    BLANK_LINE@35..36 "\n"
+  PARAGRAPH@36..56
+    TEXT@36..50 "&#42;foo&#42; "
+    EMPHASIS@50..55
+      EMPHASIS_MARKER@50..51 "*"
+      TEXT@51..54 "foo"
+      EMPHASIS_MARKER@54..55 "*"
+    NEWLINE@55..56 "\n"
+  BLANK_LINE@56..57
+    BLANK_LINE@56..57 "\n"
+  PARAGRAPH@57..65
+    TEXT@57..64 "&#9;foo"
+    NEWLINE@64..65 "\n"
+  BLANK_LINE@65..66
+    BLANK_LINE@65..66 "\n"
+  PARAGRAPH@66..98
+    LINK@66..97
+      LINK_START@66..67
+        LINK_START@66..67 "["
+      LINK_TEXT@67..70
+        TEXT@67..70 "foo"
+      LINK_TEXT_END@70..71 "]"
+      LINK_DEST_START@71..72 "("
+      LINK_DEST@72..96
+        TEXT@72..96 "/u&ouml;url \"t&ouml;tle\""
+      LINK_DEST_END@96..97 ")"
+    NEWLINE@97..98 "\n"
+  BLANK_LINE@98..99
+    BLANK_LINE@98..99 "\n"
+  CODE_BLOCK@99..125
+    CODE_FENCE_OPEN@99..117
+      CODE_FENCE_MARKER@99..102 "```"
+      WHITESPACE@102..103 " "
+      CODE_INFO@103..116
+        CODE_LANGUAGE@103..116 "f&ouml;&ouml;"
+      NEWLINE@116..117 "\n"
+    CODE_CONTENT@117..121
+      TEXT@117..120 "foo"
+      NEWLINE@120..121 "\n"
+    CODE_FENCE_CLOSE@121..125
+      CODE_FENCE_MARKER@121..124 "```"
+      NEWLINE@124..125 "\n"

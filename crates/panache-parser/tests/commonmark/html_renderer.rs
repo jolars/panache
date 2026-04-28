@@ -19,7 +19,7 @@ pub fn render(tree: &SyntaxNode) -> String {
     let refs = collect_references(tree);
     let mut out = String::new();
     render_blocks(tree, &refs, &mut out);
-    out
+    restore_entity_placeholders(&out)
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +65,13 @@ fn parse_reference_definition(node: &SyntaxNode) -> Option<(String, RefDef)> {
     }
     let tail = tail.trim_start_matches(':').trim();
     let (url, title) = split_dest_and_title(tail);
-    Some((label, RefDef { url, title }))
+    Some((
+        label,
+        RefDef {
+            url: decode_entities(&url),
+            title: title.map(|t| decode_entities(&t)),
+        },
+    ))
 }
 
 fn split_dest_and_title(text: &str) -> (String, Option<String>) {
@@ -215,6 +221,11 @@ fn render_paragraph(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut
 /// render output never contains a bare leading space at line start (links/
 /// images/code spans render as inline tags, and code-span newlines are
 /// already turned into spaces during normalization).
+///
+/// `decode_entities` substitutes whitespace produced by entity references with
+/// the placeholders defined in `entity_placeholders`, so this strip pass only
+/// removes whitespace that came directly from source bytes. Placeholders are
+/// converted back at the top of `render`.
 fn strip_paragraph_line_indent(inner: &str) -> String {
     let mut out = String::with_capacity(inner.len());
     let mut at_line_start = true;
@@ -408,20 +419,21 @@ fn render_code_block(node: &SyntaxNode, out: &mut String) {
 }
 
 fn code_block_language(node: &SyntaxNode) -> String {
-    for child in node.children() {
-        if child.kind() == SyntaxKind::CODE_FENCE_OPEN {
-            for grand in child.children() {
-                if grand.kind() == SyntaxKind::CODE_LANGUAGE {
-                    return grand.text().to_string().trim().to_string();
-                }
+    let Some(open) = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::CODE_FENCE_OPEN)
+    else {
+        return String::new();
+    };
+    for desc in open.descendants_with_tokens() {
+        match desc {
+            NodeOrToken::Node(n) if n.kind() == SyntaxKind::CODE_LANGUAGE => {
+                return decode_entities(n.text().to_string().trim());
             }
-            for tok in child.children_with_tokens() {
-                if let Some(t) = tok.as_token()
-                    && t.kind() == SyntaxKind::CODE_LANGUAGE
-                {
-                    return t.text().to_string().trim().to_string();
-                }
+            NodeOrToken::Token(t) if t.kind() == SyntaxKind::CODE_LANGUAGE => {
+                return decode_entities(t.text().trim());
             }
+            _ => {}
         }
     }
     String::new()
@@ -479,7 +491,7 @@ fn render_inlines(parent: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut
 
 fn render_token(t: &rowan::SyntaxToken<panache_parser::syntax::PanacheLanguage>, out: &mut String) {
     match t.kind() {
-        SyntaxKind::TEXT => out.push_str(&escape_html(t.text())),
+        SyntaxKind::TEXT => out.push_str(&escape_html(&decode_entities(t.text()))),
         SyntaxKind::ESCAPED_CHAR => {
             // \x — emit just the escaped character, HTML-escaped
             let text = t.text();
@@ -541,7 +553,8 @@ fn render_link(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut Stri
 
     let (url, title) = if let Some(d) = dest_node.as_ref() {
         let raw = d.text().to_string();
-        split_dest_and_title(raw.trim_matches(['(', ')'].as_ref()))
+        let (url, title) = split_dest_and_title(raw.trim_matches(['(', ')'].as_ref()));
+        (decode_entities(&url), title.map(|t| decode_entities(&t)))
     } else if let Some(label_node) = node.children().find(|c| c.kind() == SyntaxKind::LINK_REF) {
         let label = collect_text(&label_node);
         match refs.get(&normalize_label(&label)) {
@@ -585,7 +598,8 @@ fn render_image(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut Str
 
     let (url, title) = if let Some(d) = dest_node.as_ref() {
         let raw = d.text().to_string();
-        split_dest_and_title(raw.trim_matches(['(', ')'].as_ref()))
+        let (url, title) = split_dest_and_title(raw.trim_matches(['(', ')'].as_ref()));
+        (decode_entities(&url), title.map(|t| decode_entities(&t)))
     } else if let Some(label_node) = node.children().find(|c| c.kind() == SyntaxKind::LINK_REF) {
         let label = collect_text(&label_node);
         match refs.get(&normalize_label(&label)) {
@@ -718,4 +732,131 @@ fn is_url_safe(b: u8) -> bool {
         | b':' | b'/' | b'?' | b'#' | b'[' | b']' | b'@'
         | b'!' | b'$' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'='
     )
+}
+
+/// Decode CommonMark entity and numeric character references in a string.
+/// Per spec §6.2: only references with a trailing `;` are recognized;
+/// unknown names are left as literal text. Invalid code points (NUL,
+/// surrogates, > U+10FFFF) are replaced with U+FFFD. This is applied
+/// before HTML-escaping in inline contexts (paragraphs, links, etc.)
+/// and is *not* applied inside code spans or code blocks.
+///
+/// ASCII whitespace produced by entity decoding is substituted with private-use
+/// placeholder characters (see `entity_placeholders`) so paragraph line-indent
+/// stripping doesn't treat decoded whitespace as if it were a source-level
+/// indent. `restore_entity_placeholders` reverses the substitution before the
+/// final HTML is returned.
+fn decode_entities(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut idx = 0;
+    while idx < input.len() {
+        let rest = &input[idx..];
+        if rest.starts_with('&')
+            && let Some(semi) = find_entity_end(rest)
+            && let Some(decoded) = decode_one_entity(&rest[..=semi])
+        {
+            for c in decoded.chars() {
+                out.push(protect_entity_whitespace(c));
+            }
+            idx += semi + 1;
+            continue;
+        }
+        let ch = rest.chars().next().unwrap();
+        out.push(ch);
+        idx += ch.len_utf8();
+    }
+    out
+}
+
+/// Map ASCII whitespace produced by entity decoding to private-use
+/// placeholders so they survive the source-indent strip.
+fn protect_entity_whitespace(c: char) -> char {
+    match c {
+        '\t' => '\u{E001}',
+        ' ' => '\u{E002}',
+        _ => c,
+    }
+}
+
+fn restore_entity_placeholders(s: &str) -> String {
+    s.replace('\u{E001}', "\t").replace('\u{E002}', " ")
+}
+
+/// Returns the byte index of the closing `;` if the prefix of `s` plausibly
+/// looks like a CommonMark entity reference (named or numeric). Bails out on
+/// invalid characters within the body.
+fn find_entity_end(s: &str) -> Option<usize> {
+    let bytes = s.as_bytes();
+    if bytes.first() != Some(&b'&') || bytes.len() < 3 {
+        return None;
+    }
+    if bytes[1] == b'#' {
+        let is_hex = matches!(bytes.get(2), Some(b'x' | b'X'));
+        let body_start = if is_hex { 3 } else { 2 };
+        let max_len = if is_hex { 6 } else { 7 };
+        let mut i = body_start;
+        while i < bytes.len() && i - body_start < max_len {
+            let b = bytes[i];
+            let valid = if is_hex {
+                b.is_ascii_hexdigit()
+            } else {
+                b.is_ascii_digit()
+            };
+            if !valid {
+                break;
+            }
+            i += 1;
+        }
+        if i == body_start {
+            return None;
+        }
+        if bytes.get(i) == Some(&b';') {
+            return Some(i);
+        }
+        return None;
+    }
+    // Named: `[A-Za-z][A-Za-z0-9]*;`. The longest HTML5 entity name is 31 chars
+    // (`CounterClockwiseContourIntegral`).
+    if !bytes[1].is_ascii_alphabetic() {
+        return None;
+    }
+    let mut i = 2;
+    while i < bytes.len() && i < 33 {
+        let b = bytes[i];
+        if b == b';' {
+            return Some(i);
+        }
+        if !b.is_ascii_alphanumeric() {
+            return None;
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Decode a complete entity reference of the form `&NAME;`, `&#NNNN;`, or
+/// `&#xHHHH;`. Returns `None` for unknown names so the caller can leave the
+/// source bytes alone.
+fn decode_one_entity(ent: &str) -> Option<String> {
+    let body = ent.strip_prefix('&')?.strip_suffix(';')?;
+    if let Some(rest) = body.strip_prefix('#') {
+        let code = if let Some(hex) = rest.strip_prefix(['x', 'X']) {
+            u32::from_str_radix(hex, 16).ok()?
+        } else {
+            rest.parse::<u32>().ok()?
+        };
+        return Some(decode_codepoint(code).to_string());
+    }
+    entities::ENTITIES
+        .iter()
+        .find(|e| e.entity == ent)
+        .map(|e| e.characters.to_string())
+}
+
+fn decode_codepoint(c: u32) -> char {
+    if c == 0 || c > 0x10FFFF || (0xD800..=0xDFFF).contains(&c) {
+        '\u{FFFD}'
+    } else {
+        char::from_u32(c).unwrap_or('\u{FFFD}')
+    }
 }
