@@ -509,7 +509,25 @@ impl Extensions {
 
     fn commonmark_defaults() -> Self {
         let mut ext = Self::none_defaults();
+        // CommonMark's core grammar is what pandoc's commonmark reader treats
+        // as "not extensions" — they're built into the reader. Panache's
+        // parser still gates each construct on its extension flag, so we have
+        // to enable the CommonMark-mandatory ones explicitly here.
+        //
+        // Notably absent: `all_symbols_escapable`. CommonMark only allows
+        // backslash escapes of ASCII punctuation, and panache's
+        // `all_symbols_escapable` flag widens that to any character — so it
+        // must stay off for CommonMark.
+        ext.autolinks = true;
+        ext.backtick_code_blocks = true;
+        ext.escaped_line_breaks = true;
+        ext.fenced_code_blocks = true;
+        ext.inline_images = true;
+        ext.inline_links = true;
+        ext.intraword_underscores = true;
         ext.raw_html = true;
+        ext.reference_links = true;
+        ext.shortcut_reference_links = true;
         ext
     }
 

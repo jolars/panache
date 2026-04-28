@@ -1,35 +1,35 @@
 CommonMark spec.txt v0.31.2 conformance report
-263 / 652 examples passing (40.3%)
-389 failing
-0 blocked-list entries
+348 / 652 examples passing (53.4%)
+304 failing
+12 blocked-list entries
 
 === Per-section pass / fail ===
-  ATX headings: 14 pass / 4 fail
-  Autolinks: 8 pass / 11 fail
-  Backslash escapes: 4 pass / 9 fail
+  ATX headings: 15 pass / 3 fail
+  Autolinks: 15 pass / 4 fail
+  Backslash escapes: 7 pass / 6 fail
   Blank lines: 1 pass / 0 fail
   Block quotes: 12 pass / 13 fail
   Code spans: 20 pass / 2 fail
-  Emphasis and strong emphasis: 79 pass / 53 fail
+  Emphasis and strong emphasis: 85 pass / 47 fail
   Entity and numeric character references: 5 pass / 12 fail
-  Fenced code blocks: 4 pass / 25 fail
+  Fenced code blocks: 15 pass / 14 fail
   HTML blocks: 24 pass / 20 fail
-  Hard line breaks: 7 pass / 8 fail
-  Images: 2 pass / 20 fail
+  Hard line breaks: 11 pass / 4 fail
+  Images: 7 pass / 15 fail
   Indented code blocks: 7 pass / 5 fail
   Inlines: 1 pass / 0 fail
-  Link reference definitions: 5 pass / 22 fail
-  Links: 13 pass / 77 fail
+  Link reference definitions: 13 pass / 14 fail
+  Links: 42 pass / 48 fail
   List items: 14 pass / 34 fail
   Lists: 5 pass / 21 fail
-  Paragraphs: 4 pass / 4 fail
+  Paragraphs: 5 pass / 3 fail
   Precedence: 1 pass / 0 fail
   Raw HTML: 6 pass / 14 fail
-  Setext headings: 6 pass / 21 fail
+  Setext headings: 15 pass / 12 fail
   Soft line breaks: 1 pass / 1 fail
   Tabs: 6 pass / 5 fail
   Textual content: 3 pass / 0 fail
-  Thematic breaks: 11 pass / 8 fail
+  Thematic breaks: 12 pass / 7 fail
 
 === Passing example numbers (allowlist candidates) ===
 1
@@ -40,8 +40,11 @@ CommonMark spec.txt v0.31.2 conformance report
 11
 13
 15
+16
 17
 18
+19
+20
 28
 29
 30
@@ -59,11 +62,13 @@ CommonMark spec.txt v0.31.2 conformance report
 53
 54
 55
+59
 62
 63
 64
 65
 66
+67
 68
 69
 71
@@ -73,10 +78,19 @@ CommonMark spec.txt v0.31.2 conformance report
 75
 76
 77
+80
+84
 85
+86
+89
+90
+91
 93
+96
 97
 100
+102
+103
 104
 106
 107
@@ -86,10 +100,21 @@ CommonMark spec.txt v0.31.2 conformance report
 116
 117
 118
+119
+120
 121
+122
+123
+124
+125
+129
 134
+135
+136
 138
+141
 145
+147
 149
 150
 153
@@ -114,15 +139,24 @@ CommonMark spec.txt v0.31.2 conformance report
 183
 185
 189
+192
 197
 199
-209
+203
+204
+205
+206
+207
+210
 211
-213
+212
+214
+215
 219
 220
 221
 225
+226
 227
 231
 232
@@ -170,9 +204,9 @@ CommonMark spec.txt v0.31.2 conformance report
 339
 340
 341
-342
 343
 345
+346
 347
 348
 349
@@ -211,6 +245,7 @@ CommonMark spec.txt v0.31.2 conformance report
 397
 399
 403
+404
 405
 406
 410
@@ -219,8 +254,10 @@ CommonMark spec.txt v0.31.2 conformance report
 414
 415
 418
+419
 420
 421
+422
 423
 424
 428
@@ -228,6 +265,7 @@ CommonMark spec.txt v0.31.2 conformance report
 430
 431
 432
+433
 434
 435
 436
@@ -253,28 +291,71 @@ CommonMark spec.txt v0.31.2 conformance report
 462
 463
 469
+473
+474
 478
 479
-488
-490
-493
+482
+483
+484
+485
+487
 497
-508
+501
+502
+504
+509
+510
 511
+512
 513
-523
-525
-546
+514
+515
+516
+517
+521
+522
+527
+528
+529
+530
+531
+535
+539
+542
+543
+544
 547
 548
+549
 551
+557
+560
+561
+562
+563
+565
+567
+570
+577
 579
+582
+583
 590
+592
+593
+594
+595
+596
+598
+599
+600
+601
 602
-606
+604
+605
 607
 608
-609
 610
 611
 612
@@ -285,12 +366,16 @@ CommonMark spec.txt v0.31.2 conformance report
 622
 624
 633
+634
 635
 638
+639
 640
 641
 644
+645
 646
+647
 648
 650
 651
@@ -303,6 +388,7 @@ CommonMark spec.txt v0.31.2 conformance report
 64
 65
 66
+67
 68
 69
 71
@@ -314,11 +400,18 @@ CommonMark spec.txt v0.31.2 conformance report
 77
 
 # Autolinks
+594
+595
+596
+598
+599
+600
+601
 602
-606
+604
+605
 607
 608
-609
 610
 611
 612
@@ -326,8 +419,11 @@ CommonMark spec.txt v0.31.2 conformance report
 # Backslash escapes
 13
 15
+16
 17
 18
+19
+20
 
 # Blank lines
 227
@@ -361,9 +457,9 @@ CommonMark spec.txt v0.31.2 conformance report
 339
 340
 341
-342
 343
 345
+346
 347
 348
 349
@@ -404,6 +500,7 @@ CommonMark spec.txt v0.31.2 conformance report
 397
 399
 403
+404
 405
 406
 410
@@ -412,8 +509,10 @@ CommonMark spec.txt v0.31.2 conformance report
 414
 415
 418
+419
 420
 421
+422
 423
 424
 428
@@ -421,6 +520,7 @@ CommonMark spec.txt v0.31.2 conformance report
 430
 431
 432
+433
 434
 435
 436
@@ -446,6 +546,8 @@ CommonMark spec.txt v0.31.2 conformance report
 462
 463
 469
+473
+474
 478
 479
 
@@ -457,10 +559,21 @@ CommonMark spec.txt v0.31.2 conformance report
 36
 
 # Fenced code blocks
+119
+120
 121
+122
+123
+124
+125
+129
 134
+135
+136
 138
+141
 145
+147
 
 # HTML blocks
 149
@@ -490,16 +603,25 @@ CommonMark spec.txt v0.31.2 conformance report
 
 # Hard line breaks
 633
+634
 635
 638
+639
 640
 641
 644
+645
 646
+647
 
 # Images
+577
 579
+582
+583
 590
+592
+593
 
 # Indented code blocks
 107
@@ -514,26 +636,63 @@ CommonMark spec.txt v0.31.2 conformance report
 327
 
 # Link reference definitions
+192
 197
 199
-209
+203
+204
+205
+206
+207
+210
 211
-213
+212
+214
+215
 
 # Links
-488
-490
-493
+482
+483
+484
+485
+487
 497
-508
+501
+502
+504
+509
+510
 511
+512
 513
-523
-525
-546
+514
+515
+516
+517
+521
+522
+527
+528
+529
+530
+531
+535
+539
+542
+543
+544
 547
 548
+549
 551
+557
+560
+561
+562
+563
+565
+567
+570
 
 # List items
 253
@@ -563,6 +722,7 @@ CommonMark spec.txt v0.31.2 conformance report
 220
 221
 225
+226
 
 # Precedence
 42
@@ -576,10 +736,19 @@ CommonMark spec.txt v0.31.2 conformance report
 624
 
 # Setext headings
+80
+84
 85
+86
+89
+90
+91
 93
+96
 97
 100
+102
+103
 104
 106
 
@@ -611,4 +780,5 @@ CommonMark spec.txt v0.31.2 conformance report
 53
 54
 55
+59
 

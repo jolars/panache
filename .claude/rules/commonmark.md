@@ -49,7 +49,17 @@ flavor-gated.
   asserted in detail.
 - Keep `blocked.txt` reasons specific and actionable so future work can target
   concrete gaps. Do not use `blocked.txt` to silence regressions — that's the
-  allowlist's job (by removing entries) plus a follow-up fix.
+  allowlist's job (by removing entries) plus a follow-up fix. The one
+  exception: examples that were *passing-by-accident* under prior flavor
+  defaults (e.g. a construct was disabled, parser fell through to plain text,
+  and that happened to match the spec) and that now fail with a *more
+  correct* output once the construct is enabled. These are not regressions;
+  they expose pre-existing parser laxity that the prior defaults masked.
+  They may be moved from the allowlist to `blocked.txt`, but each entry
+  must be labeled "passing-by-accident under prior defaults" along with the
+  concrete parser gap it now exposes. This exception does not cover genuine
+  regressions from parser/renderer changes — those still require a fix, not
+  a `blocked.txt` entry.
 - `spec.txt` is pinned to the version recorded in
   `tests/fixtures/commonmark-spec/.panache-source`. Bumping the spec means
   re-running the full report and reviewing the diff intentionally; do not bump

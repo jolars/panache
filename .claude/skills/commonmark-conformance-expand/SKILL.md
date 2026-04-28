@@ -145,7 +145,15 @@ panache aligned.
      `crates/panache-parser/tests/fixtures/cases/<descriptive-name>/`
      (parser golden) that pins the desired CST shape, then make it pass.
      The conformance harness is *not* where parser invariants are
-     authored.
+     authored. **Fixture-first is non-negotiable** — land the fixture
+     before the allowlist grows. The allowlist guards regressions; it is
+     not where new parsing behavior is asserted in detail.
+   - **Renderer-only gap**: a pure renderer fix (e.g. emitting `<br />`,
+     trimming heading whitespace) does not need a parser fixture if the
+     CST shape it consumes is already pinned by an existing parser
+     golden. If the renderer fix is leaning on a CST shape that has no
+     parser golden yet, add one before allowlisting — otherwise the
+     "invariant" lives only in `html_renderer.rs` and rots silently.
    - **Flavor leak**: confirm by checking the flag in
      `Extensions::for_flavor(Flavor::CommonMark)`. Tighten the gate at
      the parser site that consults the flag.
@@ -193,7 +201,17 @@ panache aligned.
   this harness is `Flavor::CommonMark` only.
 - **Don't** silence a regression by removing an allowlist entry — fix the
   underlying cause, or open a follow-up and document the gap in
-  `blocked.txt`.
+  `blocked.txt`. **Exception — passing-by-accident**: when a flavor-leak
+  or extension-default fix turns on a construct that was previously
+  disabled, examples that were "passing" only because the parser fell
+  through to plain-text may now fail with a *more correct* output that
+  no longer matches the spec. These are not regressions in the
+  invariant-breaking sense; the prior pass was an artifact. They belong
+  in `blocked.txt` with a comment explicitly labeling them
+  "passing-by-accident under prior defaults" plus the concrete parser
+  gap they expose. Removing them from the allowlist requires that label
+  and a follow-up plan; do not use this exception for genuine regressions
+  caused by parser/renderer changes.
 - **Don't** edit `report.txt` or `docs/development/commonmark-report.json`
   by hand. They are derived.
 - **Don't** bump `spec.txt` to a new spec version as a side effect of a

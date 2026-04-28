@@ -139,13 +139,16 @@ fn render_blocks(parent: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut 
 
 fn render_heading(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut String) {
     let level = heading_level(node).clamp(1, 6);
-    out.push_str(&format!("<h{level}>"));
+    let mut inner = String::new();
     if let Some(content) = node
         .children()
         .find(|c| c.kind() == SyntaxKind::HEADING_CONTENT)
     {
-        render_inlines(&content, refs, out);
+        render_inlines(&content, refs, &mut inner);
     }
+    let trimmed = inner.trim_matches(|c: char| c == ' ' || c == '\t');
+    out.push_str(&format!("<h{level}>"));
+    out.push_str(trimmed);
     out.push_str(&format!("</h{level}>\n"));
 }
 
@@ -161,26 +164,64 @@ fn heading_level(node: &SyntaxNode) -> usize {
             }
         }
     }
-    for tok in node.children_with_tokens() {
-        if let Some(t) = tok.as_token()
+    for el in node.descendants_with_tokens() {
+        if let NodeOrToken::Token(t) = el
             && t.kind() == SyntaxKind::SETEXT_HEADING_UNDERLINE
         {
-            return if t.text().starts_with('=') { 1 } else { 2 };
+            return if t.text().trim_start().starts_with('=') {
+                1
+            } else {
+                2
+            };
         }
     }
     1
 }
 
 fn render_paragraph(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut String) {
-    out.push_str("<p>");
-    let inline_start = out.len();
-    render_inlines(node, refs, out);
-    // CommonMark: the trailing newline of a paragraph is not part of its
-    // content. Drop a single trailing '\n' before closing the tag.
-    if out.len() > inline_start && out.ends_with('\n') {
-        out.pop();
+    let mut inner = String::new();
+    render_inlines(node, refs, &mut inner);
+    // CommonMark: trailing newlines of a paragraph are not part of its
+    // content, and any hard line breaks at the end of the block are removed.
+    // A backslash-form hard line break (`\\\n`) at end-of-block leaves the
+    // backslash as literal text per spec ("Hard line breaks at the end of a
+    // block are removed"; the spec example uses `foo\` ⇒ `<p>foo\</p>`).
+    let trailing_backslash = paragraph_ends_with_backslash_hard_break(node);
+    loop {
+        if let Some(rest) = inner.strip_suffix('\n') {
+            inner.truncate(rest.len());
+            continue;
+        }
+        if let Some(rest) = inner.strip_suffix("<br />") {
+            inner.truncate(rest.len());
+            continue;
+        }
+        break;
     }
+    if trailing_backslash {
+        inner.push('\\');
+    }
+    out.push_str("<p>");
+    out.push_str(&inner);
     out.push_str("</p>\n");
+}
+
+fn paragraph_ends_with_backslash_hard_break(node: &SyntaxNode) -> bool {
+    for el in node
+        .descendants_with_tokens()
+        .collect::<Vec<_>>()
+        .iter()
+        .rev()
+    {
+        if let NodeOrToken::Token(t) = el {
+            match t.kind() {
+                SyntaxKind::HARD_LINE_BREAK => return t.text().starts_with('\\'),
+                SyntaxKind::NEWLINE | SyntaxKind::WHITESPACE => continue,
+                _ => return false,
+            }
+        }
+    }
+    false
 }
 
 fn render_list(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut String) {
