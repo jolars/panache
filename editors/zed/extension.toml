@@ -1,6 +1,6 @@
 id = "panache-language-server"
 name = "Panache"
-description = "Language server for Pandoc, Quarto, and R Markdown"
+description = "Language server for Markdown, Quarto, and R Markdown"
 version = "2.35.0"
 schema_version = 1
 authors = ["Johan Larsson <johan@jolars.co>"]

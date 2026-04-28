@@ -1,6 +1,6 @@
 # Panache
 
-A language server for Pandoc, Quarto, and R Markdown.
+A language server for Markdown, Quarto, and R Markdown.
 
 ## Quick start
 

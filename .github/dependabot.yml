@@ -17,3 +17,7 @@ updates:
       interval: "weekly"
     ignore:
       - dependency-name: "@types/vscode"
+  - package-ecosystem: "npm"
+    directory: "/npm/panache-cli"
+    schedule:
+      interval: "weekly"
