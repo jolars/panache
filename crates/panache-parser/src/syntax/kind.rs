@@ -183,6 +183,12 @@ pub enum SyntaxKind {
     HTML_BLOCK_TAG,     // Opening/closing tags
     HTML_BLOCK_CONTENT, // Content between tags
 
+    // Inline raw HTML (CommonMark §6.6 / Pandoc raw_html). One node per HTML
+    // tag/comment/declaration/PI/CDATA span; child token holds the verbatim
+    // bytes of the span.
+    INLINE_HTML,
+    INLINE_HTML_CONTENT,
+
     // TeX blocks
     TEX_BLOCK, // Raw tex block (e.g., LaTeX commands)
 

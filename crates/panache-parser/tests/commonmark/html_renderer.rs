@@ -593,6 +593,22 @@ fn render_inline_node(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &m
         SyntaxKind::LINK => render_link(node, refs, out),
         SyntaxKind::IMAGE_LINK => render_image(node, refs, out),
         SyntaxKind::AUTO_LINK => render_autolink(node, out),
+        SyntaxKind::INLINE_HTML => {
+            // Emit verbatim — entities and backslashes are not processed
+            // inside raw HTML spans (CommonMark §6.6). Whitespace inside the
+            // span must survive `strip_paragraph_line_indent`, so substitute
+            // private-use placeholders that `restore_entity_placeholders`
+            // reverses before the final HTML is returned.
+            for el in node.children_with_tokens() {
+                if let NodeOrToken::Token(t) = el
+                    && t.kind() == SyntaxKind::INLINE_HTML_CONTENT
+                {
+                    for c in t.text().chars() {
+                        out.push(protect_entity_whitespace(c));
+                    }
+                }
+            }
+        }
         _ => {
             // Fallback: descend into children, treating everything as inline
             for el in node.children_with_tokens() {

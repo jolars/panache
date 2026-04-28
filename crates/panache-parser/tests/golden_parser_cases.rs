@@ -224,6 +224,7 @@ golden_test_cases!(
     ignore_directives,
     images,
     indented_code,
+    inline_html_basic_commonmark,
     inline_link_dest_strict_commonmark,
     inline_link_dest_strict_pandoc,
     inline_code,

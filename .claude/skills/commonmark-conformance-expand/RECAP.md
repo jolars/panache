@@ -13,7 +13,153 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-28 (g)
+## Latest session — 2026-04-28 (h)
+
+**Pass count: 437 → 458 / 652 (70.2%, +21)**
+
+Targeted the inline raw HTML §6.6 grammar (the prior recap's #1 target), which
+was a missing feature in the parser entirely — `<a href="x">` and friends fell
+through to plain TEXT, escaped as `&lt;a&gt;` by the renderer. Implemented the
+recognizer once; it cleared all of Raw HTML (7 → 20), the two Hard line breaks
+that were really "no break inside HTML attribute" (642, 643), and incidental
+unlocks in HTML blocks (168, 175, 187), Code spans (344), and Links (491, 494)
+where raw HTML appeared inside other constructs.
+
+### Targets and root causes
+
+- **Raw HTML #613–#617, #623, #625–#631 (13)**, **Hard line breaks #642, #643
+  (2)**, **HTML blocks #168, #175, #187 (3)**, **Code spans #344 (1)**, **Links
+  #491, #494 (2)** — single shared root cause: the parser had no recognizer for
+  CommonMark §6.6 *inline* raw HTML (only block-level `<div>` etc. via the
+  HTML-block detector, and only `<span>...</span>` via the Pandoc native-spans
+  extension). Added the recognizer; both CommonMark and Pandoc-markdown ship
+  with `raw_html = true`, so the same code path serves both flavors and pandoc
+  parity was confirmed (`pandoc -f commonmark -t native` and `pandoc -f markdown
+  -t native` agree on every probed case). Not a dialect divergence.
+
+  The §6.6 grammar covers six discriminated forms — open tag, close tag, comment
+  (with the two degenerate `<!-->` and `<!--->` shapes), processing
+  instruction, declaration, CDATA — each terminated either by `>` or by a
+  delimiter pair. Quoted attribute values may contain anything except the
+  closing quote and may span lines; whitespace between tag-name and attributes
+  may include up to one line ending. The recognizer is a byte-level dispatch
+  in priority order and bails to `None` on any unterminated form, so plausible
+  but unclosed `<a foo="...` correctly falls through to plain text.
+
+  CST shape: one `INLINE_HTML` node per matched span containing a single
+  `INLINE_HTML_CONTENT` token with the verbatim bytes. Backslashes and entity
+  references inside the span are *not* decoded — the dispatcher consumes the
+  whole span before the standard escape/entity passes can fire on those bytes,
+  which is what makes #21-style cases (`<a href="\*">`) and #630 (`&ouml;` in
+  attr value) come out right.
+
+### Files changed
+
+- **Parser (missing feature)**:
+  - `crates/panache-parser/src/parser/inlines/inline_html.rs` (new) —
+    `try_parse_inline_html(text)` returns the byte length of a matched span,
+    or `None`. Handles the six §6.6 forms in priority order. Has a focused
+    set of unit tests for the recognizer (open/close/empty-element tags,
+    multi-line quoted attribute values, comments incl. `<!-->` /`<!--->`,
+    PI/CDATA/declaration, illegal-name and unterminated rejection).
+  - `crates/panache-parser/src/parser/inlines.rs` — module wired in.
+  - `crates/panache-parser/src/parser/inlines/core.rs` — dispatcher inserted
+    after autolink + native-span checks (both more specific) and before the
+    fallthrough to TEXT, gated on `config.extensions.raw_html` so it stays
+    off when a flavor explicitly disables raw HTML.
+  - `crates/panache-parser/src/syntax/kind.rs` — added `INLINE_HTML` and
+    `INLINE_HTML_CONTENT` kinds. CST shape: one node per span, single child
+    token with the verbatim bytes.
+- **Renderer (test-only)**:
+  `crates/panache-parser/tests/commonmark/html_renderer.rs`
+  - `render_inline_node` matches `INLINE_HTML` and emits its
+    `INLINE_HTML_CONTENT` text verbatim (no entity decoding, no
+    backslash-escape processing, no HTML escaping) — but routes the
+    characters through `protect_entity_whitespace`, the same private-use
+    placeholder mechanism `decode_entities` already uses, so the spaces and
+    tabs *inside* an HTML span survive `strip_paragraph_line_indent`.
+    Without that, #642 (`<a href="foo  \nbar">`) loses the two-space
+    trailing run inside the attribute value.
+- **Parser fixture (CST snapshot via insta)**:
+  `crates/panache-parser/tests/fixtures/cases/inline_html_basic_commonmark/`
+  pins one paragraph per HTML form (open/close, comment incl. degenerate
+  forms, PI, CDATA, declaration, attribute with backslash + entity).
+  `parser-options.toml` sets `flavor = "commonmark"`. Registered in
+  `crates/panache-parser/tests/golden_parser_cases.rs`. Single fixture is
+  enough — pandoc-markdown produces the same CST under default extensions
+  (verified by hand), and the rules say not to duplicate when both dialects
+  agree.
+- **Allowlist additions**: `tests/commonmark/allowlist.txt`
+  - HTML blocks: +#168, +#175, +#187
+  - Code spans: +#344
+  - Links: +#491, +#494
+  - Raw HTML: +#613, +#614, +#615, +#616, +#617, +#623, +#625, +#626, +#627,
+    +#628, +#629, +#630, +#631
+  - Hard line breaks: +#642, +#643
+
+### Don't redo
+
+- Don't reorder the inline `<` dispatchers. The current order
+  (autolink → Pandoc native-span → inline raw HTML) is load-bearing:
+  autolink is the most specific (`<scheme:...>`), Pandoc native-span only
+  fires when `extensions.native_spans` is on (Pandoc-only) and consumes the
+  full `<span>...</span>` pair, and inline raw HTML matches a single tag.
+  Moving inline raw HTML earlier would steal `<span>` from native-span
+  under Pandoc and regress the SPAN AST.
+- Don't widen `try_parse_inline_html` to consume past a missing terminator
+  ("be liberal"). The whole recognizer hinges on returning `None` when the
+  span doesn't actually close, so the dispatcher falls through to TEXT and
+  the bytes survive as plain text — that's what makes `<33>`, unterminated
+  `<a foo="...`, illegal attribute names, etc. all render as escaped text
+  instead of bogus HTML.
+- Don't drop the `protect_entity_whitespace` pass on the rendered
+  `INLINE_HTML_CONTENT`. `strip_paragraph_line_indent` runs after inline
+  rendering and trims trailing whitespace before each `\n` in the inner
+  paragraph buffer; without the placeholder substitution, attribute values
+  that contain trailing-space-before-LF lose those spaces.
+- The §6.6 recognizer is a *missing feature* that improved Pandoc-markdown
+  too — both flavors had the same TEXT-only fallback. There's no flavor or
+  dialect branch on this code path, only the existing `raw_html` extension
+  flag, which is the right gate.
+- #21 (Backslash escapes section) is *still failing*. Input is a single
+  bare `<a href="/bar\/)">` line — under CommonMark this is a *block-level*
+  HTML block (type 7), expected output omits the `<p>` wrapper entirely.
+  Our parser still wraps it in `<p>...</p>`. That's an HTML-block detector
+  gap, not an inline raw HTML gap. Belongs with the HTML blocks bucket.
+
+### Suggested next targets, ranked
+
+1. **HTML blocks (27/17)** — biggest remaining bucket where raw HTML matters.
+   The §7 *block*-level HTML grammar still has gaps: missing block-type-7
+   detection (#21), and the "blank-line-separated HTML block with markdown
+   between" pattern (#151, #188, #191 from the prior session). Worth
+   probing each cluster — they may share a fix.
+2. **Lists (5/21) + List items (17/31)** — biggest absolute pass-rate gap and
+   shares root cause with thematic-break #57, #60, #61 and blockquote #234,
+   #246 (HR-interrupts-list / -blockquote). #115 (Indented code blocks)
+   chained on the same paragraph-vs-block-interruption refactor.
+3. **#128 (Block quotes / fenced code in blockquote)** — single-example
+   follow-up to the prior session's dialect gate; fix in
+   `parse_fenced_code_block` to strip blockquote markers from content lines
+   (see prior recap's "Don't redo").
+4. **Emphasis and strong emphasis (85/47)** — largest remaining absolute
+   failure count; flanking-rule and autolink-precedence edge cases (#480,
+   #481 are autolink-vs-emphasis precedence).
+5. **Link reference definitions (15/12)** — #194 (label with `\]`), #195
+   (multiline title), #196, #198 (multiline destination), #208, #213, #216,
+   #217: the LRD parser currently captures the whole line(s) as raw TEXT
+   instead of structured nodes. Bigger refactor.
+6. **Tabs (6/5)** — #2, #4, #5, #6, #7 all need tab→space expansion with
+   column alignment in indented-code, list, and blockquote contexts. Spec
+   §2.2. One shared fix across most of these.
+7. **Setext heading multi-line content (#81, #82, #95)** + **#115
+   (`# Heading\n    foo`)** — paragraph parser refactor: needs to recognize
+   indented-code-after-heading without a blank line, plus retroactive setext
+   conversion of accumulated paragraph lines. These are interrelated.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-28 (g)
 
 **Pass count: 427 → 437 / 652 (67.0%, +10)**
 
@@ -22,7 +168,7 @@ fixes for blank lines inside indented code blocks. The fenced-code dialect gate
 was the biggest leverage win (8 examples in Fenced code + 1 cascading unlock in
 Block quotes from the same root cause).
 
-### Targets and root causes
+### Targets and root causes (g)
 
 - **#111, #112 (Indented code blocks)**: blank lines inside an indented code
   block should have *up to 4* leading spaces stripped — the rest preserved.

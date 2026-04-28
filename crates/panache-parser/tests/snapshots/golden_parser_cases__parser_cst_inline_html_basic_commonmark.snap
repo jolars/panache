@@ -1,0 +1,50 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..225
+  PARAGRAPH@0..36
+    TEXT@0..6 "Open: "
+    INLINE_HTML@6..18
+      INLINE_HTML_CONTENT@6..18 "<a href=\"x\">"
+    TEXT@18..27 ". Close: "
+    INLINE_HTML@27..34
+      INLINE_HTML_CONTENT@27..34 "</foo >"
+    TEXT@34..35 "."
+    NEWLINE@35..36 "\n"
+  BLANK_LINE@36..37
+    BLANK_LINE@36..37 "\n"
+  PARAGRAPH@37..103
+    TEXT@37..46 "Comment: "
+    INLINE_HTML@46..56
+      INLINE_HTML_CONTENT@46..56 "<!-- a -->"
+    TEXT@56..62 ". PI: "
+    INLINE_HTML@62..78
+      INLINE_HTML_CONTENT@62..78 "<?php echo 1; ?>"
+    TEXT@78..87 ". CDATA: "
+    INLINE_HTML@87..101
+      INLINE_HTML_CONTENT@87..101 "<![CDATA[xy]]>"
+    TEXT@101..102 "."
+    NEWLINE@102..103 "\n"
+  BLANK_LINE@103..104
+    BLANK_LINE@103..104 "\n"
+  PARAGRAPH@104..165
+    TEXT@104..110 "Decl: "
+    INLINE_HTML@110..129
+      INLINE_HTML_CONTENT@110..129 "<!ELEMENT br EMPTY>"
+    TEXT@129..147 ". Empty comments: "
+    INLINE_HTML@147..152
+      INLINE_HTML_CONTENT@147..152 "<!-->"
+    TEXT@152..157 " and "
+    INLINE_HTML@157..163
+      INLINE_HTML_CONTENT@157..163 "<!--->"
+    TEXT@163..164 "."
+    NEWLINE@164..165 "\n"
+  BLANK_LINE@165..166
+    BLANK_LINE@165..166 "\n"
+  PARAGRAPH@166..225
+    TEXT@166..204 "Backslashes and entit ..."
+    INLINE_HTML@204..223
+      INLINE_HTML_CONTENT@204..223 "<a href=\"\\*&ouml;\">"
+    TEXT@223..224 "."
+    NEWLINE@224..225 "\n"

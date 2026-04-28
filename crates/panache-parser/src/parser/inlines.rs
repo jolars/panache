@@ -22,6 +22,8 @@ pub mod escapes;
 pub mod inline_executable;
 #[path = "inlines/inline_footnotes.rs"]
 pub mod inline_footnotes;
+#[path = "inlines/inline_html.rs"]
+pub mod inline_html;
 #[path = "inlines/latex.rs"]
 pub mod latex;
 #[path = "inlines/links.rs"]

@@ -41,6 +41,7 @@ use super::inline_footnotes::{
     emit_footnote_reference, emit_inline_footnote, try_parse_footnote_reference,
     try_parse_inline_footnote,
 };
+use super::inline_html::{emit_inline_html, try_parse_inline_html};
 use super::latex::{parse_latex_command, try_parse_latex_command};
 use super::links::{
     emit_autolink, emit_bare_uri_link, emit_inline_image, emit_inline_link, emit_reference_image,
@@ -1630,6 +1631,23 @@ fn parse_inline_range_impl(
             }
             log::trace!("Matched native span at pos {}", pos);
             emit_native_span(builder, content, &attributes, config);
+            pos += len;
+            text_start = pos;
+            continue;
+        }
+
+        // Try inline raw HTML (CommonMark §6.6 / Pandoc raw_html). Must run
+        // after autolinks (more specific) and native spans (Pandoc
+        // <span>…</span> wrapper) since all three start with `<`.
+        if byte == b'<'
+            && config.extensions.raw_html
+            && let Some(len) = try_parse_inline_html(&text[pos..])
+        {
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            }
+            log::trace!("Matched inline raw HTML at pos {}", pos);
+            emit_inline_html(builder, &text[pos..pos + len]);
             pos += len;
             text_start = pos;
             continue;
