@@ -9,7 +9,9 @@ VSX](https://img.shields.io/open-vsx/v/jolars/panache)](https://open-vsx.org/ext
 Code](https://vsmarketplacebadges.dev/version-short/jolars.panache.svg)](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
 [![codecov](https://codecov.io/gh/jolars/panache/graph/badge.svg?token=uaBVOBfILv)](https://codecov.io/gh/jolars/panache)
 
-A language server, formatter, and linter for Pandoc, Quarto, and R Markdown.
+A language server, formatter, and linter for Markdown, Quarto, and R Markdown,
+built in Rust with a lossless CST parser and support for external formatters and
+linters on code blocks.
 
 ## Installation
 
