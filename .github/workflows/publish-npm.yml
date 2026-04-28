@@ -219,7 +219,7 @@ jobs:
           fi
 
   publish-main:
-    name: Publish panache-cli
+    name: Publish @panache-cli/panache
     needs: publish-platform-packages
     runs-on: ubuntu-latest
     environment: release

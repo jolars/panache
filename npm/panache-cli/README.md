@@ -1,4 +1,4 @@
-# panache-cli
+# @panache-cli/panache
 
 [Panache](https://panache.bz) is an LSP, formatter, and linter for Markdown,
 Quarto, and RMarkdown documents.
@@ -6,7 +6,7 @@ Quarto, and RMarkdown documents.
 ## Install
 
 ```sh
-npm install -g panache-cli
+npm install -g @panache-cli/panache
 ```
 
 This installs the `panache` command globally. The package detects your platform
@@ -16,7 +16,7 @@ at install time and pulls in a prebuilt binary via npm's optional dependencies
 You can also use it without a global install:
 
 ```sh
-npx panache-cli format document.qmd
+npx @panache-cli/panache format document.qmd
 ```
 
 ## Usage
@@ -43,8 +43,8 @@ Prebuilt binaries are shipped for:
 
 If your platform isn't covered, install via
 [Cargo](https://crates.io/crates/panache),
-[PyPI](https://pypi.org/project/panache-cli/), or one of the other methods
-listed at <https://panache.bz>.
+[PyPI](https://pypi.org/project/panache-cli/) (named `panache-cli` there), or
+one of the other methods listed at <https://panache.bz>.
 
 ## License
 

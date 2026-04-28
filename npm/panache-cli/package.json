@@ -1,5 +1,5 @@
 {
-  "name": "panache-cli",
+  "name": "@panache-cli/panache",
   "version": "2.40.0",
   "description": "An LSP, formatter, and linter for Pandoc markdown, Quarto, and RMarkdown",
   "keywords": [
