@@ -152,7 +152,7 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Download binary
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: binary-${{ matrix.target }}
           path: binary
