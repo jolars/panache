@@ -100,10 +100,10 @@ Install with [npx](https://www.npmjs.com/package/npx) or
 
 ```bash
 # One-shot run, no install:
-npx panache-cli format path/to/file.qmd
+npx @panache-cli/panache format path/to/file.qmd
 
 # Persistent install:
-npm install -g panache-cli
+npm install -g @panache-cli/panache
 ```
 
 ### VS Code Extension
