@@ -181,3 +181,11 @@ NJ66
 WZ62
 # Block-map value is a multi-line flow map whose entries each split on `:`.
 ZF4X
+# Multi-line flow map containing nested flow sequences and flow maps as values.
+M7NX
+# Flow map with explicit-key indicator (`{ ? foo :, : bar }`).
+FRK4
+# Multi-line flow map mixing explicit and implicit keys (`? explicit: ...` and a trailing `?`).
+DFF7
+# Comment line inside a multi-line flow sequence is dropped from projected scalar text.
+7TMG

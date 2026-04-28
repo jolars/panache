@@ -567,9 +567,13 @@ fn fold_plain_scalar(text: &str) -> String {
     let mut pieces = Vec::new();
     for line in text.split('\n') {
         let trimmed = line.trim();
-        if !trimmed.is_empty() {
-            pieces.push(trimmed.to_string());
+        // A line whose first non-blank character is `#` is a YAML comment
+        // line (the lexer currently leaves these embedded in scalar token
+        // text inside multi-line flow continuations); skip it from folding.
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
         }
+        pieces.push(trimmed.to_string());
     }
     if pieces.is_empty() {
         return String::new();
@@ -578,7 +582,6 @@ fn fold_plain_scalar(text: &str) -> String {
 }
 
 fn project_flow_map_entries(flow_map: &SyntaxNode, handles: &TagHandles, out: &mut Vec<String>) {
-    let _ = handles;
     for entry in flow_map
         .children()
         .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_ENTRY)
@@ -604,22 +607,114 @@ fn project_flow_map_entries(flow_map: &SyntaxNode, handles: &TagHandles, out: &m
             .map(|tok| tok.text().to_string())
             .collect::<Vec<_>>()
             .join("");
-        let raw_value = value_node
-            .descendants_with_tokens()
-            .filter_map(|el| el.into_token())
-            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
-            .map(|tok| tok.text().to_string())
-            .collect::<Vec<_>>()
-            .join("");
 
         if has_explicit_colon {
-            out.push(flow_scalar_event(&raw_key, handles));
-            out.push(flow_scalar_event(&raw_value, handles));
+            // Strip the explicit-key `?` indicator (`{ ? foo : v }`) from
+            // the projected key text. A bare `? :` entry (key reduces to
+            // empty after stripping) projects to an empty `=VAL :`.
+            let stripped_key = strip_explicit_key_indicator(raw_key.trim());
+            if stripped_key.is_empty() {
+                out.push("=VAL :".to_string());
+            } else {
+                out.push(flow_scalar_event(stripped_key, handles));
+            }
+            project_flow_map_value(&value_node, handles, out);
         } else {
+            let raw_value = value_node
+                .descendants_with_tokens()
+                .filter_map(|el| el.into_token())
+                .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+                .map(|tok| tok.text().to_string())
+                .collect::<Vec<_>>()
+                .join("");
             let combined = format!("{raw_key}{raw_value}");
-            out.push(plain_val_event(&fold_plain_scalar(&combined)));
+            let folded = fold_plain_scalar(&combined);
+            let stripped = strip_explicit_key_indicator(&folded);
+            if stripped.is_empty() {
+                out.push("=VAL :".to_string());
+            } else {
+                out.push(plain_val_event(stripped));
+            }
             out.push("=VAL :".to_string());
         }
+    }
+}
+
+/// Project a `YAML_FLOW_MAP_VALUE` node, recursing into nested flow
+/// collections (`+SEQ [] ... -SEQ`, `+MAP {} ... -MAP`) when present so that
+/// multi-line nested flow values like `{ a: [ b, c, { d: [e, f] } ] }`
+/// produce structured event streams instead of one slurped scalar.
+fn project_flow_map_value(value_node: &SyntaxNode, handles: &TagHandles, out: &mut Vec<String>) {
+    if let Some(flow_seq) = value_node
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
+    {
+        out.push("+SEQ []".to_string());
+        project_flow_sequence_items_cst(&flow_seq, handles, out);
+        out.push("-SEQ".to_string());
+        return;
+    }
+    if let Some(nested_map) = value_node
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
+    {
+        out.push("+MAP {}".to_string());
+        project_flow_map_entries(&nested_map, handles, out);
+        out.push("-MAP".to_string());
+        return;
+    }
+
+    let raw_value = value_node
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+        .map(|tok| tok.text().to_string())
+        .collect::<Vec<_>>()
+        .join("");
+    out.push(flow_scalar_event(&raw_value, handles));
+}
+
+/// CST-walking variant of flow-sequence projection. Each
+/// `YAML_FLOW_SEQUENCE_ITEM` may contain a nested `YAML_FLOW_SEQUENCE` /
+/// `YAML_FLOW_MAP`; if neither is present we fall back to the text-based
+/// `project_flow_seq_item` for plain/quoted scalar items.
+fn project_flow_sequence_items_cst(
+    flow_seq: &SyntaxNode,
+    handles: &TagHandles,
+    out: &mut Vec<String>,
+) {
+    for item in flow_seq
+        .children()
+        .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE_ITEM)
+    {
+        if let Some(nested_seq) = item
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
+        {
+            out.push("+SEQ []".to_string());
+            project_flow_sequence_items_cst(&nested_seq, handles, out);
+            out.push("-SEQ".to_string());
+            continue;
+        }
+        if let Some(nested_map) = item
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
+        {
+            out.push("+MAP {}".to_string());
+            project_flow_map_entries(&nested_map, handles, out);
+            out.push("-MAP".to_string());
+            continue;
+        }
+        // Build the item text from scalar/key tokens only so embedded
+        // `YAML_COMMENT` tokens (e.g. `[ word1\n# comment\n, word2]`) do not
+        // leak into the projected scalar value.
+        let item_text: String = item
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_KEY))
+            .map(|tok| tok.text().to_string())
+            .collect();
+        project_flow_seq_item(&item_text, handles, out);
     }
 }
 

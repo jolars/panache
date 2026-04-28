@@ -899,12 +899,6 @@
       "tree": false
     },
     {
-      "case_id": "7TMG",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "7W2P",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -1163,12 +1157,6 @@
       "tree": false
     },
     {
-      "case_id": "DFF7",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "DK3J",
       "diagnostic_codes": [
         "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START"
@@ -1253,12 +1241,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "FRK4",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "FTA2",
@@ -1465,12 +1447,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "M7NX",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "M9B4",
@@ -1885,6 +1861,7 @@
     "6SLA",
     "6XDY",
     "74H7",
+    "7TMG",
     "7Z25",
     "87E4",
     "8KB6",
@@ -1902,10 +1879,12 @@
     "CUP7",
     "D88J",
     "D9TU",
+    "DFF7",
     "DHP8",
     "E76Z",
     "F2C7",
     "FQ7F",
+    "FRK4",
     "H3Z8",
     "HMK4",
     "HWV9",
@@ -1920,6 +1899,7 @@
     "LP6E",
     "LQZ7",
     "M29M",
+    "M7NX",
     "MXS3",
     "NJ66",
     "PUW8",
@@ -1948,8 +1928,8 @@
   "summary": {
     "error_contract_ok_count": 54,
     "fails_needs_error_path_count": 24,
-    "fails_needs_feature_count": 173,
-    "passes_now_count": 82,
+    "fails_needs_feature_count": 169,
+    "passes_now_count": 86,
     "total_cases": 352
   }
 }
