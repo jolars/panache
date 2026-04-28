@@ -145,7 +145,9 @@ fn emit_flow_sequence<'a>(
                 emit_token_as_yaml(builder, &tokens[*i]);
                 *i += 1;
             }
-            YamlToken::Whitespace if !open_item => {
+            YamlToken::Whitespace | YamlToken::Newline | YamlToken::Indent | YamlToken::Dedent
+                if !open_item =>
+            {
                 emit_token_as_yaml(builder, &tokens[*i]);
                 *i += 1;
             }
@@ -220,10 +222,14 @@ fn emit_flow_map<'a>(
         // Skip inter-entry whitespace and newlines. The flow lexer chunks
         // text between flow indicators into Scalar tokens, including
         // whitespace-only chunks like the space in `, }` — treat those as
-        // trivia here so they do not synthesize phantom entries.
+        // trivia here so they do not synthesize phantom entries. Indent and
+        // Dedent are emitted on multi-line flow continuations and carry no
+        // semantic weight inside a flow collection.
         while *i < tokens.len()
-            && (matches!(tokens[*i].kind, YamlToken::Whitespace | YamlToken::Newline)
-                || (tokens[*i].kind == YamlToken::Scalar && tokens[*i].text.trim().is_empty()))
+            && (matches!(
+                tokens[*i].kind,
+                YamlToken::Whitespace | YamlToken::Newline | YamlToken::Indent | YamlToken::Dedent
+            ) || (tokens[*i].kind == YamlToken::Scalar && tokens[*i].text.trim().is_empty()))
         {
             emit_token_as_yaml(builder, &tokens[*i]);
             *i += 1;
@@ -285,50 +291,100 @@ fn emit_flow_map_entry<'a>(
     builder.start_node(SyntaxKind::YAML_FLOW_MAP_ENTRY.into());
     builder.start_node(SyntaxKind::YAML_FLOW_MAP_KEY.into());
 
-    // Emit leading whitespace inside key node
-    while *i < tokens.len() && tokens[*i].kind == YamlToken::Whitespace {
+    // Emit leading whitespace and zero-width indent markers inside key node.
+    // Indent/Dedent appear on multi-line flow continuations but are not
+    // semantic inside a flow collection.
+    while *i < tokens.len()
+        && matches!(
+            tokens[*i].kind,
+            YamlToken::Whitespace | YamlToken::Indent | YamlToken::Dedent
+        )
+    {
         emit_token_as_yaml(builder, &tokens[*i]);
         *i += 1;
     }
 
-    // Determine key/value split point
-    let value_prefix: Option<&'a str> = match tokens.get(*i).map(|t| t.kind) {
-        Some(YamlToken::Scalar) => {
-            let scalar = tokens[*i];
+    // Locate the colon that terminates an implicit key, if any. The implicit
+    // key may span several Scalar tokens separated by Newline/Whitespace/
+    // Indent/Dedent when a flow-map entry's key wraps across lines (e.g.
+    // `{ multi\n  line: value}`). Nested flow openers, an explicit
+    // `Key`/`Tag`/`Anchor`/`Alias` indicator, or a structural delimiter end
+    // the search.
+    let colon_at: Option<usize> = {
+        let mut j = *i;
+        let mut found = None;
+        while j < tokens.len() {
+            match tokens[j].kind {
+                YamlToken::Comma
+                | YamlToken::FlowMapEnd
+                | YamlToken::FlowSeqEnd
+                | YamlToken::FlowMapStart
+                | YamlToken::FlowSeqStart
+                | YamlToken::Tag
+                | YamlToken::Key
+                | YamlToken::Anchor
+                | YamlToken::Alias => break,
+                YamlToken::Scalar => {
+                    if split_once_unquoted(tokens[j].text, ':').is_some() {
+                        found = Some(j);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            j += 1;
+        }
+        found
+    };
+
+    let value_prefix: Option<&'a str> = if let Some(target) = colon_at {
+        // Emit any inter-scalar trivia (Newline / Whitespace / Indent / Dedent
+        // / preceding key-half Scalar chunks) into the key node before the
+        // colon split.
+        while *i < target {
+            emit_token_as_yaml(builder, &tokens[*i]);
             *i += 1;
-            if let Some((key_text, rest_text)) = split_once_unquoted(scalar.text, ':') {
-                builder.token(SyntaxKind::YAML_KEY.into(), key_text);
-                builder.token(
-                    SyntaxKind::YAML_COLON.into(),
-                    &scalar.text[key_text.len()..key_text.len() + 1],
-                );
-                Some(rest_text)
-            } else {
-                // No colon — standalone scalar (implicit key or value-only)
+        }
+        let scalar = tokens[target];
+        *i += 1;
+        let (key_text, rest_text) = split_once_unquoted(scalar.text, ':')
+            .expect("implicit-key scan promised a colon in this scalar");
+        if !key_text.is_empty() {
+            builder.token(SyntaxKind::YAML_KEY.into(), key_text);
+        }
+        builder.token(
+            SyntaxKind::YAML_COLON.into(),
+            &scalar.text[key_text.len()..key_text.len() + 1],
+        );
+        Some(rest_text)
+    } else {
+        match tokens.get(*i).map(|t| t.kind) {
+            Some(YamlToken::Scalar) => {
+                let scalar = tokens[*i];
+                *i += 1;
                 builder.token(SyntaxKind::YAML_SCALAR.into(), scalar.text);
                 None
             }
-        }
-        Some(YamlToken::Key) => {
-            // Already-tokenized key (from multi-line block lexing inside a flow map)
-            builder.token(SyntaxKind::YAML_KEY.into(), tokens[*i].text);
-            *i += 1;
-            while *i < tokens.len() && tokens[*i].kind == YamlToken::Whitespace {
+            Some(YamlToken::Key) => {
+                builder.token(SyntaxKind::YAML_KEY.into(), tokens[*i].text);
+                *i += 1;
+                while *i < tokens.len() && tokens[*i].kind == YamlToken::Whitespace {
+                    emit_token_as_yaml(builder, &tokens[*i]);
+                    *i += 1;
+                }
+                if *i < tokens.len() && tokens[*i].kind == YamlToken::Colon {
+                    builder.token(SyntaxKind::YAML_COLON.into(), tokens[*i].text);
+                    *i += 1;
+                }
+                None
+            }
+            Some(YamlToken::Tag) => {
                 emit_token_as_yaml(builder, &tokens[*i]);
                 *i += 1;
+                None
             }
-            if *i < tokens.len() && tokens[*i].kind == YamlToken::Colon {
-                builder.token(SyntaxKind::YAML_COLON.into(), tokens[*i].text);
-                *i += 1;
-            }
-            None
+            _ => None,
         }
-        Some(YamlToken::Tag) => {
-            emit_token_as_yaml(builder, &tokens[*i]);
-            *i += 1;
-            None
-        }
-        _ => None,
     };
 
     builder.finish_node(); // YAML_FLOW_MAP_KEY

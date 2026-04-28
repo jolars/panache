@@ -1529,12 +1529,6 @@
       "tree": false
     },
     {
-      "case_id": "NJ66",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "NKF9",
       "diagnostic_codes": [
         "YAML_LEX_ERROR"
@@ -1805,12 +1799,6 @@
       "tree": false
     },
     {
-      "case_id": "WZ62",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "X38W",
       "diagnostic_codes": [
         "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END"
@@ -1857,12 +1845,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "ZF4X",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "ZK9H",
@@ -1939,6 +1921,7 @@
     "LQZ7",
     "M29M",
     "MXS3",
+    "NJ66",
     "PUW8",
     "Q88A",
     "QF4Y",
@@ -1955,16 +1938,18 @@
     "UDR7",
     "V55R",
     "W5VH",
+    "WZ62",
     "Y2GN",
     "YD5X",
     "Z9M4",
+    "ZF4X",
     "ZH7C"
   ],
   "summary": {
     "error_contract_ok_count": 54,
     "fails_needs_error_path_count": 24,
-    "fails_needs_feature_count": 176,
-    "passes_now_count": 79,
+    "fails_needs_feature_count": 173,
+    "passes_now_count": 82,
     "total_cases": 352
   }
 }

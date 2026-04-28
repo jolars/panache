@@ -15,8 +15,8 @@ DOCUMENT@0..21
         YAML_BLOCK_MAP@0..21
           YAML_FLOW_SEQUENCE@0..20
             YAML_SCALAR@0..1 "["
-            YAML_FLOW_SEQUENCE_ITEM@1..19
-              YAML_SCALAR@1..2 "\n"
+            YAML_SCALAR@1..2 "\n"
+            YAML_FLOW_SEQUENCE_ITEM@2..19
               YAML_SCALAR@2..7 "? foo"
               YAML_SCALAR@7..8 "\n"
               YAML_SCALAR@8..8 ""

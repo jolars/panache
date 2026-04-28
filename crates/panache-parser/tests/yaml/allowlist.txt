@@ -175,3 +175,9 @@ Z9M4
 F2C7
 # Block sequence with mixed quoted scalars + tags + anchors + alias + tag-only-empty.
 LE5A
+# Block-sequence item containing a flow map whose implicit key wraps across lines.
+NJ66
+# Flow map across multiple lines whose entries separate with newlines plus tags (`!!str`).
+WZ62
+# Block-map value is a multi-line flow map whose entries each split on `:`.
+ZF4X
