@@ -148,11 +148,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
-
-      - name: Upgrade npm (OIDC trusted publishing requires >=11.5.1)
-        run: npm install -g npm@latest
 
       - name: Download binary
         uses: actions/download-artifact@v6
@@ -233,11 +230,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
-
-      - name: Upgrade npm (OIDC trusted publishing requires >=11.5.1)
-        run: npm install -g npm@latest
 
       - name: Assemble main package
         run: |
