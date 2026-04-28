@@ -502,6 +502,7 @@ fn code_block_content(node: &SyntaxNode) -> String {
         .children()
         .any(|c| c.kind() == SyntaxKind::CODE_FENCE_OPEN);
     let bq_depth = blockquote_depth(node);
+    let li_indent = enclosing_list_item_content_column(node);
     let mut content = String::new();
     if is_fenced {
         // Per CommonMark §4.5: if the opening fence is indented, content lines
@@ -537,11 +538,19 @@ fn code_block_content(node: &SyntaxNode) -> String {
         // Indented code block: strip up to 4 leading spaces (or 1 tab) from
         // each line. Blank lines (whitespace-only) are also stripped of up
         // to 4 leading spaces; any remaining whitespace is preserved.
+        // Inside a list item, also strip the list-item content column first
+        // so the 4-space indented-code marker remains the only thing the
+        // generic strip removes.
         for child in node.children() {
             if child.kind() == SyntaxKind::CODE_CONTENT {
                 let raw = child.text().to_string();
                 let raw = if bq_depth > 0 {
                     strip_blockquote_prefix_per_line(&raw, bq_depth)
+                } else {
+                    raw
+                };
+                let raw = if li_indent > 0 {
+                    strip_leading_spaces_per_line(&raw, li_indent)
                 } else {
                     raw
                 };
@@ -578,6 +587,52 @@ fn code_block_content(node: &SyntaxNode) -> String {
         content.push('\n');
     }
     content
+}
+
+/// Walk up to the immediate enclosing `LIST_ITEM` ancestor and return its
+/// content column (the column at which post-marker content begins). Returns
+/// `0` if the node is not inside a list item, so callers can short-circuit.
+///
+/// Stops at the *first* `LIST_ITEM` because deeper nesting already accounts
+/// for outer list indents in the inner item's leading whitespace token.
+fn enclosing_list_item_content_column(node: &SyntaxNode) -> usize {
+    let mut current = node.parent();
+    while let Some(parent) = current {
+        if parent.kind() == SyntaxKind::LIST_ITEM {
+            return list_item_content_column(&parent);
+        }
+        current = parent.parent();
+    }
+    0
+}
+
+fn list_item_content_column(item: &SyntaxNode) -> usize {
+    let mut col = 0usize;
+    for el in item.children_with_tokens() {
+        match el {
+            NodeOrToken::Token(t) => match t.kind() {
+                SyntaxKind::WHITESPACE => col += t.text().chars().count(),
+                SyntaxKind::LIST_MARKER => col += t.text().chars().count(),
+                _ => return col,
+            },
+            NodeOrToken::Node(_) => return col,
+        }
+    }
+    col
+}
+
+fn strip_leading_spaces_per_line(text: &str, max: usize) -> String {
+    let mut out = String::with_capacity(text.len());
+    for line in text.split_inclusive('\n') {
+        let bytes = line.as_bytes();
+        let body_len = line.len() - if line.ends_with('\n') { 1 } else { 0 };
+        let mut stripped = 0usize;
+        while stripped < max && stripped < body_len && bytes[stripped] == b' ' {
+            stripped += 1;
+        }
+        out.push_str(&line[stripped..]);
+    }
+    out
 }
 
 fn render_html_block(node: &SyntaxNode, out: &mut String) {
