@@ -151,6 +151,8 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      - run: npm --version
+
       - name: Download binary
         uses: actions/download-artifact@v6
         with:
