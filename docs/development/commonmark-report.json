@@ -1,8 +1,8 @@
 {
   "blocked": 12,
-  "failing": 169,
-  "pass_pct": 74.1,
-  "passing": 483,
+  "failing": 165,
+  "pass_pct": 74.7,
+  "passing": 487,
   "passing_numbers": [
     1,
     3,
@@ -55,8 +55,10 @@
     54,
     55,
     56,
+    57,
     58,
     59,
+    60,
     62,
     63,
     64,
@@ -87,9 +89,11 @@
     91,
     92,
     93,
+    94,
     96,
     97,
     98,
+    99,
     100,
     101,
     102,
@@ -595,9 +599,9 @@
       "pass": 20
     },
     {
-      "fail": 5,
+      "fail": 3,
       "name": "Setext headings",
-      "pass": 22
+      "pass": 24
     },
     {
       "fail": 0,
@@ -615,9 +619,9 @@
       "pass": 3
     },
     {
-      "fail": 3,
+      "fail": 1,
       "name": "Thematic breaks",
-      "pass": 16
+      "pass": 18
     }
   ],
   "spec_version": "0.31.2",

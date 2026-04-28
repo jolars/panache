@@ -76,6 +76,28 @@ impl<'a> Parser<'a> {
         SyntaxNode::new_root(self.builder.finish())
     }
 
+    /// Close enclosing list items (and their containing list) whose
+    /// `content_col` exceeds the given indent. Used by CommonMark when an
+    /// interrupting block (HR, ATX heading, fenced code, ...) appears at a
+    /// column shallower than the current list-item content column — per
+    /// §5.2 the line cannot continue the item, so the item and the
+    /// surrounding list close before the new block is emitted at the
+    /// outer level. Pandoc-markdown reaches this branch only when the
+    /// dispatcher already required a blank line before the interrupter,
+    /// at which point the blank-line handler has already closed the list;
+    /// gating on dialect at the call site keeps Pandoc unaffected.
+    fn close_lists_above_indent(&mut self, indent_cols: usize) {
+        while let Some(Container::ListItem { content_col, .. }) = self.containers.last() {
+            if indent_cols >= *content_col {
+                break;
+            }
+            self.close_containers_to(self.containers.depth() - 1);
+            if matches!(self.containers.last(), Some(Container::List { .. })) {
+                self.close_containers_to(self.containers.depth() - 1);
+            }
+        }
+    }
+
     /// Emit buffered PLAIN content if Definition container has open PLAIN.
     /// Close containers down to `keep`, emitting buffered content first.
     fn close_containers_to(&mut self, keep: usize) {
@@ -2183,6 +2205,19 @@ impl<'a> Parser<'a> {
                     self.emit_list_item_buffer_if_needed();
                     if self.is_paragraph_open() {
                         self.close_containers_to(self.containers.depth() - 1);
+                    }
+
+                    // CommonMark §5.2: a thematic break / ATX heading /
+                    // fenced code at column 0 cannot continue an open list
+                    // item whose content column is greater than the line's
+                    // indent — close the surrounding list before emitting.
+                    // OpenList is excluded so that a same-level marker still
+                    // continues the list rather than closing it.
+                    if self.config.dialect == crate::options::Dialect::CommonMark
+                        && !matches!(block_match.effect, BlockEffect::OpenList)
+                    {
+                        let (indent_cols, _) = leading_indent(content);
+                        self.close_lists_above_indent(indent_cols);
                     }
                 }
                 BlockDetectionResult::Yes => {
