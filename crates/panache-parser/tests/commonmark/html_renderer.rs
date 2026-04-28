@@ -312,16 +312,20 @@ fn list_tag_and_start(node: &SyntaxNode) -> (&'static str, String) {
 fn is_loose_list(node: &SyntaxNode) -> bool {
     // CommonMark §5.3: a list is loose if any of its constituent list items
     // are separated by blank lines, or if any item directly contains two
-    // block-level elements separated by a blank line. Approximation: a list
-    // is loose if any LIST_ITEM contains a PARAGRAPH (the parser uses PLAIN
-    // for tight items) OR if multiple items are separated by a BLANK_LINE
-    // in the list node.
+    // block-level elements separated by a blank line. Approximation:
+    // - any LIST_ITEM has a PARAGRAPH descendant (the parser uses PLAIN for
+    //   tight items), OR
+    // - two LIST_ITEMs are separated by a BLANK_LINE in the list node, OR
+    // - any LIST_ITEM has a BLANK_LINE between two block-level children.
     let mut prev_was_item = false;
     for child in node.children_with_tokens() {
         match child {
             NodeOrToken::Node(n) => {
                 if n.kind() == SyntaxKind::LIST_ITEM {
                     if n.descendants().any(|d| d.kind() == SyntaxKind::PARAGRAPH) {
+                        return true;
+                    }
+                    if list_item_has_internal_blank(&n) {
                         return true;
                     }
                     prev_was_item = true;
@@ -340,6 +344,42 @@ fn is_loose_list(node: &SyntaxNode) -> bool {
     false
 }
 
+fn list_item_has_internal_blank(item: &SyntaxNode) -> bool {
+    let mut saw_block = false;
+    for child in item.children() {
+        match child.kind() {
+            SyntaxKind::BLANK_LINE => {
+                if saw_block
+                    && child
+                        .next_sibling()
+                        .is_some_and(|s| is_block_child(s.kind()))
+                {
+                    return true;
+                }
+            }
+            k if is_block_child(k) => {
+                saw_block = true;
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+fn is_block_child(kind: SyntaxKind) -> bool {
+    matches!(
+        kind,
+        SyntaxKind::PLAIN
+            | SyntaxKind::PARAGRAPH
+            | SyntaxKind::HEADING
+            | SyntaxKind::CODE_BLOCK
+            | SyntaxKind::BLOCK_QUOTE
+            | SyntaxKind::LIST
+            | SyntaxKind::HORIZONTAL_RULE
+            | SyntaxKind::HTML_BLOCK
+    )
+}
+
 fn render_list_item(
     item: &SyntaxNode,
     refs: &HashMap<String, RefDef>,
@@ -355,18 +395,16 @@ fn render_list_item(
         match child.kind() {
             SyntaxKind::PLAIN => {
                 if loose {
-                    out.push_str("<p>");
-                    render_inlines(&child, refs, out);
-                    out.push_str("</p>\n");
+                    render_paragraph(&child, refs, out);
                 } else {
-                    render_inlines(&child, refs, out);
+                    let mut inner = String::new();
+                    render_inlines(&child, refs, &mut inner);
+                    out.push_str(&strip_paragraph_line_indent(&inner));
                 }
                 wrote_block = true;
             }
             SyntaxKind::PARAGRAPH => {
-                out.push_str("<p>");
-                render_inlines(&child, refs, out);
-                out.push_str("</p>\n");
+                render_paragraph(&child, refs, out);
                 wrote_block = true;
             }
             SyntaxKind::LIST => {

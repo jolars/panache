@@ -1,6 +1,6 @@
 CommonMark spec.txt v0.31.2 conformance report
-488 / 652 examples passing (74.8%)
-164 failing
+508 / 652 examples passing (77.9%)
+144 failing
 12 blocked-list entries
 
 === Per-section pass / fail ===
@@ -16,24 +16,25 @@ CommonMark spec.txt v0.31.2 conformance report
   HTML blocks: 43 pass / 1 fail
   Hard line breaks: 15 pass / 0 fail
   Images: 22 pass / 0 fail
-  Indented code blocks: 9 pass / 3 fail
+  Indented code blocks: 11 pass / 1 fail
   Inlines: 1 pass / 0 fail
   Link reference definitions: 15 pass / 12 fail
   Links: 54 pass / 36 fail
-  List items: 17 pass / 31 fail
-  Lists: 5 pass / 21 fail
+  List items: 25 pass / 23 fail
+  Lists: 14 pass / 12 fail
   Paragraphs: 8 pass / 0 fail
   Precedence: 1 pass / 0 fail
   Raw HTML: 20 pass / 0 fail
   Setext headings: 24 pass / 3 fail
   Soft line breaks: 2 pass / 0 fail
-  Tabs: 6 pass / 5 fail
+  Tabs: 7 pass / 4 fail
   Textual content: 3 pass / 0 fail
   Thematic breaks: 19 pass / 0 fail
 
 === Passing example numbers (allowlist candidates) ===
 1
 3
+4
 8
 9
 10
@@ -131,6 +132,8 @@ CommonMark spec.txt v0.31.2 conformance report
 105
 106
 107
+108
+109
 110
 111
 112
@@ -258,9 +261,14 @@ CommonMark spec.txt v0.31.2 conformance report
 250
 253
 255
+256
 257
+258
+259
 260
 261
+262
+263
 265
 267
 268
@@ -268,16 +276,28 @@ CommonMark spec.txt v0.31.2 conformance report
 272
 275
 276
+277
+279
 282
 285
 289
+291
 294
 295
 304
+306
+307
 308
+309
 310
+311
+313
+314
+316
+319
 322
 323
+325
 327
 328
 329
@@ -852,6 +872,8 @@ CommonMark spec.txt v0.31.2 conformance report
 
 # Indented code blocks
 107
+108
+109
 110
 111
 112
@@ -940,9 +962,14 @@ CommonMark spec.txt v0.31.2 conformance report
 # List items
 253
 255
+256
 257
+258
+259
 260
 261
+262
+263
 265
 267
 268
@@ -950,18 +977,30 @@ CommonMark spec.txt v0.31.2 conformance report
 272
 275
 276
+277
+279
 282
 285
 289
+291
 294
 295
 
 # Lists
 304
+306
+307
 308
+309
 310
+311
+313
+314
+316
+319
 322
 323
+325
 
 # Paragraphs
 219
@@ -1031,6 +1070,7 @@ CommonMark spec.txt v0.31.2 conformance report
 # Tabs
 1
 3
+4
 8
 9
 10

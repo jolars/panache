@@ -252,6 +252,7 @@ golden_test_cases!(
     line_ending_crlf,
     line_ending_lf,
     links,
+    list_item_blank_line_inside,
     lists_bullet,
     lists_code,
     lists_example,
