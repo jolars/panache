@@ -165,6 +165,8 @@ jobs:
           version=$(node -p "require('./npm/panache-cli/package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - run: npm --version
+
       - name: Assemble package
         run: |
           set -euo pipefail
