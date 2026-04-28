@@ -13,160 +13,158 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-28 (f)
+## Latest session — 2026-04-28 (g)
 
-**Pass count: 417 → 427 / 652 (65.5%, +10)**
+**Pass count: 427 → 437 / 652 (67.0%, +10)**
 
-Mix of small renderer-only fixes plus one CommonMark-strict link-destination
-parser gate. The link-dest fix was the highest-leverage win (4 examples in
-Links + 1 in Entity refs from a single root cause).
+Targeted Fenced code blocks (the recap's #6 follow-up) plus low-risk renderer
+fixes for blank lines inside indented code blocks. The fenced-code dialect gate
+was the biggest leverage win (8 examples in Fenced code + 1 cascading unlock in
+Block quotes from the same root cause).
 
 ### Targets and root causes
 
-- **#24 (Backslash escapes)**: info string `foo\+bar` should produce class
-  `foo+bar` per spec ("Backslash escapes ... work in fenced code block info
-  strings"). Renderer-only: `code_block_language()` was returning the raw
-  text. Fix: pipe through `decode_backslash_escapes` after `decode_entities`.
-- **#597 (Autolinks, MAILTO uppercase)**: `<MAILTO:FOO@BAR.BAZ>` was rendered
-  as `mailto:MAILTO:FOO@BAR.BAZ` because `target.starts_with("mailto:")` was
-  case-sensitive and we fell into the email branch. Renderer-only: replace
-  with a proper `has_uri_scheme()` check (alpha + alphanum/+./- 2-32 chars,
-  then `:`) — per spec §6.5 a URI autolink starts with a scheme.
-- **#603 (Autolinks, backslash in href)**: `<https://example.com/\[\>` should
-  encode the `[` as `%5B` in the href. Renderer-only: removed `[` and `]`
-  from `is_url_safe()` set. Spec examples consistently encode brackets in
-  rendered URLs (cf. #7954, #8112, #8857). No regressions in passing tests.
-- **#130, #144 (Fenced code blocks, empty content)**: empty fenced code
-  blocks rendered with a stray `\n` between the tags. Renderer-only:
-  `code_block_content()` unconditionally appended `\n` if content didn't
-  end in one — including when content was empty. Guard the push with
-  `!content.is_empty()`. #130 (`\`\`\`\n\`\`\``) was unlocked as a freebie.
-- **#41, #488, #490, #493, #508 (Entity refs / Links — link destination)**:
-  CommonMark §6.4 link destinations may not contain spaces or ASCII control
-  chars in the bare form, must be `<...>`-bracketed otherwise; what follows
-  must be either empty or a properly-delimited title. Pandoc-markdown is
-  more permissive (URL-encodes spaces, accepts everything between parens).
-  Verified the divergence with `pandoc -f commonmark` vs `pandoc -f markdown`.
-  Fix: dialect-gated. `try_parse_inline_link` now takes a `strict_dest: bool`
-  flag; callers in `inlines/core.rs` pass
-  `config.dialect == Dialect::CommonMark`. New `dest_and_title_ok_commonmark`
-  helper validates the destination + optional title structure; if it fails,
-  parsing falls through and the source stays as plain text (which is what
-  CommonMark renders for these examples).
+- **#111, #112 (Indented code blocks)**: blank lines inside an indented code
+  block should have *up to 4* leading spaces stripped — the rest preserved.
+  The renderer's old branch only handled `strip_prefix("    ")` and fell
+  through to `content.push_str(line)` for shorter lines, leaking partial
+  whitespace. Renderer-only: replace with a byte-counting strip capped at 4
+  spaces, plus a "blank line shorter than the indent collapses to just `\n`"
+  rule. The fix is symmetric for content lines (CommonMark §4.4 doesn't
+  distinguish "blank-ish" vs "content" lines for stripping — every line gets
+  up to 4 spaces removed). #112 was already in the allowlist; the original
+  attempt regressed it before being corrected.
+- **#126, #127, #131, #132, #133, #137, #139, #140 (Fenced code blocks)** and
+  **#237 (Block quotes)** — share two root causes:
+  - **Dialect divergence**: CommonMark fenced code blocks always interrupt
+    paragraphs and run to end-of-document if the closing fence is missing
+    (spec §4.5). Pandoc-markdown requires a closer (else falls back to a
+    paragraph). Verified with `pandoc -f commonmark` vs `pandoc -f markdown`.
+    Fix: in `block_dispatcher.rs::FencedCodeBlockParser::detect_prepared`,
+    short-circuit on `!has_matching_closer` only when the dialect is *not*
+    CommonMark; under CommonMark, also force `YesCanInterrupt` so a bare
+    fence interrupts paragraphs without needing the existing transcript-like
+    special cases. Unlocked: #126 (`\`\`\`` alone), #127 (longer opener,
+    inner closer too short), #128 partially, #137, #139, #140, plus #237
+    (`> \`\`\`\nfoo\n\`\`\`` — inner blockquote sees an unclosed fence and
+    must close it at the blockquote boundary).
+  - **Renderer-only — fence-opener indent stripping**: per CommonMark §4.5,
+    if the opening fence is indented, content lines have an *equivalent*
+    amount of leading whitespace removed (capped at the opener's indent —
+    extra is preserved). The CST already captures the opener indent as a
+    leading WHITESPACE token on the CODE_BLOCK before CODE_FENCE_OPEN, so
+    this is a renderer fix. Added `fenced_opener_indent()` helper and a
+    per-line strip in `code_block_content()`. Unlocked: #131, #132, #133.
 
 ### Files changed
 
 - **Renderer (test-only)**:
   `crates/panache-parser/tests/commonmark/html_renderer.rs`
-  - `code_block_language`: chain `decode_backslash_escapes(decode_entities(...))`.
-  - `code_block_content`: only push trailing `\n` if content nonempty.
-  - `render_autolink`: switch from `starts_with("mailto:")` to
-    `has_uri_scheme()`.
-  - `is_url_safe`: drop `[` and `]` from the safe set.
-  - Added `has_uri_scheme(s: &str) -> bool`.
+  - `code_block_content` (indented branch): cap-strip up to 4 leading spaces
+    per line; collapse short whitespace-only lines to bare `\n`.
+  - `code_block_content` (fenced branch): strip opener-indent worth of
+    leading spaces per content line.
+  - Added `fenced_opener_indent(node) -> usize`.
 - **Parser (dialect gate)**:
-  `crates/panache-parser/src/parser/inlines/links.rs`
-  - `try_parse_inline_link` gained a `strict_dest: bool` parameter.
-  - Added `dest_and_title_ok_commonmark()` validator (bracketed + bare
-    destination forms, optional title in `"..."` / `'...'` / `(...)`,
-    only whitespace allowed before/after).
-  - Updated all in-file unit tests to pass `false` (Pandoc-permissive).
-  `crates/panache-parser/src/parser/inlines/core.rs`
-  - Three callers (`parse_until_closer_with_nested_two`,
-    `parse_until_closer_with_nested_one`, `parse_inline_range_impl`) now
-    pass `config.dialect == Dialect::CommonMark`.
-- **Parser fixtures (CST snapshots via insta)**:
-  - `tests/fixtures/cases/inline_link_dest_strict_{commonmark,pandoc}/`
-    pin the divergent CST shapes for `[link](/my uri)`. CommonMark snapshot
-    shows plain TEXT; Pandoc snapshot shows the LINK structure.
-  - Registered in `tests/golden_parser_cases.rs`.
+  `crates/panache-parser/src/parser/block_dispatcher.rs`
+  - `FencedCodeBlockParser::detect_prepared` now reads
+    `ctx.config.dialect == Dialect::CommonMark` and:
+    - allows `!has_matching_closer` (no early return) under CommonMark
+    - sets `YesCanInterrupt` for bare fences under CommonMark
+- **Parser fixtures (paired CST snapshots via insta)**:
+  - `crates/panache-parser/tests/fixtures/cases/fenced_code_unclosed_{commonmark,pandoc}/`
+    pin the divergent shape for `text\n\`\`\`\ncode\n`. CommonMark snapshot
+    shows PARAGRAPH + CODE_BLOCK; Pandoc snapshot shows a single PARAGRAPH.
+  - Registered in `crates/panache-parser/tests/golden_parser_cases.rs`.
 - **Formatter golden**:
-  - `tests/fixtures/cases/inline_link_dest_strict_commonmark/` —
-    `flavor = "commonmark"`, `[link](/my uri)` → `\[link\](/my uri)`. The
-    formatter escapes the brackets so re-parsing (under CommonMark) keeps
-    them literal — different block sequence than Pandoc, where the same
-    input parses as a LINK and round-trips with literal brackets.
-  - Registered in `tests/golden_cases.rs`. No paired Pandoc formatter
-    case (existing top-level fixtures already cover Pandoc-default).
+  - `tests/fixtures/cases/fenced_code_unclosed_commonmark/` —
+    `flavor = "commonmark"`. Input `text\n\`\`\`\ncode\n`; expected
+    `text\n\n\`\`\`\ncode\n` (paragraph then unclosed fenced block, formatter
+    preserves the missing closer). Different block sequence than Pandoc, where
+    the same input formats as a single paragraph with backslash-escaped
+    backticks.
+  - Registered in `tests/golden_cases.rs`. No paired Pandoc formatter case
+    (existing top-level fixtures already cover Pandoc-default).
 - **Allowlist additions**: `tests/commonmark/allowlist.txt`
-  - Backslash escapes: +#24
-  - Entity and numeric character references: +#41
-  - Fenced code blocks: +#130, +#144
-  - Autolinks: +#597, +#603
-  - Links: +#488, +#490, +#493, +#508
+  - Indented code blocks: +#111
+  - Fenced code blocks: +#126, +#127, +#131, +#132, +#133, +#137, +#139, +#140
+  - Block quotes: +#237
 
 ### Don't redo
 
-- The renderer is the right home for the `decode_backslash_escapes` and
-  `[`/`]` URL-encoding fixes — these are spec-mandated rendering steps,
-  not parser CST shapes. Don't move them into the parser.
-- `has_uri_scheme()` already enforces the 2–32-char rule; that means
-  `<m:abc>` (#609) still fails because the parser at
-  `inlines/links.rs::try_parse_autolink` accepts ANY content with `:`.
-  Tightening the autolink parser to require a scheme is a separate
-  parser-shape change (and is dialect-divergent — pandoc-markdown
-  accepts `<m:abc>` as raw HTML).
-- The CommonMark link-dest validator does **not** cover the bracketed
-  form's edge cases like `<b)c>` (#494) — `try_parse_inline_link`'s
-  paren-balance loop terminates on the first `)` regardless of angle
-  brackets, so `dest_content` for that case is `<b` and the validator
-  accepts it but the rendered link text is wrong. A real fix needs
-  bracket-aware destination scanning in the inline-link parser, not
-  more validator logic.
-- Don't drop the `strict_dest` parameter back to a bare `bool` — pass
-  it as `config.dialect == Dialect::CommonMark` from callers so the
-  Pandoc path stays untouched.
+- The renderer is the right home for both the fenced-opener indent stripping
+  *and* the indented-code blank-line stripping. CSTs already pin the shape;
+  moving these into the parser would entangle whitespace policy with
+  tokenization.
+- The CommonMark dialect gate in `FencedCodeBlockParser::detect_prepared` is
+  load-bearing for #126/#127/#140 — don't simplify it back to "interrupt only
+  with a matching closer" without preserving the `common_mark_dialect` branch
+  that *also* allows unclosed fences. The two branches are independent and
+  both needed.
+- For #128 (`> \`\`\`\n> aaa\n\nbbb`): we now correctly *detect* a fenced code
+  block inside the blockquote, but the rendered content includes the inner
+  `> ` prefix from the second line (`<pre><code>&gt; aaa`). The fenced-code
+  parser strips the surrounding blockquote markers from line 1 (the opener)
+  but not from subsequent content lines when the fence is unclosed and the
+  blockquote ends at a blank line. Fix lives in
+  `parse_fenced_code_block`'s content-collection loop (around
+  `crates/panache-parser/src/parser/blocks/code_blocks.rs:1140`) — strip
+  `bq_depth` markers from content lines too, not just for the closer check.
+- The "passing-by-accident under prior defaults" exception in
+  `.claude/rules/commonmark.md` did not come into play this session — every
+  unlock is a real correctness improvement, no allowlist removals.
 
 ### Suggested next targets, ranked
 
-1. **Lists (5/21) + List items (17/31)** — biggest absolute pass-rate
-   gap and likely shares root cause with thematic-break #57, #60, #61
-   and blockquote #234, #246 (HR-interrupts-list / -blockquote).
-2. **HTML blocks (24/20)** — bulk of failures fall into two patterns:
-   blank-line-separated HTML blocks with markdown between (#151, #188,
-   #191) and HTML blocks not detected (#161, #162, #174). Both need
-   parser work.
-3. **Emphasis and strong emphasis (85/47)** — largest remaining absolute
-   failure count; flanking-rule and autolink-precedence edge cases
-   (#480, #481 are autolink-vs-emphasis precedence).
-4. **Link reference definitions (15/12)** — #194 (label with `\]`),
-   #195 (multiline title), #196, #198 (multiline destination); the
-   reference def parser captures the whole line as raw TEXT instead of
-   structured nodes. Bigger refactor.
-5. **Tabs (6/5)** — #2, #4, #5, #6, #7 all need tab→space expansion
-   with column alignment in indented-code, list, and blockquote
-   contexts. Spec §2.2. Probably one shared fix.
-6. **Fenced code blocks remaining (20/9)** — #126, #127, #128 want
-   "unclosed fence = code block to EOF" (CommonMark) vs Pandoc's
-   "unclosed = paragraph". Dialect-gated parser work in
-   `block_dispatcher.rs::FencedCodeBlockParser` (`has_matching_closer`
-   guard).
-7. **Block quotes (18/7)** — #234 (`> foo\n---`) and #246 (`> aaa\n***`)
-   need HR-to-interrupt-blockquote logic. Verify dialect parity.
-8. Setext heading multi-line content (#81, #82, #95) — paragraph
-   parser refactor.
-9. Hard line breaks #642, #643 — multi-line raw inline HTML
-   (covered by "HTML blocks" / "Raw HTML").
-10. Known link/autolink follow-ups: #523, #546, #606 (`<foo\+@…>` —
-    autolink parser too lax), #609 (`<m:abc>` — dialect divergence).
+1. **HTML blocks (24/20)** — bulk of failures fall into two patterns:
+   blank-line-separated HTML blocks with markdown between (#151, #188, #191)
+   and HTML blocks not detected (#161, #162, #174). Both need parser work.
+   Inline raw HTML (the §6.6 grammar) is a sibling target: would unlock
+   Raw HTML #623, #625–631, plus Hard line breaks #642/#643 and Backslash
+   escapes #21 — all currently failing because the parser doesn't recognize
+   `<a href="...">` etc. as inline raw HTML and the renderer escapes the
+   characters. Implementing the §6.6 inline HTML recognizer is a meaningful
+   feature but bounded; the failing cases share one grammar.
+2. **Lists (5/21) + List items (17/31)** — biggest absolute pass-rate gap and
+   shares root cause with thematic-break #57, #60, #61 and blockquote #234,
+   #246 (HR-interrupts-list / -blockquote). #115 (Indented code blocks)
+   chained on the same paragraph-vs-block-interruption refactor.
+3. **#128 (Block quotes / fenced code in blockquote)** — single-example
+   follow-up to this session's dialect gate; fix in `parse_fenced_code_block`
+   to strip blockquote markers from content lines (see "Don't redo" above).
+4. **Emphasis and strong emphasis (85/47)** — largest remaining absolute
+   failure count; flanking-rule and autolink-precedence edge cases (#480,
+   #481 are autolink-vs-emphasis precedence).
+5. **Link reference definitions (15/12)** — #194 (label with `\]`), #195
+   (multiline title), #196, #198 (multiline destination), #208, #213, #216,
+   #217: the LRD parser currently captures the whole line(s) as raw TEXT
+   instead of structured nodes. Bigger refactor.
+6. **Tabs (6/5)** — #2, #4, #5, #6, #7 all need tab→space expansion with
+   column alignment in indented-code, list, and blockquote contexts. Spec
+   §2.2. One shared fix across most of these.
+7. **Setext heading multi-line content (#81, #82, #95)** + **#115
+   (`# Heading\n    foo`)** — paragraph parser refactor: needs to recognize
+   indented-code-after-heading without a blank line, plus retroactive setext
+   conversion of accumulated paragraph lines. These are interrelated.
+8. **Hard line breaks #642, #643** + **Backslash escapes #21** — all blocked
+   on inline raw HTML (see target 1).
 
 ### Carried-forward notes
 
-Remaining setext / thematic-break gaps not unlocked yet:
+Remaining setext / thematic-break gaps not unlocked yet (carried over from
+prior session):
 
 - **#57, #60, #61** — thematic break interrupting a list. List
-  continuation/termination logic is more involved than the paragraph
-  case.
-- **#92, #94, #99, #101** — setext underline / thematic break
-  following `> Foo` or `- Foo`. Needs blockquote/list interruption
-  work; verify dialect parity before fixing (pandoc behavior may
-  differ).
-- **#81, #82, #95** — multi-line setext content (`Foo\nBar\n---`).
-  Bigger refactor of the paragraph parser to retroactively convert
-  accumulated lines into a setext heading.
+  continuation/termination logic is more involved than the paragraph case.
+- **#92, #94, #99, #101** — setext underline / thematic break following
+  `> Foo` or `- Foo`. Needs blockquote/list interruption work; verify
+  dialect parity before fixing.
+- **#81, #82, #95** — multi-line setext content (`Foo\nBar\n---`). Bigger
+  refactor of the paragraph parser to retroactively convert accumulated
+  lines into a setext heading.
 
 Renderer-only quick check before deeper parser work: `report.txt` plus a
 throwaway `probe_examples` test in `commonmark.rs` (printing
 markdown/expected/got/match for a small list of failing numbers) is the
-fastest way to triage whether a failure is a 1-line renderer fix or a
-real parser-shape gap.
+fastest way to triage whether a failure is a 1-line renderer fix or a real
+parser-shape gap. Don't forget to reset its example numbers before finishing.

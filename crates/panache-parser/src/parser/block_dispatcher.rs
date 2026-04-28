@@ -1423,7 +1423,11 @@ impl BlockParser for FencedCodeBlockParser {
             found
         };
 
-        if !has_matching_closer {
+        // CommonMark dialect: fenced code blocks always interrupt paragraphs and
+        // run to end-of-document if the closing fence is missing (spec §4.5).
+        // Pandoc dialect: bare fences without a closer fall through to a paragraph.
+        let common_mark_dialect = ctx.config.dialect == crate::options::Dialect::CommonMark;
+        if !has_matching_closer && !common_mark_dialect {
             return None;
         }
 
@@ -1448,6 +1452,7 @@ impl BlockParser for FencedCodeBlockParser {
             || bare_fence_after_colon_with_closer
             || bare_fence_in_list_with_closer
             || bare_fence_after_matching_closer
+            || common_mark_dialect
         {
             BlockDetectionResult::YesCanInterrupt
         } else if ctx.has_blank_before {

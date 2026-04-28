@@ -439,29 +439,87 @@ fn code_block_language(node: &SyntaxNode) -> String {
     String::new()
 }
 
+/// Number of space characters that precede the opening fence on the same line.
+/// Used to drive CommonMark's "strip equivalent leading whitespace" rule.
+fn fenced_opener_indent(node: &SyntaxNode) -> usize {
+    let mut indent = 0usize;
+    for el in node.children_with_tokens() {
+        match el {
+            NodeOrToken::Token(t) if t.kind() == SyntaxKind::WHITESPACE => {
+                indent += t.text().chars().filter(|c| *c == ' ').count();
+            }
+            NodeOrToken::Node(n) if n.kind() == SyntaxKind::CODE_FENCE_OPEN => {
+                return indent;
+            }
+            _ => {
+                indent = 0;
+            }
+        }
+    }
+    0
+}
+
 fn code_block_content(node: &SyntaxNode) -> String {
     let is_fenced = node
         .children()
         .any(|c| c.kind() == SyntaxKind::CODE_FENCE_OPEN);
     let mut content = String::new();
     if is_fenced {
+        // Per CommonMark §4.5: if the opening fence is indented, content lines
+        // have an equivalent amount of leading whitespace removed (capped at
+        // the opener's indent — extra indentation is preserved verbatim).
+        let opener_indent = fenced_opener_indent(node);
         for child in node.children() {
             if child.kind() == SyntaxKind::CODE_CONTENT {
-                content.push_str(&child.text().to_string());
+                let raw = child.text().to_string();
+                if opener_indent == 0 {
+                    content.push_str(&raw);
+                } else {
+                    for line in raw.split_inclusive('\n') {
+                        let mut stripped = 0usize;
+                        let bytes = line.as_bytes();
+                        while stripped < opener_indent
+                            && stripped < bytes.len()
+                            && bytes[stripped] == b' '
+                        {
+                            stripped += 1;
+                        }
+                        content.push_str(&line[stripped..]);
+                    }
+                }
             }
         }
     } else {
-        // Indented code block: strip leading 4-space (or tab) indent on each line.
+        // Indented code block: strip up to 4 leading spaces (or 1 tab) from
+        // each line. Blank lines (whitespace-only) are also stripped of up
+        // to 4 leading spaces; any remaining whitespace is preserved.
         for child in node.children() {
             if child.kind() == SyntaxKind::CODE_CONTENT {
                 let raw = child.text().to_string();
                 for line in raw.split_inclusive('\n') {
-                    if let Some(rest) = line.strip_prefix("    ") {
+                    if let Some(rest) = line.strip_prefix('\t') {
                         content.push_str(rest);
-                    } else if let Some(rest) = line.strip_prefix('\t') {
-                        content.push_str(rest);
+                        continue;
+                    }
+                    let body_len = line.len() - if line.ends_with('\n') { 1 } else { 0 };
+                    let body = &line[..body_len];
+                    let bytes = line.as_bytes();
+                    let mut stripped = 0usize;
+                    while stripped < 4 && stripped < body_len && bytes[stripped] == b' ' {
+                        stripped += 1;
+                    }
+                    // If the line is whitespace-only and shorter than the
+                    // indent, the entire line is consumed (only the newline
+                    // remains).
+                    if stripped == body_len
+                        && body.chars().all(|c| c == ' ' || c == '\t')
+                        && stripped < 4
+                    {
+                        if line.ends_with('\n') {
+                            content.push('\n');
+                        }
                     } else {
-                        content.push_str(line);
+                        content.push_str(&line[stripped..]);
                     }
                 }
             }

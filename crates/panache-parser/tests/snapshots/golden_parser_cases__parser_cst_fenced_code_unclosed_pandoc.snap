@@ -1,0 +1,12 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..14
+  PARAGRAPH@0..14
+    TEXT@0..4 "text"
+    NEWLINE@4..5 "\n"
+    TEXT@5..8 "```"
+    NEWLINE@8..9 "\n"
+    TEXT@9..13 "code"
+    NEWLINE@13..14 "\n"

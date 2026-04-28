@@ -198,6 +198,7 @@ golden_test_cases!(
     exec_code_in_list,
     fenced_code,
     fenced_code_quarto,
+    fenced_code_unclosed_commonmark,
     fenced_divs,
     fenced_div_list_idempotency_setup,
     fenced_div_close_grid_table,

@@ -201,6 +201,8 @@ golden_test_cases!(
     escapes,
     fenced_code,
     fenced_code_quarto,
+    fenced_code_unclosed_commonmark,
+    fenced_code_unclosed_pandoc,
     fenced_divs,
     fenced_div_list_idempotency_setup,
     fenced_div_close_grid_table,
