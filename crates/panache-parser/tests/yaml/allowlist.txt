@@ -197,3 +197,17 @@ DFF7
 6WLZ
 # Same `%TAG !` primary-handle override pattern but with no `---` on the first doc.
 9WXW
+# Block map containing standalone explicit-key (`? a`) lines projected with empty values.
+7W2P
+# Block map mixing regular entries, an explicit-key (`? b`) line, and an anchored key.
+ZWK4
+# Double-quoted scalars with `\u`, `\x`, and control-char escapes decoded then re-escaped.
+G4RS
+# Double-quoted scalar containing a literal tab; literal tab re-escaped as `\t` in event.
+J3BT
+# Multi-doc with bare `---` ... comment ... `...` empty-body doc between content docs.
+6ZKB
+# Same empty-body-doc-with-comment pattern but preceded by a non-trivial mapping doc.
+9DXL
+# Empty-body doc whose `---` and `...` are separated by a `# Empty` comment at EOF.
+UT92

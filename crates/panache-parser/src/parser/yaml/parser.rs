@@ -1026,7 +1026,36 @@ fn emit_document<'a>(
 
     // Phase 3: optional `...` marker (and its trailing newline). Trivia
     // between the body and the marker that we did NOT consume into the body
-    // belongs to the stream, not this document, so we don't drain it here.
+    // belongs to the stream, not this document, so we don't drain it here —
+    // except when the body was empty: then any comments/blank lines between
+    // `---` and `...` semantically belong to the empty document, and so does
+    // the `...` itself even when it lies a few trivia tokens away.
+    if matches!(body_kind, DocumentBody::Empty) {
+        let mut peek = *i;
+        while peek < tokens.len() {
+            match tokens[peek].kind {
+                YamlToken::Newline | YamlToken::Whitespace | YamlToken::Comment => peek += 1,
+                _ => break,
+            }
+        }
+        if peek < tokens.len() && tokens[peek].kind == YamlToken::DocumentEnd {
+            while *i < peek {
+                match tokens[*i].kind {
+                    YamlToken::Newline => {
+                        builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text)
+                    }
+                    YamlToken::Whitespace => {
+                        builder.token(SyntaxKind::WHITESPACE.into(), tokens[*i].text)
+                    }
+                    YamlToken::Comment => {
+                        builder.token(SyntaxKind::YAML_COMMENT.into(), tokens[*i].text)
+                    }
+                    _ => unreachable!("only trivia in this range"),
+                }
+                *i += 1;
+            }
+        }
+    }
     if *i < tokens.len() && tokens[*i].kind == YamlToken::DocumentEnd {
         builder.token(SyntaxKind::YAML_DOCUMENT_END.into(), tokens[*i].text);
         *i += 1;

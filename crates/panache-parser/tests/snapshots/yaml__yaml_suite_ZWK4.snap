@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 245
+expression: snapshot
+---
+case_id: ZWK4
+input: "---\na: 1\n? b\n&anchor c: 3\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

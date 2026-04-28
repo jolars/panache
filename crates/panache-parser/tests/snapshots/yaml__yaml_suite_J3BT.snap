@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 245
+expression: snapshot
+---
+case_id: J3BT
+input: "# Tabs and spaces\nquoted: \"Quoted \t\"\nblock:\t|\n  void main() {\n  \tprintf(\"Hello, world!\\n\");\n  }\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

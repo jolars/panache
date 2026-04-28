@@ -1,0 +1,64 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: G4RS
+input: "unicode: \"Sosa did fine.\\u263A\"\ncontrol: \"\\b1998\\t1999\\t2000\\n\"\nhex esc: \"\\x0d\\x0a is \\r\\n\"\n\nsingle: '\"Howdy!\" he cried.'\nquoted: ' # Not a ''comment''.'\ntie-fighter: '|\\-*-/|'\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..177
+  YAML_METADATA_CONTENT@0..177
+    YAML_STREAM@0..177
+      YAML_DOCUMENT@0..177
+        YAML_BLOCK_MAP@0..177
+          YAML_BLOCK_MAP_ENTRY@0..32
+            YAML_BLOCK_MAP_KEY@0..8
+              YAML_KEY@0..7 "unicode"
+              YAML_COLON@7..8 ":"
+            YAML_BLOCK_MAP_VALUE@8..31
+              WHITESPACE@8..9 " "
+              YAML_SCALAR@9..31 "\"Sosa did fine.\\u263A\""
+            NEWLINE@31..32 "\n"
+          YAML_BLOCK_MAP_ENTRY@32..64
+            YAML_BLOCK_MAP_KEY@32..40
+              YAML_KEY@32..39 "control"
+              YAML_COLON@39..40 ":"
+            YAML_BLOCK_MAP_VALUE@40..63
+              WHITESPACE@40..41 " "
+              YAML_SCALAR@41..63 "\"\\b1998\\t1999\\t2000\\n\""
+            NEWLINE@63..64 "\n"
+          YAML_BLOCK_MAP_ENTRY@64..92
+            YAML_BLOCK_MAP_KEY@64..72
+              YAML_KEY@64..71 "hex esc"
+              YAML_COLON@71..72 ":"
+            YAML_BLOCK_MAP_VALUE@72..91
+              WHITESPACE@72..73 " "
+              YAML_SCALAR@73..91 "\"\\x0d\\x0a is \\r\\n\""
+            NEWLINE@91..92 "\n"
+          NEWLINE@92..93 "\n"
+          YAML_BLOCK_MAP_ENTRY@93..122
+            YAML_BLOCK_MAP_KEY@93..100
+              YAML_KEY@93..99 "single"
+              YAML_COLON@99..100 ":"
+            YAML_BLOCK_MAP_VALUE@100..121
+              WHITESPACE@100..101 " "
+              YAML_SCALAR@101..121 "'\"Howdy!\" he cried.'"
+            NEWLINE@121..122 "\n"
+          YAML_BLOCK_MAP_ENTRY@122..154
+            YAML_BLOCK_MAP_KEY@122..129
+              YAML_KEY@122..128 "quoted"
+              YAML_COLON@128..129 ":"
+            YAML_BLOCK_MAP_VALUE@129..153
+              WHITESPACE@129..130 " "
+              YAML_SCALAR@130..153 "' # Not a ''comment''.'"
+            NEWLINE@153..154 "\n"
+          YAML_BLOCK_MAP_ENTRY@154..177
+            YAML_BLOCK_MAP_KEY@154..166
+              YAML_KEY@154..165 "tie-fighter"
+              YAML_COLON@165..166 ":"
+            YAML_BLOCK_MAP_VALUE@166..176
+              WHITESPACE@166..167 " "
+              YAML_SCALAR@167..176 "'|\\-*-/|'"
+            NEWLINE@176..177 "\n"

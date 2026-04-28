@@ -819,12 +819,6 @@
       "tree": false
     },
     {
-      "case_id": "6ZKB",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "735Y",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_KEY_TOKEN"
@@ -879,12 +873,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "7W2P",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "7ZZ5",
@@ -963,12 +951,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "9DXL",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "9KAX",
@@ -1235,12 +1217,6 @@
       "tree": false
     },
     {
-      "case_id": "G4RS",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "G992",
       "diagnostic_codes": [
         "YAML_PARSE_UNEXPECTED_INDENT"
@@ -1279,12 +1255,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "J3BT",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "J7PZ",
@@ -1713,12 +1683,6 @@
       "tree": false
     },
     {
-      "case_id": "UT92",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "UV7Q",
       "diagnostic_codes": [
         "YAML_LEX_ERROR"
@@ -1805,12 +1769,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "ZWK4",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     }
   ],
   "passes_now": [
@@ -1839,14 +1797,17 @@
     "6SLA",
     "6WLZ",
     "6XDY",
+    "6ZKB",
     "74H7",
     "7TMG",
+    "7W2P",
     "7Z25",
     "87E4",
     "8KB6",
     "8MK2",
     "8XYN",
     "98YD",
+    "9DXL",
     "9FMG",
     "9J7A",
     "9SHH",
@@ -1865,9 +1826,11 @@
     "F2C7",
     "FQ7F",
     "FRK4",
+    "G4RS",
     "H3Z8",
     "HMK4",
     "HWV9",
+    "J3BT",
     "J5UC",
     "J7VC",
     "JHB9",
@@ -1896,6 +1859,7 @@
     "U9NS",
     "UDM2",
     "UDR7",
+    "UT92",
     "V55R",
     "W5VH",
     "WZ62",
@@ -1903,13 +1867,14 @@
     "YD5X",
     "Z9M4",
     "ZF4X",
-    "ZH7C"
+    "ZH7C",
+    "ZWK4"
   ],
   "summary": {
     "error_contract_ok_count": 54,
     "fails_needs_error_path_count": 24,
-    "fails_needs_feature_count": 165,
-    "passes_now_count": 90,
+    "fails_needs_feature_count": 158,
+    "passes_now_count": 97,
     "total_cases": 352
   }
 }

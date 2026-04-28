@@ -1,0 +1,38 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: UT92
+input: "---\n{ matches\n% : 20 }\n...\n---\n# Empty\n...\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..43
+  YAML_METADATA_CONTENT@0..43
+    YAML_STREAM@0..43
+      YAML_DOCUMENT@0..27
+        YAML_DOCUMENT_START@0..3 "---"
+        NEWLINE@3..4 "\n"
+        YAML_BLOCK_MAP@4..23
+          YAML_FLOW_MAP@4..22
+            YAML_SCALAR@4..5 "{"
+            YAML_FLOW_MAP_ENTRY@5..21
+              YAML_FLOW_MAP_KEY@5..17
+                YAML_SCALAR@5..13 " matches"
+                YAML_SCALAR@13..14 "\n"
+                YAML_KEY@14..16 "% "
+                YAML_COLON@16..17 ":"
+              YAML_FLOW_MAP_VALUE@17..21
+                YAML_SCALAR@17..21 " 20 "
+            YAML_SCALAR@21..22 "}"
+          NEWLINE@22..23 "\n"
+        YAML_DOCUMENT_END@23..26 "..."
+        NEWLINE@26..27 "\n"
+      YAML_DOCUMENT@27..43
+        YAML_DOCUMENT_START@27..30 "---"
+        NEWLINE@30..31 "\n"
+        YAML_COMMENT@31..38 "# Empty"
+        NEWLINE@38..39 "\n"
+        YAML_DOCUMENT_END@39..42 "..."
+        NEWLINE@42..43 "\n"

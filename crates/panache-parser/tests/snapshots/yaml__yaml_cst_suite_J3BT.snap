@@ -1,0 +1,39 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: J3BT
+input: "# Tabs and spaces\nquoted: \"Quoted \t\"\nblock:\t|\n  void main() {\n  \tprintf(\"Hello, world!\\n\");\n  }\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..96
+  YAML_METADATA_CONTENT@0..96
+    YAML_STREAM@0..96
+      YAML_COMMENT@0..17 "# Tabs and spaces"
+      NEWLINE@17..18 "\n"
+      YAML_DOCUMENT@18..96
+        YAML_BLOCK_MAP@18..96
+          YAML_BLOCK_MAP_ENTRY@18..37
+            YAML_BLOCK_MAP_KEY@18..25
+              YAML_KEY@18..24 "quoted"
+              YAML_COLON@24..25 ":"
+            YAML_BLOCK_MAP_VALUE@25..36
+              WHITESPACE@25..26 " "
+              YAML_SCALAR@26..36 "\"Quoted \t\""
+            NEWLINE@36..37 "\n"
+          YAML_BLOCK_MAP_ENTRY@37..96
+            YAML_BLOCK_MAP_KEY@37..43
+              YAML_KEY@37..42 "block"
+              YAML_COLON@42..43 ":"
+            YAML_BLOCK_MAP_VALUE@43..96
+              WHITESPACE@43..44 "\t"
+              YAML_SCALAR@44..45 "|"
+              NEWLINE@45..46 "\n"
+              YAML_SCALAR@46..61 "  void main() {"
+              NEWLINE@61..62 "\n"
+              YAML_SCALAR@62..91 "  \tprintf(\"Hello, wor ..."
+              NEWLINE@91..92 "\n"
+              YAML_SCALAR@92..95 "  }"
+              NEWLINE@95..96 "\n"

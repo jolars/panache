@@ -394,35 +394,110 @@ fn strip_explicit_key_indicator(key: &str) -> &str {
 
 fn quoted_val_event(text: &str) -> String {
     if text.starts_with('\'') {
-        let trimmed = text.trim_end_matches('\'');
-        let normalized = trimmed.replace("''", "'").replace('\\', "\\\\");
-        format!("=VAL {normalized}")
+        let inner = decode_single_quoted(text);
+        format!("=VAL '{}", escape_for_event(&inner))
     } else {
-        let trimmed = text.trim_end_matches('"');
-        let mut normalized = String::with_capacity(trimmed.len());
-        let mut chars = trimmed.chars().peekable();
-        while let Some(ch) = chars.next() {
-            if ch != '\\' {
-                normalized.push(ch);
-                continue;
-            }
+        let inner = decode_double_quoted(text);
+        format!("=VAL \"{}", escape_for_event(&inner))
+    }
+}
 
-            let Some(next) = chars.next() else {
-                normalized.push('\\');
-                break;
-            };
+fn decode_single_quoted(text: &str) -> String {
+    let body = text.strip_prefix('\'').unwrap_or(text);
+    let body = body.strip_suffix('\'').unwrap_or(body);
+    body.replace("''", "'")
+}
 
-            match next {
-                '/' => normalized.push('/'),
-                '"' => normalized.push('"'),
-                other => {
-                    normalized.push('\\');
-                    normalized.push(other);
+/// Decode YAML double-quoted scalar escape sequences into actual characters
+/// per YAML 1.2 §5.7. Unknown escapes are kept verbatim so the harness can
+/// surface them as bare backslash-prefixed text.
+fn decode_double_quoted(text: &str) -> String {
+    let body = text.strip_prefix('"').unwrap_or(text);
+    let mut out = String::with_capacity(body.len());
+    let mut chars = body.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '"' {
+            break;
+        }
+        if ch != '\\' {
+            out.push(ch);
+            continue;
+        }
+        let Some(next) = chars.next() else {
+            out.push('\\');
+            break;
+        };
+        match next {
+            '0' => out.push('\0'),
+            'a' => out.push('\u{07}'),
+            'b' => out.push('\u{08}'),
+            't' | '\t' => out.push('\t'),
+            'n' => out.push('\n'),
+            'v' => out.push('\u{0B}'),
+            'f' => out.push('\u{0C}'),
+            'r' => out.push('\r'),
+            'e' => out.push('\u{1B}'),
+            ' ' => out.push(' '),
+            '"' => out.push('"'),
+            '/' => out.push('/'),
+            '\\' => out.push('\\'),
+            'N' => out.push('\u{85}'),
+            '_' => out.push('\u{A0}'),
+            'L' => out.push('\u{2028}'),
+            'P' => out.push('\u{2029}'),
+            'x' => {
+                if let Some(c) = take_hex_char(&mut chars, 2) {
+                    out.push(c);
                 }
             }
+            'u' => {
+                if let Some(c) = take_hex_char(&mut chars, 4) {
+                    out.push(c);
+                }
+            }
+            'U' => {
+                if let Some(c) = take_hex_char(&mut chars, 8) {
+                    out.push(c);
+                }
+            }
+            other => {
+                out.push('\\');
+                out.push(other);
+            }
         }
-        format!("=VAL {normalized}")
     }
+    out
+}
+
+fn take_hex_char(chars: &mut std::str::Chars<'_>, n: usize) -> Option<char> {
+    let hex: String = chars.take(n).collect();
+    if hex.len() != n {
+        return None;
+    }
+    u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32)
+}
+
+/// Escape decoded scalar text for the yaml-test-suite event format, where
+/// control characters and structural backslashes are rendered as backslash
+/// escapes (`\n`, `\t`, `\b`, ...).
+fn escape_for_event(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            '\r' => out.push_str("\\r"),
+            '\u{07}' => out.push_str("\\a"),
+            '\u{08}' => out.push_str("\\b"),
+            '\u{0B}' => out.push_str("\\v"),
+            '\u{0C}' => out.push_str("\\f"),
+            '\u{1B}' => out.push_str("\\e"),
+            '\0' => out.push_str("\\0"),
+            other => out.push(other),
+        }
+    }
+    out
 }
 
 fn long_tag_builtin(tag: &str) -> Option<String> {
@@ -892,107 +967,126 @@ fn scalar_event(anchor: Option<&str>, long_tag: Option<&str>, body: &str) -> Str
 }
 
 fn project_block_map_entries(map_node: &SyntaxNode, handles: &TagHandles, out: &mut Vec<String>) {
-    for entry in map_node
-        .children()
-        .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
-    {
-        let key_node = entry
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)
-            .expect("key node");
-        let value_node = entry
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
-            .expect("value node");
-
-        let key_tag = key_node
-            .children_with_tokens()
-            .filter_map(|el| el.into_token())
-            .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
-            .map(|tok| tok.text().to_string());
-        let key_text = key_node
-            .children_with_tokens()
-            .filter_map(|el| el.into_token())
-            .find(|tok| tok.kind() == SyntaxKind::YAML_KEY)
-            .map(|tok| tok.text().trim_end().to_string())
-            .expect("key token");
-
-        let key_event = if key_text.starts_with('*') {
-            format!("=ALI {}", key_text.trim_end())
-        } else {
-            let key_long_tag = key_tag
-                .as_deref()
-                .and_then(|t| resolve_long_tag(t, handles));
-            let (anchor, body_tag, body) = decompose_scalar(key_text.trim(), handles);
-            let long_tag = key_long_tag.or(body_tag);
-            scalar_event(anchor, long_tag.as_deref(), body)
-        };
-        out.push(key_event);
-
-        if let Some(nested_map) = value_node
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
-        {
-            out.push("+MAP".to_string());
-            project_block_map_entries(&nested_map, handles, out);
-            out.push("-MAP".to_string());
-            continue;
-        }
-
-        if let Some(flow_map) = value_node
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
-        {
-            out.push("+MAP {}".to_string());
-            project_flow_map_entries(&flow_map, handles, out);
-            out.push("-MAP".to_string());
-            continue;
-        }
-
-        if let Some((indicator, body)) = extract_block_scalar_body(&value_node) {
-            let escaped = escape_block_scalar_text(&body);
-            out.push(format!("=VAL {indicator}{escaped}"));
-            continue;
-        }
-
-        let value_tag = value_node
-            .children_with_tokens()
-            .filter_map(|el| el.into_token())
-            .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
-            .map(|tok| tok.text().to_string());
-        let value_text = value_node
-            .descendants_with_tokens()
-            .filter_map(|el| el.into_token())
-            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
-            .map(|tok| tok.text().to_string())
-            .collect::<Vec<_>>()
-            .join("");
-
-        if value_tag.is_none()
-            && let Some(items) = simple_flow_sequence_items(&value_text)
-        {
-            out.push("+SEQ []".to_string());
-            for item in items {
-                project_flow_seq_item(&item, handles, out);
-            }
-            out.push("-SEQ".to_string());
-        } else if value_text.trim().is_empty() {
-            if let Some(tag) = value_tag
-                && let Some(long) = resolve_long_tag(&tag, handles)
+    for child in map_node.children_with_tokens() {
+        match child {
+            rowan::NodeOrToken::Token(tok)
+                if tok.kind() == SyntaxKind::YAML_SCALAR
+                    && tok.text().trim_start().starts_with("? ") =>
             {
-                out.push(format!("=VAL {long} :"));
-            } else {
+                let body = tok.text().trim_start().trim_start_matches("? ").trim();
+                if body.is_empty() {
+                    out.push("=VAL :".to_string());
+                } else {
+                    let (anchor, body_tag, rest) = decompose_scalar(body, handles);
+                    out.push(scalar_event(anchor, body_tag.as_deref(), rest));
+                }
                 out.push("=VAL :".to_string());
             }
-        } else if value_text.trim_start().starts_with('*') {
-            out.push(format!("=ALI {}", value_text.trim()));
-        } else {
-            let value_long_tag = value_tag
-                .as_deref()
-                .and_then(|t| resolve_long_tag(t, handles));
-            let (anchor, body_tag, body) = decompose_scalar(value_text.trim(), handles);
-            let long_tag = value_long_tag.or(body_tag);
-            out.push(scalar_event(anchor, long_tag.as_deref(), body));
+            rowan::NodeOrToken::Node(entry) if entry.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY => {
+                project_block_map_entry(&entry, handles, out);
+            }
+            _ => {}
         }
+    }
+}
+
+fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut Vec<String>) {
+    let key_node = entry
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)
+        .expect("key node");
+    let value_node = entry
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
+        .expect("value node");
+
+    let key_tag = key_node
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
+        .map(|tok| tok.text().to_string());
+    let key_text = key_node
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .find(|tok| tok.kind() == SyntaxKind::YAML_KEY)
+        .map(|tok| tok.text().trim_end().to_string())
+        .expect("key token");
+
+    let key_event = if key_text.starts_with('*') {
+        format!("=ALI {}", key_text.trim_end())
+    } else {
+        let key_long_tag = key_tag
+            .as_deref()
+            .and_then(|t| resolve_long_tag(t, handles));
+        let (anchor, body_tag, body) = decompose_scalar(key_text.trim(), handles);
+        let long_tag = key_long_tag.or(body_tag);
+        scalar_event(anchor, long_tag.as_deref(), body)
+    };
+    out.push(key_event);
+
+    if let Some(nested_map) = value_node
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
+    {
+        out.push("+MAP".to_string());
+        project_block_map_entries(&nested_map, handles, out);
+        out.push("-MAP".to_string());
+        return;
+    }
+
+    if let Some(flow_map) = value_node
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
+    {
+        out.push("+MAP {}".to_string());
+        project_flow_map_entries(&flow_map, handles, out);
+        out.push("-MAP".to_string());
+        return;
+    }
+
+    if let Some((indicator, body)) = extract_block_scalar_body(&value_node) {
+        let escaped = escape_block_scalar_text(&body);
+        out.push(format!("=VAL {indicator}{escaped}"));
+        return;
+    }
+
+    let value_tag = value_node
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
+        .map(|tok| tok.text().to_string());
+    let value_text = value_node
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+        .map(|tok| tok.text().to_string())
+        .collect::<Vec<_>>()
+        .join("");
+
+    if value_tag.is_none()
+        && let Some(items) = simple_flow_sequence_items(&value_text)
+    {
+        out.push("+SEQ []".to_string());
+        for item in items {
+            project_flow_seq_item(&item, handles, out);
+        }
+        out.push("-SEQ".to_string());
+    } else if value_text.trim().is_empty() {
+        if let Some(tag) = value_tag
+            && let Some(long) = resolve_long_tag(&tag, handles)
+        {
+            out.push(format!("=VAL {long} :"));
+        } else {
+            out.push("=VAL :".to_string());
+        }
+    } else if value_text.trim_start().starts_with('*') {
+        out.push(format!("=ALI {}", value_text.trim()));
+    } else {
+        let value_long_tag = value_tag
+            .as_deref()
+            .and_then(|t| resolve_long_tag(t, handles));
+        let (anchor, body_tag, body) = decompose_scalar(value_text.trim(), handles);
+        let long_tag = value_long_tag.or(body_tag);
+        out.push(scalar_event(anchor, long_tag.as_deref(), body));
     }
 }
