@@ -378,6 +378,12 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Optio
     // Try decimal numbers: 1. or 1)
     let digit_count = trimmed.chars().take_while(|c| c.is_ascii_digit()).count();
     if digit_count > 0 && trimmed.len() > digit_count {
+        // CommonMark restricts ordered list markers to 1-9 digits (spec §5.2).
+        // Pandoc-markdown accepts arbitrary digit counts.
+        if config.dialect == crate::Dialect::CommonMark && digit_count > 9 {
+            return None;
+        }
+
         let number = &trimmed[..digit_count];
         let delim = trimmed.chars().nth(digit_count);
 

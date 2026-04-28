@@ -265,6 +265,8 @@ golden_test_cases!(
     lists_task,
     lists_wrapping_nested,
     lists_wrapping_simple,
+    ordered_marker_max_digits_commonmark,
+    ordered_marker_max_digits_pandoc,
     multiline_table_basic,
     multiline_table_caption,
     multiline_table_caption_after,

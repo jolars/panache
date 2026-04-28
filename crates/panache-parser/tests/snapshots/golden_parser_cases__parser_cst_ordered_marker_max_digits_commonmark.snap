@@ -1,0 +1,8 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..19
+  PARAGRAPH@0..19
+    TEXT@0..18 "1234567890. not ok"
+    NEWLINE@18..19 "\n"
