@@ -1,0 +1,20 @@
+{
+  "name": "panache-pre-commit",
+  "version": "2.40.0",
+  "description": "pre-commit hook wrapper for panache",
+  "private": true,
+  "license": "MIT",
+  "bin": {
+    "panache": "./bin/panache-precommit.js"
+  },
+  "files": [
+    "bin/",
+    ".pre-commit-hooks.yaml"
+  ],
+  "dependencies": {
+    "@panache-cli/panache": "2.40.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

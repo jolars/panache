@@ -37,6 +37,10 @@ lcov.info
 crates/panache-wasm/pkg/
 docs/playground/pkg/
 
+# Pre-commit / node wrapper
+/node_modules
+/package-lock.json
+
 .panache-cache/
 /test.Rmd
 /test.qmd

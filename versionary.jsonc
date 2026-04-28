@@ -25,6 +25,16 @@
           "type": "json",
           "path": "npm/panache-cli/package.json",
           "jsonpath": "$.optionalDependencies.*"
+        },
+        {
+          "type": "json",
+          "path": "package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "package.json",
+          "jsonpath": "$.dependencies.@panache-cli/panache"
         }
       ]
     },
