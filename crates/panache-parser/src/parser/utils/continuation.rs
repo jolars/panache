@@ -255,7 +255,11 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
             return false;
         }
         if self.config.extensions.raw_html
-            && html_blocks::try_parse_html_block_start(stripped_content).is_some()
+            && html_blocks::try_parse_html_block_start(
+                stripped_content,
+                self.config.dialect == crate::options::Dialect::CommonMark,
+            )
+            .is_some()
         {
             return false;
         }

@@ -221,6 +221,8 @@ golden_test_cases!(
     headerless_table,
     horizontal_rules,
     html_block,
+    html_block_commonmark_type6_type7_commonmark,
+    html_block_commonmark_type6_type7_pandoc,
     ignore_directives,
     images,
     indented_code,

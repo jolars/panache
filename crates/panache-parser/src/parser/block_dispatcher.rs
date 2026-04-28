@@ -1539,11 +1539,19 @@ impl BlockParser for HtmlBlockParser {
             return None;
         }
 
-        let block_type = try_parse_html_block_start(ctx.content)?;
+        let is_commonmark = ctx.config.dialect == crate::options::Dialect::CommonMark;
+        let block_type = try_parse_html_block_start(ctx.content, is_commonmark)?;
 
-        // Match previous behavior (and Pandoc-ish semantics): HTML blocks can interrupt
-        // paragraphs; blank lines are not required.
-        let detection = if ctx.has_blank_before || ctx.at_document_start {
+        // Type 7 cannot interrupt a paragraph (CommonMark §4.6). Other
+        // types can. Match prior behavior otherwise: HTML blocks may
+        // interrupt paragraphs; blank lines are not required.
+        let detection = if matches!(block_type, HtmlBlockType::Type7) {
+            if ctx.has_blank_before || ctx.at_document_start {
+                BlockDetectionResult::Yes
+            } else {
+                return None;
+            }
+        } else if ctx.has_blank_before || ctx.at_document_start {
             BlockDetectionResult::Yes
         } else {
             BlockDetectionResult::YesCanInterrupt
@@ -1560,10 +1568,12 @@ impl BlockParser for HtmlBlockParser {
         line_pos: usize,
         payload: Option<&dyn Any>,
     ) -> usize {
+        let is_commonmark = ctx.config.dialect == crate::options::Dialect::CommonMark;
         let block_type = if let Some(bt) = payload.and_then(|p| p.downcast_ref::<HtmlBlockType>()) {
             bt.clone()
         } else {
-            try_parse_html_block_start(ctx.content).expect("HTML block type should exist")
+            try_parse_html_block_start(ctx.content, is_commonmark)
+                .expect("HTML block type should exist")
         };
 
         let new_pos = parse_html_block(builder, lines, line_pos, block_type, ctx.blockquote_depth);

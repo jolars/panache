@@ -1,0 +1,56 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..91
+  HTML_BLOCK@0..31
+    HTML_BLOCK_TAG@0..6
+      TEXT@0..5 "<div>"
+      NEWLINE@5..6 "\n"
+    HTML_BLOCK_CONTENT@6..31
+      TEXT@6..9 "foo"
+      NEWLINE@9..10 "\n"
+      TEXT@10..16 "</div>"
+      NEWLINE@16..17 "\n"
+      TEXT@17..30 "trailing line"
+      NEWLINE@30..31 "\n"
+  BLANK_LINE@31..32
+    BLANK_LINE@31..32 "\n"
+  HTML_BLOCK@32..45
+    HTML_BLOCK_TAG@32..39
+      TEXT@32..38 "</div>"
+      NEWLINE@38..39 "\n"
+    HTML_BLOCK_CONTENT@39..45
+      TEXT@39..44 "*foo*"
+      NEWLINE@44..45 "\n"
+  BLANK_LINE@45..46
+    BLANK_LINE@45..46 "\n"
+  HTML_BLOCK@46..70
+    HTML_BLOCK_TAG@46..59
+      TEXT@46..58 "<a href=\"x\">"
+      NEWLINE@58..59 "\n"
+    HTML_BLOCK_CONTENT@59..70
+      TEXT@59..64 "*bar*"
+      NEWLINE@64..65 "\n"
+      TEXT@65..69 "</a>"
+      NEWLINE@69..70 "\n"
+  BLANK_LINE@70..71
+    BLANK_LINE@70..71 "\n"
+  HTML_BLOCK@71..77
+    HTML_BLOCK_TAG@71..77
+      TEXT@71..76 "<div>"
+      NEWLINE@76..77 "\n"
+  BLANK_LINE@77..78
+    BLANK_LINE@77..78 "\n"
+  PARAGRAPH@78..83
+    EMPHASIS@78..82
+      EMPHASIS_MARKER@78..79 "*"
+      TEXT@79..81 "md"
+      EMPHASIS_MARKER@81..82 "*"
+    NEWLINE@82..83 "\n"
+  BLANK_LINE@83..84
+    BLANK_LINE@83..84 "\n"
+  HTML_BLOCK@84..91
+    HTML_BLOCK_TAG@84..91
+      TEXT@84..90 "</div>"
+      NEWLINE@90..91 "\n"

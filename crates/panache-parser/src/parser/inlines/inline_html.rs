@@ -92,7 +92,7 @@ fn parse_declaration(text: &str) -> Option<usize> {
     None
 }
 
-fn parse_close_tag(text: &str) -> Option<usize> {
+pub(crate) fn parse_close_tag(text: &str) -> Option<usize> {
     let bytes = text.as_bytes();
     if !text.starts_with("</") {
         return None;
@@ -113,7 +113,7 @@ fn parse_close_tag(text: &str) -> Option<usize> {
     }
 }
 
-fn parse_open_tag(text: &str) -> Option<usize> {
+pub(crate) fn parse_open_tag(text: &str) -> Option<usize> {
     let bytes = text.as_bytes();
     if !text.starts_with('<') {
         return None;
