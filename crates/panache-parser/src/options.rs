@@ -17,6 +17,7 @@ pub enum Flavor {
     /// GitHub Flavored Markdown
     Gfm,
     /// CommonMark
+    #[cfg_attr(feature = "serde", serde(alias = "commonmark"))]
     CommonMark,
     /// MultiMarkdown
     #[cfg_attr(feature = "serde", serde(rename = "multimarkdown"))]

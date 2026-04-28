@@ -74,9 +74,29 @@ fn run_golden_case(case_name: &str) {
 
     // Load optional config, then apply extension-based flavor detection for
     // config-less fixtures (matching CLI behavior for qmd/Rmd inputs).
+    //
+    // When a fixture's `panache.toml` sets only `flavor = "..."` (no
+    // `[extensions]` table), serde leaves `extensions` at its `Default` —
+    // which is Pandoc — so dialect-divergent parser paths gated on the
+    // CommonMark/GFM flavor would silently fall back to Pandoc behavior.
+    // Re-derive extension defaults from the resolved flavor so the fixture
+    // actually exercises the flavor it declares.
     let config = match load_test_config(&dir) {
         Some(mut config) => {
+            let toml_text = fs::read_to_string(dir.join("panache.toml")).unwrap_or_default();
+            let toml_value: toml::Value =
+                toml::from_str(&toml_text).unwrap_or(toml::Value::Table(toml::value::Table::new()));
+            let extensions_overridden = toml_value.get("extensions").is_some();
+            let formatter_extensions_overridden = toml_value.get("formatter-extensions").is_some()
+                || toml_value.get("formatter_extensions").is_some();
+
             config.flavor = detect_fixture_flavor(&input_path, config.flavor);
+            if !extensions_overridden {
+                config.extensions = Extensions::for_flavor(config.flavor);
+            }
+            if !formatter_extensions_overridden {
+                config.formatter_extensions = FormatterExtensions::for_flavor(config.flavor);
+            }
             Some(config)
         }
         None => {
@@ -189,6 +209,8 @@ golden_test_cases!(
     footnote_defs_consecutive_no_blanks,
     headings,
     setext_headings,
+    setext_text_thematic_break_commonmark,
+    thematic_break_interrupts_paragraph_commonmark,
     headerless_table,
     horizontal_rules,
     html_block,

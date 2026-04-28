@@ -188,6 +188,28 @@ between sessions — short, judgment-call-only, not a duplicate of
    - **Missing feature**: scope it carefully; if it's large, file it as
      follow-up rather than landing it in a conformance session.
 
+   **Formatter golden case (when needed)** — if the parser change produces
+   a *new structural shape* under CommonMark (e.g. paragraph + thematic
+   break + paragraph where there was previously a single paragraph), also
+   add one formatter golden case under `tests/fixtures/cases/` (top-level,
+   not the parser-crate one) with `panache.toml` setting
+   `flavor = "commonmark"`. The formatter fixture pins the formatted
+   output and exercises idempotency, which is how non-obvious round-trip
+   bugs surface (the formatter's HR style colliding with setext underlines
+   is the canonical example). **Skip the paired Pandoc formatter case** —
+   the existing top-level fixture suite already covers Pandoc-default
+   behavior, and adding duplicates is churn. Only add a CommonMark
+   formatter case when the new CommonMark behavior produces a different
+   block sequence than the Pandoc path; if both dialects format
+   identically, the parser fixture alone is sufficient.
+
+   Reference: `tests/fixtures/cases/thematic_break_interrupts_paragraph_commonmark/`.
+
+   Note on `panache.toml` flavor strings: the formatter config uses serde's
+   kebab-case rename. `Flavor::CommonMark` accepts both `"commonmark"` and
+   `"common-mark"` (alias). Other variants follow kebab-case strictly
+   (`"rmarkdown"`, `"multimarkdown"`, `"gfm"`, `"pandoc"`, `"quarto"`).
+
 5. **Apply the smallest focused change**, keeping the parser
    CST-lossless and parser/formatter policy separate (per
    `.claude/rules/parser.md`).

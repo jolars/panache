@@ -648,6 +648,17 @@ impl Formatter {
             }
 
             SyntaxKind::HORIZONTAL_RULE => {
+                // Ensure blank line BEFORE the rule when the previous output ended
+                // with a paragraph line. Without this, output like `Foo\n----\n`
+                // round-trips through the parser as a setext h2 (`<h2>Foo</h2>`),
+                // which breaks idempotency.
+                if !self.output.is_empty()
+                    && self.output.ends_with('\n')
+                    && !self.output.ends_with("\n\n")
+                {
+                    self.output.push('\n');
+                }
+
                 // Output normalized horizontal rule using full available width.
                 self.output
                     .push_str(&self.horizontal_rule_text(self.config.line_width));

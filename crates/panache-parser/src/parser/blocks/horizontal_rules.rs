@@ -11,6 +11,13 @@ use crate::parser::utils::helpers::strip_newline;
 /// A horizontal rule is 3 or more `*`, `-`, or `_` characters,
 /// optionally separated by spaces.
 pub(crate) fn try_parse_horizontal_rule(line: &str) -> Option<char> {
+    // Per CommonMark §4.1, a thematic break may be indented up to three spaces.
+    // Four or more spaces of indentation makes the line an indented code block
+    // (or, inside a paragraph, plain text continuation), not a thematic break.
+    let leading = line.bytes().take_while(|b| *b == b' ').count();
+    if leading >= 4 {
+        return None;
+    }
     let trimmed = line.trim();
 
     // Must have at least 3 characters

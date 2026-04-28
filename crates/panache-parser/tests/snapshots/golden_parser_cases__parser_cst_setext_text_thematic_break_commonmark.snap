@@ -1,0 +1,11 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..8
+  HORIZONTAL_RULE@0..4
+    HORIZONTAL_RULE@0..3 "***"
+    NEWLINE@3..4 "\n"
+  HORIZONTAL_RULE@4..8
+    HORIZONTAL_RULE@4..7 "---"
+    NEWLINE@7..8 "\n"

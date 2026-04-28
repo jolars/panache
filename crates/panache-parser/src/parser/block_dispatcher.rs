@@ -199,14 +199,23 @@ impl BlockParser for HorizontalRuleParser {
         _lines: &[&str],
         _line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
-        // Must have blank line before
-        if !ctx.has_blank_before {
+        // CommonMark §4.1: thematic breaks can interrupt a paragraph (no
+        // blank line required). Pandoc-markdown disagrees and treats a
+        // would-be thematic break inside a paragraph as plain text. Branch
+        // on dialect.
+        let common_mark = ctx.config.dialect == crate::options::Dialect::CommonMark;
+        if !common_mark && !ctx.has_blank_before {
             return None;
         }
 
         // Check if this looks like a horizontal rule
         if try_parse_horizontal_rule(ctx.content).is_some() {
-            Some((BlockDetectionResult::Yes, None))
+            let detection = if common_mark {
+                BlockDetectionResult::YesCanInterrupt
+            } else {
+                BlockDetectionResult::Yes
+            };
+            Some((detection, None))
         } else {
             None
         }
@@ -600,7 +609,9 @@ impl BlockParser for ListParser {
         {
             return None;
         }
-        if (ctx.has_blank_before || ctx.at_document_start)
+        if (ctx.has_blank_before
+            || ctx.at_document_start
+            || ctx.config.dialect == crate::options::Dialect::CommonMark)
             && try_parse_horizontal_rule(ctx.content).is_some()
         {
             return None;
@@ -2057,6 +2068,14 @@ impl BlockParser for SetextHeadingParser {
 
         // Try to detect setext heading
         if try_parse_setext_heading(&lines, 0).is_some() {
+            // CommonMark §4.3: a setext heading text line cannot itself be a
+            // valid thematic break. Pandoc-markdown allows it (e.g. `***\n---`
+            // becomes `<h2>***</h2>`), so this branch is dialect-gated.
+            if ctx.config.dialect == crate::options::Dialect::CommonMark
+                && try_parse_horizontal_rule(ctx.content).is_some()
+            {
+                return None;
+            }
             Some((BlockDetectionResult::Yes, None))
         } else {
             None
