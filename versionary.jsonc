@@ -14,6 +14,18 @@
         "crates/panache-parser",
         "crates/panache-wasm",
         "editors"
+      ],
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "npm/panache-cli/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "npm/panache-cli/package.json",
+          "jsonpath": "$.optionalDependencies.*"
+        }
       ]
     },
     "crates/panache-parser": {},

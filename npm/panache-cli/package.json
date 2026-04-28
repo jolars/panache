@@ -1,0 +1,42 @@
+{
+  "name": "panache-cli",
+  "version": "2.40.0",
+  "description": "An LSP, formatter, and linter for Pandoc markdown, Quarto, and RMarkdown",
+  "keywords": [
+    "quarto",
+    "pandoc",
+    "markdown",
+    "formatter",
+    "linter",
+    "language-server"
+  ],
+  "homepage": "https://panache.bz",
+  "bugs": "https://github.com/jolars/panache/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jolars/panache.git"
+  },
+  "license": "MIT",
+  "author": "Johan Larsson <johan@jolars.co>",
+  "bin": {
+    "panache": "bin/panache.js"
+  },
+  "files": [
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@panache-cli/linux-x64-gnu": "2.40.0",
+    "@panache-cli/linux-arm64-gnu": "2.40.0",
+    "@panache-cli/linux-x64-musl": "2.40.0",
+    "@panache-cli/linux-arm64-musl": "2.40.0",
+    "@panache-cli/darwin-x64": "2.40.0",
+    "@panache-cli/darwin-arm64": "2.40.0",
+    "@panache-cli/win32-x64": "2.40.0",
+    "@panache-cli/win32-arm64": "2.40.0"
+  }
+}

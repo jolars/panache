@@ -1,0 +1,30 @@
+{
+  "name": "@panache-cli/__NAME__",
+  "version": "__VERSION__",
+  "description": "Prebuilt panache binary for __NAME__. Install panache-cli instead.",
+  "homepage": "https://panache.bz",
+  "bugs": "https://github.com/jolars/panache/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jolars/panache.git"
+  },
+  "license": "MIT",
+  "author": "Johan Larsson <johan@jolars.co>",
+  "files": [
+    "__BINARY__",
+    "README.md",
+    "LICENSE"
+  ],
+  "os": [
+    "__OS__"
+  ],
+  "cpu": [
+    "__CPU__"
+  ],
+  "libc": [
+    "__LIBC__"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

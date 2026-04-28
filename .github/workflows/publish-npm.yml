@@ -1,0 +1,256 @@
+name: Publish npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Build and assemble packages but do not publish"
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-binaries:
+    name: Build binary ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            npm_name: linux-x64-gnu
+            binary: panache
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+            npm_name: linux-arm64-gnu
+            binary: panache
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            npm_name: linux-x64-musl
+            binary: panache
+            musl: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+            npm_name: linux-arm64-musl
+            binary: panache
+            musl: true
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+            npm_name: darwin-x64
+            binary: panache
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            npm_name: darwin-arm64
+            binary: panache
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            npm_name: win32-x64
+            binary: panache.exe
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
+            npm_name: win32-arm64
+            binary: panache.exe
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.1
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: npm-${{ matrix.target }}
+
+      - name: Install musl tools
+        if: matrix.musl
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Build binary
+        run: cargo build --release --bin panache --target ${{ matrix.target }} --locked
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: binary-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/${{ matrix.binary }}
+          if-no-files-found: error
+
+  publish-platform-packages:
+    name: Publish @panache-cli/${{ matrix.npm_name }}
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            npm_name: linux-x64-gnu
+            os: linux
+            cpu: x64
+            libc: glibc
+            binary: panache
+          - target: aarch64-unknown-linux-gnu
+            npm_name: linux-arm64-gnu
+            os: linux
+            cpu: arm64
+            libc: glibc
+            binary: panache
+          - target: x86_64-unknown-linux-musl
+            npm_name: linux-x64-musl
+            os: linux
+            cpu: x64
+            libc: musl
+            binary: panache
+          - target: aarch64-unknown-linux-musl
+            npm_name: linux-arm64-musl
+            os: linux
+            cpu: arm64
+            libc: musl
+            binary: panache
+          - target: x86_64-apple-darwin
+            npm_name: darwin-x64
+            os: darwin
+            cpu: x64
+            binary: panache
+          - target: aarch64-apple-darwin
+            npm_name: darwin-arm64
+            os: darwin
+            cpu: arm64
+            binary: panache
+          - target: x86_64-pc-windows-msvc
+            npm_name: win32-x64
+            os: win32
+            cpu: x64
+            binary: panache.exe
+          - target: aarch64-pc-windows-msvc
+            npm_name: win32-arm64
+            os: win32
+            cpu: arm64
+            binary: panache.exe
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Download binary
+        uses: actions/download-artifact@v6
+        with:
+          name: binary-${{ matrix.target }}
+          path: binary
+
+      - name: Read package version
+        id: version
+        run: |
+          version=$(node -p "require('./npm/panache-cli/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble package
+        run: |
+          set -euo pipefail
+          pkg_dir=staging/${{ matrix.npm_name }}
+          mkdir -p "$pkg_dir"
+          cp npm/platform-template/package.json "$pkg_dir/package.json"
+          cp npm/platform-template/README.md "$pkg_dir/README.md"
+          cp LICENSE "$pkg_dir/LICENSE"
+          cp binary/${{ matrix.binary }} "$pkg_dir/${{ matrix.binary }}"
+          chmod +x "$pkg_dir/${{ matrix.binary }}"
+
+          node -e '
+            const fs = require("node:fs");
+            const path = process.argv[1];
+            const repl = {
+              __NAME__: process.env.NPM_NAME,
+              __VERSION__: process.env.PKG_VERSION,
+              __OS__: process.env.PKG_OS,
+              __CPU__: process.env.PKG_CPU,
+              __BINARY__: process.env.BINARY,
+            };
+            let json = JSON.parse(fs.readFileSync(path, "utf8"));
+            const subst = (v) => typeof v === "string"
+              ? v.replace(/__[A-Z]+__/g, (m) => repl[m] ?? m)
+              : Array.isArray(v) ? v.map(subst)
+              : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, subst(x)]))
+              : v;
+            json = subst(json);
+            if (process.env.PKG_LIBC) json.libc = [process.env.PKG_LIBC];
+            else delete json.libc;
+            fs.writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
+          ' "$pkg_dir/package.json"
+
+          # Substitute __NAME__ in README
+          sed -i "s|__NAME__|${{ matrix.npm_name }}|g" "$pkg_dir/README.md"
+
+          echo "--- package.json ---"
+          cat "$pkg_dir/package.json"
+        env:
+          NPM_NAME: ${{ matrix.npm_name }}
+          PKG_VERSION: ${{ steps.version.outputs.version }}
+          PKG_OS: ${{ matrix.os }}
+          PKG_CPU: ${{ matrix.cpu }}
+          PKG_LIBC: ${{ matrix.libc }}
+          BINARY: ${{ matrix.binary }}
+
+      - name: Publish to npm
+        working-directory: staging/${{ matrix.npm_name }}
+        run: |
+          if [ "${{ inputs.dry-run }}" = "true" ]; then
+            npm publish --provenance --access public --dry-run
+          else
+            npm publish --provenance --access public
+          fi
+
+  publish-main:
+    name: Publish panache-cli
+    needs: publish-platform-packages
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Assemble main package
+        run: |
+          set -euo pipefail
+          pkg_dir=staging/panache-cli
+          mkdir -p "$pkg_dir/bin"
+          cp npm/panache-cli/package.json "$pkg_dir/package.json"
+          cp npm/panache-cli/README.md "$pkg_dir/README.md"
+          cp npm/panache-cli/bin/panache.js "$pkg_dir/bin/panache.js"
+          cp LICENSE "$pkg_dir/LICENSE"
+
+          echo "--- package.json ---"
+          cat "$pkg_dir/package.json"
+
+      - name: Publish to npm
+        working-directory: staging/panache-cli
+        run: |
+          if [ "${{ inputs.dry-run }}" = "true" ]; then
+            npm publish --provenance --access public --dry-run
+          else
+            npm publish --provenance --access public
+          fi
