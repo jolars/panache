@@ -191,3 +191,9 @@ DFF7
 7TMG
 # Flow map with URL-like plain value (`http://foo.com`) — colon needs whitespace to split.
 4ABK
+# Tag suffix percent-encoding (`!e!tag%21`) decoded to `<...tag!>` in event projection.
+6CK3
+# Multi-document with `%TAG !` directive overriding the primary handle on the second doc.
+6WLZ
+# Same `%TAG !` primary-handle override pattern but with no `---` on the first doc.
+9WXW

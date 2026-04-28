@@ -1,0 +1,35 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: 6WLZ
+input: "# Private\n---\n!foo \"bar\"\n...\n# Global\n%TAG ! tag:example.com,2000:app/\n---\n!foo \"bar\"\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..86
+  YAML_METADATA_CONTENT@0..86
+    YAML_STREAM@0..86
+      YAML_COMMENT@0..9 "# Private"
+      NEWLINE@9..10 "\n"
+      YAML_DOCUMENT@10..29
+        YAML_DOCUMENT_START@10..13 "---"
+        NEWLINE@13..14 "\n"
+        YAML_TAG@14..18 "!foo"
+        WHITESPACE@18..19 " "
+        YAML_SCALAR@19..24 "\"bar\""
+        NEWLINE@24..25 "\n"
+        YAML_DOCUMENT_END@25..28 "..."
+        NEWLINE@28..29 "\n"
+      YAML_COMMENT@29..37 "# Global"
+      NEWLINE@37..38 "\n"
+      YAML_DOCUMENT@38..86
+        YAML_SCALAR@38..70 "%TAG ! tag:example.co ..."
+        NEWLINE@70..71 "\n"
+        YAML_DOCUMENT_START@71..74 "---"
+        NEWLINE@74..75 "\n"
+        YAML_TAG@75..79 "!foo"
+        WHITESPACE@79..80 " "
+        YAML_SCALAR@80..85 "\"bar\""
+        NEWLINE@85..86 "\n"

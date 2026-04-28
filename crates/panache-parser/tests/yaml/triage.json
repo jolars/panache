@@ -747,12 +747,6 @@
       "tree": false
     },
     {
-      "case_id": "6CK3",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "6FWR",
       "diagnostic_codes": [
         "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START"
@@ -815,12 +809,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "6WLZ",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "6WPF",
@@ -1016,12 +1004,6 @@
     },
     {
       "case_id": "9U5K",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "9WXW",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -1851,9 +1833,11 @@
     "5T43",
     "652Z",
     "65WH",
+    "6CK3",
     "6H3V",
     "6KGN",
     "6SLA",
+    "6WLZ",
     "6XDY",
     "74H7",
     "7TMG",
@@ -1866,6 +1850,7 @@
     "9FMG",
     "9J7A",
     "9SHH",
+    "9WXW",
     "C2DT",
     "CC74",
     "CFD4",
@@ -1923,8 +1908,8 @@
   "summary": {
     "error_contract_ok_count": 54,
     "fails_needs_error_path_count": 24,
-    "fails_needs_feature_count": 168,
-    "passes_now_count": 87,
+    "fails_needs_feature_count": 165,
+    "passes_now_count": 90,
     "total_cases": 352
   }
 }

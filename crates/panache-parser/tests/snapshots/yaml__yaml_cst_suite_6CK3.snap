@@ -1,0 +1,40 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: 6CK3
+input: "%TAG !e! tag:example.com,2000:app/\n---\n- !local foo\n- !!str bar\n- !e!tag%21 baz\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..80
+  YAML_METADATA_CONTENT@0..80
+    YAML_STREAM@0..80
+      YAML_DOCUMENT@0..80
+        YAML_SCALAR@0..34 "%TAG !e! tag:example. ..."
+        NEWLINE@34..35 "\n"
+        YAML_DOCUMENT_START@35..38 "---"
+        NEWLINE@38..39 "\n"
+        YAML_BLOCK_SEQUENCE@39..80
+          YAML_BLOCK_SEQUENCE_ITEM@39..52
+            YAML_BLOCK_SEQ_ENTRY@39..40 "-"
+            WHITESPACE@40..41 " "
+            YAML_TAG@41..47 "!local"
+            WHITESPACE@47..48 " "
+            YAML_SCALAR@48..51 "foo"
+            NEWLINE@51..52 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@52..64
+            YAML_BLOCK_SEQ_ENTRY@52..53 "-"
+            WHITESPACE@53..54 " "
+            YAML_TAG@54..59 "!!str"
+            WHITESPACE@59..60 " "
+            YAML_SCALAR@60..63 "bar"
+            NEWLINE@63..64 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@64..80
+            YAML_BLOCK_SEQ_ENTRY@64..65 "-"
+            WHITESPACE@65..66 " "
+            YAML_TAG@66..75 "!e!tag%21"
+            WHITESPACE@75..76 " "
+            YAML_SCALAR@76..79 "baz"
+            NEWLINE@79..80 "\n"

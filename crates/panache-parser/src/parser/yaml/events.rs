@@ -51,11 +51,9 @@ fn collect_tag_handles(doc: &SyntaxNode) -> TagHandles {
 
 /// Resolve a tag shorthand (e.g. `!!str`, `!yaml!str`, `!e!foo`, `!local`) to
 /// the long-form `<tag:...>` event token, consulting the per-document handle
-/// map. Falls back to the built-in handling for unknown handles.
+/// map. Handles are checked first (so a `%TAG !` directive can override the
+/// primary handle); we fall back to the built-in handling for unknown handles.
 fn resolve_long_tag(tag: &str, handles: &TagHandles) -> Option<String> {
-    if let Some(s) = long_tag_builtin(tag) {
-        return Some(s);
-    }
     let mut best: Option<(&str, &String)> = None;
     for (h, p) in handles {
         if tag.starts_with(h)
@@ -66,9 +64,42 @@ fn resolve_long_tag(tag: &str, handles: &TagHandles) -> Option<String> {
     }
     if let Some((handle, prefix)) = best {
         let suffix = &tag[handle.len()..];
-        return Some(format!("<{prefix}{suffix}>"));
+        let resolved = format!("{prefix}{suffix}");
+        return Some(format!("<{}>", percent_decode_tag(&resolved)));
     }
-    None
+    long_tag_builtin(tag)
+}
+
+/// Decode percent-encoded bytes (`%xx`) in a resolved tag URI. YAML 1.2 allows
+/// percent-encoding in tag suffixes so callers can embed otherwise-special
+/// characters (`!`, `:`, etc.); event-stream parity expects the decoded form.
+fn percent_decode_tag(tag: &str) -> String {
+    let bytes = tag.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let (Some(hi), Some(lo)) =
+                (hex_digit_value(bytes[i + 1]), hex_digit_value(bytes[i + 2]))
+        {
+            out.push(hi * 16 + lo);
+            i += 3;
+            continue;
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap_or_else(|_| tag.to_string())
+}
+
+fn hex_digit_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
 }
 
 /// Walk the shadow CST for `input` and return the projected yaml-test-suite
