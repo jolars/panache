@@ -1,10 +1,10 @@
 CommonMark spec.txt v0.31.2 conformance report
-415 / 652 examples passing (63.7%)
-237 failing
+417 / 652 examples passing (64.0%)
+235 failing
 12 blocked-list entries
 
 === Per-section pass / fail ===
-  ATX headings: 17 pass / 1 fail
+  ATX headings: 18 pass / 0 fail
   Autolinks: 15 pass / 4 fail
   Backslash escapes: 11 pass / 2 fail
   Blank lines: 1 pass / 0 fail
@@ -25,7 +25,7 @@ CommonMark spec.txt v0.31.2 conformance report
   Paragraphs: 8 pass / 0 fail
   Precedence: 1 pass / 0 fail
   Raw HTML: 7 pass / 13 fail
-  Setext headings: 19 pass / 8 fail
+  Setext headings: 20 pass / 7 fail
   Soft line breaks: 2 pass / 0 fail
   Tabs: 6 pass / 5 fail
   Textual content: 3 pass / 0 fail
@@ -98,7 +98,9 @@ CommonMark spec.txt v0.31.2 conformance report
 76
 77
 78
+79
 80
+83
 84
 85
 86
@@ -467,6 +469,7 @@ CommonMark spec.txt v0.31.2 conformance report
 76
 77
 78
+79
 
 # Autolinks
 594
@@ -862,6 +865,7 @@ CommonMark spec.txt v0.31.2 conformance report
 
 # Setext headings
 80
+83
 84
 85
 86

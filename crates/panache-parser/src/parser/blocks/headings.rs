@@ -73,7 +73,7 @@ pub fn try_parse_atx_heading(content: &str) -> Option<usize> {
 /// 2. An underline of `=` (level 1) or `-` (level 2) characters
 ///
 /// Rules:
-/// - Underline must be at least 3 characters long
+/// - Underline can be any non-zero length (CommonMark §4.3 / Pandoc both)
 /// - Underline can have leading/trailing spaces (up to 3 leading spaces)
 /// - All underline characters must be the same (`=` or `-`)
 /// - Text line cannot be indented 4+ spaces (would be code block)
@@ -106,8 +106,8 @@ pub fn try_parse_setext_heading(lines: &[&str], pos: usize) -> Option<(usize, ch
     // Check if underline is valid
     let underline_trimmed = underline.trim();
 
-    // Must be at least 3 characters
-    if underline_trimmed.len() < 3 {
+    // Must be non-empty
+    if underline_trimmed.is_empty() {
         return None;
     }
 
@@ -316,11 +316,16 @@ pub(crate) fn emit_atx_heading(
         if trailing_hashes > 0 {
             let hashes_start = without_trailing_ws.len() - trailing_hashes;
             let before_hashes = &without_trailing_ws[..hashes_start];
-            if before_hashes
+            // Closing fence requires the hashes to be preceded by whitespace.
+            // That whitespace can be in `before_hashes` (non-empty content case),
+            // or it can be the post-marker spaces we already consumed when content
+            // is empty (e.g. `### ###` → empty heading with closing fence).
+            let preceded_by_ws = before_hashes
                 .chars()
                 .last()
                 .is_some_and(|c| c == ' ' || c == '\t')
-            {
+                || (before_hashes.is_empty() && spaces_after_marker_count > 0);
+            if preceded_by_ws {
                 let content_end = before_hashes.trim_end_matches([' ', '\t']).len();
                 (&heading_text[..content_end], &heading_text[content_end..])
             } else {
@@ -505,9 +510,15 @@ mod tests {
     }
 
     #[test]
-    fn test_setext_minimum_three_chars() {
+    fn test_setext_any_underline_length() {
+        // Per CommonMark §4.3 and Pandoc, the setext underline can be any
+        // non-zero length. Single `=` or `-` after a non-blank line is a
+        // valid setext underline.
+        let lines = vec!["Heading", "="];
+        assert_eq!(try_parse_setext_heading(&lines, 0), Some((1, '=')));
+
         let lines = vec!["Heading", "=="];
-        assert_eq!(try_parse_setext_heading(&lines, 0), None);
+        assert_eq!(try_parse_setext_heading(&lines, 0), Some((1, '=')));
 
         let lines = vec!["Heading", "==="];
         assert_eq!(try_parse_setext_heading(&lines, 0), Some((1, '=')));
