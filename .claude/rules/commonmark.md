@@ -21,6 +21,25 @@ flavor-gated.
 - All conformance runs use `Flavor::CommonMark`. Do not add cross-flavor
   branches into the harness. GFM-specific or Pandoc-specific behavior belongs
   in flavor-specific golden cases under `tests/fixtures/cases/`, not here.
+- Parser changes unlocked by conformance work must not regress Pandoc-markdown.
+  CommonMark and Pandoc disagree on more constructs than they agree on
+  (backtick run matching, emphasis flanking, raw HTML recognition, ...).
+  Before landing a parser-side fix, **verify against pandoc**:
+  ```
+  pandoc <case>.md -f commonmark -t native    # CommonMark expected shape
+  pandoc <case>.md -f markdown   -t native    # Pandoc expected shape
+  ```
+  If the two outputs differ, the fix belongs behind the `Dialect` switch on
+  `ParserOptions` (`Dialect::CommonMark` vs `Dialect::Pandoc`) — *not* an
+  unconditional change in `parser/inlines/**` or `parser/blocks/**`. Add
+  paired parser fixtures (one per dialect) under `tests/fixtures/cases/`
+  with `parser-options.toml` pinning the flavor. See
+  `code_spans_unmatched_backtick_run_{commonmark,pandoc}` for the canonical
+  shape.
+- Per-feature toggles (one bit, narrow scope) still belong on `Extensions`.
+  `Dialect` is reserved for *structural* parser-identity differences. When in
+  doubt: if multiple flavors share the same value, it's probably a `Dialect`
+  knob; if it tracks one named feature, it's an extension flag.
 - Never add a number to `tests/commonmark/allowlist.txt` without first running
   `commonmark_full_report` and confirming it appears in the passing set. Group
   entries under section header comments matching the spec's section names.

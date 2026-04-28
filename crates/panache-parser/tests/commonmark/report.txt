@@ -1,35 +1,35 @@
 CommonMark spec.txt v0.31.2 conformance report
-66 / 652 examples passing (10.1%)
-586 failing
+263 / 652 examples passing (40.3%)
+389 failing
 0 blocked-list entries
 
 === Per-section pass / fail ===
-  ATX headings: 11 pass / 7 fail
-  Autolinks: 0 pass / 19 fail
-  Backslash escapes: 1 pass / 12 fail
-  Blank lines: 0 pass / 1 fail
-  Block quotes: 3 pass / 22 fail
-  Code spans: 0 pass / 22 fail
-  Emphasis and strong emphasis: 0 pass / 132 fail
-  Entity and numeric character references: 1 pass / 16 fail
-  Fenced code blocks: 1 pass / 28 fail
-  HTML blocks: 14 pass / 30 fail
-  Hard line breaks: 1 pass / 14 fail
-  Images: 0 pass / 22 fail
-  Indented code blocks: 6 pass / 6 fail
-  Inlines: 0 pass / 1 fail
-  Link reference definitions: 0 pass / 27 fail
-  Links: 0 pass / 90 fail
-  List items: 8 pass / 40 fail
-  Lists: 4 pass / 22 fail
-  Paragraphs: 0 pass / 8 fail
+  ATX headings: 14 pass / 4 fail
+  Autolinks: 8 pass / 11 fail
+  Backslash escapes: 4 pass / 9 fail
+  Blank lines: 1 pass / 0 fail
+  Block quotes: 12 pass / 13 fail
+  Code spans: 20 pass / 2 fail
+  Emphasis and strong emphasis: 79 pass / 53 fail
+  Entity and numeric character references: 5 pass / 12 fail
+  Fenced code blocks: 4 pass / 25 fail
+  HTML blocks: 24 pass / 20 fail
+  Hard line breaks: 7 pass / 8 fail
+  Images: 2 pass / 20 fail
+  Indented code blocks: 7 pass / 5 fail
+  Inlines: 1 pass / 0 fail
+  Link reference definitions: 5 pass / 22 fail
+  Links: 13 pass / 77 fail
+  List items: 14 pass / 34 fail
+  Lists: 5 pass / 21 fail
+  Paragraphs: 4 pass / 4 fail
   Precedence: 1 pass / 0 fail
-  Raw HTML: 0 pass / 20 fail
-  Setext headings: 2 pass / 25 fail
-  Soft line breaks: 0 pass / 2 fail
+  Raw HTML: 6 pass / 14 fail
+  Setext headings: 6 pass / 21 fail
+  Soft line breaks: 1 pass / 1 fail
   Tabs: 6 pass / 5 fail
-  Textual content: 0 pass / 3 fail
-  Thematic breaks: 7 pass / 12 fail
+  Textual content: 3 pass / 0 fail
+  Thematic breaks: 11 pass / 8 fail
 
 === Passing example numbers (allowlist candidates) ===
 1
@@ -38,9 +38,19 @@ CommonMark spec.txt v0.31.2 conformance report
 9
 10
 11
+13
+15
+17
 18
+28
+29
+30
+35
 36
 42
+44
+45
+46
 47
 48
 50
@@ -48,7 +58,11 @@ CommonMark spec.txt v0.31.2 conformance report
 52
 53
 54
+55
 62
+63
+64
+65
 66
 68
 69
@@ -60,14 +74,23 @@ CommonMark spec.txt v0.31.2 conformance report
 76
 77
 85
+93
+97
 100
+104
+106
 107
 110
 112
+114
 116
 117
 118
+121
 134
+138
+145
+149
 150
 153
 154
@@ -76,25 +99,516 @@ CommonMark spec.txt v0.31.2 conformance report
 158
 159
 160
+169
+170
 171
+172
 173
+176
+177
 178
+179
+180
 181
+182
 183
+185
 189
+197
+199
+209
+211
+213
+219
+220
+221
+225
+227
 231
+232
 239
 240
+241
+242
+244
+245
+247
+248
+249
+250
+253
 257
+260
+261
 265
 267
 268
+269
+272
 282
+285
 289
 294
 295
+304
 308
 310
 322
 323
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+345
+347
+348
+349
+350
+351
+353
+355
+356
+357
+358
+359
+360
+361
+362
+363
+364
+365
+370
+371
+377
+378
+379
+381
+382
+383
+384
+385
+386
+387
+388
+390
+393
+394
+395
+396
+397
+399
+403
+405
+406
+410
+411
+413
+414
+415
+418
+420
+421
+423
+424
+428
+429
+430
+431
+432
+434
+435
+436
+437
+438
+439
+440
+441
+444
+446
+447
+448
+449
+450
+451
+452
+453
+456
+458
+459
+460
+461
+462
+463
+469
+478
+479
+488
+490
+493
+497
+508
+511
+513
+523
+525
+546
+547
+548
+551
+579
+590
+602
+606
+607
+608
+609
+610
+611
+612
+618
+619
+620
+621
+622
+624
+633
+635
+638
+640
+641
+644
 646
+648
+650
+651
+652
+
+=== Passing examples grouped by section ===
+# ATX headings
+62
+63
+64
+65
+66
+68
+69
+71
+72
+73
+74
+75
+76
+77
+
+# Autolinks
+602
+606
+607
+608
+609
+610
+611
+612
+
+# Backslash escapes
+13
+15
+17
+18
+
+# Blank lines
+227
+
+# Block quotes
+231
+232
+239
+240
+241
+242
+244
+245
+247
+248
+249
+250
+
+# Code spans
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+345
+347
+348
+349
+
+# Emphasis and strong emphasis
+350
+351
+353
+355
+356
+357
+358
+359
+360
+361
+362
+363
+364
+365
+370
+371
+377
+378
+379
+381
+382
+383
+384
+385
+386
+387
+388
+390
+393
+394
+395
+396
+397
+399
+403
+405
+406
+410
+411
+413
+414
+415
+418
+420
+421
+423
+424
+428
+429
+430
+431
+432
+434
+435
+436
+437
+438
+439
+440
+441
+444
+446
+447
+448
+449
+450
+451
+452
+453
+456
+458
+459
+460
+461
+462
+463
+469
+478
+479
+
+# Entity and numeric character references
+28
+29
+30
+35
+36
+
+# Fenced code blocks
+121
+134
+138
+145
+
+# HTML blocks
+149
+150
+153
+154
+156
+157
+158
+159
+160
+169
+170
+171
+172
+173
+176
+177
+178
+179
+180
+181
+182
+183
+185
+189
+
+# Hard line breaks
+633
+635
+638
+640
+641
+644
+646
+
+# Images
+579
+590
+
+# Indented code blocks
+107
+110
+112
+114
+116
+117
+118
+
+# Inlines
+327
+
+# Link reference definitions
+197
+199
+209
+211
+213
+
+# Links
+488
+490
+493
+497
+508
+511
+513
+523
+525
+546
+547
+548
+551
+
+# List items
+253
+257
+260
+261
+265
+267
+268
+269
+272
+282
+285
+289
+294
+295
+
+# Lists
+304
+308
+310
+322
+323
+
+# Paragraphs
+219
+220
+221
+225
+
+# Precedence
+42
+
+# Raw HTML
+618
+619
+620
+621
+622
+624
+
+# Setext headings
+85
+93
+97
+100
+104
+106
+
+# Soft line breaks
+648
+
+# Tabs
+1
+3
+8
+9
+10
+11
+
+# Textual content
+650
+651
+652
+
+# Thematic breaks
+44
+45
+46
+47
+48
+50
+51
+52
+53
+54
+55
+

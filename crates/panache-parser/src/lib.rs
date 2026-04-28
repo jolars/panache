@@ -26,6 +26,7 @@ pub mod parser;
 pub mod range_utils;
 pub mod syntax;
 
+pub use options::Dialect;
 pub use options::Extensions;
 pub use options::Flavor;
 pub use options::PandocCompat;

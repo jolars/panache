@@ -1,4 +1,4 @@
-use crate::options::{Extensions, Flavor, ParserOptions};
+use crate::options::{Dialect, Extensions, Flavor, ParserOptions};
 use crate::parser::Parser;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
@@ -32,6 +32,7 @@ pub fn parse_blocks_rmarkdown(input: &str) -> SyntaxNode {
 pub fn parse_blocks_gfm(input: &str) -> SyntaxNode {
     let config = ParserOptions {
         flavor: Flavor::Gfm,
+        dialect: Dialect::for_flavor(Flavor::Gfm),
         extensions: Extensions::for_flavor(Flavor::Gfm),
         ..Default::default()
     };

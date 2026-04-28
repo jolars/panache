@@ -19,7 +19,7 @@ mod spec_parser;
 #[path = "commonmark/html_renderer.rs"]
 mod html_renderer;
 
-use panache_parser::{Extensions, Flavor, ParserOptions, parse};
+use panache_parser::{Dialect, Extensions, Flavor, ParserOptions, parse};
 use spec_parser::{SpecExample, normalize_html, read_spec};
 use std::collections::BTreeSet;
 use std::fs;
@@ -41,6 +41,7 @@ fn manifest_path(rel: &str) -> PathBuf {
 fn commonmark_options() -> ParserOptions {
     ParserOptions {
         flavor: Flavor::CommonMark,
+        dialect: Dialect::for_flavor(Flavor::CommonMark),
         extensions: Extensions::for_flavor(Flavor::CommonMark),
         ..ParserOptions::default()
     }
@@ -186,6 +187,23 @@ fn commonmark_full_report() {
     report.push_str("\n=== Passing example numbers (allowlist candidates) ===\n");
     for n in &passing {
         report.push_str(&format!("{n}\n"));
+    }
+
+    report.push_str("\n=== Passing examples grouped by section ===\n");
+    let by_number: std::collections::HashMap<u32, &SpecExample> =
+        examples.iter().map(|e| (e.number, e)).collect();
+    let mut section_to_passing: std::collections::BTreeMap<&str, Vec<u32>> =
+        std::collections::BTreeMap::new();
+    for n in &passing {
+        let sec = by_number[n].section.as_str();
+        section_to_passing.entry(sec).or_default().push(*n);
+    }
+    for (section, nums) in &section_to_passing {
+        report.push_str(&format!("# {section}\n"));
+        for n in nums {
+            report.push_str(&format!("{n}\n"));
+        }
+        report.push('\n');
     }
 
     let report_path = manifest_path(REPORT_REL);

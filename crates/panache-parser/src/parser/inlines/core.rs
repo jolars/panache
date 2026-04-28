@@ -20,7 +20,7 @@
 //!
 //! This matches Pandoc's behavior exactly.
 
-use crate::options::ParserOptions;
+use crate::options::{Dialect, ParserOptions};
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -1303,42 +1303,57 @@ fn parse_inline_range_impl(
         }
 
         // Try code spans
-        if byte == b'`'
-            && let Some((len, content, backtick_count, attributes)) =
+        if byte == b'`' {
+            if let Some((len, content, backtick_count, attributes)) =
                 try_parse_code_span(&text[pos..])
-        {
-            // Emit accumulated text
-            if pos > text_start {
-                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-            }
-
-            log::trace!(
-                "Matched code span at pos {}: {} backticks",
-                pos,
-                backtick_count
-            );
-
-            // Check for raw inline
-            if let Some(ref attrs) = attributes
-                && config.extensions.raw_attribute
-                && let Some(format) = is_raw_inline(attrs)
             {
-                use super::raw_inline::emit_raw_inline;
-                log::trace!("Matched raw inline span at pos {}: format={}", pos, format);
-                emit_raw_inline(builder, content, backtick_count, format);
-            } else if !config.extensions.inline_code_attributes && attributes.is_some() {
-                let code_span_len = backtick_count * 2 + content.len();
-                emit_code_span(builder, content, backtick_count, None);
-                pos += code_span_len;
+                // Emit accumulated text
+                if pos > text_start {
+                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                }
+
+                log::trace!(
+                    "Matched code span at pos {}: {} backticks",
+                    pos,
+                    backtick_count
+                );
+
+                // Check for raw inline
+                if let Some(ref attrs) = attributes
+                    && config.extensions.raw_attribute
+                    && let Some(format) = is_raw_inline(attrs)
+                {
+                    use super::raw_inline::emit_raw_inline;
+                    log::trace!("Matched raw inline span at pos {}: format={}", pos, format);
+                    emit_raw_inline(builder, content, backtick_count, format);
+                } else if !config.extensions.inline_code_attributes && attributes.is_some() {
+                    let code_span_len = backtick_count * 2 + content.len();
+                    emit_code_span(builder, content, backtick_count, None);
+                    pos += code_span_len;
+                    text_start = pos;
+                    continue;
+                } else {
+                    emit_code_span(builder, content, backtick_count, attributes);
+                }
+
+                pos += len;
                 text_start = pos;
                 continue;
-            } else {
-                emit_code_span(builder, content, backtick_count, attributes);
             }
 
-            pos += len;
-            text_start = pos;
-            continue;
+            // Unmatched backtick run.
+            //
+            // CommonMark (and GFM) treat the whole run as literal text — the
+            // run cannot be re-entered as a shorter opener. Pandoc-markdown
+            // instead lets a longer run shadow a shorter one (e.g.
+            // `` ```foo`` `` parses as `` ` `` + ``<code>foo</code>``), so
+            // for the Pandoc dialect we fall through and advance one byte at
+            // a time, allowing the inner run to be tried on a later iteration.
+            if config.dialect == Dialect::CommonMark {
+                let run_len = text[pos..].bytes().take_while(|&b| b == b'`').count();
+                pos += run_len;
+                continue;
+            }
         }
 
         // Try textual emoji aliases: :smile:
@@ -2189,10 +2204,11 @@ mod tests {
 
     #[test]
     fn test_parse_inline_text_gfm_inline_link_destination_not_autolinked() {
-        use crate::options::{Extensions, Flavor};
+        use crate::options::{Dialect, Extensions, Flavor};
 
         let config = ParserOptions {
             flavor: Flavor::Gfm,
+            dialect: Dialect::for_flavor(Flavor::Gfm),
             extensions: Extensions::for_flavor(Flavor::Gfm),
             ..ParserOptions::default()
         };

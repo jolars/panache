@@ -10,7 +10,7 @@
 //! Run `INSTA_UPDATE=always cargo test -p panache-parser --test golden_parser_cases`
 //! to update snapshots intentionally.
 
-use panache_parser::{Extensions, Flavor, ParserOptions, parse};
+use panache_parser::{Dialect, Extensions, Flavor, ParserOptions, parse};
 use std::{
     collections::HashMap,
     fs,
@@ -51,6 +51,7 @@ fn load_test_parser_options(dir: &Path) -> Option<ParserOptions> {
             _ => Flavor::default(),
         };
         options.flavor = flavor;
+        options.dialect = Dialect::for_flavor(flavor);
         options.extensions = Extensions::for_flavor(flavor);
     }
 
@@ -161,6 +162,8 @@ golden_test_cases!(
     code_blocks_executable,
     code_blocks_raw,
     code_spans,
+    code_spans_unmatched_backtick_run_commonmark,
+    code_spans_unmatched_backtick_run_pandoc,
     crlf_basic,
     crlf_code_blocks,
     crlf_definition_lists,

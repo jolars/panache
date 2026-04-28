@@ -1,8 +1,8 @@
 {
   "blocked": 0,
-  "failing": 586,
-  "pass_pct": 10.1,
-  "passing": 66,
+  "failing": 389,
+  "pass_pct": 40.3,
+  "passing": 263,
   "passing_numbers": [
     1,
     3,
@@ -10,9 +10,19 @@
     9,
     10,
     11,
+    13,
+    15,
+    17,
     18,
+    28,
+    29,
+    30,
+    35,
     36,
     42,
+    44,
+    45,
+    46,
     47,
     48,
     50,
@@ -20,7 +30,11 @@
     52,
     53,
     54,
+    55,
     62,
+    63,
+    64,
+    65,
     66,
     68,
     69,
@@ -32,14 +46,23 @@
     76,
     77,
     85,
+    93,
+    97,
     100,
+    104,
+    106,
     107,
     110,
     112,
+    114,
     116,
     117,
     118,
+    121,
     134,
+    138,
+    145,
+    149,
     150,
     153,
     154,
@@ -48,124 +71,298 @@
     158,
     159,
     160,
+    169,
+    170,
     171,
+    172,
     173,
+    176,
+    177,
     178,
+    179,
+    180,
     181,
+    182,
     183,
+    185,
     189,
+    197,
+    199,
+    209,
+    211,
+    213,
+    219,
+    220,
+    221,
+    225,
+    227,
     231,
+    232,
     239,
     240,
+    241,
+    242,
+    244,
+    245,
+    247,
+    248,
+    249,
+    250,
+    253,
     257,
+    260,
+    261,
     265,
     267,
     268,
+    269,
+    272,
     282,
+    285,
     289,
     294,
     295,
+    304,
     308,
     310,
     322,
     323,
-    646
+    327,
+    328,
+    329,
+    330,
+    331,
+    332,
+    333,
+    334,
+    335,
+    336,
+    337,
+    338,
+    339,
+    340,
+    341,
+    342,
+    343,
+    345,
+    347,
+    348,
+    349,
+    350,
+    351,
+    353,
+    355,
+    356,
+    357,
+    358,
+    359,
+    360,
+    361,
+    362,
+    363,
+    364,
+    365,
+    370,
+    371,
+    377,
+    378,
+    379,
+    381,
+    382,
+    383,
+    384,
+    385,
+    386,
+    387,
+    388,
+    390,
+    393,
+    394,
+    395,
+    396,
+    397,
+    399,
+    403,
+    405,
+    406,
+    410,
+    411,
+    413,
+    414,
+    415,
+    418,
+    420,
+    421,
+    423,
+    424,
+    428,
+    429,
+    430,
+    431,
+    432,
+    434,
+    435,
+    436,
+    437,
+    438,
+    439,
+    440,
+    441,
+    444,
+    446,
+    447,
+    448,
+    449,
+    450,
+    451,
+    452,
+    453,
+    456,
+    458,
+    459,
+    460,
+    461,
+    462,
+    463,
+    469,
+    478,
+    479,
+    488,
+    490,
+    493,
+    497,
+    508,
+    511,
+    513,
+    523,
+    525,
+    546,
+    547,
+    548,
+    551,
+    579,
+    590,
+    602,
+    606,
+    607,
+    608,
+    609,
+    610,
+    611,
+    612,
+    618,
+    619,
+    620,
+    621,
+    622,
+    624,
+    633,
+    635,
+    638,
+    640,
+    641,
+    644,
+    646,
+    648,
+    650,
+    651,
+    652
   ],
   "sections": [
     {
-      "fail": 7,
+      "fail": 4,
       "name": "ATX headings",
-      "pass": 11
-    },
-    {
-      "fail": 19,
-      "name": "Autolinks",
-      "pass": 0
-    },
-    {
-      "fail": 12,
-      "name": "Backslash escapes",
-      "pass": 1
-    },
-    {
-      "fail": 1,
-      "name": "Blank lines",
-      "pass": 0
-    },
-    {
-      "fail": 22,
-      "name": "Block quotes",
-      "pass": 3
-    },
-    {
-      "fail": 22,
-      "name": "Code spans",
-      "pass": 0
-    },
-    {
-      "fail": 132,
-      "name": "Emphasis and strong emphasis",
-      "pass": 0
-    },
-    {
-      "fail": 16,
-      "name": "Entity and numeric character references",
-      "pass": 1
-    },
-    {
-      "fail": 28,
-      "name": "Fenced code blocks",
-      "pass": 1
-    },
-    {
-      "fail": 30,
-      "name": "HTML blocks",
       "pass": 14
     },
     {
-      "fail": 14,
+      "fail": 11,
+      "name": "Autolinks",
+      "pass": 8
+    },
+    {
+      "fail": 9,
+      "name": "Backslash escapes",
+      "pass": 4
+    },
+    {
+      "fail": 0,
+      "name": "Blank lines",
+      "pass": 1
+    },
+    {
+      "fail": 13,
+      "name": "Block quotes",
+      "pass": 12
+    },
+    {
+      "fail": 2,
+      "name": "Code spans",
+      "pass": 20
+    },
+    {
+      "fail": 53,
+      "name": "Emphasis and strong emphasis",
+      "pass": 79
+    },
+    {
+      "fail": 12,
+      "name": "Entity and numeric character references",
+      "pass": 5
+    },
+    {
+      "fail": 25,
+      "name": "Fenced code blocks",
+      "pass": 4
+    },
+    {
+      "fail": 20,
+      "name": "HTML blocks",
+      "pass": 24
+    },
+    {
+      "fail": 8,
       "name": "Hard line breaks",
+      "pass": 7
+    },
+    {
+      "fail": 20,
+      "name": "Images",
+      "pass": 2
+    },
+    {
+      "fail": 5,
+      "name": "Indented code blocks",
+      "pass": 7
+    },
+    {
+      "fail": 0,
+      "name": "Inlines",
       "pass": 1
     },
     {
       "fail": 22,
-      "name": "Images",
-      "pass": 0
-    },
-    {
-      "fail": 6,
-      "name": "Indented code blocks",
-      "pass": 6
-    },
-    {
-      "fail": 1,
-      "name": "Inlines",
-      "pass": 0
-    },
-    {
-      "fail": 27,
       "name": "Link reference definitions",
-      "pass": 0
+      "pass": 5
     },
     {
-      "fail": 90,
+      "fail": 77,
       "name": "Links",
-      "pass": 0
+      "pass": 13
     },
     {
-      "fail": 40,
+      "fail": 34,
       "name": "List items",
-      "pass": 8
+      "pass": 14
     },
     {
-      "fail": 22,
+      "fail": 21,
       "name": "Lists",
-      "pass": 4
+      "pass": 5
     },
     {
-      "fail": 8,
+      "fail": 4,
       "name": "Paragraphs",
-      "pass": 0
+      "pass": 4
     },
     {
       "fail": 0,
@@ -173,19 +370,19 @@
       "pass": 1
     },
     {
-      "fail": 20,
+      "fail": 14,
       "name": "Raw HTML",
-      "pass": 0
+      "pass": 6
     },
     {
-      "fail": 25,
+      "fail": 21,
       "name": "Setext headings",
-      "pass": 2
+      "pass": 6
     },
     {
-      "fail": 2,
+      "fail": 1,
       "name": "Soft line breaks",
-      "pass": 0
+      "pass": 1
     },
     {
       "fail": 5,
@@ -193,14 +390,14 @@
       "pass": 6
     },
     {
-      "fail": 3,
+      "fail": 0,
       "name": "Textual content",
-      "pass": 0
+      "pass": 3
     },
     {
-      "fail": 12,
+      "fail": 8,
       "name": "Thematic breaks",
-      "pass": 7
+      "pass": 11
     }
   ],
   "spec_version": "0.31.2",

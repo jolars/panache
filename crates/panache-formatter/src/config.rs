@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+pub use panache_parser::Dialect;
 pub use panache_parser::Extensions as ParserExtensions;
 pub use panache_parser::Flavor;
 pub use panache_parser::PandocCompat;
@@ -160,6 +161,7 @@ impl Config {
     pub fn parser_options(&self) -> ParserOptions {
         ParserOptions {
             flavor: self.flavor,
+            dialect: Dialect::for_flavor(self.flavor),
             extensions: self.parser_extensions.clone(),
             pandoc_compat: self.parser,
         }

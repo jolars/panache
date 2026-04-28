@@ -173,7 +173,13 @@ fn heading_level(node: &SyntaxNode) -> usize {
 
 fn render_paragraph(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut String) {
     out.push_str("<p>");
+    let inline_start = out.len();
     render_inlines(node, refs, out);
+    // CommonMark: the trailing newline of a paragraph is not part of its
+    // content. Drop a single trailing '\n' before closing the tag.
+    if out.len() > inline_start && out.ends_with('\n') {
+        out.pop();
+    }
     out.push_str("</p>\n");
 }
 
@@ -427,12 +433,13 @@ fn render_inline_node(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &m
             out.push_str("</strong>");
         }
         SyntaxKind::INLINE_CODE => {
-            let content: String = node
+            let raw: String = node
                 .children_with_tokens()
                 .filter_map(|el| el.into_token())
                 .filter(|t| t.kind() == SyntaxKind::INLINE_CODE_CONTENT)
                 .map(|t| t.text().to_string())
                 .collect();
+            let content = normalize_code_span(&raw);
             out.push_str("<code>");
             out.push_str(&escape_html(&content));
             out.push_str("</code>");
@@ -548,6 +555,26 @@ fn render_autolink(node: &SyntaxNode, out: &mut String) {
     out.push_str("\">");
     out.push_str(&escape_html(&target));
     out.push_str("</a>");
+}
+
+fn normalize_code_span(raw: &str) -> String {
+    // CommonMark §6.1: line endings → spaces; if the result both begins and
+    // ends with a single ASCII space and is not entirely spaces, strip one
+    // leading and one trailing space.
+    let spaced: String = raw
+        .chars()
+        .map(|c| if c == '\n' || c == '\r' { ' ' } else { c })
+        .collect();
+    let bytes = spaced.as_bytes();
+    let all_spaces = !bytes.is_empty() && bytes.iter().all(|&b| b == b' ');
+    if !all_spaces
+        && bytes.len() >= 2
+        && bytes.first() == Some(&b' ')
+        && bytes.last() == Some(&b' ')
+    {
+        return spaced[1..spaced.len() - 1].to_string();
+    }
+    spaced
 }
 
 fn collect_text(node: &SyntaxNode) -> String {

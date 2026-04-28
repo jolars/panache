@@ -65,8 +65,43 @@ Every failing example is one of:
   Fix by adding/tightening the gate in `parser/blocks/**` or
   `parser/inlines/**`, and verify `Extensions::for_flavor(CommonMark)`
   has the right defaults.
+- **Dialect divergence** — the construct *parses differently* between
+  Pandoc-markdown and CommonMark (not a single feature toggle, but a
+  structural rule difference). Fix by branching on
+  `config.dialect == Dialect::CommonMark` in the parser. Examples: backtick
+  run matching, emphasis flanking edge cases, raw HTML recognition.
 - **Genuine missing feature** — CommonMark construct not currently
   modeled. Less common; usually the largest fix.
+
+### How to tell flavor leak from dialect divergence
+
+A flavor leak means *Pandoc-flavored markdown* would also produce the
+"wrong" output if the relevant extension were off. A dialect divergence
+means even a fully-extensions-on Pandoc-markdown parse disagrees with
+CommonMark on the construct.
+
+Before classifying, verify with pandoc itself (assume it's available):
+
+```
+printf '<markdown>' > /tmp/probe.md
+pandoc /tmp/probe.md -f commonmark -t native
+pandoc /tmp/probe.md -f markdown   -t native
+pandoc /tmp/probe.md -f gfm        -t native       # if GFM-relevant
+```
+
+- Outputs *agree* → not a flavor or dialect issue; it's a renderer or
+  parser-shape gap that affects every flavor.
+- Outputs *differ between commonmark/gfm and markdown* → **dialect
+  divergence**. Gate on `Dialect`.
+- Output for `markdown` matches CommonMark only when an extension is
+  toggled → **flavor leak**, fix the extension default in
+  `Extensions::for_flavor(...)`.
+
+Reference for which extensions Pandoc itself ships under each flavor:
+`pandoc/src/Text/Pandoc/Extensions.hs` (read-only checkout in the
+workspace root). When designing a new `Extensions` flag default, check
+that file for `getDefaultExtensions Markdown / CommonMark / GFM` to keep
+panache aligned.
 
 ## Workflow
 
@@ -96,7 +131,14 @@ Every failing example is one of:
    throwaway `#[ignore]` test inside `commonmark.rs` that prints both
    sides. Remove the probe before finishing.
 
-4. **Classify the fix** before editing:
+4. **Classify the fix** before editing — and **verify with pandoc** when
+   the construct could plausibly differ between dialects:
+   ```
+   pandoc <case>.md -f commonmark -t native
+   pandoc <case>.md -f markdown   -t native
+   ```
+   If the two disagree, the change is a dialect divergence, not a free
+   parser fix. Then:
    - **Renderer gap**: edit `html_renderer.rs`. Keep changes narrow to the
      constructs the failing examples actually exercise.
    - **Parser-shape gap**: add a focused parser regression test under
@@ -107,6 +149,13 @@ Every failing example is one of:
    - **Flavor leak**: confirm by checking the flag in
      `Extensions::for_flavor(Flavor::CommonMark)`. Tighten the gate at
      the parser site that consults the flag.
+   - **Dialect divergence**: gate the parser branch on
+     `config.dialect == Dialect::CommonMark` (see
+     `crates/panache-parser/src/options.rs`). Add **paired parser
+     fixtures** — one with `parser-options.toml` set to
+     `flavor = "commonmark"`, one set to `flavor = "pandoc"` — both
+     pinning the dialect-specific CST shape. Pattern reference:
+     `code_spans_unmatched_backtick_run_{commonmark,pandoc}`.
    - **Missing feature**: scope it carefully; if it's large, file it as
      follow-up rather than landing it in a conformance session.
 

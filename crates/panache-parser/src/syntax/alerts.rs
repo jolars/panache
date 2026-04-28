@@ -39,7 +39,7 @@ impl Alert {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::options::{Extensions, Flavor, ParserOptions};
+    use crate::options::{Dialect, Extensions, Flavor, ParserOptions};
     use crate::parse;
 
     #[test]
@@ -48,6 +48,7 @@ mod tests {
         extensions.alerts = true;
         let config = ParserOptions {
             flavor: Flavor::Gfm,
+            dialect: Dialect::for_flavor(Flavor::Gfm),
             extensions,
             ..Default::default()
         };

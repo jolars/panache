@@ -937,6 +937,7 @@ impl Config {
     pub fn parser_options(&self) -> ParserOptions {
         ParserOptions {
             flavor: self.flavor,
+            dialect: panache_parser::Dialect::for_flavor(self.flavor),
             extensions: self.extensions.clone(),
             pandoc_compat: self.parser,
         }

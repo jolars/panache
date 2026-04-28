@@ -712,11 +712,46 @@ impl PandocCompat {
     }
 }
 
+/// Parser dialect — the underlying inline tokenization rule set.
+///
+/// Distinct from [`Flavor`]: `Flavor` is the user-facing identity (Pandoc,
+/// Quarto, GFM, etc.) and selects extension defaults; `Dialect` is the
+/// structural parser identity. Several flavors share a dialect — Quarto and
+/// RMarkdown both use `Pandoc`; CommonMark and GFM both use `CommonMark`.
+///
+/// Use this for parser branches whose behavior is fundamentally different
+/// between dialect families (e.g. unmatched backtick run handling). Per-flavor
+/// feature toggles still belong on [`Extensions`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
+pub enum Dialect {
+    /// Pandoc-markdown family. Default for Pandoc, Quarto, RMarkdown,
+    /// MultiMarkdown.
+    #[default]
+    Pandoc,
+    /// CommonMark family. Default for CommonMark and GFM.
+    CommonMark,
+}
+
+impl Dialect {
+    /// Default dialect for a given user-facing flavor.
+    pub fn for_flavor(flavor: Flavor) -> Self {
+        match flavor {
+            Flavor::CommonMark | Flavor::Gfm => Dialect::CommonMark,
+            Flavor::Pandoc | Flavor::Quarto | Flavor::RMarkdown | Flavor::MultiMarkdown => {
+                Dialect::Pandoc
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case"))]
 pub struct ParserOptions {
     pub flavor: Flavor,
+    pub dialect: Dialect,
     pub extensions: Extensions,
     /// Compatibility target for ambiguous Pandoc behavior.
     pub pandoc_compat: PandocCompat,
@@ -727,6 +762,7 @@ impl Default for ParserOptions {
         let flavor = Flavor::default();
         Self {
             flavor,
+            dialect: Dialect::for_flavor(flavor),
             extensions: Extensions::for_flavor(flavor),
             pandoc_compat: PandocCompat::default(),
         }
