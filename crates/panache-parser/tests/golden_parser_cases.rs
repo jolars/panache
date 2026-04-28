@@ -167,6 +167,7 @@ golden_test_cases!(
     code_spans_unmatched_backtick_run_commonmark,
     code_spans_unmatched_backtick_run_pandoc,
     commonmark_entity_references_preserved,
+    commonmark_image_paragraph_no_figure,
     crlf_basic,
     crlf_code_blocks,
     crlf_definition_lists,

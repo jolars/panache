@@ -68,8 +68,8 @@ fn parse_reference_definition(node: &SyntaxNode) -> Option<(String, RefDef)> {
     Some((
         label,
         RefDef {
-            url: decode_entities(&url),
-            title: title.map(|t| decode_entities(&t)),
+            url: decode_entities(&decode_backslash_escapes(&strip_angle_brackets(&url))),
+            title: title.map(|t| decode_entities(&decode_backslash_escapes(&t))),
         },
     ))
 }
@@ -554,7 +554,10 @@ fn render_link(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut Stri
     let (url, title) = if let Some(d) = dest_node.as_ref() {
         let raw = d.text().to_string();
         let (url, title) = split_dest_and_title(raw.trim_matches(['(', ')'].as_ref()));
-        (decode_entities(&url), title.map(|t| decode_entities(&t)))
+        (
+            decode_entities(&decode_backslash_escapes(&strip_angle_brackets(&url))),
+            title.map(|t| decode_entities(&decode_backslash_escapes(&t))),
+        )
     } else if let Some(label_node) = node.children().find(|c| c.kind() == SyntaxKind::LINK_REF) {
         let label = collect_text(&label_node);
         match refs.get(&normalize_label(&label)) {
@@ -595,13 +598,41 @@ fn render_link(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut Stri
 fn render_image(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut String) {
     let alt_node = node.children().find(|c| c.kind() == SyntaxKind::IMAGE_ALT);
     let dest_node = node.children().find(|c| c.kind() == SyntaxKind::LINK_DEST);
+    let ref_node = node.children().find(|c| c.kind() == SyntaxKind::LINK_REF);
 
     let (url, title) = if let Some(d) = dest_node.as_ref() {
         let raw = d.text().to_string();
         let (url, title) = split_dest_and_title(raw.trim_matches(['(', ')'].as_ref()));
-        (decode_entities(&url), title.map(|t| decode_entities(&t)))
-    } else if let Some(label_node) = node.children().find(|c| c.kind() == SyntaxKind::LINK_REF) {
-        let label = collect_text(&label_node);
+        (
+            decode_entities(&decode_backslash_escapes(&strip_angle_brackets(&url))),
+            title.map(|t| decode_entities(&decode_backslash_escapes(&t))),
+        )
+    } else {
+        // Reference-style image. CommonMark §6.4: a link label is normalized
+        // by case-folding and collapsing whitespace.
+        // - Full reference: `![alt][label]` — use LINK_REF text.
+        // - Collapsed: `![alt][]` — empty LINK_REF, use IMAGE_ALT raw source.
+        // - Shortcut: `![alt]` — no LINK_REF, use IMAGE_ALT raw source.
+        // The IMAGE_ALT raw source preserves emphasis markers so labels match
+        // the reference definition's bracket text byte-for-byte after
+        // normalization.
+        let label = match ref_node.as_ref() {
+            Some(rn) => {
+                let l = rn.text().to_string();
+                if l.trim().is_empty() {
+                    alt_node
+                        .as_ref()
+                        .map(|n| n.text().to_string())
+                        .unwrap_or_default()
+                } else {
+                    l
+                }
+            }
+            None => alt_node
+                .as_ref()
+                .map(|n| n.text().to_string())
+                .unwrap_or_default(),
+        };
         match refs.get(&normalize_label(&label)) {
             Some(def) => (def.url.clone(), def.title.clone()),
             None => {
@@ -609,12 +640,9 @@ fn render_image(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut Str
                 return;
             }
         }
-    } else {
-        out.push_str(&escape_html(&node.text().to_string()));
-        return;
     };
 
-    let alt = alt_node.as_ref().map(collect_text).unwrap_or_default();
+    let alt = alt_node.as_ref().map(collect_alt_text).unwrap_or_default();
     out.push_str("<img src=\"");
     out.push_str(&encode_url(&url));
     out.push_str("\" alt=\"");
@@ -626,6 +654,79 @@ fn render_image(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut Str
         out.push('"');
     }
     out.push_str(" />");
+}
+
+/// CommonMark §6.5: only the plain string content of the image description is
+/// used for the `alt` attribute. Concatenate text tokens, but for nested
+/// images/links descend only into their description (skip their destination
+/// and title metadata).
+fn collect_alt_text(node: &SyntaxNode) -> String {
+    let mut out = String::new();
+    push_alt_from(node, &mut out);
+    out
+}
+
+fn push_alt_from(node: &SyntaxNode, out: &mut String) {
+    for el in node.children_with_tokens() {
+        match el {
+            NodeOrToken::Token(t) => match t.kind() {
+                SyntaxKind::TEXT | SyntaxKind::INLINE_CODE_CONTENT => out.push_str(t.text()),
+                SyntaxKind::ESCAPED_CHAR => {
+                    if let Some(ch) = t.text().chars().nth(1) {
+                        out.push(ch);
+                    }
+                }
+                _ => {}
+            },
+            NodeOrToken::Node(n) => match n.kind() {
+                SyntaxKind::LINK => {
+                    if let Some(text) = n.children().find(|c| c.kind() == SyntaxKind::LINK_TEXT) {
+                        push_alt_from(&text, out);
+                    }
+                }
+                SyntaxKind::IMAGE_LINK => {
+                    if let Some(alt) = n.children().find(|c| c.kind() == SyntaxKind::IMAGE_ALT) {
+                        push_alt_from(&alt, out);
+                    }
+                }
+                _ => push_alt_from(&n, out),
+            },
+        }
+    }
+}
+
+/// CommonMark §6.3: when a link destination is wrapped in `<...>`, the angle
+/// brackets are stripped and entity/numeric references inside the wrapping
+/// are decoded normally.
+fn strip_angle_brackets(s: &str) -> String {
+    let trimmed = s.trim();
+    if trimmed.starts_with('<') && trimmed.ends_with('>') && trimmed.len() >= 2 {
+        trimmed[1..trimmed.len() - 1].to_string()
+    } else {
+        s.to_string()
+    }
+}
+
+/// CommonMark §2.4: backslash before any ASCII punctuation char is treated as
+/// an escape and emits the literal character. In link destinations and titles
+/// these escapes apply before entity references; in raw text they apply
+/// instead of treating the punctuation as a delimiter. We apply this to URL
+/// and title strings extracted from the CST.
+fn decode_backslash_escapes(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\\'
+            && let Some(&next) = chars.peek()
+            && next.is_ascii_punctuation()
+        {
+            chars.next();
+            out.push(next);
+            continue;
+        }
+        out.push(c);
+    }
+    out
 }
 
 fn render_autolink(node: &SyntaxNode, out: &mut String) {

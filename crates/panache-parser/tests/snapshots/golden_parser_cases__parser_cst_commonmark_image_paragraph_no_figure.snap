@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..21
+  PARAGRAPH@0..21
+    IMAGE_LINK@0..20
+      IMAGE_LINK_START@0..2
+        IMAGE_LINK_START@0..2 "!["
+      IMAGE_ALT@2..5
+        TEXT@2..5 "foo"
+      IMAGE_ALT_END@5..6 "]"
+      IMAGE_DEST_START@6..7 "("
+      LINK_DEST@7..19
+        TEXT@7..19 "/url \"title\""
+      IMAGE_DEST_END@19..20 ")"
+    NEWLINE@20..21 "\n"

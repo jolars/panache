@@ -457,6 +457,12 @@ impl BlockParser for FigureParser {
         _lines: &[&str],
         _line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        // Pandoc-only behavior; CommonMark/GFM keep the image inline within
+        // the paragraph and do not promote it to a figure block.
+        if !ctx.config.extensions.implicit_figures {
+            return None;
+        }
+
         // Must have blank line before
         if !ctx.has_blank_before {
             return None;
