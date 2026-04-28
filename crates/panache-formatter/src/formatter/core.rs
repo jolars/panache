@@ -569,6 +569,22 @@ impl Formatter {
 
             SyntaxKind::HEADING => {
                 log::trace!("Formatting heading");
+                // Ensure blank line BEFORE the heading when it follows a sibling
+                // block element. Under CommonMark a heading can interrupt a
+                // paragraph (`Foo\n# bar`), so the formatter must separate them
+                // with a blank line for a stable round-trip. Excluded prev kinds
+                // (e.g. fenced-div openers or HTML blocks) either already manage
+                // their own spacing or sit inside ignore regions where extra
+                // blank lines would alter the user's content.
+                if let Some(prev) = node.prev_sibling()
+                    && is_block_element(prev.kind())
+                    && !self.output.is_empty()
+                    && self.output.ends_with('\n')
+                    && !self.output.ends_with("\n\n")
+                {
+                    self.output.push('\n');
+                }
+
                 // Determine level
                 let mut level = 1;
                 let mut attributes = String::new();
