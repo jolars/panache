@@ -196,6 +196,18 @@ pub fn try_parse_emphasis(
         return None;
     }
 
+    // CommonMark §6.2: an asterisk delimiter run can open emphasis only if
+    // it is part of a left-flanking delimiter run. Pandoc-markdown applies
+    // the looser "not followed by whitespace" rule already checked above,
+    // so this strict left-flanking gate is dialect-specific.
+    if delim_char == '*'
+        && config.dialect == Dialect::CommonMark
+        && !is_left_flanking(text, pos, count)
+    {
+        log::trace!("CommonMark: '*' opener not left-flanking, treating as literal");
+        return None;
+    }
+
     // Dispatch based on delimiter count
     let result = match count {
         1 => try_parse_one(text, pos, delim_char, end, config, builder),
@@ -489,6 +501,74 @@ fn find_first_potential_ender(
     }
 
     None
+}
+
+/// CommonMark §6.2 punctuation predicate: ASCII punctuation, or any
+/// non-ASCII char that is neither alphanumeric nor whitespace.
+///
+/// Strict CommonMark uses Unicode P + S categories. We approximate via the
+/// alnum/whitespace complement, which is wider in theory (covers M and Cf
+/// categories) but matches every flanking-rule case the spec exercises in
+/// practice, without pulling in a Unicode-categories table.
+fn is_unicode_punct_or_symbol(c: char) -> bool {
+    if c.is_ascii() {
+        c.is_ascii_punctuation()
+    } else {
+        !c.is_alphanumeric() && !c.is_whitespace()
+    }
+}
+
+/// CommonMark §6.2 left-flanking delimiter run check.
+///
+/// (1) not followed by Unicode whitespace, and either
+/// (2a) not followed by a Unicode punctuation character, or
+/// (2b) preceded by Unicode whitespace or a Unicode punctuation character.
+///
+/// Absence of any character on either side counts as Unicode whitespace.
+fn is_left_flanking(text: &str, run_start: usize, run_len: usize) -> bool {
+    let after = run_start + run_len;
+    let next_char = text.get(after..).and_then(|s| s.chars().next());
+    let prev_char = (run_start > 0)
+        .then(|| text[..run_start].chars().last())
+        .flatten();
+
+    // (1) Not followed by whitespace (end-of-input counts as whitespace).
+    let followed_by_ws = next_char.is_none_or(|c| c.is_whitespace());
+    if followed_by_ws {
+        return false;
+    }
+
+    // (2a) Not followed by punctuation.
+    let followed_by_punct = next_char.is_some_and(is_unicode_punct_or_symbol);
+    if !followed_by_punct {
+        return true;
+    }
+
+    // (2b) Preceded by whitespace (incl. start-of-input) or punctuation.
+    prev_char.is_none_or(|c| c.is_whitespace() || is_unicode_punct_or_symbol(c))
+}
+
+/// CommonMark §6.2 right-flanking delimiter run check.
+///
+/// Mirror of `is_left_flanking` with the "before" and "after" sides swapped.
+fn is_right_flanking(text: &str, run_start: usize, run_len: usize) -> bool {
+    let after = run_start + run_len;
+    let next_char = text.get(after..).and_then(|s| s.chars().next());
+    let prev_char = (run_start > 0)
+        .then(|| text[..run_start].chars().last())
+        .flatten();
+
+    let preceded_by_ws = prev_char.is_none_or(|c| c.is_whitespace());
+    if preceded_by_ws {
+        return false;
+    }
+
+    let preceded_by_punct = prev_char.is_some_and(is_unicode_punct_or_symbol);
+    if !preceded_by_punct {
+        return true;
+    }
+
+    next_char.is_none_or(|c| c.is_whitespace() || is_unicode_punct_or_symbol(c))
 }
 
 /// Check if a delimiter at the given position is a valid ender.
@@ -851,6 +931,19 @@ fn parse_until_closer_with_nested_two(
                         continue;
                     }
 
+                    // CommonMark §6.2: an asterisk closer must be part of a
+                    // right-flanking delimiter run. Pandoc-markdown's `ender`
+                    // for asterisks has no flanking requirement, so this strict
+                    // check is dialect-specific.
+                    if delim_char == '*'
+                        && config.dialect == Dialect::CommonMark
+                        && !is_right_flanking(text, pos, delim_count)
+                    {
+                        log::trace!("CommonMark: '*' closer at pos {} not right-flanking", pos);
+                        pos = advance_char_boundary(text, pos, end);
+                        continue;
+                    }
+
                     log::trace!(
                         "Found exact {} x {} closer at pos {}",
                         delim_char,
@@ -1101,6 +1194,19 @@ fn parse_until_closer_with_nested_one(
                             "Underscore closer followed by alphanumeric at pos {}, not right-flanking",
                             pos
                         );
+                        pos = advance_char_boundary(text, pos, end);
+                        continue;
+                    }
+
+                    // CommonMark §6.2: an asterisk closer must be part of a
+                    // right-flanking delimiter run. Pandoc-markdown's `ender`
+                    // for asterisks has no flanking requirement, so this strict
+                    // check is dialect-specific.
+                    if delim_char == '*'
+                        && config.dialect == Dialect::CommonMark
+                        && !is_right_flanking(text, pos, delim_count)
+                    {
+                        log::trace!("CommonMark: '*' closer at pos {} not right-flanking", pos);
                         pos = advance_char_boundary(text, pos, end);
                         continue;
                     }

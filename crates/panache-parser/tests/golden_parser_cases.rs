@@ -196,6 +196,8 @@ golden_test_cases!(
     display_math_trailing_text,
     double_backslash_math,
     emphasis,
+    emphasis_asterisk_flanking_commonmark,
+    emphasis_asterisk_flanking_pandoc,
     emphasis_complex,
     emphasis_intraword_underscore_closer,
     emphasis_nested_inlines,

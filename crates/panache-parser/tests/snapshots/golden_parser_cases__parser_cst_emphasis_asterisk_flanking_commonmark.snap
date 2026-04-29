@@ -1,0 +1,40 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..66
+  PARAGRAPH@0..9
+    TEXT@0..1 "a"
+    TEXT@1..7 "*\"foo\""
+    TEXT@7..8 "*"
+    NEWLINE@8..9 "\n"
+  BLANK_LINE@9..10
+    BLANK_LINE@9..10 "\n"
+  PARAGRAPH@10..20
+    TEXT@10..12 "*$"
+    TEXT@12..19 "*alpha."
+    NEWLINE@19..20 "\n"
+  BLANK_LINE@20..21
+    BLANK_LINE@20..21 "\n"
+  PARAGRAPH@21..32
+    TEXT@21..30 "*foo bar "
+    TEXT@30..31 "*"
+    NEWLINE@31..32 "\n"
+  BLANK_LINE@32..33
+    BLANK_LINE@32..33 "\n"
+  PARAGRAPH@33..41
+    TEXT@33..35 "*("
+    TEXT@35..40 "*foo)"
+    NEWLINE@40..41 "\n"
+  BLANK_LINE@41..42
+    BLANK_LINE@41..42 "\n"
+  PARAGRAPH@42..55
+    TEXT@42..52 "**foo bar "
+    TEXT@52..54 "**"
+    NEWLINE@54..55 "\n"
+  BLANK_LINE@55..56
+    BLANK_LINE@55..56 "\n"
+  PARAGRAPH@56..66
+    TEXT@56..59 "**("
+    TEXT@59..65 "**foo)"
+    NEWLINE@65..66 "\n"
