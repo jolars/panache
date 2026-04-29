@@ -1,0 +1,50 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..33
+  LIST@0..33
+    LIST_ITEM@0..17
+      LIST_MARKER@0..1 "-"
+      WHITESPACE@1..2 " "
+      PLAIN@2..4
+        TEXT@2..3 "a"
+        NEWLINE@3..4 "\n"
+      LIST@4..17
+        LIST_ITEM@4..10
+          WHITESPACE@4..6 "  "
+          LIST_MARKER@6..7 "-"
+          WHITESPACE@7..8 " "
+          PLAIN@8..10
+            TEXT@8..9 "b"
+            NEWLINE@9..10 "\n"
+        LIST_ITEM@10..16
+          WHITESPACE@10..12 "  "
+          LIST_MARKER@12..13 "-"
+          WHITESPACE@13..14 " "
+          PLAIN@14..16
+            TEXT@14..15 "c"
+            NEWLINE@15..16 "\n"
+        BLANK_LINE@16..17
+          BLANK_LINE@16..17 "\n"
+    LIST_ITEM@17..33
+      LIST_MARKER@17..18 "-"
+      WHITESPACE@18..19 " "
+      PLAIN@19..21
+        TEXT@19..20 "d"
+        NEWLINE@20..21 "\n"
+      LIST@21..33
+        LIST_ITEM@21..27
+          WHITESPACE@21..23 "  "
+          LIST_MARKER@23..24 "-"
+          WHITESPACE@24..25 " "
+          PLAIN@25..27
+            TEXT@25..26 "e"
+            NEWLINE@26..27 "\n"
+        LIST_ITEM@27..33
+          WHITESPACE@27..29 "  "
+          LIST_MARKER@29..30 "-"
+          WHITESPACE@30..31 " "
+          PLAIN@31..33
+            TEXT@31..32 "f"
+            NEWLINE@32..33 "\n"

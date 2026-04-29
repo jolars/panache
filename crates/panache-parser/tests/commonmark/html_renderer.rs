@@ -356,36 +356,68 @@ fn list_tag_and_start(node: &SyntaxNode) -> (&'static str, String) {
 fn is_loose_list(node: &SyntaxNode) -> bool {
     // CommonMark §5.3: a list is loose if any of its constituent list items
     // are separated by blank lines, or if any item directly contains two
-    // block-level elements separated by a blank line. Approximation:
-    // - any LIST_ITEM has a PARAGRAPH descendant (the parser uses PLAIN for
-    //   tight items), OR
-    // - two LIST_ITEMs are separated by a BLANK_LINE in the list node, OR
-    // - any LIST_ITEM has a BLANK_LINE between two block-level children.
+    // block-level elements separated by a blank line.
+    //
+    // The parser uses PLAIN for tight item content and (in some cases)
+    // PARAGRAPH for content that is separated from another block by a blank
+    // line. Looseness must be checked at the *direct* child level — a
+    // PARAGRAPH inside a nested blockquote or sublist is not a loose-list
+    // signal for the outer list.
+    let items: Vec<SyntaxNode> = node
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::LIST_ITEM)
+        .collect();
+
+    // (a) Items separated by blank lines.
     let mut prev_was_item = false;
     for child in node.children_with_tokens() {
-        match child {
-            NodeOrToken::Node(n) => {
-                if n.kind() == SyntaxKind::LIST_ITEM {
-                    if n.descendants().any(|d| d.kind() == SyntaxKind::PARAGRAPH) {
-                        return true;
-                    }
-                    if list_item_has_internal_blank(&n) {
-                        return true;
-                    }
-                    prev_was_item = true;
-                } else if n.kind() == SyntaxKind::BLANK_LINE
-                    && prev_was_item
-                    && n.next_sibling()
-                        .map(|s| s.kind() == SyntaxKind::LIST_ITEM)
-                        .unwrap_or(false)
-                {
-                    return true;
-                }
+        if let NodeOrToken::Node(n) = child {
+            if n.kind() == SyntaxKind::LIST_ITEM {
+                prev_was_item = true;
+            } else if n.kind() == SyntaxKind::BLANK_LINE
+                && prev_was_item
+                && n.next_sibling()
+                    .map(|s| s.kind() == SyntaxKind::LIST_ITEM)
+                    .unwrap_or(false)
+            {
+                return true;
             }
-            NodeOrToken::Token(_) => {}
         }
     }
+
+    // The blank-line separator can also live *inside* the trailing portion of
+    // the previous item (commonly inside a sublist's last child) — the source
+    // still has a blank line between the outer items.
+    let last_idx = items.len().saturating_sub(1);
+    for item in items.iter().take(last_idx) {
+        if list_item_ends_with_blank(item) {
+            return true;
+        }
+    }
+
+    // (b) Any item directly contains two block-level children separated by a
+    // blank line, or has an inline PARAGRAPH child (parser-level signal that
+    // the item's content was preceded or followed by a blank).
+    for item in &items {
+        if item.children().any(|c| c.kind() == SyntaxKind::PARAGRAPH) {
+            return true;
+        }
+        if list_item_has_internal_blank(item) {
+            return true;
+        }
+    }
+
     false
+}
+
+fn list_item_ends_with_blank(item: &SyntaxNode) -> bool {
+    let end = item.text_range().end();
+    item.descendants()
+        .any(|d| d.kind() == SyntaxKind::BLANK_LINE && d.text_range().end() == end)
+}
+
+fn plain_is_empty(node: &SyntaxNode) -> bool {
+    node.text().to_string().trim().is_empty()
 }
 
 fn list_item_has_internal_blank(item: &SyntaxNode) -> bool {
@@ -421,6 +453,7 @@ fn is_block_child(kind: SyntaxKind) -> bool {
             | SyntaxKind::LIST
             | SyntaxKind::HORIZONTAL_RULE
             | SyntaxKind::HTML_BLOCK
+            | SyntaxKind::REFERENCE_DEFINITION
     )
 }
 
@@ -439,7 +472,9 @@ fn render_list_item(
         match child.kind() {
             SyntaxKind::PLAIN => {
                 if loose {
-                    render_paragraph(&child, refs, out);
+                    if !plain_is_empty(&child) {
+                        render_paragraph(&child, refs, out);
+                    }
                 } else {
                     let mut inner = String::new();
                     render_inlines(&child, refs, &mut inner);

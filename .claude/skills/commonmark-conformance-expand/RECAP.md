@@ -16,119 +16,126 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (ii)
+## Latest session — 2026-04-29 (iii)
 
-**Pass count: 566 → 569 / 652 (87.3%, +3)**
+**Pass count: 569 → 572 / 652 (87.7%, +3)**
 
-Took the carried-forward "Indented code block after ATX heading
-(#115)" target. Single-site fix at the indented-code dispatcher
-gate. Unlocked #115 plus two related blockquote-with-indented-code
-cases (#236, #252) that were blocked by the same overly-strict
-gate.
+Took recap target #2 (loose-vs-tight semantic gaps, renderer-only).
+Three wins in the Lists section: #315, #317, #326. The other two
+candidates the recap floated for the same fix — #312, #320 — are
+*not* renderer-only and remained failing (confirmed parser-shape
+gaps; see "Don't redo" below).
 
-### Root cause: indented-code gate required literal blank line before
+### Root cause: `is_loose_list` over-detected and under-detected
 
-`IndentedCodeBlockParser::detect_prepared` consulted
-`ctx.has_blank_before_strict`, which is true only when the previous
-line was *literally* blank (or pos==0). That misses the case where
-the previous block was a heading / fenced code / HR — those don't
-continue, so the next indented line is at block-level start, not
-mid-paragraph. CommonMark §4.4 says only paragraphs block
-interruption; non-paragraph predecessors are fine.
+The previous `is_loose_list` made three structurally different
+mistakes:
 
-For `# Heading\n    foo\n`:
-- Line 1 prev is `# Heading` (not blank) → strict=false → indented
-  code rejected → falls through to paragraph buffer.
+1. **Over-eager descendant scan.** It returned true on any
+   PARAGRAPH *descendant*, so a paragraph inside a nested
+   blockquote made the *outer* list loose. This was the recap's
+   diagnosis. Fix: drop the descendant scan; check PARAGRAPH only
+   at the *direct* child level (which is the parser's signal).
+2. **Missing trailing-blank case.** For `- a\n  - b\n  - c\n\n- d
+   ...` (#326), the parser puts the blank line as the last child
+   of the *inner* sublist. The outer list's children are just
+   LIST_ITEM, LIST_ITEM with no sibling BLANK_LINE — the existing
+   between-items check missed it. Fix: also walk the previous
+   item's descendants and look for a BLANK_LINE whose end byte
+   coincides with the item's end byte.
+3. **REFERENCE_DEFINITION not counted as block-level.** For
+   `- a\n- b\n\n  [ref]: /url\n- d\n` (#317), item 2 directly
+   contains PLAIN, BLANK_LINE, REFERENCE_DEFINITION — by §5.3 (b)
+   that is two block-level children separated by a blank, so the
+   list is loose. `is_block_child` excluded REFERENCE_DEFINITION.
+   Fix: add it.
 
-The relaxed `has_blank_before` field already encodes the right
-signal (paragraph-not-open / prev-block-is-self-closing), since
-`previous_block_requires_blank_before_heading()` returns false
-after a heading.
+Plus a small list-rendering gap surfaced by #315: `* a\n*\n\n* c\n`
+makes a loose list whose middle item has empty PLAIN content
+(`PLAIN { NEWLINE }`). The existing renderer wrapped it as
+`<p></p>` inside `<li>`; the spec wants bare `<li></li>`. Fix: in
+`render_list_item`, skip the paragraph wrapper when the PLAIN's
+text is whitespace-only.
 
-### Why dialect-gated
+### Why renderer-only
 
-For `>     foo\n    bar\n`, the dialects diverge (verified with
-pandoc):
-- `pandoc -f commonmark`: closes the BQ, `    bar` is a top-level
-  indented code block. The relaxed gate is correct.
-- `pandoc -f markdown`: lazily extends the BQ; `    bar` is a
-  paragraph inside the BQ. The strict gate (or some other
-  Pandoc-specific lazy-continuation logic) is needed.
-
-So the relaxed gate applies under `Dialect::CommonMark` only; Pandoc
-keeps `has_blank_before_strict`. Pandoc-side `# Heading\n    foo\n`
-is *also* buggy under our parser (buffers as paragraph instead of
-heading + code block per pandoc's own native output), but the OLD
-behavior wasn't tested by any fixture and fixing it under Pandoc
-would touch lazy-continuation rules; left as a follow-up.
+All three winning examples produce CSTs whose shapes are already
+correct — just being rendered to the wrong HTML. The remaining
+list-section failures (#312, #320) are genuine parser-shape gaps
+the renderer cannot paper over: #312 splits a 5th list item that
+should continue the 4th (marker-indent tracking), #320 emits a
+stray PARAGRAPH for `  > b` instead of extending the blockquote
+(blockquote-continuation under list-item indent).
 
 ### Files changed
 
-- **Parser-shape gap (CommonMark dialect divergence)**:
-  - `crates/panache-parser/src/parser/block_dispatcher.rs`: in
-    `IndentedCodeBlockParser::detect_prepared`, replace the
-    `!ctx.has_blank_before_strict` gate with a dialect-aware check:
-    under `Dialect::CommonMark`, allow when
-    `has_blank_before || at_document_start`; otherwise keep the
-    literal-blank-line strict gate.
-- **New parser fixtures + snapshots (paired)**:
-  - `indented_code_after_atx_heading_commonmark`: pins HEADING +
-    CODE_BLOCK with WHITESPACE("    ") + TEXT("foo") under
-    `flavor = "commonmark"`.
-  - `indented_code_after_atx_heading_pandoc`: pins the current
-    Pandoc behavior (HEADING + PARAGRAPH containing
-    TEXT("    foo")). This locks in that the dialect gate stays;
-    a future Pandoc-side fix will need to update this fixture
-    intentionally.
-- **New formatter fixture**:
-  - `indented_code_after_atx_heading_commonmark` (top-level
-    `tests/fixtures/cases/`): pins
-    `# Heading\n    foo\n` → `# Heading\n\n` + fenced code
-    `\`\`\`\nfoo\n\`\`\`\n`. Idempotency verified by the harness.
-- **Allowlist additions**: #115 (Indented code blocks); #236, #252
-  (Block quotes — both were blocked by the same gate).
+- **Renderer gap**:
+  - `crates/panache-parser/tests/commonmark/html_renderer.rs`:
+    rewrote `is_loose_list` per CommonMark §5.3 cleanly (drops
+    descendant PARAGRAPH scan; adds `list_item_ends_with_blank`
+    helper); added REFERENCE_DEFINITION to `is_block_child`;
+    skipped empty PLAIN paragraph wrapper in `render_list_item`
+    via a new `plain_is_empty` helper.
+- **New parser fixtures + snapshots** (CommonMark-flavored — these
+  pin the CST shapes the renderer fix now leans on, so the
+  invariants don't rot silently in `html_renderer.rs`):
+  - `list_item_blank_then_refdef_commonmark`: pins LIST_ITEM
+    containing PLAIN + BLANK_LINE + REFERENCE_DEFINITION (the
+    "internal blank between two block children" shape used for
+    §5.3 (b) detection in #317).
+  - `nested_list_blank_between_outer_items_commonmark`: pins
+    inner LIST whose last child is a BLANK_LINE that ends at the
+    outer LIST_ITEM's end byte (the shape `list_item_ends_with_blank`
+    walks for #326).
+  - The empty-PLAIN shape for #315 is already pinned by
+    `list_item_bare_marker_empty_commonmark`.
+- **Allowlist additions** (Lists section): #315, #317, #326.
 
 ### Don't redo
 
-- Don't drop the `Dialect::CommonMark` gate. Removing it
-  globally regresses Pandoc lazy-continuation: `>     foo\n    bar`
-  would close the blockquote and emit a top-level code block,
-  contradicting `pandoc -f markdown` (which keeps it inside the
-  BQ as a lazy paragraph). The Pandoc fixture
-  `indented_code_after_atx_heading_pandoc` will fail loudly if
-  the gate is dropped.
-- Don't try to also "fix" Pandoc's `# Heading\n    foo\n`
-  behavior in the same change. It's a separate Pandoc-side bug
-  (the strict gate is over-strict there too) but resolving it
-  needs care around BQ lazy continuation. The fixture pins the
-  current behavior so a future fix is a clean diff.
-- Don't widen the renderer's loose-list logic. The four "Lists"
-  failures (#312, #315, #317, #320, #326) are NOT in this fix's
-  blast radius — verified by re-running the report.
+- Don't try to fix #320 via the renderer. The CST has a stray
+  direct-child PARAGRAPH for `  > b` that is *outside* the
+  intended BLOCK_QUOTE — even with perfect loose-vs-tight
+  detection the rendered text body would still emit
+  `<p>  &gt; b</p>` instead of a blockquote. Real fix is in the
+  parser's blockquote-continuation under list-item indent.
+- Don't try to fix #312 via the renderer. The 5th item splits
+  off into its own outer list because the parser interprets
+  4-space indent as a nested-list start; this is marker-indent
+  tracking, not a render-time decision.
+- Don't reintroduce the descendant PARAGRAPH scan in
+  `is_loose_list`. It was over-detecting (paragraphs inside
+  nested blockquotes/sublists triggered loose), which is exactly
+  what #320's expected output (TIGHT outer with a blockquote
+  child) showed was wrong; the new direct-child check is what
+  spec §5.3 actually requires. The two new fixtures pin the
+  shapes the new logic relies on, and the existing
+  `lists_*` golden snapshots verify it doesn't false-positive.
+- Don't promote `plain_is_empty` to the renderer's general
+  paragraph path. It is specifically a list-item rendering
+  rule (§5.3 example #315) — for top-level paragraphs an empty
+  paragraph is a parser bug worth surfacing, not silencing.
 
 ### Suggested next targets, ranked
 
 1. **Empty list item closes the list when followed by blank line
    (#280)** — `-\n\n  foo\n` should produce
-   `<ul><li></li></ul><p>foo</p>`. Parser-shape gap.
-2. **Loose-vs-tight semantic gaps (#315, #320, #326)** —
-   `is_loose_list` in the test renderer overshoots: it returns
-   true on any PARAGRAPH descendant (including paragraphs inside
-   nested blockquotes). Per CommonMark §5.3, looseness is about
-   blank-line separation, and the parser already encodes the
-   PLAIN-vs-PARAGRAPH distinction at the *direct* child level.
-   Likely renderer-only fix: change `descendants()` to
-   `children()` in `is_loose_list`'s PARAGRAPH check, then verify
-   the BLANK_LINE-between-items rule still fires for #326.
-   Unblocks at least 3 examples (the loose-vs-tight detection
-   also affects #312/#317 indirectly).
-3. **List with non-uniform marker indentation (#312)** —
+   `<ul><li></li></ul><p>foo</p>`. Parser-shape gap: parser keeps
+   `  foo` inside the same LIST_ITEM as a second PLAIN child
+   instead of closing the list. Touches list-item continuation
+   when the item starts with bare-marker + blank.
+2. **List with non-uniform marker indentation (#312)** —
    `- a\n - b\n  - c\n   - d\n    - e\n` should keep all five at
    the same list level (last "- e" is lazy continuation of "d"
    per CommonMark indent rules). Currently splits at "- e"
    because the parser interprets 4-space indent as starting a
    nested list. Parser-shape gap; touches list-marker indent
    tracking.
+3. **Blockquote inside list item misaligned (#320)** — `* a\n  >
+   b\n  >\n* c\n` should produce a single BLOCK_QUOTE inside
+   item 1 (containing "b"); parser instead emits PARAGRAPH("  >
+   b") + BLOCK_QUOTE("  >" + blank). Parser-shape gap in
+   blockquote-continuation under list-item indent.
 4. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion for
    indented-code inside containers. Substantial; touches
    `leading_indent` and tab-stop logic.
@@ -145,7 +152,7 @@ would touch lazy-continuation rules; left as a follow-up.
    #536, #538)** — bracket scanner must skip past raw HTML and
    autolinks too.
 9. **Block quotes lazy-continuation #235, #251** — last two
-   blockquote failures (after this session's #236, #252 wins).
+   blockquote failures.
 10. **Fence inside blockquote inside list item (#321)**.
 11. **Lazy / nested marker continuation (#298, #299)**.
 12. **Multi-block content in `1.     code` items (#273, #274)**.
