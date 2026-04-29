@@ -19,7 +19,7 @@ DOCUMENT@0..176
     NEWLINE@67..68 "\n"
   BLANK_LINE@68..69
     BLANK_LINE@68..69 "\n"
-  REFERENCE_DEFINITION@69..135
+  PARAGRAPH@69..176
     LINK@69..74
       LINK_START@69..70
         LINK_START@69..70 "["
@@ -28,6 +28,5 @@ DOCUMENT@0..176
       TEXT@73..74 "]"
     TEXT@74..134 ": https://path.to/ima ..."
     NEWLINE@134..135 "\n"
-  PARAGRAPH@135..176
     TEXT@135..175 "       id=myId class= ..."
     NEWLINE@175..176 "\n"

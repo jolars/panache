@@ -16,24 +16,46 @@
 //! ```
 
 /// Try to parse a reference definition starting at the current position.
-/// Returns Some((length, label, url, title)) if successful.
+/// Returns Some((bytes_consumed, label, url, title)) on success.
+///
+/// `text` may span multiple lines. The destination and title may each be
+/// preceded by at most one newline (per CommonMark §4.7). Blank lines
+/// terminate the definition: callers should stop the input at the first
+/// blank line so the parser cannot cross one.
 ///
 /// Syntax:
 /// ```markdown
 /// [label]: url "title"
 /// [label]: <url> 'title'
-/// [label]: url
-///          (title on next line)
+/// [label]:
+///   url
+///   "title"
 /// ```
 pub fn try_parse_reference_definition(
     text: &str,
+) -> Option<(usize, String, String, Option<String>)> {
+    try_parse_reference_definition_with_mode(text, true)
+}
+
+/// Multimarkdown-flavored variant: tolerates trailing content after the title
+/// on the same line (e.g. `[ref]: /url "title" width=20px ...`). Callers in
+/// the MMD code path then keep collecting attribute-continuation lines.
+pub fn try_parse_reference_definition_lax(
+    text: &str,
+) -> Option<(usize, String, String, Option<String>)> {
+    try_parse_reference_definition_with_mode(text, false)
+}
+
+fn try_parse_reference_definition_with_mode(
+    text: &str,
+    strict_eol: bool,
 ) -> Option<(usize, String, String, Option<String>)> {
     let leading_spaces = text.chars().take_while(|&c| c == ' ').count();
     if leading_spaces > 3 {
         return None;
     }
-    let text = &text[leading_spaces..];
-    let bytes = text.as_bytes();
+    let inner = &text[leading_spaces..];
+    let bytes = inner.as_bytes();
 
     // Must start at beginning of line with [
     if bytes.is_empty() || bytes[0] != b'[' {
@@ -65,7 +87,7 @@ pub fn try_parse_reference_definition(
                 break;
             }
             b'\n' => {
-                // Labels can't span lines
+                // Labels can't span lines (handled via separate path).
                 return None;
             }
             _ => {
@@ -78,7 +100,7 @@ pub fn try_parse_reference_definition(
         return None;
     }
 
-    let label = &text[1..pos];
+    let label = &inner[1..pos];
     if label.is_empty() {
         return None;
     }
@@ -91,20 +113,15 @@ pub fn try_parse_reference_definition(
     }
     pos += 1;
 
-    // Skip whitespace
-    while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t') {
-        pos += 1;
-    }
+    // Skip ws + at most one newline + ws to the URL.
+    pos = skip_ws_one_newline(bytes, pos)?;
 
     // Parse URL
     let url_start = pos;
-    let url_end;
 
-    // Check for angle-bracketed URL <url>
-    if pos < bytes.len() && bytes[pos] == b'<' {
+    let url = if pos < bytes.len() && bytes[pos] == b'<' {
         pos += 1;
         let url_content_start = pos;
-        // Find closing >
         while pos < bytes.len() && bytes[pos] != b'>' && bytes[pos] != b'\n' && bytes[pos] != b'\r'
         {
             pos += 1;
@@ -112,32 +129,131 @@ pub fn try_parse_reference_definition(
         if pos >= bytes.len() || bytes[pos] != b'>' {
             return None;
         }
-        url_end = pos;
-        let url = text[url_content_start..url_end].to_string();
+        let url = inner[url_content_start..pos].to_string();
         pos += 1; // Skip >
-
-        // Parse optional title
-        let title = parse_title(text, bytes, &mut pos)?;
-
-        Some((pos, label.to_string(), url, title))
+        url
     } else {
-        // Parse unbracketed URL (until whitespace or newline)
         while pos < bytes.len() && !matches!(bytes[pos], b' ' | b'\t' | b'\n' | b'\r') {
             pos += 1;
         }
-
-        url_end = pos;
-        if url_start == url_end {
-            return None; // No URL found
+        if pos == url_start {
+            return None;
         }
+        inner[url_start..pos].to_string()
+    };
 
-        let url = text[url_start..url_end].to_string();
+    // After URL, try optional title. If a title attempt is malformed but we
+    // had to cross a newline to reach it, fall back to "no title, end of URL
+    // line" — the next line is then parsed independently (e.g.
+    // `[foo]: /url\n"title" ok\n` → ref def `[foo]: /url`, paragraph
+    // `"title" ok`).
+    let after_url = pos;
+    let url_line_end = consume_to_eol(bytes, after_url);
+    let url_line_end_lax = if strict_eol {
+        url_line_end
+    } else {
+        Some(consume_to_eol_lax(bytes, after_url))
+    };
 
-        // Parse optional title
-        let title = parse_title(text, bytes, &mut pos)?;
+    let mut title: Option<String> = None;
+    let mut end_pos: Option<usize> = None;
 
-        Some((pos, label.to_string(), url, title))
+    if let Some(title_start) = skip_ws_one_newline(bytes, after_url) {
+        let crossed_newline = bytes[after_url..title_start]
+            .iter()
+            .any(|&b| b == b'\n' || b == b'\r');
+        let mut title_pos = title_start;
+        match parse_title(inner, bytes, &mut title_pos) {
+            Some(Some(t)) => {
+                let line_end = if strict_eol {
+                    consume_to_eol(bytes, title_pos)
+                } else {
+                    Some(consume_to_eol_lax(bytes, title_pos))
+                };
+                if let Some(end) = line_end {
+                    title = Some(t);
+                    end_pos = Some(end);
+                } else if !crossed_newline {
+                    return None;
+                }
+            }
+            None => {
+                if !crossed_newline {
+                    return None;
+                }
+            }
+            Some(None) => {}
+        }
     }
+
+    let end = match end_pos {
+        Some(p) => p,
+        None => url_line_end_lax?,
+    };
+
+    Some((leading_spaces + end, label.to_string(), url, title))
+}
+
+/// Like `consume_to_eol` but returns the end-of-line position regardless of
+/// whether the line had non-whitespace content after the parsed segment.
+fn consume_to_eol_lax(bytes: &[u8], mut pos: usize) -> usize {
+    while pos < bytes.len() && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
+        pos += 1;
+    }
+    if pos < bytes.len() {
+        if bytes[pos] == b'\r' && pos + 1 < bytes.len() && bytes[pos + 1] == b'\n' {
+            pos += 2;
+        } else {
+            pos += 1;
+        }
+    }
+    pos
+}
+
+/// Skip space/tab from `pos`, then consume one line ending if present.
+/// Returns `None` if non-whitespace is found before the line ending.
+fn consume_to_eol(bytes: &[u8], mut pos: usize) -> Option<usize> {
+    while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t') {
+        pos += 1;
+    }
+    if pos >= bytes.len() {
+        return Some(pos);
+    }
+    match bytes[pos] {
+        b'\n' => Some(pos + 1),
+        b'\r' => {
+            if pos + 1 < bytes.len() && bytes[pos + 1] == b'\n' {
+                Some(pos + 2)
+            } else {
+                Some(pos + 1)
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Skip space/tab and optionally one line ending followed by more space/tab,
+/// per the "optional spaces or tabs (including up to one [line ending])" rule
+/// in CommonMark §4.7. Returns `None` if a *second* line ending is encountered
+/// (i.e. a blank line), which terminates the definition.
+fn skip_ws_one_newline(bytes: &[u8], mut pos: usize) -> Option<usize> {
+    while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t') {
+        pos += 1;
+    }
+    if pos < bytes.len() && (bytes[pos] == b'\n' || bytes[pos] == b'\r') {
+        if bytes[pos] == b'\r' && pos + 1 < bytes.len() && bytes[pos + 1] == b'\n' {
+            pos += 2;
+        } else {
+            pos += 1;
+        }
+        while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t') {
+            pos += 1;
+        }
+        if pos < bytes.len() && (bytes[pos] == b'\n' || bytes[pos] == b'\r') {
+            return None;
+        }
+    }
+    Some(pos)
 }
 
 pub fn line_is_mmd_link_attribute_continuation(line: &str) -> bool {

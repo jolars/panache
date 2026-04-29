@@ -13,15 +13,83 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-28 (r)
+## Latest session — 2026-04-29
 
-**Pass count: 521 → 522 / 652 (80.1%, +1)**
+**Pass count: 522 → 529 / 652 (81.1%, +7)**
 
-Targeted prior recap's #3 (10-digit ordered marker rejection, #266).
-Single-example clean dialect-divergence fix. Probed several adjacent
-candidates (Tabs #2/#5/#6/#7, multi-line setext #81/#82/#95/#115,
-Block quotes #235/#236/#251/#252, Link reference defs 12 fails) and
-documented why they were left for follow-up.
+Targeted prior recap's #2 (multi-line link reference definitions). One
+parser-shape rewrite + one renderer fix unlocked 7 examples spanning two
+sections. Verified with pandoc that both dialects agree on every change
+made — no `Dialect` gating was needed.
+
+### Single root cause: ref-def parser was single-line only
+
+`try_parse_reference_definition` consumed exactly one line; the
+dispatcher fed it `ctx.content`. Spec §4.7 allows up to one line ending
+between `:` and the destination, and another between destination and
+title. The parser also lacked an end-of-line check after the title, so
+junk like `[foo]: /url "title" ok` was being accepted (and then
+suppressed by the renderer).
+
+### Files changed
+
+- **Parser (parser-shape gap)**:
+  - `crates/panache-parser/src/parser/blocks/reference_links.rs`:
+    - Rewrote `try_parse_reference_definition` to take multi-line input.
+    - Added `skip_ws_one_newline` helper to enforce "at most one line
+      ending" between the colon → URL and URL → title gaps.
+    - Added strict end-of-line validation (`consume_to_eol`) after the
+      title, with a fallback to "no title, end of URL line" when the
+      title attempt fails *after* crossing a newline (matches spec
+      example #210: `[foo]: /url\n"title" ok\n` → ref def `[foo]: /url`,
+      paragraph `"title" ok`).
+    - Split into `try_parse_reference_definition` (strict) and
+      `try_parse_reference_definition_lax` (MMD-flavored — tolerates
+      trailing same-line content like `"title" width=20px ...`).
+  - `crates/panache-parser/src/parser/block_dispatcher.rs`:
+    - `ReferenceDefinitionParser::detect_prepared` now joins consecutive
+      non-blank lines into a multi-line candidate (top-level only;
+      blockquote-context falls back to single-line on `ctx.content`
+      because the raw `lines[]` carry `>` markers).
+    - Translates `bytes_consumed` from the parser into a `consumed_lines`
+      count for emission.
+    - Selects strict vs lax parser based on
+      `extensions.mmd_link_attributes`.
+  - `emit_reference_definition_content` now strips up to 3 leading
+     spaces and emits them as a `WHITESPACE` token before the `LINK`
+     node (otherwise indented ref defs like `   [foo]: /url` regressed
+     to a single TEXT token and the renderer couldn't extract the
+     label).
+- **Renderer (renderer-only fix in test code)**:
+  - `crates/panache-parser/tests/commonmark/html_renderer.rs`:
+    - `parse_reference_definition` now collects `NEWLINE` and
+      `WHITESPACE` tokens into the tail in addition to `TEXT`, so
+      multi-line URLs/titles survive concatenation.
+    - Tail trim now uses `.trim_start().trim_start_matches(':').trim()`
+      so a leading `WHITESPACE` token from the indent doesn't block the
+      colon strip.
+    - `split_dest_and_title` now special-cases `<…>` URLs (e.g. `<my
+      url>`), preserving spaces inside the angle brackets. Also
+      benefited inline link #489 (`[link](</my uri>)`).
+- **Parser fixture (pins multi-line ref-def CST)**:
+  - `crates/panache-parser/tests/fixtures/cases/reference_definition_multiline_destination/`
+    — `[foo]:\n/url\n\n[foo]\n` parses as a single `REFERENCE_DEFINITION`
+    spanning both lines, followed by a paragraph with the link
+    reference. No paired Pandoc fixture: pandoc-markdown produces the
+    same shape (verified via `pandoc -f markdown -t native`), so a
+    duplicate would be churn.
+- **Existing fixture corrected**:
+  - `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_mmd_link_attributes_disabled.snap`
+    — was pinning the lax-parser behavior (accepting `[ref]: /url
+    "title" key=val` as a ref def). Pandoc-markdown rejects this as a
+    paragraph. Snapshot updated to match the new strict behavior; this
+    is *more correct*, not a regression.
+  - `tests/fixtures/cases/mmd_link_attributes_disabled/expected.md`
+    — formatter expectation updated correspondingly: the whole `[ref]:
+    ...key=val` block is now one paragraph (idempotent).
+- **Allowlist additions**:
+  - Link reference definitions: +#193, +#195, +#196, +#198, +#209, +#217
+  - Links: +#489 (side effect of `<…>` URL handling in renderer)
 
 ### Single root cause: ordered list marker accepted >9 digits
 
@@ -46,104 +114,132 @@ of `try_parse_list_marker` did not gate on dialect, so
 - **Allowlist additions** (List items):
   - +#266
 
-No formatter golden case added: the new CommonMark shape is just a
-plain paragraph (the default fallback) — no new block sequence vs.
-the Pandoc path-shape on disk, just a different parse. Per the rule,
-formatter cases are only added when CommonMark produces a
-*structurally different* block sequence.
+No CommonMark-specific formatter golden case added: both dialects
+produce the same multi-line ref-def CST and the same formatted
+output, so adding a CommonMark-only fixture would be churn (per the
+formatter-fixture rule).
 
 ### Don't redo
 
-- Don't broaden the cap to `Dialect::Pandoc`. Pandoc accepts
-  arbitrary-digit ordered markers (verified via
-  `pandoc -f markdown -t native`). The fixture
-  `ordered_marker_max_digits_pandoc` pins this — drop it and Pandoc
-  behavior silently regresses.
-- Don't try to reuse this gate for the `(2)` parenthesized form on
-  line 252-275 of `lists.rs`. That form is already disabled under
-  CommonMark (gated on `fancy_lists`, which CM does not enable),
-  so no extra check needed there.
-- The **multi-line setext heading** failures (#81, #82, #95, #115)
-  produce a *broken CST* under `Dialect::CommonMark` — bytes appear
-  in the wrong order (the HEADING node's content is from the second
-  paragraph line, while the first paragraph line ends up as a sibling
-  after it). Verified via `parse` on `Foo\nBar\n---\n`. This looks
-  like a losslessness bug, not a feature gap. Pandoc treats that
-  input as a paragraph (em-dash via intraword punctuation); CommonMark
-  treats it as `<h2>Foo Bar</h2>`. Fixing requires reworking how the
-  paragraph buffer is converted into a setext heading when the
-  underline is encountered. **Big change, do not attempt as a
-  conformance one-off** — needs its own session and probably a
-  losslessness regression test first.
+- Don't try to widen `try_parse_reference_definition` to handle
+  multi-line **labels** (#208: `[\nfoo\n]: /url\nbar`). That requires
+  the label loop to cross newlines and a different "blank line ends
+  the label attempt" check, plus careful handling of the
+  passing-by-accident risk that ordinary `[\n` openers no longer fall
+  through to inline link parsing. It's a separate change with its own
+  fixture story.
+- Don't drop the `consume_to_eol` strict check thinking
+  `consume_to_eol_lax` could replace it for everyone. The strict
+  check is what makes #209 / #210 / `mmd_link_attributes_disabled`
+  produce the spec-correct paragraph fall-through; only the MMD
+  attribute-continuation path needs lax behavior.
+- Don't remove the blockquote-context single-line fallback in
+  `ReferenceDefinitionParser::detect_prepared`. Inside a blockquote,
+  the raw `lines[]` still carry `>` markers; the multi-line join
+  would feed them to the parser and the very first byte (`>`) makes
+  the parser reject. Multi-line ref defs inside blockquotes are
+  tracked separately (see #218 below).
+- Don't expect the renderer's `parse_reference_definition` to keep
+  working if you stop emitting `WHITESPACE` for the leading-indent of
+  an indented ref def. The renderer concatenates TEXT + NEWLINE +
+  WHITESPACE tokens to reconstruct the def's tail; dropping any of
+  the three breaks indented-def reconstruction (#193).
+- The strict-EOL check intentionally rejects `[foo]: <bar>(baz)`
+  (#201) under both dialects. Pandoc-markdown actually *accepts* this
+  as a ref def — the fix matches CommonMark, not Pandoc. If/when
+  Pandoc-flavor #201 behavior is needed for parity with the Haskell
+  pandoc, gate the strict check on `Dialect::CommonMark` and add a
+  paired fixture; do not just relax the check globally.
+- The current strict parser correctly rejects `[ref]: /url "title"
+  width=20px` (Pandoc) — verified against `pandoc -f markdown -t
+  native`. The previous golden snapshot expected REFERENCE_DEFINITION
+  for this input; the snapshot was wrong. New snapshot is more
+  correct.
 
 ### Suggested next targets, ranked
 
-1. **Multi-line setext heading + losslessness bug (#81, #82, #95,
+1. **Ref def can't interrupt a paragraph (#213)** — `Foo\n[bar]:
+   /baz\n\n[bar]\n` currently emits `REFERENCE_DEFINITION` *inside*
+   an open paragraph (CST byte ranges look correct but the textual
+   order is jumbled — looks like the same buffered-paragraph pattern
+   the multi-line setext bug exhibits). Easiest fix: in
+   `parser/core.rs` around line 2316–2335, mirror the
+   `fenced_div_open` paragraph-protection branch for
+   `parser_name == "reference_definition"` so a `Yes` ref-def
+   detection while a paragraph is open just appends to the paragraph
+   instead. Add a paired fixture under
+   `tests/fixtures/cases/reference_definition_no_interrupt_paragraph/`.
+2. **Ref-def vs setext priority (#216)** — `[foo]: /url\n===\n[foo]`
+   currently matches the SetextHeadingParser before
+   ReferenceDefinitionParser (registry order). Spec §4.2: setext
+   underline content must not itself parse as a ref def. Fix in
+   `SetextHeadingParser::detect_prepared`: before claiming the line,
+   try `try_parse_reference_definition` on the buffered paragraph
+   line; if it succeeds, decline. Verify with pandoc both ways.
+3. **Multi-line setext heading + losslessness bug (#81, #82, #95,
    #115)** — under `Dialect::CommonMark`, the parser produces a
    broken CST when a paragraph of >1 line is followed by a setext
    underline. Verify losslessness fails (`tree.text() != input`)
    then fix in the setext detection path
    (`block_dispatcher.rs::SetextHeadingParser`, possibly
-   `parser/core.rs` paragraph-buffer drain logic). Pandoc keeps
-   the paragraph-with-em-dash behavior. Will need paired fixtures
-   + a top-level CommonMark formatter golden because the new shape
-   is structurally different.
-2. **Multi-line link reference definitions (#193, #195, #196, #198,
-   #208)** — ref defs whose URL or title are split across lines are
-   not currently recognized. Single root cause; likely a
-   parser-shape change in the inline / block scanning of
-   `[label]:`. Verify each form against pandoc first.
-3. **Empty list item closes the list when followed by blank line
+   `parser/core.rs` paragraph-buffer drain logic). Pandoc keeps the
+   paragraph-with-em-dash behavior. Will need paired fixtures + a
+   top-level CommonMark formatter golden because the new shape is
+   structurally different. Big change, plan a session for it.
+4. **Multi-line label ref def (#208)** — `[\nfoo\n]: /url\nbar` →
+   `<p>bar</p>`. The label loop in
+   `try_parse_reference_definition` rejects on `\n`. Allowing
+   newlines inside the label needs a blank-line check (a blank line
+   inside the label terminates the def attempt, not just stops the
+   loop) and label normalization (whitespace runs collapse). Add a
+   paired fixture; verify with pandoc.
+5. **Bracketed ref-def label with escapes (#194)** —
+   `[Foo*bar\]]:my_(url) 'title (with parens)'`. Two bugs:
+   `emit_reference_definition_content` uses `rest.find(']')` which
+   stops at the *escaped* `]`; the renderer's label normalization
+   doesn't decode `\]`. Fix the emit by walking the label with the
+   same `escape_next` logic the parser uses, and decode backslash
+   escapes before label-matching in the renderer.
+6. **Ref-def inside blockquote affects outer scope (#218)** —
+   `[foo]\n\n> [foo]: /url\n` should resolve `[foo]` outside the
+   blockquote. The dispatcher *does* register a REFERENCE_DEFINITION
+   inside the blockquote, but the renderer's `collect_references`
+   currently descends into all `REFERENCE_DEFINITION` nodes — verify.
+   Likely a renderer issue with how blockquoted defs are emitted: the
+   multi-line single-line fallback in detect_prepared may be wrong.
+7. **Empty list item closes the list when followed by blank line
    (#280)** — markdown `-\n\n  foo\n` should produce
-   `<ul><li></li></ul><p>foo</p>` (the empty item closes after the
-   blank, foo is *outside* the list). Currently produces
-   `<ul><li><p></p><p>foo</p></li></ul>` because the blank-line +
-   indented-content rule keeps the foo inside the empty item.
-   Likely needs a list-blank-handling branch in `core.rs` or
-   `list_postprocessor.rs`.
-4. **Multi-empty-marker with subsequent indented content (#278)** —
-   `-\n  foo\n-\n  ```\n  bar\n  ```\n-\n      baz\n`. Three bare
-   markers each followed by indented content (or blank). Currently
-   parses chaotically. Once #280 is solved this may partially come
-   along.
-5. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion needed
-   for indented-code inside containers. Tab at column 2 should
-   expand to 2 spaces (to reach next tab stop = 4); tab at column 0
-   should expand to 4. Mostly a `leading_indent` / indent-counting
-   change but touches the dispatcher's column bookkeeping.
-   Substantial.
-6. **Block quotes lazy-continuation (#235, #236, #251)** — lazy
-   continuation must not extend a list or code block inside a
-   blockquote. CommonMark §5.1: laziness only applies to paragraph
-   continuations.
-7. **Fence inside blockquote inside list item (#321)** — list-item
-   continuation can be interrupted by a fence at content column;
-   dispatcher's continuation-line fence detection
-   (`parse_line` ~lines 1614-1620) only fires when `bq_depth > 0`.
-8. **Loose-vs-tight nested loose lists (#312, #326)** — top-level
-   loose list with tight inner lists; renderer over-wraps inner
-   items in `<p>` or splits at the wrong level. Mixed
-   parser/renderer shape.
-9. **Lazy / nested marker continuation (#296, #297, #305)** —
-   `10) foo\n  - bar` should produce nested list; currently parses
-   as a paragraph. Parser issue: ordered-list-with-paren-marker
-   doesn't accept a nested bullet without a blank line.
-10. **Multi-block content in `1.     code` items (#273, #274)** —
+   `<ul><li></li></ul><p>foo</p>`. Likely needs a list-blank-handling
+   branch in `core.rs` or `list_postprocessor.rs`.
+8. **Multi-empty-marker with subsequent indented content (#278)** —
+   chaotic parse; partially comes along once #280 is solved.
+9. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion needed
+   for indented-code inside containers. Substantial.
+10. **Block quotes lazy-continuation (#235, #236, #251)** — lazy
+    continuation must not extend a list or code block inside a
+    blockquote. CommonMark §5.1.
+11. **Fence inside blockquote inside list item (#321)** — list-item
+    continuation can be interrupted by a fence at content column;
+    dispatcher's continuation-line fence detection only fires when
+    `bq_depth > 0`.
+12. **Loose-vs-tight nested loose lists (#312, #326)** — mixed
+    parser/renderer shape.
+13. **Lazy / nested marker continuation (#296, #297, #305)** —
+    `10) foo\n  - bar` should produce nested list; currently parses
+    as a paragraph.
+14. **Multi-block content in `1.     code` items (#273, #274)** —
     `1.` followed by 5+ spaces should open a list item whose first
-    block is an indented code block. Currently parser falls through
-    to plain text.
-11. **Setext-in-list-item (#300)** — `- # Foo\n- Bar\n  ---\n  baz\n`
-    needs `<h2>Bar</h2>` inside the second item; currently produces
-    `<hr />` because the setext underline isn't recognized at the
-    list-item content column.
-12. **Marker-on-same-line nesting (#298, #299)** — `- - foo\n`
-    should be nested lists; parser flattens.
-13. **Emphasis and strong emphasis (47 fails)** — flanking-rule and
-    autolink-precedence edge cases (#480, #481 are
-    autolink-vs-emphasis).
-14. **Link reference definitions remainder (#194, #201, #213, #216,
-    #217, #218)** — URL with parens, strict validation, setext
-    eating defs, cross-block cascade, blockquoted def lookup.
+    block is an indented code block.
+15. **Setext-in-list-item (#300)** — `- # Foo\n- Bar\n  ---\n  baz`
+    needs `<h2>Bar</h2>` inside the second item.
+16. **Marker-on-same-line nesting (#298, #299)** — `- - foo` should
+    be nested lists; parser flattens.
+17. **Emphasis and strong emphasis (47 fails)** — flanking-rule and
+    autolink-precedence edge cases.
+18. **Ref-def dialect divergence #201** — `[foo]: <bar>(baz)`. Fix
+    requires gating the strict-EOL check on `Dialect::CommonMark`
+    and adding a paired fixture; Pandoc-markdown accepts it, current
+    code rejects both. Low priority.
 
 --------------------------------------------------------------------------------
 

@@ -46,7 +46,7 @@ use super::blocks::raw_blocks;
 use super::blocks::raw_blocks::extract_environment_name;
 use super::blocks::reference_links::{
     line_is_mmd_link_attribute_continuation, try_parse_footnote_marker,
-    try_parse_reference_definition,
+    try_parse_reference_definition, try_parse_reference_definition_lax,
 };
 use super::blocks::tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
@@ -974,12 +974,61 @@ impl BlockParser for ReferenceDefinitionParser {
             return None;
         }
 
-        // Parse once and cache for emission.
-        let _parsed = try_parse_reference_definition(ctx.content)?;
+        // Build a multi-line candidate from consecutive non-blank lines so the
+        // ref-def parser can recognize destinations and titles that wrap across
+        // lines (CommonMark §4.7). Blank lines terminate the definition, so we
+        // stop the input there.
+        //
+        // Inside blockquotes, the raw `lines` carry the `>` markers. The
+        // dispatcher already strips them into `ctx.content`, but a multi-line
+        // join here would feed those markers back to the parser. Fall back to
+        // a single-line attempt in that case — multi-line ref defs inside
+        // blockquotes are tracked separately.
+        type RefDefParseFn = fn(&str) -> Option<(usize, String, String, Option<String>)>;
+        let parse_fn: RefDefParseFn = if ctx.config.extensions.mmd_link_attributes {
+            try_parse_reference_definition_lax
+        } else {
+            try_parse_reference_definition
+        };
 
-        let mut consumed = 1usize;
+        let consumed = if ctx.blockquote_depth > 0 {
+            parse_fn(ctx.content)?;
+            1usize
+        } else {
+            let mut multi = String::new();
+            let mut joined_lines = 0usize;
+            for line in lines.iter().skip(line_pos) {
+                if line.trim().is_empty() {
+                    break;
+                }
+                multi.push_str(line);
+                joined_lines += 1;
+            }
+            if joined_lines == 0 {
+                return None;
+            }
+
+            let (bytes_consumed, _label, _url, _title) = parse_fn(&multi)?;
+
+            let mut consumed = 0usize;
+            let mut byte_cursor = 0usize;
+            for line in lines.iter().skip(line_pos).take(joined_lines) {
+                if byte_cursor >= bytes_consumed {
+                    break;
+                }
+                byte_cursor += line.len();
+                consumed += 1;
+            }
+            if consumed == 0 {
+                consumed = 1;
+            }
+            consumed
+        };
+
+        let mut consumed = consumed;
+
         if ctx.config.extensions.mmd_link_attributes {
-            let mut i = line_pos + 1;
+            let mut i = line_pos + consumed;
             while i < lines.len() {
                 let line = lines[i];
 
@@ -1321,18 +1370,27 @@ impl BlockParser for TableParser {
 fn emit_reference_definition_content(builder: &mut GreenNodeBuilder<'static>, text: &str) {
     use crate::syntax::SyntaxKind;
 
-    if !text.starts_with('[') {
+    let leading = text.chars().take_while(|&c| c == ' ').count();
+    if leading > 3 {
+        builder.token(SyntaxKind::TEXT.into(), text);
+        return;
+    }
+    let after_indent = &text[leading..];
+    if !after_indent.starts_with('[') {
         builder.token(SyntaxKind::TEXT.into(), text);
         return;
     }
 
-    let rest = &text[1..];
+    let rest = &after_indent[1..];
     if let Some(close_pos) = rest.find(']') {
         let label = &rest[..close_pos];
         let after_bracket = &rest[close_pos + 1..];
 
         if after_bracket.starts_with(':') {
-            // Emit LINK node with the label
+            if leading > 0 {
+                builder.token(SyntaxKind::WHITESPACE.into(), &text[..leading]);
+            }
+
             builder.start_node(SyntaxKind::LINK.into());
 
             builder.start_node(SyntaxKind::LINK_START.into());

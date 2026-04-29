@@ -57,13 +57,16 @@ fn parse_reference_definition(node: &SyntaxNode) -> Option<(String, RefDef)> {
 
     let mut tail = String::new();
     for el in node.children_with_tokens() {
-        if let NodeOrToken::Token(t) = el
-            && t.kind() == SyntaxKind::TEXT
-        {
-            tail.push_str(t.text());
+        if let NodeOrToken::Token(t) = el {
+            match t.kind() {
+                SyntaxKind::TEXT | SyntaxKind::NEWLINE | SyntaxKind::WHITESPACE => {
+                    tail.push_str(t.text())
+                }
+                _ => {}
+            }
         }
     }
-    let tail = tail.trim_start_matches(':').trim();
+    let tail = tail.trim_start().trim_start_matches(':').trim();
     let (url, title) = split_dest_and_title(tail);
     Some((
         label,
@@ -76,6 +79,18 @@ fn parse_reference_definition(node: &SyntaxNode) -> Option<(String, RefDef)> {
 
 fn split_dest_and_title(text: &str) -> (String, Option<String>) {
     let text = text.trim();
+    if let Some(rest) = text.strip_prefix('<')
+        && let Some(end) = rest.find('>')
+    {
+        let url = &text[..end + 2];
+        let after = text[end + 2..].trim();
+        let title = if after.is_empty() {
+            None
+        } else {
+            parse_title(after)
+        };
+        return (url.to_string(), title);
+    }
     let mut url_end = text.len();
     let mut title = None;
     for (i, c) in text.char_indices() {
