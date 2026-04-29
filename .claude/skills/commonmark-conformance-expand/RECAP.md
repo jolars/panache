@@ -13,7 +13,154 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (b)
+## Latest session — 2026-04-29 (c)
+
+**Pass count: 534 → 539 / 652 (82.7%, +5)**
+
+Targeted prior recap's #5 (`10)` paren-marker recognition for #296/#297) and
+the §5.2 paragraph-interrupt rules behind #303/#305. Two dialect-divergence
+fixes — one in the list-marker parser, one in the parser's paragraph-
+interrupt gate — unlocked five conformance examples (#296, #297, #302, #303,
+#305).
+
+### Single root cause: decimal-paren markers gated on `fancy_lists`
+
+`try_parse_list_marker` rejected `RightParen` markers (`10)`) whenever
+`fancy_lists` was off, regardless of dialect. CommonMark §5.2 lists `1-9
+digits + . or )` as part of the *core* grammar, not an extension. Pandoc-
+markdown defaults `fancy_lists` ON, so the bug only surfaced under
+`Flavor::CommonMark`. Verified with `pandoc -f commonmark -t native` that
+both dialects agree on `10) foo` becoming an ordered list when the marker is
+recognized — the divergence is purely in *what gates recognition*, not in
+the resulting CST shape. Bypass added: dialect == CommonMark skips the
+fancy_lists check; Pandoc-default behavior is unchanged.
+
+### Single root cause: parser unconditionally blocked list-interrupts
+
+CommonMark §5.2 allows bullet lists *and* ordered lists starting with `1` to
+interrupt a paragraph without a blank line. Pandoc-markdown forbids any list
+interruption. The check at `core.rs::parse_line` for `BlockEffect::OpenList
+&& YesCanInterrupt && paragraph_open && !in_list && content_indent == 0`
+appended the line to the paragraph regardless of dialect. Verified with
+pandoc that the divergence is real (`Foo\n- bar` is paragraph + list under
+commonmark, single paragraph under markdown). Fix gates the block on
+dialect: under CommonMark, allow the interrupt when the prepared marker is
+`Bullet(_)` or `Ordered(Decimal { number == "1", .. })`. Pandoc behavior
+unchanged.
+
+### Files changed
+
+- **Parser (dialect divergence × 2)**:
+  - `crates/panache-parser/src/parser/blocks/lists.rs`: the
+    `RightParen && !fancy_lists` rejection in `try_parse_list_marker` now
+    skips when `config.dialect == Dialect::CommonMark`.
+  - `crates/panache-parser/src/parser/core.rs`: the list-interrupt block in
+    `parse_line` (around the `YesCanInterrupt` arm) now reads the
+    `ListPrepared` payload to decide if the marker is allowed to interrupt
+    under CommonMark (bullet OR ordered-decimal with `number == "1"`); all
+    other markers fall through to the existing paragraph-append path.
+- **Parser fixtures (paired where divergent)**:
+  - `crates/panache-parser/tests/fixtures/cases/list_interrupts_paragraph_{commonmark,pandoc}/`
+    — `Foo\n- bar\n\nBaz\n1. qux\n\nQuux\n2. corge\n` parses as
+    paragraph + bullet list, paragraph + ordered list (start=1), single
+    paragraph (start=2 doesn't interrupt) under CommonMark; under Pandoc all
+    three are single paragraphs.
+  - `crates/panache-parser/tests/fixtures/cases/ordered_paren_marker_decimal_commonmark/`
+    — `10) foo\n    - bar\n` parses as an ordered list (LIST_MARKER `10)`)
+    with a nested bullet. CommonMark-only fixture; Pandoc default (with
+    `fancy_lists`) already accepts the same shape, so a paired fixture
+    would be churn.
+- **Formatter golden case (CommonMark-only structural shape)**:
+  - `tests/fixtures/cases/list_interrupts_paragraph_commonmark/` — pins the
+    formatted output for the same input under `flavor = "commonmark"`. The
+    third block (`Quux\n2. corge`) reflows to `Quux 2. corge` because
+    CommonMark treats it as a single paragraph; the formatter is idempotent.
+    Skipped paired Pandoc case — Pandoc-default produces a different shape
+    (single paragraph each), already exercised by the existing fixture
+    suite.
+- **Allowlist additions**:
+  - List items: +#296, +#297.
+  - Lists: +#302, +#303, +#305.
+
+### Don't redo
+
+- Don't drop the dialect gate from the `RightParen` marker check thinking
+  enabling `fancy_lists` for `commonmark_defaults()` would suffice.
+  `fancy_lists` covers letters and roman numerals too — those are *not*
+  valid CommonMark markers (CommonMark §5.2 restricts ordered markers to
+  digits). Enabling the extension would over-permit and likely regress
+  Pandoc-flavored fixtures.
+- Don't broaden the list-interrupt allowance to ordered-with-any-start
+  under CommonMark. The spec is explicit: only `1.` or `1)` may interrupt
+  (this is the rule that lets `windows house\n14. doors` stay a paragraph
+  in #304). Removing the `number == "1"` check would regress #304.
+- Don't move the list-interrupt gate into the dispatcher's `detect_prepared`.
+  At detection time the dispatcher doesn't know if a paragraph is currently
+  open vs whether the line is at document start with no prior context — the
+  gate has to consult parser state (`is_paragraph_open && !in_list &&
+  content_indent == 0`), which lives in core.rs. Keeping the marker-aware
+  check colocated with that gate avoids a duplicated paragraph-state probe.
+- Don't expect bullet markers (`-`, `+`, `*`) to be subject to the
+  `fancy_lists` gate at all. Their match path is at the top of
+  `try_parse_list_marker` and is unconditional — only the ordered-decimal
+  paren branch and the letters/roman branches care about `fancy_lists`.
+
+### Suggested next targets, ranked
+
+1. **Multi-line setext heading + losslessness bug (#81, #82, #95, #115)** —
+   under `Dialect::CommonMark`, a paragraph of >1 line followed by a setext
+   underline yields a broken CST (paragraph text appears in reverse order).
+   Verify losslessness fails first
+   (`printf 'Foo\nBar\n---\n' | cargo run -- debug format --checks
+   losslessness`), then fix in the setext detection path
+   (`SetextHeadingParser`, possibly the paragraph-buffer drain logic in
+   `parser/core.rs`). Pandoc keeps the paragraph-with-em-dash behavior.
+   Will need paired fixtures + a top-level CommonMark formatter golden
+   because the new shape is structurally different. Big change, plan a
+   session for it.
+2. **Bracketed ref-def label with escapes (#194)** —
+   `[Foo*bar\]]:my_(url) 'title (with parens)'`. Two bugs:
+   `emit_reference_definition_content` uses `rest.find(']')` which stops at
+   the *escaped* `]`; the renderer's label normalization doesn't decode
+   `\]`. Fix the emit by walking the label with the same `escape_next`
+   logic the parser uses, and decode backslash escapes before
+   label-matching in the renderer.
+3. **Empty list item closes the list when followed by blank line (#280)** —
+   markdown `-\n\n  foo\n` should produce `<ul><li></li></ul><p>foo</p>`.
+   Likely needs a list-blank-handling branch in `core.rs` or
+   `list_postprocessor.rs`.
+4. **Multi-empty-marker with subsequent indented content (#278)** — chaotic
+   parse; partially comes along once #280 is solved.
+5. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion needed for
+   indented-code inside containers. Substantial.
+6. **Block quotes lazy-continuation (#235, #236, #251)** — lazy
+   continuation must not extend a list or code block inside a blockquote.
+   CommonMark §5.1.
+7. **Fence inside blockquote inside list item (#321)** — list-item
+   continuation can be interrupted by a fence at content column;
+   dispatcher's continuation-line fence detection only fires when
+   `bq_depth > 0`.
+8. **Loose-vs-tight nested loose lists (#312, #326)** — mixed
+   parser/renderer shape. #326's outer list should be loose (blank line
+   between items) so `a` and `d` need `<p>` wrappers, but renderer treats
+   it as tight. Likely a renderer-side loose-detection gap.
+9. **Lazy / nested marker continuation (#298, #299)** — `- - foo` and
+   `1. - 2. foo` should produce nested list-on-same-line; parser flattens.
+10. **Multi-block content in `1.     code` items (#273, #274)** —
+    `1.` followed by 5+ spaces should open a list item whose first block is
+    an indented code block.
+11. **Setext-in-list-item (#300)** — `- # Foo\n- Bar\n  ---\n  baz` needs
+    `<h2>Bar</h2>` inside the second item.
+12. **Emphasis and strong emphasis (47 fails)** — flanking-rule and
+    autolink-precedence edge cases.
+13. **Ref-def dialect divergence #201** — `[foo]: <bar>(baz)`. Fix requires
+    gating the strict-EOL check on `Dialect::CommonMark` and adding a
+    paired fixture; Pandoc-markdown accepts it, current code rejects both.
+    Low priority.
+
+--------------------------------------------------------------------------------
+
+## Previous session — 2026-04-29 (b)
 
 **Pass count: 529 → 534 / 652 (81.9%, +5)**
 

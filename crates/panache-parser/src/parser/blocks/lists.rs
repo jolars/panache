@@ -392,7 +392,12 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Optio
             Some(')') => (ListDelimiter::RightParen, digit_count + 1),
             _ => return None,
         };
-        if style == ListDelimiter::RightParen && !config.extensions.fancy_lists {
+        // CommonMark §5.2: decimal `1)` markers are part of the core grammar.
+        // Pandoc-markdown gates `)`-style ordered markers behind `fancy_lists`.
+        if style == ListDelimiter::RightParen
+            && !config.extensions.fancy_lists
+            && config.dialect != crate::Dialect::CommonMark
+        {
             return None;
         }
 

@@ -211,6 +211,7 @@ golden_test_cases!(
     footnote_definition_list,
     footnote_defs_consecutive_no_blanks,
     atx_interrupts_paragraph_commonmark,
+    list_interrupts_paragraph_commonmark,
     headings,
     setext_headings,
     setext_text_thematic_break_commonmark,

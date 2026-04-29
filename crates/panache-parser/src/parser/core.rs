@@ -2284,15 +2284,38 @@ impl<'a> Parser<'a> {
                         && !lists::in_list(&self.containers)
                         && self.content_container_indent_to_strip() == 0
                     {
-                        // Do not let lists interrupt a paragraph without a blank line.
-                        paragraphs::append_paragraph_line(
-                            &mut self.containers,
-                            &mut self.builder,
-                            line_to_append.unwrap_or(self.lines[self.pos]),
-                            self.config,
-                        );
-                        self.pos += 1;
-                        return true;
+                        // CommonMark §5.2: bullet lists and ordered lists with
+                        // start = 1 may interrupt a paragraph; ordered lists
+                        // with any other start cannot. Pandoc-markdown forbids
+                        // *any* list from interrupting a paragraph without a
+                        // blank line.
+                        let allow_interrupt =
+                            self.config.dialect == crate::options::Dialect::CommonMark && {
+                                use super::block_dispatcher::ListPrepared;
+                                use super::blocks::lists::OrderedMarker;
+                                let prepared = block_match
+                                    .payload
+                                    .as_ref()
+                                    .and_then(|p| p.downcast_ref::<ListPrepared>());
+                                match prepared.map(|p| &p.marker) {
+                                    Some(ListMarker::Bullet(_)) => true,
+                                    Some(ListMarker::Ordered(OrderedMarker::Decimal {
+                                        number,
+                                        ..
+                                    })) => number == "1",
+                                    _ => false,
+                                }
+                            };
+                        if !allow_interrupt {
+                            paragraphs::append_paragraph_line(
+                                &mut self.containers,
+                                &mut self.builder,
+                                line_to_append.unwrap_or(self.lines[self.pos]),
+                                self.config,
+                            );
+                            self.pos += 1;
+                            return true;
+                        }
                     }
 
                     self.emit_list_item_buffer_if_needed();
