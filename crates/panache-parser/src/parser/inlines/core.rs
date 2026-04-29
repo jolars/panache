@@ -44,9 +44,10 @@ use super::inline_footnotes::{
 use super::inline_html::{emit_inline_html, try_parse_inline_html};
 use super::latex::{parse_latex_command, try_parse_latex_command};
 use super::links::{
-    emit_autolink, emit_bare_uri_link, emit_inline_image, emit_inline_link, emit_reference_image,
-    emit_reference_link, try_parse_autolink, try_parse_bare_uri, try_parse_inline_image,
-    try_parse_inline_link, try_parse_reference_image, try_parse_reference_link,
+    LinkScanContext, emit_autolink, emit_bare_uri_link, emit_inline_image, emit_inline_link,
+    emit_reference_image, emit_reference_link, try_parse_autolink, try_parse_bare_uri,
+    try_parse_inline_image, try_parse_inline_link, try_parse_reference_image,
+    try_parse_reference_link,
 };
 use super::mark::{emit_mark, try_parse_mark};
 use super::math::{
@@ -828,6 +829,7 @@ fn parse_until_closer_with_nested_two(
             && let Some((len, _, _, _)) = try_parse_inline_link(
                 &text[pos..],
                 config.dialect == crate::options::Dialect::CommonMark,
+                LinkScanContext::from_options(config),
             )
         {
             log::trace!("Skipping inline link of {} bytes at pos {}", len, pos);
@@ -846,6 +848,7 @@ fn parse_until_closer_with_nested_two(
                 &text[pos..],
                 config.extensions.shortcut_reference_links,
                 config.extensions.inline_links,
+                LinkScanContext::from_options(config),
             )
         {
             log::trace!("Skipping reference link of {} bytes at pos {}", len, pos);
@@ -1215,6 +1218,7 @@ fn parse_until_closer_with_nested_one(
             && let Some((len, _, _, _)) = try_parse_inline_link(
                 &text[pos..],
                 config.dialect == crate::options::Dialect::CommonMark,
+                LinkScanContext::from_options(config),
             )
         {
             log::trace!("Skipping inline link of {} bytes at pos {}", len, pos);
@@ -1230,6 +1234,7 @@ fn parse_until_closer_with_nested_one(
                 &text[pos..],
                 config.extensions.shortcut_reference_links,
                 config.extensions.inline_links,
+                LinkScanContext::from_options(config),
             )
         {
             log::trace!("Skipping reference link of {} bytes at pos {}", len, pos);
@@ -2022,7 +2027,9 @@ fn parse_inline_range_impl(
         // Images and links - process in order: inline image, reference image, footnote ref, inline link, reference link
         if byte == b'!' && pos + 1 < text.len() && text.as_bytes()[pos + 1] == b'[' {
             // Try inline image: ![alt](url)
-            if let Some((len, alt_text, dest, attributes)) = try_parse_inline_image(&text[pos..]) {
+            if let Some((len, alt_text, dest, attributes)) =
+                try_parse_inline_image(&text[pos..], LinkScanContext::from_options(config))
+            {
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
@@ -2079,6 +2086,7 @@ fn parse_inline_range_impl(
                 && let Some((len, link_text, dest, attributes)) = try_parse_inline_link(
                     &text[pos..],
                     config.dialect == crate::options::Dialect::CommonMark,
+                    LinkScanContext::from_options(config),
                 )
             {
                 if pos > text_start {
@@ -2105,6 +2113,7 @@ fn parse_inline_range_impl(
                     &text[pos..],
                     allow_shortcut,
                     config.extensions.inline_links,
+                    LinkScanContext::from_options(config),
                 ) {
                     if pos > text_start {
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);

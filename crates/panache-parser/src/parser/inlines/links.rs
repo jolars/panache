@@ -11,6 +11,7 @@
 
 use super::code_spans::try_parse_code_span;
 use super::core::parse_inline_text;
+use super::inline_html::try_parse_inline_html;
 use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
@@ -18,15 +19,44 @@ use rowan::GreenNodeBuilder;
 // Import attribute parsing
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 
+/// Flags that control which inline spans the link-bracket scanner treats as
+/// opaque (so a `]` inside them does not terminate the link/image text).
+///
+/// - `skip_raw_html` is universal across dialects: pandoc-markdown and
+///   CommonMark both refuse to close link text inside a raw HTML span (e.g.
+///   `[foo <bar attr="](baz)">`), per CommonMark spec example #524 / #536.
+/// - `skip_autolinks` is **CommonMark-only**. Pandoc-markdown does *not*
+///   treat `<scheme://...>` as opaque inside link text, so the same input
+///   produces a different parse under each dialect (CommonMark spec example
+///   #526 / #538). Always derive this from
+///   `extensions.autolinks && dialect == Dialect::CommonMark`.
+#[derive(Clone, Copy, Default)]
+pub struct LinkScanContext {
+    pub skip_raw_html: bool,
+    pub skip_autolinks: bool,
+}
+
+impl LinkScanContext {
+    pub fn from_options(config: &ParserOptions) -> Self {
+        Self {
+            skip_raw_html: config.extensions.raw_html,
+            skip_autolinks: config.extensions.autolinks
+                && config.dialect == crate::options::Dialect::CommonMark,
+        }
+    }
+}
+
 /// Find the closing `]` of a link/image text span, starting from `start`.
 ///
 /// Walks `text[start..]` tracking nested brackets and backslash escapes. When
 /// a backtick run starting a valid code span is encountered, the entire span
 /// (including any trailing attribute block) is skipped — per CommonMark §6
 /// precedence, code spans bind tighter than links/images, so a `]` *inside*
-/// a code span cannot terminate the link's text. Returns the byte offset of
-/// the closing `]` within `text`, or `None` if no unmatched `]` is reached.
-fn find_link_close_bracket(text: &str, start: usize) -> Option<usize> {
+/// a code span cannot terminate the link's text. The same opacity applies to
+/// raw HTML and (CommonMark-only) autolink spans gated through `ctx`.
+/// Returns the byte offset of the closing `]` within `text`, or `None` if no
+/// unmatched `]` is reached.
+fn find_link_close_bracket(text: &str, start: usize, ctx: LinkScanContext) -> Option<usize> {
     let bytes = text.as_bytes();
     let mut bracket_depth = 0;
     let mut escape_next = false;
@@ -48,6 +78,23 @@ fn find_link_close_bracket(text: &str, start: usize) -> Option<usize> {
             }
             b'`' => {
                 if let Some((len, _, _, _)) = try_parse_code_span(&text[i..]) {
+                    i += len;
+                } else {
+                    i += 1;
+                }
+            }
+            b'<' => {
+                // Order matters: autolinks are the more specific `<...>`
+                // shape (URI/email between angle brackets), so try that
+                // before falling through to general inline raw HTML which
+                // would also match `<bar attr="...">`-style tags.
+                if ctx.skip_autolinks
+                    && let Some((len, _)) = try_parse_autolink(&text[i..], true)
+                {
+                    i += len;
+                } else if ctx.skip_raw_html
+                    && let Some(len) = try_parse_inline_html(&text[i..])
+                {
                     i += len;
                 } else {
                     i += 1;
@@ -138,13 +185,19 @@ fn step(s: &str, i: usize) -> usize {
 /// Inline images have the form `![alt](url)` or `![alt](url "title")`.
 /// Can also have trailing attributes: `![alt](url){#id .class}`.
 /// Returns Some((length, alt_text, dest_content, raw_attributes)) if a valid image is found.
-pub fn try_parse_inline_image(text: &str) -> Option<(usize, &str, &str, Option<&str>)> {
+///
+/// `ctx` controls bracket-scanner opacity for raw HTML / autolink spans;
+/// see `LinkScanContext`.
+pub fn try_parse_inline_image(
+    text: &str,
+    ctx: LinkScanContext,
+) -> Option<(usize, &str, &str, Option<&str>)> {
     if !text.starts_with("![") {
         return None;
     }
 
     // Find the closing ]
-    let close_bracket = find_link_close_bracket(text, 2)?;
+    let close_bracket = find_link_close_bracket(text, 2, ctx)?;
     let alt_text = &text[2..close_bracket];
 
     // Check for immediate ( after ]
@@ -457,13 +510,14 @@ pub fn try_parse_bare_uri(text: &str) -> Option<(usize, &str)> {
 pub fn try_parse_inline_link(
     text: &str,
     strict_dest: bool,
+    ctx: LinkScanContext,
 ) -> Option<(usize, &str, &str, Option<&str>)> {
     if !text.starts_with('[') {
         return None;
     }
 
     // Find the closing ]
-    let close_bracket = find_link_close_bracket(text, 1)?;
+    let close_bracket = find_link_close_bracket(text, 1, ctx)?;
     let link_text = &text[1..close_bracket];
 
     // Check for immediate ( after ]
@@ -704,6 +758,7 @@ pub fn try_parse_reference_link(
     text: &str,
     allow_shortcut: bool,
     inline_link_attempted: bool,
+    ctx: LinkScanContext,
 ) -> Option<(usize, &str, String, bool)> {
     if !text.starts_with('[') {
         return None;
@@ -723,8 +778,9 @@ pub fn try_parse_reference_link(
     // Find the closing ] for the text. Uses the shared helper so that a
     // `]` inside a code span doesn't terminate the link text (CommonMark
     // §6 — code spans bind tighter than links). See spec examples #342
-    // and #525.
-    let close_bracket = find_link_close_bracket(text, 1)?;
+    // and #525. Raw HTML and (CommonMark-only) autolink spans are also
+    // opaque per `ctx`.
+    let close_bracket = find_link_close_bracket(text, 1, ctx)?;
     let link_text = &text[1..close_bracket];
 
     // Check what follows the ]
@@ -1031,77 +1087,77 @@ mod tests {
     #[test]
     fn test_parse_inline_link_simple() {
         let input = "[text](url)";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         assert_eq!(result, Some((11, "text", "url", None)));
     }
 
     #[test]
     fn test_parse_inline_link_with_title() {
         let input = r#"[text](url "title")"#;
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         assert_eq!(result, Some((19, "text", r#"url "title""#, None)));
     }
 
     #[test]
     fn test_parse_inline_link_with_nested_brackets() {
         let input = "[outer [inner] text](url)";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         assert_eq!(result, Some((25, "outer [inner] text", "url", None)));
     }
 
     #[test]
     fn test_parse_inline_link_no_space_between_brackets_and_parens() {
         let input = "[text] (url)";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_inline_link_no_closing_bracket() {
         let input = "[text(url)";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_inline_link_no_closing_paren() {
         let input = "[text](url";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_inline_link_escaped_bracket() {
         let input = r"[text\]more](url)";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         assert_eq!(result, Some((17, r"text\]more", "url", None)));
     }
 
     #[test]
     fn test_parse_inline_link_parens_in_url() {
         let input = "[text](url(with)parens)";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         assert_eq!(result, Some((23, "text", "url(with)parens", None)));
     }
 
     #[test]
     fn test_parse_inline_image_simple() {
         let input = "![alt](image.jpg)";
-        let result = try_parse_inline_image(input);
+        let result = try_parse_inline_image(input, LinkScanContext::default());
         assert_eq!(result, Some((17, "alt", "image.jpg", None)));
     }
 
     #[test]
     fn test_parse_inline_image_with_title() {
         let input = r#"![alt](image.jpg "A title")"#;
-        let result = try_parse_inline_image(input);
+        let result = try_parse_inline_image(input, LinkScanContext::default());
         assert_eq!(result, Some((27, "alt", r#"image.jpg "A title""#, None)));
     }
 
     #[test]
     fn test_parse_inline_image_with_nested_brackets() {
         let input = "![outer [inner] alt](image.jpg)";
-        let result = try_parse_inline_image(input);
+        let result = try_parse_inline_image(input, LinkScanContext::default());
         assert_eq!(result, Some((31, "outer [inner] alt", "image.jpg", None)));
     }
 
@@ -1115,28 +1171,28 @@ mod tests {
     #[test]
     fn test_parse_inline_image_no_space_between_brackets_and_parens() {
         let input = "![alt] (image.jpg)";
-        let result = try_parse_inline_image(input);
+        let result = try_parse_inline_image(input, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_inline_image_no_closing_bracket() {
         let input = "![alt(image.jpg)";
-        let result = try_parse_inline_image(input);
+        let result = try_parse_inline_image(input, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_inline_image_no_closing_paren() {
         let input = "![alt](image.jpg";
-        let result = try_parse_inline_image(input);
+        let result = try_parse_inline_image(input, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_inline_image_with_simple_class() {
         let input = "![alt](img.png){.large}";
-        let result = try_parse_inline_image(input);
+        let result = try_parse_inline_image(input, LinkScanContext::default());
         let (len, alt, dest, attrs) = result.unwrap();
         assert_eq!(len, 23);
         assert_eq!(alt, "alt");
@@ -1149,7 +1205,7 @@ mod tests {
     #[test]
     fn test_parse_inline_image_with_id() {
         let input = "![Figure 1](fig1.png){#fig-1}";
-        let result = try_parse_inline_image(input);
+        let result = try_parse_inline_image(input, LinkScanContext::default());
         let (len, alt, dest, attrs) = result.unwrap();
         assert_eq!(len, 29);
         assert_eq!(alt, "Figure 1");
@@ -1162,7 +1218,7 @@ mod tests {
     #[test]
     fn test_parse_inline_image_with_full_attributes() {
         let input = "![alt](img.png){#fig .large width=\"80%\"}";
-        let result = try_parse_inline_image(input);
+        let result = try_parse_inline_image(input, LinkScanContext::default());
         let (len, alt, dest, attrs) = result.unwrap();
         assert_eq!(len, 40);
         assert_eq!(alt, "alt");
@@ -1176,7 +1232,7 @@ mod tests {
     fn test_parse_inline_image_attributes_must_be_adjacent() {
         // Space between ) and { should not parse as attributes
         let input = "![alt](img.png) {.large}";
-        let result = try_parse_inline_image(input);
+        let result = try_parse_inline_image(input, LinkScanContext::default());
         assert_eq!(result, Some((15, "alt", "img.png", None)));
     }
 
@@ -1184,7 +1240,7 @@ mod tests {
     #[test]
     fn test_parse_inline_link_with_id() {
         let input = "[text](url){#link-1}";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         let (len, text, dest, attrs) = result.unwrap();
         assert_eq!(len, 20);
         assert_eq!(text, "text");
@@ -1197,7 +1253,7 @@ mod tests {
     #[test]
     fn test_parse_inline_link_with_full_attributes() {
         let input = "[text](url){#link .external target=\"_blank\"}";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         let (len, text, dest, attrs) = result.unwrap();
         assert_eq!(len, 44);
         assert_eq!(text, "text");
@@ -1211,14 +1267,14 @@ mod tests {
     fn test_parse_inline_link_attributes_must_be_adjacent() {
         // Space between ) and { should not parse as attributes
         let input = "[text](url) {.class}";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         assert_eq!(result, Some((11, "text", "url", None)));
     }
 
     #[test]
     fn test_parse_inline_link_with_title_and_attributes() {
         let input = r#"[text](url "title"){.external}"#;
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         let (len, text, dest, attrs) = result.unwrap();
         assert_eq!(len, 30);
         assert_eq!(text, "text");
@@ -1232,28 +1288,28 @@ mod tests {
     #[test]
     fn test_parse_reference_link_explicit() {
         let input = "[link text][label]";
-        let result = try_parse_reference_link(input, false, true);
+        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
         assert_eq!(result, Some((18, "link text", "label".to_string(), false)));
     }
 
     #[test]
     fn test_parse_reference_link_implicit() {
         let input = "[link text][]";
-        let result = try_parse_reference_link(input, false, true);
+        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
         assert_eq!(result, Some((13, "link text", String::new(), false)));
     }
 
     #[test]
     fn test_parse_reference_link_explicit_same_label_as_text() {
         let input = "[stack][stack]";
-        let result = try_parse_reference_link(input, false, true);
+        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
         assert_eq!(result, Some((14, "stack", "stack".to_string(), false)));
     }
 
     #[test]
     fn test_parse_reference_link_shortcut() {
         let input = "[link text] rest";
-        let result = try_parse_reference_link(input, true, true);
+        let result = try_parse_reference_link(input, true, true, LinkScanContext::default());
         assert_eq!(
             result,
             Some((11, "link text", "link text".to_string(), true))
@@ -1263,14 +1319,14 @@ mod tests {
     #[test]
     fn test_parse_reference_link_shortcut_rejects_empty_label() {
         let input = "[] rest";
-        let result = try_parse_reference_link(input, true, true);
+        let result = try_parse_reference_link(input, true, true, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_reference_link_shortcut_disabled() {
         let input = "[link text] rest";
-        let result = try_parse_reference_link(input, false, true);
+        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
@@ -1279,7 +1335,7 @@ mod tests {
         // With shortcut disabled, `[text](url)` is rejected so the inline
         // link form upstream gets exclusive ownership.
         let input = "[text](url)";
-        let result = try_parse_reference_link(input, false, true);
+        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
@@ -1290,14 +1346,14 @@ mod tests {
         // link first; if that returns None, we should still see `[text]`
         // as a shortcut and leave `(url)` to be parsed as following text).
         let input = "[text](url)";
-        let result = try_parse_reference_link(input, true, true);
+        let result = try_parse_reference_link(input, true, true, LinkScanContext::default());
         assert_eq!(result, Some((6, "text", "text".to_string(), true)));
     }
 
     #[test]
     fn test_parse_reference_link_with_nested_brackets() {
         let input = "[outer [inner] text][ref]";
-        let result = try_parse_reference_link(input, false, true);
+        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
         assert_eq!(
             result,
             Some((25, "outer [inner] text", "ref".to_string(), false))
@@ -1307,7 +1363,7 @@ mod tests {
     #[test]
     fn test_parse_reference_link_label_no_newline() {
         let input = "[text][label\nmore]";
-        let result = try_parse_reference_link(input, false, true);
+        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
@@ -1365,7 +1421,7 @@ mod tests {
     fn test_reference_link_label_with_crlf() {
         // Reference link labels should not span lines with CRLF
         let input = "[foo\r\nbar]";
-        let result = try_parse_reference_link(input, false, true);
+        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
 
         // Should fail to parse because label contains line break
         assert_eq!(
@@ -1378,7 +1434,7 @@ mod tests {
     fn test_reference_link_label_with_lf() {
         // Reference link labels should not span lines with LF either
         let input = "[foo\nbar]";
-        let result = try_parse_reference_link(input, false, true);
+        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
 
         // Should fail to parse because label contains line break
         assert_eq!(
@@ -1392,7 +1448,7 @@ mod tests {
     fn test_parse_inline_link_multiline_text() {
         // Per Pandoc spec, link text CAN contain newlines (soft breaks)
         let input = "[text on\nline two](url)";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         assert_eq!(
             result,
             Some((23, "text on\nline two", "url", None)),
@@ -1405,7 +1461,7 @@ mod tests {
         // Link text with newlines and other inline elements
         let input =
             "[A network graph. Different edges\nwith probability](../images/networkfig.png)";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         assert!(result.is_some(), "Link text with newlines should parse");
         let (len, text, _dest, _attrs) = result.unwrap();
         assert!(text.contains('\n'), "Link text should preserve newline");
@@ -1416,7 +1472,7 @@ mod tests {
     fn test_parse_inline_image_multiline_alt() {
         // Per Pandoc spec, image alt text CAN contain newlines
         let input = "![alt on\nline two](img.png)";
-        let result = try_parse_inline_image(input);
+        let result = try_parse_inline_image(input, LinkScanContext::default());
         assert_eq!(
             result,
             Some((27, "alt on\nline two", "img.png", None)),
@@ -1428,7 +1484,7 @@ mod tests {
     fn test_parse_inline_image_multiline_with_attributes() {
         // Image with multiline alt text and attributes
         let input = "![network graph\ndiagram](../images/fig.png){width=70%}";
-        let result = try_parse_inline_image(input);
+        let result = try_parse_inline_image(input, LinkScanContext::default());
         assert!(
             result.is_some(),
             "Image alt with newlines and attributes should parse"
@@ -1445,7 +1501,7 @@ mod tests {
         // Test for regression: when text is concatenated with newlines,
         // attributes after ) should still be recognized
         let input = "[A network graph.](../images/networkfig.png){width=70%}\nA word\n";
-        let result = try_parse_inline_link(input, false);
+        let result = try_parse_inline_link(input, false, LinkScanContext::default());
         assert!(
             result.is_some(),
             "Link with attributes should parse even with following text"

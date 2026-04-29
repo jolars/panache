@@ -52,7 +52,7 @@ use super::blocks::tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
     try_parse_pipe_table, try_parse_simple_table,
 };
-use super::inlines::links::try_parse_inline_image;
+use super::inlines::links::{LinkScanContext, try_parse_inline_image};
 use super::utils::container_stack::{byte_index_at_column, leading_indent};
 use super::utils::helpers::strip_newline;
 use super::utils::marker_utils::parse_blockquote_marker_info;
@@ -485,7 +485,8 @@ impl BlockParser for FigureParser {
         }
 
         // Run the expensive inline-image validation once here.
-        let (len, _alt, _dest, _attrs) = try_parse_inline_image(trimmed)?;
+        let (len, _alt, _dest, _attrs) =
+            try_parse_inline_image(trimmed, LinkScanContext::from_options(ctx.config))?;
         let after_image = &trimmed[len..];
         if !after_image.trim().is_empty() {
             return None;
