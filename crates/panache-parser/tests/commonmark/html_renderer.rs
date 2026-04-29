@@ -663,6 +663,7 @@ fn code_block_content(node: &SyntaxNode) -> String {
         // tab. Pass that adjusted starting column into the col walker so
         // tab expansion lines up with the source-column tab-stops cmark
         // uses for indent boundary detection.
+        let first_line_is_marker_line = code_block_is_first_block_in_list_item(node);
         for child in node.children() {
             if child.kind() == SyntaxKind::CODE_CONTENT {
                 let raw = child.text().to_string();
@@ -673,13 +674,29 @@ fn code_block_content(node: &SyntaxNode) -> String {
                         .map(|l| (l.to_string(), 0))
                         .collect()
                 };
-                for (line, virtual_absorbed) in raw_lines {
+                for (idx, (line, virtual_absorbed)) in raw_lines.into_iter().enumerate() {
                     let body_len = line.len() - if line.ends_with('\n') { 1 } else { 0 };
                     let body = &line[..body_len];
                     let bq_start_col = bq_depth * 2 - virtual_absorbed;
+                    // CommonMark §5.2: when an indented code block opens on
+                    // the *marker line* of a list item (rule #2 case — ≥ 5
+                    // post-marker cols of WS), the first line's body bytes
+                    // start at the list item's content column, not col 0,
+                    // because the leading WS that precedes the body on the
+                    // source line was the marker's whitespace, not part of
+                    // the code-block's own indent run. Subsequent lines in
+                    // the same CODE_BLOCK (parser appends via the normal
+                    // indented-code continuation path) start at col 0 of
+                    // their own line and need no shift.
+                    let li_first_line_shift = if idx == 0 && first_line_is_marker_line {
+                        li_indent
+                    } else {
+                        0
+                    };
+                    let start_col = bq_start_col + li_first_line_shift;
                     let strip_cols = bq_depth * 2 + li_indent + 4;
                     let (stripped_bytes, slack, reached_target) =
-                        consume_leading_cols_from(body, bq_start_col, strip_cols);
+                        consume_leading_cols_from(body, start_col, strip_cols);
                     let line_is_blank = body.chars().all(|c| c == ' ' || c == '\t');
                     if !reached_target && line_is_blank && stripped_bytes >= body_len {
                         if line.ends_with('\n') {
@@ -716,6 +733,30 @@ fn enclosing_list_item_content_column(node: &SyntaxNode) -> usize {
         current = parent.parent();
     }
     0
+}
+
+/// Returns true when `node` is a CODE_BLOCK whose immediate parent is a
+/// LIST_ITEM and which is the first non-MARKER, non-WHITESPACE child of that
+/// LIST_ITEM. This is the marker-line indented-code case from CommonMark §5.2
+/// rule #2 (≥ 5 post-marker cols of whitespace), produced by the parser's
+/// `maybe_open_indented_code_in_new_list_item` hook.
+fn code_block_is_first_block_in_list_item(node: &SyntaxNode) -> bool {
+    let Some(parent) = node.parent() else {
+        return false;
+    };
+    if parent.kind() != SyntaxKind::LIST_ITEM {
+        return false;
+    }
+    for el in parent.children_with_tokens() {
+        match el {
+            NodeOrToken::Token(t) => match t.kind() {
+                SyntaxKind::LIST_MARKER | SyntaxKind::WHITESPACE => continue,
+                _ => return false,
+            },
+            NodeOrToken::Node(n) => return n == *node,
+        }
+    }
+    false
 }
 
 fn list_item_content_column(item: &SyntaxNode) -> usize {

@@ -16,227 +16,151 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (xxii)
+## Latest session — 2026-04-29 (xxiii)
 
-**Pass count: 629 → 631 / 652 (96.8%, +2)**
+**Pass count: 631 → 632 / 652 (96.9%, +1)**
 
-CommonMark §5.2 rule #2: when a list marker is followed by ≥ 5
-columns of post-marker whitespace and non-empty content, the
-list item's content column is `marker + 1` (the marker plus
-exactly one — possibly virtual — space). The surplus whitespace
-becomes part of the content, typically forming an indented code
-block on the marker line itself. Both `try_parse_list_marker`
-and the renderer's `list_item_content_column` were unaware of
-this rule, so `1.     indented code` (#273) buffered the wrong
-content_col, and `-\t\tfoo` (#7) didn't even produce a CODE_BLOCK
-inside the LIST_ITEM.
+Implemented the renderer-only fix sketched at the end of
+session (xxii)'s recap: split `code_block_content`'s per-line
+walk so the *first* line of a CODE_BLOCK that opens on the
+list-item marker line walks from `start_col = li_indent`,
+while continuation lines stay at `start_col = 0`. The CST
+already had the right shape from session (xxii)'s parser work;
+only the renderer was producing the wrong leading whitespace
+for "≥ 5 spaces with leftover" variants.
 
 ### Targets unlocked
 
-- **#7** `-\t\tfoo` — bullet + 2 tabs. Total 7 cols of post-
-  marker whitespace from col 1 → rule fires; spaces_after_bytes
-  collapses to 0 (the entire tab1 stays in content) and the
-  marker space is virtually absorbed from tab1.
-- **#273** `1.     indented code` — ordered marker + 5 spaces.
-  Rule fires; 1 space consumed as marker space, 4 spaces remain
-  in content as the indented-code prefix.
+- **#274** `1.      indented code\n\n   paragraph\n\n       more code`
+  — ordered marker + 6 spaces. Rule #2 fires; 1 space consumed
+  as marker space (literal WHITESPACE token between MARKER and
+  CODE_BLOCK), 5 spaces remain in CODE_CONTENT's leading
+  WHITESPACE. li_indent=3, target_strip=7. With start_col=3 for
+  line 0, walker advances 4 cols (consuming 4 of the 5 spaces),
+  reaches target, emits `" indented code"` with the expected 1
+  leading space. The continuation paragraph and the second
+  CODE_BLOCK (`more code`, line at col 0 with 7 leading spaces)
+  are unaffected because they are not the first block in the
+  LIST_ITEM (paragraph in between) — `code_block_is_first_block_in_list_item`
+  returns false for the second CODE_BLOCK.
 
 ### Root cause + fix
 
-Three coordinated changes, parser-shape + renderer:
+Pure renderer change in `tests/commonmark/html_renderer.rs`:
 
-1. **Col-aware indent computation**
-   (`parser/utils/container_stack.rs`):
-   - `leading_indent` was hardwired to start at col 0. Added
-     `leading_indent_from(line, start_col)` that seeds tab
-     expansion from a given source column. `leading_indent` now
-     delegates to `leading_indent_from(_, 0)`.
-2. **Marker rule + propagation**
-   (`parser/blocks/lists.rs`,
-   `parser/block_dispatcher.rs`,
-   `parser/core.rs`):
-   - New `marker_spaces_after(after_marker, marker_end_col)`
-     helper computes effective cols col-aware. If the post-
-     marker WS is ≥ 5 cols and content is non-empty, returns
-     `(spaces_after_cols=1, spaces_after_bytes, virtual=true/false)`
-     — bytes is 1 if next byte is a literal space (consumed as
-     marker space), 0 if it's a tab whose source-col span > 1
-     (the whole tab stays in content, marker space is virtual).
-   - `ListMarkerMatch` / `ListPrepared` /
-     `ListItemEmissionInput` / `Container::ListItem` all gained
-     a `virtual_marker_space: bool` field threaded through.
-   - The bullet, ordered-decimal, fancy-list, hash, example, and
-     parens-style branches in `try_parse_list_marker` all call
-     `marker_spaces_after(after_marker, _indent_cols + marker_len)`
-     instead of `leading_indent(after_marker)`.
-   - UpperAlpha `A.` keeps its 2-space minimum gate but now uses
-     `leading_indent_from` for the gate so tab-after-`A.` cases
-     count cols correctly. Rule application happens after the
-     gate passes.
-3. **Indented-code-from-marker-line emission**
-   (`parser/core.rs:`
-   `maybe_open_indented_code_in_new_list_item`):
-   - New helper called after every `add_list_item` /
-     `add_list_item_with_nested_empty_list` /
-     `start_nested_list` site (3 call sites, mirroring
-     `maybe_open_fenced_code_in_new_list_item`).
-   - Inspects the just-pushed `Container::ListItem`'s buffer.
-     If it has exactly one text segment whose leading whitespace
-     reaches `content_col + 4` source cols (col-aware from
-     `content_col - virtual_marker_space`), clears the buffer
-     and emits `CODE_BLOCK > CODE_CONTENT > WHITESPACE + TEXT +
-     NEWLINE` directly into the LIST_ITEM. Single-line only;
-     multi-line indented-code on continuation lines is handled
-     by the normal block-detection path.
-4. **Renderer virtual marker space**
-   (`tests/commonmark/html_renderer.rs`):
-   - `list_item_content_column` now tracks `chars_after_marker`
-     and adds 1 col when `saw_marker && chars_after_marker == 0`,
-     so a LIST_ITEM with `LIST_MARKER` followed directly by a
-     CODE_BLOCK (no WHITESPACE token between them) reports the
-     logical content_col instead of just the literal marker
-     width. This makes `li_indent + 4` correctly equal to
-     `target_strip_cols` for the indented-code walker, and the
-     col-walking from start_col=0 lines up with the source-col
-     tab-stops.
+1. **`code_block_is_first_block_in_list_item(node)`** helper:
+   walks `node.parent()`'s `children_with_tokens()` skipping
+   LIST_MARKER and WHITESPACE tokens; returns true iff the first
+   non-trivia child node equals `node`. This identifies the
+   marker-line indented-code case produced by the parser's
+   `maybe_open_indented_code_in_new_list_item` hook.
+2. **Per-line `start_col` split** in the indented-code branch of
+   `code_block_content`: switched the per-line loop to enumerate
+   `raw_lines`, computed `li_first_line_shift = li_indent` when
+   `idx == 0 && first_line_is_marker_line` else 0, and passed
+   `start_col = bq_start_col + li_first_line_shift` into
+   `consume_leading_cols_from`. `strip_cols` is unchanged
+   (`bq_depth * 2 + li_indent + 4`).
+
+Verified `code_block_is_first_block_in_list_item` requires the
+PRESENCE of WHITESPACE between MARKER and CODE_BLOCK in the #274
+case (which the parser does emit because `1.` was followed by a
+literal space marker-space). For the #7 case (`-\t\tfoo`, no
+literal space — entire tab stays in content), there is no
+WHITESPACE token between MARKER and CODE_BLOCK, but the helper
+still returns true (it skips both LIST_MARKER and WHITESPACE).
+The existing #7 path was passing pre-session via the renderer's
+`list_item_content_column` virtual-marker-space addition; this
+session's change preserves that — for #7 li_indent=2,
+target=6, body has `\t\tfoo` from col 0+li_indent=2; first tab
+takes col 2→4, second tab col 4→8 (next_stop=8 > target=6,
+slack=2, byte_idx=2)... wait that would give 2 spaces of slack,
+prepending "  foo". The expected output is `  foo` (2 leading
+spaces, since the spec strips 4 cols of indent from a tab that
+expands to 8 cols). Let me re-verify against the test... (the
+allowlist still includes #7 and the suite passes, so the math
+works out — for #7 the previous start_col=0 + li_indent=2 (with
+virtual) lined up such that walker reached target with slack=2;
+with this session's change, start_col becomes
+bq_start_col + li_indent = 0 + 2 = 2, then the first tab
+expands col 2→4, second tab col 4→8 (next_stop > target=6,
+slack=2). Same slack, same output. Compatible.)
 
 ### Files changed
 
-- **Parser-shape gap**:
-  - `parser/utils/container_stack.rs` — `leading_indent_from`
-    helper + `virtual_marker_space` field on `Container::ListItem`.
-  - `parser/blocks/lists.rs` — `marker_spaces_after` helper;
-    `virtual_marker_space` threaded through `ListMarkerMatch`,
-    `ListItemEmissionInput`, all `Container::ListItem` push
-    sites, `add_list_item`, `add_list_item_with_nested_empty_list`,
-    `start_nested_list`, `finish_list_item_with_optional_nested`.
-  - `parser/block_dispatcher.rs` — `virtual_marker_space` on
-    `ListPrepared` + `ListParser::detect_prepared`.
-  - `parser/core.rs` — `maybe_open_indented_code_in_new_list_item`
-    helper + 3 call sites; `ListItemEmissionInput` constructions
-    pass `virtual_marker_space` through (6 sites).
 - **Renderer gap** (test-only):
-  - `tests/commonmark/html_renderer.rs` —
-    `list_item_content_column` virtual-marker-space awareness.
+  - `tests/commonmark/html_renderer.rs` — added
+    `code_block_is_first_block_in_list_item` helper and
+    `li_first_line_shift` per-line logic in `code_block_content`.
 - **Parser fixture** (CommonMark only):
-  - `list_item_indented_code_tabs_commonmark/{input.md,
-    parser-options.toml}` pins `LIST_ITEM > LIST_MARKER + CODE_BLOCK
-    > CODE_CONTENT > WHITESPACE "\t\t" + TEXT "foo"` for
-    `-\t\tfoo`. Wired in `golden_parser_cases.rs`. Snapshot
-    accepted via `INSTA_UPDATE=always`.
-- **Allowlist additions**: #7 (Tabs), #273 (List items).
+  - `list_item_indented_code_marker_line_partial_overflow/{input.md,
+    parser-options.toml}` pins the multi-block LIST_ITEM CST
+    shape for #274 (CODE_BLOCK marker-line + PLAIN paragraph +
+    CODE_BLOCK continuation at deeper indent). Wired in
+    `golden_parser_cases.rs`. Snapshot accepted via
+    `INSTA_UPDATE=always`.
+- **Allowlist additions**: #274 (List items).
 
-No formatter golden case for #7: pandoc agrees with the
-expected output across both `commonmark` and `markdown` flavors
-(`-\t\tfoo` → `BulletList [[CodeBlock "  foo"]]` in both), and
-the existing top-level Pandoc fixtures already cover bullet +
-indented-code idempotency.
+No formatter golden case: this is a renderer-only fix consuming
+a CST shape the parser was already producing correctly. No new
+structural shape was introduced.
 
 ### Don't redo
 
-- **Don't add a paired Pandoc parser fixture for #7's CST shape.**
-  Both dialects produce the same `LIST_ITEM > CODE_BLOCK` shape
-  for `-\t\tfoo` after the parser fix; the existing Pandoc list
-  fixtures cover the structural pattern. The fixture is
-  CommonMark-flavor for symmetry with the harness, not for
-  dialect-divergence.
-- **Don't widen `maybe_open_indented_code_in_new_list_item` to
-  multi-line buffers.** The current single-line gate
-  (`iter.next().is_some() → return`) is intentional. Multi-line
-  same-line-then-continuation cases (e.g.
-  `1.     code1\n       code2` if such a panache code path
-  arises) need the renderer to walk first lines from
-  `start_col=content_col-virtual` and continuation lines from
-  `start_col=0` — those are *different start_cols within the
-  same CODE_CONTENT*. That's a renderer refactor, not a parser
-  one. Don't try to handle it in the parser hook.
-- **Don't gate `marker_spaces_after` on `Dialect::CommonMark`.**
-  Verified pandoc-markdown agrees with CommonMark on rule #2 for
-  `-\t\tfoo` and `1.     code` — both flavors should apply the
-  rule. Adding a dialect gate would re-break the Pandoc-flavor
-  cases that currently rely on the same logic.
-- **Don't change `consume_leading_cols_from` start_col handling
-  for list items.** The walker still uses `start_col=0` for
-  list-item-only (no bq) indented-code; the virtual-marker-space
-  fix lives entirely in `list_item_content_column`'s logical
-  return value. Adjusting the walker's start_col on top of this
-  would double-count.
-- **Don't try `start_col = li_indent` for the renderer walker.**
-  It happens to work for #7 (tab alignment) but breaks
-  continuation-line cases like `- foo\n\n      bar` where
-  start_col=0 is correct. The current logic (start_col=0 + li_indent
-  inflated by virtual) is the right invariant.
-
-### Why #274 still fails (and won't fall out of #273's fix)
-
-`1.      indented code` (6 spaces) expects ` indented code` (1
-leading space). After my parser changes, content_col=3 and the
-buffer text has 5 leading spaces (1 was consumed as marker
-space). The renderer's indented-code walker uses `start_col=0`
-with `target=li_indent+4=7`. Walking 5 spaces from col 0 reaches
-col 5, target 7 not reached, so the walker returns
-`(byte_idx=5, slack=0)` and outputs `line[5..]="indented code"`
-without the expected leading space. To fix this, the renderer
-would need to walk the FIRST line of a CODE_CONTENT (when
-CODE_BLOCK is the first non-MARKER non-WHITESPACE child of
-LIST_ITEM) from `start_col=content_col`, while continuation
-lines stay at `start_col=0`. That's a per-line context split
-inside `code_block_content`. Concretely:
-
-```rust
-let li_indent = enclosing_list_item_content_column(node);
-let first_line_is_marker_line =
-    code_block_is_first_block_in_list_item(node);
-for (idx, line) in raw_lines.into_iter().enumerate() {
-    let start_col = if idx == 0 && first_line_is_marker_line {
-        li_indent  // walk from content_col (with virtual already
-                   // baked into li_indent if relevant)
-    } else {
-        0  // continuation line, body at col 0 of its own line
-    };
-    let strip_cols = bq_depth * 2 + li_indent + 4;
-    // ... walk + emit
-}
-```
-
-This is the **suggested next target** (and naturally handles
-#274 plus any other "≥ 5 spaces, content > 4 cols of WS"
-variants).
+- **Don't move the `li_first_line_shift` logic into
+  `consume_leading_cols_from`.** The walker is generic and
+  reused for the `bq_depth > 0` and continuation-line paths.
+  Keep the marker-line context (which depends on the parent
+  LIST_ITEM's child layout) in the caller.
+- **Don't extend `code_block_is_first_block_in_list_item` to
+  recurse through wrapper nodes.** It looks at `node.parent()`
+  only (not ancestors). A CODE_BLOCK nested inside a
+  blockquote-inside-list-item is not the marker-line case — the
+  blockquote breaks the chain. The current direct-parent check
+  is the right invariant.
+- **Don't try to detect "marker line" by inspecting CODE_CONTENT
+  text.** The parser's `maybe_open_indented_code_in_new_list_item`
+  hook is what produces the special CST layout (CODE_BLOCK as
+  first block in LIST_ITEM with leading WHITESPACE in
+  CODE_CONTENT). The structural test on the CST is the
+  load-bearing signal, not the bytes.
+- **Don't try to fix #278 by extending the marker-line hook to
+  the empty-marker case (`-\n  foo`).** That's a different
+  parser code path (marker followed by blank then indented
+  content); see §"Why #278 still fails" notes carried from
+  prior sessions. The marker-line indented-code hook is for
+  same-line content only.
 
 ### Suggested next targets, ranked
 
-1. **#274 first-line-vs-continuation start_col split** — see
-   sketch above. Should also clean up any latent issues with
-   future "≥ 5 cols" variants. Renderer-only fix; parser CST is
-   already correct.
-2. **Proper delimiter-stack for emphasis (#402, #408, #412, #417,
+1. **Proper delimiter-stack for emphasis (#402, #408, #412, #417,
    #426, #445, #457, #464, #465, #466, #468)** — rewrite emphasis
    to use CMark's process_emphasis algorithm. Largest single fix;
    substantial; gate on `Dialect::CommonMark`. (Carried.)
-3. **#472 `*foo *bar baz*`** — CommonMark expects `*foo <em>bar
+2. **#472 `*foo *bar baz*`** — CommonMark expects `*foo <em>bar
    baz</em>`. Likely needs delimiter-stack work. (Carried.)
-4. **Reference-link nesting (#569, #571)** — `[foo][bar][baz]`
+3. **Reference-link nesting (#569, #571)** — `[foo][bar][baz]`
    with only `[baz]` defined should parse as `[foo]` + ref-link
    `[bar][baz]`. CMark left-bracket scanner stack with
    refdef-aware resolution. Probably the next big link cluster.
    (Carried; #533 stays in this group.)
-5. **#533** — inline link with emphasis closing inside the
+4. **#533** — inline link with emphasis closing inside the
    bracket text plus a trailing reference link. (Carried;
    companion to #569/#571.)
-6. **Formatter fix for nested-only outer LIST_ITEM** — carried
+5. **Formatter fix for nested-only outer LIST_ITEM** — carried
    over. Unblocks removing the dialect gate on same-line nested
    list markers (#298, #299).
-7. **Same-line blockquote inside list item (#292, #293)** — `> 1.
+6. **Same-line blockquote inside list item (#292, #293)** — `> 1.
    > Blockquote` needs the inner `>` to open a blockquote inside
    the list item. Both pandoc dialects agree (verified — not a
    dialect divergence) — fix in `lists.rs`
    `finish_list_item_with_optional_nested` to also handle `>`
    markers. (Carried over.)
-8. **#278 `-\n  foo\n-\n  ```\n…`** — empty marker followed by
+7. **#278 `-\n  foo\n-\n  ```\n…`** — empty marker followed by
    indented content; multiple bugs. (Carried over.)
-9. **#300 setext-in-list-item** — `- # Foo\n- Bar\n  ---\n  baz`
+8. **#300 setext-in-list-item** — `- # Foo\n- Bar\n  ---\n  baz`
     should treat `Bar\n  ---` as setext h2. (Carried over.)
-10. **#523 `*foo [bar* baz]`** — emphasis closes inside link
+9. **#523 `*foo [bar* baz]`** — emphasis closes inside link
     bracket text mid-flight. Likely needs delimiter-stack work +
     bracket scanner integration. (Carried over.)
 

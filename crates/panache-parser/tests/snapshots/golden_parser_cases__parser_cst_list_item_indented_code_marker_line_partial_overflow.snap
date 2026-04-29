@@ -1,0 +1,26 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..54
+  LIST@0..54
+    LIST_ITEM@0..54
+      LIST_MARKER@0..2 "1."
+      WHITESPACE@2..3 " "
+      CODE_BLOCK@3..22
+        CODE_CONTENT@3..22
+          WHITESPACE@3..8 "     "
+          TEXT@8..21 "indented code"
+          NEWLINE@21..22 "\n"
+      BLANK_LINE@22..23
+        BLANK_LINE@22..23 "\n"
+      PLAIN@23..36
+        TEXT@23..35 "   paragraph"
+        NEWLINE@35..36 "\n"
+      BLANK_LINE@36..37
+        BLANK_LINE@36..37 "\n"
+      CODE_BLOCK@37..54
+        CODE_CONTENT@37..54
+          WHITESPACE@37..44 "       "
+          TEXT@44..53 "more code"
+          NEWLINE@53..54 "\n"
