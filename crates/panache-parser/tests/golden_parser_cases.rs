@@ -198,6 +198,7 @@ golden_test_cases!(
     emphasis,
     emphasis_complex,
     emphasis_nested_inlines,
+    emphasis_skips_shortcut_reference_link,
     equation_attributes,
     equation_attributes_disabled,
     equation_attributes_single_line,

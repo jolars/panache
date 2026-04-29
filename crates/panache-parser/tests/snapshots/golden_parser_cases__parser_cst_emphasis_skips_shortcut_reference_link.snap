@@ -1,0 +1,26 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..22
+  REFERENCE_DEFINITION@0..13
+    LINK@0..6
+      LINK_START@0..1
+        LINK_START@0..1 "["
+      LINK_TEXT@1..5
+        TEXT@1..5 "foo*"
+      TEXT@5..6 "]"
+    TEXT@6..12 ": /url"
+    NEWLINE@12..13 "\n"
+  BLANK_LINE@13..14
+    BLANK_LINE@13..14 "\n"
+  PARAGRAPH@14..22
+    TEXT@14..15 "*"
+    LINK@15..21
+      LINK_START@15..16
+        LINK_START@15..16 "["
+      LINK_TEXT@16..20
+        TEXT@16..19 "foo"
+        TEXT@19..20 "*"
+      TEXT@20..21 "]"
+    NEWLINE@21..22 "\n"

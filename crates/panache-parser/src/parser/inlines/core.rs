@@ -702,6 +702,24 @@ fn parse_until_closer_with_nested_two(
             continue;
         }
 
+        // Skip over reference / shortcut links too. Without this, a delimiter
+        // inside the bracket label (e.g. the `*` in `[foo*]`) would be picked
+        // as the emphasis closer, then the inner content parser would re-parse
+        // the bracket pair greedily and consume bytes past the assumed closer
+        // — producing a CST whose total byte length exceeds the input.
+        if bytes[pos] == b'['
+            && config.extensions.reference_links
+            && let Some((len, _, _, _)) = try_parse_reference_link(
+                &text[pos..],
+                config.extensions.shortcut_reference_links,
+                config.extensions.inline_links,
+            )
+        {
+            log::trace!("Skipping reference link of {} bytes at pos {}", len, pos);
+            pos += len;
+            continue;
+        }
+
         // Pandoc algorithm: If we're looking for a single delimiter (*) and
         // encounter a double delimiter (**), try to parse it as `two` (strong).
         // This happens BEFORE checking if pos is a closer for our current emphasis.
@@ -909,6 +927,21 @@ fn parse_until_closer_with_nested_one(
             )
         {
             log::trace!("Skipping inline link of {} bytes at pos {}", len, pos);
+            pos += len;
+            continue;
+        }
+
+        // Skip over reference / shortcut links too — see the matching block
+        // in `parse_until_closer_with_nested_two` for the rationale.
+        if bytes[pos] == b'['
+            && config.extensions.reference_links
+            && let Some((len, _, _, _)) = try_parse_reference_link(
+                &text[pos..],
+                config.extensions.shortcut_reference_links,
+                config.extensions.inline_links,
+            )
+        {
+            log::trace!("Skipping reference link of {} bytes at pos {}", len, pos);
             pos += len;
             continue;
         }
