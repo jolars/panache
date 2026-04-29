@@ -1,8 +1,8 @@
 {
   "blocked": 12,
-  "failing": 46,
-  "pass_pct": 92.9,
-  "passing": 606,
+  "failing": 41,
+  "pass_pct": 93.7,
+  "passing": 611,
   "passing_numbers": [
     1,
     3,
@@ -449,8 +449,13 @@
     471,
     473,
     474,
+    475,
+    476,
+    477,
     478,
     479,
+    480,
+    481,
     482,
     483,
     484,
@@ -643,9 +648,9 @@
       "pass": 22
     },
     {
-      "fail": 17,
+      "fail": 12,
       "name": "Emphasis and strong emphasis",
-      "pass": 115
+      "pass": 120
     },
     {
       "fail": 0,

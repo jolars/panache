@@ -1,0 +1,46 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..118
+  PARAGRAPH@0..28
+    TEXT@0..1 "*"
+    INLINE_HTML@1..27
+      INLINE_HTML_CONTENT@1..27 "<img src=\"foo\" title= ..."
+    NEWLINE@27..28 "\n"
+  BLANK_LINE@28..29
+    BLANK_LINE@28..29 "\n"
+  PARAGRAPH@29..45
+    TEXT@29..31 "**"
+    INLINE_HTML@31..44
+      INLINE_HTML_CONTENT@31..44 "<a href=\"**\">"
+    NEWLINE@44..45 "\n"
+  BLANK_LINE@45..46
+    BLANK_LINE@45..46 "\n"
+  PARAGRAPH@46..62
+    TEXT@46..48 "__"
+    INLINE_HTML@48..61
+      INLINE_HTML_CONTENT@48..61 "<a href=\"__\">"
+    NEWLINE@61..62 "\n"
+  BLANK_LINE@62..63
+    BLANK_LINE@62..63 "\n"
+  PARAGRAPH@63..90
+    TEXT@63..66 "**a"
+    AUTO_LINK@66..89
+      AUTO_LINK_MARKER@66..67
+        AUTO_LINK_MARKER@66..67 "<"
+      TEXT@67..88 "https://foo.bar/?q=**"
+      AUTO_LINK_MARKER@88..89
+        AUTO_LINK_MARKER@88..89 ">"
+    NEWLINE@89..90 "\n"
+  BLANK_LINE@90..91
+    BLANK_LINE@90..91 "\n"
+  PARAGRAPH@91..118
+    TEXT@91..94 "__a"
+    AUTO_LINK@94..117
+      AUTO_LINK_MARKER@94..95
+        AUTO_LINK_MARKER@94..95 "<"
+      TEXT@95..116 "https://foo.bar/?q=__"
+      AUTO_LINK_MARKER@116..117
+        AUTO_LINK_MARKER@116..117 ">"
+    NEWLINE@117..118 "\n"

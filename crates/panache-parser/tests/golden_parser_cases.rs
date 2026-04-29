@@ -201,6 +201,8 @@ golden_test_cases!(
     emphasis_complex,
     emphasis_same_delim_nested_commonmark,
     emphasis_same_delim_nested_pandoc,
+    emphasis_skips_raw_html_and_autolink_commonmark,
+    emphasis_skips_raw_html_and_autolink_pandoc,
     emphasis_split_runs_commonmark,
     emphasis_split_runs_pandoc,
     emphasis_intraword_underscore_closer,

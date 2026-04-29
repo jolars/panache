@@ -853,6 +853,32 @@ fn parse_until_closer_with_nested_two(
             continue;
         }
 
+        // Skip over autolinks `<scheme:...>` and `<email>` — their interior is
+        // verbatim and must not be scanned for emphasis delimiters. CommonMark
+        // §6.5 / Pandoc both treat autolinks as a single inline unit; without
+        // this, a `**` inside `<https://...?q=**>` is mis-detected as a closer.
+        if bytes[pos] == b'<'
+            && config.extensions.autolinks
+            && let Some((len, _)) =
+                try_parse_autolink(&text[pos..], config.dialect == Dialect::CommonMark)
+        {
+            log::trace!("Skipping autolink of {} bytes at pos {}", len, pos);
+            pos += len;
+            continue;
+        }
+
+        // Skip over inline raw HTML — same reasoning: the embedded delimiters
+        // in attribute values (e.g. the `*` in `<img title="*"/>`) must not be
+        // considered as emphasis closers. CommonMark §6.6 / Pandoc raw_html.
+        if bytes[pos] == b'<'
+            && config.extensions.raw_html
+            && let Some(len) = try_parse_inline_html(&text[pos..])
+        {
+            log::trace!("Skipping inline HTML of {} bytes at pos {}", len, pos);
+            pos += len;
+            continue;
+        }
+
         // Pandoc algorithm: If we're looking for a single delimiter (*) and
         // encounter a double delimiter (**), try to parse it as `two` (strong).
         // This happens BEFORE checking if pos is a closer for our current emphasis.
@@ -1207,6 +1233,27 @@ fn parse_until_closer_with_nested_one(
             )
         {
             log::trace!("Skipping reference link of {} bytes at pos {}", len, pos);
+            pos += len;
+            continue;
+        }
+
+        // Skip over autolinks and inline raw HTML — see the matching block in
+        // `parse_until_closer_with_nested_two` for the rationale.
+        if bytes[pos] == b'<'
+            && config.extensions.autolinks
+            && let Some((len, _)) =
+                try_parse_autolink(&text[pos..], config.dialect == Dialect::CommonMark)
+        {
+            log::trace!("Skipping autolink of {} bytes at pos {}", len, pos);
+            pos += len;
+            continue;
+        }
+
+        if bytes[pos] == b'<'
+            && config.extensions.raw_html
+            && let Some(len) = try_parse_inline_html(&text[pos..])
+        {
+            log::trace!("Skipping inline HTML of {} bytes at pos {}", len, pos);
             pos += len;
             continue;
         }
