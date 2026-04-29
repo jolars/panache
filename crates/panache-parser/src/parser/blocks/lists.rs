@@ -1392,6 +1392,57 @@ fn finish_list_item_with_optional_nested(
         }
     }
 
+    // Same-line blockquote marker inside a list item: `1. > Blockquote`
+    // opens a BLOCK_QUOTE inside the LIST_ITEM, with the post-marker text
+    // becoming the first line of the blockquote's paragraph. Both
+    // CommonMark and Pandoc-markdown agree on this shape (verified via
+    // `pandoc -f commonmark` and `pandoc -f markdown`), but emission is
+    // gated to CommonMark for now: the formatter does not yet preserve a
+    // LIST_ITEM whose first structural child is a BLOCK_QUOTE through a
+    // round-trip (the LIST_MARKER gets dropped on re-format, breaking
+    // idempotency). Gating mirrors the same-line nested LIST gate above
+    // and is tracked alongside that formatter work.
+    if dialect_allows_nested
+        && !buffered_is_thematic_break
+        && text_to_buffer.starts_with('>')
+        && !text_to_buffer.starts_with(">>")
+    {
+        let bytes = text_to_buffer.as_bytes();
+        let has_trailing_space = bytes.get(1).copied() == Some(b' ');
+        let content_offset = if has_trailing_space { 2 } else { 1 };
+        let remaining = &text_to_buffer[content_offset..];
+
+        // Push outer ListItem with empty buffer; the inner BLOCK_QUOTE
+        // counts as real content so `marker_only` is false.
+        containers.push(Container::ListItem {
+            content_col,
+            buffer: ListItemBuffer::new(),
+            marker_only: false,
+            virtual_marker_space,
+        });
+
+        // Open BLOCK_QUOTE node inside the LIST_ITEM and emit the marker.
+        builder.start_node(SyntaxKind::BLOCK_QUOTE.into());
+        builder.token(SyntaxKind::BLOCK_QUOTE_MARKER.into(), ">");
+        if has_trailing_space {
+            builder.token(SyntaxKind::WHITESPACE.into(), " ");
+        }
+        containers.push(Container::BlockQuote {});
+
+        // If there is content after `> `, start a paragraph and buffer
+        // the first line; subsequent lines flow in via the parser's main
+        // loop (lazy continuation handles the no-marker continuation
+        // line in cases like #292).
+        let trimmed = remaining.trim_end_matches(['\r', '\n']);
+        if !trimmed.is_empty() {
+            crate::parser::blocks::paragraphs::start_paragraph_if_needed(containers, builder);
+            crate::parser::blocks::paragraphs::append_paragraph_line(
+                containers, builder, remaining, config,
+            );
+        }
+        return;
+    }
+
     let marker_only = text_to_buffer.trim().is_empty();
     let mut buffer = ListItemBuffer::new();
     if !text_to_buffer.is_empty() {
