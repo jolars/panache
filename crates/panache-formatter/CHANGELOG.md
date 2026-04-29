@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/jolars/panache/compare/panache-formatter-v0.3.1...panache-formatter-v0.4.0) (2026-04-29)
+
+### Features
+- add `Dialect` to untangle CommonMark from Pandoc ([`a1cb7df`](https://github.com/jolars/panache/commit/a1cb7df9ca8461f45db2b7f4efb50e57e8febce3))
+
+### Bug Fixes
+- **parser:** handle ruler as only list item ([`a1004e6`](https://github.com/jolars/panache/commit/a1004e66c6a4e6404ded859a997405e24d85eb3e))
+- **parser:** handle autolinks and blockquotes for cmark ([`b1cedd4`](https://github.com/jolars/panache/commit/b1cedd4f586ea53b7174a039d37f2160c1dcdfab))
+- **formatter:** ensure blankline before header in commonmark ([`fd96f2a`](https://github.com/jolars/panache/commit/fd96f2a016d8b3177122d8734bdb96b3db9188dd))
+- handle thematic breaks in commonmark correctly ([`f98fca0`](https://github.com/jolars/panache/commit/f98fca002c517d06a67c443d4c1e841ebe087842))
+
 ## [0.3.1](https://github.com/jolars/panache/compare/panache-formatter-v0.3.0...panache-formatter-v0.3.1) (2026-04-27)
 
 ## [0.3.0](https://github.com/jolars/panache/compare/panache-formatter-v0.2.1...panache-formatter-v0.3.0) (2026-04-27)

@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.6.0](https://github.com/jolars/panache/compare/panache-parser-v0.5.1...panache-parser-v0.6.0) (2026-04-29)
+
+### Features
+- **parser:** handle inline HTML ([`5fb7272`](https://github.com/jolars/panache/commit/5fb727257c0b2d6385b22e29a64f2bde1d0196f4))
+- add `Dialect` to untangle CommonMark from Pandoc ([`a1cb7df`](https://github.com/jolars/panache/commit/a1cb7df9ca8461f45db2b7f4efb50e57e8febce3))
+
+### Bug Fixes
+- **parser:** respect escapes inside reference definitions ([`2ec4025`](https://github.com/jolars/panache/commit/2ec402586d143d076041bcb5ebd44fd4fea0c95e))
+- **parser:** allow fancy lists in core cmark, improve logic ([`191f636`](https://github.com/jolars/panache/commit/191f63671c2f3502be516f1f5f8ee506d8265d61))
+- **parser:** don't allow ref defs to break paragraphs ([`b05e3f3`](https://github.com/jolars/panache/commit/b05e3f3afd58527992c9b4c6df4c91d60b6c821c))
+- **parser:** allow breaks in reference links ([`7da4875`](https://github.com/jolars/panache/commit/7da487518a0ee90736e68247c887ce25a9d4484f))
+- **parser:** for cmark, cap digits for lists at 1-9 ([`39ba64b`](https://github.com/jolars/panache/commit/39ba64b9f6c7aab566150f58fe49641b79f7f740))
+- **parser:** correctly handle empty list items ([`1143607`](https://github.com/jolars/panache/commit/11436073c2aa73badc411c3366195f65ad52c7a0))
+- **parser:** properly handle fenced code inside list items ([`6b6ccdd`](https://github.com/jolars/panache/commit/6b6ccddcdc07940bdec2ee2ce4f3bda3e514a165))
+- **parser:** make blanklines inside list item a loose list ([`23d7a90`](https://github.com/jolars/panache/commit/23d7a9042518bdbf51f0a368309fd91eb500d596))
+- **parser:** handle ruler as only list item ([`a1004e6`](https://github.com/jolars/panache/commit/a1004e66c6a4e6404ded859a997405e24d85eb3e))
+- **parser:** handle thematic breaks and setext headings ([`a02c3d5`](https://github.com/jolars/panache/commit/a02c3d50eaa038fc6c4ab0f5f20f28db3e28b8ef))
+- **parser:** don't emit synthethic token ([`a137fc4`](https://github.com/jolars/panache/commit/a137fc4d6352890a44ff47c247072be90077e8a0)), closes [#235](https://github.com/jolars/panache/issues/235)
+- **parser:** handle autolinks and blockquotes for cmark ([`b1cedd4`](https://github.com/jolars/panache/commit/b1cedd4f586ea53b7174a039d37f2160c1dcdfab))
+- **parser:** handle HTML blocks for pandoc/commonmark ([`227648e`](https://github.com/jolars/panache/commit/227648e07760c65282372dab159ca50bb5e32f09))
+- **parser:** handle pandoc/cmark difference in fenced code ([`b370edd`](https://github.com/jolars/panache/commit/b370eddfd66d67b4e4865b177729a78af5b27af2))
+- **parser:** handle backslash escapes, autolinks, empty code ([`317b150`](https://github.com/jolars/panache/commit/317b150a07783e6b58c8f5de770c2da354af165b))
+- **parser:** allow space after atx and any length setext ([`647d274`](https://github.com/jolars/panache/commit/647d2741bc95fcc901b831f26b2de3135b70d4f0))
+- **parser:** enable `all_symbols_escapable` for commonmark ([`04c52d7`](https://github.com/jolars/panache/commit/04c52d7a20e0047c618a69f5b38e46f0f379df45))
+- handle thematic breaks in commonmark correctly ([`f98fca0`](https://github.com/jolars/panache/commit/f98fca002c517d06a67c443d4c1e841ebe087842))
+- **parser:** fix image link handling in commonmark ([`cac6004`](https://github.com/jolars/panache/commit/cac600484142950a97f77a3f3cf0cb8a67e2f21d))
+- **parser:** preserve entity references in cmark ([`0ae7579`](https://github.com/jolars/panache/commit/0ae75793f54e59402a4d69f601b449ef681b7e25))
+- **parser:** handle ATX headings in commonmark correctly ([`8c09c19`](https://github.com/jolars/panache/commit/8c09c19565292b363fafb1a08fd85a42c721d10d))
+- **parser:** add extensions to commonmark flavor ([`59166ab`](https://github.com/jolars/panache/commit/59166ab00fc960b19a259ad31397eb50d541f69c))
+
 ## [0.5.1](https://github.com/jolars/panache/compare/panache-parser-v0.5.0...panache-parser-v0.5.1) (2026-04-27)
 
 ### Bug Fixes
