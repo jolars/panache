@@ -2155,8 +2155,24 @@ impl BlockParser for IndentedCodeBlockParser {
         _lines: &[&str],
         _line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
-        // Indented code blocks require a strict blank line before (or doc start).
-        if !ctx.has_blank_before_strict {
+        // CommonMark §4.4: indented code blocks cannot interrupt a paragraph,
+        // but they CAN follow non-paragraph blocks (headings, fenced code,
+        // HRs) without an intervening blank line. The relaxed
+        // `has_blank_before` captures that "no continuation-eligible block is
+        // open" signal — use it under CommonMark so `# Heading\n    foo`
+        // correctly emits a code block (spec examples #115, #236, #252).
+        //
+        // Under Pandoc-markdown the construct diverges: a `>` blockquote with
+        // an indented code line followed by an unmarked indented line lazily
+        // extends the blockquote (verified with `pandoc -f markdown` for
+        // `>     foo\n    bar`). Keep the literal strict gate there to avoid
+        // regressing lazy-continuation behavior.
+        let allow = if ctx.config.dialect == crate::options::Dialect::CommonMark {
+            ctx.has_blank_before || ctx.at_document_start
+        } else {
+            ctx.has_blank_before_strict
+        };
+        if !allow {
             return None;
         }
 

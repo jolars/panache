@@ -239,6 +239,8 @@ golden_test_cases!(
     ignore_directives,
     images,
     indented_code,
+    indented_code_after_atx_heading_commonmark,
+    indented_code_after_atx_heading_pandoc,
     inline_html_basic_commonmark,
     inline_link_code_span_precedence,
     inline_link_dest_angle_brackets_with_parens,

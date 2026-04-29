@@ -1,0 +1,15 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..18
+  HEADING@0..10
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..9
+      TEXT@2..9 "Heading"
+    NEWLINE@9..10 "\n"
+  PARAGRAPH@10..18
+    TEXT@10..17 "    foo"
+    NEWLINE@17..18 "\n"

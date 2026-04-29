@@ -16,166 +16,137 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (i)
+## Latest session — 2026-04-29 (ii)
 
-**Pass count: 563 → 566 / 652 (86.8%, +3)**
+**Pass count: 566 → 569 / 652 (87.3%, +3)**
 
-Took the carried-forward "Multi-line setext heading + losslessness
-bug" target. The fix unlocked #81, #82, #95 (multi-line setext
-forms). #115 was on the same target list but turned out to be a
-different (orthogonal) bug — indented-code-after-ATX-heading is
-mis-buffered as paragraph text, and that bug existed both before
-and after this fix.
+Took the carried-forward "Indented code block after ATX heading
+(#115)" target. Single-site fix at the indented-code dispatcher
+gate. Unlocked #115 plus two related blockquote-with-indented-code
+cases (#236, #252) that were blocked by the same overly-strict
+gate.
 
-### Root cause: setext detected at the text line ignored prior buffered paragraph
+### Root cause: indented-code gate required literal blank line before
 
-For `Foo\nBar\n---\n` under CommonMark:
+`IndentedCodeBlockParser::detect_prepared` consulted
+`ctx.has_blank_before_strict`, which is true only when the previous
+line was *literally* blank (or pos==0). That misses the case where
+the previous block was a heading / fenced code / HR — those don't
+continue, so the next indented line is at block-level start, not
+mid-paragraph. CommonMark §4.4 says only paragraphs block
+interruption; non-paragraph predecessors are fine.
 
-- At line "Foo", dispatcher checks `[Foo, Bar]` → not setext;
-  buffer "Foo\n" in paragraph.
-- At line "Bar", dispatcher checks `[Bar, ---]` → setext! With
-  `blank_before_header=false` (CommonMark default), detection
-  proceeded. The dispatcher fall-through called `parse_prepared`,
-  which emitted a fresh `HEADING { text="Bar", underline="---" }`
-  while the paragraph container was still open with "Foo\n"
-  buffered.
-- Result: `HEADING` emitted *inside* the open `PARAGRAPH`, then
-  buffered "Foo" got flushed *after* the heading, scrambling byte
-  order: the green tree text came out `Bar\n---\nFoo\n` for input
-  `Foo\nBar\n---\n` (losslessness violation).
+For `# Heading\n    foo\n`:
+- Line 1 prev is `# Heading` (not blank) → strict=false → indented
+  code rejected → falls through to paragraph buffer.
 
-Pandoc-markdown does *not* form a multi-line setext here (verified
-with `pandoc -f commonmark` vs `-f markdown` — they disagree), so
-the fix is **dialect-gated** on `Dialect::CommonMark`.
+The relaxed `has_blank_before` field already encodes the right
+signal (paragraph-not-open / prev-block-is-self-closing), since
+`previous_block_requires_blank_before_heading()` returns false
+after a heading.
 
-### Fix: deferred PARAGRAPH wrapper via rowan checkpoint + fold path
+### Why dialect-gated
 
-Two moving parts:
+For `>     foo\n    bar\n`, the dialects diverge (verified with
+pandoc):
+- `pandoc -f commonmark`: closes the BQ, `    bar` is a top-level
+  indented code block. The relaxed gate is correct.
+- `pandoc -f markdown`: lazily extends the BQ; `    bar` is a
+  paragraph inside the BQ. The strict gate (or some other
+  Pandoc-specific lazy-continuation logic) is needed.
 
-1. **Refactor paragraph emission to use `rowan::Checkpoint`.**
-   `start_paragraph_if_needed` no longer calls `start_node(PARAGRAPH)`
-   eagerly; it stores a checkpoint in `Container::Paragraph` and
-   the close paths (`close_containers_to`) call
-   `start_node_at(checkpoint, PARAGRAPH)` at close. With nothing
-   committed to the green tree until close, the kind can change.
-2. **CommonMark setext fold.** In core.rs's no-blank-before
-   dispatch (`BlockDetectionResult::Yes` arm), when
-   `parser_name == "setext_heading"` AND a paragraph is open AND
-   dialect is CommonMark: take the buffered text + current line
-   as the heading content, pop the paragraph container without
-   emitting `PARAGRAPH`, and `start_node_at(checkpoint, HEADING)`
-   to wrap retroactively from the paragraph start. Body is emitted
-   via the new `emit_setext_heading_body` helper (extracted from
-   `emit_setext_heading` so callers can supply their own outer
-   `HEADING` wrapper).
-
-Formatter follow-on: under CommonMark, `Foo\nBar\n---` now parses
-as a heading whose `HEADING_CONTENT` contains an internal NEWLINE
-(between TEXT "Foo" and TEXT "Bar"). The formatter writes
-ATX-only, so the inner NEWLINE was being passed through verbatim
-as `## Foo\nBar`, which round-trips as `## Foo` + a `Bar`
-paragraph, breaking idempotency. Fix: in `format_heading`'s second
-pass (core.rs), collapse NEWLINE tokens inside HEADING_CONTENT to
-a single space.
+So the relaxed gate applies under `Dialect::CommonMark` only; Pandoc
+keeps `has_blank_before_strict`. Pandoc-side `# Heading\n    foo\n`
+is *also* buggy under our parser (buffers as paragraph instead of
+heading + code block per pandoc's own native output), but the OLD
+behavior wasn't tested by any fixture and fixing it under Pandoc
+would touch lazy-continuation rules; left as a follow-up.
 
 ### Files changed
 
 - **Parser-shape gap (CommonMark dialect divergence)**:
-  - `crates/panache-parser/src/parser/utils/container_stack.rs`:
-    added `start_checkpoint: rowan::Checkpoint` to
-    `Container::Paragraph`.
-  - `crates/panache-parser/src/parser/blocks/paragraphs.rs`:
-    `start_paragraph_if_needed` now takes a checkpoint instead of
-    calling `start_node(PARAGRAPH)`. `append_paragraph_line` and
-    other patterns updated to ignore the new field.
-  - `crates/panache-parser/src/parser/core.rs`:
-    `close_containers_to` paragraph branches call
-    `start_node_at(checkpoint, PARAGRAPH)` before emitting buffer
-    or finishing empty. New `emit_setext_heading_folding_paragraph`
-    method. Dispatcher fall-through (no-blank-before
-    `BlockDetectionResult::Yes`) routes setext+open-paragraph to
-    the fold under CommonMark dialect.
-  - `crates/panache-parser/src/parser/blocks/headings.rs`:
-    extracted `emit_setext_heading_body` from `emit_setext_heading`.
-- **Formatter (consequent fix to keep idempotency)**:
-  - `crates/panache-formatter/src/formatter/core.rs`: HEADING_CONTENT
-    inner NEWLINE tokens now collapse to a single space.
-- **New parser fixtures + snapshots**:
-  - `setext_multiline_commonmark` (parser): paired CommonMark
-    fixture for `Foo\nBar\n---\n`. CST shows HEADING wrapping
-    HEADING_CONTENT `[TEXT Foo, NEWLINE, TEXT Bar]` then NEWLINE,
-    SETEXT_HEADING_UNDERLINE `---`, NEWLINE.
-  - `setext_multiline_pandoc` (parser): the dialect partner;
-    PARAGRAPH containing TEXT/NEWLINE for "Foo Bar ---" (Pandoc
-    refuses multi-line setext).
+  - `crates/panache-parser/src/parser/block_dispatcher.rs`: in
+    `IndentedCodeBlockParser::detect_prepared`, replace the
+    `!ctx.has_blank_before_strict` gate with a dialect-aware check:
+    under `Dialect::CommonMark`, allow when
+    `has_blank_before || at_document_start`; otherwise keep the
+    literal-blank-line strict gate.
+- **New parser fixtures + snapshots (paired)**:
+  - `indented_code_after_atx_heading_commonmark`: pins HEADING +
+    CODE_BLOCK with WHITESPACE("    ") + TEXT("foo") under
+    `flavor = "commonmark"`.
+  - `indented_code_after_atx_heading_pandoc`: pins the current
+    Pandoc behavior (HEADING + PARAGRAPH containing
+    TEXT("    foo")). This locks in that the dialect gate stays;
+    a future Pandoc-side fix will need to update this fixture
+    intentionally.
 - **New formatter fixture**:
-  - `setext_multiline_commonmark` (formatter, top-level
-    `tests/fixtures/cases/`): `panache.toml` with
-    `flavor = "commonmark"`. Pins
-    `Foo\nBar\n---\n` → `## Foo Bar\n` and verifies idempotency.
-    No paired Pandoc formatter case (existing top-level fixtures
-    already cover the Pandoc paragraph path).
-- **Allowlist additions**: #81, #82, #95 (Setext headings section,
-  inserted in numerical order between #80 and #83/etc.).
+  - `indented_code_after_atx_heading_commonmark` (top-level
+    `tests/fixtures/cases/`): pins
+    `# Heading\n    foo\n` → `# Heading\n\n` + fenced code
+    `\`\`\`\nfoo\n\`\`\`\n`. Idempotency verified by the harness.
+- **Allowlist additions**: #115 (Indented code blocks); #236, #252
+  (Block quotes — both were blocked by the same gate).
 
 ### Don't redo
 
-- Don't try to make this fix work without the checkpoint refactor.
-  The PARAGRAPH start_node was being emitted *before* the buffer
-  filled, so there's no way to convert it to HEADING after the
-  fact without `start_node_at`. Calling `finish_node` on an empty
-  PARAGRAPH and then emitting HEADING would leave a stray empty
-  PARAGRAPH in the tree.
-- Don't drop the `Dialect::CommonMark` gate on the fold path. The
-  Pandoc dispatcher already declines setext detection here because
-  `blank_before_header` is on by default, so the gate is partly
-  defensive — but if anyone toggles `blank_before_header=false`
-  while staying on the Pandoc dialect, *Pandoc itself* still
-  doesn't recognize multi-line setext (verified). The dialect gate
-  is what keeps that behavior aligned.
-- Don't try to also fix #115 here. Its expected output requires
-  `# Heading\n    foo\n` to start an indented code block on
-  line 2, which currently buffers as paragraph continuation. The
-  setext fold makes the *symptom* slightly different (now folds
-  "    foo\nHeading" into the H2) but the underlying gap is
-  unrelated — see "Suggested next targets" #1.
-- Don't move the formatter NEWLINE-flatten logic into the parser.
-  The parser's CST is the lossless source of truth; the formatter
-  is what owns "ATX-only output" policy and therefore where the
-  multi-line collapse belongs.
+- Don't drop the `Dialect::CommonMark` gate. Removing it
+  globally regresses Pandoc lazy-continuation: `>     foo\n    bar`
+  would close the blockquote and emit a top-level code block,
+  contradicting `pandoc -f markdown` (which keeps it inside the
+  BQ as a lazy paragraph). The Pandoc fixture
+  `indented_code_after_atx_heading_pandoc` will fail loudly if
+  the gate is dropped.
+- Don't try to also "fix" Pandoc's `# Heading\n    foo\n`
+  behavior in the same change. It's a separate Pandoc-side bug
+  (the strict gate is over-strict there too) but resolving it
+  needs care around BQ lazy continuation. The fixture pins the
+  current behavior so a future fix is a clean diff.
+- Don't widen the renderer's loose-list logic. The four "Lists"
+  failures (#312, #315, #317, #320, #326) are NOT in this fix's
+  blast radius — verified by re-running the report.
 
 ### Suggested next targets, ranked
 
-1. **Indented code block after ATX heading (#115)** — input
-   `# Heading\n    foo\nHeading\n----` should produce ATX H1 +
-   indented code "foo" + setext H2 "Heading" + indented code +
-   HR. Currently "    foo" gets buffered as paragraph
-   continuation. Likely a missed `at_document_start`-style reset
-   in the dispatcher's indented-code precondition after an ATX
-   heading. Single example, but may unlock more if the gap is
-   systemic.
-2. **Empty list item closes the list when followed by blank line
+1. **Empty list item closes the list when followed by blank line
    (#280)** — `-\n\n  foo\n` should produce
-   `<ul><li></li></ul><p>foo</p>`.
-3. **Multi-empty-marker with subsequent indented content (#278)** —
-   partially comes along once #280 is solved.
-4. **Reference link followed by another bracket pair (#569, #571)**
-   — `[foo][bar][baz]` requires the CMark "left-bracket scanner"
-   stack model. Larger fix.
-5. **Nested LINKs in link text (#518, #519, #520, #532, #533)** —
-   CommonMark §6.4 forbids real nesting; outer must un-link itself
-   when inner resolves. Same scanner-stack work as #569.
-6. **HTML-tag/autolink interaction with link brackets (#524, #526,
+   `<ul><li></li></ul><p>foo</p>`. Parser-shape gap.
+2. **Loose-vs-tight semantic gaps (#315, #320, #326)** —
+   `is_loose_list` in the test renderer overshoots: it returns
+   true on any PARAGRAPH descendant (including paragraphs inside
+   nested blockquotes). Per CommonMark §5.3, looseness is about
+   blank-line separation, and the parser already encodes the
+   PLAIN-vs-PARAGRAPH distinction at the *direct* child level.
+   Likely renderer-only fix: change `descendants()` to
+   `children()` in `is_loose_list`'s PARAGRAPH check, then verify
+   the BLANK_LINE-between-items rule still fires for #326.
+   Unblocks at least 3 examples (the loose-vs-tight detection
+   also affects #312/#317 indirectly).
+3. **List with non-uniform marker indentation (#312)** —
+   `- a\n - b\n  - c\n   - d\n    - e\n` should keep all five at
+   the same list level (last "- e" is lazy continuation of "d"
+   per CommonMark indent rules). Currently splits at "- e"
+   because the parser interprets 4-space indent as starting a
+   nested list. Parser-shape gap; touches list-marker indent
+   tracking.
+4. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion for
+   indented-code inside containers. Substantial; touches
+   `leading_indent` and tab-stop logic.
+5. **HTML block #148** — raw HTML `<pre>`-block contains a blank
+   line that should be emitted verbatim, but our parser/renderer
+   reformats `_world_` as inline emphasis inside the `<pre>`. May
+   be a renderer bug (HTML block content should be byte-perfect).
+6. **Reference link followed by another bracket pair (#569, #571)**
+   — requires CMark "left-bracket scanner" stack model. Large.
+7. **Nested LINKs in link text (#518, #519, #520, #532, #533)** —
+   CommonMark §6.4 forbids real nesting; outer must un-link
+   itself when inner resolves. Same scanner-stack work as #569.
+8. **HTML-tag/autolink interaction with link brackets (#524, #526,
    #536, #538)** — bracket scanner must skip past raw HTML and
    autolinks too.
-7. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion for
-   indented-code inside containers. Substantial.
-8. **Block quotes lazy-continuation (#235, #236, #251)** — lazy
-   continuation must not extend a list or code block inside a
-   blockquote.
-9. **Fence inside blockquote inside list item (#321)**.
-10. **Loose-vs-tight nested loose lists (#312, #326)** — renderer's
-    loose-detection gap for nested lists.
+9. **Block quotes lazy-continuation #235, #251** — last two
+   blockquote failures (after this session's #236, #252 wins).
+10. **Fence inside blockquote inside list item (#321)**.
 11. **Lazy / nested marker continuation (#298, #299)**.
 12. **Multi-block content in `1.     code` items (#273, #274)**.
 13. **Setext-in-list-item (#300)**.
