@@ -1,0 +1,68 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..82
+  PARAGRAPH@0..10
+    EMPHASIS@0..9
+      EMPHASIS_MARKER@0..1 "*"
+      TEXT@1..2 "("
+      EMPHASIS@2..7
+        EMPHASIS_MARKER@2..3 "*"
+        TEXT@3..6 "foo"
+        EMPHASIS_MARKER@6..7 "*"
+      TEXT@7..8 ")"
+      EMPHASIS_MARKER@8..9 "*"
+    NEWLINE@9..10 "\n"
+  BLANK_LINE@10..11
+    BLANK_LINE@10..11 "\n"
+  PARAGRAPH@11..21
+    EMPHASIS@11..20
+      EMPHASIS_MARKER@11..12 "_"
+      TEXT@12..13 "("
+      EMPHASIS@13..18
+        EMPHASIS_MARKER@13..14 "_"
+        TEXT@14..17 "foo"
+        EMPHASIS_MARKER@17..18 "_"
+      TEXT@18..19 ")"
+      EMPHASIS_MARKER@19..20 "_"
+    NEWLINE@20..21 "\n"
+  BLANK_LINE@21..22
+    BLANK_LINE@21..22 "\n"
+  PARAGRAPH@22..38
+    EMPHASIS@22..37
+      EMPHASIS_MARKER@22..23 "*"
+      TEXT@23..27 "foo "
+      EMPHASIS@27..32
+        EMPHASIS_MARKER@27..28 "*"
+        TEXT@28..31 "bar"
+        EMPHASIS_MARKER@31..32 "*"
+      TEXT@32..36 " baz"
+      EMPHASIS_MARKER@36..37 "*"
+    NEWLINE@37..38 "\n"
+  BLANK_LINE@38..39
+    BLANK_LINE@38..39 "\n"
+  PARAGRAPH@39..61
+    STRONG@39..60
+      STRONG_MARKER@39..41 "__"
+      TEXT@41..46 "foo, "
+      STRONG@46..53
+        STRONG_MARKER@46..48 "__"
+        TEXT@48..51 "bar"
+        STRONG_MARKER@51..53 "__"
+      TEXT@53..58 ", baz"
+      STRONG_MARKER@58..60 "__"
+    NEWLINE@60..61 "\n"
+  BLANK_LINE@61..62
+    BLANK_LINE@61..62 "\n"
+  PARAGRAPH@62..82
+    STRONG@62..81
+      STRONG_MARKER@62..64 "__"
+      TEXT@64..68 "foo "
+      STRONG@68..75
+        STRONG_MARKER@68..70 "__"
+        TEXT@70..73 "bar"
+        STRONG_MARKER@73..75 "__"
+      TEXT@75..79 " baz"
+      STRONG_MARKER@79..81 "__"
+    NEWLINE@81..82 "\n"

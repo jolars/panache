@@ -898,59 +898,62 @@ fn parse_until_closer_with_nested_two(
                 let after_pos = pos + delim_count;
                 let at_run_end = after_pos >= bytes.len() || bytes[after_pos] != delim_char as u8;
 
+                let mut closer_failed_at_isolated_run = false;
                 if (at_run_start || at_run_end) && !is_escaped {
-                    // Found a potential closer!
-                    // For underscores, check right-flanking: closer must be preceded by non-whitespace
-                    // For asterisks, Pandoc doesn't require right-flanking (see ender function in Markdown.hs)
-                    if delim_char == '_'
-                        && pos > start
-                        && let Some(prev_char) = text[..pos].chars().last()
-                        && prev_char.is_whitespace()
-                    {
-                        log::trace!(
-                            "Underscore closer preceded by whitespace at pos {}, not right-flanking",
-                            pos
-                        );
-                        // Not a valid closer, continue searching
-                        pos = advance_char_boundary(text, pos, end);
-                        continue;
-                    }
-
-                    // For underscores, also reject closers followed by alphanumeric
-                    // (intraword underscore rule: `_foo_bar` is not emphasis).
-                    // Mirrors the rule in `is_valid_ender` and matches Pandoc.
-                    if delim_char == '_'
-                        && let Some(next_char) = text[after_pos..].chars().next()
-                        && next_char.is_alphanumeric()
-                    {
-                        log::trace!(
-                            "Underscore closer followed by alphanumeric at pos {}, not right-flanking",
-                            pos
-                        );
-                        pos = advance_char_boundary(text, pos, end);
-                        continue;
-                    }
-
-                    // CommonMark §6.2: an asterisk closer must be part of a
-                    // right-flanking delimiter run. Pandoc-markdown's `ender`
-                    // for asterisks has no flanking requirement, so this strict
-                    // check is dialect-specific.
-                    if delim_char == '*'
-                        && config.dialect == Dialect::CommonMark
-                        && !is_right_flanking(text, pos, delim_count)
-                    {
-                        log::trace!("CommonMark: '*' closer at pos {} not right-flanking", pos);
-                        pos = advance_char_boundary(text, pos, end);
-                        continue;
-                    }
-
-                    log::trace!(
-                        "Found exact {} x {} closer at pos {}",
+                    let valid_closer = is_valid_same_delim_closer(
+                        text,
+                        pos,
                         delim_char,
                         delim_count,
-                        pos
+                        start,
+                        config,
                     );
-                    return Some(pos);
+                    if valid_closer {
+                        log::trace!(
+                            "Found exact {} x {} closer at pos {}",
+                            delim_char,
+                            delim_count,
+                            pos
+                        );
+                        return Some(pos);
+                    }
+                    if at_run_start && at_run_end {
+                        closer_failed_at_isolated_run = true;
+                    }
+                }
+
+                // CommonMark same-delim nested emphasis: when this delim run is
+                // an isolated run of exactly `delim_count` (so it can't be part
+                // of a longer-run match) but failed the closer rules, treat it
+                // as a potential nested opener and recurse via `try_parse_emphasis`.
+                // We only attempt this when there are enough remaining `delim_char`s
+                // ahead to satisfy *both* the nested span's closer and the outer
+                // emphasis's closer (≥ 2 * delim_count). Otherwise the nested
+                // attempt would steal the outer's only closer (e.g. #470, where
+                // a `*` opener inside a strong span has just one trailing `*` left
+                // for the outer emphasis). On nested success, skip past the span;
+                // on failure, advance without poisoning the outer scan.
+                if closer_failed_at_isolated_run
+                    && has_enough_delim_chars_ahead(
+                        bytes,
+                        pos + delim_count,
+                        end,
+                        delim_char,
+                        2 * delim_count,
+                    )
+                {
+                    let mut temp_builder = GreenNodeBuilder::new();
+                    if let Some((consumed, _)) =
+                        try_parse_emphasis(text, pos, end, config, &mut temp_builder)
+                    {
+                        log::trace!(
+                            "Nested same-delim emphasis at pos {} consumed {} bytes",
+                            pos,
+                            consumed
+                        );
+                        pos += consumed;
+                        continue;
+                    }
                 }
             }
         }
@@ -960,6 +963,84 @@ fn parse_until_closer_with_nested_two(
     }
 
     None
+}
+
+/// Count `delim_char` occurrences in `bytes[from..end]` and report whether at
+/// least `min_count` were found. Used as a cheap precondition before attempting
+/// a nested same-delim emphasis: we only want to recurse when the input has
+/// enough remaining delimiters for *both* the nested span's closer and the
+/// outer emphasis's closer.
+fn has_enough_delim_chars_ahead(
+    bytes: &[u8],
+    from: usize,
+    end: usize,
+    delim_char: char,
+    min_count: usize,
+) -> bool {
+    let upper = end.min(bytes.len());
+    let mut count = 0usize;
+    let mut i = from;
+    while i < upper {
+        if bytes[i] == delim_char as u8 {
+            count += 1;
+            if count >= min_count {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
+/// Validate a delimiter run as a closer for outer same-delim emphasis.
+///
+/// Captures the rules previously inlined at each closer site: the underscore
+/// "preceded by whitespace" / "followed by alphanumeric" tests (Pandoc's
+/// intraword + right-flanking gates) and the CommonMark-only asterisk
+/// right-flanking gate. Returns `true` if `pos..pos+delim_count` is a valid
+/// closer and the caller should match the outer emphasis here.
+fn is_valid_same_delim_closer(
+    text: &str,
+    pos: usize,
+    delim_char: char,
+    delim_count: usize,
+    start: usize,
+    config: &ParserOptions,
+) -> bool {
+    let after_pos = pos + delim_count;
+
+    if delim_char == '_'
+        && pos > start
+        && let Some(prev_char) = text[..pos].chars().last()
+        && prev_char.is_whitespace()
+    {
+        log::trace!(
+            "Underscore closer preceded by whitespace at pos {}, not right-flanking",
+            pos
+        );
+        return false;
+    }
+
+    if delim_char == '_'
+        && let Some(next_char) = text[after_pos..].chars().next()
+        && next_char.is_alphanumeric()
+    {
+        log::trace!(
+            "Underscore closer followed by alphanumeric at pos {}, not right-flanking",
+            pos
+        );
+        return false;
+    }
+
+    if delim_char == '*'
+        && config.dialect == Dialect::CommonMark
+        && !is_right_flanking(text, pos, delim_count)
+    {
+        log::trace!("CommonMark: '*' closer at pos {} not right-flanking", pos);
+        return false;
+    }
+
+    true
 }
 
 /// Parse inline content and look for a matching closer, with nested one attempts.
@@ -1166,58 +1247,45 @@ fn parse_until_closer_with_nested_one(
                 let after_pos = pos + delim_count;
                 let at_run_end = after_pos >= bytes.len() || bytes[after_pos] != delim_char as u8;
 
+                let mut closer_failed_at_isolated_run = false;
                 if (at_run_start || at_run_end) && !is_escaped {
-                    // Found a potential closer!
-                    // For underscores, check right-flanking: closer must be preceded by non-whitespace
-                    // For asterisks, Pandoc doesn't require right-flanking (see ender function in Markdown.hs)
-                    if delim_char == '_'
-                        && pos > start
-                        && let Some(prev_char) = text[..pos].chars().last()
-                        && prev_char.is_whitespace()
-                    {
-                        log::trace!(
-                            "Underscore closer preceded by whitespace at pos {}, not right-flanking",
-                            pos
-                        );
-                        // Not a valid closer, continue searching
-                        pos = advance_char_boundary(text, pos, end);
-                        continue;
-                    }
-
-                    // For underscores, also reject closers followed by alphanumeric
-                    // (intraword underscore rule). Mirrors `is_valid_ender`.
-                    if delim_char == '_'
-                        && let Some(next_char) = text[after_pos..].chars().next()
-                        && next_char.is_alphanumeric()
-                    {
-                        log::trace!(
-                            "Underscore closer followed by alphanumeric at pos {}, not right-flanking",
-                            pos
-                        );
-                        pos = advance_char_boundary(text, pos, end);
-                        continue;
-                    }
-
-                    // CommonMark §6.2: an asterisk closer must be part of a
-                    // right-flanking delimiter run. Pandoc-markdown's `ender`
-                    // for asterisks has no flanking requirement, so this strict
-                    // check is dialect-specific.
-                    if delim_char == '*'
-                        && config.dialect == Dialect::CommonMark
-                        && !is_right_flanking(text, pos, delim_count)
-                    {
-                        log::trace!("CommonMark: '*' closer at pos {} not right-flanking", pos);
-                        pos = advance_char_boundary(text, pos, end);
-                        continue;
-                    }
-
-                    log::trace!(
-                        "Found exact {} x {} closer at pos {}",
+                    let valid_closer = is_valid_same_delim_closer(
+                        text,
+                        pos,
                         delim_char,
                         delim_count,
-                        pos
+                        start,
+                        config,
                     );
-                    return Some(pos);
+                    if valid_closer {
+                        log::trace!(
+                            "Found exact {} x {} closer at pos {}",
+                            delim_char,
+                            delim_count,
+                            pos
+                        );
+                        return Some(pos);
+                    }
+                    if at_run_start && at_run_end {
+                        closer_failed_at_isolated_run = true;
+                    }
+                }
+
+                // CommonMark same-delim nested emphasis: see the matching block
+                // in `parse_until_closer_with_nested_two` for the rationale.
+                if closer_failed_at_isolated_run {
+                    let mut temp_builder = GreenNodeBuilder::new();
+                    if let Some((consumed, _)) =
+                        try_parse_emphasis(text, pos, end, config, &mut temp_builder)
+                    {
+                        log::trace!(
+                            "Nested same-delim emphasis at pos {} consumed {} bytes",
+                            pos,
+                            consumed
+                        );
+                        pos += consumed;
+                        continue;
+                    }
                 }
             }
         }

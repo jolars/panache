@@ -16,138 +16,137 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (vi)
+## Latest session — 2026-04-29 (vii)
 
-**Pass count: 581 → 592 / 652 (90.8%, +11)**
+**Pass count: 592 → 597 / 652 (91.6%, +5)**
 
-All eleven wins are in the Emphasis section, from a single
-dialect-divergence fix: CommonMark's strict left/right-flanking
-rules for `*` opener/closer detection. Pandoc and CommonMark
-disagree (verified with `pandoc -f commonmark` vs
-`pandoc -f markdown`), so the fix is gated on
-`config.dialect == Dialect::CommonMark`.
+All five wins are in the Emphasis section, from one same-delim
+nested-emphasis fix that applies under both dialects.
 
-### Root cause: looser asterisk flanking than CommonMark §6.2 requires
+### Root cause: panache's recursive scanner missed nested same-delim openers
 
-Pandoc-markdown's `ender` for `*` has no flanking rule beyond
-"not preceded by whitespace" (and even that is `_`-only in
-panache today). CommonMark §6.2 is strict:
+When scanning the inside of `*X*` for its closer,
+`parse_until_closer_with_nested_two` only attempted nested `**`
+(strong) — it never attempted another `*X*`. Symmetric gap in
+`parse_until_closer_with_nested_one` for `__X__`. So inputs like
+`*(*foo*)*` and `__foo, __bar__, baz__` resolved to a single flat
+emphasis at the first available closer, dropping the nested span
+panache should produce. Pandoc-markdown agrees with CommonMark
+here for `_(_foo_)_` and the `__` cases, so the fix is universal.
+For the `*` cases (#369, #407) the dialects diverge but the
+existing CommonMark right-flanking gate already prevents the
+outer's premature close; the new nested attempt rounds out the
+result.
 
-- A `*` can only **open** if it is part of a *left-flanking*
-  delimiter run.
-- A `*` can only **close** if it is part of a *right-flanking*
-  delimiter run.
+Fix: when an isolated delim run of exactly `delim_count` fails
+the closer check (right-flanking for `*` under CommonMark, or
+the underscore intraword/right-flanking gates under both
+dialects), retry it as a *nested same-delim opener* via
+`try_parse_emphasis` with a throwaway builder. On success, skip
+the consumed bytes and keep scanning for the outer closer; on
+failure, advance one char without poisoning the outer.
 
-The flanking rules use both adjacent characters (whitespace and
-punctuation/symbol from Unicode P+S categories), so cases like
-`a*"foo"*` (alnum-then-punct opener) and `*$*alpha.`
-(punct-then-alnum closer) are literal under CommonMark but
-emphasis under Pandoc.
+Critical heuristic to avoid regressing #470: only attempt the
+nested when there are at least `2 * delim_count` `delim_char`s
+remaining ahead. Without this, `*foo __bar *baz bim__ bam*` (#470)
+greedily binds the `*` at "bar *baz" to the trailing `*` and
+leaves the outer `*` with no closer. The "≥ 2*delim_count
+remaining" check ensures both the nested span and the outer
+emphasis can plausibly close. CommonMark's stack algorithm
+naturally handles this via opener removal during inner closer
+matching; we approximate with the count check.
 
-Fix: add `is_left_flanking` / `is_right_flanking` helpers plus a
-permissive `is_unicode_punct_or_symbol` (ASCII punctuation, or
-non-ASCII non-alnum non-whitespace — wider than strict P+S but
-matches every relevant spec case without a Unicode-categories
-crate). Gate on CommonMark dialect at three sites in
-`crates/panache-parser/src/parser/inlines/core.rs`:
-
-1. `try_parse_emphasis` (entry-level opener): reject `*` opener
-   that is not left-flanking.
-2. `parse_until_closer_with_nested_two` (used while scanning
-   `*...*` for its closer): reject `*` closer that is not
-   right-flanking.
-3. `parse_until_closer_with_nested_one` (used while scanning
-   `**...**` for its closer): same right-flanking rejection.
-
-Pandoc behavior is unchanged (the gate is dialect-specific).
+Also factored the closer-validity check (underscore intraword,
+underscore right-flanking, asterisk CommonMark right-flanking)
+out of the inline `continue` paths into a single
+`is_valid_same_delim_closer` helper to make the new
+"closer-failed-at-isolated-run" branching readable.
 
 ### Wins unlocked
 
-- #352 `a*"foo"*` — alnum-before opener rejected
-- #354 `*$*alpha.` (incl. `£`/`€`) — punct→alnum closer rejected
-- #366 `*foo bar *` — whitespace-before closer rejected
-- #367 `*foo bar\n*` — same with `\n`
-- #368 `*(*foo)` — punct→alnum closer rejected
-- #380 `a**"foo"**` — strong-version of #352
-- #391 `**foo bar **` — strong-version of #366
-- #392 `**(**foo)` — strong-version of #368
-- #427 `**foo **bar****` — bonus: rejected mid-run `**` closer
-  resolves the nested-strong shape
-- #470 `*foo __bar *baz bim__ bam*` — bonus: outer `*…*` no
-  longer matches the inner `*` (right-flanking by punct/alnum
-  context fails), so the underscore strong runs cleanly
-- #471 `**foo **bar baz**` — bonus: same logic for `**`
+- #369 `*(*foo*)*` → `<em>(<em>foo</em>)</em>` (CM only)
+- #373 `_(_foo_)_` → `<em>(<em>foo</em>)</em>` (both dialects)
+- #389 `__foo, __bar__, baz__` → nested STRONG (both dialects)
+- #407 `*foo *bar* baz*` → nested EMPH (CM only)
+- #425 `__foo __bar__ baz__` → nested STRONG (both dialects)
 
 ### Files changed
 
-- **Dialect divergence**:
-  - `crates/panache-parser/src/parser/inlines/core.rs`: new
-    flanking helpers + three CommonMark-gated rejections in
-    `try_parse_emphasis`, `parse_until_closer_with_nested_two`,
-    and `parse_until_closer_with_nested_one`.
+- **Parser-shape (universal nested-same-delim) + dialect
+  approximation of CommonMark's stack semantics**:
+  - `crates/panache-parser/src/parser/inlines/core.rs`:
+    - New `is_valid_same_delim_closer` helper consolidating the
+      `_`/`*` closer rules.
+    - New `has_enough_delim_chars_ahead` heuristic guarding
+      nested attempts (≥ 2 * delim_count).
+    - In both `parse_until_closer_with_nested_two` (delim_count=1)
+      and `parse_until_closer_with_nested_one` (delim_count=2):
+      rewired the closer-check branch to set a
+      `closer_failed_at_isolated_run` flag and, when set, invoke
+      `try_parse_emphasis` for nested same-delim with the
+      heuristic gate. On success skip; on failure advance.
 - **New paired parser fixtures + snapshots**:
-  - `emphasis_asterisk_flanking_commonmark/` — pins literal-text
-    CST under CommonMark for the six representative cases
-    (#352, #354, #366, #368, #391, #392).
-  - `emphasis_asterisk_flanking_pandoc/` — same inputs, pins
-    EMPHASIS/STRONG CST under Pandoc-markdown.
+  - `emphasis_same_delim_nested_commonmark/` — CST snapshot
+    pinning nested EMPH/STRONG for all five inputs.
+  - `emphasis_same_delim_nested_pandoc/` — same inputs, pins
+    Pandoc-markdown CST: `*(*foo*)*` is two adjacent EMPH and
+    `*foo *bar* baz*` is partial-EMPH-with-literal-tail
+    (matches `pandoc -f markdown -t native`); the underscore
+    cases match CommonMark.
   - Wired into `golden_parser_cases.rs` next to existing
     `emphasis_*` cases.
-- **Allowlist additions** (Emphasis): #352, #354, #366, #367,
-  #368, #380, #391, #392, #427, #470, #471.
+- **Allowlist additions** (Emphasis): #369, #373, #389, #407,
+  #425.
 
-No CommonMark formatter golden case added: the new CommonMark
-output is structurally identical (PARAGRAPH only) to the Pandoc
-path — the rule explicitly says skip the formatter case unless
-block sequence differs. Verified idempotency manually
-(`format(format(x)) == format(x)` for the CommonMark output, which
-is just escaped `\*` in literal text).
+No CommonMark formatter golden case added: while the formatted
+output of `*foo *bar* baz*` differs between CM
+(`*foo *bar* baz*`) and Pandoc (`*foo* bar\* baz\*`), the block
+sequence is unchanged (still PARAGRAPH-only). Verified
+idempotency manually under CommonMark (`format(format(x)) ==
+format(x)` for all five inputs).
 
 ### Don't redo
 
-- Don't apply the flanking gate to `try_parse_emphasis_nested`.
-  That helper deliberately bypasses the "followed by whitespace"
-  opener check for nested contexts; tightening it under
-  CommonMark is plausibly correct but would need its own probe
-  and may regress nested cases. Out of scope for this session.
-- Don't apply the flanking gate inside `is_valid_ender` (used by
-  `try_parse_three`). The triple-asterisk path has its own rules
-  and the `***` failures (#416, #417) are the rule-of-3 nesting
-  story, not flanking.
-- Don't add a paired *Pandoc* formatter golden case — existing
-  formatter goldens already cover Pandoc emphasis behavior.
-- Don't expect #369 `*(*foo*)*` to fall out of this fix. With
-  flanking, the outer `*` closer is now correctly placed at the
-  trailing `*`, but we still need same-delim nested-emphasis logic
-  inside `parse_until_closer_with_nested_two` to recognize the
-  inner `*foo*`. Currently produces `<em>(*foo</em>)*` — wrong.
-  Same structural change blocks #369, #389, #407–409, #425–426.
-- Don't approximate CommonMark punctuation with strict
-  ASCII-only. The spec includes Unicode P+S categories — `£`/`€`
-  in #354 must register as punctuation. The current
-  `!alnum && !whitespace` heuristic covers them.
+- Don't drop the `has_enough_delim_chars_ahead` heuristic. It
+  isn't strictly correct CommonMark semantics (the real
+  algorithm uses delimiter-stack opener-removal when nested
+  other-delim emphasis closes), but it preserves #470 and #471
+  which are currently in the allowlist. Removing it regresses
+  #470 immediately.
+- Don't try to apply this approach to #408 / #409 / #426 /
+  #402. Those need *partial-match* logic (a length-2 opener
+  matching against a length-1 closer, leaving residual
+  delimiters) — that's the next step toward a real delimiter
+  stack and is a substantially larger refactor.
+- Don't try to apply this to #416 / #417 (rule-of-3). Different
+  story: closer rejection when the open+close delimiter run
+  lengths sum to a non-trivial multiple of 3.
+- Don't pass the inner content via the temp_builder. We
+  intentionally discard it; the outer emphasis's content gets
+  re-parsed via `parse_inline_range_nested` once the outer
+  closer is found, which correctly emits the nested span.
+- Don't tighten `try_parse_emphasis_nested` here either —
+  that's still its own follow-up and not load-bearing for these
+  five wins.
 
 ### Suggested next targets, ranked
 
-1. **Same-delimiter nested emphasis (#369, #389, #407, #408,
-   #409, #425, #426, #427)** — `parse_until_closer_with_nested_two`
-   currently only attempts nested `**` inside `*...*`. CommonMark
-   needs nested same-delim too: when scanning `*...*` and we hit
-   another `*` that fails as a closer (because not right-flanking)
-   but would be a valid opener, try parsing `*X*` as nested EMPH.
-   Symmetric in `parse_until_closer_with_nested_one`. Could unlock
-   6–7 examples. Largest fix in this group.
-2. **Rule of 3 (#402, #412, #416, #417)** — CommonMark §6.2:
+1. **Partial-match emphasis (#402, #408, #426)** — the
+   delimiter-stack idea: a `__` opener can match a single `_`
+   closer (consuming one of two `_`s), leaving residual openers
+   for later closers. Currently `try_parse_two` looks for a
+   length-2 closer only. Largest tractable fix; needs care to
+   avoid regressing existing `__` behavior and to keep Pandoc
+   parity. Likely unlocks 3+ examples.
+2. **Rule of 3 (#412, #416, #417)** — CommonMark §6.2:
    "If one of the delimiters can both open and close (strong)
    emphasis, then the sum of the lengths of the delimiter runs
    containing the open and close delimiters must not be a
-   multiple of 3 unless both lengths are multiples of 3." Touches
-   the closer-detection logic when both flanking conditions are
-   satisfied. Cross-dialect divergence; gate on
-   `Dialect::CommonMark`.
-3. **Underscore nested-one (#373)** — companion to the
-   same-delim nested-emphasis work in (1) but for `_`. After
-   landing (1), this should be a small extension.
+   multiple of 3 unless both lengths are multiples of 3."
+   Cross-dialect divergence; gate on `Dialect::CommonMark`.
+3. **#409 `*foo *bar**`** — needs partial-match for `**` closer
+   to be split between inner `*` and outer `*`. Companion to
+   (1).
 4. **Empty list item closes the list when followed by blank line
    (#280)** — parser-shape gap.
 5. **List with non-uniform marker indentation (#312)** —
