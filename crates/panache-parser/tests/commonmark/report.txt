@@ -1,6 +1,6 @@
 CommonMark spec.txt v0.31.2 conformance report
-599 / 652 examples passing (91.9%)
-53 failing
+606 / 652 examples passing (92.9%)
+46 failing
 12 blocked-list entries
 
 === Per-section pass / fail ===
@@ -10,7 +10,7 @@ CommonMark spec.txt v0.31.2 conformance report
   Blank lines: 1 pass / 0 fail
   Block quotes: 23 pass / 2 fail
   Code spans: 22 pass / 0 fail
-  Emphasis and strong emphasis: 108 pass / 24 fail
+  Emphasis and strong emphasis: 115 pass / 17 fail
   Entity and numeric character references: 17 pass / 0 fail
   Fenced code blocks: 29 pass / 0 fail
   HTML blocks: 43 pass / 1 fail
@@ -421,11 +421,13 @@ CommonMark spec.txt v0.31.2 conformance report
 405
 406
 407
+409
 410
 411
 413
 414
 415
+416
 418
 419
 420
@@ -449,6 +451,8 @@ CommonMark spec.txt v0.31.2 conformance report
 439
 440
 441
+442
+443
 444
 446
 447
@@ -458,6 +462,8 @@ CommonMark spec.txt v0.31.2 conformance report
 451
 452
 453
+454
+455
 456
 458
 459
@@ -465,6 +471,7 @@ CommonMark spec.txt v0.31.2 conformance report
 461
 462
 463
+467
 469
 470
 471
@@ -799,11 +806,13 @@ CommonMark spec.txt v0.31.2 conformance report
 405
 406
 407
+409
 410
 411
 413
 414
 415
+416
 418
 419
 420
@@ -827,6 +836,8 @@ CommonMark spec.txt v0.31.2 conformance report
 439
 440
 441
+442
+443
 444
 446
 447
@@ -836,6 +847,8 @@ CommonMark spec.txt v0.31.2 conformance report
 451
 452
 453
+454
+455
 456
 458
 459
@@ -843,6 +856,7 @@ CommonMark spec.txt v0.31.2 conformance report
 461
 462
 463
+467
 469
 470
 471

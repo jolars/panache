@@ -349,19 +349,38 @@ fn try_parse_three(
 
         // Try *** (line 1696)
         if closer_count >= 3 && is_valid_ender(text, closer_start, delim_char, 3) {
-            log::trace!("Matched *** closer, emitting Strong[Emph[content]]");
+            // CommonMark §6.2 rule 14 prefers `<em><strong>...</strong></em>`
+            // when both interpretations apply; Pandoc-markdown wraps the other
+            // way (`<strong><em>...</em></strong>`). Branch on dialect.
+            if config.dialect == Dialect::CommonMark {
+                log::trace!("Matched *** closer, emitting Emph[Strong[content]] (CommonMark)");
 
-            builder.start_node(SyntaxKind::STRONG.into());
-            builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
+                builder.start_node(SyntaxKind::EMPHASIS.into());
+                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
 
-            builder.start_node(SyntaxKind::EMPHASIS.into());
-            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-            parse_inline_range_nested(text, content_start, closer_start, config, builder);
-            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-            builder.finish_node(); // EMPHASIS
+                builder.start_node(SyntaxKind::STRONG.into());
+                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
+                parse_inline_range_nested(text, content_start, closer_start, config, builder);
+                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
+                builder.finish_node(); // STRONG
 
-            builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
-            builder.finish_node(); // STRONG
+                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
+                builder.finish_node(); // EMPHASIS
+            } else {
+                log::trace!("Matched *** closer, emitting Strong[Emph[content]]");
+
+                builder.start_node(SyntaxKind::STRONG.into());
+                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
+
+                builder.start_node(SyntaxKind::EMPHASIS.into());
+                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
+                parse_inline_range_nested(text, content_start, closer_start, config, builder);
+                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
+                builder.finish_node(); // EMPHASIS
+
+                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
+                builder.finish_node(); // STRONG
+            }
 
             return Some(closer_start + 3 - pos);
         }
@@ -633,6 +652,7 @@ fn try_parse_two(
     builder: &mut GreenNodeBuilder,
 ) -> Option<usize> {
     let content_start = pos + 2;
+    let one = delim_char.to_string();
 
     log::trace!("try_parse_two: '{}' x 2 at pos {}", delim_char, pos);
 
@@ -653,6 +673,39 @@ fn try_parse_two(
         builder.finish_node(); // STRONG
 
         return Some(closer_pos + 2 - pos);
+    }
+
+    // CommonMark §6.2 split-opener: a length-2 left-flanking opener can
+    // match a length-1 right-flanking closer, leaving the leading delimiter
+    // char as literal text before the emphasis. Examples #442 `**foo*`,
+    // #454 `__foo_`. Pandoc-markdown does not split runs this way, so gate
+    // on dialect.
+    //
+    // Restrict to the "tail-end" case: the 1-closer is the final delimiter
+    // run in the parse range. Otherwise the leftover delim char could
+    // conflict with later openers/closers, and our linear fallback can't
+    // model the proper delimiter-stack matching that CommonMark requires
+    // for those cases (e.g. #402 `__foo__bar__baz__`, #412 `*foo**bar*`).
+    if config.dialect == Dialect::CommonMark
+        && let Some(closer_pos) =
+            parse_until_closer_with_nested_two(text, content_start, delim_char, 1, end, config)
+        && !text[(closer_pos + 1).min(end.min(text.len()))..end.min(text.len())]
+            .contains(delim_char)
+    {
+        log::trace!(
+            "CommonMark split-opener: ** at pos {} matches single closer at {}",
+            pos,
+            closer_pos
+        );
+
+        builder.token(SyntaxKind::TEXT.into(), &one);
+        builder.start_node(SyntaxKind::EMPHASIS.into());
+        builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
+        parse_inline_range_nested(text, content_start, closer_pos, config, builder);
+        builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
+        builder.finish_node(); // EMPHASIS
+
+        return Some(closer_pos + 1 - pos);
     }
 
     // No closer found
@@ -860,6 +913,29 @@ fn parse_until_closer_with_nested_two(
                 // alternative fails, and the first alternative `notFollowedBy (ender c 1) >> inline`
                 // also fails because we ARE followed by an ender (the first * of **).
                 // So the entire content parsing fails, and `one` returns failure.
+                //
+                // CommonMark §6.2 differs: a length-2 right-flanking run can
+                // close a length-1 opener, leaving 1 leftover char of the run
+                // to be emitted as literal text after the emphasis (split
+                // closer). Examples #443 `*foo**`, #455 `_foo__`. Gate on
+                // dialect; the run must be a valid 1-closer (right-flanking,
+                // and for `_` not intraword).
+                //
+                // Restrict to the "tail-end" case: no more delim_char after
+                // the leftover. Otherwise the leftover could conflict with a
+                // later closer/opener, and this linear fallback can't model
+                // CommonMark's full delimiter-stack matching.
+                let leftover_after = (pos + 2).min(end.min(text.len()));
+                if config.dialect == Dialect::CommonMark
+                    && is_valid_same_delim_closer(text, pos, delim_char, 1, start, config)
+                    && !text[leftover_after..end.min(text.len())].contains(delim_char)
+                {
+                    log::trace!(
+                        "CommonMark split-closer: ** at pos {} closes outer * with leftover",
+                        pos
+                    );
+                    return Some(pos);
+                }
                 log::trace!("Nested two failed at pos {}, entire one() should fail", pos);
                 return None;
             }
