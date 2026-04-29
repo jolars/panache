@@ -1,6 +1,7 @@
 use super::list_item_buffer::ListItemBuffer;
 use super::text_buffer::{ParagraphBuffer, TextBuffer};
 use crate::parser::blocks::lists::ListMarker;
+use rowan::Checkpoint;
 
 #[derive(Debug, Clone)]
 pub(crate) enum Container {
@@ -37,6 +38,10 @@ pub(crate) enum Container {
         buffer: ParagraphBuffer, // Interleaved buffer for paragraph content with markers
         open_inline_math_envs: Vec<String>,
         open_display_math_dollar_count: Option<usize>,
+        // Checkpoint at the position the paragraph started; used to retroactively
+        // wrap buffered content as PARAGRAPH (or HEADING for multi-line setext)
+        // when the paragraph is closed.
+        start_checkpoint: Checkpoint,
     },
     FootnoteDefinition {
         content_col: usize,

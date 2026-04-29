@@ -222,6 +222,8 @@ golden_test_cases!(
     hr_interrupts_lazy_blockquote_paragraph_commonmark,
     hr_interrupts_lazy_blockquote_paragraph_pandoc,
     setext_headings,
+    setext_multiline_commonmark,
+    setext_multiline_pandoc,
     setext_underline_crosses_blockquote_commonmark,
     setext_short_underline_commonmark,
     setext_short_underline_pandoc,

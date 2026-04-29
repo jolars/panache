@@ -4,7 +4,6 @@
 //! are tightly integrated with container handling.
 
 use crate::options::ParserOptions;
-use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use crate::parser::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
@@ -56,16 +55,22 @@ fn extract_end_environment_name(line: &str) -> Option<&str> {
 }
 
 /// Start a paragraph if not already in one.
+///
+/// Takes a checkpoint at the current builder position so the paragraph can be
+/// retroactively wrapped as `PARAGRAPH` on close, or as `HEADING` for
+/// multi-line setext heading promotion. Nothing is emitted into the builder
+/// here; emission happens at close via `start_node_at(checkpoint, kind)`.
 pub(in crate::parser) fn start_paragraph_if_needed(
     containers: &mut ContainerStack,
     builder: &mut GreenNodeBuilder<'static>,
 ) {
     if !matches!(containers.last(), Some(Container::Paragraph { .. })) {
-        builder.start_node(SyntaxKind::PARAGRAPH.into());
+        let start_checkpoint = builder.checkpoint();
         containers.push(Container::Paragraph {
             buffer: ParagraphBuffer::new(),
             open_inline_math_envs: Vec::new(),
             open_display_math_dollar_count: None,
+            start_checkpoint,
         });
     }
 }
@@ -83,6 +88,7 @@ pub(in crate::parser) fn append_paragraph_line(
         buffer,
         open_inline_math_envs,
         open_display_math_dollar_count,
+        ..
     }) = containers.stack.last_mut()
     {
         buffer.push_text(line);

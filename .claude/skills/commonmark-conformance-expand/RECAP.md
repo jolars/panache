@@ -16,99 +16,144 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (h)
+## Latest session — 2026-04-29 (i)
 
-**Pass count: 561 → 563 / 652 (86.3%, +2)**
+**Pass count: 563 → 566 / 652 (86.8%, +3)**
 
-Targeted the parser losslessness bug carried forward from session
-(g). The fix unlocked the two examples it was blocking — #564
-(`*[foo*]` with `[foo*]: /url`) and #534 (`*[foo*][ref]` with
-`[ref]: /uri`). Both produced extra `*]` (or `*][bar]`) bytes in the
-CST and could not parse losslessly.
+Took the carried-forward "Multi-line setext heading + losslessness
+bug" target. The fix unlocked #81, #82, #95 (multi-line setext
+forms). #115 was on the same target list but turned out to be a
+different (orthogonal) bug — indented-code-after-ATX-heading is
+mis-buffered as paragraph text, and that bug existed both before
+and after this fix.
 
-### Root cause: emphasis closer scanner only skipped inline links
+### Root cause: setext detected at the text line ignored prior buffered paragraph
 
-`parse_until_closer_with_nested_two` and `_one` (in
-`crates/panache-parser/src/parser/inlines/core.rs`) had a `[`-skip
-that called `try_parse_inline_link` — but only the inline
-`[text](url)` form. For shortcut/full reference brackets like
-`[foo*]`, the inline link parser returns None, so the scanner
-advanced byte-by-byte and picked the `*` *inside* the bracket label
-as the emphasis closer.
+For `Foo\nBar\n---\n` under CommonMark:
 
-That caused two failures simultaneously:
+- At line "Foo", dispatcher checks `[Foo, Bar]` → not setext;
+  buffer "Foo\n" in paragraph.
+- At line "Bar", dispatcher checks `[Bar, ---]` → setext! With
+  `blank_before_header=false` (CommonMark default), detection
+  proceeded. The dispatcher fall-through called `parse_prepared`,
+  which emitted a fresh `HEADING { text="Bar", underline="---" }`
+  while the paragraph container was still open with "Foo\n"
+  buffered.
+- Result: `HEADING` emitted *inside* the open `PARAGRAPH`, then
+  buffered "Foo" got flushed *after* the heading, scrambling byte
+  order: the green tree text came out `Bar\n---\nFoo\n` for input
+  `Foo\nBar\n---\n` (losslessness violation).
 
-1. **Losslessness violation.** Once the closer was at the inner `*`
-   (position 19 for `*[foo*]\n`), `parse_inline_range_nested` was
-   called for the emphasis content [15, 19). Inside, the *unbounded*
-   `try_parse_reference_link` greedily consumed the whole `[foo*]`
-   bracket pair (6 bytes), going past the assumed closer. The
-   emphasis still emitted its own closing `*`, so the CST gained 2
-   extra bytes (`*]`). Same shape for #534, just longer
-   (`*][bar]`).
-2. **Wrong semantic.** Even after fixing losslessness alone, the
-   link would be lost entirely — the bytes would parse as
-   `<em>[foo</em>]` instead of `* + LINK[foo*]`, contradicting
-   *both* dialects (verified with `pandoc -f commonmark` and
-   `-f markdown` — both produce `* + Link("foo*", /url)` when the
-   ref is defined).
+Pandoc-markdown does *not* form a multi-line setext here (verified
+with `pandoc -f commonmark` vs `-f markdown` — they disagree), so
+the fix is **dialect-gated** on `Dialect::CommonMark`.
 
-The fix: in both closer scanners, after the existing inline-link
-skip, also call `try_parse_reference_link` (gated on
-`config.extensions.reference_links`) and skip past it if it
-matches. With brackets treated as opaque during the closer scan,
-emphasis correctly fails (no `*` closer found between the leading
-`*` and the paragraph end), and the outer parser then resolves the
-bracket pair as a real LINK.
+### Fix: deferred PARAGRAPH wrapper via rowan checkpoint + fold path
+
+Two moving parts:
+
+1. **Refactor paragraph emission to use `rowan::Checkpoint`.**
+   `start_paragraph_if_needed` no longer calls `start_node(PARAGRAPH)`
+   eagerly; it stores a checkpoint in `Container::Paragraph` and
+   the close paths (`close_containers_to`) call
+   `start_node_at(checkpoint, PARAGRAPH)` at close. With nothing
+   committed to the green tree until close, the kind can change.
+2. **CommonMark setext fold.** In core.rs's no-blank-before
+   dispatch (`BlockDetectionResult::Yes` arm), when
+   `parser_name == "setext_heading"` AND a paragraph is open AND
+   dialect is CommonMark: take the buffered text + current line
+   as the heading content, pop the paragraph container without
+   emitting `PARAGRAPH`, and `start_node_at(checkpoint, HEADING)`
+   to wrap retroactively from the paragraph start. Body is emitted
+   via the new `emit_setext_heading_body` helper (extracted from
+   `emit_setext_heading` so callers can supply their own outer
+   `HEADING` wrapper).
+
+Formatter follow-on: under CommonMark, `Foo\nBar\n---` now parses
+as a heading whose `HEADING_CONTENT` contains an internal NEWLINE
+(between TEXT "Foo" and TEXT "Bar"). The formatter writes
+ATX-only, so the inner NEWLINE was being passed through verbatim
+as `## Foo\nBar`, which round-trips as `## Foo` + a `Bar`
+paragraph, breaking idempotency. Fix: in `format_heading`'s second
+pass (core.rs), collapse NEWLINE tokens inside HEADING_CONTENT to
+a single space.
 
 ### Files changed
 
-- **Parser (parser-shape gap)**:
-  - `crates/panache-parser/src/parser/inlines/core.rs`: added a
-    reference-link skip block in *both*
-    `parse_until_closer_with_nested_two` (right after the
-    inline-link skip near line ~693) and
-    `parse_until_closer_with_nested_one` (matching block near line
-    ~904). Gated on `config.extensions.reference_links`; passes
-    `shortcut_reference_links` and `inline_links` through to
-    `try_parse_reference_link` so the existing
-    `inline_links_disabled_keeps_inline_link_literal` invariant
-    still holds.
-- **New parser fixture + snapshot**:
-  - `emphasis_skips_shortcut_reference_link` — pins the CST for
-    `[foo*]: /url\n\n*[foo*]\n`. Single dialect-agnostic fixture
-    (verified: pandoc commonmark and markdown produce identical
-    native AST). The CST shows the `*` as a literal TEXT and
-    `[foo*]` as a shortcut LINK at the paragraph top level.
-- **Allowlist additions**: #534, #564 (Links section, appended to
-  the trailing block).
+- **Parser-shape gap (CommonMark dialect divergence)**:
+  - `crates/panache-parser/src/parser/utils/container_stack.rs`:
+    added `start_checkpoint: rowan::Checkpoint` to
+    `Container::Paragraph`.
+  - `crates/panache-parser/src/parser/blocks/paragraphs.rs`:
+    `start_paragraph_if_needed` now takes a checkpoint instead of
+    calling `start_node(PARAGRAPH)`. `append_paragraph_line` and
+    other patterns updated to ignore the new field.
+  - `crates/panache-parser/src/parser/core.rs`:
+    `close_containers_to` paragraph branches call
+    `start_node_at(checkpoint, PARAGRAPH)` before emitting buffer
+    or finishing empty. New `emit_setext_heading_folding_paragraph`
+    method. Dispatcher fall-through (no-blank-before
+    `BlockDetectionResult::Yes`) routes setext+open-paragraph to
+    the fold under CommonMark dialect.
+  - `crates/panache-parser/src/parser/blocks/headings.rs`:
+    extracted `emit_setext_heading_body` from `emit_setext_heading`.
+- **Formatter (consequent fix to keep idempotency)**:
+  - `crates/panache-formatter/src/formatter/core.rs`: HEADING_CONTENT
+    inner NEWLINE tokens now collapse to a single space.
+- **New parser fixtures + snapshots**:
+  - `setext_multiline_commonmark` (parser): paired CommonMark
+    fixture for `Foo\nBar\n---\n`. CST shows HEADING wrapping
+    HEADING_CONTENT `[TEXT Foo, NEWLINE, TEXT Bar]` then NEWLINE,
+    SETEXT_HEADING_UNDERLINE `---`, NEWLINE.
+  - `setext_multiline_pandoc` (parser): the dialect partner;
+    PARAGRAPH containing TEXT/NEWLINE for "Foo Bar ---" (Pandoc
+    refuses multi-line setext).
+- **New formatter fixture**:
+  - `setext_multiline_commonmark` (formatter, top-level
+    `tests/fixtures/cases/`): `panache.toml` with
+    `flavor = "commonmark"`. Pins
+    `Foo\nBar\n---\n` → `## Foo Bar\n` and verifies idempotency.
+    No paired Pandoc formatter case (existing top-level fixtures
+    already cover the Pandoc paragraph path).
+- **Allowlist additions**: #81, #82, #95 (Setext headings section,
+  inserted in numerical order between #80 and #83/etc.).
 
 ### Don't redo
 
-- Don't drop the `config.extensions.reference_links` gate on the
-  new skip. If the extension is off, `try_parse_reference_link`
-  isn't called from `parse_inline_range_impl` either, so skipping
-  here would silently let bracket pairs swallow emphasis closers
-  in flavors that don't enable reference links at all.
-- Don't try to fix the no-ref-def case to match CommonMark spec
-  (`*[foo*]` alone → `<em>[foo</em>]`). With our fix the parser
-  treats `[foo*]` as a shortcut LINK whether or not it resolves,
-  and the renderer's shortcut-fallback emits literal `[foo*]` —
-  net result `*[foo*]` literal, which matches Pandoc but diverges
-  from CommonMark spec for *unresolved* refs. Proper CommonMark
-  behavior here requires the delimiter-stack algorithm (process
-  brackets first, deactivate emphasis delimiters between matched
-  brackets, fall back if no link resolves) — see suggested next
-  targets about scanner-stack work. Don't try to bolt that onto
-  the current Pandoc-style closer scanner; it'll regress Pandoc.
-- Don't only add the skip to one of the two closer scanners. Both
-  `_two` (`**...**`) and `_one` (`*...*`) need it — see e.g.
-  `**[foo*]bar**` shaped inputs.
+- Don't try to make this fix work without the checkpoint refactor.
+  The PARAGRAPH start_node was being emitted *before* the buffer
+  filled, so there's no way to convert it to HEADING after the
+  fact without `start_node_at`. Calling `finish_node` on an empty
+  PARAGRAPH and then emitting HEADING would leave a stray empty
+  PARAGRAPH in the tree.
+- Don't drop the `Dialect::CommonMark` gate on the fold path. The
+  Pandoc dispatcher already declines setext detection here because
+  `blank_before_header` is on by default, so the gate is partly
+  defensive — but if anyone toggles `blank_before_header=false`
+  while staying on the Pandoc dialect, *Pandoc itself* still
+  doesn't recognize multi-line setext (verified). The dialect gate
+  is what keeps that behavior aligned.
+- Don't try to also fix #115 here. Its expected output requires
+  `# Heading\n    foo\n` to start an indented code block on
+  line 2, which currently buffers as paragraph continuation. The
+  setext fold makes the *symptom* slightly different (now folds
+  "    foo\nHeading" into the H2) but the underlying gap is
+  unrelated — see "Suggested next targets" #1.
+- Don't move the formatter NEWLINE-flatten logic into the parser.
+  The parser's CST is the lossless source of truth; the formatter
+  is what owns "ATX-only output" policy and therefore where the
+  multi-line collapse belongs.
 
 ### Suggested next targets, ranked
 
-1. **Multi-line setext heading + losslessness bug (#81, #82, #95,
-   #115)** — carried forward. Big change.
+1. **Indented code block after ATX heading (#115)** — input
+   `# Heading\n    foo\nHeading\n----` should produce ATX H1 +
+   indented code "foo" + setext H2 "Heading" + indented code +
+   HR. Currently "    foo" gets buffered as paragraph
+   continuation. Likely a missed `at_document_start`-style reset
+   in the dispatcher's indented-code precondition after an ATX
+   heading. Single example, but may unlock more if the gap is
+   systemic.
 2. **Empty list item closes the list when followed by blank line
    (#280)** — `-\n\n  foo\n` should produce
    `<ul><li></li></ul><p>foo</p>`.

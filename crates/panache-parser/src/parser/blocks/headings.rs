@@ -142,11 +142,26 @@ pub(crate) fn emit_setext_heading(
     builder: &mut GreenNodeBuilder<'static>,
     text_line: &str,
     underline_line: &str,
-    _level: usize,
+    level: usize,
     config: &ParserOptions,
 ) {
     builder.start_node(SyntaxKind::HEADING.into());
+    emit_setext_heading_body(builder, text_line, underline_line, level, config);
+    builder.finish_node(); // HEADING
+}
 
+/// Emit the body of a setext heading (HEADING_CONTENT + underline + newlines).
+///
+/// The caller is responsible for the surrounding `HEADING` start/finish node.
+/// This split lets multi-line setext headings retroactively wrap a previously
+/// open paragraph by combining its buffered content with the underline line.
+pub(crate) fn emit_setext_heading_body(
+    builder: &mut GreenNodeBuilder<'static>,
+    text_line: &str,
+    underline_line: &str,
+    _level: usize,
+    config: &ParserOptions,
+) {
     // Strip trailing newline from text line for processing
     let (text_without_newline, text_newline_str) =
         if let Some(stripped) = text_line.strip_suffix("\r\n") {
@@ -248,8 +263,6 @@ pub(crate) fn emit_setext_heading(
     if !underline_newline_str.is_empty() {
         builder.token(SyntaxKind::NEWLINE.into(), underline_newline_str);
     }
-
-    builder.finish_node(); // HEADING
 }
 
 /// Emit an ATX heading node to the builder.

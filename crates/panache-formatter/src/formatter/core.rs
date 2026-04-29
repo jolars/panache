@@ -616,14 +616,25 @@ impl Formatter {
                 self.output.push(' ');
 
                 // Second pass: format content by traversing tokens/nodes directly
-                // This preserves formatting without adding spaces between inline elements
+                // This preserves formatting without adding spaces between inline elements.
+                // Internal newlines (multi-line setext heading content like
+                // `Foo\nBar\n---`) collapse to a single space so the heading
+                // re-emits as a single ATX line; otherwise the formatter would
+                // write `## Foo\nBar`, which round-trips through the parser as
+                // `## Foo` plus a separate `Bar` paragraph and breaks idempotency.
                 let content_start = self.output.len();
                 for child in node.children() {
                     if child.kind() == SyntaxKind::HEADING_CONTENT {
                         for element in child.children_with_tokens() {
                             match element {
                                 NodeOrToken::Token(t) => {
-                                    self.output.push_str(t.text());
+                                    if t.kind() == SyntaxKind::NEWLINE {
+                                        if !self.output.ends_with(' ') {
+                                            self.output.push(' ');
+                                        }
+                                    } else {
+                                        self.output.push_str(t.text());
+                                    }
                                 }
                                 NodeOrToken::Node(n) => {
                                     // Format inline nodes (emphasis, code, spans, etc.)

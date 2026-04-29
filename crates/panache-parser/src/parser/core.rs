@@ -10,7 +10,7 @@ use super::blocks::blockquotes;
 use super::blocks::code_blocks;
 use super::blocks::definition_lists;
 use super::blocks::fenced_divs;
-use super::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
+use super::blocks::headings::{emit_atx_heading, emit_setext_heading_body, try_parse_atx_heading};
 use super::blocks::horizontal_rules::try_parse_horizontal_rule;
 use super::blocks::line_blocks;
 use super::blocks::lists;
@@ -156,19 +156,31 @@ impl<'a> Parser<'a> {
                     self.builder.finish_node();
                 }
                 // Handle Paragraph with buffering
-                Some(Container::Paragraph { buffer, .. }) if !buffer.is_empty() => {
+                Some(Container::Paragraph {
+                    buffer,
+                    start_checkpoint,
+                    ..
+                }) if !buffer.is_empty() => {
                     // Clone buffer to avoid borrow issues
                     let buffer_clone = buffer.clone();
+                    let checkpoint = *start_checkpoint;
                     // Pop container first
                     self.containers.stack.pop();
-                    // Emit buffered content with inline parsing (handles markers)
+                    // Retroactively wrap as PARAGRAPH and emit buffered content
+                    self.builder
+                        .start_node_at(checkpoint, SyntaxKind::PARAGRAPH.into());
                     buffer_clone.emit_with_inlines(&mut self.builder, self.config);
                     self.builder.finish_node();
                 }
                 // Handle Paragraph without content
-                Some(Container::Paragraph { .. }) => {
-                    // Just close normally
+                Some(Container::Paragraph {
+                    start_checkpoint, ..
+                }) => {
+                    let checkpoint = *start_checkpoint;
+                    // Just close normally — emit empty PARAGRAPH wrapper
                     self.containers.stack.pop();
+                    self.builder
+                        .start_node_at(checkpoint, SyntaxKind::PARAGRAPH.into());
                     self.builder.finish_node();
                 }
                 // Handle Definition with buffered PLAIN
@@ -436,6 +448,53 @@ impl<'a> Parser<'a> {
     /// Check if a paragraph is currently open.
     fn is_paragraph_open(&self) -> bool {
         matches!(self.containers.last(), Some(Container::Paragraph { .. }))
+    }
+
+    /// Fold an open paragraph's buffered content into a setext heading and emit it.
+    ///
+    /// Used for CommonMark multi-line setext: when a setext underline is matched
+    /// and a paragraph is already open with buffered text, the entire paragraph
+    /// (buffer + current text line) becomes the heading content. The HEADING node
+    /// is wrapped retroactively from the paragraph's start checkpoint so the
+    /// emitted bytes appear in source order.
+    fn emit_setext_heading_folding_paragraph(
+        &mut self,
+        text_line: &str,
+        underline_line: &str,
+        level: usize,
+    ) {
+        let (buffered_text, checkpoint) = match self.containers.stack.last() {
+            Some(Container::Paragraph {
+                buffer,
+                start_checkpoint,
+                ..
+            }) => (buffer.get_text_for_parsing(), Some(*start_checkpoint)),
+            _ => (String::new(), None),
+        };
+
+        if checkpoint.is_some() {
+            self.containers.stack.pop();
+        }
+
+        let combined_text = if buffered_text.is_empty() {
+            text_line.to_string()
+        } else {
+            format!("{}{}", buffered_text, text_line)
+        };
+
+        let cp = checkpoint.expect(
+            "emit_setext_heading_folding_paragraph requires an open paragraph; \
+             single-line setext should go through the regular dispatcher path",
+        );
+        self.builder.start_node_at(cp, SyntaxKind::HEADING.into());
+        emit_setext_heading_body(
+            &mut self.builder,
+            &combined_text,
+            underline_line,
+            level,
+            self.config,
+        );
+        self.builder.finish_node();
     }
 
     /// Close paragraph if one is currently open.
@@ -2337,6 +2396,34 @@ impl<'a> Parser<'a> {
                     }
                 }
                 BlockDetectionResult::Yes => {
+                    // CommonMark multi-line setext: when an open paragraph is
+                    // followed by a setext underline, the entire paragraph
+                    // becomes the heading content. The dispatcher reports
+                    // setext at the line *before* the underline (the last text
+                    // line); fold the buffered paragraph + this line into a
+                    // single HEADING. Pandoc-markdown disagrees (it never
+                    // forms a multi-line setext), so this branch is dialect-
+                    // gated; under Pandoc, a setext detection while a
+                    // paragraph is open never reaches this point because
+                    // `blank_before_header` is on by default and gates out the
+                    // detection earlier in `SetextHeadingParser::detect_prepared`.
+                    if parser_name == "setext_heading"
+                        && self.is_paragraph_open()
+                        && self.config.dialect == crate::options::Dialect::CommonMark
+                    {
+                        let text_line = self.lines[self.pos];
+                        let underline_line = self.lines[self.pos + 1];
+                        let underline_char = underline_line.trim().chars().next().unwrap_or('=');
+                        let level = if underline_char == '=' { 1 } else { 2 };
+                        self.emit_setext_heading_folding_paragraph(
+                            text_line,
+                            underline_line,
+                            level,
+                        );
+                        self.pos += 2;
+                        return true;
+                    }
+
                     // Keep ambiguous fenced-div openers from interrupting an
                     // active paragraph without a blank line.
                     if parser_name == "fenced_div_open" && self.is_paragraph_open() {

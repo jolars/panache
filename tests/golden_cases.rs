@@ -214,6 +214,7 @@ golden_test_cases!(
     list_interrupts_paragraph_commonmark,
     headings,
     setext_headings,
+    setext_multiline_commonmark,
     setext_text_thematic_break_commonmark,
     thematic_break_interrupts_paragraph_commonmark,
     hr_as_list_item_content,
