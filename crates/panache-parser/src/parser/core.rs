@@ -680,7 +680,12 @@ impl<'a> Parser<'a> {
                             nested_marker,
                         );
                     } else {
-                        lists::add_list_item(&mut self.containers, &mut self.builder, &list_item);
+                        lists::add_list_item(
+                            &mut self.containers,
+                            &mut self.builder,
+                            &list_item,
+                            self.config,
+                        );
                     }
                     self.maybe_open_fenced_code_in_new_list_item();
                     return;
@@ -695,6 +700,7 @@ impl<'a> Parser<'a> {
                 &prepared.marker,
                 &list_item,
                 indent_to_emit,
+                self.config,
             );
             self.maybe_open_fenced_code_in_new_list_item();
             return;
@@ -723,7 +729,12 @@ impl<'a> Parser<'a> {
                     nested_marker,
                 );
             } else {
-                lists::add_list_item(&mut self.containers, &mut self.builder, &list_item);
+                lists::add_list_item(
+                    &mut self.containers,
+                    &mut self.builder,
+                    &list_item,
+                    self.config,
+                );
             }
             self.maybe_open_fenced_code_in_new_list_item();
             return;
@@ -732,10 +743,10 @@ impl<'a> Parser<'a> {
         if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
             self.close_containers_to(self.containers.depth() - 1);
         }
-        while matches!(self.containers.last(), Some(Container::ListItem { .. })) {
-            self.close_containers_to(self.containers.depth() - 1);
-        }
-        while matches!(self.containers.last(), Some(Container::List { .. })) {
+        while matches!(
+            self.containers.last(),
+            Some(Container::ListItem { .. } | Container::List { .. })
+        ) {
             self.close_containers_to(self.containers.depth() - 1);
         }
 
@@ -758,7 +769,12 @@ impl<'a> Parser<'a> {
                 nested_marker,
             );
         } else {
-            lists::add_list_item(&mut self.containers, &mut self.builder, &list_item);
+            lists::add_list_item(
+                &mut self.containers,
+                &mut self.builder,
+                &list_item,
+                self.config,
+            );
         }
         self.maybe_open_fenced_code_in_new_list_item();
     }
@@ -966,6 +982,7 @@ impl<'a> Parser<'a> {
                                 &mut self.containers,
                                 &mut self.builder,
                                 &list_item,
+                                self.config,
                             );
                         }
                     } else if let Some(fence) = code_blocks::try_parse_fence_open(content_slice) {
@@ -1668,6 +1685,7 @@ impl<'a> Parser<'a> {
                                 &mut self.containers,
                                 &mut self.builder,
                                 &list_item,
+                                self.config,
                             );
                         }
                         self.pos += 1;
@@ -1884,7 +1902,12 @@ impl<'a> Parser<'a> {
                             indent_cols,
                             indent_bytes,
                         };
-                        lists::add_list_item(&mut self.containers, &mut self.builder, &list_item);
+                        lists::add_list_item(
+                            &mut self.containers,
+                            &mut self.builder,
+                            &list_item,
+                            self.config,
+                        );
                     }
                     self.pos += 1;
                     return true;

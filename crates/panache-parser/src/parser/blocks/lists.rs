@@ -1091,6 +1091,7 @@ pub(in crate::parser) fn start_nested_list(
     marker: &ListMarker,
     item: &ListItemEmissionInput<'_>,
     indent_to_emit: Option<&str>,
+    config: &ParserOptions,
 ) {
     // Emit the indent if needed
     if let Some(indent_str) = indent_to_emit {
@@ -1107,14 +1108,7 @@ pub(in crate::parser) fn start_nested_list(
 
     // Add the nested list item
     let (content_col, text_to_buffer) = emit_list_item(builder, item);
-    let mut buffer = ListItemBuffer::new();
-    if !text_to_buffer.is_empty() {
-        buffer.push_text(text_to_buffer);
-    }
-    containers.push(Container::ListItem {
-        content_col,
-        buffer,
-    });
+    finish_list_item_with_optional_nested(containers, builder, content_col, text_to_buffer, config);
 }
 
 /// Checks if the content after a list marker is exactly another bullet marker.
@@ -1215,6 +1209,7 @@ pub(in crate::parser) fn add_list_item(
     containers: &mut ContainerStack,
     builder: &mut GreenNodeBuilder<'static>,
     item: &ListItemEmissionInput<'_>,
+    config: &ParserOptions,
 ) {
     let (content_col, text_to_buffer) = emit_list_item(builder, item);
 
@@ -1223,6 +1218,84 @@ pub(in crate::parser) fn add_list_item(
         item.content,
         text_to_buffer
     );
+
+    finish_list_item_with_optional_nested(containers, builder, content_col, text_to_buffer, config);
+}
+
+/// Finish a list item by either buffering its content or, when the buffered
+/// content begins with another list marker followed by content, recursively
+/// opening a nested LIST with another LIST_ITEM. Pushes the appropriate
+/// containers onto the stack so the caller doesn't need to.
+fn finish_list_item_with_optional_nested(
+    containers: &mut ContainerStack,
+    builder: &mut GreenNodeBuilder<'static>,
+    content_col: usize,
+    text_to_buffer: String,
+    config: &ParserOptions,
+) {
+    // A line whose content is a thematic break (e.g. `* * *`) takes precedence
+    // over being parsed as a sequence of nested list markers. Both dialects
+    // agree: `- * * *` is a list item containing a thematic break, not a
+    // chain of bullets.
+    let buffered_is_thematic_break = super::horizontal_rules::try_parse_horizontal_rule(
+        text_to_buffer.trim_end_matches(['\r', '\n']),
+    )
+    .is_some();
+
+    // Recursive same-line nested list emission is gated to CommonMark.
+    // Pandoc-markdown also nests in this position (e.g. `- b. foo` is a
+    // bullet wrapping an alpha-ordered list), but the formatter does not
+    // yet support emitting an outer LIST_ITEM whose only child is a
+    // nested LIST, so producing the nested CST under Pandoc breaks
+    // formatter idempotency. Tracked as future work.
+    let dialect_allows_nested = config.dialect == crate::Dialect::CommonMark;
+
+    if dialect_allows_nested
+        && !buffered_is_thematic_break
+        && let Some(inner_match) = try_parse_list_marker(&text_to_buffer, config)
+    {
+        let inner_content_start = inner_match.marker_len + inner_match.spaces_after_bytes;
+        let after_inner = text_to_buffer
+            .get(inner_content_start..)
+            .unwrap_or("")
+            .trim_end_matches(['\r', '\n']);
+        // Recurse only when there is real content after the inner marker.
+        // The bare-inner-marker case (e.g. `- *`) is handled by the existing
+        // `add_list_item_with_nested_empty_list` path.
+        if !after_inner.is_empty() {
+            // Push outer ListItem with empty buffer.
+            containers.push(Container::ListItem {
+                content_col,
+                buffer: ListItemBuffer::new(),
+            });
+            // Open nested LIST inside the outer LIST_ITEM.
+            builder.start_node(SyntaxKind::LIST.into());
+            containers.push(Container::List {
+                marker: inner_match.marker.clone(),
+                base_indent_cols: content_col,
+                has_blank_between_items: false,
+            });
+            // Emit nested LIST_ITEM via emit_list_item, then recurse on its
+            // content for further-nested same-line markers.
+            let inner_item = ListItemEmissionInput {
+                content: text_to_buffer.as_str(),
+                marker_len: inner_match.marker_len,
+                spaces_after_cols: inner_match.spaces_after_cols,
+                spaces_after_bytes: inner_match.spaces_after_bytes,
+                indent_cols: content_col,
+                indent_bytes: 0,
+            };
+            let (inner_content_col, inner_text_to_buffer) = emit_list_item(builder, &inner_item);
+            finish_list_item_with_optional_nested(
+                containers,
+                builder,
+                inner_content_col,
+                inner_text_to_buffer,
+                config,
+            );
+            return;
+        }
+    }
 
     let mut buffer = ListItemBuffer::new();
     if !text_to_buffer.is_empty() {

@@ -1,6 +1,6 @@
 CommonMark spec.txt v0.31.2 conformance report
-597 / 652 examples passing (91.6%)
-55 failing
+599 / 652 examples passing (91.9%)
+53 failing
 12 blocked-list entries
 
 === Per-section pass / fail ===
@@ -20,7 +20,7 @@ CommonMark spec.txt v0.31.2 conformance report
   Inlines: 1 pass / 0 fail
   Link reference definitions: 26 pass / 1 fail
   Links: 78 pass / 12 fail
-  List items: 39 pass / 9 fail
+  List items: 41 pass / 7 fail
   Lists: 24 pass / 2 fail
   Paragraphs: 8 pass / 0 fail
   Precedence: 1 pass / 0 fail
@@ -315,6 +315,8 @@ CommonMark spec.txt v0.31.2 conformance report
 295
 296
 297
+298
+299
 301
 302
 303
@@ -1150,6 +1152,8 @@ CommonMark spec.txt v0.31.2 conformance report
 295
 296
 297
+298
+299
 
 # Lists
 301

@@ -16,161 +16,209 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (vii)
+## Latest session — 2026-04-29 (viii)
 
-**Pass count: 592 → 597 / 652 (91.6%, +5)**
+**Pass count: 597 → 599 / 652 (91.9%, +2)**
 
-All five wins are in the Emphasis section, from one same-delim
-nested-emphasis fix that applies under both dialects.
+Both wins are in List items: #298 and #299 — same-line nested list
+markers (`- - foo`, `1. - 2. foo`).
 
-### Root cause: panache's recursive scanner missed nested same-delim openers
+### Root cause: same-line nested list markers were never recursed
 
-When scanning the inside of `*X*` for its closer,
-`parse_until_closer_with_nested_two` only attempted nested `**`
-(strong) — it never attempted another `*X*`. Symmetric gap in
-`parse_until_closer_with_nested_one` for `__X__`. So inputs like
-`*(*foo*)*` and `__foo, __bar__, baz__` resolved to a single flat
-emphasis at the first available closer, dropping the nested span
-panache should produce. Pandoc-markdown agrees with CommonMark
-here for `_(_foo_)_` and the `__` cases, so the fix is universal.
-For the `*` cases (#369, #407) the dialects diverge but the
-existing CommonMark right-flanking gate already prevents the
-outer's premature close; the new nested attempt rounds out the
-result.
+When a list item's first-line content begins with another list marker
+followed by content, CommonMark requires emitting a nested LIST inside
+the outer LIST_ITEM. Panache previously buffered the entire content
+(including any inner marker) as inline text, so `- - foo` rendered as
+`<li>- foo</li>` instead of `<li><ul><li>foo</li></ul></li>`.
 
-Fix: when an isolated delim run of exactly `delim_count` fails
-the closer check (right-flanking for `*` under CommonMark, or
-the underscore intraword/right-flanking gates under both
-dialects), retry it as a *nested same-delim opener* via
-`try_parse_emphasis` with a throwaway builder. On success, skip
-the consumed bytes and keep scanning for the outer closer; on
-failure, advance one char without poisoning the outer.
+The existing `is_content_nested_bullet_marker` /
+`add_list_item_with_nested_empty_list` path only handled the bare-inner
+case (`- *`, `- +`, `- -`) where the inner marker has no content after
+it. The non-bare case fell through to plain text.
 
-Critical heuristic to avoid regressing #470: only attempt the
-nested when there are at least `2 * delim_count` `delim_char`s
-remaining ahead. Without this, `*foo __bar *baz bim__ bam*` (#470)
-greedily binds the `*` at "bar *baz" to the trailing `*` and
-leaves the outer `*` with no closer. The "≥ 2*delim_count
-remaining" check ensures both the nested span and the outer
-emphasis can plausibly close. CommonMark's stack algorithm
-naturally handles this via opener removal during inner closer
-matching; we approximate with the count check.
+### Fix
 
-Also factored the closer-validity check (underscore intraword,
-underscore right-flanking, asterisk CommonMark right-flanking)
-out of the inline `continue` paths into a single
-`is_valid_same_delim_closer` helper to make the new
-"closer-failed-at-isolated-run" branching readable.
+1. New `finish_list_item_with_optional_nested` helper in
+   `crates/panache-parser/src/parser/blocks/lists.rs`. After
+   `emit_list_item` produces the outer LIST_ITEM markers and a buffered
+   text, the helper:
+   - Tries `try_parse_list_marker` on the buffered text.
+   - If it matches AND there's content after the inner marker AND the
+     buffered text isn't itself a thematic break (`- * * *` exception),
+     recursively opens a nested LIST + LIST_ITEM, emits the inner item
+     via the same helper (so 3+ levels work), and returns.
+   - Otherwise, buffers the text and pushes the outer ListItem
+     container — original behavior.
 
-### Wins unlocked
+2. Both `add_list_item` and `start_nested_list` now route through this
+   helper. They now take a `&ParserOptions` so the recursive
+   `try_parse_list_marker` has the dialect/extensions context.
 
-- #369 `*(*foo*)*` → `<em>(<em>foo</em>)</em>` (CM only)
-- #373 `_(_foo_)_` → `<em>(<em>foo</em>)</em>` (both dialects)
-- #389 `__foo, __bar__, baz__` → nested STRONG (both dialects)
-- #407 `*foo *bar* baz*` → nested EMPH (CM only)
-- #425 `__foo __bar__ baz__` → nested STRONG (both dialects)
+3. **Container-stack unwind fix** in
+   `crates/panache-parser/src/parser/core.rs`
+   `handle_list_open_effect` (third branch, no-matching-level case):
+   the previous code popped while `ListItem` then while `List`, which
+   doesn't fully unwind interleaved `[..., LIST, LIST_ITEM, LIST,
+   LIST_ITEM]` stacks the recursion produces. Combined into a single
+   loop popping while last is either `ListItem` or `List`. Without
+   this, a new top-level list arriving after a nested-recursion-line
+   ended up nested inside the previous outer LIST_ITEM. (See "Don't
+   redo" below: this affected only the deep interleaved case; existing
+   single-level nested behavior was already correct because that path
+   matched on `find_matching_list_level` and used
+   `close_containers_to(level + 1)` instead of the unwind loops.)
+
+### Dialect gating
+
+The recursion is gated to `Dialect::CommonMark`:
+
+```
+let dialect_allows_nested = config.dialect == crate::Dialect::CommonMark;
+```
+
+Pandoc-markdown also nests in this position (verified with `pandoc -f
+markdown -t native`: `- b. foo` is a bullet wrapping an alpha-ordered
+list), but the **formatter** does not yet support emitting an outer
+LIST_ITEM whose only child is a nested LIST — when triggered, it drops
+the outer marker and emits just the inner list, breaking idempotency
+(specifically, the `escaped_double_underscore_in_list_item_stays_idempotent`
+test). So under Pandoc dialect we keep the existing flat behavior and
+the formatter test stays green; under CommonMark we land the nested
+shape and unlock #298, #299. **Removing the dialect gate is a
+follow-up that requires a formatter fix first** — see "Suggested next
+targets" #N below.
 
 ### Files changed
 
-- **Parser-shape (universal nested-same-delim) + dialect
-  approximation of CommonMark's stack semantics**:
-  - `crates/panache-parser/src/parser/inlines/core.rs`:
-    - New `is_valid_same_delim_closer` helper consolidating the
-      `_`/`*` closer rules.
-    - New `has_enough_delim_chars_ahead` heuristic guarding
-      nested attempts (≥ 2 * delim_count).
-    - In both `parse_until_closer_with_nested_two` (delim_count=1)
-      and `parse_until_closer_with_nested_one` (delim_count=2):
-      rewired the closer-check branch to set a
-      `closer_failed_at_isolated_run` flag and, when set, invoke
-      `try_parse_emphasis` for nested same-delim with the
-      heuristic gate. On success skip; on failure advance.
-- **New paired parser fixtures + snapshots**:
-  - `emphasis_same_delim_nested_commonmark/` — CST snapshot
-    pinning nested EMPH/STRONG for all five inputs.
-  - `emphasis_same_delim_nested_pandoc/` — same inputs, pins
-    Pandoc-markdown CST: `*(*foo*)*` is two adjacent EMPH and
-    `*foo *bar* baz*` is partial-EMPH-with-literal-tail
-    (matches `pandoc -f markdown -t native`); the underscore
-    cases match CommonMark.
-  - Wired into `golden_parser_cases.rs` next to existing
-    `emphasis_*` cases.
-- **Allowlist additions** (Emphasis): #369, #373, #389, #407,
-  #425.
+- **Parser-shape (universal)**:
+  - `crates/panache-parser/src/parser/blocks/lists.rs`:
+    - New `finish_list_item_with_optional_nested` helper.
+    - `add_list_item` and `start_nested_list` take `&ParserOptions` and
+      route through it.
+    - Thematic-break short-circuit so `- * * *` keeps producing a
+      thematic-break inside the list item, not a deep bullet chain.
+  - `crates/panache-parser/src/parser/core.rs`:
+    - All 6 `add_list_item` call sites pass `self.config`.
+    - `start_nested_list` call site passes `self.config`.
+    - Combined `while ListItem` + `while List` unwind loops in
+      `handle_list_open_effect` third branch.
+- **Paired parser fixtures + snapshots**:
+  - `list_nested_same_line_marker_commonmark/` — pins nested CST for
+    `- - foo` and `1. - 2. foo` (3 levels).
+  - `list_nested_same_line_marker_pandoc/` — pins flat CST (current
+    Pandoc-mode behavior; will change when the formatter supports
+    nested-only outer items).
+  - Wired into `golden_parser_cases.rs` next to existing `list_*`
+    cases.
+- **Allowlist additions** (List items): #298, #299.
 
-No CommonMark formatter golden case added: while the formatted
-output of `*foo *bar* baz*` differs between CM
-(`*foo *bar* baz*`) and Pandoc (`*foo* bar\* baz\*`), the block
-sequence is unchanged (still PARAGRAPH-only). Verified
-idempotency manually under CommonMark (`format(format(x)) ==
-format(x)` for all five inputs).
+No CommonMark formatter golden case added: the new structural shape
+under CommonMark is `LIST > LIST_ITEM > LIST > LIST_ITEM`, but the
+**Pandoc** existing formatter behavior already round-trips the *same
+input* differently (flat single-level list with `- foo` text), and the
+formatter golden suite covers Pandoc defaults. Adding a CommonMark
+formatter case would only confirm the same flat-output formatter
+behavior is reused under CommonMark too, which isn't worth the churn.
+The parser fixture is sufficient.
 
 ### Don't redo
 
-- Don't drop the `has_enough_delim_chars_ahead` heuristic. It
-  isn't strictly correct CommonMark semantics (the real
-  algorithm uses delimiter-stack opener-removal when nested
-  other-delim emphasis closes), but it preserves #470 and #471
-  which are currently in the allowlist. Removing it regresses
-  #470 immediately.
-- Don't try to apply this approach to #408 / #409 / #426 /
-  #402. Those need *partial-match* logic (a length-2 opener
-  matching against a length-1 closer, leaving residual
-  delimiters) — that's the next step toward a real delimiter
-  stack and is a substantially larger refactor.
-- Don't try to apply this to #416 / #417 (rule-of-3). Different
-  story: closer rejection when the open+close delimiter run
-  lengths sum to a non-trivial multiple of 3.
-- Don't pass the inner content via the temp_builder. We
-  intentionally discard it; the outer emphasis's content gets
-  re-parsed via `parse_inline_range_nested` once the outer
-  closer is found, which correctly emits the nested span.
-- Don't tighten `try_parse_emphasis_nested` here either —
-  that's still its own follow-up and not load-bearing for these
-  five wins.
+- Don't drop the `Dialect::CommonMark` gate. It's load-bearing for the
+  Pandoc `escaped_double_underscore_in_list_item_stays_idempotent`
+  test. Removing it requires fixing the formatter to handle a
+  LIST_ITEM whose only child is a non-empty nested LIST (probably:
+  emit outer marker + space + recurse inline, like pandoc's `- b.
+  WHERE...` round-trip).
+- Don't drop the thematic-break short-circuit. Without it `- * * *`
+  (#61) regresses immediately — the `* * *` content gets recursed as
+  three nested bullet markers.
+- Don't drop the unwind-loop merge in `handle_list_open_effect` third
+  branch. Without it, a non-matching new list at indent 0 after a
+  nested same-line line ends up inside the previous outer LIST_ITEM
+  instead of at document level.
+- Don't try to handle the **bare inner marker** case (`- *`, `- -`,
+  `- +`) in the new helper. The existing
+  `add_list_item_with_nested_empty_list` path is still load-bearing
+  for that — it closes the inner LIST_ITEM (empty) rather than leaving
+  it open. Keep them separate.
+- Don't extend recursion to handle `> 1. > Blockquote` (#292, #293) by
+  reusing this helper. Those need same-line *blockquote markers*
+  inside list items, which is a different mechanism (open
+  `Container::BlockQuote` mid-item, not open another `Container::List`).
+- The `has_enough_delim_chars_ahead` heuristic from session (vii) is
+  still load-bearing for emphasis #470/#471 — don't touch.
 
 ### Suggested next targets, ranked
 
-1. **Partial-match emphasis (#402, #408, #426)** — the
+1. **Formatter fix for nested-only outer LIST_ITEM** — the unblocker
+   for removing the Pandoc dialect gate and gaining whatever pandoc
+   parity Pandoc-markdown gets out of the recursion. Probably 1
+   formatter file change in
+   `crates/panache-formatter/src/formatter/lists.rs`
+   (`format_list_item`'s lines.is_empty() / has_only_empty_nested_list
+   path needs a new case: when the LIST_ITEM has a non-empty nested
+   LIST as its first content and no PLAIN/PARAGRAPH, emit outer marker
+   + space inline and let the nested list recursion continue on the
+   same line). Verify against pandoc round-trip.
+2. **Partial-match emphasis (#402, #408, #426)** — the
    delimiter-stack idea: a `__` opener can match a single `_`
    closer (consuming one of two `_`s), leaving residual openers
    for later closers. Currently `try_parse_two` looks for a
    length-2 closer only. Largest tractable fix; needs care to
    avoid regressing existing `__` behavior and to keep Pandoc
-   parity. Likely unlocks 3+ examples.
-2. **Rule of 3 (#412, #416, #417)** — CommonMark §6.2:
+   parity. Likely unlocks 3+ examples. (Carried over from vii.)
+3. **Rule of 3 (#412, #416, #417)** — CommonMark §6.2:
    "If one of the delimiters can both open and close (strong)
    emphasis, then the sum of the lengths of the delimiter runs
    containing the open and close delimiters must not be a
    multiple of 3 unless both lengths are multiples of 3."
    Cross-dialect divergence; gate on `Dialect::CommonMark`.
-3. **#409 `*foo *bar**`** — needs partial-match for `**` closer
-   to be split between inner `*` and outer `*`. Companion to
-   (1).
-4. **Empty list item closes the list when followed by blank line
-   (#280)** — parser-shape gap.
-5. **List with non-uniform marker indentation (#312)** —
-   parser-shape gap; 4-space `- e` should be lazy continuation
-   of preceding `- d`.
-6. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion;
-   substantial.
-7. **HTML block #148** — `</pre>` inside HTML block followed by
+   (Carried over.)
+4. **#409 `*foo *bar**`** — needs partial-match for `**` closer
+   to be split between inner `*` and outer `*`. Companion to (2).
+5. **#280 empty list item closes the list** —
+   `-\n\n  foo\n` should produce empty LI + separate paragraph
+   under CommonMark. Pandoc keeps `foo` as the list item content.
+   Dialect divergence. Parser-shape gap, gate on CommonMark.
+6. **#312 list with non-uniform marker indentation** — `- a\n -
+   b\n  - c\n   - d\n    - e\n` should be 4 sibling items with
+   `- e` as lazy paragraph continuation of `d`. Both dialects
+   agree per pandoc. Parser-shape gap, universal.
+7. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion;
+   substantial. (Carried over.)
+8. **HTML block #148** — `</pre>` inside HTML block followed by
    blank-line content should be inline raw HTML in the resumed
    paragraph; renderer/parser disagreement on where the HTML
-   block ends.
-8. **Reference link followed by another bracket pair (#569,
+   block ends. (Carried over.)
+9. **Reference link followed by another bracket pair (#569,
    #571)** — CMark left-bracket scanner stack model. Large.
-9. **Nested LINKs in link text (#518, #519, #520, #532, #533)** —
-   CommonMark §6.4 forbids real nesting; outer must un-link.
-   Same scanner-stack work.
-10. **HTML-tag/autolink interaction with link brackets (#524,
+   (Carried over.)
+10. **Nested LINKs in link text (#518, #519, #520, #532, #533)** —
+    CommonMark §6.4 forbids real nesting; outer must un-link.
+    Same scanner-stack work. (Carried over.)
+11. **HTML-tag/autolink interaction with link brackets (#524,
     #526, #536, #538)** — bracket scanner must skip past raw HTML
-    and autolinks.
-11. **Block quotes lazy-continuation #235, #251** — last two
-    blockquote failures.
-12. **Fence inside blockquote inside list item (#321)**.
-13. **Lazy / nested marker continuation (#298, #299)**.
-14. **Multi-block content in `1.     code` items (#273, #274)**.
-15. **Setext-in-list-item (#300)**.
-16. **Ref-def dialect divergence #201** — `[foo]: <bar>(baz)`.
-    Low priority.
+    and autolinks. (Carried over.)
+12. **Block quotes lazy-continuation #235, #251** — last two
+    blockquote failures. #235 is a dialect divergence (CommonMark
+    closes the BQ-list pair, Pandoc lazy-continues). #251 is the
+    `>>>` / `> bar` / `>>baz` lazy-continuation pattern.
+13. **Fence inside blockquote inside list item (#321)**.
+    (Carried over.)
+14. **Same-line blockquote inside list item (#292, #293)** —
+    `> 1. > Blockquote` needs the inner `>` to open a blockquote
+    inside the list item. Conceptually similar to (1)'s same-line
+    nesting, but different mechanism (BlockQuote container, not
+    List container). Lazy continuation `continued here.` should
+    fold into the inner blockquote's paragraph.
+15. **#273, #274 multi-block content in `1.     code` items** —
+    spaces ≥ 5 after marker means content_col is at marker+1 and
+    the rest is indented code. Currently we accept all spaces as
+    spaces_after.
+16. **#278 `-\n  foo\n-\n  ```\n…`** — empty marker followed by
+    indented content. We currently misinterpret `-\n  foo` as
+    setext heading; multiple bugs likely.
+17. **#300 setext-in-list-item** — `- # Foo\n- Bar\n  ---\n  baz`
+    should treat `Bar\n  ---` as setext h2.
+18. **Ref-def dialect divergence #201** — `[foo]: <bar>(baz)`.
+    Low priority. (Carried over.)

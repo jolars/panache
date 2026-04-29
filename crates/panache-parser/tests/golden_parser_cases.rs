@@ -274,6 +274,8 @@ golden_test_cases!(
     list_item_indented_code,
     list_mixed_bullets_commonmark,
     list_mixed_bullets_pandoc,
+    list_nested_same_line_marker_commonmark,
+    list_nested_same_line_marker_pandoc,
     lists_bullet,
     lists_code,
     lists_example,
