@@ -1697,7 +1697,9 @@ impl<'a> Parser<'a> {
                 // append in this case.
                 let is_commonmark = self.config.dialect == crate::options::Dialect::CommonMark;
                 let interrupts_via_hr = is_commonmark && try_parse_horizontal_rule(line).is_some();
-                if !interrupts_via_hr {
+                let interrupts_via_fence =
+                    is_commonmark && code_blocks::try_parse_fence_open(line).is_some();
+                if !interrupts_via_hr && !interrupts_via_fence {
                     if bq_depth > 0 {
                         // Buffer the explicit `>` markers we have into the
                         // paragraph (it's at the deeper blockquote level, so

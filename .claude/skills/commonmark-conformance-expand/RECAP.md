@@ -16,160 +16,138 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (xix)
+## Latest session — 2026-04-29 (xx)
 
-**Pass count: 625 → 627 / 652 (96.2%, +2)**
+**Pass count: 627 → 628 / 652 (96.3%, +1)**
 
-Mixed tab/space indented code: a line whose leading whitespace
-expands (column-wise, tabstop = 4) to ≥ 4 cols is an indented code
-block, even if the column-4 boundary lands on a tab — e.g. `  \tfoo`
-(2 spaces + tab) is indented code, not paragraph. The renderer's
-indent-stripping was also byte-level; column-aware stripping is
-required so that a tab partially consumed by the strip emits its
-remaining cols as virtual spaces in the rendered content.
+Fenced code openers must interrupt a lazy-continuing blockquote
+paragraph under CommonMark, in the same way HR already does.
+Without that, a fence that appears below `> b` (with no `>` on
+the fence line) stayed inside the blockquote's paragraph and got
+parsed as an inline code span, rather than closing the blockquote
+and opening a `CODE_BLOCK` at the outer level.
 
 ### Targets unlocked
 
-- **#2** `  \tfoo\tbaz\t\tbim` → indented code with content
-  `foo\tbaz\t\tbim` (interior tabs preserved verbatim).
-- **#5** `- foo\n\n\t\tbar` → loose list item with `<p>foo</p>`
-  + indented code containing `  bar` (li_indent=2 + 4-col strip
-  = 6 cols total; second tab contributes 2 cols of slack as
-  virtual spaces).
+- **#321** `- a\n  > b\n  ```\n  c\n  ```\n- d` — list item with
+  child blockquote `b`, sibling fenced code block `c`, then
+  second list item `d`.
 
 ### Root cause
 
-Two byte-level checks broke column-aware indent semantics:
+In `crates/panache-parser/src/parser/core.rs`, the
+`bq_depth < current_bq_depth` branch (≈ line 1685) handles a
+line with fewer `>` markers than the open blockquote stack. When
+the last container is a paragraph, it tries lazy continuation,
+but only bails out to "close paragraph + close blockquote, then
+parse this line as a fresh block" when the line itself is a
+paragraph-interrupter. The interrupter check was HR-only:
+```rust
+let interrupts_via_hr = is_commonmark
+    && try_parse_horizontal_rule(line).is_some();
+```
+A `\`\`\`` line is also a paragraph-interrupter under CommonMark,
+but it wasn't in the predicate, so it got lazily appended.
 
-1. `is_indented_code_line` in
-   `crates/panache-parser/src/parser/blocks/indented_code.rs`
-   counted only pure-space prefixes (or a leading `\t`), so a line
-   like `  \t…` (2 sp + tab = 4 cols) returned false and the
-   dispatcher fell through to paragraph. With column-aware
-   accounting it returns true, parsing it as `CODE_BLOCK`.
-2. The conformance harness's renderer at
-   `crates/panache-parser/tests/commonmark/html_renderer.rs`
-   stripped up to 4 leading **bytes** (or one leading tab) per
-   line of indented-code content. For the list-item case
-   (`li_indent=2` + 4-col indent marker = 6 cols total), this
-   missed both the partial-tab consumption and the slack-as-
-   virtual-spaces emission CMark requires.
-
-Both flavors agree on the construct (verified with
-`pandoc -f commonmark -t native` and `-f markdown -t native`),
-so the parser change is dialect-neutral — no `Dialect::CommonMark`
-gate, no paired Pandoc fixture.
+Verified with pandoc: both `-f commonmark` and `-f markdown`
+agree that a fence terminates the blockquote paragraph for the
+standalone `> b\n\`\`\`...\n\`\`\`` case. Inside the list-item-
+containing case (#321), pandoc-markdown additionally never opens
+the inner blockquote (lazy paragraph absorbs `> b`), so the bug
+only surfaces under CommonMark dialect. The fix is gated on
+`Dialect::CommonMark` to match the existing HR pattern (HR
+genuinely diverges between dialects — `> b\n---` is setext h2
+under markdown, blockquote + HR under commonmark).
 
 ### Fix
 
-- `crates/panache-parser/src/parser/blocks/indented_code.rs`:
-  rewrote `is_indented_code_line` to call `leading_indent` and
-  return `cols >= 4` (column-aware via the existing helper in
-  `parser/utils/container_stack.rs`).
-- `crates/panache-parser/tests/commonmark/html_renderer.rs`:
-  - New `consume_leading_cols(body, target_cols)` helper that
-    advances byte-by-byte through ` ` / `\t`, advancing `col`
-    against tabstop = 4. If a tab would push past `target_cols`,
-    it stops and returns `(byte_idx + 1, slack, true)` where
-    `slack = next_stop - target_cols`.
-  - Replaced the indented-code branch's separate `li_indent`
-    + 4-col passes with a single `strip_cols = li_indent + 4`
-    pass using the helper. The slack (if any) is prepended to
-    the line as literal spaces before the byte tail. Whitespace-
-    only lines that don't reach the strip target collapse to
-    just the newline (preserving the prior blank-line rule).
-  - Old `strip_leading_spaces_per_line` retained — still used
-    by the fenced-code branch and HTML blocks, where it's
-    correct (those paths only see spaces).
+- `crates/panache-parser/src/parser/core.rs`: extend the
+  interrupter predicate in the lazy-continuation branch to also
+  detect a fence opener (uses `code_blocks::try_parse_fence_open`,
+  which already handles up-to-3 leading spaces). Renamed the
+  bail-out condition from `!interrupts_via_hr` to
+  `!interrupts_via_hr && !interrupts_via_fence`.
 
 ### Files changed
 
-- **Parser-shape gap** (dialect-neutral):
-  - `crates/panache-parser/src/parser/blocks/indented_code.rs`
-    (`is_indented_code_line` made column-aware).
-- **Renderer gap** (test code only):
-  - `crates/panache-parser/tests/commonmark/html_renderer.rs`
-    (new `consume_leading_cols` helper, indented-code branch
-    rewritten to single column-aware pass).
-- **Parser fixture** (single, dialect-neutral):
-  - `indented_code_mixed_tab_space/input.md` pins the new
-    `CODE_BLOCK` shape with `WHITESPACE@0..3 "  \t"` +
-    `TEXT@3..15 "foo\tbaz\t\tbim"`. Wired into
-    `golden_parser_cases.rs` next to `indented_code`.
-- **Allowlist additions** (Tabs section): #2, #5.
+- **Dialect divergence** (parser):
+  - `crates/panache-parser/src/parser/core.rs` — fence opener now
+    also breaks lazy paragraph continuation across reduced
+    blockquote depth, gated on `Dialect::CommonMark`.
+- **Parser fixture** (CommonMark only):
+  - `fence_interrupts_blockquote_paragraph_commonmark/{input.md,
+    parser-options.toml}` pins the `BLOCK_QUOTE > PARAGRAPH "b"`
+    + sibling `CODE_BLOCK` shape. Wired into
+    `golden_parser_cases.rs`. Snapshot accepted via
+    `INSTA_UPDATE=always`.
+- **Allowlist additions** (Lists section): #321.
 
-No formatter golden case added: the parser already lossless-roundtrips
-the input; existing `tab_handling` and `tab_preserve` formatter
-fixtures cover the surrounding behavior, and the new shape isn't
-something the formatter rewrites differently from the prior
-paragraph shape (the input isn't reachable via panache's standard
-formatted output of any other input).
+No formatter golden case added: the new CommonMark-only block
+sequence (BLOCK_QUOTE then CODE_BLOCK siblings) is structurally
+identical to the existing Pandoc shape for `> b\n\`\`\`...\`\`\``
+once you give it a blank line before the fence (which Pandoc
+already requires); existing top-level fixtures cover the
+formatted-output and idempotency checks. No paired Pandoc parser
+fixture either: under Pandoc the input doesn't even open the
+inner blockquote (paragraph absorbs `> b`), so a paired fixture
+would just be the absorbed-paragraph shape — not a meaningful
+contrast.
 
 ### Don't redo
 
-- **Don't try to fix #6 (`>\t\tfoo`) or #7 (`-\t\tfoo`) by
-  retouching `is_indented_code_line` alone.** The parser doesn't
-  even reach the indented-code dispatcher for those: blockquote
-  marker stripping (`try_parse_blockquote_marker`) only consumes
-  one literal *space* after `>`, not a partial tab; list-item
-  parsing's content_col / 5-col-rule logic likewise treats post-
-  marker whitespace byte-wise. Both need column-aware refactors
-  of the marker utilities (`parser/utils/marker_utils.rs`,
-  `parser/blocks/blockquotes.rs`, list-item content-col
-  derivation in `parser/blocks/list_items*` and the dispatcher).
-  Substantial; not a one-line fix.
-- **Don't widen the new `consume_leading_cols` helper to the
-  fenced-code or HTML-block paths.** Fenced-code stripping is
-  driven by the opener's literal space count (CMark §4.5) — its
-  rule is already implemented in `code_block_content`'s `if
-  is_fenced` branch using a byte-level walk that's correct for
-  spaces-only opener indent, and tabs in the opener are vanishingly
-  rare. HTML blocks don't strip indent. Touching either is
-  yak-shaving.
-- **Don't add a paired Pandoc parser fixture for
-  `indented_code_mixed_tab_space`.** Both flavors emit the same
-  CodeBlock per pandoc; the existing dialect-neutral fixture is
-  enough.
-- **Don't replace `strip_leading_spaces_per_line` outright.** It's
-  still load-bearing for the fenced-code stripping path (where
-  the input genuinely is space-only) and the blockquote-prefix
-  stripping (which deals only with `> ` style markers). Only the
-  indented-code branch needed the column-aware behavior.
+- **Don't widen the interrupter predicate to ATX, list, or
+  setext underlines without dialect gating and paired pandoc
+  verification.** Each interrupts paragraphs under CommonMark
+  but not under Pandoc-markdown:
+  - ATX: `> b\n# h` — pandoc-markdown lazily appends `# h` to
+    the bq paragraph as text; commonmark closes bq, opens `<h1>`.
+  - List: `> b\n- d` — pandoc-markdown lazily appends; commonmark
+    closes bq, opens list.
+  - HR: already handled (gated).
+  Any expansion needs `Dialect::CommonMark` gating + a paired
+  parser fixture per construct, and a pandoc-native verify.
+- **Don't move `try_parse_fence_open` out of `code_blocks.rs`.**
+  It's a `pub(crate)` block-detection helper; the import in
+  `core.rs` is via the existing `super::blocks::code_blocks`
+  alias. No need to lift it to `utils/`.
+- **Don't generalize `try_parse_fence_open` to handle indents
+  ≥ 4 spaces just because list items have content_col.** The
+  existing logic uses raw `line` for HR/fence checks — fine for
+  list items with content_col ≤ 3 (the line's leading-space count
+  matches the relative indent). For content_col ≥ 4 the same
+  pre-existing limitation already applies to HR; that's a wider
+  refactor (column-aware interrupter checks) and not unlocked
+  by any current failing example.
 
 ### Suggested next targets, ranked
 
-1. **#6 (`>\t\tfoo`) and #7 (`-\t\tfoo`)** — both need column-aware
-   marker-utility refactors. #6 wants the optional space-after-`>`
-   rule to consume 1 *col* of a tab (with slack staying as content).
-   #7 wants the list-item content-col derivation to apply the
-   "5+ cols of post-marker whitespace ⇒ content_col = marker+1
-   + indented-code" rule with column-aware tab expansion. Likely
-   share helper code; tackle together. Both are dialect-neutral
-   per pandoc.
+1. **#6 (`>\t\tfoo`) and #7 (`-\t\tfoo`)** — column-aware
+   marker-utility refactors. (Carried; see session xix's
+   "Don't redo" note for scope.)
 2. **Proper delimiter-stack for emphasis (#402, #408, #412, #417,
    #426, #445, #457, #464, #465, #466, #468)** — rewrite emphasis
    to use CMark's process_emphasis algorithm. Largest single fix;
-   would unlock the 4+ char run cases and the rule-of-3 cases.
-   Substantial; gate on `Dialect::CommonMark`. Pandoc-markdown
-   stays on the recursive enclosure parser. (Carried over.)
+   substantial; gate on `Dialect::CommonMark`. (Carried.)
 3. **#472 `*foo *bar baz*`** — CommonMark expects `*foo <em>bar
-   baz</em>`. Likely needs delimiter-stack work too. (Carried
-   over.)
-4. **Reference-link nesting (#533, #569, #571)** — CMark
-   left-bracket scanner stack with refdef-aware resolution.
-   Probably the next big link cluster. (Carried over.)
-5. **Formatter fix for nested-only outer LIST_ITEM** — carried
+   baz</em>`. Likely needs delimiter-stack work. (Carried.)
+4. **Reference-link nesting (#569, #571)** — `[foo][bar][baz]`
+   with only `[baz]` defined should parse as `[foo]` + ref-link
+   `[bar][baz]`. CMark left-bracket scanner stack with
+   refdef-aware resolution. Probably the next big link cluster.
+   (Carried; #533 stays in this group.)
+5. **#533** — inline link with emphasis closing inside the
+   bracket text plus a trailing reference link. (Carried;
+   companion to #569/#571.)
+6. **Formatter fix for nested-only outer LIST_ITEM** — carried
    over. Unblocks removing the dialect gate on same-line nested
    list markers (#298, #299).
-6. **Fence inside blockquote inside list item (#321)**. (Carried
-   over.)
 7. **Same-line blockquote inside list item (#292, #293)** — `> 1.
    > Blockquote` needs the inner `>` to open a blockquote inside
    the list item. (Carried over.)
 8. **#273, #274 multi-block content in `1.     code` items** —
    spaces ≥ 5 after marker means content_col is at marker+1 and
    the rest is indented code. (Carried over; likely shares helper
-   with #7 above.)
+   with the #6/#7 column-aware refactor.)
 9. **#278 `-\n  foo\n-\n  ```\n…`** — empty marker followed by
    indented content; multiple bugs. (Carried over.)
 10. **#300 setext-in-list-item** — `- # Foo\n- Bar\n  ---\n  baz`
@@ -189,11 +167,12 @@ formatted output of any other input).
   for #524/#526/#536/#538. Don't unify the autolink and raw-HTML
   skip flags — Pandoc treats them differently.
 - Session (xii)'s lazy paragraph continuation across reduced
-  blockquote depth (`bq_depth < current_bq_depth` branch) is
-  orthogonal to session (xiii)'s list-marker lazy continuation and
-  the bq_depth=0 list-continuation gate; the three paths share the
-  "lazy continuation" name but operate on different state. Don't
-  try to unify them.
+  blockquote depth (`bq_depth < current_bq_depth` branch) is the
+  same site session (xx) extended for fence interrupts. Don't
+  conflate it with session (xiii)'s list-marker lazy continuation
+  and the bq_depth=0 list-continuation gate — the three paths
+  share the "lazy continuation" name but operate on different
+  state. Don't try to unify them.
 - Session (xiii)'s `try_lazy_list_continuation` only fires for
   `BlockEffect::OpenList` with `indent_cols ≥ 4`. Other
   interrupting-block effects (HR, ATX, fence) at deep indent
@@ -205,6 +184,11 @@ formatted output of any other input).
   Pandoc-unreachable via `extract_block_tag_name(_, false)`.
 - Session (xviii)'s `disallow_inner_links` flag and
   `link_text_contains_inner_link` helper are scoped to inline
-  links only. Reference-link nesting (#533/#569/#571) needs a
+  links only. Reference-link nesting (#569/#571 + #533) needs a
   different pass with refdef resolution; do not retrofit the
   helper.
+- Session (xix)'s column-aware indented-code logic
+  (`is_indented_code_line` via `leading_indent`,
+  `consume_leading_cols` in the renderer) does not yet extend to
+  blockquote-marker post-space consumption or list-item
+  content-col derivation. #6/#7 still need that wider refactor.

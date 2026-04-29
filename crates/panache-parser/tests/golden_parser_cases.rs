@@ -217,6 +217,7 @@ golden_test_cases!(
     equation_attributes_disabled,
     equation_attributes_single_line,
     escapes,
+    fence_interrupts_blockquote_paragraph_commonmark,
     fenced_code,
     fenced_code_quarto,
     fenced_code_unclosed_commonmark,
