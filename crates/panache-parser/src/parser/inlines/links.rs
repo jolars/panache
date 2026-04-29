@@ -9,6 +9,7 @@
 //! - Reference links: `[text][ref]`, `[text][]`, `[text]`
 //! - Reference images: `![alt][ref]`, `![alt][]`, `![alt]`
 
+use super::code_spans::try_parse_code_span;
 use super::core::parse_inline_text;
 use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
@@ -16,6 +17,121 @@ use rowan::GreenNodeBuilder;
 
 // Import attribute parsing
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
+
+/// Find the closing `]` of a link/image text span, starting from `start`.
+///
+/// Walks `text[start..]` tracking nested brackets and backslash escapes. When
+/// a backtick run starting a valid code span is encountered, the entire span
+/// (including any trailing attribute block) is skipped — per CommonMark §6
+/// precedence, code spans bind tighter than links/images, so a `]` *inside*
+/// a code span cannot terminate the link's text. Returns the byte offset of
+/// the closing `]` within `text`, or `None` if no unmatched `]` is reached.
+fn find_link_close_bracket(text: &str, start: usize) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut bracket_depth = 0;
+    let mut escape_next = false;
+    let mut i = start;
+
+    while i < bytes.len() {
+        let b = bytes[i];
+
+        if escape_next {
+            escape_next = false;
+            i += step(text, i);
+            continue;
+        }
+
+        match b {
+            b'\\' => {
+                escape_next = true;
+                i += 1;
+            }
+            b'`' => {
+                if let Some((len, _, _, _)) = try_parse_code_span(&text[i..]) {
+                    i += len;
+                } else {
+                    i += 1;
+                }
+            }
+            b'[' => {
+                bracket_depth += 1;
+                i += 1;
+            }
+            b']' => {
+                if bracket_depth == 0 {
+                    return Some(i);
+                }
+                bracket_depth -= 1;
+                i += 1;
+            }
+            _ => i += step(text, i),
+        }
+    }
+    None
+}
+
+/// Find the closing `)` of a link/image destination, given the text *after*
+/// the opening `(`. Tracks paren nesting, quoted titles, and angle-bracketed
+/// destinations (`<...>` may legitimately contain unbalanced parens — see
+/// spec example #499). Returns the byte offset of the closing `)` within the
+/// passed slice, or `None` if not found.
+fn find_dest_close_paren(remaining: &str) -> Option<usize> {
+    let bytes = remaining.as_bytes();
+    let mut paren_depth = 0;
+    let mut escape_next = false;
+    let mut in_quotes = false;
+    let mut in_angle = false;
+    let mut i = 0;
+
+    while i < bytes.len() {
+        let b = bytes[i];
+
+        if escape_next {
+            escape_next = false;
+            i += step(remaining, i);
+            continue;
+        }
+
+        match b {
+            b'\\' => {
+                escape_next = true;
+                i += 1;
+            }
+            b'<' if !in_quotes && !in_angle => {
+                in_angle = true;
+                i += 1;
+            }
+            b'>' if in_angle => {
+                in_angle = false;
+                i += 1;
+            }
+            b'"' if !in_angle => {
+                in_quotes = !in_quotes;
+                i += 1;
+            }
+            b'(' if !in_quotes && !in_angle => {
+                paren_depth += 1;
+                i += 1;
+            }
+            b')' if !in_quotes && !in_angle => {
+                if paren_depth == 0 {
+                    return Some(i);
+                }
+                paren_depth -= 1;
+                i += 1;
+            }
+            _ => i += step(remaining, i),
+        }
+    }
+    None
+}
+
+/// Byte length of the UTF-8 character starting at byte index `i` in `s`.
+/// Used to advance an index loop char-by-char without incurring `char_indices`
+/// overhead and without splitting on a UTF-8 boundary.
+fn step(s: &str, i: usize) -> usize {
+    s[i..].chars().next().map(|c| c.len_utf8()).unwrap_or(1)
+}
 
 /// Try to parse an inline image starting at the current position.
 ///
@@ -28,31 +144,7 @@ pub fn try_parse_inline_image(text: &str) -> Option<(usize, &str, &str, Option<&
     }
 
     // Find the closing ]
-    let mut bracket_depth = 0;
-    let mut escape_next = false;
-    let mut close_bracket_pos = None;
-
-    for (i, ch) in text[2..].char_indices() {
-        if escape_next {
-            escape_next = false;
-            continue;
-        }
-
-        match ch {
-            '\\' => escape_next = true,
-            '[' => bracket_depth += 1,
-            ']' => {
-                if bracket_depth == 0 {
-                    close_bracket_pos = Some(i + 2);
-                    break;
-                }
-                bracket_depth -= 1;
-            }
-            _ => {}
-        }
-    }
-
-    let close_bracket = close_bracket_pos?;
+    let close_bracket = find_link_close_bracket(text, 2)?;
     let alt_text = &text[2..close_bracket];
 
     // Check for immediate ( after ]
@@ -65,33 +157,7 @@ pub fn try_parse_inline_image(text: &str) -> Option<(usize, &str, &str, Option<&
     let dest_start = after_bracket + 1;
     let remaining = &text[dest_start..];
 
-    let mut paren_depth = 0;
-    let mut escape_next = false;
-    let mut in_quotes = false;
-    let mut close_paren_pos = None;
-
-    for (i, ch) in remaining.char_indices() {
-        if escape_next {
-            escape_next = false;
-            continue;
-        }
-
-        match ch {
-            '\\' => escape_next = true,
-            '"' => in_quotes = !in_quotes,
-            '(' if !in_quotes => paren_depth += 1,
-            ')' if !in_quotes => {
-                if paren_depth == 0 {
-                    close_paren_pos = Some(i);
-                    break;
-                }
-                paren_depth -= 1;
-            }
-            _ => {}
-        }
-    }
-
-    let close_paren = close_paren_pos?;
+    let close_paren = find_dest_close_paren(remaining)?;
     let dest_content = &remaining[..close_paren];
 
     // Check for trailing attributes {#id .class key=value}
@@ -397,31 +463,7 @@ pub fn try_parse_inline_link(
     }
 
     // Find the closing ]
-    let mut bracket_depth = 0;
-    let mut escape_next = false;
-    let mut close_bracket_pos = None;
-
-    for (i, ch) in text[1..].char_indices() {
-        if escape_next {
-            escape_next = false;
-            continue;
-        }
-
-        match ch {
-            '\\' => escape_next = true,
-            '[' => bracket_depth += 1,
-            ']' => {
-                if bracket_depth == 0 {
-                    close_bracket_pos = Some(i + 1);
-                    break;
-                }
-                bracket_depth -= 1;
-            }
-            _ => {}
-        }
-    }
-
-    let close_bracket = close_bracket_pos?;
+    let close_bracket = find_link_close_bracket(text, 1)?;
     let link_text = &text[1..close_bracket];
 
     // Check for immediate ( after ]
@@ -434,33 +476,7 @@ pub fn try_parse_inline_link(
     let dest_start = after_bracket + 1;
     let remaining = &text[dest_start..];
 
-    let mut paren_depth = 0;
-    let mut escape_next = false;
-    let mut in_quotes = false;
-    let mut close_paren_pos = None;
-
-    for (i, ch) in remaining.char_indices() {
-        if escape_next {
-            escape_next = false;
-            continue;
-        }
-
-        match ch {
-            '\\' => escape_next = true,
-            '"' => in_quotes = !in_quotes,
-            '(' if !in_quotes => paren_depth += 1,
-            ')' if !in_quotes => {
-                if paren_depth == 0 {
-                    close_paren_pos = Some(i);
-                    break;
-                }
-                paren_depth -= 1;
-            }
-            _ => {}
-        }
-    }
-
-    let close_paren = close_paren_pos?;
+    let close_paren = find_dest_close_paren(remaining)?;
     let dest_content = &remaining[..close_paren];
 
     if strict_dest && !dest_and_title_ok_commonmark(dest_content) {

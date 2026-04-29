@@ -237,6 +237,8 @@ golden_test_cases!(
     images,
     indented_code,
     inline_html_basic_commonmark,
+    inline_link_code_span_precedence,
+    inline_link_dest_angle_brackets_with_parens,
     inline_link_dest_strict_commonmark,
     inline_link_dest_strict_pandoc,
     inline_code,

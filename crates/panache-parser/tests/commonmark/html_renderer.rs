@@ -94,7 +94,12 @@ fn split_dest_and_title(text: &str) -> (String, Option<String>) {
     let mut url_end = text.len();
     let mut title = None;
     for (i, c) in text.char_indices() {
-        if c.is_whitespace() {
+        // CommonMark §6.6: only ASCII whitespace (space, tab, newline, line
+        // tabulation, form feed, carriage return) separates the destination
+        // from the title. Unicode whitespace such as NBSP (U+00A0) is *part*
+        // of the destination and must be percent-encoded — see spec example
+        // #507 (`[link](/url\u{a0}"title")`).
+        if matches!(c, ' ' | '\t' | '\n' | '\x0b' | '\x0c' | '\r') {
             url_end = i;
             let rest = text[i..].trim();
             if let Some(t) = parse_title(rest) {

@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..23
+  PARAGRAPH@0..23
+    LINK@0..22
+      LINK_START@0..1
+        LINK_START@0..1 "["
+      LINK_TEXT@1..5
+        TEXT@1..5 "link"
+      LINK_TEXT_END@5..6 "]"
+      LINK_DEST_START@6..7 "("
+      LINK_DEST@7..21
+        TEXT@7..21 "<foo(and(bar)>"
+      LINK_DEST_END@21..22 ")"
+    NEWLINE@22..23 "\n"
