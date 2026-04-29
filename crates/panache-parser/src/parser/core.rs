@@ -612,6 +612,7 @@ impl<'a> Parser<'a> {
             &self.containers,
             &prepared.marker,
             prepared.indent_cols,
+            self.config.dialect,
         );
         let list_item = ListItemEmissionInput {
             content,
@@ -1620,6 +1621,7 @@ impl<'a> Parser<'a> {
                         &self.containers,
                         &marker_match.marker,
                         indent_cols,
+                        self.config.dialect,
                     ) {
                         // Continue the list inside the blockquote
                         // Close containers to the target level, emitting buffers properly
@@ -1840,6 +1842,7 @@ impl<'a> Parser<'a> {
                     &self.containers,
                     &marker_match.marker,
                     indent_cols,
+                    self.config.dialect,
                 ) {
                     // Close containers to the target level, emitting buffers properly
                     self.close_containers_to(level + 1);

@@ -543,10 +543,17 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Optio
     None
 }
 
-pub(crate) fn markers_match(a: &ListMarker, b: &ListMarker) -> bool {
+pub(crate) fn markers_match(a: &ListMarker, b: &ListMarker, dialect: crate::Dialect) -> bool {
     match (a, b) {
-        // All bullet list markers (-, *, +) are considered matching (Pandoc behavior)
-        (ListMarker::Bullet(_), ListMarker::Bullet(_)) => true,
+        // CommonMark §5.3: bullet list markers `-`, `+`, `*` are *distinct*
+        // bullet types — switching from one to another starts a new list.
+        // Pandoc-markdown treats them as interchangeable: any bullet
+        // continues an open bullet list. Verified with pandoc against
+        // `- foo\n- bar\n+ baz\n` (#301).
+        (ListMarker::Bullet(ca), ListMarker::Bullet(cb)) => match dialect {
+            crate::Dialect::CommonMark => ca == cb,
+            _ => true,
+        },
         (ListMarker::Ordered(OrderedMarker::Hash), ListMarker::Ordered(OrderedMarker::Hash)) => {
             true
         }
@@ -694,7 +701,7 @@ fn markers_match_fancy_lists() {
         style: Period,
     });
     assert!(
-        markers_match(&a_period, &b_period),
+        markers_match(&a_period, &b_period, crate::Dialect::Pandoc),
         "a. and b. should match"
     );
 
@@ -707,7 +714,7 @@ fn markers_match_fancy_lists() {
         style: Period,
     });
     assert!(
-        markers_match(&i_period, &ii_period),
+        markers_match(&i_period, &ii_period, crate::Dialect::Pandoc),
         "i. and ii. should match"
     );
 
@@ -717,9 +724,36 @@ fn markers_match_fancy_lists() {
         style: RightParen,
     });
     assert!(
-        !markers_match(&a_period, &a_paren),
+        !markers_match(&a_period, &a_paren, crate::Dialect::Pandoc),
         "a. and a) should not match"
     );
+}
+
+#[test]
+fn markers_match_bullet_dialect_split() {
+    use ListMarker::*;
+    // Pandoc: any bullet matches any bullet (same list).
+    assert!(markers_match(
+        &Bullet('-'),
+        &Bullet('+'),
+        crate::Dialect::Pandoc
+    ));
+    // CommonMark: bullets match only when the marker character is the same.
+    assert!(markers_match(
+        &Bullet('-'),
+        &Bullet('-'),
+        crate::Dialect::CommonMark
+    ));
+    assert!(!markers_match(
+        &Bullet('-'),
+        &Bullet('+'),
+        crate::Dialect::CommonMark
+    ));
+    assert!(!markers_match(
+        &Bullet('*'),
+        &Bullet('-'),
+        crate::Dialect::CommonMark
+    ));
 }
 
 #[test]
@@ -831,7 +865,8 @@ fn deep_ordered_prefers_nearest_enclosing_indent_over_nearest_below() {
                 numeral: "iii".to_string(),
                 style: ListDelimiter::Period,
             }),
-            7
+            7,
+            crate::Dialect::Pandoc,
         ),
         Some(0)
     );
@@ -865,7 +900,8 @@ fn deep_ordered_matches_exact_indent_when_available() {
                 numeral: "iii".to_string(),
                 style: ListDelimiter::Period,
             }),
-            6
+            6,
+            crate::Dialect::Pandoc,
         ),
         Some(1)
     );
@@ -958,6 +994,7 @@ pub(in crate::parser) fn find_matching_list_level(
     containers: &ContainerStack,
     marker: &ListMarker,
     indent_cols: usize,
+    dialect: crate::Dialect,
 ) -> Option<usize> {
     // Search from deepest (last) to shallowest (first)
     // But for shallow items (0-3 indent), prefer matching at the closest base indent
@@ -972,7 +1009,7 @@ pub(in crate::parser) fn find_matching_list_level(
             base_indent_cols,
             ..
         } = c
-            && markers_match(marker, list_marker)
+            && markers_match(marker, list_marker, dialect)
         {
             let matches = if indent_cols >= 4 && *base_indent_cols >= 4 {
                 // Deep indentation:

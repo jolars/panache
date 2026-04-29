@@ -132,7 +132,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
 
                     let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
                     let continues_list = if let Some(ref marker_match) = next_marker {
-                        lists::markers_match(marker, &marker_match.marker)
+                        lists::markers_match(marker, &marker_match.marker, self.config.dialect)
                             && effective_indent <= base_indent_cols + 3
                     } else {
                         let item_content_col = containers

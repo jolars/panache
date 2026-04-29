@@ -74,7 +74,13 @@ impl Formatter {
     }
 
     /// Extract the marker text from a ListItem node
-    /// Standardizes bullet list markers to "-" for consistency
+    /// Standardizes bullet list markers to "-" for consistency.
+    ///
+    /// This helper is used for *width* and *indent* calculations, where
+    /// all three bullet characters (`-`, `+`, `*`) are interchangeable
+    /// (single byte each), so normalizing here is harmless across dialects.
+    /// The marker actually pushed to output goes through dialect-aware
+    /// normalization (see `normalize_bullet_for_output`).
     pub(super) fn extract_list_marker(node: &SyntaxNode) -> Option<String> {
         for el in node.children_with_tokens() {
             if let NodeOrToken::Token(t) = el
@@ -89,6 +95,23 @@ impl Formatter {
             }
         }
         None
+    }
+
+    /// Decide whether to normalize a raw bullet character (`-`/`+`/`*`)
+    /// when emitting it. Pandoc-markdown treats them as interchangeable, so
+    /// we standardize for visual consistency. CommonMark §5.3 makes the
+    /// bullet character semantically meaningful — a list whose marker
+    /// changes from `-` to `+` becomes two separate lists (spec example
+    /// #301) — so we preserve the source character to keep that grouping
+    /// intent intact across re-formats.
+    fn normalize_bullet_for_output(&self, raw: &str) -> String {
+        let preserve = panache_parser::Dialect::for_flavor(self.config.flavor)
+            == panache_parser::Dialect::CommonMark;
+        if !preserve && raw.len() == 1 && matches!(raw, "-" | "+" | "*") {
+            "-".to_string()
+        } else {
+            raw.to_string()
+        }
     }
 
     /// Check if a nested list is empty (contains only one item with no text content)
@@ -411,15 +434,7 @@ impl Formatter {
                         // The `indent` parameter determines output indentation
                     }
                     SyntaxKind::LIST_MARKER => {
-                        let raw_marker = t.text().to_string();
-                        // Standardize bullet list markers to "-"
-                        marker = if raw_marker.len() == 1
-                            && matches!(raw_marker.as_str(), "-" | "*" | "+")
-                        {
-                            "-".to_string()
-                        } else {
-                            raw_marker
-                        };
+                        marker = self.normalize_bullet_for_output(t.text());
                     }
                     SyntaxKind::TASK_CHECKBOX => {
                         checkbox = Some(Self::normalize_task_checkbox(t.text()));

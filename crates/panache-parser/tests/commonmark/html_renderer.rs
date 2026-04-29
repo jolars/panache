@@ -411,9 +411,32 @@ fn is_loose_list(node: &SyntaxNode) -> bool {
 }
 
 fn list_item_ends_with_blank(item: &SyntaxNode) -> bool {
+    // Walk descendants but stay within the outer list's structural space:
+    // a BLANK_LINE inside a BLOCK_QUOTE (or other strict container that owns
+    // its own blank lines, like CODE_BLOCK / HTML_BLOCK) is *that container's*
+    // blank, not a blank in the source between outer items. Only blanks that
+    // transit through nested LISTs / LIST_ITEMs count for outer-list looseness.
     let end = item.text_range().end();
-    item.descendants()
-        .any(|d| d.kind() == SyntaxKind::BLANK_LINE && d.text_range().end() == end)
+    descendant_blank_at_end(item, end)
+}
+
+fn descendant_blank_at_end(node: &SyntaxNode, end: rowan::TextSize) -> bool {
+    for child in node.children() {
+        match child.kind() {
+            SyntaxKind::BLANK_LINE => {
+                if child.text_range().end() == end {
+                    return true;
+                }
+            }
+            SyntaxKind::LIST | SyntaxKind::LIST_ITEM => {
+                if descendant_blank_at_end(&child, end) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
 }
 
 fn plain_is_empty(node: &SyntaxNode) -> bool {

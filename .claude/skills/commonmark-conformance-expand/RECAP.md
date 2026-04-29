@@ -16,105 +16,125 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (iii)
+## Latest session — 2026-04-29 (iv)
 
-**Pass count: 569 → 572 / 652 (87.7%, +3)**
+**Pass count: 572 → 574 / 652 (88.0%, +2)**
 
-Took recap target #2 (loose-vs-tight semantic gaps, renderer-only).
-Three wins in the Lists section: #315, #317, #326. The other two
-candidates the recap floated for the same fix — #312, #320 — are
-*not* renderer-only and remained failing (confirmed parser-shape
-gaps; see "Don't redo" below).
+Two Lists-section wins from independent root causes: #320
+(renderer-only, loose-list mis-detection) and #301 (dialect
+divergence on bullet-marker matching). The recap's prior "don't
+redo: #320 needs a parser fix" was wrong — under the current
+CommonMark flavor defaults, the parser already produces a clean
+`LIST_ITEM > BLOCK_QUOTE` shape for `* a\n  > b\n  >\n* c\n`; the
+remaining gap was purely a renderer bug.
 
-### Root cause: `is_loose_list` over-detected and under-detected
+### Root cause #1: `list_item_ends_with_blank` walked into BLOCK_QUOTEs
 
-The previous `is_loose_list` made three structurally different
-mistakes:
+The previous-session helper used `node.descendants()` to find a
+BLANK_LINE whose end byte coincides with the LIST_ITEM's end. That
+walk crosses into BLOCK_QUOTE children, so for #320 the blockquote-
+internal blank (`  >\n`) — which is *blockquote* content, not
+document-level whitespace — was treated as if the outer item ended
+with a blank. That made the list loose, the renderer added
+`<p>` wrappers around `a` and `c`, and the spec output (tight
+list) did not match.
 
-1. **Over-eager descendant scan.** It returned true on any
-   PARAGRAPH *descendant*, so a paragraph inside a nested
-   blockquote made the *outer* list loose. This was the recap's
-   diagnosis. Fix: drop the descendant scan; check PARAGRAPH only
-   at the *direct* child level (which is the parser's signal).
-2. **Missing trailing-blank case.** For `- a\n  - b\n  - c\n\n- d
-   ...` (#326), the parser puts the blank line as the last child
-   of the *inner* sublist. The outer list's children are just
-   LIST_ITEM, LIST_ITEM with no sibling BLANK_LINE — the existing
-   between-items check missed it. Fix: also walk the previous
-   item's descendants and look for a BLANK_LINE whose end byte
-   coincides with the item's end byte.
-3. **REFERENCE_DEFINITION not counted as block-level.** For
-   `- a\n- b\n\n  [ref]: /url\n- d\n` (#317), item 2 directly
-   contains PLAIN, BLANK_LINE, REFERENCE_DEFINITION — by §5.3 (b)
-   that is two block-level children separated by a blank, so the
-   list is loose. `is_block_child` excluded REFERENCE_DEFINITION.
-   Fix: add it.
+Fix: replace `descendants()` with a custom walk that only descends
+into LIST and LIST_ITEM. Blank lines inside BLOCK_QUOTE (or any
+other strict container that owns its own blank lines) are no
+longer seen by the outer-list looseness check. The #326 pattern
+still works because its BLANK_LINE lives one level deep inside an
+inner LIST, not behind a BLOCK_QUOTE.
 
-Plus a small list-rendering gap surfaced by #315: `* a\n*\n\n* c\n`
-makes a loose list whose middle item has empty PLAIN content
-(`PLAIN { NEWLINE }`). The existing renderer wrapped it as
-`<p></p>` inside `<li>`; the spec wants bare `<li></li>`. Fix: in
-`render_list_item`, skip the paragraph wrapper when the PLAIN's
-text is whitespace-only.
+### Root cause #2: bullet markers always matched across dialects
 
-### Why renderer-only
+`markers_match` returned `true` for any two `Bullet(_)` markers
+regardless of character. CommonMark §5.3 makes `-`, `+`, `*`
+*distinct* bullet types — switching characters at the same indent
+starts a new list (verified with pandoc: `pandoc -f commonmark -t
+native` splits, `pandoc -f markdown -t native` joins). So the
+parser was producing one LIST for `- foo\n- bar\n+ baz\n` instead
+of two.
 
-All three winning examples produce CSTs whose shapes are already
-correct — just being rendered to the wrong HTML. The remaining
-list-section failures (#312, #320) are genuine parser-shape gaps
-the renderer cannot paper over: #312 splits a 5th list item that
-should continue the 4th (marker-indent tracking), #320 emits a
-stray PARAGRAPH for `  > b` instead of extending the blockquote
-(blockquote-continuation under list-item indent).
+Fix: thread `Dialect` into `markers_match` and
+`find_matching_list_level`, and gate the bullet-character check on
+`Dialect::CommonMark`. Pandoc dialect keeps the existing "any
+bullet matches any bullet" behavior.
+
+### Formatter idempotency follow-on
+
+The parser fix exposed a formatter idempotency bug under
+CommonMark: the formatter unconditionally normalized `*`/`+` to
+`-`, which silently merged the two CommonMark lists into one and
+required two format passes to stabilize (every-pair blanks vs.
+single-blank). Fix: in
+`crates/panache-formatter/src/formatter/lists.rs`, route LIST_MARKER
+output through `normalize_bullet_for_output(&self, raw)`, which
+preserves the source character when
+`Dialect::for_flavor(flavor) == Dialect::CommonMark` and keeps the
+existing standardize-to-`-` behavior under Pandoc/Quarto/etc.
+(Pandoc's `standardize_bullets` golden case is unaffected.)
 
 ### Files changed
 
 - **Renderer gap**:
   - `crates/panache-parser/tests/commonmark/html_renderer.rs`:
-    rewrote `is_loose_list` per CommonMark §5.3 cleanly (drops
-    descendant PARAGRAPH scan; adds `list_item_ends_with_blank`
-    helper); added REFERENCE_DEFINITION to `is_block_child`;
-    skipped empty PLAIN paragraph wrapper in `render_list_item`
-    via a new `plain_is_empty` helper.
-- **New parser fixtures + snapshots** (CommonMark-flavored — these
-  pin the CST shapes the renderer fix now leans on, so the
-  invariants don't rot silently in `html_renderer.rs`):
-  - `list_item_blank_then_refdef_commonmark`: pins LIST_ITEM
-    containing PLAIN + BLANK_LINE + REFERENCE_DEFINITION (the
-    "internal blank between two block children" shape used for
-    §5.3 (b) detection in #317).
-  - `nested_list_blank_between_outer_items_commonmark`: pins
-    inner LIST whose last child is a BLANK_LINE that ends at the
-    outer LIST_ITEM's end byte (the shape `list_item_ends_with_blank`
-    walks for #326).
-  - The empty-PLAIN shape for #315 is already pinned by
-    `list_item_bare_marker_empty_commonmark`.
-- **Allowlist additions** (Lists section): #315, #317, #326.
+    replaced `descendants()`-based scan in
+    `list_item_ends_with_blank` with `descendant_blank_at_end`
+    that walks only LIST/LIST_ITEM children.
+- **Dialect divergence (parser)**:
+  - `crates/panache-parser/src/parser/blocks/lists.rs`:
+    `markers_match` and `find_matching_list_level` take
+    `dialect: Dialect`; bullet pair matching gated on it.
+  - `crates/panache-parser/src/parser/core.rs`,
+    `.../parser/utils/continuation.rs`: pass `self.config.dialect`
+    at the three call sites.
+- **Formatter idempotency**:
+  - `crates/panache-formatter/src/formatter/lists.rs`: new
+    `normalize_bullet_for_output` method; replaces inline bullet
+    standardization at the LIST_MARKER output site. Static
+    `extract_list_marker` left as-is (used for width/indent
+    only — bullets are 1 byte each, normalization is harmless
+    there).
+- **New parser fixtures + snapshots**:
+  - `list_item_blockquote_internal_blank_commonmark`: pins the
+    `LIST_ITEM > BLOCK_QUOTE > BLANK_LINE` CST that the renderer
+    fix now leans on (so the invariant doesn't rot silently in
+    `html_renderer.rs`).
+  - `list_mixed_bullets_commonmark` /
+    `list_mixed_bullets_pandoc`: paired dialect-divergence
+    fixtures pinning the two-LIST vs one-LIST CST split.
+- **Formatter golden case**:
+  - `tests/fixtures/cases/list_mixed_bullets_commonmark/` with
+    `flavor = "commonmark"` — pins formatted output and exercises
+    idempotency for the CommonMark-only "two adjacent lists"
+    block sequence.
+- **Allowlist additions** (Lists): #301, #320.
 
 ### Don't redo
 
-- Don't try to fix #320 via the renderer. The CST has a stray
-  direct-child PARAGRAPH for `  > b` that is *outside* the
-  intended BLOCK_QUOTE — even with perfect loose-vs-tight
-  detection the rendered text body would still emit
-  `<p>  &gt; b</p>` instead of a blockquote. Real fix is in the
-  parser's blockquote-continuation under list-item indent.
-- Don't try to fix #312 via the renderer. The 5th item splits
-  off into its own outer list because the parser interprets
-  4-space indent as a nested-list start; this is marker-indent
-  tracking, not a render-time decision.
-- Don't reintroduce the descendant PARAGRAPH scan in
-  `is_loose_list`. It was over-detecting (paragraphs inside
-  nested blockquotes/sublists triggered loose), which is exactly
-  what #320's expected output (TIGHT outer with a blockquote
-  child) showed was wrong; the new direct-child check is what
-  spec §5.3 actually requires. The two new fixtures pin the
-  shapes the new logic relies on, and the existing
-  `lists_*` golden snapshots verify it doesn't false-positive.
-- Don't promote `plain_is_empty` to the renderer's general
-  paragraph path. It is specifically a list-item rendering
-  rule (§5.3 example #315) — for top-level paragraphs an empty
-  paragraph is a parser bug worth surfacing, not silencing.
+- Don't merge `extract_list_marker` and
+  `normalize_bullet_for_output`. The static helper's normalization
+  is fine for width/indent math (all bullets are 1 byte) and
+  changing it would force every static caller to take a `Config`
+  or `Dialect` parameter. The output site is the only place where
+  the character actually matters.
+- Don't add a paired Pandoc formatter golden for
+  `list_mixed_bullets_*`. Pandoc's behavior here (single
+  collapsed list) is already covered by the existing
+  `standardize_bullets` fixture; duplicating is the churn the
+  rule explicitly warns against.
+- Don't reintroduce the `descendants()`-based scan in
+  `list_item_ends_with_blank`. The walk-only-LIST/LIST_ITEM
+  helper is what spec §5.3 actually requires; BLOCK_QUOTEs and
+  CODE_BLOCKs own their own blank lines.
+- Recap (iii) said "#320 needs a parser fix (stray PARAGRAPH for
+  `  > b`)". That was true under the *prior* CommonMark defaults.
+  Current defaults already produce the clean BLOCK_QUOTE shape
+  under `Flavor::CommonMark`, so #320 is now renderer-only. Don't
+  go hunting for the parser-side blockquote-continuation fix
+  again — re-verify with `printf '...' | cargo run -- --config
+  /tmp/cm.toml parse` first.
 
 ### Suggested next targets, ranked
 
@@ -131,36 +151,31 @@ stray PARAGRAPH for `  > b` instead of extending the blockquote
    because the parser interprets 4-space indent as starting a
    nested list. Parser-shape gap; touches list-marker indent
    tracking.
-3. **Blockquote inside list item misaligned (#320)** — `* a\n  >
-   b\n  >\n* c\n` should produce a single BLOCK_QUOTE inside
-   item 1 (containing "b"); parser instead emits PARAGRAPH("  >
-   b") + BLOCK_QUOTE("  >" + blank). Parser-shape gap in
-   blockquote-continuation under list-item indent.
-4. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion for
+3. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion for
    indented-code inside containers. Substantial; touches
    `leading_indent` and tab-stop logic.
-5. **HTML block #148** — raw HTML `<pre>`-block contains a blank
+4. **HTML block #148** — raw HTML `<pre>`-block contains a blank
    line that should be emitted verbatim, but our parser/renderer
    reformats `_world_` as inline emphasis inside the `<pre>`. May
    be a renderer bug (HTML block content should be byte-perfect).
-6. **Reference link followed by another bracket pair (#569, #571)**
+5. **Reference link followed by another bracket pair (#569, #571)**
    — requires CMark "left-bracket scanner" stack model. Large.
-7. **Nested LINKs in link text (#518, #519, #520, #532, #533)** —
+6. **Nested LINKs in link text (#518, #519, #520, #532, #533)** —
    CommonMark §6.4 forbids real nesting; outer must un-link
    itself when inner resolves. Same scanner-stack work as #569.
-8. **HTML-tag/autolink interaction with link brackets (#524, #526,
+7. **HTML-tag/autolink interaction with link brackets (#524, #526,
    #536, #538)** — bracket scanner must skip past raw HTML and
    autolinks too.
-9. **Block quotes lazy-continuation #235, #251** — last two
+8. **Block quotes lazy-continuation #235, #251** — last two
    blockquote failures.
-10. **Fence inside blockquote inside list item (#321)**.
-11. **Lazy / nested marker continuation (#298, #299)**.
-12. **Multi-block content in `1.     code` items (#273, #274)**.
-13. **Setext-in-list-item (#300)**.
-14. **Emphasis and strong emphasis (47 fails)** — flanking-rule
+9. **Fence inside blockquote inside list item (#321)**.
+10. **Lazy / nested marker continuation (#298, #299)**.
+11. **Multi-block content in `1.     code` items (#273, #274)**.
+12. **Setext-in-list-item (#300)**.
+13. **Emphasis and strong emphasis (47 fails)** — flanking-rule
     edge cases. #352 (`a*"foo"*`), #354 (`*$*alpha`),
     #366/#367/#368/#369, #372–376 (underscore intra-word). Need
     proper CommonMark flanking-rule gating; current emphasis
     parser leans on Pandoc's looser semantics.
-15. **Ref-def dialect divergence #201** — `[foo]: <bar>(baz)`. Low
+14. **Ref-def dialect divergence #201** — `[foo]: <bar>(baz)`. Low
     priority.
