@@ -1,8 +1,8 @@
 {
   "blocked": 12,
-  "failing": 32,
-  "pass_pct": 95.1,
-  "passing": 620,
+  "failing": 31,
+  "pass_pct": 95.2,
+  "passing": 621,
   "passing_numbers": [
     1,
     3,
@@ -147,6 +147,7 @@
     145,
     146,
     147,
+    148,
     149,
     150,
     151,
@@ -672,9 +673,9 @@
       "pass": 29
     },
     {
-      "fail": 1,
+      "fail": 0,
       "name": "HTML blocks",
-      "pass": 43
+      "pass": 44
     },
     {
       "fail": 0,

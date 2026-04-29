@@ -16,129 +16,91 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (xvi)
+## Latest session — 2026-04-29 (xvii)
 
-**Pass count: 619 → 620 / 652 (95.1%, +1)**
+**Pass count: 620 → 621 / 652 (95.2%, +1)**
 
-Single List items win: #280 (`-\n\n  foo\n`) — empty list-item
-marker followed by a blank line followed by indented content.
-CommonMark §5.2 says a list item can begin with at most one
-blank line; once the marker line is empty and the next line is
-blank, the item is closed. Subsequent indented content is a
-separate paragraph. Pandoc keeps the indented content inside
-the same item. Verified against pandoc `-f commonmark`
-(`BulletList [[]] , Para [Str "foo"]`) vs `-f markdown`
-(`BulletList [[Plain [Str "foo"]]]`). Dialect divergence.
+Single HTML blocks win: #148 (`<table>...<pre>\n...\n\n_world_.\n</pre>\n</td></tr></table>`).
+CommonMark §4.6 type-1 HTML blocks start only with **opening**
+tags from the verbatim set (`<pre`, `<script`, `<style`,
+`<textarea`); closing forms like `</pre>` do not start any HTML
+block (they're not in type-6's tag list, and type-7 explicitly
+excludes verbatim names). Verified against pandoc `-f
+commonmark` — `</pre>` stays inside the paragraph there too.
+Parser-shape gap (CommonMark only).
 
 ### Target unlocked
 
-- **#280** → CommonMark now closes the empty list item at the
-  first blank line, lets the parent List close (since the next
-  line has no list marker), and parses `  foo` as a top-level
-  paragraph. Pandoc behavior unchanged.
+- **#148** → `</pre>` no longer starts a verbatim HTML block
+  under CommonMark; the paragraph absorbs it as inline raw
+  HTML. The next line `</td></tr></table>` still interrupts as
+  a type-6 block (because `td` is in the type-6 tag list).
+  Pandoc behavior unchanged (closing forms were already
+  rejected by `extract_block_tag_name` when `accept_closing =
+  false`).
 
 ### Root cause
 
-`ContinuationPolicy::compute_levels_to_keep` kept any open
-ListItem alive when the next non-blank line's indent met the
-item's `content_col`. For an empty marker line (`-` with no
-content) followed by a blank, that allowed indented content to
-re-attach as continuation — wrong under CommonMark §5.2. Pandoc
-allows this attachment, so the existing behavior was correct
-for `Dialect::Pandoc`.
+`try_parse_html_block_start` accepted *any* form (opening or
+closing) of a verbatim tag as starting a type-1 block, as long
+as `extract_block_tag_name` returned the name. Under CommonMark
+that function accepts closing tags (for type-6 detection), so
+`</pre>` slipped into the verbatim branch and wrongly opened a
+new type-1 block — interrupting the paragraph.
 
 ### Fix
 
-- `crates/panache-parser/src/parser/utils/container_stack.rs`:
-  added `marker_only: bool` field to `Container::ListItem`. True
-  iff the item has so far seen only its marker line (no text,
-  blockquote marker, or nested-list content).
-- `crates/panache-parser/src/parser/blocks/lists.rs`:
-  initializes `marker_only` per construction site:
-  - `finish_list_item_with_optional_nested` final fallthrough:
-    `text_to_buffer.trim().is_empty()` (true for `-\n`, `- \n`).
-  - Recursion case (same-line nested marker): `false` (nested
-    LIST counts as content).
-  - `add_list_item_with_nested_empty_list`: `false` (nested LIST
-    counts as content).
-- `crates/panache-parser/src/parser/core.rs`: when content is
-  pushed to the buffer (parse_inner_content, list-item buffering
-  branch, blockquote-marker emission), flips `marker_only` to
-  `false` if the pushed text is non-blank or a structural marker.
-- `crates/panache-parser/src/parser/utils/continuation.rs`:
-  inside the `ListItem` arm, when `marker_only && dialect ==
-  CommonMark`, `continue` (don't keep the level). If the next
-  non-blank line *also* has no list marker AND the parent List
-  was the most recently kept level, walk `keep_level` back by 1
-  so the List closes too — otherwise the List would absorb the
-  blank and following paragraph as continuation content.
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs`:
+  inside `try_parse_html_block_start`, after extracting the tag
+  name, compute `is_closing = trimmed.starts_with("</")` and
+  gate the VERBATIM_TAGS branch on `!is_closing`. The BLOCK_TAGS
+  branch is unchanged (type-6 legitimately accepts closing
+  forms). With the gate in place, `</pre>` falls through to the
+  type-7 check, which already rejects verbatim names — so it
+  returns `None` (not an HTML block start) and the line stays
+  inside the paragraph as inline raw HTML.
 
 ### Files changed
 
-- **Dialect divergence** (parser):
-  - `crates/panache-parser/src/parser/utils/container_stack.rs`:
-    new `marker_only` field on `Container::ListItem`.
-  - `crates/panache-parser/src/parser/blocks/lists.rs`:
-    initialize `marker_only` at all 4 ListItem construction
-    sites.
-  - `crates/panache-parser/src/parser/core.rs`: flip
-    `marker_only` to false when buffering text (line ~617),
-    when buffering continuation lines inside ListItem (line
-    ~2685), and when buffering blockquote markers (line ~1266).
-    Also added `..` to one destructuring pattern that didn't
-    need the new field.
-  - `crates/panache-parser/src/parser/utils/continuation.rs`:
-    new CommonMark gate inside the `ListItem` match arm; also
-    walks `keep_level` back when the parent List has nothing to
-    continue with.
-- **Paired parser fixtures**:
-  - `empty_list_marker_blank_then_content_commonmark/{input.md,parser-options.toml}`
-    (`flavor = "commonmark"`) — pins LIST + BLANK_LINE +
-    PARAGRAPH CST (list closes after empty item).
-  - `empty_list_marker_blank_then_content_pandoc/{input.md,parser-options.toml}`
-    (`flavor = "pandoc"`) — pins LIST(LIST_ITEM(BLANK_LINE+PLAIN))
-    CST (item absorbs the indented content).
-  - Wired into `golden_parser_cases.rs` after
-    `emphasis_skips_shortcut_reference_link`.
+- **Parser-shape** (CommonMark only):
+  - `crates/panache-parser/src/parser/blocks/html_blocks.rs`:
+    new `is_closing` check in the VERBATIM_TAGS branch of
+    `try_parse_html_block_start`.
+- **Parser fixture** (CommonMark only — Pandoc path unchanged):
+  - `html_block_pre_close_tag_inline_commonmark/{input.md,parser-options.toml}`
+    (`flavor = "commonmark"`) — pins HTML_BLOCK +
+    BLANK_LINE + PARAGRAPH(...INLINE_HTML(`</pre>`)...) +
+    HTML_BLOCK CST. Wired into `golden_parser_cases.rs` after
+    `html_block_commonmark_type6_type7_pandoc`.
 - **Formatter golden case** (CommonMark only):
-  - `tests/fixtures/cases/empty_list_marker_blank_then_content_commonmark/`
-    with `panache.toml` setting `flavor = "commonmark"`. Input
-    `-\n\n  foo\n`, expected `- \n\nfoo\n` (formatter renders
-    bare bullet as `- ` and lifts the now-non-list paragraph out
-    of any indent). Pins idempotency under the new structural
-    shape (LIST + PARAGRAPH instead of LIST(item with content)).
+  - `tests/fixtures/cases/html_block_pre_close_tag_inline_commonmark/`
+    with `panache.toml` setting `flavor = "commonmark"`.
+    Pins idempotent reformat: `_world_.` → `*world*.` and
+    `</pre>` joins the paragraph wrap as `*world*. </pre>`.
     Wired into `tests/golden_cases.rs` after
-    `blockquote_list_no_marker_closes_commonmark`.
-- **Allowlist addition** (List items): #280.
+    `html_block_commonmark_type6_type7`.
+- **Allowlist addition** (HTML blocks): #148.
 
 ### Don't redo
 
-- **Don't try to detect "marker line was empty" by inspecting
-  the buffer at blank-line time.** The buffer is flushed during
-  blank-line handling, so by the time the second blank arrives
-  it's empty regardless of whether the marker line had content.
-  `marker_only` is the durable signal — it persists across
-  buffer flushes and is updated on push, not on flush.
-- **Don't gate the List branch directly on `marker_only`.** The
-  ListItem arm runs *after* the List arm in the same loop; by
-  then the List has already optimistically claimed the next
-  line as continuation. The correct fix is to walk
-  `keep_level` *back* in the ListItem arm when the next line
-  has no marker, not to make the List arm aware of its child's
-  state (which would couple the two arms unnecessarily).
-- **Don't drop the `next_marker.is_none()` clause.** When the
-  next line *is* a list marker (e.g. `-\n\n- a\n`), the parent
-  List should stay open so the new marker re-uses it — both
-  CommonMark and Pandoc agree on that case (just differ on tight
-  vs loose). Walking `keep_level` back unconditionally would
-  collapse two-item lists into separate single-item lists.
-- **Don't extend `marker_only` to flow into close-time logic.**
-  The empty-list-item close path
-  (`close_containers_to`) already handles items with empty
-  buffers correctly; the new flag is only consulted by
-  `ContinuationPolicy`. Adding it to other places would risk
-  rendering mismatches (e.g. an item whose buffer was just
-  flushed mid-stream would be misread as marker-only).
+- **Don't widen the gate to also reject opening verbatim
+  tags.** `<pre>`, `<script>`, etc. on a line *do* legitimately
+  start a type-1 block under CommonMark. The bug is closing-only.
+- **Don't add `pre`/`script`/`style`/`textarea` to BLOCK_TAGS.**
+  CommonMark type 6 explicitly excludes them so the type-1
+  semantics (close on matching `</tag>`) take precedence over
+  type-6's blank-line rule. Adding them to BLOCK_TAGS would
+  collapse the two types and break the matching-close-tag rule.
+- **Don't try to fix this in the type-7 branch.** Type 7 is
+  reachable here only after the BLOCK_TAGS / VERBATIM_TAGS
+  branches both miss; the closing-verbatim case was being
+  *captured* by VERBATIM_TAGS before type 7 could see it.
+  Fixing it required moving the rejection earlier, not later.
+- **Don't extend the gate to non-CommonMark dialects.** Under
+  Pandoc, `extract_block_tag_name(_, false)` already rejects
+  closing tags entirely, so the VERBATIM_TAGS branch is
+  unreachable for `</pre>` anyway. Adding `is_closing` checks
+  there would be dead code.
 
 ### Suggested next targets, ranked
 

@@ -146,6 +146,7 @@ pub(crate) fn try_parse_html_block_start(
     // Try to parse as opening tag (or closing tag, under CommonMark)
     if let Some(tag_name) = extract_block_tag_name(trimmed, is_commonmark) {
         let tag_lower = tag_name.to_lowercase();
+        let is_closing = trimmed.starts_with("</");
 
         // Check if it's a block-level tag
         if BLOCK_TAGS.contains(&tag_lower.as_str()) {
@@ -157,8 +158,12 @@ pub(crate) fn try_parse_html_block_start(
             });
         }
 
-        // Also accept verbatim tags even if not in BLOCK_TAGS list
-        if VERBATIM_TAGS.contains(&tag_lower.as_str()) {
+        // Also accept verbatim tags even if not in BLOCK_TAGS list — but
+        // only as opening tags. CommonMark §4.6 type 1 starts with `<pre`,
+        // `<script`, `<style`, or `<textarea`; closing forms like `</pre>`
+        // do not start a type-1 block. Letting `</pre>` through here would
+        // wrongly interrupt a paragraph.
+        if !is_closing && VERBATIM_TAGS.contains(&tag_lower.as_str()) {
             return Some(HtmlBlockType::BlockTag {
                 tag_name: tag_lower,
                 is_verbatim: true,

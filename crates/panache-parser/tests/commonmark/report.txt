@@ -1,6 +1,6 @@
 CommonMark spec.txt v0.31.2 conformance report
-620 / 652 examples passing (95.1%)
-32 failing
+621 / 652 examples passing (95.2%)
+31 failing
 12 blocked-list entries
 
 === Per-section pass / fail ===
@@ -13,7 +13,7 @@ CommonMark spec.txt v0.31.2 conformance report
   Emphasis and strong emphasis: 120 pass / 12 fail
   Entity and numeric character references: 17 pass / 0 fail
   Fenced code blocks: 29 pass / 0 fail
-  HTML blocks: 43 pass / 1 fail
+  HTML blocks: 44 pass / 0 fail
   Hard line breaks: 15 pass / 0 fail
   Images: 22 pass / 0 fail
   Indented code blocks: 12 pass / 0 fail
@@ -175,6 +175,7 @@ CommonMark spec.txt v0.31.2 conformance report
 145
 146
 147
+148
 149
 150
 151
@@ -937,6 +938,7 @@ CommonMark spec.txt v0.31.2 conformance report
 147
 
 # HTML blocks
+148
 149
 150
 151

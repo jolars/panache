@@ -250,6 +250,7 @@ golden_test_cases!(
     html_block,
     html_block_commonmark_type6_type7_commonmark,
     html_block_commonmark_type6_type7_pandoc,
+    html_block_pre_close_tag_inline_commonmark,
     ignore_directives,
     images,
     indented_code,
