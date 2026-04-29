@@ -548,6 +548,7 @@ pub(crate) struct ListPrepared {
     pub indent_cols: usize,
     pub indent_bytes: usize,
     pub nested_marker: Option<char>,
+    pub virtual_marker_space: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -693,6 +694,7 @@ impl BlockParser for ListParser {
                 indent_cols,
                 indent_bytes,
                 nested_marker,
+                virtual_marker_space: marker_match.virtual_marker_space,
             })),
         ))
     }

@@ -291,6 +291,7 @@ golden_test_cases!(
     list_item_blockquote_internal_blank_commonmark,
     list_item_fenced_code_first_line_commonmark,
     list_item_indented_code,
+    list_item_indented_code_tabs_commonmark,
     list_marker_indent_4_below_content_col,
     list_mixed_bullets_commonmark,
     list_mixed_bullets_pandoc,

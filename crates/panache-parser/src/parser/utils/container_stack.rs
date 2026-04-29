@@ -28,6 +28,13 @@ pub(crate) enum Container {
         /// line, per spec §5.2 ("a list item can begin with at most one
         /// blank line"). Pandoc keeps the item open across the blank.
         marker_only: bool,
+        /// True when the marker's required-1-col space was virtually absorbed
+        /// from a tab in the post-marker text rather than consumed as a
+        /// literal byte. In that case the buffered content's first byte is at
+        /// source column `content_col - 1`, not `content_col`. Used by
+        /// indented-code-from-marker-line detection to walk col-aware leading
+        /// whitespace correctly.
+        virtual_marker_space: bool,
     },
     DefinitionList {
         // Definition lists don't need special tracking
@@ -80,6 +87,15 @@ impl ContainerStack {
 
 /// Expand tabs to columns (tab stop = 4) and return (cols, byte_offset).
 pub(crate) fn leading_indent(line: &str) -> (usize, usize) {
+    leading_indent_from(line, 0)
+}
+
+/// Like [`leading_indent`] but seeds the column counter at `start_col` so tab
+/// expansion honors source-column tab-stops. Use when the leading whitespace
+/// being measured doesn't begin at source column 0 (e.g. the bytes after a
+/// list marker, where the marker itself occupies columns
+/// `[indent_cols, indent_cols + marker_len)`).
+pub(crate) fn leading_indent_from(line: &str, start_col: usize) -> (usize, usize) {
     let mut cols = 0usize;
     let mut bytes = 0usize;
     for b in line.bytes() {
@@ -89,7 +105,8 @@ pub(crate) fn leading_indent(line: &str) -> (usize, usize) {
                 bytes += 1;
             }
             b'\t' => {
-                cols += TAB_STOP - (cols % TAB_STOP);
+                let absolute = start_col + cols;
+                cols += TAB_STOP - (absolute % TAB_STOP);
                 bytes += 1;
             }
             _ => break,

@@ -720,15 +720,39 @@ fn enclosing_list_item_content_column(node: &SyntaxNode) -> usize {
 
 fn list_item_content_column(item: &SyntaxNode) -> usize {
     let mut col = 0usize;
+    let mut saw_marker = false;
+    let mut chars_after_marker = 0usize;
     for el in item.children_with_tokens() {
         match el {
             NodeOrToken::Token(t) => match t.kind() {
-                SyntaxKind::WHITESPACE => col += t.text().chars().count(),
-                SyntaxKind::LIST_MARKER => col += t.text().chars().count(),
-                _ => return col,
+                SyntaxKind::WHITESPACE => {
+                    let n = t.text().chars().count();
+                    col += n;
+                    if saw_marker {
+                        chars_after_marker += n;
+                    }
+                }
+                SyntaxKind::LIST_MARKER => {
+                    col += t.text().chars().count();
+                    saw_marker = true;
+                }
+                _ => {
+                    if saw_marker && chars_after_marker == 0 {
+                        col += 1;
+                    }
+                    return col;
+                }
             },
-            NodeOrToken::Node(_) => return col,
+            NodeOrToken::Node(_) => {
+                if saw_marker && chars_after_marker == 0 {
+                    col += 1;
+                }
+                return col;
+            }
         }
+    }
+    if saw_marker && chars_after_marker == 0 {
+        col += 1;
     }
     col
 }

@@ -418,6 +418,90 @@ impl<'a> Parser<'a> {
         self.pos = new_pos.saturating_sub(1);
     }
 
+    /// CommonMark §5.2 rule #2: when a list marker is followed by ≥ 5 columns
+    /// of whitespace and non-empty content, the content begins as an indented
+    /// code block on the marker line. The marker parser collapses the post-
+    /// marker whitespace to "marker + 1 (possibly virtual) space" and leaves
+    /// the surplus in the post-marker text. This helper detects such a single-
+    /// line indented-code first-line and converts the buffered text into a
+    /// CODE_BLOCK > CODE_CONTENT inside the LIST_ITEM.
+    ///
+    /// Multi-line accumulation (subsequent indented-code lines on continuation
+    /// lines) is handled by the regular block-detection path.
+    fn maybe_open_indented_code_in_new_list_item(&mut self) {
+        let Some(Container::ListItem {
+            content_col,
+            buffer,
+            marker_only,
+            virtual_marker_space,
+        }) = self.containers.stack.last()
+        else {
+            return;
+        };
+        if *marker_only {
+            return;
+        }
+        if buffer.segment_count() != 1 {
+            return;
+        }
+        let Some(text) = buffer.first_text() else {
+            return;
+        };
+        let content_col = *content_col;
+        let virtual_marker_space = *virtual_marker_space;
+        let text_owned = text.to_string();
+
+        // Single-line content only for now.
+        let mut iter = text_owned.split_inclusive('\n');
+        let line_with_nl = iter.next().unwrap_or("").to_string();
+        if iter.next().is_some() {
+            return;
+        }
+
+        let line_no_nl = line_with_nl
+            .strip_suffix("\r\n")
+            .or_else(|| line_with_nl.strip_suffix('\n'))
+            .unwrap_or(&line_with_nl);
+        let nl_suffix = &line_with_nl[line_no_nl.len()..];
+
+        let buffer_start_col = if virtual_marker_space {
+            content_col.saturating_sub(1)
+        } else {
+            content_col
+        };
+
+        let target = content_col + 4;
+        let (cols_walked, ws_bytes) =
+            super::utils::container_stack::leading_indent_from(line_no_nl, buffer_start_col);
+
+        if buffer_start_col + cols_walked < target {
+            return;
+        }
+        if ws_bytes >= line_no_nl.len() {
+            return;
+        }
+
+        if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+            buffer.clear();
+        }
+
+        self.builder.start_node(SyntaxKind::CODE_BLOCK.into());
+        self.builder.start_node(SyntaxKind::CODE_CONTENT.into());
+        if ws_bytes > 0 {
+            self.builder
+                .token(SyntaxKind::WHITESPACE.into(), &line_no_nl[..ws_bytes]);
+        }
+        let rest = &line_no_nl[ws_bytes..];
+        if !rest.is_empty() {
+            self.builder.token(SyntaxKind::TEXT.into(), rest);
+        }
+        if !nl_suffix.is_empty() {
+            self.builder.token(SyntaxKind::NEWLINE.into(), nl_suffix);
+        }
+        self.builder.finish_node();
+        self.builder.finish_node();
+    }
+
     fn has_matching_fence_closer(
         &self,
         fence: &code_blocks::FenceInfo,
@@ -696,6 +780,7 @@ impl<'a> Parser<'a> {
             spaces_after_bytes: prepared.spaces_after,
             indent_cols: prepared.indent_cols,
             indent_bytes: prepared.indent_bytes,
+            virtual_marker_space: prepared.virtual_marker_space,
         };
         let current_content_col = paragraphs::current_content_col(&self.containers);
         let deep_ordered_matched_level = matched_level
@@ -763,6 +848,7 @@ impl<'a> Parser<'a> {
                         );
                     }
                     self.maybe_open_fenced_code_in_new_list_item();
+                    self.maybe_open_indented_code_in_new_list_item();
                     return;
                 }
             }
@@ -778,6 +864,7 @@ impl<'a> Parser<'a> {
                 self.config,
             );
             self.maybe_open_fenced_code_in_new_list_item();
+            self.maybe_open_indented_code_in_new_list_item();
             return;
         }
 
@@ -812,6 +899,7 @@ impl<'a> Parser<'a> {
                 );
             }
             self.maybe_open_fenced_code_in_new_list_item();
+            self.maybe_open_indented_code_in_new_list_item();
             return;
         }
 
@@ -852,6 +940,7 @@ impl<'a> Parser<'a> {
             );
         }
         self.maybe_open_fenced_code_in_new_list_item();
+        self.maybe_open_indented_code_in_new_list_item();
     }
 
     fn handle_definition_list_effect(
@@ -1039,6 +1128,7 @@ impl<'a> Parser<'a> {
                             spaces_after_bytes: marker_match.spaces_after_bytes,
                             indent_cols,
                             indent_bytes,
+                            virtual_marker_space: marker_match.virtual_marker_space,
                         };
 
                         if let Some(nested_marker) = is_content_nested_bullet_marker(
@@ -1783,6 +1873,7 @@ impl<'a> Parser<'a> {
                                 spaces_after_bytes: marker_match.spaces_after_bytes,
                                 indent_cols,
                                 indent_bytes,
+                                virtual_marker_space: marker_match.virtual_marker_space,
                             };
                             lists::add_list_item_with_nested_empty_list(
                                 &mut self.containers,
@@ -1798,6 +1889,7 @@ impl<'a> Parser<'a> {
                                 spaces_after_bytes: marker_match.spaces_after_bytes,
                                 indent_cols,
                                 indent_bytes,
+                                virtual_marker_space: marker_match.virtual_marker_space,
                             };
                             lists::add_list_item(
                                 &mut self.containers,
@@ -2004,6 +2096,7 @@ impl<'a> Parser<'a> {
                             spaces_after_bytes: marker_match.spaces_after_bytes,
                             indent_cols,
                             indent_bytes,
+                            virtual_marker_space: marker_match.virtual_marker_space,
                         };
                         lists::add_list_item_with_nested_empty_list(
                             &mut self.containers,
@@ -2019,6 +2112,7 @@ impl<'a> Parser<'a> {
                             spaces_after_bytes: marker_match.spaces_after_bytes,
                             indent_cols,
                             indent_bytes,
+                            virtual_marker_space: marker_match.virtual_marker_space,
                         };
                         lists::add_list_item(
                             &mut self.containers,
