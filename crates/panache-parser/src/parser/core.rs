@@ -1439,6 +1439,13 @@ impl<'a> Parser<'a> {
                 indent_to_emit: None,
                 list_indent_info: None,
                 in_list: lists::in_list(&self.containers),
+                in_marker_only_list_item: matches!(
+                    self.containers.last(),
+                    Some(Container::ListItem {
+                        marker_only: true,
+                        ..
+                    })
+                ),
                 next_line: if self.pos + 1 < self.lines.len() {
                     Some(self.lines[self.pos + 1])
                 } else {
@@ -2228,6 +2235,13 @@ impl<'a> Parser<'a> {
                         indent_to_emit: None,
                         list_indent_info: None,
                         in_list: lists::in_list(&self.containers),
+                        in_marker_only_list_item: matches!(
+                            self.containers.last(),
+                            Some(Container::ListItem {
+                                marker_only: true,
+                                ..
+                            })
+                        ),
                         next_line: if self.pos + 1 < self.lines.len() {
                             Some(self.lines[self.pos + 1])
                         } else {
@@ -2396,6 +2410,13 @@ impl<'a> Parser<'a> {
             indent_to_emit,
             list_indent_info,
             in_list: lists::in_list(&self.containers),
+            in_marker_only_list_item: matches!(
+                self.containers.last(),
+                Some(Container::ListItem {
+                    marker_only: true,
+                    ..
+                })
+            ),
             next_line,
         };
 

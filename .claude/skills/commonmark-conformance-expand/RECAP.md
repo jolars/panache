@@ -16,155 +16,165 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (xxiv)
+## Latest session — 2026-04-29 (xxv)
 
-**Pass count: 632 → 634 / 652 (97.2%, +2)**
+**Pass count: 634 → 635 / 652 (97.4%, +1)**
 
-Took the carried-over target #292/#293 (same-line blockquote
-inside list item). Both dialects agree on the shape (verified
-via `pandoc -f commonmark` and `pandoc -f markdown`), but the
-fix is **dialect-gated to CommonMark** because the formatter
-drops the LIST_MARKER on round-trip when LIST_ITEM's first
-structural child is a BLOCK_QUOTE — exactly the same formatter
-constraint that blocks the same-line nested-LIST recursion at
-the same site. Same gate (`dialect_allows_nested`).
+Took the carried-over target #278 (empty-marker list item
+followed by indented content). Two related parser fixes,
+both apply across dialects (verified via `pandoc -f commonmark`
+and `pandoc -f markdown`).
 
 ### Targets unlocked
 
-- **#292** `> 1. > Blockquote\ncontinued here.` — outer
-  blockquote, list item, inner blockquote, paragraph with lazy
-  continuation across both blockquote layers.
-- **#293** `> 1. > Blockquote\n> continued here.` — same shape
-  but with explicit `>` continuation marker on line 2.
+- **#278** `-\n  foo\n-\n  \`\`\`...\n-\n      baz\n` — three
+  list items: a paragraph item, a fenced-code item, and an
+  indented-code item.
 
 ### Root cause + fix
 
-Parser-shape gap. `finish_list_item_with_optional_nested`
-buffered `> Blockquote\n` as PLAIN text instead of recognizing
-the inner `>` as a structural blockquote opener.
+Two parser-shape gaps:
 
-**Fix in `crates/panache-parser/src/parser/blocks/lists.rs`**
-(after the existing same-line nested-LIST detection): when
-`text_to_buffer.starts_with('>')` (and isn't `>>`, isn't a
-thematic break), emit `BLOCK_QUOTE_MARKER` + optional
-`WHITESPACE`, push `Container::ListItem` (empty buffer,
-`marker_only: false`) and `Container::BlockQuote {}`, then if
-there's content after `> ` start a paragraph and call
-`paragraphs::append_paragraph_line` so subsequent lines flow in
-via the parser's existing lazy-continuation path. Reused
-because the standard blockquote-opening path in `core.rs`
-already does the same dance (start BLOCK_QUOTE node → push
-container → start_paragraph_if_needed → append).
+1. **Setext eagerly absorbed the next list-item's marker.**
+   For `-\n  foo\n-\n…`, when the dispatcher processed the `  foo`
+   line it looked ahead at the bare `-` on line 3 and matched
+   `try_parse_setext_heading(["foo", "-"])`, emitting an h2 with
+   "foo" — collapsing item 1 + item 2 into one item.
 
-The gate matches the same-line nested-LIST gate
-(`dialect_allows_nested = config.dialect == Dialect::CommonMark`)
-so Pandoc-default formatting is unaffected. Under Pandoc the
-same input still flows through the PLAIN path (CST verified
-unchanged via paired fixture).
+2. **Indented code didn't fire on the line *after* an empty
+   marker.** For the third item `-\n      baz\n`, the dispatcher
+   gates indented code on `has_blank_before || at_document_start`
+   (CommonMark) or `has_blank_before_strict` (Pandoc). Both are
+   false when the prior line is the empty marker line, so the
+   line was buffered as PLAIN text.
+
+**Fixes in
+`crates/panache-parser/src/parser/block_dispatcher.rs`:**
+
+- `SetextHeadingParser::detect_prepared`: after the existing
+  blockquote same-container check, also reject when
+  `ctx.list_indent_info` is `Some(list_info)` and
+  `leading_indent(next_line).0 < list_info.content_col` — the
+  underline is at shallower indent than the list item's content
+  column, so it would close the list item rather than continue
+  it. No dialect gate (both dialects agree).
+- New `BlockContext::in_marker_only_list_item` flag (mirrors
+  `Container::ListItem.marker_only`) plumbed through every
+  `BlockContext` constructor in `core.rs` and the unit-test
+  contexts in `blocks/tests/blockquotes.rs`.
+- `IndentedCodeBlockParser::detect_prepared`: when
+  `ctx.in_marker_only_list_item` is true, allow regardless of
+  blank-before, AND return `BlockDetectionResult::YesCanInterrupt`
+  so the parser core's YesCanInterrupt path runs
+  `emit_list_item_buffer_if_needed` *before* `parse_prepared`.
+  Without the YesCanInterrupt swap, the buffered post-marker
+  newline (`\n` from `-\n`) flushes *after* the CODE_BLOCK is
+  emitted, breaking byte-order losslessness (verified directly).
 
 ### Files changed
 
-- **Parser-shape gap** (CommonMark dialect only):
-  - `crates/panache-parser/src/parser/blocks/lists.rs`:
-    `finish_list_item_with_optional_nested` gains a
-    `dialect_allows_nested && text_to_buffer.starts_with('>')`
-    branch that opens an inline BLOCK_QUOTE inside the LIST_ITEM
-    and buffers the post-marker content into a paragraph.
-- **Parser fixtures** (paired, since the dialect gate makes
-  CommonMark and Pandoc CSTs differ):
-  - `list_item_same_line_blockquote_marker_commonmark/{input.md,
-    parser-options.toml}` — pins the new LIST_ITEM > BLOCK_QUOTE
-    > PARAGRAPH shape under `flavor = "commonmark"`.
-  - `list_item_same_line_blockquote_marker_pandoc/{input.md,
-    parser-options.toml}` — pins the gated-off (PLAIN-text)
-    shape under `flavor = "pandoc"` so the dialect divergence
-    is regression-tracked.
+- **Parser-shape gap** (both dialects):
+  - `crates/panache-parser/src/parser/block_dispatcher.rs`:
+    new `BlockContext.in_marker_only_list_item` field; setext
+    list-item-content-col guard; indented-code marker-only allow
+    branch returning YesCanInterrupt.
+  - `crates/panache-parser/src/parser/core.rs`: set
+    `in_marker_only_list_item` from
+    `containers.last() == Some(ListItem { marker_only: true, .. })`
+    in all three `BlockContext` construction sites.
+  - `crates/panache-parser/src/parser/blocks/tests/blockquotes.rs`:
+    `in_marker_only_list_item: false` added to seven test
+    `BlockContext` literals.
+- **Parser fixtures** (both Pandoc-default since CSTs match):
+  - `list_item_empty_marker_indented_code_next_line/input.md` —
+    pins `-\n      baz\n` → LIST_ITEM with
+    PLAIN(NEWLINE) + CODE_BLOCK, exercising the indented-code
+    fix. No `parser-options.toml` (Pandoc default).
+  - `list_item_empty_marker_setext_blocked_commonmark/{input.md,
+    parser-options.toml = "commonmark"}` — pins
+    `-\n  foo\n-\n` → two LIST_ITEMs (no setext absorbing the
+    second marker). Pandoc-default already produced this shape
+    via `blank_before_header`, so a paired Pandoc fixture is
+    redundant; existing top-level fixture suite covers it.
   - Both wired in `golden_parser_cases.rs`. Snapshots accepted
     via `INSTA_UPDATE=always`.
-- **Allowlist additions**: #292, #293 (List items).
-- **Lib test update**:
-  `parser::blocks::tests::blockquotes::definition_list_list_blockquote_continuation_stays_structural`
-  uses `parse_blocks` (Pandoc-default), so under the dialect
-  gate the test's pre-fix behavior is preserved. No assertion
-  change needed — restored to `marker_count == 2`. (Earlier
-  push of this test to `marker_count == 3` was reverted when the
-  dialect gate landed.)
+- **Allowlist additions**: #278 (List items).
 
-No formatter golden case under CommonMark flavor: the formatter
-currently drops the LIST_MARKER on round-trip for this CST shape
-(verified — `1. > foo` re-formats to `   > foo`, losing the list
-entirely). Adding a CommonMark formatter case would fail the
-idempotency assertion. Tracked as carry-forward (see Suggested
-next targets).
+No formatter golden case: the new CST under CommonMark is
+structurally identical to the Pandoc path (existing top-level
+fixture coverage applies). `cargo run -- debug format --checks
+all` on `-\n      baz\n` passes (losslessness + idempotency).
 
 ### Don't redo
 
+- **Don't drop the `BlockDetectionResult::YesCanInterrupt`
+  return for the marker-only indented-code case.** Returning
+  plain `Yes` makes the parser core skip
+  `emit_list_item_buffer_if_needed`, leaving the post-marker
+  newline buffered until end-of-item — it then flushes *after*
+  the CODE_BLOCK and breaks byte-order losslessness. Verified
+  directly: with plain `Yes` the CST text is `-      baz\n\n`
+  vs source `-\n      baz\n`.
+- **Don't thread setext-in-buffered-list-item via the existing
+  `SetextHeadingParser`.** The dispatcher's setext detection
+  fires on the *text* line with next_line as underline. For
+  #300's case (`- Bar\n  ---\n  baz`), "Bar" is buffered on
+  line 2 (no dispatch) and `  ---` arrives as the *current*
+  line on line 3 — by then setext can't see "Bar". A separate
+  fold pass over the list-item buffer is needed. Tracked as
+  next session.
+- **Don't simplify the setext list-item indent check by reusing
+  `try_parse_list_marker`.** A line of `-` at column 0 is a
+  list marker only when it would actually open/continue a list
+  at that column; the simpler "is the underline at a shallower
+  indent than the current list item's content_col?" check
+  captures the precedence rule directly without re-invoking
+  the marker parser.
+- **Don't generalize `in_marker_only_list_item` to
+  `BlockContext` users beyond IndentedCode without re-checking
+  what each parser does on a marker-only first line.** ATX,
+  fenced code, HRs already handle this through other paths
+  (post-marker text on the marker line). The flag is narrowly
+  needed for "block on the line *after* an empty marker."
 - **Don't lift the `dialect_allows_nested` gate** on the
   blockquote-in-list-item branch without also fixing the
-  formatter's nested-only LIST_ITEM round-trip. The gate is
-  load-bearing: under Pandoc-default, the formatter would
-  silently drop the `1.` LIST_MARKER on re-format because
-  LIST_ITEM's first structural child is a BLOCK_QUOTE.
-  Verified by reproducing on `1. > Blockquote\n` directly.
-- **Don't try to add a CommonMark formatter golden case yet.**
-  The output today is `>    > > Blockquote continued here.`
-  which round-trips to nested blockquotes only (LIST stripped).
-  The case lands together with the formatter fix.
-- **Don't merge this branch with the same-line nested-LIST
-  branch above it** — the inner-content classification is
-  mutually exclusive (a list marker isn't a blockquote marker
-  and vice versa). Sharing `dialect_allows_nested` is enough;
-  the bodies do different work (recurse into emit_list_item vs
-  open BLOCK_QUOTE + paragraph) and conflating them obscures
-  intent.
-- **Don't simplify `text_to_buffer.starts_with('>')` to use
-  `try_parse_blockquote_marker`.** That helper accepts up to 3
-  leading spaces; for our same-line path we want strict
-  byte-0 `>` because leading whitespace was already consumed by
-  `emit_list_item` into the post-marker WHITESPACE token, and
-  re-detecting it here would double-count.
-- **The `>>` short-circuit (`!text_to_buffer.starts_with(">>")`)**
-  is intentional. Letting `> > x` through this branch would
-  open one inner blockquote and leave the second `>` as text,
-  which is wrong; nested blockquotes inside list items are not
-  in scope for this session and would need recursion analogous
-  to the nested-LIST branch. Leave the short-circuit; revisit
-  if the next block of List-items failures includes one of
-  these forms.
+  formatter's nested-only LIST_ITEM round-trip. (Carried from
+  session xxiv.)
 
 ### Suggested next targets, ranked
 
-1. **Formatter fix for nested-only outer LIST_ITEM** — now the
-   #1 unblocker. Lifting it removes both the same-line
-   nested-LIST gate (unlocking #298, #299) AND the same-line
-   blockquote-in-list-item gate (would let Pandoc match
-   pandoc-markdown's actual shape). The formatter today drops
-   the LIST_MARKER when LIST_ITEM's first structural child is
-   a BLOCK_QUOTE or LIST. Likely lives in
+1. **#300 setext-in-list-item** — `- # Foo\n- Bar\n  ---\n  baz`.
+   Item 2's "Bar" buffers as text; `  ---` arrives on the next
+   line and the dispatcher fires HR. The `\n` after "Bar" is
+   already in the buffer when `  ---` reaches the dispatcher,
+   so a fold-on-flush approach in
+   `list_item_buffer.rs::emit_as_block` (or a new pre-dispatcher
+   hook in `core.rs`'s YesCanInterrupt path that intercepts HR
+   when the buffered text could be setext-content) is the next
+   move. Likely both-dialect (pandoc agrees on the shape).
+2. **Formatter fix for nested-only outer LIST_ITEM** — still
+   the #1 unblocker for lifting the same-line nested-LIST and
+   blockquote-in-list-item dialect gates. The formatter today
+   drops the LIST_MARKER when LIST_ITEM's first structural
+   child is a BLOCK_QUOTE or LIST. Likely lives in
    `crates/panache-formatter/src/formatter/lists.rs`'s LIST_ITEM
-   emission path; add a CommonMark formatter golden case
-   alongside the fix.
-2. **Proper delimiter-stack for emphasis (#402, #408, #412, #417,
+   emission path. (Carried.)
+3. **Proper delimiter-stack for emphasis (#402, #408, #412, #417,
    #426, #445, #457, #464, #465, #466, #468)** — rewrite emphasis
    to use CMark's process_emphasis algorithm. Largest single fix;
    substantial; gate on `Dialect::CommonMark`. (Carried.)
-3. **#472 `*foo *bar baz*`** — CommonMark expects `*foo <em>bar
+4. **#472 `*foo *bar baz*`** — CommonMark expects `*foo <em>bar
    baz</em>`. Likely needs delimiter-stack work. (Carried.)
-4. **Reference-link nesting (#569, #571)** — `[foo][bar][baz]`
+5. **Reference-link nesting (#569, #571)** — `[foo][bar][baz]`
    with only `[baz]` defined should parse as `[foo]` + ref-link
    `[bar][baz]`. CMark left-bracket scanner stack with
-   refdef-aware resolution. Probably the next big link cluster.
-   (Carried; #533 stays in this group.)
-5. **#533** — inline link with emphasis closing inside the
+   refdef-aware resolution. (Carried; #533 stays in this group.)
+6. **#533** — inline link with emphasis closing inside the
    bracket text plus a trailing reference link. (Carried;
    companion to #569/#571.)
-6. **#278 `-\n  foo\n-\n  ```\n…`** — empty marker followed by
-   indented content; multiple bugs. (Carried over.)
-7. **#300 setext-in-list-item** — `- # Foo\n- Bar\n  ---\n  baz`
-    should treat `Bar\n  ---` as setext h2. (Carried over.)
-8. **#523 `*foo [bar* baz]`** — emphasis closes inside link
-    bracket text mid-flight. Likely needs delimiter-stack work +
-    bracket scanner integration. (Carried over.)
+7. **#523 `*foo [bar* baz]`** — emphasis closes inside link
+   bracket text mid-flight. Likely needs delimiter-stack work +
+   bracket scanner integration. (Carried.)
 
 ### Carry-forward from prior sessions
 
@@ -210,3 +220,10 @@ next targets).
   fields. They contribute additively in the renderer's
   `code_block_content` when both are present (rare; not yet
   exercised by a passing example).
+- Session (xxiv)'s same-line blockquote-in-list-item branch in
+  `finish_list_item_with_optional_nested` is dialect-gated to
+  CommonMark via `dialect_allows_nested`. Don't lift the gate
+  without first fixing the formatter's nested-only LIST_ITEM
+  round-trip (the formatter currently drops the LIST_MARKER on
+  re-format when LIST_ITEM's first structural child is a
+  BLOCK_QUOTE).

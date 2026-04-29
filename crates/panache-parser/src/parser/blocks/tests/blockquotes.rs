@@ -395,6 +395,7 @@ fn dispatcher_blockquote_detection() {
         indent_to_emit: None,
         list_indent_info: None,
         in_list: false,
+        in_marker_only_list_item: false,
         next_line: None,
     };
 
@@ -427,6 +428,7 @@ fn dispatcher_blockquote_requires_blank_before() {
         indent_to_emit: None,
         list_indent_info: None,
         in_list: false,
+        in_marker_only_list_item: false,
         next_line: None,
     };
 
@@ -465,6 +467,7 @@ fn dispatcher_blockquote_payload_basic() {
         indent_to_emit: None,
         list_indent_info: None,
         in_list: false,
+        in_marker_only_list_item: false,
         next_line: None,
     };
 
@@ -500,6 +503,7 @@ fn dispatcher_blockquote_payload_nested_requires_blank() {
         indent_to_emit: None,
         list_indent_info: None,
         in_list: false,
+        in_marker_only_list_item: false,
         next_line: None,
     };
 
@@ -534,6 +538,7 @@ fn dispatcher_blockquote_ignored_inside_blockquote() {
         indent_to_emit: None,
         list_indent_info: None,
         in_list: false,
+        in_marker_only_list_item: false,
         next_line: None,
     };
 
@@ -563,6 +568,7 @@ fn dispatcher_blockquote_payload_nested_with_blank() {
         indent_to_emit: None,
         list_indent_info: None,
         in_list: false,
+        in_marker_only_list_item: false,
         next_line: None,
     };
 
@@ -597,6 +603,7 @@ fn dispatcher_blockquote_payload_nested_after_blank_line() {
         indent_to_emit: None,
         list_indent_info: None,
         in_list: false,
+        in_marker_only_list_item: false,
         next_line: None,
     };
 

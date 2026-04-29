@@ -107,6 +107,15 @@ pub(crate) struct BlockContext<'a> {
     /// Whether we're currently inside any list
     pub in_list: bool,
 
+    /// Whether the immediate enclosing container is a list item that has so
+    /// far seen only its marker (no content yet). Equivalent to the
+    /// `marker_only` flag on `Container::ListItem`. Used by indented code
+    /// detection so that the line *after* an empty list marker can still
+    /// open an indented code block when its indent is ≥ content_col + 4,
+    /// even though there is no blank line separating the marker line from
+    /// the indented line.
+    pub in_marker_only_list_item: bool,
+
     /// Next line content for lookahead (used by setext headings)
     pub next_line: Option<&'a str>,
 }
@@ -2172,7 +2181,20 @@ impl BlockParser for IndentedCodeBlockParser {
         // extends the blockquote (verified with `pandoc -f markdown` for
         // `>     foo\n    bar`). Keep the literal strict gate there to avoid
         // regressing lazy-continuation behavior.
-        let allow = if ctx.config.dialect == crate::options::Dialect::CommonMark {
+        //
+        // Marker-only list items have no buffered content yet, so an indented
+        // line on the *next* line cannot interrupt anything; allow the code
+        // block to open under either dialect (spec example #278's third item:
+        // `-\n      baz` → indented code block inside the list item). Both
+        // dialects agree here (verified via `pandoc -f commonmark / -f
+        // markdown`). Returned as `YesCanInterrupt` so the parser core flushes
+        // the list-item buffer (which holds the marker line's trailing
+        // newline) *before* emitting the code block, preserving lossless byte
+        // ordering.
+        let allow_marker_only = ctx.in_marker_only_list_item;
+        let allow = if allow_marker_only {
+            true
+        } else if ctx.config.dialect == crate::options::Dialect::CommonMark {
             ctx.has_blank_before || ctx.at_document_start
         } else {
             ctx.has_blank_before_strict
@@ -2198,7 +2220,12 @@ impl BlockParser for IndentedCodeBlockParser {
             return None;
         }
 
-        Some((BlockDetectionResult::Yes, None))
+        let detection = if allow_marker_only {
+            BlockDetectionResult::YesCanInterrupt
+        } else {
+            BlockDetectionResult::Yes
+        };
+        Some((detection, None))
     }
 
     fn parse_prepared(
@@ -2295,6 +2322,20 @@ impl BlockParser for SetextHeadingParser {
                 && count_blockquote_markers(next_line).0 != ctx.blockquote_depth
             {
                 return None;
+            }
+            // Same-container rule for list items: if the text line is inside a
+            // list item (content_col > 0) and the underline line's indent is
+            // less than that content_col, the underline breaks out of the
+            // list item — it's a sibling list marker (or HR / paragraph
+            // continuation), not a setext underline. Both dialects agree on
+            // this for the single-`-` case (`-\n  foo\n-\n` → two sibling
+            // list items, not a setext heading), verified via
+            // `pandoc -f commonmark` and `pandoc -f markdown`.
+            if let Some(list_info) = ctx.list_indent_info {
+                let (next_indent_cols, _) = leading_indent(next_line);
+                if next_indent_cols < list_info.content_col {
+                    return None;
+                }
             }
             Some((BlockDetectionResult::Yes, None))
         } else {
