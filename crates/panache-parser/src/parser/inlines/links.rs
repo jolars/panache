@@ -30,18 +30,26 @@ use crate::parser::utils::attributes::try_parse_trailing_attributes;
 ///   produces a different parse under each dialect (CommonMark spec example
 ///   #526 / #538). Always derive this from
 ///   `extensions.autolinks && dialect == Dialect::CommonMark`.
+/// - `disallow_inner_links` is **CommonMark-only** structural rule (§6.4):
+///   "Links may not contain other links, at any level of nesting." When the
+///   candidate link/image text contains a valid inline link or image, the
+///   outer match is rejected so the inner-most definition is used instead
+///   (spec examples #518–#520, #532). Pandoc-markdown allows nested links,
+///   so the flag is `false` there.
 #[derive(Clone, Copy, Default)]
 pub struct LinkScanContext {
     pub skip_raw_html: bool,
     pub skip_autolinks: bool,
+    pub disallow_inner_links: bool,
 }
 
 impl LinkScanContext {
     pub fn from_options(config: &ParserOptions) -> Self {
+        let is_commonmark = config.dialect == crate::options::Dialect::CommonMark;
         Self {
             skip_raw_html: config.extensions.raw_html,
-            skip_autolinks: config.extensions.autolinks
-                && config.dialect == crate::options::Dialect::CommonMark,
+            skip_autolinks: config.extensions.autolinks && is_commonmark,
+            disallow_inner_links: is_commonmark,
         }
     }
 }
@@ -178,6 +186,80 @@ fn find_dest_close_paren(remaining: &str) -> Option<usize> {
 /// overhead and without splitting on a UTF-8 boundary.
 fn step(s: &str, i: usize) -> usize {
     s[i..].chars().next().map(|c| c.len_utf8()).unwrap_or(1)
+}
+
+/// CommonMark §6.4: "Links may not contain other links, at any level of
+/// nesting. If multiple otherwise valid link definitions appear nested inside
+/// each other, the inner-most definition is used." This helper scans a
+/// candidate link text for any `[` that starts a valid inline link; when
+/// found, the outer link must be rejected so the inner-most wins (spec
+/// examples #518–#519, #532).
+///
+/// Images themselves do not count as inner links — a link can contain an
+/// image (#517, #531). A link *inside* an image's alt text, however, still
+/// deactivates outer link openers per CommonMark's bracket-scanner rules, so
+/// the helper recurses into image alt text looking for inner links.
+///
+/// Reference-link nesting (#533, #569, #571) requires resolving labels
+/// against the document's reference-definition map, which the parser does
+/// not have at this point — those cases remain unhandled and need a later
+/// stack-based pass.
+fn link_text_contains_inner_link(text: &str, ctx: LinkScanContext, strict_dest: bool) -> bool {
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    let mut escape_next = false;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if escape_next {
+            escape_next = false;
+            i += step(text, i);
+            continue;
+        }
+        match b {
+            b'\\' => {
+                escape_next = true;
+                i += 1;
+            }
+            b'`' => {
+                if let Some((len, _, _, _)) = try_parse_code_span(&text[i..]) {
+                    i += len;
+                } else {
+                    i += 1;
+                }
+            }
+            b'<' => {
+                if ctx.skip_autolinks
+                    && let Some((len, _)) = try_parse_autolink(&text[i..], true)
+                {
+                    i += len;
+                } else if ctx.skip_raw_html
+                    && let Some(len) = try_parse_inline_html(&text[i..])
+                {
+                    i += len;
+                } else {
+                    i += 1;
+                }
+            }
+            b'!' if i + 1 < bytes.len() && bytes[i + 1] == b'[' => {
+                if let Some((len, alt, _, _)) = try_parse_inline_image(&text[i..], ctx) {
+                    if link_text_contains_inner_link(alt, ctx, strict_dest) {
+                        return true;
+                    }
+                    i += len;
+                } else {
+                    i += 2;
+                }
+            }
+            b'[' => {
+                if try_parse_inline_link(&text[i..], strict_dest, ctx).is_some() {
+                    return true;
+                }
+                i += 1;
+            }
+            _ => i += step(text, i),
+        }
+    }
+    false
 }
 
 /// Try to parse an inline image starting at the current position.
@@ -537,6 +619,12 @@ pub fn try_parse_inline_link(
         return None;
     }
 
+    // CommonMark §6.4: outer link is rejected when its text contains a valid
+    // inner inline link or image, so the inner-most definition wins.
+    if ctx.disallow_inner_links && link_text_contains_inner_link(link_text, ctx, strict_dest) {
+        return None;
+    }
+
     // Check for trailing attributes {#id .class key=value}
     let after_paren = dest_start + close_paren + 1;
     let after_close = &text[after_paren..];
@@ -782,6 +870,16 @@ pub fn try_parse_reference_link(
     // opaque per `ctx`.
     let close_bracket = find_link_close_bracket(text, 1, ctx)?;
     let link_text = &text[1..close_bracket];
+
+    // CommonMark §6.4: outer reference link is rejected when its text contains
+    // a valid inner inline link/image (spec example #532). Reference-link
+    // nesting (#533/#569/#571) is not handled here; it requires resolving
+    // labels against the document refdef map.
+    if ctx.disallow_inner_links
+        && link_text_contains_inner_link(link_text, ctx, ctx.disallow_inner_links)
+    {
+        return None;
+    }
 
     // Check what follows the ]
     let after_bracket = close_bracket + 1;

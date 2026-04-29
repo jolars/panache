@@ -247,6 +247,7 @@ golden_test_cases!(
     list_nested_roman_idempotency_136,
     line_ending_crlf,
     line_ending_lf,
+    link_inside_link_text_commonmark,
     links,
     lists_bullet,
     lists_code,

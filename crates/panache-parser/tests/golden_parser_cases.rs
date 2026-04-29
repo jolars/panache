@@ -273,6 +273,8 @@ golden_test_cases!(
     line_blocks,
     line_ending_crlf,
     line_ending_lf,
+    link_inside_link_text_commonmark,
+    link_inside_link_text_pandoc,
     link_text_skips_autolink_commonmark,
     link_text_skips_autolink_pandoc,
     link_text_skips_raw_html_commonmark,
