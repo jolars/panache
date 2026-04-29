@@ -1376,6 +1376,19 @@ impl BlockParser for TableParser {
 }
 
 /// Helper function to emit reference definition content with inline structure.
+fn find_label_close(s: &str) -> Option<usize> {
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' if i + 1 < bytes.len() => i += 2,
+            b']' => return Some(i),
+            _ => i += 1,
+        }
+    }
+    None
+}
+
 fn emit_reference_definition_content(builder: &mut GreenNodeBuilder<'static>, text: &str) {
     use crate::syntax::SyntaxKind;
 
@@ -1391,7 +1404,7 @@ fn emit_reference_definition_content(builder: &mut GreenNodeBuilder<'static>, te
     }
 
     let rest = &after_indent[1..];
-    if let Some(close_pos) = rest.find(']') {
+    if let Some(close_pos) = find_label_close(rest) {
         let label = &rest[..close_pos];
         let after_bracket = &rest[close_pos + 1..];
 

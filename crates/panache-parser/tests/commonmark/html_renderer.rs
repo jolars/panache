@@ -46,7 +46,7 @@ fn parse_reference_definition(node: &SyntaxNode) -> Option<(String, RefDef)> {
         if child.kind() == SyntaxKind::LINK {
             for grand in child.children() {
                 if grand.kind() == SyntaxKind::LINK_TEXT {
-                    label = collect_text(&grand);
+                    label = collect_label_text(&grand);
                 }
             }
         }
@@ -125,11 +125,38 @@ fn parse_title(text: &str) -> Option<String> {
 }
 
 fn normalize_label(label: &str) -> String {
+    // CommonMark §6.4: matching is performed on normalized *raw* strings,
+    // not parsed inline content. Backslash escapes are NOT decoded — see
+    // spec example #545 (`[bar][foo\!]` does not match `[foo!]:`).
     label
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
         .to_lowercase()
+}
+
+/// Collect the raw label text of a node (link text or link ref) for
+/// reference-matching purposes. Includes `ESCAPED_CHAR` tokens with their
+/// backslashes intact: per CommonMark §6.4 example #545, label matching is
+/// performed on raw strings, not parsed inline content (`[bar][foo\!]` does
+/// not match `[foo!]:`). The inline-link side produces `LINK_TEXT` with
+/// separate `TEXT` and `ESCAPED_CHAR` tokens; the corresponding ref-def
+/// emits the entire label as one `TEXT` token. Both must produce the same
+/// raw string for `normalize_label` to compare them correctly.
+fn collect_label_text(node: &SyntaxNode) -> String {
+    node.descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|t| {
+            matches!(
+                t.kind(),
+                SyntaxKind::TEXT
+                    | SyntaxKind::ESCAPED_CHAR
+                    | SyntaxKind::WHITESPACE
+                    | SyntaxKind::NEWLINE
+            )
+        })
+        .map(|t| t.text().to_string())
+        .collect()
 }
 
 fn render_blocks(parent: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut String) {
@@ -817,22 +844,46 @@ fn render_link(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut Stri
             title.map(|t| decode_entities(&decode_backslash_escapes(&t))),
         )
     } else if let Some(label_node) = node.children().find(|c| c.kind() == SyntaxKind::LINK_REF) {
-        let label = collect_text(&label_node);
+        // Collapsed reference `[text][]`: empty `[]`, fall back to text as label.
+        let label_raw = collect_label_text(&label_node);
+        let label = if label_raw.trim().is_empty() {
+            text_node
+                .as_ref()
+                .map(collect_label_text)
+                .unwrap_or_default()
+        } else {
+            label_raw
+        };
         match refs.get(&normalize_label(&label)) {
             Some(def) => (def.url.clone(), def.title.clone()),
             None => {
                 // Unresolved reference: render verbatim
-                out.push_str(&escape_html(&node.text().to_string()));
+                // Per CommonMark §6.4 example #545, an unresolved reference
+                // link still has its label content decoded for display
+                // (backslash escapes resolved), even though matching uses
+                // the raw form.
+                out.push_str(&escape_html(&decode_backslash_escapes(
+                    &node.text().to_string(),
+                )));
                 return;
             }
         }
     } else {
         // Shortcut reference [label] resolves with text as the label
-        let label = text_node.as_ref().map(collect_text).unwrap_or_default();
+        let label = text_node
+            .as_ref()
+            .map(collect_label_text)
+            .unwrap_or_default();
         match refs.get(&normalize_label(&label)) {
             Some(def) => (def.url.clone(), def.title.clone()),
             None => {
-                out.push_str(&escape_html(&node.text().to_string()));
+                // Per CommonMark §6.4 example #545, an unresolved reference
+                // link still has its label content decoded for display
+                // (backslash escapes resolved), even though matching uses
+                // the raw form.
+                out.push_str(&escape_html(&decode_backslash_escapes(
+                    &node.text().to_string(),
+                )));
                 return;
             }
         }
@@ -894,7 +945,13 @@ fn render_image(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut Str
         match refs.get(&normalize_label(&label)) {
             Some(def) => (def.url.clone(), def.title.clone()),
             None => {
-                out.push_str(&escape_html(&node.text().to_string()));
+                // Per CommonMark §6.4 example #545, an unresolved reference
+                // link still has its label content decoded for display
+                // (backslash escapes resolved), even though matching uses
+                // the raw form.
+                out.push_str(&escape_html(&decode_backslash_escapes(
+                    &node.text().to_string(),
+                )));
                 return;
             }
         }
@@ -1045,14 +1102,6 @@ fn normalize_code_span(raw: &str) -> String {
         return spaced[1..spaced.len() - 1].to_string();
     }
     spaced
-}
-
-fn collect_text(node: &SyntaxNode) -> String {
-    node.descendants_with_tokens()
-        .filter_map(|el| el.into_token())
-        .filter(|t| t.kind() == SyntaxKind::TEXT)
-        .map(|t| t.text().to_string())
-        .collect()
 }
 
 fn escape_html(s: &str) -> String {

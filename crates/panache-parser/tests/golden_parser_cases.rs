@@ -296,6 +296,7 @@ golden_test_cases!(
     raw_blocks,
     raw_tex_commands,
     reference_definition_inside_blockquote,
+    reference_definition_label_with_escaped_bracket,
     reference_definition_multiline_destination,
     reference_definition_multiline_label,
     reference_definition_no_interrupt_paragraph,
