@@ -558,6 +558,72 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// CommonMark spec example #312: handle a detected list marker that's
+    /// actually lazy continuation rather than a new list item. Returns true
+    /// when the line was consumed as continuation (caller should advance pos
+    /// without calling `handle_list_open_effect`).
+    ///
+    /// A marker line whose leading indent is ≥ 4 columns isn't a real list
+    /// marker when (a) the indent doesn't reach the deepest open list item's
+    /// content column (so it can't open a child list), and (b) no open list
+    /// level matches the indent (so it can't be a sibling). In that case the
+    /// content is just text that lazily extends the deepest open paragraph
+    /// or list item.
+    fn try_lazy_list_continuation(
+        &mut self,
+        block_match: &super::block_dispatcher::PreparedBlockMatch,
+        content: &str,
+    ) -> bool {
+        use super::block_dispatcher::ListPrepared;
+
+        let Some(prepared) = block_match
+            .payload
+            .as_ref()
+            .and_then(|p| p.downcast_ref::<ListPrepared>())
+        else {
+            return false;
+        };
+
+        if prepared.indent_cols < 4 || !lists::in_list(&self.containers) {
+            return false;
+        }
+
+        let current_content_col = paragraphs::current_content_col(&self.containers);
+        if prepared.indent_cols >= current_content_col {
+            return false;
+        }
+
+        if lists::find_matching_list_level(
+            &self.containers,
+            &prepared.marker,
+            prepared.indent_cols,
+            self.config.dialect,
+        )
+        .is_some()
+        {
+            return false;
+        }
+
+        match self.containers.last() {
+            Some(Container::Paragraph { .. }) => {
+                paragraphs::append_paragraph_line(
+                    &mut self.containers,
+                    &mut self.builder,
+                    content,
+                    self.config,
+                );
+                true
+            }
+            Some(Container::ListItem { .. }) => {
+                if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+                    buffer.push_text(content);
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn handle_list_open_effect(
         &mut self,
         block_match: &super::block_dispatcher::PreparedBlockMatch,
@@ -2431,6 +2497,19 @@ impl<'a> Parser<'a> {
                             self.pos += 1;
                             return true;
                         }
+                    }
+
+                    // CommonMark spec example #312: a "list marker" at indent
+                    // ≥ 4 isn't actually a marker when it can't reach the
+                    // deepest item's content column AND no list level matches
+                    // at that indent. Treat as lazy paragraph continuation of
+                    // the deepest open list item or paragraph rather than
+                    // flushing the buffer and opening a new sibling list.
+                    if matches!(block_match.effect, BlockEffect::OpenList)
+                        && self.try_lazy_list_continuation(block_match, content)
+                    {
+                        self.pos += 1;
+                        return true;
                     }
 
                     self.emit_list_item_buffer_if_needed();
