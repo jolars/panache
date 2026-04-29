@@ -12,20 +12,14 @@ use rowan::GreenNodeBuilder;
 use crate::parser::utils::helpers::strip_newline;
 
 /// Check if a line is indented enough to be part of an indented code block.
-/// Returns true if the line starts with 4+ spaces or 1+ tab.
+/// Returns true if the leading whitespace expands to at least 4 columns
+/// (tabs count toward the next column-4 stop, so `  \t` is 4 cols).
 pub(crate) fn is_indented_code_line(content: &str) -> bool {
     if content.is_empty() {
         return false;
     }
-
-    // Check for tab
-    if content.starts_with('\t') {
-        return true;
-    }
-
-    // Check for 4+ spaces
-    let spaces = content.chars().take_while(|&c| c == ' ').count();
-    spaces >= 4
+    let (cols, _) = leading_indent(content);
+    cols >= 4
 }
 
 /// Parse an indented code block, consuming lines from the parser.

@@ -646,12 +646,12 @@ fn code_block_content(node: &SyntaxNode) -> String {
             }
         }
     } else {
-        // Indented code block: strip up to 4 leading spaces (or 1 tab) from
-        // each line. Blank lines (whitespace-only) are also stripped of up
-        // to 4 leading spaces; any remaining whitespace is preserved.
-        // Inside a list item, also strip the list-item content column first
-        // so the 4-space indented-code marker remains the only thing the
-        // generic strip removes.
+        // Indented code block: strip `li_indent + 4` leading columns from
+        // each line, with column-aware tab expansion (tabstop = 4) and
+        // partial-tab slack emitted as virtual spaces. Whitespace-only
+        // lines shorter than the strip target collapse to just the
+        // newline, matching CommonMark's blank-line treatment.
+        let strip_cols = li_indent + 4;
         for child in node.children() {
             if child.kind() == SyntaxKind::CODE_CONTENT {
                 let raw = child.text().to_string();
@@ -660,35 +660,21 @@ fn code_block_content(node: &SyntaxNode) -> String {
                 } else {
                     raw
                 };
-                let raw = if li_indent > 0 {
-                    strip_leading_spaces_per_line(&raw, li_indent)
-                } else {
-                    raw
-                };
                 for line in raw.split_inclusive('\n') {
-                    if let Some(rest) = line.strip_prefix('\t') {
-                        content.push_str(rest);
-                        continue;
-                    }
                     let body_len = line.len() - if line.ends_with('\n') { 1 } else { 0 };
                     let body = &line[..body_len];
-                    let bytes = line.as_bytes();
-                    let mut stripped = 0usize;
-                    while stripped < 4 && stripped < body_len && bytes[stripped] == b' ' {
-                        stripped += 1;
-                    }
-                    // If the line is whitespace-only and shorter than the
-                    // indent, the entire line is consumed (only the newline
-                    // remains).
-                    if stripped == body_len
-                        && body.chars().all(|c| c == ' ' || c == '\t')
-                        && stripped < 4
-                    {
+                    let (stripped_bytes, slack, reached_target) =
+                        consume_leading_cols(body, strip_cols);
+                    let line_is_blank = body.chars().all(|c| c == ' ' || c == '\t');
+                    if !reached_target && line_is_blank && stripped_bytes >= body_len {
                         if line.ends_with('\n') {
                             content.push('\n');
                         }
                     } else {
-                        content.push_str(&line[stripped..]);
+                        if slack > 0 {
+                            content.push_str(&" ".repeat(slack));
+                        }
+                        content.push_str(&line[stripped_bytes..]);
                     }
                 }
             }
@@ -744,6 +730,36 @@ fn strip_leading_spaces_per_line(text: &str, max: usize) -> String {
         out.push_str(&line[stripped..]);
     }
     out
+}
+
+/// Consume up to `target_cols` columns of leading whitespace from `body`,
+/// expanding tabs against tabstop = 4. Returns (bytes_consumed, slack,
+/// reached_target). `slack` is the number of virtual spaces a partial tab
+/// at the boundary contributes back to the line content.
+fn consume_leading_cols(body: &str, target_cols: usize) -> (usize, usize, bool) {
+    let bytes = body.as_bytes();
+    let mut byte_idx = 0usize;
+    let mut col = 0usize;
+    while col < target_cols && byte_idx < bytes.len() {
+        match bytes[byte_idx] {
+            b' ' => {
+                col += 1;
+                byte_idx += 1;
+            }
+            b'\t' => {
+                let next_stop = col + 4 - (col % 4);
+                if next_stop <= target_cols {
+                    col = next_stop;
+                    byte_idx += 1;
+                } else {
+                    let slack = next_stop - target_cols;
+                    return (byte_idx + 1, slack, true);
+                }
+            }
+            _ => break,
+        }
+    }
+    (byte_idx, 0, col >= target_cols)
 }
 
 fn render_html_block(node: &SyntaxNode, out: &mut String) {

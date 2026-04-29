@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..16
+  CODE_BLOCK@0..16
+    CODE_CONTENT@0..16
+      WHITESPACE@0..3 "  \t"
+      TEXT@3..15 "foo\tbaz\t\tbim"
+      NEWLINE@15..16 "\n"

@@ -1,6 +1,6 @@
 CommonMark spec.txt v0.31.2 conformance report
-625 / 652 examples passing (95.9%)
-27 failing
+627 / 652 examples passing (96.2%)
+25 failing
 12 blocked-list entries
 
 === Per-section pass / fail ===
@@ -27,14 +27,16 @@ CommonMark spec.txt v0.31.2 conformance report
   Raw HTML: 20 pass / 0 fail
   Setext headings: 27 pass / 0 fail
   Soft line breaks: 2 pass / 0 fail
-  Tabs: 7 pass / 4 fail
+  Tabs: 9 pass / 2 fail
   Textual content: 3 pass / 0 fail
   Thematic breaks: 19 pass / 0 fail
 
 === Passing example numbers (allowlist candidates) ===
 1
+2
 3
 4
+5
 8
 9
 10
@@ -1303,8 +1305,10 @@ CommonMark spec.txt v0.31.2 conformance report
 
 # Tabs
 1
+2
 3
 4
+5
 8
 9
 10

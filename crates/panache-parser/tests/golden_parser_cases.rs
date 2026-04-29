@@ -256,6 +256,7 @@ golden_test_cases!(
     indented_code,
     indented_code_after_atx_heading_commonmark,
     indented_code_after_atx_heading_pandoc,
+    indented_code_mixed_tab_space,
     inline_html_basic_commonmark,
     inline_link_code_span_precedence,
     inline_link_dest_angle_brackets_with_parens,
