@@ -22,6 +22,12 @@ pub(crate) enum Container {
     ListItem {
         content_col: usize,
         buffer: ListItemBuffer, // Buffer for list item content
+        /// True iff this list item has so far only seen its marker line, with
+        /// no real content (text, nested list, etc.) — a marker-only item.
+        /// Used by CommonMark to close empty list items at the first blank
+        /// line, per spec §5.2 ("a list item can begin with at most one
+        /// blank line"). Pandoc keeps the item open across the blank.
+        marker_only: bool,
     },
     DefinitionList {
         // Definition lists don't need special tracking

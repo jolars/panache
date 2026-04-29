@@ -371,6 +371,7 @@ impl<'a> Parser<'a> {
         let Some(Container::ListItem {
             content_col,
             buffer,
+            ..
         }) = self.containers.stack.last()
         else {
             return;
@@ -615,8 +616,16 @@ impl<'a> Parser<'a> {
                 true
             }
             Some(Container::ListItem { .. }) => {
-                if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+                if let Some(Container::ListItem {
+                    buffer,
+                    marker_only,
+                    ..
+                }) = self.containers.stack.last_mut()
+                {
                     buffer.push_text(content);
+                    if !content.trim().is_empty() {
+                        *marker_only = false;
+                    }
                 }
                 true
             }
@@ -1254,8 +1263,14 @@ impl<'a> Parser<'a> {
         leading_spaces: usize,
         has_trailing_space: bool,
     ) {
-        if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+        if let Some(Container::ListItem {
+            buffer,
+            marker_only,
+            ..
+        }) = self.containers.stack.last_mut()
+        {
             buffer.push_blockquote_marker(leading_spaces, has_trailing_space);
+            *marker_only = false;
             return;
         }
 
@@ -2683,8 +2698,16 @@ impl<'a> Parser<'a> {
             let line = line_to_append.unwrap_or(self.lines[self.pos]);
 
             // Add line to buffer in the ListItem container
-            if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+            if let Some(Container::ListItem {
+                buffer,
+                marker_only,
+                ..
+            }) = self.containers.stack.last_mut()
+            {
                 buffer.push_text(line);
+                if !line.trim().is_empty() {
+                    *marker_only = false;
+                }
             }
 
             self.pos += 1;

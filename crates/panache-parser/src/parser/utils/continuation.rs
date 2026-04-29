@@ -153,7 +153,9 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                     }
                 }
                 crate::parser::utils::container_stack::Container::ListItem {
-                    content_col, ..
+                    content_col,
+                    marker_only,
+                    ..
                 } => {
                     let definition_ancestor_kept = containers.stack[..i]
                         .iter()
@@ -168,6 +170,23 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                         })
                         .unwrap_or(true);
                     if !definition_ancestor_kept {
+                        continue;
+                    }
+
+                    // CommonMark §5.2: a list item that has only seen its
+                    // marker line is closed by the first blank line. Any
+                    // subsequent indented content is no longer part of the
+                    // item. Pandoc keeps the item open across the blank.
+                    if *marker_only && self.config.dialect == crate::options::Dialect::CommonMark {
+                        // If the next line doesn't start another list marker,
+                        // the parent List has nothing to continue with — close
+                        // it too. (The List's own branch above optimistically
+                        // kept itself based on indent ≥ content_col, which
+                        // assumes a continuing item; that assumption fails
+                        // once the empty item is closed by the blank.)
+                        if next_marker.is_none() && i > 0 && keep_level == i {
+                            keep_level = i - 1;
+                        }
                         continue;
                     }
 

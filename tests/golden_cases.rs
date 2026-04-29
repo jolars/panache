@@ -220,6 +220,7 @@ golden_test_cases!(
     setext_text_thematic_break_commonmark,
     thematic_break_interrupts_paragraph_commonmark,
     blockquote_list_no_marker_closes_commonmark,
+    empty_list_marker_blank_then_content_commonmark,
     hr_as_list_item_content,
     hr_closes_list_commonmark,
     headerless_table,

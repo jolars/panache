@@ -1,8 +1,8 @@
 {
   "blocked": 12,
-  "failing": 33,
-  "pass_pct": 94.9,
-  "passing": 619,
+  "failing": 32,
+  "pass_pct": 95.1,
+  "passing": 620,
   "passing_numbers": [
     1,
     3,
@@ -275,6 +275,7 @@
     276,
     277,
     279,
+    280,
     281,
     282,
     283,
@@ -706,9 +707,9 @@
       "pass": 82
     },
     {
-      "fail": 7,
+      "fail": 6,
       "name": "List items",
-      "pass": 41
+      "pass": 42
     },
     {
       "fail": 1,

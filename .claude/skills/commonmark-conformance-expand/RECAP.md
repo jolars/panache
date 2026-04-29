@@ -16,94 +16,129 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (xv)
+## Latest session — 2026-04-29 (xvi)
 
-**Pass count: 618 → 619 / 652 (94.9%, +1)**
+**Pass count: 619 → 620 / 652 (95.1%, +1)**
 
-Single Link reference definitions win: #201 (`[foo]: <bar>(baz)`)
-— the last remaining LRD failure. CommonMark §4.7 requires the
-title (when on the same line as the destination) to be separated
-from the destination by at least one space or tab; Pandoc accepts
-the title even when directly attached. Verified against pandoc
-`-f commonmark` (paragraphs) vs `-f markdown` (Link). Dialect
-divergence.
+Single List items win: #280 (`-\n\n  foo\n`) — empty list-item
+marker followed by a blank line followed by indented content.
+CommonMark §5.2 says a list item can begin with at most one
+blank line; once the marker line is empty and the next line is
+blank, the item is closed. Subsequent indented content is a
+separate paragraph. Pandoc keeps the indented content inside
+the same item. Verified against pandoc `-f commonmark`
+(`BulletList [[]] , Para [Str "foo"]`) vs `-f markdown`
+(`BulletList [[Plain [Str "foo"]]]`). Dialect divergence.
 
 ### Target unlocked
 
-- **#201** → CommonMark now rejects `[foo]: <bar>(baz)` as an LRD
-  candidate; the dispatcher falls back to a paragraph (matching
-  the spec). Pandoc behavior unchanged (still parses as
-  `[foo]: <bar>` with title `baz`).
+- **#280** → CommonMark now closes the empty list item at the
+  first blank line, lets the parent List close (since the next
+  line has no list marker), and parses `  foo` as a top-level
+  paragraph. Pandoc behavior unchanged.
 
 ### Root cause
 
-`try_parse_reference_definition_with_mode` accepted any title
-that `parse_title` could match, regardless of whether the title
-was whitespace-separated from the destination. Under CommonMark
-§4.7, a same-line title without a preceding space/tab is
-malformed.
+`ContinuationPolicy::compute_levels_to_keep` kept any open
+ListItem alive when the next non-blank line's indent met the
+item's `content_col`. For an empty marker line (`-` with no
+content) followed by a blank, that allowed indented content to
+re-attach as continuation — wrong under CommonMark §5.2. Pandoc
+allows this attachment, so the existing behavior was correct
+for `Dialect::Pandoc`.
 
 ### Fix
 
-`crates/panache-parser/src/parser/blocks/reference_links.rs`:
-
-- Added `dialect: Dialect` parameter to the public
-  `try_parse_reference_definition` /
-  `try_parse_reference_definition_lax` and the internal
-  `_with_mode` helper. Threads through from
-  `block_dispatcher.rs` (call sites in the LRD detector and the
-  setext-vs-LRD priority check).
-- Inside the title-detection branch, after computing
-  `crossed_newline` and `title_start`, when
-  `dialect == CommonMark && !crossed_newline && title_start ==
-  after_url` (no whitespace consumed by `skip_ws_one_newline`),
-  return `None` — caller sees no LRD candidate and the line
-  becomes a paragraph.
+- `crates/panache-parser/src/parser/utils/container_stack.rs`:
+  added `marker_only: bool` field to `Container::ListItem`. True
+  iff the item has so far seen only its marker line (no text,
+  blockquote marker, or nested-list content).
+- `crates/panache-parser/src/parser/blocks/lists.rs`:
+  initializes `marker_only` per construction site:
+  - `finish_list_item_with_optional_nested` final fallthrough:
+    `text_to_buffer.trim().is_empty()` (true for `-\n`, `- \n`).
+  - Recursion case (same-line nested marker): `false` (nested
+    LIST counts as content).
+  - `add_list_item_with_nested_empty_list`: `false` (nested LIST
+    counts as content).
+- `crates/panache-parser/src/parser/core.rs`: when content is
+  pushed to the buffer (parse_inner_content, list-item buffering
+  branch, blockquote-marker emission), flips `marker_only` to
+  `false` if the pushed text is non-blank or a structural marker.
+- `crates/panache-parser/src/parser/utils/continuation.rs`:
+  inside the `ListItem` arm, when `marker_only && dialect ==
+  CommonMark`, `continue` (don't keep the level). If the next
+  non-blank line *also* has no list marker AND the parent List
+  was the most recently kept level, walk `keep_level` back by 1
+  so the List closes too — otherwise the List would absorb the
+  blank and following paragraph as continuation content.
 
 ### Files changed
 
 - **Dialect divergence** (parser):
-  - `crates/panache-parser/src/parser/blocks/reference_links.rs`:
-    new `dialect` parameter; CommonMark gate on
-    same-line-attached title.
-  - `crates/panache-parser/src/parser/block_dispatcher.rs`: pass
-    `ctx.config.dialect` to LRD parse calls (parse_fn and the
-    setext-priority check).
+  - `crates/panache-parser/src/parser/utils/container_stack.rs`:
+    new `marker_only` field on `Container::ListItem`.
+  - `crates/panache-parser/src/parser/blocks/lists.rs`:
+    initialize `marker_only` at all 4 ListItem construction
+    sites.
+  - `crates/panache-parser/src/parser/core.rs`: flip
+    `marker_only` to false when buffering text (line ~617),
+    when buffering continuation lines inside ListItem (line
+    ~2685), and when buffering blockquote markers (line ~1266).
+    Also added `..` to one destructuring pattern that didn't
+    need the new field.
+  - `crates/panache-parser/src/parser/utils/continuation.rs`:
+    new CommonMark gate inside the `ListItem` match arm; also
+    walks `keep_level` back when the parent List has nothing to
+    continue with.
 - **Paired parser fixtures**:
-  - `reference_definition_attached_title_commonmark/{input.md,parser-options.toml}`
-    (`flavor = "commonmark"`) — pins paragraph + paragraph CST.
-  - `reference_definition_attached_title_pandoc/{input.md,parser-options.toml}`
-    (`flavor = "pandoc"`) — pins REFERENCE_DEFINITION + PARAGRAPH
-    CST.
-  - Wired into `golden_parser_cases.rs` before
-    `reference_definition_inside_blockquote`.
+  - `empty_list_marker_blank_then_content_commonmark/{input.md,parser-options.toml}`
+    (`flavor = "commonmark"`) — pins LIST + BLANK_LINE +
+    PARAGRAPH CST (list closes after empty item).
+  - `empty_list_marker_blank_then_content_pandoc/{input.md,parser-options.toml}`
+    (`flavor = "pandoc"`) — pins LIST(LIST_ITEM(BLANK_LINE+PLAIN))
+    CST (item absorbs the indented content).
+  - Wired into `golden_parser_cases.rs` after
+    `emphasis_skips_shortcut_reference_link`.
 - **Formatter golden case** (CommonMark only):
-  - `tests/fixtures/cases/reference_definition_attached_title_commonmark/`
-    with `panache.toml` setting `flavor = "commonmark"`. Output
-    is byte-identical to input (`[foo]: <bar>(baz)\n\n[foo]\n`)
-    but pins idempotency under the new CommonMark block sequence
-    (PARAGRAPH + PARAGRAPH instead of REFDEF + PARAGRAPH).
-    Wired into `tests/golden_cases.rs` before `reference_footnotes`.
-- **Allowlist addition** (Link reference definitions): #201.
+  - `tests/fixtures/cases/empty_list_marker_blank_then_content_commonmark/`
+    with `panache.toml` setting `flavor = "commonmark"`. Input
+    `-\n\n  foo\n`, expected `- \n\nfoo\n` (formatter renders
+    bare bullet as `- ` and lifts the now-non-list paragraph out
+    of any indent). Pins idempotency under the new structural
+    shape (LIST + PARAGRAPH instead of LIST(item with content)).
+    Wired into `tests/golden_cases.rs` after
+    `blockquote_list_no_marker_closes_commonmark`.
+- **Allowlist addition** (List items): #280.
 
 ### Don't redo
 
-- **Don't widen the gate to other "title without whitespace"
-  cases.** The check is specifically `title_start == after_url
-  && !crossed_newline` — i.e. zero whitespace skipped on the
-  same line. Multi-line titles (preceded by a newline) are
-  permitted by CommonMark §4.7 even with no leading space on the
-  next line, so the `crossed_newline` clause is load-bearing.
-- **Don't generalize to other ref-def parser branches.** The
-  only place CommonMark and Pandoc actually disagree on LRD
-  parsing in the failing-spec set is the title-separator rule.
-  Other deviations (multi-line label/destination, escapes, etc.)
-  already match between dialects.
-- **Don't try to repurpose `strict_eol` for this.** The existing
-  `strict_eol: bool` controls the MMD-lax behavior (trailing
-  attribute tokens on the same line as the title); it's
-  orthogonal to the dialect-level title-separator rule. Keep
-  them as independent parameters.
+- **Don't try to detect "marker line was empty" by inspecting
+  the buffer at blank-line time.** The buffer is flushed during
+  blank-line handling, so by the time the second blank arrives
+  it's empty regardless of whether the marker line had content.
+  `marker_only` is the durable signal — it persists across
+  buffer flushes and is updated on push, not on flush.
+- **Don't gate the List branch directly on `marker_only`.** The
+  ListItem arm runs *after* the List arm in the same loop; by
+  then the List has already optimistically claimed the next
+  line as continuation. The correct fix is to walk
+  `keep_level` *back* in the ListItem arm when the next line
+  has no marker, not to make the List arm aware of its child's
+  state (which would couple the two arms unnecessarily).
+- **Don't drop the `next_marker.is_none()` clause.** When the
+  next line *is* a list marker (e.g. `-\n\n- a\n`), the parent
+  List should stay open so the new marker re-uses it — both
+  CommonMark and Pandoc agree on that case (just differ on tight
+  vs loose). Walking `keep_level` back unconditionally would
+  collapse two-item lists into separate single-item lists.
+- **Don't extend `marker_only` to flow into close-time logic.**
+  The empty-list-item close path
+  (`close_containers_to`) already handles items with empty
+  buffers correctly; the new flag is only consulted by
+  `ContinuationPolicy`. Adding it to other places would risk
+  rendering mismatches (e.g. an item whose buffer was just
+  flushed mid-stream would be misread as marker-only).
 
 ### Suggested next targets, ranked
 
@@ -122,32 +157,31 @@ malformed.
    Unblocks removing the dialect gate on same-line nested list
    markers (#298, #299). Probably one formatter change in
    `crates/panache-formatter/src/formatter/lists.rs`.
-4. **#280 empty list item closes the list** — `-\n\n  foo\n`
-   should produce empty LI + separate paragraph under CommonMark.
-   Pandoc keeps `foo` as the list item content. Dialect divergence.
-   Parser-shape gap, gate on CommonMark. (Carried over.)
-5. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion;
+4. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion;
    substantial. (Carried over.)
-6. **HTML block #148** — `</pre>` inside HTML block followed by
+5. **HTML block #148** — `</pre>` inside HTML block followed by
    blank-line content. (Carried over.)
-7. **Reference link followed by another bracket pair (#569, #571)**
+6. **Reference link followed by another bracket pair (#569, #571)**
    — CMark left-bracket scanner stack model. Large. (Carried over.)
-8. **Nested LINKs in link text (#518, #519, #520, #532, #533)** —
+7. **Nested LINKs in link text (#518, #519, #520, #532, #533)** —
    CommonMark §6.4 forbids real nesting; outer must un-link. Same
    scanner-stack work as #569/#571. (Carried over.)
-9. **Fence inside blockquote inside list item (#321)**. (Carried
+8. **Fence inside blockquote inside list item (#321)**. (Carried
    over.)
-10. **Same-line blockquote inside list item (#292, #293)** — `> 1. >
+9. **Same-line blockquote inside list item (#292, #293)** — `> 1. >
     Blockquote` needs the inner `>` to open a blockquote inside the
     list item. (Carried over.)
-11. **#273, #274 multi-block content in `1.     code` items** —
+10. **#273, #274 multi-block content in `1.     code` items** —
     spaces ≥ 5 after marker means content_col is at marker+1 and the
     rest is indented code. (Carried over.)
-12. **#278 `-\n  foo\n-\n  ```\n…`** — empty marker followed by
-    indented content; multiple bugs. (Carried over.)
-13. **#300 setext-in-list-item** — `- # Foo\n- Bar\n  ---\n  baz`
+11. **#278 `-\n  foo\n-\n  ```\n…`** — empty marker followed by
+    indented content; multiple bugs. (Carried over.) Note:
+    `marker_only` from this session is unrelated — #278 has content
+    on the line *immediately following* the empty marker (no blank
+    in between), so the new gate doesn't fire.
+12. **#300 setext-in-list-item** — `- # Foo\n- Bar\n  ---\n  baz`
     should treat `Bar\n  ---` as setext h2. (Carried over.)
-14. **#523 `*foo [bar* baz]`** — emphasis closes inside link bracket
+13. **#523 `*foo [bar* baz]`** — emphasis closes inside link bracket
     text mid-flight. Probably needs delimiter-stack work + bracket
     scanner integration. (Carried over from session x.)
 

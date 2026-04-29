@@ -211,6 +211,8 @@ golden_test_cases!(
     emphasis_intraword_underscore_closer,
     emphasis_nested_inlines,
     emphasis_skips_shortcut_reference_link,
+    empty_list_marker_blank_then_content_commonmark,
+    empty_list_marker_blank_then_content_pandoc,
     equation_attributes,
     equation_attributes_disabled,
     equation_attributes_single_line,

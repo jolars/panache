@@ -849,6 +849,7 @@ fn deep_ordered_prefers_nearest_enclosing_indent_over_nearest_below() {
     containers.push(Container::ListItem {
         content_col: 11,
         buffer: crate::parser::utils::list_item_buffer::ListItemBuffer::new(),
+        marker_only: false,
     });
     containers.push(Container::List {
         marker,
@@ -1201,6 +1202,7 @@ pub(in crate::parser) fn add_list_item_with_nested_empty_list(
     containers.push(Container::ListItem {
         content_col,
         buffer: ListItemBuffer::new(),
+        marker_only: false, // The nested LIST counts as real content.
     });
 }
 
@@ -1267,6 +1269,7 @@ fn finish_list_item_with_optional_nested(
             containers.push(Container::ListItem {
                 content_col,
                 buffer: ListItemBuffer::new(),
+                marker_only: false, // The nested LIST counts as real content.
             });
             // Open nested LIST inside the outer LIST_ITEM.
             builder.start_node(SyntaxKind::LIST.into());
@@ -1297,6 +1300,7 @@ fn finish_list_item_with_optional_nested(
         }
     }
 
+    let marker_only = text_to_buffer.trim().is_empty();
     let mut buffer = ListItemBuffer::new();
     if !text_to_buffer.is_empty() {
         buffer.push_text(text_to_buffer);
@@ -1304,5 +1308,6 @@ fn finish_list_item_with_optional_nested(
     containers.push(Container::ListItem {
         content_col,
         buffer,
+        marker_only,
     });
 }
