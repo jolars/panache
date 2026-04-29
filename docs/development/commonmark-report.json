@@ -1,8 +1,8 @@
 {
   "blocked": 12,
-  "failing": 35,
-  "pass_pct": 94.6,
-  "passing": 617,
+  "failing": 34,
+  "pass_pct": 94.8,
+  "passing": 618,
   "passing_numbers": [
     1,
     3,
@@ -232,6 +232,7 @@
     232,
     233,
     234,
+    235,
     236,
     237,
     238,
@@ -644,9 +645,9 @@
       "pass": 1
     },
     {
-      "fail": 1,
+      "fail": 0,
       "name": "Block quotes",
-      "pass": 24
+      "pass": 25
     },
     {
       "fail": 0,

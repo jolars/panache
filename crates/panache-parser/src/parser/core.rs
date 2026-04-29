@@ -1723,7 +1723,12 @@ impl<'a> Parser<'a> {
                     return true;
                 }
             }
-            if bq_depth == 0 {
+            // CommonMark §5.1: a no-`>` line that begins a list marker
+            // closes the blockquote and starts a fresh list at the outer
+            // level rather than continuing the inner list. Pandoc keeps
+            // the inner list going (lazy list continuation across
+            // blockquote depth).
+            if bq_depth == 0 && self.config.dialect != crate::options::Dialect::CommonMark {
                 // Check for lazy list continuation - if we're in a list item and
                 // this line looks like a list item with matching marker
                 if lists::in_blockquote_list(&self.containers)

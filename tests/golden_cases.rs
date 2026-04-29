@@ -219,6 +219,7 @@ golden_test_cases!(
     indented_code_after_atx_heading_commonmark,
     setext_text_thematic_break_commonmark,
     thematic_break_interrupts_paragraph_commonmark,
+    blockquote_list_no_marker_closes_commonmark,
     hr_as_list_item_content,
     hr_closes_list_commonmark,
     headerless_table,
