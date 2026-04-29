@@ -1,8 +1,8 @@
 {
   "blocked": 12,
-  "failing": 123,
-  "pass_pct": 81.1,
-  "passing": 529,
+  "failing": 118,
+  "pass_pct": 81.9,
+  "passing": 534,
   "passing_numbers": [
     1,
     3,
@@ -200,13 +200,17 @@
     205,
     206,
     207,
+    208,
     209,
     210,
     211,
     212,
+    213,
     214,
     215,
+    216,
     217,
+    218,
     219,
     220,
     221,
@@ -438,6 +442,7 @@
     542,
     543,
     544,
+    546,
     547,
     548,
     549,
@@ -606,14 +611,14 @@
       "pass": 1
     },
     {
-      "fail": 6,
+      "fail": 2,
       "name": "Link reference definitions",
-      "pass": 21
+      "pass": 25
     },
     {
-      "fail": 35,
+      "fail": 34,
       "name": "Links",
-      "pass": 55
+      "pass": 56
     },
     {
       "fail": 11,

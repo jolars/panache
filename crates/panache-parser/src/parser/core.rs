@@ -2332,6 +2332,19 @@ impl<'a> Parser<'a> {
                         self.pos += 1;
                         return true;
                     }
+
+                    // Reference definitions cannot interrupt a paragraph
+                    // (CommonMark §4.7 / Pandoc-markdown agree).
+                    if parser_name == "reference_definition" && self.is_paragraph_open() {
+                        paragraphs::append_paragraph_line(
+                            &mut self.containers,
+                            &mut self.builder,
+                            line_to_append.unwrap_or(self.lines[self.pos]),
+                            self.config,
+                        );
+                        self.pos += 1;
+                        return true;
+                    }
                 }
                 BlockDetectionResult::No => unreachable!(),
             }

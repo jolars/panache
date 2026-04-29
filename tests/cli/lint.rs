@@ -623,7 +623,7 @@ fn test_lint_reports_unused_definitions() {
     let doc_path = temp_dir.path().join("unused.qmd");
     fs::write(
         &doc_path,
-        "Used note[^1].\n\n[^1]: Used.\n[^2]: Unused.\n\nSee [UsedLabel][].\n[UsedLabel]: https://example.com\n[UnusedLabel]: https://unused.example.com\n",
+        "Used note[^1].\n\n[^1]: Used.\n[^2]: Unused.\n\nSee [UsedLabel][].\n\n[UsedLabel]: https://example.com\n[UnusedLabel]: https://unused.example.com\n",
     )
     .unwrap();
 

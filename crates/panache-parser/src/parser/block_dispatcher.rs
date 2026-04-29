@@ -1054,7 +1054,7 @@ impl BlockParser for ReferenceDefinitionParser {
 
     fn parse_prepared(
         &self,
-        _ctx: &BlockContext,
+        ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         line_pos: usize,
@@ -1069,7 +1069,16 @@ impl BlockParser for ReferenceDefinitionParser {
             .map(|p| p.consumed_lines)
             .unwrap_or(1);
 
-        let full_line = lines[line_pos];
+        // Inside a blockquote, BLOCK_QUOTE_MARKER + WHITESPACE were already
+        // emitted by the dispatcher; using lines[line_pos] would duplicate the
+        // `>` marker (CST losslessness violation). detect_prepared restricts
+        // blockquote-context defs to a single line, so we can rely on
+        // ctx.content here.
+        let full_line = if ctx.blockquote_depth > 0 {
+            ctx.content
+        } else {
+            lines[line_pos]
+        };
         let (content_without_newline, line_ending) = strip_newline(full_line);
         emit_reference_definition_content(builder, content_without_newline);
         if !line_ending.is_empty() {
@@ -2159,6 +2168,17 @@ impl BlockParser for SetextHeadingParser {
             // becomes `<h2>***</h2>`), so this branch is dialect-gated.
             if ctx.config.dialect == crate::options::Dialect::CommonMark
                 && try_parse_horizontal_rule(ctx.content).is_some()
+            {
+                return None;
+            }
+            // CommonMark §4.3 / §4.7: a setext heading text line cannot
+            // itself be a reference definition — the ref-def takes priority,
+            // and the underline becomes a separate paragraph line. Pandoc
+            // disagrees: it consumes `[foo]: /url\n===\n` as an H1 with
+            // text `[foo]: /url`, so this branch is dialect-gated.
+            if ctx.config.dialect == crate::options::Dialect::CommonMark
+                && ctx.config.extensions.reference_links
+                && try_parse_reference_definition(ctx.content).is_some()
             {
                 return None;
             }

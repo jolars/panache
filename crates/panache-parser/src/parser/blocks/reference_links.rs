@@ -67,7 +67,9 @@ fn try_parse_reference_definition_with_mode(
         return None;
     }
 
-    // Find the closing ] for the label
+    // Find the closing ] for the label. Labels may span lines (CommonMark
+    // §4.7) but a blank line inside the label terminates the attempt. We also
+    // reject unescaped `[` inside the label per spec.
     let mut pos = 1;
     let mut escape_next = false;
 
@@ -86,9 +88,24 @@ fn try_parse_reference_definition_with_mode(
             b']' => {
                 break;
             }
-            b'\n' => {
-                // Labels can't span lines (handled via separate path).
+            b'[' => {
                 return None;
+            }
+            b'\n' | b'\r' => {
+                let nl_end =
+                    if bytes[pos] == b'\r' && pos + 1 < bytes.len() && bytes[pos + 1] == b'\n' {
+                        pos + 2
+                    } else {
+                        pos + 1
+                    };
+                let mut probe = nl_end;
+                while probe < bytes.len() && matches!(bytes[probe], b' ' | b'\t') {
+                    probe += 1;
+                }
+                if probe >= bytes.len() || bytes[probe] == b'\n' || bytes[probe] == b'\r' {
+                    return None;
+                }
+                pos = nl_end;
             }
             _ => {
                 pos += 1;
@@ -101,7 +118,7 @@ fn try_parse_reference_definition_with_mode(
     }
 
     let label = &inner[1..pos];
-    if label.is_empty() {
+    if label.trim().is_empty() {
         return None;
     }
 
