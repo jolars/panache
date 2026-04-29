@@ -197,6 +197,7 @@ golden_test_cases!(
     double_backslash_math,
     emphasis,
     emphasis_complex,
+    emphasis_intraword_underscore_closer,
     emphasis_nested_inlines,
     emphasis_skips_shortcut_reference_link,
     equation_attributes,

@@ -836,6 +836,21 @@ fn parse_until_closer_with_nested_two(
                         continue;
                     }
 
+                    // For underscores, also reject closers followed by alphanumeric
+                    // (intraword underscore rule: `_foo_bar` is not emphasis).
+                    // Mirrors the rule in `is_valid_ender` and matches Pandoc.
+                    if delim_char == '_'
+                        && let Some(next_char) = text[after_pos..].chars().next()
+                        && next_char.is_alphanumeric()
+                    {
+                        log::trace!(
+                            "Underscore closer followed by alphanumeric at pos {}, not right-flanking",
+                            pos
+                        );
+                        pos = advance_char_boundary(text, pos, end);
+                        continue;
+                    }
+
                     log::trace!(
                         "Found exact {} x {} closer at pos {}",
                         delim_char,
@@ -1072,6 +1087,20 @@ fn parse_until_closer_with_nested_one(
                             pos
                         );
                         // Not a valid closer, continue searching
+                        pos = advance_char_boundary(text, pos, end);
+                        continue;
+                    }
+
+                    // For underscores, also reject closers followed by alphanumeric
+                    // (intraword underscore rule). Mirrors `is_valid_ender`.
+                    if delim_char == '_'
+                        && let Some(next_char) = text[after_pos..].chars().next()
+                        && next_char.is_alphanumeric()
+                    {
+                        log::trace!(
+                            "Underscore closer followed by alphanumeric at pos {}, not right-flanking",
+                            pos
+                        );
                         pos = advance_char_boundary(text, pos, end);
                         continue;
                     }
