@@ -279,6 +279,7 @@ golden_test_cases!(
     quarto_shortcodes,
     raw_blocks,
     raw_tex_commands,
+    reference_definition_attached_title_commonmark,
     reference_footnotes,
     reference_images,
     reference_links,

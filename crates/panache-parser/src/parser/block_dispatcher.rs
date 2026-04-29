@@ -985,15 +985,17 @@ impl BlockParser for ReferenceDefinitionParser {
         // join here would feed those markers back to the parser. Fall back to
         // a single-line attempt in that case — multi-line ref defs inside
         // blockquotes are tracked separately.
-        type RefDefParseFn = fn(&str) -> Option<(usize, String, String, Option<String>)>;
+        type RefDefParseFn =
+            fn(&str, crate::options::Dialect) -> Option<(usize, String, String, Option<String>)>;
         let parse_fn: RefDefParseFn = if ctx.config.extensions.mmd_link_attributes {
             try_parse_reference_definition_lax
         } else {
             try_parse_reference_definition
         };
+        let dialect = ctx.config.dialect;
 
         let consumed = if ctx.blockquote_depth > 0 {
-            parse_fn(ctx.content)?;
+            parse_fn(ctx.content, dialect)?;
             1usize
         } else {
             let mut multi = String::new();
@@ -1009,7 +1011,7 @@ impl BlockParser for ReferenceDefinitionParser {
                 return None;
             }
 
-            let (bytes_consumed, _label, _url, _title) = parse_fn(&multi)?;
+            let (bytes_consumed, _label, _url, _title) = parse_fn(&multi, dialect)?;
 
             let mut consumed = 0usize;
             let mut byte_cursor = 0usize;
@@ -2275,7 +2277,7 @@ impl BlockParser for SetextHeadingParser {
             // text `[foo]: /url`, so this branch is dialect-gated.
             if ctx.config.dialect == crate::options::Dialect::CommonMark
                 && ctx.config.extensions.reference_links
-                && try_parse_reference_definition(ctx.content).is_some()
+                && try_parse_reference_definition(ctx.content, ctx.config.dialect).is_some()
             {
                 return None;
             }

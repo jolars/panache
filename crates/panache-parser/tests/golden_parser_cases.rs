@@ -326,6 +326,8 @@ golden_test_cases!(
     quarto_shortcodes,
     raw_blocks,
     raw_tex_commands,
+    reference_definition_attached_title_commonmark,
+    reference_definition_attached_title_pandoc,
     reference_definition_inside_blockquote,
     reference_definition_label_with_escaped_bracket,
     reference_definition_multiline_destination,

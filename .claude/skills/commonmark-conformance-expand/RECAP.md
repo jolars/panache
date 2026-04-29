@@ -16,107 +16,94 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (xiv)
+## Latest session — 2026-04-29 (xv)
 
-**Pass count: 617 → 618 / 652 (94.8%, +1)**
+**Pass count: 618 → 619 / 652 (94.9%, +1)**
 
-Single Block-quotes win: #235 (`> - foo\n- bar\n`) — the last
-remaining Block-quotes failure. CommonMark exits the blockquote
-on `- bar` and starts a fresh top-level list; Pandoc keeps the
-inner list going inside the blockquote (verified against pandoc
-`-f commonmark` vs `-f markdown`). Dialect divergence.
+Single Link reference definitions win: #201 (`[foo]: <bar>(baz)`)
+— the last remaining LRD failure. CommonMark §4.7 requires the
+title (when on the same line as the destination) to be separated
+from the destination by at least one space or tab; Pandoc accepts
+the title even when directly attached. Verified against pandoc
+`-f commonmark` (paragraphs) vs `-f markdown` (Link). Dialect
+divergence.
 
 ### Target unlocked
 
-- **#235** → CommonMark now produces `<blockquote><ul><li>foo
-  </li></ul></blockquote><ul><li>bar</li></ul>` (two top-level
-  blocks). Pandoc behavior unchanged (single blockquote
-  containing the full list).
+- **#201** → CommonMark now rejects `[foo]: <bar>(baz)` as an LRD
+  candidate; the dispatcher falls back to a paragraph (matching
+  the spec). Pandoc behavior unchanged (still parses as
+  `[foo]: <bar>` with title `baz`).
 
 ### Root cause
 
-In `parse_line`'s `bq_depth < current_bq_depth` branch
-(`core.rs:1670+`), when `bq_depth == 0` we have a "lazy list
-continuation" path (around line 1726) that fires when:
-- the parser is `in_blockquote_list` (a list lives inside an
-  open blockquote), and
-- the current line has a list marker matching an open list
-  level via `find_matching_list_level`.
-
-That path appends the new list item *inside the blockquote*,
-keeping the blockquote open even though the line has no `>`.
-For Pandoc that's correct; for CommonMark §5.1 it's wrong —
-without a `>` prefix on a line that itself starts a block-level
-construct (a list marker), the blockquote must close.
+`try_parse_reference_definition_with_mode` accepted any title
+that `parse_title` could match, regardless of whether the title
+was whitespace-separated from the destination. Under CommonMark
+§4.7, a same-line title without a preceding space/tab is
+malformed.
 
 ### Fix
 
-`crates/panache-parser/src/parser/core.rs` (one-line gate):
+`crates/panache-parser/src/parser/blocks/reference_links.rs`:
 
-```rust
-if bq_depth == 0 && self.config.dialect != crate::options::Dialect::CommonMark {
-    if lists::in_blockquote_list(&self.containers)
-        && let Some(marker_match) = try_parse_list_marker(line, self.config) { ... }
-}
-```
-
-Under CommonMark we fall through to the existing close-paragraph
-+ `close_blockquotes_to_depth(0)` path immediately below, which
-then re-enters `parse_inner_content(line, None)` for the bare
-line and opens a new top-level list correctly.
+- Added `dialect: Dialect` parameter to the public
+  `try_parse_reference_definition` /
+  `try_parse_reference_definition_lax` and the internal
+  `_with_mode` helper. Threads through from
+  `block_dispatcher.rs` (call sites in the LRD detector and the
+  setext-vs-LRD priority check).
+- Inside the title-detection branch, after computing
+  `crossed_newline` and `title_start`, when
+  `dialect == CommonMark && !crossed_newline && title_start ==
+  after_url` (no whitespace consumed by `skip_ws_one_newline`),
+  return `None` — caller sees no LRD candidate and the line
+  becomes a paragraph.
 
 ### Files changed
 
 - **Dialect divergence** (parser):
-  - `crates/panache-parser/src/parser/core.rs`: gated the
-    `bq_depth == 0` lazy-list-continuation block on
-    `Dialect != CommonMark`.
+  - `crates/panache-parser/src/parser/blocks/reference_links.rs`:
+    new `dialect` parameter; CommonMark gate on
+    same-line-attached title.
+  - `crates/panache-parser/src/parser/block_dispatcher.rs`: pass
+    `ctx.config.dialect` to LRD parse calls (parse_fn and the
+    setext-priority check).
 - **Paired parser fixtures**:
-  - `blockquote_list_no_marker_closes_commonmark/{input.md,parser-options.toml}`
-    (`flavor = "commonmark"`)
-  - `blockquote_list_no_marker_continues_pandoc/{input.md,parser-options.toml}`
-    (`flavor = "pandoc"`)
-  - Wired into `golden_parser_cases.rs` after
-    `blockquote_list_blockquote`. Snapshots pin the divergent
-    CST shapes (CommonMark: BLOCK_QUOTE@0..8 + LIST@8..14;
-    Pandoc: single BLOCK_QUOTE@0..14 with a 2-item list).
+  - `reference_definition_attached_title_commonmark/{input.md,parser-options.toml}`
+    (`flavor = "commonmark"`) — pins paragraph + paragraph CST.
+  - `reference_definition_attached_title_pandoc/{input.md,parser-options.toml}`
+    (`flavor = "pandoc"`) — pins REFERENCE_DEFINITION + PARAGRAPH
+    CST.
+  - Wired into `golden_parser_cases.rs` before
+    `reference_definition_inside_blockquote`.
 - **Formatter golden case** (CommonMark only):
-  - `tests/fixtures/cases/blockquote_list_no_marker_closes_commonmark/`
+  - `tests/fixtures/cases/reference_definition_attached_title_commonmark/`
     with `panache.toml` setting `flavor = "commonmark"`. Output
-    is `> - foo\n\n- bar\n`. Wired into
-    `tests/golden_cases.rs` after
-    `thematic_break_interrupts_paragraph_commonmark`. No paired
-    Pandoc formatter case (existing list/blockquote goldens
-    already cover Pandoc-default behavior).
-- **Allowlist addition** (Block quotes): #235.
+    is byte-identical to input (`[foo]: <bar>(baz)\n\n[foo]\n`)
+    but pins idempotency under the new CommonMark block sequence
+    (PARAGRAPH + PARAGRAPH instead of REFDEF + PARAGRAPH).
+    Wired into `tests/golden_cases.rs` before `reference_footnotes`.
+- **Allowlist addition** (Link reference definitions): #201.
 
 ### Don't redo
 
-- **Don't widen the gate to other lazy-continuation paths.** The
-  surrounding `if matches!(..., Container::Paragraph { .. })`
-  block immediately above (lines 1676-1725) handles
-  *paragraph* lazy continuation at reduced blockquote depth and
-  is already gated on `Dialect::CommonMark` differently (the HR
-  interrupt check). The list-continuation gate added here is
-  specifically about list markers at `bq_depth == 0`; don't try
-  to unify the two.
-- **Don't add a Pandoc formatter golden** — the existing
-  blockquote/list goldens (`blockquotes`, `blockquote_list_*`)
-  already exercise Pandoc-flavored idempotency. Adding a
-  duplicate would just be churn per the skill rules.
-- **Don't extend the gate to `bq_depth > 0` shallowing** (e.g.
-  three levels of `>` reducing to one). That's a different
-  state (depth still positive, just shallower) and goes through
-  the same-depth or paragraph-lazy paths above; CommonMark and
-  Pandoc agree there for list markers (the inner blockquote
-  stays open).
-- **Don't try to fold the close path into the gate.** The
-  fall-through at lines 1793+ (close paragraph, close
-  blockquotes to depth 0, then re-parse `line` at top level)
-  Just Works under CommonMark — `parse_inner_content(line,
-  None)` opens the new top-level list as a fresh container
-  cycle. Adding manual list-open code in the CommonMark branch
-  would duplicate that path.
+- **Don't widen the gate to other "title without whitespace"
+  cases.** The check is specifically `title_start == after_url
+  && !crossed_newline` — i.e. zero whitespace skipped on the
+  same line. Multi-line titles (preceded by a newline) are
+  permitted by CommonMark §4.7 even with no leading space on the
+  next line, so the `crossed_newline` clause is load-bearing.
+- **Don't generalize to other ref-def parser branches.** The
+  only place CommonMark and Pandoc actually disagree on LRD
+  parsing in the failing-spec set is the title-separator rule.
+  Other deviations (multi-line label/destination, escapes, etc.)
+  already match between dialects.
+- **Don't try to repurpose `strict_eol` for this.** The existing
+  `strict_eol: bool` controls the MMD-lax behavior (trailing
+  attribute tokens on the same line as the title); it's
+  orthogonal to the dialect-level title-separator rule. Keep
+  them as independent parameters.
 
 ### Suggested next targets, ranked
 
@@ -163,8 +150,6 @@ line and opens a new top-level list correctly.
 14. **#523 `*foo [bar* baz]`** — emphasis closes inside link bracket
     text mid-flight. Probably needs delimiter-stack work + bracket
     scanner integration. (Carried over from session x.)
-15. **Ref-def dialect divergence #201** — `[foo]: <bar>(baz)`. Low
-    priority. (Carried over.)
 
 ### Carry-forward from prior sessions
 

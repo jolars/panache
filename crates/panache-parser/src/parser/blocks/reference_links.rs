@@ -23,6 +23,11 @@
 /// terminate the definition: callers should stop the input at the first
 /// blank line so the parser cannot cross one.
 ///
+/// `dialect` controls a CommonMark-only constraint (§4.7): the title, if
+/// present on the same line as the destination, must be separated from the
+/// destination by at least one space or tab. Pandoc-markdown accepts the
+/// title even when it's directly attached (e.g. `[foo]: <bar>(baz)`).
+///
 /// Syntax:
 /// ```markdown
 /// [label]: url "title"
@@ -33,8 +38,9 @@
 /// ```
 pub fn try_parse_reference_definition(
     text: &str,
+    dialect: crate::options::Dialect,
 ) -> Option<(usize, String, String, Option<String>)> {
-    try_parse_reference_definition_with_mode(text, true)
+    try_parse_reference_definition_with_mode(text, true, dialect)
 }
 
 /// Multimarkdown-flavored variant: tolerates trailing content after the title
@@ -42,13 +48,15 @@ pub fn try_parse_reference_definition(
 /// the MMD code path then keep collecting attribute-continuation lines.
 pub fn try_parse_reference_definition_lax(
     text: &str,
+    dialect: crate::options::Dialect,
 ) -> Option<(usize, String, String, Option<String>)> {
-    try_parse_reference_definition_with_mode(text, false)
+    try_parse_reference_definition_with_mode(text, false, dialect)
 }
 
 fn try_parse_reference_definition_with_mode(
     text: &str,
     strict_eol: bool,
+    dialect: crate::options::Dialect,
 ) -> Option<(usize, String, String, Option<String>)> {
     let leading_spaces = text.chars().take_while(|&c| c == ' ').count();
     if leading_spaces > 3 {
@@ -179,6 +187,21 @@ fn try_parse_reference_definition_with_mode(
         let crossed_newline = bytes[after_url..title_start]
             .iter()
             .any(|&b| b == b'\n' || b == b'\r');
+        // CommonMark §4.7: when the title is on the same line as the
+        // destination, it must be separated from the destination by at least
+        // one space or tab. `<bar>(baz)` (no whitespace between `>` and `(`)
+        // is therefore not a valid LRD under CommonMark; Pandoc accepts it.
+        let cmark_requires_separator = dialect == crate::options::Dialect::CommonMark
+            && !crossed_newline
+            && title_start == after_url;
+        if cmark_requires_separator {
+            return Some((
+                leading_spaces + url_line_end_lax?,
+                label.to_string(),
+                url,
+                None,
+            ));
+        }
         let mut title_pos = title_start;
         match parse_title(inner, bytes, &mut title_pos) {
             Some(Some(t)) => {
@@ -513,8 +536,44 @@ mod tests {
 
     #[test]
     fn test_reference_definition_with_up_to_three_leading_spaces() {
-        assert!(try_parse_reference_definition("   [foo]: #bar").is_some());
-        assert!(try_parse_reference_definition("    [foo]: #bar").is_none());
+        let d = crate::options::Dialect::Pandoc;
+        assert!(try_parse_reference_definition("   [foo]: #bar", d).is_some());
+        assert!(try_parse_reference_definition("    [foo]: #bar", d).is_none());
+    }
+
+    #[test]
+    fn test_reference_definition_commonmark_requires_separator_before_title() {
+        // Pandoc: title `(baz)` directly attached after `<bar>` is accepted.
+        let pandoc =
+            try_parse_reference_definition("[foo]: <bar>(baz)\n", crate::options::Dialect::Pandoc);
+        assert_eq!(
+            pandoc
+                .as_ref()
+                .map(|(_, _, url, title)| (url.as_str(), title.as_deref())),
+            Some(("bar", Some("baz")))
+        );
+
+        // CommonMark: same input is not a valid LRD because the title `(baz)`
+        // is not space-separated from the destination; the parser rejects the
+        // candidate so the dispatcher falls back to a paragraph.
+        let cmark = try_parse_reference_definition(
+            "[foo]: <bar>(baz)\n",
+            crate::options::Dialect::CommonMark,
+        );
+        assert!(cmark.is_none());
+
+        // CommonMark with a space before the title does parse as an LRD with a
+        // title.
+        let cmark_ok = try_parse_reference_definition(
+            "[foo]: <bar> (baz)\n",
+            crate::options::Dialect::CommonMark,
+        );
+        assert_eq!(
+            cmark_ok
+                .as_ref()
+                .map(|(_, _, url, title)| (url.as_str(), title.as_deref())),
+            Some(("bar", Some("baz")))
+        );
     }
 
     #[test]
