@@ -1,14 +1,15 @@
 {
   "blocked": 12,
-  "failing": 24,
-  "pass_pct": 96.3,
-  "passing": 628,
+  "failing": 23,
+  "pass_pct": 96.5,
+  "passing": 629,
   "passing_numbers": [
     1,
     2,
     3,
     4,
     5,
+    6,
     8,
     9,
     10,
@@ -750,9 +751,9 @@
       "pass": 2
     },
     {
-      "fail": 2,
+      "fail": 1,
       "name": "Tabs",
-      "pass": 9
+      "pass": 10
     },
     {
       "fail": 0,

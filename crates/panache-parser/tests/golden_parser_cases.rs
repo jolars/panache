@@ -161,6 +161,7 @@ golden_test_cases!(
     blankline_concatenation,
     blockquote_depth_change,
     blockquote_fenced_html_blocks_commonmark,
+    blockquote_indented_code_tabs_commonmark,
     blockquote_lazy_continuation_reduced_markers,
     blockquote_list_blanks,
     blockquote_list_blockquote,

@@ -651,20 +651,35 @@ fn code_block_content(node: &SyntaxNode) -> String {
         // partial-tab slack emitted as virtual spaces. Whitespace-only
         // lines shorter than the strip target collapse to just the
         // newline, matching CommonMark's blank-line treatment.
-        let strip_cols = li_indent + 4;
+        //
+        // Inside a blockquote, each `>` marker contributes 2 source columns
+        // (the marker plus its mandatory or virtual trailing space). The
+        // body bytes after `strip_blockquote_prefix` start partway into
+        // those source columns: if the bq strip ate `> ` (2 bytes) the
+        // body's first byte is at source col `2*depth`; if it ate `>` only
+        // (because a tab/non-space followed), the body's first byte is at
+        // source col `2*depth - 1`, where the `-1` represents the virtual
+        // space the bq's optional-space rule consumed from the leading
+        // tab. Pass that adjusted starting column into the col walker so
+        // tab expansion lines up with the source-column tab-stops cmark
+        // uses for indent boundary detection.
         for child in node.children() {
             if child.kind() == SyntaxKind::CODE_CONTENT {
                 let raw = child.text().to_string();
-                let raw = if bq_depth > 0 {
-                    strip_blockquote_prefix_per_line(&raw, bq_depth)
+                let raw_lines: Vec<(String, usize)> = if bq_depth > 0 {
+                    strip_blockquote_prefix_per_line_with_offsets(&raw, bq_depth)
                 } else {
-                    raw
+                    raw.split_inclusive('\n')
+                        .map(|l| (l.to_string(), 0))
+                        .collect()
                 };
-                for line in raw.split_inclusive('\n') {
+                for (line, virtual_absorbed) in raw_lines {
                     let body_len = line.len() - if line.ends_with('\n') { 1 } else { 0 };
                     let body = &line[..body_len];
+                    let bq_start_col = bq_depth * 2 - virtual_absorbed;
+                    let strip_cols = bq_depth * 2 + li_indent + 4;
                     let (stripped_bytes, slack, reached_target) =
-                        consume_leading_cols(body, strip_cols);
+                        consume_leading_cols_from(body, bq_start_col, strip_cols);
                     let line_is_blank = body.chars().all(|c| c == ' ' || c == '\t');
                     if !reached_target && line_is_blank && stripped_bytes >= body_len {
                         if line.ends_with('\n') {
@@ -733,13 +748,21 @@ fn strip_leading_spaces_per_line(text: &str, max: usize) -> String {
 }
 
 /// Consume up to `target_cols` columns of leading whitespace from `body`,
-/// expanding tabs against tabstop = 4. Returns (bytes_consumed, slack,
-/// reached_target). `slack` is the number of virtual spaces a partial tab
-/// at the boundary contributes back to the line content.
-fn consume_leading_cols(body: &str, target_cols: usize) -> (usize, usize, bool) {
+/// starting at `start_col` and expanding tabs against tabstop = 4. Returns
+/// (bytes_consumed, slack, reached_target). `slack` is the number of
+/// virtual spaces a partial tab at the boundary contributes back to the
+/// line content. A non-zero `start_col` lets the walker honor source-
+/// column tab-stops when the body has been pre-stripped of bytes whose
+/// source columns must still influence tab-stop alignment (e.g. blockquote
+/// markers).
+fn consume_leading_cols_from(
+    body: &str,
+    start_col: usize,
+    target_cols: usize,
+) -> (usize, usize, bool) {
     let bytes = body.as_bytes();
     let mut byte_idx = 0usize;
-    let mut col = 0usize;
+    let mut col = start_col;
     while col < target_cols && byte_idx < bytes.len() {
         match bytes[byte_idx] {
             b' ' => {
@@ -803,6 +826,51 @@ fn strip_blockquote_prefix_per_line(text: &str, depth: usize) -> String {
         out.push_str(newline);
     }
     out
+}
+
+/// Per-line variant of `strip_blockquote_prefix_per_line` that also reports
+/// how many "virtual cols" the bq prefix absorbed beyond the bytes it ate.
+/// CommonMark treats `>` followed by a tab/non-space as if the bq's
+/// optional space had still consumed 1 source column (tab partially
+/// absorbed). When that happens `strip_blockquote_prefix` removes only the
+/// `>` byte, so callers tracking source columns need the extra 1 col per
+/// such level reported here. Returns one (stripped_line_with_newline,
+/// virtual_absorbed_cols) tuple per input line.
+fn strip_blockquote_prefix_per_line_with_offsets(text: &str, depth: usize) -> Vec<(String, usize)> {
+    let mut out = Vec::new();
+    for line in text.split_inclusive('\n') {
+        let (line_body, newline) = if let Some(stripped) = line.strip_suffix('\n') {
+            (stripped, "\n")
+        } else {
+            (line, "")
+        };
+        let (stripped, virtual_abs) = strip_blockquote_prefix_with_offset(line_body, depth);
+        out.push((format!("{stripped}{newline}"), virtual_abs));
+    }
+    out
+}
+
+fn strip_blockquote_prefix_with_offset(line: &str, depth: usize) -> (&str, usize) {
+    let mut remaining = line;
+    let mut virtual_abs = 0usize;
+    for _ in 0..depth {
+        let bytes = remaining.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() && i < 3 && bytes[i] == b' ' {
+            i += 1;
+        }
+        if i >= bytes.len() || bytes[i] != b'>' {
+            break;
+        }
+        i += 1;
+        if i < bytes.len() && bytes[i] == b' ' {
+            i += 1;
+        } else {
+            virtual_abs += 1;
+        }
+        remaining = &remaining[i..];
+    }
+    (remaining, virtual_abs)
 }
 
 fn strip_blockquote_prefix(line: &str, depth: usize) -> &str {
