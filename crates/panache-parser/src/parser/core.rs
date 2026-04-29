@@ -1603,31 +1603,61 @@ impl<'a> Parser<'a> {
             return self.parse_inner_content(inner_content, Some(inner_content));
         } else if bq_depth < current_bq_depth {
             // Need to close some blockquotes, but first check for lazy continuation
-            // Lazy continuation: line without > continues content in a blockquote
-            if bq_depth == 0 {
-                // Check for lazy paragraph continuation
-                if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                    // CommonMark §5.1: lazy continuation does *not* fire if
-                    // the line would itself be a paragraph-interrupting block
-                    // (e.g. a thematic break) — instead the paragraph closes,
-                    // any open blockquotes close, and the line opens that
-                    // block at the outer level. Pandoc keeps the lazy text
-                    // append in this case.
-                    let is_commonmark = self.config.dialect == crate::options::Dialect::CommonMark;
-                    let interrupts_via_hr =
-                        is_commonmark && try_parse_horizontal_rule(line).is_some();
-                    if !interrupts_via_hr {
+            // Lazy continuation: line with fewer (or zero) > markers continues
+            // a paragraph that started at a deeper blockquote level. CommonMark
+            // §5.1 explicitly allows this regardless of how many `>` markers
+            // are on the lazy line.
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                // CommonMark §5.1: lazy continuation does *not* fire if
+                // the line would itself be a paragraph-interrupting block
+                // (e.g. a thematic break) — instead the paragraph closes,
+                // any open blockquotes close, and the line opens that
+                // block at the outer level. Pandoc keeps the lazy text
+                // append in this case.
+                let is_commonmark = self.config.dialect == crate::options::Dialect::CommonMark;
+                let interrupts_via_hr = is_commonmark && try_parse_horizontal_rule(line).is_some();
+                if !interrupts_via_hr {
+                    if bq_depth > 0 {
+                        // Buffer the explicit `>` markers we have into the
+                        // paragraph (it's at the deeper blockquote level, so
+                        // structurally the markers belong to outer levels but
+                        // they're tucked inside the paragraph for losslessness;
+                        // the formatter re-emits prefixes from container nesting).
+                        let marker_info = self.marker_info_for_line(
+                            blockquote_payload.as_ref(),
+                            line,
+                            bq_marker_line,
+                            shifted_bq_prefix,
+                            used_shifted_bq,
+                        );
+                        for i in 0..bq_depth {
+                            if let Some(info) = marker_info.get(i) {
+                                paragraphs::append_paragraph_marker(
+                                    &mut self.containers,
+                                    info.leading_spaces,
+                                    info.has_trailing_space,
+                                );
+                            }
+                        }
+                        paragraphs::append_paragraph_line(
+                            &mut self.containers,
+                            &mut self.builder,
+                            inner_content,
+                            self.config,
+                        );
+                    } else {
                         paragraphs::append_paragraph_line(
                             &mut self.containers,
                             &mut self.builder,
                             line,
                             self.config,
                         );
-                        self.pos += 1;
-                        return true;
                     }
+                    self.pos += 1;
+                    return true;
                 }
-
+            }
+            if bq_depth == 0 {
                 // Check for lazy list continuation - if we're in a list item and
                 // this line looks like a list item with matching marker
                 if lists::in_blockquote_list(&self.containers)

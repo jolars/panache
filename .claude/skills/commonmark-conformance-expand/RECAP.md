@@ -16,113 +16,93 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (xi)
+## Latest session — 2026-04-29 (xii)
 
-**Pass count: 611 → 615 / 652 (94.3%, +4)**
+**Pass count: 615 → 616 / 652 (94.5%, +1)**
 
-All wins in Links section. Bracket-side counterpart to session (x)'s
-emphasis-side autolink/raw-HTML skip: link/image bracket scanner
-(`find_link_close_bracket`) was matching `]` literally inside raw
-HTML attribute values and (CommonMark-only) autolink URLs, so a
-construct like `[foo <bar attr="](baz)">` was greedily linkified.
+Single Block-quotes win: #251 (`>>> foo\n> bar\n>>baz\n`) — lazy
+paragraph continuation at *reduced* blockquote depth. Both dialects
+agree (universal fix), but only this one example in the spec
+exercises the construct.
 
-### Targets unlocked
+### Target unlocked
 
-- **#524** `[foo <bar attr="](baz)">` → literal `[foo ` + raw HTML
-  with the `]` inside the attribute value (universal — both pandoc
-  dialects agree).
-- **#526** `[foo<https://example.com/?search=](uri)>` → literal
-  `[foo` + autolink whose body contains `](uri)` (CommonMark only;
-  Pandoc keeps the greedy link parse).
-- **#536** same as #524 with reference-link `[ref]` form.
-- **#538** same as #526 with reference-link `[ref]` form.
+- **#251** `>>> foo\n> bar\n>>baz\n` → single nested-3 paragraph
+  with all three lines as content. The `>` markers on lines 2/3
+  are buffered inside the deep paragraph for losslessness; the
+  HTML renderer ignores them, the formatter re-emits prefixes
+  from container nesting.
 
 ### Root cause
 
-`find_link_close_bracket` already skips code spans (so `]` inside a
-backtick run can't close the bracket — example #525). The same
-opacity rule applies to:
-
-1. **Raw HTML spans** (`<tag attr="..."` ... `>`) — universal across
-   dialects per pandoc verification.
-2. **Autolinks** (`<scheme://...>`) — CommonMark only. Pandoc-markdown
-   does *not* treat these as opaque inside link text, so the same
-   input parses differently between dialects (#526, #538).
-
-Without the skip, a `]` inside `attr="..."` or inside the autolink
-URL closed the link bracket, the link/image was emitted with
-truncated text, and the trailing `"` / `>` was left as literal.
+`else if bq_depth < current_bq_depth` branch of `parse_line` only
+checked for lazy paragraph continuation when `bq_depth == 0`.
+CommonMark §5.1 lazy continuation works at *any* reduced bq_depth
+— a paragraph started at depth 3 with `>>> foo` survives a
+follow-on `> bar` (1 marker) or `>>baz` (2 markers) as long as the
+content doesn't itself open an interrupting block.
 
 ### Fix
 
-`crates/panache-parser/src/parser/inlines/links.rs`:
+`crates/panache-parser/src/parser/core.rs` (the `bq_depth <
+current_bq_depth` branch):
 
-1. New `LinkScanContext { skip_raw_html, skip_autolinks }` struct
-   with `from_options(&ParserOptions)` constructor:
-   - `skip_raw_html = extensions.raw_html` (universal).
-   - `skip_autolinks = extensions.autolinks && dialect == CommonMark`.
-2. `find_link_close_bracket` extended with a `b'<'` arm that tries
-   `try_parse_autolink` (when `skip_autolinks`) then
-   `try_parse_inline_html` (when `skip_raw_html`) and skips past
-   the matched span. Order matters: autolink before raw HTML, since
-   both start with `<` and autolink is the more specific shape.
-3. `try_parse_inline_image`, `try_parse_inline_link`,
-   `try_parse_reference_link` signatures grew a `LinkScanContext`
-   parameter; production call sites in `core.rs` and
-   `block_dispatcher.rs` build it from `config`; unit-test call
-   sites pass `LinkScanContext::default()` (preserves prior
-   behavior — no skipping in those tests).
+1. Hoist the paragraph-lazy-continuation check out of the
+   `bq_depth == 0` block so it fires whenever the deepest
+   container is a `Paragraph`.
+2. When `bq_depth > 0`, buffer the explicit `>` markers into the
+   paragraph via `paragraphs::append_paragraph_marker` (same
+   pattern used by the same-depth and `bq_depth==0`-with-list
+   continuation paths) and append `inner_content` (markers
+   stripped) as paragraph text. When `bq_depth == 0`, append the
+   raw `line` as before.
+3. Existing HR-interrupt check on `line` is preserved — `>` lines
+   never look like HR, so the check stays permissive in the new
+   path.
+
+The `bq_depth == 0` lazy-list-continuation arm is unchanged; it
+still fires only when `bq_depth == 0` because the list path needs
+column-anchored marker matching that doesn't generalize to nested
+blockquotes.
 
 ### Files changed
 
-- **Parser-shape / dialect-divergence gap**:
-  - `crates/panache-parser/src/parser/inlines/links.rs`: new
-    `LinkScanContext`; bracket scanner skips raw HTML / autolinks;
-    `try_parse_*` signatures updated.
-  - `crates/panache-parser/src/parser/inlines/core.rs`: pass
-    `LinkScanContext::from_options(config)` at all link/image entry
-    points + the emphasis-side skip-over-link calls.
-  - `crates/panache-parser/src/parser/block_dispatcher.rs`: same
-    for the standalone-image detector.
-- **Paired parser fixtures + snapshots**:
-  - `link_text_skips_raw_html_{commonmark,pandoc}/` — identical CST
-    under both dialects (universal fix).
-  - `link_text_skips_autolink_{commonmark,pandoc}/` — divergent CSTs:
-    CommonMark recognizes the autolink, Pandoc keeps the greedy
-    link parse.
-  - Wired into `golden_parser_cases.rs` next to `links`.
-- **Allowlist additions** (Links): #524, #526, #536, #538.
-- Cleaned up an orphan
-  `golden_parser_cases__parser_cst_list_nested_same_line_marker.snap.new`
-  (pre-existing, unrelated; the fixture is now suffixed
-  `_commonmark` / `_pandoc`).
+- **Parser-shape gap (universal)**:
+  - `crates/panache-parser/src/parser/core.rs`: lazy paragraph
+    continuation generalized to `bq_depth < current_bq_depth`,
+    not just `bq_depth == 0`.
+- **Parser fixture + snapshot**:
+  - `blockquote_lazy_continuation_reduced_markers/input.md`
+    (single fixture, no `parser-options.toml` — both dialects
+    agree on this CST shape).
+  - Wired into `golden_parser_cases.rs` next to
+    `blockquote_depth_change`.
+- **Allowlist addition** (Block quotes): #251.
 
-No CommonMark formatter golden case added: only inline shape
-changes; block sequence is unchanged (one paragraph per example).
-Per the rule, only add a CM formatter case when block sequence
-diverges between dialects.
+No paired CommonMark/Pandoc fixture and no formatter golden case
+added: the fix is universal (both dialects produce the same
+paragraph-with-buffered-markers CST) and the formatter idempotency
+already holds via `panache debug format --checks all` on the
+example.
 
 ### Don't redo
 
-- Don't unify `skip_autolinks` and `skip_raw_html` into one flag.
-  Pandoc-markdown skips raw HTML inside link text but does *not*
-  skip autolinks — verified against pandoc. Conflating the two
-  would regress Pandoc-mode parses (greedy link still expected for
-  `[foo<https://...>...]`).
-- Don't move the `b'<'` skip arm before `b'\\'` or `b'`'`. Backslash
-  escape and code-span opacity are higher precedence per CommonMark
-  §6, and the existing test #525 (code-span inside link text)
-  depends on the order.
-- Don't drop the `LinkScanContext` parameter from
-  `try_parse_inline_image` even though `block_dispatcher.rs`'s
-  standalone-image detector mostly hits trivially-shaped input —
-  Quarto/Pandoc image attributes can in principle contain `<...>`
-  in alt text, and threading the ctx keeps the bracket scanner
-  consistent across all entry points.
-- Don't widen the autolink skip to bare URIs (GFM
-  `extensions.autolink_bare_uris`). Bare URIs don't start with `<`
-  so they don't intercept the bracket scan; if one ever does cause
-  link confusion, that's its own fix.
+- Don't try to extend lazy *list* continuation to `bq_depth > 0`
+  using the same generalization. Lists need column-anchored marker
+  matching that depends on `current_bq_depth == 0` for the inner
+  content's leading-indent calculation; the existing `bq_depth ==
+  0` arm is structurally different from paragraph lazy.
+- Don't widen the HR-interrupt check to other interrupting blocks
+  (list markers, ATX, fence) without verifying against pandoc per
+  example. The existing HR-only check matches established behavior
+  for the `bq_depth == 0` path; broadening it would also affect
+  long-standing #235-style cases that have separate dialect rules
+  (Pandoc keeps lazy, CommonMark doesn't).
+- Don't drop the marker buffering on the new path. The `>` tokens
+  must end up *inside* the paragraph (not before it as siblings)
+  for the formatter to skip them when re-emitting blockquote
+  prefixes from container nesting. Emitting them outside the
+  paragraph would split the paragraph or produce a malformed CST.
 
 ### Suggested next targets, ranked
 
@@ -132,33 +112,40 @@ diverges between dialects.
    leftover matching). Largest single fix; would unlock the 4+ char
    run cases (currently rejected outright) and the rule-of-3 cases.
    Substantial; gate on `Dialect::CommonMark`. Pandoc-markdown
-   stays on the recursive enclosure parser.
-2. **#472 `*foo *bar baz*`** — CommonMark expects `*foo <em>bar
+   stays on the recursive enclosure parser. (Carried over.)
+2. **#235 `> - foo\n- bar`** — last remaining Block-quotes failure.
+   CommonMark exits the blockquote on `- bar` and starts a fresh
+   list; Pandoc continues the inner list inside the blockquote.
+   Dialect divergence. Likely needs the existing `bq_depth == 0`
+   lazy-paragraph path to also check "would this line be a list
+   marker that interrupts under CommonMark" before appending —
+   parallel to the HR-interrupt check. Verify against pandoc
+   before landing.
+3. **#472 `*foo *bar baz*`** — CommonMark expects `*foo <em>bar
    baz</em>` (outer `*` literal because inner content has unmatched
-   delim flanking). Likely needs delimiter-stack work too.
-3. **Formatter fix for nested-only outer LIST_ITEM** — carried over.
+   delim flanking). Likely needs delimiter-stack work too. (Carried
+   over.)
+4. **Formatter fix for nested-only outer LIST_ITEM** — carried over.
    Unblocks removing the dialect gate on same-line nested list
    markers (#298, #299). Probably one formatter change in
    `crates/panache-formatter/src/formatter/lists.rs`.
-4. **#280 empty list item closes the list** — `-\n\n  foo\n`
+5. **#280 empty list item closes the list** — `-\n\n  foo\n`
    should produce empty LI + separate paragraph under CommonMark.
    Pandoc keeps `foo` as the list item content. Dialect divergence.
    Parser-shape gap, gate on CommonMark. (Carried over.)
-5. **#312 list with non-uniform marker indentation** — `- a\n -
+6. **#312 list with non-uniform marker indentation** — `- a\n -
    b\n  - c\n   - d\n    - e\n` should be 4 sibling items with
    `- e` as lazy paragraph continuation of `d`. Both dialects
    agree per pandoc. Parser-shape gap, universal. (Carried over.)
-6. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion;
+7. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion;
    substantial. (Carried over.)
-7. **HTML block #148** — `</pre>` inside HTML block followed by
+8. **HTML block #148** — `</pre>` inside HTML block followed by
    blank-line content. (Carried over.)
-8. **Reference link followed by another bracket pair (#569, #571)**
+9. **Reference link followed by another bracket pair (#569, #571)**
    — CMark left-bracket scanner stack model. Large. (Carried over.)
-9. **Nested LINKs in link text (#518, #519, #520, #532, #533)** —
-   CommonMark §6.4 forbids real nesting; outer must un-link. Same
-   scanner-stack work as #569/#571. (Carried over.)
-10. **Block quotes lazy-continuation #235, #251** — last two
-    blockquote failures. (Carried over.)
+10. **Nested LINKs in link text (#518, #519, #520, #532, #533)** —
+    CommonMark §6.4 forbids real nesting; outer must un-link. Same
+    scanner-stack work as #569/#571. (Carried over.)
 11. **Fence inside blockquote inside list item (#321)**. (Carried
     over.)
 12. **Same-line blockquote inside list item (#292, #293)** — `> 1. >
@@ -183,11 +170,15 @@ diverges between dialects.
   ("tail-end only" heuristic, dialect gate, not widening to
   #402/#408/#412/#426) still apply. Don't touch those paths without
   first reading session (ix)'s recap.
-- The session (x) emphasis-side autolink/raw-HTML skip in
-  `parse_until_closer_with_nested_*` is the load-bearing companion
-  to this session's bracket-side fix. The two skip patterns must
-  stay aligned: emphasis closer scan and link bracket scan both
-  treat raw HTML as universally opaque, but only the link bracket
-  scan gates autolink-skip on CommonMark dialect (emphasis-side
-  skip is universal because Pandoc-markdown also treats autolinks
-  as opaque to emphasis closers).
+- The session (x) / (xi) link-scanner skip pattern (autolink/raw-HTML
+  opacity for emphasis closer + link bracket close) is load-bearing
+  for #524/#526/#536/#538. Don't unify the autolink and raw-HTML
+  skip flags — Pandoc treats them differently.
+- This session's lazy-continuation generalization is independent of
+  the link-scanner work, but the next target (#235) sits on the
+  same `else if bq_depth < current_bq_depth` branch and will need
+  to interact carefully: #235 is `bq_depth == 0` with paragraph
+  open inside a blockquote-list, where lazy continuation currently
+  fires (Pandoc-correct) but CommonMark wants list-marker interrupt.
+  Plan to add a CommonMark-only list-marker interrupt check
+  alongside the HR check, similar in shape.
