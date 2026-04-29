@@ -703,6 +703,7 @@ pub fn emit_bare_uri_link(builder: &mut GreenNodeBuilder, uri: &str, _config: &P
 pub fn try_parse_reference_link(
     text: &str,
     allow_shortcut: bool,
+    inline_link_attempted: bool,
 ) -> Option<(usize, &str, String, bool)> {
     if !text.starts_with('[') {
         return None;
@@ -719,44 +720,36 @@ pub fn try_parse_reference_link(
         }
     }
 
-    // Find the closing ] for the text
-    let mut bracket_depth = 0;
-    let mut escape_next = false;
-    let mut close_bracket_pos = None;
-
-    for (i, ch) in text[1..].char_indices() {
-        if escape_next {
-            escape_next = false;
-            continue;
-        }
-
-        match ch {
-            '\\' => escape_next = true,
-            '[' => bracket_depth += 1,
-            ']' => {
-                if bracket_depth == 0 {
-                    close_bracket_pos = Some(i + 1);
-                    break;
-                }
-                bracket_depth -= 1;
-            }
-            _ => {}
-        }
-    }
-
-    let close_bracket = close_bracket_pos?;
+    // Find the closing ] for the text. Uses the shared helper so that a
+    // `]` inside a code span doesn't terminate the link text (CommonMark
+    // §6 — code spans bind tighter than links). See spec examples #342
+    // and #525.
+    let close_bracket = find_link_close_bracket(text, 1)?;
     let link_text = &text[1..close_bracket];
 
     // Check what follows the ]
     let after_bracket = close_bracket + 1;
 
-    // Check if followed by ( - if so, this is an inline link, not a reference link
-    if after_bracket < text.len() && text[after_bracket..].starts_with('(') {
+    // `[content]{...}` is reserved for bracketed spans / attribute
+    // trailers, never a shortcut.
+    if after_bracket < text.len() && text[after_bracket..].starts_with('{') {
         return None;
     }
 
-    // Check if followed by { - if so, this is a bracketed span, not a reference link
-    if after_bracket < text.len() && text[after_bracket..].starts_with('{') {
+    // `[text](...)` is the inline-link shape. CommonMark spec example
+    // #568 (`[foo](not a link)` with `[foo]: /url`) requires the shortcut
+    // to succeed for `[foo]`, leaving `(not a link)` as literal text when
+    // the upstream inline-link parse was rejected by `strict_dest`. We
+    // only fall through to shortcut here when the caller has already
+    // tried the inline-link form (`inline_link_attempted`) — otherwise
+    // disabling the `inline_links` extension would silently let
+    // `[text](url)` become a shortcut + literal text, which the
+    // `inline_links_disabled_keeps_inline_link_literal` test guards
+    // against.
+    if after_bracket < text.len()
+        && text[after_bracket..].starts_with('(')
+        && (!allow_shortcut || !inline_link_attempted)
+    {
         return None;
     }
 
@@ -1239,28 +1232,28 @@ mod tests {
     #[test]
     fn test_parse_reference_link_explicit() {
         let input = "[link text][label]";
-        let result = try_parse_reference_link(input, false);
+        let result = try_parse_reference_link(input, false, true);
         assert_eq!(result, Some((18, "link text", "label".to_string(), false)));
     }
 
     #[test]
     fn test_parse_reference_link_implicit() {
         let input = "[link text][]";
-        let result = try_parse_reference_link(input, false);
+        let result = try_parse_reference_link(input, false, true);
         assert_eq!(result, Some((13, "link text", String::new(), false)));
     }
 
     #[test]
     fn test_parse_reference_link_explicit_same_label_as_text() {
         let input = "[stack][stack]";
-        let result = try_parse_reference_link(input, false);
+        let result = try_parse_reference_link(input, false, true);
         assert_eq!(result, Some((14, "stack", "stack".to_string(), false)));
     }
 
     #[test]
     fn test_parse_reference_link_shortcut() {
         let input = "[link text] rest";
-        let result = try_parse_reference_link(input, true);
+        let result = try_parse_reference_link(input, true, true);
         assert_eq!(
             result,
             Some((11, "link text", "link text".to_string(), true))
@@ -1270,29 +1263,41 @@ mod tests {
     #[test]
     fn test_parse_reference_link_shortcut_rejects_empty_label() {
         let input = "[] rest";
-        let result = try_parse_reference_link(input, true);
+        let result = try_parse_reference_link(input, true, true);
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_reference_link_shortcut_disabled() {
         let input = "[link text] rest";
-        let result = try_parse_reference_link(input, false);
+        let result = try_parse_reference_link(input, false, true);
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_reference_link_not_inline_link() {
-        // Should not match inline links with (url)
+        // With shortcut disabled, `[text](url)` is rejected so the inline
+        // link form upstream gets exclusive ownership.
         let input = "[text](url)";
-        let result = try_parse_reference_link(input, true);
+        let result = try_parse_reference_link(input, false, true);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_reference_link_shortcut_falls_through_inline_link() {
+        // CommonMark spec example #568: when an inline-link attempt would
+        // fail (here we model the reachability — the caller tries inline
+        // link first; if that returns None, we should still see `[text]`
+        // as a shortcut and leave `(url)` to be parsed as following text).
+        let input = "[text](url)";
+        let result = try_parse_reference_link(input, true, true);
+        assert_eq!(result, Some((6, "text", "text".to_string(), true)));
     }
 
     #[test]
     fn test_parse_reference_link_with_nested_brackets() {
         let input = "[outer [inner] text][ref]";
-        let result = try_parse_reference_link(input, false);
+        let result = try_parse_reference_link(input, false, true);
         assert_eq!(
             result,
             Some((25, "outer [inner] text", "ref".to_string(), false))
@@ -1302,7 +1307,7 @@ mod tests {
     #[test]
     fn test_parse_reference_link_label_no_newline() {
         let input = "[text][label\nmore]";
-        let result = try_parse_reference_link(input, false);
+        let result = try_parse_reference_link(input, false, true);
         assert_eq!(result, None);
     }
 
@@ -1360,7 +1365,7 @@ mod tests {
     fn test_reference_link_label_with_crlf() {
         // Reference link labels should not span lines with CRLF
         let input = "[foo\r\nbar]";
-        let result = try_parse_reference_link(input, false);
+        let result = try_parse_reference_link(input, false, true);
 
         // Should fail to parse because label contains line break
         assert_eq!(
@@ -1373,7 +1378,7 @@ mod tests {
     fn test_reference_link_label_with_lf() {
         // Reference link labels should not span lines with LF either
         let input = "[foo\nbar]";
-        let result = try_parse_reference_link(input, false);
+        let result = try_parse_reference_link(input, false, true);
 
         // Should fail to parse because label contains line break
         assert_eq!(

@@ -306,6 +306,7 @@ golden_test_cases!(
     setext_vs_reference_definition_pandoc,
     reference_footnotes,
     reference_images,
+    reference_link_code_span_precedence,
     reference_links,
     rmarkdown_math,
     simple_table,

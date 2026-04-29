@@ -150,27 +150,15 @@ fn normalize_label(label: &str) -> String {
 }
 
 /// Collect the raw label text of a node (link text or link ref) for
-/// reference-matching purposes. Includes `ESCAPED_CHAR` tokens with their
-/// backslashes intact: per CommonMark §6.4 example #545, label matching is
-/// performed on raw strings, not parsed inline content (`[bar][foo\!]` does
-/// not match `[foo!]:`). The inline-link side produces `LINK_TEXT` with
-/// separate `TEXT` and `ESCAPED_CHAR` tokens; the corresponding ref-def
-/// emits the entire label as one `TEXT` token. Both must produce the same
-/// raw string for `normalize_label` to compare them correctly.
+/// reference-matching purposes. CommonMark §6.4 specifies matching against
+/// the raw label string, not parsed inline content — so we return the
+/// node's full source bytes. This includes:
+///   - emphasis markers (`*`, `_`) so `[*foo* bar]` matches the literal
+///     label `*foo* bar` in the ref-def (#554, #558).
+///   - backslashes in `ESCAPED_CHAR` tokens so `[bar][foo\!]` does not
+///     match `[foo!]:` (#545).
 fn collect_label_text(node: &SyntaxNode) -> String {
-    node.descendants_with_tokens()
-        .filter_map(|el| el.into_token())
-        .filter(|t| {
-            matches!(
-                t.kind(),
-                SyntaxKind::TEXT
-                    | SyntaxKind::ESCAPED_CHAR
-                    | SyntaxKind::WHITESPACE
-                    | SyntaxKind::NEWLINE
-            )
-        })
-        .map(|t| t.text().to_string())
-        .collect()
+    node.text().to_string()
 }
 
 fn render_blocks(parent: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut String) {
@@ -896,13 +884,18 @@ fn render_link(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut Stri
         match refs.get(&normalize_label(&label)) {
             Some(def) => (def.url.clone(), def.title.clone()),
             None => {
-                // Per CommonMark §6.4 example #545, an unresolved reference
-                // link still has its label content decoded for display
-                // (backslash escapes resolved), even though matching uses
-                // the raw form.
-                out.push_str(&escape_html(&decode_backslash_escapes(
-                    &node.text().to_string(),
-                )));
+                // Unresolved shortcut: render `[` + LINK_TEXT children + `]`
+                // so that any inner inlines (emphasis, code, or even a
+                // resolved nested LINK as in spec #559) still emit their
+                // proper HTML rather than appearing as raw `[*foo*]`-style
+                // text. `render_inlines` handles `ESCAPED_CHAR` decoding,
+                // matching the prior fallback's `decode_backslash_escapes`
+                // behavior for the simple `[bar\!]` case.
+                out.push('[');
+                if let Some(text) = text_node.as_ref() {
+                    render_inlines(text, refs, out);
+                }
+                out.push(']');
                 return;
             }
         }

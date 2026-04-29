@@ -1742,9 +1742,11 @@ fn parse_inline_range_impl(
             // Try reference link: [text][ref] or [text]
             if config.extensions.reference_links {
                 let allow_shortcut = config.extensions.shortcut_reference_links;
-                if let Some((len, link_text, reference, is_implicit)) =
-                    try_parse_reference_link(&text[pos..], allow_shortcut)
-                {
+                if let Some((len, link_text, reference, is_implicit)) = try_parse_reference_link(
+                    &text[pos..],
+                    allow_shortcut,
+                    config.extensions.inline_links,
+                ) {
                     if pos > text_start {
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
