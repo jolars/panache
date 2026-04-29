@@ -1074,24 +1074,17 @@ impl BlockParser for ReferenceDefinitionParser {
         // `>` marker (CST losslessness violation). detect_prepared restricts
         // blockquote-context defs to a single line, so we can rely on
         // ctx.content here.
-        let full_line = if ctx.blockquote_depth > 0 {
-            ctx.content
+        if ctx.blockquote_depth > 0 {
+            let single = [ctx.content];
+            emit_reference_definition_lines(builder, &single);
         } else {
-            lines[line_pos]
-        };
-        let (content_without_newline, line_ending) = strip_newline(full_line);
-        emit_reference_definition_content(builder, content_without_newline);
-        if !line_ending.is_empty() {
-            builder.token(SyntaxKind::NEWLINE.into(), line_ending);
-        }
-
-        for line in lines
-            .iter()
-            .skip(line_pos + 1)
-            .take(consumed_lines.saturating_sub(1))
-        {
-            // Preserve continuation lines exactly as text/newline tokens.
-            crate::parser::utils::helpers::emit_line_tokens(builder, line);
+            let target_lines: Vec<&str> = lines
+                .iter()
+                .skip(line_pos)
+                .take(consumed_lines)
+                .copied()
+                .collect();
+            emit_reference_definition_lines(builder, &target_lines);
         }
 
         builder.finish_node();
@@ -1375,63 +1368,137 @@ impl BlockParser for TableParser {
     }
 }
 
-/// Helper function to emit reference definition content with inline structure.
-fn find_label_close(s: &str) -> Option<usize> {
-    let bytes = s.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'\\' if i + 1 < bytes.len() => i += 2,
-            b']' => return Some(i),
-            _ => i += 1,
-        }
-    }
-    None
-}
-
-fn emit_reference_definition_content(builder: &mut GreenNodeBuilder<'static>, text: &str) {
+/// Emit a (possibly multi-line) reference definition's content tokens with
+/// the appropriate inline structure: `WHITESPACE? LINK<LINK_START "[",
+/// LINK_TEXT, "]"> TEXT NEWLINE? ...`. The LINK_TEXT may span multiple
+/// lines via interleaved TEXT/NEWLINE tokens when the spec example uses a
+/// multi-line label (e.g. `[Foo\n  bar]: /url`, CommonMark example #541).
+///
+/// The walker mirrors the escape-and-bracket logic in
+/// `try_parse_reference_definition_with_mode` so the emit shape stays
+/// consistent with detection.
+///
+/// On any structural mismatch (label > 3 spaces of indent, missing `[`,
+/// no closing `]`, missing `:` after `]`), each input line is emitted
+/// verbatim via `emit_line_tokens` to preserve CST losslessness.
+fn emit_reference_definition_lines(builder: &mut GreenNodeBuilder<'static>, lines: &[&str]) {
+    use crate::parser::utils::helpers::{emit_line_tokens, strip_newline};
     use crate::syntax::SyntaxKind;
 
-    let leading = text.chars().take_while(|&c| c == ' ').count();
-    if leading > 3 {
-        builder.token(SyntaxKind::TEXT.into(), text);
-        return;
-    }
-    let after_indent = &text[leading..];
-    if !after_indent.starts_with('[') {
-        builder.token(SyntaxKind::TEXT.into(), text);
+    let fallback = |b: &mut GreenNodeBuilder<'static>| {
+        for line in lines {
+            emit_line_tokens(b, line);
+        }
+    };
+
+    if lines.is_empty() {
         return;
     }
 
-    let rest = &after_indent[1..];
-    if let Some(close_pos) = find_label_close(rest) {
-        let label = &rest[..close_pos];
-        let after_bracket = &rest[close_pos + 1..];
+    let first = lines[0];
+    let leading = first.chars().take_while(|&c| c == ' ').count();
+    if leading > 3 || !first[leading..].starts_with('[') {
+        fallback(builder);
+        return;
+    }
 
-        if after_bracket.starts_with(':') {
-            if leading > 0 {
-                builder.token(SyntaxKind::WHITESPACE.into(), &text[..leading]);
+    let mut line_idx = 0usize;
+    let mut col = leading + 1; // skip past `[`
+    let mut escape_next = false;
+    let close: Option<(usize, usize)> = 'outer: loop {
+        let bytes = lines[line_idx].as_bytes();
+        while col < bytes.len() {
+            let b = bytes[col];
+            if escape_next {
+                escape_next = false;
+                col += 1;
+                continue;
             }
+            match b {
+                b'\\' => {
+                    escape_next = true;
+                    col += 1;
+                }
+                b']' => break 'outer Some((line_idx, col)),
+                b'[' => break 'outer None,
+                b'\r' | b'\n' => break,
+                _ => col += 1,
+            }
+        }
+        line_idx += 1;
+        if line_idx >= lines.len() {
+            break 'outer None;
+        }
+        col = 0;
+    };
 
-            builder.start_node(SyntaxKind::LINK.into());
+    let Some((close_line, close_col)) = close else {
+        fallback(builder);
+        return;
+    };
 
-            builder.start_node(SyntaxKind::LINK_START.into());
-            builder.token(SyntaxKind::LINK_START.into(), "[");
-            builder.finish_node();
+    let after_close_col = close_col + 1;
+    let close_bytes = lines[close_line].as_bytes();
+    if after_close_col >= close_bytes.len() || close_bytes[after_close_col] != b':' {
+        fallback(builder);
+        return;
+    }
 
-            builder.start_node(SyntaxKind::LINK_TEXT.into());
+    if leading > 0 {
+        builder.token(SyntaxKind::WHITESPACE.into(), &first[..leading]);
+    }
+
+    builder.start_node(SyntaxKind::LINK.into());
+
+    builder.start_node(SyntaxKind::LINK_START.into());
+    builder.token(SyntaxKind::LINK_START.into(), "[");
+    builder.finish_node();
+
+    builder.start_node(SyntaxKind::LINK_TEXT.into());
+    if close_line == 0 {
+        let label = &first[leading + 1..close_col];
+        if !label.is_empty() {
             builder.token(SyntaxKind::TEXT.into(), label);
-            builder.finish_node();
-
-            builder.token(SyntaxKind::TEXT.into(), "]");
-            builder.finish_node(); // LINK
-
-            builder.token(SyntaxKind::TEXT.into(), after_bracket);
-            return;
+        }
+    } else {
+        let (content0, nl0) = strip_newline(first);
+        let part0 = &content0[leading + 1..];
+        if !part0.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), part0);
+        }
+        if !nl0.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), nl0);
+        }
+        for line in &lines[1..close_line] {
+            let (content, nl) = strip_newline(line);
+            if !content.is_empty() {
+                builder.token(SyntaxKind::TEXT.into(), content);
+            }
+            if !nl.is_empty() {
+                builder.token(SyntaxKind::NEWLINE.into(), nl);
+            }
+        }
+        let part_close = &lines[close_line][..close_col];
+        if !part_close.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), part_close);
         }
     }
+    builder.finish_node(); // LINK_TEXT
 
-    builder.token(SyntaxKind::TEXT.into(), text);
+    builder.token(SyntaxKind::TEXT.into(), "]");
+    builder.finish_node(); // LINK
+
+    let after_close_text = &lines[close_line][after_close_col..];
+    let (after_content, after_nl) = strip_newline(after_close_text);
+    if !after_content.is_empty() {
+        builder.token(SyntaxKind::TEXT.into(), after_content);
+    }
+    if !after_nl.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), after_nl);
+    }
+    for line in &lines[close_line + 1..] {
+        emit_line_tokens(builder, line);
+    }
 }
 
 /// Fenced code block parser (``` or ~~~)

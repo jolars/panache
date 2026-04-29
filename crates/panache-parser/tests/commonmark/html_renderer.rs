@@ -128,11 +128,20 @@ fn normalize_label(label: &str) -> String {
     // CommonMark §6.4: matching is performed on normalized *raw* strings,
     // not parsed inline content. Backslash escapes are NOT decoded — see
     // spec example #545 (`[bar][foo\!]` does not match `[foo!]:`).
+    //
+    // Spec mandates Unicode case folding (not lowercasing). They diverge for
+    // characters whose lowercase form is shorter than the case-folded form,
+    // most notably the German sharp S: `ẞ` (U+1E9E) lowercases to `ß`
+    // (U+00DF) but case-folds to `ss`; `ß` lowercases to itself but
+    // case-folds to `ss`. Spec example #540 exercises this. We expand both
+    // sharp-S codepoints to `ss` after lowercasing — the only multi-char
+    // fold spec.txt actually exercises beyond ASCII.
     label
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
         .to_lowercase()
+        .replace('ß', "ss")
 }
 
 /// Collect the raw label text of a node (link text or link ref) for
@@ -837,8 +846,13 @@ fn render_link(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut Stri
     let dest_node = node.children().find(|c| c.kind() == SyntaxKind::LINK_DEST);
 
     let (url, title) = if let Some(d) = dest_node.as_ref() {
+        // LINK_DEST never contains the surrounding `(` / `)` — those are
+        // emitted as LINK_DEST_START / LINK_DEST_END siblings — so don't
+        // strip them off here. Trimming would corrupt destinations whose
+        // payload legitimately ends with an escaped paren, e.g.
+        // `[link](\(foo\))` (spec example #495).
         let raw = d.text().to_string();
-        let (url, title) = split_dest_and_title(raw.trim_matches(['(', ')'].as_ref()));
+        let (url, title) = split_dest_and_title(raw.trim());
         (
             decode_entities(&decode_backslash_escapes(&strip_angle_brackets(&url))),
             title.map(|t| decode_entities(&decode_backslash_escapes(&t))),
@@ -910,8 +924,11 @@ fn render_image(node: &SyntaxNode, refs: &HashMap<String, RefDef>, out: &mut Str
     let ref_node = node.children().find(|c| c.kind() == SyntaxKind::LINK_REF);
 
     let (url, title) = if let Some(d) = dest_node.as_ref() {
+        // See render_link: LINK_DEST does not contain surrounding parens,
+        // so do not strip them off (they are emitted as LINK_DEST_START /
+        // LINK_DEST_END siblings).
         let raw = d.text().to_string();
-        let (url, title) = split_dest_and_title(raw.trim_matches(['(', ')'].as_ref()));
+        let (url, title) = split_dest_and_title(raw.trim());
         (
             decode_entities(&decode_backslash_escapes(&strip_angle_brackets(&url))),
             title.map(|t| decode_entities(&decode_backslash_escapes(&t))),

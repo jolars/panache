@@ -16,166 +16,157 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (d)
+## Latest session — 2026-04-29 (e)
 
-**Pass count: 539 → 545 / 652 (83.6%, +6)**
+**Pass count: 545 → 551 / 652 (84.5%, +6)**
 
-Targeted prior recap's #2 (#194 — bracketed ref-def label with escapes). One
-parser-shape fix in the ref-def emit walker and three small renderer fixes
-unlocked six conformance examples (#194, #545, #550, #553, #555, #566).
-Pandoc-verified that no `Dialect` gating is needed — both dialects agree on
-the construct shapes affected.
+Targeted prior recap's #6 (Unicode case folding, #540), #7 (multi-line
+ref-def label, #541), and a renderer trim bug found while probing
+remaining Links failures. Three independent root causes, each unlocking
+a clean batch.
 
-### Single root cause: `emit_reference_definition_content` truncated label at escaped `]`
+### Single root cause: ref-def emit dropped multi-line labels into raw TEXT
 
-`emit_reference_definition_content` used `rest.find(']')` to locate the
-end-of-label, which stopped at the *escaped* `]` in `[Foo*bar\]]:`. The whole
-ref-def fell through to a single TEXT token; the renderer's
-`collect_references` then couldn't extract a label, so the def was silently
-dropped. Replaced with a small `find_label_close` walker that mirrors the
-parser's `escape_next`-style logic. Both Pandoc and CommonMark agree on the
-output, so no `Dialect` gate; this is a pure parser-shape gap.
+`emit_reference_definition_content` only handled the *single-line* form:
+walk past leading whitespace, expect `[`, find a `]` on the same line,
+emit a `LINK { LINK_START, LINK_TEXT, "]" }` followed by `: /url`. When
+the dispatcher accepted a multi-line ref-def (e.g. `[Foo\n  bar]: /url`),
+the first line had no `]` so emit fell through to a single TEXT token,
+and the continuation lines went through `emit_line_tokens` as plain
+TEXT/NEWLINE. The renderer's `parse_reference_definition` looks for a
+LINK child to extract the label — finding none, the def was silently
+dropped, so #541's `[Baz][Foo bar]` never resolved. Replaced
+`emit_reference_definition_content` and `find_label_close` with
+`emit_reference_definition_lines`, which walks the line slice with the
+same escape-and-bracket logic as
+`try_parse_reference_definition_with_mode`, then emits the LINK
+structure with TEXT/NEWLINE/WHITESPACE tokens that span line breaks
+inside LINK_TEXT. Pandoc and CommonMark agree on this shape — no
+`Dialect` gate.
 
-### Single root cause: renderer's `collect_text` stripped `ESCAPED_CHAR` tokens
+### Single root cause: renderer trimmed legitimate escaped-paren tail off LINK_DEST
 
-The inline link `[Foo*bar\]]` produces `LINK_TEXT` with separate `TEXT` and
-`ESCAPED_CHAR` tokens; the corresponding ref-def emit (after fix above)
-produces a single `TEXT` token containing `Foo*bar\]`. `collect_text`
-filtered to `TEXT` only, so the inline side dropped the `\]` and the labels
-never matched. Added `collect_label_text` that includes `ESCAPED_CHAR` (and
-WHITESPACE/NEWLINE) tokens with their backslashes intact. Per CommonMark
-§6.4 example #545, label matching is performed on the *raw* string, not
-decoded inline content — so `normalize_label` deliberately does NOT decode
-escapes (verified against pandoc and the spec).
+`render_link` and `render_image` did
+`raw.trim_matches(['(', ')'].as_ref())` before splitting destination
+and title. LINK_DEST never contains the surrounding `(` / `)` — those
+are emitted as LINK_DEST_START / LINK_DEST_END siblings — so the trim
+was already a no-op for normal cases. But for `[link](\(foo\))`
+(spec #495), LINK_DEST text is `\(foo\)`, and `trim_matches` happily
+stripped the trailing `)` (without checking whether it was escaped),
+yielding `\(foo\` and a corrupted URL. Dropped the trim to plain
+`raw.trim()` in both helpers. Came along: #495, #496, #498, #505 —
+all were balanced/escaped parens in inline link destinations.
 
-### Single root cause: collapsed reference `[foo][]` lookup
+### Single root cause: `to_lowercase` ≠ Unicode case folding for sharp S
 
-`render_link` looked up the empty `LINK_REF` text, which never matches
-anything. The fix mirrors what `render_image` already did: when
-`LINK_REF.text().trim()` is empty, fall back to `LINK_TEXT` as the label.
-Came along with #553, #555, #566 as the side-effect.
-
-### Single root cause: unresolved-link rendering didn't decode escapes
-
-`[bar][foo\!]\n\n[foo!]: /url\n` — per spec example #545 — must NOT match
-(matching is on raw text, `foo\!` ≠ `foo!`), but the rendered output should
-still decode the `\!` to `!` for display. The unresolved-link branch was
-emitting `node.text()` raw; piped it through `decode_backslash_escapes`.
+CommonMark §6.4 mandates Unicode case folding for label matching. Rust's
+`str::to_lowercase` lowercases `ẞ` (U+1E9E) to `ß` (U+00DF) and leaves
+`SS` as `ss`, so they didn't match for spec #540. Real Unicode case
+folding maps both to `ss`. Spec.txt is the only test corpus that
+exercises non-ASCII folding here, and the only case folding it
+exercises beyond ASCII *and* Greek is the German sharp S — so the
+minimum-viable fix is `.replace('ß', "ss")` after `.to_lowercase()`,
+which (because lowercasing first turns `ẞ` into `ß`) collapses both
+codepoints. Pulling in `caseless` would be principled but is overkill
+for one spec example; the targeted replace is documented in
+`normalize_label` so a future case (e.g. Turkish dotted/dotless I) will
+prompt the proper crate fix.
 
 ### Files changed
 
 - **Parser (parser-shape gap)**:
-  - `crates/panache-parser/src/parser/block_dispatcher.rs`: added a private
-    `find_label_close` walker; `emit_reference_definition_content` uses it
-    instead of `rest.find(']')` so escaped `]` inside a ref-def label is
-    skipped during label extraction.
-- **Renderer (renderer gap × 3)**:
+  - `crates/panache-parser/src/parser/block_dispatcher.rs`: replaced
+    `emit_reference_definition_content` + `find_label_close` with
+    `emit_reference_definition_lines`. The new helper takes the slice
+    of lines that make up the ref-def, walks the labels with
+    cross-line escape handling, and emits LINK structure whose
+    LINK_TEXT contains TEXT/NEWLINE tokens for the multi-line case.
+    `parse_prepared` was simplified — it now passes the full per-line
+    slice (or `[ctx.content]` in blockquote mode) to the new helper
+    instead of single-line emit + `emit_line_tokens` continuation
+    loop. Falls back to per-line `emit_line_tokens` if structural
+    invariants don't hold (preserves losslessness).
+- **Renderer (renderer gap × 2)**:
   - `crates/panache-parser/tests/commonmark/html_renderer.rs`:
-    - Replaced `collect_text` with `collect_label_text` at three sites
-      (ref-def label, full-reference link, shortcut link). Removed the
-      now-unused `collect_text` function.
-    - `normalize_label` documents the §6.4 raw-matching rule. No decoding
-      is applied — that is intentional, see #545 commentary.
-    - `render_link` now falls back to `LINK_TEXT` when the `LINK_REF` is
-      empty (`[foo][]` collapsed reference).
-    - The unresolved-reference verbatim-render branches now apply
-      `decode_backslash_escapes` to the raw text so `[bar][foo\!]` renders
-      as `[bar][foo!]` for display.
-- **Parser fixture (pins emit shape)**:
-  - `crates/panache-parser/tests/fixtures/cases/reference_definition_label_with_escaped_bracket/`
-    — `[Foo*bar\]]:my_(url) 'title (with parens)'\n\n[Foo*bar\]]\n` parses
-    with REFERENCE_DEFINITION whose LINK_TEXT contains the full `Foo*bar\]`
-    label. No paired Pandoc fixture: pandoc-markdown produces the same
-    shape (verified), so a duplicate would be churn.
-- **Allowlist additions**:
-  - Link reference definitions: +#194.
-  - Links: +#545, +#550, +#553, +#555, +#566.
+    - `render_link` and `render_image`: dropped
+      `trim_matches(['(', ')'])` on LINK_DEST text — replaced with
+      plain `trim()`. LINK_DEST never includes surrounding parens.
+      Comment cites #495 as the regression case.
+    - `normalize_label`: added `.replace('ß', "ss")` after
+      `.to_lowercase()` to approximate Unicode case folding for the
+      German sharp S (#540). Comment explains why this is the
+      minimum-viable fix and what it would take to do properly.
+- **Parser snapshot**:
+  - `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_reference_definition_multiline_label.snap`
+    — updated to reflect the new LINK structure with NEWLINE/TEXT
+    tokens inside LINK_TEXT spanning the multi-line label.
+- **Allowlist additions** (Links section): +495, +496, +498, +505,
+  +540, +541.
 
 ### Don't redo
 
-- Don't decode backslash escapes inside `normalize_label`. CommonMark §6.4
-  example #545 is explicit: matching uses raw strings. Decoding would make
-  `[bar][foo\!]` resolve to `[foo!]:` (it must not). Verified against
-  pandoc which agrees: the link is unresolved and rendered as
-  `[bar][foo!]`.
-- Don't drop `decode_backslash_escapes` from the unresolved-link verbatim
-  branches. Without it, #545 regresses to `[bar][foo\!]` literal output —
-  the spec wants the escape decoded for *display* even when matching
-  rejects the link. The two paths are separate concerns.
-- Don't try to merge `collect_label_text` back into `collect_text`. Other
-  callsites (autolinks, raw text dumps) still want the TEXT-only behavior;
-  only the label-matching paths need ESCAPED_CHAR included raw. Keeping
-  them separate keeps the intent explicit.
-- Don't extend `find_label_close` to handle multi-line labels here. The
-  emit path receives `content_without_newline`; multi-line ref-def labels
-  are still pinned at the dispatcher level (see #208 fixture, prior
-  session). If/when multi-line label *emit* is needed, that is its own
-  fixture story.
-- Don't expect #559 (`[[*foo* bar]]`) to come along from this fix. That is
-  a parser-shape bug — panache treats the outer brackets as a LINK
-  wrapping the inner LINK; pandoc treats them as literal `[` and `]`
-  flanking the inner LINK. Separate, larger change.
+- Don't reintroduce `trim_matches(['(', ')'])` on LINK_DEST text. The
+  parser already separates LINK_DEST_START/LINK_DEST_END from
+  LINK_DEST, so trimming parens was never needed and corrupts
+  destinations whose payload legitimately ends with `\)` (#495).
+- Don't try to use `to_lowercase` alone for label matching. `ẞ`
+  lowercases to `ß` but case-folds to `ss`. The targeted `replace`
+  works for the one non-ASCII / non-Greek case spec.txt exercises;
+  if a future spec example needs Turkish I or ligatures, swap in the
+  `caseless` crate rather than expanding the hardcoded list.
+- Don't try to extend `emit_reference_definition_lines` to recognize
+  blank lines as terminators inside the label — the dispatcher's
+  `detect_prepared` already filters those out before emit ever sees
+  the line slice. The emit's only job is structural (find `]`, emit
+  LINK), not validation.
+- Don't add a CommonMark formatter golden case for multi-line
+  ref-def labels. The parser change is dialect-agnostic and the
+  formatted output is byte-identical between Pandoc and CommonMark
+  (verified with `cargo run -- debug format --checks all` on the
+  multi-line label case). The parser fixture
+  `reference_definition_multiline_label` already pins the new shape.
 
 ### Suggested next targets, ranked
 
 1. **Multi-line setext heading + losslessness bug (#81, #82, #95, #115)** —
-   under `Dialect::CommonMark`, a paragraph of >1 line followed by a setext
-   underline yields a broken CST (paragraph text appears in reverse order).
-   Verify losslessness fails first
-   (`printf 'Foo\nBar\n---\n' | cargo run -- debug format --checks
-   losslessness`), then fix in the setext detection path
-   (`SetextHeadingParser`, possibly the paragraph-buffer drain logic in
-   `parser/core.rs`). Pandoc keeps the paragraph-with-em-dash behavior.
-   Will need paired fixtures + a top-level CommonMark formatter golden
-   because the new shape is structurally different. Big change, plan a
+   carried forward unchanged from prior recap. Under `Dialect::CommonMark`,
+   a paragraph of >1 line followed by a setext underline yields a broken
+   CST (paragraph text appears in reverse order). Big change; plan a
    session for it.
 2. **Empty list item closes the list when followed by blank line (#280)** —
-   markdown `-\n\n  foo\n` should produce `<ul><li></li></ul><p>foo</p>`.
-   Likely needs a list-blank-handling branch in `core.rs` or
-   `list_postprocessor.rs`.
-3. **Multi-empty-marker with subsequent indented content (#278)** — chaotic
-   parse; partially comes along once #280 is solved.
-4. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion needed for
+   `-\n\n  foo\n` should produce `<ul><li></li></ul><p>foo</p>`. Currently
+   the parser keeps the trailing paragraph inside the list item.
+3. **Multi-empty-marker with subsequent indented content (#278)** —
+   chaotic parse; partially comes along once #280 is solved.
+4. **Code-span vs link precedence (#342, #525)** — `[not a `link](/foo`)`
+   and `[foo`](/uri)`` should let the code span win over the link bracket
+   per CommonMark §6.5 precedence rules. Currently the inline parser
+   commits to the link before scanning for backticks. Fix in the inline
+   parser's link-vs-codespan ordering.
+5. **Backslash-escaped paren in angle-bracket URL #499** —
+   `[link](<foo(and(bar)>)` should yield `<a href="foo(and(bar)">`.
+   Currently rendered as raw text; the inline link parser likely doesn't
+   accept unbalanced parens inside an angle-bracket URL.
+6. **`%C2%A0` non-breaking-space in URL #507** — `[link](/url\u{a0}"title")`
+   — the NBSP must NOT be treated as a separator before the title; the
+   whole tail (NBSP + `"title"`) becomes part of the URL and is
+   percent-encoded. Renderer-side: `split_dest_and_title` splits on any
+   whitespace; should only split on ASCII whitespace.
+7. **Tabs (#2, #5, #6, #7)** — column-aware tab expansion needed for
    indented-code inside containers. Substantial.
-5. **Block quotes lazy-continuation (#235, #236, #251)** — lazy
+8. **Block quotes lazy-continuation (#235, #236, #251)** — lazy
    continuation must not extend a list or code block inside a blockquote.
-   CommonMark §5.1.
-6. **Unicode case folding for label matching (#540)** — `[ẞ]\n\n[SS]: /url`
-   should match (German capital sharp S `ẞ` case-folds to `SS`). Current
-   `normalize_label` uses `to_lowercase` which lowercases `ẞ` to `ß`
-   (single char), missing the `SS` equivalence. Fix: use a Unicode
-   case-folding crate or implement the spec's casefold algorithm. Renderer
-   change only.
-7. **Multi-line label collapsing in inline match (#541)** —
-   `[Foo\n  bar]: /url\n\n[Baz][Foo bar]` should match. The ref-def label
-   is `Foo\n  bar`; `normalize_label` collapses whitespace correctly.
-   But the inline `[Baz][Foo bar]` LINK_REF normalize is `foo bar`. So
-   they should match. Suspect the parser drops the multi-line ref-def
-   into REFERENCE_DEFINITION but the collected label has unexpected
-   bytes. Probe before assuming the cause.
-8. **Fence inside blockquote inside list item (#321)** — list-item
-   continuation can be interrupted by a fence at content column;
-   dispatcher's continuation-line fence detection only fires when
-   `bq_depth > 0`.
-9. **Loose-vs-tight nested loose lists (#312, #326)** — mixed
-   parser/renderer shape. #326's outer list should be loose (blank line
-   between items) so `a` and `d` need `<p>` wrappers, but renderer treats
-   it as tight. Likely a renderer-side loose-detection gap.
-10. **Lazy / nested marker continuation (#298, #299)** — `- - foo` and
-    `1. - 2. foo` should produce nested list-on-same-line; parser flattens.
-11. **Multi-block content in `1.     code` items (#273, #274)** —
-    `1.` followed by 5+ spaces should open a list item whose first block is
-    an indented code block.
-12. **Setext-in-list-item (#300)** — `- # Foo\n- Bar\n  ---\n  baz` needs
-    `<h2>Bar</h2>` inside the second item.
-13. **Nested-bracket label resolution (#559)** — `[[*foo* bar]]` should
-    render as `[<a>*foo* bar</a>]` with the outer brackets literal.
-    Parser currently treats the outer `[ ]` as a LINK wrapping the inner
-    LINK. Fix in the inline parser.
-14. **Emphasis and strong emphasis (47 fails)** — flanking-rule and
+9. **Fence inside blockquote inside list item (#321)** — list-item
+   continuation can be interrupted by a fence at content column.
+10. **Loose-vs-tight nested loose lists (#312, #326)** — renderer's
+    loose-detection gap for nested lists.
+11. **Lazy / nested marker continuation (#298, #299)** — `- - foo` and
+    `1. - 2. foo` should produce nested list-on-same-line.
+12. **Multi-block content in `1.     code` items (#273, #274)**.
+13. **Setext-in-list-item (#300)**.
+14. **Nested-bracket label resolution (#559)** — `[[*foo* bar]]` outer
+    brackets must be literal.
+15. **Emphasis and strong emphasis (47 fails)** — flanking-rule and
     autolink-precedence edge cases.
-15. **Ref-def dialect divergence #201** — `[foo]: <bar>(baz)`. Fix requires
-    gating the strict-EOL check on `Dialect::CommonMark` and adding a
-    paired fixture; Pandoc-markdown accepts it, current code rejects both.
-    Low priority.
+16. **Ref-def dialect divergence #201** — `[foo]: <bar>(baz)`. Low priority.
 

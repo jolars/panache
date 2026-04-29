@@ -4,11 +4,15 @@ expression: cst_output
 ---
 DOCUMENT@0..18
   REFERENCE_DEFINITION@0..14
-    TEXT@0..1 "["
-    NEWLINE@1..2 "\n"
-    TEXT@2..5 "foo"
-    NEWLINE@5..6 "\n"
-    TEXT@6..13 "]: /url"
+    LINK@0..7
+      LINK_START@0..1
+        LINK_START@0..1 "["
+      LINK_TEXT@1..6
+        NEWLINE@1..2 "\n"
+        TEXT@2..5 "foo"
+        NEWLINE@5..6 "\n"
+      TEXT@6..7 "]"
+    TEXT@7..13 ": /url"
     NEWLINE@13..14 "\n"
   PARAGRAPH@14..18
     TEXT@14..17 "bar"
