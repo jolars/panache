@@ -1,41 +1,51 @@
-//! Inline IR for the CommonMark dialect.
+//! Inline IR for both CommonMark and Pandoc dialects.
 //!
-//! The CommonMark inline parsing pipeline runs in three passes over an
-//! intermediate representation (IR):
+//! The inline parsing pipeline runs in three passes over an intermediate
+//! representation (IR):
 //!
 //! 1. **Scan** ([`build_ir`]): walk the source bytes once, producing a flat
 //!    [`Vec<IrEvent>`]. Opaque higher-precedence constructs (escapes, code
-//!    spans, autolinks, raw HTML) are skipped past as a single
-//!    [`IrEvent::Construct`] event whose source range is preserved for
-//!    losslessness. Delimiter runs (`*`/`_`), bracket markers (`[`, `![`,
-//!    `]`), soft line breaks, and plain text spans become distinct events.
+//!    spans, autolinks, raw HTML, plus Pandoc math / native spans / inline
+//!    footnotes / footnote references / citations / bracketed spans) are
+//!    skipped past as a single [`IrEvent::Construct`] event whose source
+//!    range is preserved for losslessness. Delimiter runs (`*`/`_`),
+//!    bracket markers (`[`, `![`, `]`), soft line breaks, and plain text
+//!    spans become distinct events.
 //!
-//! 2. **Process emphasis** ([`process_emphasis`]) — CommonMark §6.2: the
-//!    classic delimiter-stack algorithm runs over the [`IrEvent::DelimRun`]
-//!    events, pairing openers with closers and recording matches on the
-//!    runs. Each match consumes 1 or 2 inner-edge bytes from each side;
-//!    leftover bytes fall through to literal text.
-//!
-//! 3. **Process brackets** ([`process_brackets`]) — CommonMark §6.3: the
+//! 2. **Process brackets** ([`process_brackets`]) — CommonMark §6.3: the
 //!    bracket-stack algorithm walks `]` markers left-to-right. For each
 //!    `]`, the algorithm finds the nearest active opener and tries to
 //!    resolve the pair as a link or image: inline `[text](dest)`, full
 //!    reference `[text][label]`, collapsed `[text][]`, or shortcut
-//!    `[text]`. Reference forms are validated against the document refdef
-//!    map. When a match resolves, all earlier active openers are marked
-//!    inactive — this implements the "links may not contain other links"
-//!    rule (§6.3) by suppressing outer bracket pairs once an inner link
-//!    has been recognised.
+//!    `[text]`. Under CommonMark, reference forms are validated against
+//!    the document refdef map and a successful match deactivates all
+//!    earlier active openers (§6.3 "links may not contain other links").
+//!    Under Pandoc, reference forms resolve shape-only (any non-empty
+//!    label) and the deactivation pass is skipped; outer-wins nested-link
+//!    semantics are enforced by the emission walk's `suppress_inner_links`
+//!    flag instead.
 //!
-//! Emission ([`emit_from_ir`]) walks the resolved IR and writes CST nodes
-//! via `GreenNodeBuilder`. Matched delim runs become `EMPHASIS` / `STRONG`
-//! nodes wrapping a recursive emit of the inner range. Matched bracket
-//! pairs become `LINK` / `IMAGE` nodes. Unmatched delims and brackets
-//! fall through to plain text.
+//! 3. **Process emphasis** ([`process_emphasis_in_range`]): the classic
+//!    delimiter-stack algorithm runs over the [`IrEvent::DelimRun`]
+//!    events, pairing openers with closers and recording matches on the
+//!    runs. Runs first scoped per resolved bracket pair (innermost
+//!    first), then a top-level pass over the residual events. Each match
+//!    consumes 1 or 2 inner-edge bytes from each side; leftover bytes
+//!    fall through to literal text. Dialect gates (Pandoc flanking rules,
+//!    mod-3 rejection, asymmetric (1,2)/(2,1) rejection, opener-count >= 4
+//!    rejection, triple-emph nesting flip, cascade-then-rerun) branch on
+//!    the `dialect` parameter.
 //!
-//! The IR is `Dialect::CommonMark`-only. The Pandoc dialect retains its
-//! existing recursive-descent inline parser; both paths coexist behind
-//! the `dialect` switch in [`super::core::parse_inline_text_recursive`].
+//! The emission walk in [`super::core::parse_inline_range_impl`] consumes
+//! three byte-keyed plans built by [`build_full_plans`]: an
+//! [`EmphasisPlan`] for delim-run dispositions, a [`BracketPlan`] for
+//! resolved link/image bracket pairs, and a [`ConstructPlan`] for
+//! standalone Pandoc constructs (inline footnotes, native spans, footnote
+//! references, citations, bracketed spans). Matched delim runs become
+//! `EMPHASIS` / `STRONG` nodes; matched bracket pairs become `LINK` /
+//! `IMAGE` nodes via the dispatcher's `try_parse_*` recognizers (called
+//! to *parse* a matched range, not to *resolve* it). Unmatched delims and
+//! brackets fall through to plain text.
 
 use crate::options::ParserOptions;
 use crate::parser::inlines::refdef_map::{RefdefMap, normalize_label};
@@ -213,36 +223,35 @@ pub enum ConstructKind {
     PandocOpaque,
     /// Pandoc inline footnote `^[note text]`. Recognised in `build_ir`
     /// under `Dialect::Pandoc` and consumed by the emission walk via
-    /// the IR's `ConstructPlan` (Phase 2). The dispatcher's legacy
-    /// `^[` branch is gated to CommonMark dialect only.
+    /// the IR's `ConstructPlan`. The dispatcher's legacy `^[` branch
+    /// is gated to CommonMark dialect only.
     InlineFootnote,
     /// Pandoc native span `<span ...>...</span>`. Recognised in
     /// `build_ir` under `Dialect::Pandoc` and consumed by the emission
-    /// walk via the IR's `ConstructPlan` (Phase 2). The dispatcher's
-    /// legacy `<span>` branch is gated to CommonMark dialect only.
+    /// walk via the IR's `ConstructPlan`. The dispatcher's legacy
+    /// `<span>` branch is gated to CommonMark dialect only.
     NativeSpan,
     /// Pandoc footnote reference `[^id]`. Recognised in `build_ir`
     /// under `Dialect::Pandoc` and consumed by the emission walk via
-    /// the IR's `ConstructPlan` (Phase 3). The dispatcher's legacy
-    /// `[^id]` branch is gated to CommonMark dialect only.
+    /// the IR's `ConstructPlan`. The dispatcher's legacy `[^id]`
+    /// branch is gated to CommonMark dialect only.
     FootnoteReference,
     /// Pandoc bracketed citation `[@key]`, `[see @key, p. 1]`,
     /// `[@a; @b]`. Recognised in `build_ir` under `Dialect::Pandoc`
-    /// and consumed by the emission walk via the IR's `ConstructPlan`
-    /// (Phase 4). The dispatcher's legacy `[@cite]` branch is gated
-    /// to CommonMark dialect only.
+    /// and consumed by the emission walk via the IR's `ConstructPlan`.
+    /// The dispatcher's legacy `[@cite]` branch is gated to CommonMark
+    /// dialect only.
     BracketedCitation,
     /// Pandoc bare citation `@key` or `-@key` (author-in-text /
     /// suppress-author). Recognised in `build_ir` under
     /// `Dialect::Pandoc` and consumed by the emission walk via the
-    /// IR's `ConstructPlan` (Phase 4). The dispatcher's legacy `@`
-    /// and `-@` branches are gated to CommonMark dialect only.
+    /// IR's `ConstructPlan`. The dispatcher's legacy `@` and `-@`
+    /// branches are gated to CommonMark dialect only.
     BareCitation,
     /// Pandoc bracketed span `[content]{attrs}`. Recognised in
     /// `build_ir` under `Dialect::Pandoc` and consumed by the emission
-    /// walk via the IR's `ConstructPlan` (Phase 5). The dispatcher's
-    /// legacy `[text]{attrs}` branch is gated to CommonMark dialect
-    /// only.
+    /// walk via the IR's `ConstructPlan`. The dispatcher's legacy
+    /// `[text]{attrs}` branch is gated to CommonMark dialect only.
     BracketedSpan,
 }
 
@@ -2137,10 +2146,9 @@ impl BracketPlan {
 }
 
 /// A standalone Pandoc inline construct recognised by `build_ir` and
-/// dispatched directly from the emission walk (Phase 2). Carries the
-/// construct's full source range so the emission walk can slice the
-/// content for the existing `emit_*` helpers without re-running the
-/// recognition.
+/// dispatched directly from the emission walk. Carries the construct's
+/// full source range so the emission walk can slice the content for the
+/// existing `emit_*` helpers without re-running the recognition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstructDispo {
     /// `^[note text]` — emit via `emit_inline_footnote` after slicing
@@ -2165,10 +2173,13 @@ pub enum ConstructDispo {
 }
 
 /// A byte-keyed view of the IR's standalone Pandoc constructs that the
-/// emission walk consumes directly (currently inline footnotes and
-/// native spans). Phase 2 of the Pandoc IR migration: recognition is
-/// authoritative in `build_ir`, the dispatcher's legacy `^[` /
-/// `<span>` branches are gated to `Dialect::CommonMark` only.
+/// emission walk consumes directly: inline footnotes, native spans,
+/// footnote references, bracketed citations, bare citations, and
+/// bracketed spans. Recognition is authoritative in `build_ir` under
+/// `Dialect::Pandoc`; the dispatcher's legacy branches for these
+/// constructs (`^[`, `<span>`, `[^id]`, `[@cite]`, `@cite` / `-@cite`,
+/// `[text]{attrs}`) are gated to `Dialect::CommonMark` only and only
+/// fire when the relevant extension is explicitly enabled.
 #[derive(Debug, Default, Clone)]
 pub struct ConstructPlan {
     by_pos: BTreeMap<usize, ConstructDispo>,
@@ -2267,10 +2278,10 @@ pub fn build_bracket_plan(events: &[IrEvent]) -> BracketPlan {
     BracketPlan { by_pos }
 }
 
-/// One-shot helper: build the IR, run all passes, and return both the
-/// [`BracketPlan`] and the byte-keyed [`EmphasisPlan`] — packaged
-/// together so the CommonMark inline emission path can consume them in
-/// one go.
+/// One-shot helper: build the IR, run all passes, and return the
+/// bundled [`InlinePlans`] (emphasis dispositions, bracket resolutions,
+/// and standalone Pandoc constructs) — packaged together so the inline
+/// emission path can consume them in one go for either dialect.
 ///
 /// Pass ordering follows the CommonMark §6.3 reference impl: bracket
 /// resolution runs first, then emphasis is processed *scoped per resolved

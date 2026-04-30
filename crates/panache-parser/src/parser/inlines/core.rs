@@ -1,11 +1,13 @@
 //! Inline emission walk.
 //!
 //! Consumes the IR plans built by [`super::inline_ir::build_full_plans`]
-//! (emphasis pairings, bracket resolutions, Pandoc opaque-construct
-//! events) and emits the inline CST tokens / nodes in source order.
-//! Emphasis pair selection is entirely IR-driven; brackets are
-//! IR-driven for `Dialect::CommonMark` and dispatcher-driven for
-//! `Dialect::Pandoc`.
+//! (emphasis pairings, bracket resolutions, standalone Pandoc constructs)
+//! and emits the inline CST tokens / nodes in source order. Resolution
+//! decisions for emphasis, brackets, and standalone Pandoc constructs
+//! are entirely IR-driven for both dialects; the dispatcher's
+//! `try_parse_*` recognizers are still called to *parse* a matched byte
+//! range into a CST subtree, but "what is this byte range?" is answered
+//! exclusively by the IR.
 
 use crate::options::{Dialect, ParserOptions};
 use crate::syntax::SyntaxKind;
@@ -56,17 +58,15 @@ use super::strikeout::{emit_strikeout, try_parse_strikeout};
 use super::subscript::{emit_subscript, try_parse_subscript};
 use super::superscript::{emit_superscript, try_parse_superscript};
 
-/// Parse inline text using the recursive emphasis algorithm.
+/// Parse inline text into the CST builder.
 ///
-/// This is the main entry point for parsing inline content with Pandoc-style
-/// recursive emphasis handling. It uses a greedy left-to-right, first-match-wins
-/// approach that matches Pandoc's behavior exactly.
-///
-/// **Algorithm**:
-/// 1. Parse text left-to-right trying each inline element type in precedence order
-/// 2. When we see `*` or `_`, try to parse emphasis recursively
-/// 3. Nested emphasis naturally consumes delimiters before outer matches
-/// 4. All inline elements (code, links, math, etc.) are parsed on-the-fly
+/// Top-level entry point for inline parsing. Builds the IR plans
+/// (emphasis pairings, bracket resolutions, standalone Pandoc constructs)
+/// once via [`super::inline_ir::build_full_plans`], then walks the byte
+/// range left-to-right consulting those plans plus the dispatcher's
+/// ordered-try chain for non-IR-resolved constructs (autolinks, code
+/// spans, escapes, math, etc.). Dialect-specific behavior is selected
+/// inside `build_full_plans`.
 ///
 /// # Arguments
 /// * `text` - The inline text to parse
@@ -186,13 +186,14 @@ fn parse_inline_range_impl(
     let mut text_start = start;
 
     while pos < end {
-        // IR-driven dispatch (Phase 2): if the IR identified a Pandoc
-        // standalone construct starting here, emit it directly. Bypasses
-        // the dispatcher's ordered-try chain for `^[note]` and
-        // `<span>...</span>` under `Dialect::Pandoc`. The IR scan
-        // already gates these on `!is_commonmark` and the relevant
-        // extension flag, so this branch is empty under CommonMark
-        // dialect (where the legacy branches still run).
+        // IR-driven dispatch: if the IR identified a Pandoc standalone
+        // construct starting here, emit it directly. Bypasses the
+        // dispatcher's ordered-try chain for inline footnotes, native
+        // spans, footnote references, citations, and bracketed spans
+        // under `Dialect::Pandoc`. The IR scan gates these on
+        // `!is_commonmark` and the relevant extension flag, so this
+        // branch is empty under CommonMark dialect (where the legacy
+        // dispatcher branches still run when the extension is enabled).
         if let Some(dispo) = construct_plan.lookup(pos) {
             match *dispo {
                 ConstructDispo::InlineFootnote { end: dispo_end } => {
@@ -299,9 +300,9 @@ fn parse_inline_range_impl(
             }
         }
 
-        // IR-driven bracket dispatch (Phase 8): if the IR's
-        // `process_brackets` resolved a bracket pair starting at this
-        // position, emit it directly via the appropriate helper. The
+        // IR-driven bracket dispatch: if the IR's `process_brackets`
+        // resolved a bracket pair starting at this position, emit it
+        // directly via the appropriate helper. The
         // dispatcher's `try_parse_*` recognizers compute the actual
         // byte length and extract content / attributes; the IR's
         // `suffix_end` is used to constrain the dispatcher's match
@@ -666,10 +667,10 @@ fn parse_inline_range_impl(
             continue;
         }
 
-        // Try inline footnotes: ^[note]. Phase 2: under Pandoc
-        // dialect this is consumed via the IR's `ConstructPlan` at
-        // the top of the loop; the dispatcher branch only fires for
-        // CommonMark dialect with the extension explicitly enabled.
+        // Try inline footnotes: ^[note]. Under Pandoc dialect this is
+        // consumed via the IR's `ConstructPlan` at the top of the loop;
+        // this dispatcher branch only fires for CommonMark dialect with
+        // the extension explicitly enabled.
         if byte == b'^'
             && pos + 1 < text.len()
             && text.as_bytes()[pos + 1] == b'['
@@ -909,10 +910,10 @@ fn parse_inline_range_impl(
         }
 
         // Try native spans: <span>text</span> (after autolink since both
-        // start with <). Phase 2: under Pandoc dialect this is consumed
-        // via the IR's `ConstructPlan` at the top of the loop; the
-        // dispatcher branch only fires for CommonMark dialect with the
-        // extension explicitly enabled.
+        // start with <). Under Pandoc dialect this is consumed via the
+        // IR's `ConstructPlan` at the top of the loop; this dispatcher
+        // branch only fires for CommonMark dialect with the extension
+        // explicitly enabled.
         if byte == b'<'
             && config.dialect == Dialect::CommonMark
             && config.extensions.native_spans
@@ -945,14 +946,13 @@ fn parse_inline_range_impl(
             continue;
         }
 
-        // Bracket-starting elements (Phase 8): inline / reference
-        // links and images are dispatched via the IR-driven arm at
-        // the top of the loop, gated by the IR's `BracketPlan`. Only
-        // dialect-CM-specific Pandoc-extension constructs that share
-        // the `[...]` shape (footnote refs, bracketed citations) need
-        // a CM-gated dispatcher branch — under Pandoc dialect they
-        // were already moved to dedicated `Construct` events earlier
-        // in the migration (Phases 3-4).
+        // Bracket-starting elements: inline / reference links and
+        // images are dispatched via the IR-driven arm at the top of
+        // the loop, gated by the IR's `BracketPlan`. Only dialect-CM-
+        // specific Pandoc-extension constructs that share the `[...]`
+        // shape (footnote refs, bracketed citations) need a CM-gated
+        // dispatcher branch — under Pandoc dialect they're consumed
+        // via the IR's `ConstructPlan` instead.
         if byte == b'['
             && config.dialect == Dialect::CommonMark
             && config.extensions.footnotes
@@ -982,12 +982,11 @@ fn parse_inline_range_impl(
             continue;
         }
 
-        // Try bracketed spans: [text]{.class}
-        // Must come after links/citations.
-        // Phase 5: under Pandoc dialect this is consumed via the IR's
-        // `ConstructPlan` at the top of the loop; the dispatcher branch
-        // only fires for CommonMark dialect with the extension
-        // explicitly enabled.
+        // Try bracketed spans: [text]{.class}. Must come after
+        // links/citations. Under Pandoc dialect this is consumed via
+        // the IR's `ConstructPlan` at the top of the loop; this
+        // dispatcher branch only fires for CommonMark dialect with the
+        // extension explicitly enabled.
         if config.dialect == Dialect::CommonMark
             && byte == b'['
             && config.extensions.bracketed_spans
@@ -1004,8 +1003,8 @@ fn parse_inline_range_impl(
         }
 
         // Try bare citation: @cite (must come after bracketed elements).
-        // Phase 4: under Pandoc dialect this is consumed via the IR's
-        // `ConstructPlan` at the top of the loop; the dispatcher branch
+        // Under Pandoc dialect this is consumed via the IR's
+        // `ConstructPlan` at the top of the loop; this dispatcher branch
         // only fires for CommonMark dialect with the extension
         // explicitly enabled.
         if config.dialect == Dialect::CommonMark
@@ -1032,10 +1031,10 @@ fn parse_inline_range_impl(
             }
         }
 
-        // Try suppress-author citation: -@cite. Phase 4: under Pandoc
-        // dialect this is consumed via the IR's `ConstructPlan` at the
-        // top of the loop; the dispatcher branch only fires for
-        // CommonMark dialect with the extension explicitly enabled.
+        // Try suppress-author citation: -@cite. Under Pandoc dialect
+        // this is consumed via the IR's `ConstructPlan` at the top of
+        // the loop; this dispatcher branch only fires for CommonMark
+        // dialect with the extension explicitly enabled.
         if config.dialect == Dialect::CommonMark
             && byte == b'-'
             && pos + 1 < text.len()
