@@ -54,10 +54,9 @@ pub fn parse(input: &str, config: Option<ParserOptions>) -> SyntaxNode {
 ///
 /// Pandoc-markdown agrees on the document-scoped lookup rule: a
 /// `[foo][bar]` shape with no `[bar]: ...` definition is literal text.
-/// As of the Phase 1 IR migration, both dialects populate this set so
-/// the dispatcher's reference-link branch (under Pandoc) and the IR's
-/// `process_brackets` pass (under CommonMark) can consult it
-/// uniformly.
+/// Both dialects populate this set so the dispatcher's reference-link
+/// branch (under Pandoc) and the IR's `process_brackets` pass (under
+/// CommonMark) can consult it uniformly.
 ///
 /// Only populated when the caller hasn't already supplied one.
 fn populate_refdef_labels(input: &str, config: &mut ParserOptions) {

@@ -434,8 +434,8 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
         // before the generic autolink/raw-html branches so the open tag
         // doesn't get claimed as inline HTML. Span content is opaque to
         // the emphasis pass; emission consumes the event via the IR's
-        // `ConstructPlan` (Phase 2). Suppressed inside Pandoc
-        // bracket-shape link/image text.
+        // `ConstructPlan`. Suppressed inside Pandoc bracket-shape
+        // link/image text.
         if !is_commonmark
             && !in_pandoc_bracket
             && b == b'<'
@@ -513,8 +513,8 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
         // time so the emphasis pass treats it as opaque (delim runs
         // inside the label can't pair with delim runs outside) and the
         // emission walk dispatches it directly via the IR's
-        // `ConstructPlan` (Phase 3). Must come before the generic
-        // bracket-opaque scan so the dedicated kind wins.
+        // `ConstructPlan`. Must come before the generic bracket-opaque
+        // scan so the dedicated kind wins.
         if !is_commonmark
             && b == b'['
             && pos + 1 < end
@@ -538,8 +538,8 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
         // scan time so the emphasis pass treats it as opaque (delim
         // runs inside the citation can't pair with delim runs outside)
         // and the emission walk dispatches it directly via the IR's
-        // `ConstructPlan` (Phase 4). Must come before the generic
-        // bracket-opaque scan so the dedicated kind wins.
+        // `ConstructPlan`. Must come before the generic bracket-opaque
+        // scan so the dedicated kind wins.
         if !is_commonmark
             && b == b'['
             && exts.citations
@@ -559,9 +559,9 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
 
         // Pandoc-only: bare citation `@key` or `-@key`. Recognised at
         // scan time so the emission walk dispatches it directly via
-        // the IR's `ConstructPlan` (Phase 4). Bare citations don't
-        // contain emphasis-eligible content, so opacity is moot here
-        // — IR participation is only for dispatch consolidation.
+        // the IR's `ConstructPlan`. Bare citations don't contain
+        // emphasis-eligible content, so opacity is moot here — IR
+        // participation is only for dispatch consolidation.
         if !is_commonmark
             && (b == b'@' || (b == b'-' && pos + 1 < end && bytes[pos + 1] == b'@'))
             && (exts.citations || exts.quarto_crossrefs)
@@ -583,8 +583,8 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
         // at scan time so the emphasis pass treats it as opaque (delim
         // runs inside the span content can't pair with delim runs
         // outside) and the emission walk dispatches it directly via
-        // the IR's `ConstructPlan` (Phase 5). Must come before the
-        // generic bracket-opaque scan so the dedicated kind wins.
+        // the IR's `ConstructPlan`. Must come before the generic
+        // bracket-opaque scan so the dedicated kind wins.
         // `try_parse_bracketed_span` requires `]` to be immediately
         // followed by `{`, so this never shadows inline links
         // (`[text](url)`) or reference links (`[label][refdef]`) —

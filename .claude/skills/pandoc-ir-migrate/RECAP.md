@@ -11,7 +11,55 @@ what trap to avoid) are the load-bearing content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (xiv)
+## Latest session — 2026-04-30 (xv)
+
+**Workspace test count: 0 failing → 0 failing.** **Polish: residual
+Phase-N marker sweep.** Sub-targets #2/#3 from recap-(xiv). Greppped
+the parser source for "Phase [0-9]" and removed the IR-migration
+markers that recap-(xiii) missed: one in `parser.rs`'s
+`populate_refdef_labels` doc and five "Phase N" parentheticals in the
+opaque-construct scan branches in `inline_ir.rs::build_ir`. The
+"Phase 7.1" hits in `formatter/tables.rs` and the YAML/CommonMark-spec
+phases are unrelated and stay. clippy + fmt + full workspace test
+suite green.
+
+### Files in committable diff
+
+- `crates/panache-parser/src/parser.rs` (1 docstring tweak)
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs` (5
+  parenthetical phase tags dropped from comments at the
+  NativeSpan / FootnoteReference / BracketedCitation / BareCitation /
+  BracketedSpan opaque-construct scan branches in `build_ir`)
+- `.claude/skills/pandoc-ir-migrate/RECAP.md` (this entry).
+
+### Verification done
+
+- `cargo check --workspace`: clean.
+- `cargo test --workspace --no-fail-fast`: all green.
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`:
+  clean.
+- `cargo fmt -- --check`: clean.
+
+### Suggested next sub-targets, ranked
+
+1. **Bugs #1/#2: parser-as-source-of-truth path.** Out of scope for
+   this skill; multi-session parser-linter-LSP cross-cut. Carried
+   from recap-(xiv).
+2. **(Optional) Sweep `assets/`, `docs/`, and `.claude/rules/` for
+   stale IR-migration phase references.** Spot-check only — these are
+   the unsearched corners. Likely empty: `.claude/rules/parser.md`
+   already references migration *concepts* (TEXT-coalescence rule,
+   pandoc-native-as-reference) without phase numbers, which is the
+   intended end-state.
+
+### Don't redo / known traps
+
+All traps from recap-(i) through recap-(xiv) still apply. No new
+traps this session — the sweep was mechanical comment cleanup.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (xiv)
 
 **Workspace test count: 0 failing → 0 failing.** **Audit only — no
 code change.** Investigated sub-target #1 from recap-(xiii): "drop
