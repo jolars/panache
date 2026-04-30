@@ -12,7 +12,108 @@ content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (iv)
+## Latest session — 2026-04-30 (v)
+
+**Workspace test count: 0 failing → 0 failing.** **Phase 3 LANDED.**
+Footnote references (`[^id]`) now dispatched IR-first under
+`Dialect::Pandoc`; legacy dispatcher branch gated to
+`Dialect::CommonMark`. Conformance allowlist preserved; clippy + fmt
+clean. Diff is committable.
+
+### What landed this session
+
+1. **New `ConstructKind::FootnoteReference`** in `inline_ir.rs`.
+   `build_ir`'s `[^id]` recognition (previously folded into
+   `try_pandoc_bracket_opaque` and emitted as generic `PandocOpaque`)
+   now has a dedicated branch BEFORE the generic bracket-opaque scan.
+   Footnote-ref recognition was REMOVED from `try_pandoc_bracket_opaque`
+   to keep the dedicated kind authoritative.
+
+2. **New `ConstructDispo::FootnoteReference { end }`** alongside
+   `InlineFootnote` and `NativeSpan`. `build_construct_plan` extended
+   with one more match arm.
+
+3. **IR-driven dispatch branch** in `parse_inline_range_impl`: same
+   shape as Phase 2's `InlineFootnote` / `NativeSpan` branches.
+   Sanity-checks `pos + len == dispo_end`; falls through silently if
+   they disagree.
+
+4. **Dispatcher's legacy `[^id]` branch** gated on
+   `config.dialect == Dialect::CommonMark`. Under Pandoc the IR
+   drives; under CommonMark dialect with `extensions.footnotes`
+   override (rare), the legacy branch still fires.
+
+### Why this is "pure additive; no algorithm change"
+
+Same as Phase 2: `try_parse_footnote_reference` and
+`emit_footnote_reference` are unchanged; `build_ir` and the
+emission walk in `parse_inline_range_impl` are augmented with a
+new kind/dispo pair, but iteration logic for everything else is
+untouched. The IR's recorded `[^id]` range and the dispatcher's
+recomputed range must agree (both call `try_parse_footnote_reference`).
+
+### Files in committed-ready diff
+
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`:
+  +1 `ConstructKind` variant, +1 `ConstructDispo` variant, +20
+  lines for the `[^id]` branch in `build_ir`, +3 lines in
+  `build_construct_plan`, -5 lines (removed footnote-ref from
+  `try_pandoc_bracket_opaque`).
+- `crates/panache-parser/src/parser/inlines/core.rs`:
+  +15 lines for the `FootnoteReference` dispatch arm in the
+  IR-driven branch, +3 lines for the dialect gate on the legacy
+  branch.
+
+### Verification done
+
+- Workspace tests: 0 → 0 failing.
+- CommonMark conformance allowlist: green.
+- clippy + fmt: clean.
+- Manual probes:
+  - `See the note[^myref] for *details*.` → expected
+    FOOTNOTE_REFERENCE + EMPHASIS, no interaction.
+  - `*emph [^ref] still emph*` → outer EMPHASIS containing
+    FOOTNOTE_REFERENCE (opacity confirmed).
+  - `multiple refs: [^a] [^b] [^c] ok` → three FOOTNOTE_REFERENCE
+    nodes, all extracted.
+
+### Suggested next sub-targets, ranked
+
+Phase 3 is done. Logical next:
+
+1. **Phase 4** — `[@cite]` bracketed citations + bare `@cite`.
+   Currently `[@cite]` is recognised in `build_ir`'s
+   `try_pandoc_bracket_opaque` helper as generic `PandocOpaque`;
+   need to break it out into a dedicated kind. Bare `@cite`
+   (no brackets) is more involved — it needs a NEW recognition
+   branch in `build_ir` since it's not bracket-shaped. Mirror
+   Phase 3's pattern for the bracketed form first.
+2. Phases 5-7 in order. Phase 5 is the first phase that
+   *changes* `process_brackets` (for bracketed spans
+   `[text]{attrs}`).
+
+### Don't redo / known traps (carried forward + new)
+
+All Phase 1-2 traps still apply. Plus:
+
+- **NEW (Phase 3 pattern): when the dedicated kind takes over
+  recognition of a construct, also REMOVE that construct from
+  `try_pandoc_bracket_opaque`.** Otherwise the same bytes can be
+  matched by both branches; the dedicated branch fires first
+  (ordering in `build_ir`), but leaving the duplicate in
+  `try_pandoc_bracket_opaque` is dead code that future phases
+  might reactivate by accident. Removed `try_parse_footnote_reference`
+  call from the helper.
+
+### Files in current diff (committable)
+
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`
+- `crates/panache-parser/src/parser/inlines/core.rs`
+- `.claude/skills/pandoc-ir-migrate/RECAP.md`
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (iv)
 
 **Workspace test count: 0 failing → 0 failing.** **Phase 2 LANDED.**
 Inline footnotes (`^[note]`) and native spans (`<span>...</span>`)

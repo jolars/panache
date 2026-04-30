@@ -175,6 +175,11 @@ pub enum ConstructKind {
     /// walk via the IR's `ConstructPlan` (Phase 2). The dispatcher's
     /// legacy `<span>` branch is gated to CommonMark dialect only.
     NativeSpan,
+    /// Pandoc footnote reference `[^id]`. Recognised in `build_ir`
+    /// under `Dialect::Pandoc` and consumed by the emission walk via
+    /// the IR's `ConstructPlan` (Phase 3). The dispatcher's legacy
+    /// `[^id]` branch is gated to CommonMark dialect only.
+    FootnoteReference,
 }
 
 /// One matched fragment within a [`IrEvent::DelimRun`].
@@ -401,13 +406,39 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
             continue;
         }
 
+        // Pandoc-only: footnote reference `[^id]`. Recognised at scan
+        // time so the emphasis pass treats it as opaque (delim runs
+        // inside the label can't pair with delim runs outside) and the
+        // emission walk dispatches it directly via the IR's
+        // `ConstructPlan` (Phase 3). Must come before the generic
+        // bracket-opaque scan so the dedicated kind wins.
+        if !is_commonmark
+            && b == b'['
+            && pos + 1 < end
+            && bytes[pos + 1] == b'^'
+            && exts.footnotes
+            && let Some((len, _)) = try_parse_footnote_reference(&text[pos..])
+            && pos + len <= end
+        {
+            flush_text!();
+            events.push(IrEvent::Construct {
+                start: pos,
+                end: pos + len,
+                kind: ConstructKind::FootnoteReference,
+            });
+            pos += len;
+            text_run_start = pos;
+            continue;
+        }
+
         // Pandoc-only: bracket-shaped opaque constructs. Tries the
         // dispatcher's precedence order to identify the full byte range
         // of any bracket-shaped Pandoc construct (links, images,
-        // footnote refs, citations, bracketed spans), and emits them as
-        // a single `Construct` so the emphasis pass cannot pair across
-        // their boundaries. Emission re-parses each construct through
-        // the dispatcher's existing `try_parse_*` chain.
+        // citations, bracketed spans), and emits them as a single
+        // `Construct` so the emphasis pass cannot pair across their
+        // boundaries. Emission re-parses each construct through the
+        // dispatcher's existing `try_parse_*` chain. Footnote refs
+        // (`[^id]`) are handled by the dedicated branch above.
         if !is_commonmark
             && (b == b'[' || (b == b'!' && pos + 1 < end && bytes[pos + 1] == b'['))
             && let Some(len) = try_pandoc_bracket_opaque(text, pos, end, config)
@@ -721,14 +752,9 @@ fn try_pandoc_bracket_opaque(
         return None;
     }
 
-    // `[...]` openers — try in dispatcher order. Footnote ref first
-    // because `[^id]` is a unique two-byte opener.
-    if exts.footnotes
-        && let Some((len, _)) = try_parse_footnote_reference(&text[pos..])
-        && pos + len <= end
-    {
-        return Some(len);
-    }
+    // `[...]` openers — try in dispatcher order. Footnote refs
+    // (`[^id]`) are handled by a dedicated branch in `build_ir` and
+    // do not appear here.
     if exts.inline_links
         && let Some((len, _, _, _)) = try_parse_inline_link(&text[pos..], false, ctx)
         && pos + len <= end
@@ -1942,6 +1968,9 @@ pub enum ConstructDispo {
     /// `<span ...>...</span>` — emit via `emit_native_span` after
     /// re-parsing the open-tag attributes from the source range.
     NativeSpan { end: usize },
+    /// `[^id]` — emit via `emit_footnote_reference` after extracting
+    /// the label id from the source range.
+    FootnoteReference { end: usize },
 }
 
 /// A byte-keyed view of the IR's standalone Pandoc constructs that the
@@ -1977,6 +2006,9 @@ pub fn build_construct_plan(events: &[IrEvent]) -> ConstructPlan {
                 }
                 ConstructKind::NativeSpan => {
                     by_pos.insert(*start, ConstructDispo::NativeSpan { end: *end });
+                }
+                ConstructKind::FootnoteReference => {
+                    by_pos.insert(*start, ConstructDispo::FootnoteReference { end: *end });
                 }
                 _ => {}
             }

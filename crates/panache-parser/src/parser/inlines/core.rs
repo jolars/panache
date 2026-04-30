@@ -1625,6 +1625,21 @@ fn parse_inline_range_impl(
                         continue;
                     }
                 }
+                ConstructDispo::FootnoteReference { end: dispo_end } => {
+                    if dispo_end <= end
+                        && let Some((len, id)) = try_parse_footnote_reference(&text[pos..])
+                        && pos + len == dispo_end
+                    {
+                        if pos > text_start {
+                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                        }
+                        log::trace!("IR: matched footnote reference at pos {}", pos);
+                        emit_footnote_reference(builder, &id);
+                        pos += len;
+                        text_start = pos;
+                        continue;
+                    }
+                }
             }
         }
 
@@ -2232,8 +2247,12 @@ fn parse_inline_range_impl(
 
         // Process bracket-starting elements
         if byte == b'[' {
-            // Try footnote reference: [^id]
-            if config.extensions.footnotes
+            // Try footnote reference: [^id]. Phase 3: under Pandoc
+            // dialect this is consumed via the IR's `ConstructPlan` at
+            // the top of the loop; the dispatcher branch only fires for
+            // CommonMark dialect with the extension explicitly enabled.
+            if config.dialect == Dialect::CommonMark
+                && config.extensions.footnotes
                 && let Some((len, id)) = try_parse_footnote_reference(&text[pos..])
             {
                 if pos > text_start {
