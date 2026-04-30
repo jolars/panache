@@ -27,6 +27,23 @@ Parser and syntax changes must preserve lossless CST behavior.
   ```
   If the outputs differ, land paired parser fixtures (one per dialect) under
   `tests/fixtures/cases/` with `parser-options.toml` pinning the flavor.
+- Pandoc-native (`pandoc -f markdown -t native`) is the **behavioral
+  reference** for Pandoc-dialect parsing changes, not the legacy parser's
+  current output. The legacy recursive-descent paths (e.g.
+  `try_parse_emphasis` and the `delimiter_stack` module) approximate
+  pandoc but have their own quirks; an existing fixture matching the
+  legacy output is NOT a guarantee of correctness. When the parser
+  output, an existing fixture, and pandoc-native disagree, fix toward
+  pandoc-native and update the fixture — don't preserve a legacy bug.
+- **TEXT-token coalescence diffs are benign.** Two CSTs that differ only
+  in whether a TEXT span is split (`TEXT@0..5 "foo" + TEXT@5..6 "*"`)
+  versus coalesced (`TEXT@0..6 "foo*"`) over the same byte range and
+  with no structural-element (Strong/Emph/Link/Image/etc.) differences
+  are equivalent. Pandoc-native doesn't pin TEXT-token granularity, so
+  these are not regressions; update the snapshot. **Structural diffs**
+  (presence, absence, or changed nesting of typed wrapper nodes) DO
+  require pandoc-native verification before accepting — those are the
+  cases where dialect-divergence rules and fixture preservation matter.
 - Preserve all structural markers and whitespace in CST nodes/tokens.
 - Do not move formatter policy into parser code.
 - Keep parser single-pass assumptions intact (block parsing with inline emission

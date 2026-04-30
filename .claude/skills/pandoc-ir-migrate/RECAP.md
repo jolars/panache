@@ -1,0 +1,355 @@
+# Pandoc IR migration — running session recap
+
+This file is the rolling, terse handoff between sessions of the
+`pandoc-ir-migrate` skill. Read it at the start of a session for
+suggested next sub-targets and known traps; rewrite the **Latest
+session** entry at the end with what changed and what to look at next.
+
+Keep entries short. Test counts + a one-line root cause beat a
+narrative. The hard-won judgment calls (why a lever was chosen, why an
+approach was reverted, what trap to avoid) are the load-bearing
+content here.
+
+--------------------------------------------------------------------------------
+
+## Latest session — 2026-04-30 (ii)
+
+**Workspace test count: 12 failing → 6 failing (uncommitted).**
+**Phase 1 still partial — uncommitted; remaining 6 all cluster on
+scoped-emphasis-on-strong-matched-inner-range (the keystone refactor).
+Do NOT commit until that lands or the remaining tests are
+deferred-with-fixture-update per the skill's protocol.** Pre-Phase-1
+baseline (origin/main = `33a88e89`) is 0 failures, so this diff still
+regresses main.
+
+### What landed this session (on top of session-(i)'s WIP)
+
+- **8 TEXT-coalescence parser-CST snapshot updates** accepted manually
+  (no `cargo-insta` available; renamed `.snap.new` → `.snap` and
+  stripped `assertion_line:` metadata lines). Verified each diff has
+  zero non-TEXT structural lines via
+  `diff <snap> <snap.new> | grep -v 'TEXT@' | grep -v assertion_line`.
+  Files:
+  - `parser_cst_emphasis`
+  - `parser_cst_emphasis_intraword_underscore_closer`
+  - `parser_cst_emphasis_nested_inlines` (recap-(i) was right to suggest
+    re-categorizing — pure TEXT-coalescence after the cascade
+    refinement)
+  - `parser_cst_emphasis_same_delim_nested_pandoc`
+  - `parser_cst_emphasis_skips_shortcut_reference_link`
+  - `parser_cst_emphasis_split_runs_pandoc`
+  - `parser_cst_equation_attributes_disabled`
+  - `parser_cst_reference_definition_label_with_escaped_bracket`
+- **Formatter intraword-underscore fix** at
+  `crates/panache-formatter/src/formatter/inline_layout.rs:60-70`. The
+  TEXT-coalescence improvement broke the formatter's escape logic:
+  `escape_special_chars` only treated `_` as intraword when at the
+  start or end of a TEXT chunk. With coalesced TEXT
+  (`TEXT "quarto_crossrefs"` instead of three separate nodes), the
+  `_` is mid-chunk and was being escaped to `\_` despite being
+  between two alphanumerics. Added `intraword_mid` branch:
+  `_` between two `is_alphanumeric()` chars in the same text run is
+  treated as intraword and not escaped. Fixes
+  `equation_attributes_disabled` formatter test.
+
+### What remains uncommitted
+
+Phase 0 + Phase 1 algorithm changes (still as in session-(i)):
+
+- `crates/panache-parser/src/parser.rs` (`populate_refdef_labels`
+  widened to both dialects)
+- `crates/panache-parser/src/parser/inlines/core.rs` (dispatcher fork
+  removed; `parse_inline_range` marked `#[allow(dead_code)]`)
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs` (~488 lines
+  of dialect gates, opaque scan, cascade rule)
+- `.claude/rules/parser.md` (TEXT-coalescence rule paragraph added)
+
+This session's additions:
+
+- 8 modified `.snap` files (TEXT-coalescence updates, listed above)
+- `crates/panache-formatter/src/formatter/inline_layout.rs`
+  (`intraword_mid` fix, ~10 lines)
+- 1 leftover `parser_cst_emphasis_complex.snap.new` (kept as a working
+  artifact for the structural-regression case; do not accept until
+  scoped-emphasis lands)
+
+### Remaining 6 failures (all scoped-emphasis-bucket)
+
+| Test | File | Notes |
+| --- | --- | --- |
+| `emphasis_complex` | `tests/golden_cases.rs` | Formatter-side; cascades from parser |
+| `emphasis_complex` | `crates/panache-parser/tests/golden_parser_cases.rs` | 4 specific input lines diverge structurally |
+| `overlapping_emphasis_strong` | `crates/panache-parser/tests/emphasis_parser.rs` | `*foo **bar* baz**` → expects STRONG[bar* baz] |
+| `test_deeply_nested_emphasis` | `crates/panache-parser/src/parser/inlines/tests.rs:1485` | `**foo *bar **nested** baz* qux**` |
+| `test_triple_emphasis_pandoc_structure` | `tests.rs:1406` | `***foo **bar** baz***` → outer EM + 2 STRONG |
+| `test_triple_emphasis_with_nested_strong` | `tests.rs:1254` | Same input as above; structural assertions |
+
+### Trap discovered this session
+
+- **TEXT-coalescence in the parser cascades into formatter escape-logic
+  bugs.** The formatter's `escape_special_chars` made assumptions
+  about TEXT-token granularity (intraword `_` detection only at
+  chunk start/end). When coalescing the parser CST, audit *every*
+  formatter-side place that branches on TEXT boundaries — there may
+  be more such bugs latent. The fix landed in
+  `inline_layout.rs:60-70` is the canonical pattern: detect intraword
+  by checking actual neighboring chars in the text run, not by
+  positional heuristics.
+
+### Refining the proposed scoped-emphasis approach
+
+Initial recap-(i) proposal: "strong-only pass first, then scoped
+emphasis on each strong pair's inner range." This DOES NOT cleanly
+solve `***foo **bar** baz***` (pandoc-native: `Emph[Strong[foo,
+" "], "bar", Strong[" ", baz]]`). Reason: the outer `***...***`
+matches via Pandoc's "consume 1 first" rule (EM outermost,
+`***`-as-`*` + `**`), and the leftover `**`s on each side then
+match independently with `**bar**`'s `**`s. A pure strong-only-first
+pass would greedily pair `**foo `'s `**` with `**bar`'s closing
+`**` (left-to-right closer walk, both eligible), preventing the
+correct `***...***` outer match.
+
+The right algorithm is closer to **mutual scoped recursion**:
+when the outer `***...***` matches with consume=1 (EM), recursively
+process emphasis on the inner range with separate state, including
+the leftover `**`s from the outer's opener/closer as additional
+runs. This is materially harder than the bracket scoped pass and
+needs careful design — start the next session by sketching the
+algorithm on paper before editing.
+
+### Suggested next sub-targets, ranked
+
+1. **Scoped emphasis pass design session** — read pandoc's
+   `Text.Pandoc.Readers.Markdown.handleEmph` (or equivalent
+   recursive-descent code) for the canonical algorithm, then
+   sketch the IR-friendly translation. Don't start coding until
+   the algorithm handles all 4 of: `***foo **bar** baz***`,
+   `**foo *bar **nested** baz* qux**`, `*foo **bar* baz**`, and
+   `**foo *bar* baz**` on paper.
+2. **Implement scoped emphasis** in `build_full_plans`. Rough size:
+   80-150 lines added, similar shape to the existing bracket scoped
+   pass (`inline_ir.rs:1714-1746`).
+3. **Audit other formatter escape-logic call sites** for TEXT-
+   coalescence-driven bugs — likely candidates: `*` escape (similar
+   pattern), maybe `[`/`]` near footnote refs.
+4. **Phases 2-7** — gated on Phase 1 finishing clean.
+
+### Don't redo / known traps (carried forward)
+
+- **Don't try "two-pass + un-remove-between" for scoped emphasis.**
+  See SKILL.md "Trap: two-pass + un-remove-between breaks pair
+  crossing".
+- **Don't widen the cascade rule to `can_open || can_close`.** Must
+  be `&&`. (Recap-(i).)
+- **Don't tighten `pandoc_reject` to require strict count equality.**
+  Rejects legitimate (1,3)/(3,1)/(2,3)/(3,2) which pandoc DOES match.
+- **Don't add `can_open = false for count >= 4`.** Breaks
+  `**foo****bar**`.
+- **Don't preserve a legacy-fixture output that conflicts with
+  pandoc-native.** Verify with `pandoc -f markdown -t native`.
+- **Math opacity in `build_ir` is non-negotiable for losslessness.**
+- **`populate_refdef_labels` MUST be widened to Pandoc.**
+- **TEXT-coalescence improvements may regress formatter tests via
+  escape-logic.** Check `escape_special_chars` and similar.
+
+### Files in current uncommitted diff
+
+Same as session-(i)'s + 8 .snap updates + intraword_mid fix:
+
+- `.claude/rules/parser.md`
+- `crates/panache-parser/src/parser.rs`
+- `crates/panache-parser/src/parser/inlines/core.rs`
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`
+- `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_*.snap` (8 files)
+- `crates/panache-formatter/src/formatter/inline_layout.rs`
+- `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_emphasis_complex.snap.new` (untracked, intentional)
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (i)
+
+**Workspace test count: 0 failing → 15 failing (+15, uncommitted).**
+**Phase 0 LANDED clean and committed-ready.** **Phase 1 partial — diff
+is uncommitted; do NOT commit until the remaining 15 regressions are
+resolved or deferred-with-fixture-update per the skill's protocol.**
+
+### Phase 0 — Thread `Dialect` through `inline_ir`
+
+- Status: **complete, clean**.
+- Diff: +21 / -9 in `crates/panache-parser/src/parser/inlines/inline_ir.rs`
+  only.
+- Changed `compute_flanking`, `process_emphasis`,
+  `process_emphasis_in_range`, `process_emphasis_in_range_filtered`
+  to accept `Dialect`. All branch points stubbed; no behavior change.
+- Validation: workspace tests, clippy, fmt all green; CommonMark
+  conformance unchanged.
+
+### Phase 1 — Pandoc emphasis on the IR (PARTIAL)
+
+What landed and works:
+
+- **Pandoc opaque-construct scan in `build_ir`** under `!is_commonmark`:
+  inline links, reference links, `[^id]`, `[@cite]`, `[text]{attrs}`,
+  `^[note]`, `<span>...</span>`, `$math$` and other tex-math forms all
+  emit `ConstructKind::PandocOpaque`. **Math opacity is load-bearing
+  for losslessness** — without it, the IR pairs emphasis across `$a *
+  b$` and the dispatcher's later math parse re-claims the bytes,
+  producing `+9 byte` losslessness failures.
+- **`build_full_plans` skips `process_brackets` under Pandoc.**
+  Bracket plan stays empty; dispatcher's bracket branches keep firing.
+  `parse_inline_text_recursive` / `parse_inline_text` always call
+  `build_full_plans` (dispatcher fork dropped) but pass
+  `bracket_plan = None` under Pandoc.
+- **Dialect gates active**:
+  - `compute_flanking` Pandoc branch: `can_open = !followed_by_ws`,
+    `can_close = true` always (Pandoc's `ender` has no flanking gate),
+    intraword underscore hard-rule on top.
+  - `pandoc_reject` opener-finder gate: rejects (1,2), (2,1), and
+    `count_o >= 4`.
+  - Mod-3 rejection gated on `is_commonmark`.
+  - Triple-emph nesting flip: under Pandoc, `count_o >= 3 &&
+    count_c >= 3` consumes 1 first → STRONG(EM) for `***x***`.
+- **`pandoc_cascade_invalidate` post-pass**: invalidates pairs
+  containing unmatched same-ch runs with `can_open && can_close`.
+  Iterates to fixed point. **The `&&` is load-bearing** — `||`
+  over-invalidates intraword `_` cases.
+- **`populate_refdef_labels` widened** to both dialects in
+  `parser.rs`.
+
+What's deferred (the 15 remaining workspace failures):
+
+- 2 in `tests/golden_cases.rs` (top-level formatter):
+  `equation_attributes_disabled`, `emphasis_complex`.
+- 1 in `tests/emphasis_parser.rs`: `overlapping_emphasis_strong`
+  (`*foo **bar* baz**`).
+- 3 in lib `complex_emphasis_tests`: `test_deeply_nested_emphasis`,
+  `test_triple_emphasis_pandoc_structure`,
+  `test_triple_emphasis_with_nested_strong`.
+- 9 in `tests/golden_parser_cases.rs`. Of these:
+  - **7 are TEXT-coalescence only** (verified by
+    `grep -E "^[<>] +(STRONG|EMPHASIS)"` on each diff). Safe to
+    snapshot-update after pandoc-native confirms structural
+    equivalence — this was the planned next step but session ended
+    before completion.
+  - **2 have residual structural divergences**: `emphasis_complex`
+    (4 specific cases inside the fixture) and `emphasis_nested_inlines`
+    (TEXT-coalescence only after the latest cascade refinement —
+    re-categorize next session).
+
+### Algorithmic divergences still needing work
+
+All cluster on **scoped-emphasis-on-strong-matched-inner-range**:
+
+- `**foo *bar* baz**` → Pandoc: STRONG[foo, EM[bar], baz]. IR currently:
+  STRONG[...] with EM lost (between-removal eats the inner runs).
+- `*foo **bar* baz**` → Pandoc: `*foo` literal + STRONG[bar* baz]. IR
+  currently: all literal (cascade invalidates greedy outer emph).
+- `***foo **bar** baz***` → Pandoc: EM[STRONG[foo], "bar", STRONG[baz]].
+  IR currently: simpler / different nesting.
+- `**foo *bar **nested** baz* qux**` → Pandoc:
+  STRONG[foo, EM[bar STRONG[nested] baz], qux]. IR currently: all
+  literal.
+
+The structural fix is **scoped emphasis passes after pass-1 strong
+matches**, mirroring the existing CommonMark bracket scoped pass at
+`inline_ir.rs:1247-1306`. Implementation outline:
+
+1. In `build_full_plans` under Pandoc, run a strong-only emphasis
+   pass first (a new entry point that filters openers to count >= 2
+   AND closers to count >= 2).
+2. Collect resolved strong pairs.
+3. For each pair, run `process_emphasis_in_range_filtered` over the
+   inner event range with **separate state arrays** (count,
+   source_start, removed) — NOT shared with the outer pass.
+4. Run a final top-level emphasis pass with an exclusion bitmap on
+   strong-matched inner ranges (analogous to the CommonMark bracket
+   exclusion bitmap at `inline_ir.rs:1284-1289`).
+
+### Don't redo / known traps
+
+- **Don't try "two-pass + un-remove-between" for scoped emphasis.**
+  An obvious-looking shortcut: pass 1 matches strong (closers
+  count >= 2), apply between-removal as usual, then between passes
+  un-remove the inner events so pass 2 can match nested emph. This
+  was attempted and reverted because it **breaks the pair-crossing
+  invariant** — pass 2 emph matches the un-removed inner opener
+  with an opener whose strong partner is INSIDE the emph's range,
+  producing crossing markers that emit invalid CST. The
+  state-separation in scoped passes is the crucial bit; reusing
+  the outer pass's state is what causes the crossing. See SKILL.md
+  "Trap: two-pass + un-remove-between breaks pair crossing".
+- **Don't widen the cascade rule to `can_open || can_close`.** Tested;
+  over-invalidates intraword `_` (e.g. `_foo_bar_baz_`). The `&&`
+  version is the verified-correct rule.
+- **Don't tighten `pandoc_reject` to require strict count equality**
+  (i.e., reject all `count_o != count_c` matches). Tested; rejects
+  legitimate (1,3), (3,1), (2,3), (3,2) cases that pandoc DOES match.
+  The current rule (`(1,2) || (2,1) || count_o >= 4`) is the
+  verified-correct shape.
+- **Don't add `can_open = false for count >= 4`.** Tested; breaks
+  `**foo****bar**` which pandoc parses as STRONG[foo, bar] (the
+  middle `****` splits naturally via consume rule).
+- **Don't preserve a legacy-fixture output when it conflicts with
+  `pandoc -f markdown -t native`.** The legacy
+  `try_parse_emphasis` path is not the migration's reference. It
+  approximates pandoc but has its own quirks. See SKILL.md
+  "Pandoc vs legacy fixture trap".
+- **Math opacity is non-negotiable for losslessness.** If you remove
+  the `try_pandoc_math_opaque` call from `build_ir`, the parser
+  crate test `emphasis_nested_inlines` fails with `+9 bytes` (the
+  IR pairs emph across `$math$` and the dispatcher's math parse
+  re-emits the math content).
+- **`populate_refdef_labels` MUST be widened to Pandoc.** Without
+  this, reference-link recognition under Pandoc would diverge from
+  pandoc-native (which DOES require the refdef to exist for `[foo][bar]`
+  to be a link).
+
+### Suggested next sub-targets, ranked
+
+1. **TEXT-coalescence snapshot updates** — quick win. Verify each
+   diff in the 7 TEXT-coalescence-only fixtures against pandoc-native
+   (structural shape unchanged), then run `cargo insta review` and
+   accept. Reduces the failing-test count from 15 to ~8 with zero
+   algorithm risk. Fixtures:
+   - `emphasis_intraword_underscore_closer`
+   - `emphasis_split_runs_pandoc`
+   - `emphasis_same_delim_nested_pandoc`
+   - `emphasis_skips_shortcut_reference_link`
+   - `equation_attributes_disabled`
+   - `reference_definition_label_with_escaped_bracket`
+   - `emphasis` (just the "This is _ not emphasized _" line)
+
+2. **Scoped emphasis passes** — the structural fix for the remaining
+   ~8 algorithmic regressions. Outline above. This is the keystone
+   work for finishing Phase 1; estimated 1-2 sessions because the
+   algorithm refactor is non-trivial and each test case needs
+   pandoc-native verification.
+
+3. **Top-level golden_cases regressions** — `equation_attributes_disabled`
+   and `emphasis_complex` (formatter side). Likely re-pass once
+   parser-side TEXT-coalescence updates land; verify after #1.
+
+4. **Phases 2-7** — gated on Phase 1 finishing clean. Don't start
+   them while Phase 1 has uncommitted regressions.
+
+### Carry-forward
+
+(First session of this skill — nothing to carry forward yet.)
+
+### Files in current uncommitted diff
+
+- `crates/panache-parser/src/parser.rs` — `populate_refdef_labels`
+  widened.
+- `crates/panache-parser/src/parser/inlines/core.rs` —
+  `parse_inline_text_recursive` / `parse_inline_text` dispatcher
+  fork removed; `parse_inline_range` marked `#[allow(dead_code)]`
+  for Phase 7 cleanup.
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs` — all
+  the dialect gates, opaque-construct scan, cascade rule. Bulk of
+  the diff (~488 lines added / 60 lines deleted).
+
+### Initial migration plan (historical reference)
+
+`/home/jola/.claude/plans/let-s-create-a-plan-noble-barto.md` — the
+8-phase plan written at the start of the migration. Treat as
+historical; the recap supersedes it for current state.
