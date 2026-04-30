@@ -32,13 +32,11 @@
 #  - 490: URL cannot span lines
 #  - 493: angle-bracketed URL rejects `\>` escapes
 #  - 508: title cannot contain unescaped same-quote char
-#  - 523: emphasis run inside a link's bracketed text must close before `]`
 #  - 546: link label rejects an unescaped `[` inside it
 488
 490
 493
 508
-523
 546
 
 # Autolink validator accepts strings that aren't valid URI / email autolinks:

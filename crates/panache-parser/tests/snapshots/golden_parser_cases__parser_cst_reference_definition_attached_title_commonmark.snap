@@ -4,13 +4,7 @@ expression: cst_output
 ---
 DOCUMENT@0..25
   PARAGRAPH@0..18
-    LINK@0..5
-      LINK_START@0..1
-        LINK_START@0..1 "["
-      LINK_TEXT@1..4
-        TEXT@1..4 "foo"
-      TEXT@4..5 "]"
-    TEXT@5..7 ": "
+    TEXT@0..7 "[foo]: "
     INLINE_HTML@7..12
       INLINE_HTML_CONTENT@7..12 "<bar>"
     TEXT@12..17 "(baz)"
@@ -18,10 +12,5 @@ DOCUMENT@0..25
   BLANK_LINE@18..19
     BLANK_LINE@18..19 "\n"
   PARAGRAPH@19..25
-    LINK@19..24
-      LINK_START@19..20
-        LINK_START@19..20 "["
-      LINK_TEXT@20..23
-        TEXT@20..23 "foo"
-      TEXT@23..24 "]"
+    TEXT@19..24 "[foo]"
     NEWLINE@24..25 "\n"

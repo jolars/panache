@@ -22,6 +22,8 @@
     pkgs.hyperfine
     pkgs.quartoMinimal
     pkgs.air-formatter
+    pkgs.cargo-show-asm
+    pkgs.samply
     pkgs.ruff
     pkgs.shfmt
     pkgs.wasm-pack

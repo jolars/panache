@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 /// The flavor of Markdown to parse and format.
 /// Each flavor has a different set of default extensions enabled.
@@ -774,6 +775,18 @@ pub struct ParserOptions {
     pub extensions: Extensions,
     /// Compatibility target for ambiguous Pandoc behavior.
     pub pandoc_compat: PandocCompat,
+    /// Document-level reference link label set, populated by the
+    /// top-level `parse()` function when running CommonMark dialect and
+    /// consulted by inline parsing's bracket resolution pass. `None`
+    /// means "not pre-computed"; the inline pipeline then treats every
+    /// reference-shaped bracket pair conservatively (current behavior),
+    /// which is correct for the Pandoc dialect and a graceful
+    /// degradation for embedded use cases that bypass `parse()`.
+    ///
+    /// Skipped by serde so config files don't try to (de)serialize a
+    /// runtime cache.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub refdef_labels: Option<Arc<HashSet<String>>>,
 }
 
 impl Default for ParserOptions {
@@ -784,6 +797,7 @@ impl Default for ParserOptions {
             dialect: Dialect::for_flavor(flavor),
             extensions: Extensions::for_flavor(flavor),
             pandoc_compat: PandocCompat::default(),
+            refdef_labels: None,
         }
     }
 }

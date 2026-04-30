@@ -26,6 +26,30 @@ use rowan::GreenNodeBuilder;
 
 use super::delimiter_stack::{self, DelimChar, EmphasisKind, EmphasisPlan};
 
+/// CommonMark dialect bracket-resolution helper. Wraps
+/// `delimiter_stack::reference_resolves` with the
+/// `is_commonmark` flag pre-derived from `config`.
+///
+/// The emission walk uses this to gate `try_parse_reference_*` /
+/// `try_parse_inline_*` matches: under CommonMark dialect a
+/// reference-shaped bracket pair only counts as a link if its
+/// (normalised) label resolves to a definition in the document refdef
+/// map. This keeps emission in sync with the refdef-aware emphasis
+/// scanner in `delimiter_stack::scan_delim_runs`, so unresolved
+/// brackets fall through to literal text and the inner emphasis bytes
+/// they were previously hiding stay visible to the emphasis pass.
+/// Spec example #523 is the canonical case.
+fn reference_resolves(
+    config: &ParserOptions,
+    link_text: &str,
+    label: &str,
+    is_shortcut: bool,
+) -> bool {
+    let is_commonmark = config.dialect == Dialect::CommonMark;
+    delimiter_stack::reference_resolves(is_commonmark, link_text, label, is_shortcut, config)
+}
+use super::inline_ir::BracketPlan;
+
 // Import inline element parsers from sibling modules
 use super::bookdown::{
     try_parse_bookdown_definition, try_parse_bookdown_reference, try_parse_bookdown_text_reference,
@@ -105,6 +129,7 @@ pub fn parse_inline_text_recursive(
             false,
             false,
             Some(&plan),
+            None,
         );
     } else {
         parse_inline_range(text, 0, text.len(), config, builder);
@@ -144,9 +169,20 @@ pub fn parse_inline_text(
             false,
             true,
             Some(&plan),
+            None,
         );
     } else {
-        parse_inline_range_impl(text, 0, text.len(), config, builder, false, true, None);
+        parse_inline_range_impl(
+            text,
+            0,
+            text.len(),
+            config,
+            builder,
+            false,
+            true,
+            None,
+            None,
+        );
     }
 }
 
@@ -1478,7 +1514,7 @@ fn parse_inline_range(
     config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) {
-    parse_inline_range_impl(text, start, end, config, builder, false, false, None)
+    parse_inline_range_impl(text, start, end, config, builder, false, false, None, None)
 }
 
 /// Same as `parse_inline_range` but bypasses opener validity checks for emphasis.
@@ -1490,7 +1526,7 @@ fn parse_inline_range_nested(
     config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) {
-    parse_inline_range_impl(text, start, end, config, builder, true, false, None)
+    parse_inline_range_impl(text, start, end, config, builder, true, false, None, None)
 }
 
 fn is_emoji_boundary(text: &str, pos: usize) -> bool {
@@ -1525,6 +1561,7 @@ fn parse_inline_range_impl(
     nested_emphasis: bool,
     nested_in_link: bool,
     plan: Option<&EmphasisPlan>,
+    bracket_plan: Option<&BracketPlan>,
 ) {
     log::trace!(
         "parse_inline_range: start={}, end={}, text={:?}",
@@ -2056,11 +2093,18 @@ fn parse_inline_range_impl(
             continue;
         }
 
+        // Bracket-plan consultation reserved for a future IR-based
+        // emission migration; presently the bracket_plan parameter is
+        // always `None` and the existing emission below handles
+        // `[` / `![` / `]` directly.
+        let _ = bracket_plan;
+
         // Images and links - process in order: inline image, reference image, footnote ref, inline link, reference link
         if byte == b'!' && pos + 1 < text.len() && text.as_bytes()[pos + 1] == b'[' {
             // Try inline image: ![alt](url)
             if let Some((len, alt_text, dest, attributes)) =
                 try_parse_inline_image(&text[pos..], LinkScanContext::from_options(config))
+                && pos + len <= end
             {
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
@@ -2079,17 +2123,27 @@ fn parse_inline_range_impl(
                 continue;
             }
 
-            // Try reference image: ![alt][ref] or ![alt]
+            // Try reference image: ![alt][ref] or ![alt]. Under CommonMark
+            // dialect this branch is gated on the document refdef map: a
+            // bracket-shaped pair without a resolving label is not a link
+            // and must fall through to literal text so emphasis processing
+            // (which already saw it as transparent via the IR-aware
+            // `scan_delim_runs`) and the emission stay in sync. See spec
+            // example #523. The Pandoc dialect keeps the historical
+            // shape-only behavior because its renderer / formatter has
+            // its own resolution path.
             if config.extensions.reference_links {
                 let allow_shortcut = config.extensions.shortcut_reference_links;
-                if let Some((len, alt_text, reference, is_implicit)) =
+                if let Some((len, alt_text, reference, is_shortcut)) =
                     try_parse_reference_image(&text[pos..], allow_shortcut)
+                    && pos + len <= end
+                    && reference_resolves(config, alt_text, &reference, is_shortcut)
                 {
                     if pos > text_start {
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
                     log::trace!("Matched reference image at pos {}", pos);
-                    emit_reference_image(builder, alt_text, &reference, is_implicit, config);
+                    emit_reference_image(builder, alt_text, &reference, is_shortcut, config);
                     pos += len;
                     text_start = pos;
                     continue;
@@ -2120,6 +2174,7 @@ fn parse_inline_range_impl(
                     config.dialect == crate::options::Dialect::CommonMark,
                     LinkScanContext::from_options(config),
                 )
+                && pos + len <= end
             {
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
@@ -2138,20 +2193,24 @@ fn parse_inline_range_impl(
                 continue;
             }
 
-            // Try reference link: [text][ref] or [text]
+            // Try reference link: [text][ref] or [text]. Refdef-aware under
+            // CommonMark dialect — see the matching reference-image branch
+            // above for the rationale.
             if config.extensions.reference_links {
                 let allow_shortcut = config.extensions.shortcut_reference_links;
-                if let Some((len, link_text, reference, is_implicit)) = try_parse_reference_link(
+                if let Some((len, link_text, reference, is_shortcut)) = try_parse_reference_link(
                     &text[pos..],
                     allow_shortcut,
                     config.extensions.inline_links,
                     LinkScanContext::from_options(config),
-                ) {
+                ) && pos + len <= end
+                    && reference_resolves(config, link_text, &reference, is_shortcut)
+                {
                     if pos > text_start {
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
                     log::trace!("Matched reference link at pos {}", pos);
-                    emit_reference_link(builder, link_text, &reference, is_implicit, config);
+                    emit_reference_link(builder, link_text, &reference, is_shortcut, config);
                     pos += len;
                     text_start = pos;
                     continue;
@@ -2275,6 +2334,7 @@ fn parse_inline_range_impl(
                             nested_emphasis,
                             nested_in_link,
                             plan,
+                            bracket_plan,
                         );
                         builder.token(marker_kind.into(), &text[partner..partner + partner_len]);
                         builder.finish_node();

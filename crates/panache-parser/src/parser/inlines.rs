@@ -26,6 +26,8 @@ pub mod inline_executable;
 pub mod inline_footnotes;
 #[path = "inlines/inline_html.rs"]
 pub mod inline_html;
+#[path = "inlines/inline_ir.rs"]
+pub mod inline_ir;
 #[path = "inlines/latex.rs"]
 pub mod latex;
 #[path = "inlines/links.rs"]
@@ -38,6 +40,8 @@ pub mod math;
 pub mod native_spans;
 #[path = "inlines/raw_inline.rs"]
 pub mod raw_inline;
+#[path = "inlines/refdef_map.rs"]
+pub mod refdef_map;
 #[path = "inlines/shortcodes.rs"]
 pub mod shortcodes;
 #[path = "inlines/strikeout.rs"]

@@ -3,7 +3,7 @@
 //! This module implements a single-pass parser that constructs a lossless syntax tree (CST) for
 //! Quarto documents.
 
-use crate::options::ParserOptions;
+use crate::options::{Dialect, ParserOptions};
 use crate::range_utils::find_incremental_restart_offset;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::{GreenNode, GreenToken, NodeOrToken};
@@ -38,8 +38,34 @@ pub use core::Parser;
 /// * `input` - The Quarto document content to parse
 /// * `config` - Optional configuration. If None, uses default config.
 pub fn parse(input: &str, config: Option<ParserOptions>) -> SyntaxNode {
-    let config = config.unwrap_or_default();
+    let mut config = config.unwrap_or_default();
+    populate_refdef_labels(input, &mut config);
     Parser::new(input, &config).parse()
+}
+
+/// Pre-compute the document-level reference link label set when running
+/// in CommonMark dialect.
+///
+/// CommonMark §6.3 makes reference link resolution depend on whether the
+/// label matches a definition that may appear anywhere in the document
+/// (including after the use site). The IR-based bracket resolution pass
+/// in `inlines::inline_ir` consults this set to distinguish a real
+/// shortcut/reference link from bracket-shaped literal text.
+///
+/// Only populated when the caller hasn't already supplied one. Outside
+/// CommonMark dialect, the field stays `None` — Pandoc-markdown's inline
+/// parser doesn't consult it.
+fn populate_refdef_labels(input: &str, config: &mut ParserOptions) {
+    if config.dialect != Dialect::CommonMark {
+        return;
+    }
+    if config.refdef_labels.is_some() {
+        return;
+    }
+    config.refdef_labels = Some(self::inlines::refdef_map::collect_refdef_labels(
+        input,
+        config.dialect,
+    ));
 }
 
 pub struct IncrementalParseResult {
@@ -57,7 +83,8 @@ pub fn parse_incremental_suffix(
     old_edit_range: (usize, usize),
     new_edit_range: (usize, usize),
 ) -> IncrementalParseResult {
-    let config = config.unwrap_or_default();
+    let mut config = config.unwrap_or_default();
+    populate_refdef_labels(input, &mut config);
     let input_len = input.len();
 
     let Some(old_edit) = normalize_range(old_edit_range) else {

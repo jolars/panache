@@ -71,6 +71,13 @@ impl EmphasisPlan {
     pub fn is_empty(&self) -> bool {
         self.by_pos.is_empty()
     }
+
+    /// Construct an `EmphasisPlan` from a byte-keyed disposition map.
+    /// Used by the IR pipeline (`inline_ir`) to expose its emphasis
+    /// resolution in the same shape the existing emission walk expects.
+    pub fn from_dispositions(by_pos: BTreeMap<usize, DelimChar>) -> Self {
+        Self { by_pos }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -171,14 +178,21 @@ fn scan_delim_runs(text: &str, start: usize, end: usize, config: &ParserOptions)
             continue;
         }
 
-        // Reference image `![alt][ref]` / `![alt]` shortcut variant.
+        // Reference image `![alt][ref]` / `![alt]` shortcut variant. Under
+        // CommonMark dialect, the skip is gated on label resolution: a
+        // bracket pair with no resolving refdef must NOT be treated as
+        // opaque, because the inner bytes (notably `*`/`_`) are still
+        // available to the emphasis scanner. Pandoc-markdown's emission
+        // path doesn't have a refdef map at this layer, so it falls back
+        // to the shape-only behavior — see the dialect gate below.
         if b == b'!'
             && pos + 1 < end
             && bytes[pos + 1] == b'['
             && exts.reference_links
-            && let Some((len, _, _, _)) =
+            && let Some((len, alt_text, label, is_shortcut)) =
                 try_parse_reference_image(&text[pos..], exts.shortcut_reference_links)
             && pos + len <= end
+            && reference_resolves(is_commonmark, alt_text, &label, is_shortcut, config)
         {
             pos += len;
             continue;
@@ -198,15 +212,18 @@ fn scan_delim_runs(text: &str, start: usize, end: usize, config: &ParserOptions)
         }
 
         // Reference link `[text][ref]`, `[text][]`, or `[text]` shortcut form.
+        // Refdef-aware skip — see the matching block for reference images
+        // above for the rationale.
         if b == b'['
             && exts.reference_links
-            && let Some((len, _, _, _)) = try_parse_reference_link(
+            && let Some((len, link_text, label, is_shortcut)) = try_parse_reference_link(
                 &text[pos..],
                 exts.shortcut_reference_links,
                 false,
                 link_ctx,
             )
             && pos + len <= end
+            && reference_resolves(is_commonmark, link_text, &label, is_shortcut, config)
         {
             pos += len;
             continue;
@@ -240,6 +257,48 @@ fn scan_delim_runs(text: &str, start: usize, end: usize, config: &ParserOptions)
     }
 
     runs
+}
+
+/// Decide whether a reference-shaped bracket pair should be treated as
+/// opaque to the emphasis scanner (true) or fall through to literal
+/// brackets (false).
+///
+/// Under CommonMark dialect we consult the document refdef map: a
+/// bracket pair `[label]` / `[text][label]` / `[text][]` only counts as
+/// a link if the resolved label is in the map. This is what fixes spec
+/// example #523 (`*foo [bar* baz]`): `[bar* baz]` has no refdef, so the
+/// scanner refuses to treat it as opaque and the inner `*` becomes
+/// available as an emphasis closer for the outer `*foo`.
+///
+/// Under the Pandoc dialect (and CommonMark configurations that haven't
+/// pre-computed the refdef map) we keep the historical shape-only skip
+/// to preserve existing behavior.
+pub(super) fn reference_resolves(
+    is_commonmark: bool,
+    link_text: &str,
+    label: &str,
+    is_shortcut: bool,
+    config: &ParserOptions,
+) -> bool {
+    if !is_commonmark {
+        return true;
+    }
+    let labels = match &config.refdef_labels {
+        Some(map) => map,
+        None => return true,
+    };
+
+    // The lookup key depends on the bracket form:
+    // - shortcut `[text]`: key is the link text
+    // - collapsed `[text][]` (label empty, !is_shortcut): key is the link text
+    // - full `[text][label]`: key is the explicit label
+    let key_raw = if is_shortcut || label.is_empty() {
+        link_text
+    } else {
+        label
+    };
+    let key = crate::parser::inlines::refdef_map::normalize_label(key_raw);
+    !key.is_empty() && labels.contains(&key)
 }
 
 /// CommonMark §6.2 left/right flanking, plus §6.2 underscore intra-word rules.
@@ -502,6 +561,7 @@ mod tests {
             dialect: Dialect::for_flavor(flavor),
             extensions: crate::options::Extensions::for_flavor(flavor),
             pandoc_compat: crate::options::PandocCompat::default(),
+            refdef_labels: None,
         }
     }
 

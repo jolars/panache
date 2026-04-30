@@ -940,6 +940,7 @@ impl Config {
             dialect: panache_parser::Dialect::for_flavor(self.flavor),
             extensions: self.extensions.clone(),
             pandoc_compat: self.parser,
+            refdef_labels: None,
         }
     }
 }

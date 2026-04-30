@@ -164,6 +164,7 @@ impl Config {
             dialect: Dialect::for_flavor(self.flavor),
             extensions: self.parser_extensions.clone(),
             pandoc_compat: self.parser,
+            refdef_labels: None,
         }
     }
 }
