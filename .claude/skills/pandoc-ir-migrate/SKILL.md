@@ -65,7 +65,7 @@ is multi-phase sessions (rare) — there a task list per phase helps.
 
 ## Phased plan
 
-The migration is bounded by 8 phases. Pick one (or part of one) per
+The migration is bounded by 9 phases. Pick one (or part of one) per
 session. The latest phase status lives in `RECAP.md`.
 
 **Phase 0** — Thread `Dialect` through `inline_ir`'s `compute_flanking`,
@@ -97,10 +97,19 @@ scan as `Construct::BracketedCitation` / `Construct::BareCitation`.
 `BracketResolutionKind::BracketedSpan` variant and gates
 `bracket_says_resolved` on kind.
 
-**Phase 6** — Pandoc links/images consume the IR bracket plan. Replace
-dispatcher branches at `core.rs:2113-2234` with bracket-plan-driven
-dispatch. Gate `deactivate_earlier_link_openers` on
-`Dialect::CommonMark` only (Pandoc allows link-in-link).
+**Phase 6** — Pandoc links/images dispatched IR-first. Originally
+planned as full BracketPlan-driven dispatch with
+`deactivate_earlier_link_openers` gated on CommonMark only; recap-(viii)
+verified against pandoc-native that the gating mechanism would have
+been wrong (pandoc-native does NOT allow nested links — outer wins,
+inner literal — so the rule isn't "don't deactivate," it's "deactivate
+inner instead of outer"). Phase 6 instead followed the Phase 2-5
+`ConstructPlan` pattern: a new `ConstructKind::PandocLinkOrImage`
+that drives IR-first dispatch through the dispatcher's existing
+`try_parse_*` chain, with the legacy `[`/`![` branches in
+`parse_inline_range_impl` gated on `Dialect::CommonMark`. Pure
+additive; the three pre-existing pandoc-native divergences below
+are preserved and addressed in Phase 8.
 
 **Phase 7** — Delete the legacy emphasis path: `try_parse_emphasis*`,
 `try_parse_one/two/three`, `parse_until_closer_with_nested_*`,
@@ -108,6 +117,47 @@ dispatch. Gate `deactivate_earlier_link_openers` on
 `parse_inline_range_impl`. Delete the `delimiter_stack` module;
 relocate `EmphasisPlan` / `DelimChar` / `EmphasisKind` into
 `inline_ir.rs`.
+
+**Phase 8** (final) — Pandoc bracket emission on the IR's
+`BracketPlan`. Enable `process_brackets` under `Dialect::Pandoc`
+(currently CommonMark-only in `build_full_plans`) with two
+Pandoc-aware semantic differences:
+1. **Outer-wins link-in-link suppression.** When a Pandoc bracket
+   resolves, mark all bracket events inside its range as inactive
+   so they emit literal. This is the OPPOSITE of CommonMark §6.3's
+   `deactivate_earlier_link_openers` (inner-wins). NOT a toggle of
+   that flag — a different rule.
+2. **Refdef-aware shortcut resolution under Pandoc.** Replace
+   `is_commonmark` short-circuit in `process_brackets`'s shortcut
+   path with refdef-map consultation for both dialects. Pandoc's
+   shape-only `reference_resolves = true` is wrong; it produces
+   malformed LINK nodes for unresolved shortcuts and steals inner
+   `*`/`_` chars from the emphasis scanner.
+
+This fixes the three pre-existing pandoc-native divergences noted
+in recap-(viii):
+- `[foo]` with no refdef parses as malformed LINK → should be
+  literal (`Str "[foo]"`).
+- `*foo [bar* baz]` produces TEXT + partial LINK → should be all
+  literal (refdef miss frees the `*` for emphasis pairing).
+- `[link [inner](u2)](u1)` allows nested LINK → should be
+  outer-wins with inner literal.
+
+Cleanup once Phase 8 lands: `ConstructKind::PandocLinkOrImage` and
+its `ConstructDispo` variant become unused (folded into
+`BracketDispo::Open`); the CM-gated `[`/`![` legacy dispatcher
+branches in `parse_inline_range_impl` either stay (as the CM
+emission path) or get unified with the IR-driven path. Pandoc-
+specific golden fixtures for the three bug cases land under
+`crates/panache-parser/tests/fixtures/cases/`, verified against
+`pandoc -f markdown -t native`.
+
+**Migration-complete invariant**: after Phase 8, no Pandoc inline
+construct depends on the dispatcher's `try_parse_*` chain for
+*resolution* decisions. The dispatcher recognizers are still called
+to *parse* a matched range into a CST subtree, but "what is this
+byte range?" is answered exclusively by the IR. That is the
+end-state of this migration.
 
 The full design rationale lives in `/home/jola/.claude/plans/let-s-create-a-plan-noble-barto.md`
 (initial migration plan; treat as historical reference once the recap

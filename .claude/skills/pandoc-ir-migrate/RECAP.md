@@ -99,38 +99,85 @@ clippy + fmt clean. Diff is committable.
 
 ### Suggested next sub-targets, ranked
 
-The 8-phase plan in SKILL.md is now complete. Logical next:
+Phases 0–7 of the SKILL.md plan are landed, but the **migration is
+not complete** until Phase 8 lands. The original 8-phase plan
+treated Pandoc bracket emission as a pure dispatcher-chain
+passthrough (Phase 6 was implemented as `ConstructPlan`-driven
+dispatch over the existing `try_parse_*` recognizers). That keeps
+the dispatcher's three pre-existing pandoc-native divergences — and
+leaves Pandoc bracket emission as the ONLY path that doesn't
+consume the IR's resolution decisions. Closing that gap is the
+final phase.
 
-1. **Phase 6b (deferred bug-fix phase)** — enable `process_brackets`
-   under Pandoc to fix the three pre-existing dispatcher-chain bugs
-   noted in recap-(viii):
-   - `[foo]` with no refdef parses as malformed LINK (should be
-     literal text).
-   - `*foo [bar* baz]` produces TEXT + partial LINK (should all be
-     literal under pandoc-native).
-   - `[link [inner](u2)](u1)` allows nested links (pandoc-native is
-     outer-wins with inner literal).
-   This is a focused algorithm change — Pandoc bracket emission
-   would consume the IR's `BracketPlan` directly. The
-   `ConstructDispo::PandocLinkOrImage` variant in `inline_ir.rs`
-   would likely fold into `BracketDispo::Open`. Not covered by the
-   original 8-phase plan.
+1. **Phase 8 — Pandoc bracket emission on the IR's `BracketPlan`
+   (REQUIRED to finish the migration).** Enable `process_brackets`
+   under `Dialect::Pandoc` in `inline_ir::build_full_plans` (today
+   gated on `Dialect::CommonMark`) and switch the Pandoc
+   bracket-emission branch in `parse_inline_range_impl` to consume
+   `BracketDispo` instead of re-running the dispatcher's
+   `try_parse_inline_link` / `try_parse_reference_link` chain. The
+   `ConstructDispo::PandocLinkOrImage` variant folds into
+   `BracketDispo::Open`. The IR's bracket pass needs Pandoc-aware
+   semantics for two divergences from CommonMark §6.3:
+   - **No nested links.** Pandoc-native is outer-wins with inner
+     literal: `[link [inner](u2)](u1)` →
+     `Link [Str "link", ..., Str "[inner](u2)"] ("u1", "")`.
+     CommonMark §6.3's `deactivate_earlier_link_openers` does the
+     OPPOSITE (inner-wins, deactivate outer). The Pandoc rule is
+     greedy outer-first matching — when an opener resolves, mark
+     all bracket events inside its range as inactive so they emit
+     literal. NOT just toggling `deactivate_earlier_link_openers`
+     off (which is what SKILL.md originally proposed and recap-(viii)
+     correctly flagged as wrong).
+   - **Refdef-aware shortcut resolution.** Pandoc's
+     shape-only-resolves rule (`reference_resolves` returns `true`
+     unconditionally under `Dialect::Pandoc`) is wrong; it produces
+     malformed LINK nodes for unresolved shortcut refs. Under
+     Pandoc, `[foo]` with no refdef should parse as literal text
+     (matching `Str "[foo]"`); `*foo [bar* baz]` should be all
+     literal because `[bar*` is not a valid reference. The fix:
+     have the IR's `process_brackets` consult `refdef_labels` for
+     Pandoc too (currently it falls through to `true` because
+     `is_commonmark` is false). With shortcut resolution refdef-
+     gated, the inner `*` chars become available to the emphasis
+     scanner, fixing both the malformed-LINK and partial-LINK bugs.
 
-2. **Comment / docstring cleanup pass.** With the legacy chain
-   gone, several comments still reference "the legacy `try_parse_*`
-   dispatcher chain" in a way that may confuse — e.g. the
-   `bracket_plan` Some/None branches in
-   `parse_inline_text_recursive` and `parse_inline_text`. The
-   dispatcher chain for *brackets* (Pandoc dialect) is still alive
-   and well; only the emphasis chain is gone. Audit each comment
-   and re-word "legacy" → "dispatcher" where it still applies.
-   Low-priority polish.
+   Side effects to expect:
+   - The legacy dispatcher branches for `[`/`![` link / image /
+     reference-link / reference-image (currently CM-gated by
+     Phase 6) become reachable from CommonMark only and can be
+     deleted once the IR-driven Pandoc path replaces them. Or
+     keep them for the CommonMark branch — same shape — and just
+     gate the IR-driven path on dialect.
+   - `ConstructKind::PandocLinkOrImage` and its `ConstructDispo`
+     variant become unused once `BracketDispo::Open` carries
+     image/link discrimination. Remove.
+   - Pandoc-specific golden fixtures for the three bug cases
+     should be added under
+     `crates/panache-parser/tests/fixtures/cases/` and verified
+     against `pandoc -f markdown -t native`.
+
+   Verification gate: after Phase 8, no Pandoc inline construct
+   should depend on the dispatcher's `try_parse_*` chain for
+   resolution decisions — only for *parsing* the matched range
+   into a CST subtree. The IR is the single source of truth for
+   "what is this byte range?". That is what "migration complete"
+   means.
+
+2. **Comment / docstring cleanup pass.** With the legacy emphasis
+   chain gone (Phase 7) and the bracket dispatcher chain gone or
+   demoted (Phase 8), comments referencing "the legacy
+   `try_parse_*` dispatcher chain" need to be audited and
+   re-worded. Examples: the `bracket_plan` Some/None branches in
+   `parse_inline_text_recursive` and `parse_inline_text`; the
+   "legacy branches still run" comment in `parse_inline_range_impl`.
+   Low-priority polish; do AFTER Phase 8 when the dust settles.
 
 3. **Optional simplification**: tighten `parse_inline_range_impl`'s
    signature — `plan` and `construct_plan` are always `Some` in
-   production callers, so `Option<&...>` could become `&...`. The
-   `bracket_plan` wrapper stays `Option<&...>` because Pandoc
-   dialect passes `None`. Mild ergonomic win, not load-bearing.
+   production callers, so `Option<&...>` could become `&...`. After
+   Phase 8 enables `bracket_plan` for both dialects, that one too.
+   Mild ergonomic win, not load-bearing.
 
 ### Don't redo / known traps (carried forward + new)
 
