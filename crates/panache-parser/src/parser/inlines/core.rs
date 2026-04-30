@@ -91,9 +91,9 @@ pub fn parse_inline_text_recursive(
         config,
         builder,
         false,
-        Some(&plans.emphasis),
-        Some(&plans.brackets),
-        Some(&plans.constructs),
+        &plans.emphasis,
+        &plans.brackets,
+        &plans.constructs,
         false,
     );
 
@@ -134,9 +134,9 @@ pub fn parse_inline_text(
         config,
         builder,
         true,
-        Some(&plans.emphasis),
-        Some(&plans.brackets),
-        Some(&plans.constructs),
+        &plans.emphasis,
+        &plans.brackets,
+        &plans.constructs,
         suppress_inner_links,
     );
 }
@@ -171,9 +171,9 @@ fn parse_inline_range_impl(
     config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
     nested_in_link: bool,
-    plan: Option<&EmphasisPlan>,
-    bracket_plan: Option<&BracketPlan>,
-    construct_plan: Option<&ConstructPlan>,
+    plan: &EmphasisPlan,
+    bracket_plan: &BracketPlan,
+    construct_plan: &ConstructPlan,
     suppress_inner_links: bool,
 ) {
     log::trace!(
@@ -193,9 +193,7 @@ fn parse_inline_range_impl(
         // already gates these on `!is_commonmark` and the relevant
         // extension flag, so this branch is empty under CommonMark
         // dialect (where the legacy branches still run).
-        if let Some(plan) = construct_plan
-            && let Some(dispo) = plan.lookup(pos)
-        {
+        if let Some(dispo) = construct_plan.lookup(pos) {
             match *dispo {
                 ConstructDispo::InlineFootnote { end: dispo_end } => {
                     if dispo_end <= end
@@ -320,12 +318,11 @@ fn parse_inline_range_impl(
         // dispatcher's len is therefore constrained to
         // `[suffix_end, end]` rather than required to equal
         // `suffix_end` exactly.
-        if let Some(plan) = bracket_plan
-            && let Some(super::inline_ir::BracketDispo::Open {
-                is_image,
-                suffix_end,
-                ..
-            }) = plan.lookup(pos)
+        if let Some(super::inline_ir::BracketDispo::Open {
+            is_image,
+            suffix_end,
+            ..
+        }) = bracket_plan.lookup(pos)
         {
             let is_image = *is_image;
             let dispo_suffix_end = *suffix_end;
@@ -1070,75 +1067,70 @@ fn parse_inline_range_impl(
         // marker, close marker, or unmatched literal); consult the
         // plan here instead of re-scanning.
         if byte == b'*' || byte == b'_' {
-            if let Some(plan_ref) = plan {
-                match plan_ref.lookup(pos) {
-                    Some(DelimChar::Open {
-                        len,
+            match plan.lookup(pos) {
+                Some(DelimChar::Open {
+                    len,
+                    partner,
+                    partner_len,
+                    kind,
+                }) => {
+                    if pos > text_start {
+                        builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                    }
+                    let len = len as usize;
+                    let partner_len = partner_len as usize;
+                    let (wrapper_kind, marker_kind) = match kind {
+                        EmphasisKind::Strong => (SyntaxKind::STRONG, SyntaxKind::STRONG_MARKER),
+                        EmphasisKind::Emph => (SyntaxKind::EMPHASIS, SyntaxKind::EMPHASIS_MARKER),
+                    };
+                    builder.start_node(wrapper_kind.into());
+                    builder.token(marker_kind.into(), &text[pos..pos + len]);
+                    parse_inline_range_impl(
+                        text,
+                        pos + len,
                         partner,
-                        partner_len,
-                        kind,
-                    }) => {
-                        if pos > text_start {
-                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                        config,
+                        builder,
+                        nested_in_link,
+                        plan,
+                        bracket_plan,
+                        construct_plan,
+                        suppress_inner_links,
+                    );
+                    builder.token(marker_kind.into(), &text[partner..partner + partner_len]);
+                    builder.finish_node();
+                    pos = partner + partner_len;
+                    text_start = pos;
+                    continue;
+                }
+                Some(DelimChar::Close) => {
+                    // Defensive: a close should be jumped past by its
+                    // matching open. If we hit one anyway (e.g. when the
+                    // outer caller's range starts mid-pair), let it be
+                    // emitted as part of the surrounding text by simply
+                    // advancing. text_start stays put so the byte folds
+                    // into the next TEXT flush.
+                    pos += 1;
+                    continue;
+                }
+                Some(DelimChar::Literal) | None => {
+                    // Unmatched delim chars at this position behave as
+                    // literal text. Don't emit yet — let them coalesce
+                    // with surrounding plain bytes via the existing
+                    // text_start flushing so the CST keeps the same TEXT
+                    // token granularity Pandoc fixtures expect.
+                    let bytes = text.as_bytes();
+                    let mut end_pos = pos + 1;
+                    while end_pos < end && bytes[end_pos] == byte {
+                        match plan.lookup(end_pos) {
+                            Some(DelimChar::Literal) | None => end_pos += 1,
+                            _ => break,
                         }
-                        let len = len as usize;
-                        let partner_len = partner_len as usize;
-                        let (wrapper_kind, marker_kind) = match kind {
-                            EmphasisKind::Strong => (SyntaxKind::STRONG, SyntaxKind::STRONG_MARKER),
-                            EmphasisKind::Emph => {
-                                (SyntaxKind::EMPHASIS, SyntaxKind::EMPHASIS_MARKER)
-                            }
-                        };
-                        builder.start_node(wrapper_kind.into());
-                        builder.token(marker_kind.into(), &text[pos..pos + len]);
-                        parse_inline_range_impl(
-                            text,
-                            pos + len,
-                            partner,
-                            config,
-                            builder,
-                            nested_in_link,
-                            plan,
-                            bracket_plan,
-                            construct_plan,
-                            suppress_inner_links,
-                        );
-                        builder.token(marker_kind.into(), &text[partner..partner + partner_len]);
-                        builder.finish_node();
-                        pos = partner + partner_len;
-                        text_start = pos;
-                        continue;
                     }
-                    Some(DelimChar::Close) => {
-                        // Defensive: a close should be jumped past by its
-                        // matching open. If we hit one anyway (e.g. when the
-                        // outer caller's range starts mid-pair), let it be
-                        // emitted as part of the surrounding text by simply
-                        // advancing. text_start stays put so the byte folds
-                        // into the next TEXT flush.
-                        pos += 1;
-                        continue;
-                    }
-                    Some(DelimChar::Literal) | None => {
-                        // Unmatched delim chars at this position behave as
-                        // literal text. Don't emit yet — let them coalesce
-                        // with surrounding plain bytes via the existing
-                        // text_start flushing so the CST keeps the same TEXT
-                        // token granularity Pandoc fixtures expect.
-                        let bytes = text.as_bytes();
-                        let mut end_pos = pos + 1;
-                        while end_pos < end && bytes[end_pos] == byte {
-                            match plan_ref.lookup(end_pos) {
-                                Some(DelimChar::Literal) | None => end_pos += 1,
-                                _ => break,
-                            }
-                        }
-                        pos = end_pos;
-                        continue;
-                    }
+                    pos = end_pos;
+                    continue;
                 }
             }
-            continue;
         }
 
         // Check for newlines - may need to emit as hard line break

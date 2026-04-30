@@ -12,7 +12,82 @@ content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (xi)
+## Latest session — 2026-04-30 (xii)
+
+**Workspace test count: 0 failing → 0 failing.** **Polish: tightened
+`parse_inline_range_impl` signature.** Dropped `Option<&...>` wrappers
+on `plan` / `bracket_plan` / `construct_plan` parameters; all
+production callers (`parse_inline_text_recursive`,
+`parse_inline_text`, the recursive emphasis call site) already passed
+`Some(&plans.X)` after Phase 8 sub-step D. The Option was load-bearing
+historically (CommonMark used to skip `bracket_plan`, Pandoc used to
+skip `process_brackets` and pass `None`), but those gates are gone.
+Net diff: small mechanical edit in `core.rs` only — 4 fewer indent
+levels in the emphasis match arm, two `if let Some(...) && let
+Some(...) =` chains collapsed to single `if let Some(...) =`, signature
+parameters tightened. 0 → 0 tests; clippy + fmt + CommonMark
+conformance allowlist all green.
+
+### What landed this session
+
+1. **`parse_inline_range_impl` signature**: `plan: Option<&EmphasisPlan>`
+   → `plan: &EmphasisPlan`; same for `bracket_plan` and
+   `construct_plan`. The `nested_in_link` / `suppress_inner_links`
+   bool parameters are unchanged.
+2. **Public callers updated**: `parse_inline_text_recursive` and
+   `parse_inline_text` now pass `&plans.X` instead of `Some(&plans.X)`.
+   The recursive call site at the emphasis Open arm passes the
+   references through unchanged (already not wrapping).
+3. **Function body simplifications**:
+   - `if let Some(plan) = construct_plan && let Some(dispo) = plan.lookup(pos)`
+     → `if let Some(dispo) = construct_plan.lookup(pos)`.
+   - `if let Some(plan) = bracket_plan && let Some(BracketDispo::Open {…}) = plan.lookup(pos)`
+     → `if let Some(BracketDispo::Open {…}) = bracket_plan.lookup(pos)`.
+   - The emphasis branch's outer `if let Some(plan_ref) = plan { … }`
+     wrapping (with a now-dead trailing `continue;` for the `None`
+     case) was unwrapped; `match plan.lookup(pos)` is now the top-level
+     statement inside `if byte == b'*' || byte == b'_' { … }`. The
+     `Some(DelimChar::Literal) | None` arm is preserved (it handles
+     the `None` lookup return for unmatched delim chars).
+
+### Verification done
+
+- `cargo check --workspace`: clean.
+- `cargo test --workspace --no-fail-fast`: 0 failing (same buckets as
+  pre-edit, including the parser-crate `258 passed` golden cases).
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`:
+  clean.
+- `cargo fmt -- --check`: clean.
+- `cargo test -p panache-parser --test commonmark commonmark_allowlist`:
+  green.
+
+### Files in committable diff
+
+- `crates/panache-parser/src/parser/inlines/core.rs` only.
+- `.claude/skills/pandoc-ir-migrate/RECAP.md` (this entry).
+
+### Suggested next sub-targets, ranked
+
+1. **Comment / docstring cleanup pass.** Still pending — module-level
+   docstrings in `inline_ir.rs` and `core.rs` still reference
+   `try_pandoc_bracket_opaque`, `ConstructKind::PandocLinkOrImage`,
+   and "Pandoc dispatches via `ConstructDispo`" framings that no
+   longer match the post-Phase-8-D code. Low-risk polish.
+2. **Drop `LinkScanContext.skip_autolinks`?** Since `build_ir`'s
+   `pandoc_bracket_extent` now suppresses autolink Constructs while
+   inside a Pandoc bracket, the dispatcher's per-call
+   `skip_autolinks` flag may be redundant. Audit and simplify.
+3. **Bugs #1/#2: parser-as-source-of-truth path.** Out of scope for
+   the IR migration; multi-session parser-linter-LSP cross-cut.
+
+### Don't redo / known traps
+
+All Phase 1–8 traps still apply (recap-(viii) onward). No new traps
+discovered this session; the signature change was structural only.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (xi)
 
 **Workspace test count: 0 failing → 0 failing.** **Phase 8 sub-step D
 LANDED — migration architecturally complete.** `process_brackets`
