@@ -5,14 +5,14 @@
       "id": "small.qmd",
       "name": "Small (synthetic)",
       "document": "small.qmd",
-      "size_bytes": 748,
+      "size_bytes": 756,
       "line_count": 48,
       "iterations": 1000,
       "built_in_greedy_wrap": true,
-      "full_avg_us": 71.103,
-      "parse_avg_us": 29.999,
-      "format_avg_us": 33.52,
-      "throughput_kb_s": 10273.388605262788
+      "full_avg_us": 94.668,
+      "parse_avg_us": 47.514,
+      "format_avg_us": 38.642,
+      "throughput_kb_s": 7798.635758651286
     },
     {
       "id": "medium_quarto.qmd",
@@ -22,10 +22,10 @@
       "line_count": 146,
       "iterations": 100,
       "built_in_greedy_wrap": true,
-      "full_avg_us": 472.93,
-      "parse_avg_us": 120.72,
-      "format_avg_us": 293.8,
-      "throughput_kb_s": 18363.331386251666
+      "full_avg_us": 622.95,
+      "parse_avg_us": 250.09,
+      "format_avg_us": 285.66,
+      "throughput_kb_s": 13941.039108275141
     },
     {
       "id": "tables.qmd",
@@ -35,10 +35,10 @@
       "line_count": 636,
       "iterations": 50,
       "built_in_greedy_wrap": true,
-      "full_avg_us": 1178.1,
-      "parse_avg_us": 419.52,
-      "format_avg_us": 636.56,
-      "throughput_kb_s": 15611.23976105594
+      "full_avg_us": 1426.44,
+      "parse_avg_us": 702.1,
+      "format_avg_us": 603.52,
+      "throughput_kb_s": 12893.357983861923
     },
     {
       "id": "math.qmd",
@@ -48,10 +48,10 @@
       "line_count": 664,
       "iterations": 50,
       "built_in_greedy_wrap": true,
-      "full_avg_us": 1411.7,
-      "parse_avg_us": 363.94,
-      "format_avg_us": 807.88,
-      "throughput_kb_s": 19758.148420344263
+      "full_avg_us": 1456.02,
+      "parse_avg_us": 604.38,
+      "format_avg_us": 696.86,
+      "throughput_kb_s": 19156.727328608125
     },
     {
       "id": "large_authoring.qmd",
@@ -61,10 +61,10 @@
       "line_count": 592,
       "iterations": 20,
       "built_in_greedy_wrap": true,
-      "full_avg_us": 1083.6,
-      "parse_avg_us": 407.05,
-      "format_avg_us": 576.75,
-      "throughput_kb_s": 26908.640757659658
+      "full_avg_us": 1301.4,
+      "parse_avg_us": 645.5,
+      "format_avg_us": 556.75,
+      "throughput_kb_s": 22405.258279545105
     },
     {
       "id": "pandoc_manual.md",
@@ -74,10 +74,10 @@
       "line_count": 8036,
       "iterations": 3,
       "built_in_greedy_wrap": true,
-      "full_avg_us": 16433.666666666668,
-      "parse_avg_us": 5545.333333333333,
-      "format_avg_us": 10314.666666666666,
-      "throughput_kb_s": 17799.77840206081
+      "full_avg_us": 20049.333333333332,
+      "parse_avg_us": 9993.666666666666,
+      "format_avg_us": 10230.666666666666,
+      "throughput_kb_s": 14589.793093702203
     }
   ]
 }

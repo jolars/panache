@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-OUTPUT_FILE="docs/benchmarks.qmd"
+OUTPUT_FILE="docs/guide/benchmarks.qmd"
 JSON_FILE="benches/benchmark_results.json"
 
 echo "Running benchmarks..."
