@@ -1,5 +1,51 @@
 # Changelog
 
+## [2.41.1](https://github.com/jolars/panache/compare/v2.41.0...v2.41.1) (2026-04-30)
+
+### Bug Fixes
+- **parser:** handle Pandoc emphasis on the IR path ([`afa0ef5`](https://github.com/jolars/panache/commit/afa0ef5e3a202dae86ff1b4a282618b35a34f413))
+- **parser:** finish milestone - full commonmark compliance ([`33a88e8`](https://github.com/jolars/panache/commit/33a88e89ac573872a0a7ec26ea9e9e5b0ace5d64))
+- **parser:** implement IR algorithm ([`bb91c85`](https://github.com/jolars/panache/commit/bb91c850dbf790895ab01e233aacde1debd544a5))
+- **formatter,parser:** handle setext in list ([`86494b5`](https://github.com/jolars/panache/commit/86494b57765e2c2a8eae7b1183018774bd99fecc))
+- **parser:** fix emphasis parsing for cmark ([`de1b406`](https://github.com/jolars/panache/commit/de1b406bca16c390452cc9c3605a31edcbab28de))
+- **parser:** handle empty maker followed by indented content ([`6a9b188`](https://github.com/jolars/panache/commit/6a9b188fc8ac53bb2130dc9cd3394919aaeeb839))
+- **parser:** open inline blockquote for commonmark ([`a2ad903`](https://github.com/jolars/panache/commit/a2ad903f478552dbef53c374b441ebe802ab2eec))
+- **parser:** handle rule of 5 cols for commonmark ([`dcb36e6`](https://github.com/jolars/panache/commit/dcb36e63801223549e038a39c009a0d2ecc9fcfb))
+- **parser:** honor source-column tab stops ([`15ebe05`](https://github.com/jolars/panache/commit/15ebe058943fdb053d5a3eb1c7cd918d34fcb329))
+- **parser:** make fenced code openers interrupt paragraphs ([`f9a3b50`](https://github.com/jolars/panache/commit/f9a3b5021900151d6d56998b2f68a9ef8d15c60a))
+- **parser:** handle two tab cases in commonmark tests ([`3bf2140`](https://github.com/jolars/panache/commit/3bf2140dd4015e67abe7c6c0f7ba72484dd9d8e4))
+- **parser:** don't allow links to contain links in cmark ([`52eb5f2`](https://github.com/jolars/panache/commit/52eb5f248ab8e817a3364eba62b2c06a7c9184b2))
+- **parser:** handle last HTML block edge case ([`3a13337`](https://github.com/jolars/panache/commit/3a13337455a7c950d5692bd81297f2014ca4862a))
+- **parser:** handle dialect-specific list item closing ([`c61f93b`](https://github.com/jolars/panache/commit/c61f93bddd5faa256edf412b9350a739d6b9fd6c))
+- **parser:** handle last refdef dialect mismatch ([`245543b`](https://github.com/jolars/panache/commit/245543bbbb8ca87496e8aca7d881486731526b64))
+- **parser:** handle last block quote discrepancy in cmark ([`0fce82a`](https://github.com/jolars/panache/commit/0fce82a7d7c8273d8d401ca4ef3920da31a70760))
+- **parser:** correctly handle non-uniform list indents ([`f7750dd`](https://github.com/jolars/panache/commit/f7750dde57c23d8b9e531e370870a2a6b33b4540))
+- **parser:** handle continuation in block quote better ([`2f209e5`](https://github.com/jolars/panache/commit/2f209e51b1d73e7abbad2b09b5bd435120f9f653))
+- **parser:** implement better link scanning ([`eaca3a1`](https://github.com/jolars/panache/commit/eaca3a1323ac81b888a25b8572e77e0dbb2f4d69))
+- **parser:** don't skip code spans in closer scan ([`687e908`](https://github.com/jolars/panache/commit/687e9087fd481679ac0161200a2cfacc91fdad94))
+- **parser:** allow partial emphasis matching for commonmark ([`e172b52`](https://github.com/jolars/panache/commit/e172b52b6772df3a43d296f9c0e3ff8884f54e98))
+- **parser:** recurse inte same-line nested lists markers ([`ac05e88`](https://github.com/jolars/panache/commit/ac05e88d7addd1e8eef3caa6bf2bf36568e67b66))
+- **parser:** handle emphasis edge case ([`1b13a73`](https://github.com/jolars/panache/commit/1b13a73a970af4c2e8ac8d0a365bf5ec40b017ac))
+- **parser:** improve cmark emphasis parsing ([`95b2811`](https://github.com/jolars/panache/commit/95b281120d7beafb3cfda494d4b7ec617784c717))
+- **parser:** handle edge-cases for cmark emphasis ([`be57d7d`](https://github.com/jolars/panache/commit/be57d7d95343dec133c3b3955a752f407b35ad8c))
+- maintain list markers for commonmark ([`084fc87`](https://github.com/jolars/panache/commit/084fc870805fa1fe8b4b36fcfe0c4b06f2a23a43))
+- **parser:** relax indented-code opener ([`c0dcfb7`](https://github.com/jolars/panache/commit/c0dcfb7472c301afe2044dd461ca54966f78af06))
+- **parser:** support multiline setext headings ([`4b4e1a3`](https://github.com/jolars/panache/commit/4b4e1a3b90e78c8ca0b981051d68dbf33805faad))
+- **parser:** handle parser losslessnes from emphasis ([`0104a7c`](https://github.com/jolars/panache/commit/0104a7c390b60639de6ac823b03811004a2d3dce))
+- **parser:** don't let `]` terminate a link inside code span ([`18e028d`](https://github.com/jolars/panache/commit/18e028dd2d28af7561f3b3bff67a265a2811323f))
+- **parser:** fix parenthesis tracking ([`d37ba7d`](https://github.com/jolars/panache/commit/d37ba7d9c2e24918c049ed3014cb854d255c269f))
+- **parser:** properly handle multilevel ref def ([`50f28f4`](https://github.com/jolars/panache/commit/50f28f47475a739732d2133667fc7e1b01990d9e))
+
+### Performance Improvements
+- **parser:** add IR-driven dispatch for Pandoc links/images ([`1e4227e`](https://github.com/jolars/panache/commit/1e4227e94e1c110f99a4e5185f3b13cdc58825d5))
+- **parser:** add IR-driven dispatch for [text]{attrs} ([`cf50ec5`](https://github.com/jolars/panache/commit/cf50ec5c7d5572bad8a6b5989c34e7b0c593a12a))
+- **parser:** add IR-driven dispatch for citations ([`9e826db`](https://github.com/jolars/panache/commit/9e826db3c488fecb821f42a22410a34297690b18))
+- **parser:** add IR-driven dispatch for [^id] footnote refs ([`614221e`](https://github.com/jolars/panache/commit/614221e5b9d0d2819b50abdd6d499fd87509c8c2))
+- **parser:** add IR-driven dispatch for ^[note] and <span> ([`1b9e618`](https://github.com/jolars/panache/commit/1b9e61876896c36964dba36ffdc60bcf489c7309))
+
+### Dependencies
+- updated crates/panache-formatter to v0.4.1
+- updated crates/panache-parser to v0.6.1
 ## [2.41.0](https://github.com/jolars/panache/compare/v2.40.0...v2.41.0) (2026-04-29)
 
 ### Features
