@@ -14,6 +14,8 @@ pub mod citations;
 pub mod code_spans;
 #[path = "inlines/core.rs"]
 pub mod core; // Public for use in block parsing and list postprocessor
+#[path = "inlines/delimiter_stack.rs"]
+pub mod delimiter_stack;
 #[path = "inlines/emoji.rs"]
 pub mod emoji;
 #[path = "inlines/escapes.rs"]

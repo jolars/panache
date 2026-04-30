@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..14
+  PARAGRAPH@0..14
+    EMPHASIS@0..13
+      EMPHASIS_MARKER@0..1 "_"
+      STRONG@1..12
+        STRONG_MARKER@1..3 "__"
+        STRONG@3..10
+          STRONG_MARKER@3..5 "__"
+          TEXT@5..8 "foo"
+          STRONG_MARKER@8..10 "__"
+        STRONG_MARKER@10..12 "__"
+      EMPHASIS_MARKER@12..13 "_"
+    NEWLINE@13..14 "\n"

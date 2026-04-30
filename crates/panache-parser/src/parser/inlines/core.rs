@@ -24,6 +24,8 @@ use crate::options::{Dialect, ParserOptions};
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use super::delimiter_stack::{self, DelimChar, EmphasisKind, EmphasisPlan};
+
 // Import inline element parsers from sibling modules
 use super::bookdown::{
     try_parse_bookdown_definition, try_parse_bookdown_reference, try_parse_bookdown_text_reference,
@@ -92,7 +94,21 @@ pub fn parse_inline_text_recursive(
         text.len()
     );
 
-    parse_inline_range(text, 0, text.len(), config, builder);
+    if config.dialect == Dialect::CommonMark {
+        let plan = delimiter_stack::build_plan(text, 0, text.len(), config);
+        parse_inline_range_impl(
+            text,
+            0,
+            text.len(),
+            config,
+            builder,
+            false,
+            false,
+            Some(&plan),
+        );
+    } else {
+        parse_inline_range(text, 0, text.len(), config, builder);
+    }
 
     log::trace!("Recursive inline parsing complete");
 }
@@ -117,7 +133,21 @@ pub fn parse_inline_text(
         text.len()
     );
 
-    parse_inline_range_impl(text, 0, text.len(), config, builder, false, true);
+    if config.dialect == Dialect::CommonMark {
+        let plan = delimiter_stack::build_plan(text, 0, text.len(), config);
+        parse_inline_range_impl(
+            text,
+            0,
+            text.len(),
+            config,
+            builder,
+            false,
+            true,
+            Some(&plan),
+        );
+    } else {
+        parse_inline_range_impl(text, 0, text.len(), config, builder, false, true, None);
+    }
 }
 
 /// Try to parse emphasis starting at the given position.
@@ -1448,7 +1478,7 @@ fn parse_inline_range(
     config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) {
-    parse_inline_range_impl(text, start, end, config, builder, false, false)
+    parse_inline_range_impl(text, start, end, config, builder, false, false, None)
 }
 
 /// Same as `parse_inline_range` but bypasses opener validity checks for emphasis.
@@ -1460,7 +1490,7 @@ fn parse_inline_range_nested(
     config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) {
-    parse_inline_range_impl(text, start, end, config, builder, true, false)
+    parse_inline_range_impl(text, start, end, config, builder, true, false, None)
 }
 
 fn is_emoji_boundary(text: &str, pos: usize) -> bool {
@@ -1485,6 +1515,7 @@ fn advance_char_boundary(text: &str, pos: usize, end: usize) -> usize {
     (pos + ch_len).min(end)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn parse_inline_range_impl(
     text: &str,
     start: usize,
@@ -1493,6 +1524,7 @@ fn parse_inline_range_impl(
     builder: &mut GreenNodeBuilder,
     nested_emphasis: bool,
     nested_in_link: bool,
+    plan: Option<&EmphasisPlan>,
 ) {
     log::trace!(
         "parse_inline_range: start={}, end={}, text={:?}",
@@ -2209,6 +2241,78 @@ fn parse_inline_range_impl(
 
         // Try to parse emphasis at this position
         if byte == b'*' || byte == b'_' {
+            // CommonMark plan-driven path: the delimiter stack pre-pass has
+            // already decided every delimiter byte's disposition (open marker,
+            // close marker, or unmatched literal). Consult it here instead of
+            // running the recursive-descent matcher.
+            if let Some(plan_ref) = plan {
+                match plan_ref.lookup(pos) {
+                    Some(DelimChar::Open {
+                        len,
+                        partner,
+                        partner_len,
+                        kind,
+                    }) => {
+                        if pos > text_start {
+                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                        }
+                        let len = len as usize;
+                        let partner_len = partner_len as usize;
+                        let (wrapper_kind, marker_kind) = match kind {
+                            EmphasisKind::Strong => (SyntaxKind::STRONG, SyntaxKind::STRONG_MARKER),
+                            EmphasisKind::Emph => {
+                                (SyntaxKind::EMPHASIS, SyntaxKind::EMPHASIS_MARKER)
+                            }
+                        };
+                        builder.start_node(wrapper_kind.into());
+                        builder.token(marker_kind.into(), &text[pos..pos + len]);
+                        parse_inline_range_impl(
+                            text,
+                            pos + len,
+                            partner,
+                            config,
+                            builder,
+                            nested_emphasis,
+                            nested_in_link,
+                            plan,
+                        );
+                        builder.token(marker_kind.into(), &text[partner..partner + partner_len]);
+                        builder.finish_node();
+                        pos = partner + partner_len;
+                        text_start = pos;
+                        continue;
+                    }
+                    Some(DelimChar::Close) => {
+                        // Defensive: a close should be jumped past by its
+                        // matching open. If we hit one anyway (e.g. when the
+                        // outer caller's range starts mid-pair), let it be
+                        // emitted as part of the surrounding text by simply
+                        // advancing. text_start stays put so the byte folds
+                        // into the next TEXT flush.
+                        pos += 1;
+                        continue;
+                    }
+                    Some(DelimChar::Literal) | None => {
+                        // Unmatched delim chars at this position behave as
+                        // literal text. Don't emit yet — let them coalesce
+                        // with surrounding plain bytes via the existing
+                        // text_start flushing so the CST keeps the same TEXT
+                        // token granularity Pandoc fixtures expect.
+                        let bytes = text.as_bytes();
+                        let mut end_pos = pos + 1;
+                        while end_pos < end && bytes[end_pos] == byte {
+                            match plan_ref.lookup(end_pos) {
+                                Some(DelimChar::Literal) | None => end_pos += 1,
+                                _ => break,
+                            }
+                        }
+                        pos = end_pos;
+                        continue;
+                    }
+                }
+            }
+
+            // Pandoc dialect: existing recursive-descent emphasis path.
             // Count the delimiter run to avoid re-parsing
             let bytes = text.as_bytes();
             let mut delim_count = 0;

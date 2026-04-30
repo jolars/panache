@@ -1,0 +1,43 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..60
+  PARAGRAPH@0..18
+    STRONG@0..17
+      STRONG_MARKER@0..2 "__"
+      TEXT@2..15 "foo__bar__baz"
+      STRONG_MARKER@15..17 "__"
+    NEWLINE@17..18 "\n"
+  BLANK_LINE@18..19
+    BLANK_LINE@18..19 "\n"
+  PARAGRAPH@19..35
+    STRONG@19..34
+      STRONG_MARKER@19..21 "__"
+      STRONG@21..28
+        STRONG_MARKER@21..23 "__"
+        TEXT@23..26 "foo"
+        STRONG_MARKER@26..28 "__"
+      TEXT@28..32 " bar"
+      STRONG_MARKER@32..34 "__"
+    NEWLINE@34..35 "\n"
+  BLANK_LINE@35..36
+    BLANK_LINE@35..36 "\n"
+  PARAGRAPH@36..47
+    EMPHASIS@36..46
+      EMPHASIS_MARKER@36..37 "*"
+      TEXT@37..45 "foo**bar"
+      EMPHASIS_MARKER@45..46 "*"
+    NEWLINE@46..47 "\n"
+  BLANK_LINE@47..48
+    BLANK_LINE@47..48 "\n"
+  PARAGRAPH@48..60
+    EMPHASIS@48..59
+      EMPHASIS_MARKER@48..49 "_"
+      EMPHASIS@49..54
+        EMPHASIS_MARKER@49..50 "_"
+        TEXT@50..53 "foo"
+        EMPHASIS_MARKER@53..54 "_"
+      TEXT@54..58 " bar"
+      EMPHASIS_MARKER@58..59 "_"
+    NEWLINE@59..60 "\n"
