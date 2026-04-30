@@ -42,7 +42,7 @@ use crate::parser::inlines::refdef_map::{RefdefMap, normalize_label};
 use std::collections::HashSet;
 
 use super::bracketed_spans::try_parse_bracketed_span;
-use super::citations::try_parse_bracketed_citation;
+use super::citations::{try_parse_bare_citation, try_parse_bracketed_citation};
 use super::code_spans::try_parse_code_span;
 use super::delimiter_stack::EmphasisKind;
 use super::escapes::{EscapeType, try_parse_escape};
@@ -180,6 +180,18 @@ pub enum ConstructKind {
     /// the IR's `ConstructPlan` (Phase 3). The dispatcher's legacy
     /// `[^id]` branch is gated to CommonMark dialect only.
     FootnoteReference,
+    /// Pandoc bracketed citation `[@key]`, `[see @key, p. 1]`,
+    /// `[@a; @b]`. Recognised in `build_ir` under `Dialect::Pandoc`
+    /// and consumed by the emission walk via the IR's `ConstructPlan`
+    /// (Phase 4). The dispatcher's legacy `[@cite]` branch is gated
+    /// to CommonMark dialect only.
+    BracketedCitation,
+    /// Pandoc bare citation `@key` or `-@key` (author-in-text /
+    /// suppress-author). Recognised in `build_ir` under
+    /// `Dialect::Pandoc` and consumed by the emission walk via the
+    /// IR's `ConstructPlan` (Phase 4). The dispatcher's legacy `@`
+    /// and `-@` branches are gated to CommonMark dialect only.
+    BareCitation,
 }
 
 /// One matched fragment within a [`IrEvent::DelimRun`].
@@ -431,14 +443,60 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
             continue;
         }
 
+        // Pandoc-only: bracketed citation `[@cite]`. Recognised at
+        // scan time so the emphasis pass treats it as opaque (delim
+        // runs inside the citation can't pair with delim runs outside)
+        // and the emission walk dispatches it directly via the IR's
+        // `ConstructPlan` (Phase 4). Must come before the generic
+        // bracket-opaque scan so the dedicated kind wins.
+        if !is_commonmark
+            && b == b'['
+            && exts.citations
+            && let Some((len, _)) = try_parse_bracketed_citation(&text[pos..])
+            && pos + len <= end
+        {
+            flush_text!();
+            events.push(IrEvent::Construct {
+                start: pos,
+                end: pos + len,
+                kind: ConstructKind::BracketedCitation,
+            });
+            pos += len;
+            text_run_start = pos;
+            continue;
+        }
+
+        // Pandoc-only: bare citation `@key` or `-@key`. Recognised at
+        // scan time so the emission walk dispatches it directly via
+        // the IR's `ConstructPlan` (Phase 4). Bare citations don't
+        // contain emphasis-eligible content, so opacity is moot here
+        // — IR participation is only for dispatch consolidation.
+        if !is_commonmark
+            && (b == b'@' || (b == b'-' && pos + 1 < end && bytes[pos + 1] == b'@'))
+            && (exts.citations || exts.quarto_crossrefs)
+            && let Some((len, _, _)) = try_parse_bare_citation(&text[pos..])
+            && pos + len <= end
+        {
+            flush_text!();
+            events.push(IrEvent::Construct {
+                start: pos,
+                end: pos + len,
+                kind: ConstructKind::BareCitation,
+            });
+            pos += len;
+            text_run_start = pos;
+            continue;
+        }
+
         // Pandoc-only: bracket-shaped opaque constructs. Tries the
         // dispatcher's precedence order to identify the full byte range
         // of any bracket-shaped Pandoc construct (links, images,
-        // citations, bracketed spans), and emits them as a single
-        // `Construct` so the emphasis pass cannot pair across their
-        // boundaries. Emission re-parses each construct through the
-        // dispatcher's existing `try_parse_*` chain. Footnote refs
-        // (`[^id]`) are handled by the dedicated branch above.
+        // bracketed spans), and emits them as a single `Construct` so
+        // the emphasis pass cannot pair across their boundaries.
+        // Emission re-parses each construct through the dispatcher's
+        // existing `try_parse_*` chain. Footnote refs (`[^id]`) and
+        // bracketed citations (`[@cite]`) are handled by dedicated
+        // branches above.
         if !is_commonmark
             && (b == b'[' || (b == b'!' && pos + 1 < end && bytes[pos + 1] == b'['))
             && let Some(len) = try_pandoc_bracket_opaque(text, pos, end, config)
@@ -753,8 +811,8 @@ fn try_pandoc_bracket_opaque(
     }
 
     // `[...]` openers — try in dispatcher order. Footnote refs
-    // (`[^id]`) are handled by a dedicated branch in `build_ir` and
-    // do not appear here.
+    // (`[^id]`) and bracketed citations (`[@cite]`) are handled by
+    // dedicated branches in `build_ir` and do not appear here.
     if exts.inline_links
         && let Some((len, _, _, _)) = try_parse_inline_link(&text[pos..], false, ctx)
         && pos + len <= end
@@ -764,12 +822,6 @@ fn try_pandoc_bracket_opaque(
     if exts.reference_links
         && let Some((len, _, _, _)) =
             try_parse_reference_link(&text[pos..], allow_shortcut, exts.inline_links, ctx)
-        && pos + len <= end
-    {
-        return Some(len);
-    }
-    if exts.citations
-        && let Some((len, _)) = try_parse_bracketed_citation(&text[pos..])
         && pos + len <= end
     {
         return Some(len);
@@ -1971,6 +2023,13 @@ pub enum ConstructDispo {
     /// `[^id]` — emit via `emit_footnote_reference` after extracting
     /// the label id from the source range.
     FootnoteReference { end: usize },
+    /// `[@cite]` — emit via `emit_bracketed_citation` after slicing
+    /// the inner content.
+    BracketedCitation { end: usize },
+    /// `@key` or `-@key` — emit via `emit_bare_citation` (or
+    /// `emit_crossref` when `is_quarto_crossref_key` matches and
+    /// `extensions.quarto_crossrefs` is enabled).
+    BareCitation { end: usize },
 }
 
 /// A byte-keyed view of the IR's standalone Pandoc constructs that the
@@ -2009,6 +2068,12 @@ pub fn build_construct_plan(events: &[IrEvent]) -> ConstructPlan {
                 }
                 ConstructKind::FootnoteReference => {
                     by_pos.insert(*start, ConstructDispo::FootnoteReference { end: *end });
+                }
+                ConstructKind::BracketedCitation => {
+                    by_pos.insert(*start, ConstructDispo::BracketedCitation { end: *end });
+                }
+                ConstructKind::BareCitation => {
+                    by_pos.insert(*start, ConstructDispo::BareCitation { end: *end });
                 }
                 _ => {}
             }

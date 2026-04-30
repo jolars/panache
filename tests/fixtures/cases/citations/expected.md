@@ -9,9 +9,9 @@ Blah blah
 extra words to exercise wrapping
 behavior.
 
-Blah blah [see @doe99, pp. 33-35 and
-*passim*; @smith04, chap. 1] in a longer
-sentence for reflow.
+Blah blah
+[see @doe99, pp. 33-35 and *passim*; @smith04, chap. 1]
+in a longer sentence for reflow.
 
 Smith says blah [-@smith04] when the
 author appears in the prose already.
@@ -32,12 +32,12 @@ Citation with suffix only
 [@item1 and nowhere else] followed by
 more explanatory words.
 
-With some markup [*see* @item1 p.
-**32**] in a sentence that should still
-reflow.
+With some markup
+[*see* @item1 p. **32**] in a sentence
+that should still reflow.
 
-Citation group with unicode key [see
-@item1 chap. 3; also @пункт3 p. 34-35]
+Citation group with unicode key
+[see @item1 chap. 3; also @пункт3 p. 34-35]
 for UTF-8 handling.
 
 Braced keys and punctuation

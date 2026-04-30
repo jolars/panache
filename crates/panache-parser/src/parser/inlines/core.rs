@@ -1640,6 +1640,46 @@ fn parse_inline_range_impl(
                         continue;
                     }
                 }
+                ConstructDispo::BracketedCitation { end: dispo_end } => {
+                    if dispo_end <= end
+                        && let Some((len, content)) = try_parse_bracketed_citation(&text[pos..])
+                        && pos + len == dispo_end
+                    {
+                        if pos > text_start {
+                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                        }
+                        log::trace!("IR: matched bracketed citation at pos {}", pos);
+                        emit_bracketed_citation(builder, content);
+                        pos += len;
+                        text_start = pos;
+                        continue;
+                    }
+                }
+                ConstructDispo::BareCitation { end: dispo_end } => {
+                    if dispo_end <= end
+                        && let Some((len, key, has_suppress)) =
+                            try_parse_bare_citation(&text[pos..])
+                        && pos + len == dispo_end
+                    {
+                        let is_crossref = config.extensions.quarto_crossrefs
+                            && super::citations::is_quarto_crossref_key(key);
+                        if is_crossref || config.extensions.citations {
+                            if pos > text_start {
+                                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                            }
+                            if is_crossref {
+                                log::trace!("IR: matched Quarto crossref at pos {}: {}", pos, key);
+                                super::citations::emit_crossref(builder, key, has_suppress);
+                            } else {
+                                log::trace!("IR: matched bare citation at pos {}: {}", pos, key);
+                                emit_bare_citation(builder, key, has_suppress);
+                            }
+                            pos += len;
+                            text_start = pos;
+                            continue;
+                        }
+                    }
+                }
             }
         }
 
@@ -2316,8 +2356,13 @@ fn parse_inline_range_impl(
                 }
             }
 
-            // Try bracketed citation: [@cite]
-            if config.extensions.citations
+            // Try bracketed citation: [@cite]. Phase 4: under Pandoc
+            // dialect this is consumed via the IR's `ConstructPlan` at
+            // the top of the loop; the dispatcher branch only fires
+            // for CommonMark dialect with the extension explicitly
+            // enabled.
+            if config.dialect == Dialect::CommonMark
+                && config.extensions.citations
                 && let Some((len, content)) = try_parse_bracketed_citation(&text[pos..])
             {
                 if pos > text_start {
@@ -2347,8 +2392,13 @@ fn parse_inline_range_impl(
             continue;
         }
 
-        // Try bare citation: @cite (must come after bracketed elements)
-        if byte == b'@'
+        // Try bare citation: @cite (must come after bracketed elements).
+        // Phase 4: under Pandoc dialect this is consumed via the IR's
+        // `ConstructPlan` at the top of the loop; the dispatcher branch
+        // only fires for CommonMark dialect with the extension
+        // explicitly enabled.
+        if config.dialect == Dialect::CommonMark
+            && byte == b'@'
             && (config.extensions.citations || config.extensions.quarto_crossrefs)
             && let Some((len, key, has_suppress)) = try_parse_bare_citation(&text[pos..])
         {
@@ -2371,8 +2421,12 @@ fn parse_inline_range_impl(
             }
         }
 
-        // Try suppress-author citation: -@cite
-        if byte == b'-'
+        // Try suppress-author citation: -@cite. Phase 4: under Pandoc
+        // dialect this is consumed via the IR's `ConstructPlan` at the
+        // top of the loop; the dispatcher branch only fires for
+        // CommonMark dialect with the extension explicitly enabled.
+        if config.dialect == Dialect::CommonMark
+            && byte == b'-'
             && pos + 1 < text.len()
             && text.as_bytes()[pos + 1] == b'@'
             && (config.extensions.citations || config.extensions.quarto_crossrefs)

@@ -38,25 +38,18 @@ DOCUMENT@0..1707
     BLANK_LINE@207..208 "\n"
   PARAGRAPH@208..307
     TEXT@208..218 "Blah blah "
-    LINK@218..273
-      LINK_START@218..219
-        LINK_START@218..219 "["
-      LINK_TEXT@219..272
-        TEXT@219..223 "see "
-        CITATION@223..229
-          CITATION_MARKER@223..224 "@"
-          CITATION_KEY@224..229 "doe99"
-        TEXT@229..245 ", pp. 33-35 and "
-        EMPHASIS@245..253
-          EMPHASIS_MARKER@245..246 "*"
-          TEXT@246..252 "passim"
-          EMPHASIS_MARKER@252..253 "*"
-        TEXT@253..255 "; "
-        CITATION@255..263
-          CITATION_MARKER@255..256 "@"
-          CITATION_KEY@256..263 "smith04"
-        TEXT@263..272 ", chap. 1"
-      TEXT@272..273 "]"
+    CITATION@218..273
+      LINK_START@218..219 "["
+      CITATION_CONTENT@219..223 "see "
+      CITATION_MARKER@223..224 "@"
+      CITATION_KEY@224..229 "doe99"
+      CITATION_CONTENT@229..253 ", pp. 33-35 and *passim*"
+      CITATION_SEPARATOR@253..254 ";"
+      CITATION_CONTENT@254..255 " "
+      CITATION_MARKER@255..256 "@"
+      CITATION_KEY@256..263 "smith04"
+      CITATION_CONTENT@263..272 ", chap. 1"
+      LINK_DEST@272..273 "]"
     TEXT@273..306 " in a longer sentence ..."
     NEWLINE@306..307 "\n"
   BLANK_LINE@307..308
@@ -121,44 +114,31 @@ DOCUMENT@0..1707
     BLANK_LINE@739..740 "\n"
   PARAGRAPH@740..822
     TEXT@740..757 "With some markup "
-    LINK@757..781
-      LINK_START@757..758
-        LINK_START@757..758 "["
-      LINK_TEXT@758..780
-        EMPHASIS@758..763
-          EMPHASIS_MARKER@758..759 "*"
-          TEXT@759..762 "see"
-          EMPHASIS_MARKER@762..763 "*"
-        TEXT@763..764 " "
-        CITATION@764..770
-          CITATION_MARKER@764..765 "@"
-          CITATION_KEY@765..770 "item1"
-        TEXT@770..774 " p. "
-        STRONG@774..780
-          STRONG_MARKER@774..776 "**"
-          TEXT@776..778 "32"
-          STRONG_MARKER@778..780 "**"
-      TEXT@780..781 "]"
+    CITATION@757..781
+      LINK_START@757..758 "["
+      CITATION_CONTENT@758..764 "*see* "
+      CITATION_MARKER@764..765 "@"
+      CITATION_KEY@765..770 "item1"
+      CITATION_CONTENT@770..780 " p. **32**"
+      LINK_DEST@780..781 "]"
     TEXT@781..821 " in a sentence that s ..."
     NEWLINE@821..822 "\n"
   BLANK_LINE@822..823
     BLANK_LINE@822..823 "\n"
   PARAGRAPH@823..924
     TEXT@823..855 "Citation group with u ..."
-    LINK@855..903
-      LINK_START@855..856
-        LINK_START@855..856 "["
-      LINK_TEXT@856..902
-        TEXT@856..860 "see "
-        CITATION@860..866
-          CITATION_MARKER@860..861 "@"
-          CITATION_KEY@861..866 "item1"
-        TEXT@866..881 " chap. 3; also "
-        CITATION@881..893
-          CITATION_MARKER@881..882 "@"
-          CITATION_KEY@882..893 "пункт3"
-        TEXT@893..902 " p. 34-35"
-      TEXT@902..903 "]"
+    CITATION@855..903
+      LINK_START@855..856 "["
+      CITATION_CONTENT@856..860 "see "
+      CITATION_MARKER@860..861 "@"
+      CITATION_KEY@861..866 "item1"
+      CITATION_CONTENT@866..874 " chap. 3"
+      CITATION_SEPARATOR@874..875 ";"
+      CITATION_CONTENT@875..881 " also "
+      CITATION_MARKER@881..882 "@"
+      CITATION_KEY@882..893 "пункт3"
+      CITATION_CONTENT@893..902 " p. 34-35"
+      LINK_DEST@902..903 "]"
     TEXT@903..923 " for UTF-8 handling."
     NEWLINE@923..924 "\n"
   BLANK_LINE@924..925

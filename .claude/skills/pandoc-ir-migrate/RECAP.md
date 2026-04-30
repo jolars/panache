@@ -12,7 +12,180 @@ content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (v)
+## Latest session — 2026-04-30 (vi)
+
+**Workspace test count: 0 failing → 0 failing.** **Phase 4 LANDED.**
+Bracketed citations (`[@cite]`) and bare citations (`@key` / `-@key`)
+now dispatched IR-first under `Dialect::Pandoc`; legacy dispatcher
+branches gated to `Dialect::CommonMark`. Two fixture updates landed
+alongside (legacy bug fixes — see below). Conformance allowlist
+preserved; clippy + fmt clean. Diff is committable.
+
+### What landed this session
+
+1. **Two new `ConstructKind` variants** in `inline_ir.rs`:
+   `BracketedCitation`, `BareCitation`. `build_ir`'s `[@cite]`
+   recognition (previously folded into `try_pandoc_bracket_opaque`
+   and emitted as generic `PandocOpaque`) now has a dedicated branch
+   BEFORE the generic bracket-opaque scan. Bare-citation recognition
+   is NEW (no previous IR participation) — added as its own branch
+   for `b == b'@'` or `b == b'-' && next == b'@'`. Bracketed-citation
+   recognition was REMOVED from `try_pandoc_bracket_opaque` to keep
+   the dedicated kind authoritative (Phase 3 trap pattern).
+
+2. **Two new `ConstructDispo` variants** alongside the Phase 2-3
+   variants. `build_construct_plan` extended with two more match arms.
+
+3. **IR-driven dispatch branches** in `parse_inline_range_impl`:
+   - `BracketedCitation` mirrors Phase 3's pattern exactly.
+   - `BareCitation` re-detects via `try_parse_bare_citation` and
+     dispatches to `emit_crossref` or `emit_bare_citation` based on
+     `is_quarto_crossref_key(key)` and the `quarto_crossrefs` /
+     `citations` extension flags — same logic as the legacy branches.
+
+4. **Three legacy dispatcher branches** gated on
+   `config.dialect == Dialect::CommonMark`: bracketed citation
+   (`[@cite]`), bare `@cite`, and suppress-author `-@cite`.
+
+### Why bare citation needed a NEW recognition site (vs. Phase 3)
+
+Bare citations aren't bracket-shaped, so `try_pandoc_bracket_opaque`
+never recognised them. They fell through `build_ir` as text events
+and were picked up by the dispatcher's `byte == b'@'` / `byte == b'-'`
+branches at emission time. The new IR branch at `b'@'` or `b'-@'`
+adds first-class IR participation. Opacity is moot for bare citations
+(no internal emphasis-eligible content) — IR participation is purely
+for dispatch consolidation toward Phase 7.
+
+### Fixture updates landed (legacy-bug fixes — see trap below)
+
+Two cases in `tests/fixtures/cases/citations/` and three nodes in
+`crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_citations.snap`
+were misclassified as `LINK` (shortcut reference link) by the legacy
+dispatcher when they should have been `CITATION`:
+
+- `[see @doe99, pp. 33-35 and *passim*; @smith04, chap. 1]`
+- `[*see* @item1 p. **32**]`
+- `[see @item1 chap. 3; also @пункт3 p. 34-35]`
+
+Pandoc-native confirms each is a `Cite`, not a `Link`. The legacy
+dispatcher tried `try_parse_reference_link` BEFORE
+`try_parse_bracketed_citation`; `reference_resolves` was permissive
+enough to accept these as shortcut refs (even without a matching
+refdef under Pandoc dialect's looser rules). The new IR-first
+dispatch path recognises them as bracketed citations FIRST (the
+build_ir branch fires before the dispatcher's reference-link branch),
+matching pandoc-native.
+
+The formatter's wrap behavior changes as a consequence: previously
+the misparsed LINK exposed internal EMPHASIS/STRONG/CITATION
+sub-nodes that the formatter could break across. The correctly-parsed
+CITATION is one opaque unit (because `emit_bracketed_citation` emits
+flat CITATION_CONTENT tokens, not inline-parsed prefix/suffix). So
+the citation is now treated as an unbreakable token. This is
+acceptable: a citation is one semantic unit; idempotency is
+preserved (re-parsing the wrap output gets the same CITATION).
+
+### Files in committed-ready diff
+
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`:
+  +2 `ConstructKind` variants, +2 `ConstructDispo` variants, +40
+  lines for the `[@cite]` and `@cite`/`-@cite` branches in
+  `build_ir`, +6 lines in `build_construct_plan`, -5 lines (removed
+  bracketed-citation from `try_pandoc_bracket_opaque`).
+- `crates/panache-parser/src/parser/inlines/core.rs`:
+  +44 lines for the `BracketedCitation` and `BareCitation` dispatch
+  arms in the IR-driven branch, +9 lines for dialect gates on the
+  three legacy branches.
+- `tests/fixtures/cases/citations/expected.md`: 6 lines changed
+  (formatter wrap shifts for the 2 newly-correct CITATION cases).
+- `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_citations.snap`:
+  3 nodes changed from LINK to CITATION (legacy-bug fixes).
+
+### Verification done
+
+- Workspace tests: 0 → 0 failing.
+- CommonMark conformance allowlist: green.
+- clippy + fmt: clean.
+- Manual probes (all match pandoc-native):
+  - `*emph @doe99 still emph*` → outer EMPHASIS containing CITATION.
+  - `*emph [@doe99] still emph*` → outer EMPHASIS containing
+    bracketed CITATION.
+  - `*emph -@doe99 still emph*` → outer EMPHASIS containing
+    suppress-author CITATION (`-@` marker preserved).
+  - `@doe99 says *hi*.` → CITATION + EMPHASIS, separate.
+  - `[@doe99; @smith2000] for refs.` → multi-cite CITATION with
+    CITATION_SEPARATOR.
+  - `**strong @key strong**` → STRONG containing CITATION.
+
+### Suggested next sub-targets, ranked
+
+Phase 4 is done. Logical next:
+
+1. **Phase 5** — bracketed spans `[text]{attrs}` into IR
+   `process_brackets`. This is the FIRST phase that *changes*
+   `process_brackets` (Phases 1-4 left it untouched under Pandoc).
+   Adds a new `BracketResolutionKind::BracketedSpan` variant and
+   gates `bracket_says_resolved` on kind. This is materially harder
+   than Phases 1-4 because it intersects bracket resolution
+   (current bracket plan is built only under CommonMark; Phase 5
+   needs to enable a Pandoc-only `process_brackets` invocation
+   that handles spans without trying to resolve as
+   links/images/refs).
+2. **Phase 6** — Pandoc links/images consume the IR bracket plan.
+   Replaces dispatcher branches at `core.rs:2113-2234` with
+   bracket-plan-driven dispatch. Gates
+   `deactivate_earlier_link_openers` on `Dialect::CommonMark` only
+   (Pandoc allows link-in-link). The biggest dispatcher cleanup
+   before Phase 7.
+3. **Phase 7** — delete legacy emphasis path. Fall-out cleanup.
+
+### Don't redo / known traps (carried forward + new)
+
+All Phase 1-3 traps still apply. Plus:
+
+- **NEW (Phase 4): legacy dispatcher's reference-link branch can
+  shadow bracketed citations that contain markup.** The legacy
+  ordering (try inline link → try reference link → try bracketed
+  citation) means `[*see* @item1 p. **32**]` can match as a
+  shortcut reference link before reaching the citation branch.
+  Under the IR-first dispatch this is correctly identified as a
+  citation. This has been load-bearing on existing fixtures: any
+  fixture with rich-content bracketed citations that was passing
+  the legacy parser was relying on this misclassification. Always
+  verify against pandoc-native when fixture diffs flip
+  LINK→CITATION; the new IR output is correct.
+- **NEW (Phase 4): `emit_bracketed_citation` does NOT inline-parse
+  prefix/suffix.** It emits flat `CITATION_CONTENT` tokens. So
+  `[*see* @key]` produces a CITATION with `*see*` as literal
+  CITATION_CONTENT, not as nested EMPHASIS. Pandoc-native parses
+  prefix/suffix as inline content; we don't. This is a known
+  limitation OUT OF SCOPE for the IR migration but worth noting
+  as a follow-up enhancement (would let the formatter wrap inside
+  the brackets and would render emphasis/strong correctly in
+  citation prefix/suffix).
+- **NEW (Phase 4): bare-citation recognition is NEW IR
+  participation, not a migration.** `try_pandoc_bracket_opaque`
+  never handled bare citations (they're not bracket-shaped). So
+  there's no `try_pandoc_bracket_opaque` cleanup to do for bare
+  cites. The IR branch is additive.
+- **NEW (Phase 4): both `@` and `-@` go through the same recognizer
+  (`try_parse_bare_citation`) — the recognizer handles the
+  optional `-` prefix internally.** Don't split into two IR
+  branches; one branch with a combined byte-check is correct and
+  matches the dispatcher's behavior.
+
+### Files in current diff (committable)
+
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`
+- `crates/panache-parser/src/parser/inlines/core.rs`
+- `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_citations.snap`
+- `tests/fixtures/cases/citations/expected.md`
+- `.claude/skills/pandoc-ir-migrate/RECAP.md`
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (v)
 
 **Workspace test count: 0 failing → 0 failing.** **Phase 3 LANDED.**
 Footnote references (`[^id]`) now dispatched IR-first under
