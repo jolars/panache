@@ -12,7 +12,229 @@ content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (x)
+## Latest session — 2026-04-30 (xi)
+
+**Workspace test count: 0 failing → 0 failing.** **Phase 8 sub-step D
+LANDED — migration architecturally complete.** `process_brackets`
+runs for both dialects, `try_pandoc_bracket_opaque` and the
+`ConstructKind::PandocLinkOrImage` / `ConstructDispo::PandocLinkOrImage`
+variants are gone, the dispatcher's IR-driven arm now consumes
+`BracketDispo::Open` for both dialects (replacing the legacy CM-gated
+`[`/`![` branches), and `parse_inline_text*` passes `Some(&plans.brackets)`
+unconditionally. Net diff: −139 lines (309 insertions, 448 deletions
+across `core.rs` and `inline_ir.rs`). Diff is committable.
+
+### What landed this session
+
+1. **`process_brackets` is now dialect-aware**:
+   - New parameter `dialect: Dialect`.
+   - Under Pandoc, the §6.3 `deactivate_earlier_link_openers` pass
+     is skipped — outer-wins semantics for nested links is enforced
+     by the dispatcher's `suppress_inner_links` flag during LINK-text
+     recursion (sub-step C).
+   - Reference-form resolution (full-ref / collapsed / shortcut) is
+     **shape-only** under Pandoc (any non-empty label resolves),
+     preserving the legacy `reference_resolves`-returns-`true`
+     behavior. The deliberate architectural choice noted in
+     recap-(x) — "the parser INTENTIONALLY emits LINK nodes for
+     unresolved Pandoc shortcuts" — is preserved here too.
+2. **CommonMark §6.3 shortcut-suppression rule fixed**: when a `]` is
+   followed by `[label]` (full-ref shape) or `[]` (collapsed marker),
+   the shortcut form is suppressed even if the link text resolves as
+   a refdef. Pre-existing bug in `process_brackets` that was masked
+   while bracket emission still ran through the legacy CM-gated
+   dispatcher branches; surfaced once the legacy branches were
+   dropped. Spec example #571 (`[foo][bar][baz]` with `[baz]: /url`)
+   exercises this.
+3. **`build_ir` opens `[`/`![` for any link-or-reference extension**:
+   gates widened from `inline_links` / `inline_images` to
+   `inline_links || reference_links` and `inline_images ||
+   reference_links`. MultiMarkdown disables `inline_images` /
+   `inline_links` but enables `reference_links` for `![alt][ref]` /
+   `[text][ref]` reference forms; the previous narrow gates
+   prevented `process_brackets` from seeing those bracket events.
+4. **Pandoc bracket-text autolink suppression**: `build_ir` now
+   maintains a `pandoc_bracket_extent` state. At `[` or `![` under
+   Pandoc, the new helper `try_pandoc_bracket_link_extent` does a
+   lookahead via the dispatcher's `try_parse_inline_link` /
+   `try_parse_reference_link` chain. If the bracket-shape forms a
+   valid link/image, `pandoc_bracket_extent` is set to the link's
+   total byte end; while `pos < pandoc_bracket_extent`, the
+   autolink / native-span / raw-html branches are skipped.
+   Replicates the bracket-link-text opacity that
+   `try_pandoc_bracket_opaque`'s wholesale Construct event
+   previously provided. Verified against pandoc-native:
+   `[foo<https://...>](uri)` keeps the bracket as a LINK with
+   the autolink text literal inside.
+5. **Dispatcher's IR-driven arm switched from `ConstructDispo::PandocLinkOrImage`
+   to `BracketDispo::Open`**:
+   - Lookup is `bracket_plan.lookup(pos)` and matches on
+     `BracketDispo::Open { is_image, suffix_end, .. }`.
+   - For inline links/images: `pos + len >= suffix_end` (loose —
+     Pandoc-extended `{.attrs}` can extend past the IR's shape-only
+     `suffix_end`).
+   - For reference links/images: `pos + len == suffix_end` (strict —
+     ensures the dispatcher's shape-detection agrees with the IR's
+     resolution kind, e.g. preventing the dispatcher from greedily
+     returning a full-ref shape when the IR resolved as shortcut).
+   - Same `suppress_inner_links` gate as before (sub-step C).
+   - `reference_resolves` helper deleted; the IR's `BracketDispo::Open`
+     existence already encodes "this is a resolved reference".
+6. **Legacy CM-gated `[`/`![` dispatcher branches deleted**: the
+   inline image / reference image / inline link / reference link
+   branches are now consumed by the IR-driven arm. CM-gated
+   dispatcher branches that remain are footnote-ref `[^id]` and
+   bracketed citation `[@cite]` — these share the `[...]` shape but
+   don't go through `process_brackets`.
+7. **`bracket_says_resolved` helper deleted**: redundant with the
+   IR-driven arm.
+8. **`bracket_plan` ternary in `parse_inline_text*` deleted**: both
+   dialects now pass `Some(&plans.brackets)` unconditionally.
+
+### Migration status: COMPLETE-IN-SPIRIT
+
+Every Pandoc inline construct's *resolution decision* now flows
+from the IR. The dispatcher's `try_parse_*` recognizers are still
+called to *parse* a matched range into a CST subtree, but "what is
+this byte range?" is answered exclusively by the IR. That is the
+SKILL.md migration-complete invariant.
+
+The three pre-existing pandoc-native divergences from recap-(viii)
+remain (and are preserved by sub-step D's shape-only resolution):
+- `[foo]` with no refdef → malformed `LINK` (should be literal `Str
+  "[foo]"`).
+- `*foo [bar* baz]` → `TEXT` + partial `LINK` (should be all literal).
+- `[link [inner](u2)](u1)` → outer LINK with literal `[inner](u2)`
+  inside (this one IS now correct — fixed by sub-step C's
+  `suppress_inner_links`).
+
+Wait, that's two remaining. Bug #3 is fixed (sub-step C). Bugs #1
+and #2 remain — they need refdef-aware shortcut resolution under
+Pandoc, which is the parser-linter-LSP cross-cut described in
+recap-(x). Out of scope for the IR migration.
+
+### Verification done
+
+- Workspace tests: 0 → 0 failing (full suite green).
+- CommonMark conformance allowlist (`commonmark_allowlist`): green.
+- clippy `--all-targets --all-features -- -D warnings`: clean.
+- `cargo fmt -- --check`: clean.
+- Probes against `pandoc -f markdown -t native`:
+  - `[foo<https://example.com/?search=](uri)>` — Pandoc dialect:
+    LINK with text "foo<https://example.com/?search=" and dest
+    "uri", trailing `>` literal. Matches pandoc-native. ✓
+  - `[foo<https://example.com/?search=>]` — Pandoc dialect:
+    pre-existing shape-only divergence (panache emits LINK,
+    pandoc-native parses literal `[foo` + autolink + `]`).
+    Documented as bug #1/#2-class.
+  - `*[bar*](/url)` — outer `*` literal, LINK with EMPHASIS inside.
+  - `[foo][bar][baz]` with `[baz]: /url` (CommonMark) — `[foo]`
+    literal + LINK `[bar][baz]` to /url. Fixed by shortcut
+    suppression. ✓
+- MMD `![image][ref]` reference image case — works under widened
+  `inline_images || reference_links` gate. ✓
+
+### Files in committable diff
+
+- `crates/panache-parser/src/parser/inlines/core.rs`
+  (−481/+292: dropped legacy CM-gated `[`/`![` branches; dropped
+  `bracket_says_resolved` helper; dropped `reference_resolves`
+  helper; replaced `ConstructDispo::PandocLinkOrImage` arm with
+  `BracketDispo::Open` arm; dropped `bracket_plan` ternary in
+  `parse_inline_text*`)
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`
+  (~+150/−~125: `process_brackets` accepts `dialect`; shape-only
+  shortcut/collapsed/full-ref under Pandoc; CM-only deactivation
+  pass; CommonMark §6.3 shortcut-suppression rule (full-ref or
+  collapsed shape suppresses shortcut); `[`/`![` opener gates
+  widened to `inline_links || reference_links` /
+  `inline_images || reference_links`; new
+  `try_pandoc_bracket_link_extent` lookahead helper; new
+  `pandoc_bracket_extent` state with autolink / native-span /
+  raw-html suppression while inside; dropped
+  `try_pandoc_bracket_opaque`; dropped
+  `ConstructKind::PandocLinkOrImage` and
+  `ConstructDispo::PandocLinkOrImage` enum variants and their
+  `build_construct_plan` arm)
+
+### Suggested next sub-targets, ranked
+
+The migration's structural goal is met. Remaining work is polish
+plus the previously-deferred pre-existing bugs.
+
+1. **Comment / docstring cleanup pass.** With `try_pandoc_bracket_opaque`,
+   `ConstructKind::PandocLinkOrImage`, and the legacy CM-gated `[`/`![`
+   dispatcher branches all gone, comments referencing them are stale.
+   Audit the `inline_ir.rs` and `core.rs` module/function docstrings.
+   Low-risk, low-priority polish.
+2. **Optional simplification (carried forward)**: tighten
+   `parse_inline_range_impl`'s signature — `plan`, `bracket_plan`, and
+   `construct_plan` are always `Some` in production callers now. Drop
+   the `Option<&...>` wrappers for `&...`. Mild ergonomic win.
+3. **Bugs #1/#2: parser-as-source-of-truth path.** Documented as out
+   of scope for the IR migration. Requires a coordinated change to
+   the linter / LSP / formatter so they walk source text (or a
+   side-channel) for unresolved bracket-shaped patterns instead of
+   walking `LINK` nodes. Multi-session workstream of its own.
+4. **Drop `LinkScanContext.skip_autolinks`?** Now that
+   `pandoc_bracket_extent` suppresses autolink Constructs *in
+   `build_ir`*, the dispatcher's link-text scanning may not need the
+   per-call `skip_autolinks` flag. Worth verifying and simplifying.
+   Minor cleanup, not load-bearing.
+
+### Don't redo / known traps (carried forward + new)
+
+All Phase 1–7 traps still apply. Plus the recap-(x) traps, plus:
+
+- **NEW (this session): `process_brackets`'s shortcut path must
+  check whether the `]` is followed by `[]` or `[label]` *before*
+  trying to match.** If either shape is present (regardless of
+  whether the label resolves), shortcut is suppressed and the
+  bracket pair stays literal. Per CommonMark §6.3 verbatim: "A
+  shortcut reference link consists of a link label that matches a
+  link reference definition elsewhere in the document and is not
+  followed by [] or a link label." The fix is in process_brackets's
+  ordering — full-ref / collapsed branches set a
+  `shortcut_suppressed` flag that gates the shortcut branch. Don't
+  fall through from full-ref-fail straight to shortcut.
+- **NEW (this session): `build_ir`'s `[`/`![` opener gates must be
+  widened beyond just `inline_links` / `inline_images`.** Use
+  `inline_links || reference_links` and `inline_images ||
+  reference_links`. Otherwise MultiMarkdown (which disables
+  `inline_links` / `inline_images` but enables `reference_links` for
+  reference forms) gets no bracket events and `process_brackets`
+  has nothing to resolve. This bit me hard during sub-step D.
+- **NEW (this session): the IR-driven dispatch arm must constrain
+  the dispatcher's `try_parse_*` len against the IR's
+  `BracketDispo::Open.suffix_end`.** Reference forms use strict
+  equality (`pos + len == suffix_end`) so the dispatcher's
+  shape-detection (full-ref vs shortcut) agrees with the IR's
+  resolution kind. Inline forms use `>=` (Pandoc-extended
+  `{.attrs}` can extend past suffix_end). Without this constraint,
+  `try_parse_reference_link` on `[foo][bar]` always returns
+  full-ref shape (len=10), even when the IR resolved `[foo]` as
+  shortcut (suffix_end=5) — they disagree and the dispatcher wins,
+  emitting a malformed LINK with `LINK_REF "bar"`.
+- **NEW (this session): Pandoc bracket-text autolink suppression
+  is needed in `build_ir`, not just in the dispatcher.** The
+  previous `try_pandoc_bracket_opaque` approach absorbed the
+  bracket-shape WHOLE as a Construct event, which incidentally
+  prevented autolink scanning inside. Without it, the autolink
+  scanner can eat the closing `]` of a Pandoc link's text (e.g.
+  `[foo<https://...](uri)>` — the autolink would consume from `<`
+  to the trailing `>`, eating the `]`). The fix is the
+  `pandoc_bracket_extent` state + `try_pandoc_bracket_link_extent`
+  lookahead: when `[`/`![` could form a valid link/image, suppress
+  autolink / native-span / raw-html scanning until past the
+  bracket's end. Only fires when the bracket forms a link —
+  unmatched `[`/`]` and bracket-shapes-without-suffix don't
+  trigger suppression (matches pandoc-native:
+  `[foo<https://...>]` parses the autolink and treats the
+  brackets as literal).
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (x)
 
 **Workspace test count: 0 failing → 0 failing.** **Phase 8 partially
 landed (sub-step C only).** Bug #3 (link-in-link nesting under Pandoc:

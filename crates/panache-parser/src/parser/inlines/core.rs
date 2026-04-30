@@ -15,43 +15,6 @@ use super::inline_ir::{
     BracketPlan, ConstructDispo, ConstructPlan, DelimChar, EmphasisKind, EmphasisPlan,
 };
 
-/// CommonMark dialect bracket-resolution helper.
-///
-/// The emission walk uses this to gate `try_parse_reference_*` /
-/// `try_parse_inline_*` matches: under CommonMark dialect a
-/// reference-shaped bracket pair only counts as a link if its
-/// (normalised) label resolves to a definition in the document refdef
-/// map. This keeps emission in sync with the IR's refdef-aware bracket
-/// resolution, so unresolved brackets fall through to literal text and
-/// the inner emphasis bytes they were previously hiding stay visible to
-/// the emphasis pass. Spec example #523 is the canonical case.
-///
-/// Under the Pandoc dialect (and CommonMark configurations that haven't
-/// pre-computed the refdef map) we keep the historical shape-only skip
-/// to preserve existing behavior.
-fn reference_resolves(
-    config: &ParserOptions,
-    link_text: &str,
-    label: &str,
-    is_shortcut: bool,
-) -> bool {
-    if config.dialect != Dialect::CommonMark {
-        return true;
-    }
-    let labels = match &config.refdef_labels {
-        Some(map) => map,
-        None => return true,
-    };
-
-    let key_raw = if is_shortcut || label.is_empty() {
-        link_text
-    } else {
-        label
-    };
-    let key = super::refdef_map::normalize_label(key_raw);
-    !key.is_empty() && labels.contains(&key)
-}
-
 // Import inline element parsers from sibling modules
 use super::bookdown::{
     try_parse_bookdown_definition, try_parse_bookdown_reference, try_parse_bookdown_text_reference,
@@ -121,16 +84,6 @@ pub fn parse_inline_text_recursive(
     );
 
     let plans = super::inline_ir::build_full_plans(text, 0, text.len(), config);
-    let bracket_plan = if config.dialect == Dialect::CommonMark {
-        Some(&plans.brackets)
-    } else {
-        // Pandoc keeps the legacy `try_parse_*` dispatcher chain for
-        // bracket emission; the IR is consulted only for emphasis. The
-        // IR's `BracketPlan` is empty under Pandoc (process_brackets is
-        // skipped) — passing `None` keeps `bracket_says_resolved` true
-        // so the dispatcher branches fire as before.
-        None
-    };
     parse_inline_range_impl(
         text,
         0,
@@ -139,7 +92,7 @@ pub fn parse_inline_text_recursive(
         builder,
         false,
         Some(&plans.emphasis),
-        bracket_plan,
+        Some(&plans.brackets),
         Some(&plans.constructs),
         false,
     );
@@ -174,11 +127,6 @@ pub fn parse_inline_text(
     );
 
     let plans = super::inline_ir::build_full_plans(text, 0, text.len(), config);
-    let bracket_plan = if config.dialect == Dialect::CommonMark {
-        Some(&plans.brackets)
-    } else {
-        None
-    };
     parse_inline_range_impl(
         text,
         0,
@@ -187,7 +135,7 @@ pub fn parse_inline_text(
         builder,
         true,
         Some(&plans.emphasis),
-        bracket_plan,
+        Some(&plans.brackets),
         Some(&plans.constructs),
         suppress_inner_links,
     );
@@ -350,117 +298,122 @@ fn parse_inline_range_impl(
                         continue;
                     }
                 }
-                ConstructDispo::PandocLinkOrImage { end: dispo_end } => {
-                    if dispo_end <= end {
-                        let bytes = text.as_bytes();
-                        let ctx = LinkScanContext::from_options(config);
-                        let allow_shortcut = config.extensions.shortcut_reference_links;
-                        let is_image = bytes[pos] == b'!';
+            }
+        }
 
-                        // pandoc-native: links cannot contain other links,
-                        // so when recursing into a LINK / REFERENCE LINK's
-                        // text the IR-driven dispatch must not re-resolve
-                        // an inner `[...](...)` / `[...][...]`. Images are
-                        // still allowed (`![alt with [inner](u)](u2)` keeps
-                        // the inner LINK per pandoc-native).
-                        if suppress_inner_links && !is_image {
-                            // fall through to literal byte handling
-                        } else if is_image {
-                            if config.extensions.inline_images
-                                && let Some((len, alt_text, dest, attributes)) =
-                                    try_parse_inline_image(&text[pos..], ctx)
-                                && pos + len == dispo_end
-                            {
-                                if pos > text_start {
-                                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-                                }
-                                log::trace!("IR: matched inline image at pos {}", pos);
-                                emit_inline_image(
-                                    builder,
-                                    &text[pos..pos + len],
-                                    alt_text,
-                                    dest,
-                                    attributes,
-                                    config,
-                                );
-                                pos += len;
-                                text_start = pos;
-                                continue;
-                            }
-                            if config.extensions.reference_links
-                                && let Some((len, alt_text, reference, is_shortcut)) =
-                                    try_parse_reference_image(&text[pos..], allow_shortcut)
-                                && pos + len == dispo_end
-                                && reference_resolves(config, alt_text, &reference, is_shortcut)
-                            {
-                                if pos > text_start {
-                                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-                                }
-                                log::trace!("IR: matched reference image at pos {}", pos);
-                                emit_reference_image(
-                                    builder,
-                                    alt_text,
-                                    &reference,
-                                    is_shortcut,
-                                    config,
-                                );
-                                pos += len;
-                                text_start = pos;
-                                continue;
-                            }
-                        } else {
-                            if config.extensions.inline_links
-                                && let Some((len, link_text, dest, attributes)) =
-                                    try_parse_inline_link(
-                                        &text[pos..],
-                                        config.dialect == Dialect::CommonMark,
-                                        ctx,
-                                    )
-                                && pos + len == dispo_end
-                            {
-                                if pos > text_start {
-                                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-                                }
-                                log::trace!("IR: matched inline link at pos {}", pos);
-                                emit_inline_link(
-                                    builder,
-                                    &text[pos..pos + len],
-                                    link_text,
-                                    dest,
-                                    attributes,
-                                    config,
-                                );
-                                pos += len;
-                                text_start = pos;
-                                continue;
-                            }
-                            if config.extensions.reference_links
-                                && let Some((len, link_text, reference, is_shortcut)) =
-                                    try_parse_reference_link(
-                                        &text[pos..],
-                                        allow_shortcut,
-                                        config.extensions.inline_links,
-                                        ctx,
-                                    )
-                                && pos + len == dispo_end
-                                && reference_resolves(config, link_text, &reference, is_shortcut)
-                            {
-                                if pos > text_start {
-                                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-                                }
-                                log::trace!("IR: matched reference link at pos {}", pos);
-                                emit_reference_link(
-                                    builder,
-                                    link_text,
-                                    &reference,
-                                    is_shortcut,
-                                    config,
-                                );
-                                pos += len;
-                                text_start = pos;
-                                continue;
-                            }
+        // IR-driven bracket dispatch (Phase 8): if the IR's
+        // `process_brackets` resolved a bracket pair starting at this
+        // position, emit it directly via the appropriate helper. The
+        // dispatcher's `try_parse_*` recognizers compute the actual
+        // byte length and extract content / attributes; the IR's
+        // `suffix_end` is used to constrain the dispatcher's match
+        // shape so the two pipelines agree on which link variant
+        // resolved (e.g. `[foo][bar]` with `bar` undefined and `foo`
+        // defined: IR resolves `[foo]` as shortcut, but the
+        // dispatcher's `try_parse_reference_link` would otherwise
+        // greedily return the full-ref shape). Suppression of inner
+        // LINK / REFERENCE LINK during LINK-text recursion is applied
+        // here (pandoc-native: outer-wins for nested links).
+        //
+        // Pandoc-extended `{.attrs}` after a link can extend the
+        // dispatcher's match length past the IR's `suffix_end`. The
+        // dispatcher's len is therefore constrained to
+        // `[suffix_end, end]` rather than required to equal
+        // `suffix_end` exactly.
+        if let Some(plan) = bracket_plan
+            && let Some(super::inline_ir::BracketDispo::Open {
+                is_image,
+                suffix_end,
+                ..
+            }) = plan.lookup(pos)
+        {
+            let is_image = *is_image;
+            let dispo_suffix_end = *suffix_end;
+            let suppress = suppress_inner_links && !is_image;
+            if !suppress {
+                let ctx = LinkScanContext::from_options(config);
+                let allow_shortcut = config.extensions.shortcut_reference_links;
+                let is_commonmark = config.dialect == Dialect::CommonMark;
+                if is_image {
+                    if config.extensions.inline_images
+                        && let Some((len, alt_text, dest, attributes)) =
+                            try_parse_inline_image(&text[pos..], ctx)
+                        && pos + len >= dispo_suffix_end
+                        && pos + len <= end
+                    {
+                        if pos > text_start {
+                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                         }
+                        log::trace!("IR: matched inline image at pos {}", pos);
+                        emit_inline_image(
+                            builder,
+                            &text[pos..pos + len],
+                            alt_text,
+                            dest,
+                            attributes,
+                            config,
+                        );
+                        pos += len;
+                        text_start = pos;
+                        continue;
+                    }
+                    if config.extensions.reference_links
+                        && let Some((len, alt_text, reference, is_shortcut)) =
+                            try_parse_reference_image(&text[pos..], allow_shortcut)
+                        && pos + len == dispo_suffix_end
+                        && pos + len <= end
+                    {
+                        if pos > text_start {
+                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                        }
+                        log::trace!("IR: matched reference image at pos {}", pos);
+                        emit_reference_image(builder, alt_text, &reference, is_shortcut, config);
+                        pos += len;
+                        text_start = pos;
+                        continue;
+                    }
+                } else {
+                    if config.extensions.inline_links
+                        && let Some((len, link_text, dest, attributes)) =
+                            try_parse_inline_link(&text[pos..], is_commonmark, ctx)
+                        && pos + len >= dispo_suffix_end
+                        && pos + len <= end
+                    {
+                        if pos > text_start {
+                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                        }
+                        log::trace!("IR: matched inline link at pos {}", pos);
+                        emit_inline_link(
+                            builder,
+                            &text[pos..pos + len],
+                            link_text,
+                            dest,
+                            attributes,
+                            config,
+                        );
+                        pos += len;
+                        text_start = pos;
+                        continue;
+                    }
+                    if config.extensions.reference_links
+                        && let Some((len, link_text, reference, is_shortcut)) =
+                            try_parse_reference_link(
+                                &text[pos..],
+                                allow_shortcut,
+                                config.extensions.inline_links,
+                                ctx,
+                            )
+                        && pos + len == dispo_suffix_end
+                        && pos + len <= end
+                    {
+                        if pos > text_start {
+                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                        }
+                        log::trace!("IR: matched reference link at pos {}", pos);
+                        emit_reference_link(builder, link_text, &reference, is_shortcut, config);
+                        pos += len;
+                        text_start = pos;
+                        continue;
                     }
                 }
             }
@@ -995,179 +948,41 @@ fn parse_inline_range_impl(
             continue;
         }
 
-        // CommonMark IR bracket plan: if a plan is present, it has decided
-        // every `[` / `![` position's disposition (resolved link/image, or
-        // literal text). Use it to gate the legacy `try_parse_*` branches
-        // below — the IR additionally enforces §6.3 link-in-link
-        // suppression, which the legacy shape-based path doesn't (spec
-        // example #533). When the plan says a position is NOT a resolved
-        // opener, skip the link/image branches entirely so the bracket
-        // bytes coalesce into the surrounding TEXT.
-        let bracket_says_resolved = |p: usize| -> bool {
-            bracket_plan.is_none_or(|bp| {
-                matches!(
-                    bp.lookup(p),
-                    Some(super::inline_ir::BracketDispo::Open { .. })
-                )
-            })
-        };
-
-        // Images and links - process in order: inline image, reference
-        // image, footnote ref, inline link, reference link. Phase 6:
-        // under Pandoc dialect this is consumed via the IR's
-        // `ConstructPlan` at the top of the loop; the dispatcher branch
-        // only fires for CommonMark dialect.
-        if config.dialect == Dialect::CommonMark
-            && byte == b'!'
-            && pos + 1 < text.len()
-            && text.as_bytes()[pos + 1] == b'['
-            && bracket_says_resolved(pos)
+        // Bracket-starting elements (Phase 8): inline / reference
+        // links and images are dispatched via the IR-driven arm at
+        // the top of the loop, gated by the IR's `BracketPlan`. Only
+        // dialect-CM-specific Pandoc-extension constructs that share
+        // the `[...]` shape (footnote refs, bracketed citations) need
+        // a CM-gated dispatcher branch — under Pandoc dialect they
+        // were already moved to dedicated `Construct` events earlier
+        // in the migration (Phases 3-4).
+        if byte == b'['
+            && config.dialect == Dialect::CommonMark
+            && config.extensions.footnotes
+            && let Some((len, id)) = try_parse_footnote_reference(&text[pos..])
         {
-            // Try inline image: ![alt](url)
-            if let Some((len, alt_text, dest, attributes)) =
-                try_parse_inline_image(&text[pos..], LinkScanContext::from_options(config))
-                && pos + len <= end
-            {
-                if pos > text_start {
-                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-                }
-                log::trace!("Matched inline image at pos {}", pos);
-                emit_inline_image(
-                    builder,
-                    &text[pos..pos + len],
-                    alt_text,
-                    dest,
-                    attributes,
-                    config,
-                );
-                pos += len;
-                text_start = pos;
-                continue;
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-
-            // Try reference image: ![alt][ref] or ![alt]. Under CommonMark
-            // dialect this branch is gated on the document refdef map: a
-            // bracket-shaped pair without a resolving label is not a link
-            // and must fall through to literal text so emphasis processing
-            // (which already saw it as transparent via the IR-aware
-            // `scan_delim_runs`) and the emission stay in sync. See spec
-            // example #523. The Pandoc dialect keeps the historical
-            // shape-only behavior because its renderer / formatter has
-            // its own resolution path.
-            if config.extensions.reference_links {
-                let allow_shortcut = config.extensions.shortcut_reference_links;
-                if let Some((len, alt_text, reference, is_shortcut)) =
-                    try_parse_reference_image(&text[pos..], allow_shortcut)
-                    && pos + len <= end
-                    && reference_resolves(config, alt_text, &reference, is_shortcut)
-                {
-                    if pos > text_start {
-                        builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-                    }
-                    log::trace!("Matched reference image at pos {}", pos);
-                    emit_reference_image(builder, alt_text, &reference, is_shortcut, config);
-                    pos += len;
-                    text_start = pos;
-                    continue;
-                }
-            }
+            log::trace!("Matched footnote reference at pos {}", pos);
+            emit_footnote_reference(builder, &id);
+            pos += len;
+            text_start = pos;
+            continue;
         }
-
-        // Process bracket-starting elements
-        if byte == b'[' {
-            // Try footnote reference: [^id]. Phase 3: under Pandoc
-            // dialect this is consumed via the IR's `ConstructPlan` at
-            // the top of the loop; the dispatcher branch only fires for
-            // CommonMark dialect with the extension explicitly enabled.
-            if config.dialect == Dialect::CommonMark
-                && config.extensions.footnotes
-                && let Some((len, id)) = try_parse_footnote_reference(&text[pos..])
-            {
-                if pos > text_start {
-                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-                }
-                log::trace!("Matched footnote reference at pos {}", pos);
-                emit_footnote_reference(builder, &id);
-                pos += len;
-                text_start = pos;
-                continue;
+        if byte == b'['
+            && config.dialect == Dialect::CommonMark
+            && config.extensions.citations
+            && let Some((len, content)) = try_parse_bracketed_citation(&text[pos..])
+        {
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-
-            // Try inline link: [text](url). Phase 6: under Pandoc
-            // dialect this is consumed via the IR's `ConstructPlan` at
-            // the top of the loop; the dispatcher branch only fires for
-            // CommonMark dialect.
-            if config.dialect == Dialect::CommonMark
-                && config.extensions.inline_links
-                && bracket_says_resolved(pos)
-                && let Some((len, link_text, dest, attributes)) =
-                    try_parse_inline_link(&text[pos..], true, LinkScanContext::from_options(config))
-                && pos + len <= end
-            {
-                if pos > text_start {
-                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-                }
-                log::trace!("Matched inline link at pos {}", pos);
-                emit_inline_link(
-                    builder,
-                    &text[pos..pos + len],
-                    link_text,
-                    dest,
-                    attributes,
-                    config,
-                );
-                pos += len;
-                text_start = pos;
-                continue;
-            }
-
-            // Try reference link: [text][ref] or [text]. Refdef-aware
-            // under CommonMark dialect — see the matching
-            // reference-image branch above for the rationale. Phase 6:
-            // under Pandoc dialect this is consumed via the IR's
-            // `ConstructPlan` at the top of the loop.
-            if config.dialect == Dialect::CommonMark
-                && config.extensions.reference_links
-                && bracket_says_resolved(pos)
-            {
-                let allow_shortcut = config.extensions.shortcut_reference_links;
-                if let Some((len, link_text, reference, is_shortcut)) = try_parse_reference_link(
-                    &text[pos..],
-                    allow_shortcut,
-                    config.extensions.inline_links,
-                    LinkScanContext::from_options(config),
-                ) && pos + len <= end
-                    && reference_resolves(config, link_text, &reference, is_shortcut)
-                {
-                    if pos > text_start {
-                        builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-                    }
-                    log::trace!("Matched reference link at pos {}", pos);
-                    emit_reference_link(builder, link_text, &reference, is_shortcut, config);
-                    pos += len;
-                    text_start = pos;
-                    continue;
-                }
-            }
-
-            // Try bracketed citation: [@cite]. Phase 4: under Pandoc
-            // dialect this is consumed via the IR's `ConstructPlan` at
-            // the top of the loop; the dispatcher branch only fires
-            // for CommonMark dialect with the extension explicitly
-            // enabled.
-            if config.dialect == Dialect::CommonMark
-                && config.extensions.citations
-                && let Some((len, content)) = try_parse_bracketed_citation(&text[pos..])
-            {
-                if pos > text_start {
-                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-                }
-                log::trace!("Matched bracketed citation at pos {}", pos);
-                emit_bracketed_citation(builder, content);
-                pos += len;
-                text_start = pos;
-                continue;
-            }
+            log::trace!("Matched bracketed citation at pos {}", pos);
+            emit_bracketed_citation(builder, content);
+            pos += len;
+            text_start = pos;
+            continue;
         }
 
         // Try bracketed spans: [text]{.class}

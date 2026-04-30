@@ -211,14 +211,6 @@ pub enum ConstructKind {
     /// boundary. Emission re-parses the construct via the dispatcher's
     /// existing `try_parse_*` chain.
     PandocOpaque,
-    /// Pandoc bracket-shaped link or image (inline link `[text](dest)`,
-    /// reference link `[text][label]` / `[text][]` / `[text]`, inline
-    /// image `![alt](dest)`, reference image `![alt][label]` etc.).
-    /// Recognised in `build_ir` under `Dialect::Pandoc` and consumed
-    /// by the emission walk via the IR's `ConstructPlan` (Phase 6).
-    /// The dispatcher's legacy `[`/`![` link/image branches are gated
-    /// to CommonMark dialect only.
-    PandocLinkOrImage,
     /// Pandoc inline footnote `^[note text]`. Recognised in `build_ir`
     /// under `Dialect::Pandoc` and consumed by the emission walk via
     /// the IR's `ConstructPlan` (Phase 2). The dispatcher's legacy
@@ -319,6 +311,18 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
 
     let mut pos = start;
     let mut text_run_start = start;
+    // Pandoc-only: extent of the current bracket-shape link/image's
+    // opaque range. While `pos < pandoc_bracket_extent`, autolinks /
+    // raw HTML / native spans are NOT recognised — pandoc-native
+    // treats `[link text]` as opaque to those constructs (CommonMark
+    // spec example #526 / #538). The lookahead at `[`/`![` sets this
+    // when a bracket-shape forms a valid link/image; once `pos`
+    // passes the extent, normal scanning resumes. CommonMark
+    // dialect's link-text-vs-autolink ordering is handled by the
+    // dispatcher's `try_parse_inline_link` rejecting outer matches
+    // when the link text contains a valid autolink (a different
+    // mechanism, see `LinkScanContext.skip_autolinks`).
+    let mut pandoc_bracket_extent: usize = 0;
 
     macro_rules! flush_text {
         () => {
@@ -333,6 +337,20 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
 
     while pos < end {
         let b = bytes[pos];
+
+        // Pandoc-only: at `[` or `![`, look ahead to see if this
+        // bracket-shape forms a valid link/image. If so, suppress
+        // autolink / raw HTML / native span recognition until `pos`
+        // passes the bracket-shape's end. Skipped if we're already
+        // inside an enclosing bracket-shape's opaque range.
+        if !is_commonmark
+            && pos >= pandoc_bracket_extent
+            && (b == b'[' || (b == b'!' && pos + 1 < end && bytes[pos + 1] == b'['))
+            && let Some(len) = try_pandoc_bracket_link_extent(text, pos, end, config)
+        {
+            pandoc_bracket_extent = pos + len;
+        }
+        let in_pandoc_bracket = !is_commonmark && pos < pandoc_bracket_extent;
 
         // Backslash escape (§2.4) — including `\\\n` hard line break.
         if b == b'\\'
@@ -407,8 +425,10 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
         // before the generic autolink/raw-html branches so the open tag
         // doesn't get claimed as inline HTML. Span content is opaque to
         // the emphasis pass; emission consumes the event via the IR's
-        // `ConstructPlan` (Phase 2).
+        // `ConstructPlan` (Phase 2). Suppressed inside Pandoc
+        // bracket-shape link/image text.
         if !is_commonmark
+            && !in_pandoc_bracket
             && b == b'<'
             && exts.native_spans
             && let Some((len, _, _)) = try_parse_native_span(&text[pos..])
@@ -425,9 +445,11 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
             continue;
         }
 
-        // Autolink (§6.5) before raw HTML — autolinks are the more specific
-        // shape inside `<...>`.
-        if b == b'<' {
+        // Autolink (§6.5) before raw HTML — autolinks are the more
+        // specific shape inside `<...>`. Both are suppressed inside
+        // Pandoc bracket-shape link/image text (pandoc-native treats
+        // link text as opaque to autolinks and raw HTML).
+        if b == b'<' && !in_pandoc_bracket {
             if exts.autolinks
                 && let Some((len, _)) = try_parse_autolink(&text[pos..], is_commonmark)
                 && pos + len <= end
@@ -575,31 +597,16 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
             continue;
         }
 
-        // Pandoc-only: bracket-shaped link/image constructs. Tries the
-        // dispatcher's precedence order to identify the full byte range
-        // of any bracket-shaped Pandoc link or image, and emits them as
-        // a single `Construct` so the emphasis pass cannot pair across
-        // their boundaries AND the emission walk can dispatch them via
-        // the IR's `ConstructPlan` (Phase 6). Footnote refs (`[^id]`),
-        // bracketed citations (`[@cite]`), and bracketed spans
-        // (`[text]{attrs}`) are handled by dedicated branches above.
-        if !is_commonmark
-            && (b == b'[' || (b == b'!' && pos + 1 < end && bytes[pos + 1] == b'['))
-            && let Some(len) = try_pandoc_bracket_opaque(text, pos, end, config)
+        // `![` opens an image bracket. Recognised whenever any
+        // image-producing extension is on — `inline_images` for the
+        // `![alt](url)` form, or `reference_links` for the
+        // `![alt][label]` reference-image form (e.g. MultiMarkdown
+        // disables `inline_images` but uses reference images).
+        if b == b'!'
+            && pos + 1 < end
+            && bytes[pos + 1] == b'['
+            && (exts.inline_images || exts.reference_links)
         {
-            flush_text!();
-            events.push(IrEvent::Construct {
-                start: pos,
-                end: pos + len,
-                kind: ConstructKind::PandocLinkOrImage,
-            });
-            pos += len;
-            text_run_start = pos;
-            continue;
-        }
-
-        // `![` opens an image bracket.
-        if b == b'!' && pos + 1 < end && bytes[pos + 1] == b'[' && exts.inline_images {
             flush_text!();
             events.push(IrEvent::OpenBracket {
                 start: pos,
@@ -613,15 +620,12 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
             continue;
         }
 
-        // `[` opens a link bracket.
-        if b == b'[' && exts.inline_links {
+        // `[` opens a link bracket. Recognised whenever any
+        // link-producing extension is on — `inline_links` for
+        // `[text](url)`, or `reference_links` for `[text][label]` /
+        // `[text]` shortcut form.
+        if b == b'[' && (exts.inline_links || exts.reference_links) {
             flush_text!();
-            // Citations / footnote references / bracketed spans are Pandoc
-            // constructs, not enabled in CommonMark dialect by default.
-            // The IR is CommonMark-only; if any of those are enabled by
-            // user override under a CommonMark flavor, we leave them to
-            // the existing emission path by skipping IR usage at the
-            // dispatcher level (handled in `core::parse_inline_text_recursive`).
             events.push(IrEvent::OpenBracket {
                 start: pos,
                 end: pos + 1,
@@ -865,7 +869,16 @@ fn try_pandoc_math_opaque(
 /// the generic `OpenBracket`/`CloseBracket` emission and the dispatcher
 /// emits the bracket bytes as literal text (or as plain emphasis if the
 /// pattern matches an opener).
-fn try_pandoc_bracket_opaque(
+/// Lookahead helper: at a `[` or `![` byte under Pandoc dialect, return
+/// the total byte length of the bracket-shape link/image if it forms a
+/// valid one, else `None`. Used by `build_ir` to suppress autolink /
+/// raw HTML / native span recognition inside Pandoc link text —
+/// pandoc-native treats link text as opaque to those constructs
+/// (CommonMark spec example #526 / #538 differs). Mirrors the
+/// dispatcher's `try_parse_*` precedence so the lookahead, the IR's
+/// `process_brackets` resolution, and the dispatcher's emission agree
+/// on the bracket-shape's byte boundaries.
+fn try_pandoc_bracket_link_extent(
     text: &str,
     pos: usize,
     end: usize,
@@ -898,8 +911,8 @@ fn try_pandoc_bracket_opaque(
 
     // `[...]` openers — try in dispatcher order. Footnote refs
     // (`[^id]`), bracketed citations (`[@cite]`), and bracketed spans
-    // (`[text]{attrs}`) are handled by dedicated branches in
-    // `build_ir` and do not appear here.
+    // (`[text]{attrs}`) are recognised by their own dedicated branches
+    // in `build_ir` and don't need this lookahead.
     if exts.inline_links
         && let Some((len, _, _, _)) = try_parse_inline_link(&text[pos..], false, ctx)
         && pos + len <= end
@@ -1646,7 +1659,8 @@ fn source_start_event(event: &IrEvent) -> usize {
 // Pass 3: Process brackets (CommonMark §6.3)
 // ============================================================================
 
-/// Resolve `[`/`![`/`]` markers into link/image nodes per CommonMark §6.3.
+/// Resolve `[`/`![`/`]` markers into link/image nodes per CommonMark §6.3
+/// (with Pandoc-aware variations under `Dialect::Pandoc`).
 ///
 /// Walks the IR forward looking for `]` markers. For each one, finds the
 /// nearest active matching `[`/`![` and tries to resolve the bracket pair
@@ -1660,17 +1674,45 @@ fn source_start_event(event: &IrEvent) -> usize {
 ///    `text` (normalised) is in `refdefs`.
 ///
 /// On a match, the opener gets a `BracketResolution` and the closer is
-/// flagged `matched`. All earlier active openers are deactivated to
-/// implement the §6.3 "links may not contain other links" rule. (Image
-/// brackets do not deactivate earlier link openers — only links do.)
+/// flagged `matched`. Under `Dialect::CommonMark`, all earlier active link
+/// openers are deactivated to implement the §6.3 "links may not contain
+/// other links" rule (image brackets do not deactivate earlier link
+/// openers — only links do). Under `Dialect::Pandoc`, the deactivate-pass
+/// is skipped: pandoc-native is outer-wins for nested links (the inner
+/// `[inner](u2)` of `[link [inner](u2)](u1)` is literal text inside the
+/// outer link), and the dispatcher enforces this via a `suppress_inner_links`
+/// flag during LINK-text recursion. So under Pandoc the IR can leave both
+/// outer and inner resolved and trust the dispatcher to suppress inner
+/// LINK emission.
 ///
 /// On a miss the bracket pair stays opaque-as-literal and the closer is
 /// dropped from the bracket stack so the next `]` can re-pair.
-pub fn process_brackets(events: &mut [IrEvent], text: &str, refdefs: Option<&RefdefMap>) {
+///
+/// Reference-form resolution under `Dialect::Pandoc` is shape-only: any
+/// non-empty link text or label resolves regardless of refdef presence,
+/// matching the historical legacy `reference_resolves`-returns-`true`
+/// behavior. (Pandoc emits LINK nodes for unresolved shortcut/collapsed/
+/// full-reference shapes so downstream features — linter, LSP, formatter
+/// — have a typed wrapper to walk. Refdef-aware resolution under Pandoc
+/// is bug #1/#2 territory and is a parser-linter-LSP cross-cut deferred
+/// to a future workstream.)
+pub fn process_brackets(
+    events: &mut [IrEvent],
+    text: &str,
+    refdefs: Option<&RefdefMap>,
+    dialect: crate::options::Dialect,
+) {
     let empty: HashSet<String> = HashSet::new();
     let labels: &HashSet<String> = match refdefs {
         Some(map) => map.as_ref(),
         None => &empty,
+    };
+    let is_commonmark = dialect == crate::options::Dialect::CommonMark;
+    // Under Pandoc, any non-empty reference label resolves shape-only —
+    // matches the legacy `reference_resolves` short-circuit. Under
+    // CommonMark, the refdef map is consulted.
+    let label_resolves = |key_norm: &str| -> bool {
+        !key_norm.is_empty() && (!is_commonmark || labels.contains(key_norm))
     };
 
     // Walk forward through events, treating it as a linear scan for `]`.
@@ -1703,12 +1745,14 @@ pub fn process_brackets(events: &mut [IrEvent], text: &str, refdefs: Option<&Ref
 
         // 1. Inline link / image.
         if let Some((suffix_end, dest, title)) = try_inline_suffix(text, after_close) {
-            // §6.3 link-in-link rule: if this is a *link* (not an image),
-            // and any earlier active link opener exists, deactivate them.
-            // We also deactivate openers strictly before `o` here because
-            // matching means the inner link wins; the spec applies this
-            // *after* matching.
-            if !is_image {
+            // §6.3 link-in-link rule (CommonMark): if this is a *link*
+            // (not an image), and any earlier active link opener exists,
+            // deactivate them. We also deactivate openers strictly before
+            // `o` here because matching means the inner link wins; the
+            // spec applies this *after* matching. Pandoc skips this —
+            // outer-wins is enforced by the dispatcher's
+            // `suppress_inner_links` flag during LINK-text recursion.
+            if !is_image && is_commonmark {
                 deactivate_earlier_link_openers(events, o);
             }
             commit_resolution(
@@ -1730,10 +1774,11 @@ pub fn process_brackets(events: &mut [IrEvent], text: &str, refdefs: Option<&Ref
         }
 
         // 2. Full reference link: `[text][label]`.
-        if let Some((suffix_end, label_raw)) = try_full_reference_suffix(text, after_close) {
-            let label_norm = normalize_label(&label_raw);
-            if !label_norm.is_empty() && labels.contains(&label_norm) {
-                if !is_image {
+        let full_ref_suffix = try_full_reference_suffix(text, after_close);
+        if let Some((suffix_end, label_raw)) = &full_ref_suffix {
+            let label_norm = normalize_label(label_raw);
+            if label_resolves(&label_norm) {
+                if !is_image && is_commonmark {
                     deactivate_earlier_link_openers(events, o);
                 }
                 commit_resolution(
@@ -1743,53 +1788,58 @@ pub fn process_brackets(events: &mut [IrEvent], text: &str, refdefs: Option<&Ref
                     text_start,
                     text_end,
                     after_close,
-                    suffix_end,
-                    LinkKind::FullReference { label: label_raw },
+                    *suffix_end,
+                    LinkKind::FullReference {
+                        label: label_raw.clone(),
+                    },
                 );
                 mark_opener_resolved(events, o);
                 i += 1;
                 continue;
             }
             // Bracketed but unresolved label: §6.3 says we still treat
-            // `[text][label]` as not-a-link, but the brackets get consumed
-            // as literal text. Continue to next `]`.
+            // `[text][label]` as not-a-link, but the brackets get
+            // consumed as literal text AND the shortcut form is
+            // suppressed (since the `]` is followed by a link label).
         }
 
-        // 3 & 4. Collapsed `[]` or shortcut.
+        // 3. Collapsed `[]`.
         let link_text = &text[text_start..text_end];
         let link_text_norm = normalize_label(link_text);
         let is_collapsed = is_collapsed_marker(text, after_close);
         let collapsed_suffix_end = after_close + 2;
 
-        if !link_text_norm.is_empty() && labels.contains(&link_text_norm) {
-            if is_collapsed {
-                if !is_image {
-                    deactivate_earlier_link_openers(events, o);
-                }
-                commit_resolution(
-                    events,
-                    o,
-                    i,
-                    text_start,
-                    text_end,
-                    after_close,
-                    collapsed_suffix_end,
-                    LinkKind::CollapsedReference,
-                );
-                mark_opener_resolved(events, o);
-                i += 1;
-                continue;
+        if is_collapsed && label_resolves(&link_text_norm) {
+            if !is_image && is_commonmark {
+                deactivate_earlier_link_openers(events, o);
             }
-            // Shortcut form: by the time we reach this branch, the
-            // inline form `(dest)` and full-reference / collapsed forms
-            // `[label]` / `[]` have been tried above and failed (or
-            // weren't present). Per CommonMark §6.3 the shortcut form
-            // matches as a last resort when the link text resolves as a
-            // refdef — regardless of what byte follows the `]`. (Spec
-            // example #568: `[foo](not a link)` resolves as shortcut
-            // `[foo]` followed by literal text `(not a link)` because the
-            // inline form fails on the invalid URL.)
-            if !is_image {
+            commit_resolution(
+                events,
+                o,
+                i,
+                text_start,
+                text_end,
+                after_close,
+                collapsed_suffix_end,
+                LinkKind::CollapsedReference,
+            );
+            mark_opener_resolved(events, o);
+            i += 1;
+            continue;
+        }
+        // `[text][]` with text not in refdefs — falls through to
+        // literal text; shortcut is suppressed (followed by `[]`).
+
+        // 4. Shortcut form: `[text]` not followed by `[]` or `[label]`.
+        // Per CommonMark §6.3: "A shortcut reference link consists of a
+        // link label that matches a link reference definition elsewhere
+        // in the document and is not followed by [] or a link label."
+        // The full-ref / collapsed shape attempts above suppress the
+        // shortcut even when their labels don't resolve — the bracket
+        // bytes still get consumed as literal text.
+        let shortcut_suppressed = full_ref_suffix.is_some() || is_collapsed;
+        if !shortcut_suppressed && label_resolves(&link_text_norm) {
+            if !is_image && is_commonmark {
                 deactivate_earlier_link_openers(events, o);
             }
             commit_resolution(
@@ -2112,13 +2162,6 @@ pub enum ConstructDispo {
     /// `[content]{attrs}` — emit via `emit_bracketed_span` after
     /// slicing the inner content and attribute string.
     BracketedSpan { end: usize },
-    /// `[text](dest)` / `[text][label]` / `[text][]` / `[text]` /
-    /// `![alt](dest)` / `![alt][label]` etc. Emit via the dispatcher's
-    /// `try_parse_inline_image` / `try_parse_reference_image` /
-    /// `try_parse_inline_link` / `try_parse_reference_link` chain in
-    /// precedence order, gated by `reference_resolves` for the
-    /// reference forms (Phase 6).
-    PandocLinkOrImage { end: usize },
 }
 
 /// A byte-keyed view of the IR's standalone Pandoc constructs that the
@@ -2166,9 +2209,6 @@ pub fn build_construct_plan(events: &[IrEvent]) -> ConstructPlan {
                 }
                 ConstructKind::BracketedSpan => {
                     by_pos.insert(*start, ConstructDispo::BracketedSpan { end: *end });
-                }
-                ConstructKind::PandocLinkOrImage => {
-                    by_pos.insert(*start, ConstructDispo::PandocLinkOrImage { end: *end });
                 }
                 _ => {}
             }
@@ -2245,13 +2285,19 @@ pub fn build_full_plans(
     config: &ParserOptions,
 ) -> InlinePlans {
     let mut events = build_ir(text, start, end, config);
-    // CommonMark §6.3 bracket resolution. Skipped under Pandoc, where
-    // bracket-shaped constructs are pre-recognised as opaque
-    // `Construct` events in `build_ir` and emission stays on the
-    // legacy dispatcher chain.
-    if config.dialect == crate::options::Dialect::CommonMark {
-        process_brackets(&mut events, text, config.refdef_labels.as_ref());
-    }
+    // §6.3 bracket resolution runs for both dialects. Under CommonMark
+    // it enforces refdef-aware shortcut/collapsed/full-ref resolution
+    // and the §6.3 link-in-link deactivation rule. Under Pandoc it
+    // performs shape-only resolution (any non-empty label resolves) and
+    // skips the deactivation pass — pandoc-native is outer-wins for
+    // nested links and the dispatcher's `suppress_inner_links` flag
+    // suppresses inner LINK emission during LINK-text recursion.
+    process_brackets(
+        &mut events,
+        text,
+        config.refdef_labels.as_ref(),
+        config.dialect,
+    );
 
     // Scoped emphasis pass per resolved bracket pair, innermost first.
     // We collect (open_idx, close_idx) pairs of resolved brackets and run
@@ -2507,7 +2553,7 @@ mod tests {
     fn brackets_resolve_inline_link() {
         let opts = cm_opts();
         let mut ir = build_ir("[foo](/url)", 0, 11, &opts);
-        process_brackets(&mut ir, "[foo](/url)", None);
+        process_brackets(&mut ir, "[foo](/url)", None, opts.dialect);
         let open = ir
             .iter()
             .find(|e| matches!(e, IrEvent::OpenBracket { start: 0, .. }))
@@ -2527,7 +2573,7 @@ mod tests {
         let text = "[foo]";
         let map = refdefs(["foo"]);
         let mut ir = build_ir(text, 0, text.len(), &opts);
-        process_brackets(&mut ir, text, Some(&map));
+        process_brackets(&mut ir, text, Some(&map), opts.dialect);
         let open = ir
             .iter()
             .find(|e| matches!(e, IrEvent::OpenBracket { start: 0, .. }))
@@ -2548,7 +2594,7 @@ mod tests {
         let opts = cm_opts();
         let text = "[bar* baz]";
         let mut ir = build_ir(text, 0, text.len(), &opts);
-        process_brackets(&mut ir, text, None);
+        process_brackets(&mut ir, text, None, opts.dialect);
         let open = ir
             .iter()
             .find(|e| matches!(e, IrEvent::OpenBracket { start: 0, .. }))
