@@ -119,7 +119,7 @@ pub fn parse_inline_text_recursive(
     );
 
     if config.dialect == Dialect::CommonMark {
-        let plan = delimiter_stack::build_plan(text, 0, text.len(), config);
+        let plans = super::inline_ir::build_full_plans(text, 0, text.len(), config);
         parse_inline_range_impl(
             text,
             0,
@@ -128,8 +128,8 @@ pub fn parse_inline_text_recursive(
             builder,
             false,
             false,
-            Some(&plan),
-            None,
+            Some(&plans.emphasis),
+            Some(&plans.brackets),
         );
     } else {
         parse_inline_range(text, 0, text.len(), config, builder);
@@ -159,7 +159,7 @@ pub fn parse_inline_text(
     );
 
     if config.dialect == Dialect::CommonMark {
-        let plan = delimiter_stack::build_plan(text, 0, text.len(), config);
+        let plans = super::inline_ir::build_full_plans(text, 0, text.len(), config);
         parse_inline_range_impl(
             text,
             0,
@@ -168,8 +168,8 @@ pub fn parse_inline_text(
             builder,
             false,
             true,
-            Some(&plan),
-            None,
+            Some(&plans.emphasis),
+            Some(&plans.brackets),
         );
     } else {
         parse_inline_range_impl(
@@ -2093,14 +2093,29 @@ fn parse_inline_range_impl(
             continue;
         }
 
-        // Bracket-plan consultation reserved for a future IR-based
-        // emission migration; presently the bracket_plan parameter is
-        // always `None` and the existing emission below handles
-        // `[` / `![` / `]` directly.
-        let _ = bracket_plan;
+        // CommonMark IR bracket plan: if a plan is present, it has decided
+        // every `[` / `![` position's disposition (resolved link/image, or
+        // literal text). Use it to gate the legacy `try_parse_*` branches
+        // below — the IR additionally enforces §6.3 link-in-link
+        // suppression, which the legacy shape-based path doesn't (spec
+        // example #533). When the plan says a position is NOT a resolved
+        // opener, skip the link/image branches entirely so the bracket
+        // bytes coalesce into the surrounding TEXT.
+        let bracket_says_resolved = |p: usize| -> bool {
+            bracket_plan.is_none_or(|bp| {
+                matches!(
+                    bp.lookup(p),
+                    Some(super::inline_ir::BracketDispo::Open { .. })
+                )
+            })
+        };
 
         // Images and links - process in order: inline image, reference image, footnote ref, inline link, reference link
-        if byte == b'!' && pos + 1 < text.len() && text.as_bytes()[pos + 1] == b'[' {
+        if byte == b'!'
+            && pos + 1 < text.len()
+            && text.as_bytes()[pos + 1] == b'['
+            && bracket_says_resolved(pos)
+        {
             // Try inline image: ![alt](url)
             if let Some((len, alt_text, dest, attributes)) =
                 try_parse_inline_image(&text[pos..], LinkScanContext::from_options(config))
@@ -2169,6 +2184,7 @@ fn parse_inline_range_impl(
 
             // Try inline link: [text](url)
             if config.extensions.inline_links
+                && bracket_says_resolved(pos)
                 && let Some((len, link_text, dest, attributes)) = try_parse_inline_link(
                     &text[pos..],
                     config.dialect == crate::options::Dialect::CommonMark,
@@ -2196,7 +2212,7 @@ fn parse_inline_range_impl(
             // Try reference link: [text][ref] or [text]. Refdef-aware under
             // CommonMark dialect — see the matching reference-image branch
             // above for the rationale.
-            if config.extensions.reference_links {
+            if config.extensions.reference_links && bracket_says_resolved(pos) {
                 let allow_shortcut = config.extensions.shortcut_reference_links;
                 if let Some((len, link_text, reference, is_shortcut)) = try_parse_reference_link(
                     &text[pos..],

@@ -512,11 +512,61 @@ fn is_right_flanking(text: &str, run_start: usize, run_len: usize) -> bool {
 /// bound to keep walk-back bounded; consume rules and the §6.2 mod-3
 /// rejection match the reference implementation.
 pub fn process_emphasis(events: &mut [IrEvent]) {
-    // Indices of DelimRun events, in order.
-    let mut delim_idxs: Vec<usize> = events
+    process_emphasis_in_range(events, 0, events.len());
+}
+
+/// Range-scoped variant of [`process_emphasis`].
+///
+/// Only delim runs whose IR event index lies in `[lo, hi)` are considered.
+/// Used by [`build_full_plans`] to run emphasis pairing inside each
+/// resolved bracket pair *before* the global top-level pass, so emphasis
+/// can never form across a link's bracket boundary (CommonMark §6.3
+/// requires bracket resolution to happen first when at a `]`, with
+/// emphasis processed on the link's inner range).
+///
+/// The function additionally skips delim runs that already carry a
+/// recorded match in their `matches` vec — this lets the second
+/// (top-level) pass reuse the same algorithm without re-pairing bytes
+/// already consumed by inner-range passes.
+pub fn process_emphasis_in_range(events: &mut [IrEvent], lo: usize, hi: usize) {
+    process_emphasis_in_range_filtered(events, lo, hi, None);
+}
+
+/// Internal variant of [`process_emphasis_in_range`] with an optional
+/// exclusion bitmap. Event indices for which `excluded[i] == true` are
+/// treated as if their delim run were already fully consumed — used by
+/// [`build_full_plans`] to keep the top-level emphasis pass from pairing
+/// across a resolved bracket pair's boundary (the inner delim runs of
+/// such a pair belong to the link's inner range and were already paired
+/// by the scoped pass).
+fn process_emphasis_in_range_filtered(
+    events: &mut [IrEvent],
+    lo: usize,
+    hi: usize,
+    excluded: Option<&[bool]>,
+) {
+    let hi = hi.min(events.len());
+    if lo >= hi {
+        return;
+    }
+    // Indices of DelimRun events within [lo, hi), in order, that have
+    // not already been fully consumed by an earlier scoped pass and that
+    // are not in the optional exclusion bitmap.
+    let mut delim_idxs: Vec<usize> = events[lo..hi]
         .iter()
         .enumerate()
-        .filter_map(|(i, e)| matches!(e, IrEvent::DelimRun { .. }).then_some(i))
+        .filter_map(|(i, e)| {
+            let abs = lo + i;
+            match e {
+                IrEvent::DelimRun { matches, .. }
+                    if matches.is_empty()
+                        && excluded.is_none_or(|ex| ex.get(abs).copied() != Some(true)) =>
+                {
+                    Some(abs)
+                }
+                _ => None,
+            }
+        })
         .collect();
     if delim_idxs.is_empty() {
         return;
@@ -824,32 +874,31 @@ pub fn process_brackets(events: &mut [IrEvent], text: &str, refdefs: Option<&Ref
                 i += 1;
                 continue;
             }
-            // Shortcut: bracket must NOT be followed by `(` or `[`.
-            // Also, the link text must not itself contain a bracket pair
-            // that resolved to a link (handled by deactivation above —
-            // when we resolved an inner link, this opener was earlier
-            // and got deactivated, so we won't reach here for that case).
-            // CommonMark also rules out shortcut when followed by `{...}`
-            // attribute, but that's a Pandoc construct; CommonMark treats
-            // `{...}` as literal text after the bracket.
-            if !is_followed_by_inline_or_full_ref_or_collapsed(text, after_close) {
-                if !is_image {
-                    deactivate_earlier_link_openers(events, o);
-                }
-                commit_resolution(
-                    events,
-                    o,
-                    i,
-                    text_start,
-                    text_end,
-                    after_close,
-                    after_close,
-                    LinkKind::ShortcutReference,
-                );
-                mark_opener_resolved(events, o);
-                i += 1;
-                continue;
+            // Shortcut form: by the time we reach this branch, the
+            // inline form `(dest)` and full-reference / collapsed forms
+            // `[label]` / `[]` have been tried above and failed (or
+            // weren't present). Per CommonMark §6.3 the shortcut form
+            // matches as a last resort when the link text resolves as a
+            // refdef — regardless of what byte follows the `]`. (Spec
+            // example #568: `[foo](not a link)` resolves as shortcut
+            // `[foo]` followed by literal text `(not a link)` because the
+            // inline form fails on the invalid URL.)
+            if !is_image {
+                deactivate_earlier_link_openers(events, o);
             }
+            commit_resolution(
+                events,
+                o,
+                i,
+                text_start,
+                text_end,
+                after_close,
+                after_close,
+                LinkKind::ShortcutReference,
+            );
+            mark_opener_resolved(events, o);
+            i += 1;
+            continue;
         }
 
         // No resolution. Drop the opener — its `]` partner is this one,
@@ -1092,11 +1141,6 @@ fn is_collapsed_marker(text: &str, pos: usize) -> bool {
     text.as_bytes().get(pos) == Some(&b'[') && text.as_bytes().get(pos + 1) == Some(&b']')
 }
 
-fn is_followed_by_inline_or_full_ref_or_collapsed(text: &str, pos: usize) -> bool {
-    let bytes = text.as_bytes();
-    bytes.get(pos) == Some(&b'(') || bytes.get(pos) == Some(&b'[')
-}
-
 // ============================================================================
 // Bracket plan — byte-position-keyed view of resolved brackets, consumed by
 // the existing emission walk in `core::parse_inline_range_impl`.
@@ -1193,6 +1237,13 @@ pub fn build_bracket_plan(events: &[IrEvent]) -> BracketPlan {
 /// ([`EmphasisPlan`](super::delimiter_stack::EmphasisPlan)) — packaged
 /// together so the CommonMark inline emission path can consume them in
 /// one go.
+///
+/// Pass ordering follows the CommonMark §6.3 reference impl: bracket
+/// resolution runs first, then emphasis is processed *scoped per resolved
+/// bracket pair's inner event range*, then once more on the residual
+/// top-level events. This prevents emphasis pairs from forming across a
+/// link's bracket boundary, which the previous "all-emphasis-then-all-
+/// brackets" order got wrong (e.g. spec example #473).
 pub fn build_full_plans(
     text: &str,
     start: usize,
@@ -1200,8 +1251,48 @@ pub fn build_full_plans(
     config: &ParserOptions,
 ) -> InlinePlans {
     let mut events = build_ir(text, start, end, config);
-    process_emphasis(&mut events);
     process_brackets(&mut events, text, config.refdef_labels.as_ref());
+
+    // Scoped emphasis pass per resolved bracket pair, innermost first.
+    // We collect (open_idx, close_idx) pairs of resolved brackets and run
+    // emphasis only over the events strictly between them. Innermost-first
+    // ordering matters: an outer link wraps emphasis that wraps an inner
+    // link, and the inner link's inner range must be paired before the
+    // outer's inner range so the top-level pass sees consistent state.
+    let mut bracket_pairs: Vec<(usize, usize)> = events
+        .iter()
+        .enumerate()
+        .filter_map(|(i, ev)| match ev {
+            IrEvent::OpenBracket {
+                resolution: Some(res),
+                ..
+            } => Some((i, res.close_event as usize)),
+            _ => None,
+        })
+        .collect();
+    // Innermost-first: sort by close_idx ascending, then open_idx descending.
+    bracket_pairs.sort_by(|a, b| a.1.cmp(&b.1).then(b.0.cmp(&a.0)));
+    for &(open_idx, close_idx) in &bracket_pairs {
+        process_emphasis_in_range(&mut events, open_idx + 1, close_idx);
+    }
+
+    // Build exclusion bitmap: any delim run whose event index lies inside
+    // a resolved bracket pair is excluded from the top-level pass. This
+    // implements the §6.3 boundary rule: emphasis at the top level must
+    // not pair across a link's brackets, even when one side is inside the
+    // link text and the other is outside.
+    let mut excluded: Vec<bool> = vec![false; events.len()];
+    for &(open_idx, close_idx) in &bracket_pairs {
+        for slot in excluded.iter_mut().take(close_idx).skip(open_idx + 1) {
+            *slot = true;
+        }
+    }
+
+    // Top-level emphasis pass: handles delim runs that fall outside any
+    // resolved bracket pair.
+    let len = events.len();
+    process_emphasis_in_range_filtered(&mut events, 0, len, Some(&excluded));
+
     InlinePlans {
         emphasis: build_emphasis_plan(&events),
         brackets: build_bracket_plan(&events),
@@ -1271,6 +1362,7 @@ pub fn build_emphasis_plan(events: &[IrEvent]) -> super::delimiter_stack::Emphas
 mod tests {
     use super::*;
     use crate::options::Flavor;
+    use crate::parser::inlines::delimiter_stack::DelimChar;
     use std::sync::Arc;
 
     fn cm_opts() -> ParserOptions {
@@ -1463,5 +1555,72 @@ mod tests {
         if let IrEvent::OpenBracket { resolution, .. } = open {
             assert!(resolution.is_none(), "no refdef → bracket stays literal");
         }
+    }
+
+    /// Spec #473: `*[bar*](/url)`. The link `[bar*](/url)` resolves; the
+    /// outer `*...*` MUST NOT pair across the link's bracket boundary,
+    /// because the inner `*` belongs to the link text.
+    #[test]
+    fn full_plans_emphasis_does_not_cross_resolved_link_boundary() {
+        let opts = cm_opts();
+        let text = "*[bar*](/url)";
+        let plans = build_full_plans(text, 0, text.len(), &opts);
+        // The leading `*` (at byte 0) must NOT be matched as an emphasis
+        // opener — there's no closer outside the link, and the inner `*`
+        // (at byte 5) is inside the resolved link's text range so it must
+        // not be paired with byte 0.
+        assert!(
+            matches!(plans.emphasis.lookup(0), Some(DelimChar::Literal) | None),
+            "outer `*` at byte 0 must not pair across link boundary, got {:?}",
+            plans.emphasis.lookup(0)
+        );
+        // The link `[bar*](/url)` must resolve (opener at byte 1).
+        assert!(
+            matches!(plans.brackets.lookup(1), Some(BracketDispo::Open { .. })),
+            "link [bar*](/url) must resolve at byte 1"
+        );
+    }
+
+    /// Spec #533: `[foo *bar [baz][ref]*][ref]` with `[ref]: /uri`.
+    /// Inner `[baz][ref]` resolves as a link; §6.3 link-in-link rule
+    /// deactivates the outer `[foo ...][ref]` so it falls through to
+    /// literal brackets. Emphasis `*bar [baz][ref]*` wraps the inner link.
+    #[test]
+    fn full_plans_link_in_link_suppression_for_reference_links() {
+        let opts = cm_opts();
+        let text = "[foo *bar [baz][ref]*][ref]";
+        let mut opts_with_refs = opts.clone();
+        let labels: HashSet<String> = ["ref".to_string()].into_iter().collect();
+        opts_with_refs.refdef_labels = Some(std::sync::Arc::new(labels));
+        let plans = build_full_plans(text, 0, text.len(), &opts_with_refs);
+
+        // Inner `[baz][ref]` opener is at byte 10 — must resolve.
+        assert!(
+            matches!(plans.brackets.lookup(10), Some(BracketDispo::Open { .. })),
+            "inner [baz][ref] must resolve at byte 10, got {:?}",
+            plans.brackets.lookup(10)
+        );
+        // Outer `[foo ...][ref]` opener is at byte 0 — must NOT resolve
+        // (link-in-link suppression).
+        assert!(
+            matches!(plans.brackets.lookup(0), Some(BracketDispo::Literal) | None),
+            "outer [foo ...][ref] must fall through to literal at byte 0, got {:?}",
+            plans.brackets.lookup(0)
+        );
+        // Trailing `[ref]` after the outer `]` is at byte 22 — it's a
+        // standalone shortcut reference and must resolve.
+        assert!(
+            matches!(plans.brackets.lookup(22), Some(BracketDispo::Open { .. })),
+            "trailing [ref] must resolve at byte 22, got {:?}",
+            plans.brackets.lookup(22)
+        );
+        // Emphasis `*...*` at bytes 5 and 20 must pair — the scoped
+        // emphasis pass over the (deactivated) outer bracket's inner
+        // event range pairs these.
+        assert!(
+            matches!(plans.emphasis.lookup(5), Some(DelimChar::Open { .. })),
+            "emphasis opener at byte 5 must pair, got {:?}",
+            plans.emphasis.lookup(5)
+        );
     }
 }

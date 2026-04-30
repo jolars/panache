@@ -16,222 +16,190 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (xxix)
+## Latest session — 2026-04-30 (xxx)
 
-**Pass count: 648 → 651 / 652 (99.8%, +3)**
+**Pass count: 651 → 652 / 652 (100.0%, +1)** 🎉
 
-User asked for "implement a full IR" rather than the
-minimal #523 fix. Landed the IR scaffolding *and* a
-refdef-aware bracket gate, which together unlocked
-**#523, #569, #571** (three of the four remaining link
-failures). Only **#533** remains failing.
+User asked to focus on the inline IR migration from
+session (xxix)'s #2 next target. Solved the
+pass-ordering problem the prior session got stuck on,
+wired the IR into production emission, unlocked the
+last remaining failure **#533**.
 
 ### Targets unlocked
 
-- **#523** — `*foo [bar* baz]` now correctly emits
-  `<em>foo [bar</em> baz]`. Inner `*` is exposed to the
-  emphasis scanner because the shortcut bracket
-  `[bar* baz]` no longer opaque-skips when its label
-  isn't in the document refdef map.
-- **#569** — `[foo][bar][baz]` with `[baz]: /url`. The
-  middle `[bar][baz]` resolves; refdef-aware emission
-  now refuses to emit the trailing `[foo][bar]` as a
-  reference link (no refdef), so `[foo]` falls through
-  to literal text.
-- **#571** — same as #569 but with `[foo]` also defined
-  as a refdef. Even though `foo` resolves, the
-  left-to-right `[foo][bar]` form fails (bar not in
-  refdefs), so `[foo]` stays literal — matches CMark's
-  scan order.
+- **#533** — `[foo *bar [baz][ref]*][ref]` with
+  `[ref]: /uri`. The IR's `process_brackets` resolves
+  the inner `[baz][ref]` first; its
+  `deactivate_earlier_link_openers` then marks the
+  outer `[foo ...][ref]` opener inactive. With the IR
+  driving emission, the outer brackets now correctly
+  fall through to literal text. §6.3 link-in-link
+  suppression for *reference* links — what session
+  (xxix) couldn't reach with the refdef-aware gate
+  alone.
 
 ### Architecture: what landed
 
-Two new modules in `crates/panache-parser/src/parser/inlines/`:
+The "real" inline IR migration:
 
-1. **`refdef_map.rs`** — document-level refdef label
-   pre-pass. `collect_refdef_labels(input, dialect)`
-   walks the input lines once and collects normalised
-   labels into an `Arc<HashSet<String>>`. The scanner
-   handles refdefs at line-start *and* after a stripped
-   blockquote prefix (`> [foo]: /url` — spec example
-   #218). Normalisation matches the test renderer's
-   `normalize_label` (lowercase + collapse whitespace +
-   `ß` → `ss` for the CMark §6.4 sharp-S case fold,
-   spec example #540).
+1. **Pass-ordering fix in
+   `inline_ir::build_full_plans`** —  reordered to
+   `process_brackets` first, then per-resolved-bracket
+   scoped `process_emphasis_in_range` (innermost
+   first), then a top-level emphasis pass with an
+   exclusion bitmap that hides events inside resolved
+   bracket pairs. This implements strategy (a) from
+   the prior session's plan and matches the CMark
+   reference impl's interleaving.
 
-2. **`inline_ir.rs`** — full IR scaffolding for the
-   CommonMark inline pipeline (build_ir,
-   process_emphasis, process_brackets,
-   build_full_plans, BracketPlan, EmphasisPlan adapter
-   `build_emphasis_plan`). Tested in isolation (9 unit
-   tests pass). **NOT yet wired into production
-   emission** — see *Don't redo* below for why and what
-   the next session should do with it.
+2. **`process_emphasis_in_range_filtered`** — internal
+   range-scoped variant with an optional event-index
+   exclusion bitmap. The top-level pass uses it to
+   skip delim runs inside resolved bracket pairs (so
+   emphasis can't pair across a link's bracket
+   boundary — spec #473's regression case from the
+   prior failed wiring attempt).
 
-Plumbing change: `ParserOptions` gained
-`refdef_labels: Option<Arc<HashSet<String>>>`
-(serde-skip). Top-level `parse()` and
-`parse_incremental_suffix()` populate it via
-`populate_refdef_labels()` when `dialect ==
-CommonMark`. The field is consulted by
-`delimiter_stack::reference_resolves` and the matching
-helper in `core.rs`.
+3. **Wiring in `core::parse_inline_text_recursive` /
+   `parse_inline_text`** — switched from
+   `delimiter_stack::build_plan` to
+   `inline_ir::build_full_plans`. The IR now produces
+   both the `EmphasisPlan` (via
+   `build_emphasis_plan` → `from_dispositions`) and
+   the `BracketPlan` consumed by
+   `parse_inline_range_impl`.
 
-The actual #523/#569/#571 fix:
-`delimiter_stack::scan_delim_runs` and the four bracket
-branches in `core::parse_inline_range_impl` now gate
-their reference-link/image opaque-skip on
-`reference_resolves(...)`, which checks the
-(normalised) label against the refdef map. When the
-label doesn't resolve, the bracket pair stays
-transparent to the emphasis scanner *and* unrecognised
-by the emission walk — both halves needed in sync,
-otherwise the emphasis pair forms but emission still
-emits a (mis-spanning) LINK node.
+4. **`bracket_says_resolved` gate in
+   `parse_inline_range_impl`** — added to the
+   inline-image / reference-image / inline-link /
+   reference-link branches. When the IR's bracket
+   plan exists and says a position is NOT a resolved
+   `Open`, those branches are skipped so the bracket
+   bytes coalesce into TEXT. This is what makes #533
+   work: the outer `[foo ...][ref]` is plan-Literal
+   even though its label resolves, because the IR
+   ran link-in-link suppression. The legacy
+   `try_parse_reference_link` would still match
+   shape-only without this gate. Note: footnote /
+   citation / bracketed-span / native-span branches
+   are NOT gated, since those extensions are off
+   under the CommonMark flavor and the IR doesn't
+   model them.
 
-Snapshot updates (intentional; previous CST emitted
-LINK nodes for unresolved shortcut references that the
-renderer would later down-convert to text):
-
-- `tests/snapshots/golden_parser_cases__parser_cst_inline_link_dest_strict_commonmark.snap`
-- `tests/snapshots/golden_parser_cases__parser_cst_reference_definition_attached_title_commonmark.snap`
-- `tests/fixtures/cases/inline_link_dest_strict_commonmark/expected.md`
-  (formatter now escapes `\[link\](/my uri)` as
-  literal text — idempotent under the new parse)
-- `tests/fixtures/cases/reference_definition_attached_title_commonmark/expected.md`
-  (same — `\[foo\]: <bar>(baz)` and `\[foo\]`)
+5. **Bug fix in `process_brackets`** — removed the
+   `is_followed_by_inline_or_full_ref_or_collapsed`
+   check on the shortcut-form fallback. Per
+   CommonMark §6.3, when inline `(dest)` and full
+   `[label]` / collapsed `[]` forms have already been
+   tried and failed, shortcut form must match
+   regardless of what byte follows the `]`. Spec
+   example #568 (`[foo](not a link)` →
+   `<a>foo</a>(not a link)`) requires this: the
+   inline form fails on the invalid URL, then
+   shortcut resolves `[foo]` even though `(` follows.
 
 ### Files touched
 
-- `crates/panache-parser/src/options.rs` — added
-  `refdef_labels` field.
-- `crates/panache-parser/src/parser.rs` — top-level
-  refdef pre-pass plumbing.
-- `crates/panache-parser/src/parser/inlines.rs` —
-  module declarations.
-- `crates/panache-parser/src/parser/inlines/refdef_map.rs`
-  — NEW module.
 - `crates/panache-parser/src/parser/inlines/inline_ir.rs`
-  — NEW module (foundation only, not yet emission-wired).
-- `crates/panache-parser/src/parser/inlines/delimiter_stack.rs`
-  — `reference_resolves` helper, refdef-aware skip in
-  `scan_delim_runs`, public `EmphasisPlan::from_dispositions`.
-- `crates/panache-parser/src/parser/inlines/core.rs` —
-  `reference_resolves` wrapper, refdef-aware gate on the
-  four bracket branches in `parse_inline_range_impl`,
-  `BracketPlan` parameter threaded (currently always
-  `None` — reserved for the IR migration).
+  — split `process_emphasis` into `process_emphasis`
+  + `process_emphasis_in_range` +
+  `process_emphasis_in_range_filtered`; reordered
+  `build_full_plans` to bracket-first +
+  scoped-emphasis + top-level-with-exclusion;
+  removed `is_followed_by_inline_or_full_ref_or_collapsed`;
+  added 2 regression tests (#473 boundary, #533
+  link-in-link).
+- `crates/panache-parser/src/parser/inlines/core.rs`
+  — switched both CommonMark dispatchers to
+  `build_full_plans`; added `bracket_says_resolved`
+  closure and applied it to the four link/image
+  branches.
 - `crates/panache-parser/tests/commonmark/allowlist.txt`
-  — added 523, 569, 571 under `# Links`.
-- `crates/panache-parser/tests/commonmark/blocked.txt`
-  — removed the 523 entry (no longer passing-by-accident).
-- `crates/panache-formatter/src/config.rs`,
-  `src/config/types.rs` — fill in the new
-  `refdef_labels: None` field.
-- 4 snapshot/fixture files for intentional CST changes.
+  — added `533` under `# Links`.
+- `crates/panache-parser/tests/fixtures/cases/link_in_link_reference_commonmark/`
+  — NEW parser fixture (`flavor = "commonmark"`)
+  pinning the §6.3 link-in-link CST shape.
+- `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_link_in_link_reference_commonmark.snap`
+  — NEW snapshot.
+- `crates/panache-parser/tests/golden_parser_cases.rs`
+  — registered the new case.
 
 ### Don't redo
 
-- **Don't try to wire `inline_ir::build_full_plans`
-  into emission as-is.** It works in isolation but the
-  emphasis/bracket pass *order* is wrong for cases
-  where they overlap (e.g. spec #473 `*[bar*](/url)`).
-  My first attempt produced 15 regressions because the
-  IR's `process_emphasis` runs before
-  `process_brackets` — emphasis pairs can incorrectly
-  form across what would be a link's bracket boundary,
-  then bracket resolution succeeds, leaving emission
-  with two overlapping resolutions and no way to
-  reconcile them.
-
-  The CMark reference impl interleaves the two passes:
-  bracket resolution at each `]` is *immediately*
-  followed by emphasis processing on that link's inner
-  range, with the link wrapped around the result.
-  Replicating this on the IR means either:
-  (a) running `process_brackets` first and then
-      `process_emphasis` *scoped* to each resolved
-      bracket pair's inner event range, or
-  (b) walking the events left-to-right and resolving
-      brackets and emphasis in interleaved order.
-
-  Either way, top-level emphasis (between resolved
-  bracket pairs) is processed last, on whatever events
-  are left.
-
-- **Don't try to use the `BracketPlan` for emission
-  without solving the boundary problem.** When a
-  resolved link's `suffix_end` falls past a recursion
-  boundary (which happens whenever an outer emphasis
-  range wraps over a link), the plan can't naively
-  emit the link inside the emphasis's recursive call.
-  My first attempt hit this and emitted both the link
-  AND the emphasis closer, double-counting bytes and
-  breaking losslessness.
-
-- **Don't merge `inline_ir`'s emphasis plan with
-  `delimiter_stack`'s.** The current
-  `delimiter_stack::scan_delim_runs` + `process_emphasis`
-  is the production path; the IR's parallel
-  implementation is for *future* migration. Keeping
-  them separate avoids accidental coupling. The
-  `EmphasisPlan::from_dispositions` constructor I
-  added is the migration seam — it lets the IR build
-  an `EmphasisPlan` from the same byte-keyed shape, so
-  a future session can swap the two without changing
-  the emission walk.
-
-- **The `bracket_plan: Option<&BracketPlan>` parameter
-  in `parse_inline_range_impl` is intentionally always
-  `None` right now.** Don't remove it — it's the
-  hook the next session can wire when the
-  pass-ordering problem is solved. (Kept as a `let _ =
-  bracket_plan;` placeholder.)
+- **Don't add the `is_followed_by_inline_or_full_ref_or_collapsed`
+  guard back to the shortcut branch.** That bug masked
+  #568 and similar cases. The shortcut form is the
+  last-resort fallback; whether `(` or `[` follows is
+  irrelevant once the earlier forms have been tried.
+- **Don't unify `inline_ir`'s emphasis plan with
+  `delimiter_stack`'s.** They share the
+  `EmphasisPlan::from_dispositions` migration seam
+  but the production path now reads from the IR.
+  `delimiter_stack::scan_delim_runs` +
+  `process_emphasis` is dead code under
+  `Dialect::CommonMark` — leave it for the Pandoc
+  dialect migration to reuse, don't delete in this
+  session.
+- **Don't gate footnote / citation / bracketed-span /
+  native-span branches on `bracket_says_resolved`.**
+  The IR only models CommonMark links/images. Those
+  Pandoc constructs aren't in the bracket plan and
+  should not be suppressed when bracket_plan is
+  `Some`. Today they're off under the CommonMark
+  flavor anyway, but a user who manually enables
+  them shouldn't have them silently dropped.
+- **The exclusion bitmap in `build_full_plans` is
+  load-bearing.** Without it, the top-level emphasis
+  pass pairs across a resolved link's brackets (spec
+  #473 — `*[bar*](/url)` regresses to outer-emphasis
+  forming over the link). The unit test
+  `full_plans_emphasis_does_not_cross_resolved_link_boundary`
+  guards this.
 
 ### Suggested next targets, ranked
 
-1. **#533** — `[foo *bar [baz][ref]*][ref]`. Last
-   remaining link failure. Needs the §6.3 link-in-link
-   suppression rule for *reference* links: when the
-   inner `[baz][ref]` resolves, the outer
-   `[foo ...][ref]` must NOT also resolve as a
-   reference link (it should fall through to literal).
-   The current refdef-aware gate doesn't address this
-   because both labels resolve — the rule is about
-   *nesting*, not resolution. Likely needs the IR's
-   `deactivate_earlier_link_openers` semantics applied
-   to the existing `try_parse_reference_link` path.
-   Could be solved either by:
-   - Extending `disallow_inner_links` (the existing
-     CommonMark gate for inline link nesting in
-     `links::link_text_contains_inner_link`) to also
-     reject reference-link inner content. Today it
-     only checks for inline links/images.
-   - Or: porting the IR's bracket scanner to drive
-     emission for reference links specifically.
+1. **Pandoc dialect migration onto the unified
+   algorithm.** The CommonMark IR path is now in
+   production. To migrate Pandoc:
+   - Parameterize `compute_flanking` and
+     `is_left_flanking` / `is_right_flanking` in
+     `inline_ir` by `Dialect` (Pandoc's intraword
+     underscore rule + tail-end emphasis heuristic
+     differ).
+   - Build a Pandoc-specific bracket resolver
+     (footnotes / citations / bracketed spans /
+     native spans become bracket constructs in the
+     IR).
+   - Wire under `Dialect::Pandoc` in
+     `parse_inline_text_recursive`.
+   - Once both dialects use the IR,
+     `delimiter_stack` and the recursive-descent
+     emphasis path (`try_parse_emphasis`,
+     `try_parse_one/two/three`) can be deleted.
 
-2. **Inline IR migration (the real one).** Now that
-   the IR module exists and is unit-tested, a future
-   session can wire it into production by solving the
-   pass-ordering problem (see *Don't redo* above).
-   When that lands, #533 falls out for free (the IR
-   already has the link-in-link suppression in
-   `process_brackets::deactivate_earlier_link_openers`).
+2. **Decommission `delimiter_stack::scan_delim_runs`
+   + `process_emphasis`.** Dead code under
+   `Dialect::CommonMark` post-this-session. Remove
+   only after Pandoc migration (#1) lands.
 
-3. **Pandoc dialect migration onto the unified
-   algorithm.** Once the IR drives CommonMark
-   emission, parameterize the flanking predicates by
-   `Dialect` and run Pandoc through the same pipeline.
-
-4. **Formatter fix for nested-only outer LIST_ITEM** —
+3. **Formatter fix for nested-only outer LIST_ITEM** —
    carried prerequisite for lifting the same-line
    nested-LIST and blockquote-in-list-item dialect
    gates.
 
-5. **Multi-line setext inside list items** (CommonMark
-   only) — paired parser + formatter fixtures, dialect-
-   gated. Strictly cosmetic; no spec example exercises
-   it in the conformance harness today.
+4. **Multi-line setext inside list items** (CommonMark
+   only) — paired parser + formatter fixtures,
+   dialect-gated. Strictly cosmetic; no spec example
+   exercises it in the conformance harness today.
+
+5. **Conformance follow-ups in `blocked.txt`** —
+   reference-definition leniency (#209/#213),
+   code-span vs link precedence (#342/#525),
+   inline-link strict syntax (#488/#490/#493/#508/#546),
+   autolink validator strictness (#606/#609). Each
+   needs its own focused parser fix; the current
+   `blocked.txt` documents what each one exposes.
 
 ### Carry-forward from prior sessions
 

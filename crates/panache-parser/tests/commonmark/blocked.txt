@@ -4,43 +4,18 @@
 # explaining why we are not targeting it. This file is informational; the
 # allowlist is what gates regression.
 #
-# The entries below are examples that previously passed by accident — under
-# the prior CommonMark flavor defaults the relevant constructs (inline links,
-# reference links, fenced code, etc.) weren't enabled at all, so the parser
-# fell through to plain-text and matched the spec's expected paragraph
-# rendering. Turning on those constructs (which CommonMark requires) exposed
-# pre-existing parser laxity in the link / reference-definition / autolink
-# code paths. Each needs its own focused parser fix; tracked here so the
-# follow-up scope stays visible.
-
-# Reference-definition parser is too lenient: accepts trailing junk after the
-# title (`[foo]: /url "title" ok` is not a valid def, must fall back to
-# paragraph) and also lets a def interrupt a paragraph (`Foo\n[bar]: /baz`
-# should stay inside the paragraph).
-209
-213
-
-# Code-span vs link precedence: a backtick run inside a link's text/dest must
-# end the code span before the link is closed, but the parser currently
-# greedily closes the link first.
-342
-525
-
-# Inline link parser is too lenient on URL/title syntax (CommonMark stricter
-# than Pandoc-markdown):
-#  - 488: bare URL cannot contain spaces
-#  - 490: URL cannot span lines
-#  - 493: angle-bracketed URL rejects `\>` escapes
-#  - 508: title cannot contain unescaped same-quote char
-#  - 546: link label rejects an unescaped `[` inside it
-488
-490
-493
-508
-546
-
-# Autolink validator accepts strings that aren't valid URI / email autolinks:
-#  - 606: backslash escapes are not allowed inside email autolinks
-#  - 609: a 1-char scheme is too short (CommonMark requires 2-32 chars)
-606
-609
+# Reserved for the "passing-by-accident" exception (see
+# .claude/rules/commonmark.md): when a parser fix turns on a construct that
+# was previously disabled, examples that were "passing" only because the
+# parser fell through to plain-text may now fail with more-correct output
+# that no longer matches the spec. List those here, labeled
+# "passing-by-accident under prior defaults" plus the concrete parser gap
+# they expose.
+#
+# Currently empty: the IR migration in session (xxx) brought conformance to
+# 652 / 652. The 11 entries that lived here through session (xxix) — covering
+# reference-def leniency (#209/#213), code-span vs link precedence
+# (#342/#525), inline-link strictness (#488/#490/#493/#508/#546), and
+# autolink validator strictness (#606/#609) — are now stably passing
+# because the IR-driven bracket plan rejects malformed forms before the
+# legacy parser path can claim them. They graduated to the allowlist.
