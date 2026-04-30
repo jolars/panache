@@ -12,7 +12,161 @@ content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (viii)
+## Latest session — 2026-04-30 (ix)
+
+**Workspace test count: 0 failing → 0 failing.** **Phase 7 LANDED.**
+The legacy recursive-descent emphasis path is gone. The
+`delimiter_stack` module is deleted; its remaining types
+(`EmphasisKind`, `DelimChar`, `EmphasisPlan`) now live in
+`inline_ir.rs`. Net diff: -2151 lines (724 from `delimiter_stack.rs`
+deletion, ~1300 from `try_parse_emphasis*` family in `core.rs`, plus
+test consolidation). CommonMark conformance allowlist preserved;
+clippy + fmt clean. Diff is committable.
+
+### What landed this session
+
+1. **Types relocated** from `delimiter_stack` to `inline_ir`:
+   `EmphasisKind`, `DelimChar`, `EmphasisPlan` (with `lookup`,
+   `is_empty`, `from_dispositions`). The IR's `build_emphasis_plan`
+   consumes them locally; downstream `core::parse_inline_range_impl`
+   imports them from `inline_ir` instead of `delimiter_stack`.
+2. **`reference_resolves` body inlined** in `core.rs`. Previously a
+   thin wrapper around `delimiter_stack::reference_resolves`; now a
+   self-contained helper that consults `config.refdef_labels` directly.
+3. **Legacy emphasis chain deleted** (~1300 lines from `core.rs`):
+   `try_parse_emphasis`, `try_parse_emphasis_nested`, `try_parse_one`,
+   `try_parse_two`, `try_parse_three`,
+   `parse_until_closer_with_nested_one`,
+   `parse_until_closer_with_nested_two`, plus their helpers
+   `find_first_potential_ender`, `is_unicode_punct_or_symbol`,
+   `is_left_flanking`, `is_right_flanking`, `is_valid_ender`,
+   `is_valid_same_delim_closer`. The doc-comment `try_parse_emphasis`
+   chain referenced in module docstring is also gone.
+4. **Private `parse_inline_range` / `parse_inline_range_nested`
+   wrappers deleted.** They were only called by the legacy chain
+   plus a handful of in-file tests; the tests were converted (or
+   deleted as duplicates).
+5. **Legacy emphasis branch in `parse_inline_range_impl` deleted.**
+   The `// Pandoc dialect: existing recursive-descent emphasis path.`
+   block is gone. The `if let Some(plan_ref) = plan { ... }` block
+   stays — it covers both dialects since both production callers
+   pass `Some(&plans.emphasis)`.
+6. **`nested_emphasis: bool` parameter dropped** from
+   `parse_inline_range_impl`. It only fed the deleted legacy branch.
+7. **`delimiter_stack` module unregistered** in
+   `crates/panache-parser/src/parser/inlines.rs`; the file is
+   deleted from disk.
+8. **Module docstring on `core.rs` rewritten** to describe the
+   IR-driven emission walk instead of the recursive-descent algorithm.
+9. **Tests consolidated**: 2 duplicates of `test_recursive_*`
+   deleted (`test_parse_simple_emphasis`,
+   `test_parse_nested_emphasis_strong`); 10 tests calling
+   `try_parse_emphasis` / `parse_inline_range` directly converted
+   to wrap with PARAGRAPH/DOCUMENT and call
+   `parse_inline_text_recursive`. Byte-count assertions
+   (`Some((6, 1))`-style) dropped — the IR doesn't expose that
+   shape and the structural assertions still verify behaviour.
+10. **`delimiter_stack`'s own test module** (10 tests:
+    `simple_emph_pair`, `simple_strong_pair`,
+    `rule_9_multiple_of_3_rejects`, `run_split_4_open_1_close`,
+    `lazy_opener_preference`, `nested_strong_inside_emph_triple_run`,
+    `intraword_underscore_rejected`, `empty_input`,
+    `no_delimiters`, `escape_blocks_delim`) removed with the file.
+    These tests targeted `delimiter_stack::build_plan` which no
+    longer exists. The IR's own test module in `inline_ir.rs`
+    covers equivalent scenarios.
+
+### Verification done
+
+- Workspace tests: 0 → 0 failing (one bucket: 1005 → 993, accounted
+  for by 12 deleted/inlined tests above).
+- CommonMark conformance allowlist (`commonmark_allowlist`): green.
+- clippy `--all-targets --all-features -- -D warnings`: clean.
+- `cargo fmt -- --check`: clean.
+
+### Files in committed-ready diff
+
+- `crates/panache-parser/src/parser/inlines.rs`
+  (-2 lines: unregister `delimiter_stack` mod)
+- `crates/panache-parser/src/parser/inlines/core.rs`
+  (-1864 lines net: legacy chain + tests + dead branches)
+- `crates/panache-parser/src/parser/inlines/delimiter_stack.rs`
+  (-724 lines: file deleted)
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`
+  (~+50/-20: types moved in, super::delimiter_stack:: refs removed)
+- `.claude/skills/pandoc-ir-migrate/RECAP.md`
+  (this entry)
+
+### Suggested next sub-targets, ranked
+
+The 8-phase plan in SKILL.md is now complete. Logical next:
+
+1. **Phase 6b (deferred bug-fix phase)** — enable `process_brackets`
+   under Pandoc to fix the three pre-existing dispatcher-chain bugs
+   noted in recap-(viii):
+   - `[foo]` with no refdef parses as malformed LINK (should be
+     literal text).
+   - `*foo [bar* baz]` produces TEXT + partial LINK (should all be
+     literal under pandoc-native).
+   - `[link [inner](u2)](u1)` allows nested links (pandoc-native is
+     outer-wins with inner literal).
+   This is a focused algorithm change — Pandoc bracket emission
+   would consume the IR's `BracketPlan` directly. The
+   `ConstructDispo::PandocLinkOrImage` variant in `inline_ir.rs`
+   would likely fold into `BracketDispo::Open`. Not covered by the
+   original 8-phase plan.
+
+2. **Comment / docstring cleanup pass.** With the legacy chain
+   gone, several comments still reference "the legacy `try_parse_*`
+   dispatcher chain" in a way that may confuse — e.g. the
+   `bracket_plan` Some/None branches in
+   `parse_inline_text_recursive` and `parse_inline_text`. The
+   dispatcher chain for *brackets* (Pandoc dialect) is still alive
+   and well; only the emphasis chain is gone. Audit each comment
+   and re-word "legacy" → "dispatcher" where it still applies.
+   Low-priority polish.
+
+3. **Optional simplification**: tighten `parse_inline_range_impl`'s
+   signature — `plan` and `construct_plan` are always `Some` in
+   production callers, so `Option<&...>` could become `&...`. The
+   `bracket_plan` wrapper stays `Option<&...>` because Pandoc
+   dialect passes `None`. Mild ergonomic win, not load-bearing.
+
+### Don't redo / known traps (carried forward + new)
+
+All Phase 1-6 traps still apply. Plus:
+
+- **NEW (Phase 7): `EmphasisKind` / `DelimChar` / `EmphasisPlan`
+  live in `inline_ir.rs`** — never recreate the
+  `super::delimiter_stack::` import; that module is gone. The IR's
+  own test module imports these via `use super::*;` (path is
+  `crate::parser::inlines::inline_ir::DelimChar`).
+- **NEW (Phase 7): `parse_inline_range_impl`'s legacy fallback is
+  gone.** The `if byte == b'*' || byte == b'_' { ... continue; }`
+  block now contains ONLY the IR-plan-driven match. If a future
+  change wants to short-circuit the IR for some new dialect, it
+  must add its branch INSIDE the `if let Some(plan_ref) = plan`
+  block (or before it) — the bare `continue;` after the if-let is
+  a no-advance fallback that depends on `plan` always being
+  `Some` in production callers. Keep it that way.
+- **NEW (Phase 7): the production callers
+  `parse_inline_text_recursive` and `parse_inline_text` ALWAYS
+  pass `Some(&plans.emphasis)` and `Some(&plans.constructs)` and
+  pass `Some(&plans.brackets)` only for `Dialect::CommonMark`.**
+  If a future caller is added, it must do the same — the
+  emphasis-pass invariant assumes the plan exists.
+
+### Files in current diff (committable)
+
+- `crates/panache-parser/src/parser/inlines.rs`
+- `crates/panache-parser/src/parser/inlines/core.rs`
+- `crates/panache-parser/src/parser/inlines/delimiter_stack.rs` (deleted)
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`
+- `.claude/skills/pandoc-ir-migrate/RECAP.md`
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (viii)
 
 **Workspace test count: 0 failing → 0 failing.** **Phase 6 LANDED
 (simple-pattern variant — same as Phases 2-5).** Pandoc bracket-shaped

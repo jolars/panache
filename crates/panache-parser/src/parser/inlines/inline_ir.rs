@@ -39,12 +39,59 @@
 
 use crate::options::ParserOptions;
 use crate::parser::inlines::refdef_map::{RefdefMap, normalize_label};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmphasisKind {
+    Emph,
+    Strong,
+}
+
+/// Disposition of a single delimiter byte after emphasis resolution.
+#[derive(Debug, Clone, Copy)]
+pub enum DelimChar {
+    /// Start of an opening marker. The marker spans `len` bytes from this
+    /// position; the matching closer starts at `partner` and spans
+    /// `partner_len` bytes.
+    Open {
+        len: u8,
+        partner: usize,
+        partner_len: u8,
+        kind: EmphasisKind,
+    },
+    /// Start of a closing marker. The matching opener starts at `partner`.
+    /// Emission jumps past close markers via the matching `Open` entry, so
+    /// this variant is only consulted defensively.
+    Close,
+    /// Unmatched delimiter byte; emit as literal text.
+    Literal,
+}
+
+/// Byte-keyed disposition map for `*` / `_` delimiter chars produced by
+/// the IR's emphasis pass and consumed by the inline emission walk.
+#[derive(Debug, Default, Clone)]
+pub struct EmphasisPlan {
+    by_pos: BTreeMap<usize, DelimChar>,
+}
+
+impl EmphasisPlan {
+    pub fn lookup(&self, pos: usize) -> Option<DelimChar> {
+        self.by_pos.get(&pos).copied()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.by_pos.is_empty()
+    }
+
+    /// Construct an `EmphasisPlan` from a byte-keyed disposition map.
+    pub fn from_dispositions(by_pos: BTreeMap<usize, DelimChar>) -> Self {
+        Self { by_pos }
+    }
+}
 
 use super::bracketed_spans::try_parse_bracketed_span;
 use super::citations::{try_parse_bare_citation, try_parse_bracketed_citation};
 use super::code_spans::try_parse_code_span;
-use super::delimiter_stack::EmphasisKind;
 use super::escapes::{EscapeType, try_parse_escape};
 use super::inline_footnotes::{try_parse_footnote_reference, try_parse_inline_footnote};
 use super::inline_html::try_parse_inline_html;
@@ -2005,8 +2052,6 @@ fn is_collapsed_marker(text: &str, pos: usize) -> bool {
 // the existing emission walk in `core::parse_inline_range_impl`.
 // ============================================================================
 
-use std::collections::BTreeMap;
-
 /// Disposition of a single bracket byte after [`process_brackets`].
 #[derive(Debug, Clone)]
 pub enum BracketDispo {
@@ -2183,8 +2228,7 @@ pub fn build_bracket_plan(events: &[IrEvent]) -> BracketPlan {
 }
 
 /// One-shot helper: build the IR, run all passes, and return both the
-/// [`BracketPlan`] and the byte-keyed emphasis plan
-/// ([`EmphasisPlan`](super::delimiter_stack::EmphasisPlan)) — packaged
+/// [`BracketPlan`] and the byte-keyed [`EmphasisPlan`] — packaged
 /// together so the CommonMark inline emission path can consume them in
 /// one go.
 ///
@@ -2260,14 +2304,14 @@ pub fn build_full_plans(
 /// inline emission walk.
 #[derive(Debug, Default, Clone)]
 pub struct InlinePlans {
-    pub emphasis: super::delimiter_stack::EmphasisPlan,
+    pub emphasis: EmphasisPlan,
     pub brackets: BracketPlan,
     pub constructs: ConstructPlan,
 }
 
-/// Convert the IR's delim-run match decisions into an
-/// [`EmphasisPlan`](super::delimiter_stack::EmphasisPlan), preserving the
-/// byte-keyed disposition shape the existing emission walk consumes.
+/// Convert the IR's delim-run match decisions into an [`EmphasisPlan`],
+/// preserving the byte-keyed disposition shape the existing emission walk
+/// consumes.
 ///
 /// Each match on a [`DelimRun`](IrEvent::DelimRun) produces one entry in
 /// the plan: the opener side records `Open` with the partner's source
@@ -2275,8 +2319,7 @@ pub struct InlinePlans {
 /// that are *not* covered by any match get a `Literal` entry, which the
 /// emission walk uses to coalesce unmatched delimiter bytes with
 /// surrounding plain text.
-pub fn build_emphasis_plan(events: &[IrEvent]) -> super::delimiter_stack::EmphasisPlan {
-    use super::delimiter_stack::DelimChar;
+pub fn build_emphasis_plan(events: &[IrEvent]) -> EmphasisPlan {
     let mut by_pos: BTreeMap<usize, DelimChar> = BTreeMap::new();
     for ev in events {
         if let IrEvent::DelimRun {
@@ -2313,14 +2356,14 @@ pub fn build_emphasis_plan(events: &[IrEvent]) -> super::delimiter_stack::Emphas
             }
         }
     }
-    super::delimiter_stack::EmphasisPlan::from_dispositions(by_pos)
+    EmphasisPlan::from_dispositions(by_pos)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::options::Flavor;
-    use crate::parser::inlines::delimiter_stack::DelimChar;
+    use crate::parser::inlines::inline_ir::DelimChar;
     use std::sync::Arc;
 
     fn cm_opts() -> ParserOptions {

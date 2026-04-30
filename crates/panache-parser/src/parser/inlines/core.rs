@@ -1,54 +1,56 @@
-//! Recursive emphasis parsing using Pandoc's algorithm.
+//! Inline emission walk.
 //!
-//! This module implements emphasis/strong emphasis parsing using a recursive
-//! descent approach based on Pandoc's Haskell implementation in
-//! `Readers/Markdown.hs:L1662-L1722`.
-//!
-//! **Key algorithm**: Left-to-right, greedy, first-match wins
-//! 1. Parse text left-to-right
-//! 2. When we see delimiters, try to parse emphasis (look for matching closer)
-//! 3. If successful, emit emphasis node and continue from after closer
-//! 4. If failed (no closer found), emit delimiter as literal and continue
-//! 5. Nested emphasis is handled naturally by recursive parsing of content
-//!
-//! **Example**: `*foo **bar* baz**`
-//! - See `*`, try to parse EMPH
-//! - Parse content: see `**`, try to parse STRONG
-//! - STRONG finds closer `**` at end → succeeds, emits STRONG[bar* baz]
-//! - Outer `*` can't find closer (all delimiters consumed) → fails, emits `*foo` as literal
-//! - Result: `*foo` + STRONG[bar* baz]
-//!
-//! This matches Pandoc's behavior exactly.
+//! Consumes the IR plans built by [`super::inline_ir::build_full_plans`]
+//! (emphasis pairings, bracket resolutions, Pandoc opaque-construct
+//! events) and emits the inline CST tokens / nodes in source order.
+//! Emphasis pair selection is entirely IR-driven; brackets are
+//! IR-driven for `Dialect::CommonMark` and dispatcher-driven for
+//! `Dialect::Pandoc`.
 
 use crate::options::{Dialect, ParserOptions};
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
-use super::delimiter_stack::{self, DelimChar, EmphasisKind, EmphasisPlan};
+use super::inline_ir::{
+    BracketPlan, ConstructDispo, ConstructPlan, DelimChar, EmphasisKind, EmphasisPlan,
+};
 
-/// CommonMark dialect bracket-resolution helper. Wraps
-/// `delimiter_stack::reference_resolves` with the
-/// `is_commonmark` flag pre-derived from `config`.
+/// CommonMark dialect bracket-resolution helper.
 ///
 /// The emission walk uses this to gate `try_parse_reference_*` /
 /// `try_parse_inline_*` matches: under CommonMark dialect a
 /// reference-shaped bracket pair only counts as a link if its
 /// (normalised) label resolves to a definition in the document refdef
-/// map. This keeps emission in sync with the refdef-aware emphasis
-/// scanner in `delimiter_stack::scan_delim_runs`, so unresolved
-/// brackets fall through to literal text and the inner emphasis bytes
-/// they were previously hiding stay visible to the emphasis pass.
-/// Spec example #523 is the canonical case.
+/// map. This keeps emission in sync with the IR's refdef-aware bracket
+/// resolution, so unresolved brackets fall through to literal text and
+/// the inner emphasis bytes they were previously hiding stay visible to
+/// the emphasis pass. Spec example #523 is the canonical case.
+///
+/// Under the Pandoc dialect (and CommonMark configurations that haven't
+/// pre-computed the refdef map) we keep the historical shape-only skip
+/// to preserve existing behavior.
 fn reference_resolves(
     config: &ParserOptions,
     link_text: &str,
     label: &str,
     is_shortcut: bool,
 ) -> bool {
-    let is_commonmark = config.dialect == Dialect::CommonMark;
-    delimiter_stack::reference_resolves(is_commonmark, link_text, label, is_shortcut, config)
+    if config.dialect != Dialect::CommonMark {
+        return true;
+    }
+    let labels = match &config.refdef_labels {
+        Some(map) => map,
+        None => return true,
+    };
+
+    let key_raw = if is_shortcut || label.is_empty() {
+        link_text
+    } else {
+        label
+    };
+    let key = super::refdef_map::normalize_label(key_raw);
+    !key.is_empty() && labels.contains(&key)
 }
-use super::inline_ir::{BracketPlan, ConstructDispo, ConstructPlan};
 
 // Import inline element parsers from sibling modules
 use super::bookdown::{
@@ -136,7 +138,6 @@ pub fn parse_inline_text_recursive(
         config,
         builder,
         false,
-        false,
         Some(&plans.emphasis),
         bracket_plan,
         Some(&plans.constructs),
@@ -177,1365 +178,11 @@ pub fn parse_inline_text(
         text.len(),
         config,
         builder,
-        false,
         true,
         Some(&plans.emphasis),
         bracket_plan,
         Some(&plans.constructs),
     );
-}
-
-/// Try to parse emphasis starting at the given position.
-///
-/// This is the entry point for recursive emphasis parsing, equivalent to
-/// Pandoc's `enclosure` function.
-///
-/// Returns Some((bytes_consumed, delim_count)) if emphasis was successfully parsed,
-/// or None if the delimiter should be treated as literal text.
-/// When returning None, the delim_count tells the caller how many delimiter
-/// characters to skip (to avoid re-parsing parts of a failed delimiter run).
-///
-/// # Arguments
-/// * `text` - The full text being parsed
-/// * `pos` - Current position in text (where the delimiter starts)
-/// * `end` - End boundary (don't search for closers beyond this)
-/// * `config` - Configuration
-/// * `builder` - CST builder
-///
-/// **Algorithm**:
-/// 1. Count opening delimiters
-/// 2. Check if followed by whitespace (if so, return None)
-/// 3. Dispatch to parse_one/two/three based on count
-/// 4. Those functions parse content and look for matching closer (within bounds)
-/// 5. If closer found, emit node and return bytes consumed
-/// 6. If not found, return None with delimiter count (caller skips entire run)
-pub fn try_parse_emphasis(
-    text: &str,
-    pos: usize,
-    end: usize,
-    config: &ParserOptions,
-    builder: &mut GreenNodeBuilder,
-) -> Option<(usize, usize)> {
-    let bytes = text.as_bytes();
-
-    if pos >= bytes.len() {
-        return None;
-    }
-
-    let delim_char = bytes[pos] as char;
-    if delim_char != '*' && delim_char != '_' {
-        return None;
-    }
-
-    // Count consecutive delimiters
-    let mut count = 0;
-    while pos + count < bytes.len() && bytes[pos + count] == bytes[pos] {
-        count += 1;
-    }
-
-    let after_pos = pos + count;
-
-    log::trace!(
-        "try_parse_emphasis: '{}' x {} at pos {}",
-        delim_char,
-        count,
-        pos
-    );
-
-    // Check if followed by whitespace (Pandoc rule: treat as literal)
-    if after_pos < text.len()
-        && let Some(next_char) = text[after_pos..].chars().next()
-        && next_char.is_whitespace()
-    {
-        log::trace!("Delimiter followed by whitespace, treating as literal");
-        return None;
-    }
-
-    // For underscores: check intraword_underscores extension (Pandoc lines 1668-1672)
-    // Can't open if preceded by alphanumeric (prevents foo_bar from parsing)
-    if delim_char == '_'
-        && pos > 0
-        && let Some(prev_char) = text[..pos].chars().last()
-        && prev_char.is_alphanumeric()
-    {
-        log::trace!("Underscore preceded by alphanumeric, can't open (intraword)");
-        return None;
-    }
-
-    // CommonMark §6.2: an asterisk delimiter run can open emphasis only if
-    // it is part of a left-flanking delimiter run. Pandoc-markdown applies
-    // the looser "not followed by whitespace" rule already checked above,
-    // so this strict left-flanking gate is dialect-specific.
-    if delim_char == '*'
-        && config.dialect == Dialect::CommonMark
-        && !is_left_flanking(text, pos, count)
-    {
-        log::trace!("CommonMark: '*' opener not left-flanking, treating as literal");
-        return None;
-    }
-
-    // Dispatch based on delimiter count
-    let result = match count {
-        1 => try_parse_one(text, pos, delim_char, end, config, builder),
-        2 => try_parse_two(text, pos, delim_char, end, config, builder),
-        3 => try_parse_three(text, pos, delim_char, end, config, builder),
-        _ => {
-            // 4+ delimiters: treat as literal (Pandoc behavior)
-            log::trace!("{} delimiters (4+), treating as literal", count);
-            None
-        }
-    };
-
-    // If parsing succeeded, return (bytes_consumed, delim_count)
-    // If failed, return None but the caller will know to skip `count` delimiters
-    result.map(|consumed| (consumed, count))
-}
-
-/// Try to parse emphasis in a nested context (bypassing opener validity checks).
-///
-/// This mirrors Pandoc's behavior where `one` can call `two c mempty` directly,
-/// bypassing the `enclosure` opener validity checks. This is needed because
-/// patterns like `***foo **bar** baz***` require `**` followed by space to be
-/// parsed as a nested strong opener.
-///
-/// Returns Some((bytes_consumed, delim_count)) if successful, None otherwise.
-fn try_parse_emphasis_nested(
-    text: &str,
-    pos: usize,
-    end: usize,
-    config: &ParserOptions,
-    builder: &mut GreenNodeBuilder,
-) -> Option<(usize, usize)> {
-    let bytes = text.as_bytes();
-
-    if pos >= bytes.len() {
-        return None;
-    }
-
-    let delim_char = bytes[pos] as char;
-    if delim_char != '*' && delim_char != '_' {
-        return None;
-    }
-
-    // Count consecutive delimiters
-    let mut count = 0;
-    while pos + count < bytes.len() && bytes[pos + count] == bytes[pos] {
-        count += 1;
-    }
-
-    log::trace!(
-        "try_parse_emphasis_nested: '{}' x {} at pos {}",
-        delim_char,
-        count,
-        pos
-    );
-
-    // For underscores: still check intraword_underscores (prevents foo_bar parsing)
-    // This check applies even in nested contexts
-    if delim_char == '_'
-        && pos > 0
-        && let Some(prev_char) = text[..pos].chars().last()
-        && prev_char.is_alphanumeric()
-    {
-        log::trace!("Underscore preceded by alphanumeric, can't open (intraword)");
-        return None;
-    }
-
-    // NOTE: We intentionally skip the "delimiter followed by whitespace" check here.
-    // In nested contexts (inside `one` calling `two`), Pandoc allows openers
-    // followed by whitespace because the opener has already been matched.
-
-    // Dispatch based on delimiter count
-    let result = match count {
-        1 => try_parse_one(text, pos, delim_char, end, config, builder),
-        2 => try_parse_two(text, pos, delim_char, end, config, builder),
-        3 => try_parse_three(text, pos, delim_char, end, config, builder),
-        _ => {
-            // 4+ delimiters: treat as literal (Pandoc behavior)
-            log::trace!("{} delimiters (4+), treating as literal", count);
-            None
-        }
-    };
-
-    result.map(|consumed| (consumed, count))
-}
-
-/// Try to parse emphasis with *** opening delimiter.
-///
-/// Tries to match closers in order: *** → ** → *
-/// Returns Some(bytes_consumed) if successful, None otherwise.
-fn try_parse_three(
-    text: &str,
-    pos: usize,
-    delim_char: char,
-    end: usize,
-    config: &ParserOptions,
-    builder: &mut GreenNodeBuilder,
-) -> Option<usize> {
-    let content_start = pos + 3;
-    let one = delim_char.to_string();
-    let two = one.repeat(2);
-
-    log::trace!("try_parse_three: '{}' x 3 at pos {}", delim_char, pos);
-
-    // Pandoc algorithm (line 1695): Parse content UNTIL we see a VALID ender
-    // We loop through potential enders, checking if each is valid.
-    // Invalid enders (like `**` preceded by whitespace) are skipped.
-    let mut search_pos = content_start;
-
-    loop {
-        // Find next potential ender
-        let closer_start = match find_first_potential_ender(text, search_pos, delim_char, end) {
-            Some(p) => p,
-            None => {
-                log::trace!("No potential ender found for ***");
-                return None;
-            }
-        };
-
-        log::trace!("Potential ender at pos {}", closer_start);
-
-        // Count how many delimiters we have at closer_start
-        let bytes = text.as_bytes();
-        let mut closer_count = 0;
-        let mut check_pos = closer_start;
-        while check_pos < bytes.len() && bytes[check_pos] == delim_char as u8 {
-            closer_count += 1;
-            check_pos += 1;
-        }
-
-        log::trace!(
-            "Found {} x {} at pos {}",
-            delim_char,
-            closer_count,
-            closer_start
-        );
-
-        // Try to match closers in order: ***, **, * (Pandoc lines 1696-1698)
-
-        // Try *** (line 1696)
-        if closer_count >= 3 && is_valid_ender(text, closer_start, delim_char, 3) {
-            // CommonMark §6.2 rule 14 prefers `<em><strong>...</strong></em>`
-            // when both interpretations apply; Pandoc-markdown wraps the other
-            // way (`<strong><em>...</em></strong>`). Branch on dialect.
-            if config.dialect == Dialect::CommonMark {
-                log::trace!("Matched *** closer, emitting Emph[Strong[content]] (CommonMark)");
-
-                builder.start_node(SyntaxKind::EMPHASIS.into());
-                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-
-                builder.start_node(SyntaxKind::STRONG.into());
-                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
-                parse_inline_range_nested(text, content_start, closer_start, config, builder);
-                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
-                builder.finish_node(); // STRONG
-
-                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-                builder.finish_node(); // EMPHASIS
-            } else {
-                log::trace!("Matched *** closer, emitting Strong[Emph[content]]");
-
-                builder.start_node(SyntaxKind::STRONG.into());
-                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
-
-                builder.start_node(SyntaxKind::EMPHASIS.into());
-                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-                parse_inline_range_nested(text, content_start, closer_start, config, builder);
-                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-                builder.finish_node(); // EMPHASIS
-
-                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
-                builder.finish_node(); // STRONG
-            }
-
-            return Some(closer_start + 3 - pos);
-        }
-
-        // Try ** (line 1697)
-        if closer_count >= 2 && is_valid_ender(text, closer_start, delim_char, 2) {
-            log::trace!("Matched ** closer, wrapping as Strong and continuing with one");
-
-            let continue_pos = closer_start + 2;
-
-            if let Some(final_closer_pos) =
-                parse_until_closer_with_nested_two(text, continue_pos, delim_char, 1, end, config)
-            {
-                log::trace!(
-                    "Found * closer at pos {}, emitting Emph[Strong[...], ...]",
-                    final_closer_pos
-                );
-
-                builder.start_node(SyntaxKind::EMPHASIS.into());
-                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-
-                builder.start_node(SyntaxKind::STRONG.into());
-                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
-                parse_inline_range_nested(text, content_start, closer_start, config, builder);
-                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
-                builder.finish_node(); // STRONG
-
-                // Parse additional content between ** and * (up to but not including the closer)
-                parse_inline_range_nested(text, continue_pos, final_closer_pos, config, builder);
-
-                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-                builder.finish_node(); // EMPHASIS
-
-                return Some(final_closer_pos + 1 - pos);
-            }
-
-            // Fallback: emit * + STRONG
-            log::trace!("No * closer found after **, emitting * + STRONG");
-            builder.token(SyntaxKind::TEXT.into(), &one);
-
-            builder.start_node(SyntaxKind::STRONG.into());
-            builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
-            parse_inline_range_nested(text, content_start, closer_start, config, builder);
-            builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
-            builder.finish_node(); // STRONG
-
-            return Some(closer_start + 2 - pos);
-        }
-
-        // Try * (line 1698)
-        if closer_count >= 1 && is_valid_ender(text, closer_start, delim_char, 1) {
-            log::trace!("Matched * closer, wrapping as Emph and continuing with two");
-
-            let continue_pos = closer_start + 1;
-
-            if let Some(final_closer_pos) =
-                parse_until_closer_with_nested_one(text, continue_pos, delim_char, 2, end, config)
-            {
-                log::trace!(
-                    "Found ** closer at pos {}, emitting Strong[Emph[...], ...]",
-                    final_closer_pos
-                );
-
-                builder.start_node(SyntaxKind::STRONG.into());
-                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
-
-                builder.start_node(SyntaxKind::EMPHASIS.into());
-                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-                parse_inline_range_nested(text, content_start, closer_start, config, builder);
-                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-                builder.finish_node(); // EMPHASIS
-
-                parse_inline_range_nested(text, continue_pos, final_closer_pos, config, builder);
-
-                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
-                builder.finish_node(); // STRONG
-
-                return Some(final_closer_pos + 2 - pos);
-            }
-
-            // Fallback: emit ** + EMPH
-            log::trace!("No ** closer found after *, emitting ** + EMPH");
-            builder.token(SyntaxKind::TEXT.into(), &two);
-
-            builder.start_node(SyntaxKind::EMPHASIS.into());
-            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-            parse_inline_range_nested(text, content_start, closer_start, config, builder);
-            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-            builder.finish_node(); // EMPHASIS
-
-            return Some(closer_start + 1 - pos);
-        }
-
-        // No valid ender at this position - continue searching after this delimiter run
-        log::trace!(
-            "No valid ender at pos {}, continuing search from {}",
-            closer_start,
-            closer_start + closer_count
-        );
-        search_pos = closer_start + closer_count;
-    }
-}
-
-/// Find the first potential emphasis ender (delimiter character) starting from `start`.
-/// This implements Pandoc's `many (notFollowedBy (ender c 1) >> inline)` -
-/// we parse inline content until we hit a delimiter that could be an ender.
-fn find_first_potential_ender(
-    text: &str,
-    start: usize,
-    delim_char: char,
-    end: usize,
-) -> Option<usize> {
-    let bytes = text.as_bytes();
-    let mut pos = start;
-
-    while pos < end.min(text.len()) {
-        // Check if we found the delimiter character
-        if bytes[pos] == delim_char as u8 {
-            // Check if it's escaped
-            let is_escaped = {
-                let mut backslash_count = 0;
-                let mut check_pos = pos;
-                while check_pos > 0 && bytes[check_pos - 1] == b'\\' {
-                    backslash_count += 1;
-                    check_pos -= 1;
-                }
-                backslash_count % 2 == 1
-            };
-
-            if !is_escaped {
-                // Found a potential ender
-                return Some(pos);
-            }
-        }
-
-        pos += 1;
-    }
-
-    None
-}
-
-/// CommonMark §6.2 punctuation predicate: ASCII punctuation, or any
-/// non-ASCII char that is neither alphanumeric nor whitespace.
-///
-/// Strict CommonMark uses Unicode P + S categories. We approximate via the
-/// alnum/whitespace complement, which is wider in theory (covers M and Cf
-/// categories) but matches every flanking-rule case the spec exercises in
-/// practice, without pulling in a Unicode-categories table.
-fn is_unicode_punct_or_symbol(c: char) -> bool {
-    if c.is_ascii() {
-        c.is_ascii_punctuation()
-    } else {
-        !c.is_alphanumeric() && !c.is_whitespace()
-    }
-}
-
-/// CommonMark §6.2 left-flanking delimiter run check.
-///
-/// (1) not followed by Unicode whitespace, and either
-/// (2a) not followed by a Unicode punctuation character, or
-/// (2b) preceded by Unicode whitespace or a Unicode punctuation character.
-///
-/// Absence of any character on either side counts as Unicode whitespace.
-fn is_left_flanking(text: &str, run_start: usize, run_len: usize) -> bool {
-    let after = run_start + run_len;
-    let next_char = text.get(after..).and_then(|s| s.chars().next());
-    let prev_char = (run_start > 0)
-        .then(|| text[..run_start].chars().last())
-        .flatten();
-
-    // (1) Not followed by whitespace (end-of-input counts as whitespace).
-    let followed_by_ws = next_char.is_none_or(|c| c.is_whitespace());
-    if followed_by_ws {
-        return false;
-    }
-
-    // (2a) Not followed by punctuation.
-    let followed_by_punct = next_char.is_some_and(is_unicode_punct_or_symbol);
-    if !followed_by_punct {
-        return true;
-    }
-
-    // (2b) Preceded by whitespace (incl. start-of-input) or punctuation.
-    prev_char.is_none_or(|c| c.is_whitespace() || is_unicode_punct_or_symbol(c))
-}
-
-/// CommonMark §6.2 right-flanking delimiter run check.
-///
-/// Mirror of `is_left_flanking` with the "before" and "after" sides swapped.
-fn is_right_flanking(text: &str, run_start: usize, run_len: usize) -> bool {
-    let after = run_start + run_len;
-    let next_char = text.get(after..).and_then(|s| s.chars().next());
-    let prev_char = (run_start > 0)
-        .then(|| text[..run_start].chars().last())
-        .flatten();
-
-    let preceded_by_ws = prev_char.is_none_or(|c| c.is_whitespace());
-    if preceded_by_ws {
-        return false;
-    }
-
-    let preceded_by_punct = prev_char.is_some_and(is_unicode_punct_or_symbol);
-    if !preceded_by_punct {
-        return true;
-    }
-
-    next_char.is_none_or(|c| c.is_whitespace() || is_unicode_punct_or_symbol(c))
-}
-
-/// Check if a delimiter at the given position is a valid ender.
-/// This implements Pandoc's `ender c n` function.
-fn is_valid_ender(text: &str, pos: usize, delim_char: char, delim_count: usize) -> bool {
-    let bytes = text.as_bytes();
-
-    // Check we have exactly delim_count delimiters (not more, not less)
-    if pos + delim_count > text.len() {
-        return false;
-    }
-
-    for i in 0..delim_count {
-        if bytes[pos + i] != delim_char as u8 {
-            return false;
-        }
-    }
-
-    // Check no delimiter immediately before
-    if pos > 0 && bytes[pos - 1] == delim_char as u8 {
-        return false;
-    }
-
-    // Check no delimiter immediately after
-    let after_pos = pos + delim_count;
-    if after_pos < bytes.len() && bytes[after_pos] == delim_char as u8 {
-        return false;
-    }
-
-    // For underscores, check right-flanking (not preceded by whitespace)
-    // Pandoc's `ender` for asterisks has NO right-flanking requirement
-    if delim_char == '_' {
-        if pos > 0
-            && let Some(prev_char) = text[..pos].chars().last()
-            && prev_char.is_whitespace()
-        {
-            return false;
-        }
-
-        // Check not followed by alphanumeric (right-flanking rule for underscores)
-        if after_pos < text.len()
-            && let Some(next_char) = text[after_pos..].chars().next()
-            && next_char.is_alphanumeric()
-        {
-            return false;
-        }
-    }
-
-    true
-}
-
-/// Try to parse emphasis with ** opening delimiter.
-///
-/// Tries to match ** closer only. No fallback.
-/// Returns Some(bytes_consumed) if successful, None otherwise.
-fn try_parse_two(
-    text: &str,
-    pos: usize,
-    delim_char: char,
-    end: usize,
-    config: &ParserOptions,
-    builder: &mut GreenNodeBuilder,
-) -> Option<usize> {
-    let content_start = pos + 2;
-    let one = delim_char.to_string();
-
-    log::trace!("try_parse_two: '{}' x 2 at pos {}", delim_char, pos);
-
-    // Try to find ** closer, checking for nested * emphasis along the way
-    if let Some(closer_pos) =
-        parse_until_closer_with_nested_one(text, content_start, delim_char, 2, end, config)
-    {
-        log::trace!("Found ** closer at pos {}", closer_pos);
-
-        // Emit STRONG(content)
-        builder.start_node(SyntaxKind::STRONG.into());
-        builder.token(SyntaxKind::STRONG_MARKER.into(), &text[pos..pos + 2]);
-        parse_inline_range_nested(text, content_start, closer_pos, config, builder);
-        builder.token(
-            SyntaxKind::STRONG_MARKER.into(),
-            &text[closer_pos..closer_pos + 2],
-        );
-        builder.finish_node(); // STRONG
-
-        return Some(closer_pos + 2 - pos);
-    }
-
-    // CommonMark §6.2 split-opener: a length-2 left-flanking opener can
-    // match a length-1 right-flanking closer, leaving the leading delimiter
-    // char as literal text before the emphasis. Examples #442 `**foo*`,
-    // #454 `__foo_`. Pandoc-markdown does not split runs this way, so gate
-    // on dialect.
-    //
-    // Restrict to the "tail-end" case: the 1-closer is the final delimiter
-    // run in the parse range. Otherwise the leftover delim char could
-    // conflict with later openers/closers, and our linear fallback can't
-    // model the proper delimiter-stack matching that CommonMark requires
-    // for those cases (e.g. #402 `__foo__bar__baz__`, #412 `*foo**bar*`).
-    if config.dialect == Dialect::CommonMark
-        && let Some(closer_pos) =
-            parse_until_closer_with_nested_two(text, content_start, delim_char, 1, end, config)
-        && !text[(closer_pos + 1).min(end.min(text.len()))..end.min(text.len())]
-            .contains(delim_char)
-    {
-        log::trace!(
-            "CommonMark split-opener: ** at pos {} matches single closer at {}",
-            pos,
-            closer_pos
-        );
-
-        builder.token(SyntaxKind::TEXT.into(), &one);
-        builder.start_node(SyntaxKind::EMPHASIS.into());
-        builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-        parse_inline_range_nested(text, content_start, closer_pos, config, builder);
-        builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
-        builder.finish_node(); // EMPHASIS
-
-        return Some(closer_pos + 1 - pos);
-    }
-
-    // No closer found
-    log::trace!("No closer found for **");
-    None
-}
-
-/// Try to parse emphasis with * opening delimiter.
-///
-/// Tries to match * closer.
-/// Returns Some(bytes_consumed) if successful, None otherwise.
-///
-/// **Pandoc algorithm**: While parsing content, if we encounter **,
-/// try to parse it as `two` (strong) recursively. If `two` succeeds,
-/// it consumes the ** delimiters, potentially preventing us from finding
-/// a closer for the outer *. This creates priority where ** can "steal"
-/// matches from *.
-fn try_parse_one(
-    text: &str,
-    pos: usize,
-    delim_char: char,
-    end: usize,
-    config: &ParserOptions,
-    builder: &mut GreenNodeBuilder,
-) -> Option<usize> {
-    let content_start = pos + 1;
-
-    log::trace!("try_parse_one: '{}' x 1 at pos {}", delim_char, pos);
-
-    // Try to find * closer using Pandoc's algorithm with nested two attempts
-    if let Some(closer_pos) =
-        parse_until_closer_with_nested_two(text, content_start, delim_char, 1, end, config)
-    {
-        log::trace!("Found * closer at pos {}", closer_pos);
-
-        // Emit EMPH(content)
-        builder.start_node(SyntaxKind::EMPHASIS.into());
-        builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &text[pos..pos + 1]);
-        parse_inline_range_nested(text, content_start, closer_pos, config, builder);
-        builder.token(
-            SyntaxKind::EMPHASIS_MARKER.into(),
-            &text[closer_pos..closer_pos + 1],
-        );
-        builder.finish_node(); // EMPHASIS
-
-        return Some(closer_pos + 1 - pos);
-    }
-
-    // No closer found
-    log::trace!("No closer found for *");
-    None
-}
-
-/// Parse inline content and look for a matching closer, with nested two attempts.
-///
-/// This implements Pandoc's algorithm from Markdown.hs lines 1712-1717:
-/// When parsing `*...*`, if we encounter `**` (and it's not followed by
-/// another `*` that would close the outer emphasis), try to parse it as
-/// `two c mempty` (strong). If `two` succeeds, those `**` delimiters are
-/// consumed, and we continue searching for the `*` closer.
-///
-/// This creates a priority system where `**` can "steal" matches from `*`.
-///
-/// Example: `*foo **bar* baz**`
-/// - When parsing the outer `*...*`, we encounter `**` at position 5
-/// - We try `two` which succeeds with `**bar* baz**`
-/// - Now there's no `*` closer for the outer `*`, so it fails
-/// - Result: literal `*foo ` + STRONG("bar* baz")
-///
-/// # Arguments
-/// * `end` - Don't search beyond this position (respects nesting boundaries)
-fn parse_until_closer_with_nested_two(
-    text: &str,
-    start: usize,
-    delim_char: char,
-    delim_count: usize,
-    end: usize,
-    config: &ParserOptions,
-) -> Option<usize> {
-    let bytes = text.as_bytes();
-    let mut pos = start;
-
-    while pos < end.min(text.len()) {
-        if bytes[pos] == b'`'
-            && let Some(m) = try_parse_inline_executable(
-                &text[pos..],
-                config.extensions.rmarkdown_inline_code,
-                config.extensions.quarto_inline_code,
-            )
-        {
-            log::trace!(
-                "Skipping inline executable span of {} bytes at pos {}",
-                m.total_len,
-                pos
-            );
-            pos += m.total_len;
-            continue;
-        }
-
-        // Skip over code spans - their content is protected from delimiter matching
-        if bytes[pos] == b'`'
-            && let Some((len, _, _, _)) = try_parse_code_span(&text[pos..])
-        {
-            log::trace!("Skipping code span of {} bytes at pos {}", len, pos);
-            pos += len;
-            continue;
-        }
-
-        // Skip over inline math - their content is protected from delimiter matching
-        if bytes[pos] == b'$'
-            && let Some((len, _)) = try_parse_inline_math(&text[pos..])
-        {
-            log::trace!("Skipping inline math of {} bytes at pos {}", len, pos);
-            pos += len;
-            continue;
-        }
-
-        // Skip over links - their content is protected from delimiter matching
-        if bytes[pos] == b'['
-            && let Some((len, _, _, _)) = try_parse_inline_link(
-                &text[pos..],
-                config.dialect == crate::options::Dialect::CommonMark,
-                LinkScanContext::from_options(config),
-            )
-        {
-            log::trace!("Skipping inline link of {} bytes at pos {}", len, pos);
-            pos += len;
-            continue;
-        }
-
-        // Skip over reference / shortcut links too. Without this, a delimiter
-        // inside the bracket label (e.g. the `*` in `[foo*]`) would be picked
-        // as the emphasis closer, then the inner content parser would re-parse
-        // the bracket pair greedily and consume bytes past the assumed closer
-        // — producing a CST whose total byte length exceeds the input.
-        if bytes[pos] == b'['
-            && config.extensions.reference_links
-            && let Some((len, _, _, _)) = try_parse_reference_link(
-                &text[pos..],
-                config.extensions.shortcut_reference_links,
-                config.extensions.inline_links,
-                LinkScanContext::from_options(config),
-            )
-        {
-            log::trace!("Skipping reference link of {} bytes at pos {}", len, pos);
-            pos += len;
-            continue;
-        }
-
-        // Skip over autolinks `<scheme:...>` and `<email>` — their interior is
-        // verbatim and must not be scanned for emphasis delimiters. CommonMark
-        // §6.5 / Pandoc both treat autolinks as a single inline unit; without
-        // this, a `**` inside `<https://...?q=**>` is mis-detected as a closer.
-        if bytes[pos] == b'<'
-            && config.extensions.autolinks
-            && let Some((len, _)) =
-                try_parse_autolink(&text[pos..], config.dialect == Dialect::CommonMark)
-        {
-            log::trace!("Skipping autolink of {} bytes at pos {}", len, pos);
-            pos += len;
-            continue;
-        }
-
-        // Skip over inline raw HTML — same reasoning: the embedded delimiters
-        // in attribute values (e.g. the `*` in `<img title="*"/>`) must not be
-        // considered as emphasis closers. CommonMark §6.6 / Pandoc raw_html.
-        if bytes[pos] == b'<'
-            && config.extensions.raw_html
-            && let Some(len) = try_parse_inline_html(&text[pos..])
-        {
-            log::trace!("Skipping inline HTML of {} bytes at pos {}", len, pos);
-            pos += len;
-            continue;
-        }
-
-        // Pandoc algorithm: If we're looking for a single delimiter (*) and
-        // encounter a double delimiter (**), try to parse it as `two` (strong).
-        // This happens BEFORE checking if pos is a closer for our current emphasis.
-        if delim_count == 1
-            && pos + 2 <= text.len()
-            && bytes[pos] == delim_char as u8
-            && bytes[pos + 1] == delim_char as u8
-        {
-            // First check if the first delimiter is escaped
-            let first_is_escaped = {
-                let mut backslash_count = 0;
-                let mut check_pos = pos;
-                while check_pos > 0 && bytes[check_pos - 1] == b'\\' {
-                    backslash_count += 1;
-                    check_pos -= 1;
-                }
-                backslash_count % 2 == 1
-            };
-
-            if first_is_escaped {
-                // First * is escaped, skip it and continue
-                // The second * might be a closer or start of emphasis
-                log::trace!(
-                    "First * at pos {} is escaped, skipping to check second *",
-                    pos
-                );
-                pos = advance_char_boundary(text, pos, end);
-                continue;
-            }
-
-            // Check that there's NOT a third delimiter (which would make this
-            // part of a longer run that we shouldn't treat as `two`)
-            let no_third_delim = pos + 2 >= bytes.len() || bytes[pos + 2] != delim_char as u8;
-
-            if no_third_delim {
-                log::trace!(
-                    "try_parse_one: found ** at pos {}, attempting nested two",
-                    pos
-                );
-
-                // Try to parse as `two` (strong emphasis)
-                // We create a temporary builder to test if `two` succeeds
-                let mut temp_builder = GreenNodeBuilder::new();
-                if let Some(two_consumed) =
-                    try_parse_two(text, pos, delim_char, end, config, &mut temp_builder)
-                {
-                    // `two` succeeded! Those ** delimiters are consumed.
-                    // We skip past the `two` and continue searching for our `*` closer.
-                    log::trace!(
-                        "Nested two succeeded, consumed {} bytes, continuing search",
-                        two_consumed
-                    );
-                    pos += two_consumed;
-                    continue;
-                }
-                // `two` failed - this means the entire `one` parse should fail!
-                // In Pandoc, the `try (string [c,c] >> notFollowedBy (ender c 1) >> two c mempty)`
-                // alternative fails, and the first alternative `notFollowedBy (ender c 1) >> inline`
-                // also fails because we ARE followed by an ender (the first * of **).
-                // So the entire content parsing fails, and `one` returns failure.
-                //
-                // CommonMark §6.2 differs: a length-2 right-flanking run can
-                // close a length-1 opener, leaving 1 leftover char of the run
-                // to be emitted as literal text after the emphasis (split
-                // closer). Examples #443 `*foo**`, #455 `_foo__`. Gate on
-                // dialect; the run must be a valid 1-closer (right-flanking,
-                // and for `_` not intraword).
-                //
-                // Restrict to the "tail-end" case: no more delim_char after
-                // the leftover. Otherwise the leftover could conflict with a
-                // later closer/opener, and this linear fallback can't model
-                // CommonMark's full delimiter-stack matching.
-                let leftover_after = (pos + 2).min(end.min(text.len()));
-                if config.dialect == Dialect::CommonMark
-                    && is_valid_same_delim_closer(text, pos, delim_char, 1, start, config)
-                    && !text[leftover_after..end.min(text.len())].contains(delim_char)
-                {
-                    log::trace!(
-                        "CommonMark split-closer: ** at pos {} closes outer * with leftover",
-                        pos
-                    );
-                    return Some(pos);
-                }
-                log::trace!("Nested two failed at pos {}, entire one() should fail", pos);
-                return None;
-            }
-        }
-
-        // Check if we have a potential closer here
-        if pos + delim_count <= text.len() {
-            let mut matches = true;
-            for i in 0..delim_count {
-                if bytes[pos + i] != delim_char as u8 {
-                    matches = false;
-                    break;
-                }
-            }
-
-            if matches {
-                // IMPORTANT: Check that there are EXACTLY delim_count delimiters,
-                // not more. E.g., when looking for `*`, we shouldn't match
-                // `*` that's part of a longer run.
-
-                // Check: not escaped (preceded by odd number of backslashes)
-                let is_escaped = {
-                    let mut backslash_count = 0;
-                    let mut check_pos = pos;
-                    while check_pos > 0 && bytes[check_pos - 1] == b'\\' {
-                        backslash_count += 1;
-                        check_pos -= 1;
-                    }
-                    backslash_count % 2 == 1 // Odd number = escaped
-                };
-
-                // Allow matching at the start OR end of a delimiter run.
-                // This lets `**` close at the end of `***` (after a nested `*` closes),
-                // while still avoiding matches in the middle of longer runs.
-                let at_run_start = pos == 0 || bytes[pos - 1] != delim_char as u8;
-                let after_pos = pos + delim_count;
-                let at_run_end = after_pos >= bytes.len() || bytes[after_pos] != delim_char as u8;
-
-                let mut closer_failed_at_isolated_run = false;
-                if (at_run_start || at_run_end) && !is_escaped {
-                    let valid_closer = is_valid_same_delim_closer(
-                        text,
-                        pos,
-                        delim_char,
-                        delim_count,
-                        start,
-                        config,
-                    );
-                    if valid_closer {
-                        log::trace!(
-                            "Found exact {} x {} closer at pos {}",
-                            delim_char,
-                            delim_count,
-                            pos
-                        );
-                        return Some(pos);
-                    }
-                    if at_run_start && at_run_end {
-                        closer_failed_at_isolated_run = true;
-                    }
-                }
-
-                // CommonMark same-delim nested emphasis: when this delim run is
-                // an isolated run of exactly `delim_count` (so it can't be part
-                // of a longer-run match) but failed the closer rules, treat it
-                // as a potential nested opener and recurse via `try_parse_emphasis`.
-                // We only attempt this when there are enough remaining `delim_char`s
-                // ahead to satisfy *both* the nested span's closer and the outer
-                // emphasis's closer (≥ 2 * delim_count). Otherwise the nested
-                // attempt would steal the outer's only closer (e.g. #470, where
-                // a `*` opener inside a strong span has just one trailing `*` left
-                // for the outer emphasis). On nested success, skip past the span;
-                // on failure, advance without poisoning the outer scan.
-                if closer_failed_at_isolated_run
-                    && has_enough_delim_chars_ahead(
-                        bytes,
-                        pos + delim_count,
-                        end,
-                        delim_char,
-                        2 * delim_count,
-                    )
-                {
-                    let mut temp_builder = GreenNodeBuilder::new();
-                    if let Some((consumed, _)) =
-                        try_parse_emphasis(text, pos, end, config, &mut temp_builder)
-                    {
-                        log::trace!(
-                            "Nested same-delim emphasis at pos {} consumed {} bytes",
-                            pos,
-                            consumed
-                        );
-                        pos += consumed;
-                        continue;
-                    }
-                }
-            }
-        }
-
-        // Not a closer, move to next UTF-8 boundary.
-        pos = advance_char_boundary(text, pos, end);
-    }
-
-    None
-}
-
-/// Count `delim_char` occurrences in `bytes[from..end]` and report whether at
-/// least `min_count` were found. Used as a cheap precondition before attempting
-/// a nested same-delim emphasis: we only want to recurse when the input has
-/// enough remaining delimiters for *both* the nested span's closer and the
-/// outer emphasis's closer.
-fn has_enough_delim_chars_ahead(
-    bytes: &[u8],
-    from: usize,
-    end: usize,
-    delim_char: char,
-    min_count: usize,
-) -> bool {
-    let upper = end.min(bytes.len());
-    let mut count = 0usize;
-    let mut i = from;
-    while i < upper {
-        if bytes[i] == delim_char as u8 {
-            count += 1;
-            if count >= min_count {
-                return true;
-            }
-        }
-        i += 1;
-    }
-    false
-}
-
-/// Validate a delimiter run as a closer for outer same-delim emphasis.
-///
-/// Captures the rules previously inlined at each closer site: the underscore
-/// "preceded by whitespace" / "followed by alphanumeric" tests (Pandoc's
-/// intraword + right-flanking gates) and the CommonMark-only asterisk
-/// right-flanking gate. Returns `true` if `pos..pos+delim_count` is a valid
-/// closer and the caller should match the outer emphasis here.
-fn is_valid_same_delim_closer(
-    text: &str,
-    pos: usize,
-    delim_char: char,
-    delim_count: usize,
-    start: usize,
-    config: &ParserOptions,
-) -> bool {
-    let after_pos = pos + delim_count;
-
-    if delim_char == '_'
-        && pos > start
-        && let Some(prev_char) = text[..pos].chars().last()
-        && prev_char.is_whitespace()
-    {
-        log::trace!(
-            "Underscore closer preceded by whitespace at pos {}, not right-flanking",
-            pos
-        );
-        return false;
-    }
-
-    if delim_char == '_'
-        && let Some(next_char) = text[after_pos..].chars().next()
-        && next_char.is_alphanumeric()
-    {
-        log::trace!(
-            "Underscore closer followed by alphanumeric at pos {}, not right-flanking",
-            pos
-        );
-        return false;
-    }
-
-    if delim_char == '*'
-        && config.dialect == Dialect::CommonMark
-        && !is_right_flanking(text, pos, delim_count)
-    {
-        log::trace!("CommonMark: '*' closer at pos {} not right-flanking", pos);
-        return false;
-    }
-
-    true
-}
-
-/// Parse inline content and look for a matching closer, with nested one attempts.
-///
-/// This implements the symmetric case to `parse_until_closer_with_nested_two`:
-/// When parsing `**...**`, if we encounter `*` (and it's not followed by
-/// another `*` that would be part of our `**` closer), try to parse it as
-/// `one c mempty` (emphasis). If `one` succeeds, those `*` delimiters are
-/// consumed, and we continue searching for the `**` closer.
-///
-/// This ensures nested emphasis closes before the outer strong emphasis.
-///
-/// Example: `**bold with *italic***`
-/// - When parsing the outer `**...**, we scan for `**` closer
-/// - At position 12, we encounter a single `*` (start of `*italic`)
-/// - We try `one` which succeeds with `*italic*` (consuming the first `*` from `***`)
-/// - We continue scanning and find `**` at position 20 (the remaining `**` from `***`)
-/// - Result: STRONG["bold with " EMPHASIS["italic"]]
-///
-/// # Arguments
-/// * `end` - Don't search beyond this position (respects nesting boundaries)
-fn parse_until_closer_with_nested_one(
-    text: &str,
-    start: usize,
-    delim_char: char,
-    delim_count: usize,
-    end: usize,
-    config: &ParserOptions,
-) -> Option<usize> {
-    let bytes = text.as_bytes();
-    let mut pos = start;
-
-    while pos < end.min(text.len()) {
-        if bytes[pos] == b'`'
-            && let Some(m) = try_parse_inline_executable(
-                &text[pos..],
-                config.extensions.rmarkdown_inline_code,
-                config.extensions.quarto_inline_code,
-            )
-        {
-            log::trace!(
-                "Skipping inline executable span of {} bytes at pos {}",
-                m.total_len,
-                pos
-            );
-            pos += m.total_len;
-            continue;
-        }
-
-        // Skip over code spans - their content is protected from delimiter matching
-        if bytes[pos] == b'`'
-            && let Some((len, _, _, _)) = try_parse_code_span(&text[pos..])
-        {
-            log::trace!("Skipping code span of {} bytes at pos {}", len, pos);
-            pos += len;
-            continue;
-        }
-
-        // Skip over inline math - their content is protected from delimiter matching
-        if bytes[pos] == b'$'
-            && let Some((len, _)) = try_parse_inline_math(&text[pos..])
-        {
-            log::trace!("Skipping inline math of {} bytes at pos {}", len, pos);
-            pos += len;
-            continue;
-        }
-
-        // Skip over links - their content is protected from delimiter matching
-        if bytes[pos] == b'['
-            && let Some((len, _, _, _)) = try_parse_inline_link(
-                &text[pos..],
-                config.dialect == crate::options::Dialect::CommonMark,
-                LinkScanContext::from_options(config),
-            )
-        {
-            log::trace!("Skipping inline link of {} bytes at pos {}", len, pos);
-            pos += len;
-            continue;
-        }
-
-        // Skip over reference / shortcut links too — see the matching block
-        // in `parse_until_closer_with_nested_two` for the rationale.
-        if bytes[pos] == b'['
-            && config.extensions.reference_links
-            && let Some((len, _, _, _)) = try_parse_reference_link(
-                &text[pos..],
-                config.extensions.shortcut_reference_links,
-                config.extensions.inline_links,
-                LinkScanContext::from_options(config),
-            )
-        {
-            log::trace!("Skipping reference link of {} bytes at pos {}", len, pos);
-            pos += len;
-            continue;
-        }
-
-        // Skip over autolinks and inline raw HTML — see the matching block in
-        // `parse_until_closer_with_nested_two` for the rationale.
-        if bytes[pos] == b'<'
-            && config.extensions.autolinks
-            && let Some((len, _)) =
-                try_parse_autolink(&text[pos..], config.dialect == Dialect::CommonMark)
-        {
-            log::trace!("Skipping autolink of {} bytes at pos {}", len, pos);
-            pos += len;
-            continue;
-        }
-
-        if bytes[pos] == b'<'
-            && config.extensions.raw_html
-            && let Some(len) = try_parse_inline_html(&text[pos..])
-        {
-            log::trace!("Skipping inline HTML of {} bytes at pos {}", len, pos);
-            pos += len;
-            continue;
-        }
-
-        // Pandoc algorithm: If we're looking for a double delimiter (**) and
-        // encounter a single delimiter (*), check if it's a valid emphasis opener.
-        // If it is, try to parse it as `one` (emphasis). If `one` succeeds, skip
-        // over it. If `one` fails, the outer `two` also fails (delimiter poisoning).
-        // If the `*` is NOT a valid opener (e.g., followed by whitespace or escaped),
-        // skip it and continue looking for the `**` closer.
-        if delim_count == 2 && pos < text.len() && bytes[pos] == delim_char as u8 {
-            // Check that there's NOT a second delimiter immediately after
-            // (which would make this part of our `**` closer or another `**` opener)
-            let no_second_delim = pos + 1 >= bytes.len() || bytes[pos + 1] != delim_char as u8;
-
-            if no_second_delim {
-                // Check if this * is escaped (preceded by odd number of backslashes)
-                let is_escaped = {
-                    let mut backslash_count = 0;
-                    let mut check_pos = pos;
-                    while check_pos > 0 && bytes[check_pos - 1] == b'\\' {
-                        backslash_count += 1;
-                        check_pos -= 1;
-                    }
-                    backslash_count % 2 == 1
-                };
-
-                if is_escaped {
-                    // Escaped delimiter - just literal text, skip it
-                    log::trace!("* at pos {} is escaped, skipping", pos);
-                    pos = advance_char_boundary(text, pos, end);
-                    continue;
-                }
-
-                // Check if this * is a valid emphasis opener (Pandoc's enclosure rule).
-                // A delimiter followed by whitespace is NOT an opener - it's literal text.
-                let after_delim = pos + 1;
-                let followed_by_whitespace = after_delim < text.len()
-                    && text[after_delim..]
-                        .chars()
-                        .next()
-                        .is_some_and(|c| c.is_whitespace());
-
-                if followed_by_whitespace {
-                    // Not a valid opener - just literal text, skip it
-                    log::trace!(
-                        "* at pos {} followed by whitespace, not an opener, skipping",
-                        pos
-                    );
-                    pos = advance_char_boundary(text, pos, end);
-                    continue;
-                }
-
-                log::trace!(
-                    "try_parse_two: found * at pos {}, attempting nested one",
-                    pos
-                );
-
-                // Try to parse as `one` (emphasis)
-                // We create a temporary builder to test if `one` succeeds
-                let mut temp_builder = GreenNodeBuilder::new();
-                if let Some(one_consumed) =
-                    try_parse_one(text, pos, delim_char, end, config, &mut temp_builder)
-                {
-                    // `one` succeeded! Those * delimiters are consumed.
-                    // We skip past the `one` and continue searching for our `**` closer.
-                    log::trace!(
-                        "Nested one succeeded, consumed {} bytes, continuing search",
-                        one_consumed
-                    );
-                    pos += one_consumed;
-                    continue;
-                }
-
-                // `one` failed to find a closer. According to Pandoc's algorithm,
-                // this means the outer `two` should also fail. An unmatched inner
-                // delimiter "poisons" the outer emphasis.
-                // Example: `**foo *bar**` - the `*` can't find a closer, so the
-                // outer `**` should fail and the whole thing becomes literal.
-                log::trace!(
-                    "Nested one failed at pos {}, poisoning outer two (no closer found)",
-                    pos
-                );
-                return None;
-            }
-        }
-
-        // Check if we have a potential closer here
-        if pos + delim_count <= text.len() {
-            let mut matches = true;
-            for i in 0..delim_count {
-                if bytes[pos + i] != delim_char as u8 {
-                    matches = false;
-                    break;
-                }
-            }
-
-            if matches {
-                // Check: not escaped (preceded by odd number of backslashes)
-                let is_escaped = {
-                    let mut backslash_count = 0;
-                    let mut check_pos = pos;
-                    while check_pos > 0 && bytes[check_pos - 1] == b'\\' {
-                        backslash_count += 1;
-                        check_pos -= 1;
-                    }
-                    backslash_count % 2 == 1 // Odd number = escaped
-                };
-
-                // Allow matching at the start OR end of a delimiter run.
-                // This lets `**` close at the end of `***` (after a nested `*` closes),
-                // while still avoiding matches in the middle of longer runs.
-                let at_run_start = pos == 0 || bytes[pos - 1] != delim_char as u8;
-                let after_pos = pos + delim_count;
-                let at_run_end = after_pos >= bytes.len() || bytes[after_pos] != delim_char as u8;
-
-                let mut closer_failed_at_isolated_run = false;
-                if (at_run_start || at_run_end) && !is_escaped {
-                    let valid_closer = is_valid_same_delim_closer(
-                        text,
-                        pos,
-                        delim_char,
-                        delim_count,
-                        start,
-                        config,
-                    );
-                    if valid_closer {
-                        log::trace!(
-                            "Found exact {} x {} closer at pos {}",
-                            delim_char,
-                            delim_count,
-                            pos
-                        );
-                        return Some(pos);
-                    }
-                    if at_run_start && at_run_end {
-                        closer_failed_at_isolated_run = true;
-                    }
-                }
-
-                // CommonMark same-delim nested emphasis: see the matching block
-                // in `parse_until_closer_with_nested_two` for the rationale.
-                if closer_failed_at_isolated_run {
-                    let mut temp_builder = GreenNodeBuilder::new();
-                    if let Some((consumed, _)) =
-                        try_parse_emphasis(text, pos, end, config, &mut temp_builder)
-                    {
-                        log::trace!(
-                            "Nested same-delim emphasis at pos {} consumed {} bytes",
-                            pos,
-                            consumed
-                        );
-                        pos += consumed;
-                        continue;
-                    }
-                }
-            }
-        }
-
-        // Not a closer, move to next UTF-8 boundary.
-        pos = advance_char_boundary(text, pos, end);
-    }
-
-    None
-}
-
-///
-/// This is the recursive inline parser that handles all inline elements:
-/// - Text
-/// - Escapes (highest priority)
-/// - Code spans
-/// - Math (inline and display)
-/// - Emphasis/strong (via try_parse_emphasis)
-/// - Other inline elements
-///
-/// **Important**: This is where the greedy left-to-right parsing happens.
-/// When we see `**`, we try to parse it as STRONG. If it succeeds, those
-/// delimiters are consumed and won't be available for outer emphasis.
-///
-/// # Arguments
-/// * `nested_emphasis` - If true, bypass opener validity checks for emphasis.
-///   Set to true when called from within emphasis parsing (e.g., from try_parse_one/two/three).
-///
-/// Currently unused: both dialect entry points wire through the IR's
-/// `build_full_plans` since Phase 1 of the Pandoc IR migration. Kept
-/// for the duration of the migration as a rollback target; will be
-/// removed in Phase 7 along with the rest of the legacy emphasis path.
-#[allow(dead_code)]
-fn parse_inline_range(
-    text: &str,
-    start: usize,
-    end: usize,
-    config: &ParserOptions,
-    builder: &mut GreenNodeBuilder,
-) {
-    parse_inline_range_impl(
-        text, start, end, config, builder, false, false, None, None, None,
-    )
-}
-
-/// Same as `parse_inline_range` but bypasses opener validity checks for emphasis.
-/// Used within emphasis parsing contexts (e.g., from try_parse_one/two/three).
-fn parse_inline_range_nested(
-    text: &str,
-    start: usize,
-    end: usize,
-    config: &ParserOptions,
-    builder: &mut GreenNodeBuilder,
-) {
-    parse_inline_range_impl(
-        text, start, end, config, builder, true, false, None, None, None,
-    )
 }
 
 fn is_emoji_boundary(text: &str, pos: usize) -> bool {
@@ -1567,7 +214,6 @@ fn parse_inline_range_impl(
     end: usize,
     config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
-    nested_emphasis: bool,
     nested_in_link: bool,
     plan: Option<&EmphasisPlan>,
     bracket_plan: Option<&BracketPlan>,
@@ -2587,12 +1233,11 @@ fn parse_inline_range_impl(
             }
         }
 
-        // Try to parse emphasis at this position
+        // Emphasis emission, plan-driven. The IR's emphasis pass has
+        // already decided every delimiter byte's disposition (open
+        // marker, close marker, or unmatched literal); consult the
+        // plan here instead of re-scanning.
         if byte == b'*' || byte == b'_' {
-            // CommonMark plan-driven path: the delimiter stack pre-pass has
-            // already decided every delimiter byte's disposition (open marker,
-            // close marker, or unmatched literal). Consult it here instead of
-            // running the recursive-descent matcher.
             if let Some(plan_ref) = plan {
                 match plan_ref.lookup(pos) {
                     Some(DelimChar::Open {
@@ -2620,7 +1265,6 @@ fn parse_inline_range_impl(
                             partner,
                             config,
                             builder,
-                            nested_emphasis,
                             nested_in_link,
                             plan,
                             bracket_plan,
@@ -2660,53 +1304,6 @@ fn parse_inline_range_impl(
                         continue;
                     }
                 }
-            }
-
-            // Pandoc dialect: existing recursive-descent emphasis path.
-            // Count the delimiter run to avoid re-parsing
-            let bytes = text.as_bytes();
-            let mut delim_count = 0;
-            while pos + delim_count < bytes.len() && bytes[pos + delim_count] == byte {
-                delim_count += 1;
-            }
-
-            // Emit any accumulated text before the delimiter
-            if pos > text_start {
-                log::trace!(
-                    "Emitting TEXT before delimiter: {:?}",
-                    &text[text_start..pos]
-                );
-                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-                text_start = pos; // Update text_start after emission
-            }
-
-            // Try to parse emphasis
-            // Use nested variant (bypass opener validity) when in nested context
-            let emphasis_result = if nested_emphasis {
-                try_parse_emphasis_nested(text, pos, end, config, builder)
-            } else {
-                try_parse_emphasis(text, pos, end, config, builder)
-            };
-
-            if let Some((consumed, _)) = emphasis_result {
-                // Successfully parsed emphasis
-                log::trace!(
-                    "Parsed emphasis, consumed {} bytes from pos {}",
-                    consumed,
-                    pos
-                );
-                pos += consumed;
-                text_start = pos;
-            } else {
-                // Failed to parse, delimiter run will be treated as regular text
-                // Skip the ENTIRE delimiter run to avoid re-parsing parts of it
-                log::trace!(
-                    "Failed to parse emphasis at pos {}, skipping {} delimiters as literal",
-                    pos,
-                    delim_count
-                );
-                pos += delim_count;
-                // DON'T update text_start - let the delimiters accumulate
             }
             continue;
         }
@@ -2856,63 +1453,8 @@ mod tests {
         assert!(has_strong, "Should have STRONG node");
     }
 
-    /// Test that we can parse a simple emphasis case
-    #[test]
-    fn test_parse_simple_emphasis() {
-        use crate::options::ParserOptions;
-        use crate::syntax::SyntaxNode;
-        use rowan::GreenNode;
-
-        let text = "*test*";
-        let config = ParserOptions::default();
-        let mut builder = GreenNodeBuilder::new();
-
-        // Try to parse emphasis at position 0
-        let result = try_parse_emphasis(text, 0, text.len(), &config, &mut builder);
-
-        // Should successfully parse
-        assert_eq!(result, Some((6, 1))); // Consumed all 6 bytes, delimiter count 1
-
-        // Check the generated CST
-        let green: GreenNode = builder.finish();
-        let node = SyntaxNode::new_root(green);
-
-        // The root IS the EMPHASIS node
-        assert_eq!(node.kind(), SyntaxKind::EMPHASIS);
-
-        // Verify losslessness: CST text should match input
-        assert_eq!(node.text().to_string(), text);
-    }
-
-    /// Test parsing nested emphasis/strong
-    #[test]
-    fn test_parse_nested_emphasis_strong() {
-        use crate::options::ParserOptions;
-
-        let text = "*foo **bar** baz*";
-        let config = ParserOptions::default();
-        let mut builder = GreenNodeBuilder::new();
-
-        // Parse the whole range
-        parse_inline_range(text, 0, text.len(), &config, &mut builder);
-
-        let green = builder.finish();
-        let node = crate::syntax::SyntaxNode::new_root(green);
-
-        // Verify losslessness
-        assert_eq!(node.text().to_string(), text);
-
-        // Should have EMPHASIS and STRONG nodes
-        let has_emph = node.descendants().any(|n| n.kind() == SyntaxKind::EMPHASIS);
-        let has_strong = node.descendants().any(|n| n.kind() == SyntaxKind::STRONG);
-
-        assert!(has_emph, "Should have EMPHASIS node");
-        assert!(has_strong, "Should have STRONG node");
-    }
-
     /// Test Pandoc's "three" algorithm: ***foo* bar**
     /// Expected: Strong[Emph[foo], bar]
-    /// Current bug: Parses as *Strong[foo* bar]
     #[test]
     fn test_triple_emphasis_star_then_double_star() {
         use crate::options::ParserOptions;
@@ -2924,7 +1466,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         builder.start_node(SyntaxKind::DOCUMENT.into());
-        parse_inline_range(text, 0, text.len(), &config, &mut builder);
+        parse_inline_text_recursive(&mut builder, text, &config);
         builder.finish_node();
 
         let green: GreenNode = builder.finish();
@@ -2975,7 +1517,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         builder.start_node(SyntaxKind::DOCUMENT.into());
-        parse_inline_range(text, 0, text.len(), &config, &mut builder);
+        parse_inline_text_recursive(&mut builder, text, &config);
         builder.finish_node();
 
         let green: GreenNode = builder.finish();
@@ -3137,12 +1679,14 @@ mod tests {
         let config = ParserOptions::default();
         let mut builder = GreenNodeBuilder::new();
 
-        let result = try_parse_emphasis(text, 0, text.len(), &config, &mut builder);
-        assert_eq!(result, Some((text.len(), 1)));
+        builder.start_node(SyntaxKind::PARAGRAPH.into());
+        parse_inline_text_recursive(&mut builder, text, &config);
+        builder.finish_node();
 
         let green: GreenNode = builder.finish();
         let node = SyntaxNode::new_root(green);
-        assert_eq!(node.kind(), SyntaxKind::EMPHASIS);
+        let has_emph = node.descendants().any(|n| n.kind() == SyntaxKind::EMPHASIS);
+        assert!(has_emph, "Should have EMPHASIS node");
         assert_eq!(node.text().to_string(), text);
     }
 }
@@ -3161,26 +1705,27 @@ fn test_two_with_nested_one_and_triple_closer() {
     let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
-    // parse_inline_range emits inline content directly
-    parse_inline_range(text, 0, text.len(), &config, &mut builder);
+    builder.start_node(SyntaxKind::PARAGRAPH.into());
+    parse_inline_text_recursive(&mut builder, text, &config);
+    builder.finish_node();
 
     let green: GreenNode = builder.finish();
     let node = SyntaxNode::new_root(green);
 
-    // Verify lossless parsing
     assert_eq!(node.text().to_string(), text, "Should be lossless");
 
-    // The root node should be STRONG (parse_inline_range doesn't add wrapper)
-    assert_eq!(
-        node.kind(),
-        SyntaxKind::STRONG,
-        "Root should be STRONG, got: {:?}",
-        node.kind()
+    let strong_nodes: Vec<_> = node
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::STRONG)
+        .collect();
+    assert_eq!(strong_nodes.len(), 1, "Should have exactly one STRONG node");
+    let has_emphasis_in_strong = strong_nodes[0]
+        .descendants()
+        .any(|n| n.kind() == SyntaxKind::EMPHASIS);
+    assert!(
+        has_emphasis_in_strong,
+        "STRONG should contain EMPHASIS node"
     );
-
-    // STRONG should contain EMPHASIS as a nested node
-    let has_emphasis = node.children().any(|c| c.kind() == SyntaxKind::EMPHASIS);
-    assert!(has_emphasis, "STRONG should contain EMPHASIS node");
 }
 
 #[test]
@@ -3196,25 +1741,15 @@ fn test_emphasis_with_trailing_space_before_closer() {
     let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
-    // Try to parse emphasis at position 0
-    let result = try_parse_emphasis(text, 0, text.len(), &config, &mut builder);
+    builder.start_node(SyntaxKind::PARAGRAPH.into());
+    parse_inline_text_recursive(&mut builder, text, &config);
+    builder.finish_node();
 
-    // Should successfully parse (consumed all 6 bytes, delimiter count 1)
-    assert_eq!(
-        result,
-        Some((6, 1)),
-        "Should parse as emphasis, result: {:?}",
-        result
-    );
-
-    // Check the generated CST
     let green: GreenNode = builder.finish();
     let node = SyntaxNode::new_root(green);
 
-    // The root IS the EMPHASIS node
-    assert_eq!(node.kind(), SyntaxKind::EMPHASIS);
-
-    // Verify losslessness
+    let has_emph = node.descendants().any(|n| n.kind() == SyntaxKind::EMPHASIS);
+    assert!(has_emph, "Should have EMPHASIS node");
     assert_eq!(node.text().to_string(), text);
 }
 
@@ -3231,7 +1766,9 @@ fn test_triple_emphasis_all_strong_nested() {
     let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
-    parse_inline_range(text, 0, text.len(), &config, &mut builder);
+    builder.start_node(SyntaxKind::DOCUMENT.into());
+    parse_inline_text_recursive(&mut builder, text, &config);
+    builder.finish_node();
 
     let green: GreenNode = builder.finish();
     let node = SyntaxNode::new_root(green);
@@ -3278,7 +1815,9 @@ fn test_triple_emphasis_all_emph_nested() {
     let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
-    parse_inline_range(text, 0, text.len(), &config, &mut builder);
+    builder.start_node(SyntaxKind::DOCUMENT.into());
+    parse_inline_text_recursive(&mut builder, text, &config);
+    builder.finish_node();
 
     let green: GreenNode = builder.finish();
     let node = SyntaxNode::new_root(green);
@@ -3324,23 +1863,16 @@ fn test_parse_emphasis_multiline() {
     let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
-    let result = try_parse_emphasis(text, 0, text.len(), &config, &mut builder);
+    builder.start_node(SyntaxKind::PARAGRAPH.into());
+    parse_inline_text_recursive(&mut builder, text, &config);
+    builder.finish_node();
 
-    // Should successfully parse all bytes
-    assert_eq!(
-        result,
-        Some((text.len(), 1)),
-        "Emphasis should parse multiline content"
-    );
-
-    // Check the generated CST
     let green: GreenNode = builder.finish();
     let node = SyntaxNode::new_root(green);
 
-    // Should have EMPHASIS node
-    assert_eq!(node.kind(), SyntaxKind::EMPHASIS);
+    let has_emph = node.descendants().any(|n| n.kind() == SyntaxKind::EMPHASIS);
+    assert!(has_emph, "Should have EMPHASIS node");
 
-    // Verify losslessness: should preserve the newline
     assert_eq!(node.text().to_string(), text);
     assert!(
         node.text().to_string().contains('\n'),
@@ -3359,23 +1891,16 @@ fn test_parse_strong_multiline() {
     let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
-    let result = try_parse_emphasis(text, 0, text.len(), &config, &mut builder);
+    builder.start_node(SyntaxKind::PARAGRAPH.into());
+    parse_inline_text_recursive(&mut builder, text, &config);
+    builder.finish_node();
 
-    // Should successfully parse all bytes
-    assert_eq!(
-        result,
-        Some((text.len(), 2)),
-        "Strong emphasis should parse multiline content"
-    );
-
-    // Check the generated CST
     let green: GreenNode = builder.finish();
     let node = SyntaxNode::new_root(green);
 
-    // Should have STRONG node
-    assert_eq!(node.kind(), SyntaxKind::STRONG);
+    let has_strong = node.descendants().any(|n| n.kind() == SyntaxKind::STRONG);
+    assert!(has_strong, "Should have STRONG node");
 
-    // Verify losslessness
     assert_eq!(node.text().to_string(), text);
     assert!(
         node.text().to_string().contains('\n'),
@@ -3394,16 +1919,10 @@ fn test_parse_triple_emphasis_multiline() {
     let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
-    let result = try_parse_emphasis(text, 0, text.len(), &config, &mut builder);
+    builder.start_node(SyntaxKind::PARAGRAPH.into());
+    parse_inline_text_recursive(&mut builder, text, &config);
+    builder.finish_node();
 
-    // Should successfully parse all bytes
-    assert_eq!(
-        result,
-        Some((text.len(), 3)),
-        "Triple emphasis should parse multiline content"
-    );
-
-    // Check the generated CST
     let green: GreenNode = builder.finish();
     let node = SyntaxNode::new_root(green);
 
@@ -3411,7 +1930,6 @@ fn test_parse_triple_emphasis_multiline() {
     let has_strong = node.descendants().any(|n| n.kind() == SyntaxKind::STRONG);
     assert!(has_strong, "Should have STRONG node");
 
-    // Verify losslessness
     assert_eq!(node.text().to_string(), text);
     assert!(
         node.text().to_string().contains('\n'),
