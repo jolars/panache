@@ -12,7 +12,127 @@ content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (iii)
+## Latest session — 2026-04-30 (iv)
+
+**Workspace test count: 0 failing → 0 failing.** **Phase 2 LANDED.**
+Inline footnotes (`^[note]`) and native spans (`<span>...</span>`)
+now dispatched IR-first under `Dialect::Pandoc`; legacy dispatcher
+branches gated to `Dialect::CommonMark`. Conformance allowlist
+preserved; clippy + fmt clean. Diff is committable.
+
+### What landed this session
+
+1. **New `ConstructKind` variants** in `inline_ir.rs`:
+   `InlineFootnote`, `NativeSpan`. `build_ir`'s `^[note]` and
+   `<span>` recognition (added in Phase 1) now emits these kinds
+   instead of generic `PandocOpaque`. The other Pandoc bracket-shaped
+   opaques (links, ref-links, `[^id]`, `[@cite]`, `[span]{attrs}`,
+   math) remain as `PandocOpaque` for now — they're consumed by the
+   dispatcher's bracket chain and will move in Phases 3-6.
+
+2. **`ConstructPlan` byte-keyed lookup** added alongside `BracketPlan`
+   and `EmphasisPlan` on `InlinePlans`. Maps start-byte → `ConstructDispo`
+   (`InlineFootnote { end }` or `NativeSpan { end }`).
+
+3. **IR-driven dispatch** at the top of `parse_inline_range_impl`'s
+   loop. When `construct_plan.lookup(pos)` hits, the dispatcher
+   re-runs the same `try_parse_inline_footnote` / `try_parse_native_span`
+   to extract content+attributes, sanity-checks `pos + len ==
+   dispo_end`, then emits via the existing `emit_*` helpers. Same
+   recognition algorithm, same emission helpers — the IR just gates
+   *when* they fire.
+
+4. **Dispatcher's legacy `^[` and `<span>` branches** gated on
+   `config.dialect == Dialect::CommonMark`. Under Pandoc the IR
+   drives; under CommonMark dialect with the (rare) extension
+   override, the legacy branch still fires.
+
+5. **Signature change**: `parse_inline_range_impl` gained a
+   `construct_plan: Option<&ConstructPlan>` argument. All 5 call
+   sites (entry points + nested helpers + recursive emphasis call
+   at line 2408) updated.
+
+### Why this is "pure additive; no algorithm change"
+
+The `try_parse_*` recognition is unchanged. The `emit_*` emission
+helpers are unchanged. The byte-by-byte iteration logic in
+`parse_inline_range_impl` is unchanged for everything except the
+new top-of-loop `construct_plan.lookup(pos)` early-out. The
+sanity-check `pos + len == dispo_end` ensures the IR's recorded
+range matches the dispatcher's recomputed range — if they ever
+disagree (shouldn't, since both call the same helper), we fall
+through to the rest of the loop without panicking.
+
+### Files in committed-ready diff
+
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`:
+  + 2 new `ConstructKind` variants, +60 lines for `ConstructDispo`
+    / `ConstructPlan` / `build_construct_plan`, plus `InlinePlans`
+    field and `build_full_plans` wiring.
+- `crates/panache-parser/src/parser/inlines/core.rs`:
+  + import of `ConstructDispo` / `ConstructPlan`, +35 lines for
+    the IR-driven dispatch branch at top of loop, signature change
+    to `parse_inline_range_impl`, dialect gate on the two legacy
+    branches.
+
+### Verification done
+
+- Workspace tests: 0 → 0.
+- CommonMark conformance allowlist: green.
+- clippy + fmt: clean.
+- Manual probe: `*emph ^[*not-emph*] still emph*` produces outer
+  EMPHASIS containing INLINE_FOOTNOTE containing inner EMPHASIS,
+  matching `pandoc -f markdown -t native` exactly.
+- Manual probe: `before <span class="x">*emph*</span> after`
+  produces correct BRACKETED_SPAN with nested EMPHASIS.
+
+### Suggested next sub-targets, ranked
+
+Phase 2 is done. Logical next:
+
+1. **Phase 3** — `[^id]` footnote refs into IR scan as
+   `Construct::FootnoteReference` with IR-driven dispatch (mirror
+   Phase 2's pattern: add `ConstructKind::FootnoteReference`,
+   extend `build_construct_plan`, add a `ConstructDispo` variant,
+   add a dispatch branch in `parse_inline_range_impl`, gate the
+   dispatcher's `[^...]` branch to CommonMark dialect). Currently
+   `[^id]` is recognised in `build_ir`'s `try_pandoc_bracket_opaque`
+   helper as generic `PandocOpaque`; need to break it out into a
+   dedicated kind.
+2. **Phase 4** — `[@cite]` bracketed citations + bare `@cite` —
+   same pattern as Phase 3.
+3. Phases 5-7 in order.
+
+### Don't redo / known traps (carried forward + new)
+
+All Phase 1 traps still apply. Plus:
+
+- **NEW (Phase 2 pattern): always sanity-check `pos + len ==
+  dispo_end`** in the IR-driven dispatch branch. The IR records the
+  range from `build_ir`'s scan; the dispatcher re-runs the same
+  helper to extract the payload. If they ever disagree, fall through
+  silently rather than panicking — protects against future drift.
+- **NEW: emission helpers `emit_inline_footnote` and `emit_native_span`
+  recursively call `parse_inline_text`** for inner content. That
+  call constructs ITS OWN `InlinePlans` for the inner range — it
+  doesn't reuse the outer plan. So nested constructs (footnote
+  inside span, span inside footnote) work correctly without any
+  special-case state passing.
+- **NEW: don't gate the dispatcher's `^[` branch on
+  `!is_commonmark`** alone — gate on the explicit
+  `config.dialect == Dialect::CommonMark` check. The migration
+  is on `Dialect`, not on a `!is_commonmark` boolean derived
+  elsewhere. Same lesson for `<span>`.
+
+### Files in current diff (committable)
+
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`
+- `crates/panache-parser/src/parser/inlines/core.rs`
+- `.claude/skills/pandoc-ir-migrate/RECAP.md`
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (iii)
 
 **Workspace test count: 6 failing → 0 failing.** **Phase 1 LANDED.**
 All previously-failing emphasis tests pass; CommonMark conformance

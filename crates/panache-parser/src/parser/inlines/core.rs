@@ -48,7 +48,7 @@ fn reference_resolves(
     let is_commonmark = config.dialect == Dialect::CommonMark;
     delimiter_stack::reference_resolves(is_commonmark, link_text, label, is_shortcut, config)
 }
-use super::inline_ir::BracketPlan;
+use super::inline_ir::{BracketPlan, ConstructDispo, ConstructPlan};
 
 // Import inline element parsers from sibling modules
 use super::bookdown::{
@@ -139,6 +139,7 @@ pub fn parse_inline_text_recursive(
         false,
         Some(&plans.emphasis),
         bracket_plan,
+        Some(&plans.constructs),
     );
 
     log::trace!("Recursive inline parsing complete");
@@ -180,6 +181,7 @@ pub fn parse_inline_text(
         true,
         Some(&plans.emphasis),
         bracket_plan,
+        Some(&plans.constructs),
     );
 }
 
@@ -1517,7 +1519,9 @@ fn parse_inline_range(
     config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) {
-    parse_inline_range_impl(text, start, end, config, builder, false, false, None, None)
+    parse_inline_range_impl(
+        text, start, end, config, builder, false, false, None, None, None,
+    )
 }
 
 /// Same as `parse_inline_range` but bypasses opener validity checks for emphasis.
@@ -1529,7 +1533,9 @@ fn parse_inline_range_nested(
     config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) {
-    parse_inline_range_impl(text, start, end, config, builder, true, false, None, None)
+    parse_inline_range_impl(
+        text, start, end, config, builder, true, false, None, None, None,
+    )
 }
 
 fn is_emoji_boundary(text: &str, pos: usize) -> bool {
@@ -1565,6 +1571,7 @@ fn parse_inline_range_impl(
     nested_in_link: bool,
     plan: Option<&EmphasisPlan>,
     bracket_plan: Option<&BracketPlan>,
+    construct_plan: Option<&ConstructPlan>,
 ) {
     log::trace!(
         "parse_inline_range: start={}, end={}, text={:?}",
@@ -1576,6 +1583,51 @@ fn parse_inline_range_impl(
     let mut text_start = start;
 
     while pos < end {
+        // IR-driven dispatch (Phase 2): if the IR identified a Pandoc
+        // standalone construct starting here, emit it directly. Bypasses
+        // the dispatcher's ordered-try chain for `^[note]` and
+        // `<span>...</span>` under `Dialect::Pandoc`. The IR scan
+        // already gates these on `!is_commonmark` and the relevant
+        // extension flag, so this branch is empty under CommonMark
+        // dialect (where the legacy branches still run).
+        if let Some(plan) = construct_plan
+            && let Some(dispo) = plan.lookup(pos)
+        {
+            match *dispo {
+                ConstructDispo::InlineFootnote { end: dispo_end } => {
+                    if dispo_end <= end
+                        && let Some((len, content)) = try_parse_inline_footnote(&text[pos..])
+                        && pos + len == dispo_end
+                    {
+                        if pos > text_start {
+                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                        }
+                        log::trace!("IR: matched inline footnote at pos {}", pos);
+                        emit_inline_footnote(builder, content, config);
+                        pos += len;
+                        text_start = pos;
+                        continue;
+                    }
+                }
+                ConstructDispo::NativeSpan { end: dispo_end } => {
+                    if dispo_end <= end
+                        && let Some((len, content, attributes)) =
+                            try_parse_native_span(&text[pos..])
+                        && pos + len == dispo_end
+                    {
+                        if pos > text_start {
+                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                        }
+                        log::trace!("IR: matched native span at pos {}", pos);
+                        emit_native_span(builder, content, &attributes, config);
+                        pos += len;
+                        text_start = pos;
+                        continue;
+                    }
+                }
+            }
+        }
+
         let byte = text.as_bytes()[pos];
 
         // Backslash math (highest priority if enabled)
@@ -1826,10 +1878,14 @@ fn parse_inline_range_impl(
             continue;
         }
 
-        // Try inline footnotes: ^[note]
+        // Try inline footnotes: ^[note]. Phase 2: under Pandoc
+        // dialect this is consumed via the IR's `ConstructPlan` at
+        // the top of the loop; the dispatcher branch only fires for
+        // CommonMark dialect with the extension explicitly enabled.
         if byte == b'^'
             && pos + 1 < text.len()
             && text.as_bytes()[pos + 1] == b'['
+            && config.dialect == Dialect::CommonMark
             && config.extensions.inline_footnotes
             && let Some((len, content)) = try_parse_inline_footnote(&text[pos..])
         {
@@ -2064,8 +2120,13 @@ fn parse_inline_range_impl(
             continue;
         }
 
-        // Try native spans: <span>text</span> (after autolink since both start with <)
+        // Try native spans: <span>text</span> (after autolink since both
+        // start with <). Phase 2: under Pandoc dialect this is consumed
+        // via the IR's `ConstructPlan` at the top of the loop; the
+        // dispatcher branch only fires for CommonMark dialect with the
+        // extension explicitly enabled.
         if byte == b'<'
+            && config.dialect == Dialect::CommonMark
             && config.extensions.native_spans
             && let Some((len, content, attributes)) = try_parse_native_span(&text[pos..])
         {
@@ -2354,6 +2415,7 @@ fn parse_inline_range_impl(
                             nested_in_link,
                             plan,
                             bracket_plan,
+                            construct_plan,
                         );
                         builder.token(marker_kind.into(), &text[partner..partner + partner_len]);
                         builder.finish_node();

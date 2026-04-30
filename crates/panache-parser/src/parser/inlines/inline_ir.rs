@@ -158,14 +158,23 @@ pub enum ConstructKind {
     /// `<tag ...>` and friends (§6.6).
     InlineHtml,
     /// Pandoc bracket-shaped opaque construct (inline link, reference
-    /// link, image, footnote ref, bracketed citation, bracketed span,
-    /// inline footnote, native span). Pre-recognised in `build_ir` under
-    /// `Dialect::Pandoc` solely so the emphasis pass treats the entire
-    /// construct as opaque and delim runs inside don't cross its
-    /// boundary. Emission re-parses the construct via the dispatcher's
-    /// existing `try_parse_*` chain (the IR is not authoritative for
-    /// Pandoc bracket emission yet).
+    /// link, image, footnote ref, bracketed citation, bracketed span).
+    /// Pre-recognised in `build_ir` under `Dialect::Pandoc` solely so
+    /// the emphasis pass treats the entire construct as opaque and
+    /// delim runs inside don't cross its boundary. Emission re-parses
+    /// the construct via the dispatcher's existing `try_parse_*` chain
+    /// (the IR is not authoritative for Pandoc bracket emission yet).
     PandocOpaque,
+    /// Pandoc inline footnote `^[note text]`. Recognised in `build_ir`
+    /// under `Dialect::Pandoc` and consumed by the emission walk via
+    /// the IR's `ConstructPlan` (Phase 2). The dispatcher's legacy
+    /// `^[` branch is gated to CommonMark dialect only.
+    InlineFootnote,
+    /// Pandoc native span `<span ...>...</span>`. Recognised in
+    /// `build_ir` under `Dialect::Pandoc` and consumed by the emission
+    /// walk via the IR's `ConstructPlan` (Phase 2). The dispatcher's
+    /// legacy `<span>` branch is gated to CommonMark dialect only.
+    NativeSpan,
 }
 
 /// One matched fragment within a [`IrEvent::DelimRun`].
@@ -320,7 +329,8 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
         // Pandoc-only: native span `<span ...>...</span>`. Must come
         // before the generic autolink/raw-html branches so the open tag
         // doesn't get claimed as inline HTML. Span content is opaque to
-        // the emphasis pass; emission re-parses via the dispatcher.
+        // the emphasis pass; emission consumes the event via the IR's
+        // `ConstructPlan` (Phase 2).
         if !is_commonmark
             && b == b'<'
             && exts.native_spans
@@ -331,7 +341,7 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
             events.push(IrEvent::Construct {
                 start: pos,
                 end: pos + len,
-                kind: ConstructKind::PandocOpaque,
+                kind: ConstructKind::NativeSpan,
             });
             pos += len;
             text_run_start = pos;
@@ -384,7 +394,7 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
             events.push(IrEvent::Construct {
                 start: pos,
                 end: pos + len,
-                kind: ConstructKind::PandocOpaque,
+                kind: ConstructKind::InlineFootnote,
             });
             pos += len;
             text_run_start = pos;
@@ -1919,6 +1929,62 @@ impl BracketPlan {
     }
 }
 
+/// A standalone Pandoc inline construct recognised by `build_ir` and
+/// dispatched directly from the emission walk (Phase 2). Carries the
+/// construct's full source range so the emission walk can slice the
+/// content for the existing `emit_*` helpers without re-running the
+/// recognition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstructDispo {
+    /// `^[note text]` — emit via `emit_inline_footnote` after slicing
+    /// the inner content.
+    InlineFootnote { end: usize },
+    /// `<span ...>...</span>` — emit via `emit_native_span` after
+    /// re-parsing the open-tag attributes from the source range.
+    NativeSpan { end: usize },
+}
+
+/// A byte-keyed view of the IR's standalone Pandoc constructs that the
+/// emission walk consumes directly (currently inline footnotes and
+/// native spans). Phase 2 of the Pandoc IR migration: recognition is
+/// authoritative in `build_ir`, the dispatcher's legacy `^[` /
+/// `<span>` branches are gated to `Dialect::CommonMark` only.
+#[derive(Debug, Default, Clone)]
+pub struct ConstructPlan {
+    by_pos: BTreeMap<usize, ConstructDispo>,
+}
+
+impl ConstructPlan {
+    pub fn lookup(&self, pos: usize) -> Option<&ConstructDispo> {
+        self.by_pos.get(&pos)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.by_pos.is_empty()
+    }
+}
+
+/// Build a [`ConstructPlan`] from the resolved IR. Each
+/// `Construct { kind: InlineFootnote | NativeSpan, .. }` becomes one
+/// entry keyed at its start byte.
+pub fn build_construct_plan(events: &[IrEvent]) -> ConstructPlan {
+    let mut by_pos: BTreeMap<usize, ConstructDispo> = BTreeMap::new();
+    for ev in events {
+        if let IrEvent::Construct { start, end, kind } = ev {
+            match kind {
+                ConstructKind::InlineFootnote => {
+                    by_pos.insert(*start, ConstructDispo::InlineFootnote { end: *end });
+                }
+                ConstructKind::NativeSpan => {
+                    by_pos.insert(*start, ConstructDispo::NativeSpan { end: *end });
+                }
+                _ => {}
+            }
+        }
+    }
+    ConstructPlan { by_pos }
+}
+
 /// Build a [`BracketPlan`] from the resolved IR. Each `OpenBracket`
 /// resolution becomes an [`BracketDispo::Open`] keyed at the opener's
 /// start byte. Unresolved openers and unmatched closers become
@@ -2039,15 +2105,17 @@ pub fn build_full_plans(
     InlinePlans {
         emphasis: build_emphasis_plan(&events),
         brackets: build_bracket_plan(&events),
+        constructs: build_construct_plan(&events),
     }
 }
 
 /// Bundle of plans produced by [`build_full_plans`] and consumed by the
-/// CommonMark dialect's emission walk.
+/// inline emission walk.
 #[derive(Debug, Default, Clone)]
 pub struct InlinePlans {
     pub emphasis: super::delimiter_stack::EmphasisPlan,
     pub brackets: BracketPlan,
+    pub constructs: ConstructPlan,
 }
 
 /// Convert the IR's delim-run match decisions into an
