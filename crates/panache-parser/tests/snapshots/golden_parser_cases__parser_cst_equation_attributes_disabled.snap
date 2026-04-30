@@ -4,8 +4,7 @@ expression: cst_output
 ---
 DOCUMENT@0..140
   PARAGRAPH@0..68
-    TEXT@0..11 "When quarto"
-    TEXT@11..67 "_crossrefs is disable ..."
+    TEXT@0..67 "When quarto_crossrefs ..."
     NEWLINE@67..68 "\n"
   BLANK_LINE@68..69
     BLANK_LINE@68..69 "\n"

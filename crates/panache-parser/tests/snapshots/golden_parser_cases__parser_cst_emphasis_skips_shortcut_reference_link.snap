@@ -20,7 +20,6 @@ DOCUMENT@0..22
       LINK_START@15..16
         LINK_START@15..16 "["
       LINK_TEXT@16..20
-        TEXT@16..19 "foo"
-        TEXT@19..20 "*"
+        TEXT@16..20 "foo*"
       TEXT@20..21 "]"
     NEWLINE@21..22 "\n"

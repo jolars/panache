@@ -57,8 +57,17 @@ fn escape_special_chars(
                     at_start && prev_is_text && !matches!(chars.peek(), Some((_, '_')));
                 // If underscore is at end and next token is TEXT, it's intraword
                 let intraword_end = at_end && next_is_text;
+                // Mid-text underscore between two alphanumeric chars (e.g. foo_bar
+                // inside a single coalesced TEXT node).
+                let intraword_mid = !at_start
+                    && !at_end
+                    && text[..byte_idx]
+                        .chars()
+                        .next_back()
+                        .is_some_and(|c| c.is_alphanumeric())
+                    && chars.peek().is_some_and(|(_, c)| c.is_alphanumeric());
 
-                let is_intraword = intraword_start || intraword_end;
+                let is_intraword = intraword_start || intraword_end || intraword_mid;
 
                 if escape_underscores && !skip_emphasis_delim && !is_intraword {
                     result.push('\\');

@@ -19,8 +19,7 @@ DOCUMENT@0..56
       LINK_START@44..45
         LINK_START@44..45 "["
       LINK_TEXT@45..54
-        TEXT@45..48 "Foo"
-        TEXT@48..52 "*bar"
+        TEXT@45..52 "Foo*bar"
         ESCAPED_CHAR@52..54 "\\]"
       TEXT@54..55 "]"
     NEWLINE@55..56 "\n"

@@ -33,14 +33,12 @@ DOCUMENT@0..1176
   BLANK_LINE@62..63
     BLANK_LINE@62..63 "\n"
   PARAGRAPH@63..70
-    TEXT@63..68 "**foo"
-    TEXT@68..69 "*"
+    TEXT@63..69 "**foo*"
     NEWLINE@69..70 "\n"
   BLANK_LINE@70..71
     BLANK_LINE@70..71 "\n"
   PARAGRAPH@71..78
-    TEXT@71..75 "*foo"
-    TEXT@75..77 "**"
+    TEXT@71..77 "*foo**"
     NEWLINE@77..78 "\n"
   BLANK_LINE@78..79
     BLANK_LINE@78..79 "\n"
@@ -134,17 +132,13 @@ DOCUMENT@0..1176
     TEXT@214..219 "*foo "
     STRONG@219..231
       STRONG_MARKER@219..221 "**"
-      TEXT@221..224 "bar"
-      TEXT@224..229 "* baz"
+      TEXT@221..229 "bar* baz"
       STRONG_MARKER@229..231 "**"
     NEWLINE@231..232 "\n"
   BLANK_LINE@232..233
     BLANK_LINE@232..233 "\n"
   PARAGRAPH@233..251
-    TEXT@233..239 "**foo "
-    TEXT@239..243 "*bar"
-    TEXT@243..249 "** baz"
-    TEXT@249..250 "*"
+    TEXT@233..250 "**foo *bar** baz*"
     NEWLINE@250..251 "\n"
   BLANK_LINE@251..252
     BLANK_LINE@251..252 "\n"
@@ -158,9 +152,7 @@ DOCUMENT@0..1176
   BLANK_LINE@273..274
     BLANK_LINE@273..274 "\n"
   PARAGRAPH@274..285
-    TEXT@274..278 "*foo"
-    TEXT@278..283 "**bar"
-    TEXT@283..284 "*"
+    TEXT@274..284 "*foo**bar*"
     NEWLINE@284..285 "\n"
   BLANK_LINE@285..286
     BLANK_LINE@285..286 "\n"
@@ -182,8 +174,7 @@ DOCUMENT@0..1176
       EMPHASIS_MARKER@299..300 "*"
       TEXT@300..303 "foo"
       EMPHASIS_MARKER@303..304 "*"
-    TEXT@304..307 "bar"
-    TEXT@307..308 "*"
+    TEXT@304..308 "bar*"
     NEWLINE@308..309 "\n"
   BLANK_LINE@309..310
     BLANK_LINE@309..310 "\n"
@@ -226,15 +217,12 @@ DOCUMENT@0..1176
   BLANK_LINE@431..432
     BLANK_LINE@431..432 "\n"
   PARAGRAPH@432..442
-    TEXT@432..436 "feas"
-    TEXT@436..441 "_ible"
+    TEXT@432..441 "feas_ible"
     NEWLINE@441..442 "\n"
   BLANK_LINE@442..443
     BLANK_LINE@442..443 "\n"
   PARAGRAPH@443..457
-    TEXT@443..445 "un"
-    TEXT@445..450 "_frig"
-    TEXT@450..456 "_gable"
+    TEXT@443..456 "un_frig_gable"
     NEWLINE@456..457 "\n"
   BLANK_LINE@457..458
     BLANK_LINE@457..458 "\n"
@@ -252,8 +240,7 @@ DOCUMENT@0..1176
       LIST_MARKER@482..483 "-"
       WHITESPACE@483..484 " "
       PLAIN@484..489
-        TEXT@484..487 "foo"
-        TEXT@487..488 "*"
+        TEXT@484..488 "foo*"
         NEWLINE@488..489 "\n"
   BLANK_LINE@489..490
     BLANK_LINE@489..490 "\n"
@@ -270,14 +257,12 @@ DOCUMENT@0..1176
       LIST_MARKER@498..499 "-"
       WHITESPACE@499..500 " "
       PLAIN@500..506
-        TEXT@500..504 "foo "
-        TEXT@504..505 "*"
+        TEXT@500..505 "foo *"
         NEWLINE@505..506 "\n"
   BLANK_LINE@506..507
     BLANK_LINE@506..507 "\n"
   PARAGRAPH@507..516
-    TEXT@507..513 "** bar"
-    TEXT@513..515 "**"
+    TEXT@507..515 "** bar**"
     NEWLINE@515..516 "\n"
   BLANK_LINE@516..517
     BLANK_LINE@516..517 "\n"
@@ -290,8 +275,7 @@ DOCUMENT@0..1176
   BLANK_LINE@526..527
     BLANK_LINE@526..527 "\n"
   PARAGRAPH@527..537
-    TEXT@527..534 "** bar "
-    TEXT@534..536 "**"
+    TEXT@527..536 "** bar **"
     NEWLINE@536..537 "\n"
   BLANK_LINE@537..538
     BLANK_LINE@537..538 "\n"
@@ -357,17 +341,13 @@ DOCUMENT@0..1176
     TEXT@628..633 "*foo "
     STRONG@633..645
       STRONG_MARKER@633..635 "**"
-      TEXT@635..638 "bar"
-      TEXT@638..643 "* baz"
+      TEXT@635..643 "bar* baz"
       STRONG_MARKER@643..645 "**"
     NEWLINE@645..646 "\n"
   BLANK_LINE@646..647
     BLANK_LINE@646..647 "\n"
   PARAGRAPH@647..665
-    TEXT@647..653 "**foo "
-    TEXT@653..657 "*bar"
-    TEXT@657..663 "** baz"
-    TEXT@663..664 "*"
+    TEXT@647..664 "**foo *bar** baz*"
     NEWLINE@664..665 "\n"
   BLANK_LINE@665..666
     BLANK_LINE@665..666 "\n"
@@ -518,14 +498,12 @@ DOCUMENT@0..1176
   BLANK_LINE@934..935
     BLANK_LINE@934..935 "\n"
   PARAGRAPH@935..938
-    TEXT@935..936 "a"
-    TEXT@936..937 "*"
+    TEXT@935..937 "a*"
     NEWLINE@937..938 "\n"
   BLANK_LINE@938..939
     BLANK_LINE@938..939 "\n"
   PARAGRAPH@939..943
-    TEXT@939..940 "a"
-    TEXT@940..942 "**"
+    TEXT@939..942 "a**"
     NEWLINE@942..943 "\n"
   BLANK_LINE@943..944
     BLANK_LINE@943..944 "\n"
@@ -539,14 +517,12 @@ DOCUMENT@0..1176
   BLANK_LINE@961..962
     BLANK_LINE@961..962 "\n"
   PARAGRAPH@962..966
-    TEXT@962..963 "a"
-    TEXT@963..965 "*b"
+    TEXT@962..965 "a*b"
     NEWLINE@965..966 "\n"
   BLANK_LINE@966..967
     BLANK_LINE@966..967 "\n"
   PARAGRAPH@967..972
-    TEXT@967..968 "a"
-    TEXT@968..971 "**b"
+    TEXT@967..971 "a**b"
     NEWLINE@971..972 "\n"
   BLANK_LINE@972..973
     BLANK_LINE@972..973 "\n"
@@ -560,17 +536,14 @@ DOCUMENT@0..1176
   BLANK_LINE@1001..1002
     BLANK_LINE@1001..1002 "\n"
   PARAGRAPH@1002..1014
-    TEXT@1002..1005 "foo"
-    TEXT@1005..1009 "_bar"
-    TEXT@1009..1013 "_baz"
+    TEXT@1002..1013 "foo_bar_baz"
     NEWLINE@1013..1014 "\n"
   BLANK_LINE@1014..1015
     BLANK_LINE@1014..1015 "\n"
   PARAGRAPH@1015..1025
     EMPHASIS@1015..1024
       EMPHASIS_MARKER@1015..1016 "*"
-      TEXT@1016..1019 "foo"
-      TEXT@1019..1023 "_bar"
+      TEXT@1016..1023 "foo_bar"
       EMPHASIS_MARKER@1023..1024 "*"
     NEWLINE@1024..1025 "\n"
   BLANK_LINE@1025..1026
@@ -578,9 +551,7 @@ DOCUMENT@0..1176
   PARAGRAPH@1026..1040
     EMPHASIS@1026..1039
       EMPHASIS_MARKER@1026..1027 "*"
-      TEXT@1027..1030 "foo"
-      TEXT@1030..1034 "_bar"
-      TEXT@1034..1038 "_baz"
+      TEXT@1027..1038 "foo_bar_baz"
       EMPHASIS_MARKER@1038..1039 "*"
     NEWLINE@1039..1040 "\n"
   BLANK_LINE@1040..1041

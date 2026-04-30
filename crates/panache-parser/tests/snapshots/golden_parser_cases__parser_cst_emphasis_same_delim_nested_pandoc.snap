@@ -34,9 +34,7 @@ DOCUMENT@0..82
       EMPHASIS_MARKER@22..23 "*"
       TEXT@23..27 "foo "
       EMPHASIS_MARKER@27..28 "*"
-    TEXT@28..31 "bar"
-    TEXT@31..36 "* baz"
-    TEXT@36..37 "*"
+    TEXT@28..37 "bar* baz*"
     NEWLINE@37..38 "\n"
   BLANK_LINE@38..39
     BLANK_LINE@38..39 "\n"

@@ -41,11 +41,23 @@ use crate::options::ParserOptions;
 use crate::parser::inlines::refdef_map::{RefdefMap, normalize_label};
 use std::collections::HashSet;
 
+use super::bracketed_spans::try_parse_bracketed_span;
+use super::citations::try_parse_bracketed_citation;
 use super::code_spans::try_parse_code_span;
 use super::delimiter_stack::EmphasisKind;
 use super::escapes::{EscapeType, try_parse_escape};
+use super::inline_footnotes::{try_parse_footnote_reference, try_parse_inline_footnote};
 use super::inline_html::try_parse_inline_html;
-use super::links::try_parse_autolink;
+use super::links::{
+    LinkScanContext, try_parse_autolink, try_parse_inline_image, try_parse_inline_link,
+    try_parse_reference_image, try_parse_reference_link,
+};
+use super::math::{
+    try_parse_display_math, try_parse_double_backslash_display_math,
+    try_parse_double_backslash_inline_math, try_parse_gfm_inline_math, try_parse_inline_math,
+    try_parse_single_backslash_display_math, try_parse_single_backslash_inline_math,
+};
+use super::native_spans::try_parse_native_span;
 
 /// One event in the inline IR.
 ///
@@ -145,6 +157,15 @@ pub enum ConstructKind {
     Autolink,
     /// `<tag ...>` and friends (§6.6).
     InlineHtml,
+    /// Pandoc bracket-shaped opaque construct (inline link, reference
+    /// link, image, footnote ref, bracketed citation, bracketed span,
+    /// inline footnote, native span). Pre-recognised in `build_ir` under
+    /// `Dialect::Pandoc` solely so the emphasis pass treats the entire
+    /// construct as opaque and delim runs inside don't cross its
+    /// boundary. Emission re-parses the construct via the dispatcher's
+    /// existing `try_parse_*` chain (the IR is not authoritative for
+    /// Pandoc bracket emission yet).
+    PandocOpaque,
 }
 
 /// One matched fragment within a [`IrEvent::DelimRun`].
@@ -278,6 +299,45 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
             continue;
         }
 
+        // Pandoc-only: math spans are opaque to emphasis. The legacy
+        // `parse_until_closer_with_nested_*` skip-list includes inline
+        // math; without recognising it here, delim runs inside `$math$`
+        // would be picked up by the emphasis pass and break losslessness
+        // (the dispatcher's math parser would later re-claim the bytes,
+        // duplicating content).
+        if !is_commonmark && let Some(len) = try_pandoc_math_opaque(text, pos, end, config) {
+            flush_text!();
+            events.push(IrEvent::Construct {
+                start: pos,
+                end: pos + len,
+                kind: ConstructKind::PandocOpaque,
+            });
+            pos += len;
+            text_run_start = pos;
+            continue;
+        }
+
+        // Pandoc-only: native span `<span ...>...</span>`. Must come
+        // before the generic autolink/raw-html branches so the open tag
+        // doesn't get claimed as inline HTML. Span content is opaque to
+        // the emphasis pass; emission re-parses via the dispatcher.
+        if !is_commonmark
+            && b == b'<'
+            && exts.native_spans
+            && let Some((len, _, _)) = try_parse_native_span(&text[pos..])
+            && pos + len <= end
+        {
+            flush_text!();
+            events.push(IrEvent::Construct {
+                start: pos,
+                end: pos + len,
+                kind: ConstructKind::PandocOpaque,
+            });
+            pos += len;
+            text_run_start = pos;
+            continue;
+        }
+
         // Autolink (§6.5) before raw HTML — autolinks are the more specific
         // shape inside `<...>`.
         if b == b'<' {
@@ -309,6 +369,48 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
                 text_run_start = pos;
                 continue;
             }
+        }
+
+        // Pandoc-only: inline footnote `^[note]`. Recognized at scan
+        // time so the emphasis pass treats it as opaque (delim runs
+        // inside the footnote can't pair with delim runs outside).
+        if !is_commonmark
+            && b == b'^'
+            && exts.inline_footnotes
+            && let Some((len, _)) = try_parse_inline_footnote(&text[pos..])
+            && pos + len <= end
+        {
+            flush_text!();
+            events.push(IrEvent::Construct {
+                start: pos,
+                end: pos + len,
+                kind: ConstructKind::PandocOpaque,
+            });
+            pos += len;
+            text_run_start = pos;
+            continue;
+        }
+
+        // Pandoc-only: bracket-shaped opaque constructs. Tries the
+        // dispatcher's precedence order to identify the full byte range
+        // of any bracket-shaped Pandoc construct (links, images,
+        // footnote refs, citations, bracketed spans), and emits them as
+        // a single `Construct` so the emphasis pass cannot pair across
+        // their boundaries. Emission re-parses each construct through
+        // the dispatcher's existing `try_parse_*` chain.
+        if !is_commonmark
+            && (b == b'[' || (b == b'!' && pos + 1 < end && bytes[pos + 1] == b'['))
+            && let Some(len) = try_pandoc_bracket_opaque(text, pos, end, config)
+        {
+            flush_text!();
+            events.push(IrEvent::Construct {
+                start: pos,
+                end: pos + len,
+                kind: ConstructKind::PandocOpaque,
+            });
+            pos += len;
+            text_run_start = pos;
+            continue;
         }
 
         // `![` opens an image bracket.
@@ -367,7 +469,7 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
                 run_end += 1;
             }
             let count = run_end - pos;
-            let (can_open, can_close) = compute_flanking(text, pos, count, b);
+            let (can_open, can_close) = compute_flanking(text, pos, count, b, config.dialect);
             events.push(IrEvent::DelimRun {
                 ch: b,
                 start: pos,
@@ -439,7 +541,51 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
 // Flanking (CommonMark §6.2)
 // ============================================================================
 
-fn compute_flanking(text: &str, pos: usize, count: usize, ch: u8) -> (bool, bool) {
+fn compute_flanking(
+    text: &str,
+    pos: usize,
+    count: usize,
+    ch: u8,
+    dialect: crate::options::Dialect,
+) -> (bool, bool) {
+    if dialect == crate::options::Dialect::Pandoc {
+        // Pandoc-markdown's recursive-descent emphasis parser does NOT
+        // apply CommonMark §6.2 flanking rules. Instead it gates on:
+        //   - opener: must not be followed by whitespace (Pandoc
+        //     `try_parse_emphasis` line 247 in legacy core.rs).
+        //   - closer: no flanking gate at all (Pandoc-markdown's
+        //     `ender` parser only counts characters; see Markdown.hs
+        //     in pandoc/src/Text/Pandoc/Readers/Markdown.hs).
+        //   - underscore intraword hard rule: `_` adjacent to an
+        //     alphanumeric on either side cannot open / close
+        //     (Pandoc's `intraword_underscores` extension default).
+        let prev_char = (pos > 0).then(|| text[..pos].chars().last()).flatten();
+        let next_char = text.get(pos + count..).and_then(|s| s.chars().next());
+        let followed_by_ws = next_char.is_none_or(|c| c.is_whitespace());
+
+        let mut can_open = !followed_by_ws;
+        // Pandoc-markdown's `ender` (in pandoc/Readers/Markdown.hs)
+        // has no flanking restriction on closers — just a count match.
+        // Set can_close unconditionally; the per-pair match logic in
+        // `process_emphasis_in_range_filtered` constrains pairing via
+        // the equal-count rule.
+        let mut can_close = true;
+
+        if ch == b'_' {
+            let prev_is_alnum = prev_char.is_some_and(|c| c.is_alphanumeric());
+            let next_is_alnum = next_char.is_some_and(|c| c.is_alphanumeric());
+            if prev_is_alnum {
+                can_open = false;
+            }
+            if next_is_alnum {
+                can_close = false;
+            }
+        }
+
+        return (can_open, can_close);
+    }
+
+    // CommonMark §6.2 flanking.
     let lf = is_left_flanking(text, pos, count);
     let rf = is_right_flanking(text, pos, count);
     if ch == b'*' {
@@ -453,6 +599,153 @@ fn compute_flanking(text: &str, pos: usize, count: usize, ch: u8) -> (bool, bool
         let can_close = rf && (!lf || followed_by_punct);
         (can_open, can_close)
     }
+}
+
+/// Pandoc-only: identify a math span starting at `pos` and return its
+/// byte length. Tries `$math$` and `$$display$$` (gated on
+/// `tex_math_dollars`), GFM `$math$` (gated on `tex_math_gfm`), and the
+/// `\(math\)` / `\[math\]` / `\\(math\\)` / `\\[math\\]` backslash
+/// forms (gated on `tex_math_single_backslash` / `_double_backslash`).
+/// Math content is opaque to emphasis: `$a * b$` must not produce an
+/// emphasis closer at the inner `*`.
+fn try_pandoc_math_opaque(
+    text: &str,
+    pos: usize,
+    end: usize,
+    config: &ParserOptions,
+) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let exts = &config.extensions;
+    let b = bytes[pos];
+
+    if exts.tex_math_dollars && b == b'$' {
+        if let Some((len, _)) = try_parse_display_math(&text[pos..])
+            && pos + len <= end
+        {
+            return Some(len);
+        }
+        if let Some((len, _)) = try_parse_inline_math(&text[pos..])
+            && pos + len <= end
+        {
+            return Some(len);
+        }
+    }
+    if exts.tex_math_gfm
+        && b == b'$'
+        && let Some((len, _)) = try_parse_gfm_inline_math(&text[pos..])
+        && pos + len <= end
+    {
+        return Some(len);
+    }
+    if exts.tex_math_double_backslash && b == b'\\' {
+        if let Some((len, _)) = try_parse_double_backslash_display_math(&text[pos..])
+            && pos + len <= end
+        {
+            return Some(len);
+        }
+        if let Some((len, _)) = try_parse_double_backslash_inline_math(&text[pos..])
+            && pos + len <= end
+        {
+            return Some(len);
+        }
+    }
+    if exts.tex_math_single_backslash && b == b'\\' {
+        if let Some((len, _)) = try_parse_single_backslash_display_math(&text[pos..])
+            && pos + len <= end
+        {
+            return Some(len);
+        }
+        if let Some((len, _)) = try_parse_single_backslash_inline_math(&text[pos..])
+            && pos + len <= end
+        {
+            return Some(len);
+        }
+    }
+    None
+}
+
+/// Pandoc-only: identify a bracket-shaped opaque construct starting at
+/// `pos` and return its byte length. Tries the dispatcher's precedence
+/// order:
+///   1. `![alt](dest)` inline image
+///   2. `![alt][ref]` / `![alt]` reference image (shape-only opacity)
+///   3. `[^id]` footnote reference
+///   4. `[text](dest)` inline link
+///   5. `[text][ref]` / `[text]` reference link (shape-only opacity)
+///   6. `[@cite]` bracketed citation
+///   7. `[text]{attrs}` bracketed span
+///
+/// Returns `None` if the bytes at `pos` don't open any recognised Pandoc
+/// bracket-shaped construct. In that case the scanner falls through to
+/// the generic `OpenBracket`/`CloseBracket` emission and the dispatcher
+/// emits the bracket bytes as literal text (or as plain emphasis if the
+/// pattern matches an opener).
+fn try_pandoc_bracket_opaque(
+    text: &str,
+    pos: usize,
+    end: usize,
+    config: &ParserOptions,
+) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let exts = &config.extensions;
+    let ctx = LinkScanContext::from_options(config);
+    let allow_shortcut = exts.shortcut_reference_links;
+
+    // `![...]` images.
+    if bytes[pos] == b'!' {
+        if pos + 1 >= end || bytes[pos + 1] != b'[' {
+            return None;
+        }
+        if exts.inline_images
+            && let Some((len, _, _, _)) = try_parse_inline_image(&text[pos..], ctx)
+            && pos + len <= end
+        {
+            return Some(len);
+        }
+        if exts.reference_links
+            && let Some((len, _, _, _)) = try_parse_reference_image(&text[pos..], allow_shortcut)
+            && pos + len <= end
+        {
+            return Some(len);
+        }
+        return None;
+    }
+
+    // `[...]` openers — try in dispatcher order. Footnote ref first
+    // because `[^id]` is a unique two-byte opener.
+    if exts.footnotes
+        && let Some((len, _)) = try_parse_footnote_reference(&text[pos..])
+        && pos + len <= end
+    {
+        return Some(len);
+    }
+    if exts.inline_links
+        && let Some((len, _, _, _)) = try_parse_inline_link(&text[pos..], false, ctx)
+        && pos + len <= end
+    {
+        return Some(len);
+    }
+    if exts.reference_links
+        && let Some((len, _, _, _)) =
+            try_parse_reference_link(&text[pos..], allow_shortcut, exts.inline_links, ctx)
+        && pos + len <= end
+    {
+        return Some(len);
+    }
+    if exts.citations
+        && let Some((len, _)) = try_parse_bracketed_citation(&text[pos..])
+        && pos + len <= end
+    {
+        return Some(len);
+    }
+    if exts.bracketed_spans
+        && let Some((len, _, _)) = try_parse_bracketed_span(&text[pos..])
+        && pos + len <= end
+    {
+        return Some(len);
+    }
+
+    None
 }
 
 fn is_unicode_punct_or_symbol(c: char) -> bool {
@@ -511,8 +804,8 @@ fn is_right_flanking(text: &str, run_start: usize, run_len: usize) -> bool {
 /// The algorithm tracks a per-bucket `openers_bottom` exclusive lower
 /// bound to keep walk-back bounded; consume rules and the §6.2 mod-3
 /// rejection match the reference implementation.
-pub fn process_emphasis(events: &mut [IrEvent]) {
-    process_emphasis_in_range(events, 0, events.len());
+pub fn process_emphasis(events: &mut [IrEvent], dialect: crate::options::Dialect) {
+    process_emphasis_in_range(events, 0, events.len(), dialect);
 }
 
 /// Range-scoped variant of [`process_emphasis`].
@@ -528,8 +821,13 @@ pub fn process_emphasis(events: &mut [IrEvent]) {
 /// recorded match in their `matches` vec — this lets the second
 /// (top-level) pass reuse the same algorithm without re-pairing bytes
 /// already consumed by inner-range passes.
-pub fn process_emphasis_in_range(events: &mut [IrEvent], lo: usize, hi: usize) {
-    process_emphasis_in_range_filtered(events, lo, hi, None);
+pub fn process_emphasis_in_range(
+    events: &mut [IrEvent],
+    lo: usize,
+    hi: usize,
+    dialect: crate::options::Dialect,
+) {
+    process_emphasis_in_range_filtered(events, lo, hi, None, dialect);
 }
 
 /// Internal variant of [`process_emphasis_in_range`] with an optional
@@ -544,7 +842,71 @@ fn process_emphasis_in_range_filtered(
     lo: usize,
     hi: usize,
     excluded: Option<&[bool]>,
+    dialect: crate::options::Dialect,
 ) {
+    let is_commonmark = dialect == crate::options::Dialect::CommonMark;
+    if is_commonmark {
+        run_emphasis_pass(events, lo, hi, excluded, dialect, &[], false);
+        return;
+    }
+    // Pandoc dialect: cascade-then-rerun. Run the standard pass, then
+    // invalidate Emph/Strong pairs whose inner range contains an
+    // unmatched same-char run with both can_open && can_close (Pandoc's
+    // recursive descent would have failed those outer pairs because the
+    // inner content has a stray, ambiguous delimiter the recursive
+    // parser cannot pair). The invalidated pairs go into a "rejected
+    // list" that the next iteration of the standard pass consults to
+    // pick a different opener for the same closer (or reject the
+    // closer altogether). Iterate to a fixed point.
+    //
+    // The rerun (iter 2+) runs in `strict` mode: a candidate pair is
+    // rejected if its inner range contains an unmatched same-char run
+    // with count > pair.count. This mirrors pandoc-markdown's
+    // recursive-descent semantics where, e.g. inside a failed outer
+    // `**...**` Strong, the inner `one c` parser's `option2`
+    // (`string [c,c] >> two c mempty`) greedily consumes a stray `**`
+    // and prevents subsequent `*` runs from pairing as Emph. Without
+    // this gate, `**foo *bar** baz*` would produce Emph[bar** baz]
+    // after the outer Strong invalidation, but pandoc treats it as
+    // all-literal because the inner `**` blocks the Emph match.
+    let mut rejected: Vec<(usize, usize)> = Vec::new();
+    let max_iters = events.len().saturating_add(2);
+    let mut iter = 0;
+    loop {
+        let strict = iter > 0;
+        run_emphasis_pass(events, lo, hi, excluded, dialect, &rejected, strict);
+        let invalidations = pandoc_cascade_invalidate(events);
+        if invalidations.is_empty() {
+            break;
+        }
+        rejected.extend(invalidations);
+        iter += 1;
+        if iter >= max_iters {
+            break;
+        }
+    }
+    // Recovery for `***A **B** C***` patterns: synthesise the inner
+    // Strong match the standard delim-stack algorithm can't reach.
+    pandoc_inner_strong_recovery(events);
+}
+
+/// One pass of the CommonMark §6.2 emphasis pairing algorithm over the
+/// IR's [`DelimRun`](IrEvent::DelimRun) events in `[lo, hi)`. Pandoc
+/// dialect gates apply when `dialect == Dialect::Pandoc`. The
+/// `rejected_pairs` list (Pandoc only) excludes specific
+/// (opener_event_idx, closer_event_idx) pairs from matching — used by
+/// the cascade-then-rerun loop to prevent invalidated pairs from
+/// re-forming on the next iteration.
+fn run_emphasis_pass(
+    events: &mut [IrEvent],
+    lo: usize,
+    hi: usize,
+    excluded: Option<&[bool]>,
+    dialect: crate::options::Dialect,
+    rejected_pairs: &[(usize, usize)],
+    strict_pandoc: bool,
+) {
+    let is_commonmark = dialect == crate::options::Dialect::CommonMark;
     let hi = hi.min(events.len());
     if lo >= hi {
         return;
@@ -599,6 +961,7 @@ fn process_emphasis_in_range_filtered(
     let prev_active =
         |removed: &[bool], from: usize| -> Option<usize> { (0..from).rev().find(|&i| !removed[i]) };
 
+    let min_closer_count = 1usize;
     let mut closer_local = first_active(&removed);
     while let Some(c) = closer_local {
         let ev_c_idx = delim_idxs[c];
@@ -611,7 +974,7 @@ fn process_emphasis_in_range_filtered(
             } => (*ch, *can_open, *can_close),
             _ => unreachable!(),
         };
-        if !can_close_c || removed[c] {
+        if !can_close_c || removed[c] || count[c] < min_closer_count {
             closer_local = next_active(&removed, c);
             continue;
         }
@@ -642,10 +1005,78 @@ fn process_emphasis_in_range_filtered(
                 let oc_sum = count[o] + count[c];
                 let opener_both = can_open_o && can_close_o;
                 let closer_both = can_open_c && can_close_c;
-                let mod3_reject = (opener_both || closer_both)
+                let mod3_reject = is_commonmark
+                    && (opener_both || closer_both)
                     && oc_sum.is_multiple_of(3)
                     && !(count[o].is_multiple_of(3) && count[c].is_multiple_of(3));
-                if !mod3_reject {
+                // Pandoc-markdown rejects emph/strong pairs whose counts
+                // disagree in the exactly-(1,2) / (2,1) shape:
+                //   - `**foo*` (2,1): `try_parse_two` looks only for a
+                //     `**` closer; the lone `*` doesn't satisfy that.
+                //   - `*foo**` (1,2): `try_parse_one` encountering `**`
+                //     tries `try_parse_two`; absence of an inner `**`
+                //     closer cascades the outer parse to fail.
+                // Other count combinations DO match (verified against
+                // `pandoc -f markdown`):
+                //   - (1,3) / (3,1) → emph match, opposite-side
+                //     leftover `**` literal.
+                //   - (2,3) / (3,2) → strong match, single `*` literal.
+                //   - (3,3) → STRONG(EM(...)) nested.
+                //   - (1..3, 4+) → match (Pandoc's ender walks the
+                //     closer run for a valid position; algorithm
+                //     consumes leftmost via leftover-as-literal).
+                // Opener count >= 4 is rejected (Pandoc's
+                // `try_parse_emphasis` has no count-4+ dispatch).
+                let pandoc_reject = !is_commonmark
+                    && ((count[o] == 1 && count[c] == 2)
+                        || (count[o] == 2 && count[c] == 1)
+                        || count[o] >= 4);
+                let pair_rejected = !is_commonmark && {
+                    let oe = delim_idxs[o];
+                    let ce = delim_idxs[c];
+                    rejected_pairs.iter().any(|&(ro, rc)| ro == oe && rc == ce)
+                };
+                // Pandoc strict-rerun gate (iter 2+ only): block a
+                // candidate pair if any unmatched same-char run between
+                // its opener and closer has remaining count strictly
+                // greater than the consume rule for this pair.
+                // Mirrors pandoc-markdown's recursive descent where
+                // `one c`'s `option2` (`string [c,c] >> two c`) would
+                // greedily consume a stray higher-count run, blocking
+                // the outer `one c` from finding its `ender c 1` —
+                // e.g. `**foo *bar** baz*` after the outer Strong
+                // invalidates: a naïve rerun pairs ev1 (`*`) ↔ ev3
+                // (`*`) as Emph (consume=1), but pandoc treats the
+                // `**` between as having "consumed" any further
+                // matching, leaving everything literal.
+                let strict_block = strict_pandoc && {
+                    let tentative_consume = if !is_commonmark && count[o] >= 3 && count[c] >= 3 {
+                        1
+                    } else if count[o] >= 2 && count[c] >= 2 {
+                        2
+                    } else {
+                        1
+                    };
+                    let lo_evt = delim_idxs[o] + 1;
+                    let hi_evt = delim_idxs[c];
+                    (lo_evt..hi_evt).any(|k| match &events[k] {
+                        IrEvent::DelimRun {
+                            ch: ch_k,
+                            start,
+                            end,
+                            matches,
+                            ..
+                        } => {
+                            *ch_k == ch_c && {
+                                let total = end - start;
+                                let consumed: usize = matches.iter().map(|m| m.len as usize).sum();
+                                total.saturating_sub(consumed) > tentative_consume
+                            }
+                        }
+                        _ => false,
+                    })
+                };
+                if !mod3_reject && !pandoc_reject && !pair_rejected && !strict_block {
                     found_opener = Some(o);
                     break;
                 }
@@ -657,7 +1088,23 @@ fn process_emphasis_in_range_filtered(
         }
 
         if let Some(o) = found_opener {
-            let consume = if count[o] >= 2 && count[c] >= 2 { 2 } else { 1 };
+            // Consume rule:
+            //   CommonMark — consume 2 (Strong) when both sides have
+            //     >= 2 chars, else 1 (Emph). For `***x***` (3,3) this
+            //     produces EM(STRONG(...)) because the first match
+            //     consumes 2 from each side (Strong outermost).
+            //   Pandoc — when both sides have >= 3, consume 1 first
+            //     (Emph innermost) leaving 2 + 2 to pair as Strong on
+            //     the second pass. This produces STRONG(EM(...)) for
+            //     `***x***`, matching Pandoc-markdown's recursive
+            //     `try_parse_three` algorithm.
+            let consume = if !is_commonmark && count[o] >= 3 && count[c] >= 3 {
+                1
+            } else if count[o] >= 2 && count[c] >= 2 {
+                2
+            } else {
+                1
+            };
             let kind = if consume == 2 {
                 EmphasisKind::Strong
             } else {
@@ -725,8 +1172,298 @@ fn process_emphasis_in_range_filtered(
     }
 
     // No further mutation needed: matches are recorded; remaining bytes
-    // stay implicit literal.
-    let _ = &mut delim_idxs;
+    // stay implicit literal. Pandoc cascade is invoked by the caller
+    // (`process_emphasis_in_range_filtered`) once per pass so it can
+    // accumulate invalidations into a rejected-pairs list and re-run.
+    let _ = (&mut delim_idxs, &mut openers_bottom, min_closer_count);
+}
+
+/// Pandoc-only post-processing pass over [`process_emphasis_in_range_filtered`]
+/// matches: invalidate any matched delim pair that contains an unmatched
+/// same-character run between its opener and closer. Returns the list
+/// of (opener_event_idx, closer_event_idx) pairs that were invalidated
+/// in this call, so the caller can seed a rejected-pairs list and
+/// re-run the standard pass — this lets Pandoc re-pair the inner runs
+/// that the invalidated outer match would have stolen via
+/// between-removal (e.g. `*foo **bar* baz**` → after the outer
+/// `ev0..ev2` Emph is invalidated, `ev1..ev3` matches as Strong on the
+/// next iteration).
+fn pandoc_cascade_invalidate(events: &mut [IrEvent]) -> Vec<(usize, usize)> {
+    let mut invalidated_pairs: Vec<(usize, usize)> = Vec::new();
+    loop {
+        // Compute total bytes (run length) and consumed bytes (sum of
+        // match lens) per DelimRun event index.
+        let total: Vec<usize> = events
+            .iter()
+            .map(|e| match e {
+                IrEvent::DelimRun { start, end, .. } => end - start,
+                _ => 0,
+            })
+            .collect();
+        let consumed: Vec<usize> = events
+            .iter()
+            .map(|e| match e {
+                IrEvent::DelimRun { matches, .. } => matches.iter().map(|m| m.len as usize).sum(),
+                _ => 0,
+            })
+            .collect();
+
+        // Find a pair to invalidate. We invalidate one and restart so
+        // the cascade can re-evaluate dependent pairs.
+        let mut to_invalidate: Option<(usize, u8)> = None;
+        'outer: for opener_idx in 0..events.len() {
+            let IrEvent::DelimRun {
+                ch: ch_o, matches, ..
+            } = &events[opener_idx]
+            else {
+                continue;
+            };
+            for (mi, m) in matches.iter().enumerate() {
+                if !m.is_opener {
+                    continue;
+                }
+                let closer_idx = m.partner_event as usize;
+                if closer_idx <= opener_idx || closer_idx >= events.len() {
+                    continue;
+                }
+                // Scan events strictly between opener and closer for any
+                // DelimRun with the same `ch`, unmatched bytes, AND
+                // both `can_open` and `can_close` (i.e., the run could
+                // have participated in pairing on both sides). A
+                // can_open-only or can_close-only run is a one-sided
+                // fragment (e.g. an isolated `*` after a backslash
+                // escape) that the Pandoc recursive-descent path would
+                // never have tried as a nested-strong opener — those
+                // shouldn't cascade-invalidate the surrounding pair.
+                for k in (opener_idx + 1)..closer_idx {
+                    if let IrEvent::DelimRun {
+                        ch: ch_k,
+                        can_open: co_k,
+                        can_close: cc_k,
+                        ..
+                    } = &events[k]
+                        && *ch_k == *ch_o
+                        && consumed[k] < total[k]
+                        && *co_k
+                        && *cc_k
+                    {
+                        to_invalidate = Some((opener_idx, mi as u8));
+                        break 'outer;
+                    }
+                }
+            }
+        }
+
+        let Some((opener_idx, mi)) = to_invalidate else {
+            break;
+        };
+
+        // Look up the partner event/offset before mutating.
+        let (closer_idx, opener_offset) = match &events[opener_idx] {
+            IrEvent::DelimRun { matches, .. } => {
+                let m = matches[mi as usize];
+                (m.partner_event as usize, m.offset_in_run)
+            }
+            _ => break,
+        };
+
+        // Remove the opener match.
+        if let IrEvent::DelimRun { matches, .. } = &mut events[opener_idx] {
+            matches.remove(mi as usize);
+        }
+        // Remove the corresponding closer match (closer's match has
+        // is_opener=false and partner_offset == opener's offset_in_run).
+        if let IrEvent::DelimRun { matches, .. } = &mut events[closer_idx] {
+            matches.retain(|m| m.is_opener || m.partner_offset != opener_offset);
+        }
+        invalidated_pairs.push((opener_idx, closer_idx));
+    }
+    invalidated_pairs
+}
+
+/// Pandoc-only post-pass: recover the inner Strong match in
+/// `***A **B** C***` patterns where the IR's standard pass produced
+/// `Emph[Strong[A], "B**...** C"]` (matching the outer triple as
+/// Strong+Emph but losing the inner `**...**`-as-Strong-of-`C` pair).
+///
+/// Pandoc's recursive descent here goes
+/// `three c → ender c 2 → one c → option2 → two c`, producing
+/// `Emph[Strong[A], "B", Strong[C]]` — two Strong nodes inside an outer
+/// Emph. The standard delim-stack algorithm can't reach this pairing
+/// because between-removal during the outer Emph match removes the
+/// inner closer-side `**` (e.g. `bar**`) from the candidate pool.
+///
+/// This recovery scans Emph matches whose opener and closer originally
+/// had count >= 3, and whose closer has unmatched bytes >= 2 after the
+/// standard pass; for each, we look for an unmatched same-char
+/// between-run with count >= 2 and `can_close = true` (the would-be
+/// inner-Strong opener) and synthesise a Strong match that consumes
+/// the leftmost 2 bytes of the closer (where the existing Emph match
+/// shifts to the rightmost 1 byte). The byte-position rewrite lets
+/// the CST emission produce well-nested `Emph[..., Strong[...]]` —
+/// outer Emph close at the rightmost outer-triple byte, inner Strong
+/// close at the leftmost two.
+fn pandoc_inner_strong_recovery(events: &mut [IrEvent]) {
+    let n = events.len();
+    // (between_idx, opener_idx, closer_idx, len)
+    let mut to_apply: Vec<(usize, usize, usize, u8)> = Vec::new();
+
+    for opener_idx in 0..n {
+        let (open_total, open_matches_clone, ch_o) = match &events[opener_idx] {
+            IrEvent::DelimRun {
+                start,
+                end,
+                matches,
+                ch,
+                ..
+            } => (*end - *start, matches.clone(), *ch),
+            _ => continue,
+        };
+        if open_total < 3 {
+            continue;
+        }
+
+        for m in open_matches_clone.iter() {
+            if !m.is_opener || m.kind != EmphasisKind::Emph {
+                continue;
+            }
+            let closer_idx = m.partner_event as usize;
+            if closer_idx <= opener_idx || closer_idx >= n {
+                continue;
+            }
+
+            let (close_total, close_consumed) = match &events[closer_idx] {
+                IrEvent::DelimRun {
+                    start,
+                    end,
+                    matches,
+                    ..
+                } => {
+                    let total = end - start;
+                    let consumed: usize = matches.iter().map(|m| m.len as usize).sum();
+                    (total, consumed)
+                }
+                _ => continue,
+            };
+            if close_total < 3 {
+                continue;
+            }
+            let leftover = close_total.saturating_sub(close_consumed);
+            if leftover < 2 {
+                continue;
+            }
+
+            // Walk backward from closer-1 looking for the rightmost
+            // unmatched same-char run with count >= 2 and
+            // can_close=true.
+            for k in ((opener_idx + 1)..closer_idx).rev() {
+                if let IrEvent::DelimRun {
+                    ch,
+                    start,
+                    end,
+                    matches,
+                    can_close,
+                    ..
+                } = &events[k]
+                {
+                    if *ch != ch_o || !*can_close {
+                        continue;
+                    }
+                    let total = end - start;
+                    let consumed: usize = matches.iter().map(|m| m.len as usize).sum();
+                    let remaining = total.saturating_sub(consumed);
+                    if remaining < 2 {
+                        continue;
+                    }
+                    to_apply.push((k, opener_idx, closer_idx, 2));
+                    break;
+                }
+            }
+        }
+    }
+
+    for (between_idx, opener_idx, closer_idx, len) in to_apply {
+        // Find the existing Emph match on the closer side.
+        let (closer_emph_match_idx, closer_emph_offset) = {
+            let mut found: Option<(usize, u8)> = None;
+            if let IrEvent::DelimRun { matches, .. } = &events[closer_idx] {
+                for (mi, m) in matches.iter().enumerate() {
+                    if !m.is_opener
+                        && m.partner_event as usize == opener_idx
+                        && m.kind == EmphasisKind::Emph
+                    {
+                        found = Some((mi, m.offset_in_run));
+                        break;
+                    }
+                }
+            }
+            match found {
+                Some(x) => x,
+                None => continue,
+            }
+        };
+
+        // Find the corresponding Emph match on the opener side.
+        let opener_emph_match_idx = {
+            let mut found: Option<usize> = None;
+            if let IrEvent::DelimRun { matches, .. } = &events[opener_idx] {
+                for (mi, m) in matches.iter().enumerate() {
+                    if m.is_opener
+                        && m.partner_event as usize == closer_idx
+                        && m.kind == EmphasisKind::Emph
+                    {
+                        found = Some(mi);
+                        break;
+                    }
+                }
+            }
+            match found {
+                Some(x) => x,
+                None => continue,
+            }
+        };
+
+        // Shift the Emph closer's offset to the right of the new
+        // Strong closer's bytes (Strong takes leftmost `len` bytes,
+        // Emph takes the next byte).
+        let new_closer_emph_offset = closer_emph_offset + len;
+
+        // Update closer's Emph offset_in_run.
+        if let IrEvent::DelimRun { matches, .. } = &mut events[closer_idx] {
+            matches[closer_emph_match_idx].offset_in_run = new_closer_emph_offset;
+        }
+        // Update opener's Emph partner_offset to point at the shifted
+        // Emph closer position.
+        if let IrEvent::DelimRun { matches, .. } = &mut events[opener_idx] {
+            matches[opener_emph_match_idx].partner_offset = new_closer_emph_offset;
+        }
+
+        // Add Strong opener match on the between-run.
+        if let IrEvent::DelimRun { matches, .. } = &mut events[between_idx] {
+            matches.push(DelimMatch {
+                offset_in_run: 0,
+                len,
+                is_opener: true,
+                partner_event: closer_idx as u32,
+                partner_offset: closer_emph_offset,
+                kind: EmphasisKind::Strong,
+            });
+        }
+        // Add Strong closer match on the closer (at the original
+        // pre-shift Emph-closer position; the bytes that were the
+        // single Emph closer now become the leftmost 2 bytes of the
+        // Strong closer).
+        if let IrEvent::DelimRun { matches, .. } = &mut events[closer_idx] {
+            matches.push(DelimMatch {
+                offset_in_run: closer_emph_offset,
+                len,
+                is_opener: false,
+                partner_event: between_idx as u32,
+                partner_offset: 0,
+                kind: EmphasisKind::Strong,
+            });
+        }
+    }
 }
 
 fn source_start_event(event: &IrEvent) -> usize {
@@ -1251,7 +1988,13 @@ pub fn build_full_plans(
     config: &ParserOptions,
 ) -> InlinePlans {
     let mut events = build_ir(text, start, end, config);
-    process_brackets(&mut events, text, config.refdef_labels.as_ref());
+    // CommonMark §6.3 bracket resolution. Skipped under Pandoc, where
+    // bracket-shaped constructs are pre-recognised as opaque
+    // `Construct` events in `build_ir` and emission stays on the
+    // legacy dispatcher chain.
+    if config.dialect == crate::options::Dialect::CommonMark {
+        process_brackets(&mut events, text, config.refdef_labels.as_ref());
+    }
 
     // Scoped emphasis pass per resolved bracket pair, innermost first.
     // We collect (open_idx, close_idx) pairs of resolved brackets and run
@@ -1273,7 +2016,7 @@ pub fn build_full_plans(
     // Innermost-first: sort by close_idx ascending, then open_idx descending.
     bracket_pairs.sort_by(|a, b| a.1.cmp(&b.1).then(b.0.cmp(&a.0)));
     for &(open_idx, close_idx) in &bracket_pairs {
-        process_emphasis_in_range(&mut events, open_idx + 1, close_idx);
+        process_emphasis_in_range(&mut events, open_idx + 1, close_idx, config.dialect);
     }
 
     // Build exclusion bitmap: any delim run whose event index lies inside
@@ -1291,7 +2034,7 @@ pub fn build_full_plans(
     // Top-level emphasis pass: handles delim runs that fall outside any
     // resolved bracket pair.
     let len = events.len();
-    process_emphasis_in_range_filtered(&mut events, 0, len, Some(&excluded));
+    process_emphasis_in_range_filtered(&mut events, 0, len, Some(&excluded), config.dialect);
 
     InlinePlans {
         emphasis: build_emphasis_plan(&events),
@@ -1489,7 +2232,7 @@ mod tests {
     fn process_emphasis_simple_pair() {
         let opts = cm_opts();
         let mut ir = build_ir("*foo*", 0, 5, &opts);
-        process_emphasis(&mut ir);
+        process_emphasis(&mut ir, opts.dialect);
         // First DelimRun (open) gets a match.
         let opener = ir
             .iter()

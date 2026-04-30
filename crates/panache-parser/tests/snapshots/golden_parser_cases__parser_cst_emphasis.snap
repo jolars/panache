@@ -106,7 +106,5 @@ DOCUMENT@0..367
   BLANK_LINE@339..340
     BLANK_LINE@339..340 "\n"
   PARAGRAPH@340..367
-    TEXT@340..348 "This is "
-    TEXT@348..365 "_ not emphasized "
-    TEXT@365..366 "_"
+    TEXT@340..366 "This is _ not emphasi ..."
     NEWLINE@366..367 "\n"

@@ -205,8 +205,7 @@ DOCUMENT@0..1387
         LINK_START@391..392
           LINK_START@391..392 "["
         LINK_TEXT@392..403
-          TEXT@392..397 "link "
-          TEXT@397..403 "* here"
+          TEXT@392..403 "link * here"
         LINK_TEXT_END@403..404 "]"
         LINK_DEST_START@404..405 "("
         LINK_DEST@405..408
@@ -225,8 +224,7 @@ DOCUMENT@0..1387
         LINK_START@423..424
           LINK_START@423..424 "["
         LINK_TEXT@424..436
-          TEXT@424..429 "link "
-          TEXT@429..436 "** here"
+          TEXT@424..436 "link ** here"
         LINK_TEXT_END@436..437 "]"
         LINK_DEST_START@437..438 "("
         LINK_DEST@438..441

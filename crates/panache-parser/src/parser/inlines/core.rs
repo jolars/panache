@@ -118,22 +118,28 @@ pub fn parse_inline_text_recursive(
         text.len()
     );
 
-    if config.dialect == Dialect::CommonMark {
-        let plans = super::inline_ir::build_full_plans(text, 0, text.len(), config);
-        parse_inline_range_impl(
-            text,
-            0,
-            text.len(),
-            config,
-            builder,
-            false,
-            false,
-            Some(&plans.emphasis),
-            Some(&plans.brackets),
-        );
+    let plans = super::inline_ir::build_full_plans(text, 0, text.len(), config);
+    let bracket_plan = if config.dialect == Dialect::CommonMark {
+        Some(&plans.brackets)
     } else {
-        parse_inline_range(text, 0, text.len(), config, builder);
-    }
+        // Pandoc keeps the legacy `try_parse_*` dispatcher chain for
+        // bracket emission; the IR is consulted only for emphasis. The
+        // IR's `BracketPlan` is empty under Pandoc (process_brackets is
+        // skipped) — passing `None` keeps `bracket_says_resolved` true
+        // so the dispatcher branches fire as before.
+        None
+    };
+    parse_inline_range_impl(
+        text,
+        0,
+        text.len(),
+        config,
+        builder,
+        false,
+        false,
+        Some(&plans.emphasis),
+        bracket_plan,
+    );
 
     log::trace!("Recursive inline parsing complete");
 }
@@ -158,32 +164,23 @@ pub fn parse_inline_text(
         text.len()
     );
 
-    if config.dialect == Dialect::CommonMark {
-        let plans = super::inline_ir::build_full_plans(text, 0, text.len(), config);
-        parse_inline_range_impl(
-            text,
-            0,
-            text.len(),
-            config,
-            builder,
-            false,
-            true,
-            Some(&plans.emphasis),
-            Some(&plans.brackets),
-        );
+    let plans = super::inline_ir::build_full_plans(text, 0, text.len(), config);
+    let bracket_plan = if config.dialect == Dialect::CommonMark {
+        Some(&plans.brackets)
     } else {
-        parse_inline_range_impl(
-            text,
-            0,
-            text.len(),
-            config,
-            builder,
-            false,
-            true,
-            None,
-            None,
-        );
-    }
+        None
+    };
+    parse_inline_range_impl(
+        text,
+        0,
+        text.len(),
+        config,
+        builder,
+        false,
+        true,
+        Some(&plans.emphasis),
+        bracket_plan,
+    );
 }
 
 /// Try to parse emphasis starting at the given position.
@@ -1507,6 +1504,12 @@ fn parse_until_closer_with_nested_one(
 /// # Arguments
 /// * `nested_emphasis` - If true, bypass opener validity checks for emphasis.
 ///   Set to true when called from within emphasis parsing (e.g., from try_parse_one/two/three).
+///
+/// Currently unused: both dialect entry points wire through the IR's
+/// `build_full_plans` since Phase 1 of the Pandoc IR migration. Kept
+/// for the duration of the migration as a rollback target; will be
+/// removed in Phase 7 along with the rest of the legacy emphasis path.
+#[allow(dead_code)]
 fn parse_inline_range(
     text: &str,
     start: usize,

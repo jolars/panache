@@ -12,7 +12,183 @@ content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (ii)
+## Latest session — 2026-04-30 (iii)
+
+**Workspace test count: 6 failing → 0 failing.** **Phase 1 LANDED.**
+All previously-failing emphasis tests pass; CommonMark conformance
+allowlist preserved; clippy + fmt clean. Diff is committable.
+
+### What landed this session
+
+Three Pandoc-only mechanisms in `inline_ir.rs`, all gated on
+`Dialect::Pandoc`:
+
+1. **Cascade-then-rerun loop** (replaces the single in-pass cascade
+   call). After each `run_emphasis_pass`, collect cascade
+   invalidations into a `rejected_pairs: Vec<(usize, usize)>` and
+   re-run; iterate to fixed point. Lets the inner runs the
+   between-removal stole back into the candidate pool. Fixes:
+   - `*foo **bar* baz**` → `Strong[bar*, " ", baz]`.
+   - `**foo *bar **nested** baz* qux**` →
+     `Strong[foo, " ", Emph[bar, " ", Strong[nested], " ", baz], " ", qux]`.
+
+2. **Strict-rerun gate** (iter 2+ only). Block a candidate pair if
+   any unmatched same-char between-run has remaining count
+   strictly greater than the pair's tentative consume. Mirrors
+   pandoc-markdown's `one c → option2 → string [c,c]` greedy
+   consumption: a stray `**` between two `*`s in a re-run would
+   block an Emph that pandoc treats as literal. Fixes
+   `**foo *bar** baz*` → all literal (was: spurious Emph in
+   iter 2 from naive cascade-rerun).
+
+3. **`pandoc_inner_strong_recovery` post-pass.** For each Emph
+   match where opener and closer originally count >= 3, and
+   closer has unmatched bytes >= 2, find the rightmost unmatched
+   same-char between-run with count >= 2 and `can_close = true`
+   and synthesise a Strong match: between-run becomes opener,
+   closer's leftover becomes closer, AND the existing Emph
+   match's offsets are shifted right (Emph close moves to
+   rightmost byte; Strong takes leftmost 2 bytes of closer).
+   This is byte-position rewriting, not pure addition. Fixes
+   `***foo **bar** baz***` →
+   `Emph[Strong[foo, " "], "bar", Strong[" ", baz]]`.
+
+Plus: `parser_cst_emphasis_complex.snap` updated (TEXT-coalescence
+diffs only — no structural changes per `diff | grep -v 'TEXT@' |
+grep -v assertion_line` returning empty).
+
+### Files in committed-ready diff
+
+Same as session-(ii)'s WIP plus this session's edits:
+
+- `.claude/rules/parser.md` (TEXT-coalescence rule paragraph from
+  session-(ii)).
+- `crates/panache-parser/src/parser.rs` (`populate_refdef_labels`
+  widened, from session-(i)).
+- `crates/panache-parser/src/parser/inlines/core.rs` (dispatcher
+  fork dropped, from session-(i)).
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs` (~660
+  net-added lines: dialect gates from session-(i), opaque scan
+  from session-(i), cascade rule from session-(i), the three
+  mechanisms above from this session).
+- `crates/panache-formatter/src/formatter/inline_layout.rs`
+  (`intraword_mid` fix, from session-(ii)).
+- 9 modified `.snap` files (8 TEXT-coalescence from session-(ii) +
+  `emphasis_complex` TEXT-coalescence from this session).
+
+### Algorithm reference: pandoc's `three c` source
+
+The breakthrough this session was reading
+`pandoc/src/Text/Pandoc/Readers/Markdown.hs:1692-1718` — the
+`three c`, `two c`, `one c` recursive descent. Key properties:
+
+- `ender c n` for `c == '*'` succeeds purely on `count n (char c)`
+  because `guard (c == '*')` short-circuits. **It does NOT
+  require `notFollowedBy alphaNum`** — for underscore yes, for
+  asterisk no. Earlier sessions assumed otherwise; this was the
+  trace bug that made me think pandoc's algorithm couldn't
+  produce the observed output.
+- `enclosure c` consumes a delim run, then tries the
+  whitespace-after alternative `(return (B.str cs) <>) <$>
+  whitespace`. For `*foo *` the `*` opener is followed by `f`
+  (no ws) so case-1 → `one c`; for `bar *` the `*` is followed
+  by ` ` (ws) so the whitespace alternative fires and emits the
+  `*` as literal. **This IS the can_open=!followed_by_ws gate.**
+- `three c` reads content greedy until `ender c 1` candidate.
+  Then tries `ender 3 → ender 2 → ender 1` in order:
+  - `ender 3` succeeds → `Strong[Emph[content]]` (pandoc-markdown
+    swaps Strong/Emph order vs CommonMark; `***foo***` is
+    `Strong[Emph[foo]]` in markdown but `Emph[Strong[foo]]` in
+    commonmark).
+  - `ender 2` succeeds → `one c (B.strong <$> contents)` — wraps
+    content as Strong, makes it `one c`'s prefix; outer wrap
+    becomes Emph if `one c` finds its `ender 1`. **This is the
+    `***A **B** C***` → `Emph[Strong[A], B, Strong[C]]` path.**
+  - `ender 1` succeeds → `two c (B.emph <$> contents)` —
+    symmetric variant.
+
+### Trap reflections (session experience)
+
+- **Don't trust your manual trace of pandoc's parser without
+  re-checking `ender`'s guard chain.** I spent ~30 minutes
+  convinced pandoc's algorithm couldn't produce its own output
+  because I missed that `guard (c == '*')` short-circuits the
+  `notFollowedBy alphaNum` check for asterisks.
+- **Cascade-then-rerun without the strict-iter-2+ gate is too
+  permissive.** Re-runs find pairs whose CONTENT has stray
+  higher-count runs that pandoc would have absorbed via
+  `option2`. The strict gate (`remaining > tentative_consume`
+  blocks) is the canonical fix; iter-1 must NOT apply it (it
+  would over-block legitimate cases like `***foo **bar**
+  baz***`).
+- **The Strong-recovery for `***A **B** C***` requires REWRITING
+  the existing Emph's offsets**, not just appending matches.
+  The Emph close has to shift right by 2 bytes so the Strong
+  close fits in the leftmost 2 bytes (well-nested CST). I
+  initially tried append-only and got CST emission with crossing
+  markers (Strong's range extending past Emph's range).
+- **`build_emphasis_plan` records by source byte position in a
+  BTreeMap**, so two matches on the same run end up at distinct
+  positions iff their `start + offset_in_run` differs. The
+  emission walk then drives off Open's `partner_len` to know
+  how far to skip — Close entries don't carry length.
+
+### Suggested next sub-targets, ranked
+
+Phase 1 is done. Logical next:
+
+1. **Phase 2** — `^[note]` and `<span>...</span>` recognition out
+   of the dispatcher's ordered-try chain into `build_ir` as
+   `Construct` events. Pure additive; should be straightforward
+   given Phase 1's groundwork.
+2. **Phase 3** — `[^id]` footnote refs into IR scan as
+   `Construct::FootnoteReference`.
+3. Phases 4-7 in order.
+
+### Don't redo / known traps (carried forward + new)
+
+- **Don't try "two-pass + un-remove-between" for scoped emphasis.**
+  (The `pandoc_inner_strong_recovery` here is NOT this approach
+  — it's a targeted post-pass that synthesises specific matches
+  with byte-offset rewriting, only firing on the precise outer-
+  triple pattern.)
+- **Don't widen the cascade rule to `can_open || can_close`.** Must
+  be `&&`. Over-invalidates intraword `_` cases.
+- **Don't widen the cascade rule to `can_close=true alone`.**
+  Tested mentally on `**foo* bar**`: ev1 is right-flanking only
+  (`can_open=false, can_close=true`), the cascade with
+  `can_close=true alone` would invalidate the legitimate Strong;
+  pandoc keeps it.
+- **Don't tighten `pandoc_reject` to require strict count
+  equality.** Rejects (1,3)/(3,1)/(2,3)/(3,2) which pandoc
+  matches.
+- **Don't add `can_open = false for count >= 4`.** Breaks
+  `**foo****bar**`.
+- **Don't preserve a legacy-fixture output that conflicts with
+  pandoc-native.**
+- **Math opacity in `build_ir` is non-negotiable for losslessness.**
+- **`populate_refdef_labels` MUST be widened to Pandoc.**
+- **TEXT-coalescence improvements may regress formatter
+  escape-logic.** (intraword_mid fix in inline_layout.rs.)
+- **NEW: Pandoc cascade-then-rerun must run strict-mode in iter
+  2+ only.** Strict in iter 1 over-blocks; strict in iter 2+
+  prevents naive re-runs from forming pairs pandoc rejects.
+- **NEW: `***A **B** C***` recovery rewrites Emph offsets**, not
+  just adds Strong. The Emph close must move right to make room
+  for Strong's leftmost 2 bytes; otherwise CST is not
+  well-nested.
+- **NEW: `ender c n` for `c == '*'` does NOT check
+  `notFollowedBy alphaNum`.** When tracing pandoc by hand, do
+  NOT assume the alphanum check fires — it's gated behind
+  `guard (c == '*') <|> ...` which short-circuits.
+
+### Files in current diff (committable)
+
+All as listed in "Files in committed-ready diff" above.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (ii)
 
 **Workspace test count: 12 failing → 6 failing (uncommitted).**
 **Phase 1 still partial — uncommitted; remaining 6 all cluster on
