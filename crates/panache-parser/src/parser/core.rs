@@ -10,7 +10,10 @@ use super::blocks::blockquotes;
 use super::blocks::code_blocks;
 use super::blocks::definition_lists;
 use super::blocks::fenced_divs;
-use super::blocks::headings::{emit_atx_heading, emit_setext_heading_body, try_parse_atx_heading};
+use super::blocks::headings::{
+    emit_atx_heading, emit_setext_heading, emit_setext_heading_body, try_parse_atx_heading,
+    try_parse_setext_heading,
+};
 use super::blocks::horizontal_rules::try_parse_horizontal_rule;
 use super::blocks::line_blocks;
 use super::blocks::lists;
@@ -580,6 +583,71 @@ impl<'a> Parser<'a> {
             self.config,
         );
         self.builder.finish_node();
+    }
+
+    /// Try to fold a list item's buffered first-line text and the current line
+    /// into a setext HEADING node, returning true on success.
+    ///
+    /// CommonMark §4.3 / Pandoc-markdown both treat the marker line of a list
+    /// item as a fresh start for setext detection — i.e. `- Bar\n  ---\n` is a
+    /// setext h2 inside the list item. The dispatcher path can't see this
+    /// because the list parser consumes the marker line and buffers the
+    /// post-marker text; by the time `  ---` reaches the dispatcher, the
+    /// candidate text line is already inside the buffer rather than the line
+    /// stream. This helper bridges that gap: when the innermost container is a
+    /// `ListItem` with a single buffered text segment and the current
+    /// (list-item-content-stripped) line is a setext underline, emit the
+    /// folded heading directly and clear the buffer.
+    ///
+    /// Multi-line setext (multiple buffered text segments) is *not* handled
+    /// here because Pandoc-markdown disagrees with CommonMark on whether
+    /// `- Foo\n  Bar\n  ---\n` forms a setext heading.
+    fn try_fold_list_item_buffer_into_setext(&mut self, content: &str) -> bool {
+        let Some(Container::ListItem {
+            buffer,
+            content_col,
+            ..
+        }) = self.containers.stack.last()
+        else {
+            return false;
+        };
+        if buffer.segment_count() != 1 {
+            return false;
+        }
+        let Some(text_line) = buffer.first_text() else {
+            return false;
+        };
+
+        // CommonMark §5.2: the underline must be indented to at least the
+        // list item's content column. A bare `---` at column 0 escapes the
+        // item and becomes a thematic break (CMark spec example #94/#99); a
+        // bare `-` at column 0 is a sibling list marker (#281/#282).
+        let content_col = *content_col;
+        let (underline_indent_cols, _) = leading_indent(content);
+        if underline_indent_cols < content_col {
+            return false;
+        }
+
+        let lines = [text_line, content];
+        let Some((level, _)) = try_parse_setext_heading(&lines, 0) else {
+            return false;
+        };
+
+        let (text_no_newline, _) = strip_newline(text_line);
+        if text_no_newline.trim().is_empty() {
+            return false;
+        }
+        if try_parse_horizontal_rule(text_no_newline).is_some() {
+            return false;
+        }
+
+        let text_owned = text_line.to_string();
+        if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+            buffer.clear();
+        }
+        emit_setext_heading(&mut self.builder, &text_owned, content, level, self.config);
+        self.pos += 1;
+        true
     }
 
     /// Close paragraph if one is currently open.
@@ -2423,6 +2491,13 @@ impl<'a> Parser<'a> {
         // We'll update these two fields shortly (after they are computed), but we can still
         // use this ctx shape to avoid rebuilding repeated context objects.
         let mut dispatcher_ctx = dispatcher_ctx;
+
+        // Setext heading folded over a list item's buffered first-line text.
+        // Must run before block detection so that an HR-shaped underline like
+        // `---` doesn't get claimed by the thematic-break parser.
+        if self.try_fold_list_item_buffer_into_setext(stripped_content) {
+            return true;
+        }
 
         // Initial detection (before blank/doc-start are computed). Note: this can
         // match reference definitions, but footnotes are handled explicitly later.

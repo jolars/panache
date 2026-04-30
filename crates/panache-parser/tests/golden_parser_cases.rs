@@ -243,6 +243,7 @@ golden_test_cases!(
     hr_interrupts_lazy_blockquote_paragraph_commonmark,
     hr_interrupts_lazy_blockquote_paragraph_pandoc,
     setext_headings,
+    setext_heading_in_list_item_commonmark,
     setext_multiline_commonmark,
     setext_multiline_pandoc,
     setext_underline_crosses_blockquote_commonmark,

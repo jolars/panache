@@ -114,6 +114,22 @@ impl Formatter {
         }
     }
 
+    /// Block-level kinds that participate in CMark looseness detection inside
+    /// a list item. HTML_BLOCK is intentionally excluded — pandoc treats raw
+    /// HTML comments inline, so panache's ignore-directive comments inside an
+    /// otherwise-tight item must not flip the list to loose.
+    fn is_loose_trigger_block(kind: SyntaxKind) -> bool {
+        matches!(
+            kind,
+            SyntaxKind::PLAIN
+                | SyntaxKind::PARAGRAPH
+                | SyntaxKind::HEADING
+                | SyntaxKind::CODE_BLOCK
+                | SyntaxKind::BLOCK_QUOTE
+                | SyntaxKind::HORIZONTAL_RULE
+        )
+    }
+
     /// Check if a nested list is empty (contains only one item with no text content)
     fn is_empty_nested_list(list_node: &SyntaxNode) -> bool {
         let items: Vec<_> = list_node
@@ -273,7 +289,60 @@ impl Formatter {
                     .children()
                     .any(|item_child| matches!(item_child.kind(), SyntaxKind::BLOCK_QUOTE))
         });
-        let is_loose = (has_blank_between_items || has_blockquote_children) && !has_nested_lists;
+        // CMark §5.3: a list is loose if any item directly contains two
+        // block-level elements separated by a blank line. The PLAIN+BLANK+PLAIN
+        // shape that the parser emits for `- foo\n\n  bar\n- baz` falls under
+        // this rule; pandoc canonicalizes the writer output to match.
+        let has_blank_within_item = list_children.iter().any(|child| {
+            if child.kind() != SyntaxKind::LIST_ITEM {
+                return false;
+            }
+            let mut saw_block = false;
+            for item_child in child.children() {
+                let kind = item_child.kind();
+                if matches!(kind, SyntaxKind::BLANK_LINE) {
+                    if saw_block
+                        && item_child
+                            .next_sibling()
+                            .is_some_and(|s| Self::is_loose_trigger_block(s.kind()))
+                    {
+                        return true;
+                    }
+                } else if Self::is_loose_trigger_block(kind) {
+                    saw_block = true;
+                }
+            }
+            false
+        });
+        // Pandoc also marks a list as loose if any item contains a structural
+        // block (HEADING, CODE_BLOCK, HORIZONTAL_RULE) alongside other content
+        // — even without an intervening blank line. CMark's HTML output has
+        // `<li>` newlines around such blocks and the writer benefits from
+        // matching that visual loosening. HTML_BLOCK is excluded so panache's
+        // own ignore-directive comments inside an item don't flip the list.
+        let has_structural_multi_block = list_children.iter().any(|child| {
+            if child.kind() != SyntaxKind::LIST_ITEM {
+                return false;
+            }
+            let block_children: Vec<_> = child
+                .children()
+                .filter(|c| Self::is_loose_trigger_block(c.kind()))
+                .collect();
+            if block_children.len() < 2 {
+                return false;
+            }
+            block_children.iter().any(|c| {
+                matches!(
+                    c.kind(),
+                    SyntaxKind::HEADING | SyntaxKind::CODE_BLOCK | SyntaxKind::HORIZONTAL_RULE
+                )
+            })
+        });
+        let is_loose = (has_blank_between_items
+            || has_blockquote_children
+            || has_blank_within_item
+            || has_structural_multi_block)
+            && !has_nested_lists;
 
         log::trace!("Formatting list: is_loose={}", is_loose);
 

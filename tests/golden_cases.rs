@@ -215,6 +215,7 @@ golden_test_cases!(
     list_mixed_bullets_commonmark,
     headings,
     setext_headings,
+    setext_heading_in_list_item,
     setext_multiline_commonmark,
     indented_code_after_atx_heading_commonmark,
     setext_text_thematic_break_commonmark,

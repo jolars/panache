@@ -16,271 +16,211 @@ what was deliberately skipped, which fix unlocked which group).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-29 (xxvi)
+## Latest session — 2026-04-30 (xxvii)
 
-**Pass count: 635 → 647 / 652 (99.2%, +12)**
+**Pass count: 647 → 648 / 652 (99.4%, +1)**
 
-Took the carried-over emphasis bucket (#3 in xxv). Replaced
-the CommonMark-dialect emphasis path with a real CMark §6.3
-`process_emphasis` algorithm operating on a delimiter stack.
-Pandoc dialect untouched. Emphasis section moved from
-120 pass / 12 fail to **132 pass / 0 fail** — the section is
-fully clean.
+Took the carried-over #300 setext-in-list-item target from
+session (xxvi). The List items section moved from 47 pass /
+1 fail to **48 pass / 0 fail** — fully clean.
 
 ### Targets unlocked
 
-All 12 spec examples that prior sessions called out as
-delimiter-stack work:
-
-- **Group A — intraword underscore parity**: #402, #408, #412,
-  #426
-- **Group B — multiple-of-3 rule**: #417, #464, #465, #466
-- **Group C — run split with single closer**: #445, #457
-- **Group D — 5-char underscore run**: #468
-- **Group E — lazy opener preference**: #472
+- **#300** (List items): `- # Foo\n- Bar\n  ---\n  baz\n`
+  — single-line setext h2 inside a list item, followed by a
+  plain continuation.
 
 ### Root cause + fix
 
-The previous emphasis parser was a Pandoc-derived greedy
-recursive descent (`try_parse_emphasis` and friends in
-`crates/panache-parser/src/parser/inlines/core.rs`). It
-couldn't express CMark's rules 7, 9, 10:
+The list parser consumes the marker line `- Bar` and
+buffers `Bar\n` in the LIST_ITEM's text buffer (no
+PARAGRAPH is opened). When the dispatcher processes the
+next line `  ---`, it has no way to "see" the buffered
+text as a setext-text candidate, so the thematic-break
+parser claims the underline and emits `<hr />` between two
+plain blocks instead of folding them into a setext
+heading.
 
-- **Rule 7 lazy-opener preference** — `*foo *bar baz*` needs
-  the *later* `*` to be the opener, not the first.
-- **Rules 9 & 10 multiple-of-3** — when both delimiters are
-  flagged "can both open and close," (opener_len + closer_len)
-  divisible by 3 rejects the match unless both are individually
-  divisible by 3.
-- **Run-length splitting** — `****foo*` needs the opener to
-  split: 3 chars stay literal, 1 char pairs with the closer.
+The fix introduces
+`Parser::try_fold_list_item_buffer_into_setext` (called
+from `parse_inner_content` *before* `dispatcher_match` is
+computed). It fires only when the innermost container is
+`ListItem` with exactly one buffered text segment, the
+current line's indent is ≥ the item's `content_col`
+(CommonMark §5.2 — bare `---` at column 0 still escapes
+the item), and the buffered text + current line satisfies
+`try_parse_setext_heading`. On match it emits a `HEADING`
+node directly via `emit_setext_heading`, clears the
+buffer, advances `pos`, and returns true.
 
-The fix introduces a CommonMark-only delimiter-stack pre-pass
-that produces an `EmphasisPlan` mapping every `*`/`_` byte to
-its disposition (Open / Close / Literal), then the existing
-emission walk consults the plan instead of running the
-recursive matcher.
+The fix is dialect-agnostic. Pandoc-markdown agrees on the
+single-line case (`pandoc -f markdown` returns
+`Header 2 [Str "Bar"], Plain [Str "baz"]` for the same
+input); multi-line setext inside list items *is*
+dialect-divergent (Pandoc treats it as continuation text)
+and is intentionally out of scope here — the helper bails
+when `segment_count() != 1`.
 
 **Files touched:**
 
-- **NEW** `crates/panache-parser/src/parser/inlines/delimiter_stack.rs`
-  (~470 LOC). Public API: `EmphasisPlan`, `DelimChar`,
-  `EmphasisKind`, `build_plan`. Internals: `scan_delim_runs`
-  walks bytes (skipping escapes, code spans, autolinks, raw
-  HTML, inline links/images, reference links/images via the
-  existing try_parse_* helpers); `process_emphasis` is a
-  faithful port of CMark's algorithm with `openers_bottom`
-  bucket tracking. Has 10 in-module unit tests covering rules
-  7/9/10, run-splitting, intraword `_`, and escape handling.
-- **MOD** `crates/panache-parser/src/parser/inlines.rs` —
-  declare the new module.
-- **MOD** `crates/panache-parser/src/parser/inlines/core.rs`:
-  - `parse_inline_text_recursive` and `parse_inline_text` build
-    the plan when `config.dialect == Dialect::CommonMark` and
-    pass it down.
-  - `parse_inline_range_impl` gains an
-    `Option<&EmphasisPlan>` parameter; the `*`/`_` branch
-    consults the plan when present (Open → emit
-    EMPHASIS/STRONG wrapper + recurse on content; Literal →
-    accumulate into surrounding TEXT; Close → defensive
-    fold-into-text).
-  - `parse_inline_range` and `parse_inline_range_nested`
-    wrappers pass `None` to keep the Pandoc emphasis path on
-    its existing recursive-descent code, including all
-    `try_parse_one/two/three`, `parse_until_closer_*`, etc.
-- **NEW** five parser fixtures under
-  `crates/panache-parser/tests/fixtures/cases/`, each with
-  `parser-options.toml = "commonmark"`:
-  `emphasis_intraword_underscore_strong_commonmark`,
-  `emphasis_run_split_multiple_of_three_commonmark`,
-  `emphasis_run_split_single_closer_commonmark`,
-  `emphasis_underscore_run_5_commonmark`,
-  `emphasis_lazy_opener_preference_commonmark`. Wired into
-  `golden_parser_cases.rs`.
-- **MOD** existing snapshot
-  `golden_parser_cases__parser_cst_emphasis_asterisk_flanking_commonmark.snap`
-  — the previous shape fragmented TEXT tokens at every
-  emphasis-attempt boundary; the new shape coalesces a
-  paragraph of unmatched delimiters into a single TEXT token
-  (cleaner and HTML-equivalent). All Pandoc fixture snapshots
-  are byte-equal — no Pandoc regressions.
-- **MOD** `tests/commonmark/allowlist.txt` — added #402, #408,
-  #412, #417, #426, #445, #457, #464, #465, #466, #468, #472
-  in sorted order under the existing Emphasis section header.
-
-### Scope deviation from the approved plan (read this!)
-
-The plan called for a "full inline IR" with pre-resolved
-opaque-construct GreenNodes and event re-emission — the
-intended long-term architecture. Implementing that means
-duplicating ~1200 LOC of byte-walk-and-emit logic
-(`parse_inline_range_impl`) into an IR-builder variant,
-including every higher-precedence construct, and routing
-emission via a recursive `splice_green_node` helper. That
-scope was real but uncertain to land cleanly in one session
-alongside the algorithm itself.
-
-I shipped a **compact alternative**: the same algorithm
-(delimiter stack, `process_emphasis`, openers_bottom buckets,
-multiple-of-3 rule, lazy-opener preference) implemented as a
-**pre-pass** producing an `EmphasisPlan`. Emission is the
-existing byte walk, slightly modified to consult the plan in
-the `*`/`_` branch. Algorithmically equivalent for emphasis;
-unlocks all 12 targets; smaller diff; doesn't fight rowan's
-GreenNodeBuilder.
-
-The full IR is still the destination. When the next session
-extends the algorithm to `[`/`]` bracket markers (link nesting
-fixes #523, #533, #569, #571), it should absorb the pre-pass
-into a real IR — the bracket scanner needs the same
-event-stream shape that the IR provides, so doing both in one
-go pays for the refactor properly. Today's `delimiter_stack`
-module is structured so that step is incremental: keep
-`process_emphasis`'s shape, swap the linear `Vec<DelimRun>` for
-the IR's doubly-linked event list.
-
-If the user wants the IR refactor done first as a standalone
-session, that's a follow-up — say so explicitly and I'll
-prioritize it.
+- **MOD** `crates/panache-parser/src/parser/core.rs`:
+  added imports (`emit_setext_heading`,
+  `try_parse_setext_heading`); new method
+  `try_fold_list_item_buffer_into_setext`; one call site in
+  `parse_inner_content` immediately before the initial
+  `dispatcher_match` detection.
+- **NEW** parser fixture
+  `crates/panache-parser/tests/fixtures/cases/setext_heading_in_list_item_commonmark/`
+  with `flavor = "commonmark"`, wired into
+  `golden_parser_cases.rs` and a new insta snapshot.
+- **MOD** `crates/panache-formatter/src/formatter/lists.rs`:
+  added `is_loose_trigger_block` helper plus two new
+  loose-detection conditions to the existing
+  `is_loose` calculation:
+  - `has_blank_within_item` — CMark §5.3 spec rule
+    (item has 2+ block-level children separated by a
+    blank line). Was missing; affected items like
+    `- foo\n\n  bar\n- baz` whose item 1 had
+    PLAIN+BLANK+PLAIN.
+  - `has_structural_multi_block` — pandoc-flavored
+    rule that any item with 2+ block-level children
+    *where at least one is HEADING / CODE_BLOCK /
+    HORIZONTAL_RULE* forces the list loose. Required
+    for #300 (HEADING + PLAIN with no source blank).
+    HTML_BLOCK is intentionally excluded so panache's
+    own `<!-- panache-ignore-* -->` directives don't
+    flip otherwise-tight lists.
+- **NEW** formatter golden case
+  `tests/fixtures/cases/setext_heading_in_list_item/`
+  (default flavor, no `panache.toml`) wired into
+  `golden_cases.rs`. The formatter now produces a
+  blank-separated loose layout matching pandoc:
+  `- # Foo\n\n- ## Bar\n\n  baz\n`.
+- **MOD** `tests/commonmark/allowlist.txt` — appended `300`
+  in sorted order under the existing List items section.
 
 ### Don't redo
 
-- **Don't drop the `coalesce-on-Literal` behavior** in the
-  emphasis branch of `parse_inline_range_impl`. Initial
-  attempts emitted Literal delim chars as separate TEXT
-  tokens, which fragmented existing CommonMark fixture
-  snapshots even though the HTML rendering was equivalent.
-  The current code lets Literal positions fold into
-  surrounding `text_start..pos` accumulation by NOT flushing
-  on entry to the Literal branch — that's load-bearing for
-  snapshot stability.
-- **Don't set `openers_bottom` to the closer index itself.**
-  CMark's algorithm sets it to `closer.previous` (the
-  starting point of the walk). Setting to `Some(c)` makes the
-  next closer with the same bucket terminate its walk-back
-  before checking the run that should match. Caused 8 emphasis
-  regressions during initial implementation; fixed by setting
-  to `prev_active(&runs, c)`.
-- **Don't try to coalesce literals across position boundaries
-  inside the algorithm.** `process_emphasis` operates on
-  `DelimRun`s (one entry per run), but emission needs
-  *per-byte* dispositions because a single run can split
-  multiple ways (e.g. `***` at pos 0 can have pos 0 = Literal
-  and pos 1 = Open(Strong) for `***foo*`). Keep `EmphasisPlan`
-  byte-keyed.
-- **Don't route emphasis-content recursion through the Pandoc
-  path.** When the plan-driven branch emits a wrapper and
-  recurses, it MUST pass the same `plan` parameter through
-  `parse_inline_range_impl` — otherwise inner emphasis falls
-  back to Pandoc-style recursive descent and the multiple-of-3
-  / nested-pair rules don't compose correctly.
-- **Don't extend the `delimiter_stack` module to bracket
-  markers without first migrating to a true linked-list IR.**
-  The current `Vec<DelimRun>` representation works for
-  emphasis-only because emphasis pairs don't cross other
-  pairs at the run-character level. Bracket markers
-  (`[`/`]`) introduce cross-cutting structure that needs the
-  IR's linked list to splice opaque-construct subtrees
-  cleanly.
-- **Don't expect the Pandoc-default formatter to be idempotent
-  on the new CommonMark fixtures' input.md.** The inputs are
-  intentionally CMark-only constructs; idempotency under
-  Pandoc isn't expected. Run with `--config` setting
-  `flavor = "commonmark"` for that check.
+- **Don't drop the indent guard**
+  (`underline_indent_cols < content_col → return false`).
+  Without it, `- Foo\n---\n` (#94/#99: `---` at column 0)
+  and `- foo\n-\n- bar\n` (#281/#282: bare `-` sibling
+  marker) flip to spurious setext headings inside the
+  outgoing list item. Caught during initial implementation
+  via the allowlist guard.
+- **Don't lift the `segment_count() != 1` gate to handle
+  multi-line setext inside list items.** Pandoc and
+  CommonMark disagree on whether
+  `- Foo\n  Bar\n  ---\n` is a setext heading
+  (CommonMark: yes; Pandoc: paragraph with em-dash). If a
+  future session wants to cover the multi-line case, it
+  must dialect-gate to CommonMark and add paired parser
+  fixtures.
+- **Don't move the call site below `dispatcher_match`
+  detection.** The thematic-break parser would otherwise
+  claim `---` first; the helper is correctness-load-bearing
+  to run before block detection.
+- **Don't rely on the renderer's `<hr />` heuristic to
+  hide regressions.** The pre-fix CST had the buffer
+  flushed as a separate `PLAIN` followed by a real
+  `HORIZONTAL_RULE` node — the parser, not the renderer,
+  was producing the wrong shape. Confirmed by inspecting
+  `cargo run -- parse --config /tmp/cm.toml`.
+- **Don't include HTML_BLOCK in
+  `is_loose_trigger_block`.** The `ignore_directives`
+  fixture has LIST_ITEMs containing PLAIN + HTML_BLOCK
+  + PLAIN + HTML_BLOCK, where the HTML blocks are
+  panache-specific ignore-format directives. Pandoc
+  treats raw HTML inline so the surrounding list stays
+  tight; if HTML_BLOCK is counted, the formatter starts
+  inserting blank lines between items (one of the
+  initial broader rules I tried regressed exactly this
+  fixture).
+- **Don't drop the `!has_nested_lists` exclusion
+  unconditionally.** Lists like `- a\n  - b\n- c` need
+  to stay tight; nested LISTs are not block children
+  that count toward looseness. The combined
+  `(... || has_structural_multi_block) && !has_nested_lists`
+  formulation keeps the established tight-with-nested
+  behavior while letting HEADING/CODE/HR force loose.
 
 ### Suggested next targets, ranked
 
-1. **Inline IR migration** — turn `delimiter_stack`'s
-   `Vec<DelimRun>` into a real linked-list IR with `Text`,
+The remaining 4 failures (#523, #533, #569, #571) all
+sit in **Links** and all require the link-bracket scanner
+work that the prior recap labeled as the next destination
+for the inline IR migration. None of the four is
+tractable as a small, self-contained fix.
+
+1. **Inline IR migration** — turn
+   `delimiter_stack`'s `Vec<DelimRun>` into a real
+   linked-list IR with `Text`,
    `Construct(GreenNode)`, `DelimRun`, `EmphasisGroup`,
    `BracketMarker` events. Move the byte walk in
    `parse_inline_range_impl` (CommonMark path) into an
-   IR-builder pass, and emission into an IR-walker. This is
-   the prerequisite for unlocking the link-bracket fixes.
-2. **#523 `*foo [bar* baz]` and #533 — emphasis closing
-   inside link bracket text.** Needs the IR plus a CMark
-   bracket scanner. Group with #569/#571 (reference-link
-   nesting) since they share the bracket-scanner work.
-3. **#569 / #571 — reference-link nesting.** `[foo][bar][baz]`
-   with only `[baz]` defined should parse as `[foo]` + ref
-   `[bar][baz]`. Needs the bracket scanner + refdef-aware
-   resolution pass.
-4. **Pandoc dialect migration onto the unified algorithm.**
-   Once the IR is in place, parameterize `process_emphasis`'s
-   flanking predicates by `Dialect` and run Pandoc through it
-   too. Will require re-deriving session (ix)'s "tail-end
-   only" heuristic inside the new framework and re-validating
-   every Pandoc emphasis fixture.
-5. **Formatter fix for nested-only outer LIST_ITEM** — still
-   the #1 unblocker for lifting the same-line nested-LIST and
-   blockquote-in-list-item dialect gates. Carried from
-   sessions xxiv–xxv.
-6. **#300 setext-in-list-item** — `- # Foo\n- Bar\n  ---\n  baz`.
-   Needs a fold-on-flush pass over the list-item buffer.
-   Carried.
-7. **List-item single remaining failure** — see report.txt.
+   IR-builder pass, and emission into an IR-walker.
+   Prerequisite for the bracket fixes.
+2. **#523 / #533** — emphasis closing inside link
+   bracket text, and the inner-link → outer-`[…][ref]`
+   suppression rule.
+3. **#569 / #571** — `[foo][bar][baz]` reference-link
+   nesting. Needs the bracket scanner plus a
+   refdef-aware resolution pass that scans
+   right-to-left (or with three-pair lookahead).
+4. **Pandoc dialect migration onto the unified
+   algorithm.** Once the IR is in place, parameterize
+   `process_emphasis`'s flanking predicates by
+   `Dialect` and run Pandoc through it too.
+5. **Formatter fix for nested-only outer LIST_ITEM** —
+   carried prerequisite for lifting the same-line
+   nested-LIST and blockquote-in-list-item dialect gates.
+6. **Multi-line setext inside list items** (CommonMark
+   only) — paired parser + formatter fixtures, dialect-
+   gated. Strictly cosmetic; no spec example exercises
+   it in the conformance harness today.
 
 ### Carry-forward from prior sessions
 
-- **Session (xxv)'s setext list-item indent guard and
-  `in_marker_only_list_item` flag** (in `block_dispatcher.rs`)
-  is load-bearing for #278 and shouldn't be generalized to
-  `BlockContext` users beyond `IndentedCode` without checking
-  what each parser does on a marker-only first line. Also,
-  the `BlockDetectionResult::YesCanInterrupt` return for the
-  marker-only indented-code case is required for byte-order
-  losslessness — don't drop it for plain `Yes`.
-- The "Don't redo" notes from session (ix) about emphasis
-  split-runs ("tail-end only" heuristic, Pandoc dialect gate,
-  the careful avoidance of widening to #402/#408/#412/#426)
-  still apply **to the Pandoc path only**. Session (xxvi)
-  replaced the CommonMark emphasis path; the Pandoc path is
-  unchanged and the (ix) notes are still load-bearing there.
-- The session (x) / (xi) link-scanner skip pattern (autolink /
-  raw-HTML opacity for emphasis closer + link bracket close)
-  is load-bearing for #524/#526/#536/#538. Don't unify the
-  autolink and raw-HTML skip flags — Pandoc treats them
-  differently.
-- Session (xii)'s lazy paragraph continuation across reduced
-  blockquote depth (`bq_depth < current_bq_depth` branch) is
-  the same site session (xx) extended for fence interrupts.
-  Don't conflate it with session (xiii)'s list-marker lazy
-  continuation and the bq_depth=0 list-continuation gate —
-  the three paths share the "lazy continuation" name but
-  operate on different state. Don't try to unify them.
-- Session (xiii)'s `try_lazy_list_continuation` only fires for
-  `BlockEffect::OpenList` with `indent_cols ≥ 4`. Other
-  interrupting-block effects (HR, ATX, fence) at deep indent
-  inside lists go through the existing CommonMark §5.2 close
-  path at `core.rs:2447+` (`close_lists_above_indent`); don't
-  touch that path on its account.
-- Session (xvii)'s HTML block #148 fix (`</pre>` rejection in
-  the VERBATIM_TAGS branch) remains active under CommonMark
-  and is Pandoc-unreachable via `extract_block_tag_name(_, false)`.
-- Session (xviii)'s `disallow_inner_links` flag and
-  `link_text_contains_inner_link` helper are scoped to inline
-  links only. Reference-link nesting (#569/#571 + #533) needs
-  a different pass with refdef resolution; do not retrofit the
-  helper.
-- Session (xix)'s column-aware indented-code logic
-  (`is_indented_code_line` via `leading_indent`,
-  `consume_leading_cols` in the renderer) was extended in
-  (xxi) to handle blockquote tab-expansion via
-  `consume_leading_cols_from(body, start_col, target)`.
-  Session (xxii) closed the parser-side gap: list-item
-  markers now apply CommonMark §5.2 rule #2 via
-  `marker_spaces_after`, with a parallel
-  `virtual_marker_space` flag mirroring the bq
-  `virtual_absorbed` bookkeeping. The bq and list-item virtual
-  spaces are *separate* concepts — don't try to unify their
-  fields. They contribute additively in the renderer's
-  `code_block_content` when both are present (rare; not yet
-  exercised by a passing example).
-- Session (xxiv)'s same-line blockquote-in-list-item branch in
-  `finish_list_item_with_optional_nested` is dialect-gated to
-  CommonMark via `dialect_allows_nested`. Don't lift the gate
-  without first fixing the formatter's nested-only LIST_ITEM
-  round-trip (the formatter currently drops the LIST_MARKER on
-  re-format when LIST_ITEM's first structural child is a
-  BLOCK_QUOTE).
+(Carrying forward from session xxvi unless noted.)
+
+- The session (xxvi) emphasis carry-forward (delimiter
+  stack, `EmphasisPlan`, `Vec<DelimRun>` representation,
+  the four "don't redo" notes about
+  `coalesce-on-Literal`, `openers_bottom`, byte-keyed
+  plan, plan threading through nested recursion) is all
+  still load-bearing on the CommonMark inline path.
+  Don't extend that module to bracket markers without
+  first migrating to the linked-list IR.
+- Session (xxv)'s setext list-item indent guard and
+  `in_marker_only_list_item` flag in
+  `block_dispatcher.rs` are load-bearing for #278; this
+  session's fold helper is *additive* (different code
+  path, different state) and does not interact with
+  them. Don't try to merge the two.
+- The session (ix) "tail-end only" emphasis heuristic and
+  Pandoc dialect gate still apply to the Pandoc inline
+  path only; session (xxvi) replaced the CommonMark path
+  entirely.
+- Session (x)/(xi) link-scanner skip pattern (autolink /
+  raw-HTML opacity for emphasis closer + link bracket
+  close) is load-bearing for #524/#526/#536/#538. Don't
+  unify the autolink and raw-HTML skip flags — Pandoc
+  treats them differently. The bracket scanner work for
+  #523/#533/#569/#571 will need to interoperate with
+  these flags, not replace them.
+- Session (xii)'s lazy paragraph continuation across
+  reduced blockquote depth, session (xiii)'s
+  `try_lazy_list_continuation` for OpenList only at
+  `indent_cols ≥ 4`, session (xvii)'s HTML block #148
+  fix (`</pre>` rejection in VERBATIM_TAGS), session
+  (xviii)'s `disallow_inner_links` flag scope (inline
+  links only — reference-link nesting #569/#571 needs a
+  different pass), session (xix)/(xxi)/(xxii)'s
+  column-aware indented-code logic (list-item
+  `marker_spaces_after` and `virtual_marker_space`
+  separate from blockquote `virtual_absorbed`), and
+  session (xxiv)'s same-line blockquote-in-list-item
+  branch dialect gate are all unchanged and unaffected
+  by this session.
+
 
