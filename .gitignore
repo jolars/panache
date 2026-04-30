@@ -46,3 +46,4 @@ docs/playground/pkg/
 /test.qmd
 /out.md
 /out.native
+pnpm-lock.yaml
