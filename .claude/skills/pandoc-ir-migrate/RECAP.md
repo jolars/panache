@@ -12,7 +12,178 @@ content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (vi)
+## Latest session — 2026-04-30 (vii)
+
+**Workspace test count: 0 failing → 0 failing.** **Phase 5 LANDED
+(simple-pattern variant).** Bracketed spans `[content]{attrs}` now
+dispatched IR-first under `Dialect::Pandoc`; legacy dispatcher branch
+gated to `Dialect::CommonMark`. Conformance allowlist preserved;
+clippy + fmt clean. Diff is committable.
+
+### Important: Phase 5 deviated from the SKILL.md plan
+
+The SKILL.md description of Phase 5 calls for changing
+`process_brackets` and adding `BracketResolutionKind::BracketedSpan`.
+This session deliberately followed the simpler **Phase 2-4 pattern**
+(`ConstructPlan`-driven dispatch) instead, because:
+
+1. Phases 2-4 already deviated from the original 8-phase plan in the
+   same direction: they used `ConstructPlan` (a separate byte-keyed
+   construct dispatch table) rather than touching `process_brackets`.
+   Continuing that pattern keeps the migration consistent.
+2. `process_brackets` integration has not been needed for any
+   construct so far. Pandoc-dialect bracket plan stays empty (Phase 1
+   established `build_full_plans` skips `process_brackets` under
+   Pandoc); changing that would be a much bigger blast radius for
+   no current benefit.
+3. Phase 6 (Pandoc links/images consume the IR bracket plan) is the
+   first phase that genuinely *requires* bracket plan participation.
+   When Phase 6 lands, it will introduce a Pandoc-dialect
+   `process_brackets` invocation; bracketed spans can then move from
+   `ConstructPlan` to `BracketPlan` if it reduces duplication. For
+   now the `ConstructPlan` route is correct, simple, and analogous
+   to footnote refs / inline footnotes / native spans / citations.
+
+### What landed this session
+
+1. **New `ConstructKind::BracketedSpan`** in `inline_ir.rs`. `build_ir`'s
+   `[content]{attrs}` recognition (previously folded into
+   `try_pandoc_bracket_opaque` and emitted as generic `PandocOpaque`)
+   now has a dedicated branch BEFORE the generic bracket-opaque scan.
+   Bracketed-span recognition was REMOVED from `try_pandoc_bracket_opaque`
+   to keep the dedicated kind authoritative.
+
+2. **New `ConstructDispo::BracketedSpan { end }`** alongside the
+   Phase 2-4 variants. `build_construct_plan` extended with one more
+   match arm.
+
+3. **IR-driven dispatch branch** in `parse_inline_range_impl`: same
+   shape as Phase 2's `InlineFootnote` / `NativeSpan` branches.
+   Re-runs `try_parse_bracketed_span` to extract `(content, attrs)`,
+   sanity-checks `pos + len == dispo_end`, calls `emit_bracketed_span`.
+
+4. **Dispatcher's legacy `[text]{attrs}` branch** gated on
+   `config.dialect == Dialect::CommonMark`. Under Pandoc the IR
+   drives; under CommonMark dialect with the (rare) extension
+   override, the legacy branch still fires.
+
+### Why the new IR branch can come BEFORE `try_pandoc_bracket_opaque`
+
+`try_parse_bracketed_span` requires `]` to be IMMEDIATELY followed by
+`{` (no `(...)` allowed in between). So:
+- `[foo](url){.cls}` → bracketed_span returns None (bytes[5]=`(`); falls
+  through to `try_pandoc_bracket_opaque` → inline_link succeeds with
+  the full thing including attrs. **Verified vs pandoc-native**:
+  produces Link with `[ "cls" ]` attrs.
+- `[foo]{.cls}` with `[foo]: /url` refdef → bracketed_span succeeds at
+  position 0; pre-empts the (would-have-been-shortcut-ref) link.
+  **Verified vs pandoc-native**: pandoc-native ALSO parses this as a
+  Span, not a reference link followed by literal `{.cls}`. So the
+  IR-first ordering matches pandoc semantics.
+
+### Why this is "pure additive; no algorithm change"
+
+Same as Phase 2-4: `try_parse_bracketed_span` and `emit_bracketed_span`
+are unchanged; `build_ir` and the emission walk in
+`parse_inline_range_impl` are augmented with a new kind/dispo pair,
+but iteration logic for everything else is untouched. The IR's
+recorded `[content]{attrs}` range and the dispatcher's recomputed range
+must agree (both call `try_parse_bracketed_span`).
+
+### Files in committed-ready diff
+
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`:
+  +1 `ConstructKind` variant, +1 `ConstructDispo` variant, +20 lines
+  for the `[content]{attrs}` branch in `build_ir`, +3 lines in
+  `build_construct_plan`, -5 lines (removed bracketed-span from
+  `try_pandoc_bracket_opaque`).
+- `crates/panache-parser/src/parser/inlines/core.rs`:
+  +18 lines for the `BracketedSpan` dispatch arm in the IR-driven
+  branch, +5 lines for the dialect gate on the legacy branch.
+
+### Verification done
+
+- Workspace tests: 0 → 0 failing.
+- CommonMark conformance allowlist: green.
+- clippy + fmt: clean.
+- Manual probes (all match pandoc-native structurally):
+  - `[foo]{.cls}` → BRACKETED_SPAN.
+  - `[*foo*]{.cls}` → BRACKETED_SPAN containing EMPHASIS (inner
+    inline-parsed via emit_bracketed_span's recursive
+    parse_inline_text call).
+  - `*[foo]{.cls}*` → outer EMPHASIS containing BRACKETED_SPAN.
+  - `*emph [span]{.cls} still emph*` → outer EMPHASIS containing
+    BRACKETED_SPAN (opacity confirmed).
+  - `[foo](http://x){.cls}` → LINK (inline_link wins because
+    bracketed_span requires `]{`, not `](`).
+  - `**strong [span]{.cls} strong**` → STRONG containing
+    BRACKETED_SPAN.
+  - `[*foo* and **bar**]{.cls}` → BRACKETED_SPAN containing EMPHASIS
+    + STRONG.
+- Pre-existing divergence noted but OUT OF SCOPE: `[[nested]]{.cls}`
+  produces BRACKETED_SPAN with inner LINK (legacy `parse_inline_text`
+  finds a shortcut ref), but pandoc-native parses inner as plain
+  `Str "[nested]"`. This was true before Phase 5 — it's a quirk of
+  `emit_bracketed_span`'s recursive inline-parse, not introduced by
+  this migration.
+
+### Suggested next sub-targets, ranked
+
+Phase 5 is done. Logical next:
+
+1. **Phase 6** — Pandoc links/images consume the IR bracket plan.
+   This is the LAST construct migration before the legacy emphasis
+   path can be deleted. Replaces dispatcher branches at
+   `core.rs:2113-2234` with bracket-plan-driven dispatch. Gates
+   `deactivate_earlier_link_openers` on `Dialect::CommonMark` only
+   (Pandoc allows link-in-link). The biggest dispatcher cleanup
+   before Phase 7.
+   - This is the FIRST phase that genuinely needs Pandoc-dialect
+     `process_brackets` participation. Will need to enable
+     `process_brackets` for Pandoc with links/images-only resolution
+     (no shortcut-ref under Pandoc unless dialect-equivalent).
+2. **Phase 7** — delete legacy emphasis path. Fall-out cleanup
+   once Phase 6 lands.
+
+### Don't redo / known traps (carried forward + new)
+
+All Phase 1-4 traps still apply. Plus:
+
+- **NEW (Phase 5): bracketed_span recognition can come BEFORE
+  `try_pandoc_bracket_opaque` because `try_parse_bracketed_span`
+  requires `]` immediately followed by `{`.** Inline links
+  (`[text](url)`) and reference links (`[label][refdef]` /
+  `[label]`) all have non-`{` characters after `]`, so the dedicated
+  branch never shadows them. Verified against pandoc-native:
+  `[foo]{.cls}` with refdef `[foo]: /url` produces Span (NOT
+  reference link followed by literal `{.cls}`), confirming the
+  IR-first precedence is correct.
+- **NEW (Phase 5): `emit_bracketed_span` inline-parses inner content
+  via `parse_inline_text`, which under Pandoc dialect can find
+  shortcut reference links inside the span content even when no
+  refdef exists.** Pandoc-native does NOT do this — it treats
+  `[[nested]]{.cls}` as Span with literal `Str "[nested]"`. This
+  divergence is pre-existing (predates the IR migration) and is
+  OUT OF SCOPE for Phase 5. Worth noting as a follow-up improvement
+  for the Pandoc inline-parsing semantics inside spans.
+- **NEW (Phase 5): the SKILL.md plan's Phase 5 description does NOT
+  match what was actually implemented.** The plan calls for
+  `BracketResolutionKind::BracketedSpan` and changing
+  `process_brackets`. The implementation followed the simpler
+  Phase 2-4 pattern (`ConstructKind` + `ConstructDispo`). This is
+  consistent with Phases 2-4 also deviating from the original plan
+  toward `ConstructPlan`-driven dispatch. Bracket-plan integration
+  is deferred to Phase 6 where it's actually needed.
+
+### Files in current diff (committable)
+
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`
+- `crates/panache-parser/src/parser/inlines/core.rs`
+- `.claude/skills/pandoc-ir-migrate/RECAP.md`
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (vi)
 
 **Workspace test count: 0 failing → 0 failing.** **Phase 4 LANDED.**
 Bracketed citations (`[@cite]`) and bare citations (`@key` / `-@key`)

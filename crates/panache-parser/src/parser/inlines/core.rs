@@ -1680,6 +1680,21 @@ fn parse_inline_range_impl(
                         }
                     }
                 }
+                ConstructDispo::BracketedSpan { end: dispo_end } => {
+                    if dispo_end <= end
+                        && let Some((len, content, attrs)) = try_parse_bracketed_span(&text[pos..])
+                        && pos + len == dispo_end
+                    {
+                        if pos > text_start {
+                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                        }
+                        log::trace!("IR: matched bracketed span at pos {}", pos);
+                        emit_bracketed_span(builder, &content, &attrs, config);
+                        pos += len;
+                        text_start = pos;
+                        continue;
+                    }
+                }
             }
         }
 
@@ -2377,8 +2392,13 @@ fn parse_inline_range_impl(
         }
 
         // Try bracketed spans: [text]{.class}
-        // Must come after links/citations
-        if byte == b'['
+        // Must come after links/citations.
+        // Phase 5: under Pandoc dialect this is consumed via the IR's
+        // `ConstructPlan` at the top of the loop; the dispatcher branch
+        // only fires for CommonMark dialect with the extension
+        // explicitly enabled.
+        if config.dialect == Dialect::CommonMark
+            && byte == b'['
             && config.extensions.bracketed_spans
             && let Some((len, text_content, attrs)) = try_parse_bracketed_span(&text[pos..])
         {

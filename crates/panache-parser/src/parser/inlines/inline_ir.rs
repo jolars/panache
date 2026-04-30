@@ -192,6 +192,12 @@ pub enum ConstructKind {
     /// IR's `ConstructPlan` (Phase 4). The dispatcher's legacy `@`
     /// and `-@` branches are gated to CommonMark dialect only.
     BareCitation,
+    /// Pandoc bracketed span `[content]{attrs}`. Recognised in
+    /// `build_ir` under `Dialect::Pandoc` and consumed by the emission
+    /// walk via the IR's `ConstructPlan` (Phase 5). The dispatcher's
+    /// legacy `[text]{attrs}` branch is gated to CommonMark dialect
+    /// only.
+    BracketedSpan,
 }
 
 /// One matched fragment within a [`IrEvent::DelimRun`].
@@ -488,15 +494,42 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
             continue;
         }
 
+        // Pandoc-only: bracketed span `[content]{attrs}`. Recognised
+        // at scan time so the emphasis pass treats it as opaque (delim
+        // runs inside the span content can't pair with delim runs
+        // outside) and the emission walk dispatches it directly via
+        // the IR's `ConstructPlan` (Phase 5). Must come before the
+        // generic bracket-opaque scan so the dedicated kind wins.
+        // `try_parse_bracketed_span` requires `]` to be immediately
+        // followed by `{`, so this never shadows inline links
+        // (`[text](url)`) or reference links (`[label][refdef]`) —
+        // those don't have the `{attrs}` suffix.
+        if !is_commonmark
+            && b == b'['
+            && exts.bracketed_spans
+            && let Some((len, _, _)) = try_parse_bracketed_span(&text[pos..])
+            && pos + len <= end
+        {
+            flush_text!();
+            events.push(IrEvent::Construct {
+                start: pos,
+                end: pos + len,
+                kind: ConstructKind::BracketedSpan,
+            });
+            pos += len;
+            text_run_start = pos;
+            continue;
+        }
+
         // Pandoc-only: bracket-shaped opaque constructs. Tries the
         // dispatcher's precedence order to identify the full byte range
-        // of any bracket-shaped Pandoc construct (links, images,
-        // bracketed spans), and emits them as a single `Construct` so
-        // the emphasis pass cannot pair across their boundaries.
-        // Emission re-parses each construct through the dispatcher's
-        // existing `try_parse_*` chain. Footnote refs (`[^id]`) and
-        // bracketed citations (`[@cite]`) are handled by dedicated
-        // branches above.
+        // of any bracket-shaped Pandoc construct (links, images), and
+        // emits them as a single `Construct` so the emphasis pass
+        // cannot pair across their boundaries. Emission re-parses each
+        // construct through the dispatcher's existing `try_parse_*`
+        // chain. Footnote refs (`[^id]`), bracketed citations
+        // (`[@cite]`), and bracketed spans (`[text]{attrs}`) are
+        // handled by dedicated branches above.
         if !is_commonmark
             && (b == b'[' || (b == b'!' && pos + 1 < end && bytes[pos + 1] == b'['))
             && let Some(len) = try_pandoc_bracket_opaque(text, pos, end, config)
@@ -811,8 +844,9 @@ fn try_pandoc_bracket_opaque(
     }
 
     // `[...]` openers — try in dispatcher order. Footnote refs
-    // (`[^id]`) and bracketed citations (`[@cite]`) are handled by
-    // dedicated branches in `build_ir` and do not appear here.
+    // (`[^id]`), bracketed citations (`[@cite]`), and bracketed spans
+    // (`[text]{attrs}`) are handled by dedicated branches in
+    // `build_ir` and do not appear here.
     if exts.inline_links
         && let Some((len, _, _, _)) = try_parse_inline_link(&text[pos..], false, ctx)
         && pos + len <= end
@@ -822,12 +856,6 @@ fn try_pandoc_bracket_opaque(
     if exts.reference_links
         && let Some((len, _, _, _)) =
             try_parse_reference_link(&text[pos..], allow_shortcut, exts.inline_links, ctx)
-        && pos + len <= end
-    {
-        return Some(len);
-    }
-    if exts.bracketed_spans
-        && let Some((len, _, _)) = try_parse_bracketed_span(&text[pos..])
         && pos + len <= end
     {
         return Some(len);
@@ -2030,6 +2058,9 @@ pub enum ConstructDispo {
     /// `emit_crossref` when `is_quarto_crossref_key` matches and
     /// `extensions.quarto_crossrefs` is enabled).
     BareCitation { end: usize },
+    /// `[content]{attrs}` — emit via `emit_bracketed_span` after
+    /// slicing the inner content and attribute string.
+    BracketedSpan { end: usize },
 }
 
 /// A byte-keyed view of the IR's standalone Pandoc constructs that the
@@ -2074,6 +2105,9 @@ pub fn build_construct_plan(events: &[IrEvent]) -> ConstructPlan {
                 }
                 ConstructKind::BareCitation => {
                     by_pos.insert(*start, ConstructDispo::BareCitation { end: *end });
+                }
+                ConstructKind::BracketedSpan => {
+                    by_pos.insert(*start, ConstructDispo::BracketedSpan { end: *end });
                 }
                 _ => {}
             }
