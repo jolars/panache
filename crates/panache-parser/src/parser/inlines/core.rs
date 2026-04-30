@@ -141,6 +141,7 @@ pub fn parse_inline_text_recursive(
         Some(&plans.emphasis),
         bracket_plan,
         Some(&plans.constructs),
+        false,
     );
 
     log::trace!("Recursive inline parsing complete");
@@ -152,13 +153,19 @@ pub fn parse_inline_text_recursive(
 /// Suppresses constructs that would create nested links (CommonMark §6.3 forbids
 /// links inside links), notably extended bare-URI autolinks under GFM.
 ///
-/// The `_allow_reference_links` parameter is accepted for compatibility and is
-/// currently unused.
+/// `suppress_inner_links` should be `true` when the recursion is for a
+/// LINK or REFERENCE-LINK's text, where inner link / reference-link
+/// brackets must emit as literal text (pandoc-native:
+/// `[link [inner](u2)](u1)` → outer `Link` with `Str "[inner](u2)"`).
+/// Image alt text and all non-link contexts pass `false`:
+/// pandoc-native verifies `![alt with [inner](u)](u2)` keeps the inner
+/// `Link`, and bracketed spans / native spans / inline footnotes /
+/// emphasis all allow nested links.
 pub fn parse_inline_text(
     builder: &mut GreenNodeBuilder,
     text: &str,
     config: &ParserOptions,
-    _allow_reference_links: bool,
+    suppress_inner_links: bool,
 ) {
     log::trace!(
         "Parsing inline text (nested in link): {:?} ({} bytes)",
@@ -182,6 +189,7 @@ pub fn parse_inline_text(
         Some(&plans.emphasis),
         bracket_plan,
         Some(&plans.constructs),
+        suppress_inner_links,
     );
 }
 
@@ -218,6 +226,7 @@ fn parse_inline_range_impl(
     plan: Option<&EmphasisPlan>,
     bracket_plan: Option<&BracketPlan>,
     construct_plan: Option<&ConstructPlan>,
+    suppress_inner_links: bool,
 ) {
     log::trace!(
         "parse_inline_range: start={}, end={}, text={:?}",
@@ -348,7 +357,15 @@ fn parse_inline_range_impl(
                         let allow_shortcut = config.extensions.shortcut_reference_links;
                         let is_image = bytes[pos] == b'!';
 
-                        if is_image {
+                        // pandoc-native: links cannot contain other links,
+                        // so when recursing into a LINK / REFERENCE LINK's
+                        // text the IR-driven dispatch must not re-resolve
+                        // an inner `[...](...)` / `[...][...]`. Images are
+                        // still allowed (`![alt with [inner](u)](u2)` keeps
+                        // the inner LINK per pandoc-native).
+                        if suppress_inner_links && !is_image {
+                            // fall through to literal byte handling
+                        } else if is_image {
                             if config.extensions.inline_images
                                 && let Some((len, alt_text, dest, attributes)) =
                                     try_parse_inline_image(&text[pos..], ctx)
@@ -1269,6 +1286,7 @@ fn parse_inline_range_impl(
                             plan,
                             bracket_plan,
                             construct_plan,
+                            suppress_inner_links,
                         );
                         builder.token(marker_kind.into(), &text[partner..partner + partner_len]);
                         builder.finish_node();

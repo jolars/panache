@@ -780,10 +780,13 @@ pub fn emit_inline_link(
     builder.token(SyntaxKind::LINK_START.into(), "[");
     builder.finish_node();
 
-    // Link text (recursively parse inline elements)
+    // Link text (recursively parse inline elements). Pandoc-native:
+    // links cannot contain other links, so suppress inner LINK / ref-link
+    // recognition during the recursion. Images, emphasis, code, etc. are
+    // still recognised. CommonMark relies on outer-level process_brackets
+    // to prevent nested links, but the flag is harmless under CM.
     builder.start_node(SyntaxKind::LINK_TEXT.into());
-    // Use the standalone parse_inline_text function for recursive parsing
-    parse_inline_text(builder, link_text, config, false);
+    parse_inline_text(builder, link_text, config, true);
     builder.finish_node();
 
     // Closing ]
@@ -966,9 +969,12 @@ pub fn emit_reference_link(
     builder.token(SyntaxKind::LINK_START.into(), "[");
     builder.finish_node();
 
-    // Link text (recursively parse inline elements)
+    // Link text (recursively parse inline elements). Pandoc-native:
+    // links cannot contain other links, so suppress inner LINK / ref-link
+    // recognition during the recursion. Images, emphasis, code, etc. are
+    // still recognised.
     builder.start_node(SyntaxKind::LINK_TEXT.into());
-    parse_inline_text(builder, link_text, config, false);
+    parse_inline_text(builder, link_text, config, true);
     builder.finish_node();
 
     // Closing ] and reference label

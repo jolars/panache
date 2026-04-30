@@ -1,0 +1,29 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..40
+  PARAGRAPH@0..24
+    LINK@0..23
+      LINK_START@0..1
+        LINK_START@0..1 "["
+      LINK_TEXT@1..17
+        TEXT@1..17 "outer [inner](u)"
+      TEXT@17..18 "]"
+      TEXT@18..19 "["
+      LINK_REF@19..22
+        TEXT@19..22 "bar"
+      TEXT@22..23 "]"
+    NEWLINE@23..24 "\n"
+  BLANK_LINE@24..25
+    BLANK_LINE@24..25 "\n"
+  REFERENCE_DEFINITION@25..40
+    LINK@25..30
+      LINK_START@25..26
+        LINK_START@25..26 "["
+      LINK_TEXT@26..29
+        TEXT@26..29 "bar"
+      TEXT@29..30 "]"
+    TEXT@30..39 ": /barurl"
+    NEWLINE@39..40 "\n"

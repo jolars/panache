@@ -12,7 +12,255 @@ content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (ix)
+## Latest session — 2026-04-30 (x)
+
+**Workspace test count: 0 failing → 0 failing.** **Phase 8 partially
+landed (sub-step C only).** Bug #3 (link-in-link nesting under Pandoc:
+`[link [inner](u2)](u1)` produced a nested `LINK` instead of outer
+`LINK` with literal `[inner](u2)` inside) is fixed. Bugs #1 and #2 are
+DEFERRED — see "Why bugs #1/#2 deferred" below. Diff is committable.
+
+### What landed this session
+
+1. **`parse_inline_text` 4th arg repurposed** from unused
+   `_allow_reference_links` to **load-bearing** `suppress_inner_links:
+   bool`. When `true`, the recursion suppresses inner LINK / REFERENCE
+   LINK recognition (images, emphasis, code, etc. still recognised).
+2. **`parse_inline_range_impl` plumbed** with new
+   `suppress_inner_links: bool` parameter. Threaded through the
+   emphasis-recursion call site.
+3. **IR-driven `ConstructDispo::PandocLinkOrImage` arm gated** on
+   `!(suppress_inner_links && !is_image)`. The `if is_image { … }
+   else { … }` branches were restructured to:
+   ```
+   if suppress_inner_links && !is_image {
+       // fall through — inner link suppressed, bytes go to TEXT
+   } else if is_image {
+       // image dispatch
+   } else {
+       // link dispatch
+   }
+   ```
+4. **`emit_inline_link` and `emit_reference_link` now pass `true`**
+   for `suppress_inner_links`. All other callers (image alt,
+   bracketed span, native span, inline footnote, mark, strikeout,
+   subscript, superscript) keep `false` — pandoc-native verifies
+   nested LINK is allowed in those contexts.
+5. **Existing fixture `link_inside_link_text_pandoc` snapshot
+   updated.** The old snapshot encoded the legacy nested-LINK bug
+   (outer `LINK` containing inner `LINK`); the new snapshot matches
+   pandoc-native (outer `LINK` with `LINK_TEXT` containing
+   `TEXT@1..16 "foo [bar](/uri)"` literal).
+6. **Two new Pandoc fixtures added:**
+   - `image_inside_link_text_pandoc` — locks down that
+     `[outer ![inner](u2)](u1)` keeps the inner `IMAGE_LINK` inside
+     `LINK_TEXT` (image-in-link is allowed). Verified against
+     `pandoc -f markdown -t native`.
+   - `link_inside_reference_link_text_pandoc` —
+     `[outer [inner](u)][bar]` with `[bar]: /barurl` produces an
+     outer reference `LINK` whose text contains `TEXT "outer [inner](u)"`
+     (inner LINK suppressed). Verified against pandoc-native.
+
+### Why bugs #1 / #2 deferred
+
+The recap-(ix) plan called for making `reference_resolves` dialect-
+neutral (always consult `refdef_labels`) to fix:
+- Bug #1: `[foo]` (no refdef) → malformed `LINK` → should be `Str
+  "[foo]"`.
+- Bug #2: `*foo [bar* baz]` → `TEXT` + partial `LINK` → should be
+  all literal.
+
+**Attempted in this session, then reverted.** Removing the
+`Dialect != CommonMark → return true` short-circuit in
+`reference_resolves` (core.rs:32) cleanly fixed bugs #1 and #2 at
+the parser level, BUT broke 7+ downstream tests in linter / LSP /
+Salsa:
+- `linter::rules::undefined_references` (`reports_missing_reference_labels`,
+  `implicit_heading_references_require_auto_identifiers`) — the
+  linter walks `LINK` nodes to flag unresolved refs. With the fix,
+  unresolved bracket patterns become `TEXT`, so the linter has
+  nothing to flag.
+- `lsp::handlers::heading_link_conversion` (3 tests) — code action
+  to convert implicit heading links walks `LINK` nodes.
+- `lsp::test_diagnostics::test_code_action_convert_implicit_heading_link_to_explicit`,
+  `lsp::test_goto_definition` (4 tests),
+  `lsp::test_incremental_edits::test_incremental_edit_updates_dependents`,
+  `lsp::test_rename::test_rename_heading_reference_updates_shortcut_and_hash_links` —
+  all walk `LINK` nodes for unresolved refs.
+- `salsa::tests::symbol_usage_index_collects_heading_ranges_for_links_and_ids` —
+  same root cause.
+- Multi-file project tests
+  (`test_unused_definitions_resolved_across_project_files`,
+  `test_missing_reference_targets`) — same.
+- Format golden cases (`reference_links`, `reference_images`,
+  `mmd_link_attributes`, `citations`, `mmd_link_attributes_disabled`)
+  — formatter walks `LINK` nodes.
+
+The Panache parser INTENTIONALLY emits `LINK` nodes for unresolved
+shortcut refs under Pandoc dialect (shape-only) so downstream
+features (linter, LSP, formatter) can operate on the bracket-shaped
+patterns regardless of refdef resolution. This is a deliberate
+architectural choice — the fix-bug-#1-and-#2 work crosses parser /
+linter / LSP boundaries and needs a coordinated change beyond the
+inline-IR migration's scope.
+
+**Bugs #1/#2 are NOT migration-blockers.** They are pre-existing
+parser-vs-pandoc-native divergences. The IR migration's stated goal
+is "the IR is the single source of truth for what is this byte
+range?" — bugs #1/#2 are about *what the byte range MEANS* (a literal
+`Str` vs a `Link` node), which is downstream of the migration's
+scope.
+
+### Verification done
+
+- Workspace tests: 0 → 0 failing (256 → 258 in golden_parser_cases
+  bucket; +2 new fixtures).
+- CommonMark conformance allowlist (`commonmark_allowlist`): green.
+- clippy `--all-targets --all-features -- -D warnings`: clean.
+- `cargo fmt -- --check`: clean.
+- Manual probes against `pandoc -f markdown -t native`:
+  - `[foo [bar](/uri)](/uri)` → outer `Link` with `Str "foo", Space,
+    Str "[bar](/uri)"` ✓
+  - `[outer ![inner](u2)](u1)` → outer `Link` with `Str "outer",
+    Space, Image [Str "inner"] ("u2","")` ✓
+  - `[outer [inner](u)][bar]` (with refdef) → outer reference `Link`
+    with `Str "outer", Space, Str "[inner](u)"` ✓
+  - `[*emph*](u)` → `Link` with `Emph [Str "emph"]` ✓
+  - `` [`code`](u) `` → `Link` with `Code "code"` ✓
+
+### Files in committable diff
+
+- `crates/panache-parser/src/parser/inlines/core.rs`
+  (parameter additions; gate; docstring rewrites)
+- `crates/panache-parser/src/parser/inlines/links.rs`
+  (`emit_inline_link` and `emit_reference_link` pass `true`)
+- `crates/panache-parser/tests/golden_parser_cases.rs`
+  (+2 case names)
+- `crates/panache-parser/tests/fixtures/cases/image_inside_link_text_pandoc/`
+  (new directory: input.md, parser-options.toml)
+- `crates/panache-parser/tests/fixtures/cases/link_inside_reference_link_text_pandoc/`
+  (new directory: input.md, parser-options.toml)
+- `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_link_inside_link_text_pandoc.snap`
+  (legacy buggy fixture corrected to pandoc-native)
+- `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_image_inside_link_text_pandoc.snap`
+  (new)
+- `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_link_inside_reference_link_text_pandoc.snap`
+  (new)
+- `.claude/skills/pandoc-ir-migrate/RECAP.md` (this entry)
+
+### Suggested next sub-targets, ranked
+
+1. **Phase 8 sub-step D — fold `ConstructDispo::PandocLinkOrImage`
+   into `BracketDispo::Open` and enable `process_brackets` under
+   Pandoc.** This is the architectural unification the SKILL calls
+   for. After this lands, no Pandoc inline construct depends on the
+   dispatcher's `try_parse_*` chain for resolution decisions —
+   migration "complete" per the SKILL gate. Implementation outline:
+   - Drop `try_pandoc_bracket_opaque` from `build_ir`'s scan
+     (lines 586–599). Bracket bytes flow through `OpenBracket` /
+     `CloseBracket` events under both dialects.
+   - Drop `ConstructKind::PandocLinkOrImage` and
+     `ConstructDispo::PandocLinkOrImage` variants and their
+     handlers. The CM-gated legacy `[`/`![` dispatcher branches
+     ungate (fire for both dialects, consuming `BracketDispo::Open`).
+   - Enable `process_brackets` under Pandoc in `build_full_plans`
+     (line 2252).
+   - Make `process_brackets` dialect-aware: under Pandoc, skip
+     `deactivate_earlier_link_openers`; instead, after committing
+     a resolution, walk events between `(open_idx+1, close_idx-1)`
+     and INVALIDATE inner resolutions (set `OpenBracket.resolution
+     = None`, `OpenBracket.active = false`, `CloseBracket.matched
+     = false`). This implements Pandoc's outer-wins via post-
+     resolution invalidation.
+   - Drop the dialect ternary in `parse_inline_text_recursive` /
+     `parse_inline_text` so `bracket_plan = Some(&plans.brackets)`
+     for both dialects.
+   - Important: keep the `suppress_inner_links` flag and its
+     gate on the legacy `[` link branches too (under Pandoc the
+     legacy branches will now fire). Otherwise nested-link
+     suppression in link text breaks again.
+
+   **Caveat about emphasis interaction**: removing
+   `try_pandoc_bracket_opaque` opens the `*` chars inside
+   bracket-shaped runs to the emphasis pass. For
+   `*foo [bar* baz]*` the IR currently has `[bar* baz]` opaque, so
+   only `*` at pos 0 and pos 15 are DelimRuns and they pair as
+   outer Emph. WITHOUT the opaque, pos 9's `*` becomes a DelimRun
+   too, and the IR's left-to-right closer walk would pair (0, 9)
+   as inner Emph — DIFFERENT from pandoc-native, which pairs
+   (0, 15). Pandoc's recursive-descent has bracket-skip semantics
+   in its `ender` walk that the IR doesn't replicate. To keep
+   pandoc-native parity here, sub-step D needs ALSO to keep
+   bracket-shape opacity for emphasis (but not for emission).
+   One mechanism: after `process_brackets` runs under Pandoc,
+   build a "bracket opacity" range list (UNRESOLVED bracket pairs
+   too), and feed it into the emphasis pass exclusion bitmap
+   alongside the resolved-pair exclusion. The "even unresolved
+   bracket pairs are emphasis-opaque" rule is Pandoc-only.
+
+2. **Bugs #1/#2: parser-as-source-of-truth path.** Requires
+   changing the linter / LSP / formatter to walk source text (or a
+   side-channel) for unresolved bracket-shaped patterns, instead of
+   walking `LINK` nodes. This is its own multi-session project and
+   shouldn't gate the IR migration. Consider deferring to a
+   dedicated "refdef-aware downstream" workstream.
+
+3. **Comment / docstring cleanup pass.** Carried forward from
+   recap-(ix). Audit comments referencing "the legacy `try_parse_*`
+   dispatcher chain" once Phase 8 sub-step D lands. Low-priority.
+
+4. **Optional simplification**: tighten `parse_inline_range_impl`'s
+   signature — `plan` and `construct_plan` are always `Some` in
+   production callers. After Phase 8 sub-step D enables
+   `bracket_plan` for both dialects, that one too. Mild ergonomic
+   win.
+
+### Don't redo / known traps (carried forward + new)
+
+All Phase 1–7 traps still apply. Plus:
+
+- **NEW (this session): refdef-aware `reference_resolves` is a
+  parser-linter-LSP cross-cut, not a parser-only change.** Bugs
+  #1/#2 LOOK like simple parser fixes (drop the
+  `Dialect != CommonMark → return true` short-circuit) but break
+  7+ downstream tests because the linter / LSP / formatter walk
+  `LINK` nodes for refdef resolution. The Panache parser
+  INTENTIONALLY emits `LINK` for unresolved Pandoc-shape brackets
+  so downstream features have something to operate on. Don't try
+  to fix bugs #1/#2 in the parser alone; coordinate with downstream
+  consumers first.
+- **NEW (this session): `suppress_inner_links` is the new lever.**
+  Re-purposed `_allow_reference_links` parameter. Set `true` ONLY
+  from `emit_inline_link` (links.rs:786) and `emit_reference_link`
+  (links.rs:971). All other recursion entry points keep `false` —
+  pandoc-native confirms images / spans / footnotes / emphasis
+  ALLOW nested LINK. Don't over-apply: blanket-suppressing in any
+  nested context would regress those.
+- **NEW (this session): the IR-driven dispatch arm structure**
+  for `PandocLinkOrImage` now is:
+  ```
+  if suppress_inner_links && !is_image { /* fall through */ }
+  else if is_image { /* image dispatch */ }
+  else { /* link dispatch */ }
+  ```
+  The empty-body first branch with a comment is the cleanest way
+  to fall through under suppress for non-image. Don't refactor it
+  into a `&&` guard on the link branch alone — that would lose the
+  early-exit shape and make the suppression less obvious to a
+  future reader.
+- **NEW (this session): emphasis-opacity vs emission-opacity are
+  distinct concerns under Pandoc.** Currently both are coupled in
+  `try_pandoc_bracket_opaque` (one Construct event handles both).
+  Phase 8 sub-step D will need to disentangle: emphasis still
+  needs bracket-shape opacity (to match pandoc-native's
+  `*foo [bar* baz]*` outer-pair behaviour), but emission uses
+  `BracketDispo::Open` for resolved cases and falls through to
+  literal TEXT for unresolved cases. See "caveat about emphasis
+  interaction" in sub-step D outline above.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (ix)
 
 **Workspace test count: 0 failing → 0 failing.** **Phase 7 LANDED.**
 The legacy recursive-descent emphasis path is gone. The

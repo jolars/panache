@@ -1,0 +1,28 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..25
+  PARAGRAPH@0..25
+    LINK@0..24
+      LINK_START@0..1
+        LINK_START@0..1 "["
+      LINK_TEXT@1..19
+        TEXT@1..7 "outer "
+        IMAGE_LINK@7..19
+          IMAGE_LINK_START@7..9
+            IMAGE_LINK_START@7..9 "!["
+          IMAGE_ALT@9..14
+            TEXT@9..14 "inner"
+          IMAGE_ALT_END@14..15 "]"
+          IMAGE_DEST_START@15..16 "("
+          LINK_DEST@16..18
+            TEXT@16..18 "u2"
+          IMAGE_DEST_END@18..19 ")"
+      LINK_TEXT_END@19..20 "]"
+      LINK_DEST_START@20..21 "("
+      LINK_DEST@21..23
+        TEXT@21..23 "u1"
+      LINK_DEST_END@23..24 ")"
+    NEWLINE@24..25 "\n"
