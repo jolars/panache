@@ -157,14 +157,21 @@ pub enum ConstructKind {
     Autolink,
     /// `<tag ...>` and friends (§6.6).
     InlineHtml,
-    /// Pandoc bracket-shaped opaque construct (inline link, reference
-    /// link, image, footnote ref, bracketed citation, bracketed span).
-    /// Pre-recognised in `build_ir` under `Dialect::Pandoc` solely so
-    /// the emphasis pass treats the entire construct as opaque and
-    /// delim runs inside don't cross its boundary. Emission re-parses
-    /// the construct via the dispatcher's existing `try_parse_*` chain
-    /// (the IR is not authoritative for Pandoc bracket emission yet).
+    /// Pandoc opaque construct that doesn't have a dedicated kind yet
+    /// (currently: math spans). Pre-recognised in `build_ir` under
+    /// `Dialect::Pandoc` solely so the emphasis pass treats the entire
+    /// construct as opaque and delim runs inside don't cross its
+    /// boundary. Emission re-parses the construct via the dispatcher's
+    /// existing `try_parse_*` chain.
     PandocOpaque,
+    /// Pandoc bracket-shaped link or image (inline link `[text](dest)`,
+    /// reference link `[text][label]` / `[text][]` / `[text]`, inline
+    /// image `![alt](dest)`, reference image `![alt][label]` etc.).
+    /// Recognised in `build_ir` under `Dialect::Pandoc` and consumed
+    /// by the emission walk via the IR's `ConstructPlan` (Phase 6).
+    /// The dispatcher's legacy `[`/`![` link/image branches are gated
+    /// to CommonMark dialect only.
+    PandocLinkOrImage,
     /// Pandoc inline footnote `^[note text]`. Recognised in `build_ir`
     /// under `Dialect::Pandoc` and consumed by the emission walk via
     /// the IR's `ConstructPlan` (Phase 2). The dispatcher's legacy
@@ -521,15 +528,14 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
             continue;
         }
 
-        // Pandoc-only: bracket-shaped opaque constructs. Tries the
+        // Pandoc-only: bracket-shaped link/image constructs. Tries the
         // dispatcher's precedence order to identify the full byte range
-        // of any bracket-shaped Pandoc construct (links, images), and
-        // emits them as a single `Construct` so the emphasis pass
-        // cannot pair across their boundaries. Emission re-parses each
-        // construct through the dispatcher's existing `try_parse_*`
-        // chain. Footnote refs (`[^id]`), bracketed citations
-        // (`[@cite]`), and bracketed spans (`[text]{attrs}`) are
-        // handled by dedicated branches above.
+        // of any bracket-shaped Pandoc link or image, and emits them as
+        // a single `Construct` so the emphasis pass cannot pair across
+        // their boundaries AND the emission walk can dispatch them via
+        // the IR's `ConstructPlan` (Phase 6). Footnote refs (`[^id]`),
+        // bracketed citations (`[@cite]`), and bracketed spans
+        // (`[text]{attrs}`) are handled by dedicated branches above.
         if !is_commonmark
             && (b == b'[' || (b == b'!' && pos + 1 < end && bytes[pos + 1] == b'['))
             && let Some(len) = try_pandoc_bracket_opaque(text, pos, end, config)
@@ -538,7 +544,7 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
             events.push(IrEvent::Construct {
                 start: pos,
                 end: pos + len,
-                kind: ConstructKind::PandocOpaque,
+                kind: ConstructKind::PandocLinkOrImage,
             });
             pos += len;
             text_run_start = pos;
@@ -2061,6 +2067,13 @@ pub enum ConstructDispo {
     /// `[content]{attrs}` — emit via `emit_bracketed_span` after
     /// slicing the inner content and attribute string.
     BracketedSpan { end: usize },
+    /// `[text](dest)` / `[text][label]` / `[text][]` / `[text]` /
+    /// `![alt](dest)` / `![alt][label]` etc. Emit via the dispatcher's
+    /// `try_parse_inline_image` / `try_parse_reference_image` /
+    /// `try_parse_inline_link` / `try_parse_reference_link` chain in
+    /// precedence order, gated by `reference_resolves` for the
+    /// reference forms (Phase 6).
+    PandocLinkOrImage { end: usize },
 }
 
 /// A byte-keyed view of the IR's standalone Pandoc constructs that the
@@ -2108,6 +2121,9 @@ pub fn build_construct_plan(events: &[IrEvent]) -> ConstructPlan {
                 }
                 ConstructKind::BracketedSpan => {
                     by_pos.insert(*start, ConstructDispo::BracketedSpan { end: *end });
+                }
+                ConstructKind::PandocLinkOrImage => {
+                    by_pos.insert(*start, ConstructDispo::PandocLinkOrImage { end: *end });
                 }
                 _ => {}
             }

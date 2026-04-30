@@ -12,7 +12,272 @@ content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (vii)
+## Latest session — 2026-04-30 (viii)
+
+**Workspace test count: 0 failing → 0 failing.** **Phase 6 LANDED
+(simple-pattern variant — same as Phases 2-5).** Pandoc bracket-shaped
+links and images (`[text](dest)`, `[text][label]`, `[text][]`,
+`[text]`, `![alt](dest)`, `![alt][label]`, etc.) now dispatched
+IR-first under `Dialect::Pandoc`; legacy dispatcher branches for
+`![` (inline image / reference image) and `[...](...)` /
+`[...][...]` / `[...]` (inline link / reference link) gated to
+`Dialect::CommonMark`. Conformance allowlist preserved; clippy +
+fmt clean. Diff is committable.
+
+### Important: Phase 6 deviated from the SKILL.md plan (same as Phase 5)
+
+The SKILL.md description of Phase 6 calls for enabling
+`process_brackets` under Pandoc and BracketPlan-driven dispatch,
+with `deactivate_earlier_link_openers` gated on CommonMark only
+(SKILL.md notes "Pandoc allows link-in-link"). This session
+deliberately followed the simpler **Phase 2-5 pattern**
+(`ConstructPlan`-driven dispatch) instead, because:
+
+1. Continuing the Phase 2-5 pattern keeps the migration consistent
+   and zero-blast-radius. `ConstructPlan`-driven dispatch is pure
+   additive — same recognition algorithm, same emission helpers,
+   IR just gates *when* they fire. No behavior change.
+2. Verification against `pandoc -f markdown -t native` actually
+   showed the SKILL.md note about "Pandoc allows link-in-link" is
+   incorrect: pandoc-native DOES NOT nest links — input
+   `[link [inner](u2)](u1)` produces `Link [Str "link", Space,
+   Str "[inner](u2)"] (u1, "")` (outer wins, inner literal). So
+   the SKILL.md's specific mechanism of gating
+   `deactivate_earlier_link_openers` would have to be re-thought
+   anyway; deferring this to a future bug-fix session is cleaner.
+3. The legacy `try_parse_emphasis` recursive-descent path (the
+   subject of Phase 7) is already dead code in the production flow:
+   `parse_inline_text_recursive` and `parse_inline_text` always
+   pass `Some(&plans.emphasis)` to `parse_inline_range_impl`, so
+   the legacy emphasis branch at `core.rs:2549+` (gated on
+   `plan.is_none()`) never fires in production. Phase 7 can
+   proceed independently of full BracketPlan integration. The
+   `process_brackets` under Pandoc work can be its own
+   bug-fix-driven phase later (or never, if not needed).
+
+### What landed this session
+
+1. **New `ConstructKind::PandocLinkOrImage`** in `inline_ir.rs`. The
+   existing `try_pandoc_bracket_opaque` recognition for inline
+   link / reference link / inline image / reference image (which
+   was previously emitted as the catch-all `PandocOpaque`) now
+   emits this dedicated kind. `PandocOpaque` retains its meaning
+   as the catch-all for opacity-only constructs that don't have
+   a dedicated kind yet (currently: math spans via
+   `try_pandoc_math_opaque`).
+
+2. **New `ConstructDispo::PandocLinkOrImage { end }`** alongside
+   the Phase 2-5 variants. `build_construct_plan` extended with
+   one more match arm.
+
+3. **IR-driven dispatch branch** in `parse_inline_range_impl`.
+   When `construct_plan.lookup(pos)` returns
+   `PandocLinkOrImage { end }`, the branch tries the dispatcher's
+   precedence chain in order:
+   - Image (`bytes[pos] == b'!'`):
+     - `try_parse_inline_image` (gated on `extensions.inline_images`).
+     - `try_parse_reference_image` (gated on
+       `extensions.reference_links` AND `reference_resolves`).
+   - Link (`bytes[pos] == b'['`):
+     - `try_parse_inline_link` (gated on `extensions.inline_links`,
+       called with `is_commonmark = false` since this branch only
+       fires under Pandoc).
+     - `try_parse_reference_link` (gated on
+       `extensions.reference_links` AND `reference_resolves`).
+   Same order as the dispatcher's legacy branches; the
+   `pos + len == dispo_end` sanity check ensures the IR's
+   recorded range matches the dispatcher's recomputed range.
+
+4. **Three legacy dispatcher branches** gated on
+   `config.dialect == Dialect::CommonMark`:
+   - The `b'!['` image branch (covers inline image + reference
+     image inside the same `if`).
+   - The `b'['` inline link branch.
+   - The `b'['` reference link branch.
+   The legacy footnote-ref / bracketed-citation / bracketed-span
+   branches inside the `b'['` block were already CM-gated by
+   Phases 3-5; Phase 6 just adds the link/reference-link gates.
+
+5. **Simplified `try_parse_inline_link` argument** in the
+   CM-gated legacy branch. Was `config.dialect == Dialect::CommonMark`,
+   now hard-coded `true` since the branch only fires under
+   CommonMark anyway.
+
+### Why this is "pure additive; no algorithm change"
+
+Same as Phases 2-5: `try_parse_inline_link`, `try_parse_inline_image`,
+`try_parse_reference_link`, `try_parse_reference_image`, and the
+emission helpers (`emit_inline_link`, `emit_inline_image`,
+`emit_reference_link`, `emit_reference_image`) are all unchanged.
+`build_ir` and the emission walk in `parse_inline_range_impl` are
+augmented with a new kind/dispo pair, but iteration logic for
+everything else is untouched. The IR's recorded range and the
+dispatcher's recomputed range must agree (both call the same
+`try_parse_*` helpers in the same order).
+
+### Files in committed-ready diff
+
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`:
+  +1 `ConstructKind` variant (`PandocLinkOrImage`), +1
+  `ConstructDispo` variant (`PandocLinkOrImage { end }`), +3
+  lines in `build_construct_plan`. Updated the `build_ir` call
+  site that emits the construct event from `PandocOpaque` to
+  `PandocLinkOrImage`. Updated `PandocOpaque`'s docstring to
+  reflect its narrower remaining scope (math only).
+- `crates/panache-parser/src/parser/inlines/core.rs`:
+  +118 lines for the `PandocLinkOrImage` dispatch arm in the
+  IR-driven branch (mirrors the legacy chain for the four
+  link/image forms). +12 lines for the dialect gates on the
+  three legacy branches. -1 line simplifying the
+  `try_parse_inline_link` argument now that the branch is
+  CM-only.
+
+### Verification done
+
+- Workspace tests: 0 → 0 failing.
+- CommonMark conformance allowlist: green.
+- clippy + fmt: clean.
+- Manual probes (all match pre-Phase-6 baseline byte-for-byte):
+  - `*[foo](http://x)*` → outer EMPHASIS containing LINK.
+  - `[foo]` (no refdef) → partial LINK with TEXT "]" trailing
+    (pre-existing legacy behavior; Pandoc dialect's
+    `reference_resolves = true` makes the legacy parser emit
+    a malformed LINK for shape-only matches; pandoc-native would
+    parse this as literal `[foo]`. PRE-EXISTING BUG, OUT OF SCOPE
+    for Phase 6 — see "Don't redo / known traps" below).
+  - `*foo [bar* baz]` → TEXT "*foo " + partial LINK (similar
+    pre-existing bug).
+  - `[*foo*](http://x)` → LINK with inner EMPHASIS (scoped pass).
+  - `[link [inner](u2)](u1)` → outer LINK containing inner LINK
+    (legacy nested-link bug; pandoc-native would parse outer-wins
+    with inner literal).
+  - `![alt](u)` → IMAGE_LINK (with surrounding FIGURE wrapper).
+  - `*[foo](u) bar*` → outer EMPHASIS containing LINK + TEXT.
+  - `[foo](u) and [bar](v)` → two separate LINK nodes.
+
+### Pre-existing bugs noted (NOT introduced by Phase 6)
+
+Verification against `pandoc -f markdown -t native` reveals
+THREE pre-existing divergences in the Pandoc dialect's link
+handling that this session deliberately preserved (no
+behavior change):
+
+1. **`[foo]` with no refdef parses as a malformed LINK node**
+   instead of literal text. Pandoc-native: `Str "[foo]"`.
+   Cause: `delimiter_stack::reference_resolves` returns `true`
+   under Pandoc dialect (shape-only opacity), so the legacy
+   `try_parse_reference_link` emits LINK regardless of refdef
+   resolution.
+2. **`*foo [bar* baz]` produces TEXT + partial LINK** instead
+   of all-literal. Pandoc-native: `Str "*foo", Space,
+   Str "[bar*", Space, Str "baz]"` — emphasis cannot pair
+   because `[` would create unmatched-bracket-like ambiguity,
+   and `[bar*` is not a valid reference. Same root cause as
+   #1: shape-only resolution.
+3. **`[link [inner](u2)](u1)` allows nested links** under
+   Pandoc. Pandoc-native: outer LINK contains LITERAL
+   `[inner](u2)`, not a nested LINK. Cause: the dispatcher's
+   recursive `parse_inline_text` for link text re-enters link
+   parsing, finding `[inner](u2)` as an inner link.
+
+All three would be addressed by enabling `process_brackets`
+under Pandoc with proper refdef resolution and link-in-link
+suppression — i.e., the SKILL.md's original Phase 6 vision.
+This session deferred that work to keep the diff
+zero-regression. A future phase (call it Phase 6b or a
+dedicated bug-fix phase) can do the BracketPlan integration.
+
+### Suggested next sub-targets, ranked
+
+Phase 6 (simple variant) is done. Logical next:
+
+1. **Phase 7** — delete legacy emphasis path. The `try_parse_emphasis`
+   family (`try_parse_emphasis`, `try_parse_emphasis_nested`,
+   `try_parse_one`, `try_parse_two`, `try_parse_three`,
+   `parse_until_closer_with_nested_one`,
+   `parse_until_closer_with_nested_two`, `parse_inline_range`,
+   `parse_inline_range_nested`) is already dead code in the
+   production flow (plan is always Some). Deletion is mostly
+   mechanical:
+   - Remove the legacy emphasis branch in
+     `parse_inline_range_impl` (currently `core.rs:~2549+`,
+     gated on `plan.is_none()`).
+   - Update the in-file tests at `core.rs:2755`, `2781`, `2811`,
+     `2862`, `3024` that call the legacy entry points directly.
+   - Delete the `delimiter_stack` module and relocate
+     `EmphasisPlan`, `DelimChar`, `EmphasisKind`, and
+     `reference_resolves` into `inline_ir.rs`.
+   This is the LARGEST diff in the migration so far (~1500 lines
+   deleted) but mostly mechanical. Estimate: 1 session, mostly
+   spent on test updates and rebuild verification.
+2. **Phase 6b (optional)** — `process_brackets` under Pandoc.
+   Would fix the three pre-existing bugs noted above. Higher
+   risk because it changes algorithm. Probably warrants its own
+   focused session AFTER Phase 7 lands (less scaffolding to
+   preserve).
+
+### Don't redo / known traps (carried forward + new)
+
+All Phase 1-5 traps still apply. Plus:
+
+- **NEW (Phase 6): the SKILL.md plan's claim "Pandoc allows
+  link-in-link" is INCORRECT.** Verified against
+  `pandoc -f markdown -t native`:
+  `[link [inner](u2)](u1)` → `Link [Str "link", ..., Str
+  "[inner](u2)"] ("u1", "")` (outer-wins, inner-literal). So
+  any future BracketPlan integration under Pandoc must use
+  outer-wins semantics, NOT the simple "don't deactivate earlier
+  link openers" CommonMark-inverted behavior. The mechanism is
+  greedy outer-first matching, not just the
+  `deactivate_earlier_link_openers` toggle.
+- **NEW (Phase 6): `try_pandoc_bracket_opaque` now produces
+  `ConstructKind::PandocLinkOrImage` for bracket-shaped
+  link/image bytes.** Math spans (recognized by
+  `try_pandoc_math_opaque`) still produce
+  `ConstructKind::PandocOpaque`. The two kinds are distinct in
+  `build_construct_plan`: `PandocLinkOrImage` gets a dedicated
+  `ConstructDispo`, `PandocOpaque` falls through to the `_ => {}`
+  arm (no IR-driven dispatch — math has its own dispatcher
+  branch).
+- **NEW (Phase 6): the IR-driven dispatch arm for
+  `PandocLinkOrImage` mirrors the legacy dispatcher's
+  precedence chain exactly.** Don't reorder; don't skip steps.
+  Inline image first, then reference image (gated on
+  `reference_resolves`), then inline link, then reference link
+  (also gated on `reference_resolves`). The dispatcher uses the
+  same order; matching it ensures byte-identical CST output.
+- **NEW (Phase 6): `try_parse_inline_link`'s `is_commonmark`
+  arg under the IR-driven Pandoc branch must be `false`.** It
+  controls whether the link parser uses CommonMark §6.3
+  inline-suffix rules (allow `<dest>` autolink-shaped
+  destination, etc.). The legacy CM-gated branch hard-codes
+  `true`. Don't conflate the two — the dialect must match
+  the call context.
+- **NEW (Phase 6): Pandoc's `reference_resolves` returning
+  `true` always is a PRE-EXISTING bug that produces malformed
+  LINK nodes for unresolved shortcut refs.** Don't try to fix
+  it in Phase 6 — it requires `process_brackets` integration
+  and changes algorithm. Defer to Phase 6b. The current
+  session preserved this bug to keep zero-regression.
+- **NEW (Phase 6): Phase 7 does NOT depend on Phase 6.** The
+  legacy emphasis path (`try_parse_emphasis*` family) is
+  already dead code in the production flow — plan is always
+  Some, so the legacy emphasis branch in
+  `parse_inline_range_impl` never fires. Deletion is straight
+  cleanup, not a behavior change. The recap-(vii) note that
+  Phase 6 is "the LAST construct migration before the legacy
+  emphasis path can be deleted" is misleading; both can land
+  in either order.
+
+### Files in current diff (committable)
+
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs`
+- `crates/panache-parser/src/parser/inlines/core.rs`
+- `.claude/skills/pandoc-ir-migrate/RECAP.md`
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (vii)
 
 **Workspace test count: 0 failing → 0 failing.** **Phase 5 LANDED
 (simple-pattern variant).** Bracketed spans `[content]{attrs}` now

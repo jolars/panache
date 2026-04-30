@@ -1695,6 +1695,111 @@ fn parse_inline_range_impl(
                         continue;
                     }
                 }
+                ConstructDispo::PandocLinkOrImage { end: dispo_end } => {
+                    if dispo_end <= end {
+                        let bytes = text.as_bytes();
+                        let ctx = LinkScanContext::from_options(config);
+                        let allow_shortcut = config.extensions.shortcut_reference_links;
+                        let is_image = bytes[pos] == b'!';
+
+                        if is_image {
+                            if config.extensions.inline_images
+                                && let Some((len, alt_text, dest, attributes)) =
+                                    try_parse_inline_image(&text[pos..], ctx)
+                                && pos + len == dispo_end
+                            {
+                                if pos > text_start {
+                                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                                }
+                                log::trace!("IR: matched inline image at pos {}", pos);
+                                emit_inline_image(
+                                    builder,
+                                    &text[pos..pos + len],
+                                    alt_text,
+                                    dest,
+                                    attributes,
+                                    config,
+                                );
+                                pos += len;
+                                text_start = pos;
+                                continue;
+                            }
+                            if config.extensions.reference_links
+                                && let Some((len, alt_text, reference, is_shortcut)) =
+                                    try_parse_reference_image(&text[pos..], allow_shortcut)
+                                && pos + len == dispo_end
+                                && reference_resolves(config, alt_text, &reference, is_shortcut)
+                            {
+                                if pos > text_start {
+                                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                                }
+                                log::trace!("IR: matched reference image at pos {}", pos);
+                                emit_reference_image(
+                                    builder,
+                                    alt_text,
+                                    &reference,
+                                    is_shortcut,
+                                    config,
+                                );
+                                pos += len;
+                                text_start = pos;
+                                continue;
+                            }
+                        } else {
+                            if config.extensions.inline_links
+                                && let Some((len, link_text, dest, attributes)) =
+                                    try_parse_inline_link(
+                                        &text[pos..],
+                                        config.dialect == Dialect::CommonMark,
+                                        ctx,
+                                    )
+                                && pos + len == dispo_end
+                            {
+                                if pos > text_start {
+                                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                                }
+                                log::trace!("IR: matched inline link at pos {}", pos);
+                                emit_inline_link(
+                                    builder,
+                                    &text[pos..pos + len],
+                                    link_text,
+                                    dest,
+                                    attributes,
+                                    config,
+                                );
+                                pos += len;
+                                text_start = pos;
+                                continue;
+                            }
+                            if config.extensions.reference_links
+                                && let Some((len, link_text, reference, is_shortcut)) =
+                                    try_parse_reference_link(
+                                        &text[pos..],
+                                        allow_shortcut,
+                                        config.extensions.inline_links,
+                                        ctx,
+                                    )
+                                && pos + len == dispo_end
+                                && reference_resolves(config, link_text, &reference, is_shortcut)
+                            {
+                                if pos > text_start {
+                                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                                }
+                                log::trace!("IR: matched reference link at pos {}", pos);
+                                emit_reference_link(
+                                    builder,
+                                    link_text,
+                                    &reference,
+                                    is_shortcut,
+                                    config,
+                                );
+                                pos += len;
+                                text_start = pos;
+                                continue;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -2244,8 +2349,13 @@ fn parse_inline_range_impl(
             })
         };
 
-        // Images and links - process in order: inline image, reference image, footnote ref, inline link, reference link
-        if byte == b'!'
+        // Images and links - process in order: inline image, reference
+        // image, footnote ref, inline link, reference link. Phase 6:
+        // under Pandoc dialect this is consumed via the IR's
+        // `ConstructPlan` at the top of the loop; the dispatcher branch
+        // only fires for CommonMark dialect.
+        if config.dialect == Dialect::CommonMark
+            && byte == b'!'
             && pos + 1 < text.len()
             && text.as_bytes()[pos + 1] == b'['
             && bracket_says_resolved(pos)
@@ -2320,14 +2430,15 @@ fn parse_inline_range_impl(
                 continue;
             }
 
-            // Try inline link: [text](url)
-            if config.extensions.inline_links
+            // Try inline link: [text](url). Phase 6: under Pandoc
+            // dialect this is consumed via the IR's `ConstructPlan` at
+            // the top of the loop; the dispatcher branch only fires for
+            // CommonMark dialect.
+            if config.dialect == Dialect::CommonMark
+                && config.extensions.inline_links
                 && bracket_says_resolved(pos)
-                && let Some((len, link_text, dest, attributes)) = try_parse_inline_link(
-                    &text[pos..],
-                    config.dialect == crate::options::Dialect::CommonMark,
-                    LinkScanContext::from_options(config),
-                )
+                && let Some((len, link_text, dest, attributes)) =
+                    try_parse_inline_link(&text[pos..], true, LinkScanContext::from_options(config))
                 && pos + len <= end
             {
                 if pos > text_start {
@@ -2347,10 +2458,15 @@ fn parse_inline_range_impl(
                 continue;
             }
 
-            // Try reference link: [text][ref] or [text]. Refdef-aware under
-            // CommonMark dialect — see the matching reference-image branch
-            // above for the rationale.
-            if config.extensions.reference_links && bracket_says_resolved(pos) {
+            // Try reference link: [text][ref] or [text]. Refdef-aware
+            // under CommonMark dialect — see the matching
+            // reference-image branch above for the rationale. Phase 6:
+            // under Pandoc dialect this is consumed via the IR's
+            // `ConstructPlan` at the top of the loop.
+            if config.dialect == Dialect::CommonMark
+                && config.extensions.reference_links
+                && bracket_says_resolved(pos)
+            {
                 let allow_shortcut = config.extensions.shortcut_reference_links;
                 if let Some((len, link_text, reference, is_shortcut)) = try_parse_reference_link(
                     &text[pos..],
