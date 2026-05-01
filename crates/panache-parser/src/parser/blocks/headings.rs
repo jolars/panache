@@ -94,7 +94,7 @@ pub fn try_parse_setext_heading(lines: &[&str], pos: usize) -> Option<(usize, ch
     let underline = lines[next_pos];
 
     // Text line cannot be empty or blank
-    if text_line.trim().is_empty() {
+    if crate::parser::utils::helpers::is_blank_line(text_line) {
         return None;
     }
 

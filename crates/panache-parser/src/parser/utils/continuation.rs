@@ -10,6 +10,7 @@ use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry};
 use crate::parser::blocks::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
 use crate::parser::blocks::{definition_lists, html_blocks, lists, raw_blocks};
 use crate::parser::utils::container_stack::{ContainerStack, leading_indent};
+use crate::parser::utils::helpers::is_blank_line;
 
 pub(crate) struct ContinuationPolicy<'a, 'cfg> {
     config: &'cfg ParserOptions,
@@ -48,7 +49,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         let next_marker = lists::try_parse_list_marker(next_inner, self.config);
         let next_is_definition_marker =
             definition_lists::try_parse_definition_marker(next_inner).is_some();
-        let next_is_definition_term = !next_inner.trim().is_empty()
+        let next_is_definition_term = !is_blank_line(next_inner)
             && definition_lists::next_line_is_definition_marker(lines, next_line_pos).is_some();
 
         // `current_bq_depth` is used for proper indent calculation when the next line
@@ -230,14 +231,14 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         let prev_line_blank = if pos > 0 {
             let prev_line = lines[pos - 1];
             let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
-            prev_line.trim().is_empty() || (prev_bq_depth > 0 && prev_inner.trim().is_empty())
+            is_blank_line(prev_line) || (prev_bq_depth > 0 && is_blank_line(prev_inner))
         } else {
             false
         };
 
         // A blank line that isn't indented to the definition content column ends the definition.
         let (indent_cols, _) = leading_indent(raw_content);
-        if raw_content.trim().is_empty() && indent_cols < content_indent {
+        if is_blank_line(raw_content) && indent_cols < content_indent {
             return false;
         }
         let min_block_indent = self.definition_min_block_indent(content_indent);

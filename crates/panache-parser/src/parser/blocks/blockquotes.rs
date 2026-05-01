@@ -19,7 +19,7 @@ pub(in crate::parser) fn can_start_blockquote(pos: usize, lines: &[&str]) -> boo
         return true;
     }
     // After a blank line, can start blockquote
-    if pos > 0 && lines[pos - 1].trim().is_empty() {
+    if pos > 0 && crate::parser::utils::helpers::is_blank_line(lines[pos - 1]) {
         return true;
     }
     // If we're already in a blockquote, nested blockquotes need blank line too
