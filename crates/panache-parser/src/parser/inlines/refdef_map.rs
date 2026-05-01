@@ -97,21 +97,25 @@ pub fn collect_refdef_labels(input: &str, dialect: Dialect) -> RefdefMap {
     let mut pos = 0;
 
     while pos < bytes.len() {
-        // Try at the unmodified line-start first; this covers the
-        // top-level case and avoids allocating the stripped buffer for
-        // most lines.
-        if let Some((consumed, label, _url, _title)) =
-            try_parse_reference_definition(&input[pos..], dialect)
-        {
-            set.insert(normalize_label(&label));
-            pos += consumed.max(1);
-            continue;
+        // Cheap leading-byte gate: a refdef line starts with `[` after
+        // up to 3 spaces, or with `>` (blockquote-wrapped). Anything
+        // else can't be a refdef — skip the full
+        // `try_parse_reference_definition` scan and the blockquote
+        // strip+retry. Most lines in a typical doc fail this gate.
+        let mut gate = pos;
+        while gate < bytes.len() && gate - pos < 3 && bytes[gate] == b' ' {
+            gate += 1;
         }
-
-        // Try after stripping a leading blockquote prefix. We do this
-        // lazily: only when the line actually starts with `>` (possibly
-        // preceded by up to 3 spaces).
-        if line_starts_with_blockquote(&input[pos..])
+        let gate_byte = bytes.get(gate).copied();
+        if gate_byte == Some(b'[') {
+            if let Some((consumed, label, _url, _title)) =
+                try_parse_reference_definition(&input[pos..], dialect)
+            {
+                set.insert(normalize_label(&label));
+                pos += consumed.max(1);
+                continue;
+            }
+        } else if gate_byte == Some(b'>')
             && let Some(stripped) = strip_blockquote_line(&input[pos..])
             && let Some((_, label, _, _)) = try_parse_reference_definition(&stripped, dialect)
         {
