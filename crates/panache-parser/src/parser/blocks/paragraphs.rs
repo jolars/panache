@@ -101,9 +101,9 @@ pub(in crate::parser) fn append_paragraph_line(
         // PARAGRAPH + TEX_BLOCK across parse passes.
         update_display_math_dollar_state(line_no_newline, open_display_math_dollar_count);
         if let Some(env_name) = extract_environment_name(line_no_newline)
-            && is_inline_math_environment(&env_name)
+            && is_inline_math_environment(env_name)
         {
-            open_inline_math_envs.push(env_name);
+            open_inline_math_envs.push(env_name.to_string());
             return;
         }
 

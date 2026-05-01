@@ -298,7 +298,7 @@ pub fn try_parse_double_backslash_display_math(text: &str) -> Option<(usize, &st
 /// as display math. Returns (total_len, begin_marker, content, end_marker).
 pub fn try_parse_math_environment(text: &str) -> Option<(usize, &str, &str, &str)> {
     let env_name = extract_environment_name(text)?;
-    if !is_inline_math_environment(&env_name) {
+    if !is_inline_math_environment(env_name) {
         return None;
     }
 

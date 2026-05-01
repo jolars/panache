@@ -2557,7 +2557,7 @@ impl<'a> Parser<'a> {
 
         if has_blank_before {
             if let Some(env_name) = extract_environment_name(content)
-                && is_inline_math_environment(&env_name)
+                && is_inline_math_environment(env_name)
             {
                 if !self.is_paragraph_open() {
                     paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);

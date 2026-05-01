@@ -17,41 +17,51 @@ pub fn try_parse_code_span(text: &str) -> Option<(usize, &str, usize, Option<Att
     }
 
     let rest = &text[opening_backticks..];
+    let rest_bytes = rest.as_bytes();
 
-    // Look for matching closing backticks
+    // Look for matching closing backticks. Skip non-backtick bytes via
+    // memchr (compiles to vectorized scan) instead of stepping one
+    // UTF-8 char at a time — `try_parse_code_span` is called on every
+    // `` ` `` byte the dispatcher encounters and scans to end of input
+    // when no closer matches, so the inner skip dominates self-time.
     let mut pos = 0;
-    while pos < rest.len() {
-        if rest[pos..].starts_with('`') {
-            let closing_backticks = rest[pos..].bytes().take_while(|&b| b == b'`').count();
+    while pos < rest_bytes.len() {
+        let next_tick = match rest_bytes[pos..].iter().position(|&b| b == b'`') {
+            Some(off) => pos + off,
+            None => break,
+        };
+        // Count the run of consecutive backticks starting at `next_tick`.
+        let mut closing_backticks = 0;
+        while next_tick + closing_backticks < rest_bytes.len()
+            && rest_bytes[next_tick + closing_backticks] == b'`'
+        {
+            closing_backticks += 1;
+        }
 
-            if closing_backticks == opening_backticks {
-                // Found matching close
-                let code_content = &rest[..pos];
-                let after_close = opening_backticks + pos + closing_backticks;
+        if closing_backticks == opening_backticks {
+            // Found matching close
+            let code_content = &rest[..next_tick];
+            let after_close = opening_backticks + next_tick + closing_backticks;
 
-                // Check for trailing attributes {#id .class key=value}
-                let remaining = &text[after_close..];
-                if remaining.starts_with('{') {
-                    // Find the closing brace
-                    if let Some(close_brace_pos) = remaining.find('}') {
-                        let attr_text = &remaining[..=close_brace_pos];
-                        // Try to parse as attributes
-                        if let Some((attrs, _)) = try_parse_trailing_attributes(attr_text) {
-                            let total_len = after_close + close_brace_pos + 1;
-                            return Some((total_len, code_content, opening_backticks, Some(attrs)));
-                        }
+            // Check for trailing attributes {#id .class key=value}
+            let remaining = &text[after_close..];
+            if remaining.starts_with('{') {
+                // Find the closing brace
+                if let Some(close_brace_pos) = remaining.find('}') {
+                    let attr_text = &remaining[..=close_brace_pos];
+                    // Try to parse as attributes
+                    if let Some((attrs, _)) = try_parse_trailing_attributes(attr_text) {
+                        let total_len = after_close + close_brace_pos + 1;
+                        return Some((total_len, code_content, opening_backticks, Some(attrs)));
                     }
                 }
-
-                // No attributes, just return the code span
-                return Some((after_close, code_content, opening_backticks, None));
             }
-            // Skip these backticks and continue searching
-            pos += closing_backticks;
-        } else {
-            // Move to next character (handle UTF-8 properly)
-            pos += rest[pos..].chars().next()?.len_utf8();
+
+            // No attributes, just return the code span
+            return Some((after_close, code_content, opening_backticks, None));
         }
+        // Skip past this run of backticks and keep searching.
+        pos = next_tick + closing_backticks;
     }
 
     // No matching close found

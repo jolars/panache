@@ -1776,7 +1776,7 @@ impl BlockParser for LatexEnvironmentParser {
             return None;
         }
 
-        let env_name = extract_environment_name(ctx.content)?;
+        let env_name = extract_environment_name(ctx.content)?.to_string();
         let env_info = LatexEnvInfo { env_name };
 
         // Skip inline math environments - they should be parsed inline in paragraphs
@@ -1809,8 +1809,9 @@ impl BlockParser for LatexEnvironmentParser {
         let env_info = if let Some(info) = payload.and_then(|p| p.downcast_ref::<LatexEnvInfo>()) {
             info.clone()
         } else {
-            let env_name =
-                extract_environment_name(ctx.content).expect("LaTeX env info should exist");
+            let env_name = extract_environment_name(ctx.content)
+                .expect("LaTeX env info should exist")
+                .to_string();
             LatexEnvInfo { env_name }
         };
 

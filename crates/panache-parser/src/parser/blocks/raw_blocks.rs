@@ -54,16 +54,23 @@ pub fn is_inline_math_environment(name: &str) -> bool {
     INLINE_MATH_ENVIRONMENTS.contains(&name)
 }
 
-/// Extract environment name from `\begin{name}` line.
-/// Returns None if not a valid \begin{...} line.
-pub fn extract_environment_name(line: &str) -> Option<String> {
-    let trimmed = line.trim_start();
-
-    if !trimmed.starts_with("\\begin{") {
-        return None;
+/// Extract environment name from `\begin{name}` line as a borrowed
+/// slice. Returns `None` if not a valid `\begin{...}` line.
+///
+/// This is the hot path used by the block dispatcher / paragraph
+/// scanner; allocating a `String` per call shows up in profiles when
+/// the doc has many LaTeX-style lines.
+pub fn extract_environment_name(line: &str) -> Option<&str> {
+    // ASCII byte-level leading-whitespace skip; `str::trim_start`
+    // iterates Unicode whitespace which is unnecessary here.
+    let bytes = line.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b'\t') {
+        i += 1;
     }
+    let trimmed = &line[i..];
 
-    let after_begin = &trimmed[7..]; // Skip "\begin{"
+    let after_begin = trimmed.strip_prefix("\\begin{")?;
     let close_brace = after_begin.find('}')?;
     let env_name = &after_begin[..close_brace];
 
@@ -71,7 +78,7 @@ pub fn extract_environment_name(line: &str) -> Option<String> {
         return None;
     }
 
-    Some(env_name.to_string())
+    Some(env_name)
 }
 
 /// Check if content could start a raw TeX block.
@@ -89,7 +96,7 @@ pub fn can_start_raw_block(content: &str, config: &ParserOptions) -> bool {
     // Check if it's a \begin{env} line
     if let Some(env_name) = extract_environment_name(content) {
         // Skip inline math environments - they should be parsed inline in paragraphs
-        if is_inline_math_environment(&env_name) {
+        if is_inline_math_environment(env_name) {
             return false;
         }
         // Non-math environment: parse as block
@@ -155,7 +162,7 @@ pub fn parse_raw_tex_block(
     // Check if this is an environment
     let lines_consumed = if let Some(env_name) = extract_environment_name(first_line_inner) {
         // Parse environment: \begin{env}...content...\end{env}
-        parse_tex_environment_lines(builder, lines, start_pos, &env_name, blockquote_depth)
+        parse_tex_environment_lines(builder, lines, start_pos, env_name, blockquote_depth)
     } else {
         // Parse consecutive LaTeX command lines
         parse_tex_command_lines(builder, lines, start_pos, blockquote_depth)
