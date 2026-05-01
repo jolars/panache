@@ -31,19 +31,26 @@ work on, or extend the corpus with a new construct.
 ## Related rules to read first
 
 These project rules apply directly to this skill's work; read them before
-starting if you haven't already loaded them this session:
+starting if you haven't already loaded them this session. **Skip if your
+session is purely projector-only** — the failure-bucket triage in step 4
+of the workflow tells you which session this is, and projector-only work
+doesn't intersect with parser/test-organization rules.
 
 - `.claude/rules/parser.md` — `Dialect` vs `Extensions` split, dialect
   pandoc-verification requirement, CST losslessness, parser-policy
   separation from formatter, **pandoc-native is the behavioral reference**
-  for Pandoc-dialect parsing changes.
+  for Pandoc-dialect parsing changes. *Material when fixing parser-shape
+  or flavor gaps.*
 - `.claude/rules/commonmark.md` — read for context: CommonMark conformance
   must stay green every session here too. Pandoc-side fixes that
-  silently regress CommonMark are not allowed.
+  silently regress CommonMark are not allowed. *Always-on guard, but only
+  triggers when the fix touches shared CommonMark code.*
 - `.claude/rules/integration-tests.md` — formatter golden cases live under
   top-level `tests/fixtures/cases/`; parser-only cases live under
   `crates/panache-parser/tests/fixtures/cases/`. Conformance corpus is
   separate from both — it is *not* where parser invariants are authored.
+  *Material when adding fixtures (parser-shape and missing-feature
+  buckets).*
 
 ## Harness noise to ignore inside this skill
 
@@ -92,9 +99,21 @@ for conformance sessions unless the user explicitly asks for a task list.
 - `crates/panache-parser/src/parser/blocks/**`,
   `crates/panache-parser/src/parser/inlines/**` — where parser fixes land
   when the CST shape is wrong.
-- `pandoc/src/Text/Pandoc/Extensions.hs` — read-only reference checkout in
-  the workspace root. Cross-check `getDefaultExtensions Markdown` here when
-  designing flavor-default flags so panache stays aligned with pandoc.
+- `pandoc/src/Text/Pandoc/...` — read-only pandoc source checkout in the
+  workspace root. **The ground truth for any algorithm question, not just
+  flavor defaults.** When pandoc-native output disagrees with your
+  intuition, *read the parser*. High-leverage spots:
+  - `Extensions.hs` (`getDefaultExtensions Markdown`) — flavor defaults.
+  - `Readers/Markdown.hs` (`simpleTableHeader`, `multilineTableHeader`,
+    `pipeTable`, `gridTable`, `alignType`, `bulletList`, `definition`,
+    etc.) — block parsers; check here when CST shape decisions need to
+    match pandoc.
+  - `Parsing/GridTable.hs` (`fractionalColumnWidths`,
+    `widthsFromIndices`) — grid/multiline column-width math.
+  - `URI.hs` (`schemes`) — autolink scheme allowlist.
+  - `data/abbreviations` — pandoc's bundled abbreviation list.
+  Probing `pandoc -f markdown -t native` is faster for shape questions;
+  reading the source is faster for *why* a shape is what it is.
 
 ## Failure buckets
 

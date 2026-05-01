@@ -5,545 +5,612 @@ state; this file is judgment calls only.
 
 ## Suggested next targets
 
-Ranked by likely shared root cause and leverage. Numbers in parentheses are
-the count of currently-failing imports remaining under that bucket in the
-latest `report.txt`.
+Ranked by likely shared root cause and leverage. Numbers in parentheses are the
+count of currently-failing imports remaining under that bucket in the latest
+`report.txt`.
 
-1. **Citations proper (~14 Unsupported "CITATION")** — `citations` plus
-   embedded inline cites in many natural-text cases. The Example-list
-   carve-out (`@label` resolving to a number) landed; the bulk of the
-   17 `Unsupported "CITATION"` markers in `report.txt` come from real
-   citations that need full pandoc shape: `Cite [Citation {
-   citationId, citationPrefix, citationSuffix, citationMode =
-   AuthorInText | NormalCitation | SuppressAuthor, citationNoteNum,
-   citationHash }] [Inline]`. Heaviest projector entry remaining; all
-   ~14 cases share one fix.
-2. **Tables — Simple/Headerless/Multiline/Grid (~13)** — only
-   `PIPE_TABLE` is projected so far. Simple/Multiline/Grid tables
-   need: (a) explicit `ColWidth N` math derived from dash counts vs
-   total width (Multiline/Grid); (b) alignment derivation from
-   header column position (Simple/Headerless); (c) parser fix:
-   trailing `-------` separator in headerless simple table is
-   currently parsed as a `TABLE_ROW` of dash cells (parser bug).
-3. **Lists — `lists_fancy` (#115) needs a parser fix** — `I.`
-   (single space, not double) is parsed as a list by panache but
-   pandoc rejects (single capital letter requires double-space).
-   Parser is too permissive on uppercase markers. Parser-shape gap.
-4. **Footnotes — DefinitionList-inside-Note (~2 — cases #66, #67)** —
-   the basic Note resolver landed; what remains in this bucket is the
-   parser-shape gap where a definition list inside a footnote body
-   isn't parsed as `DefinitionList`. Parser fix territory, not
-   projector.
-5. **Definition list nesting (~2 — cases #43, #44, #45)** —
-   `definition_list_nesting`, `*_pandoc_loose_compact`,
-   `definition_list`. Per-item loose/tight detection landed (#179);
-   #44 still has a nested-list-inside-definition offset
-   propagation gap (the `LIST` carries a leading WHITESPACE sibling
-   that `list_item_content_offset` doesn't see); #43 / #45 have
-   parser-shape issues where nested bullets inside definitions
-   aren't parsed as `BulletList`.
-6. **HTML blocks / fenced divs with raw HTML adjacency (~3)** —
-   `writer_html_blocks`, `html_block` cases with adjacent HTML.
-   Pandoc splits each `<tag>` line into its own `RawBlock`; we
-   coalesce them into one block. Parser-shape gap: HTML_BLOCK
-   currently spans contiguous HTML lines; would need to split on
-   tag boundaries. `<div class="container">…</div>` is a related
-   parser gap: pandoc parses as `Div ( "" , [ "container" ] , [ ] )`
+1. **Citations proper (\~14 Unsupported "CITATION", but only #38 is currently
+   failing)** --- embedded inline cites need full pandoc shape:
+   `Cite [Citation { citationId, citationPrefix,    citationSuffix, citationMode = AuthorInText | NormalCitation |    SuppressAuthor, citationNoteNum, citationHash }] [Inline]`.
+   Most citation-bearing cases pass via Example-list carve-out; #38 is the
+   single remaining real-citation showcase. Smaller leverage than the \~14
+   occurrence count would suggest (one case, not many).
+2. **Tables --- remaining (\~5)** --- Simple/Multiline/Headerless basics landed
+   (+9 cases). What remains:
+   - **#94** (simple_table_short_header) --- parser emits 0-width
+     `TABLE_CELL@x..x` artifacts when header words don't align with the table's
+     leading/trailing dashes. Needs a parser-shape fix or a stricter projector
+     skip rule.
+   - **#126** (multiline inline_formatting) --- multiline-cell content is sliced
+     out of raw row text via column boundaries, so `**bold**`, `` `code` ``,
+     `[link](url)` aren't parsed as Strong/Code/Link --- they're emitted as raw
+     `Str`. Needs an inline-parser pass on the cell-text strings (re-parse).
+   - **#68/#70/#71** (grid_table) --- grid cells need block-level reparse (e.g.
+     `B` → CodeBlock, multi-line cells → SoftBreak/LineBreak, complex span
+     tables); requires running panache's block parser on each cell's content.
+     #71 also has rowspan/colspan layout. Heavy.
+   - **#171** (tables_in_divs) --- pipe table inside fenced div with custom
+     caption form `: Caption {#tbl-foo}` isn't recognized as pandoc's
+     `+caption_attributes` Caption-with-attr shape.
+3. **Lists --- `lists_fancy` (#115) needs a parser fix** --- `I.` (single space,
+   not double) is parsed as a list by panache but pandoc rejects (single capital
+   letter requires double-space). Parser is too permissive on uppercase markers.
+   Parser-shape gap.
+4. **Footnotes --- DefinitionList-inside-Note (\~2 --- cases #66, #67)** --- the
+   basic Note resolver landed; what remains in this bucket is the parser-shape
+   gap where a definition list inside a footnote body isn't parsed as
+   `DefinitionList`. Parser fix territory, not projector.
+5. **Definition list nesting (\~2 --- cases #43, #44, #45)** ---
+   `definition_list_nesting`, `*_pandoc_loose_compact`, `definition_list`.
+   Per-item loose/tight detection landed (#179); #44 still has a
+   nested-list-inside-definition offset propagation gap (the `LIST` carries a
+   leading WHITESPACE sibling that `list_item_content_offset` doesn't see); #43
+   / #45 have parser-shape issues where nested bullets inside definitions aren't
+   parsed as `BulletList`.
+6. **HTML blocks / fenced divs with raw HTML adjacency (\~3)** ---
+   `writer_html_blocks`, `html_block` cases with adjacent HTML. Pandoc splits
+   each `<tag>` line into its own `RawBlock`; we coalesce them into one block.
+   Parser-shape gap: HTML_BLOCK currently spans contiguous HTML lines; would
+   need to split on tag boundaries. `<div class="container">...</div>` is a
+   related parser gap: pandoc parses as `Div ( "" , [ "container" ] , [ ] )`
    with markdown-parsed content; we wrap as a single RawBlock.
-7. **Block-level cases where parser splits paragraphs around inline
-   HTML comments (#79 ignore_directives)** — pandoc keeps the
-   comment as `RawInline (Format "html") "<!-- … -->"` inside the
-   surrounding paragraph (or as the trailing inline of a Para); we
-   split into separate RawBlock and shorter Paras. Parser-shape gap
-   in HTML_BLOCK detection: a comment that abuts a paragraph
-   boundary should not always start a new block.
+7. **Block-level cases where parser splits paragraphs around inline HTML
+   comments (#79 ignore_directives)** --- pandoc keeps the comment as
+   `RawInline (Format "html") "<!-- ... -->"` inside the surrounding paragraph
+   (or as the trailing inline of a Para); we split into separate RawBlock and
+   shorter Paras. Parser-shape gap in HTML_BLOCK detection: a comment that abuts
+   a paragraph boundary should not always start a new block.
 8. **Misc remaining**:
-   - `double_backslash_math` (#51) — `\(`/`\[` shouldn't trigger
-     inline math parsing; *also* `^...^` inside the broken-math
-     content is over-permissive (matches with whitespace inside,
-     pandoc rejects). Parser-shape gap.
-   - `indented_code_after_atx_heading_pandoc` (#82) — parser doesn't
-     start a code block after an ATX heading.
-   - `emphasis_nested_inlines` (#56) — single edge case where
-     unclosed `~~` is split as `Subscript [] + Str`. Niche.
-   - `nested_headings_in_containers` (#128) — parser doesn't parse
-     `# Heading` inside list items / definition items as Header.
-   - Several blockquote/list/definition-list nesting cases where
-     blockquote/list markers on the same line as another container
-     marker aren't recognized (#34, #91, #93, #96, #108, #111).
-     Parser-shape gaps shared across that bucket.
+   - `double_backslash_math` (#51) --- `\(`/`\[` shouldn't trigger inline math
+     parsing; *also* `^...^` inside the broken-math content is over-permissive
+     (matches with whitespace inside, pandoc rejects). Parser-shape gap.
+   - `indented_code_after_atx_heading_pandoc` (#82) --- parser doesn't start a
+     code block after an ATX heading.
+   - `emphasis_nested_inlines` (#56) --- single edge case where unclosed `~~` is
+     split as `Subscript [] + Str`. Niche.
+   - `nested_headings_in_containers` (#128) --- parser doesn't parse `# Heading`
+     inside list items / definition items as Header.
+   - Several blockquote/list/definition-list nesting cases where blockquote/list
+     markers on the same line as another container marker aren't recognized
+     (#34, #91, #93, #96, #108, #111). Parser-shape gaps shared across that
+     bucket.
 
-Suggested first session: **#1 (Citations proper)** is still the
-largest single-fix unlock (14 cases) and the heaviest projector
-entry. After Example-list numbering proved the document-level
-counter pre-pass shape (`example_list_start_by_offset`), the
-Citation projector can lean on the same `RefsCtx` pre-pass to
-assign `citationNoteNum` per inline-occurrence. After that, the
-table buckets (#2) are the next largest leverage.
+Suggested first session: **#1 (Citations proper)** is still the largest
+single-fix unlock (14 cases) and the heaviest projector entry. After
+Example-list numbering proved the document-level counter pre-pass shape
+(`example_list_start_by_offset`), the Citation projector can lean on the same
+`RefsCtx` pre-pass to assign `citationNoteNum` per inline-occurrence. After
+that, the table buckets (#2) are the next largest leverage.
 
 ## Don't redo
 
 - The CST → pandoc-native projector is **test-only** at
-  `crates/panache-parser/tests/pandoc/native_projector.rs`. Do not move
-  it under `src/` or wire it into the public API.
+  `crates/panache-parser/tests/pandoc/native_projector.rs`. Do not move it under
+  `src/` or wire it into the public API.
 - Slugifier in the projector is intentionally a copy of
-  `panache-formatter::utils::pandoc_slugify` — the parser crate cannot
-  depend on the formatter crate (would cycle). Keep it inline.
+  `panache-formatter::utils::pandoc_slugify` --- the parser crate cannot depend
+  on the formatter crate (would cycle). Keep it inline.
 - `expected.native` files are pinned to pandoc 3.9.0.2 (see
   `tests/fixtures/pandoc-conformance/.panache-source`). Regenerate via
-  `scripts/update-pandoc-conformance-corpus.sh` only when intentionally
-  bumping pandoc.
+  `scripts/update-pandoc-conformance-corpus.sh` only when intentionally bumping
+  pandoc.
 - The bulk-import script (`import-pandoc-conformance-from-parser-fixtures.sh`)
-  uses leading-zero-stripped IDs to avoid POSIX shell octal interpretation
-  in `$((...))`. Do not refactor it back to direct `$((0025 + 1))`-style
+  uses leading-zero-stripped IDs to avoid POSIX shell octal interpretation in
+  `$((...))`. Do not refactor it back to direct `$((0025 + 1))`-style
   arithmetic.
-- `imported-*` cases live alongside hand-curated cases under
-  `corpus/`. The script wipes prior `*-imported-*` dirs before re-running,
-  so the import is idempotent — but **do not hand-edit** an imported case's
-  `input.md` or `expected.native`. If a hand-curated variant is needed,
-  copy it into a new `<NNNN>-<section>-<slug>/` dir with a non-`imported`
-  section prefix.
-- The reference-link resolver uses a `thread_local!<RefCell<RefsCtx>>`
-  populated at `project()` entry. Cleared at `project()` exit. Do **not**
-  refactor to a parameter-threading model — every projector function
-  takes only `&SyntaxNode`, and the rewrite would touch the entire
-  module for no functional gain.
+- `imported-*` cases live alongside hand-curated cases under `corpus/`. The
+  script wipes prior `*-imported-*` dirs before re-running, so the import is
+  idempotent --- but **do not hand-edit** an imported case's `input.md` or
+  `expected.native`. If a hand-curated variant is needed, copy it into a new
+  `<NNNN>-<section>-<slug>/` dir with a non-`imported` section prefix.
+- The reference-link resolver uses a `thread_local!<RefCell<RefsCtx>>` populated
+  at `project()` entry. Cleared at `project()` exit. Do **not** refactor to a
+  parameter-threading model --- every projector function takes only
+  `&SyntaxNode`, and the rewrite would touch the entire module for no functional
+  gain.
 - Inline-link vs reference-link discrimination uses presence of
-  `LINK_DEST_START` / `IMAGE_DEST_START` *tokens* — not `LINK_DEST` node.
-  An empty `[Empty]()` still has `LINK_DEST_START`, so the token check
-  is the correct discriminator. (Reference-style `[foo][bar]` has no
-  `LINK_DEST_START` at all.)
-- Unresolved reference links emit `Str "[" + text + "]<suffix>"` rather
-  than a `Link` with empty dest, matching pandoc's "preserve original
-  bytes" behavior. Do not switch to `Link ("","")` — it produces a
-  spurious Link node in the output.
-- Reference labels are normalized via `normalize_ref_label()`:
-  unescape ASCII-punct backslash escapes, lowercase, collapse runs of
-  whitespace to one space, trim. Both def labels (raw `LINK_TEXT.text()`
-  with literal escapes) and body labels (mix of TEXT + ESCAPED_CHAR
-  tokens, `text()` already 9-byte raw) feed this same normalizer so
-  they match.
+  `LINK_DEST_START` / `IMAGE_DEST_START` *tokens* --- not `LINK_DEST` node. An
+  empty `[Empty]()` still has `LINK_DEST_START`, so the token check is the
+  correct discriminator. (Reference-style `[foo][bar]` has no `LINK_DEST_START`
+  at all.)
+- Unresolved reference links emit `Str "[" + text + "]<suffix>"` rather than a
+  `Link` with empty dest, matching pandoc's "preserve original bytes" behavior.
+  Do not switch to `Link ("","")` --- it produces a spurious Link node in the
+  output.
+- Reference labels are normalized via `normalize_ref_label()`: unescape
+  ASCII-punct backslash escapes, lowercase, collapse runs of whitespace to one
+  space, trim. Both def labels (raw `LINK_TEXT.text()` with literal escapes) and
+  body labels (mix of TEXT + ESCAPED_CHAR tokens, `text()` already 9-byte raw)
+  feed this same normalizer so they match.
+- Pandoc-native `Double` rendering is *not* the same as Rust's `Display`
+  for `f64`. Use the existing `show_double` helper in the projector (it
+  matches Haskell's `Show Double`: decimal in `[0.1, 1e7)`, scientific
+  outside, `.0` suffix on whole-number mantissas). Don't reach for
+  `format!("{:.16}", x)` or hand-rolled rendering — both diverge from
+  pandoc's `ppShow` output for `ColWidth N`, `citationNoteNum`, etc.
 
 ## Latest session
 
-- **Date**: 2026-05-01 (later)
+- **Date**: 2026-05-01 (tables)
+- **Pass before → after**: 152 → 161 / 187 (+9 imports). All wins are
+  **projector-only** — no parser code was touched. CommonMark allowlist
+  stayed green; full parser-crate suite green; clippy + fmt clean.
+- **What landed (all in `tests/pandoc/native_projector.rs`)**:
+  - **`SIMPLE_TABLE` projector** (`simple_table`,
+    `simple_table_dash_runs`, `simple_table_aligns`,
+    `simple_table_row_cells`, `simple_table_row_is_all_dashes`).
+    Walks `TABLE_HEADER` / `TABLE_SEPARATOR` / `TABLE_ROW` /
+    `TABLE_CAPTION` children. Column boundaries from dash runs in the
+    separator. Alignment derivation via the *flushness* rule: each
+    cell's visible (whitespace-trimmed) `(start_col, end_col)` vs the
+    column's dash-run `(start, end)` — both flush → AlignDefault,
+    left-only → AlignLeft, right-only → AlignRight, neither →
+    AlignCenter (mirrors pandoc's `alignType` in
+    `Markdown.hs::simpleTableHeader`). Headerless variant: derives
+    alignment from the first data row, and drops a trailing all-dashes
+    `TABLE_ROW` (parser-shape quirk: the closing `------` in headerless
+    tables is currently emitted as a row of dash cells). All
+    simple-table widths are `ColWidthDefault` per pandoc
+    (`useDefaultColumnWidths` in `simpleTable`).
+  - **`MULTILINE_TABLE` projector** (`multiline_table`,
+    `multiline_row_cells_blocks`, `char_slice`,
+    `push_plain_text_inlines`). Two `TABLE_SEPARATOR`s (top border +
+    column separator) when a header is present, one when headerless;
+    the column separator is the canonical one for column boundaries.
+    Row content is sliced from raw row text via column ranges and
+    joined with `SoftBreak` between source lines (multi-line cells).
+    Width computation per pandoc `widthsFromIndices`:
+    `width[i] = (col_start[i+1] - col_start[i])` for non-last cols,
+    `width[last] = dashes[last] + 2` (the `indices'` last-index `+1`
+    bump). Normalize by `max(sum(widths), 72)`. Alignment uses the
+    same flushness rule as simple tables (header line 1 only —
+    sufficient for current cases).
+  - **`GRID_TABLE` projector** (`grid_table`, `grid_dash_widths`,
+    `grid_separator_aligns`, `grid_segment_align`). Column widths
+    follow pandoc's `fractionalColumnWidths`:
+    `raw[i] = dashes[i] + 1`, `norm = max(sum(raw) + count - 2, 72)`,
+    `width[i] = raw[i] / norm`. Alignment from the first
+    `:`-bearing separator using the pipe-table rule (left:, :right,
+    :center: → AlignLeft/AlignRight/AlignCenter; otherwise
+    AlignDefault). Each row's cells are taken directly from
+    `TABLE_CELL` children (parser already splits them at `|`
+    boundaries).
+  - **`TableData.widths`** field added to the projector AST: each
+    column carries `Option<f64>` (None → `ColWidthDefault`,
+    Some(w) → `ColWidth w`). `write_table` renders the appropriate
+    form. Pipe-table widths populate as all `None`.
+  - **`show_double` helper**. Renders `f64` like Haskell's `show`:
+    decimal in `[0.1, 1e7)`, scientific outside. Always emits a
+    fractional component (`1.0` not `1`) and a `.0` mantissa for
+    whole-number scientific (`1.0e8`). Matches pandoc's pretty-print
+    of `ColWidth N` exactly (probed: `1/12 = 8.333333333333333e-2`,
+    `1/8 = 0.125`, `11/72 = 0.1527777777777778`).
+- **Cases unlocked** (+9, all allowlisted under `# imported`):
+  - 69 (grid_table_caption_before)
+  - 72 (headerless_table)
+  - 122 (multiline_table_basic)
+  - 123 (multiline_table_caption)
+  - 124 (multiline_table_caption_after)
+  - 125 (multiline_table_headerless)
+  - 127 (multiline_table_single_row)
+  - 169 (simple_table)
+  - 172 (table_with_caption)
+- **Files changed (classified)**:
+  - **projector** (single file): `tests/pandoc/native_projector.rs`
+  - **allowlist**: `tests/pandoc/allowlist.txt` (+9 imported IDs)
+- **Don't redo**:
+  - `simple_table_aligns` operates on the cell's *trimmed-content*
+    range, not the raw `TABLE_CELL` byte range. Multiline-table cells
+    include padding whitespace within the column slice (e.g.
+    `TABLE_CELL@62..73 " Centered  "`); simple-table cells don't
+    (parser splits leading/trailing WHITESPACE out, so cell range
+    already equals trimmed range). Both paths feed the same
+    visible-range computation. Don't switch to raw-range — case 122
+    (`Centered Default Right Left`) regresses to all-Default.
+  - For multiline-table widths, pandoc's `widthsFromIndices` produces
+    `width[last] = dashes[last] + 2` (the indices' last-index `+1`
+    bump compensates for trailing-spaces being excluded). Non-last
+    cols use `dashes[i] + spaces_after[i] = col_start[i+1] -
+    col_start[i]`. The `+2` for last is *not* the same as `dashes+1`;
+    for typical 1-space-between-cols layouts they happen to coincide
+    for non-last cols only by accident. Keep the explicit branch on
+    `i + 1 < cols.len()`.
+  - For grid-table widths: norm = `max(sum_raw + count - 2, 72)`,
+    where `sum_raw = sum(dashes+1)` and `count` = number of cols.
+    This is *not* `max(line_length, 72)` and *not* `max(sum_dashes +
+    count, 72)`. The `- 2` term is from pandoc's code (line 205 of
+    `GridTable.hs`); without it widths come out a few percent too
+    small for wide tables. Verified vs probed pandoc output for the
+    0070 nordics layout (`24/82 = 0.2926...`).
+  - Headerless-simple-table parser quirk: trailing `-------` emitted
+    as a `TABLE_ROW` of dash cells. The projector skips the last row
+    when its non-empty cells are all-dashes
+    (`simple_table_row_is_all_dashes`). Don't try to fix this in the
+    parser as part of a conformance session — it'd require a separate
+    parser-fixture-first change.
+  - Inline content of multiline-table cells goes through
+    `push_plain_text_inlines`, a cheap whitespace-tokenizer that emits
+    `Str` + `Space` only — *no* markdown re-parsing. This is why
+    **#126** (`multiline_table_inline_formatting`) still fails on
+    `**bold**`/`` `code` ``/`[link](url)`. Re-parsing requires feeding
+    the cell text through panache's inline parser; not done in this
+    session.
+  - `show_double` sticks to `format!("{x}")` for the decimal branch
+    and `format!("{x:e}")` for scientific. Rust's default f64 Display
+    happens to match Haskell `show` for `[0.1, 1e7)` and the
+    shortest-round-trip scientific form matches outside that range.
+    Don't switch to a fixed-precision formatter (`{:.16}`); that
+    over-pads and breaks expected output.
+
+## Previous session (2026-05-01, later)
+
 - **Pass before → after**: 147 → 152 / 187 (+5 imports). All wins are
-  **projector-only** again — no parser code was touched this session.
-  CommonMark allowlist stayed green; full parser-crate suite green;
-  clippy + fmt clean.
+  **projector-only** again --- no parser code was touched this session.
+  CommonMark allowlist stayed green; full parser-crate suite green; clippy + fmt
+  clean.
 - **What landed (all in `tests/pandoc/native_projector.rs`)**:
   - **Inline-code whitespace normalization** (`strip_inline_code_padding`).
     Pandoc's `Markdown.hs::code` does `\n` → space then `trim`, with no
-    preservation of edge whitespace beyond what `trim` keeps. The
-    previous "strip a single leading/trailing space if both ends have a
-    space" rule under-stripped (`\`  a  \`` would keep edge spaces).
-    Replaced with `chars().map(|c| if c == '\n' { ' ' } else { c })`
-    then `.trim()`. Internal multi-space runs are still preserved
-    (probed: `\`  a   b  \`` → `Code "a   b"`). Unlocked **#63** —
-    Quarto fence at column 0 (` ```{r} `) is parsed by pandoc as
-    inline code (no language ID after `\`\`\``), and the body
-    `{r}\na <- 1\n` had to collapse to `"{r} a <- 1"`.
-  - **`PANDOC_TITLE_BLOCK` → drop**. Pandoc's `% Title\n% Authors\n%
-    Date` populates Meta and emits *no body block*. Added the
-    `SyntaxKind::PANDOC_TITLE_BLOCK => None` arm in the dispatcher
-    (mirrors the existing `YAML_METADATA => None`). Unlocked **#130**.
-  - **Link/Image attribute attachment** (`extract_attr_from_node`).
-    Parser already attaches a child `ATTRIBUTE` node/token to LINK and
-    IMAGE_LINK for `[text](url){.cls #id key=val}` form, but
-    `render_link_inline` / `render_image_inline` were ignoring it and
-    passing `Attr::default()`. Added an `extract_attr_from_node`
-    helper that reads the `ATTRIBUTE` child and parses via the
-    existing `parse_attr_block`, then applied it to all four
-    code paths (inline link/image with paren dest, reference link/
-    image both ref-resolved and heading-id-resolved). Unlocked
-    **#101**.
-  - **Example-list document-level numbering pre-pass** (`RefsCtx`
-    additions: `example_label_to_num`, `example_list_start_by_offset`).
-    Mirrors the heading-id pre-pass shape. `collect_example_numbering`
-    walks every `LIST` in document order; for each Example list
-    (detected via `list_is_example` reading the first `LIST_MARKER`),
-    records the start counter for the list's offset and increments a
-    shared counter per item. Labeled items (`(@label)`) populate
-    `example_label_to_num`. `ordered_list_attrs` consults the offset
-    map for Example lists so each subsequent list starts where the
-    last left off (rather than restarting at 1). Inline `@label`
-    refs are routed through a new `render_citation_inline` that
-    looks up the label in `example_label_to_num` and emits
-    `Inline::Str(N.to_string())` (just the digits — surrounding
-    parens come from adjacent source `(`/`)` text and our coalescing
-    pass merges them with the digits into a single Str). Unrecognized
-    citations still emit `Unsupported "CITATION"` to keep general
-    citation work visible. Unlocked **#114**.
-  - **`Figure` block** for `+implicit_figures` (`figure_block`,
-    `Block::Figure`). Parser already produces a `FIGURE` block when
-    a paragraph is exactly one image; the projector previously fell
-    through to `Unsupported "FIGURE"`. Added `Block::Figure(Attr,
-    caption_blocks, body_blocks)` with `Caption Nothing
-    [Plain alt-inlines]` shape, body re-inserts the Image as a
-    `Plain` block. Image alt becomes the Figure caption. Image attrs
-    (id only — pandoc keeps classes/kvs on the Image) migrate to the
-    Figure attr. Unlocked **#81**.
+    preservation of edge whitespace beyond what `trim` keeps. The previous
+    "strip a single leading/trailing space if both ends have a space" rule
+    under-stripped (`\` a
+    \``would keep edge spaces).     Replaced with`chars().map(\|c\| if c == '\n'
+    { ' ' } else { c
+    })`then`.trim()`. Internal multi-space runs are still preserved     (probed:`\`
+    a b \``→`Code "a b"`). Unlocked **#63** ---     Quarto fence at column 0 (`
+    \```{r} `) is parsed by pandoc as     inline code (no language ID after `\`\`\``),
+    and the body `{r}\na <- 1\n` had to collapse to `"{r} a <- 1"`.
+  - **`PANDOC_TITLE_BLOCK`→ drop**. Pandoc's `% Title\n% Authors\n%     Date`
+    populates Meta and emits *no body block*. Added the
+    `SyntaxKind::PANDOC_TITLE_BLOCK => None` arm in the dispatcher (mirrors the
+    existing `YAML_METADATA => None`). Unlocked **#130**.
+  - **Link/Image attribute attachment** (`extract_attr_from_node`). Parser
+    already attaches a child `ATTRIBUTE` node/token to LINK and IMAGE_LINK for
+    `[text](url){.cls #id key=val}` form, but `render_link_inline` /
+    `render_image_inline` were ignoring it and passing `Attr::default()`. Added
+    an `extract_attr_from_node` helper that reads the `ATTRIBUTE` child and
+    parses via the existing `parse_attr_block`, then applied it to all four code
+    paths (inline link/image with paren dest, reference link/ image both
+    ref-resolved and heading-id-resolved). Unlocked **#101**.
+  - **Example-list document-level numbering pre-pass** (`RefsCtx` additions:
+    `example_label_to_num`, `example_list_start_by_offset`). Mirrors the
+    heading-id pre-pass shape. `collect_example_numbering` walks every `LIST` in
+    document order; for each Example list (detected via `list_is_example`
+    reading the first `LIST_MARKER`), records the start counter for the list's
+    offset and increments a shared counter per item. Labeled items (`(@label)`)
+    populate `example_label_to_num`. `ordered_list_attrs` consults the offset
+    map for Example lists so each subsequent list starts where the last left off
+    (rather than restarting at 1). Inline `@label` refs are routed through a new
+    `render_citation_inline` that looks up the label in `example_label_to_num`
+    and emits `Inline::Str(N.to_string())` (just the digits --- surrounding
+    parens come from adjacent source `(`/`)` text and our coalescing pass merges
+    them with the digits into a single Str). Unrecognized citations still emit
+    `Unsupported "CITATION"` to keep general citation work visible. Unlocked
+    **#114**.
+  - **`Figure`block** for `+implicit_figures` (`figure_block`, `Block::Figure`).
+    Parser already produces a `FIGURE` block when a paragraph is exactly one
+    image; the projector previously fell through to `Unsupported "FIGURE"`.
+    Added `Block::Figure(Attr,     caption_blocks, body_blocks)` with
+    `Caption Nothing     [Plain alt-inlines]` shape, body re-inserts the Image
+    as a `Plain` block. Image alt becomes the Figure caption. Image attrs (id
+    only --- pandoc keeps classes/kvs on the Image) migrate to the Figure attr.
+    Unlocked **#81**.
 - **Cases unlocked** (+5, all allowlisted under `# imported`):
-  - 63 (fenced_code) — inline-code newline-collapse + trim
-  - 81 (images) — Figure block for image-only paragraph
-  - 101 (links) — `{.cls key=val}` attribute attachment
-  - 114 (lists_example) — document-level Example numbering +
-    `@label` reference resolution
-  - 130 (pandoc_title_block) — drop title block (Meta-bound)
+  - 63 (fenced_code) --- inline-code newline-collapse + trim
+  - 81 (images) --- Figure block for image-only paragraph
+  - 101 (links) --- `{.cls key=val}` attribute attachment
+  - 114 (lists_example) --- document-level Example numbering + `@label`
+    reference resolution
+  - 130 (pandoc_title_block) --- drop title block (Meta-bound)
 - **Files changed (classified)**:
   - **projector** (single file): `tests/pandoc/native_projector.rs`
   - **allowlist**: `tests/pandoc/allowlist.txt` (+5 imported IDs)
 - **Don't redo**:
-  - The inline-code normalization rule is **not** the CommonMark
-    "strip exactly one leading and one trailing space if both ends
-    are spaces" rule. Pandoc fully `trim`s after `\n`→space (probed:
-    `\`  a  \`` → `Code "a"`, `\`  a   b  \`` → `Code "a   b"`).
-    Don't restore the strip-1-each-side logic — it under-strips.
-  - `extract_attr_from_node` reads ATTRIBUTE as either a child
-    *node* or *token* (parser attaches it both ways depending on
-    syntax). Mirrors the heading-attr extraction. Don't switch to
-    a single-form lookup; both shapes exist in the wild.
-  - The Example-list inline reference (`@label` → `Str "N"`) emits
-    *only the digits*. Pandoc's surrounding parens (`(@good)` →
-    `Str "(1)"`) come from adjacent `(` / `)` *source text* that
-    our text-coalescing pass merges with the digit Str. If you try
-    to emit `Str "(N)"` directly you'll double up the parens for
-    `(@good)` and break the bare-`@good` form (which renders as
+  - The inline-code normalization rule is **not** the CommonMark "strip exactly
+    one leading and one trailing space if both ends are spaces" rule. Pandoc
+    fully `trim`s after `\n`→space (probed: `\` a \``→`Code "a"`,`\` a b
+    \``→`Code "a b"\`). Don't restore the strip-1-each-side logic --- it
+    under-strips.
+  - `extract_attr_from_node` reads ATTRIBUTE as either a child *node* or *token*
+    (parser attaches it both ways depending on syntax). Mirrors the heading-attr
+    extraction. Don't switch to a single-form lookup; both shapes exist in the
+    wild.
+  - The Example-list inline reference (`@label` → `Str "N"`) emits *only the
+    digits*. Pandoc's surrounding parens (`(@good)` → `Str "(1)"`) come from
+    adjacent `(` / `)` *source text* that our text-coalescing pass merges with
+    the digit Str. If you try to emit `Str "(N)"` directly you'll double up the
+    parens for `(@good)` and break the bare-`@good` form (which renders as
     `Str "1"` with no parens).
-  - The Example pre-pass uses one global counter across the entire
-    document. Pandoc tracks Example numbering at document scope; do
-    *not* reset per OrderedList. The counter increments per
-    LIST_ITEM, not per LIST, so multi-item lists get sequential
-    numbers (1,2,3) and the next list picks up at 4.
-  - `list_is_example` keys off the *first* item's marker only —
-    pandoc decides list style from the first marker. Don't scan
-    every item; mismatched markers (e.g. first `(@)` then `1.`)
-    are accepted by pandoc as one Example list.
-  - `Figure` body re-wraps the Image as `Plain [Image]` (not bare
-    `Image`). Pandoc-native shape: `Figure attr caption [Plain [
-    Image ... ]]`. The Image's classes/kvs stay on the Image; only
-    the id (when present) moves to the Figure attr.
-  - The `render_citation_inline` fallback path emits
-    `Unsupported "CITATION"` for non-Example labels. Keep this — it
-    keeps real-citation cases visibly failing in `report.txt` so
-    they're easy to find when proper Cite support lands. Don't
-    silently drop unrecognized citations.
+  - The Example pre-pass uses one global counter across the entire document.
+    Pandoc tracks Example numbering at document scope; do *not* reset per
+    OrderedList. The counter increments per LIST_ITEM, not per LIST, so
+    multi-item lists get sequential numbers (1,2,3) and the next list picks up
+    at 4.
+  - `list_is_example` keys off the *first* item's marker only --- pandoc decides
+    list style from the first marker. Don't scan every item; mismatched markers
+    (e.g. first `(@)` then `1.`) are accepted by pandoc as one Example list.
+  - `Figure` body re-wraps the Image as `Plain [Image]` (not bare `Image`).
+    Pandoc-native shape: `Figure attr caption [Plain [     Image ... ]]`. The
+    Image's classes/kvs stay on the Image; only the id (when present) moves to
+    the Figure attr.
+  - The `render_citation_inline` fallback path emits `Unsupported "CITATION"`
+    for non-Example labels. Keep this --- it keeps real-citation cases visibly
+    failing in `report.txt` so they're easy to find when proper Cite support
+    lands. Don't silently drop unrecognized citations.
 
 ## Previous session (2026-05-01)
 
 - **Pass before → after**: 134 → 147 / 187 (+13 imports). All wins are
-  **projector-only** again — no parser code was touched this session.
-  CommonMark allowlist stayed green; full parser-crate suite green;
-  clippy + fmt clean.
+  **projector-only** again --- no parser code was touched this session.
+  CommonMark allowlist stayed green; full parser-crate suite green; clippy + fmt
+  clean.
 - **What landed (all in `tests/pandoc/native_projector.rs`)**:
-  - **Pandoc abbreviations (`+abbreviations` extension).** Added a
-    fixed list of pandoc's default abbrevs (verbatim from
-    `pandoc/data/abbreviations`, ~80 entries) and an
-    `apply_abbreviations` post-pass run after `smart_quote_pairs`
-    inside `coalesce_inlines_inner`. Rule: a `Str` ending in an
-    abbrev followed by `Space` has the `Space` replaced by `\u{a0}`
-    (NBSP) appended to the `Str`, and the next `Str` (if any)
-    merged in. The match is suffix-anchored: the abbrev must end the
-    Str and be preceded by either start-of-Str or a non-letter,
-    non-dot char (matches pandoc's parser behavior where the abbrev
-    is parsed as an isolated token before coalescing). Recurses into
-    `Quoted` content because `Quoted` is built inside
-    `smart_quote_pairs` and bypasses the per-marker
-    `coalesce_inlines_keep_edges` recursion. Unlocked **#152, #157**.
-  - **OrderedList style/delim classifier.** Replaced the
-    always-`Decimal/Period` stub with `classify_ordered_marker` that
-    mirrors pandoc's `anyOrderedListMarker` parser: try `decimal` →
-    `exampleNum` (`@label`) → `defaultNum` (`#`) → `romanOne`
-    (single `i`/`I`) → single-letter alpha → multi-char roman, in
-    that order. Added `roman_to_int` for roman parsing. Delimiters
-    derived from the marker punctuation: `(X)` →
-    `TwoParens`, `X)` → `OneParen`, `X.` → `Period`. `#` style
-    forces `DefaultDelim` regardless of punctuation (per pandoc's
-    `inPeriod`). Unlocked **#117** and contributed to **#116**.
+  - **Pandoc abbreviations (`+abbreviations` extension).** Added a fixed list of
+    pandoc's default abbrevs (verbatim from `pandoc/data/abbreviations`, \~80
+    entries) and an `apply_abbreviations` post-pass run after
+    `smart_quote_pairs` inside `coalesce_inlines_inner`. Rule: a `Str` ending in
+    an abbrev followed by `Space` has the `Space` replaced by `\u{a0}` (NBSP)
+    appended to the `Str`, and the next `Str` (if any) merged in. The match is
+    suffix-anchored: the abbrev must end the Str and be preceded by either
+    start-of-Str or a non-letter, non-dot char (matches pandoc's parser behavior
+    where the abbrev is parsed as an isolated token before coalescing). Recurses
+    into `Quoted` content because `Quoted` is built inside `smart_quote_pairs`
+    and bypasses the per-marker `coalesce_inlines_keep_edges` recursion.
+    Unlocked **#152, #157**.
+  - **OrderedList style/delim classifier.** Replaced the always-`Decimal/Period`
+    stub with `classify_ordered_marker` that mirrors pandoc's
+    `anyOrderedListMarker` parser: try `decimal` → `exampleNum` (`@label`) →
+    `defaultNum` (`#`) → `romanOne` (single `i`/`I`) → single-letter alpha →
+    multi-char roman, in that order. Added `roman_to_int` for roman parsing.
+    Delimiters derived from the marker punctuation: `(X)` → `TwoParens`, `X)` →
+    `OneParen`, `X.` → `Period`. `#` style forces `DefaultDelim` regardless of
+    punctuation (per pandoc's `inPeriod`). Unlocked **#117** and contributed to
+    **#116**.
   - **Task-list checkbox glyph.** `list_item_blocks` now reads the
-    `TASK_CHECKBOX` token from the `LIST_ITEM` and prepends
-    `Str "\u{2610}"` (☐) or `Str "\u{2612}"` (☒) plus a `Space` to
-    the first non-empty `PLAIN`/`PARAGRAPH` content. The checkbox
-    only applies to the first inline-content block per item; later
-    blocks are unchanged. Unlocked **#118, #120, #121**.
-  - **Code-block language normalization.** Added `normalize_lang_id`
-    mirroring pandoc's `toLanguageId`: lowercase, `c++` → `cpp`,
-    `objective-c` → `objectivec`. Applied at both attribute-block
-    and shortcut paths in `code_block_attr`. Unlocked **#113** (in
-    combination with the offset fix).
-  - **Nested-list-item content offset includes leading
-    WHITESPACE.** `list_item_content_offset` previously only counted
-    `LIST_MARKER + WHITESPACE-after-marker`. Nested list items also
-    carry leading WHITESPACE *before* the marker (the outer item's
-    content offset). Including those spaces makes the cumulative
-    offset correct for stripping nested fenced/indented code-block
-    bodies. The CODE_BLOCK arm in `list_item_blocks` now routes
-    *both* fenced and indented code through
-    `indented_code_block_with_extra_strip` so the offset gets
-    stripped uniformly.
-  - **Definition-item loose vs. tight.** `definition_blocks` now
-    takes a `loose` flag set by `is_loose_definition_item`. The
-    rule: a `DEFINITION_ITEM` is loose iff there is a `BLANK_LINE`
-    between its `TERM` and the first `DEFINITION` (per-item, not
-    per-definition). When loose, all `PLAIN` children become `Para`;
-    when tight, they stay `Plain`. Unlocked **#139** and **#179**.
-  - **Raw block via `{=format}` info string.** Added
-    `code_block_raw_format` that detects the pandoc raw-attribute
-    form (info string of the shape `{=fmt}`, no other attrs). When
-    matched, `code_block` and `indented_code_block_with_extra_strip`
-    return `RawBlock(fmt, content)` instead of `CodeBlock`. Unlocked
-    **#40, #140**.
-  - **Tab expansion in code blocks.** Pandoc tab-expands code-block
-    bodies to 4-col tab stops *before* any indent stripping. Added
-    `expand_tabs_to_4` and applied it: in
-    `strip_indented_code_indent` (before the 4-col strip), in
-    `indented_code_block_with_extra_strip` (before the leading-space
-    strip), and in `code_block` for fenced bodies. Unlocked **#83**.
-    Also added `advance_col` so `definition_content_offset` measures
-    in *columns* (with tab-rounding) rather than chars — without
-    this, `:\t` was reading as offset 2 instead of the correct
-    column 4.
+    `TASK_CHECKBOX` token from the `LIST_ITEM` and prepends `Str "\u{2610}"` (☐)
+    or `Str "\u{2612}"` (☒) plus a `Space` to the first non-empty
+    `PLAIN`/`PARAGRAPH` content. The checkbox only applies to the first
+    inline-content block per item; later blocks are unchanged. Unlocked **#118,
+    #120, #121**.
+  - **Code-block language normalization.** Added `normalize_lang_id` mirroring
+    pandoc's `toLanguageId`: lowercase, `c++` → `cpp`, `objective-c` →
+    `objectivec`. Applied at both attribute-block and shortcut paths in
+    `code_block_attr`. Unlocked **#113** (in combination with the offset fix).
+  - **Nested-list-item content offset includes leading WHITESPACE.**
+    `list_item_content_offset` previously only counted
+    `LIST_MARKER + WHITESPACE-after-marker`. Nested list items also carry
+    leading WHITESPACE *before* the marker (the outer item's content offset).
+    Including those spaces makes the cumulative offset correct for stripping
+    nested fenced/indented code-block bodies. The CODE_BLOCK arm in
+    `list_item_blocks` now routes *both* fenced and indented code through
+    `indented_code_block_with_extra_strip` so the offset gets stripped
+    uniformly.
+  - **Definition-item loose vs. tight.** `definition_blocks` now takes a `loose`
+    flag set by `is_loose_definition_item`. The rule: a `DEFINITION_ITEM` is
+    loose iff there is a `BLANK_LINE` between its `TERM` and the first
+    `DEFINITION` (per-item, not per-definition). When loose, all `PLAIN`
+    children become `Para`; when tight, they stay `Plain`. Unlocked **#139** and
+    **#179**.
+  - **Raw block via `{=format}` info string.** Added `code_block_raw_format`
+    that detects the pandoc raw-attribute form (info string of the shape
+    `{=fmt}`, no other attrs). When matched, `code_block` and
+    `indented_code_block_with_extra_strip` return `RawBlock(fmt, content)`
+    instead of `CodeBlock`. Unlocked **#40, #140**.
+  - **Tab expansion in code blocks.** Pandoc tab-expands code-block bodies to
+    4-col tab stops *before* any indent stripping. Added `expand_tabs_to_4` and
+    applied it: in `strip_indented_code_indent` (before the 4-col strip), in
+    `indented_code_block_with_extra_strip` (before the leading-space strip), and
+    in `code_block` for fenced bodies. Unlocked **#83**. Also added
+    `advance_col` so `definition_content_offset` measures in *columns* (with
+    tab-rounding) rather than chars --- without this, `:\t` was reading as
+    offset 2 instead of the correct column 4.
 - **Cases unlocked** (+13, all allowlisted under `# imported`):
-  - 40 (code_blocks_raw) — `{=format}` → RawBlock
-  - 83 (indented_code_mixed_tab_space) — tab expansion
-  - 113 (lists_code) — c++→cpp, nested code offset
-  - 116 (lists_nested) — fell out from list classifier + offset
-  - 117 (lists_ordered) — `#.` DefaultStyle
-  - 118 (lists_task) — task checkbox glyphs
-  - 120 (lists_wrapping_nested) — task checkbox in nested
-  - 121 (lists_wrapping_simple) — task checkbox in simple
-  - 139 (plain_continuation_edge_cases) — definition loose/tight
-  - 140 (raw_blocks) — `{=format}` → RawBlock
-  - 152 (sentence_wrap_abbreviations) — abbreviation NBSP
-  - 157 (sentence_wrap_inline_code_sentence_end) — abbreviation NBSP
-  - 179 (writer_definition_lists_multiblock) — definition loose
+  - 40 (code_blocks_raw) --- `{=format}` → RawBlock
+  - 83 (indented_code_mixed_tab_space) --- tab expansion
+  - 113 (lists_code) --- c++→cpp, nested code offset
+  - 116 (lists_nested) --- fell out from list classifier + offset
+  - 117 (lists_ordered) --- `#.` DefaultStyle
+  - 118 (lists_task) --- task checkbox glyphs
+  - 120 (lists_wrapping_nested) --- task checkbox in nested
+  - 121 (lists_wrapping_simple) --- task checkbox in simple
+  - 139 (plain_continuation_edge_cases) --- definition loose/tight
+  - 140 (raw_blocks) --- `{=format}` → RawBlock
+  - 152 (sentence_wrap_abbreviations) --- abbreviation NBSP
+  - 157 (sentence_wrap_inline_code_sentence_end) --- abbreviation NBSP
+  - 179 (writer_definition_lists_multiblock) --- definition loose
 - **Files changed (classified)**:
   - **projector** (single file): `tests/pandoc/native_projector.rs`
   - **allowlist**: `tests/pandoc/allowlist.txt` (+13 imported IDs)
 - **Don't redo**:
   - The `PANDOC_ABBREVIATIONS` list is a verbatim copy of
-    `pandoc/data/abbreviations`. When pandoc updates that file,
-    refresh — but don't try to derive abbreviations from heuristics
-    (e.g. "ends with `.`"). Pandoc rejects `etc.` and `X.Y.Z.`
-    despite both ending with a dot — the explicit allowlist is
-    load-bearing.
-  - The abbreviation match requires the char preceding the abbrev
-    inside the Str to be neither alphanumeric nor `.`. The `.`
-    exclusion is critical: `a.M.D.` must NOT match (pandoc rejects
-    because its tokenizer parses the whole thing as one Str token,
-    then the result `a.M.D.` isn't in the abbrev set). Don't relax
-    to `!is_alphanumeric()` alone.
-  - `apply_abbreviations` recurses into `Quoted` because Quoted
-    content is built inside `smart_quote_pairs` *after* its source
-    has been coalesced — the parent's abbrev pass won't see Quoted
-    contents. Other inline wrappers (Emph/Strong/Link/Image/Note)
-    have their content built via their own `coalesce_inlines_*`
-    call, so they get the abbrev pass for free. Don't add explicit
-    recursion for those — it'd run twice.
-  - The ordered-list classifier follows pandoc's *parser order*: try
-    decimal first, then example, then default, then romanOne, then
-    single-letter alpha, then multi-char roman. Critical: `i.`
-    becomes `LowerRoman` (not `LowerAlpha`) because `romanOne` runs
-    before `lowerAlpha` in pandoc. Don't reorder. Multi-char
-    lowercase non-roman (e.g. `ab.`) won't reach the classifier
-    because the parser wouldn't accept it as a list marker — the
-    fallback `Decimal` arm exists only to keep the projector
-    rendering rather than panicking on parser-permissive markers.
-  - The task-checkbox glyph is `\u{2610}` (BALLOT BOX) for `[ ]` and
-    `\u{2612}` (BALLOT BOX WITH X) for `[x]` / `[X]`. Pandoc emits
-    them as a single-char `Str` followed by `Space`; do *not* fold
-    the glyph + space into one `Str` (`\u{2612} foo`). Pandoc keeps
-    them separate so it can reflow.
-  - `expand_tabs_to_4` uses 4-column tab stops measured from column
-    0 of each line. The CST already strips outer container offsets
-    *visually*, but the body line text is raw. Don't adjust the
-    starting column — tabs in source columns N still expand based
-    on the real column N, which equals the byte column once we're
-    in CODE_CONTENT (the parser doesn't shift content columns).
-  - `definition_content_offset` returns *columns* (tab-aware), not
-    chars. The strip in `indented_code_block_with_extra_strip`
-    operates on tab-*expanded* body, so the offset must be in
-    columns to match. Don't switch to char-counting; it'll silently
-    over/under-strip on tab-indented definitions.
-  - `code_block_raw_format` requires the info string to be exactly
-    `{=fmt}` with no spaces, classes, ids, or kvs. If pandoc
-    accepts `{=html .extra}` etc. in some future version, this is
-    where to relax — but probe first; current pandoc rejects.
-- **Next**: same as before — **Citations (~14 remaining)** is the
-  largest single-fix unlock but heavy. Smaller leverage targets
-  now:
-  - **#114 lists_example** — needs document-level Example numbering
-    (counter across all OrderedList(_, Example, _) in the doc) plus
-    `(@label)` reference resolution. The `heading_id_by_offset`
-    pre-pass is the right template. Single-case unlock once both
-    pieces land.
-  - **#43/#44/#45 definition list** (3 cases) — multiple parser +
-    projector gaps; #44 in particular has the nested-list-inside-
-    definition offset propagation issue (LIST has leading
-    WHITESPACE sibling that `list_item_content_offset` doesn't
-    see).
-  - **Tables (~13 across simple/headerless/multiline/grid)** — all
-    still gated on parser-shape and projector buildout.
-  - **#115 lists_fancy** — parser too permissive on uppercase
-    markers (`I.` with single space accepted as list).
-  - **Footnotes #66/#67** — definition-list-inside-Note parser
-    shape.
-  - **HTML block coalescence (#78/#181)** — parser splits each
-    `<tag>` line into separate raw blocks under pandoc; we
-    coalesce.
-  - **Misc remaining**: #51 double-backslash math (parser-shape:
-    `\(`/`\[` shouldn't trigger inline parsing), #79
-    ignore_directives, #82 indented-code-after-heading, #128
-    nested-headings-in-containers (parser).
+    `pandoc/data/abbreviations`. When pandoc updates that file, refresh --- but
+    don't try to derive abbreviations from heuristics (e.g. "ends with `.`").
+    Pandoc rejects `etc.` and `X.Y.Z.` despite both ending with a dot --- the
+    explicit allowlist is load-bearing.
+  - The abbreviation match requires the char preceding the abbrev inside the Str
+    to be neither alphanumeric nor `.`. The `.` exclusion is critical: `a.M.D.`
+    must NOT match (pandoc rejects because its tokenizer parses the whole thing
+    as one Str token, then the result `a.M.D.` isn't in the abbrev set). Don't
+    relax to `!is_alphanumeric()` alone.
+  - `apply_abbreviations` recurses into `Quoted` because Quoted content is built
+    inside `smart_quote_pairs` *after* its source has been coalesced --- the
+    parent's abbrev pass won't see Quoted contents. Other inline wrappers
+    (Emph/Strong/Link/Image/Note) have their content built via their own
+    `coalesce_inlines_*` call, so they get the abbrev pass for free. Don't add
+    explicit recursion for those --- it'd run twice.
+  - The ordered-list classifier follows pandoc's *parser order*: try decimal
+    first, then example, then default, then romanOne, then single-letter alpha,
+    then multi-char roman. Critical: `i.` becomes `LowerRoman` (not
+    `LowerAlpha`) because `romanOne` runs before `lowerAlpha` in pandoc. Don't
+    reorder. Multi-char lowercase non-roman (e.g. `ab.`) won't reach the
+    classifier because the parser wouldn't accept it as a list marker --- the
+    fallback `Decimal` arm exists only to keep the projector rendering rather
+    than panicking on parser-permissive markers.
+  - The task-checkbox glyph is `\u{2610}` (BALLOT BOX) for `[ ]` and `\u{2612}`
+    (BALLOT BOX WITH X) for `[x]` / `[X]`. Pandoc emits them as a single-char
+    `Str` followed by `Space`; do *not* fold the glyph + space into one `Str`
+    (`\u{2612} foo`). Pandoc keeps them separate so it can reflow.
+  - `expand_tabs_to_4` uses 4-column tab stops measured from column 0 of each
+    line. The CST already strips outer container offsets *visually*, but the
+    body line text is raw. Don't adjust the starting column --- tabs in source
+    columns N still expand based on the real column N, which equals the byte
+    column once we're in CODE_CONTENT (the parser doesn't shift content
+    columns).
+  - `definition_content_offset` returns *columns* (tab-aware), not chars. The
+    strip in `indented_code_block_with_extra_strip` operates on tab-*expanded*
+    body, so the offset must be in columns to match. Don't switch to
+    char-counting; it'll silently over/under-strip on tab-indented definitions.
+  - `code_block_raw_format` requires the info string to be exactly `{=fmt}` with
+    no spaces, classes, ids, or kvs. If pandoc accepts `{=html .extra}` etc. in
+    some future version, this is where to relax --- but probe first; current
+    pandoc rejects.
+- **Next**: same as before --- **Citations (\~14 remaining)** is the largest
+  single-fix unlock but heavy. Smaller leverage targets now:
+  - **#114 lists_example** --- needs document-level Example numbering (counter
+    across all OrderedList(_, Example, _) in the doc) plus `(@label)` reference
+    resolution. The `heading_id_by_offset` pre-pass is the right template.
+    Single-case unlock once both pieces land.
+  - **#43/#44/#45 definition list** (3 cases) --- multiple parser + projector
+    gaps; #44 in particular has the nested-list-inside- definition offset
+    propagation issue (LIST has leading WHITESPACE sibling that
+    `list_item_content_offset` doesn't see).
+  - **Tables (\~13 across simple/headerless/multiline/grid)** --- all still
+    gated on parser-shape and projector buildout.
+  - **#115 lists_fancy** --- parser too permissive on uppercase markers (`I.`
+    with single space accepted as list).
+  - **Footnotes #66/#67** --- definition-list-inside-Note parser shape.
+  - **HTML block coalescence (#78/#181)** --- parser splits each `<tag>` line
+    into separate raw blocks under pandoc; we coalesce.
+  - **Misc remaining**: #51 double-backslash math (parser-shape: `\(`/`\[`
+    shouldn't trigger inline parsing), #79 ignore_directives, #82
+    indented-code-after-heading, #128 nested-headings-in-containers (parser).
 
 ## Earlier session (2026-05-01, first)
 
 - **Pass before → after**: 123 → 134 / 187 (+11 imports). All wins are
-  **projector-only** again — no parser code was touched this session.
-  CommonMark allowlist stayed green; full parser-crate suite green;
-  clippy + fmt clean.
+  **projector-only** again --- no parser code was touched this session.
+  CommonMark allowlist stayed green; full parser-crate suite green; clippy + fmt
+  clean.
 - **What landed (all in `tests/pandoc/native_projector.rs`)**:
   - **Misc small fixes from recap-#9.**
-    - **#92 (HTML span attrs).** `<span class="rtl">…</span>` was
-      emitted as `Unsupported "BRACKETED_SPAN"`. The parser CST shape
-      was already correct; the projector just needed to (a) read
-      `SPAN_ATTRIBUTES` via `children_with_tokens()` (it's a *token*
-      for HTML form, but a *node* for `[text]{.cls}` form), and (b)
-      parse HTML-style `class="x" id="y" key="z"` attributes via a
-      new `parse_html_attrs` helper. `class` splits on whitespace.
-    - **#29 (autolink scheme allowlist).** `<m:abc>` was projected as
-      a uri Link, but pandoc rejects the autolink (scheme `m` is too
-      short / not in pandoc's known-schemes set) and falls back to
-      `RawInline (Format "html") "<m:abc>"`. Added the full pandoc
-      schemes list (sorted, ~280 entries from
-      `pandoc/src/Text/Pandoc/URI.hs`) and an `is_known_uri_scheme`
-      check. Anything that isn't email *and* isn't a known scheme is
-      now projected as RawInline html.
-    - **#41 (all-space inline code).** `strip_inline_code_padding`
-      wasn't stripping all-whitespace inline code to empty. Pandoc
-      does (`( )` → `Code "" ""`). Added a fast path before the
-      surround-pair-strip arm.
-    - **#87/#88 (link dest URL escaping).** `parse_link_dest` was
-      truncating at the first space (so `[link](/my uri)` lost
-      `uri`) and not stripping angle-bracket wrappers (so
-      `[link](<foo(and(bar)>)` kept the `<…>`). Rewrote to (a) strip
-      `<…>` wrapping, (b) split URL/title only when the trailing
-      whitespace is followed by `"`/`'`/`(`, (c) percent-escape per
-      pandoc's `escapeURI` set: ASCII whitespace + `<>|"{}[]^\``.
-      Backslash and Unicode are preserved (pandoc-tested).
-  - **Heading-id pre-pass (#167).** `***\n---\n` projects as a setext
-    H2 with content `***`, but our slugifier returned `""` (no
-    alphanum), so the id was empty. Pandoc's auto-id falls back to
-    `section` and disambiguates duplicates against ALL prior
-    auto-generated ids (but explicit `{#x}` ids are kept verbatim
-    even on conflict — pandoc only warns). Replaced
-    `fixup_empty_heading_ids` (which only handled bare-marker
-    headings with empty *inlines*) with a `RefsCtx` pre-pass that
-    walks every HEADING in document order, classifies as
-    explicit/auto via `heading_id_with_explicitness`, applies
-    `section`/disambiguation only to auto, and stores the final id
-    in `heading_id_by_offset`. `heading_block` now consults that map
-    instead of slugifying inline.
+    - **#92 (HTML span attrs).** `<span class="rtl">...</span>` was emitted as
+      `Unsupported "BRACKETED_SPAN"`. The parser CST shape was already correct;
+      the projector just needed to (a) read `SPAN_ATTRIBUTES` via
+      `children_with_tokens()` (it's a *token* for HTML form, but a *node* for
+      `[text]{.cls}` form), and (b) parse HTML-style `class="x" id="y" key="z"`
+      attributes via a new `parse_html_attrs` helper. `class` splits on
+      whitespace.
+    - **#29 (autolink scheme allowlist).** `<m:abc>` was projected as a uri
+      Link, but pandoc rejects the autolink (scheme `m` is too short / not in
+      pandoc's known-schemes set) and falls back to
+      `RawInline (Format "html") "<m:abc>"`. Added the full pandoc schemes list
+      (sorted, \~280 entries from `pandoc/src/Text/Pandoc/URI.hs`) and an
+      `is_known_uri_scheme` check. Anything that isn't email *and* isn't a known
+      scheme is now projected as RawInline html.
+    - **#41 (all-space inline code).** `strip_inline_code_padding` wasn't
+      stripping all-whitespace inline code to empty. Pandoc does (`( )` →
+      `Code "" ""`). Added a fast path before the surround-pair-strip arm.
+    - **#87/#88 (link dest URL escaping).** `parse_link_dest` was truncating at
+      the first space (so `[link](/my uri)` lost `uri`) and not stripping
+      angle-bracket wrappers (so `[link](<foo(and(bar)>)` kept the `<...>`).
+      Rewrote to (a) strip `<...>` wrapping, (b) split URL/title only when the
+      trailing whitespace is followed by `"`/`'`/`(`, (c) percent-escape per
+      pandoc's `escapeURI` set: ASCII whitespace + \`<>\|"{}\[\]^\`\`. Backslash
+      and Unicode are preserved (pandoc-tested).
+  - **Heading-id pre-pass (#167).** `***\n---\n` projects as a setext H2 with
+    content `***`, but our slugifier returned `""` (no alphanum), so the id was
+    empty. Pandoc's auto-id falls back to `section` and disambiguates duplicates
+    against ALL prior auto-generated ids (but explicit `{#x}` ids are kept
+    verbatim even on conflict --- pandoc only warns). Replaced
+    `fixup_empty_heading_ids` (which only handled bare-marker headings with
+    empty *inlines*) with a `RefsCtx` pre-pass that walks every HEADING in
+    document order, classifies as explicit/auto via
+    `heading_id_with_explicitness`, applies `section`/disambiguation only to
+    auto, and stores the final id in `heading_id_by_offset`. `heading_block` now
+    consults that map instead of slugifying inline.
   - **Loose-list "blank between blocks of one item" (#105/#107/#158).**
-    `is_loose_list` only checked for blanks *between items* and
-    items containing a `PARAGRAPH`. It missed CommonMark's other
-    half: a list is also loose if any single item directly contains
-    a blank line between two of its block-level children. Added
-    `has_internal_blank_between_blocks` — but with a critical caveat
-    surfaced by #61 (regressed mid-session): bare-marker lines emit
-    an *empty* PLAIN node (NEWLINE only), and pandoc does *not*
-    count that as the "first block". Added `child_is_empty_plain`
-    to skip those. Verified vs `-\n\n  foo` (tight, Plain) and `-
-    bar\n\n  foo` (loose, Para) by probing pandoc directly.
-  - **List-item content offset for indented code (#107/#106).**
-    Indented code blocks inside list items are doubly indented in
-    the CST (item-content offset + the 4-space code-block indent).
-    `list_item_blocks` now computes `list_item_content_offset` and
-    routes non-fenced code through
-    `indented_code_block_with_extra_strip`. The offset rule
-    (verified against pandoc): bare-marker line (no WHITESPACE
-    after LIST_MARKER) → offset = marker width; marker followed by
-    space(s) → offset = marker_width + ws_width.
-  - **Definition body content offset for fenced code (#176).**
-    Same shape as list items: a fenced code block inside a
-    `: …` definition has the body's indent on each content line.
-    Added `definition_content_offset` and threaded it through
-    `definition_blocks`; also generalized
-    `indented_code_block_with_extra_strip` to skip
-    `strip_indented_code_indent` when fenced (the offset strip is
-    sufficient — no extra 4-space removal).
+    `is_loose_list` only checked for blanks *between items* and items containing
+    a `PARAGRAPH`. It missed CommonMark's other half: a list is also loose if
+    any single item directly contains a blank line between two of its
+    block-level children. Added `has_internal_blank_between_blocks` --- but with
+    a critical caveat surfaced by #61 (regressed mid-session): bare-marker lines
+    emit an *empty* PLAIN node (NEWLINE only), and pandoc does *not* count that
+    as the "first block". Added `child_is_empty_plain` to skip those. Verified
+    vs `-\n\n  foo` (tight, Plain) and `-     bar\n\n  foo` (loose, Para) by
+    probing pandoc directly.
+  - **List-item content offset for indented code (#107/#106).** Indented code
+    blocks inside list items are doubly indented in the CST (item-content offset +
+    the 4-space code-block indent). `list_item_blocks` now computes
+    `list_item_content_offset` and routes non-fenced code through
+    `indented_code_block_with_extra_strip`. The offset rule (verified against
+    pandoc): bare-marker line (no WHITESPACE after LIST_MARKER) → offset =
+    marker width; marker followed by space(s) → offset = marker_width +
+    ws_width.
+  - **Definition body content offset for fenced code (#176).** Same shape as
+    list items: a fenced code block inside a `: ...` definition has the body's
+    indent on each content line. Added `definition_content_offset` and threaded
+    it through `definition_blocks`; also generalized
+    `indented_code_block_with_extra_strip` to skip `strip_indented_code_indent`
+    when fenced (the offset strip is sufficient --- no extra 4-space removal).
 - **Cases unlocked** (+11, all allowlisted under `# imported`):
-  - 29 (autolink_strict_validation_pandoc) — known-schemes allowlist
-  - 41 (code_spans) — all-space inline code → empty
-  - 87 (inline_link_dest_angle_brackets_with_parens) — `<…>` strip
-  - 88 (inline_link_dest_strict_pandoc) — space → %20
-  - 92 (issue_175_native_span_unicode_panic) — HTML span attrs
-  - 105 (list_item_blank_line_inside) — internal-blank → loose
-  - 106 (list_item_empty_marker_indented_code_next_line) — bare
-    marker offset
-  - 107 (list_item_indented_code) — list-item code-block strip
-  - 158 (sentence_wrap_lazy_continuation) — fell out from #105
-    (loose-list rule)
-  - 167 (setext_text_thematic_break_pandoc) — `section` fallback
-  - 176 (unicode) — definition fenced-code offset strip
+  - 29 (autolink_strict_validation_pandoc) --- known-schemes allowlist
+  - 41 (code_spans) --- all-space inline code → empty
+  - 87 (inline_link_dest_angle_brackets_with_parens) --- `<...>` strip
+  - 88 (inline_link_dest_strict_pandoc) --- space → %20
+  - 92 (issue_175_native_span_unicode_panic) --- HTML span attrs
+  - 105 (list_item_blank_line_inside) --- internal-blank → loose
+  - 106 (list_item_empty_marker_indented_code_next_line) --- bare marker offset
+  - 107 (list_item_indented_code) --- list-item code-block strip
+  - 158 (sentence_wrap_lazy_continuation) --- fell out from #105 (loose-list
+    rule)
+  - 167 (setext_text_thematic_break_pandoc) --- `section` fallback
+  - 176 (unicode) --- definition fenced-code offset strip
 - **Files changed (classified)**:
   - **projector** (single file): `tests/pandoc/native_projector.rs`
   - **allowlist**: `tests/pandoc/allowlist.txt` (+11 imported IDs)
 - **Don't redo**:
-  - The pandoc URI-scheme allowlist
-    (`PANDOC_KNOWN_SCHEMES`) is a verbatim copy of pandoc's
-    `Text.Pandoc.URI.schemes` (sorted alphabetically for
-    `binary_search`). When pandoc adds/removes a scheme, refresh
-    this list — but don't try to derive it from `Network.URI`
-    parsing rules. The test for "is this a URI autolink?" is *not*
-    RFC3986 conformance; it's "is this scheme in pandoc's
-    allowlist?".
-  - `parse_html_attrs` is intentionally minimal and does *not*
-    handle attribute-value-less keys (e.g. `<input disabled>`).
-    Pandoc's HTML-span reader doesn't need them — adding support
-    would require a different code path. Leave it narrow.
+  - The pandoc URI-scheme allowlist (`PANDOC_KNOWN_SCHEMES`) is a verbatim copy
+    of pandoc's `Text.Pandoc.URI.schemes` (sorted alphabetically for
+    `binary_search`). When pandoc adds/removes a scheme, refresh this list ---
+    but don't try to derive it from `Network.URI` parsing rules. The test for
+    "is this a URI autolink?" is *not* RFC3986 conformance; it's "is this scheme
+    in pandoc's allowlist?".
+  - `parse_html_attrs` is intentionally minimal and does *not* handle
+    attribute-value-less keys (e.g. `<input disabled>`). Pandoc's HTML-span
+    reader doesn't need them --- adding support would require a different code
+    path. Leave it narrow.
   - The percent-escape set in `escape_link_dest` is exactly
-    `isSpace || c \in "<>|\"{}[]^\``" — copied from pandoc's
-    `escapeURI`. Backslash is *not* in the set, even though it
-    would be a syntax-significant char in raw URLs. Don't add
-    backslash without re-probing pandoc — `[a](foo\\bar)` →
-    `"foo\\bar"`, preserved.
-  - The auto-id pre-pass uses `text_range().start()` as the map key
-    (a `u32` since rowan's `TextSize` is u32-based). Don't change
-    the key type — explicit `usize` would conflict with rowan's
-    type. Heading offsets are unique per document.
-  - `child_is_empty_plain` only counts `NEWLINE`/`WHITESPACE` tokens
-    as "empty". Don't broaden to count, e.g., comment-only PLAIN
-    nodes — that's not what pandoc considers empty.
-  - The list-item content offset is *measured*, not assumed: the
-    bare-marker rule (offset = marker_width, no `+1`) is verified
-    against pandoc and matches its behavior, contradicting the
-    naive CommonMark §5.2 reading. Don't refactor to a "marker
-    width + 1" universal rule.
-  - `indented_code_block_with_extra_strip` now branches on
-    `is_fenced` to skip the legacy `strip_indented_code_indent`
-    pass when the block is fenced. The offset strip alone is
-    sufficient for fenced; layering both produces over-strip in
-    nested `: ` + ` ``` ` cases.
-- **Next**: same as before — **Citations (~14 remaining)** is the
-  largest single-fix unlock but heavy. Smaller leverage targets
-  now:
-  - **#43/#44/#45 definition list** (3 cases) — multiple parser
-    + projector gaps; #44 in particular has a fenced code with
-    tabs that lose tab-stops in the projector.
-  - **Tables (~18 across simple/headerless/multiline/grid)** — all
-    still gated on parser-shape and projector buildout.
-  - **Lists (#113/#114/#115/#116/#117/#118 etc.)** — fancy/example/
-    ordered styles still need `LowerRoman`/`UpperAlpha`/`OneParen`/
-    etc. projector entries.
-  - **Footnotes #66/#67** — definition-list-inside-Note parser
-    shape.
-  - **HTML block coalescence (#78/#181)** — parser splits each
-    `<tag>` line into separate raw blocks under pandoc; we
-    coalesce.
-  - **Misc remaining**: #51 double-backslash math (parser-shape:
-    `\(`/`\[` shouldn't trigger inline parsing), #79
-    ignore_directives (block-level `<!-- -->` comment is RawBlock
-    in pandoc but our `<!--…-->` inside lists projects as
-    RawBlock-with-leading-spaces).
-
+    ```isSpace || c \in "<>|\"{}[]^\``" --- copied from pandoc's```escapeURI`. Backslash is *not* in the set, even though it     would be a syntax-significant char in raw URLs. Don't add     backslash without re-probing pandoc ---`[a](foo\\bar)`→`"foo\\bar"\`,
+    preserved.
+  - The auto-id pre-pass uses `text_range().start()` as the map key (a `u32`
+    since rowan's `TextSize` is u32-based). Don't change the key type ---
+    explicit `usize` would conflict with rowan's type. Heading offsets are
+    unique per document.
+  - `child_is_empty_plain` only counts `NEWLINE`/`WHITESPACE` tokens as "empty".
+    Don't broaden to count, e.g., comment-only PLAIN nodes --- that's not what
+    pandoc considers empty.
+  - The list-item content offset is *measured*, not assumed: the bare-marker
+    rule (offset = marker_width, no `+1`) is verified against pandoc and matches
+    its behavior, contradicting the naive CommonMark §5.2 reading. Don't
+    refactor to a "marker width + 1" universal rule.
+  - `indented_code_block_with_extra_strip` now branches on `is_fenced` to skip
+    the legacy `strip_indented_code_indent` pass when the block is fenced. The
+    offset strip alone is sufficient for fenced; layering both produces
+    over-strip in nested `:` + ```` ``` ```` cases.
+- **Next**: same as before --- **Citations (\~14 remaining)** is the largest
+  single-fix unlock but heavy. Smaller leverage targets now:
+  - **#43/#44/#45 definition list** (3 cases) --- multiple parser
+    - projector gaps; #44 in particular has a fenced code with tabs that lose
+      tab-stops in the projector.
+  - **Tables (\~18 across simple/headerless/multiline/grid)** --- all still
+    gated on parser-shape and projector buildout.
+  - **Lists (#113/#114/#115/#116/#117/#118 etc.)** --- fancy/example/ ordered
+    styles still need `LowerRoman`/`UpperAlpha`/`OneParen`/ etc. projector
+    entries.
+  - **Footnotes #66/#67** --- definition-list-inside-Note parser shape.
+  - **HTML block coalescence (#78/#181)** --- parser splits each `<tag>` line
+    into separate raw blocks under pandoc; we coalesce.
+  - **Misc remaining**: #51 double-backslash math (parser-shape: `\(`/`\[`
+    shouldn't trigger inline parsing), #79 ignore_directives (block-level
+    `<!-- -->` comment is RawBlock in pandoc but our `<!--...-->` inside lists
+    projects as RawBlock-with-leading-spaces).

@@ -510,6 +510,8 @@ enum Block {
 struct TableData {
     caption: Vec<Inline>,
     aligns: Vec<&'static str>,
+    /// Per-column width. `None` → `ColWidthDefault`, `Some(f)` → `ColWidth f`.
+    widths: Vec<Option<f64>>,
     head_rows: Vec<Vec<Vec<Block>>>,
     body_rows: Vec<Vec<Vec<Block>>>,
 }
@@ -580,6 +582,9 @@ fn block_from(node: &SyntaxNode) -> Option<Block> {
         SyntaxKind::PANDOC_TITLE_BLOCK => None,
         SyntaxKind::HTML_BLOCK => Some(html_block(node)),
         SyntaxKind::PIPE_TABLE => pipe_table(node).map(Block::Table),
+        SyntaxKind::SIMPLE_TABLE => simple_table(node).map(Block::Table),
+        SyntaxKind::GRID_TABLE => grid_table(node).map(Block::Table),
+        SyntaxKind::MULTILINE_TABLE => multiline_table(node).map(Block::Table),
         SyntaxKind::TEX_BLOCK => Some(tex_block(node)),
         SyntaxKind::FENCED_DIV => Some(fenced_div(node)),
         SyntaxKind::LINE_BLOCK => Some(line_block(node)),
@@ -1295,6 +1300,7 @@ fn pipe_table(node: &SyntaxNode) -> Option<TableData> {
     Some(TableData {
         caption: caption_inlines,
         aligns,
+        widths: vec![None; cols],
         head_rows,
         body_rows,
     })
@@ -1370,6 +1376,525 @@ fn cells_to_plain_blocks(cells: Vec<Vec<Inline>>, cols: usize) -> Vec<Vec<Block>
         out.push(Vec::new());
     }
     out
+}
+
+/// Pandoc-style `show` for `Double`. Decimal in `[0.1, 1e7)`, scientific
+/// otherwise. Always emits a fractional component (`1.0` not `1`). Used for
+/// `ColWidth N` rendering, where N is in `(0.0, 1.0)` for our cases.
+fn show_double(x: f64) -> String {
+    if x == 0.0 {
+        return "0.0".to_string();
+    }
+    let abs = x.abs();
+    if (0.1..1e7).contains(&abs) {
+        let s = format!("{x}");
+        if s.contains('.') || s.contains('e') {
+            s
+        } else {
+            format!("{s}.0")
+        }
+    } else {
+        // Rust's `{:e}` already matches Haskell's mantissa/exponent shape:
+        // `8.333333333333333e-2`. Whole-number mantissa needs `.0` appended.
+        let s = format!("{x:e}");
+        if let Some((m, e)) = s.split_once('e') {
+            if m.contains('.') {
+                s
+            } else {
+                format!("{m}.0e{e}")
+            }
+        } else {
+            s
+        }
+    }
+}
+
+// ----- simple table -------------------------------------------------------
+
+/// Project a `SIMPLE_TABLE` node. Pandoc's "simple" table form:
+///
+/// ```text
+///    Col1     Col2
+/// -------- --------    ← TABLE_SEPARATOR (dash runs define columns)
+///   data1    data2
+///
+/// Table: optional caption
+/// ```
+///
+/// Headerless variant skips the header row and uses dash runs both above
+/// and below the data. Alignment is derived from each header cell's
+/// position relative to its column's dash run boundaries. For headerless
+/// tables, alignment derives from the *first data row*.
+fn simple_table(node: &SyntaxNode) -> Option<TableData> {
+    let separator = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::TABLE_SEPARATOR)?;
+    let cols = simple_table_dash_runs(&separator);
+    if cols.is_empty() {
+        return None;
+    }
+    let header = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::TABLE_HEADER);
+    // Body rows: every TABLE_ROW. Drop a trailing all-dashes row — that is
+    // the closing `---` separator of a headerless table that the parser
+    // currently emits as a TABLE_ROW of dash cells.
+    let mut body_rows_nodes: Vec<SyntaxNode> = node
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::TABLE_ROW)
+        .collect();
+    if header.is_none()
+        && body_rows_nodes
+            .last()
+            .map(simple_table_row_is_all_dashes)
+            .unwrap_or(false)
+    {
+        body_rows_nodes.pop();
+    }
+    // Alignment: from header if present, else from the first data row.
+    let aligns = if let Some(h) = &header {
+        simple_table_aligns(h, &cols)
+    } else if let Some(r0) = body_rows_nodes.first() {
+        simple_table_aligns(r0, &cols)
+    } else {
+        vec!["AlignDefault"; cols.len()]
+    };
+    let head_rows = match &header {
+        Some(h) => {
+            let cells: Vec<Vec<Inline>> = simple_table_row_cells(h);
+            vec![cells_to_plain_blocks(cells, cols.len())]
+        }
+        None => Vec::new(),
+    };
+    let body_rows: Vec<Vec<Vec<Block>>> = body_rows_nodes
+        .iter()
+        .map(|r| cells_to_plain_blocks(simple_table_row_cells(r), cols.len()))
+        .collect();
+    let caption_inlines = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::TABLE_CAPTION)
+        .map(|n| pipe_table_caption(&n))
+        .unwrap_or_default();
+    Some(TableData {
+        caption: caption_inlines,
+        aligns,
+        widths: vec![None; cols.len()],
+        head_rows,
+        body_rows,
+    })
+}
+
+/// Return the `(start_col, end_col)` (inclusive) of each dash run in a
+/// `TABLE_SEPARATOR` node, where columns are 0-based offsets within the
+/// separator's line.
+fn simple_table_dash_runs(separator: &SyntaxNode) -> Vec<(usize, usize)> {
+    let raw = separator.text().to_string();
+    let line = raw.trim_end_matches(['\n', '\r']);
+    let mut runs = Vec::new();
+    let mut start: Option<usize> = None;
+    for (i, ch) in line.char_indices() {
+        if ch == '-' {
+            if start.is_none() {
+                start = Some(i);
+            }
+        } else if let Some(s) = start.take() {
+            runs.push((s, i - 1));
+        }
+    }
+    if let Some(s) = start.take() {
+        runs.push((s, line.len() - 1));
+    }
+    runs
+}
+
+fn simple_table_row_cells(row: &SyntaxNode) -> Vec<Vec<Inline>> {
+    row.children()
+        .filter(|c| c.kind() == SyntaxKind::TABLE_CELL)
+        .filter_map(|cell| {
+            // Skip 0-width parser artifacts (case 0094).
+            if cell.text_range().is_empty() {
+                return None;
+            }
+            Some(coalesce_inlines(inlines_from(&cell)))
+        })
+        .collect()
+}
+
+fn simple_table_row_is_all_dashes(row: &SyntaxNode) -> bool {
+    let mut had_cell = false;
+    for cell in row
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::TABLE_CELL)
+    {
+        let text = cell.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        had_cell = true;
+        if !trimmed.chars().all(|c| c == '-') {
+            return false;
+        }
+    }
+    had_cell
+}
+
+/// Derive alignments for a simple-table header (or first data row) by
+/// comparing each cell's *visible* (whitespace-trimmed) column range to
+/// the corresponding dash run. Multiline-table TABLE_CELL nodes include
+/// the padding whitespace within the column slice, so we have to peel
+/// off leading/trailing whitespace before applying the flushness rule.
+/// (Single-line simple-table cells already exclude padding whitespace,
+/// but the trim is a no-op there.)
+fn simple_table_aligns(row: &SyntaxNode, cols: &[(usize, usize)]) -> Vec<&'static str> {
+    let row_start: u32 = row.text_range().start().into();
+    let mut cell_ranges: Vec<(usize, usize)> = Vec::new();
+    for cell in row
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::TABLE_CELL)
+    {
+        if cell.text_range().is_empty() {
+            continue;
+        }
+        let text = cell.text().to_string();
+        let lstrip = text.chars().take_while(|c| *c == ' ' || *c == '\t').count();
+        let rstrip = text
+            .chars()
+            .rev()
+            .take_while(|c| *c == ' ' || *c == '\t')
+            .count();
+        let trimmed_len = text.chars().count().saturating_sub(lstrip + rstrip);
+        if trimmed_len == 0 {
+            continue;
+        }
+        let start: u32 = cell.text_range().start().into();
+        let s = (start - row_start) as usize;
+        let visible_start = s + lstrip;
+        let visible_end = visible_start + trimmed_len - 1;
+        cell_ranges.push((visible_start, visible_end));
+    }
+    cols.iter()
+        .map(|(col_start, col_end)| {
+            let cell = cell_ranges
+                .iter()
+                .find(|(cs, ce)| ce >= col_start && cs <= col_end);
+            match cell {
+                Some((cs, ce)) => {
+                    let left_flush = cs == col_start;
+                    let right_flush = ce == col_end;
+                    match (left_flush, right_flush) {
+                        (true, true) => "AlignDefault",
+                        (true, false) => "AlignLeft",
+                        (false, true) => "AlignRight",
+                        (false, false) => "AlignCenter",
+                    }
+                }
+                None => "AlignDefault",
+            }
+        })
+        .collect()
+}
+
+// ----- grid table ---------------------------------------------------------
+
+/// Project a `GRID_TABLE` node. Pandoc-native column widths are
+/// `(dash_count + 1) / 72`, where 72 is pandoc's reference width (default
+/// `--columns`). Alignment colons in a `:===:` separator follow the same
+/// rules as pipe tables. We use the *first* alignment-bearing separator —
+/// the one immediately following the header — as the canonical alignment;
+/// pandoc falls back to `AlignDefault` when no separator carries colons.
+fn grid_table(node: &SyntaxNode) -> Option<TableData> {
+    let first_sep = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::TABLE_SEPARATOR)?;
+    let widths = grid_dash_widths(&first_sep);
+    let cols = widths.len();
+    if cols == 0 {
+        return None;
+    }
+    // Alignment separator: scan all separators, prefer one with `:` markers.
+    let mut aligns: Vec<&'static str> = vec!["AlignDefault"; cols];
+    for sep in node
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::TABLE_SEPARATOR)
+    {
+        let raw = sep.text().to_string();
+        if raw.contains(':') {
+            aligns = grid_separator_aligns(&raw, cols);
+            break;
+        }
+    }
+    let header = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::TABLE_HEADER);
+    let head_rows = match &header {
+        Some(h) => {
+            let cells = grid_row_cells(h);
+            vec![cells_to_plain_blocks(cells, cols)]
+        }
+        None => Vec::new(),
+    };
+    let body_rows: Vec<Vec<Vec<Block>>> = node
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::TABLE_ROW)
+        .map(|r| cells_to_plain_blocks(grid_row_cells(&r), cols))
+        .collect();
+    // Caption: a TABLE_CAPTION child of the GRID_TABLE.
+    let caption_inlines = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::TABLE_CAPTION)
+        .map(|n| pipe_table_caption(&n))
+        .unwrap_or_default();
+    Some(TableData {
+        caption: caption_inlines,
+        aligns,
+        widths: widths.into_iter().map(Some).collect(),
+        head_rows,
+        body_rows,
+    })
+}
+
+fn grid_row_cells(row: &SyntaxNode) -> Vec<Vec<Inline>> {
+    row.children()
+        .filter(|c| c.kind() == SyntaxKind::TABLE_CELL)
+        .map(|cell| coalesce_inlines(inlines_from(&cell)))
+        .collect()
+}
+
+/// Compute per-column widths from a grid-table separator like
+/// `+--------+----------+----------+`. The `+` characters delimit
+/// columns; each run of dashes/equals/colons between two `+` is one
+/// column. Pandoc's formula (`Text/Pandoc/Parsing/GridTable.hs::
+/// fractionalColumnWidths`):
+/// ```text
+/// raw[i] = dashes[i] + 1       (include separator width)
+/// norm   = max(sum(raw) + count - 2, 72)   (72 = readerColumns)
+/// width[i] = raw[i] / norm
+/// ```
+fn grid_dash_widths(separator: &SyntaxNode) -> Vec<f64> {
+    let raw_text = separator.text().to_string();
+    let line = raw_text.trim_end_matches(['\n', '\r']);
+    let mut raw: Vec<usize> = Vec::new();
+    let mut count: usize = 0;
+    let mut in_col = false;
+    for ch in line.chars() {
+        match ch {
+            '+' => {
+                if in_col {
+                    raw.push(count + 1);
+                    count = 0;
+                }
+                in_col = true;
+            }
+            _ => {
+                if in_col {
+                    count += 1;
+                }
+            }
+        }
+    }
+    if raw.is_empty() {
+        return Vec::new();
+    }
+    let total: usize = raw.iter().sum();
+    let count = raw.len();
+    let norm = (total + count).saturating_sub(2).max(72) as f64;
+    raw.into_iter().map(|w| w as f64 / norm).collect()
+}
+
+fn grid_separator_aligns(raw: &str, cols: usize) -> Vec<&'static str> {
+    let line = raw.trim_end_matches(['\n', '\r']);
+    let mut aligns: Vec<&'static str> = Vec::with_capacity(cols);
+    let mut col_start: Option<usize> = None;
+    for (i, ch) in line.char_indices() {
+        if ch == '+' {
+            if let Some(s) = col_start.take() {
+                let seg = &line[s..i];
+                aligns.push(grid_segment_align(seg));
+            }
+            col_start = Some(i + 1);
+        }
+    }
+    while aligns.len() < cols {
+        aligns.push("AlignDefault");
+    }
+    aligns.truncate(cols);
+    aligns
+}
+
+fn grid_segment_align(seg: &str) -> &'static str {
+    let bytes = seg.as_bytes();
+    let left = bytes.first() == Some(&b':');
+    let right = bytes.last() == Some(&b':');
+    match (left, right) {
+        (true, true) => "AlignCenter",
+        (true, false) => "AlignLeft",
+        (false, true) => "AlignRight",
+        _ => "AlignDefault",
+    }
+}
+
+// ----- multiline table ----------------------------------------------------
+
+/// Project a `MULTILINE_TABLE` node. Multi-line tables have an opening
+/// `-----` border, an optional header (one or more lines), a
+/// `----- ----- -----` column separator, body rows (each row possibly
+/// spans multiple lines, separated from the next row by a blank line),
+/// and a closing `-----` border. Cell content within a row is joined with
+/// `SoftBreak` between source lines. Column widths are
+/// `(dash_count + 1) / 72`.
+fn multiline_table(node: &SyntaxNode) -> Option<TableData> {
+    // The column-separator (the dashes between header and body) is the
+    // *second* TABLE_SEPARATOR if there is a header, else the first.
+    let separators: Vec<SyntaxNode> = node
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::TABLE_SEPARATOR)
+        .collect();
+    let header = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::TABLE_HEADER);
+    let column_sep = if header.is_some() {
+        separators.get(1).cloned()
+    } else {
+        separators.first().cloned()
+    }?;
+    let cols = simple_table_dash_runs(&column_sep);
+    if cols.is_empty() {
+        return None;
+    }
+    // Per pandoc `widthsFromIndices`: each non-last column's width is
+    // `dashes + spaces_after` (= start of next column - start of this); the
+    // last column's width is `dashes + 1` (the indices' bump). Normalize
+    // by `max(total, 72)`.
+    let raw: Vec<usize> = cols
+        .iter()
+        .enumerate()
+        .map(|(i, (s, e))| {
+            if i + 1 < cols.len() {
+                cols[i + 1].0 - s
+            } else {
+                e - s + 2
+            }
+        })
+        .collect();
+    let total: usize = raw.iter().sum();
+    let norm = (total.max(72)) as f64;
+    let widths: Vec<f64> = raw.into_iter().map(|w| w as f64 / norm).collect();
+    // Alignment from header (if present) or first data row, using the
+    // simple-table flushness rule against the column-separator dash runs.
+    let aligns = if let Some(h) = &header {
+        simple_table_aligns(h, &cols)
+    } else if let Some(r0) = node.children().find(|c| c.kind() == SyntaxKind::TABLE_ROW) {
+        simple_table_aligns(&r0, &cols)
+    } else {
+        vec!["AlignDefault"; cols.len()]
+    };
+    let head_rows = match &header {
+        Some(h) => vec![multiline_row_cells_blocks(h, &cols)],
+        None => Vec::new(),
+    };
+    let body_rows: Vec<Vec<Vec<Block>>> = node
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::TABLE_ROW)
+        .map(|r| multiline_row_cells_blocks(&r, &cols))
+        .collect();
+    let caption_inlines = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::TABLE_CAPTION)
+        .map(|n| pipe_table_caption(&n))
+        .unwrap_or_default();
+    Some(TableData {
+        caption: caption_inlines,
+        aligns,
+        widths: widths.into_iter().map(Some).collect(),
+        head_rows,
+        body_rows,
+    })
+}
+
+/// Slice each line of a multiline-table row by column ranges, then merge
+/// each column's per-line text into a single Plain block with `SoftBreak`s
+/// between source lines.
+fn multiline_row_cells_blocks(row: &SyntaxNode, cols: &[(usize, usize)]) -> Vec<Vec<Block>> {
+    let row_start: u32 = row.text_range().start().into();
+    let raw = row.text().to_string();
+    // Re-construct the row's per-line text. Tokens give us byte offsets, but
+    // plain `.text()` is enough — split on '\n', then for each line, slice by
+    // column ranges.
+    let lines: Vec<&str> = raw.split_inclusive('\n').collect();
+    let mut col_lines: Vec<Vec<String>> = vec![Vec::new(); cols.len()];
+    let mut line_start_offset: usize = 0;
+    for line in lines {
+        let line_no_nl = line.trim_end_matches('\n');
+        if line_no_nl.trim().is_empty() {
+            line_start_offset += line.len();
+            continue;
+        }
+        for (i, &(cs, ce)) in cols.iter().enumerate() {
+            // Slice [cs..=ce] in chars from the line. Lines may be shorter.
+            let slice = char_slice(line_no_nl, cs, ce + 1);
+            let trimmed = slice.trim();
+            if !trimmed.is_empty() {
+                col_lines[i].push(trimmed.to_string());
+            }
+        }
+        line_start_offset += line.len();
+    }
+    let _ = (row_start, line_start_offset);
+    cols.iter()
+        .enumerate()
+        .map(|(i, _)| {
+            let segments = &col_lines[i];
+            if segments.is_empty() {
+                return Vec::new();
+            }
+            // Build inlines: each segment becomes a string parsed via
+            // pandoc-ish Str/Space splitting; SoftBreak between segments.
+            let mut inlines: Vec<Inline> = Vec::new();
+            for (k, seg) in segments.iter().enumerate() {
+                if k > 0 {
+                    inlines.push(Inline::SoftBreak);
+                }
+                push_plain_text_inlines(seg, &mut inlines);
+            }
+            vec![Block::Plain(coalesce_inlines(inlines))]
+        })
+        .collect()
+}
+
+fn char_slice(s: &str, start_char: usize, end_char: usize) -> &str {
+    let mut start_byte = s.len();
+    let mut end_byte = s.len();
+    for (i, (b, _)) in s.char_indices().enumerate() {
+        if i == start_char {
+            start_byte = b;
+        }
+        if i == end_char {
+            end_byte = b;
+            break;
+        }
+    }
+    if start_byte > end_byte {
+        return "";
+    }
+    &s[start_byte..end_byte]
+}
+
+/// Cheap text → inlines splitter for multiline-table cell segments. Splits
+/// on whitespace runs, pushes `Str` for each word and `Space` between
+/// them. Does not parse markdown — multiline cells are typically plain
+/// text. (The body of a multi-line cell is not exposed via the existing
+/// inline pipeline because the parser holds raw TEXT spans across the
+/// whole row, not per-cell.)
+fn push_plain_text_inlines(s: &str, out: &mut Vec<Inline>) {
+    let mut first = true;
+    for word in s.split_whitespace() {
+        if !first {
+            out.push(Inline::Space);
+        }
+        first = false;
+        out.push(Inline::Str(word.to_string()));
+    }
 }
 
 fn list_block(node: &SyntaxNode) -> Block {
@@ -2946,7 +3471,11 @@ fn write_table(data: &TableData, out: &mut String) {
         if i > 0 {
             out.push(',');
         }
-        out.push_str(&format!(" ( {align} , ColWidthDefault )"));
+        let width = data.widths.get(i).copied().unwrap_or(None);
+        match width {
+            None => out.push_str(&format!(" ( {align} , ColWidthDefault )")),
+            Some(w) => out.push_str(&format!(" ( {align} , ColWidth {} )", show_double(w))),
+        }
     }
     out.push_str(" ] ( TableHead ( \"\" , [ ] , [ ] ) [");
     for (i, row) in data.head_rows.iter().enumerate() {
