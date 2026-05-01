@@ -56,15 +56,6 @@ count of currently-failing imports remaining under that bucket in the latest
    shorter Paras. Parser-shape gap in HTML_BLOCK detection: a comment that abuts
    a paragraph boundary should not always start a new block.
 7. **Misc remaining**:
-   - `double_backslash_math` (#51) --- the `^...^` over-permissive
-     whitespace half landed (super/subscript now reject unescaped internal
-     whitespace per pandoc), but #51 still fails on two independent gaps:
-     (a) TeX inline trailing-space inclusion (panache emits `RawInline tex
-     "\\infty"` + `Space`; pandoc emits `RawInline tex "\\infty "` with the
-     space inside the raw inline), and (b) `\\[ ... \\]` is parsed as an
-     unresolved reference Link, whose projection drops the leading space
-     inside LINK_TEXT. Either fix would need to be paired with the other to
-     unlock.
    - `nested_headings_in_containers` (#128) --- parser doesn't parse `# Heading`
      inside list items / definition items as Header.
    - Several blockquote/list/definition-list nesting cases where blockquote/list
@@ -127,6 +118,111 @@ that, the table buckets (#2) are the next largest leverage.
   pandoc's `ppShow` output for `ColWidth N`, `citationNoteNum`, etc.
 
 ## Latest session
+
+- **Date**: 2026-05-01 (tex inline trailing-space + unresolved
+  reference-link edge whitespace)
+- **Pass before → after**: 165 → 166 / 187 (+1 import: #51).
+  Two projector-only fixes that combine to unlock #51
+  (`double_backslash_math`). Both shipped in
+  `crates/panache-parser/tests/pandoc/native_projector.rs`; CST shapes
+  are unchanged so no parser fixture / snapshot updates were needed.
+  CommonMark allowlist green; full parser-crate suite green; full
+  workspace tests green; clippy + fmt clean.
+- **What landed**:
+  - **Tex inline trailing-space absorption (projector-only)** — Pandoc's
+    raw-tex inline reader absorbs trailing horizontal whitespace into a
+    `\letters` command (`\foo bar` → `RawInline tex "\\foo "` + `Str
+    "bar"`). It does **not** absorb when the command ends in `}` (i.e.
+    has brace args: `\frac{a}{b} bar` → `RawInline tex "\\frac{a}{b}"` +
+    `Space` + `Str "bar"`) or in a digit/punct (`\foo123` keeps the run).
+    The discriminator is the last byte of the command text: ASCII letter
+    → absorb, otherwise → don't. New helper
+    `emit_latex_command_with_absorb` checks the next sibling element via
+    a peekable iterator; if it's a `TEXT` token starting with one or
+    more `' '`/`'\t'` bytes, those bytes are appended to the
+    `RawInline` content, the `TEXT` token is consumed, and the
+    remainder is re-emitted via `push_text`. `inlines_from` and
+    `inlines_from_marked` were both converted to peekable iterators
+    that route LATEX_COMMAND through the helper. Verified against
+    pandoc:
+    - `\foo bar` → `RawInline "\\foo "` (absorb)
+    - `\LaTeX bar` → `RawInline "\\LaTeX "` (absorb)
+    - `\frac{a}{b} bar` → `RawInline "\\frac{a}{b}"` + `Space` (no
+      absorb — ends in `}`)
+    - `\LaTeX{} bar` → `RawInline "\\LaTeX{}"` + `Space` (no absorb)
+    - `\foo  bar` → `RawInline "\\foo  "` (multi-space absorb)
+    - `\foo\n bar` → `RawInline "\\foo"` + `SoftBreak` (no absorb across
+      newlines — `NEWLINE` token, not `TEXT`)
+  - **Unresolved reference-link keep_edges (projector-only)** —
+    `render_link_inline` previously trimmed leading/trailing whitespace
+    on the LINK_TEXT inlines for both resolved Links *and* unresolved
+    Str-fallback paths via shared `coalesce_inlines(inlines_from(n))`.
+    Pandoc strips edges on resolved Links but **preserves source
+    whitespace** for unresolved references (`[ foo ]` → `Str "[", Space,
+    Str "foo", Space, Str "]"`). Renamed the resolved-path local to
+    `resolved_text_inlines` and added a separate
+    `unresolved_text_inlines = coalesce_inlines_keep_edges(...)` for the
+    Str-fallback branch. Verified: `[ foo ]` matches pandoc; `[foo]`
+    still coalesces to `Str "[foo]"` via the parent paragraph's
+    coalesce pass merging consecutive Strs.
+  - **Combined effect on #51** — the input
+    `\\[ \int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2} \\]` is
+    parsed by panache as `ESCAPED_CHAR \\\\` + `LINK` (unresolved,
+    `[ ... ]`) + `LINK_TEXT` containing the math fragments. Both fixes
+    are needed: the trailing-space absorption gets `\infty ` correct
+    inside LINK_TEXT, and keep_edges preserves the leading `Space`
+    between `\\[` and `\int`. After parent-level coalesce merges
+    consecutive Strs, the leading `\\` + `[` and trailing `\\` + `]`
+    pairs combine to `Str "\\["` and `Str "\\]"`, matching pandoc's
+    expected shape. The `\\(...\\)` paragraphs (line 11 and 13 of
+    input) work the same way — `\\` is parsed as ESCAPED_CHAR, `(` is
+    just text, no LINK involvement, so only the trailing-space rule
+    matters.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 51 (double_backslash_math)
+- **Files changed (classified)**:
+  - **projector**:
+    `crates/panache-parser/tests/pandoc/native_projector.rs`
+    (new `emit_latex_command_with_absorb` helper; `inlines_from` and
+    `inlines_from_marked` use peekable iterators routing
+    `LATEX_COMMAND` through the helper;
+    `render_link_inline` splits `text_inlines` into
+    `resolved_text_inlines` (trim) and `unresolved_text_inlines`
+    (keep_edges))
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 51)
+- **Don't redo**:
+  - The trailing-space absorption is gated on **last byte is ASCII
+    letter**, not on "no `{...}` arg". The two are equivalent for
+    pandoc's grammar (`\letters` vs `\letters{...}`), but checking the
+    last byte is cheaper and avoids needing to parse the command
+    structure. Verified against pandoc for `\foo`, `\LaTeX`, `\frac{}`,
+    `\LaTeX{}`, `\foo123` — all align with last-byte-letter rule.
+  - The absorption is **only horizontal whitespace** (`' '` and
+    `'\t'`), not newlines. Pandoc keeps `\foo\n` as `RawInline "\\foo"`
+    + `SoftBreak`; the helper peeks at the next token and only matches
+    `TEXT` tokens (not `NEWLINE`), so newline absorption can't happen
+    by accident. Don't widen `bytes[absorbed] == b' ' || b'\t'` to
+    include `b'\n'`.
+  - The peekable-iterator pattern is **load-bearing** in
+    `inlines_from_marked` because the helper consumes the next iterator
+    element when absorbing. Don't refactor back to a
+    `for el in parent.children_with_tokens()` for-loop — the helper
+    requires `&mut iter`. The existing marker-skip arms still work
+    because they're simple non-iter-mutating cases inside the same
+    `match`.
+  - `unresolved_text_inlines` is rebuilt with `keep_edges` rather than
+    re-using `resolved_text_inlines` and re-adding stripped edges. The
+    edge-trimming inside `coalesce_inlines` is destructive (it pops the
+    leading/trailing `Space`/`SoftBreak`), so we can't recover the
+    edges from the trimmed list. Two separate calls is the correct
+    pattern.
+  - Resolved Links keep using `coalesce_inlines` (with trim). Pandoc
+    *does* strip edge whitespace for resolved Links (`[ foo ](url)` →
+    `Link [Str "foo"] ("url", "")`). Don't switch resolved Links to
+    `keep_edges` — that would regress passing cases.
+
+## Earlier session (2026-05-01, multiline-table inline reparse + `~~` empty-subscript fallback)
 
 - **Date**: 2026-05-01 (multiline-table inline reparse + `~~`
   empty-subscript fallback)

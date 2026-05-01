@@ -2255,9 +2255,13 @@ fn child_is_empty_plain(node: &SyntaxNode) -> bool {
 
 fn inlines_from(parent: &SyntaxNode) -> Vec<Inline> {
     let mut out = Vec::new();
-    for el in parent.children_with_tokens() {
+    let mut iter = parent.children_with_tokens().peekable();
+    while let Some(el) = iter.next() {
         match el {
             NodeOrToken::Token(t) => push_token_inline(&t, &mut out),
+            NodeOrToken::Node(n) if n.kind() == SyntaxKind::LATEX_COMMAND => {
+                emit_latex_command_with_absorb(&n, &mut iter, &mut out);
+            }
             NodeOrToken::Node(n) => push_inline_node(&n, &mut out),
         }
     }
@@ -2268,6 +2272,48 @@ fn inlines_from(parent: &SyntaxNode) -> Vec<Inline> {
         out.pop();
     }
     out
+}
+
+/// Pandoc's tex inline reader absorbs trailing horizontal whitespace into the
+/// raw command when (and only when) the command is `\letters` with no brace
+/// arguments — `\foo bar` becomes `RawInline tex "\\foo "` + `Str "bar"`,
+/// while `\frac{a}{b} bar` keeps the space outside (`RawInline tex
+/// "\\frac{a}{b}"` + `Space` + `Str "bar"`). The discriminator is the last
+/// byte of the command text: ASCII letter → absorb, otherwise → don't.
+fn emit_latex_command_with_absorb<I>(
+    node: &SyntaxNode,
+    iter: &mut std::iter::Peekable<I>,
+    out: &mut Vec<Inline>,
+) where
+    I: Iterator<Item = rowan::SyntaxElement<panache_parser::syntax::PanacheLanguage>>,
+{
+    let mut content = node.text().to_string();
+    let ends_in_letter = content
+        .chars()
+        .next_back()
+        .is_some_and(|c| c.is_ascii_alphabetic());
+    if ends_in_letter
+        && let Some(NodeOrToken::Token(t)) = iter.peek()
+        && t.kind() == SyntaxKind::TEXT
+    {
+        let text = t.text().to_string();
+        let bytes = text.as_bytes();
+        let mut absorbed = 0;
+        while absorbed < bytes.len() && (bytes[absorbed] == b' ' || bytes[absorbed] == b'\t') {
+            absorbed += 1;
+        }
+        if absorbed > 0 {
+            content.push_str(&text[..absorbed]);
+            out.push(Inline::RawInline("tex".to_string(), content));
+            iter.next();
+            let remainder = &text[absorbed..];
+            if !remainder.is_empty() {
+                push_text(remainder, out);
+            }
+            return;
+        }
+    }
+    out.push(Inline::RawInline("tex".to_string(), content));
 }
 
 fn push_inline_node(node: &SyntaxNode, out: &mut Vec<Inline>) {
@@ -2393,7 +2439,8 @@ fn inline_from_node(node: &SyntaxNode) -> Inline {
 /// through such marker children but skip their bytes.
 fn inlines_from_marked(parent: &SyntaxNode) -> Vec<Inline> {
     let mut out = Vec::new();
-    for el in parent.children_with_tokens() {
+    let mut iter = parent.children_with_tokens().peekable();
+    while let Some(el) = iter.next() {
         match el {
             NodeOrToken::Token(t) => match t.kind() {
                 SyntaxKind::EMPHASIS_MARKER
@@ -2411,6 +2458,9 @@ fn inlines_from_marked(parent: &SyntaxNode) -> Vec<Inline> {
                 | SyntaxKind::SUPERSCRIPT_MARKER
                 | SyntaxKind::SUBSCRIPT_MARKER
                 | SyntaxKind::MARK_MARKER => {}
+                _ if n.kind() == SyntaxKind::LATEX_COMMAND => {
+                    emit_latex_command_with_absorb(&n, &mut iter, &mut out);
+                }
                 _ => push_inline_node(&n, &mut out),
             },
         }
@@ -2441,7 +2491,7 @@ fn render_link_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
     // Reference-style link: shortcut [label], implicit [label][], or full
     // [text][ref]. Distinguish by presence/contents of LINK_REF.
     let ref_node = node.children().find(|c| c.kind() == SyntaxKind::LINK_REF);
-    let text_inlines = text_node
+    let resolved_text_inlines = text_node
         .as_ref()
         .map(|n| coalesce_inlines(inlines_from(n)))
         .unwrap_or_default();
@@ -2465,7 +2515,7 @@ fn render_link_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
     if let Some((url, title)) = lookup_ref(&label) {
         out.push(Inline::Link(
             extract_attr_from_node(node),
-            text_inlines,
+            resolved_text_inlines,
             url,
             title,
         ));
@@ -2476,7 +2526,7 @@ fn render_link_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
         let url = format!("#{id}");
         out.push(Inline::Link(
             extract_attr_from_node(node),
-            text_inlines,
+            resolved_text_inlines,
             url,
             String::new(),
         ));
@@ -2487,9 +2537,16 @@ fn render_link_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
     // assembles `[<text>]`, optionally followed by `[<ref>]` for a full or
     // implicit reference. Using Str inlines here (rather than Link with empty
     // dest) matches pandoc's behavior of leaving unresolved references as raw
-    // text in the output stream.
+    // text in the output stream. Use keep_edges so leading/trailing whitespace
+    // inside `[ ... ]` survives — pandoc preserves source whitespace for
+    // unresolved references (`[ foo ]` → `Str "[", Space, Str "foo", Space,
+    // Str "]"`), unlike resolved Links which strip edges.
+    let unresolved_text_inlines = text_node
+        .as_ref()
+        .map(|n| coalesce_inlines_keep_edges(inlines_from(n)))
+        .unwrap_or_default();
     out.push(Inline::Str("[".to_string()));
-    out.extend(text_inlines);
+    out.extend(unresolved_text_inlines);
     let suffix = if has_second_brackets {
         format!("][{second_inner}]")
     } else {

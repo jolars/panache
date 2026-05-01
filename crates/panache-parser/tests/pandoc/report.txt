@@ -1,11 +1,11 @@
 Pandoc-native conformance report (pandoc 3.9.0.2)
-165 / 187 cases passing (88.2%)
-22 failing
+166 / 187 cases passing (88.8%)
+21 failing
 0 blocked-list entries
 
 === Per-section pass / fail ===
   block: 12 pass / 0 fail
-  imported: 140 pass / 22 fail
+  imported: 141 pass / 21 fail
   inline: 13 pass / 0 fail
 
 === Passing case ids (allowlist candidates) ===
@@ -54,6 +54,7 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 48
 49
 50
+51
 52
 53
 54
@@ -211,6 +212,7 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 48
 49
 50
+51
 52
 53
 54
@@ -363,9 +365,6 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 # 45 (imported-definition_list_pandoc_loose_compact)
   expected: [ DefinitionList [ ( [ Str "Term" ] , [ [ Plain [ Str "Def" ] ] ] ) , ( [ Str "Term" ] , [ [ Plain [ Str "Def" ] ] , [ Plain [ Str "Def" ] ] ] ) , ( [ Str "Term" ] , [ [ Header 1 ( "heading" , [ ] , [ ] ) [ Str "Heading" ] , Plain [ Str "Continuation" ] ] ] ) , ( [ Str "Term" ] , [ [ BulletList [ [ Plain [ Str "List" ] ] ] ] ] ) ] ]
   got:      [ DefinitionList [ ( [ Str "Term" ] , [ [ Plain [ Str "Def" ] ] ] ) , ( [ Str "Term" ] , [ [ Plain [ Str "Def" ] ] , [ Plain [ Str "Def" ] ] ] ) , ( [ Str "Term" ] , [ [ Header 1 ( "heading" , [ ] , [ ] ) [ Str "Heading" ] , Plain [ Str "Continuation" ] ] ] ) , ( [ Str "Term" ] , [ [ Plain [ Str "-" , Space , Str "List" ] ] ] ) ] ]
-# 51 (imported-double_backslash_math)
-  expected: [ Header 1 ( "double-backslash-math-test" , [ ] , [ ] ) [ Str "Double" , Space , Str "Backslash" , Space , Str "Math" , Space , Str "Test" ] , Para [ Str "Testing" , Space , Str "double" , Space , Str "backslash" , Space , Str "inline" , Space , Str "and" , Space , Str "display" , Space , Str "math" , Space , Str "delimiters." ] , Para [ Str "Inline" , Space , Str "math" , Space , Str "with" , Space , Str "double" , Space , Str "backslash:" , Space , Str "\\(x^2" , Space , Str "+" , Space , Str "y^2" , Space , Str "=" , Space , Str "z^2\\)" , Space , Str "in" , Space , Str "text." ] , Para [ Str "Display" , Space , Str "math" , Space , Str "with" , Space , Str "double" , Space , Str "backslash:" ] , Para [ Str "\\[" , Space , RawInline ( Format "tex" ) "\\int" , Str "_0^" , RawInline ( Format "tex" ) "\\infty " , Str "e" , Superscript [ Str "{-x" ] , Str "2}" , Space , Str "dx" , Space , Str "=" , Space , RawInline ( Format "tex" ) "\\frac{\\sqrt{\\pi}}{2}" , Space , Str "\\]" ] , Para [ Str "More" , Space , Str "inline:" , Space , Str "\\(" , RawInline ( Format "tex" ) "\\alpha " , Str "+" , Space , RawInline ( Format "tex" ) "\\beta " , Str "=" , Space , RawInline ( Format "tex" ) "\\gamma" , Str "\\)" , Space , Str "and" , Space , Str "\\(E" , Space , Str "=" , Space , Str "mc^2\\)." ] , Para [ Str "Inline" , Space , Str "display" , Space , Str "math" , Space , Str "with" , Space , Str "double" , Space , Str "backslash:" , Space , Str "\\[" , Space , Str "E" , Space , Str "=" , Space , Str "mc^2" , Space , Str "\\]" , Space , Str "in" , Space , Str "text." ] ]
-  got:      [ Header 1 ( "double-backslash-math-test" , [ ] , [ ] ) [ Str "Double" , Space , Str "Backslash" , Space , Str "Math" , Space , Str "Test" ] , Para [ Str "Testing" , Space , Str "double" , Space , Str "backslash" , Space , Str "inline" , Space , Str "and" , Space , Str "display" , Space , Str "math" , Space , Str "delimiters." ] , Para [ Str "Inline" , Space , Str "math" , Space , Str "with" , Space , Str "double" , Space , Str "backslash:" , Space , Str "\\(x^2" , Space , Str "+" , Space , Str "y^2" , Space , Str "=" , Space , Str "z^2\\)" , Space , Str "in" , Space , Str "text." ] , Para [ Str "Display" , Space , Str "math" , Space , Str "with" , Space , Str "double" , Space , Str "backslash:" ] , Para [ Str "\\[" , RawInline ( Format "tex" ) "\\int" , Str "_0^" , RawInline ( Format "tex" ) "\\infty" , Space , Str "e" , Superscript [ Str "{-x" ] , Str "2}" , Space , Str "dx" , Space , Str "=" , Space , RawInline ( Format "tex" ) "\\frac{\\sqrt{\\pi}}{2}" , Space , Str "\\]" ] , Para [ Str "More" , Space , Str "inline:" , Space , Str "\\(" , RawInline ( Format "tex" ) "\\alpha" , Space , Str "+" , Space , RawInline ( Format "tex" ) "\\beta" , Space , Str "=" , Space , RawInline ( Format "tex" ) "\\gamma" , Str "\\)" , Space , Str "and" , Space , Str "\\(E" , Space , Str "=" , Space , Str "mc^2\\)." ] , Para [ Str "Inline" , Space , Str "display" , Space , Str "math" , Space , Str "with" , Space , Str "double" , Space , Str "backslash:" , Space , Str "\\[E" , Space , Str "=" , Space , Str "mc^2" , Space , Str "\\]" , Space , Str "in" , Space , Str "text." ] ]
 # 66 (imported-footnote_definition_list)
   expected: [ Header 1 ( "test-definition-list-inside-footnote" , [ ] , [ ] ) [ Str "Test:" , Space , Str "Definition" , Space , Str "list" , Space , Str "inside" , Space , Str "footnote" ] , Para [ Str "Text" , Space , Str "with" , Space , Str "footnote" , Space , Str "reference" , Note [ DefinitionList [ ( [ Str "Footnote" , Space , Str "containing" , Space , Str "a" , Space , Str "definition" , Space , Str "list:" ] , [ [ Para [ Str "First" , Space , Str "definition" ] ] , [ Para [ Str "Second" , Space , Str "definition" , Space , Str "with" , Space , Str "nested" , Space , Str "list:" ] , BulletList [ [ Plain [ Str "Nested" , Space , Str "bullet" , Space , Str "1" ] ] , [ Plain [ Str "Nested" , Space , Str "bullet" , Space , Str "2" ] ] ] ] , [ Para [ Str "Third" , Space , Str "definition" ] ] ] ) ] , Para [ Str "Continuing" , Space , Str "paragraph" , Space , Str "after" , Space , Str "the" , Space , Str "definition" , Space , Str "list." ] ] , Str "." ] ]
   got:      [ Header 1 ( "test-definition-list-inside-footnote" , [ ] , [ ] ) [ Str "Test:" , Space , Str "Definition" , Space , Str "list" , Space , Str "inside" , Space , Str "footnote" ] , Para [ Str "Text" , Space , Str "with" , Space , Str "footnote" , Space , Str "reference" , Note [ Para [ Str "Footnote" , Space , Str "containing" , Space , Str "a" , Space , Str "definition" , Space , Str "list:" ] , DefinitionList [ ( [ ] , [ [ Plain [ Str "First" , Space , Str "definition" ] ] ] ) ] , DefinitionList [ ( [ ] , [ [ Plain [ Str "Second" , Space , Str "definition" , Space , Str "with" , Space , Str "nested" , Space , Str "list:" ] , BulletList [ [ Plain [ Str "Nested" , Space , Str "bullet" , Space , Str "1" ] ] , [ Plain [ Str "Nested" , Space , Str "bullet" , Space , Str "2" ] ] ] ] ] ) ] , DefinitionList [ ( [ ] , [ [ Plain [ Str "Third" , Space , Str "definition" ] ] ] ) ] , Para [ Str "Continuing" , Space , Str "paragraph" , Space , Str "after" , Space , Str "the" , Space , Str "definition" , Space , Str "list." ] ] , Str "." ] ]
