@@ -76,93 +76,94 @@ pub(in crate::parser) struct ListItemEmissionInput<'a> {
 }
 
 /// Parse a Roman numeral (lower or upper case).
-/// Returns (numeral_string, length) if valid, None otherwise.
-fn try_parse_roman_numeral(text: &str, uppercase: bool) -> Option<(String, usize)> {
-    let valid_chars = if uppercase { "IVXLCDM" } else { "ivxlcdm" };
-
-    let count = text
-        .chars()
-        .take_while(|c| valid_chars.contains(*c))
-        .count();
+/// Returns the byte-length of the numeral if valid, None otherwise.
+///
+/// Byte-level and allocation-free. Callers (`try_parse_list_marker` for
+/// fancy-list ordering) hit this on every line, so the prior path —
+/// `to_uppercase` String + repeated `Vec<char>::collect` + an always-
+/// allocated `String` return — was a profile hotspot. All Roman numeral
+/// chars are ASCII; map to canonical-upper byte via `b & !0x20` and
+/// validate without heap traffic. Callers slice the original input
+/// only on a confirmed full match (when the trailing `.` / `)` is
+/// also present), so the `String` cost is moved off the no-match path.
+fn try_parse_roman_numeral(text: &str, uppercase: bool) -> Option<usize> {
+    let bytes = text.as_bytes();
+    // Take while ASCII char is one of `IVXLCDM` (case-folded).
+    let mut count = 0usize;
+    while count < bytes.len() {
+        let b = bytes[count];
+        let valid = if uppercase {
+            matches!(b, b'I' | b'V' | b'X' | b'L' | b'C' | b'D' | b'M')
+        } else {
+            matches!(b, b'i' | b'v' | b'x' | b'l' | b'c' | b'd' | b'm')
+        };
+        if !valid {
+            break;
+        }
+        count += 1;
+    }
 
     if count == 0 {
         return None;
     }
 
-    let numeral = &text[..count];
-    let numeral_upper = numeral.to_uppercase();
-
-    // Only consider chars that are valid Roman numeral symbols
-    // Reject if it contains only non-Roman letters (a-z except i, v, x, l, c, d, m)
-    let has_only_roman_chars = numeral_upper.chars().all(|c| "IVXLCDM".contains(c));
-    if !has_only_roman_chars {
-        return None;
-    }
-
     // For single-character numerals, only accept the most common ones to avoid
     // ambiguity with alphabetic list markers (a-z, A-Z).
-    // Single L, C, D, M are valid Roman numerals but unlikely in list contexts.
     if count == 1 {
-        let ch = numeral_upper.chars().next().unwrap();
-        if !matches!(ch, 'I' | 'V' | 'X') {
+        let upper = bytes[0] & !0x20;
+        if !matches!(upper, b'I' | b'V' | b'X') {
             return None;
         }
     }
 
-    // Validate it's a proper Roman numeral (basic validation)
-    // Must not have more than 3 consecutive same characters (except M)
-    if numeral_upper.contains("IIII")
-        || numeral_upper.contains("XXXX")
-        || numeral_upper.contains("CCCC")
-        || numeral_upper.contains("VV")
-        || numeral_upper.contains("LL")
-        || numeral_upper.contains("DD")
-    {
-        return None;
-    }
-
-    // Must have valid subtractive notation (I before V/X, X before L/C, C before D/M)
-    // V, L, D can never appear before a larger numeral (no subtractive use)
-    let chars: Vec<char> = numeral_upper.chars().collect();
-    for i in 0..chars.len().saturating_sub(1) {
-        let curr = chars[i];
-        let next = chars[i + 1];
-
-        // Get Roman numeral values for comparison
-        let curr_val = match curr {
-            'I' => 1,
-            'V' => 5,
-            'X' => 10,
-            'L' => 50,
-            'C' => 100,
-            'D' => 500,
-            'M' => 1000,
-            _ => return None,
-        };
-        let next_val = match next {
-            'I' => 1,
-            'V' => 5,
-            'X' => 10,
-            'L' => 50,
-            'C' => 100,
-            'D' => 500,
-            'M' => 1000,
-            _ => return None,
-        };
-
-        // Check for invalid subtractive notation
-        if curr_val < next_val {
-            // Subtractive notation - check if it's valid
-            match (curr, next) {
-                ('I', 'V') | ('I', 'X') => {} // Valid: IV=4, IX=9
-                ('X', 'L') | ('X', 'C') => {} // Valid: XL=40, XC=90
-                ('C', 'D') | ('C', 'M') => {} // Valid: CD=400, CM=900
-                _ => return None,             // Invalid subtractive notation
-            }
+    // Reject sequences of >= 4 consecutive same chars (case-insensitive).
+    // Also reject doubled V/L/D (only ever appear once in valid Romans).
+    let mut run_byte = 0u8;
+    let mut run_len = 0usize;
+    for &b in &bytes[..count] {
+        let upper = b & !0x20;
+        if upper == run_byte {
+            run_len += 1;
+        } else {
+            run_byte = upper;
+            run_len = 1;
+        }
+        if (run_len > 3 && matches!(upper, b'I' | b'X' | b'C'))
+            || (run_len > 1 && matches!(upper, b'V' | b'L' | b'D'))
+        {
+            return None;
         }
     }
 
-    Some((numeral.to_string(), count))
+    // Validate subtractive notation: V/L/D can never precede a larger
+    // numeral; I, X, C only precede the next two larger units.
+    fn val(upper: u8) -> u32 {
+        match upper {
+            b'I' => 1,
+            b'V' => 5,
+            b'X' => 10,
+            b'L' => 50,
+            b'C' => 100,
+            b'D' => 500,
+            b'M' => 1000,
+            _ => 0,
+        }
+    }
+    for i in 0..count.saturating_sub(1) {
+        let curr = bytes[i] & !0x20;
+        let next = bytes[i + 1] & !0x20;
+        let cv = val(curr);
+        let nv = val(next);
+        if cv < nv {
+            match (curr, next) {
+                (b'I', b'V') | (b'I', b'X') => {}
+                (b'X', b'L') | (b'X', b'C') => {}
+                (b'C', b'D') | (b'C', b'M') => {}
+                _ => return None,
+            }
+        }
+    }
+    Some(count)
 }
 
 /// Compute (spaces_after_cols, spaces_after_bytes, virtual_marker_space) for a
@@ -331,9 +332,9 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Optio
             // Try Roman numerals first (to avoid ambiguity with letters i, v, x, etc.)
 
             // Try lowercase Roman: (ii)
-            if let Some((numeral, len)) = try_parse_roman_numeral(rest, false)
+            if let Some(len) = try_parse_roman_numeral(rest, false)
                 && rest.len() > len
-                && rest.chars().nth(len) == Some(')')
+                && rest.as_bytes()[len] == b')'
             {
                 let after_marker = &rest[len + 1..];
                 if after_marker.starts_with(' ')
@@ -345,7 +346,7 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Optio
                         marker_spaces_after(after_marker, _indent_cols + marker_len);
                     return Some(ListMarkerMatch {
                         marker: ListMarker::Ordered(OrderedMarker::LowerRoman {
-                            numeral,
+                            numeral: rest[..len].to_string(),
                             style: ListDelimiter::Parens,
                         }),
                         marker_len,
@@ -357,9 +358,9 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Optio
             }
 
             // Try uppercase Roman: (II)
-            if let Some((numeral, len)) = try_parse_roman_numeral(rest, true)
+            if let Some(len) = try_parse_roman_numeral(rest, true)
                 && rest.len() > len
-                && rest.chars().nth(len) == Some(')')
+                && rest.as_bytes()[len] == b')'
             {
                 let after_marker = &rest[len + 1..];
                 if after_marker.starts_with(' ')
@@ -371,7 +372,7 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Optio
                         marker_spaces_after(after_marker, _indent_cols + marker_len);
                     return Some(ListMarkerMatch {
                         marker: ListMarker::Ordered(OrderedMarker::UpperRoman {
-                            numeral,
+                            numeral: rest[..len].to_string(),
                             style: ListDelimiter::Parens,
                         }),
                         marker_len,
@@ -487,12 +488,12 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Optio
         // Try Roman numerals first, as they may overlap with letters
 
         // Try lowercase Roman: i. or ii)
-        if let Some((numeral, len)) = try_parse_roman_numeral(trimmed, false)
+        if let Some(len) = try_parse_roman_numeral(trimmed, false)
             && trimmed.len() > len
-            && let Some(delim) = trimmed.chars().nth(len)
-            && (delim == '.' || delim == ')')
+            && let delim = trimmed.as_bytes()[len]
+            && (delim == b'.' || delim == b')')
         {
-            let style = if delim == '.' {
+            let style = if delim == b'.' {
                 ListDelimiter::Period
             } else {
                 ListDelimiter::RightParen
@@ -507,7 +508,10 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Optio
                 let (spaces_after_cols, spaces_after_bytes, virtual_marker_space) =
                     marker_spaces_after(after_marker, _indent_cols + marker_len);
                 return Some(ListMarkerMatch {
-                    marker: ListMarker::Ordered(OrderedMarker::LowerRoman { numeral, style }),
+                    marker: ListMarker::Ordered(OrderedMarker::LowerRoman {
+                        numeral: trimmed[..len].to_string(),
+                        style,
+                    }),
                     marker_len,
                     spaces_after_cols,
                     spaces_after_bytes,
@@ -517,12 +521,12 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Optio
         }
 
         // Try uppercase Roman: I. or II)
-        if let Some((numeral, len)) = try_parse_roman_numeral(trimmed, true)
+        if let Some(len) = try_parse_roman_numeral(trimmed, true)
             && trimmed.len() > len
-            && let Some(delim) = trimmed.chars().nth(len)
-            && (delim == '.' || delim == ')')
+            && let delim = trimmed.as_bytes()[len]
+            && (delim == b'.' || delim == b')')
         {
-            let style = if delim == '.' {
+            let style = if delim == b'.' {
                 ListDelimiter::Period
             } else {
                 ListDelimiter::RightParen
@@ -537,7 +541,10 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Optio
                 let (spaces_after_cols, spaces_after_bytes, virtual_marker_space) =
                     marker_spaces_after(after_marker, _indent_cols + marker_len);
                 return Some(ListMarkerMatch {
-                    marker: ListMarker::Ordered(OrderedMarker::UpperRoman { numeral, style }),
+                    marker: ListMarker::Ordered(OrderedMarker::UpperRoman {
+                        numeral: trimmed[..len].to_string(),
+                        style,
+                    }),
                     marker_len,
                     spaces_after_cols,
                     spaces_after_bytes,
