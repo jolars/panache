@@ -16,14 +16,12 @@ latest `report.txt`.
    SuppressAuthor, citationNoteNum, citationHash }] [Inline]`. The
    `citationMode` and the 5-field `Citation` record make this the most
    structurally heavy projector entry — but all 16 cases share one fix.
-2. **Footnotes (~22 combined: 11 FOOTNOTE_REFERENCE + 11 FOOTNOTE_DEFINITION,
-   plus 2 INLINE_FOOTNOTE)** — `footnote_*`, `inline_footnotes`,
-   `reference_footnotes`. Projector has no cross-reference resolver: each
-   `FOOTNOTE_REFERENCE` needs to look up its `FOOTNOTE_DEFINITION` body
-   and emit `Note [Block]` inline. The definitions then disappear from
-   the body block list. The reference-link resolver landed this session
-   provides a similar pattern (collect at document level, lookup, emit) —
-   reuse the structure but with FOOTNOTE_DEFINITION bodies as the values.
+2. **Footnotes — DefinitionList-inside-Note (~2 — cases #66, #67)** —
+   the basic Note resolver landed; what remains in this bucket is the
+   parser-shape gap where a definition list inside a footnote body
+   isn't parsed as `DefinitionList`. Parser fix territory, not
+   projector. Citation-case footnote tail (#54-ish) is also gated on
+   Citation, not on footnotes anymore.
 3. **Definition list nesting (~3 — cases #43, #44, #45)** —
    `definition_list_nesting`, `*_pandoc_loose_compact`,
    `definition_list` (the big multi-shape one). Cases with nested bullet
@@ -125,45 +123,65 @@ Either is a high-leverage target.
 ## Latest session
 
 - **Date**: 2026-05-01
-- **Pass before → after**: 103 → 115 / 187 (+12 imports). All wins are
+- **Pass before → after**: 115 → 117 / 187 (+2 imports). All wins are
   **projector-only** — no parser code was touched this session. The
   CommonMark allowlist stayed green; full parser-crate suite green.
 - **What landed (all in `tests/pandoc/native_projector.rs`)**:
-  - Document-level reference resolver. `build_refs_ctx()` walks the
-    full tree (including nested REFERENCE_DEFINITION inside BlockQuote
-    / Div / List), parses each into `(label, url, title)`, stores in a
-    thread_local `RefsCtx`. Also collects HEADING ids for
-    `implicit_header_references` resolution.
-  - `parse_reference_def()` extracts URL+title from the
-    REFERENCE_DEFINITION's tail text, supporting `<bar>(baz)` (angle
-    URL + paren title) and multiline `[label]:\n/url` shapes.
-  - `normalize_ref_label()` does the CommonMark/pandoc label
-    normalization (unescape backslash-escapes, lowercase, collapse
-    whitespace).
-  - Refactored `link_inline`/`image_inline` into
-    `render_link_inline`/`render_image_inline` (push-onto-Vec) so
-    unresolved refs can emit multiple Str inlines (matching pandoc's
-    "preserve original bytes" behavior). `inlines_from` and
-    `inlines_from_marked` route LINK / IMAGE_LINK nodes through these.
-  - Inline-vs-reference discrimination uses `LINK_DEST_START` /
-    `IMAGE_DEST_START` *token* presence (not the `LINK_DEST` node, which
-    is also present empty for `[Empty]()`).
-  - Unresolved shortcut `[label]` falls back to heading-id lookup
-    (`pandoc_slugify(label) ∈ heading_ids`) before emitting plain text.
-- **Cases unlocked**: 12 new imported cases (37, 59, 100, 102, 142,
-  143, 144, 145, 147, 149, 151, 168). All allowlisted.
+  - Footnote resolver. `RefsCtx.footnotes: HashMap<String, Vec<Block>>`
+    populated by `parse_footnote_def()` during `collect_refs_and_headings`,
+    keyed by raw `FOOTNOTE_LABEL_ID` text (case-sensitive, no
+    whitespace collapse — pandoc footnote labels are not normalized
+    like reference labels).
+  - `Inline::Note(Vec<Block>)` variant + `write_inline` arm emitting
+    `Note [<blocks>]`.
+  - `FOOTNOTE_REFERENCE` routed through `footnote_reference_inline()`:
+    looks up label, emits `Inline::Note(blocks)`. Unresolved → falls
+    back to `Str <raw bytes>` (pandoc's preserve-original-bytes
+    behavior, mirroring the unresolved-ref pattern).
+  - `INLINE_FOOTNOTE` (`^[...]`) routed through
+    `inline_footnote_inline()`: parses inner inlines into a single
+    `Para` and emits `Inline::Note([Para[...]])`.
+  - `FOOTNOTE_DEFINITION` blocks return `None` from `block_from` so
+    they're dropped from the body block list (the bodies have already
+    been pulled into the `Note` at the reference site).
+  - Indented code blocks inside a footnote definition (4-space body
+    indent + 4-space code indent = 8 raw spaces in CST) get a
+    targeted extra-4 strip via
+    `indented_code_block_with_extra_strip()` invoked from
+    `parse_footnote_def`. Most other block content (paragraphs,
+    bullet lists) recovers transparently because `coalesce_inlines`
+    trims leading spaces on inline paragraph content.
+  - `clone_block()` and Note arms in `clone_inline` /
+    `inlines_to_plaintext` for the new variant.
+- **Cases unlocked**: 2 imported cases (85 inline_footnotes, 148
+  reference_footnotes). Both allowlisted.
 - **Files changed (classified)**:
   - **projector** (single file): `tests/pandoc/native_projector.rs`
-  - **allowlist**: `tests/pandoc/allowlist.txt` (+12 imported IDs)
+  - **allowlist**: `tests/pandoc/allowlist.txt` (+2 imported IDs)
 - **Don't redo**:
-  - The thread_local state is intentional. Don't refactor to
-    parameter-threading — see "Don't redo" entry above.
-  - Unresolved-ref bytes-preserving behavior is intentional. Don't
-    emit `Link("","")`.
-  - LinkDestStart token (not the LinkDest node) is the
-    inline-vs-reference discriminator.
-- **Next**: pick **#1 (Citations)** for ~16 unlocks, or **#2
-  (Footnotes)** for ~22 unlocks now that the document-level resolver
-  pattern is in place. Footnotes follow the same lookup-table pattern
-  as references, just with Block lists as values instead of (url,
-  title).
+  - Footnote labels are NOT whitespace-collapsed or lowercased like
+    reference labels. Pandoc keys footnotes on the raw label id
+    bytes. The `footnote_label()` helper just reads
+    `FOOTNOTE_LABEL_ID.text()` directly.
+  - The 4-extra-space strip on footnote-internal code blocks lives
+    in `parse_footnote_def`, not in `block_from` or `code_block`,
+    because the strip is *contextual* to "this code block is a
+    direct child of FOOTNOTE_DEFINITION". Don't push the strip down
+    into the generic `code_block` projector — it would break code
+    blocks elsewhere.
+  - `INLINE_FOOTNOTE` body is wrapped in a single `Para`. Pandoc
+    always wraps inline-footnote content as `Note [Para [...]]`,
+    even if the content is empty (then `Note []`).
+  - Cases #66 (`footnote_definition_list`) and #67
+    (`footnote_def_paragraph`) still fail. Both need
+    `DefinitionList` parsing inside a footnote body — that's a
+    parser-shape gap, not a projector gap. Don't try to fix it via
+    the projector.
+- **Next**: pick **#1 (Citations, ~16 unlocks)** as the largest
+  remaining single-fix lever. The Citation native shape is heavier
+  (5-field record + `citationMode` enum), but unlike footnotes/refs
+  every citation case feeds the same projector entry — one fix
+  unlocks the whole bucket. Alternatively, target tables: 5 SIMPLE,
+  6 MULTILINE, 7 GRID share the same projector skeleton (alignment
+  derivation + ColWidth math) — would unlock ~18 cases but needs
+  more careful per-shape work.

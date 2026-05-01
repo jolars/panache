@@ -25,6 +25,10 @@ use rowan::NodeOrToken;
 struct RefsCtx {
     refs: HashMap<String, (String, String)>,
     heading_ids: HashSet<String>,
+    /// Footnote label → parsed body blocks. Lookup keyed by the raw label
+    /// id text (no normalization needed — pandoc footnote labels are
+    /// case-sensitive and not whitespace-collapsed).
+    footnotes: HashMap<String, Vec<Block>>,
 }
 
 thread_local! {
@@ -66,6 +70,11 @@ fn collect_refs_and_headings(node: &SyntaxNode, ctx: &mut RefsCtx) {
                         .or_insert((url, title));
                 }
             }
+            SyntaxKind::FOOTNOTE_DEFINITION => {
+                if let Some((label, blocks)) = parse_footnote_def(&child) {
+                    ctx.footnotes.entry(label).or_insert(blocks);
+                }
+            }
             SyntaxKind::HEADING => {
                 let id = heading_implicit_id(&child);
                 if !id.is_empty() {
@@ -76,6 +85,68 @@ fn collect_refs_and_headings(node: &SyntaxNode, ctx: &mut RefsCtx) {
             _ => collect_refs_and_headings(&child, ctx),
         }
     }
+}
+
+fn parse_footnote_def(node: &SyntaxNode) -> Option<(String, Vec<Block>)> {
+    let label = footnote_label(node)?;
+    let mut blocks = Vec::new();
+    for child in node.children() {
+        // The CST keeps each footnote-body line at its full raw indentation
+        // (the 4-space body indent plus any nested-block indent). Most blocks
+        // recover transparently because `coalesce_inlines` trims leading
+        // spaces on paragraph content, but indented code blocks preserve all
+        // leading whitespace — strip the 4 footnote-body spaces in addition
+        // to the code block's own 4.
+        if child.kind() == SyntaxKind::CODE_BLOCK
+            && !child
+                .children()
+                .any(|c| c.kind() == SyntaxKind::CODE_FENCE_OPEN)
+        {
+            blocks.push(indented_code_block_with_extra_strip(&child, 4));
+        } else if let Some(b) = block_from(&child) {
+            blocks.push(b);
+        }
+    }
+    Some((label, blocks))
+}
+
+fn indented_code_block_with_extra_strip(node: &SyntaxNode, extra: usize) -> Block {
+    let attr = code_block_attr(node);
+    let mut content = String::new();
+    for child in node.children() {
+        if child.kind() == SyntaxKind::CODE_CONTENT {
+            content.push_str(&child.text().to_string());
+        }
+    }
+    while content.ends_with('\n') {
+        content.pop();
+    }
+    content = strip_leading_spaces_per_line(&content, extra);
+    content = strip_indented_code_indent(&content);
+    Block::CodeBlock(attr, content)
+}
+
+fn strip_leading_spaces_per_line(s: &str, n: usize) -> String {
+    let mut out = String::with_capacity(s.len());
+    for (i, line) in s.split('\n').enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        let to_strip = line.chars().take(n).take_while(|&c| c == ' ').count();
+        out.push_str(&line[to_strip..]);
+    }
+    out
+}
+
+fn footnote_label(node: &SyntaxNode) -> Option<String> {
+    for el in node.children_with_tokens() {
+        if let NodeOrToken::Token(t) = el
+            && t.kind() == SyntaxKind::FOOTNOTE_LABEL_ID
+        {
+            return Some(t.text().to_string());
+        }
+    }
+    None
 }
 
 fn parse_reference_def(node: &SyntaxNode) -> Option<(String, String, String)> {
@@ -334,6 +405,7 @@ enum Inline {
     Span(Attr, Vec<Inline>),
     RawInline(String, String),
     Quoted(&'static str, Vec<Inline>),
+    Note(Vec<Block>),
     Unsupported(String),
 }
 
@@ -369,6 +441,9 @@ fn block_from(node: &SyntaxNode) -> Option<Block> {
         // Reference definitions don't appear in pandoc-native output (they
         // resolve into the link they define).
         SyntaxKind::REFERENCE_DEFINITION => None,
+        // Footnote definitions are pulled into Note inlines at the
+        // FOOTNOTE_REFERENCE site; the definition block itself is dropped.
+        SyntaxKind::FOOTNOTE_DEFINITION => None,
         // YAML metadata becomes the document Meta wrapper, not a body block.
         // The projector emits a bare block list, so just drop these.
         SyntaxKind::YAML_METADATA => None,
@@ -1083,6 +1158,8 @@ fn inline_from_node(node: &SyntaxNode) -> Inline {
         SyntaxKind::LATEX_COMMAND => latex_command_inline(node),
         SyntaxKind::BRACKETED_SPAN => bracketed_span_inline(node),
         SyntaxKind::INLINE_HTML => Inline::RawInline("html".to_string(), node.text().to_string()),
+        SyntaxKind::FOOTNOTE_REFERENCE => footnote_reference_inline(node),
+        SyntaxKind::INLINE_FOOTNOTE => inline_footnote_inline(node),
         other => Inline::Unsupported(format!("{other:?}")),
     }
 }
@@ -1312,6 +1389,33 @@ fn autolink_inline(node: &SyntaxNode) -> Inline {
         kvs: Vec::new(),
     };
     Inline::Link(attr, vec![Inline::Str(url.clone())], url, String::new())
+}
+
+fn footnote_reference_inline(node: &SyntaxNode) -> Inline {
+    let Some(label) = footnote_label(node) else {
+        return Inline::Unsupported("FOOTNOTE_REFERENCE".to_string());
+    };
+    let blocks = REFS_CTX.with(|c| {
+        c.borrow()
+            .footnotes
+            .get(&label)
+            .map(|bs| bs.iter().map(clone_block).collect::<Vec<_>>())
+    });
+    match blocks {
+        Some(bs) => Inline::Note(bs),
+        // Unresolved footnote reference: pandoc emits the original bytes as
+        // text rather than a `Note []`. Keep the raw token text for now.
+        None => Inline::Str(node.text().to_string()),
+    }
+}
+
+fn inline_footnote_inline(node: &SyntaxNode) -> Inline {
+    let inlines = coalesce_inlines(inlines_from(node));
+    if inlines.is_empty() {
+        Inline::Note(Vec::new())
+    } else {
+        Inline::Note(vec![Block::Para(inlines)])
+    }
 }
 
 fn parse_link_dest(node: &SyntaxNode) -> (String, String) {
@@ -1583,7 +1687,59 @@ fn clone_inline(inline: &Inline) -> Inline {
         Inline::Span(a, c) => Inline::Span(a.clone(), c.iter().map(clone_inline).collect()),
         Inline::RawInline(f, c) => Inline::RawInline(f.clone(), c.clone()),
         Inline::Quoted(k, c) => Inline::Quoted(k, c.iter().map(clone_inline).collect()),
+        Inline::Note(blocks) => Inline::Note(blocks.iter().map(clone_block).collect()),
         Inline::Unsupported(s) => Inline::Unsupported(s.clone()),
+    }
+}
+
+fn clone_block(b: &Block) -> Block {
+    match b {
+        Block::Para(c) => Block::Para(c.iter().map(clone_inline).collect()),
+        Block::Plain(c) => Block::Plain(c.iter().map(clone_inline).collect()),
+        Block::Header(lvl, a, c) => {
+            Block::Header(*lvl, a.clone(), c.iter().map(clone_inline).collect())
+        }
+        Block::BlockQuote(blocks) => Block::BlockQuote(blocks.iter().map(clone_block).collect()),
+        Block::CodeBlock(a, s) => Block::CodeBlock(a.clone(), s.clone()),
+        Block::HorizontalRule => Block::HorizontalRule,
+        Block::BulletList(items) => Block::BulletList(
+            items
+                .iter()
+                .map(|item| item.iter().map(clone_block).collect())
+                .collect(),
+        ),
+        Block::OrderedList(start, style, delim, items) => Block::OrderedList(
+            *start,
+            style,
+            delim,
+            items
+                .iter()
+                .map(|item| item.iter().map(clone_block).collect())
+                .collect(),
+        ),
+        Block::RawBlock(f, c) => Block::RawBlock(f.clone(), c.clone()),
+        Block::Table(_) => Block::Unsupported("Table".to_string()),
+        Block::Div(a, blocks) => Block::Div(a.clone(), blocks.iter().map(clone_block).collect()),
+        Block::LineBlock(lines) => Block::LineBlock(
+            lines
+                .iter()
+                .map(|line| line.iter().map(clone_inline).collect())
+                .collect(),
+        ),
+        Block::DefinitionList(items) => Block::DefinitionList(
+            items
+                .iter()
+                .map(|(term, defs)| {
+                    (
+                        term.iter().map(clone_inline).collect(),
+                        defs.iter()
+                            .map(|d| d.iter().map(clone_block).collect())
+                            .collect(),
+                    )
+                })
+                .collect(),
+        ),
+        Block::Unsupported(s) => Block::Unsupported(s.clone()),
     }
 }
 
@@ -1679,6 +1835,7 @@ fn inlines_to_plaintext(inlines: &[Inline]) -> String {
             Inline::Span(_, children) => s.push_str(&inlines_to_plaintext(children)),
             Inline::RawInline(_, _) => {}
             Inline::Quoted(_, children) => s.push_str(&inlines_to_plaintext(children)),
+            Inline::Note(_) => {}
             Inline::Unsupported(_) => {}
         }
     }
@@ -1987,6 +2144,11 @@ fn write_inline(inline: &Inline, out: &mut String) {
             out.push_str(kind);
             out.push_str(" [");
             write_inline_list(children, out);
+            out.push_str(" ]");
+        }
+        Inline::Note(blocks) => {
+            out.push_str("Note [");
+            write_block_list(blocks, out);
             out.push_str(" ]");
         }
         Inline::Unsupported(name) => {
