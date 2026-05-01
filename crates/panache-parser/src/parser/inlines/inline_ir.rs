@@ -314,6 +314,21 @@ pub enum LinkKind {
 /// into a single [`IrEvent::Text`] event by the run-flush step.
 pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) -> Vec<IrEvent> {
     let mut events = Vec::new();
+    build_ir_into(text, start, end, config, &mut events);
+    events
+}
+
+/// Like [`build_ir`] but writes into a caller-provided `Vec<IrEvent>`,
+/// clearing it first. Used by [`build_full_plans`] to amortise the
+/// per-call allocation through a thread-local scratch pool.
+pub(super) fn build_ir_into(
+    text: &str,
+    start: usize,
+    end: usize,
+    config: &ParserOptions,
+    events: &mut Vec<IrEvent>,
+) {
+    events.clear();
     let bytes = text.as_bytes();
     let exts = &config.extensions;
     let is_commonmark = config.dialect == crate::options::Dialect::CommonMark;
@@ -333,6 +348,15 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
     // mechanism, see `LinkScanContext.skip_autolinks`).
     let mut pandoc_bracket_extent: usize = 0;
 
+    // Pre-computed byte mask: `mask[b]` is `true` iff byte `b` could
+    // start any IR-recognised construct under the current dialect /
+    // extensions. Used to bulk-skip plain bytes between structural
+    // bytes — the per-byte branch chain below only runs at positions
+    // where a construct is actually possible. Non-ASCII bytes
+    // (>= 0x80) are never structural and are skipped together with
+    // ASCII plain text.
+    let mask = build_ir_byte_mask(config);
+
     macro_rules! flush_text {
         () => {
             if pos > text_run_start {
@@ -345,6 +369,14 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
     }
 
     while pos < end {
+        // Fast-skip plain bytes. `text_run_start` is preserved across
+        // the skip so the next structural-event flush picks them up.
+        while pos < end && !mask[bytes[pos] as usize] {
+            pos += 1;
+        }
+        if pos >= end {
+            break;
+        }
         let b = bytes[pos];
 
         // Pandoc-only: at `[` or `![`, look ahead to see if this
@@ -732,7 +764,86 @@ pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) ->
     }
 
     flush_text!();
-    events
+}
+
+/// Build a 256-entry mask: `mask[b]` is `true` iff byte `b` could start
+/// any IR-recognised construct under the current dialect / extensions.
+///
+/// This is the build-IR-specific superset of "is this byte interesting".
+/// Plain bytes between structural bytes are bulk-skipped via this mask
+/// in the [`build_ir`] hot loop; missing a byte here is a correctness
+/// bug (we'd skip past a real construct), but having extras only costs
+/// us a wasted branch round-trip.
+fn build_ir_byte_mask(config: &ParserOptions) -> [bool; 256] {
+    let mut mask = [false; 256];
+    let exts = &config.extensions;
+    let is_commonmark = config.dialect == crate::options::Dialect::CommonMark;
+
+    // Always structural for IR scanning:
+    //   `\n` / `\r` — soft / hard breaks
+    //   `\\`        — escape, hard line break, backslash math
+    //   `` ` ``     — code span (IR construct)
+    //   `*` / `_`   — emphasis delim runs (IR core)
+    mask[b'\n' as usize] = true;
+    mask[b'\r' as usize] = true;
+    mask[b'\\' as usize] = true;
+    mask[b'`' as usize] = true;
+    mask[b'*' as usize] = true;
+    mask[b'_' as usize] = true;
+
+    // Brackets: scanned whenever any bracket-shaped construct is
+    // reachable. `]` is structural unconditionally if `[` is — the IR
+    // emits a CloseBracket event regardless of which opener variant
+    // matches. `!` is gated on image-producing extensions; the leading
+    // `!` of `![alt]` is the only image entry point.
+    if exts.inline_links
+        || exts.reference_links
+        || exts.inline_images
+        || exts.bracketed_spans
+        || exts.footnotes
+        || exts.citations
+    {
+        mask[b'[' as usize] = true;
+        mask[b']' as usize] = true;
+    }
+    if exts.inline_images || exts.reference_links {
+        mask[b'!' as usize] = true;
+    }
+
+    // `<` covers autolinks, raw HTML, and Pandoc native spans.
+    if exts.autolinks || exts.raw_html || (!is_commonmark && exts.native_spans) {
+        mask[b'<' as usize] = true;
+    }
+
+    // `^` covers Pandoc inline footnotes (`^[...]` recognised in IR
+    // under Pandoc dialect). CM dialect inline footnotes go through
+    // the dispatcher, not the IR.
+    if !is_commonmark && exts.inline_footnotes {
+        mask[b'^' as usize] = true;
+    }
+
+    // `@` covers Pandoc bare citation `@key` and `[@cite]`. The leading
+    // `[` of `[@cite]` is already in the mask via the bracket gate;
+    // gating `@` here also covers the bare-citation form.
+    if !is_commonmark && (exts.citations || exts.quarto_crossrefs) {
+        mask[b'@' as usize] = true;
+        // `-` only matters as the first byte of `-@cite`. Tracking it
+        // here avoids missing the suppress-author bare citation form.
+        mask[b'-' as usize] = true;
+    }
+
+    // `$` covers Pandoc dollar / GFM math. CM doesn't recognise math
+    // in `build_ir`.
+    if !is_commonmark
+        && (exts.tex_math_dollars
+            || exts.tex_math_gfm
+            || exts.tex_math_single_backslash
+            || exts.tex_math_double_backslash)
+    {
+        mask[b'$' as usize] = true;
+    }
+
+    mask
 }
 
 // ============================================================================
@@ -2295,7 +2406,13 @@ pub fn build_full_plans(
     end: usize,
     config: &ParserOptions,
 ) -> InlinePlans {
-    let mut events = build_ir(text, start, end, config);
+    let mut scratch = ScratchEvents::checkout();
+    let bundle = scratch.inner.as_mut().unwrap();
+    bundle.events.clear();
+    bundle.bracket_pairs.clear();
+    bundle.excluded.clear();
+
+    build_ir_into(text, start, end, config, &mut bundle.events);
     // §6.3 bracket resolution runs for both dialects. Under CommonMark
     // it enforces refdef-aware shortcut/collapsed/full-ref resolution
     // and the §6.3 link-in-link deactivation rule. Under Pandoc it
@@ -2304,7 +2421,7 @@ pub fn build_full_plans(
     // nested links and the dispatcher's `suppress_inner_links` flag
     // suppresses inner LINK emission during LINK-text recursion.
     process_brackets(
-        &mut events,
+        &mut bundle.events,
         text,
         config.refdef_labels.as_ref(),
         config.dialect,
@@ -2316,21 +2433,28 @@ pub fn build_full_plans(
     // ordering matters: an outer link wraps emphasis that wraps an inner
     // link, and the inner link's inner range must be paired before the
     // outer's inner range so the top-level pass sees consistent state.
-    let mut bracket_pairs: Vec<(usize, usize)> = events
-        .iter()
-        .enumerate()
-        .filter_map(|(i, ev)| match ev {
-            IrEvent::OpenBracket {
-                resolution: Some(res),
-                ..
-            } => Some((i, res.close_event as usize)),
-            _ => None,
-        })
-        .collect();
+    bundle.bracket_pairs.extend(
+        bundle
+            .events
+            .iter()
+            .enumerate()
+            .filter_map(|(i, ev)| match ev {
+                IrEvent::OpenBracket {
+                    resolution: Some(res),
+                    ..
+                } => Some((i, res.close_event as usize)),
+                _ => None,
+            }),
+    );
     // Innermost-first: sort by close_idx ascending, then open_idx descending.
-    bracket_pairs.sort_by(|a, b| a.1.cmp(&b.1).then(b.0.cmp(&a.0)));
-    for &(open_idx, close_idx) in &bracket_pairs {
-        process_emphasis_in_range(&mut events, open_idx + 1, close_idx, config.dialect);
+    bundle
+        .bracket_pairs
+        .sort_by(|a, b| a.1.cmp(&b.1).then(b.0.cmp(&a.0)));
+    // Iterate pairs by index so we can hold &mut bundle.events while
+    // reading bundle.bracket_pairs (split borrow on disjoint fields).
+    for i in 0..bundle.bracket_pairs.len() {
+        let (open_idx, close_idx) = bundle.bracket_pairs[i];
+        process_emphasis_in_range(&mut bundle.events, open_idx + 1, close_idx, config.dialect);
     }
 
     // Build exclusion bitmap: any delim run whose event index lies inside
@@ -2338,22 +2462,89 @@ pub fn build_full_plans(
     // implements the §6.3 boundary rule: emphasis at the top level must
     // not pair across a link's brackets, even when one side is inside the
     // link text and the other is outside.
-    let mut excluded: Vec<bool> = vec![false; events.len()];
-    for &(open_idx, close_idx) in &bracket_pairs {
-        for slot in excluded.iter_mut().take(close_idx).skip(open_idx + 1) {
+    bundle.excluded.resize(bundle.events.len(), false);
+    for &(open_idx, close_idx) in &bundle.bracket_pairs {
+        for slot in bundle
+            .excluded
+            .iter_mut()
+            .take(close_idx)
+            .skip(open_idx + 1)
+        {
             *slot = true;
         }
     }
 
     // Top-level emphasis pass: handles delim runs that fall outside any
     // resolved bracket pair.
-    let len = events.len();
-    process_emphasis_in_range_filtered(&mut events, 0, len, Some(&excluded), config.dialect);
+    let len = bundle.events.len();
+    process_emphasis_in_range_filtered(
+        &mut bundle.events,
+        0,
+        len,
+        Some(&bundle.excluded),
+        config.dialect,
+    );
 
     InlinePlans {
-        emphasis: build_emphasis_plan(&events),
-        brackets: build_bracket_plan(&events),
-        constructs: build_construct_plan(&events),
+        emphasis: build_emphasis_plan(&bundle.events),
+        brackets: build_bracket_plan(&bundle.events),
+        constructs: build_construct_plan(&bundle.events),
+    }
+}
+
+/// Thread-local pool of scratch buffers used by [`build_full_plans`].
+///
+/// `build_full_plans` checks out one bundle for the duration of the call
+/// and returns it on drop so the next call (or a recursive nested call
+/// from an inline emitter) reuses the allocations. The pool is
+/// per-thread — the parser is single-threaded — and bounded so a
+/// long-running editor session can't accumulate stale capacity.
+struct ScratchEvents {
+    inner: Option<ScratchBundle>,
+}
+
+#[derive(Default)]
+struct ScratchBundle {
+    events: Vec<IrEvent>,
+    bracket_pairs: Vec<(usize, usize)>,
+    excluded: Vec<bool>,
+}
+
+thread_local! {
+    static IR_EVENT_POOL: std::cell::RefCell<Vec<ScratchBundle>> =
+        std::cell::RefCell::new(Vec::new());
+}
+
+impl ScratchEvents {
+    fn checkout() -> Self {
+        let bundle = IR_EVENT_POOL
+            .with(|p| p.borrow_mut().pop())
+            .unwrap_or_default();
+        Self {
+            inner: Some(bundle),
+        }
+    }
+}
+
+impl Drop for ScratchEvents {
+    fn drop(&mut self) {
+        if let Some(mut bundle) = self.inner.take() {
+            bundle.events.clear();
+            bundle.bracket_pairs.clear();
+            bundle.excluded.clear();
+            // Cap pool depth at 8 (deepest realistic nested-link recursion)
+            // and drop any bundle whose `events` grew past 8K (a single
+            // pathological paragraph shouldn't pin a huge allocation
+            // forever).
+            if bundle.events.capacity() <= 8192 {
+                IR_EVENT_POOL.with(|p| {
+                    let mut pool = p.borrow_mut();
+                    if pool.len() < 8 {
+                        pool.push(bundle);
+                    }
+                });
+            }
+        }
     }
 }
 

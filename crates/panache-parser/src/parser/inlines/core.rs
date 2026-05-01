@@ -83,6 +83,12 @@ pub fn parse_inline_text_recursive(
         text.len()
     );
 
+    let mask = structural_byte_mask(config);
+    if try_emit_plain_text_fast_path_with_mask(builder, text, &mask) {
+        log::trace!("Recursive inline parsing complete (plain-text fast path)");
+        return;
+    }
+
     let plans = super::inline_ir::build_full_plans(text, 0, text.len(), config);
     parse_inline_range_impl(
         text,
@@ -95,6 +101,7 @@ pub fn parse_inline_text_recursive(
         &plans.brackets,
         &plans.constructs,
         false,
+        &mask,
     );
 
     log::trace!("Recursive inline parsing complete");
@@ -126,6 +133,11 @@ pub fn parse_inline_text(
         text.len()
     );
 
+    let mask = structural_byte_mask(config);
+    if try_emit_plain_text_fast_path_with_mask(builder, text, &mask) {
+        return;
+    }
+
     let plans = super::inline_ir::build_full_plans(text, 0, text.len(), config);
     parse_inline_range_impl(
         text,
@@ -138,7 +150,146 @@ pub fn parse_inline_text(
         &plans.brackets,
         &plans.constructs,
         suppress_inner_links,
+        &mask,
     );
+}
+
+/// Plain-text fast path for inline ranges with no structural bytes.
+///
+/// Returns `true` if the range was emitted as a single `TEXT` token and
+/// the caller should skip the IR + dispatcher pipeline. Returns `false`
+/// if any structural byte appears (or the range is empty), letting the
+/// caller proceed normally. Empty input returns `false` so the caller's
+/// existing "no events → no output" path is preserved exactly.
+///
+/// The structural byte set is computed from `config.dialect` and
+/// `config.extensions` so prose containing dialect-irrelevant punctuation
+/// (e.g. `-` outside a citation flavor) doesn't unnecessarily disable the
+/// fast path. `\n` and `\r` are always structural — multi-line inline
+/// content must still split into TEXT + NEWLINE tokens like the slow path.
+fn try_emit_plain_text_fast_path_with_mask(
+    builder: &mut GreenNodeBuilder,
+    text: &str,
+    mask: &[bool; 256],
+) -> bool {
+    if text.is_empty() {
+        return false;
+    }
+    for &b in text.as_bytes() {
+        if mask[b as usize] {
+            return false;
+        }
+    }
+    builder.token(SyntaxKind::TEXT.into(), text);
+    true
+}
+
+/// Build a 256-entry byte mask: `mask[b]` is `true` iff byte `b` could
+/// trigger any IR-recognised construct or dispatcher branch under the
+/// current dialect/extensions. Used by the plain-text fast path to scan
+/// inline ranges in a single pass.
+fn structural_byte_mask(config: &ParserOptions) -> [bool; 256] {
+    let mut mask = [false; 256];
+    let exts = &config.extensions;
+    let pandoc = config.dialect == Dialect::Pandoc;
+
+    // Always structural: line breaks (CST splits TEXT/NEWLINE), backslash
+    // (escape / hard break / backslash-math / latex / bookdown ref),
+    // backtick (code span / inline executable), `*`/`_` (emphasis is a
+    // core CommonMark construct, not extension-gated), and `[`/`]` if
+    // any bracket-shaped construct is reachable.
+    mask[b'\n' as usize] = true;
+    mask[b'\r' as usize] = true;
+    mask[b'\\' as usize] = true;
+    mask[b'`' as usize] = true;
+    mask[b'*' as usize] = true;
+    mask[b'_' as usize] = true;
+
+    // Brackets: the IR/dispatcher only acts on `[`/`]` if some
+    // bracket-shaped feature is reachable. `!` is the leading byte of
+    // `![alt]` image brackets — the IR's `BracketPlan` keys image
+    // openers at the `!` position, so the dispatcher must stop here
+    // to consult the plan.
+    if exts.inline_links
+        || exts.reference_links
+        || exts.inline_images
+        || exts.bracketed_spans
+        || exts.footnotes
+        || exts.citations
+    {
+        mask[b'[' as usize] = true;
+        mask[b']' as usize] = true;
+    }
+    if exts.inline_images || exts.reference_links {
+        mask[b'!' as usize] = true;
+    }
+
+    // `<` covers autolinks, raw HTML, and Pandoc native spans.
+    if exts.autolinks || exts.raw_html || exts.native_spans {
+        mask[b'<' as usize] = true;
+    }
+
+    // `^` covers Pandoc inline footnotes (`^[...]`), CM inline footnotes
+    // (when explicitly enabled), and superscript (`^text^`).
+    if exts.inline_footnotes || exts.superscript {
+        mask[b'^' as usize] = true;
+    }
+
+    // `@` and `-` cover Pandoc citation forms (`@cite`, `-@cite`,
+    // `[@cite]`). Under Pandoc dialect, the IR's `ConstructPlan` keys
+    // bare citations at the `@` or `-` position, so the dispatcher
+    // must stop at either to consult the plan. Including `-` is
+    // pessimistic — most prose hyphens won't form `-@` — but missing
+    // it would skip past valid suppress-author citations.
+    if exts.citations || exts.quarto_crossrefs {
+        mask[b'@' as usize] = true;
+        if pandoc {
+            mask[b'-' as usize] = true;
+        }
+    }
+
+    // `$` covers dollar-math and GFM math.
+    if exts.tex_math_dollars || exts.tex_math_gfm {
+        mask[b'$' as usize] = true;
+    }
+
+    // `~` covers subscript and strikeout (both `~text~` and `~~text~~`).
+    if exts.subscript || exts.strikeout {
+        mask[b'~' as usize] = true;
+    }
+
+    if exts.mark {
+        mask[b'=' as usize] = true;
+    }
+    if exts.emoji {
+        mask[b':' as usize] = true;
+    }
+    if exts.bookdown_references {
+        mask[b'(' as usize] = true;
+    }
+    // `{{< ... >}}` shortcodes: the dispatcher tries them on any
+    // `{` regardless of the `quarto_shortcodes` extension flag, so
+    // `{` must always be flagged here.
+    mask[b'{' as usize] = true;
+
+    // Bare-URI autolinks (`http://...` without `<>`) have no
+    // leading-byte gate in the dispatcher — `try_parse_bare_uri`
+    // probes for a URI scheme starting at every byte. Flag all
+    // ASCII alphabetic bytes so the bulk-skip stops on every
+    // potential scheme starter. This effectively disables the
+    // bulk-skip benefit for prose under GFM-style flavors but
+    // preserves correctness; ASCII digits / punctuation / non-ASCII
+    // bytes still skip cleanly.
+    if exts.autolink_bare_uris {
+        for b in b'a'..=b'z' {
+            mask[b as usize] = true;
+        }
+        for b in b'A'..=b'Z' {
+            mask[b as usize] = true;
+        }
+    }
+
+    mask
 }
 
 fn is_emoji_boundary(text: &str, pos: usize) -> bool {
@@ -175,6 +326,7 @@ fn parse_inline_range_impl(
     bracket_plan: &BracketPlan,
     construct_plan: &ConstructPlan,
     suppress_inner_links: bool,
+    mask: &[bool; 256],
 ) {
     log::trace!(
         "parse_inline_range: start={}, end={}, text={:?}",
@@ -184,8 +336,25 @@ fn parse_inline_range_impl(
     );
     let mut pos = start;
     let mut text_start = start;
+    let bytes = text.as_bytes();
 
     while pos < end {
+        // Bulk-skip plain bytes between structural bytes. Plans
+        // (`construct_plan`, `bracket_plan`, emphasis `plan`) only
+        // resolve at structural byte positions, so skipping here
+        // never elides a real match. `text_start` is preserved
+        // across the skip; the next emitted construct flushes the
+        // accumulated TEXT span.
+        if !mask[bytes[pos] as usize] {
+            let mut next = pos + 1;
+            while next < end && !mask[bytes[next] as usize] {
+                next += 1;
+            }
+            pos = next;
+            if pos >= end {
+                break;
+            }
+        }
         // IR-driven dispatch: if the IR identified a Pandoc standalone
         // construct starting here, emit it directly. Bypasses the
         // dispatcher's ordered-try chain for inline footnotes, native
@@ -1095,6 +1264,7 @@ fn parse_inline_range_impl(
                         bracket_plan,
                         construct_plan,
                         suppress_inner_links,
+                        mask,
                     );
                     builder.token(marker_kind.into(), &text[partner..partner + partner_len]);
                     builder.finish_node();
