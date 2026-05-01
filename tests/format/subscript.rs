@@ -54,10 +54,19 @@ fn subscript_and_superscript_together() {
 }
 
 #[test]
-fn subscript_with_multiple_words() {
+fn subscript_with_unescaped_internal_whitespace_is_not_subscript() {
+    // Pandoc rejects unescaped whitespace inside subscript content; the
+    // tildes are then literal and must round-trip as escaped `\~`.
     let input = "Something~some text~ here.\n";
     let output = format(input, None, None);
-    assert!(output.contains("~some text~"));
+    assert!(output.contains("\\~some text\\~"));
+}
+
+#[test]
+fn subscript_with_escaped_internal_whitespace_is_subscript() {
+    let input = "Something~some\\ text~ here.\n";
+    let output = format(input, None, None);
+    assert!(output.contains("~some\\ text~"));
 }
 
 #[test]

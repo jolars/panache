@@ -63,8 +63,33 @@ pub fn try_parse_superscript(text: &str) -> Option<(usize, &str)> {
         return None;
     }
 
+    // Pandoc rule: superscripted text cannot contain unescaped whitespace.
+    // To include a space, source must escape it as `\ `. Verified against
+    // `pandoc -f markdown` for `^x y^` → not a superscript, `^x\ y^` →
+    // Superscript with NBSP-joined content.
+    if contains_unescaped_whitespace(content) {
+        return None;
+    }
+
     let total_len = pos + 1; // Include closing ^
     Some((total_len, content))
+}
+
+fn contains_unescaped_whitespace(content: &str) -> bool {
+    let bytes = content.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b == b'\\' && i + 1 < bytes.len() {
+            i += 2;
+            continue;
+        }
+        if (b as char).is_whitespace() {
+            return true;
+        }
+        i += 1;
+    }
+    false
 }
 
 /// Emit a superscript node with its content
@@ -137,10 +162,13 @@ mod tests {
     }
 
     #[test]
-    fn test_spaces_inside_are_ok() {
+    fn test_internal_whitespace_rejected() {
+        // Pandoc rejects unescaped internal whitespace in superscripts;
+        // backslash-escaped spaces are accepted.
+        assert_eq!(try_parse_superscript("^some text^"), None);
         assert_eq!(
-            try_parse_superscript("^some text^"),
-            Some((11, "some text"))
+            try_parse_superscript("^some\\ text^"),
+            Some((12, "some\\ text"))
         );
     }
 

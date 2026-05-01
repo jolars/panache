@@ -61,11 +61,15 @@ count of currently-failing imports remaining under that bucket in the latest
    shorter Paras. Parser-shape gap in HTML_BLOCK detection: a comment that abuts
    a paragraph boundary should not always start a new block.
 8. **Misc remaining**:
-   - `double_backslash_math` (#51) --- `\(`/`\[` shouldn't trigger inline math
-     parsing; *also* `^...^` inside the broken-math content is over-permissive
-     (matches with whitespace inside, pandoc rejects). Parser-shape gap.
-   - `indented_code_after_atx_heading_pandoc` (#82) --- parser doesn't start a
-     code block after an ATX heading.
+   - `double_backslash_math` (#51) --- the `^...^` over-permissive
+     whitespace half landed (super/subscript now reject unescaped internal
+     whitespace per pandoc), but #51 still fails on two independent gaps:
+     (a) TeX inline trailing-space inclusion (panache emits `RawInline tex
+     "\\infty"` + `Space`; pandoc emits `RawInline tex "\\infty "` with the
+     space inside the raw inline), and (b) `\\[ ... \\]` is parsed as an
+     unresolved reference Link, whose projection drops the leading space
+     inside LINK_TEXT. Either fix would need to be paired with the other to
+     unlock.
    - `emphasis_nested_inlines` (#56) --- single edge case where unclosed `~~` is
      split as `Subscript [] + Str`. Niche.
    - `nested_headings_in_containers` (#128) --- parser doesn't parse `# Heading`
@@ -130,6 +134,159 @@ that, the table buckets (#2) are the next largest leverage.
   pandoc's `ppShow` output for `ColWidth N`, `citationNoteNum`, etc.
 
 ## Latest session
+
+- **Date**: 2026-05-01 (heading-then-indented-code + super/sub whitespace)
+- **Pass before → after**: 161 → 162 / 187 (+1 import: #82). First
+  parser-touching session in a while — two related parser-shape fixes
+  landed (one unlocks #82, the other improves correctness for #51 but
+  doesn't fully unlock it because the case has additional gaps in TeX
+  inline trailing-space handling and unresolved-reference-link
+  projection of `\\[ ... \\]`). CommonMark allowlist stayed green; full
+  parser-crate suite green; full workspace tests green; clippy + fmt
+  clean.
+- **What landed**:
+  - **#82 indented_code_after_atx_heading_pandoc** —
+    `crates/panache-parser/src/parser/block_dispatcher.rs`
+    `IndentedCodeBlockParser::detect_prepared` previously gated Pandoc
+    dialect strictly on `has_blank_before_strict`. Pandoc actually
+    allows an indented code block to immediately follow a complete
+    one-liner block (ATX heading or HR) at the current blockquote
+    depth without an intervening blank line. Added
+    `prev_line_is_terminal_one_liner(lines, line_pos, expected_bq_depth)`
+    helper at the bottom of the dispatcher: looks at `lines[line_pos -
+    1]`, strips `expected_bq_depth` blockquote markers (rejects if the
+    prev line's bq depth differs — that's a lazy-continuation case),
+    then checks if the trimmed inner is a `try_parse_atx_heading` or
+    `try_parse_horizontal_rule` match. Used in the existing pandoc-arm:
+    `ctx.has_blank_before_strict || prev_line_is_terminal_one_liner(_lines, line_pos, ctx.blockquote_depth)`.
+    The fixture and snapshot for `indented_code_after_atx_heading_pandoc`
+    already existed (with the broken behavior pinned); updated the
+    snapshot to the corrected `HEADING + CODE_BLOCK` shape (matches the
+    `_commonmark` sibling). No new fixture added — the parser-shape was
+    already pinned, the fix made it correct.
+  - **Superscript / Subscript internal-whitespace gate (correctness, not
+    a #51 unlock alone)** —
+    `crates/panache-parser/src/parser/inlines/{superscript,subscript}.rs`
+    `try_parse_superscript` and `try_parse_subscript` previously
+    accepted `^foo bar^` / `~foo bar~` as a single Superscript/Subscript
+    with internal whitespace. Pandoc rejects unescaped whitespace inside
+    the carets/tildes (verified: `^x y^` is plain text; `^x\ y^` is
+    `Superscript [Str "x\160y"]`). Added a `contains_unescaped_whitespace`
+    helper in each module that walks bytes, skipping `\X` pairs as
+    escaped chars; if any unescaped whitespace char remains, return
+    `None`. Updated each module's `test_spaces_inside_are_ok` to
+    `test_internal_whitespace_rejected` (asserts None for `^some text^`
+    plus accepts `^some\ text^`). This is a correctness improvement —
+    #51 still fails because it has independent additional gaps (TeX
+    inline trailing-space inclusion: pandoc emits `RawInline tex
+    "\\infty "` with the trailing space; panache emits `RawInline tex
+    "\\infty"` + `Space`. And `\\[ E = mc^2 \\]` is parsed as an
+    unresolved reference Link `\\[E = mc^2 \\]` whose projection drops
+    the leading space inside the link text).
+  - **Test updates** —
+    - `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_indented_code_after_atx_heading_pandoc.snap`
+      updated to the corrected CST.
+    - `tests/format/subscript.rs`: replaced
+      `subscript_with_multiple_words` (asserted incorrect "tildes
+      preserved" behavior — they're now escaped to `\~`) with
+      `subscript_with_unescaped_internal_whitespace_is_not_subscript`
+      and a paired `_with_escaped_internal_whitespace_is_subscript`
+      test.
+    - `tests/format/superscript.rs`: same shape — renamed
+      `superscript_with_multiple_words` to
+      `..._with_unescaped_internal_whitespace_is_not_superscript` (the
+      assertion happened to still pass coincidentally because `^` isn't
+      escaped in plain-text output, but the test name now matches what
+      it actually verifies) and added a paired escaped-space test.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 82 (indented_code_after_atx_heading_pandoc)
+- **Files changed (classified)**:
+  - **parser-shape**:
+    `crates/panache-parser/src/parser/block_dispatcher.rs` (#82),
+    `crates/panache-parser/src/parser/inlines/superscript.rs` (correctness),
+    `crates/panache-parser/src/parser/inlines/subscript.rs` (correctness)
+  - **parser snapshot**:
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_indented_code_after_atx_heading_pandoc.snap`
+  - **formatter integration tests**:
+    `tests/format/subscript.rs`, `tests/format/superscript.rs`
+  - **allowlist**: `crates/panache-parser/tests/pandoc/allowlist.txt`
+    (+1 imported ID)
+- **Don't redo**:
+  - The `prev_line_is_terminal_one_liner` heuristic only checks ATX
+    heading + HR. Pandoc *also* allows indented code after a fenced
+    code closer or setext underline (`Heading\n=====\n    foo` →
+    Header + CodeBlock). Those weren't in the failing-cases bucket
+    this session (no remaining failing case requires them), so
+    extending the heuristic was deferred. If a future session needs
+    one of those, add the corresponding parse check to the same
+    helper — don't re-architect to track previously-emitted block
+    kinds in Parser state. The dispatch-time lookback is cheap (O(1)
+    per dispatch) and avoids per-emission state-update touch points
+    scattered across the parser.
+  - The `expected_bq_depth` argument to
+    `prev_line_is_terminal_one_liner` is the *current* line's
+    blockquote depth (passed via `ctx.blockquote_depth`). Mismatched
+    prev-line depth → return false. This is what correctly rejects
+    `>     foo\n    bar` lazy-continuation: the prev line `>     foo`
+    has bq_depth=1 but the current line `    bar` has bq_depth=0
+    (well, the dispatcher sees ctx.blockquote_depth=1 because the
+    container is still open from the prev line — but then the prev
+    line's stripped inner `    foo` doesn't parse as ATX or HR
+    either). Don't simplify the bq-depth check away; it guards
+    against future cases where prev-line is at a different depth.
+  - The whitespace check in superscript/subscript walks bytes, skipping
+    `\X` pairs as escaped (advances by 2). Don't switch to a regex or
+    use Rust's `chars()` — the byte-level walk is faster and matches
+    pandoc's lexer-level whitespace check. The check fires AFTER the
+    existing leading/trailing-whitespace and trim-empty checks, so it
+    only sees content that's already non-empty and non-edge-padded.
+  - The new `contains_unescaped_whitespace` helper is duplicated in
+    both `superscript.rs` and `subscript.rs` (private to each
+    module). It's 14 lines; deduping into a shared `parser/inlines/utils`
+    module was considered but rejected because the function is too
+    small to justify a new utils module entry, and both call sites
+    need to retain the precise pandoc-spec rationale comment in their
+    file (where future maintainers will look first).
+  - #51 (`double_backslash_math`) still fails after the superscript
+    fix. Two independent remaining gaps:
+    1. **TeX inline trailing-space**: pandoc's `\\infty ` (with
+       trailing space) → `RawInline tex "\\infty "`; panache emits
+       `RawInline tex "\\infty"` + separate `Space` token. Lives in
+       parser inlines/latex.rs (or similar). Not addressed here.
+    2. **`\\[ ... \\]` parsed as unresolved reference Link**: the
+       `[` after `\\` opens a LINK node whose LINK_TEXT contains the
+       `E = mc^2 \\` content. The unresolved-link projector path
+       drops the leading space inside LINK_TEXT (or the coalescer
+       does), producing `Str "\\[E"` instead of `Str "\\[" + Space +
+       Str "E"`. Either the parser shouldn't open a LINK after
+       `\\[`, or the projector's unresolved-link path needs to
+       preserve the leading space. Not addressed here.
+- **Next**: Citations (#38) is still the largest single-fix unlock
+  (heavy projector). Among parser-shape gaps, the most leverage
+  remaining is the **blockquote/list/definition-list nesting cluster**
+  (#34, #91, #93, #96, #108, #111 — 6 cases sharing parser-shape
+  root causes around lazy continuation and same-line marker
+  containers). Smaller individual targets:
+  - **#56 emphasis_nested_inlines** — single edge case where unclosed
+    `~~` inside emphasis should emit `Subscript []` (pandoc parses
+    `~~` as two `~` tokens, the first opens an empty Subscript
+    closed by the second; remaining text follows). Niche but tiny
+    inline-parser change.
+  - **#128 nested_headings_in_containers** — the parser doesn't
+    recognize `# Heading` on the first line of a list item or
+    definition item. The blockquote case already works, so the gap
+    is specifically in lists/definition-lists initial-content
+    dispatch. Parser-shape work.
+  - **#115 lists_fancy** — parser too permissive on uppercase
+    alphabetic markers (`I.` with single space accepted as a list
+    marker; pandoc requires double space for single capital
+    letters). Parser fix in `lists.rs::try_parse_list_marker`.
+  - **#79 ignore_directives** — pandoc keeps trailing `<!-- ... -->`
+    inline-html as a `RawInline` at the end of the surrounding
+    paragraph; panache splits each comment into a separate
+    `RawBlock`. Parser-shape gap in HTML_BLOCK boundary detection.
+
+## Previous session (2026-05-01, tables)
 
 - **Date**: 2026-05-01 (tables)
 - **Pass before → after**: 152 → 161 / 187 (+9 imports). All wins are

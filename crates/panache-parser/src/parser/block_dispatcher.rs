@@ -2213,7 +2213,7 @@ impl BlockParser for IndentedCodeBlockParser {
         &self,
         ctx: &BlockContext,
         _lines: &[&str],
-        _line_pos: usize,
+        line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         // CommonMark §4.4: indented code blocks cannot interrupt a paragraph,
         // but they CAN follow non-paragraph blocks (headings, fenced code,
@@ -2243,7 +2243,15 @@ impl BlockParser for IndentedCodeBlockParser {
         } else if ctx.config.dialect == crate::options::Dialect::CommonMark {
             ctx.has_blank_before || ctx.at_document_start
         } else {
+            // Pandoc dialect: strict literal blank, OR the previous source line
+            // (at the same blockquote depth) was a complete one-liner block
+            // (ATX heading or HR). Pandoc allows an indented code block to
+            // immediately follow a heading or HR without an intervening blank
+            // line; lazy-blockquote-continuation cases are still rejected
+            // because their previous line is paragraph-like content, not a
+            // self-contained block.
             ctx.has_blank_before_strict
+                || prev_line_is_terminal_one_liner(_lines, line_pos, ctx.blockquote_depth)
         };
         if !allow {
             return None;
@@ -2431,6 +2439,36 @@ impl BlockParser for SetextHeadingParser {
     fn name(&self) -> &'static str {
         "setext_heading"
     }
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/// Whether the immediately-previous source line (after stripping `expected_bq_depth`
+/// blockquote markers) is itself a complete one-liner block — currently an ATX
+/// heading or a horizontal rule. Used by the indented-code-block dispatcher
+/// under Pandoc dialect to allow `# Heading\n    foo` (and the analogous HR
+/// case) to emit a CodeBlock without requiring an intervening blank line,
+/// matching pandoc's behavior. Returns false on lazy-blockquote-continuation
+/// lines (where the prev line is paragraph-like content rather than a
+/// self-contained block).
+fn prev_line_is_terminal_one_liner(
+    lines: &[&str],
+    line_pos: usize,
+    expected_bq_depth: usize,
+) -> bool {
+    if line_pos == 0 {
+        return false;
+    }
+    let prev_line = lines[line_pos - 1];
+    let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
+    if prev_bq_depth != expected_bq_depth {
+        return false;
+    }
+    let (prev_inner_no_nl, _) = strip_newline(prev_inner);
+    let trimmed = prev_inner_no_nl.trim_start();
+    try_parse_atx_heading(trimmed).is_some() || try_parse_horizontal_rule(trimmed).is_some()
 }
 
 // ============================================================================
