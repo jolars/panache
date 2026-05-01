@@ -34,6 +34,16 @@ struct RefsCtx {
     /// id text (no normalization needed — pandoc footnote labels are
     /// case-sensitive and not whitespace-collapsed).
     footnotes: HashMap<String, Vec<Block>>,
+    /// Example-list label (`@label`) → resolved item number. Pandoc
+    /// numbers all `OrderedList(_, Example, _)` items across the entire
+    /// document with one shared counter; labeled items also become
+    /// referenceable so inline `@label` resolves to the item's number.
+    example_label_to_num: HashMap<String, usize>,
+    /// Example-list start number per `LIST` text-range start. Looked up
+    /// in `ordered_list_attrs` so each Example list reports the first
+    /// item's number — picking up where the previous Example list left
+    /// off rather than restarting at 1.
+    example_list_start_by_offset: HashMap<u32, usize>,
 }
 
 thread_local! {
@@ -62,7 +72,89 @@ fn build_refs_ctx(tree: &SyntaxNode) -> RefsCtx {
     let mut ctx = RefsCtx::default();
     let mut seen_ids: HashMap<String, u32> = HashMap::new();
     collect_refs_and_headings(tree, &mut ctx, &mut seen_ids);
+    let mut example_counter: usize = 0;
+    collect_example_numbering(tree, &mut ctx, &mut example_counter);
     ctx
+}
+
+/// Walk every `LIST` in document order and assign Example-list numbers.
+/// Pandoc tracks one counter across all `OrderedList(_, Example, _)` lists
+/// in a document, so each subsequent Example list picks up where the prior
+/// one left off. Labeled items (`(@label)`) get a label → number mapping
+/// for inline `@label` reference resolution.
+fn collect_example_numbering(node: &SyntaxNode, ctx: &mut RefsCtx, counter: &mut usize) {
+    for child in node.children() {
+        if child.kind() == SyntaxKind::LIST && list_is_example(&child) {
+            let list_offset: u32 = child.text_range().start().into();
+            ctx.example_list_start_by_offset
+                .insert(list_offset, *counter + 1);
+            for item in child
+                .children()
+                .filter(|c| c.kind() == SyntaxKind::LIST_ITEM)
+            {
+                *counter += 1;
+                if let Some(label) = example_item_label(&item) {
+                    ctx.example_label_to_num.entry(label).or_insert(*counter);
+                }
+            }
+            // Recurse into the list's contents to pick up nested Example
+            // lists (rare but possible).
+            collect_example_numbering(&child, ctx, counter);
+        } else {
+            collect_example_numbering(&child, ctx, counter);
+        }
+    }
+}
+
+/// `(@)` / `(@label)` markers identify Example list items. Returns true
+/// iff the LIST's first item carries such a marker (pandoc decides the
+/// list style from the first marker only).
+fn list_is_example(list: &SyntaxNode) -> bool {
+    let Some(item) = list.children().find(|c| c.kind() == SyntaxKind::LIST_ITEM) else {
+        return false;
+    };
+    let marker = list_item_marker_text(&item);
+    let trimmed = marker.trim();
+    let body = if let Some(inner) = trimmed.strip_prefix('(').and_then(|s| s.strip_suffix(')')) {
+        inner
+    } else if let Some(inner) = trimmed.strip_suffix(')') {
+        inner
+    } else if let Some(inner) = trimmed.strip_suffix('.') {
+        inner
+    } else {
+        trimmed
+    };
+    body.starts_with('@')
+        && body[1..]
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
+
+fn list_item_marker_text(item: &SyntaxNode) -> String {
+    item.children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .find(|t| t.kind() == SyntaxKind::LIST_MARKER)
+        .map(|t| t.text().to_string())
+        .unwrap_or_default()
+}
+
+/// Returns the `@label` text for an Example list item, or `None` for the
+/// unlabeled `(@)` form.
+fn example_item_label(item: &SyntaxNode) -> Option<String> {
+    let marker = list_item_marker_text(item);
+    let trimmed = marker.trim();
+    let body = trimmed
+        .strip_prefix('(')
+        .and_then(|s| s.strip_suffix(')'))
+        .or_else(|| trimmed.strip_suffix(')'))
+        .or_else(|| trimmed.strip_suffix('.'))
+        .unwrap_or(trimmed);
+    let label = body.strip_prefix('@')?;
+    if label.is_empty() {
+        None
+    } else {
+        Some(label.to_string())
+    }
 }
 
 fn collect_refs_and_headings(
@@ -406,6 +498,11 @@ enum Block {
     Div(Attr, Vec<Block>),
     LineBlock(Vec<Vec<Inline>>),
     DefinitionList(Vec<(Vec<Inline>, Vec<Vec<Block>>)>),
+    /// `Figure attr (Caption Nothing [caption-blocks]) [body-blocks]` —
+    /// pandoc's implicit_figures wraps an image-only paragraph whose
+    /// alt text becomes the caption and whose body re-includes the
+    /// image as a Plain block.
+    Figure(Attr, Vec<Block>, Vec<Block>),
     Unsupported(String),
 }
 
@@ -478,14 +575,54 @@ fn block_from(node: &SyntaxNode) -> Option<Block> {
         // YAML metadata becomes the document Meta wrapper, not a body block.
         // The projector emits a bare block list, so just drop these.
         SyntaxKind::YAML_METADATA => None,
+        // Pandoc title block (`% title\n% authors\n% date`) populates Meta
+        // and produces no body block.
+        SyntaxKind::PANDOC_TITLE_BLOCK => None,
         SyntaxKind::HTML_BLOCK => Some(html_block(node)),
         SyntaxKind::PIPE_TABLE => pipe_table(node).map(Block::Table),
         SyntaxKind::TEX_BLOCK => Some(tex_block(node)),
         SyntaxKind::FENCED_DIV => Some(fenced_div(node)),
         SyntaxKind::LINE_BLOCK => Some(line_block(node)),
         SyntaxKind::DEFINITION_LIST => Some(definition_list(node)),
+        SyntaxKind::FIGURE => Some(figure_block(node)),
         other => Some(Block::Unsupported(format!("{other:?}"))),
     }
+}
+
+/// Pandoc's `implicit_figures` extension wraps a paragraph that is *only*
+/// an Image into a `Figure` block: `Figure (id, [], []) (Caption Nothing
+/// [Plain alt]) [Plain [Image]]`. The image's alt-text inlines become the
+/// caption; the body holds the image itself wrapped in a Plain. Any
+/// attribute attached to the Image migrates to the Figure attr (id only)
+/// — the Image keeps its classes/kvs.
+fn figure_block(node: &SyntaxNode) -> Block {
+    let mut alt: Vec<Inline> = Vec::new();
+    let mut image_inline: Option<Inline> = None;
+    if let Some(image) = node.children().find(|c| c.kind() == SyntaxKind::IMAGE_LINK) {
+        let alt_node = image.children().find(|c| c.kind() == SyntaxKind::IMAGE_ALT);
+        if let Some(an) = alt_node {
+            alt = coalesce_inlines(inlines_from(&an));
+        }
+        let mut tmp = Vec::new();
+        render_image_inline(&image, &mut tmp);
+        if let Some(first) = tmp.into_iter().next() {
+            image_inline = Some(first);
+        }
+    }
+    let figure_attr = match &image_inline {
+        Some(Inline::Image(attr, _, _, _)) if !attr.id.is_empty() => Attr::with_id(attr.id.clone()),
+        _ => Attr::default(),
+    };
+    let caption = if alt.is_empty() {
+        Vec::new()
+    } else {
+        vec![Block::Plain(alt)]
+    };
+    let body = match image_inline {
+        Some(img) => vec![Block::Plain(vec![img])],
+        None => Vec::new(),
+    };
+    Block::Figure(figure_attr, caption, body)
 }
 
 fn heading_block(node: &SyntaxNode) -> Block {
@@ -778,6 +915,26 @@ fn parse_div_info(info: &str) -> Attr {
         };
     }
     Attr::default()
+}
+
+/// Read a child `ATTRIBUTE` (node or token) on `parent` and parse its
+/// `{...}` body into an `Attr`. Returns `Attr::default()` if no attribute
+/// is attached or the body isn't `{...}`-shaped.
+fn extract_attr_from_node(parent: &SyntaxNode) -> Attr {
+    let raw = parent.children_with_tokens().find_map(|el| match el {
+        NodeOrToken::Node(n) if n.kind() == SyntaxKind::ATTRIBUTE => Some(n.text().to_string()),
+        NodeOrToken::Token(t) if t.kind() == SyntaxKind::ATTRIBUTE => Some(t.text().to_string()),
+        _ => None,
+    });
+    let Some(raw) = raw else {
+        return Attr::default();
+    };
+    let trimmed = raw.trim();
+    if let Some(inner) = trimmed.strip_prefix('{').and_then(|s| s.strip_suffix('}')) {
+        parse_attr_block(inner)
+    } else {
+        Attr::default()
+    }
 }
 
 /// Parse the body of an attribute block like `#my-id .class1 .class2 key=value`.
@@ -1255,7 +1412,19 @@ fn ordered_list_attrs(node: &SyntaxNode) -> (usize, &'static str, &'static str) 
                 .map(|t| t.text().to_string())
         })
         .unwrap_or_default();
-    classify_ordered_marker(marker.trim())
+    let (mut start, style, delim) = classify_ordered_marker(marker.trim());
+    if style == "Example" {
+        let offset: u32 = node.text_range().start().into();
+        if let Some(s) = REFS_CTX.with(|c| {
+            c.borrow()
+                .example_list_start_by_offset
+                .get(&offset)
+                .copied()
+        }) {
+            start = s;
+        }
+    }
+    (start, style, delim)
 }
 
 /// Map a list-marker token (e.g. `1.`, `iv)`, `(A)`, `#.`, `(@)`) to the
@@ -1572,7 +1741,29 @@ fn push_inline_node(node: &SyntaxNode, out: &mut Vec<Inline>) {
     match node.kind() {
         SyntaxKind::LINK => render_link_inline(node, out),
         SyntaxKind::IMAGE_LINK => render_image_inline(node, out),
+        SyntaxKind::CITATION => render_citation_inline(node, out),
         _ => out.push(inline_from_node(node)),
+    }
+}
+
+/// Pandoc treats `(@label)` and bare `@label` as Example-list references
+/// when the label was defined as an Example item; the inline becomes
+/// `Str "N"` (just the digits — surrounding parens come from adjacent
+/// source bytes which our coalesce pass merges back in). Citations
+/// without an Example match still emit `Unsupported "CITATION"` until
+/// general citation support lands.
+fn render_citation_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
+    let key = node
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .find(|t| t.kind() == SyntaxKind::CITATION_KEY)
+        .map(|t| t.text().to_string())
+        .unwrap_or_default();
+    let resolved = REFS_CTX.with(|c| c.borrow().example_label_to_num.get(&key).copied());
+    if let Some(n) = resolved {
+        out.push(Inline::Str(n.to_string()));
+    } else {
+        out.push(Inline::Unsupported("CITATION".to_string()));
     }
 }
 
@@ -1710,7 +1901,7 @@ fn render_link_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
             .as_ref()
             .map(parse_link_dest)
             .unwrap_or((String::new(), String::new()));
-        out.push(Inline::Link(Attr::default(), text, url, title));
+        out.push(Inline::Link(extract_attr_from_node(node), text, url, title));
         return;
     }
 
@@ -1739,14 +1930,19 @@ fn render_link_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
     };
 
     if let Some((url, title)) = lookup_ref(&label) {
-        out.push(Inline::Link(Attr::default(), text_inlines, url, title));
+        out.push(Inline::Link(
+            extract_attr_from_node(node),
+            text_inlines,
+            url,
+            title,
+        ));
         return;
     }
 
     if let Some(id) = lookup_heading_id(&label) {
         let url = format!("#{id}");
         out.push(Inline::Link(
-            Attr::default(),
+            extract_attr_from_node(node),
             text_inlines,
             url,
             String::new(),
@@ -1786,7 +1982,7 @@ fn render_image_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
             .as_ref()
             .map(parse_link_dest)
             .unwrap_or((String::new(), String::new()));
-        out.push(Inline::Image(Attr::default(), alt, url, title));
+        out.push(Inline::Image(extract_attr_from_node(node), alt, url, title));
         return;
     }
 
@@ -1813,14 +2009,19 @@ fn render_image_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
     };
 
     if let Some((url, title)) = lookup_ref(&label) {
-        out.push(Inline::Image(Attr::default(), alt_inlines, url, title));
+        out.push(Inline::Image(
+            extract_attr_from_node(node),
+            alt_inlines,
+            url,
+            title,
+        ));
         return;
     }
 
     if let Some(id) = lookup_heading_id(&label) {
         let url = format!("#{id}");
         out.push(Inline::Image(
-            Attr::default(),
+            extract_attr_from_node(node),
             alt_inlines,
             url,
             String::new(),
@@ -1838,19 +2039,13 @@ fn render_image_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
     out.push(Inline::Str(suffix));
 }
 
-/// Pandoc strips a single space at the start and end of inline code if the
-/// content has at least one non-space char (preserving the user's intent to
-/// disambiguate the leading backtick when the code starts with a backtick).
-/// `` ` foo ` `` → `Code "foo"`; `` ` ` `` (single space) → `Code " "`.
+/// Pandoc's inline code reader (`Markdown.hs::code`) replaces internal
+/// newlines with spaces (each `\n` → one space) and then `trim`s leading
+/// and trailing whitespace from the result. Internal whitespace runs are
+/// preserved.
 fn strip_inline_code_padding(s: &str) -> String {
-    // Pandoc strips an all-whitespace inline code span to the empty string.
-    if !s.is_empty() && s.bytes().all(|b| b == b' ') {
-        return String::new();
-    }
-    if s.len() >= 2 && s.starts_with(' ') && s.ends_with(' ') && s.chars().any(|c| c != ' ') {
-        return s[1..s.len() - 1].to_string();
-    }
-    s.to_string()
+    let collapsed: String = s.chars().map(|c| if c == '\n' { ' ' } else { c }).collect();
+    collapsed.trim().to_string()
 }
 
 fn math_inline(node: &SyntaxNode, kind: &'static str) -> Inline {
@@ -2474,6 +2669,11 @@ fn clone_block(b: &Block) -> Block {
                 })
                 .collect(),
         ),
+        Block::Figure(a, caption, body) => Block::Figure(
+            a.clone(),
+            caption.iter().map(clone_block).collect(),
+            body.iter().map(clone_block).collect(),
+        ),
         Block::Unsupported(s) => Block::Unsupported(s.clone()),
     }
 }
@@ -2717,6 +2917,15 @@ fn write_block(b: &Block, out: &mut String) {
                 }
                 out.push_str(" ] )");
             }
+            out.push_str(" ]");
+        }
+        Block::Figure(attr, caption, body) => {
+            out.push_str("Figure (");
+            write_attr(attr, out);
+            out.push_str(") ( Caption Nothing [");
+            write_block_list(caption, out);
+            out.push_str(" ] ) [");
+            write_block_list(body, out);
             out.push_str(" ]");
         }
         Block::Unsupported(name) => {

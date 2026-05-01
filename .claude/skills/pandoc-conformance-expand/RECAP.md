@@ -9,13 +9,15 @@ Ranked by likely shared root cause and leverage. Numbers in parentheses are
 the count of currently-failing imports remaining under that bucket in the
 latest `report.txt`.
 
-1. **Citations (~14 Unsupported "CITATION")** — `citations`, plus
-   embedded inline cites in many natural-text cases. Projector has zero
-   coverage. Pandoc shape: `Cite [Citation { citationId, citationPrefix,
-   citationSuffix, citationMode = AuthorInText | NormalCitation |
-   SuppressAuthor, citationNoteNum, citationHash }] [Inline]`. The
-   `citationMode` and the 5-field `Citation` record make this the most
-   structurally heavy projector entry — but all 14 cases share one fix.
+1. **Citations proper (~14 Unsupported "CITATION")** — `citations` plus
+   embedded inline cites in many natural-text cases. The Example-list
+   carve-out (`@label` resolving to a number) landed; the bulk of the
+   17 `Unsupported "CITATION"` markers in `report.txt` come from real
+   citations that need full pandoc shape: `Cite [Citation {
+   citationId, citationPrefix, citationSuffix, citationMode =
+   AuthorInText | NormalCitation | SuppressAuthor, citationNoteNum,
+   citationHash }] [Inline]`. Heaviest projector entry remaining; all
+   ~14 cases share one fix.
 2. **Tables — Simple/Headerless/Multiline/Grid (~13)** — only
    `PIPE_TABLE` is projected so far. Simple/Multiline/Grid tables
    need: (a) explicit `ColWidth N` math derived from dash counts vs
@@ -23,25 +25,16 @@ latest `report.txt`.
    header column position (Simple/Headerless); (c) parser fix:
    trailing `-------` separator in headerless simple table is
    currently parsed as a `TABLE_ROW` of dash cells (parser bug).
-3. **Example list document-level numbering (#114 alone)** — the
-   `Example` style classifier landed; what remains is that pandoc
-   numbers Example items across the *entire document*, not within
-   a single OrderedList. `1, 2` for the first list, then `3, 4, 5`
-   for the second list, etc. Plus `(@label)` reference resolution to
-   the matching example number (currently projects as
-   `Unsupported "CITATION"`). Document-level Example counter — same
-   shape as the heading-id pre-pass that landed earlier
-   (`heading_id_by_offset`).
-4. **Lists — `lists_fancy` (#115) needs a parser fix** — `I.`
+3. **Lists — `lists_fancy` (#115) needs a parser fix** — `I.`
    (single space, not double) is parsed as a list by panache but
    pandoc rejects (single capital letter requires double-space).
    Parser is too permissive on uppercase markers. Parser-shape gap.
-5. **Footnotes — DefinitionList-inside-Note (~2 — cases #66, #67)** —
+4. **Footnotes — DefinitionList-inside-Note (~2 — cases #66, #67)** —
    the basic Note resolver landed; what remains in this bucket is the
    parser-shape gap where a definition list inside a footnote body
    isn't parsed as `DefinitionList`. Parser fix territory, not
    projector.
-6. **Definition list nesting (~2 — cases #43, #44, #45)** —
+5. **Definition list nesting (~2 — cases #43, #44, #45)** —
    `definition_list_nesting`, `*_pandoc_loose_compact`,
    `definition_list`. Per-item loose/tight detection landed (#179);
    #44 still has a nested-list-inside-definition offset
@@ -49,38 +42,44 @@ latest `report.txt`.
    that `list_item_content_offset` doesn't see); #43 / #45 have
    parser-shape issues where nested bullets inside definitions
    aren't parsed as `BulletList`.
-7. **HTML blocks / fenced divs with raw HTML adjacency (~3)** —
+6. **HTML blocks / fenced divs with raw HTML adjacency (~3)** —
    `writer_html_blocks`, `html_block` cases with adjacent HTML.
    Pandoc splits each `<tag>` line into its own `RawBlock`; we
    coalesce them into one block. Parser-shape gap: HTML_BLOCK
    currently spans contiguous HTML lines; would need to split on
-   tag boundaries.
+   tag boundaries. `<div class="container">…</div>` is a related
+   parser gap: pandoc parses as `Div ( "" , [ "container" ] , [ ] )`
+   with markdown-parsed content; we wrap as a single RawBlock.
+7. **Block-level cases where parser splits paragraphs around inline
+   HTML comments (#79 ignore_directives)** — pandoc keeps the
+   comment as `RawInline (Format "html") "<!-- … -->"` inside the
+   surrounding paragraph (or as the trailing inline of a Para); we
+   split into separate RawBlock and shorter Paras. Parser-shape gap
+   in HTML_BLOCK detection: a comment that abuts a paragraph
+   boundary should not always start a new block.
 8. **Misc remaining**:
-   - `pandoc_title_block` (Unsupported "PANDOC_TITLE_BLOCK" — pandoc
-     converts to Meta).
-   - `links` (case #101) where pandoc `[text](url){.cls key=value}`
-     attaches a Link attribute that's currently dropped (parser-shape
-     gap: ATTRIBUTE not attached to LINK in CST).
    - `double_backslash_math` (#51) — `\(`/`\[` shouldn't trigger
-     inline math parsing. Parser-shape gap.
-   - `ignore_directives` (#79) — `<!-- … -->` inside list items
-     should project as RawBlock not as part of a Plain.
+     inline math parsing; *also* `^...^` inside the broken-math
+     content is over-permissive (matches with whitespace inside,
+     pandoc rejects). Parser-shape gap.
    - `indented_code_after_atx_heading_pandoc` (#82) — parser doesn't
      start a code block after an ATX heading.
-   - `images` (#81) — Figure block (`Unsupported "FIGURE"`).
-     Pandoc emits `Figure` for an image-only paragraph followed by
-     an explicit caption.
    - `emphasis_nested_inlines` (#56) — single edge case where
      unclosed `~~` is split as `Subscript [] + Str`. Niche.
    - `nested_headings_in_containers` (#128) — parser doesn't parse
      `# Heading` inside list items / definition items as Header.
+   - Several blockquote/list/definition-list nesting cases where
+     blockquote/list markers on the same line as another container
+     marker aren't recognized (#34, #91, #93, #96, #108, #111).
+     Parser-shape gaps shared across that bucket.
 
-Suggested first session: **#1 (Citations)** is still the largest
-single-fix unlock (14 cases), but is also the most structurally heavy
-projector entry. The pre-pass infrastructure for document-level
-counters (`heading_id_by_offset`) is the right template for both
-Citations and Example-list numbering — once the pre-pass shape is
-in place, both can land in adjacent sessions.
+Suggested first session: **#1 (Citations proper)** is still the
+largest single-fix unlock (14 cases) and the heaviest projector
+entry. After Example-list numbering proved the document-level
+counter pre-pass shape (`example_list_start_by_offset`), the
+Citation projector can lean on the same `RefsCtx` pre-pass to
+assign `citationNoteNum` per inline-occurrence. After that, the
+table buckets (#2) are the next largest leverage.
 
 ## Don't redo
 
@@ -127,7 +126,111 @@ in place, both can land in adjacent sessions.
 
 ## Latest session
 
-- **Date**: 2026-05-01
+- **Date**: 2026-05-01 (later)
+- **Pass before → after**: 147 → 152 / 187 (+5 imports). All wins are
+  **projector-only** again — no parser code was touched this session.
+  CommonMark allowlist stayed green; full parser-crate suite green;
+  clippy + fmt clean.
+- **What landed (all in `tests/pandoc/native_projector.rs`)**:
+  - **Inline-code whitespace normalization** (`strip_inline_code_padding`).
+    Pandoc's `Markdown.hs::code` does `\n` → space then `trim`, with no
+    preservation of edge whitespace beyond what `trim` keeps. The
+    previous "strip a single leading/trailing space if both ends have a
+    space" rule under-stripped (`\`  a  \`` would keep edge spaces).
+    Replaced with `chars().map(|c| if c == '\n' { ' ' } else { c })`
+    then `.trim()`. Internal multi-space runs are still preserved
+    (probed: `\`  a   b  \`` → `Code "a   b"`). Unlocked **#63** —
+    Quarto fence at column 0 (` ```{r} `) is parsed by pandoc as
+    inline code (no language ID after `\`\`\``), and the body
+    `{r}\na <- 1\n` had to collapse to `"{r} a <- 1"`.
+  - **`PANDOC_TITLE_BLOCK` → drop**. Pandoc's `% Title\n% Authors\n%
+    Date` populates Meta and emits *no body block*. Added the
+    `SyntaxKind::PANDOC_TITLE_BLOCK => None` arm in the dispatcher
+    (mirrors the existing `YAML_METADATA => None`). Unlocked **#130**.
+  - **Link/Image attribute attachment** (`extract_attr_from_node`).
+    Parser already attaches a child `ATTRIBUTE` node/token to LINK and
+    IMAGE_LINK for `[text](url){.cls #id key=val}` form, but
+    `render_link_inline` / `render_image_inline` were ignoring it and
+    passing `Attr::default()`. Added an `extract_attr_from_node`
+    helper that reads the `ATTRIBUTE` child and parses via the
+    existing `parse_attr_block`, then applied it to all four
+    code paths (inline link/image with paren dest, reference link/
+    image both ref-resolved and heading-id-resolved). Unlocked
+    **#101**.
+  - **Example-list document-level numbering pre-pass** (`RefsCtx`
+    additions: `example_label_to_num`, `example_list_start_by_offset`).
+    Mirrors the heading-id pre-pass shape. `collect_example_numbering`
+    walks every `LIST` in document order; for each Example list
+    (detected via `list_is_example` reading the first `LIST_MARKER`),
+    records the start counter for the list's offset and increments a
+    shared counter per item. Labeled items (`(@label)`) populate
+    `example_label_to_num`. `ordered_list_attrs` consults the offset
+    map for Example lists so each subsequent list starts where the
+    last left off (rather than restarting at 1). Inline `@label`
+    refs are routed through a new `render_citation_inline` that
+    looks up the label in `example_label_to_num` and emits
+    `Inline::Str(N.to_string())` (just the digits — surrounding
+    parens come from adjacent source `(`/`)` text and our coalescing
+    pass merges them with the digits into a single Str). Unrecognized
+    citations still emit `Unsupported "CITATION"` to keep general
+    citation work visible. Unlocked **#114**.
+  - **`Figure` block** for `+implicit_figures` (`figure_block`,
+    `Block::Figure`). Parser already produces a `FIGURE` block when
+    a paragraph is exactly one image; the projector previously fell
+    through to `Unsupported "FIGURE"`. Added `Block::Figure(Attr,
+    caption_blocks, body_blocks)` with `Caption Nothing
+    [Plain alt-inlines]` shape, body re-inserts the Image as a
+    `Plain` block. Image alt becomes the Figure caption. Image attrs
+    (id only — pandoc keeps classes/kvs on the Image) migrate to the
+    Figure attr. Unlocked **#81**.
+- **Cases unlocked** (+5, all allowlisted under `# imported`):
+  - 63 (fenced_code) — inline-code newline-collapse + trim
+  - 81 (images) — Figure block for image-only paragraph
+  - 101 (links) — `{.cls key=val}` attribute attachment
+  - 114 (lists_example) — document-level Example numbering +
+    `@label` reference resolution
+  - 130 (pandoc_title_block) — drop title block (Meta-bound)
+- **Files changed (classified)**:
+  - **projector** (single file): `tests/pandoc/native_projector.rs`
+  - **allowlist**: `tests/pandoc/allowlist.txt` (+5 imported IDs)
+- **Don't redo**:
+  - The inline-code normalization rule is **not** the CommonMark
+    "strip exactly one leading and one trailing space if both ends
+    are spaces" rule. Pandoc fully `trim`s after `\n`→space (probed:
+    `\`  a  \`` → `Code "a"`, `\`  a   b  \`` → `Code "a   b"`).
+    Don't restore the strip-1-each-side logic — it under-strips.
+  - `extract_attr_from_node` reads ATTRIBUTE as either a child
+    *node* or *token* (parser attaches it both ways depending on
+    syntax). Mirrors the heading-attr extraction. Don't switch to
+    a single-form lookup; both shapes exist in the wild.
+  - The Example-list inline reference (`@label` → `Str "N"`) emits
+    *only the digits*. Pandoc's surrounding parens (`(@good)` →
+    `Str "(1)"`) come from adjacent `(` / `)` *source text* that
+    our text-coalescing pass merges with the digit Str. If you try
+    to emit `Str "(N)"` directly you'll double up the parens for
+    `(@good)` and break the bare-`@good` form (which renders as
+    `Str "1"` with no parens).
+  - The Example pre-pass uses one global counter across the entire
+    document. Pandoc tracks Example numbering at document scope; do
+    *not* reset per OrderedList. The counter increments per
+    LIST_ITEM, not per LIST, so multi-item lists get sequential
+    numbers (1,2,3) and the next list picks up at 4.
+  - `list_is_example` keys off the *first* item's marker only —
+    pandoc decides list style from the first marker. Don't scan
+    every item; mismatched markers (e.g. first `(@)` then `1.`)
+    are accepted by pandoc as one Example list.
+  - `Figure` body re-wraps the Image as `Plain [Image]` (not bare
+    `Image`). Pandoc-native shape: `Figure attr caption [Plain [
+    Image ... ]]`. The Image's classes/kvs stay on the Image; only
+    the id (when present) moves to the Figure attr.
+  - The `render_citation_inline` fallback path emits
+    `Unsupported "CITATION"` for non-Example labels. Keep this — it
+    keeps real-citation cases visibly failing in `report.txt` so
+    they're easy to find when proper Cite support lands. Don't
+    silently drop unrecognized citations.
+
+## Previous session (2026-05-01)
+
 - **Pass before → after**: 134 → 147 / 187 (+13 imports). All wins are
   **projector-only** again — no parser code was touched this session.
   CommonMark allowlist stayed green; full parser-crate suite green;
@@ -293,7 +396,7 @@ in place, both can land in adjacent sessions.
     ignore_directives, #82 indented-code-after-heading, #128
     nested-headings-in-containers (parser).
 
-## Previous session (2026-05-01 earlier)
+## Earlier session (2026-05-01, first)
 
 - **Pass before → after**: 123 → 134 / 187 (+11 imports). All wins are
   **projector-only** again — no parser code was touched this session.
