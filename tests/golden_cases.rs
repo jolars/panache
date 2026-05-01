@@ -178,6 +178,7 @@ golden_test_cases!(
     crlf_yaml_metadata,
     citations,
     definition_list,
+    definition_list_heading_content,
     definition_list_nesting,
     definition_list_pandoc_loose_compact,
     definition_list_wrapping,

@@ -193,21 +193,7 @@ impl<'a> Parser<'a> {
                     ..
                 }) if !plain_buffer.is_empty() => {
                     let text = plain_buffer.get_accumulated_text();
-                    let line_without_newline = text
-                        .strip_suffix("\r\n")
-                        .or_else(|| text.strip_suffix('\n'));
-                    if let Some(line) = line_without_newline
-                        && !line.contains('\n')
-                        && !line.contains('\r')
-                        && let Some(level) = try_parse_atx_heading(line)
-                    {
-                        emit_atx_heading(&mut self.builder, &text, level, self.config);
-                    } else {
-                        // Emit PLAIN node with buffered inline-parsed content
-                        self.builder.start_node(SyntaxKind::PLAIN.into());
-                        inline_emission::emit_inlines(&mut self.builder, &text, self.config);
-                        self.builder.finish_node();
-                    }
+                    emit_definition_plain_or_heading(&mut self.builder, &text, self.config);
 
                     // Mark PLAIN as closed and clear buffer
                     if let Some(Container::Definition {
@@ -264,21 +250,7 @@ impl<'a> Parser<'a> {
             && !plain_buffer.is_empty()
         {
             let text = plain_buffer.get_accumulated_text();
-            let line_without_newline = text
-                .strip_suffix("\r\n")
-                .or_else(|| text.strip_suffix('\n'));
-            if let Some(line) = line_without_newline
-                && !line.contains('\n')
-                && !line.contains('\r')
-                && let Some(level) = try_parse_atx_heading(line)
-            {
-                emit_atx_heading(&mut self.builder, &text, level, self.config);
-            } else {
-                // Emit PLAIN node with buffered inline-parsed content
-                self.builder.start_node(SyntaxKind::PLAIN.into());
-                inline_emission::emit_inlines(&mut self.builder, &text, self.config);
-                self.builder.finish_node();
-            }
+            emit_definition_plain_or_heading(&mut self.builder, &text, self.config);
         }
 
         // Mark PLAIN as closed and clear buffer
@@ -2948,4 +2920,48 @@ impl<'a> Parser<'a> {
             .iter()
             .any(|c| matches!(c, Container::FencedDiv { .. }))
     }
+}
+
+/// Emit buffered Definition content as either Heading-then-Plain (when the
+/// first line is an ATX heading) or as a single Plain block.
+///
+/// Pandoc parses `Term\n: # Heading\n  Some text` as DefinitionList where the
+/// definition contains [Header, Plain]; the `# Heading` line is a real Header
+/// inside the definition, not text that happens to start with `#`.
+fn emit_definition_plain_or_heading(
+    builder: &mut GreenNodeBuilder<'static>,
+    text: &str,
+    config: &ParserOptions,
+) {
+    let line_without_newline = text
+        .strip_suffix("\r\n")
+        .or_else(|| text.strip_suffix('\n'));
+    if let Some(line) = line_without_newline
+        && !line.contains('\n')
+        && !line.contains('\r')
+        && let Some(level) = try_parse_atx_heading(line)
+    {
+        emit_atx_heading(builder, text, level, config);
+        return;
+    }
+
+    // Multi-line: first line is heading, rest is plain continuation.
+    if let Some(first_nl) = text.find('\n') {
+        let first_line = &text[..first_nl];
+        let after_first = &text[first_nl + 1..];
+        if !after_first.is_empty()
+            && let Some(level) = try_parse_atx_heading(first_line)
+        {
+            let heading_bytes = &text[..first_nl + 1];
+            emit_atx_heading(builder, heading_bytes, level, config);
+            builder.start_node(SyntaxKind::PLAIN.into());
+            inline_emission::emit_inlines(builder, after_first, config);
+            builder.finish_node();
+            return;
+        }
+    }
+
+    builder.start_node(SyntaxKind::PLAIN.into());
+    inline_emission::emit_inlines(builder, text, config);
+    builder.finish_node();
 }

@@ -154,6 +154,36 @@ impl ListItemBuffer {
                     return;
                 }
             }
+
+            // Multi-line case: first line is an ATX heading, rest is plain
+            // continuation. Pandoc treats `- # Heading\n  Some text` as a
+            // list item containing Header + Plain, not a single Plain spanning
+            // both lines.
+            if self
+                .segments
+                .iter()
+                .all(|s| matches!(s, ListItemContent::Text(_)))
+                && let Some(first_nl) = text.find('\n')
+            {
+                let first_line = &text[..first_nl];
+                let after_first = &text[first_nl + 1..];
+                if !after_first.is_empty()
+                    && let Some(level) = try_parse_atx_heading(first_line)
+                {
+                    let heading_bytes = &text[..first_nl + 1];
+                    emit_atx_heading(builder, heading_bytes, level, config);
+
+                    let block_kind = if use_paragraph {
+                        SyntaxKind::PARAGRAPH
+                    } else {
+                        SyntaxKind::PLAIN
+                    };
+                    builder.start_node(block_kind.into());
+                    inline_emission::emit_inlines(builder, after_first, config);
+                    builder.finish_node();
+                    return;
+                }
+            }
         }
 
         let block_kind = if use_paragraph {

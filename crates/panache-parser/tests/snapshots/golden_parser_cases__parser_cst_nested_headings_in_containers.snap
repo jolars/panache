@@ -7,9 +7,17 @@ DOCUMENT@0..80
     LIST_ITEM@0..30
       LIST_MARKER@0..1 "-"
       WHITESPACE@1..2 " "
-      PLAIN@2..30
-        TEXT@2..17 "# Heading {#id}"
+      HEADING@2..18
+        ATX_HEADING_MARKER@2..3
+          ATX_HEADING_MARKER@2..3 "#"
+        WHITESPACE@3..4 " "
+        HEADING_CONTENT@4..11
+          TEXT@4..11 "Heading"
+        WHITESPACE@11..12 " "
+        ATTRIBUTE@12..17
+          ATTRIBUTE@12..17 "{#id}"
         NEWLINE@17..18 "\n"
+      PLAIN@18..30
         TEXT@18..29 "  Some text"
         NEWLINE@29..30 "\n"
   BLANK_LINE@30..31
@@ -39,8 +47,13 @@ DOCUMENT@0..80
       DEFINITION@56..80
         DEFINITION_MARKER@56..57 ":"
         WHITESPACE@57..58 " "
-        PLAIN@58..80
-          TEXT@58..67 "# Heading"
+        HEADING@58..68
+          ATX_HEADING_MARKER@58..59
+            ATX_HEADING_MARKER@58..59 "#"
+          WHITESPACE@59..60 " "
+          HEADING_CONTENT@60..67
+            TEXT@60..67 "Heading"
           NEWLINE@67..68 "\n"
+        PLAIN@68..80
           TEXT@68..79 "  Some text"
           NEWLINE@79..80 "\n"

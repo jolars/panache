@@ -56,8 +56,6 @@ count of currently-failing imports remaining under that bucket in the latest
    shorter Paras. Parser-shape gap in HTML_BLOCK detection: a comment that abuts
    a paragraph boundary should not always start a new block.
 7. **Misc remaining**:
-   - `nested_headings_in_containers` (#128) --- parser doesn't parse `# Heading`
-     inside list items / definition items as Header.
    - Several blockquote/list/definition-list nesting cases where blockquote/list
      markers on the same line as another container marker aren't recognized
      (#34, #91, #93, #96, #108, #111). Parser-shape gaps shared across that
@@ -119,8 +117,129 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-01 (tex inline trailing-space + unresolved
-  reference-link edge whitespace)
+- **Date**: 2026-05-01 (ATX heading inside list-item / definition buffer)
+- **Pass before → after**: 166 → 167 / 187 (+1 import: #128). One
+  parser-shape fix that detects a leading ATX-heading line in buffered
+  list-item / definition content and emits HEADING + PLAIN instead of a
+  single PLAIN spanning both lines. Required a small companion formatter
+  change so the new HEADING-then-PLAIN shape inside `DEFINITION` renders
+  with a blank line between heading and continuation (mirrors pandoc's
+  `pandoc -t markdown` round-trip and the existing list-item leading-heading
+  path). CommonMark allowlist green; full parser-crate suite green; full
+  workspace tests green; clippy + fmt clean.
+- **What landed**:
+  - **Parser-shape: heading-first list-item buffer
+    (`crates/panache-parser/src/parser/utils/list_item_buffer.rs`)** ---
+    `ListItemBuffer::emit_as_block` previously only detected a leading
+    ATX heading when the entire buffer was a single line ending with
+    `\n`. Extended with a multi-line branch: if all segments are `Text`
+    and the first `\n`-terminated line parses as ATX, emit
+    `emit_atx_heading` for the first-line bytes (`text[..first_nl + 1]`
+    so the trailing `\n` is included), then emit the rest as
+    `PLAIN`/`PARAGRAPH` via `inline_emission::emit_inlines`. The
+    all-`Text`-segments guard avoids interfering with the rare
+    `BlockquoteMarker`-bearing buffers from blockquote-inside-list
+    parsing. The existing single-line ATX/HR fast path is preserved.
+  - **Parser-shape: heading-first definition buffer
+    (`crates/panache-parser/src/parser/core.rs`)** --- the same
+    multi-line ATX detection was duplicated across two definition
+    plain-buffer call sites (the close-Definition arm of
+    `close_open_node` at the old line ~189 and `emit_buffered_plain_if_needed`
+    at the old line ~257). Extracted into a new free helper
+    `emit_definition_plain_or_heading(builder, text, config)` at the
+    end of the module which: (a) tries the existing single-line ATX
+    fast-path, (b) falls back to multi-line "first line is heading,
+    rest is plain", (c) defaults to a single PLAIN. Both call sites
+    now just call the helper; the close-Definition arm still handles
+    its own buffer-clear / pop / finish_node afterward as before.
+  - **Formatter: HEADING child inside DEFINITION
+    (`crates/panache-formatter/src/formatter/core.rs`)** --- the
+    DEFINITION node child match handled `PLAIN` with an embedded ATX
+    heading via the legacy `leading_atx_heading_with_remainder`
+    helper, but had no arm for an actual `HEADING` child node. Added
+    a new `SyntaxKind::HEADING` arm: emit
+    `format_heading(n)` followed by `\n`, then if there are *any*
+    non-`BLANK_LINE` siblings after this index AND the *immediate*
+    next sibling is not already a `BLANK_LINE` node, push another
+    `\n`. The "next-is-blank" guard is what keeps formatting
+    idempotent across re-parses (after one pass, a `BLANK_LINE` node
+    appears between HEADING and PLAIN, and the BLANK_LINE arm
+    already emits the separator). Without this guard the second
+    pass appends a duplicate blank line. The list-item path
+    (`format_list_item` `leading_heading` branch in
+    `crates/panache-formatter/src/formatter/lists.rs`) already
+    handled HEADING-first list items correctly; only DEFINITION
+    needed the new arm.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 128 (nested_headings_in_containers)
+- **Files changed (classified)**:
+  - **parser-shape**:
+    `crates/panache-parser/src/parser/utils/list_item_buffer.rs`
+    (multi-line leading-heading branch in `emit_as_block`),
+    `crates/panache-parser/src/parser/core.rs`
+    (new `emit_definition_plain_or_heading` helper; both Definition
+    plain-buffer emission sites refactored to call it; removed the
+    inline duplicates)
+  - **formatter (companion)**:
+    `crates/panache-formatter/src/formatter/core.rs`
+    (`SyntaxKind::HEADING` arm in the DEFINITION child match)
+  - **parser snapshot updated**:
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_nested_headings_in_containers.snap`
+    --- previously pinned the buggy single-`PLAIN`-spanning-both-lines
+    shape for the list-item and definition cases; now pins the
+    pandoc-native HEADING-then-PLAIN shape under both containers
+    (the BLOCK_QUOTE case in the same fixture was already correct
+    and unchanged). Per `.claude/rules/parser.md`, fixed toward
+    pandoc-native rather than preserving the legacy bug.
+  - **formatter golden expected unchanged**:
+    `tests/fixtures/cases/nested_headings_in_containers/expected.md`
+    --- the user-visible formatted output is byte-identical before
+    and after the change (verified by re-running `cargo test --test
+    golden_cases nested_headings_in_containers`). The companion
+    formatter arm exists specifically to preserve this output under
+    the new CST shape.
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 128
+    inserted between 127 and 129 under `# imported`)
+- **Don't redo**:
+  - The list-item buffer fix gates on `segments.iter().all(Text)`.
+    This guard is load-bearing: if a `BlockquoteMarker` segment is
+    present, the buffer's text is *not* the literal source bytes
+    (markers were stripped to feed inline parsing) and slicing
+    `text[..first_nl + 1]` to feed `emit_atx_heading` would emit
+    bytes that don't exist in the source. Don't drop the guard. If
+    you ever need to support heading-first inside a
+    blockquote-marker-bearing list item, you'd need to walk the
+    `segments` directly and emit per-segment, not via the
+    flat-text path.
+  - The definition helper covers the case where the first line is a
+    heading AND the rest is non-empty. The single-line case (rest
+    empty) is covered by the existing
+    `strip_suffix("\n")`/`!line.contains('\n')` fast path *before*
+    falling through to multi-line. Keep both paths; collapsing them
+    would either lose the single-line case (which feeds the entire
+    text including trailing `\n` to `emit_atx_heading`) or cause a
+    double-emit.
+  - The formatter HEADING arm's `next_is_blank_line` check inspects
+    the *immediate* sibling at index `i + 1`, not a search through
+    later siblings. After one format pass the CST has a single
+    `BLANK_LINE` node directly after the HEADING; if a future change
+    produces multiple BLANK_LINE nodes back-to-back, this check
+    still works (only the first is checked, and BLANK_LINE's own
+    arm handles the rest). Don't refactor to `find` / `any` — it
+    would re-introduce the idempotency bug if a non-blank node
+    happens to appear later in the children list (e.g., a CODE_BLOCK
+    after a BLANK_LINE that is not adjacent to the HEADING).
+  - The legacy `leading_atx_heading_with_remainder` PLAIN-branch is
+    now dead code for the heading-first definition path (the parser
+    no longer produces PLAIN-with-embedded-heading for that input),
+    but it still serves cases where a PLAIN's text *content*
+    happens to start with `# ` due to other parsing paths
+    (e.g. paragraph reflow or non-standard inputs). Don't delete it
+    — it's a defensive fallback.
+
+## Earlier session (2026-05-01, tex inline trailing-space + unresolved reference-link edge whitespace)
+
 - **Pass before → after**: 165 → 166 / 187 (+1 import: #51).
   Two projector-only fixes that combine to unlock #51
   (`double_backslash_math`). Both shipped in

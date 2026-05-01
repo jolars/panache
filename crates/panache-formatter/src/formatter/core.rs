@@ -1874,6 +1874,26 @@ impl Formatter {
                                         self.format_indented_code_block(n, def_indent);
                                     }
                                 }
+                                SyntaxKind::HEADING => {
+                                    self.output.push_str(&self.format_heading(n));
+                                    self.output.push('\n');
+
+                                    let has_following_blocks =
+                                        children.iter().skip(i + 1).any(|sib| match sib {
+                                            NodeOrToken::Node(sn) => {
+                                                sn.kind() != SyntaxKind::BLANK_LINE
+                                            }
+                                            _ => false,
+                                        });
+                                    let next_is_blank_line =
+                                        children.get(i + 1).is_some_and(|sib| matches!(
+                                            sib,
+                                            NodeOrToken::Node(sn) if sn.kind() == SyntaxKind::BLANK_LINE
+                                        ));
+                                    if has_following_blocks && !next_is_blank_line {
+                                        self.output.push('\n');
+                                    }
+                                }
                                 SyntaxKind::PLAIN => {
                                     // Plain block in definition - format inline with potential wrapping
                                     // Already handled by Plain formatter above
