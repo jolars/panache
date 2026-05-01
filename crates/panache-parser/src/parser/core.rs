@@ -1492,7 +1492,7 @@ impl<'a> Parser<'a> {
         }
         let current_bq_depth = self.current_blockquote_depth();
 
-        let has_blank_before = self.pos == 0 || self.lines[self.pos - 1].trim().is_empty();
+        let has_blank_before = self.pos == 0 || is_blank_line(self.lines[self.pos - 1]);
         let mut blockquote_match: Option<PreparedBlockMatch> = None;
         let dispatcher_ctx = if current_bq_depth == 0 {
             Some(BlockContext {
@@ -1600,7 +1600,7 @@ impl<'a> Parser<'a> {
 
             // Peek ahead to determine what containers to keep open
             let mut peek = self.pos + 1;
-            while peek < self.lines.len() && self.lines[peek].trim().is_empty() {
+            while peek < self.lines.len() && is_blank_line(self.lines[peek]) {
                 peek += 1;
             }
 
@@ -1725,7 +1725,7 @@ impl<'a> Parser<'a> {
                         || (self.pos > 0 && {
                             let prev_line = self.lines[self.pos - 1];
                             let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
-                            prev_bq_depth >= current_bq_depth && prev_inner.trim().is_empty()
+                            prev_bq_depth >= current_bq_depth && is_blank_line(prev_inner)
                         })
                 } else {
                     true
@@ -2290,10 +2290,9 @@ impl<'a> Parser<'a> {
                     content_indent,
                     &BlockContext {
                         content: stripped_content,
-                        has_blank_before: self.pos == 0
-                            || self.lines[self.pos - 1].trim().is_empty(),
+                        has_blank_before: self.pos == 0 || is_blank_line(self.lines[self.pos - 1]),
                         has_blank_before_strict: self.pos == 0
-                            || self.lines[self.pos - 1].trim().is_empty(),
+                            || is_blank_line(self.lines[self.pos - 1]),
                         at_document_start: self.pos == 0 && self.current_blockquote_depth() == 0,
                         in_fenced_div: self.in_fenced_div(),
                         blockquote_depth: self.current_blockquote_depth(),
@@ -2522,7 +2521,7 @@ impl<'a> Parser<'a> {
                 )
                 .is_some();
 
-            let prev_line_blank = prev_line.trim().is_empty();
+            let prev_line_blank = is_blank_line(prev_line);
             prev_line_blank
                 || prev_is_fenced_div_open
                 || matches!(self.containers.last(), Some(Container::BlockQuote { .. }))
@@ -2536,7 +2535,7 @@ impl<'a> Parser<'a> {
         let prev_line_blank = if self.pos > 0 {
             let prev_line = self.lines[self.pos - 1];
             let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
-            prev_line.trim().is_empty() || (prev_bq_depth > 0 && prev_inner.trim().is_empty())
+            is_blank_line(prev_line) || (prev_bq_depth > 0 && is_blank_line(prev_inner))
         } else {
             false
         };
@@ -2896,7 +2895,7 @@ impl<'a> Parser<'a> {
             }) = self.containers.stack.last_mut()
             {
                 buffer.push_text(line);
-                if !line.trim().is_empty() {
+                if !is_blank_line(line) {
                     *marker_only = false;
                 }
             }
