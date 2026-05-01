@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.1](https://github.com/jolars/panache/compare/panache-formatter-v0.4.0...panache-formatter-v0.4.1) (2026-05-01)
+
+### Bug Fixes
+- **formatter:** extend block-token list ([`d087729`](https://github.com/jolars/panache/commit/d08772922a3b983612fb29e3f0a1ed90510a66ff)), closes [#238](https://github.com/jolars/panache/issues/238)
+- **parser:** handle Pandoc emphasis on the IR path ([`afa0ef5`](https://github.com/jolars/panache/commit/afa0ef5e3a202dae86ff1b4a282618b35a34f413))
+- **parser:** implement IR algorithm ([`bb91c85`](https://github.com/jolars/panache/commit/bb91c850dbf790895ab01e233aacde1debd544a5))
+- **formatter,parser:** handle setext in list ([`86494b5`](https://github.com/jolars/panache/commit/86494b57765e2c2a8eae7b1183018774bd99fecc))
+- maintain list markers for commonmark ([`084fc87`](https://github.com/jolars/panache/commit/084fc870805fa1fe8b4b36fcfe0c4b06f2a23a43))
+- **parser:** support multiline setext headings ([`4b4e1a3`](https://github.com/jolars/panache/commit/4b4e1a3b90e78c8ca0b981051d68dbf33805faad))
+
 ## [0.4.0](https://github.com/jolars/panache/compare/panache-formatter-v0.3.1...panache-formatter-v0.4.0) (2026-04-29)
 
 ### Features
