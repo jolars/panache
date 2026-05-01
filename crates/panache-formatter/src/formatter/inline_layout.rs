@@ -1060,6 +1060,8 @@ fn process_node_recursive(
                                 | SyntaxKind::STRIKEOUT
                                 | SyntaxKind::SUPERSCRIPT
                                 | SyntaxKind::SUBSCRIPT
+                                | SyntaxKind::LINK_TEXT
+                                | SyntaxKind::IMAGE_ALT
                         )
                     });
                     if in_inline_container {

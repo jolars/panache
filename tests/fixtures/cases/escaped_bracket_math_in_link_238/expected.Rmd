@@ -1,0 +1,4 @@
+With Lex Fridman, "[Unix] was meant to be an environment where it was really
+easy to write programs."
+[\[00:23:10\]](https://www.happyscribe.com/public/lex-fridman-podcast-artificial-intelligence-ai/109-brian-kernighan-unix-c-awk-ampl-and-go-programming#paragraph_1371)
+He went on to explain why he often still uses AWK rather than writing a Python.
