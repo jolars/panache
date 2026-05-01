@@ -534,9 +534,18 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Optio
             let marker_len = len + 1;
 
             let after_marker = &trimmed[marker_len..];
-            if after_marker.starts_with(' ')
+            // Pandoc: single-character uppercase Roman (I, V, X, L, C, D, M)
+            // followed by `.` requires two spaces, to avoid confusion with
+            // initials like "I. M. Pei". Multi-character romans (II., XII.,
+            // …) and the right-paren form (I)) only need one space. See
+            // pandoc/src/Text/Pandoc/Readers/Markdown.hs `orderedListStart`.
+            let min_spaces = if delim == b'.' && len == 1 { 2 } else { 1 };
+            let (effective_cols, _) = leading_indent_from(after_marker, _indent_cols + marker_len);
+
+            if (after_marker.starts_with(' ')
                 || after_marker.starts_with('\t')
-                || after_marker.is_empty()
+                || after_marker.is_empty())
+                && (after_marker.is_empty() || effective_cols >= min_spaces)
             {
                 let (spaces_after_cols, spaces_after_bytes, virtual_marker_space) =
                     marker_spaces_after(after_marker, _indent_cols + marker_len);

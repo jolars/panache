@@ -315,6 +315,7 @@ golden_test_cases!(
     lists_code,
     lists_example,
     lists_fancy,
+    lists_fancy_uppercase_roman_period_pandoc,
     lists_nested,
     lists_ordered,
     lists_task,

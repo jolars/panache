@@ -429,10 +429,31 @@ fn fancy_list_upper_roman_period() {
         },
         ..Default::default()
     };
-    let input = "I. first\nII. second\nIII. third\n";
+    // Pandoc requires 2 spaces after a single-character upper Roman + period
+    // (avoids confusion with initials like "I. M. Pei"). Multi-character
+    // markers like `II.` only need 1 space.
+    let input = "I.  first\nII. second\nIII. third\n";
     let tree = crate::parser::Parser::new(input, &config).parse();
     let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
     assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
+}
+
+#[test]
+fn fancy_list_upper_roman_period_single_char_one_space_rejected() {
+    use crate::options::{Extensions, ParserOptions};
+    let config = ParserOptions {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "I. first\nII. second\nIII. third\n";
+    let tree = crate::parser::Parser::new(input, &config).parse();
+    assert!(
+        find_first(&tree, SyntaxKind::LIST).is_none(),
+        "single-character upper Roman + period needs 2 spaces; should fall back to paragraph"
+    );
 }
 
 #[test]

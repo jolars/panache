@@ -50,13 +50,8 @@ iii) Third item
 
 ## Uppercase Roman Numerals
 
-  I.  First item
- II. Second item
-III. Third item
- IV. Fourth item
-  V.  Fifth item
- VI. Sixth item
-VII. Seventh item
+I. First item II. Second item III. Third item IV. Fourth item V. Fifth item VI.
+Sixth item VII. Seventh item
 
   I) Right paren style
  II) Second item

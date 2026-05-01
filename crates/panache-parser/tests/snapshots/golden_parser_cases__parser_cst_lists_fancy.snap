@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..1432
@@ -255,49 +256,21 @@ DOCUMENT@0..1432
     NEWLINE@682..683 "\n"
   BLANK_LINE@683..684
     BLANK_LINE@683..684 "\n"
-  LIST@684..793
-    LIST_ITEM@684..698
-      LIST_MARKER@684..686 "I."
-      WHITESPACE@686..687 " "
-      PLAIN@687..698
-        TEXT@687..697 "First item"
-        NEWLINE@697..698 "\n"
-    LIST_ITEM@698..714
-      LIST_MARKER@698..701 "II."
-      WHITESPACE@701..702 " "
-      PLAIN@702..714
-        TEXT@702..713 "Second item"
-        NEWLINE@713..714 "\n"
-    LIST_ITEM@714..730
-      LIST_MARKER@714..718 "III."
-      WHITESPACE@718..719 " "
-      PLAIN@719..730
-        TEXT@719..729 "Third item"
-        NEWLINE@729..730 "\n"
-    LIST_ITEM@730..746
-      LIST_MARKER@730..733 "IV."
-      WHITESPACE@733..734 " "
-      PLAIN@734..746
-        TEXT@734..745 "Fourth item"
-        NEWLINE@745..746 "\n"
-    LIST_ITEM@746..760
-      LIST_MARKER@746..748 "V."
-      WHITESPACE@748..749 " "
-      PLAIN@749..760
-        TEXT@749..759 "Fifth item"
-        NEWLINE@759..760 "\n"
-    LIST_ITEM@760..775
-      LIST_MARKER@760..763 "VI."
-      WHITESPACE@763..764 " "
-      PLAIN@764..775
-        TEXT@764..774 "Sixth item"
-        NEWLINE@774..775 "\n"
-    LIST_ITEM@775..793
-      LIST_MARKER@775..779 "VII."
-      WHITESPACE@779..780 " "
-      PLAIN@780..793
-        TEXT@780..792 "Seventh item"
-        NEWLINE@792..793 "\n"
+  PARAGRAPH@684..793
+    TEXT@684..697 "I. First item"
+    NEWLINE@697..698 "\n"
+    TEXT@698..713 "II. Second item"
+    NEWLINE@713..714 "\n"
+    TEXT@714..729 "III. Third item"
+    NEWLINE@729..730 "\n"
+    TEXT@730..745 "IV. Fourth item"
+    NEWLINE@745..746 "\n"
+    TEXT@746..759 "V. Fifth item"
+    NEWLINE@759..760 "\n"
+    TEXT@760..774 "VI. Sixth item"
+    NEWLINE@774..775 "\n"
+    TEXT@775..792 "VII. Seventh item"
+    NEWLINE@792..793 "\n"
   BLANK_LINE@793..794
     BLANK_LINE@793..794 "\n"
   LIST@794..847

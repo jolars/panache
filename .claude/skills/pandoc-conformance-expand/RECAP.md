@@ -32,35 +32,31 @@ count of currently-failing imports remaining under that bucket in the latest
    - **#171** (tables_in_divs) --- pipe table inside fenced div with custom
      caption form `: Caption {#tbl-foo}` isn't recognized as pandoc's
      `+caption_attributes` Caption-with-attr shape.
-3. **Lists --- `lists_fancy` (#115) needs a parser fix** --- `I.` (single space,
-   not double) is parsed as a list by panache but pandoc rejects (single capital
-   letter requires double-space). Parser is too permissive on uppercase markers.
-   Parser-shape gap.
-4. **Footnotes --- DefinitionList-inside-Note (\~2 --- cases #66, #67)** --- the
+3. **Footnotes --- DefinitionList-inside-Note (\~2 --- cases #66, #67)** --- the
    basic Note resolver landed; what remains in this bucket is the parser-shape
    gap where a definition list inside a footnote body isn't parsed as
    `DefinitionList`. Parser fix territory, not projector.
-5. **Definition list nesting (\~2 --- cases #43, #44, #45)** ---
+4. **Definition list nesting (\~2 --- cases #43, #44, #45)** ---
    `definition_list_nesting`, `*_pandoc_loose_compact`, `definition_list`.
    Per-item loose/tight detection landed (#179); #44 still has a
    nested-list-inside-definition offset propagation gap (the `LIST` carries a
    leading WHITESPACE sibling that `list_item_content_offset` doesn't see); #43
    / #45 have parser-shape issues where nested bullets inside definitions aren't
    parsed as `BulletList`.
-6. **HTML blocks / fenced divs with raw HTML adjacency (\~3)** ---
+5. **HTML blocks / fenced divs with raw HTML adjacency (\~3)** ---
    `writer_html_blocks`, `html_block` cases with adjacent HTML. Pandoc splits
    each `<tag>` line into its own `RawBlock`; we coalesce them into one block.
    Parser-shape gap: HTML_BLOCK currently spans contiguous HTML lines; would
    need to split on tag boundaries. `<div class="container">...</div>` is a
    related parser gap: pandoc parses as `Div ( "" , [ "container" ] , [ ] )`
    with markdown-parsed content; we wrap as a single RawBlock.
-7. **Block-level cases where parser splits paragraphs around inline HTML
+6. **Block-level cases where parser splits paragraphs around inline HTML
    comments (#79 ignore_directives)** --- pandoc keeps the comment as
    `RawInline (Format "html") "<!-- ... -->"` inside the surrounding paragraph
    (or as the trailing inline of a Para); we split into separate RawBlock and
    shorter Paras. Parser-shape gap in HTML_BLOCK detection: a comment that abuts
    a paragraph boundary should not always start a new block.
-8. **Misc remaining**:
+7. **Misc remaining**:
    - `double_backslash_math` (#51) --- the `^...^` over-permissive
      whitespace half landed (super/subscript now reject unescaped internal
      whitespace per pandoc), but #51 still fails on two independent gaps:
@@ -135,7 +131,131 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-01 (heading-then-indented-code + super/sub whitespace)
+- **Date**: 2026-05-01 (single-char upper Roman period 2-space gate)
+- **Pass before → after**: 162 → 163 / 187 (+1 import: #115). One
+  parser-shape fix: pandoc requires single-character uppercase Roman
+  numerals followed by `.` (the seven values `I, V, X, L, C, D, M`)
+  to have **two** spaces after the period, mirroring its existing
+  rule for single-letter alpha markers (`A.`, `B.`). Without this
+  gate, panache greedily parsed `I. First item\nII. Second item\n...`
+  as an UpperRoman list, but pandoc rejects the whole thing as a
+  paragraph because the *first* marker `I.` (single space) fails the
+  initials-disambiguation check. Multi-character romans like `II.`,
+  `III.` only need 1 space; right-paren form `I)` is unaffected.
+  CommonMark allowlist stayed green; full parser-crate suite green;
+  full workspace tests green; clippy + fmt clean.
+- **What landed**:
+  - **Parser fix** —
+    `crates/panache-parser/src/parser/blocks/lists.rs` (uppercase
+    Roman branch around line 524). Added
+    `min_spaces = if delim == b'.' && len == 1 { 2 } else { 1 }`
+    plus an `effective_cols` measurement against `min_spaces` (mirrors
+    the existing UpperAlpha branch's pattern). The check fires
+    *before* the `ListMarkerMatch` returns, so a failing `I.` falls
+    through to the lowercase-letter branch (which won't match upper)
+    and finally returns None — paragraph dispatch takes over. Pandoc's
+    rule (`pandoc/src/Text/Pandoc/Readers/Markdown.hs::orderedListStart`,
+    lines 879-882): `delim == Period && (style == UpperAlpha ||
+    (style == UpperRoman && num ∈ [1,5,10,50,100,500,1000]))` requires
+    `lookAhead (newline <|> spaceChar)` — i.e. at least one extra
+    space after the consumed-space. `len == 1` is the right
+    discriminator because panache's `try_parse_roman_numeral` already
+    accepts only `I/V/X` as single-character romans (`L/C/D/M` get
+    rejected at the single-char gate and fall through to UpperAlpha,
+    which already had the 2-space rule). So the seven pandoc-cared-for
+    values map to: I/V/X handled here (Roman branch), L/C/D/M handled
+    by the existing UpperAlpha branch.
+  - **New parser fixture** —
+    `crates/panache-parser/tests/fixtures/cases/lists_fancy_uppercase_roman_period_pandoc/`
+    with `parser-options.toml` (`flavor = "pandoc"`) and an
+    `input.md` covering: single-space `I. First\nII. Second` (Para),
+    two-space `I.  First\nII. Second` (List, the `II.` only needs 1
+    space because multi-char), `V. Five\nX. Ten` (both single-char,
+    Para), `I) right paren\nII) Second` (List, paren form is
+    unaffected). Snapshot pinned at
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_lists_fancy_uppercase_roman_period_pandoc.snap`.
+    Wired into `tests/golden_parser_cases.rs`.
+  - **Existing parser fixture snapshot updated** —
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_lists_fancy.snap`.
+    The `## Uppercase Roman Numerals\n\nI. First item\nII. Second
+    item\n...VII. Seventh item\n` block now projects as a single
+    `PARAGRAPH` with `TEXT` + `NEWLINE` runs instead of seven
+    `LIST_ITEM` nodes. The legacy snapshot pinned the wrong
+    behavior; per `.claude/rules/parser.md`, fixed toward
+    pandoc-native rather than preserving the legacy shape.
+  - **Existing unit test updated + new test added** —
+    `crates/panache-parser/src/parser/blocks/tests/lists.rs`.
+    `fancy_list_upper_roman_period` now uses two spaces after `I.`
+    (`"I.  first\nII. second\nIII. third\n"`) and still asserts a
+    3-item list. Added
+    `fancy_list_upper_roman_period_single_char_one_space_rejected`
+    that asserts no LIST is found for the single-space form (paragraph
+    fallback). Both tests cite the pandoc rationale inline.
+  - **Formatter golden updated** —
+    `tests/fixtures/cases/lists_fancy/expected.md`. The
+    right-aligned 7-row list block in the upper-Roman section is
+    replaced by the reflowed paragraph `I. First item II. Second item
+    III. Third item IV. Fourth item V. Fifth item VI.\nSoftBreak
+    Sixth item VII. Seventh item` (default 80-col reflow). The
+    formatter `lists_fancy` golden case kept the buggy behavior
+    pinned; updated to match the corrected parser shape. Idempotency
+    holds: the formatted output round-trips through parse+format
+    unchanged (the suite verifies this for every golden case).
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 115 (lists_fancy)
+- **Files changed (classified)**:
+  - **parser-shape**:
+    `crates/panache-parser/src/parser/blocks/lists.rs`,
+    `crates/panache-parser/src/parser/blocks/tests/lists.rs`
+  - **new parser fixture**:
+    `crates/panache-parser/tests/fixtures/cases/lists_fancy_uppercase_roman_period_pandoc/`
+    (`input.md`, `parser-options.toml`),
+    `crates/panache-parser/tests/golden_parser_cases.rs` (registration)
+  - **parser snapshots**:
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_lists_fancy.snap`,
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_lists_fancy_uppercase_roman_period_pandoc.snap`
+    (new)
+  - **formatter golden**:
+    `tests/fixtures/cases/lists_fancy/expected.md`
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 115)
+- **Don't redo**:
+  - The 2-space gate is intentionally narrow — only `delim == b'.'`
+    AND `len == 1`. Right-paren form (`I)`) does *not* require 2
+    spaces (verified against pandoc: `I) Right paren style` is
+    accepted as `OrderedList ( 1 , UpperRoman , OneParen )` with
+    one space). Paren form is structurally unambiguous (no
+    confusion with sentence-end abbreviations), so pandoc's rule
+    skips it. Don't broaden to all delim forms.
+  - `len == 1` (single-char Roman) is the correct discriminator.
+    Pandoc's actual rule is `num ∈ [1,5,10,50,100,500,1000]`, the
+    single-character Romans. Panache's `try_parse_roman_numeral`
+    already rejects `L/C/D/M` as single-char Romans (only
+    `I/V/X` pass the single-char gate); `L/C/D/M` fall through to
+    UpperAlpha which has its own existing 2-space rule. So
+    `len == 1` covers I/V/X, and the rest are covered by the
+    existing UpperAlpha path. No need to enumerate the seven
+    Roman values explicitly.
+  - The `effective_cols` check (against `min_spaces`) measures
+    leading whitespace including tab-stop expansion. Don't
+    simplify to `after_marker.starts_with("  ")` — a tab can
+    legitimately satisfy 2-col-width even though it's a single
+    char. Mirrors the UpperAlpha branch's identical pattern.
+  - The legacy `lists_fancy` parser fixture had the buggy behavior
+    pinned (LIST for single-space `I.`). Per `.claude/rules/parser.md`
+    "an existing fixture matching the legacy output is NOT a
+    guarantee of correctness" — fix toward pandoc-native. Updated
+    the snapshot rather than carving out a "legacy mode" arm.
+  - The formatter expected.md change was a side effect of the parser
+    change, not an intentional formatter behavior shift. The
+    paragraph reflow comes from the default `wrap=reflow` mode
+    operating on the now-correctly-parsed Para. Don't add
+    `wrap = preserve` to the fixture's panache.toml — the reflow
+    behavior is what users get out of the box and is what the
+    fixture should pin.
+
+## Earlier session (2026-05-01, heading-then-indented-code + super/sub whitespace)
+
 - **Pass before → after**: 161 → 162 / 187 (+1 import: #82). First
   parser-touching session in a while — two related parser-shape fixes
   landed (one unlocks #82, the other improves correctness for #51 but

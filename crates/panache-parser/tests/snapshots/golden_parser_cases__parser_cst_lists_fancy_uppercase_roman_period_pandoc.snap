@@ -1,0 +1,48 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..116
+  PARAGRAPH@0..30
+    TEXT@0..13 "I. First item"
+    NEWLINE@13..14 "\n"
+    TEXT@14..29 "II. Second item"
+    NEWLINE@29..30 "\n"
+  BLANK_LINE@30..31
+    BLANK_LINE@30..31 "\n"
+  LIST@31..62
+    LIST_ITEM@31..46
+      LIST_MARKER@31..33 "I."
+      WHITESPACE@33..35 "  "
+      PLAIN@35..46
+        TEXT@35..45 "First item"
+        NEWLINE@45..46 "\n"
+    LIST_ITEM@46..62
+      LIST_MARKER@46..49 "II."
+      WHITESPACE@49..50 " "
+      PLAIN@50..62
+        TEXT@50..61 "Second item"
+        NEWLINE@61..62 "\n"
+  BLANK_LINE@62..63
+    BLANK_LINE@62..63 "\n"
+  PARAGRAPH@63..78
+    TEXT@63..70 "V. Five"
+    NEWLINE@70..71 "\n"
+    TEXT@71..77 "X. Ten"
+    NEWLINE@77..78 "\n"
+  BLANK_LINE@78..79
+    BLANK_LINE@78..79 "\n"
+  LIST@79..116
+    LIST_ITEM@79..100
+      LIST_MARKER@79..81 "I)"
+      WHITESPACE@81..82 " "
+      PLAIN@82..100
+        TEXT@82..99 "Right paren style"
+        NEWLINE@99..100 "\n"
+    LIST_ITEM@100..116
+      LIST_MARKER@100..103 "II)"
+      WHITESPACE@103..104 " "
+      PLAIN@104..116
+        TEXT@104..115 "Second item"
+        NEWLINE@115..116 "\n"
