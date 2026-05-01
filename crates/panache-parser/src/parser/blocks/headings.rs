@@ -5,10 +5,11 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use crate::parser::utils::attributes::try_parse_trailing_attributes_with_pos;
+use crate::parser::utils::helpers::trim_end_spaces_tabs;
 use crate::parser::utils::inline_emission;
 
 fn try_parse_mmd_header_identifier_with_pos(content: &str) -> Option<(String, usize, usize)> {
-    let trimmed = content.trim_end_matches([' ', '\t']);
+    let trimmed = trim_end_spaces_tabs(content);
     let end = trimmed.len();
     let bytes = trimmed.as_bytes();
 
@@ -195,7 +196,7 @@ pub(crate) fn emit_setext_heading_body(
             if let Some((_normalized, start_bracket_pos, end_bracket_pos)) =
                 try_parse_mmd_header_identifier_with_pos(text_trimmed)
             {
-                let text_before = text_trimmed[..start_bracket_pos].trim_end_matches([' ', '\t']);
+                let text_before = trim_end_spaces_tabs(&text_trimmed[..start_bracket_pos]);
                 let space = &text_trimmed[text_before.len()..start_bracket_pos];
                 let raw_attrs = &text_trimmed[start_bracket_pos..end_bracket_pos];
                 (text_before, Some(raw_attrs), space)
@@ -319,7 +320,7 @@ pub(crate) fn emit_atx_heading(
 
     // Parse optional closing ATX marker (` ###`) while preserving bytes.
     let (heading_content, closing_suffix) = {
-        let without_trailing_ws = heading_text.trim_end_matches([' ', '\t']);
+        let without_trailing_ws = trim_end_spaces_tabs(heading_text);
         let trailing_hashes = without_trailing_ws
             .chars()
             .rev()
@@ -339,7 +340,7 @@ pub(crate) fn emit_atx_heading(
                 .is_some_and(|c| c == ' ' || c == '\t')
                 || (before_hashes.is_empty() && spaces_after_marker_count > 0);
             if preceded_by_ws {
-                let content_end = before_hashes.trim_end_matches([' ', '\t']).len();
+                let content_end = trim_end_spaces_tabs(before_hashes).len();
                 (&heading_text[..content_end], &heading_text[content_end..])
             } else {
                 (heading_text, "")
@@ -361,8 +362,7 @@ pub(crate) fn emit_atx_heading(
             if let Some((_normalized, start_bracket_pos, end_bracket_pos)) =
                 try_parse_mmd_header_identifier_with_pos(heading_content)
             {
-                let text_before =
-                    heading_content[..start_bracket_pos].trim_end_matches([' ', '\t']);
+                let text_before = trim_end_spaces_tabs(&heading_content[..start_bracket_pos]);
                 let space = &heading_content[text_before.len()..start_bracket_pos];
                 let raw_attrs = &heading_content[start_bracket_pos..end_bracket_pos];
                 (text_before, Some(raw_attrs), space)
@@ -393,7 +393,9 @@ pub(crate) fn emit_atx_heading(
     }
 
     if !closing_suffix.is_empty() {
-        let closing_trimmed = closing_suffix.trim_matches(|c| c == ' ' || c == '\t');
+        let closing_trimmed = trim_end_spaces_tabs(
+            crate::parser::utils::helpers::trim_start_spaces_tabs(closing_suffix),
+        );
         let leading_ws_len = closing_suffix
             .find(|c: char| c != ' ' && c != '\t')
             .unwrap_or(closing_suffix.len());

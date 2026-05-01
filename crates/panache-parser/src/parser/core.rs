@@ -20,7 +20,7 @@ use super::blocks::lists;
 use super::blocks::paragraphs;
 use super::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
 use super::utils::container_stack;
-use super::utils::helpers::{split_lines_inclusive, strip_newline};
+use super::utils::helpers::{is_blank_line, split_lines_inclusive, strip_newline};
 use super::utils::inline_emission;
 use super::utils::marker_utils;
 use super::utils::text_buffer;
@@ -1556,8 +1556,7 @@ impl<'a> Parser<'a> {
 
         // Handle blank lines specially (including blank lines inside blockquotes)
         // A line like ">" with nothing after is a blank line inside a blockquote
-        let is_blank = line.trim_end_matches('\n').trim().is_empty()
-            || (bq_depth > 0 && inner_content.trim_end_matches('\n').trim().is_empty());
+        let is_blank = is_blank_line(line) || (bq_depth > 0 && is_blank_line(inner_content));
 
         if is_blank {
             if self.is_paragraph_open()

@@ -5,7 +5,7 @@ use rowan::GreenNodeBuilder;
 use crate::parser::utils::container_stack::{
     Container, ContainerStack, leading_indent, leading_indent_from,
 };
-use crate::parser::utils::helpers::strip_newline;
+use crate::parser::utils::helpers::{strip_newline, trim_end_newlines};
 use crate::parser::utils::list_item_buffer::ListItemBuffer;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -182,7 +182,7 @@ fn try_parse_roman_numeral(text: &str, uppercase: bool) -> Option<(String, usize
 fn marker_spaces_after(after_marker: &str, marker_end_col: usize) -> (usize, usize, bool) {
     let (effective_cols, n_bytes) = leading_indent_from(after_marker, marker_end_col);
     let after_ws = &after_marker[n_bytes..];
-    let has_content = !after_ws.trim_end_matches(['\r', '\n']).is_empty();
+    let has_content = !trim_end_newlines(after_ws).is_empty();
     if has_content && effective_cols >= 5 {
         let bytes = match after_marker.as_bytes().first() {
             Some(b' ') => 1,
@@ -201,7 +201,7 @@ fn marker_spaces_after(after_marker: &str, marker_end_col: usize) -> (usize, usi
 pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Option<ListMarkerMatch> {
     // Trailing newlines should not block bare-marker detection; the line `*\n`
     // is a bare bullet marker and the post-marker text is logically empty.
-    let line = line.trim_end_matches(['\r', '\n']);
+    let line = trim_end_newlines(line);
     let (_indent_cols, indent_bytes) = leading_indent(line);
     let trimmed = &line[indent_bytes..];
 
@@ -1328,10 +1328,9 @@ fn finish_list_item_with_optional_nested(
     // over being parsed as a sequence of nested list markers. Both dialects
     // agree: `- * * *` is a list item containing a thematic break, not a
     // chain of bullets.
-    let buffered_is_thematic_break = super::horizontal_rules::try_parse_horizontal_rule(
-        text_to_buffer.trim_end_matches(['\r', '\n']),
-    )
-    .is_some();
+    let buffered_is_thematic_break =
+        super::horizontal_rules::try_parse_horizontal_rule(trim_end_newlines(&text_to_buffer))
+            .is_some();
 
     // Recursive same-line nested list emission is gated to CommonMark.
     // Pandoc-markdown also nests in this position (e.g. `- b. foo` is a
@@ -1346,10 +1345,8 @@ fn finish_list_item_with_optional_nested(
         && let Some(inner_match) = try_parse_list_marker(&text_to_buffer, config)
     {
         let inner_content_start = inner_match.marker_len + inner_match.spaces_after_bytes;
-        let after_inner = text_to_buffer
-            .get(inner_content_start..)
-            .unwrap_or("")
-            .trim_end_matches(['\r', '\n']);
+        let after_inner =
+            trim_end_newlines(text_to_buffer.get(inner_content_start..).unwrap_or(""));
         // Recurse only when there is real content after the inner marker.
         // The bare-inner-marker case (e.g. `- *`) is handled by the existing
         // `add_list_item_with_nested_empty_list` path.
@@ -1433,7 +1430,7 @@ fn finish_list_item_with_optional_nested(
         // the first line; subsequent lines flow in via the parser's main
         // loop (lazy continuation handles the no-marker continuation
         // line in cases like #292).
-        let trimmed = remaining.trim_end_matches(['\r', '\n']);
+        let trimmed = trim_end_newlines(remaining);
         if !trimmed.is_empty() {
             crate::parser::blocks::paragraphs::start_paragraph_if_needed(containers, builder);
             crate::parser::blocks::paragraphs::append_paragraph_line(

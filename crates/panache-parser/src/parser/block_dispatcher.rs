@@ -54,7 +54,7 @@ use super::blocks::tables::{
 };
 use super::inlines::links::{LinkScanContext, try_parse_inline_image};
 use super::utils::container_stack::{byte_index_at_column, leading_indent};
-use super::utils::helpers::strip_newline;
+use super::utils::helpers::{strip_newline, trim_end_newlines};
 use super::utils::marker_utils::parse_blockquote_marker_info;
 
 /// Information about list indentation context.
@@ -610,7 +610,7 @@ impl BlockParser for ListParser {
             // task-checkbox immediately following the marker. Only the bare
             // marker is a real list opener; reject the task-checkbox case.
             // (Trailing CR/LF is not "content" for this check.)
-            if !after_marker_text.trim_end_matches(['\r', '\n']).is_empty() {
+            if !trim_end_newlines(after_marker_text).is_empty() {
                 return None;
             }
             // CommonMark: an empty list item cannot interrupt a paragraph at
@@ -1830,7 +1830,7 @@ impl BlockParser for LatexEnvironmentParser {
             first_line = false;
 
             // Emit the line content (strip newline)
-            let content = line.trim_end_matches(&['\r', '\n'][..]);
+            let content = trim_end_newlines(line);
             builder.token(SyntaxKind::TEXT.into(), content);
 
             current_pos += 1;

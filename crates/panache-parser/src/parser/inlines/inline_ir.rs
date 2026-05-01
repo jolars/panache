@@ -2512,7 +2512,7 @@ struct ScratchBundle {
 
 thread_local! {
     static IR_EVENT_POOL: std::cell::RefCell<Vec<ScratchBundle>> =
-        std::cell::RefCell::new(Vec::new());
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 impl ScratchEvents {

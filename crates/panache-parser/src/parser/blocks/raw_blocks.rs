@@ -15,6 +15,7 @@
 //! - Only enabled when `raw_tex` extension is active
 
 use crate::options::ParserOptions;
+use crate::parser::utils::helpers::trim_end_newlines;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -207,7 +208,7 @@ fn parse_tex_command_lines(
         first_line = false;
 
         // Emit the line content (strip newline)
-        let content = inner.trim_end_matches(&['\r', '\n'][..]);
+        let content = trim_end_newlines(inner);
         builder.token(SyntaxKind::TEXT.into(), content);
 
         lines_consumed += 1;
@@ -282,7 +283,7 @@ fn parse_tex_environment_lines(
         first_line = false;
 
         // Emit the line content (strip newline)
-        let content = inner.trim_end_matches(&['\r', '\n'][..]);
+        let content = trim_end_newlines(inner);
         builder.token(SyntaxKind::TEXT.into(), content);
 
         lines_consumed += 1;

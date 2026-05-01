@@ -8,6 +8,7 @@ use rowan::GreenNodeBuilder;
 
 use crate::parser::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
 use crate::parser::utils::container_stack::{Container, ContainerStack};
+use crate::parser::utils::helpers::trim_end_newlines;
 use crate::parser::utils::text_buffer::ParagraphBuffer;
 
 fn update_display_math_dollar_state(
@@ -93,7 +94,7 @@ pub(in crate::parser) fn append_paragraph_line(
     {
         buffer.push_text(line);
 
-        let line_no_newline = line.trim_end_matches(&['\r', '\n'][..]);
+        let line_no_newline = trim_end_newlines(line);
         // Track standalone `$$` delimiter lines for all paragraphs so we keep
         // multi-line display math in a single paragraph parse context.
         // This prevents `$$` + `\begin{...}` forms from being split into

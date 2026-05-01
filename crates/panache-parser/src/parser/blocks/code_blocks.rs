@@ -6,7 +6,9 @@ use rowan::GreenNodeBuilder;
 
 use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
 use crate::parser::utils::container_stack::byte_index_at_column;
-use crate::parser::utils::helpers::{strip_leading_spaces, strip_newline};
+use crate::parser::utils::helpers::{
+    strip_leading_spaces, strip_newline, trim_end_spaces_tabs, trim_start_spaces_tabs,
+};
 
 /// Represents the type of code block based on its info string syntax.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -626,21 +628,21 @@ fn emit_hashpipe_option_line(
         return false;
     }
 
-    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
+    let trimmed_start = trim_start_spaces_tabs(line_without_newline);
     let leading_ws_len = line_without_newline
         .len()
         .saturating_sub(trimmed_start.len());
     let after_prefix = &trimmed_start[prefix.len()..];
     let ws_after_prefix_len = after_prefix
         .len()
-        .saturating_sub(after_prefix.trim_start_matches([' ', '\t']).len());
+        .saturating_sub(trim_start_spaces_tabs(after_prefix).len());
     let rest = &after_prefix[ws_after_prefix_len..];
     let Some(colon_idx) = rest.find(':') else {
         return false;
     };
 
     let key_with_ws = &rest[..colon_idx];
-    let key = key_with_ws.trim_end_matches([' ', '\t']);
+    let key = trim_end_spaces_tabs(key_with_ws);
     if key.is_empty() {
         return false;
     }
@@ -649,9 +651,9 @@ fn emit_hashpipe_option_line(
     let after_colon = &rest[colon_idx + 1..];
     let value_ws_prefix_len = after_colon
         .len()
-        .saturating_sub(after_colon.trim_start_matches([' ', '\t']).len());
+        .saturating_sub(trim_start_spaces_tabs(after_colon).len());
     let value_with_trailing = &after_colon[value_ws_prefix_len..];
-    let value = value_with_trailing.trim_end_matches([' ', '\t']);
+    let value = trim_end_spaces_tabs(value_with_trailing);
     let value_ws_suffix = &value_with_trailing[value.len()..];
 
     builder.start_node(SyntaxKind::CHUNK_OPTION.into());
@@ -716,16 +718,16 @@ fn emit_hashpipe_continuation_line(
     if !is_hashpipe_continuation_line(line_without_newline, prefix) {
         return false;
     }
-    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
+    let trimmed_start = trim_start_spaces_tabs(line_without_newline);
     let leading_ws_len = line_without_newline
         .len()
         .saturating_sub(trimmed_start.len());
     let after_prefix = &trimmed_start[prefix.len()..];
     let ws_after_prefix_len = after_prefix
         .len()
-        .saturating_sub(after_prefix.trim_start_matches([' ', '\t']).len());
+        .saturating_sub(trim_start_spaces_tabs(after_prefix).len());
     let continuation_with_trailing = &after_prefix[ws_after_prefix_len..];
-    let continuation_value = continuation_with_trailing.trim_end_matches([' ', '\t']);
+    let continuation_value = trim_end_spaces_tabs(continuation_with_trailing);
     if continuation_value.is_empty() {
         return false;
     }
@@ -754,16 +756,16 @@ fn emit_hashpipe_continuation_line(
 }
 
 fn is_hashpipe_option_line(line_without_newline: &str, prefix: &str) -> bool {
-    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
+    let trimmed_start = trim_start_spaces_tabs(line_without_newline);
     if !trimmed_start.starts_with(prefix) {
         return false;
     }
     let after_prefix = &trimmed_start[prefix.len()..];
-    let rest = after_prefix.trim_start_matches([' ', '\t']);
+    let rest = trim_start_spaces_tabs(after_prefix);
     let Some(colon_idx) = rest.find(':') else {
         return false;
     };
-    let key = rest[..colon_idx].trim_end_matches([' ', '\t']);
+    let key = trim_end_spaces_tabs(&rest[..colon_idx]);
     if key.is_empty() {
         return false;
     }
@@ -771,7 +773,7 @@ fn is_hashpipe_option_line(line_without_newline: &str, prefix: &str) -> bool {
 }
 
 fn is_hashpipe_continuation_line(line_without_newline: &str, prefix: &str) -> bool {
-    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
+    let trimmed_start = trim_start_spaces_tabs(line_without_newline);
     if !trimmed_start.starts_with(prefix) {
         return false;
     }
@@ -782,7 +784,7 @@ fn is_hashpipe_continuation_line(line_without_newline: &str, prefix: &str) -> bo
     if first != ' ' && first != '\t' {
         return false;
     }
-    !after_prefix.trim_start_matches([' ', '\t']).is_empty()
+    !trim_start_spaces_tabs(after_prefix).is_empty()
 }
 
 /// Check if a line is a valid closing fence for the given fence info.

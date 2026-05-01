@@ -48,6 +48,74 @@ pub(crate) fn strip_newline(line: &str) -> (&str, &str) {
     }
 }
 
+/// Strip trailing `\n` and `\r` bytes. ASCII byte-level equivalent of
+/// `s.trim_end_matches(['\r', '\n'])` — avoids the slice-pattern
+/// `MultiCharEqSearcher` codepath that goes through `char_indices` and
+/// shows up as a measurable hot frame in per-line block detect work.
+#[inline]
+pub(crate) fn trim_end_newlines(s: &str) -> &str {
+    let bytes = s.as_bytes();
+    let mut end = bytes.len();
+    while end > 0 {
+        let b = bytes[end - 1];
+        if b == b'\n' || b == b'\r' {
+            end -= 1;
+        } else {
+            break;
+        }
+    }
+    // SAFETY: we only stripped ASCII `\n` / `\r` bytes from the end, so the
+    // remaining prefix is still valid UTF-8 ending on a char boundary.
+    unsafe { std::str::from_utf8_unchecked(&bytes[..end]) }
+}
+
+/// Strip leading ASCII space and tab bytes. Equivalent to
+/// `s.trim_start_matches([' ', '\t'])` but byte-level.
+#[inline]
+pub(crate) fn trim_start_spaces_tabs(s: &str) -> &str {
+    let bytes = s.as_bytes();
+    let mut start = 0;
+    while start < bytes.len() {
+        let b = bytes[start];
+        if b == b' ' || b == b'\t' {
+            start += 1;
+        } else {
+            break;
+        }
+    }
+    // SAFETY: only ASCII bytes stripped from the start.
+    unsafe { std::str::from_utf8_unchecked(&bytes[start..]) }
+}
+
+/// Test whether `s` is a blank line: empty or composed only of ASCII
+/// whitespace (`' '`, `'\t'`, `'\n'`, `'\r'`). Equivalent to
+/// `s.trim_end_matches('\n').trim().is_empty()` for ASCII-whitespace
+/// inputs but bypasses the unicode-whitespace iteration in `str::trim`.
+#[inline]
+pub(crate) fn is_blank_line(s: &str) -> bool {
+    s.as_bytes()
+        .iter()
+        .all(|&b| b == b' ' || b == b'\t' || b == b'\n' || b == b'\r')
+}
+
+/// Strip trailing ASCII space and tab bytes. Equivalent to
+/// `s.trim_end_matches([' ', '\t'])` but byte-level.
+#[inline]
+pub(crate) fn trim_end_spaces_tabs(s: &str) -> &str {
+    let bytes = s.as_bytes();
+    let mut end = bytes.len();
+    while end > 0 {
+        let b = bytes[end - 1];
+        if b == b' ' || b == b'\t' {
+            end -= 1;
+        } else {
+            break;
+        }
+    }
+    // SAFETY: only ASCII bytes stripped from the end.
+    unsafe { std::str::from_utf8_unchecked(&bytes[..end]) }
+}
+
 /// Split input into lines while preserving line endings (LF or CRLF).
 /// This is like split_inclusive but handles both \n and \r\n.
 pub(crate) fn split_lines_inclusive(input: &str) -> Vec<&str> {
@@ -103,5 +171,28 @@ mod tests {
         assert_eq!(strip_newline("text\n"), ("text", "\n"));
         assert_eq!(strip_newline("text\r\n"), ("text", "\r\n"));
         assert_eq!(strip_newline("text"), ("text", ""));
+    }
+
+    #[test]
+    fn test_trim_end_newlines() {
+        assert_eq!(trim_end_newlines("foo\n"), "foo");
+        assert_eq!(trim_end_newlines("foo\r\n"), "foo");
+        assert_eq!(trim_end_newlines("foo\n\n"), "foo");
+        assert_eq!(trim_end_newlines("foo"), "foo");
+        assert_eq!(trim_end_newlines(""), "");
+        assert_eq!(trim_end_newlines("\n"), "");
+        // Non-ASCII byte sequences stay intact.
+        assert_eq!(trim_end_newlines("föö\n"), "föö");
+    }
+
+    #[test]
+    fn test_trim_spaces_tabs() {
+        assert_eq!(trim_start_spaces_tabs("  \tfoo"), "foo");
+        assert_eq!(trim_start_spaces_tabs("foo"), "foo");
+        assert_eq!(trim_start_spaces_tabs(""), "");
+        assert_eq!(trim_end_spaces_tabs("foo  \t"), "foo");
+        assert_eq!(trim_end_spaces_tabs("foo"), "foo");
+        assert_eq!(trim_end_spaces_tabs(""), "");
+        assert_eq!(trim_end_spaces_tabs("föö  "), "föö");
     }
 }
