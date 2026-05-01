@@ -658,7 +658,7 @@ pub fn try_parse_inline_link(
 /// - the optional title is delimited by `"..."`, `'...'`, or `(...)`;
 /// - any text outside that structure invalidates the link.
 fn dest_and_title_ok_commonmark(content: &str) -> bool {
-    let trimmed = content.trim_start_matches([' ', '\t', '\n']);
+    let trimmed = trim_start_link_ws(content);
     if trimmed.is_empty() {
         return true;
     }
@@ -722,7 +722,7 @@ fn dest_and_title_ok_commonmark(content: &str) -> bool {
         &trimmed[end..]
     };
 
-    let after_dest = after_dest.trim_start_matches([' ', '\t', '\n']);
+    let after_dest = trim_start_link_ws(after_dest);
     if after_dest.is_empty() {
         return true;
     }
@@ -760,7 +760,34 @@ fn dest_and_title_ok_commonmark(content: &str) -> bool {
     };
 
     let after_title = &after_dest[close_idx + 1..];
-    after_title.trim_matches([' ', '\t', '\n']).is_empty()
+    is_link_ws_only(after_title)
+}
+
+/// Strip leading ASCII space/tab/newline bytes. Byte-level equivalent of
+/// `s.trim_start_matches([' ', '\t', '\n'])`; called for every
+/// CommonMark inline-link destination/title scan, so the slice-pattern
+/// MultiCharEqSearcher overhead matters.
+#[inline]
+fn trim_start_link_ws(s: &str) -> &str {
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b == b' ' || b == b'\t' || b == b'\n' {
+            i += 1;
+        } else {
+            break;
+        }
+    }
+    // SAFETY: stripped only ASCII whitespace bytes.
+    unsafe { std::str::from_utf8_unchecked(&bytes[i..]) }
+}
+
+#[inline]
+fn is_link_ws_only(s: &str) -> bool {
+    s.as_bytes()
+        .iter()
+        .all(|&b| b == b' ' || b == b'\t' || b == b'\n')
 }
 
 /// Emit an inline link node to the builder.
