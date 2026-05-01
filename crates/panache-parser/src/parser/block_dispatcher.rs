@@ -914,6 +914,11 @@ impl BlockParser for FootnoteDefinitionParser {
             return None;
         }
 
+        // A footnote def starts with `[^` after no leading indent.
+        if !ctx.content.starts_with("[^") {
+            return None;
+        }
+
         let (_id, content_start) = try_parse_footnote_marker(ctx.content)?;
         Some((
             BlockDetectionResult::YesCanInterrupt,
@@ -984,6 +989,21 @@ impl BlockParser for ReferenceDefinitionParser {
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         if !ctx.config.extensions.reference_links {
             return None;
+        }
+
+        // Cheap leading-byte gate: a reference definition starts with `[`
+        // after up to 3 leading spaces (CommonMark §4.7). Bail before the
+        // multi-line String::new() build below if the gate fails — this
+        // is the by-far common case on a typical doc.
+        {
+            let bytes = ctx.content.as_bytes();
+            let mut i = 0;
+            while i < bytes.len() && i < 3 && bytes[i] == b' ' {
+                i += 1;
+            }
+            if bytes.get(i) != Some(&b'[') {
+                return None;
+            }
         }
 
         // Build a multi-line candidate from consecutive non-blank lines so the
@@ -1713,6 +1733,18 @@ impl BlockParser for HtmlBlockParser {
             return None;
         }
 
+        // HTML block must start with `<` after up to 3 leading spaces.
+        {
+            let bytes = ctx.content.as_bytes();
+            let mut i = 0;
+            while i < bytes.len() && i < 3 && bytes[i] == b' ' {
+                i += 1;
+            }
+            if bytes.get(i) != Some(&b'<') {
+                return None;
+            }
+        }
+
         let is_commonmark = ctx.config.dialect == crate::options::Dialect::CommonMark;
         let block_type = try_parse_html_block_start(ctx.content, is_commonmark)?;
 
@@ -1989,6 +2021,19 @@ impl BlockParser for FencedDivOpenParser {
         }
 
         let content = content_for_fenced_div_detection(ctx);
+        // A fenced-div open fence starts with `:::` (Pandoc dialect)
+        // after up to 3 leading spaces. Bail before the full
+        // `try_parse_div_fence_open` scan when this byte gate fails.
+        {
+            let bytes = content.as_bytes();
+            let mut i = 0;
+            while i < bytes.len() && i < 3 && bytes[i] == b' ' {
+                i += 1;
+            }
+            if bytes.get(i) != Some(&b':') {
+                return None;
+            }
+        }
         let div_fence = try_parse_div_fence_open(content)?;
         Some((BlockDetectionResult::Yes, Some(Box::new(div_fence))))
     }
@@ -2286,6 +2331,22 @@ impl BlockParser for SetextHeadingParser {
 
         // Need next line for lookahead
         let next_line = ctx.next_line?;
+
+        // Cheap leading-byte gate: a setext underline starts with `=` or
+        // `-` after up to 3 spaces (CommonMark §4.3). Avoid the
+        // `try_parse_setext_heading` re-scan when this can't fire — the
+        // dispatcher runs SetextHeading on every non-blank line.
+        {
+            let bytes = next_line.as_bytes();
+            let mut i = 0;
+            while i < bytes.len() && i < 3 && bytes[i] == b' ' {
+                i += 1;
+            }
+            match bytes.get(i) {
+                Some(&b'=') | Some(&b'-') => {}
+                _ => return None,
+            }
+        }
 
         // Create lines array for detection function (avoid allocation)
         let lines = [ctx.content, next_line];
