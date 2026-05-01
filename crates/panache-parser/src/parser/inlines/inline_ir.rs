@@ -1492,23 +1492,32 @@ fn run_emphasis_pass(
 /// next iteration).
 fn pandoc_cascade_invalidate(events: &mut [IrEvent]) -> Vec<(usize, usize)> {
     let mut invalidated_pairs: Vec<(usize, usize)> = Vec::new();
+    // Early-exit: if there are no `DelimRun` events at all, the cascade
+    // pass is a no-op. Avoids allocating the two scratch vecs below for
+    // every range with no `*`/`_` runs (which is the common case for
+    // ranges that contain only standalone constructs / brackets).
+    if !events.iter().any(|e| matches!(e, IrEvent::DelimRun { .. })) {
+        return invalidated_pairs;
+    }
+    // Reuse two scratch vecs across the inner loop iterations instead
+    // of `.collect()` each time. These are tiny per-paragraph
+    // allocations but the function is called for every Pandoc inline
+    // emphasis pass and shows up in malloc traffic.
+    let mut total: Vec<usize> = Vec::with_capacity(events.len());
+    let mut consumed: Vec<usize> = Vec::with_capacity(events.len());
     loop {
+        total.clear();
+        consumed.clear();
         // Compute total bytes (run length) and consumed bytes (sum of
         // match lens) per DelimRun event index.
-        let total: Vec<usize> = events
-            .iter()
-            .map(|e| match e {
-                IrEvent::DelimRun { start, end, .. } => end - start,
-                _ => 0,
-            })
-            .collect();
-        let consumed: Vec<usize> = events
-            .iter()
-            .map(|e| match e {
-                IrEvent::DelimRun { matches, .. } => matches.iter().map(|m| m.len as usize).sum(),
-                _ => 0,
-            })
-            .collect();
+        total.extend(events.iter().map(|e| match e {
+            IrEvent::DelimRun { start, end, .. } => end - start,
+            _ => 0,
+        }));
+        consumed.extend(events.iter().map(|e| match e {
+            IrEvent::DelimRun { matches, .. } => matches.iter().map(|m| m.len as usize).sum(),
+            _ => 0,
+        }));
 
         // Find a pair to invalidate. We invalidate one and restart so
         // the cascade can re-evaluate dependent pairs.
