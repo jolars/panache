@@ -2457,33 +2457,38 @@ pub fn build_full_plans(
         process_emphasis_in_range(&mut bundle.events, open_idx + 1, close_idx, config.dialect);
     }
 
-    // Build exclusion bitmap: any delim run whose event index lies inside
-    // a resolved bracket pair is excluded from the top-level pass. This
-    // implements the §6.3 boundary rule: emphasis at the top level must
-    // not pair across a link's brackets, even when one side is inside the
-    // link text and the other is outside.
-    bundle.excluded.resize(bundle.events.len(), false);
-    for &(open_idx, close_idx) in &bundle.bracket_pairs {
-        for slot in bundle
-            .excluded
-            .iter_mut()
-            .take(close_idx)
-            .skip(open_idx + 1)
-        {
-            *slot = true;
-        }
-    }
-
     // Top-level emphasis pass: handles delim runs that fall outside any
     // resolved bracket pair.
     let len = bundle.events.len();
-    process_emphasis_in_range_filtered(
-        &mut bundle.events,
-        0,
-        len,
-        Some(&bundle.excluded),
-        config.dialect,
-    );
+    if bundle.bracket_pairs.is_empty() {
+        // Fast path: no resolved brackets means no exclusion mask needed —
+        // skip the resize-and-fill pass entirely. Common for prose
+        // paragraphs without inline links.
+        process_emphasis_in_range_filtered(&mut bundle.events, 0, len, None, config.dialect);
+    } else {
+        // Build exclusion bitmap: any delim run whose event index lies
+        // inside a resolved bracket pair is excluded from the top-level
+        // pass. Implements the §6.3 boundary rule: emphasis at the top
+        // level must not pair across a link's brackets.
+        bundle.excluded.resize(len, false);
+        for &(open_idx, close_idx) in &bundle.bracket_pairs {
+            for slot in bundle
+                .excluded
+                .iter_mut()
+                .take(close_idx)
+                .skip(open_idx + 1)
+            {
+                *slot = true;
+            }
+        }
+        process_emphasis_in_range_filtered(
+            &mut bundle.events,
+            0,
+            len,
+            Some(&bundle.excluded),
+            config.dialect,
+        );
+    }
 
     InlinePlans {
         emphasis: build_emphasis_plan(&bundle.events),
