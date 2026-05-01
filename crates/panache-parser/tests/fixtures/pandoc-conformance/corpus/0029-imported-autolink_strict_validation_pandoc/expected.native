@@ -1,0 +1,14 @@
+[ Para
+    [ Link
+        ( "" , [ "uri" ] , [] )
+        [ Str "https://example.com" ]
+        ( "https://example.com" , "" )
+    ]
+, Para [ RawInline (Format "html") "<m:abc>" ]
+, Para
+    [ Link
+        ( "" , [ "email" ] , [] )
+        [ Str "foo@bar.example.com" ]
+        ( "mailto:foo@bar.example.com" , "" )
+    ]
+]

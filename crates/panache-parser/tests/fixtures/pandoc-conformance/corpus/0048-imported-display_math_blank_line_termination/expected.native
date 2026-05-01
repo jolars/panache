@@ -1,0 +1,57 @@
+[ Header
+    1
+    ( "display-math-formatting" , [] , [] )
+    [ Str "Display"
+    , Space
+    , Str "Math"
+    , Space
+    , Str "Formatting"
+    ]
+, Para
+    [ Str "Testing"
+    , Space
+    , Str "that"
+    , Space
+    , Str "display"
+    , Space
+    , Str "math"
+    , Space
+    , Str "is"
+    , Space
+    , Str "properly"
+    , Space
+    , Str "formatted"
+    , Space
+    , Str "on"
+    , Space
+    , Str "separate"
+    , Space
+    , Str "lines."
+    ]
+, Para
+    [ Str "Inline"
+    , Space
+    , Str "display"
+    , Space
+    , Str "math:"
+    , Space
+    , Math DisplayMath "x = y"
+    , Space
+    , Str "gets"
+    , Space
+    , Str "formatted"
+    , Space
+    , Str "to"
+    , Space
+    , Str "block."
+    ]
+, Para
+    [ Str "Properly"
+    , Space
+    , Str "closed"
+    , Space
+    , Str "block:"
+    ]
+, Para [ Math DisplayMath "\na = b\n" ]
+, Para [ Str "Works" , Space , Str "correctly." ]
+]

@@ -1,0 +1,14 @@
+[ Para
+    [ Str "Foo"
+    , Space
+    , Str "bar"
+    , SoftBreak
+    , Str "#"
+    , Space
+    , Str "baz"
+    , SoftBreak
+    , Str "Bar"
+    , Space
+    , Str "foo"
+    ]
+]

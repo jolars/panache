@@ -1,0 +1,269 @@
+[ Header
+    2
+    ( "basic-example-lists" , [] , [] )
+    [ Str "Basic"
+    , Space
+    , Str "Example"
+    , Space
+    , Str "Lists"
+    ]
+, OrderedList
+    ( 1 , Example , TwoParens )
+    [ [ Plain
+          [ Str "My"
+          , Space
+          , Str "first"
+          , Space
+          , Str "example"
+          , Space
+          , Str "will"
+          , Space
+          , Str "be"
+          , Space
+          , Str "numbered"
+          , Space
+          , Str "(1)."
+          ]
+      ]
+    , [ Plain
+          [ Str "My"
+          , Space
+          , Str "second"
+          , Space
+          , Str "example"
+          , Space
+          , Str "will"
+          , Space
+          , Str "be"
+          , Space
+          , Str "numbered"
+          , Space
+          , Str "(2)."
+          ]
+      ]
+    ]
+, Para
+    [ Str "Explanation"
+    , Space
+    , Str "of"
+    , Space
+    , Str "examples."
+    ]
+, OrderedList
+    ( 3 , Example , TwoParens )
+    [ [ Plain
+          [ Str "My"
+          , Space
+          , Str "third"
+          , Space
+          , Str "example"
+          , Space
+          , Str "will"
+          , Space
+          , Str "be"
+          , Space
+          , Str "numbered"
+          , Space
+          , Str "(3)."
+          ]
+      ]
+    ]
+, Header
+    2
+    ( "labeled-example-lists" , [] , [] )
+    [ Str "Labeled"
+    , Space
+    , Str "Example"
+    , Space
+    , Str "Lists"
+    ]
+, OrderedList
+    ( 4 , Example , TwoParens )
+    [ [ Plain
+          [ Str "This"
+          , Space
+          , Str "is"
+          , Space
+          , Str "a"
+          , Space
+          , Str "good"
+          , Space
+          , Str "example."
+          ]
+      ]
+    , [ Plain
+          [ Str "This"
+          , Space
+          , Str "is"
+          , Space
+          , Str "a"
+          , Space
+          , Str "bad"
+          , Space
+          , Str "example."
+          ]
+      ]
+    ]
+, Para
+    [ Str "As"
+    , Space
+    , Str "(4)"
+    , Space
+    , Str "illustrates,"
+    , Space
+    , Str "labels"
+    , Space
+    , Str "can"
+    , Space
+    , Str "be"
+    , Space
+    , Str "referenced."
+    ]
+, Header
+    2
+    ( "mixed-labeled-and-unlabeled" , [] , [] )
+    [ Str "Mixed"
+    , Space
+    , Str "Labeled"
+    , Space
+    , Str "and"
+    , Space
+    , Str "Unlabeled"
+    ]
+, OrderedList
+    ( 6 , Example , TwoParens )
+    [ [ Plain [ Str "Unlabeled" , Space , Str "example" ] ]
+    , [ Plain
+          [ Str "Labeled"
+          , Space
+          , Str "example"
+          , Space
+          , Str "with"
+          , Space
+          , Str "identifier"
+          , Space
+          , Quoted DoubleQuote [ Str "foo" ]
+          ]
+      ]
+    , [ Plain
+          [ Str "Another"
+          , Space
+          , Str "unlabeled"
+          , Space
+          , Str "example"
+          ]
+      ]
+    ]
+, Header
+    2
+    ( "examples-with-complex-labels" , [] , [] )
+    [ Str "Examples"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Complex"
+    , Space
+    , Str "Labels"
+    ]
+, OrderedList
+    ( 9 , Example , TwoParens )
+    [ [ Plain
+          [ Str "Example"
+          , Space
+          , Str "with"
+          , Space
+          , Str "underscore"
+          ]
+      ]
+    , [ Plain
+          [ Str "Example"
+          , Space
+          , Str "with"
+          , Space
+          , Str "hyphen"
+          ]
+      ]
+    , [ Plain
+          [ Str "Example"
+          , Space
+          , Str "with"
+          , Space
+          , Str "numbers"
+          ]
+      ]
+    ]
+, Header
+    2
+    ( "example-lists-with-content" , [] , [] )
+    [ Str "Example"
+    , Space
+    , Str "Lists"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Content"
+    ]
+, OrderedList
+    ( 12 , Example , TwoParens )
+    [ [ Plain
+          [ Str "First"
+          , Space
+          , Str "example"
+          , Space
+          , Str "with"
+          , Space
+          , Strong [ Str "bold" ]
+          , Space
+          , Str "text"
+          ]
+      ]
+    , [ Plain
+          [ Str "Second"
+          , Space
+          , Str "example"
+          , Space
+          , Str "with"
+          , Space
+          , Code ( "" , [] , [] ) "code"
+          ]
+      ]
+    , [ Plain
+          [ Str "Third"
+          , Space
+          , Str "example"
+          , Space
+          , Str "with"
+          , Space
+          , Link
+              ( "" , [] , [] )
+              [ Str "a" , Space , Str "link" ]
+              ( "https://example.com" , "" )
+          ]
+      ]
+    ]
+, Para
+    [ Str "Some"
+    , Space
+    , Str "explanatory"
+    , Space
+    , Str "text"
+    , Space
+    , Str "between"
+    , Space
+    , Str "examples."
+    ]
+, OrderedList
+    ( 15 , Example , TwoParens )
+    [ [ Plain
+          [ Str "Fourth"
+          , Space
+          , Str "example"
+          , Space
+          , Str "continues"
+          , Space
+          , Str "numbering"
+          ]
+      ]
+    , [ Plain [ Str "Fifth" , Space , Str "example" ] ]
+    ]
+]

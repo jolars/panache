@@ -1,0 +1,75 @@
+# Pandoc-native conformance allowlist.
+#
+# One case ID per line. Matches the directory prefix under
+# tests/fixtures/pandoc-conformance/corpus/<NNNN>-<section>-<slug>/.
+#
+# Append-only in spirit: only remove an entry if you have a concrete reason and
+# a follow-up plan. Group entries under their section header. Verify each ID
+# appears in the latest tests/pandoc/report.txt before adding.
+
+# inline
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+25
+
+# block
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+
+# imported (machine-imported via scripts/import-pandoc-conformance-from-parser-fixtures.sh)
+26
+28
+30
+31
+32
+33
+35
+42
+52
+55
+62
+64
+75
+76
+77
+80
+86
+97
+99
+104
+109
+110
+119
+129
+131
+134
+146
+150
+156
+159
+160
+161
+166
+173
+174
+187

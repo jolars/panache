@@ -1,0 +1,21 @@
+[ Para
+    [ Str "An" , Space , Str "ordered" , Space , Str "list:" ]
+, OrderedList
+    ( 1 , Decimal , Period )
+    [ [ Plain [ Str "First" , Space , Str "item" ] ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    ]
+, Para
+    [ Str "Using"
+    , Space
+    , Str "hash"
+    , Space
+    , Str "markers:"
+    ]
+, OrderedList
+    ( 1 , DefaultStyle , DefaultDelim )
+    [ [ Plain [ Str "Auto-numbered" , Space , Str "one" ] ]
+    , [ Plain [ Str "Auto-numbered" , Space , Str "two" ] ]
+    ]
+]

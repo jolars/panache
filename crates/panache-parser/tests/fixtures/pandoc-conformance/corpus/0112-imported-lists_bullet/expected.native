@@ -1,0 +1,402 @@
+[ Para
+    [ Str "A"
+    , Space
+    , Str "simple"
+    , Space
+    , Str "bullet"
+    , Space
+    , Str "list:"
+    ]
+, BulletList
+    [ [ Plain [ Str "First" , Space , Str "item" ] ]
+    , [ Plain
+          [ Str "Second"
+          , Space
+          , Str "item"
+          , Space
+          , Str "with"
+          , Space
+          , Str "a"
+          , Space
+          , Str "longer"
+          , Space
+          , Str "line"
+          , Space
+          , Str "that"
+          , Space
+          , Str "might"
+          , Space
+          , Str "need"
+          , Space
+          , Str "wrapping"
+          , Space
+          , Str "if"
+          , Space
+          , Str "it"
+          , Space
+          , Str "gets"
+          , Space
+          , Str "too"
+          , Space
+          , Str "long"
+          ]
+      ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    ]
+, Para
+    [ Str "Another"
+    , Space
+    , Str "list"
+    , Space
+    , Str "with"
+    , Space
+    , Str "different"
+    , Space
+    , Str "marker:"
+    ]
+, BulletList
+    [ [ Para [ Str "Item" , Space , Str "one" ] ]
+    , [ Para [ Str "Item" , Space , Str "two" ] ]
+    , [ Para
+          [ Str "A"
+          , Space
+          , Str "function"
+          , Space
+          , Str "has"
+          , Space
+          , Str "a"
+          , Space
+          , Str "name,"
+          , Space
+          , Str "it"
+          , Space
+          , Str "takes"
+          , Space
+          , Str "a"
+          , Space
+          , Str "number"
+          , Space
+          , Str "of"
+          , Space
+          , Str "arguments"
+          , Space
+          , Str "(possibly"
+          , Space
+          , Str "zero),"
+          , SoftBreak
+          , Str "and"
+          , Space
+          , Str "when"
+          , Space
+          , Str "called"
+          , Space
+          , Str "it"
+          , Space
+          , Str "evaluates"
+          , Space
+          , Str "its"
+          , Space
+          , Str "body"
+          , Space
+          , Str "and"
+          , Space
+          , Str "returns"
+          , Space
+          , Str "a"
+          , Space
+          , Str "value."
+          ]
+      ]
+    , [ Para
+          [ Str "The"
+          , Space
+          , Str "function"
+          , Space
+          , Str "returns"
+          , Space
+          , Str "the"
+          , Space
+          , Str "value"
+          , Space
+          , Str "of"
+          , Space
+          , Str "the"
+          , Space
+          , Str "last"
+          , Space
+          , Str "expression"
+          , Space
+          , Str "in"
+          , Space
+          , Str "the"
+          , Space
+          , Str "body"
+          , Space
+          , Str "except"
+          , SoftBreak
+          , Str "when"
+          , Space
+          , Str "the"
+          , Space
+          , Str "body"
+          , Space
+          , Str "contains"
+          , Space
+          , Str "an"
+          , Space
+          , Str "explicit"
+          , Space
+          , Str "return"
+          , Space
+          , Str "statement."
+          ]
+      ]
+    , [ Para
+          [ Str "Formal"
+          , Space
+          , Str "arguments"
+          , Space
+          , Str "can"
+          , Space
+          , Str "be"
+          , Space
+          , Str "given"
+          , Space
+          , Str "default"
+          , Space
+          , Str "values"
+          , Space
+          , Str "when"
+          , Space
+          , Str "the"
+          , Space
+          , Str "function"
+          , Space
+          , Str "is"
+          , SoftBreak
+          , Str "implemented,"
+          , Space
+          , Str "and"
+          , Space
+          , Str "arguments"
+          , Space
+          , Str "can"
+          , Space
+          , Str "be"
+          , Space
+          , Str "passed"
+          , Space
+          , Str "to"
+          , Space
+          , Str "the"
+          , Space
+          , Str "function"
+          , Space
+          , Str "by"
+          , Space
+          , Str "position"
+          , Space
+          , Str "as"
+          , Space
+          , Str "well"
+          , SoftBreak
+          , Str "as"
+          , Space
+          , Str "by"
+          , Space
+          , Str "name."
+          ]
+      ]
+    , [ Para
+          [ Str "Functions"
+          , Space
+          , Str "should"
+          , Space
+          , Str "do"
+          , Space
+          , Str "a"
+          , Space
+          , Str "single"
+          , Space
+          , Str "well"
+          , Space
+          , Str "defined"
+          , Space
+          , Str "computation"
+          , Space
+          , Str "and"
+          , Space
+          , Str "be"
+          , Space
+          , Str "well"
+          , Space
+          , Str "tested."
+          ]
+      ]
+    ]
+, Para
+    [ Str "A"
+    , Space
+    , Str "list"
+    , Space
+    , Str "needs"
+    , Space
+    , Str "a"
+    , Space
+    , Str "blankline"
+    , Space
+    , Str "before."
+    , Space
+    , Str "This"
+    , Space
+    , Str "is"
+    , Space
+    , Str "not"
+    , Space
+    , Str "a"
+    , Space
+    , Str "list:"
+    , SoftBreak
+    , Str "-"
+    , Space
+    , Str "One"
+    , SoftBreak
+    , Str "-"
+    , Space
+    , Str "Two"
+    ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "is"
+    , Space
+    , Str "one"
+    , Space
+    , Str "list:"
+    ]
+, OrderedList
+    ( 1 , Decimal , Period )
+    [ [ Para [ Str "one" ] ]
+    , [ Para [ Str "two" ] ]
+    , [ Para [ Str "uno" ] ]
+    , [ Para [ Str "dos" ] ]
+    ]
+, Para
+    [ Str "If"
+    , Space
+    , Str "you"
+    , Space
+    , Str "need"
+    , Space
+    , Str "to"
+    , Space
+    , Str "have"
+    , Space
+    , Str "two"
+    , Space
+    , Str "consecutive"
+    , Space
+    , Str "lists,"
+    , SoftBreak
+    , Str "you"
+    , Space
+    , Str "can"
+    , Space
+    , Str "separate"
+    , Space
+    , Str "them"
+    , Space
+    , Str "with"
+    , Space
+    , Str "a"
+    , Space
+    , Str "comment:"
+    ]
+, OrderedList
+    ( 1 , Decimal , Period )
+    [ [ Plain [ Str "one" ] ] , [ Plain [ Str "two" ] ] ]
+, RawBlock (Format "html") "<!-- -->"
+, OrderedList
+    ( 1 , Decimal , Period )
+    [ [ Plain [ Str "uno" ] ] , [ Plain [ Str "dos" ] ] ]
+, BulletList
+    [ [ Para
+          [ Str "this"
+          , Space
+          , Str "is"
+          , Space
+          , Str "a"
+          , Space
+          , Str "list"
+          , Space
+          , Str "item"
+          , SoftBreak
+          , Str "indented"
+          , Space
+          , Str "with"
+          , Space
+          , Str "tabs"
+          ]
+      ]
+    , [ Para
+          [ Str "this"
+          , Space
+          , Str "is"
+          , Space
+          , Str "a"
+          , Space
+          , Str "list"
+          , Space
+          , Str "item"
+          , SoftBreak
+          , Str "indented"
+          , Space
+          , Str "with"
+          , Space
+          , Str "spaces"
+          ]
+      , BulletList
+          [ [ Para
+                [ Str "this"
+                , Space
+                , Str "is"
+                , Space
+                , Str "an"
+                , Space
+                , Str "example"
+                , Space
+                , Str "list"
+                , Space
+                , Str "item"
+                , SoftBreak
+                , Str "indented"
+                , Space
+                , Str "with"
+                , Space
+                , Str "tabs"
+                ]
+            ]
+          , [ Para
+                [ Str "this"
+                , Space
+                , Str "is"
+                , Space
+                , Str "an"
+                , Space
+                , Str "example"
+                , Space
+                , Str "list"
+                , Space
+                , Str "item"
+                , SoftBreak
+                , Str "indented"
+                , Space
+                , Str "with"
+                , Space
+                , Str "spaces"
+                ]
+            ]
+          ]
+      ]
+    ]
+]

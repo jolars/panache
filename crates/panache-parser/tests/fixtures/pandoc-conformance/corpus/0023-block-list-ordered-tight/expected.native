@@ -1,0 +1,7 @@
+[ OrderedList
+    ( 1 , Decimal , Period )
+    [ [ Plain [ Str "first" ] ]
+    , [ Plain [ Str "second" ] ]
+    , [ Plain [ Str "third" ] ]
+    ]
+]

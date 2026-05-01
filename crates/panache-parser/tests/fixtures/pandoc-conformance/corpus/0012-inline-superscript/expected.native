@@ -1,0 +1,9 @@
+[ Para
+    [ Str "x"
+    , Superscript [ Str "2" ]
+    , Space
+    , Str "is"
+    , Space
+    , Str "squared"
+    ]
+]

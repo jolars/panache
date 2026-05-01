@@ -1,0 +1,67 @@
+[ Header
+    1
+    ( "inline-footnotes" , [] , [] )
+    [ Str "Inline" , Space , Str "Footnotes" ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "document"
+    , Space
+    , Str "has"
+    , Space
+    , Str "an"
+    , Space
+    , Str "inline"
+    , Space
+    , Str "footnote"
+    , Note
+        [ Para
+            [ Str "This"
+            , Space
+            , Str "is"
+            , Space
+            , Str "an"
+            , Space
+            , Str "inline"
+            , Space
+            , Str "footnote"
+            , Space
+            , Str "with"
+            , Space
+            , Str "some"
+            , Space
+            , Str "text."
+            ]
+        ]
+    , SoftBreak
+    , Str "that"
+    , Space
+    , Str "should"
+    , Space
+    , Str "be"
+    , Space
+    , Str "parsable"
+    , Space
+    , Str "and"
+    , Space
+    , Str "formattable."
+    ]
+, Para
+    [ Str "Another"
+    , Space
+    , Str "inline"
+    , Space
+    , Str "footnote"
+    , Space
+    , Str "here"
+    , Note [ Para [ Str "Another" , Space , Str "note" ] ]
+    , Space
+    , Str "in"
+    , Space
+    , Str "the"
+    , Space
+    , Str "same"
+    , Space
+    , Str "document."
+    ]
+]

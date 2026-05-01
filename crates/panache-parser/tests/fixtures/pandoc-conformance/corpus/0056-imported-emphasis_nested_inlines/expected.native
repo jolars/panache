@@ -1,0 +1,475 @@
+[ Header
+    1
+    ( "emphasis-with-nested-inline-elements" , [] , [] )
+    [ Str "Emphasis"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Nested"
+    , Space
+    , Str "Inline"
+    , Space
+    , Str "Elements"
+    ]
+, Header
+    2
+    ( "code-spans-in-emphasis" , [] , [] )
+    [ Str "Code"
+    , Space
+    , Str "Spans"
+    , Space
+    , Str "in"
+    , Space
+    , Str "Emphasis"
+    ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Code ( "" , [] , [] ) "code here"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "text"
+        , Space
+        , Code ( "" , [] , [] ) "code here"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Emph
+            [ Str "text"
+            , Space
+            , Code ( "" , [] , [] ) "code here"
+            , Space
+            , Str "end"
+            ]
+        ]
+    ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Code ( "" , [] , [] ) "code * asterisk"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "text"
+        , Space
+        , Code ( "" , [] , [] ) "code ** asterisks"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Header
+    2
+    ( "math-in-emphasis" , [] , [] )
+    [ Str "Math" , Space , Str "in" , Space , Str "Emphasis" ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Math InlineMath "math"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "text"
+        , Space
+        , Math InlineMath "math"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Math InlineMath "a * b"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "text"
+        , Space
+        , Math InlineMath "a ** b"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Header
+    2
+    ( "links-in-emphasis" , [] , [] )
+    [ Str "Links" , Space , Str "in" , Space , Str "Emphasis" ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Link ( "" , [] , [] ) [ Str "link" ] ( "url" , "" )
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "text"
+        , Space
+        , Link ( "" , [] , [] ) [ Str "link" ] ( "url" , "" )
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Link
+            ( "" , [] , [] )
+            [ Str "link" , Space , Str "*" , Space , Str "here" ]
+            ( "url" , "" )
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "text"
+        , Space
+        , Link
+            ( "" , [] , [] )
+            [ Str "link" , Space , Str "**" , Space , Str "here" ]
+            ( "url" , "" )
+        , Space
+        , Str "end"
+        ]
+    ]
+, Header
+    2
+    ( "images-in-emphasis" , [] , [] )
+    [ Str "Images" , Space , Str "in" , Space , Str "Emphasis" ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Image ( "" , [] , [] ) [ Str "alt" ] ( "img.png" , "" )
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "text"
+        , Space
+        , Image ( "" , [] , [] ) [ Str "alt" ] ( "img.png" , "" )
+        , Space
+        , Str "end"
+        ]
+    ]
+, Header
+    2
+    ( "nested-emphasis-and-other-delimiters" , [] , [] )
+    [ Str "Nested"
+    , Space
+    , Str "Emphasis"
+    , Space
+    , Str "and"
+    , Space
+    , Str "Other"
+    , Space
+    , Str "Delimiters"
+    ]
+, Para
+    [ Emph
+        [ Str "em"
+        , Space
+        , Strikeout [ Str "strike" ]
+        , Space
+        , Str "text"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "strong"
+        , Space
+        , Strikeout [ Str "strike" ]
+        , Space
+        , Str "text"
+        ]
+    ]
+, Para
+    [ Strikeout
+        [ Str "strike"
+        , Space
+        , Emph [ Str "em" ]
+        , Space
+        , Str "text"
+        ]
+    ]
+, Para
+    [ Strikeout
+        [ Str "strike"
+        , Space
+        , Strong [ Str "strong" ]
+        , Space
+        , Str "text"
+        ]
+    ]
+, Para
+    [ Emph
+        [ Str "em"
+        , Space
+        , Superscript [ Str "super" ]
+        , Space
+        , Str "text"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "strong"
+        , Space
+        , Superscript [ Str "super" ]
+        , Space
+        , Str "text"
+        ]
+    ]
+, Para
+    [ Emph
+        [ Str "em"
+        , Space
+        , Subscript [ Str "sub" ]
+        , Space
+        , Str "text"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "strong"
+        , Space
+        , Subscript [ Str "sub" ]
+        , Space
+        , Str "text"
+        ]
+    ]
+, Header
+    2
+    ( "complex-nesting" , [] , [] )
+    [ Str "Complex" , Space , Str "Nesting" ]
+, Para
+    [ Emph
+        [ Str "em"
+        , Space
+        , Str "with"
+        , Space
+        , Code ( "" , [] , [] ) "code"
+        , Str ","
+        , Space
+        , Link ( "" , [] , [] ) [ Str "link" ] ( "url" , "" )
+        , Str ","
+        , Space
+        , Str "and"
+        , Space
+        , Strikeout [ Str "strike" ]
+        , Space
+        , Str "all"
+        , Space
+        , Str "together"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "strong"
+        , Space
+        , Str "with"
+        , Space
+        , Code ( "" , [] , [] ) "code"
+        , Str ","
+        , Space
+        , Link ( "" , [] , [] ) [ Str "link" ] ( "url" , "" )
+        , Str ","
+        , Space
+        , Str "and"
+        , Space
+        , Strikeout [ Str "strike" ]
+        , Space
+        , Str "all"
+        , Space
+        , Str "together"
+        ]
+    ]
+, Header
+    2
+    ( "edge-cases-empty-and-adjacent" , [] , [] )
+    [ Str "Edge"
+    , Space
+    , Str "Cases:"
+    , Space
+    , Str "Empty"
+    , Space
+    , Str "and"
+    , Space
+    , Str "Adjacent"
+    ]
+, Para [ Emph [ Code ( "" , [] , [] ) "code" ] ]
+, Para [ Strong [ Code ( "" , [] , [] ) "code" ] ]
+, Para
+    [ Emph
+        [ Link ( "" , [] , [] ) [ Str "link" ] ( "url" , "" ) ]
+    ]
+, Para
+    [ Strong
+        [ Link ( "" , [] , [] ) [ Str "link" ] ( "url" , "" ) ]
+    ]
+, Para [ Code ( "" , [] , [] ) "code *inside* code" ]
+, Para
+    [ Link
+        ( "" , [] , [] )
+        [ Str "link"
+        , Space
+        , Emph [ Str "emphasis" ]
+        , Space
+        , Str "link"
+        ]
+        ( "url" , "" )
+    ]
+, Header
+    2
+    ( "escapes-in-nested-content" , [] , [] )
+    [ Str "Escapes"
+    , Space
+    , Str "in"
+    , Space
+    , Str "Nested"
+    , Space
+    , Str "Content"
+    ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Str "*not"
+        , Space
+        , Str "emphasis*"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Code ( "" , [] , [] ) "code \\*"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Link
+            ( "" , [] , [] )
+            [ Str "link" , Space , Str "*" ]
+            ( "url" , "" )
+        , Space
+        , Str "end"
+        ]
+    ]
+, Header
+    2
+    ( "unclosed-constructs" , [] , [] )
+    [ Str "Unclosed" , Space , Str "Constructs" ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Str "`unclosed"
+        , Space
+        , Str "code"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Str "[unclosed"
+        , Space
+        , Str "link"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Para
+    [ Emph
+        [ Str "text"
+        , Space
+        , Subscript []
+        , Str "unclosed"
+        , Space
+        , Str "strike"
+        , Space
+        , Str "end"
+        ]
+    ]
+, Header
+    2
+    ( "multiple-nesting-levels" , [] , [] )
+    [ Str "Multiple"
+    , Space
+    , Str "Nesting"
+    , Space
+    , Str "Levels"
+    ]
+, Para
+    [ Strong
+        [ Emph
+            [ Str "triple"
+            , Space
+            , Str "with"
+            , Space
+            , Code ( "" , [] , [] ) "code"
+            , Space
+            , Str "here"
+            ]
+        ]
+    ]
+, Para
+    [ Strong
+        [ Emph
+            [ Str "triple"
+            , Space
+            , Str "with"
+            , Space
+            , Link ( "" , [] , [] ) [ Str "link" ] ( "url" , "" )
+            , Space
+            , Str "here"
+            ]
+        ]
+    ]
+, Para
+    [ Strong
+        [ Emph
+            [ Str "triple"
+            , Space
+            , Str "with"
+            , Space
+            , Strikeout [ Str "strike" ]
+            , Space
+            , Str "here"
+            ]
+        ]
+    ]
+]

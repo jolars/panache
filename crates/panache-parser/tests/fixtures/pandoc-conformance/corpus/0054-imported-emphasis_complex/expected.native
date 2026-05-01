@@ -1,0 +1,240 @@
+[ Header
+    1
+    ( "emphasis-complex-cases-test-suite" , [] , [] )
+    [ Str "Emphasis"
+    , Space
+    , Str "Complex"
+    , Space
+    , Str "Cases"
+    , Space
+    , Str "Test"
+    , Space
+    , Str "Suite"
+    ]
+, Header
+    2
+    ( "rule-of-3s" , [] , [] )
+    [ Str "Rule" , Space , Str "of" , Space , Str "3s" ]
+, Para [ Strong [ Emph [ Str "bar" ] ] ]
+, Para [ Str "**foo*" ]
+, Para [ Str "*foo**" ]
+, Para [ Str "*" , Strong [ Str "foo" ] ]
+, Para [ Strong [ Str "foo" ] , Str "*" ]
+, Header
+    2
+    ( "nested-emphasis" , [] , [] )
+    [ Str "Nested" , Space , Str "Emphasis" ]
+, Para
+    [ Strong
+        [ Str "foo"
+        , Space
+        , Emph [ Str "bar" ]
+        , Space
+        , Str "baz"
+        ]
+    ]
+, Para
+    [ Emph
+        [ Str "foo"
+        , Space
+        , Strong [ Str "bar" ]
+        , Space
+        , Str "baz"
+        ]
+    ]
+, Para [ Strong [ Emph [ Str "foo" ] , Space , Str "bar" ] ]
+, Para [ Strong [ Str "foo" , Space , Emph [ Str "bar" ] ] ]
+, Header
+    2
+    ( "overlapping-delimiters" , [] , [] )
+    [ Str "Overlapping" , Space , Str "Delimiters" ]
+, Para
+    [ Str "*foo"
+    , Space
+    , Strong [ Str "bar*" , Space , Str "baz" ]
+    ]
+, Para
+    [ Str "**foo" , Space , Str "*bar**" , Space , Str "baz*" ]
+, Header
+    2
+    ( "adjacent-patterns" , [] , [] )
+    [ Str "Adjacent" , Space , Str "Patterns" ]
+, Para [ Str "*foo**bar*" ]
+, Para [ Emph [ Str "foo" ] , Space , Emph [ Str "bar" ] ]
+, Para [ Emph [ Str "foo" ] , Str "bar*" ]
+, Header
+    2
+    ( "intraword-emphasis-asterisks" , [] , [] )
+    [ Str "Intraword"
+    , Space
+    , Str "Emphasis"
+    , Space
+    , Str "(asterisks)"
+    ]
+, Para
+    [ Str "un" , Emph [ Str "frigging" ] , Str "believable" ]
+, Para
+    [ Str "un" , Strong [ Str "frigging" ] , Str "believable" ]
+, Header
+    2
+    ( "intraword-emphasis-underscores" , [] , [] )
+    [ Str "Intraword"
+    , Space
+    , Str "Emphasis"
+    , Space
+    , Str "(underscores)"
+    ]
+, Para [ Str "feas_ible" ]
+, Para [ Str "un_frig_gable" ]
+, Header
+    2
+    ( "whitespace-flanking" , [] , [] )
+    [ Str "Whitespace" , Space , Str "Flanking" ]
+, BulletList [ [ Plain [ Str "foo*" ] ] ]
+, Para [ Emph [ Str "foo" , Space ] ]
+, BulletList [ [ Plain [ Str "foo" , Space , Str "*" ] ] ]
+, Para [ Str "**" , Space , Str "bar**" ]
+, Para [ Strong [ Str "bar" , Space ] ]
+, Para [ Str "**" , Space , Str "bar" , Space , Str "**" ]
+, Header
+    2
+    ( "punctuation-flanking" , [] , [] )
+    [ Str "Punctuation" , Space , Str "Flanking" ]
+, Para [ Quoted DoubleQuote [ Emph [ Str "foo" ] ] ]
+, Para [ Quoted DoubleQuote [ Strong [ Str "bar" ] ] ]
+, Para [ Str "(" , Emph [ Str "italic" ] , Str ")" ]
+, Para [ Str "(" , Strong [ Str "bold" ] , Str ")" ]
+, Header
+    2
+    ( "mixed-delimiters" , [] , [] )
+    [ Str "Mixed" , Space , Str "Delimiters" ]
+, Para
+    [ Str "*foo"
+    , Space
+    , Strong [ Str "bar*" , Space , Str "baz" ]
+    ]
+, Para
+    [ Str "**foo" , Space , Str "*bar**" , Space , Str "baz*" ]
+, Para
+    [ Emph
+        [ Str "foo"
+        , Space
+        , Strong [ Str "bar" ]
+        , Space
+        , Str "baz"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "foo"
+        , Space
+        , Emph [ Str "bar" ]
+        , Space
+        , Str "baz"
+        ]
+    ]
+, Header
+    2
+    ( "same-character-sequences" , [] , [] )
+    [ Str "Same"
+    , Space
+    , Str "Character"
+    , Space
+    , Str "Sequences"
+    ]
+, Para [ Strong [ Emph [ Str "foo" ] ] , Space , Str "bar" ]
+, Para [ Emph [ Strong [ Str "foo" ] , Space , Str "bar" ] ]
+, Para
+    [ Strong [ Str "foo" , Space ]
+    , Emph [ Str "bar" ]
+    , Str "**"
+    ]
+, Header
+    2
+    ( "backslash-escapes" , [] , [] )
+    [ Str "Backslash" , Space , Str "Escapes" ]
+, Para [ Str "*not" , Space , Str "emphasis*" ]
+, Para
+    [ Str "*" , Emph [ Str "not" , Space , Str "bold*" ] ]
+, Para
+    [ Emph
+        [ Str "escape" , Space , Str "*" , Space , Str "inside" ]
+    ]
+, Para
+    [ Strong
+        [ Str "escape" , Space , Str "**" , Space , Str "inside" ]
+    ]
+, Header
+    2
+    ( "left-flanking-only" , [] , [] )
+    [ Str "Left-Flanking" , Space , Str "Only" ]
+, Para [ Str "*a" ]
+, Para [ Str "**a" ]
+, Header
+    2
+    ( "right-flanking-only" , [] , [] )
+    [ Str "Right-Flanking" , Space , Str "Only" ]
+, Para [ Str "a*" ]
+, Para [ Str "a**" ]
+, Header
+    2
+    ( "both-flanking" , [] , [] )
+    [ Str "Both" , Space , Str "Flanking" ]
+, Para [ Str "a*b" ]
+, Para [ Str "a**b" ]
+, Header
+    2
+    ( "underscore-word-boundary" , [] , [] )
+    [ Str "Underscore"
+    , Space
+    , Str "Word"
+    , Space
+    , Str "Boundary"
+    ]
+, Para [ Str "foo_bar_baz" ]
+, Para [ Emph [ Str "foo_bar" ] ]
+, Para [ Emph [ Str "foo_bar_baz" ] ]
+, Header
+    2
+    ( "complex-nesting" , [] , [] )
+    [ Str "Complex" , Space , Str "Nesting" ]
+, Para
+    [ Emph
+        [ Strong [ Str "foo" , Space ]
+        , Str "bar"
+        , Strong [ Space , Str "baz" ]
+        ]
+    ]
+, Para
+    [ Strong
+        [ Emph [ Str "foo" ]
+        , Space
+        , Str "bar"
+        , Space
+        , Emph [ Str "baz" ]
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "foo"
+        , Space
+        , Emph
+            [ Str "bar"
+            , Space
+            , Strong [ Str "nested" ]
+            , Space
+            , Str "baz"
+            ]
+        , Space
+        , Str "qux"
+        ]
+    ]
+, Header
+    2
+    ( "empty-emphasis" , [] , [] )
+    [ Str "Empty" , Space , Str "Emphasis" ]
+, Para [ Str "**" ]
+, HorizontalRule
+, BulletList [ [ BulletList [ [] ] ] ]
+, HorizontalRule
+]

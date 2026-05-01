@@ -1,0 +1,334 @@
+[ Header
+    1
+    ( "paragraph-continuation-test" , [] , [] )
+    [ Str "Paragraph"
+    , Space
+    , Str "Continuation"
+    , Space
+    , Str "Test"
+    ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "is"
+    , Space
+    , Str "a"
+    , Space
+    , Str "multi-line"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "that"
+    , Space
+    , Str "continues"
+    , SoftBreak
+    , Str "on"
+    , Space
+    , Str "the"
+    , Space
+    , Str "second"
+    , Space
+    , Str "line"
+    , Space
+    , Str "and"
+    , Space
+    , Str "even"
+    , Space
+    , Str "has"
+    , Space
+    , Str "a"
+    , Space
+    , Str "third"
+    , Space
+    , Str "line"
+    , SoftBreak
+    , Str "with"
+    , Space
+    , Str "various"
+    , Space
+    , Str "content."
+    ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "is"
+    , Space
+    , Str "followed"
+    , Space
+    , Str "by"
+    , Space
+    , Str "a"
+    , Space
+    , Str "blockquote:"
+    ]
+, BlockQuote
+    [ Para
+        [ Str "Blockquote"
+        , Space
+        , Str "content"
+        , Space
+        , Str "here"
+        , SoftBreak
+        , Str "with"
+        , Space
+        , Str "continuation"
+        ]
+    ]
+, Para
+    [ Str "Back"
+    , Space
+    , Str "to"
+    , Space
+    , Str "a"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "after"
+    , Space
+    , Str "the"
+    , Space
+    , Str "blockquote."
+    ]
+, HorizontalRule
+, Header
+    2
+    ( "paragraph-before-list" , [] , [] )
+    [ Str "Paragraph"
+    , Space
+    , Str "Before"
+    , Space
+    , Str "List"
+    ]
+, Para
+    [ Str "Regular"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "text"
+    , Space
+    , Str "here"
+    , SoftBreak
+    , Str "continues"
+    , Space
+    , Str "on"
+    , Space
+    , Str "next"
+    , Space
+    , Str "line."
+    ]
+, BulletList
+    [ [ Plain
+          [ Str "List" , Space , Str "item" , Space , Str "one" ]
+      ]
+    , [ Plain
+          [ Str "List" , Space , Str "item" , Space , Str "two" ]
+      ]
+    ]
+, Header
+    2
+    ( "paragraph-before-code-block" , [] , [] )
+    [ Str "Paragraph"
+    , Space
+    , Str "Before"
+    , Space
+    , Str "Code"
+    , Space
+    , Str "Block"
+    ]
+, Para
+    [ Str "Some"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "text"
+    , Space
+    , Str "that"
+    , Space
+    , Str "continues"
+    , SoftBreak
+    , Str "across"
+    , Space
+    , Str "multiple"
+    , Space
+    , Str "lines"
+    , Space
+    , Str "here."
+    ]
+, CodeBlock
+    ( "" , [ "python" ] , [] ) "def example():\n    pass"
+, Header
+    2
+    ( "paragraph-before-heading" , [] , [] )
+    [ Str "Paragraph"
+    , Space
+    , Str "Before"
+    , Space
+    , Str "Heading"
+    ]
+, Para
+    [ Str "Multi-line"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "text"
+    , SoftBreak
+    , Str "with"
+    , Space
+    , Str "continuation"
+    , Space
+    , Str "lines."
+    ]
+, Header
+    3
+    ( "another-heading" , [] , [] )
+    [ Str "Another" , Space , Str "Heading" ]
+, Header
+    2
+    ( "nested-context" , [] , [] )
+    [ Str "Nested" , Space , Str "Context" ]
+, BlockQuote
+    [ Para
+        [ Str "This"
+        , Space
+        , Str "is"
+        , Space
+        , Str "a"
+        , Space
+        , Str "paragraph"
+        , Space
+        , Str "inside"
+        , Space
+        , Str "a"
+        , Space
+        , Str "blockquote"
+        , SoftBreak
+        , Str "that"
+        , Space
+        , Str "continues"
+        , Space
+        , Str "on"
+        , Space
+        , Str "the"
+        , Space
+        , Str "next"
+        , Space
+        , Str "line"
+        , SoftBreak
+        , Str "with"
+        , Space
+        , Str "more"
+        , Space
+        , Str "content."
+        ]
+    , Para
+        [ Str "Second"
+        , Space
+        , Str "paragraph"
+        , Space
+        , Str "in"
+        , Space
+        , Str "blockquote"
+        , SoftBreak
+        , Str "also"
+        , Space
+        , Str "continues."
+        ]
+    ]
+, BulletList
+    [ [ Para
+          [ Str "List"
+          , Space
+          , Str "item"
+          , Space
+          , Str "with"
+          , Space
+          , Str "paragraph"
+          ]
+      , Para
+          [ Str "Indented"
+          , Space
+          , Str "paragraph"
+          , Space
+          , Str "in"
+          , Space
+          , Str "list"
+          , Space
+          , Str "item"
+          , SoftBreak
+          , Str "continues"
+          , Space
+          , Str "here."
+          ]
+      ]
+    , [ Para
+          [ Str "Another" , Space , Str "list" , Space , Str "item" ]
+      ]
+    ]
+, Header
+    2
+    ( "hard-line-breaks" , [] , [] )
+    [ Str "Hard" , Space , Str "Line" , Space , Str "Breaks" ]
+, Para
+    [ Str "Paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Str "hard"
+    , Space
+    , Str "break"
+    , LineBreak
+    , Str "continues"
+    , Space
+    , Str "here"
+    , Space
+    , Str "after"
+    , Space
+    , Str "backslash."
+    ]
+, Para
+    [ Str "Paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Str "trailing"
+    , Space
+    , Str "spaces"
+    , LineBreak
+    , Str "continues"
+    , Space
+    , Str "here"
+    , Space
+    , Str "after"
+    , Space
+    , Str "two"
+    , Space
+    , Str "spaces."
+    ]
+, Header
+    2
+    ( "end-of-document" , [] , [] )
+    [ Str "End" , Space , Str "of" , Space , Str "Document" ]
+, Para
+    [ Str "Final"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "continues"
+    , SoftBreak
+    , Str "to"
+    , Space
+    , Str "the"
+    , Space
+    , Str "very"
+    , Space
+    , Str "end"
+    , Space
+    , Str "of"
+    , Space
+    , Str "the"
+    , Space
+    , Str "file."
+    ]
+]

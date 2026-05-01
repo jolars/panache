@@ -1,0 +1,85 @@
+[ Header
+    1
+    ( "test-definition-list-inside-footnote" , [] , [] )
+    [ Str "Test:"
+    , Space
+    , Str "Definition"
+    , Space
+    , Str "list"
+    , Space
+    , Str "inside"
+    , Space
+    , Str "footnote"
+    ]
+, Para
+    [ Str "Text"
+    , Space
+    , Str "with"
+    , Space
+    , Str "footnote"
+    , Space
+    , Str "reference"
+    , Note
+        [ DefinitionList
+            [ ( [ Str "Footnote"
+                , Space
+                , Str "containing"
+                , Space
+                , Str "a"
+                , Space
+                , Str "definition"
+                , Space
+                , Str "list:"
+                ]
+              , [ [ Para [ Str "First" , Space , Str "definition" ] ]
+                , [ Para
+                      [ Str "Second"
+                      , Space
+                      , Str "definition"
+                      , Space
+                      , Str "with"
+                      , Space
+                      , Str "nested"
+                      , Space
+                      , Str "list:"
+                      ]
+                  , BulletList
+                      [ [ Plain
+                            [ Str "Nested"
+                            , Space
+                            , Str "bullet"
+                            , Space
+                            , Str "1"
+                            ]
+                        ]
+                      , [ Plain
+                            [ Str "Nested"
+                            , Space
+                            , Str "bullet"
+                            , Space
+                            , Str "2"
+                            ]
+                        ]
+                      ]
+                  ]
+                , [ Para [ Str "Third" , Space , Str "definition" ] ]
+                ]
+              )
+            ]
+        , Para
+            [ Str "Continuing"
+            , Space
+            , Str "paragraph"
+            , Space
+            , Str "after"
+            , Space
+            , Str "the"
+            , Space
+            , Str "definition"
+            , Space
+            , Str "list."
+            ]
+        ]
+    , Str "."
+    ]
+]

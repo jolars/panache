@@ -1,0 +1,18 @@
+[ Header 1 ( "test" , [] , [] ) [ Str "Test" ]
+, Para
+    [ Str "Text"
+    , Space
+    , Str "with"
+    , Space
+    , Str "ref"
+    , Note
+        [ DefinitionList
+            [ ( [ Str "Footnote" , Space , Str "text" ]
+              , [ [ Para [ Str "Definition" ] ] ]
+              )
+            ]
+        , Para [ Str "Continuing" , Space , Str "paragraph." ]
+        ]
+    , Str "."
+    ]
+]

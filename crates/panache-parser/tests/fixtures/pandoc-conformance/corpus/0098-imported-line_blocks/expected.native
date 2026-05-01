@@ -1,0 +1,8 @@
+[ Para
+    [ Str "Basic" , Space , Str "line" , Space , Str "block:" ]
+, LineBlock
+    [ [ Str "The" , Space , Str "first" , Space , Str "line." ]
+    , [ Str "The" , Space , Str "second" , Space , Str "line." ]
+    , [ Str "The" , Space , Str "third" , Space , Str "line." ]
+    ]
+]

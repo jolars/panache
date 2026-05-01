@@ -1,0 +1,68 @@
+[ Header 1 ( "images" , [] , [] ) [ Str "Images" ]
+, Para
+    [ Str "Simple"
+    , Space
+    , Str "image:"
+    , Space
+    , Image
+        ( "" , [] , [] )
+        [ Str "alt" , Space , Str "text" ]
+        ( "image.png" , "" )
+    ]
+, Para
+    [ Str "With"
+    , Space
+    , Str "title:"
+    , Space
+    , Image
+        ( "" , [] , [] )
+        [ Str "alt" , Space , Str "text" ]
+        ( "image.png" , "Title" )
+    ]
+, Para
+    [ Str "Empty"
+    , Space
+    , Str "alt:"
+    , Space
+    , Image ( "" , [] , [] ) [] ( "image.png" , "" )
+    ]
+, Para
+    [ Str "Complex"
+    , Space
+    , Str "alt:"
+    , Space
+    , Image
+        ( "" , [] , [] )
+        [ Strong [ Str "bold" ]
+        , Space
+        , Str "alt"
+        , Space
+        , Str "text"
+        ]
+        ( "image.png" , "" )
+    ]
+, Para
+    [ Str "Automatic"
+    , Space
+    , Str "link"
+    , Space
+    , Str "style:"
+    , Space
+    , Link
+        ( "" , [ "uri" ] , [] )
+        [ Str "https://example.com/image.png" ]
+        ( "https://example.com/image.png" , "" )
+    ]
+, Para [ Str "Separate:" ]
+, Figure
+    ( "" , [] , [] )
+    (Caption
+       Nothing [ Plain [ Str "alt" , Space , Str "text" ] ])
+    [ Plain
+        [ Image
+            ( "" , [] , [] )
+            [ Str "alt" , Space , Str "text" ]
+            ( "image.png" , "" )
+        ]
+    ]
+]

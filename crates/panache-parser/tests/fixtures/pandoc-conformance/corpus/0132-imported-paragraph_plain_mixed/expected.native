@@ -1,0 +1,139 @@
+[ Header
+    1
+    ( "mixed-paragraph-and-plain" , [] , [] )
+    [ Str "Mixed"
+    , Space
+    , Str "Paragraph"
+    , Space
+    , Str "and"
+    , Space
+    , Str "PLAIN"
+    ]
+, Header
+    2
+    ( "definition-immediately-after-paragraph" , [] , [] )
+    [ Str "Definition"
+    , Space
+    , Str "Immediately"
+    , Space
+    , Str "After"
+    , Space
+    , Str "Paragraph"
+    ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "is"
+    , Space
+    , Str "a"
+    , Space
+    , Str "regular"
+    , Space
+    , Str "paragraph"
+    , SoftBreak
+    , Str "that"
+    , Space
+    , Str "continues"
+    , Space
+    , Str "on"
+    , Space
+    , Str "multiple"
+    , Space
+    , Str "lines."
+    ]
+, DefinitionList
+    [ ( [ Str "Definition" , Space , Str "term" ]
+      , [ [ Plain
+              [ Str "Definition"
+              , Space
+              , Str "content"
+              , Space
+              , Str "(PLAIN)"
+              , SoftBreak
+              , Str "continues"
+              , Space
+              , Str "here."
+              ]
+          ]
+        ]
+      )
+    ]
+, Para
+    [ Str "Another"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "after"
+    , Space
+    , Str "the"
+    , Space
+    , Str "definition"
+    , SoftBreak
+    , Str "spans"
+    , Space
+    , Str "multiple"
+    , Space
+    , Str "lines"
+    , Space
+    , Str "too."
+    ]
+, Header
+    2
+    ( "adjacent-blocks" , [] , [] )
+    [ Str "Adjacent" , Space , Str "Blocks" ]
+, Para
+    [ Str "Paragraph"
+    , Space
+    , Str "one"
+    , SoftBreak
+    , Str "continues."
+    ]
+, DefinitionList
+    [ ( [ Str "Term" , Space , Str "A" ]
+      , [ [ Plain
+              [ Str "Definition"
+              , Space
+              , Str "A"
+              , Space
+              , Str "(PLAIN)"
+              , SoftBreak
+              , Str "continues."
+              ]
+          ]
+        ]
+      )
+    ]
+, Para
+    [ Str "Paragraph"
+    , Space
+    , Str "two"
+    , SoftBreak
+    , Str "continues."
+    ]
+, DefinitionList
+    [ ( [ Str "Term" , Space , Str "B" ]
+      , [ [ Plain
+              [ Str "Definition"
+              , Space
+              , Str "B"
+              , Space
+              , Str "(PLAIN)"
+              , SoftBreak
+              , Str "continues."
+              ]
+          ]
+        ]
+      )
+    ]
+, Para
+    [ Str "Paragraph"
+    , Space
+    , Str "three"
+    , SoftBreak
+    , Str "continues"
+    , Space
+    , Str "to"
+    , Space
+    , Str "end."
+    ]
+]

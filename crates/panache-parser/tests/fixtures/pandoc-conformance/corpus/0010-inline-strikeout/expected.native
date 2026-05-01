@@ -1,0 +1,10 @@
+[ Para
+    [ Str "this"
+    , Space
+    , Str "is"
+    , Space
+    , Strikeout [ Str "struck" ]
+    , Space
+    , Str "out"
+    ]
+]

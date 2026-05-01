@@ -1,0 +1,10 @@
+[ Para
+    [ Str "water"
+    , Space
+    , Str "is"
+    , Space
+    , Str "H"
+    , Subscript [ Str "2" ]
+    , Str "O"
+    ]
+]

@@ -1,0 +1,45 @@
+[ Header
+    1
+    ( "latex-environment-test" , [] , [] )
+    [ Str "LaTeX"
+    , Space
+    , Str "Environment"
+    , Space
+    , Str "Test"
+    ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "document"
+    , Space
+    , Str "tests"
+    , Space
+    , Str "LaTeX"
+    , Space
+    , Str "environment"
+    , Space
+    , Str "parsing."
+    ]
+, RawBlock
+    (Format "tex")
+    "\\begin{tabular}{|l|l|}\\hline\nAge & Frequency \\\\ \\hline\n18--25  & 15 \\\\\n26--35  & 33 \\\\\n36--45  & 22 \\\\ \\hline\n\\end{tabular}"
+, Para
+    [ Str "The"
+    , Space
+    , Str "table"
+    , Space
+    , Str "above"
+    , Space
+    , Str "should"
+    , Space
+    , Str "be"
+    , Space
+    , Str "preserved"
+    , Space
+    , Str "as"
+    , Space
+    , Str "raw"
+    , Space
+    , Str "LaTeX."
+    ]
+]

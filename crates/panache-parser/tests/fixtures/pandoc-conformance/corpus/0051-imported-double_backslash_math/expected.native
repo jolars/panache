@@ -1,0 +1,133 @@
+[ Header
+    1
+    ( "double-backslash-math-test" , [] , [] )
+    [ Str "Double"
+    , Space
+    , Str "Backslash"
+    , Space
+    , Str "Math"
+    , Space
+    , Str "Test"
+    ]
+, Para
+    [ Str "Testing"
+    , Space
+    , Str "double"
+    , Space
+    , Str "backslash"
+    , Space
+    , Str "inline"
+    , Space
+    , Str "and"
+    , Space
+    , Str "display"
+    , Space
+    , Str "math"
+    , Space
+    , Str "delimiters."
+    ]
+, Para
+    [ Str "Inline"
+    , Space
+    , Str "math"
+    , Space
+    , Str "with"
+    , Space
+    , Str "double"
+    , Space
+    , Str "backslash:"
+    , Space
+    , Str "\\(x^2"
+    , Space
+    , Str "+"
+    , Space
+    , Str "y^2"
+    , Space
+    , Str "="
+    , Space
+    , Str "z^2\\)"
+    , Space
+    , Str "in"
+    , Space
+    , Str "text."
+    ]
+, Para
+    [ Str "Display"
+    , Space
+    , Str "math"
+    , Space
+    , Str "with"
+    , Space
+    , Str "double"
+    , Space
+    , Str "backslash:"
+    ]
+, Para
+    [ Str "\\["
+    , Space
+    , RawInline (Format "tex") "\\int"
+    , Str "_0^"
+    , RawInline (Format "tex") "\\infty "
+    , Str "e"
+    , Superscript [ Str "{-x" ]
+    , Str "2}"
+    , Space
+    , Str "dx"
+    , Space
+    , Str "="
+    , Space
+    , RawInline (Format "tex") "\\frac{\\sqrt{\\pi}}{2}"
+    , Space
+    , Str "\\]"
+    ]
+, Para
+    [ Str "More"
+    , Space
+    , Str "inline:"
+    , Space
+    , Str "\\("
+    , RawInline (Format "tex") "\\alpha "
+    , Str "+"
+    , Space
+    , RawInline (Format "tex") "\\beta "
+    , Str "="
+    , Space
+    , RawInline (Format "tex") "\\gamma"
+    , Str "\\)"
+    , Space
+    , Str "and"
+    , Space
+    , Str "\\(E"
+    , Space
+    , Str "="
+    , Space
+    , Str "mc^2\\)."
+    ]
+, Para
+    [ Str "Inline"
+    , Space
+    , Str "display"
+    , Space
+    , Str "math"
+    , Space
+    , Str "with"
+    , Space
+    , Str "double"
+    , Space
+    , Str "backslash:"
+    , Space
+    , Str "\\["
+    , Space
+    , Str "E"
+    , Space
+    , Str "="
+    , Space
+    , Str "mc^2"
+    , Space
+    , Str "\\]"
+    , Space
+    , Str "in"
+    , Space
+    , Str "text."
+    ]
+]

@@ -1,0 +1,134 @@
+[ Header
+    1
+    ( "code-spans" , [] , [] )
+    [ Str "Code" , Space , Str "Spans" ]
+, Para
+    [ Str "Simple"
+    , Space
+    , Str "code:"
+    , Space
+    , Code ( "" , [] , [] ) "code"
+    ]
+, Para
+    [ Str "With"
+    , Space
+    , Str "spaces:"
+    , Space
+    , Code ( "" , [] , [] ) "code with spaces"
+    ]
+, Para
+    [ Str "Multiple"
+    , Space
+    , Str "backticks:"
+    , Space
+    , Code ( "" , [] , [] ) "code with `backtick` inside"
+    ]
+, Para
+    [ Str "Code"
+    , Space
+    , Str "in"
+    , Space
+    , Str "emphasis:"
+    , Space
+    , Emph
+        [ Str "text"
+        , Space
+        , Str "with"
+        , Space
+        , Code ( "" , [] , [] ) "code"
+        , Space
+        , Str "inside"
+        ]
+    ]
+, Para
+    [ Str "Adjacent"
+    , Space
+    , Str "code:"
+    , Space
+    , Code ( "" , [] , [] ) "first"
+    , Space
+    , Str "and"
+    , Space
+    , Code ( "" , [] , [] ) "second"
+    , Space
+    , Str "code"
+    , Space
+    , Str "spans"
+    ]
+, Para
+    [ Str "Escaped"
+    , Space
+    , Str "backtick"
+    , Space
+    , Str "outside:"
+    , Space
+    , Str "`not"
+    , Space
+    , Str "code`"
+    ]
+, Para
+    [ Str "Hard"
+    , Space
+    , Str "line"
+    , Space
+    , Str "breaks,"
+    , Space
+    , Str "which"
+    , Space
+    , Str "are"
+    , Space
+    , Str "created"
+    , Space
+    , Str "either"
+    , Space
+    , Str "by"
+    , Space
+    , Str "ending"
+    , Space
+    , Str "a"
+    , Space
+    , Str "line"
+    , Space
+    , Str "with"
+    , Space
+    , Str "two"
+    , Space
+    , Str "or"
+    , Space
+    , Str "more"
+    , SoftBreak
+    , Str "spaces"
+    , Space
+    , Str "("
+    , Code ( "" , [] , [] ) ""
+    , Str ")"
+    , Space
+    , Str "or"
+    , Space
+    , Str "by"
+    , Space
+    , Str "using"
+    , Space
+    , Str "a"
+    , Space
+    , Str "backslash"
+    , Space
+    , Str "("
+    , Code ( "" , [] , [] ) "\\\\n"
+    , Str "),"
+    , Space
+    , Str "are"
+    , Space
+    , Str "preserved"
+    , Space
+    , Str "regardless"
+    , Space
+    , Str "of"
+    , Space
+    , Str "the"
+    , SoftBreak
+    , Str "wrapping"
+    , Space
+    , Str "mode:"
+    ]
+]

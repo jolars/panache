@@ -1,0 +1,286 @@
+[ Header
+    1
+    ( "reference-links" , [] , [] )
+    [ Str "Reference" , Space , Str "Links" ]
+, Para
+    [ Str "Explicit"
+    , Space
+    , Str "reference:"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "link" , Space , Str "text" ]
+        ( "https://example.com" , "Example Site" )
+    , Space
+    , Str "in"
+    , Space
+    , Str "paragraph."
+    ]
+, Para
+    [ Str "Implicit"
+    , Space
+    , Str "reference:"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "GitHub" ]
+        ( "https://github.com" , "" )
+    , Space
+    , Str "is"
+    , Space
+    , Str "a"
+    , Space
+    , Str "platform."
+    ]
+, Para
+    [ Str "Shortcut"
+    , Space
+    , Str "reference:"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "Wikipedia" ]
+        ( "https://wikipedia.org" , "" )
+    , Space
+    , Str "works"
+    , Space
+    , Str "too."
+    ]
+, Para
+    [ Str "Multiple"
+    , Space
+    , Str "refs"
+    , Space
+    , Str "in"
+    , Space
+    , Str "one"
+    , Space
+    , Str "line:"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "first" ]
+        ( "https://first.com" , "" )
+    , Space
+    , Str "and"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "second" ]
+        ( "https://second.com" , "" )
+    , Space
+    , Str "together."
+    ]
+, Para
+    [ Str "Unresolved"
+    , Space
+    , Str "reference:"
+    , Space
+    , Str "[missing"
+    , Space
+    , Str "link][nonexistent]"
+    , Space
+    , Str "stays"
+    , Space
+    , Str "as-is."
+    ]
+, Para
+    [ Str "Case"
+    , Space
+    , Str "insensitive:"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "CASE" ]
+        ( "https://matched.com" , "" )
+    , Space
+    , Str "matches"
+    , Space
+    , Str "lowercase"
+    , Space
+    , Str "definition."
+    ]
+, Para
+    [ Str "With"
+    , Space
+    , Str "emphasis:"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Emph [ Str "emphasized" ] , Space , Str "text" ]
+        ( "https://example.com" , "Example Site" )
+    , Space
+    , Str "and"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "text"
+        , Space
+        , Str "with"
+        , Space
+        , Code ( "" , [] , [] ) "code"
+        ]
+        ( "https://example.com" , "Example Site" )
+    , Str "."
+    ]
+, Header
+    1
+    ( "heading-identifiers-in-html" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "identifiers"
+    , Space
+    , Str "in"
+    , Space
+    , Str "HTML"
+    ]
+, Para
+    [ Str "The"
+    , Space
+    , Str "header"
+    , Space
+    , Str "above"
+    , Space
+    , Str "can"
+    , Space
+    , Str "be"
+    , Space
+    , Str "linked"
+    , Space
+    , Str "through"
+    ]
+, BulletList
+    [ [ Plain
+          [ Link
+              ( "" , [] , [] )
+              [ Str "Heading"
+              , Space
+              , Str "identifiers"
+              , Space
+              , Str "in"
+              , Space
+              , Str "HTML"
+              ]
+              ( "#heading-identifiers-in-html" , "" )
+          ]
+      ]
+    , [ Plain
+          [ Link
+              ( "" , [] , [] )
+              [ Str "Heading"
+              , Space
+              , Str "identifiers"
+              , Space
+              , Str "in"
+              , Space
+              , Str "HTML"
+              ]
+              ( "#heading-identifiers-in-html" , "" )
+          ]
+      ]
+    , [ Plain
+          [ Link
+              ( "" , [] , [] )
+              [ Str "the"
+              , Space
+              , Str "section"
+              , Space
+              , Str "on"
+              , Space
+              , Str "heading"
+              , Space
+              , Str "identifiers"
+              ]
+              ( "#heading-identifiers-in-html" , "" )
+          ]
+      ]
+    ]
+, Para
+    [ Str "Instead"
+    , Space
+    , Str "of"
+    , Space
+    , Str "giving"
+    , Space
+    , Str "the"
+    , Space
+    , Str "identifier"
+    , Space
+    , Str "explicitly:"
+    ]
+, BulletList
+    [ [ Plain
+          [ Link
+              ( "" , [] , [] )
+              [ Str "Heading"
+              , Space
+              , Str "identifiers"
+              , Space
+              , Str "in"
+              , Space
+              , Str "HTML"
+              ]
+              ( "#heading-identifiers-in-html" , "" )
+          ]
+      ]
+    ]
+, Para
+    [ Str "Explicit"
+    , Space
+    , Str "link"
+    , Space
+    , Str "reference"
+    , Space
+    , Str "definitions"
+    , Space
+    , Str "always"
+    , Space
+    , Str "take"
+    , Space
+    , Str "priority"
+    , Space
+    , Str "over"
+    , SoftBreak
+    , Str "implicit"
+    , Space
+    , Str "heading"
+    , Space
+    , Str "references."
+    , Space
+    , Str "So,"
+    , Space
+    , Str "in"
+    , Space
+    , Str "the"
+    , Space
+    , Str "following"
+    , Space
+    , Str "example,"
+    , Space
+    , Str "the"
+    , SoftBreak
+    , Str "link"
+    , Space
+    , Str "will"
+    , Space
+    , Str "point"
+    , Space
+    , Str "to"
+    , Space
+    , Code ( "" , [] , [] ) "bar"
+    , Str ","
+    , Space
+    , Str "not"
+    , Space
+    , Str "to"
+    , Space
+    , Code ( "" , [] , [] ) "#foo"
+    , Str ":"
+    ]
+, Header 2 ( "foo" , [] , [] ) [ Str "Foo" ]
+, Para
+    [ Str "See"
+    , Space
+    , Link ( "" , [] , [] ) [ Str "foo" ] ( "bar" , "" )
+    ]
+]

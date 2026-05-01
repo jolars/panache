@@ -1,0 +1,81 @@
+[ Para
+    [ Str "Some"
+    , Space
+    , Str "text"
+    , Space
+    , Str "before"
+    , Space
+    , Str "the"
+    , Space
+    , Str "equation."
+    ]
+, Para [ Math DisplayMath "\n  x = y + z\n" ]
+, Para
+    [ Str "Some" , Space , Str "text" , Space , Str "after." ]
+, Para
+    [ Str "Here\8217s"
+    , Space
+    , Str "inline"
+    , Space
+    , Str "display"
+    , Space
+    , Str "math:"
+    , Space
+    , Math DisplayMath "a = b"
+    , Space
+    , Str "that"
+    , Space
+    , Str "should"
+    , Space
+    , Str "be"
+    , Space
+    , Str "converted"
+    , Space
+    , Str "to"
+    , Space
+    , Str "block"
+    , Space
+    , Str "format."
+    ]
+, Para
+    [ Str "Another"
+    , Space
+    , Str "standalone"
+    , Space
+    , Str "block:"
+    ]
+, Para [ Math DisplayMath "\n\\frac{a}{b} = c\n" ]
+, Para
+    [ Str "End" , Space , Str "of" , Space , Str "document." ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "is"
+    , Space
+    , Str "not"
+    , Space
+    , Str "math:"
+    ]
+, Para
+    [ Str "$$"
+    , SoftBreak
+    , RawInline (Format "tex") "\\frac{a}{b}"
+    , Space
+    , Str "="
+    , Space
+    , Str "c"
+    ]
+, Para
+    [ Str "Because"
+    , Space
+    , Str "it"
+    , Space
+    , Str "is"
+    , Space
+    , Str "not"
+    , Space
+    , Str "closed"
+    , Space
+    , Str "properly."
+    ]
+]

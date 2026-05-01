@@ -1,0 +1,6 @@
+[ Header
+    1
+    ( "foo-url" , [] , [] )
+    [ Str "[foo]:" , Space , Str "/url" ]
+, Para [ Str "[foo]" ]
+]

@@ -1,0 +1,5 @@
+# Pinned pandoc version used to derive expected.native files in corpus/.
+# Bumping this is an intentional act: re-run scripts/update-pandoc-conformance-corpus.sh
+# and review the diff before committing.
+pandoc_version=3.9.0.2
+generated=2026-05-01

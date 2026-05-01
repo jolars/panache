@@ -1,0 +1,7 @@
+[ Para
+    [ Link
+        ( "" , [] , [] )
+        [ Str "Foo*bar]" ]
+        ( "my_(url)" , "title (with parens)" )
+    ]
+]

@@ -1,0 +1,63 @@
+[ Para
+    [ Str "First"
+    , Space
+    , Str "sentence"
+    , Space
+    , Str "with"
+    , Space
+    , Str "a"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "link" , Space , Str "text" ]
+        ( "https://example.com" , "" )
+    , Space
+    , Str "and"
+    , Space
+    , Str "inline"
+    , Space
+    , Str "math"
+    , Space
+    , Math InlineMath "a + b = c"
+    , Str "."
+    , Space
+    , Str "Second"
+    , Space
+    , Str "sentence;"
+    , Space
+    , Str "third"
+    , Space
+    , Str "sentence!"
+    ]
+, Para
+    [ Str "First"
+    , Space
+    , Str "sentence"
+    , SoftBreak
+    , Str "with"
+    , Space
+    , Str "a"
+    , SoftBreak
+    , Link
+        ( "" , [] , [] )
+        [ Str "link" , SoftBreak , Str "text" ]
+        ( "https://example.com" , "" )
+    , Space
+    , Str "and"
+    , Space
+    , Str "inline"
+    , Space
+    , Str "math"
+    , SoftBreak
+    , Math InlineMath "a + b = c"
+    , Str "."
+    , SoftBreak
+    , Str "Second"
+    , Space
+    , Str "sentence;"
+    , Space
+    , Str "third"
+    , Space
+    , Str "sentence!"
+    ]
+]

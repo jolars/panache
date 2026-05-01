@@ -1,0 +1,151 @@
+[ Header
+    1
+    ( "level-1-heading" , [] , [] )
+    [ Str "Level" , Space , Str "1" , Space , Str "Heading" ]
+, Header
+    2
+    ( "level-2-heading" , [] , [] )
+    [ Str "Level" , Space , Str "2" , Space , Str "Heading" ]
+, Header
+    1
+    ( "heading-with-emphasis" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Emph [ Str "emphasis" ]
+    ]
+, Header
+    2
+    ( "heading-with-strong" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Strong [ Str "strong" ]
+    ]
+, Header
+    1
+    ( "heading-with-code" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Code ( "" , [] , [] ) "code"
+    ]
+, Header
+    1
+    ( "multiple-consecutive" , [] , [] )
+    [ Str "Multiple" , Space , Str "consecutive" ]
+, Header
+    1
+    ( "setext-headings" , [] , [] )
+    [ Str "Setext" , Space , Str "headings" ]
+, Header
+    2
+    ( "in-a-row" , [] , [] )
+    [ Str "In" , Space , Str "a" , Space , Str "row" ]
+, Header
+    1
+    ( "heading-with-link" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "link" ]
+        ( "https://example.com" , "" )
+    ]
+, Header
+    2
+    ( "custom-id" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Str "attributes"
+    ]
+, Header
+    1
+    ( "long-underline-thats-longer-than-text" , [] , [] )
+    [ Str "Long"
+    , Space
+    , Str "underline"
+    , Space
+    , Str "that\8217s"
+    , Space
+    , Str "longer"
+    , Space
+    , Str "than"
+    , Space
+    , Str "text"
+    ]
+, Header
+    1
+    ( "short-text" , [] , [] )
+    [ Str "Short" , Space , Str "text" ]
+, Header
+    2
+    ( "the-following-is-in-fact-a-heading-even-though-it-looks-like-metadata"
+    , []
+    , []
+    )
+    [ Str "The"
+    , Space
+    , Str "following"
+    , Space
+    , Str "is"
+    , Space
+    , Str "in"
+    , Space
+    , Str "fact"
+    , Space
+    , Str "a"
+    , Space
+    , Str "heading,"
+    , Space
+    , Str "even"
+    , Space
+    , Str "though"
+    , Space
+    , Str "it"
+    , Space
+    , Str "looks"
+    , Space
+    , Str "like"
+    , Space
+    , Str "metadata:"
+    ]
+, Header
+    2
+    ( "subtitle-a-subtitle-added-later" , [] , [] )
+    [ Str "subtitle:"
+    , Space
+    , Quoted
+        DoubleQuote
+        [ Str "A"
+        , Space
+        , Str "subtitle"
+        , Space
+        , Str "added"
+        , Space
+        , Str "later"
+        ]
+    ]
+, Para
+    [ Str "And"
+    , Space
+    , Str "here"
+    , Space
+    , Str "is"
+    , Space
+    , Str "a"
+    , Space
+    , Str "bit"
+    , Space
+    , Str "of"
+    , Space
+    , Str "text."
+    ]
+]

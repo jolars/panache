@@ -1,0 +1,100 @@
+[ Table
+    ( "" , [] , [] )
+    (Caption
+       Nothing
+       [ Plain
+           [ Str "This"
+           , Space
+           , Str "is"
+           , Space
+           , Str "the"
+           , Space
+           , Str "first"
+           , Space
+           , Str "long"
+           , Space
+           , Str "caption"
+           , Space
+           , Str "sentence"
+           , Space
+           , Str "that"
+           , Space
+           , Str "should"
+           , Space
+           , Str "remain"
+           , Space
+           , Str "together."
+           , Space
+           , Str "This"
+           , Space
+           , Str "is"
+           , Space
+           , Str "the"
+           , Space
+           , Str "second"
+           , Space
+           , Str "long"
+           , Space
+           , Str "caption"
+           , Space
+           , Str "sentence"
+           , Space
+           , Str "that"
+           , Space
+           , Str "should"
+           , Space
+           , Str "move"
+           , Space
+           , Str "to"
+           , Space
+           , Str "its"
+           , Space
+           , Str "own"
+           , Space
+           , Str "line."
+           ]
+       ])
+    [ ( AlignDefault , ColWidthDefault )
+    , ( AlignDefault , ColWidthDefault )
+    ]
+    (TableHead
+       ( "" , [] , [] )
+       [ Row
+           ( "" , [] , [] )
+           [ Cell
+               ( "" , [] , [] )
+               AlignDefault
+               (RowSpan 1)
+               (ColSpan 1)
+               [ Plain [ Str "Feature" ] ]
+           , Cell
+               ( "" , [] , [] )
+               AlignDefault
+               (RowSpan 1)
+               (ColSpan 1)
+               [ Plain [ Str "Status" ] ]
+           ]
+       ])
+    [ TableBody
+        ( "" , [] , [] )
+        (RowHeadColumns 0)
+        []
+        [ Row
+            ( "" , [] , [] )
+            [ Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "Caption" , Space , Str "wrapping" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "Implemented" ] ]
+            ]
+        ]
+    ]
+    (TableFoot ( "" , [] , [] ) [])
+]

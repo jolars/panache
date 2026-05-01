@@ -1,0 +1,315 @@
+[ Header
+    2
+    ( "lowercase-alphabetic-lists" , [] , [] )
+    [ Str "Lowercase"
+    , Space
+    , Str "Alphabetic"
+    , Space
+    , Str "Lists"
+    ]
+, OrderedList
+    ( 1 , LowerAlpha , Period )
+    [ [ Plain [ Str "First" , Space , Str "item" ] ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    ]
+, Para
+    [ Str "Different"
+    , Space
+    , Str "delimiter"
+    , Space
+    , Str "styles:"
+    ]
+, OrderedList
+    ( 1 , LowerAlpha , OneParen )
+    [ [ Plain
+          [ Str "Using" , Space , Str "right" , Space , Str "paren" ]
+      ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    ]
+, OrderedList
+    ( 1 , LowerAlpha , TwoParens )
+    [ [ Plain [ Str "Using" , Space , Str "parens" ] ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    ]
+, Header
+    2
+    ( "uppercase-alphabetic-lists" , [] , [] )
+    [ Str "Uppercase"
+    , Space
+    , Str "Alphabetic"
+    , Space
+    , Str "Lists"
+    ]
+, OrderedList
+    ( 1 , UpperAlpha , Period )
+    [ [ Plain
+          [ Str "First"
+          , Space
+          , Str "item"
+          , Space
+          , Str "(note:"
+          , Space
+          , Str "two"
+          , Space
+          , Str "spaces"
+          , Space
+          , Str "required)"
+          ]
+      ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    ]
+, OrderedList
+    ( 1 , UpperAlpha , OneParen )
+    [ [ Plain
+          [ Str "Right" , Space , Str "paren" , Space , Str "style" ]
+      ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    ]
+, OrderedList
+    ( 1 , UpperAlpha , TwoParens )
+    [ [ Plain [ Str "Parens" , Space , Str "style" ] ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    ]
+, Header
+    2
+    ( "lowercase-roman-numerals" , [] , [] )
+    [ Str "Lowercase"
+    , Space
+    , Str "Roman"
+    , Space
+    , Str "Numerals"
+    ]
+, OrderedList
+    ( 1 , LowerRoman , Period )
+    [ [ Plain [ Str "First" , Space , Str "item" ] ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    , [ Plain [ Str "Fourth" , Space , Str "item" ] ]
+    , [ Plain [ Str "Fifth" , Space , Str "item" ] ]
+    ]
+, OrderedList
+    ( 1 , LowerRoman , OneParen )
+    [ [ Plain
+          [ Str "Right" , Space , Str "paren" , Space , Str "style" ]
+      ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    ]
+, OrderedList
+    ( 1 , LowerRoman , TwoParens )
+    [ [ Plain [ Str "Parens" , Space , Str "style" ] ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    ]
+, Header
+    2
+    ( "uppercase-roman-numerals" , [] , [] )
+    [ Str "Uppercase"
+    , Space
+    , Str "Roman"
+    , Space
+    , Str "Numerals"
+    ]
+, Para
+    [ Str "I."
+    , Space
+    , Str "First"
+    , Space
+    , Str "item"
+    , SoftBreak
+    , Str "II."
+    , Space
+    , Str "Second"
+    , Space
+    , Str "item"
+    , SoftBreak
+    , Str "III."
+    , Space
+    , Str "Third"
+    , Space
+    , Str "item"
+    , SoftBreak
+    , Str "IV."
+    , Space
+    , Str "Fourth"
+    , Space
+    , Str "item"
+    , SoftBreak
+    , Str "V."
+    , Space
+    , Str "Fifth"
+    , Space
+    , Str "item"
+    , SoftBreak
+    , Str "VI."
+    , Space
+    , Str "Sixth"
+    , Space
+    , Str "item"
+    , SoftBreak
+    , Str "VII."
+    , Space
+    , Str "Seventh"
+    , Space
+    , Str "item"
+    ]
+, OrderedList
+    ( 1 , UpperRoman , OneParen )
+    [ [ Plain
+          [ Str "Right" , Space , Str "paren" , Space , Str "style" ]
+      ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    ]
+, OrderedList
+    ( 1 , UpperRoman , TwoParens )
+    [ [ Plain [ Str "Parens" , Space , Str "style" ] ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain [ Str "Third" , Space , Str "item" ] ]
+    ]
+, Header
+    2
+    ( "complex-roman-numerals" , [] , [] )
+    [ Str "Complex"
+    , Space
+    , Str "Roman"
+    , Space
+    , Str "Numerals"
+    ]
+, OrderedList
+    ( 4 , LowerRoman , Period )
+    [ [ Plain
+          [ Str "Starting" , Space , Str "at" , Space , Str "four" ]
+      ]
+    , [ Plain [ Str "Five" ] ]
+    , [ Plain [ Str "Six" ] ]
+    , [ Plain [ Str "Seven" ] ]
+    , [ Plain [ Str "Eight" ] ]
+    , [ Plain [ Str "Nine" ] ]
+    , [ Plain [ Str "Ten" ] ]
+    ]
+, Header
+    2
+    ( "mixed-content-with-fancy-lists" , [] , [] )
+    [ Str "Mixed"
+    , Space
+    , Str "Content"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Fancy"
+    , Space
+    , Str "Lists"
+    ]
+, Para
+    [ Str "Some"
+    , Space
+    , Str "text"
+    , Space
+    , Str "before"
+    , Space
+    , Str "the"
+    , Space
+    , Str "list."
+    ]
+, OrderedList
+    ( 1 , LowerRoman , Period )
+    [ [ Plain
+          [ Str "First"
+          , Space
+          , Str "roman"
+          , Space
+          , Str "numeral"
+          , Space
+          , Str "item"
+          ]
+      ]
+    , [ Plain
+          [ Str "Second"
+          , Space
+          , Str "item"
+          , Space
+          , Str "with"
+          , Space
+          , Strong [ Str "bold" ]
+          , Space
+          , Str "text"
+          ]
+      ]
+    , [ Plain
+          [ Str "Third"
+          , Space
+          , Str "item"
+          , Space
+          , Str "with"
+          , Space
+          , Code ( "" , [] , [] ) "code"
+          ]
+      ]
+    ]
+, Para
+    [ Str "More" , Space , Str "text" , Space , Str "after." ]
+, Para
+    [ Str "Should"
+    , Space
+    , Str "not"
+    , Space
+    , Str "be"
+    , Space
+    , Str "a"
+    , Space
+    , Str "list"
+    , Space
+    , Str "item:"
+    ]
+, Para [ Str "M.A.\160\&2007" ]
+, Para [ Str "B." , Space , Str "Williams" ]
+, Header 2 ( "complex" , [] , [] ) [ Str "Complex" ]
+, OrderedList
+    ( 2 , Decimal , TwoParens )
+    [ [ Para
+          [ Str "begins" , Space , Str "with" , Space , Str "2" ]
+      ]
+    , [ Para [ Str "and" , Space , Str "now" , Space , Str "3" ]
+      , Para
+          [ Str "with"
+          , Space
+          , Str "a"
+          , Space
+          , Str "continuation"
+          ]
+      , OrderedList
+          ( 4 , LowerRoman , Period )
+          [ [ Plain
+                [ Str "sublist"
+                , Space
+                , Str "with"
+                , Space
+                , Str "roman"
+                , Space
+                , Str "numerals,"
+                , SoftBreak
+                , Str "starting"
+                , Space
+                , Str "with"
+                , Space
+                , Str "4"
+                ]
+            ]
+          , [ Plain [ Str "more" , Space , Str "items" ]
+            , OrderedList
+                ( 1 , UpperAlpha , TwoParens )
+                [ [ Plain [ Str "a" , Space , Str "subsublist" ] ]
+                , [ Plain [ Str "a" , Space , Str "subsublist" ] ]
+                ]
+            ]
+          ]
+      ]
+    ]
+]

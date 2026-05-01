@@ -1,0 +1,104 @@
+[ DefinitionList
+    [ ( [ Str "Term" ]
+      , [ [ Para [ Str "Definition" , Space , Str "2" ]
+          , Para [ Str "Another" , Space , Str "list:" ]
+          , BulletList
+              [ [ Para [ Str "Bullet" ]
+                , CodeBlock ( "" , [] , [] ) "code"
+                ]
+              , [ Para [ Str "Another" , Space , Str "bullet" ] ]
+              ]
+          ]
+        ]
+      )
+    , ( [ Str "Indented"
+        , Space
+        , Str "with"
+        , Space
+        , Str "2"
+        , Space
+        , Str "spaces,"
+        , Space
+        , Str "so"
+        , Space
+        , Str "code"
+        , Space
+        , Str "inside"
+        , Space
+        , Str "block"
+        , Space
+        , Str "will"
+        , Space
+        , Str "have"
+        , Space
+        , Str "2"
+        , Space
+        , Str "spaces"
+        ]
+      , [ [ CodeBlock
+              ( "" , [ "markdown" ] , [] ) "    code\n    a <- 1"
+          ]
+        ]
+      )
+    , ( [ Str "Indented"
+        , Space
+        , Str "with"
+        , Space
+        , Str "4"
+        , Space
+        , Str "spaces,"
+        , Space
+        , Str "so"
+        , Space
+        , Str "code"
+        , Space
+        , Str "inside"
+        , Space
+        , Str "block"
+        , Space
+        , Str "will"
+        , Space
+        , Str "have"
+        , Space
+        , Str "4"
+        , Space
+        , Str "spaces"
+        ]
+      , [ [ CodeBlock
+              ( "" , [ "markdown" ] , [] ) "    code\n    a <- 1"
+          ]
+        ]
+      )
+    , ( [ Str "Indented"
+        , Space
+        , Str "with"
+        , Space
+        , Str "tabs,"
+        , Space
+        , Str "so"
+        , Space
+        , Str "code"
+        , Space
+        , Str "keeps"
+        , Space
+        , Str "one"
+        , Space
+        , Str "tab-stop"
+        , Space
+        , Str "of"
+        , Space
+        , Str "extra"
+        , Space
+        , Str "indentation"
+        ]
+      , [ [ CodeBlock
+              ( "" , [ "markdown" ] , [] )
+              "        code\n        a <- 1"
+          ]
+        ]
+      )
+    , ( [ Str "Input" ]
+      , [ [ CodeBlock ( "" , [] , [] ) "Term\n\n  : Def" ] ]
+      )
+    ]
+]

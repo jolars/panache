@@ -1,0 +1,498 @@
+[ Header
+    1
+    ( "definition-lists" , [] , [] )
+    [ Str "Definition" , Space , Str "Lists" ]
+, Para
+    [ Str "Simple"
+    , Space
+    , Str "definition"
+    , Space
+    , Str "list:"
+    ]
+, DefinitionList
+    [ ( [ Str "Term" , Space , Str "1" ]
+      , [ [ Plain [ Str "Definition" , Space , Str "1" ] ] ]
+      )
+    , ( [ Str "Term" , Space , Str "2" ]
+      , [ [ Plain [ Str "Definition" , Space , Str "2" ] ] ]
+      )
+    ]
+, Para
+    [ Str "Multiple"
+    , Space
+    , Str "definitions"
+    , Space
+    , Str "per"
+    , Space
+    , Str "term:"
+    ]
+, DefinitionList
+    [ ( [ Str "Term" , Space , Str "A" ]
+      , [ [ Plain
+              [ Str "First"
+              , Space
+              , Str "definition"
+              , Space
+              , Str "for"
+              , Space
+              , Str "A"
+              ]
+          ]
+        , [ Plain
+              [ Str "Second"
+              , Space
+              , Str "definition"
+              , Space
+              , Str "for"
+              , Space
+              , Str "A"
+              ]
+          ]
+        ]
+      )
+    , ( [ Str "Term" , Space , Str "B" ]
+      , [ [ Plain
+              [ Str "Definition"
+              , Space
+              , Str "with"
+              , Space
+              , Str "tilde"
+              , Space
+              , Str "marker"
+              ]
+          ]
+        , [ Plain
+              [ Str "Another"
+              , Space
+              , Str "tilde"
+              , Space
+              , Str "definition"
+              ]
+          ]
+        ]
+      )
+    ]
+, Para
+    [ Str "Complex"
+    , Space
+    , Str "example"
+    , Space
+    , Str "with"
+    , Space
+    , Str "inline"
+    , Space
+    , Str "markup:"
+    ]
+, DefinitionList
+    [ ( [ Str "API" ]
+      , [ [ Plain
+              [ Str "Application"
+              , Space
+              , Str "Programming"
+              , Space
+              , Str "Interface"
+              ]
+          ]
+        ]
+      )
+    , ( [ Str "REST" ]
+      , [ [ Plain
+              [ Str "Representational"
+              , Space
+              , Str "State"
+              , Space
+              , Str "Transfer"
+              ]
+          ]
+        ]
+      )
+    , ( [ Str "GraphQL" ]
+      , [ [ Plain
+              [ Str "A"
+              , Space
+              , Str "query"
+              , Space
+              , Str "language"
+              , Space
+              , Str "for"
+              , Space
+              , Str "APIs"
+              , Space
+              , Str "developed"
+              , Space
+              , Str "by"
+              , Space
+              , Emph [ Str "Facebook" ]
+              ]
+          ]
+        ]
+      )
+    ]
+, Para
+    [ Str "Loose"
+    , Space
+    , Str "format"
+    , Space
+    , Str "(blank"
+    , Space
+    , Str "line"
+    , Space
+    , Str "before"
+    , Space
+    , Str "definition):"
+    ]
+, DefinitionList
+    [ ( [ Str "Term" , Space , Str "Loose" , Space , Str "1" ]
+      , [ [ Para [ Str "Definition" , Space , Str "1" ] ] ]
+      )
+    , ( [ Str "Term" , Space , Str "Loose" , Space , Str "2" ]
+      , [ [ Plain [ Str "Definition" , Space , Str "2" ] ] ]
+      )
+    ]
+, Para
+    [ Str "Compact"
+    , Space
+    , Str "format"
+    , Space
+    , Str "(no"
+    , Space
+    , Str "blank"
+    , Space
+    , Str "before"
+    , Space
+    , Str "definition):"
+    ]
+, DefinitionList
+    [ ( [ Str "Apple" ]
+      , [ [ Plain [ Str "A" , Space , Str "fruit" ] ] ]
+      )
+    , ( [ Str "Orange" ]
+      , [ [ Plain
+              [ Str "Also" , Space , Str "a" , Space , Str "fruit" ]
+          ]
+        , [ Plain
+              [ Str "Also" , Space , Str "a" , Space , Str "color" ]
+          ]
+        ]
+      )
+    , ( [ Str "Term" , Space , Str "1" ]
+      , [ [ Plain [ Str "Definition" , Space , Str "1" ] ] ]
+      )
+    , ( [ Str "Term"
+        , Space
+        , Str "2"
+        , Space
+        , Str "with"
+        , Space
+        , Emph [ Str "inline" , Space , Str "markup" ]
+        ]
+      , [ [ Plain
+              [ Str "Definition"
+              , Space
+              , Str "2"
+              , Space
+              , Str "{"
+              , Space
+              , Str "some"
+              , Space
+              , Str "code,"
+              , Space
+              , Str "part"
+              , Space
+              , Str "of"
+              , Space
+              , Str "Definition"
+              , Space
+              , Str "2"
+              , Space
+              , Str "}"
+              , Space
+              , Str "Third"
+              , Space
+              , Str "paragraph"
+              , Space
+              , Str "of"
+              , Space
+              , Str "definition"
+              , SoftBreak
+              , Str "2,"
+              , Space
+              , Str "quite"
+              , Space
+              , Str "long"
+              , Space
+              , Str "so"
+              , Space
+              , Str "that"
+              , Space
+              , Str "it"
+              , Space
+              , Str "wraps"
+              , Space
+              , Str "multiple"
+              , Space
+              , Str "lines"
+              , Space
+              , Str "and"
+              , Space
+              , Str "should"
+              , Space
+              , Str "be"
+              , Space
+              , Str "wrapped"
+              , Space
+              , Str "and"
+              , Space
+              , Str "indented"
+              , SoftBreak
+              , Str "properly."
+              ]
+          ]
+        ]
+      )
+    , ( [ Str "Term" , Space , Str "3" ]
+      , [ [ Plain
+              [ Str "Definition"
+              , Space
+              , Str "with"
+              , Space
+              , Str "lazy"
+              , Space
+              , Str "continuation."
+              , Space
+              , Str "Second"
+              , Space
+              , Str "paragraph"
+              , Space
+              , Str "of"
+              , Space
+              , Str "the"
+              , Space
+              , Str "definition."
+              ]
+          ]
+        ]
+      )
+    , ( [ Str "Example" , Space , Str "violation" ]
+      , [ [ CodeBlock ( "" , [ "r" ] , [] ) "a <- 1" ] ]
+      )
+    , ( [ Str "A"
+        , Space
+        , Str "definition"
+        , Space
+        , Str "list"
+        , Space
+        , Str "with"
+        , Space
+        , Str "nested"
+        , Space
+        , Str "items"
+        ]
+      , [ [ Plain
+              [ Str "Here"
+              , Space
+              , Str "comes"
+              , Space
+              , Str "a"
+              , Space
+              , Str "list"
+              , Space
+              , Str "(or"
+              , Space
+              , Str "wait,"
+              , Space
+              , Str "is"
+              , Space
+              , Str "it?)"
+              ]
+          , BulletList
+              [ [ Plain [ Str "A" ] ] , [ Plain [ Str "B" ] ] ]
+          ]
+        ]
+      )
+    , ( [ Str "Term" ]
+      , [ [ Plain
+              [ Str "Definition"
+              , Space
+              , Str "2,"
+              , Space
+              , Str "with"
+              , Space
+              , Str "a"
+              , Space
+              , Str "very"
+              , Space
+              , Str "long"
+              , Space
+              , Str "ling,"
+              , Space
+              , Str "we"
+              , Space
+              , Str "should"
+              , Space
+              , Str "wrap"
+              , Space
+              , Str "this"
+              , Space
+              , Str "and"
+              , Space
+              , Str "total"
+              , Space
+              , Str "line"
+              , Space
+              , Str "width"
+              , Space
+              , Str "should"
+              , Space
+              , Str "not"
+              , Space
+              , Str "exceed"
+              , Space
+              , Str "80."
+              ]
+          ]
+        ]
+      )
+    ]
+, Para
+    [ Str "Continuation"
+    , Space
+    , Str "of"
+    , Space
+    , Str "the"
+    , Space
+    , Str "definition"
+    , Space
+    , Str "requires"
+    , Space
+    , Str "four"
+    , Space
+    , Str "spaces"
+    , Space
+    , Str "or"
+    , Space
+    , Str "a"
+    , Space
+    , Str "tab,"
+    , Space
+    , Str "so"
+    , SoftBreak
+    , Str "this"
+    , Space
+    , Str "is"
+    , Space
+    , Str "not"
+    , Space
+    , Str "a"
+    , Space
+    , Str "continuation"
+    , Space
+    , Str "of"
+    , Space
+    , Str "the"
+    , Space
+    , Str "definition,"
+    , Space
+    , Str "but"
+    , Space
+    , Str "a"
+    , Space
+    , Str "new"
+    , Space
+    , Str "paragraph."
+    ]
+, DefinitionList
+    [ ( [ Str "Term" ]
+      , [ [ Plain
+              [ Str "The"
+              , Space
+              , Str "following"
+              , Space
+              , Str "is"
+              , Space
+              , Str "also"
+              , Space
+              , Str "not"
+              , Space
+              , Str "a"
+              , Space
+              , Str "continuation."
+              ]
+          ]
+        ]
+      )
+    ]
+, Para [ Str "A" , Space , Str "paragraph." ]
+, DefinitionList
+    [ ( [ Str "Output" ]
+      , [ [ CodeBlock
+              ( "" , [ "markdown" ] , [] )
+              "---\necho: false\nlist:\n  - a\n  - b\n---"
+          ]
+        ]
+      )
+    , ( [ Str "Orange" ]
+      , [ [ BlockQuote
+              [ Para
+                  [ Str "a"
+                  , SoftBreak
+                  , Str "b"
+                  , SoftBreak
+                  , Str "c"
+                  ]
+              ]
+          ]
+        ]
+      )
+    , ( [ Str "Term" ]
+      , [ [ BulletList
+              [ [ Plain
+                    [ Str "List"
+                    , SoftBreak
+                    , Str "with"
+                    , Space
+                    , Str "lazy"
+                    , Space
+                    , Str "continuation"
+                    ]
+                ]
+              , [ Plain
+                    [ Str "Another"
+                    , SoftBreak
+                    , Str "list"
+                    , Space
+                    , Str "item"
+                    ]
+                ]
+              ]
+          ]
+        ]
+      )
+    , ( [ Str "Term" ]
+      , [ [ BulletList
+              [ [ Plain
+                    [ Str "List"
+                    , SoftBreak
+                    , Str "with"
+                    , Space
+                    , Str "lazy"
+                    , Space
+                    , Str "continuation"
+                    ]
+                ]
+              , [ BlockQuote
+                    [ Para
+                        [ Str "a"
+                        , SoftBreak
+                        , Str "b"
+                        , SoftBreak
+                        , Str "c"
+                        ]
+                    ]
+                ]
+              ]
+          ]
+        ]
+      )
+    ]
+]

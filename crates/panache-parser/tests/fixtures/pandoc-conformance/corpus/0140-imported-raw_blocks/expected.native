@@ -1,0 +1,64 @@
+[ Header
+    1
+    ( "raw-blocks-test" , [] , [] )
+    [ Str "Raw" , Space , Str "Blocks" , Space , Str "Test" ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "tests"
+    , Space
+    , Str "the"
+    , Space
+    , Code ( "" , [] , [] ) "raw_attribute"
+    , Space
+    , Str "extension."
+    ]
+, Header
+    2
+    ( "html-raw-block" , [] , [] )
+    [ Str "HTML" , Space , Str "Raw" , Space , Str "Block" ]
+, RawBlock
+    (Format "html")
+    "<div class=\"custom\">\n  <p>This should stay exactly as-is</p>\n</div>"
+, Header
+    2
+    ( "latex-raw-block" , [] , [] )
+    [ Str "LaTeX" , Space , Str "Raw" , Space , Str "Block" ]
+, RawBlock
+    (Format "latex")
+    "\\begin{equation}\n  E = mc^2\n\\end{equation}"
+, Header
+    2
+    ( "openxml-raw-block" , [] , [] )
+    [ Str "OpenXML" , Space , Str "Raw" , Space , Str "Block" ]
+, RawBlock
+    (Format "openxml")
+    "<w:p>\n  <w:r>\n    <w:br w:type=\"page\"/>\n  </w:r>\n</w:p>"
+, Header
+    2
+    ( "groff-ms-raw-block" , [] , [] )
+    [ Str "Groff"
+    , Space
+    , Str "MS"
+    , Space
+    , Str "Raw"
+    , Space
+    , Str "Block"
+    ]
+, RawBlock
+    (Format "ms") ".MYMACRO\nblah blah\n.NH 1\nA Section"
+, Para
+    [ Str "Regular"
+    , Space
+    , Str "code"
+    , Space
+    , Str "block"
+    , Space
+    , Str "for"
+    , Space
+    , Str "comparison:"
+    ]
+, CodeBlock
+    ( "" , [ "python" ] , [] )
+    "def hello():\n    print(\"world\")"
+]

@@ -1,0 +1,173 @@
+[ Para
+    [ Str "A"
+    , Space
+    , Str "test"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "that\8217s"
+    , Space
+    , Str "already"
+    , Space
+    , Str "formatted"
+    , Space
+    , Str "to"
+    , Space
+    , Str "80"
+    , Space
+    , Str "characters"
+    , Space
+    , Str "per"
+    , Space
+    , Str "line."
+    , Space
+    , Str "This"
+    , SoftBreak
+    , Str "paragraph"
+    , Space
+    , Str "is"
+    , Space
+    , Str "intended"
+    , Space
+    , Str "to"
+    , Space
+    , Str "test"
+    , Space
+    , Str "whether"
+    , Space
+    , Str "the"
+    , Space
+    , Str "formatter"
+    , Space
+    , Str "preserves"
+    , Space
+    , Str "existing"
+    , Space
+    , Str "line"
+    , SoftBreak
+    , Str "breaks"
+    , Space
+    , Str "when"
+    , Space
+    , Str "the"
+    , Space
+    , Str "lines"
+    , Space
+    , Str "are"
+    , Space
+    , Str "already"
+    , Space
+    , Str "within"
+    , Space
+    , Str "the"
+    , Space
+    , Str "specified"
+    , Space
+    , Str "line"
+    , Space
+    , Str "length"
+    , Space
+    , Str "limit."
+    ]
+, Para
+    [ Str "Here"
+    , Space
+    , Str "is"
+    , Space
+    , Str "a"
+    , Space
+    , Str "new"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "that"
+    , Space
+    , Str "is"
+    , Space
+    , Str "intentionally"
+    , Space
+    , Str "kept"
+    , Space
+    , Str "short."
+    ]
+, Para
+    [ Str "Here"
+    , Space
+    , Str "is"
+    , Space
+    , Str "a"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Str "a"
+    , Space
+    , Str "hard"
+    , Space
+    , Str "line"
+    , Space
+    , Str "break"
+    , LineBreak
+    , Str "It"
+    , Space
+    , Str "should"
+    , Space
+    , Str "not"
+    , Space
+    , Str "be"
+    , Space
+    , Str "wrapped!"
+    ]
+, Para
+    [ Str "Here"
+    , Space
+    , Str "is"
+    , Space
+    , Str "a"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Str "two"
+    , Space
+    , Str "spaces"
+    , Space
+    , Str "at"
+    , Space
+    , Str "the"
+    , Space
+    , Str "end"
+    , Space
+    , Str "of"
+    , Space
+    , Str "the"
+    , Space
+    , Str "line."
+    , LineBreak
+    , Str "This"
+    , Space
+    , Str "is"
+    , Space
+    , Str "also"
+    , Space
+    , Str "a"
+    , Space
+    , Str "hard"
+    , Space
+    , Str "line"
+    , Space
+    , Str "break,"
+    , Space
+    , Str "and"
+    , Space
+    , Str "should"
+    , Space
+    , Str "not"
+    , Space
+    , Str "be"
+    , Space
+    , Str "wrapped!"
+    ]
+]

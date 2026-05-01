@@ -1,0 +1,82 @@
+[ Para
+    [ Str "A"
+    , Space
+    , Str "tight"
+    , Space
+    , Str "bullet"
+    , Space
+    , Str "list"
+    , Space
+    , Str "with"
+    , Space
+    , Str "no"
+    , Space
+    , Str "blank"
+    , Space
+    , Str "lines:"
+    , SoftBreak
+    , Str "-"
+    , Space
+    , Str "First"
+    , Space
+    , Str "item"
+    , SoftBreak
+    , Str "-"
+    , Space
+    , Str "Second"
+    , Space
+    , Str "item"
+    , Space
+    , Str "with"
+    , Space
+    , Str "a"
+    , Space
+    , Str "longer"
+    , Space
+    , Str "line"
+    , Space
+    , Str "that"
+    , Space
+    , Str "might"
+    , Space
+    , Str "need"
+    , Space
+    , Str "wrapping"
+    , Space
+    , Str "if"
+    , Space
+    , Str "it"
+    , Space
+    , Str "gets"
+    , Space
+    , Str "too"
+    , Space
+    , Str "long"
+    , SoftBreak
+    , Str "-"
+    , Space
+    , Str "Third"
+    , Space
+    , Str "item"
+    , SoftBreak
+    , Str "-"
+    , Space
+    , Str "Different"
+    , Space
+    , Str "marker"
+    , Space
+    , Str "(will"
+    , Space
+    , Str "normalize"
+    , Space
+    , Str "to"
+    , Space
+    , Str "-)"
+    , SoftBreak
+    , Str "-"
+    , Space
+    , Str "Another"
+    , Space
+    , Str "marker"
+    ]
+]

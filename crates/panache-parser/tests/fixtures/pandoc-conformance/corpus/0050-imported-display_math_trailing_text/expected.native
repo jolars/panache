@@ -1,0 +1,35 @@
+[ Para
+    [ Str "The"
+    , Space
+    , Str "following"
+    , Space
+    , Str "is"
+    , Space
+    , Str "a"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Str "an"
+    , Space
+    , Str "inline"
+    , Space
+    , Str "display"
+    , Space
+    , Str "math"
+    , Space
+    , Str "equation:"
+    ]
+, Para
+    [ Math DisplayMath "\nE = mc^2\n"
+    , Space
+    , Str "some"
+    , Space
+    , Str "text"
+    , Space
+    , Str "coming"
+    , Space
+    , Str "here."
+    ]
+]

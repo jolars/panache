@@ -1,0 +1,31 @@
+[ Para
+    [ Quoted
+        DoubleQuote
+        [ Str "She"
+        , Space
+        , Str "knocked"
+        , Space
+        , Str "on"
+        , Space
+        , Str "the"
+        , Space
+        , Str "door."
+        , Space
+        , Str "And"
+        , Space
+        , Str "then"
+        , Space
+        , Str "knocked"
+        , Space
+        , Str "again."
+        ]
+    , Space
+    , Str "After"
+    , Space
+    , Str "that,"
+    , Space
+    , Str "everyone"
+    , Space
+    , Str "listened."
+    ]
+]

@@ -1,0 +1,23 @@
+[ Para
+    [ Str "*"
+    , RawInline (Format "html") "<img src=\"foo\" title=\"*\"/>"
+    ]
+, Para
+    [ Str "**" , RawInline (Format "html") "<a href=\"**\">" ]
+, Para
+    [ Str "__" , RawInline (Format "html") "<a href=\"__\">" ]
+, Para
+    [ Str "**a"
+    , Link
+        ( "" , [ "uri" ] , [] )
+        [ Str "https://foo.bar/?q=**" ]
+        ( "https://foo.bar/?q=**" , "" )
+    ]
+, Para
+    [ Str "__a"
+    , Link
+        ( "" , [ "uri" ] , [] )
+        [ Str "https://foo.bar/?q=__" ]
+        ( "https://foo.bar/?q=__" , "" )
+    ]
+]

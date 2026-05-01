@@ -1,0 +1,103 @@
+[ Header
+    1 ( "introduction" , [] , [] ) [ Str "Introduction" ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "document"
+    , Space
+    , Str "demonstrates"
+    , Space
+    , Str "the"
+    , Space
+    , Str "Pandoc"
+    , Space
+    , Str "title"
+    , Space
+    , Str "block"
+    , Space
+    , Str "format"
+    , Space
+    , Str "at"
+    , Space
+    , Str "the"
+    , Space
+    , Str "document"
+    , Space
+    , Str "start."
+    ]
+, Para
+    [ Str "First"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Str "content."
+    ]
+, Header
+    2
+    ( "another-section" , [] , [] )
+    [ Str "Another" , Space , Str "Section" ]
+, Para
+    [ Str "More" , Space , Str "content" , Space , Str "here." ]
+, Header
+    2
+    ( "blank-author-example" , [] , [] )
+    [ Str "Blank"
+    , Space
+    , Str "Author"
+    , Space
+    , Str "Example"
+    ]
+, Para
+    [ Str "In"
+    , Space
+    , Str "this"
+    , Space
+    , Str "example,"
+    , Space
+    , Str "we"
+    , Space
+    , Str "show"
+    , Space
+    , Str "how"
+    , Space
+    , Str "to"
+    , Space
+    , Str "use"
+    , Space
+    , Str "blank"
+    , Space
+    , Str "fields."
+    ]
+, Para
+    [ Str "%"
+    , Space
+    , Str "Signs"
+    , Space
+    , Str "in"
+    , Space
+    , Str "text"
+    , Space
+    , Str "(like"
+    , Space
+    , Str "%"
+    , Space
+    , Str "for"
+    , Space
+    , Str "percent)"
+    , Space
+    , Str "should"
+    , Space
+    , Str "work"
+    , Space
+    , Str "fine"
+    , Space
+    , Str "in"
+    , Space
+    , Str "regular"
+    , Space
+    , Str "paragraphs."
+    ]
+, Para [ Str "Final" , Space , Str "paragraph." ]
+]

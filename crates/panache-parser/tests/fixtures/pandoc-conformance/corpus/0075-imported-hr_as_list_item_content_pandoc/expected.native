@@ -1,0 +1,3 @@
+[ BulletList
+    [ [ Plain [ Str "Foo" ] ] , [ HorizontalRule ] ]
+]

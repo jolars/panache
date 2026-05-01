@@ -1,0 +1,235 @@
+[ Div
+    ( "" , [ "callout-note" ] , [] )
+    [ Para
+        [ Str "This"
+        , Space
+        , Str "is"
+        , Space
+        , Str "a"
+        , Space
+        , Str "simple"
+        , Space
+        , Str "fenced"
+        , Space
+        , Str "div"
+        , Space
+        , Str "with"
+        , Space
+        , Str "a"
+        , Space
+        , Str "callout"
+        , Space
+        , Str "note."
+        ]
+    ]
+, Div
+    ( "special" , [ "sidebar" ] , [] )
+    [ Para
+        [ Str "This"
+        , Space
+        , Str "div"
+        , Space
+        , Str "has"
+        , Space
+        , Str "an"
+        , Space
+        , Str "ID"
+        , Space
+        , Str "and"
+        , Space
+        , Str "a"
+        , Space
+        , Str "class."
+        ]
+    , Para
+        [ Str "It"
+        , Space
+        , Str "contains"
+        , Space
+        , Str "multiple"
+        , Space
+        , Str "paragraphs."
+        ]
+    ]
+, Div
+    ( "" , [ "Warning" ] , [] )
+    [ Para
+        [ Str "This"
+        , Space
+        , Str "is"
+        , Space
+        , Str "a"
+        , Space
+        , Str "warning"
+        , Space
+        , Str "div"
+        , Space
+        , Str "using"
+        , Space
+        , Str "a"
+        , Space
+        , Str "simple"
+        , Space
+        , Str "class"
+        , Space
+        , Str "name."
+        ]
+    ]
+, Div
+    ( "" , [ "Nested" ] , [] )
+    [ Para
+        [ Str "Outer" , Space , Str "div" , Space , Str "content." ]
+    , Div
+        ( "" , [ "Inner" ] , [] )
+        [ Para
+            [ Str "Nested"
+            , Space
+            , Str "div"
+            , Space
+            , Str "content."
+            ]
+        ]
+    , Para
+        [ Str "Back"
+        , Space
+        , Str "to"
+        , Space
+        , Str "outer"
+        , Space
+        , Str "div."
+        ]
+    ]
+, Div
+    ( "" , [ "Warning" ] , [] )
+    [ Para
+        [ Str "This"
+        , Space
+        , Str "is"
+        , Space
+        , Str "a"
+        , Space
+        , Str "warning."
+        ]
+    , Div
+        ( "" , [ "Danger" ] , [] )
+        [ Para
+            [ Str "This"
+            , Space
+            , Str "is"
+            , Space
+            , Str "a"
+            , Space
+            , Str "warning"
+            , Space
+            , Str "within"
+            , Space
+            , Str "a"
+            , Space
+            , Str "warning."
+            ]
+        ]
+    ]
+, Para
+    [ Str "Here\8217s"
+    , Space
+    , Str "a"
+    , Space
+    , Str "fenced"
+    , Space
+    , Str "div"
+    , Space
+    , Str "with"
+    , Space
+    , Str "a"
+    , Space
+    , Str "list"
+    , Space
+    , Str "inside."
+    ]
+, Div
+    ( "" , [ "exercise" ] , [] )
+    [ BulletList
+        [ [ Plain [ Str "A" ] ] , [ Plain [ Str "B" ] ] ]
+    ]
+, Div
+    ( "" , [ "exercise" ] , [] )
+    [ Para [ Str "foo" , Space , Str "bar" ] ]
+, Div
+    ( "" , [ "mathdeclare" ] , [] )
+    [ RawBlock
+        (Format "tex")
+        "\\DeclareMathOperator{\\E}{E{}}\n\\DeclareMathOperator{\\Var}{Var{}}"
+    ]
+, Div ( "" , [ "declare" ] , [] ) [ Para [ Str "A" ] ]
+, Para [ Str "B" ]
+, Para
+    [ Str "Pandoc"
+    , Space
+    , Str "requires"
+    , Space
+    , Str "that"
+    , Space
+    , Str "opening"
+    , Space
+    , Str "fences"
+    , Space
+    , Str "have"
+    , Space
+    , Str "attributes,"
+    , Space
+    , Str "so"
+    , Space
+    , Str "this"
+    , Space
+    , Str "is"
+    , Space
+    , Str "not"
+    , Space
+    , Str "a"
+    , Space
+    , Str "fenced"
+    , SoftBreak
+    , Str "div:"
+    ]
+, Para
+    [ Str ":::" , SoftBreak , Str "A" , SoftBreak , Str ":::" ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "is"
+    , Space
+    , Str "not"
+    , Space
+    , Str "a"
+    , Space
+    , Str "fenced"
+    , Space
+    , Str "div"
+    , Space
+    , Str "either:"
+    ]
+, Para
+    [ Str "B"
+    , SoftBreak
+    , Str ":::"
+    , Space
+    , Str "declare"
+    , SoftBreak
+    , Str "A"
+    , SoftBreak
+    , Str ":::"
+    ]
+, Para
+    [ Str "Here"
+    , Space
+    , Str "is"
+    , Space
+    , Str "a"
+    , Space
+    , Str "fenced"
+    , Space
+    , Str "div:"
+    ]
+, Div ( "" , [ "declare" ] , [] ) [ Para [ Str "A" ] ]
+, Para [ Str "B" ]
+]

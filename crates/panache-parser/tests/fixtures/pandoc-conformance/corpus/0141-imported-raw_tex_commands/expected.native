@@ -1,0 +1,19 @@
+[ RawBlock
+    (Format "tex")
+    "\\DeclareMathOperator{\\E}{E{}}\n\\DeclareMathOperator{\\Var}{Var{}}"
+, Para [ Str "Regular" , Space , Str "paragraph." ]
+, RawBlock (Format "tex") "\\newcommand{\\foo}{bar}"
+, Para
+    [ Str "Another"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , RawInline (Format "tex") "\\cite{ref}"
+    , Space
+    , Str "inline."
+    ]
+, RawBlock (Format "tex") "\\usepackage{amsmath}"
+, Para [ Str "Final" , Space , Str "paragraph." ]
+]

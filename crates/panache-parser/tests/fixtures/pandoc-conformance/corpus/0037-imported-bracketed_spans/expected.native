@@ -1,0 +1,80 @@
+[ Header
+    1
+    ( "bracketed-spans" , [] , [] )
+    [ Str "Bracketed" , Space , Str "Spans" ]
+, Para
+    [ Str "Simple"
+    , Space
+    , Str "span:"
+    , Space
+    , Span
+        ( "" , [ "highlight" ] , [] )
+        [ Str "highlighted" , Space , Str "text" ]
+    ]
+, Para
+    [ Str "With"
+    , Space
+    , Str "emphasis:"
+    , Space
+    , Span
+        ( "" , [ "styled" ] , [] )
+        [ Str "This"
+        , Space
+        , Str "is"
+        , Space
+        , Strong [ Str "bold" ]
+        , Space
+        , Str "and"
+        , Space
+        , Emph [ Str "italic" ]
+        ]
+    ]
+, Para
+    [ Str "With"
+    , Space
+    , Str "code:"
+    , Space
+    , Span
+        ( "" , [ "code-ref" ] , [] )
+        [ Str "The"
+        , Space
+        , Code ( "" , [] , [] ) "function()"
+        , Space
+        , Str "call"
+        ]
+    ]
+, Para
+    [ Str "Multiple"
+    , Space
+    , Str "spans:"
+    , Space
+    , Span ( "" , [ "a" ] , [] ) [ Str "first" ]
+    , Space
+    , Str "and"
+    , Space
+    , Span ( "" , [ "b" ] , [] ) [ Str "second" ]
+    , Space
+    , Str "together."
+    ]
+, Para
+    [ Str "Nested"
+    , Space
+    , Str "brackets:"
+    , Space
+    , Span
+        ( "" , [ "example" ] , [] )
+        [ Str "[literal" , Space , Str "brackets]" ]
+    ]
+, Para
+    [ Str "Complex"
+    , Space
+    , Str "attributes:"
+    , Space
+    , Span
+        ( "myid"
+        , [ "class1" , "class2" ]
+        , [ ( "key" , "value" ) ]
+        )
+        [ Str "text" ]
+    ]
+]

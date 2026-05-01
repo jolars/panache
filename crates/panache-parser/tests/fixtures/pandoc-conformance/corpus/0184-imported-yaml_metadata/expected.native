@@ -1,0 +1,61 @@
+[ Header
+    1 ( "introduction" , [] , [] ) [ Str "Introduction" ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "is"
+    , Space
+    , Str "a"
+    , Space
+    , Str "test"
+    , Space
+    , Str "document"
+    , Space
+    , Str "with"
+    , Space
+    , Str "YAML"
+    , Space
+    , Str "frontmatter."
+    ]
+, Para
+    [ Str "First"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Str "some"
+    , Space
+    , Str "content."
+    ]
+, Para
+    [ Str "Second"
+    , Space
+    , Str "section"
+    , Space
+    , Str "after"
+    , Space
+    , Str "additional"
+    , Space
+    , Str "metadata."
+    ]
+, Para
+    [ Str "Para"
+    , Space
+    , Str "before"
+    , Space
+    , Str "horizontal"
+    , Space
+    , Str "rule"
+    ]
+, HorizontalRule
+, Para
+    [ Str "Para"
+    , Space
+    , Str "after"
+    , Space
+    , Str "horizontal"
+    , Space
+    , Str "rule"
+    ]
+]

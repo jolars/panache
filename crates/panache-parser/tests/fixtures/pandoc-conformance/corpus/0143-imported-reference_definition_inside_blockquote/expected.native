@@ -1,0 +1,4 @@
+[ Para
+    [ Link ( "" , [] , [] ) [ Str "foo" ] ( "/url" , "" ) ]
+, BlockQuote []
+]

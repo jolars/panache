@@ -1,0 +1,20 @@
+[ Header
+    1
+    ( "raw-code-blocks" , [] , [] )
+    [ Str "Raw" , Space , Str "Code" , Space , Str "Blocks" ]
+, Para
+    [ Str "HTML" , Space , Str "raw" , Space , Str "block:" ]
+, RawBlock
+    (Format "html")
+    "<video controls>\n  <source src=\"video.mp4\" type=\"video/mp4\">\n</video>"
+, Para
+    [ Str "LaTeX" , Space , Str "raw" , Space , Str "block:" ]
+, RawBlock
+    (Format "latex")
+    "\\begin{equation}\n  E = mc^2\n\\end{equation}"
+, Para
+    [ Str "OpenXML" , Space , Str "raw" , Space , Str "block:" ]
+, RawBlock
+    (Format "openxml")
+    "<w:p>\n  <w:r><w:t>Custom formatting</w:t></w:r>\n</w:p>"
+]

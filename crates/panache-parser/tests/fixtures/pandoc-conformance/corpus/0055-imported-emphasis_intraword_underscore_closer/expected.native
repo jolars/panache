@@ -1,0 +1,5 @@
+[ Para [ Str "_foo_bar" ]
+, Para [ Emph [ Str "foo_bar_baz" ] ]
+, Para [ Str "__foo__bar" ]
+, Para [ Str "_(_foo)" ]
+]

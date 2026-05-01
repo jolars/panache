@@ -1,0 +1,16 @@
+[ Para
+    [ Str "A"
+    , Space
+    , Str "simple"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Str "a"
+    , Space
+    , Str "few"
+    , Space
+    , Str "words."
+    ]
+]

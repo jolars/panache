@@ -1,0 +1,7 @@
+[ Para
+    [ Str "Foo" , SoftBreak , Str "-" , Space , Str "bar" ]
+, Para
+    [ Str "Baz" , SoftBreak , Str "1." , Space , Str "qux" ]
+, Para
+    [ Str "Quux" , SoftBreak , Str "2." , Space , Str "corge" ]
+]

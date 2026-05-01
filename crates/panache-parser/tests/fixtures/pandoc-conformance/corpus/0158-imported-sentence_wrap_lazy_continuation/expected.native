@@ -1,0 +1,38 @@
+[ BulletList
+    [ [ Para
+          [ Str "Item"
+          , Space
+          , Str "line"
+          , Space
+          , Str "continues"
+          , Space
+          , Str "here."
+          , SoftBreak
+          , Str "Still"
+          , Space
+          , Str "same"
+          , Space
+          , Str "paragraph;"
+          , Space
+          , Str "now"
+          , Space
+          , Str "another"
+          , Space
+          , Str "sentence."
+          ]
+      , Para
+          [ Str "New"
+          , Space
+          , Str "paragraph"
+          , Space
+          , Str "sentence"
+          , Space
+          , Str "one."
+          , Space
+          , Str "Sentence"
+          , Space
+          , Str "two."
+          ]
+      ]
+    ]
+]

@@ -1,0 +1,98 @@
+[ Header
+    1
+    ( "reference-images" , [] , [] )
+    [ Str "Reference" , Space , Str "Images" ]
+, Para
+    [ Str "Explicit"
+    , Space
+    , Str "reference:"
+    , Space
+    , Image
+        ( "" , [] , [] )
+        [ Str "alt" , Space , Str "text" ]
+        ( "/path/to/image.png" , "Image Title" )
+    , Space
+    , Str "in"
+    , Space
+    , Str "paragraph."
+    ]
+, Para
+    [ Str "Implicit"
+    , Space
+    , Str "reference:"
+    , Space
+    , Image ( "" , [] , [] ) [ Str "Logo" ] ( "/logo.svg" , "" )
+    , Space
+    , Str "shows"
+    , Space
+    , Str "brand."
+    ]
+, Para
+    [ Str "Shortcut"
+    , Space
+    , Str "reference:"
+    , Space
+    , Image ( "" , [] , [] ) [ Str "Icon" ] ( "/icon.png" , "" )
+    , Space
+    , Str "works"
+    , Space
+    , Str "too."
+    ]
+, Para
+    [ Str "Multiple"
+    , Space
+    , Str "images:"
+    , Space
+    , Image
+        ( "" , [] , [] ) [ Str "first" ] ( "/img1.jpg" , "" )
+    , Space
+    , Str "and"
+    , Space
+    , Image
+        ( "" , [] , [] ) [ Str "second" ] ( "/img2.jpg" , "" )
+    , Space
+    , Str "together."
+    ]
+, Para
+    [ Str "Unresolved:"
+    , Space
+    , Str "![missing][nonexistent]"
+    , Space
+    , Str "stays"
+    , Space
+    , Str "as-is."
+    ]
+, Para
+    [ Str "Case"
+    , Space
+    , Str "insensitive:"
+    , Space
+    , Image
+        ( "" , [] , [] ) [ Str "ALT" ] ( "/matched.png" , "" )
+    , Space
+    , Str "matches"
+    , Space
+    , Str "lowercase"
+    , Space
+    , Str "definition."
+    ]
+, Para
+    [ Str "Complex"
+    , Space
+    , Str "alt:"
+    , Space
+    , Image
+        ( "" , [] , [] )
+        [ Strong [ Str "bold" ]
+        , Space
+        , Str "and"
+        , Space
+        , Code ( "" , [] , [] ) "code"
+        ]
+        ( "/path/to/image.png" , "Image Title" )
+    , Space
+    , Str "with"
+    , Space
+    , Str "formatting."
+    ]
+]

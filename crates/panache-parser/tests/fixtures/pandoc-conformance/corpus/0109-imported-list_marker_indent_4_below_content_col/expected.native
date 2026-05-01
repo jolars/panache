@@ -1,0 +1,9 @@
+[ BulletList
+    [ [ Plain [ Str "a" ] ]
+    , [ Plain [ Str "b" ] ]
+    , [ Plain [ Str "c" ] ]
+    , [ Plain
+          [ Str "d" , SoftBreak , Str "-" , Space , Str "e" ]
+      ]
+    ]
+]

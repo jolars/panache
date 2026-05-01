@@ -1,0 +1,29 @@
+[ DefinitionList
+    [ ( [ Str "Term" ]
+      , [ [ BulletList
+              [ [ Plain
+                    [ Str "List"
+                    , SoftBreak
+                    , Str "with"
+                    , Space
+                    , Str "lazy"
+                    , Space
+                    , Str "continuation"
+                    ]
+                ]
+              , [ BlockQuote
+                    [ Para
+                        [ Str "a"
+                        , SoftBreak
+                        , Str "b"
+                        , SoftBreak
+                        , Str "c"
+                        ]
+                    ]
+                ]
+              ]
+          ]
+        ]
+      )
+    ]
+]

@@ -1,0 +1,8 @@
+[ Para
+    [ Str "not"
+    , Space
+    , Str "*emphasis*"
+    , Space
+    , Str "here"
+    ]
+]

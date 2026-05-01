@@ -1,0 +1,9 @@
+[ Para [ Str "**foo*" ]
+, Para [ Str "__foo_" ]
+, Para [ Str "*foo**" ]
+, Para [ Str "_foo__" ]
+, Para [ Strong [ Emph [ Str "foo" ] ] ]
+, Para [ Emph [ Str "foo" , Space ] , Str "bar**" ]
+, Para
+    [ Str "foo" , Strong [ Emph [ Str "bar" ] ] , Str "baz" ]
+]

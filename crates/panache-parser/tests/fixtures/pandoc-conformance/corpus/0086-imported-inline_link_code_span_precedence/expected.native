@@ -1,0 +1,10 @@
+[ Para
+    [ Str "[not"
+    , Space
+    , Str "a"
+    , Space
+    , Code ( "" , [] , [] ) "link](/foo"
+    , Str ")"
+    ]
+, Para [ Str "[foo" , Code ( "" , [] , [] ) "](/uri)" ]
+]

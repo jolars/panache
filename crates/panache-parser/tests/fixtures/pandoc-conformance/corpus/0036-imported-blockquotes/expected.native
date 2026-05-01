@@ -1,0 +1,601 @@
+[ Para
+    [ Str "Markdown"
+    , Space
+    , Str "uses"
+    , Space
+    , Str "email"
+    , Space
+    , Str "conventions"
+    , Space
+    , Str "for"
+    , Space
+    , Str "quoting"
+    , Space
+    , Str "blocks"
+    , Space
+    , Str "of"
+    , Space
+    , Str "text."
+    ]
+, BlockQuote
+    [ Para
+        [ Str "This"
+        , Space
+        , Str "is"
+        , Space
+        , Str "a"
+        , Space
+        , Str "block"
+        , Space
+        , Str "quote."
+        , Space
+        , Str "This"
+        , SoftBreak
+        , Str "paragraph"
+        , Space
+        , Str "has"
+        , Space
+        , Str "two"
+        , Space
+        , Str "lines."
+        ]
+    , OrderedList
+        ( 1 , Decimal , Period )
+        [ [ Plain
+              [ Str "This"
+              , Space
+              , Str "is"
+              , Space
+              , Str "a"
+              , Space
+              , Str "list"
+              , Space
+              , Str "inside"
+              , Space
+              , Str "a"
+              , Space
+              , Str "block"
+              , Space
+              , Str "quote."
+              ]
+          ]
+        , [ Plain [ Str "Second" , Space , Str "item." ] ]
+        ]
+    ]
+, Para
+    [ Str "A"
+    , Space
+    , Quoted DoubleQuote [ Str "lazy" ]
+    , Space
+    , Str "form,"
+    , Space
+    , Str "which"
+    , Space
+    , Str "requires"
+    , Space
+    , Str "the"
+    , Space
+    , Code ( "" , [] , [] ) ">"
+    , Space
+    , Str "character"
+    , Space
+    , Str "only"
+    , Space
+    , Str "on"
+    , Space
+    , Str "the"
+    , Space
+    , Str "first"
+    , Space
+    , Str "line"
+    , Space
+    , Str "of"
+    , Space
+    , Str "each"
+    , SoftBreak
+    , Str "block,"
+    , Space
+    , Str "is"
+    , Space
+    , Str "also"
+    , Space
+    , Str "allowed:"
+    ]
+, BlockQuote
+    [ Para
+        [ Str "This"
+        , Space
+        , Str "is"
+        , Space
+        , Str "a"
+        , Space
+        , Str "block"
+        , Space
+        , Str "quote."
+        , Space
+        , Str "This"
+        , SoftBreak
+        , Str "paragraph"
+        , Space
+        , Str "has"
+        , Space
+        , Str "two"
+        , Space
+        , Str "lines."
+        ]
+    ]
+, BlockQuote
+    [ OrderedList
+        ( 1 , Decimal , Period )
+        [ [ Plain
+              [ Str "This"
+              , Space
+              , Str "is"
+              , Space
+              , Str "a"
+              , Space
+              , Str "list"
+              , Space
+              , Str "inside"
+              , Space
+              , Str "a"
+              , Space
+              , Str "block"
+              , Space
+              , Str "quote."
+              ]
+          ]
+        , [ Plain [ Str "Second" , Space , Str "item." ] ]
+        ]
+    ]
+, Para
+    [ Str "Among"
+    , Space
+    , Str "the"
+    , Space
+    , Str "block"
+    , Space
+    , Str "elements"
+    , Space
+    , Str "that"
+    , Space
+    , Str "can"
+    , Space
+    , Str "be"
+    , Space
+    , Str "contained"
+    , Space
+    , Str "in"
+    , Space
+    , Str "a"
+    , Space
+    , Str "block"
+    , Space
+    , Str "quote"
+    , Space
+    , Str "are"
+    , Space
+    , Str "other"
+    , Space
+    , Str "block"
+    , SoftBreak
+    , Str "quotes."
+    , Space
+    , Str "That"
+    , Space
+    , Str "is,"
+    , Space
+    , Str "block"
+    , Space
+    , Str "quotes"
+    , Space
+    , Str "can"
+    , Space
+    , Str "be"
+    , Space
+    , Str "nested:"
+    ]
+, BlockQuote
+    [ Para
+        [ Str "This"
+        , Space
+        , Str "is"
+        , Space
+        , Str "a"
+        , Space
+        , Str "block"
+        , Space
+        , Str "quote."
+        ]
+    , BlockQuote
+        [ Para
+            [ Str "A"
+            , Space
+            , Str "block"
+            , Space
+            , Str "quote"
+            , Space
+            , Str "within"
+            , Space
+            , Str "a"
+            , Space
+            , Str "block"
+            , Space
+            , Str "quote."
+            ]
+        ]
+    ]
+, Para
+    [ Str "If"
+    , Space
+    , Str "the"
+    , Space
+    , Code ( "" , [] , [] ) ">"
+    , Space
+    , Str "character"
+    , Space
+    , Str "is"
+    , Space
+    , Str "followed"
+    , Space
+    , Str "by"
+    , Space
+    , Str "an"
+    , Space
+    , Str "optional"
+    , Space
+    , Str "space,"
+    , Space
+    , Str "that"
+    , Space
+    , Str "space"
+    , Space
+    , Str "will"
+    , Space
+    , Str "be"
+    , SoftBreak
+    , Str "considered"
+    , Space
+    , Str "part"
+    , Space
+    , Str "of"
+    , Space
+    , Str "the"
+    , Space
+    , Str "block"
+    , Space
+    , Str "quote"
+    , Space
+    , Str "marker"
+    , Space
+    , Str "and"
+    , Space
+    , Str "not"
+    , Space
+    , Str "part"
+    , Space
+    , Str "of"
+    , Space
+    , Str "the"
+    , Space
+    , Str "indentation"
+    , Space
+    , Str "of"
+    , SoftBreak
+    , Str "the"
+    , Space
+    , Str "contents."
+    , Space
+    , Str "Thus,"
+    , Space
+    , Str "to"
+    , Space
+    , Str "put"
+    , Space
+    , Str "an"
+    , Space
+    , Str "indented"
+    , Space
+    , Str "code"
+    , Space
+    , Str "block"
+    , Space
+    , Str "in"
+    , Space
+    , Str "a"
+    , Space
+    , Str "block"
+    , Space
+    , Str "quote,"
+    , Space
+    , Str "you"
+    , Space
+    , Str "need"
+    , SoftBreak
+    , Str "five"
+    , Space
+    , Str "spaces"
+    , Space
+    , Str "after"
+    , Space
+    , Str "the"
+    , Space
+    , Code ( "" , [] , [] ) ">"
+    , Str ":"
+    ]
+, BlockQuote [ CodeBlock ( "" , [] , [] ) "code" ]
+, Header
+    3
+    ( "extension-blank_before_blockquote" , [] , [] )
+    [ Str "Extension:"
+    , Space
+    , Code ( "" , [] , [] ) "blank_before_blockquote"
+    ]
+, Para
+    [ Str "Original"
+    , Space
+    , Str "Markdown"
+    , Space
+    , Str "syntax"
+    , Space
+    , Str "does"
+    , Space
+    , Str "not"
+    , Space
+    , Str "require"
+    , Space
+    , Str "a"
+    , Space
+    , Str "blank"
+    , Space
+    , Str "line"
+    , Space
+    , Str "before"
+    , Space
+    , Str "a"
+    , Space
+    , Str "block"
+    , Space
+    , Str "quote."
+    , SoftBreak
+    , Str "Pandoc"
+    , Space
+    , Str "does"
+    , Space
+    , Str "require"
+    , Space
+    , Str "this"
+    , Space
+    , Str "(except,"
+    , Space
+    , Str "of"
+    , Space
+    , Str "course,"
+    , Space
+    , Str "at"
+    , Space
+    , Str "the"
+    , Space
+    , Str "beginning"
+    , Space
+    , Str "of"
+    , Space
+    , Str "the"
+    , Space
+    , Str "document)."
+    , SoftBreak
+    , Str "The"
+    , Space
+    , Str "reason"
+    , Space
+    , Str "for"
+    , Space
+    , Str "the"
+    , Space
+    , Str "requirement"
+    , Space
+    , Str "is"
+    , Space
+    , Str "that"
+    , Space
+    , Str "it"
+    , Space
+    , Str "is"
+    , Space
+    , Str "all"
+    , Space
+    , Str "too"
+    , Space
+    , Str "easy"
+    , Space
+    , Str "for"
+    , Space
+    , Str "a"
+    , Space
+    , Code ( "" , [] , [] ) ">"
+    , Space
+    , Str "to"
+    , Space
+    , Str "end"
+    , Space
+    , Str "up"
+    , SoftBreak
+    , Str "at"
+    , Space
+    , Str "the"
+    , Space
+    , Str "beginning"
+    , Space
+    , Str "of"
+    , Space
+    , Str "a"
+    , Space
+    , Str "line"
+    , Space
+    , Str "by"
+    , Space
+    , Str "accident"
+    , Space
+    , Str "(perhaps"
+    , Space
+    , Str "through"
+    , Space
+    , Str "line"
+    , Space
+    , Str "wrapping)."
+    , Space
+    , Str "So,"
+    , SoftBreak
+    , Str "unless"
+    , Space
+    , Str "the"
+    , Space
+    , Code ( "" , [] , [] ) "markdown_strict"
+    , Space
+    , Str "format"
+    , Space
+    , Str "is"
+    , Space
+    , Str "used,"
+    , Space
+    , Str "the"
+    , Space
+    , Str "following"
+    , Space
+    , Str "does"
+    , Space
+    , Str "not"
+    , Space
+    , Str "produce"
+    , Space
+    , Str "a"
+    , SoftBreak
+    , Str "nested"
+    , Space
+    , Str "block"
+    , Space
+    , Str "quote"
+    , Space
+    , Str "in"
+    , Space
+    , Str "pandoc:"
+    ]
+, BlockQuote
+    [ Para
+        [ Str "This"
+        , Space
+        , Str "is"
+        , Space
+        , Str "a"
+        , Space
+        , Str "block"
+        , Space
+        , Str "quote."
+        , SoftBreak
+        , Str ">"
+        , Space
+        , Str "Not"
+        , Space
+        , Str "nested,"
+        , Space
+        , Str "since"
+        , Space
+        , Code ( "" , [] , [] ) "blank_before_blockquote"
+        , Space
+        , Str "is"
+        , Space
+        , Str "enabled"
+        , Space
+        , Str "by"
+        , Space
+        , Str "default"
+        ]
+    ]
+, BlockQuote
+    [ Para
+        [ Str "practical"
+        , Space
+        , Str "skills"
+        , Space
+        , Str "in:"
+        ]
+    , BulletList
+        [ [ Plain
+              [ Str "Developing"
+              , Space
+              , Str "and"
+              , Space
+              , Str "integrating"
+              , Space
+              , Str "custom"
+              , Space
+              , Str "formats"
+              , Space
+              , Str "to"
+              , Space
+              , Str "support"
+              , Space
+              , Str "diverse"
+              , Space
+              , Str "outputs"
+              , SoftBreak
+              , Str "while"
+              , Space
+              , Str "reducing"
+              , Space
+              , Str "repetition"
+              , Space
+              , Str "across"
+              , Space
+              , Str "projects."
+              ]
+          ]
+        , [ Plain
+              [ Str "Substituting"
+              , Space
+              , Str "Quarto\8217s"
+              , Space
+              , Str "templates"
+              , Space
+              , Str "with"
+              , Space
+              , Str "your"
+              , Space
+              , Str "own"
+              , Space
+              , Str "to"
+              , Space
+              , Str "customize"
+              , Space
+              , Str "formats"
+              , SoftBreak
+              , Str "beyond"
+              , Space
+              , Str "the"
+              , Space
+              , Str "built-in"
+              , Space
+              , Str "options."
+              ]
+          ]
+        , [ Plain
+              [ Str "Implementing"
+              , Space
+              , Str "filters"
+              , Space
+              , Str "to"
+              , Space
+              , Str "automate"
+              , Space
+              , Str "and"
+              , Space
+              , Str "streamline"
+              , Space
+              , Str "content"
+              , SoftBreak
+              , Str "transformation."
+              ]
+          ]
+        ]
+    ]
+]

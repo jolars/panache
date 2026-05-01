@@ -1,0 +1,93 @@
+[ Header 1 ( "emphasis" , [] , [] ) [ Str "Emphasis" ]
+, Para
+    [ Str "Single"
+    , Space
+    , Str "asterisks:"
+    , Space
+    , Emph [ Str "italic" , Space , Str "text" ]
+    ]
+, Para
+    [ Str "Single"
+    , Space
+    , Str "underscores:"
+    , Space
+    , Emph [ Str "italic" , Space , Str "text" ]
+    ]
+, Para
+    [ Str "Double"
+    , Space
+    , Str "asterisks:"
+    , Space
+    , Strong [ Str "bold" , Space , Str "text" ]
+    ]
+, Para
+    [ Str "Double"
+    , Space
+    , Str "underscores:"
+    , Space
+    , Strong [ Str "bold" , Space , Str "text" ]
+    ]
+, Para
+    [ Str "Combined:"
+    , Space
+    , Strong
+        [ Str "bold"
+        , Space
+        , Str "with"
+        , Space
+        , Emph [ Str "nested" , Space , Str "italic" ]
+        ]
+    ]
+, Para
+    [ Str "Mixed"
+    , Space
+    , Str "markers:"
+    , Space
+    , Emph
+        [ Str "italic"
+        , Space
+        , Str "with"
+        , Space
+        , Strong [ Str "bold" ]
+        , Space
+        , Str "inside"
+        ]
+    ]
+, Para
+    [ Str "Adjacent:"
+    , Space
+    , Emph [ Str "first" ]
+    , Space
+    , Str "and"
+    , Space
+    , Emph [ Str "second" ]
+    , Space
+    , Str "emphasis"
+    ]
+, Para
+    [ Str "Intraword:"
+    , Space
+    , Str "un"
+    , Emph [ Str "frigging" ]
+    , Str "believable"
+    , Space
+    , Str "and"
+    , Space
+    , Str "un"
+    , Strong [ Str "frigging" ]
+    , Str "believable"
+    ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "is"
+    , Space
+    , Str "_"
+    , Space
+    , Str "not"
+    , Space
+    , Str "emphasized"
+    , Space
+    , Str "_"
+    ]
+]

@@ -1,0 +1,50 @@
+[ Header
+    1
+    ( "html-block-test" , [] , [] )
+    [ Str "HTML" , Space , Str "Block" , Space , Str "Test" ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "document"
+    , Space
+    , Str "tests"
+    , Space
+    , Str "HTML"
+    , Space
+    , Str "block"
+    , Space
+    , Str "parsing."
+    ]
+, RawBlock (Format "html") "<!-- HTML comment -->"
+, Para
+    [ Str "Some"
+    , Space
+    , Str "text"
+    , Space
+    , Str "after"
+    , Space
+    , Str "comment."
+    ]
+, Div
+    ( "" , [ "container" ] , [] )
+    [ Para
+        [ Str "Content" , Space , Str "inside" , Space , Str "div" ]
+    ]
+, Para
+    [ Str "Paragraph"
+    , Space
+    , Str "after"
+    , Space
+    , Str "div."
+    ]
+, RawBlock
+    (Format "html")
+    "<script>\nalert('Hello');\nconsole.log('test');\n</script>"
+, Para [ Str "Final" , Space , Str "paragraph." ]
+, RawBlock
+    (Format "html")
+    "<!--\nHtml comment with multiple\nlines\n-->"
+, RawBlock
+    (Format "html")
+    "<!--\n    This is an indented comment.\n-->"
+]

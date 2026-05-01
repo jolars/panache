@@ -1,0 +1,72 @@
+[ Para [ Str "Nested" , Space , Str "lists:" ]
+, BulletList
+    [ [ Plain [ Str "Fruits" ]
+      , BulletList
+          [ [ Plain [ Str "Apples" ] ]
+          , [ Plain [ Str "Pears" ] ]
+          , [ Plain [ Str "Peaches" ] ]
+          ]
+      ]
+    , [ Plain [ Str "Vegetables" ]
+      , BulletList
+          [ [ Plain [ Str "Broccoli" ] ] , [ Plain [ Str "Chard" ] ] ]
+      ]
+    ]
+, Para [ Str "Mixed" , Space , Str "nesting:" ]
+, OrderedList
+    ( 1 , Decimal , Period )
+    [ [ Plain [ Str "First" , Space , Str "level" ]
+      , BulletList
+          [ [ Plain [ Str "Nested" , Space , Str "bullet" ] ]
+          , [ Plain [ Str "Another" , Space , Str "nested" ] ]
+          ]
+      ]
+    , [ Plain
+          [ Str "Back"
+          , Space
+          , Str "to"
+          , Space
+          , Str "first"
+          , Space
+          , Str "level"
+          ]
+      ]
+    ]
+, Para [ Str "Nested" , Space , Str "case:" ]
+, OrderedList
+    ( 1 , UpperAlpha , Period )
+    [ [ Plain [ Str "Upper" , Space , Str "Alpha" ]
+      , OrderedList
+          ( 1 , UpperRoman , Period )
+          [ [ Plain [ Str "Upper" , Space , Str "Roman." ]
+            , OrderedList
+                ( 6 , Decimal , TwoParens )
+                [ [ Plain
+                      [ Str "Decimal"
+                      , Space
+                      , Str "start"
+                      , Space
+                      , Str "with"
+                      , Space
+                      , Str "6"
+                      ]
+                  , OrderedList
+                      ( 3 , LowerAlpha , OneParen )
+                      [ [ Plain
+                            [ Str "Lower"
+                            , Space
+                            , Str "alpha"
+                            , Space
+                            , Str "with"
+                            , Space
+                            , Str "paren"
+                            ]
+                        ]
+                      ]
+                  ]
+                ]
+            ]
+          ]
+      ]
+    ]
+]

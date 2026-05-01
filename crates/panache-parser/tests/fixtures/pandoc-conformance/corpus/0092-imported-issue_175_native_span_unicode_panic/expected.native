@@ -1,0 +1,33 @@
+[ Para
+    [ Span
+        ( "" , [ "rtl" ] , [] )
+        [ Str "(\1588\1585\1576\1606\1575"
+        , Space
+        , Str "\1605\1606"
+        , Space
+        , Str "\1575\1604\1606\1610\1604)"
+        ]
+    , Space
+    , Str "and"
+    , Space
+    , Str "feel"
+    , Space
+    , Str "part"
+    , Space
+    , Str "of"
+    , Space
+    , Str "it."
+    , Space
+    , Str "This"
+    , Space
+    , Str "horrific"
+    , Space
+    , Str "carnage"
+    , Space
+    , Str "is"
+    , Space
+    , Str "absolutely"
+    , Space
+    , Str "sickening."
+    ]
+]

@@ -1,0 +1,50 @@
+[ Para
+    [ Str "This"
+    , Space
+    , Str "has"
+    , Space
+    , Str "a"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "link"
+        , Space
+        , Str "text"
+        , Space
+        , Str "with"
+        , Space
+        , Str "stop;"
+        , Space
+        , Str "and"
+        , Space
+        , Str "more"
+        ]
+        ( "https://example.com" , "" )
+    , Space
+    , Str "after."
+    , Space
+    , Str "And"
+    , Space
+    , Str "a"
+    , Space
+    , Str "figure:"
+    , Space
+    , Image
+        ( "" , [] , [] )
+        [ Str "Caption"
+        , Space
+        , Str "has"
+        , Space
+        , Str "a"
+        , Space
+        , Str "stop?"
+        , Space
+        , Str "yes"
+        ]
+        ( "image.png" , "" )
+    , Space
+    , Str "then"
+    , Space
+    , Str "continue."
+    ]
+]

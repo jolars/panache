@@ -1,0 +1,6 @@
+[ BulletList
+    [ [ Plain [ Str "foo" ] ]
+    , [ Plain [ Str "bar" ] ]
+    , [ Plain [ Str "baz" ] ]
+    ]
+]

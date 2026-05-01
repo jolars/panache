@@ -1,0 +1,10 @@
+[ Para
+    [ Str "first"
+    , Space
+    , Str "line"
+    , LineBreak
+    , Str "second"
+    , Space
+    , Str "line"
+    ]
+]

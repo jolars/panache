@@ -1,0 +1,42 @@
+[ Header
+    1
+    ( "test-blockquote-containing-list-containing-nested-blockquote"
+    , []
+    , []
+    )
+    [ Str "Test:"
+    , Space
+    , Str "Blockquote"
+    , Space
+    , Str "containing"
+    , Space
+    , Str "list"
+    , Space
+    , Str "containing"
+    , Space
+    , Str "nested"
+    , Space
+    , Str "blockquote"
+    ]
+, BlockQuote
+    [ BulletList
+        [ [ Para
+              [ Str "First" , Space , Str "list" , Space , Str "item" ]
+          , Para
+              [ Str "Back"
+              , Space
+              , Str "to"
+              , Space
+              , Str "list"
+              , Space
+              , Str "item"
+              , Space
+              , Str "content"
+              ]
+          ]
+        , [ Para
+              [ Str "Second" , Space , Str "list" , Space , Str "item" ]
+          ]
+        ]
+    ]
+]

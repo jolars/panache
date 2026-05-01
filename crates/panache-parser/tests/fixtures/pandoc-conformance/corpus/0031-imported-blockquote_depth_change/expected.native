@@ -1,0 +1,99 @@
+[ Header
+    1
+    ( "test-changing-blockquote-depth-mid-list" , [] , [] )
+    [ Str "Test:"
+    , Space
+    , Str "Changing"
+    , Space
+    , Str "blockquote"
+    , Space
+    , Str "depth"
+    , Space
+    , Str "mid-list"
+    ]
+, BlockQuote
+    [ BulletList
+        [ [ Plain
+              [ Str "First"
+              , Space
+              , Str "item"
+              , Space
+              , Str "at"
+              , Space
+              , Str "depth"
+              , Space
+              , Str "1"
+              ]
+          ]
+        , [ Plain
+              [ Str "Second"
+              , Space
+              , Str "item"
+              , Space
+              , Str "at"
+              , Space
+              , Str "depth"
+              , Space
+              , Str "1"
+              ]
+          ]
+        ]
+    ]
+, BlockQuote
+    [ BlockQuote
+        [ BulletList
+            [ [ Plain
+                  [ Str "Nested"
+                  , Space
+                  , Str "item"
+                  , Space
+                  , Str "at"
+                  , Space
+                  , Str "depth"
+                  , Space
+                  , Str "2"
+                  ]
+              ]
+            , [ Plain
+                  [ Str "Another"
+                  , Space
+                  , Str "at"
+                  , Space
+                  , Str "depth"
+                  , Space
+                  , Str "2"
+                  ]
+              ]
+            ]
+        ]
+    ]
+, BlockQuote
+    [ BulletList
+        [ [ Plain
+              [ Str "Back"
+              , Space
+              , Str "to"
+              , Space
+              , Str "depth"
+              , Space
+              , Str "1"
+              ]
+          ]
+        ]
+    ]
+, Para
+    [ Str "How"
+    , Space
+    , Str "should"
+    , Space
+    , Str "the"
+    , Space
+    , Str "list"
+    , Space
+    , Str "structure"
+    , Space
+    , Str "be"
+    , Space
+    , Str "interpreted?"
+    ]
+]

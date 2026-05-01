@@ -1,0 +1,79 @@
+[ Para
+    [ Str "In"
+    , Space
+    , Str "most"
+    , Space
+    , Str "cases,"
+    , Space
+    , Str "you"
+    , Space
+    , Str "can"
+    , Space
+    , Str "just"
+    , Space
+    , Str "use"
+    , Space
+    , Str "the"
+    , Space
+    , Code ( "" , [] , [] ) "@export"
+    , Space
+    , Str "tag,"
+    , Space
+    , Str "and"
+    , Space
+    , Str "roxygen2"
+    , Space
+    , Str "will"
+    , Space
+    , Str "automatically"
+    , Space
+    , Str "figure"
+    , Space
+    , Str "out"
+    , Space
+    , Str "which"
+    , Space
+    , Code ( "" , [] , [] ) "NAMESPACE"
+    , Space
+    , Str "directive"
+    , Space
+    , Str "(i.e.\160"
+    , Code ( "" , [] , [] ) "export()"
+    , Str ","
+    , Space
+    , Code ( "" , [] , [] ) "S3method()"
+    , Str ","
+    , Space
+    , Code ( "" , [] , [] ) "exportClasses()"
+    , Str ","
+    , Space
+    , Str "or"
+    , Space
+    , Code ( "" , [] , [] ) "exportMethods()"
+    , Str ")"
+    , Space
+    , Str "you"
+    , Space
+    , Str "need."
+    ]
+, Para
+    [ Str "If"
+    , Space
+    , Str "this"
+    , Space
+    , Str "happens"
+    , Space
+    , Str "to"
+    , Space
+    , Str "you,"
+    , Space
+    , Str "disambiguate"
+    , Space
+    , Str "with"
+    , Space
+    , Str "(e.g.)"
+    , Space
+    , Code ( "" , [] , [] ) "@method all.equal data.frame"
+    , Str "."
+    ]
+]

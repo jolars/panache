@@ -1,0 +1,161 @@
+[ Header
+    1
+    ( "ignore-directives-test" , [] , [] )
+    [ Str "Ignore"
+    , Space
+    , Str "Directives"
+    , Space
+    , Str "Test"
+    ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "document"
+    , Space
+    , Str "tests"
+    , Space
+    , Str "ignore"
+    , Space
+    , Str "directives"
+    , Space
+    , Str "for"
+    , Space
+    , Str "formatting"
+    , Space
+    , Str "and"
+    , Space
+    , Str "linting."
+    ]
+, RawBlock
+    (Format "html") "<!-- panache-ignore-format-start -->"
+, Para
+    [ Str "This"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "has"
+    , Space
+    , Str "weird"
+    , Space
+    , Str "spacing"
+    , Space
+    , Str "that"
+    , SoftBreak
+    , Str "should"
+    , Space
+    , Str "be"
+    , Space
+    , Str "preserved"
+    , Space
+    , Str "exactly."
+    , SoftBreak
+    , RawInline
+        (Format "html") "<!-- panache-ignore-format-end -->"
+    ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "should"
+    , Space
+    , Str "be"
+    , Space
+    , Str "formatted"
+    , Space
+    , Str "normally"
+    , Space
+    , Str "with"
+    , Space
+    , Str "proper"
+    , Space
+    , Str "spacing."
+    ]
+, RawBlock
+    (Format "html") "<!-- panache-ignore-lint-start -->"
+, Header
+    4
+    ( "heading-level-skip-should-not-be-linted" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "level"
+    , Space
+    , Str "skip"
+    , Space
+    , Str "should"
+    , Space
+    , Str "not"
+    , Space
+    , Str "be"
+    , Space
+    , Str "linted"
+    ]
+, RawBlock
+    (Format "html") "<!-- panache-ignore-lint-end -->"
+, RawBlock (Format "html") "<!-- panache-ignore-start -->"
+, Para
+    [ Str "Both"
+    , Space
+    , Str "formatting"
+    , Space
+    , Str "and"
+    , Space
+    , Str "linting"
+    , Space
+    , Str "ignored"
+    , Space
+    , Str "here"
+    , SoftBreak
+    , Str "#####"
+    , Space
+    , Str "Another"
+    , Space
+    , Str "heading"
+    , Space
+    , Str "level"
+    , Space
+    , Str "skip"
+    , SoftBreak
+    , RawInline (Format "html") "<!-- panache-ignore-end -->"
+    ]
+, Para
+    [ Str "Regular"
+    , Space
+    , Str "content"
+    , Space
+    , Str "continues"
+    , Space
+    , Str "here."
+    ]
+, BulletList
+    [ [ Plain
+          [ Str "List" , Space , Str "item" , Space , Str "1" ]
+      ]
+    , [ Plain
+          [ Str "List"
+          , Space
+          , Str "item"
+          , Space
+          , Str "2"
+          , SoftBreak
+          , RawInline
+              (Format "html") "<!-- panache-ignore-format-start -->"
+          , SoftBreak
+          , Str "Nested"
+          , Space
+          , Str "content"
+          , Space
+          , Str "with"
+          , Space
+          , Str "spacing"
+          , SoftBreak
+          , RawInline
+              (Format "html") "<!-- panache-ignore-format-end -->"
+          ]
+      ]
+    , [ Plain
+          [ Str "List" , Space , Str "item" , Space , Str "3" ]
+      ]
+    ]
+, Para [ Str "Done." ]
+]

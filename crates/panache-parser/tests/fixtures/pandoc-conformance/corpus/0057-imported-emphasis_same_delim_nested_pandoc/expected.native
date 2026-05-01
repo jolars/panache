@@ -1,0 +1,28 @@
+[ Para [ Emph [ Str "(" ] , Str "foo" , Emph [ Str ")" ] ]
+, Para [ Emph [ Str "(" , Emph [ Str "foo" ] , Str ")" ] ]
+, Para
+    [ Emph [ Str "foo" , Space ]
+    , Str "bar*"
+    , Space
+    , Str "baz*"
+    ]
+, Para
+    [ Strong
+        [ Str "foo,"
+        , Space
+        , Strong [ Str "bar" ]
+        , Str ","
+        , Space
+        , Str "baz"
+        ]
+    ]
+, Para
+    [ Strong
+        [ Str "foo"
+        , Space
+        , Strong [ Str "bar" ]
+        , Space
+        , Str "baz"
+        ]
+    ]
+]

@@ -1,0 +1,362 @@
+[ Header
+    1
+    ( "reference-footnotes" , [] , [] )
+    [ Str "Reference" , Space , Str "Footnotes" ]
+, Para
+    [ Str "Simple"
+    , Space
+    , Str "footnote"
+    , Note
+        [ Para
+            [ Str "This"
+            , Space
+            , Str "is"
+            , Space
+            , Str "a"
+            , Space
+            , Str "simple"
+            , Space
+            , Str "footnote."
+            ]
+        ]
+    , Space
+    , Str "in"
+    , Space
+    , Str "text."
+    ]
+, Para
+    [ Str "Multiple"
+    , Space
+    , Str "footnotes"
+    , Note
+        [ Para
+            [ Str "This"
+            , Space
+            , Str "is"
+            , Space
+            , Str "the"
+            , Space
+            , Str "second"
+            , Space
+            , Str "footnote."
+            ]
+        ]
+    , Space
+    , Str "in"
+    , Space
+    , Str "one"
+    , Note
+        [ Para
+            [ Str "Third"
+            , Space
+            , Str "footnote"
+            , Space
+            , Str "here."
+            ]
+        ]
+    , Space
+    , Str "paragraph."
+    ]
+, Para
+    [ Str "With"
+    , Space
+    , Str "inline"
+    , Space
+    , Str "elements:"
+    , Space
+    , Strong [ Str "bold" ]
+    , Note
+        [ Para
+            [ Str "Footnote"
+            , Space
+            , Str "after"
+            , Space
+            , Str "bold"
+            , Space
+            , Str "text."
+            ]
+        ]
+    , Space
+    , Str "and"
+    , Space
+    , Code ( "" , [] , [] ) "code"
+    , Note
+        [ Para
+            [ Str "Footnote"
+            , Space
+            , Str "after"
+            , Space
+            , Str "code"
+            , Space
+            , Str "span."
+            ]
+        ]
+    , Str "."
+    ]
+, Para
+    [ Str "Multi-line"
+    , Space
+    , Str "footnote"
+    , Note
+        [ Para
+            [ Str "This"
+            , Space
+            , Str "is"
+            , Space
+            , Str "a"
+            , Space
+            , Str "multi-line"
+            , Space
+            , Str "footnote"
+            , SoftBreak
+            , Str "that"
+            , Space
+            , Str "continues"
+            , Space
+            , Str "on"
+            , Space
+            , Str "the"
+            , Space
+            , Str "next"
+            , Space
+            , Str "line."
+            ]
+        , Para
+            [ Str "It"
+            , Space
+            , Str "can"
+            , Space
+            , Str "even"
+            , Space
+            , Str "have"
+            , Space
+            , Str "multiple"
+            , Space
+            , Str "paragraphs"
+            , SoftBreak
+            , Str "with"
+            , Space
+            , Str "proper"
+            , Space
+            , Str "indentation."
+            ]
+        , BulletList
+            [ [ Plain [ Str "And" , Space , Str "lists" ] ]
+            , [ Plain
+                  [ Str "With"
+                  , Space
+                  , Str "multiple"
+                  , Space
+                  , Str "items"
+                  ]
+              ]
+            ]
+        , Para
+            [ Str "All"
+            , Space
+            , Str "indented"
+            , Space
+            , Str "by"
+            , Space
+            , Str "4"
+            , Space
+            , Str "spaces."
+            ]
+        ]
+    , Space
+    , Str "with"
+    , Space
+    , Str "complex"
+    , Space
+    , Str "content."
+    ]
+, Para
+    [ Str "Here\8217s"
+    , Space
+    , Str "one"
+    , Space
+    , Str "with"
+    , Space
+    , Str "multiple"
+    , Space
+    , Str "blocks"
+    , Note
+        [ Para
+            [ Str "Here\8217s"
+            , Space
+            , Str "one"
+            , Space
+            , Str "with"
+            , Space
+            , Str "multiple"
+            , Space
+            , Str "blocks."
+            ]
+        , Para
+            [ Str "Subsequent"
+            , Space
+            , Str "paragraphs"
+            , Space
+            , Str "are"
+            , Space
+            , Str "indented"
+            , Space
+            , Str "to"
+            , Space
+            , Str "show"
+            , Space
+            , Str "that"
+            , Space
+            , Str "they"
+            , SoftBreak
+            , Str "belong"
+            , Space
+            , Str "to"
+            , Space
+            , Str "the"
+            , Space
+            , Str "previous"
+            , Space
+            , Str "footnote."
+            ]
+        , CodeBlock ( "" , [] , [] ) "{ some.code }"
+        , Para
+            [ Str "The"
+            , Space
+            , Str "whole"
+            , Space
+            , Str "paragraph"
+            , Space
+            , Str "can"
+            , Space
+            , Str "be"
+            , Space
+            , Str "indented,"
+            , Space
+            , Str "or"
+            , Space
+            , Str "just"
+            , Space
+            , Str "the"
+            , Space
+            , Str "first"
+            , SoftBreak
+            , Str "line."
+            , Space
+            , Str "In"
+            , Space
+            , Str "this"
+            , Space
+            , Str "way,"
+            , Space
+            , Str "multi-paragraph"
+            , Space
+            , Str "footnotes"
+            , Space
+            , Str "work"
+            , Space
+            , Str "like"
+            , SoftBreak
+            , Str "multi-paragraph"
+            , Space
+            , Str "list"
+            , Space
+            , Str "items."
+            ]
+        ]
+    , Str "."
+    ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "won\8217t"
+    , Space
+    , Str "be"
+    , Space
+    , Str "part"
+    , Space
+    , Str "of"
+    , Space
+    , Str "the"
+    , Space
+    , Str "note,"
+    , Space
+    , Str "because"
+    , Space
+    , Str "it"
+    , SoftBreak
+    , Str "isn\8217t"
+    , Space
+    , Str "indented."
+    ]
+, Para
+    [ Str "A"
+    , Space
+    , Str "footnote"
+    , Note
+        [ Para
+            [ Str "This"
+            , Space
+            , Str "is"
+            , Space
+            , Str "typically"
+            , Space
+            , Str "the"
+            , Space
+            , Str "case"
+            , Space
+            , Str "when"
+            , Space
+            , Str "we"
+            , Space
+            , Str "are"
+            , Space
+            , Str "fitting"
+            , Space
+            , Str "a"
+            , SoftBreak
+            , Str "regularization"
+            , Space
+            , Str "path."
+            , Space
+            , Str "We"
+            , Space
+            , Str "start"
+            , Space
+            , Str "with"
+            , Space
+            , Str "a"
+            , Space
+            , Str "penalty"
+            , Space
+            , Str "that\8217s"
+            , Space
+            , Str "large"
+            , Space
+            , Str "enough"
+            , Space
+            , Str "to"
+            , Space
+            , Str "make"
+            , SoftBreak
+            , Str "every"
+            , Space
+            , Str "coefficient"
+            , Space
+            , Str "zero"
+            , Space
+            , Str "and"
+            , Space
+            , Str "then"
+            , Space
+            , Str "progressively"
+            , Space
+            , Str "increase"
+            , Space
+            , Str "it."
+            ]
+        ]
+    ]
+]

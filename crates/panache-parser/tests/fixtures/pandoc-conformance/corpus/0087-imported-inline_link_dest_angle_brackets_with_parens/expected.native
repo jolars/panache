@@ -1,0 +1,5 @@
+[ Para
+    [ Link
+        ( "" , [] , [] ) [ Str "link" ] ( "foo(and(bar)" , "" )
+    ]
+]

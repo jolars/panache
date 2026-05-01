@@ -1,0 +1,11 @@
+[ Para
+    [ Str "[foo"
+    , Space
+    , RawInline (Format "html") "<bar attr=\"](baz)\">"
+    ]
+, Para
+    [ Str "[foo"
+    , Space
+    , RawInline (Format "html") "<bar attr=\"][ref]\">"
+    ]
+]

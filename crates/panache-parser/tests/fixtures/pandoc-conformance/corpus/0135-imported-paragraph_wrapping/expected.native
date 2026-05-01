@@ -1,0 +1,117 @@
+[ Para
+    [ Str "Let\8217s"
+    , Space
+    , Str "write"
+    , Space
+    , Str "a"
+    , Space
+    , Str "long"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "that"
+    , Space
+    , Str "needs"
+    , Space
+    , Str "to"
+    , Space
+    , Str "be"
+    , Space
+    , Str "wrapped."
+    , Space
+    , Str "This"
+    , Space
+    , Str "is"
+    , Space
+    , Str "just"
+    , Space
+    , Str "a"
+    , Space
+    , Str "test"
+    , SoftBreak
+    , Str "to"
+    , Space
+    , Str "see"
+    , Space
+    , Str "how"
+    , Space
+    , Str "the"
+    , Space
+    , Str "wrapping"
+    , Space
+    , Str "works"
+    , Space
+    , Str "when"
+    , Space
+    , Str "we"
+    , Space
+    , Str "have"
+    , Space
+    , Str "a"
+    , Space
+    , Str "long"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "that"
+    , Space
+    , Str "exceeds"
+    , Space
+    , Str "the"
+    , SoftBreak
+    , Str "maximum"
+    , Space
+    , Str "line"
+    , Space
+    , Str "length."
+    , Space
+    , Str "We"
+    , Space
+    , Str "want"
+    , Space
+    , Str "to"
+    , Space
+    , Str "make"
+    , Space
+    , Str "sure"
+    , Space
+    , Str "that"
+    , Space
+    , Str "the"
+    , Space
+    , Str "text"
+    , Space
+    , Str "is"
+    , Space
+    , Str "wrapped"
+    , Space
+    , Str "correctly"
+    , Space
+    , Str "and"
+    , SoftBreak
+    , Str "that"
+    , Space
+    , Str "it"
+    , Space
+    , Str "looks"
+    , Space
+    , Str "good"
+    , Space
+    , Str "when"
+    , Space
+    , Str "displayed."
+    ]
+, Para
+    [ Str "Here"
+    , Space
+    , Str "is"
+    , Space
+    , Str "just"
+    , Space
+    , Str "a"
+    , Space
+    , Str "short"
+    , Space
+    , Str "paragraph."
+    ]
+]

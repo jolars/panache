@@ -1,0 +1,7 @@
+[ Para
+    [ Link
+        ( "" , [] , [] )
+        [ Str "outer" , Space , Str "[inner](u)" ]
+        ( "/barurl" , "" )
+    ]
+]

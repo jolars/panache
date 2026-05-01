@@ -1,0 +1,143 @@
+[ Para
+    [ Str "These"
+    , Space
+    , Str "examples"
+    , Space
+    , Str "use"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "inline" , Space , Str "R" , Space , Str "code" ]
+        ( "reuse.html#inline-code" , "" )
+    , Space
+    , Str "("
+    , Code ( "" , [] , [] ) "`r `"
+    , Str "),"
+    , Space
+    , Str "which"
+    , Space
+    , Str "generates"
+    , Space
+    , Str "the"
+    , Space
+    , Str "list"
+    , Space
+    , Str "at"
+    , Space
+    , Str "documentation"
+    , Space
+    , Str "time"
+    , Space
+    , Str "(i.e.\160when"
+    , Space
+    , Str "you"
+    , Space
+    , Str "run"
+    , Space
+    , Code ( "" , [] , [] ) "devtools::document()"
+    , Str ")."
+    , Space
+    , Str "This"
+    , Space
+    , Str "only"
+    , Space
+    , Str "requires"
+    , Space
+    , Str "including"
+    , Space
+    , Str "doclisting"
+    , Space
+    , Str "in"
+    , Space
+    , Code ( "" , [] , [] ) "Suggests"
+    , Str "."
+    ]
+, Para
+    [ Str "Document"
+    , Space
+    , Strong [ Str "S4" , Space , Str "classes" ]
+    , Space
+    , Str "by"
+    , Space
+    , Str "adding"
+    , Space
+    , Str "a"
+    , Space
+    , Str "roxygen"
+    , Space
+    , Str "block"
+    , Space
+    , Str "before"
+    , Space
+    , Code ( "" , [] , [] ) "setClass()"
+    , Str "."
+    , Space
+    , Code ( "" , [] , [] ) "@export"
+    , Space
+    , Str "a"
+    , Space
+    , Str "class"
+    , Space
+    , Str "if"
+    , Space
+    , Str "you"
+    , Space
+    , Str "want"
+    , Space
+    , Str "users"
+    , Space
+    , Str "to"
+    , Space
+    , Str "create"
+    , Space
+    , Str "instances"
+    , Space
+    , Str "or"
+    , Space
+    , Str "other"
+    , Space
+    , Str "developers"
+    , Space
+    , Str "to"
+    , Space
+    , Str "extend"
+    , Space
+    , Str "it"
+    , Space
+    , Str "(e.g.\160by"
+    , Space
+    , Str "creating"
+    , Space
+    , Str "subclasses)."
+    ]
+, Para
+    [ Str "S7"
+    , Space
+    , Str "methods"
+    , Space
+    , Str "are"
+    , Space
+    , Str "registered"
+    , Space
+    , Str "with"
+    , Space
+    , Code ( "" , [] , [] ) "method(generic, class) <- fn"
+    , Str "."
+    , Space
+    , Str "Generally,"
+    , Space
+    , Str "it\8217s"
+    , Space
+    , Str "not"
+    , Space
+    , Str "necessary"
+    , Space
+    , Str "to"
+    , Space
+    , Str "document"
+    , Space
+    , Str "straightforward"
+    , Space
+    , Str "methods."
+    ]
+]

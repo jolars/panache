@@ -1,0 +1,63 @@
+[ Header 1 ( "escapes" , [] , [] ) [ Str "Escapes" ]
+, Para
+    [ Str "Escaped"
+    , Space
+    , Str "asterisks:"
+    , Space
+    , Str "*not"
+    , Space
+    , Str "emphasis*"
+    ]
+, Para
+    [ Str "Escaped"
+    , Space
+    , Str "underscores:"
+    , Space
+    , Str "_not"
+    , Space
+    , Str "emphasis_"
+    ]
+, Para
+    [ Str "Escaped"
+    , Space
+    , Str "backticks:"
+    , Space
+    , Str "`not"
+    , Space
+    , Str "code`"
+    ]
+, Para
+    [ Str "Escaped"
+    , Space
+    , Str "brackets:"
+    , Space
+    , Str "[not"
+    , Space
+    , Str "a"
+    , Space
+    , Str "link](url)"
+    ]
+, Para
+    [ Str "Escaped"
+    , Space
+    , Str "dollars:"
+    , Space
+    , Str "$not"
+    , Space
+    , Str "math$"
+    ]
+, Para
+    [ Str "Backslash"
+    , Space
+    , Str "itself:"
+    , Space
+    , Str "\\text"
+    ]
+, Para
+    [ Str "Multiple:"
+    , Space
+    , Str "**not"
+    , Space
+    , Str "bold**"
+    ]
+]

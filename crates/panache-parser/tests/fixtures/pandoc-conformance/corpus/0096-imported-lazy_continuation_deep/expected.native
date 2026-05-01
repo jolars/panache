@@ -1,0 +1,101 @@
+[ Header
+    1
+    ( "test-lazy-continuation-across-multiple-nesting-levels"
+    , []
+    , []
+    )
+    [ Str "Test:"
+    , Space
+    , Str "Lazy"
+    , Space
+    , Str "continuation"
+    , Space
+    , Str "across"
+    , Space
+    , Str "multiple"
+    , Space
+    , Str "nesting"
+    , Space
+    , Str "levels"
+    ]
+, BlockQuote
+    [ BulletList
+        [ [ Plain
+              [ Str "This"
+              , Space
+              , Str "is"
+              , Space
+              , Str "a"
+              , Space
+              , Str "blockquoted"
+              , Space
+              , Str "list"
+              , Space
+              , Str "item"
+              , Space
+              , Str "with"
+              , SoftBreak
+              , Str "lazy"
+              , Space
+              , Str "continuation"
+              , Space
+              , Str "across"
+              , Space
+              , Str "the"
+              , Space
+              , Str "first"
+              , Space
+              , Str "level"
+              ]
+          ]
+        ]
+    , BlockQuote
+        [ Para
+            [ Str "And"
+            , Space
+            , Str "a"
+            , Space
+            , Str "nested"
+            , Space
+            , Str "blockquote"
+            , Space
+            , Str "that"
+            , Space
+            , Str "also"
+            , Space
+            , Str "has"
+            , Space
+            , Str "lazy"
+            , Space
+            , Str "continuation"
+            , Space
+            , Str "text"
+            ]
+        ]
+    , Para
+        [ Str "Back"
+        , Space
+        , Str "to"
+        , Space
+        , Str "the"
+        , Space
+        , Str "list"
+        , Space
+        , Str "item,"
+        , Space
+        , Str "this"
+        , Space
+        , Str "should"
+        , Space
+        , Str "also"
+        , Space
+        , Str "support"
+        , Space
+        , Str "lazy"
+        , Space
+        , Str "continuation"
+        ]
+    , BulletList
+        [ [ Plain [ Str "Second" , Space , Str "item" ] ] ]
+    ]
+]

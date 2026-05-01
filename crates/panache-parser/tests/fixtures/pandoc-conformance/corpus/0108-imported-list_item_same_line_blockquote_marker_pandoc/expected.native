@@ -1,0 +1,16 @@
+[ BlockQuote
+    [ OrderedList
+        ( 1 , Decimal , Period )
+        [ [ BlockQuote
+              [ Para
+                  [ Str "Blockquote"
+                  , SoftBreak
+                  , Str "continued"
+                  , Space
+                  , Str "here."
+                  ]
+              ]
+          ]
+        ]
+    ]
+]

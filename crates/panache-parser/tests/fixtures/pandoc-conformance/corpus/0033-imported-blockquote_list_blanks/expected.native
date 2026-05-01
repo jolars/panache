@@ -1,0 +1,55 @@
+[ Header
+    1
+    ( "test-blockquoted-list-with-blank-lines-between-items"
+    , []
+    , []
+    )
+    [ Str "Test:"
+    , Space
+    , Str "Blockquoted"
+    , Space
+    , Str "list"
+    , Space
+    , Str "with"
+    , Space
+    , Str "blank"
+    , Space
+    , Str "lines"
+    , Space
+    , Str "between"
+    , Space
+    , Str "items"
+    ]
+, BlockQuote
+    [ BulletList [ [ Plain [ Str "item" , Space , Str "1" ] ] ]
+    ]
+, BlockQuote
+    [ BulletList [ [ Plain [ Str "item" , Space , Str "2" ] ] ]
+    ]
+, BlockQuote
+    [ BulletList [ [ Plain [ Str "item" , Space , Str "3" ] ] ]
+    ]
+, Para
+    [ Str "Should"
+    , Space
+    , Str "these"
+    , Space
+    , Str "remain"
+    , Space
+    , Str "in"
+    , Space
+    , Str "the"
+    , Space
+    , Str "same"
+    , Space
+    , Str "list"
+    , Space
+    , Str "or"
+    , Space
+    , Str "become"
+    , Space
+    , Str "separate"
+    , Space
+    , Str "lists?"
+    ]
+]

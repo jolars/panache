@@ -1,0 +1,76 @@
+[ Para
+    [ Str "Let\8217s"
+    , Space
+    , Str "ask"
+    , Space
+    , Str "Jane"
+    , Space
+    , Str "and"
+    , Space
+    , Str "co."
+    , Space
+    , Str "They"
+    , Space
+    , Str "should"
+    , Space
+    , Str "know."
+    , SoftBreak
+    , Str "I"
+    , Space
+    , Str "work"
+    , Space
+    , Str "for"
+    , Space
+    , Str "the"
+    , Space
+    , Str "U.S."
+    , Space
+    , Str "Government"
+    , Space
+    , Str "in"
+    , Space
+    , Str "Virginia."
+    , SoftBreak
+    , Str "I"
+    , Space
+    , Str "live"
+    , Space
+    , Str "in"
+    , Space
+    , Str "the"
+    , Space
+    , Str "U.S."
+    , Space
+    , Str "How"
+    , Space
+    , Str "about"
+    , Space
+    , Str "you?"
+    , SoftBreak
+    , Str "He"
+    , Space
+    , Str "left"
+    , Space
+    , Str "at"
+    , Space
+    , Str "6"
+    , Space
+    , Str "p.m."
+    , Space
+    , Str "Travelers"
+    , Space
+    , Str "who"
+    , Space
+    , Str "didn\8217t"
+    , Space
+    , Str "get"
+    , Space
+    , Str "the"
+    , Space
+    , Str "warning"
+    , Space
+    , Str "left"
+    , Space
+    , Str "later."
+    ]
+]

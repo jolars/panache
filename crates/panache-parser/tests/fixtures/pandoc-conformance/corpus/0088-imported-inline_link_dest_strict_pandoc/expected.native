@@ -1,0 +1,4 @@
+[ Para
+    [ Link ( "" , [] , [] ) [ Str "link" ] ( "/my%20uri" , "" )
+    ]
+]

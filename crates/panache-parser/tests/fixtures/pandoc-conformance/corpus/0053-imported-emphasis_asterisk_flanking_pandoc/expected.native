@@ -1,0 +1,8 @@
+[ Para
+    [ Str "a" , Emph [ Quoted DoubleQuote [ Str "foo" ] ] ]
+, Para [ Emph [ Str "$" ] , Str "alpha." ]
+, Para [ Emph [ Str "foo" , Space , Str "bar" , Space ] ]
+, Para [ Emph [ Str "(" ] , Str "foo)" ]
+, Para [ Strong [ Str "foo" , Space , Str "bar" , Space ] ]
+, Para [ Strong [ Str "(" ] , Str "foo)" ]
+]

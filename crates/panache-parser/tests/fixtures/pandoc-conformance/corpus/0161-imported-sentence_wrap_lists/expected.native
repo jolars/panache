@@ -1,0 +1,36 @@
+[ OrderedList
+    ( 1 , Decimal , Period )
+    [ [ Plain
+          [ Str "First"
+          , Space
+          , Str "sentence."
+          , Space
+          , Str "Second"
+          , Space
+          , Str "sentence;"
+          , Space
+          , Str "third"
+          , Space
+          , Str "sentence."
+          ]
+      ]
+    , [ Plain
+          [ Str "Item"
+          , Space
+          , Str "two"
+          , Space
+          , Str "sentence"
+          , Space
+          , Str "one?"
+          , Space
+          , Str "Item"
+          , Space
+          , Str "two"
+          , Space
+          , Str "sentence"
+          , Space
+          , Str "two."
+          ]
+      ]
+    ]
+]

@@ -1,0 +1,107 @@
+[ Table
+    ( "" , [] , [] )
+    (Caption Nothing [])
+    [ ( AlignCenter , ColWidth 0.16666666666666666 )
+    , ( AlignLeft , ColWidth 0.1111111111111111 )
+    , ( AlignRight , ColWidth 0.2222222222222222 )
+    , ( AlignLeft , ColWidth 0.3611111111111111 )
+    ]
+    (TableHead ( "" , [] , [] ) [])
+    [ TableBody
+        ( "" , [] , [] )
+        (RowHeadColumns 0)
+        []
+        [ Row
+            ( "" , [] , [] )
+            [ Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "First" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "row" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "12.0" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain
+                    [ Str "Example"
+                    , Space
+                    , Str "of"
+                    , Space
+                    , Str "a"
+                    , Space
+                    , Str "row"
+                    , Space
+                    , Str "that"
+                    , SoftBreak
+                    , Str "spans"
+                    , Space
+                    , Str "multiple"
+                    , Space
+                    , Str "lines."
+                    ]
+                ]
+            ]
+        , Row
+            ( "" , [] , [] )
+            [ Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "Second" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "row" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "5.0" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain
+                    [ Str "Here\8217s"
+                    , Space
+                    , Str "another"
+                    , Space
+                    , Str "one."
+                    , Space
+                    , Str "Note"
+                    , SoftBreak
+                    , Str "the"
+                    , Space
+                    , Str "blank"
+                    , Space
+                    , Str "line"
+                    , Space
+                    , Str "between"
+                    , SoftBreak
+                    , Str "rows."
+                    ]
+                ]
+            ]
+        ]
+    ]
+    (TableFoot ( "" , [] , [] ) [])
+]

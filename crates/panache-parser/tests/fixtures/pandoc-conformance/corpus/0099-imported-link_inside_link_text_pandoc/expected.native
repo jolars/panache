@@ -1,0 +1,7 @@
+[ Para
+    [ Link
+        ( "" , [] , [] )
+        [ Str "foo" , Space , Str "[bar](/uri)" ]
+        ( "/uri" , "" )
+    ]
+]

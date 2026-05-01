@@ -1,0 +1,145 @@
+[ Table
+    ( "" , [] , [] )
+    (Caption
+       Nothing
+       [ Plain
+           [ Str "Here\8217s"
+           , Space
+           , Str "the"
+           , Space
+           , Str "caption."
+           , Space
+           , Str "It,"
+           , Space
+           , Str "too,"
+           , Space
+           , Str "may"
+           , Space
+           , Str "span"
+           , SoftBreak
+           , Str "multiple"
+           , Space
+           , Str "lines."
+           ]
+       ])
+    [ ( AlignCenter , ColWidth 0.16666666666666666 )
+    , ( AlignDefault , ColWidth 0.1111111111111111 )
+    , ( AlignRight , ColWidth 0.2222222222222222 )
+    , ( AlignLeft , ColWidth 0.3611111111111111 )
+    ]
+    (TableHead
+       ( "" , [] , [] )
+       [ Row
+           ( "" , [] , [] )
+           [ Cell
+               ( "" , [] , [] )
+               AlignDefault
+               (RowSpan 1)
+               (ColSpan 1)
+               [ Plain [ Str "Centered" , SoftBreak , Str "Header" ] ]
+           , Cell
+               ( "" , [] , [] )
+               AlignDefault
+               (RowSpan 1)
+               (ColSpan 1)
+               [ Plain [ Str "Default" , SoftBreak , Str "Aligned" ] ]
+           , Cell
+               ( "" , [] , [] )
+               AlignDefault
+               (RowSpan 1)
+               (ColSpan 1)
+               [ Plain [ Str "Right" , SoftBreak , Str "Aligned" ] ]
+           , Cell
+               ( "" , [] , [] )
+               AlignDefault
+               (RowSpan 1)
+               (ColSpan 1)
+               [ Plain [ Str "Left" , SoftBreak , Str "Aligned" ] ]
+           ]
+       ])
+    [ TableBody
+        ( "" , [] , [] )
+        (RowHeadColumns 0)
+        []
+        [ Row
+            ( "" , [] , [] )
+            [ Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "First" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "row" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "12.0" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain
+                    [ Str "Example"
+                    , Space
+                    , Str "of"
+                    , Space
+                    , Str "a"
+                    , Space
+                    , Str "row"
+                    , Space
+                    , Str "that"
+                    , SoftBreak
+                    , Str "spans"
+                    , Space
+                    , Str "multiple"
+                    , Space
+                    , Str "lines."
+                    ]
+                ]
+            ]
+        , Row
+            ( "" , [] , [] )
+            [ Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "Second" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "row" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "5.0" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain
+                    [ Str "Here\8217s"
+                    , Space
+                    , Str "another"
+                    , Space
+                    , Str "one."
+                    ]
+                ]
+            ]
+        ]
+    ]
+    (TableFoot ( "" , [] , [] ) [])
+]

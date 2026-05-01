@@ -1,0 +1,11 @@
+[ BulletList [ [ BulletList [ [ Plain [ Str "foo" ] ] ] ] ]
+, OrderedList
+    ( 1 , Decimal , Period )
+    [ [ BulletList
+          [ [ OrderedList
+                ( 2 , Decimal , Period ) [ [ Plain [ Str "foo" ] ] ]
+            ]
+          ]
+      ]
+    ]
+]

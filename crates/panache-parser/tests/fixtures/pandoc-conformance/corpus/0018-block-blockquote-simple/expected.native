@@ -1,0 +1,5 @@
+[ BlockQuote
+    [ Para
+        [ Str "a" , Space , Str "short" , Space , Str "quotation" ]
+    ]
+]

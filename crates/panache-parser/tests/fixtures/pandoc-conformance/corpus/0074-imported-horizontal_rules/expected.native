@@ -1,0 +1,64 @@
+[ Para
+    [ Str "First"
+    , Space
+    , Str "section"
+    , Space
+    , Str "with"
+    , Space
+    , Str "content."
+    ]
+, HorizontalRule
+, Para
+    [ Str "Second"
+    , Space
+    , Str "section"
+    , Space
+    , Str "with"
+    , Space
+    , Str "different"
+    , Space
+    , Str "style."
+    ]
+, HorizontalRule
+, Para
+    [ Str "Third"
+    , Space
+    , Str "section"
+    , Space
+    , Str "with"
+    , Space
+    , Str "underscores."
+    ]
+, HorizontalRule
+, BlockQuote
+    [ Para
+        [ Str "Quote" , Space , Str "before" , Space , Str "rule" ]
+    , HorizontalRule
+    , Para
+        [ Str "Quote" , Space , Str "after" , Space , Str "rule" ]
+    ]
+, Para [ Str "Final" , Space , Str "paragraph." ]
+, Para
+    [ Str "Here\8217s"
+    , Space
+    , Str "a"
+    , Space
+    , Str "horizontal"
+    , Space
+    , Str "rule:"
+    ]
+, HorizontalRule
+, Para
+    [ Str "Text"
+    , Space
+    , Str "directly"
+    , Space
+    , Str "after"
+    , Space
+    , Str "the"
+    , Space
+    , Str "horizontal"
+    , Space
+    , Str "rule."
+    ]
+]

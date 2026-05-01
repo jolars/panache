@@ -1,0 +1,31 @@
+[ DefinitionList
+    [ ( [ Str "2024\8211present" ]
+      , [ [ Plain
+              [ Strong
+                  [ Str "Thiele"
+                  , Space
+                  , Str "Postdoctoral"
+                  , Space
+                  , Str "Researcher"
+                  ]
+              , Str ","
+              , Space
+              , Emph
+                  [ Str "Department"
+                  , Space
+                  , Str "of"
+                  , Space
+                  , Str "Mathematical"
+                  , Space
+                  , Str "Sciences,"
+                  , Space
+                  , Str "Copenhagen"
+                  , Space
+                  , Str "University"
+                  ]
+              ]
+          ]
+        ]
+      )
+    ]
+]

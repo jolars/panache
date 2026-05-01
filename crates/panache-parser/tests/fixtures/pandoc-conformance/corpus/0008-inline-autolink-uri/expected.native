@@ -1,0 +1,11 @@
+[ Para
+    [ Str "visit"
+    , Space
+    , Link
+        ( "" , [ "uri" ] , [] )
+        [ Str "https://example.com" ]
+        ( "https://example.com" , "" )
+    , Space
+    , Str "today"
+    ]
+]

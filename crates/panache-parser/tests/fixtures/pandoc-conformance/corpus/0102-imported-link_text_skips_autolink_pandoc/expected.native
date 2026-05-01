@@ -1,0 +1,15 @@
+[ Para
+    [ Link
+        ( "" , [] , [] )
+        [ Str "foo<https://example.com/?search=" ]
+        ( "uri" , "" )
+    , Str ">"
+    ]
+, Para
+    [ Link
+        ( "" , [] , [] )
+        [ Str "foo<https://example.com/?search=" ]
+        ( "/uri" , "" )
+    , Str ">"
+    ]
+]

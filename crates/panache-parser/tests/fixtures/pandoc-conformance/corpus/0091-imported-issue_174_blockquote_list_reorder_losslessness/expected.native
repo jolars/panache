@@ -1,0 +1,141 @@
+[ BulletList
+    [ [ Para
+          [ Strong
+              [ Str "Main"
+              , Space
+              , Str "binary"
+              , Space
+              , Str "explanatory"
+              , Space
+              , Str "variable"
+              ]
+          , Str ":"
+          , Space
+          , Str "Opposition"
+          , Space
+          , Str "parties"
+          , Space
+          , Str "autonomy"
+          , Space
+          , Str "("
+          , Code ( "" , [] , [] ) "v2psoppaut"
+          , Space
+          , Str "in"
+          , Space
+          , Str "V-Dem)."
+          , Space
+          , Str "This"
+          , Space
+          , Str "is"
+          , Space
+          , Str "an"
+          , Space
+          , Str "ordinal"
+          , Space
+          , Str "variable"
+          , Space
+          , Str "with"
+          , Space
+          , Str "these"
+          , Space
+          , Str "possible"
+          , Space
+          , Str "values:"
+          ]
+      ]
+    , [ BlockQuote
+          [ BulletList
+              [ [ Plain
+                    [ Str "0:"
+                    , Space
+                    , Str "Opposition"
+                    , Space
+                    , Str "parties"
+                    , Space
+                    , Str "are"
+                    , Space
+                    , Str "not"
+                    , Space
+                    , Str "allowed."
+                    ]
+                ]
+              ]
+          ]
+      ]
+    , [ BlockQuote
+          [ BulletList
+              [ [ Plain
+                    [ Str "1:"
+                    , Space
+                    , Str "There"
+                    , Space
+                    , Str "are"
+                    , Space
+                    , Str "no"
+                    , Space
+                    , Str "autonomous,"
+                    , Space
+                    , Str "independent"
+                    , Space
+                    , Str "opposition"
+                    , Space
+                    , Str "parties."
+                    , Space
+                    , Str "Opposition"
+                    , Space
+                    , Str "parties"
+                    , Space
+                    , Str "are"
+                    , Space
+                    , Str "either"
+                    , Space
+                    , Str "selected"
+                    , Space
+                    , Str "or"
+                    , Space
+                    , Str "co-opted"
+                    , Space
+                    , Str "by"
+                    , Space
+                    , Str "the"
+                    , Space
+                    , Str "ruling"
+                    , Space
+                    , Str "regime."
+                    ]
+                ]
+              , [ Plain
+                    [ Str "2:"
+                    , Space
+                    , Str "At"
+                    , Space
+                    , Str "least"
+                    , Space
+                    , Str "some"
+                    , Space
+                    , Str "opposition"
+                    , Space
+                    , Str "parties"
+                    , Space
+                    , Str "are"
+                    , Space
+                    , Str "autonomous"
+                    , Space
+                    , Str "and"
+                    , Space
+                    , Str "independent"
+                    , Space
+                    , Str "of"
+                    , Space
+                    , Str "the"
+                    , Space
+                    , Str "ruling"
+                    , Space
+                    , Str "regime."
+                    ]
+                ]
+              ]
+          ]
+      ]
+    ]
+]

@@ -1,0 +1,64 @@
+[ RawBlock
+    (Format "html")
+    "<!-- Source: pandoc/test/writer.markdown:L53-L79 -->"
+, Header
+    1
+    ( "blockquote-negative-case" , [] , [] )
+    [ Str "Blockquote"
+    , Space
+    , Str "negative"
+    , Space
+    , Str "case"
+    ]
+, BlockQuote
+    [ Para
+        [ Str "This"
+        , Space
+        , Str "is"
+        , Space
+        , Str "a"
+        , Space
+        , Str "block"
+        , Space
+        , Str "quote."
+        , Space
+        , Str "It"
+        , Space
+        , Str "is"
+        , Space
+        , Str "pretty"
+        , Space
+        , Str "short."
+        ]
+    ]
+, Para
+    [ Str "This"
+    , Space
+    , Str "should"
+    , Space
+    , Str "not"
+    , Space
+    , Str "be"
+    , Space
+    , Str "a"
+    , Space
+    , Str "block"
+    , Space
+    , Str "quote:"
+    , Space
+    , Str "2"
+    , Space
+    , Str ">"
+    , Space
+    , Str "1."
+    ]
+, Para
+    [ Str "And"
+    , Space
+    , Str "a"
+    , Space
+    , Str "following"
+    , Space
+    , Str "paragraph."
+    ]
+]

@@ -1,0 +1,86 @@
+[ Para
+    [ Str "This"
+    , Space
+    , Str "is"
+    , Space
+    , Str "a"
+    , Space
+    , Str "simple"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Strong [ Str "bold" ]
+    , Space
+    , Str "and"
+    , Space
+    , Emph [ Str "italic" ]
+    , Space
+    , Str "text."
+    ]
+, Para
+    [ Str "A"
+    , Space
+    , Str "paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Str "a"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "link" ]
+        ( "https://example.com" , "" )
+    , Space
+    , Str "and"
+    , Space
+    , Code ( "" , [] , [] ) "code"
+    , Str "."
+    ]
+, Para
+    [ Str "Multi-line"
+    , Space
+    , Str "paragraph"
+    , SoftBreak
+    , Str "with"
+    , Space
+    , Str "continuation"
+    , SoftBreak
+    , Str "on"
+    , Space
+    , Str "multiple"
+    , Space
+    , Str "lines."
+    ]
+, Para
+    [ Str "Paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Strong
+        [ Str "nested"
+        , Space
+        , Emph [ Str "emphasis" ]
+        , Space
+        , Str "inside"
+        ]
+    , Space
+    , Str "bold."
+    ]
+, Para
+    [ Str "Paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Str "escaped"
+    , Space
+    , Str "*"
+    , Space
+    , Str "and"
+    , Space
+    , Str "_"
+    , Space
+    , Str "characters."
+    ]
+]

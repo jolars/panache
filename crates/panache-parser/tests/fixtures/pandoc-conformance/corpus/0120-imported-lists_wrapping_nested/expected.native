@@ -1,0 +1,739 @@
+[ Header
+    2
+    ( "deep-nesting-with-long-lines" , [] , [] )
+    [ Str "Deep"
+    , Space
+    , Str "Nesting"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Long"
+    , Space
+    , Str "Lines"
+    ]
+, BulletList
+    [ [ Plain
+          [ Str "Top"
+          , Space
+          , Str "level"
+          , Space
+          , Str "item"
+          , Space
+          , Str "with"
+          , Space
+          , Str "a"
+          , Space
+          , Str "very"
+          , Space
+          , Str "long"
+          , Space
+          , Str "description"
+          , Space
+          , Str "that"
+          , Space
+          , Str "needs"
+          , Space
+          , Str "wrapping"
+          , Space
+          , Str "to"
+          , Space
+          , Str "demonstrate"
+          , Space
+          , Str "how"
+          , Space
+          , Str "the"
+          , Space
+          , Str "formatter"
+          , Space
+          , Str "handles"
+          , Space
+          , Str "text"
+          , Space
+          , Str "that"
+          , Space
+          , Str "exceeds"
+          , Space
+          , Str "the"
+          , Space
+          , Str "line"
+          , Space
+          , Str "width"
+          , Space
+          , Str "limit"
+          , Space
+          , Str "at"
+          , Space
+          , Str "the"
+          , Space
+          , Str "outermost"
+          , Space
+          , Str "level."
+          ]
+      , BulletList
+          [ [ Plain
+                [ Str "Second"
+                , Space
+                , Str "level"
+                , Space
+                , Str "nested"
+                , Space
+                , Str "item"
+                , Space
+                , Str "that"
+                , Space
+                , Str "also"
+                , Space
+                , Str "has"
+                , Space
+                , Str "a"
+                , Space
+                , Str "very"
+                , Space
+                , Str "long"
+                , Space
+                , Str "description"
+                , Space
+                , Str "which"
+                , Space
+                , Str "should"
+                , Space
+                , Str "be"
+                , Space
+                , Str "wrapped"
+                , Space
+                , Str "while"
+                , Space
+                , Str "maintaining"
+                , Space
+                , Str "the"
+                , Space
+                , Str "correct"
+                , Space
+                , Str "indentation"
+                , Space
+                , Str "relative"
+                , Space
+                , Str "to"
+                , Space
+                , Str "its"
+                , Space
+                , Str "parent"
+                , Space
+                , Str "item."
+                ]
+            , BulletList
+                [ [ Plain
+                      [ Str "Third"
+                      , Space
+                      , Str "level"
+                      , Space
+                      , Str "item"
+                      , Space
+                      , Str "with"
+                      , Space
+                      , Str "another"
+                      , Space
+                      , Str "long"
+                      , Space
+                      , Str "line"
+                      , Space
+                      , Str "that"
+                      , Space
+                      , Str "tests"
+                      , Space
+                      , Str "whether"
+                      , Space
+                      , Str "the"
+                      , Space
+                      , Str "hanging"
+                      , Space
+                      , Str "indentation"
+                      , Space
+                      , Str "works"
+                      , Space
+                      , Str "correctly"
+                      , Space
+                      , Str "even"
+                      , Space
+                      , Str "at"
+                      , Space
+                      , Str "deeper"
+                      , Space
+                      , Str "nesting"
+                      , Space
+                      , Str "levels."
+                      ]
+                  , BulletList
+                      [ [ Plain
+                            [ Str "Fourth"
+                            , Space
+                            , Str "level"
+                            , Space
+                            , Str "with"
+                            , Space
+                            , Str "more"
+                            , Space
+                            , Str "text"
+                            , Space
+                            , Str "that"
+                            , Space
+                            , Str "is"
+                            , Space
+                            , Str "quite"
+                            , Space
+                            , Str "long"
+                            , Space
+                            , Str "and"
+                            , Space
+                            , Str "should"
+                            , Space
+                            , Str "wrap"
+                            , Space
+                            , Str "properly"
+                            ]
+                        ]
+                      ]
+                  ]
+                ]
+            ]
+          , [ Plain
+                [ Str "Back"
+                , Space
+                , Str "to"
+                , Space
+                , Str "second"
+                , Space
+                , Str "level"
+                , Space
+                , Str "with"
+                , Space
+                , Str "a"
+                , Space
+                , Str "long"
+                , Space
+                , Str "line"
+                , Space
+                , Str "that"
+                , Space
+                , Str "contains"
+                , Space
+                , Str "multiple"
+                , Space
+                , Str "sentences."
+                , Space
+                , Str "The"
+                , Space
+                , Str "first"
+                , Space
+                , Str "sentence"
+                , Space
+                , Str "is"
+                , Space
+                , Str "quite"
+                , Space
+                , Str "lengthy."
+                , Space
+                , Str "The"
+                , Space
+                , Str "second"
+                , Space
+                , Str "sentence"
+                , Space
+                , Str "adds"
+                , Space
+                , Str "more"
+                , Space
+                , Str "content."
+                , Space
+                , Str "The"
+                , Space
+                , Str "third"
+                , Space
+                , Str "sentence"
+                , Space
+                , Str "ensures"
+                , Space
+                , Str "we"
+                , Space
+                , Str "test"
+                , Space
+                , Str "wrapping"
+                , Space
+                , Str "thoroughly."
+                ]
+            ]
+          ]
+      ]
+    , [ Plain
+          [ Str "Another"
+          , Space
+          , Str "top"
+          , Space
+          , Str "level"
+          , Space
+          , Str "item"
+          ]
+      , OrderedList
+          ( 1 , Decimal , Period )
+          [ [ Plain
+                [ Str "Nested"
+                , Space
+                , Str "ordered"
+                , Space
+                , Str "list"
+                , Space
+                , Str "with"
+                , Space
+                , Str "a"
+                , Space
+                , Str "very"
+                , Space
+                , Str "long"
+                , Space
+                , Str "description"
+                , Space
+                , Str "that"
+                , Space
+                , Str "should"
+                , Space
+                , Str "maintain"
+                , Space
+                , Str "proper"
+                , Space
+                , Str "indentation"
+                ]
+            ]
+          , [ Plain
+                [ Str "Second"
+                , Space
+                , Str "ordered"
+                , Space
+                , Str "item"
+                , Space
+                , Str "at"
+                , Space
+                , Str "this"
+                , Space
+                , Str "level"
+                ]
+            , BulletList
+                [ [ Plain
+                      [ Str "Bullet"
+                      , Space
+                      , Str "inside"
+                      , Space
+                      , Str "ordered"
+                      , Space
+                      , Str "list"
+                      , Space
+                      , Str "with"
+                      , Space
+                      , Str "a"
+                      , Space
+                      , Str "long"
+                      , Space
+                      , Str "description"
+                      , Space
+                      , Str "that"
+                      , Space
+                      , Str "needs"
+                      , Space
+                      , Str "wrapping"
+                      ]
+                  ]
+                , [ Plain
+                      [ Str "Another"
+                      , Space
+                      , Str "bullet"
+                      , Space
+                      , Str "with"
+                      , Space
+                      , Str "even"
+                      , Space
+                      , Str "more"
+                      , Space
+                      , Str "text"
+                      , Space
+                      , Str "that"
+                      , Space
+                      , Str "goes"
+                      , Space
+                      , Str "on"
+                      , Space
+                      , Str "and"
+                      , Space
+                      , Str "on"
+                      , Space
+                      , Str "requiring"
+                      , Space
+                      , Str "the"
+                      , Space
+                      , Str "formatter"
+                      , Space
+                      , Str "to"
+                      , Space
+                      , Str "wrap"
+                      , Space
+                      , Str "it"
+                      , Space
+                      , Str "properly"
+                      ]
+                  ]
+                ]
+            ]
+          , [ Plain
+                [ Str "Third"
+                , Space
+                , Str "ordered"
+                , Space
+                , Str "item"
+                , Space
+                , Str "returning"
+                , Space
+                , Str "to"
+                , Space
+                , Str "numbered"
+                , Space
+                , Str "format"
+                ]
+            ]
+          ]
+      ]
+    ]
+, Header
+    2
+    ( "task-lists-with-deep-nesting" , [] , [] )
+    [ Str "Task"
+    , Space
+    , Str "Lists"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Deep"
+    , Space
+    , Str "Nesting"
+    ]
+, BulletList
+    [ [ Plain
+          [ Str "\9744"
+          , Space
+          , Str "Top"
+          , Space
+          , Str "level"
+          , Space
+          , Str "unchecked"
+          , Space
+          , Str "task"
+          , Space
+          , Str "with"
+          , Space
+          , Str "a"
+          , Space
+          , Str "very"
+          , Space
+          , Str "long"
+          , Space
+          , Str "description"
+          , Space
+          , Str "that"
+          , Space
+          , Str "should"
+          , Space
+          , Str "be"
+          , Space
+          , Str "wrapped"
+          , Space
+          , Str "while"
+          , Space
+          , Str "preserving"
+          , Space
+          , Str "the"
+          , Space
+          , Str "checkbox"
+          , Space
+          , Str "syntax"
+          , Space
+          , Str "and"
+          , Space
+          , Str "maintaining"
+          , Space
+          , Str "readability."
+          ]
+      , BulletList
+          [ [ Plain
+                [ Str "\9744"
+                , Space
+                , Str "Nested"
+                , Space
+                , Str "unchecked"
+                , Space
+                , Str "task"
+                , Space
+                , Str "that"
+                , Space
+                , Str "also"
+                , Space
+                , Str "has"
+                , Space
+                , Str "a"
+                , Space
+                , Str "long"
+                , Space
+                , Str "description"
+                , Space
+                , Str "requiring"
+                , Space
+                , Str "wrapping"
+                ]
+            , BulletList
+                [ [ Plain
+                      [ Str "\9746"
+                      , Space
+                      , Str "Deeply"
+                      , Space
+                      , Str "nested"
+                      , Space
+                      , Str "completed"
+                      , Space
+                      , Str "task"
+                      , Space
+                      , Str "with"
+                      , Space
+                      , Str "text"
+                      , Space
+                      , Str "that"
+                      , Space
+                      , Str "is"
+                      , Space
+                      , Str "long"
+                      , Space
+                      , Str "enough"
+                      , Space
+                      , Str "to"
+                      , Space
+                      , Str "require"
+                      , Space
+                      , Str "wrapping"
+                      , Space
+                      , Str "at"
+                      , Space
+                      , Str "this"
+                      , Space
+                      , Str "indentation"
+                      , Space
+                      , Str "level"
+                      ]
+                  ]
+                ]
+            ]
+          , [ Plain
+                [ Str "\9746"
+                , Space
+                , Str "Back"
+                , Space
+                , Str "to"
+                , Space
+                , Str "second"
+                , Space
+                , Str "level"
+                , Space
+                , Str "completed"
+                , Space
+                , Str "task"
+                , Space
+                , Str "with"
+                , Space
+                , Str "a"
+                , Space
+                , Str "very"
+                , Space
+                , Str "long"
+                , Space
+                , Str "line"
+                , Space
+                , Str "that"
+                , Space
+                , Str "tests"
+                , Space
+                , Str "the"
+                , Space
+                , Str "formatter\8217s"
+                , Space
+                , Str "ability"
+                , Space
+                , Str "to"
+                , Space
+                , Str "handle"
+                , Space
+                , Str "wrapped"
+                , Space
+                , Str "text"
+                , Space
+                , Str "in"
+                , Space
+                , Str "completed"
+                , Space
+                , Str "tasks."
+                ]
+            ]
+          ]
+      ]
+    , [ Plain
+          [ Str "\9746"
+          , Space
+          , Str "Another"
+          , Space
+          , Str "top"
+          , Space
+          , Str "level"
+          , Space
+          , Str "completed"
+          , Space
+          , Str "task"
+          ]
+      ]
+    ]
+, Header
+    2
+    ( "roman-numerals-with-wrapping" , [] , [] )
+    [ Str "Roman"
+    , Space
+    , Str "Numerals"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Wrapping"
+    ]
+, OrderedList
+    ( 1 , LowerRoman , Period )
+    [ [ Plain
+          [ Str "First"
+          , Space
+          , Str "Roman"
+          , Space
+          , Str "numeral"
+          , Space
+          , Str "item"
+          , Space
+          , Str "with"
+          , Space
+          , Str "a"
+          , Space
+          , Str "very"
+          , Space
+          , Str "long"
+          , Space
+          , Str "description"
+          , Space
+          , Str "that"
+          , Space
+          , Str "tests"
+          , Space
+          , Str "right-alignment"
+          , Space
+          , Str "and"
+          , Space
+          , Str "wrapping"
+          , Space
+          , Str "together"
+          ]
+      ]
+    , [ Plain [ Str "Second" , Space , Str "item" ] ]
+    , [ Plain
+          [ Str "Third"
+          , Space
+          , Str "item"
+          , Space
+          , Str "with"
+          , Space
+          , Str "another"
+          , Space
+          , Str "long"
+          , Space
+          , Str "description"
+          , Space
+          , Str "that"
+          , Space
+          , Str "should"
+          , Space
+          , Str "wrap"
+          , Space
+          , Str "properly"
+          , Space
+          , Str "while"
+          , Space
+          , Str "maintaining"
+          , Space
+          , Str "the"
+          , Space
+          , Str "right-aligned"
+          , Space
+          , Str "Roman"
+          , Space
+          , Str "numeral"
+          , Space
+          , Str "formatting"
+          ]
+      ]
+    , [ Plain
+          [ Str "Fourth"
+          , Space
+          , Str "item"
+          , Space
+          , Str "with"
+          , Space
+          , Str "a"
+          , Space
+          , Str "moderately"
+          , Space
+          , Str "long"
+          , Space
+          , Str "description"
+          ]
+      ]
+    , [ Plain
+          [ Str "Fifth"
+          , Space
+          , Str "item"
+          , Space
+          , Str "with"
+          , Space
+          , Str "the"
+          , Space
+          , Str "longest"
+          , Space
+          , Str "description"
+          , Space
+          , Str "of"
+          , Space
+          , Str "all"
+          , Space
+          , Str "which"
+          , Space
+          , Str "goes"
+          , Space
+          , Str "on"
+          , Space
+          , Str "and"
+          , Space
+          , Str "on"
+          , Space
+          , Str "and"
+          , Space
+          , Str "should"
+          , Space
+          , Str "definitely"
+          , Space
+          , Str "require"
+          , Space
+          , Str "wrapping"
+          , Space
+          , Str "to"
+          , Space
+          , Str "multiple"
+          , Space
+          , Str "lines"
+          ]
+      ]
+    ]
+]

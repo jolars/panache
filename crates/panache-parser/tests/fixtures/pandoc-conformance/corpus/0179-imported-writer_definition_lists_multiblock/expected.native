@@ -1,0 +1,86 @@
+[ RawBlock
+    (Format "html")
+    "<!-- Source: pandoc/test/writer.markdown:L297-L351 -->"
+, Header
+    1
+    ( "definition-lists-multiblock" , [] , [] )
+    [ Str "Definition"
+    , Space
+    , Str "Lists"
+    , Space
+    , Str "(multiblock)"
+    ]
+, Para
+    [ Str "Multiple"
+    , Space
+    , Str "blocks"
+    , Space
+    , Str "with"
+    , Space
+    , Str "italics:"
+    ]
+, DefinitionList
+    [ ( [ Emph [ Str "apple" ] ]
+      , [ [ Para [ Str "red" , Space , Str "fruit" ]
+          , Para
+              [ Str "contains"
+              , Space
+              , Str "seeds,"
+              , Space
+              , Str "crisp,"
+              , Space
+              , Str "pleasant"
+              , Space
+              , Str "to"
+              , Space
+              , Str "taste"
+              ]
+          ]
+        ]
+      )
+    , ( [ Emph [ Str "orange" ] ]
+      , [ [ Para [ Str "orange" , Space , Str "fruit" ]
+          , CodeBlock ( "" , [] , [] ) "{ orange code block }"
+          , BlockQuote
+              [ Para
+                  [ Str "orange"
+                  , Space
+                  , Str "block"
+                  , Space
+                  , Str "quote"
+                  ]
+              ]
+          ]
+        ]
+      )
+    ]
+, Para
+    [ Str "Blank"
+    , Space
+    , Str "line"
+    , Space
+    , Str "after"
+    , Space
+    , Str "term,"
+    , Space
+    , Str "indented"
+    , Space
+    , Str "marker,"
+    , Space
+    , Str "alternate"
+    , Space
+    , Str "markers:"
+    ]
+, DefinitionList
+    [ ( [ Str "orange" ]
+      , [ [ Para [ Str "orange" , Space , Str "fruit" ]
+          , OrderedList
+              ( 1 , Decimal , Period )
+              [ [ Plain [ Str "sublist" ] ]
+              , [ Plain [ Str "sublist" ] ]
+              ]
+          ]
+        ]
+      )
+    ]
+]

@@ -1,0 +1,21 @@
+[ BulletList
+    [ [ Para [ Str "Bullet." ]
+      , CodeBlock ( "" , [ "cpp" ] , [] ) "int foo;"
+      ]
+    , [ Para [ Str "Next" , Space , Str "bullet." ] ]
+    , [ Para
+          [ Str "Here\8217s"
+          , Space
+          , Str "another"
+          , Space
+          , Str "list:"
+          ]
+      , BulletList
+          [ [ Para [ Str "Sub-bullet." ]
+            , CodeBlock ( "" , [ "cpp" ] , [] ) "int bar;"
+            ]
+          , [ Para [ Str "Another" , Space , Str "sub-bullet." ] ]
+          ]
+      ]
+    ]
+]

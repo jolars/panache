@@ -1,0 +1,105 @@
+[ CodeBlock ( "" , [ "bash" ] , [] ) "cargo install tomat"
+, CodeBlock
+    ( "" , [] , [] )
+    "if (a > 3) {\n  moveShip(5 * gravity, DOWN);\n}"
+, CodeBlock
+    ( "mycode"
+    , [ "haskell" , "numberLines" ]
+    , [ ( "startFrom" , "100" ) ]
+    )
+    "qsort []     = []\nqsort (x:xs) = qsort (filter (< x) xs) ++ [x] ++\n                qsort (filter (>= x) xs)"
+, CodeBlock ( "" , [ "haskell" ] , [] ) "qsort [] = []"
+, CodeBlock ( "" , [ "haskell" ] , [] ) "qsort [] = []"
+, CodeBlock
+    ( "" , [ "haskell" , "numberLines" ] , [] ) "qsort [] = []"
+, CodeBlock
+    ( "" , [ "haskell" , "numberLines" ] , [] ) "qsort [] = []"
+, Para
+    [ Str "A"
+    , Space
+    , Str "quarto"
+    , Space
+    , Str "fenced"
+    , Space
+    , Str "code"
+    , Space
+    , Str "block,"
+    , Space
+    , Str "with"
+    , Space
+    , Str "blankline:"
+    ]
+, Para [ Code ( "" , [] , [] ) "{r} a <- 1" ]
+, Para
+    [ Str "A"
+    , Space
+    , Str "quarto"
+    , Space
+    , Str "fenced"
+    , Space
+    , Str "code"
+    , Space
+    , Str "block,"
+    , Space
+    , Str "without"
+    , Space
+    , Str "blankline:"
+    , SoftBreak
+    , Code ( "" , [] , [] ) "{r} a <- 1"
+    ]
+, Para
+    [ Str "A"
+    , Space
+    , Str "fenced"
+    , Space
+    , Str "code"
+    , Space
+    , Str "block"
+    , Space
+    , Str "should"
+    , Space
+    , Str "be"
+    , Space
+    , Str "separated"
+    , Space
+    , Str "with"
+    , Space
+    , Str "a"
+    , Space
+    , Str "blankline"
+    , Space
+    , Str "after"
+    , Space
+    , Str "we"
+    , Space
+    , Str "have"
+    , Space
+    , Str "formatted"
+    , Space
+    , Str "it:"
+    ]
+, CodeBlock ( "" , [ "r" ] , [] ) "a <- 1\nb <- 2"
+, Para
+    [ Str "A"
+    , Space
+    , Str "code"
+    , Space
+    , Str "block"
+    , Space
+    , Str "in"
+    , Space
+    , Str "a"
+    , Space
+    , Str "definition"
+    , Space
+    , Str "list:"
+    ]
+, DefinitionList
+    [ ( [ Str "Input" ]
+      , [ [ CodeBlock
+              ( "" , [ "markdown" ] , [] ) "# Heading 1\n\n# Heading 2"
+          ]
+        ]
+      )
+    ]
+]

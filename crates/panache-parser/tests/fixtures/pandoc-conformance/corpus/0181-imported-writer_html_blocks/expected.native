@@ -1,0 +1,125 @@
+[ RawBlock
+    (Format "html")
+    "<!-- Source: pandoc/test/writer.markdown:L352-L451 -->"
+, Header
+    1
+    ( "html-blocks" , [] , [] )
+    [ Str "HTML" , Space , Str "Blocks" ]
+, Para
+    [ Str "Simple"
+    , Space
+    , Str "block"
+    , Space
+    , Str "on"
+    , Space
+    , Str "one"
+    , Space
+    , Str "line:"
+    ]
+, Div ( "" , [] , [] ) [ Para [ Str "foo" ] ]
+, Para
+    [ Str "And"
+    , Space
+    , Str "nested"
+    , Space
+    , Str "without"
+    , Space
+    , Str "indentation:"
+    ]
+, Div
+    ( "" , [] , [] )
+    [ Div
+        ( "" , [] , [] )
+        [ Div ( "" , [] , [] ) [ Para [ Str "foo" ] ] ]
+    , Div ( "" , [] , [] ) [ Para [ Str "bar" ] ]
+    ]
+, Para
+    [ Str "Interpreted"
+    , Space
+    , Str "markdown"
+    , Space
+    , Str "in"
+    , Space
+    , Str "a"
+    , Space
+    , Str "table:"
+    ]
+, RawBlock (Format "html") "<table>"
+, RawBlock (Format "html") "<tr>"
+, RawBlock (Format "html") "<td>"
+, Plain
+    [ Str "This"
+    , Space
+    , Str "is"
+    , Space
+    , Emph [ Str "emphasized" ]
+    ]
+, RawBlock (Format "html") "</td>"
+, RawBlock (Format "html") "<td>"
+, Plain
+    [ Str "And"
+    , Space
+    , Str "this"
+    , Space
+    , Str "is"
+    , Space
+    , Strong [ Str "strong" ]
+    ]
+, RawBlock (Format "html") "</td>"
+, RawBlock (Format "html") "</tr>"
+, RawBlock (Format "html") "</table>"
+, RawBlock
+    (Format "html")
+    "<script type=\"text/javascript\">document.write('This *should not* be interpreted as markdown');</script>"
+, Para
+    [ Str "This"
+    , Space
+    , Str "should"
+    , Space
+    , Str "be"
+    , Space
+    , Str "a"
+    , Space
+    , Str "code"
+    , Space
+    , Str "block,"
+    , Space
+    , Str "though:"
+    ]
+, CodeBlock ( "" , [] , [] ) "<div>\n    foo\n</div>"
+, Para
+    [ Str "As" , Space , Str "should" , Space , Str "this:" ]
+, CodeBlock ( "" , [] , [] ) "<div>foo</div>"
+, Para
+    [ Str "This"
+    , Space
+    , Str "should"
+    , Space
+    , Str "just"
+    , Space
+    , Str "be"
+    , Space
+    , Str "an"
+    , Space
+    , Str "HTML"
+    , Space
+    , Str "comment:"
+    ]
+, RawBlock (Format "html") "<!-- Comment -->"
+, Para [ Str "Multiline:" ]
+, RawBlock (Format "html") "<!--\nBlah\nBlah\n-->"
+, RawBlock
+    (Format "html") "<!--\n    This is another comment.\n-->"
+, Para [ Str "Code" , Space , Str "block:" ]
+, CodeBlock ( "" , [] , [] ) "<!-- Comment -->"
+, Para [ Str "Hr\8217s:" ]
+, RawBlock (Format "html") "<hr>"
+, RawBlock (Format "html") "<hr />"
+, RawBlock (Format "html") "<hr />"
+, RawBlock (Format "html") "<hr>"
+, RawBlock (Format "html") "<hr />"
+, RawBlock (Format "html") "<hr />"
+, RawBlock (Format "html") "<hr class=\"foo\" id=\"bar\" />"
+, RawBlock (Format "html") "<hr class=\"foo\" id=\"bar\" />"
+, RawBlock (Format "html") "<hr class=\"foo\" id=\"bar\">"
+]

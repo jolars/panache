@@ -1,0 +1,5 @@
+[ BulletList
+    [ [ Plain [ Str "foo" , SoftBreak , Str "***" ] ]
+    , [ Plain [ Str "bar" ] ]
+    ]
+]

@@ -1,0 +1,241 @@
+[ Header
+    2
+    ( "basic-task-lists" , [] , [] )
+    [ Str "Basic" , Space , Str "Task" , Space , Str "Lists" ]
+, BulletList
+    [ [ Plain
+          [ Str "\9744"
+          , Space
+          , Str "Unchecked"
+          , Space
+          , Str "task"
+          ]
+      ]
+    , [ Plain
+          [ Str "\9746" , Space , Str "Checked" , Space , Str "task" ]
+      ]
+    , [ Plain
+          [ Str "\9744"
+          , Space
+          , Str "Another"
+          , Space
+          , Str "unchecked"
+          , Space
+          , Str "task"
+          ]
+      ]
+    , [ Plain
+          [ Str "\9746"
+          , Space
+          , Str "Checked"
+          , Space
+          , Str "with"
+          , Space
+          , Str "capital"
+          , Space
+          , Str "X"
+          ]
+      ]
+    ]
+, Header
+    2
+    ( "task-lists-with-different-bullets" , [] , [] )
+    [ Str "Task"
+    , Space
+    , Str "Lists"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Different"
+    , Space
+    , Str "Bullets"
+    ]
+, BulletList
+    [ [ Para
+          [ Str "\9744"
+          , Space
+          , Str "Task"
+          , Space
+          , Str "with"
+          , Space
+          , Str "asterisk"
+          ]
+      ]
+    , [ Para
+          [ Str "\9746"
+          , Space
+          , Str "Completed"
+          , Space
+          , Str "task"
+          ]
+      ]
+    , [ Para
+          [ Str "\9744"
+          , Space
+          , Str "Task"
+          , Space
+          , Str "with"
+          , Space
+          , Str "plus"
+          ]
+      ]
+    , [ Para
+          [ Str "\9746"
+          , Space
+          , Str "Completed"
+          , Space
+          , Str "task"
+          ]
+      ]
+    ]
+, Header
+    2
+    ( "task-lists-with-content" , [] , [] )
+    [ Str "Task"
+    , Space
+    , Str "Lists"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Content"
+    ]
+, BulletList
+    [ [ Plain
+          [ Str "\9744"
+          , Space
+          , Str "Task"
+          , Space
+          , Str "with"
+          , Space
+          , Strong [ Str "bold" ]
+          , Space
+          , Str "text"
+          ]
+      ]
+    , [ Plain
+          [ Str "\9746"
+          , Space
+          , Str "Completed"
+          , Space
+          , Str "task"
+          , Space
+          , Str "with"
+          , Space
+          , Code ( "" , [] , [] ) "code"
+          ]
+      ]
+    , [ Plain
+          [ Str "\9744"
+          , Space
+          , Str "Task"
+          , Space
+          , Str "with"
+          , Space
+          , Link
+              ( "" , [] , [] )
+              [ Str "a" , Space , Str "link" ]
+              ( "https://example.com" , "" )
+          ]
+      ]
+    ]
+, Header
+    2
+    ( "nested-task-lists" , [] , [] )
+    [ Str "Nested" , Space , Str "Task" , Space , Str "Lists" ]
+, BulletList
+    [ [ Plain
+          [ Str "\9744" , Space , Str "Parent" , Space , Str "task" ]
+      , BulletList
+          [ [ Plain
+                [ Str "\9744"
+                , Space
+                , Str "Nested"
+                , Space
+                , Str "unchecked"
+                , Space
+                , Str "task"
+                ]
+            ]
+          , [ Plain
+                [ Str "\9746"
+                , Space
+                , Str "Nested"
+                , Space
+                , Str "checked"
+                , Space
+                , Str "task"
+                ]
+            ]
+          ]
+      ]
+    , [ Plain
+          [ Str "\9746"
+          , Space
+          , Str "Another"
+          , Space
+          , Str "parent"
+          , Space
+          , Str "task"
+          ]
+      ]
+    ]
+, Header
+    2
+    ( "mixed-regular-and-task-lists" , [] , [] )
+    [ Str "Mixed"
+    , Space
+    , Str "Regular"
+    , Space
+    , Str "and"
+    , Space
+    , Str "Task"
+    , Space
+    , Str "Lists"
+    ]
+, Para
+    [ Str "Regular"
+    , Space
+    , Str "list"
+    , Space
+    , Str "items:"
+    ]
+, BulletList
+    [ [ Plain
+          [ Str "Regular" , Space , Str "item" , Space , Str "one" ]
+      ]
+    , [ Plain
+          [ Str "Regular" , Space , Str "item" , Space , Str "two" ]
+      ]
+    ]
+, Para
+    [ Str "Task" , Space , Str "list" , Space , Str "items:" ]
+, BulletList
+    [ [ Plain
+          [ Str "\9744"
+          , Space
+          , Str "Task"
+          , Space
+          , Str "item"
+          , Space
+          , Str "one"
+          ]
+      ]
+    , [ Plain
+          [ Str "\9746"
+          , Space
+          , Str "Task"
+          , Space
+          , Str "item"
+          , Space
+          , Str "two"
+          ]
+      ]
+    ]
+, Para
+    [ Str "Back" , Space , Str "to" , Space , Str "regular:" ]
+, BulletList
+    [ [ Plain
+          [ Str "Regular" , Space , Str "item" , Space , Str "three" ]
+      ]
+    ]
+]

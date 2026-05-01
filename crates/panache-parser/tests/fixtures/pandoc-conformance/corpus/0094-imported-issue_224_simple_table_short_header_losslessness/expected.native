@@ -1,0 +1,260 @@
+[ Table
+    ( "" , [] , [] )
+    (Caption
+       Nothing
+       [ Plain
+           [ Str "(#tab:boxoffice-gross)Highest"
+           , Space
+           , Str "grossing"
+           , Space
+           , Str "movies"
+           , Space
+           , Str "for"
+           , Space
+           , Str "the"
+           , Space
+           , Str "weekend"
+           , Space
+           , Str "of"
+           , Space
+           , Str "December"
+           , Space
+           , Str "22-24,"
+           , Space
+           , Str "2017."
+           , Space
+           , Str "Data"
+           , Space
+           , Str "source:"
+           , Space
+           , Str "Box"
+           , Space
+           , Str "Office"
+           , Space
+           , Str "Mojo"
+           , Space
+           , Str "(http://www.boxofficemojo.com/)."
+           , Space
+           , Str "Used"
+           , Space
+           , Str "with"
+           , Space
+           , Str "permission"
+           ]
+       ])
+    [ ( AlignDefault , ColWidthDefault )
+    , ( AlignCenter , ColWidthDefault )
+    , ( AlignLeft , ColWidthDefault )
+    , ( AlignRight , ColWidthDefault )
+    , ( AlignDefault , ColWidthDefault )
+    , ( AlignDefault , ColWidthDefault )
+    ]
+    (TableHead
+       ( "" , [] , [] )
+       [ Row
+           ( "" , [] , [] )
+           [ Cell
+               ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+           , Cell
+               ( "" , [] , [] )
+               AlignDefault
+               (RowSpan 1)
+               (ColSpan 1)
+               [ Plain [ Str "Rank" ] ]
+           , Cell
+               ( "" , [] , [] )
+               AlignDefault
+               (RowSpan 1)
+               (ColSpan 1)
+               [ Plain [ Str "Title" ] ]
+           , Cell
+               ( "" , [] , [] )
+               AlignDefault
+               (RowSpan 1)
+               (ColSpan 1)
+               [ Plain [ Str "Weekend" , Space , Str "gross" ] ]
+           , Cell
+               ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+           , Cell
+               ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+           ]
+       ])
+    [ TableBody
+        ( "" , [] , [] )
+        (RowHeadColumns 0)
+        []
+        [ Row
+            ( "" , [] , [] )
+            [ Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "1" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain
+                    [ Str "Star"
+                    , Space
+                    , Str "Wars:"
+                    , Space
+                    , Str "The"
+                    , Space
+                    , Str "Last"
+                    , Space
+                    , Str "Jedi"
+                    ]
+                ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "$71,565,498" ] ]
+            , Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            , Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            ]
+        , Row
+            ( "" , [] , [] )
+            [ Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "2" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain
+                    [ Str "Jumanji:"
+                    , Space
+                    , Str "Welcome"
+                    , Space
+                    , Str "to"
+                    , Space
+                    , Str "the"
+                    , Space
+                    , Str "Jungle"
+                    ]
+                ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "$36,169,328" ] ]
+            , Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            , Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            ]
+        , Row
+            ( "" , [] , [] )
+            [ Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "3" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain
+                    [ Str "Pitch"
+                    , Space
+                    , Str "Perfect"
+                    , Space
+                    , Str "3"
+                    ]
+                ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "$19,928,525" ] ]
+            , Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            , Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            ]
+        , Row
+            ( "" , [] , [] )
+            [ Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "4" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain
+                    [ Str "The"
+                    , Space
+                    , Str "Greatest"
+                    , Space
+                    , Str "Showman"
+                    ]
+                ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "$8,805,843" ] ]
+            , Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            , Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            ]
+        , Row
+            ( "" , [] , [] )
+            [ Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "5" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "Ferdinand" ] ]
+            , Cell
+                ( "" , [] , [] )
+                AlignDefault
+                (RowSpan 1)
+                (ColSpan 1)
+                [ Plain [ Str "$7,316,746" ] ]
+            , Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            , Cell
+                ( "" , [] , [] ) AlignDefault (RowSpan 1) (ColSpan 1) []
+            ]
+        ]
+    ]
+    (TableFoot ( "" , [] , [] ) [])
+]

@@ -1,0 +1,375 @@
+[ Header
+    1
+    ( "plain-continuation-edge-cases" , [] , [] )
+    [ Str "PLAIN"
+    , Space
+    , Str "Continuation"
+    , Space
+    , Str "Edge"
+    , Space
+    , Str "Cases"
+    ]
+, Header
+    2
+    ( "multi-line-definition" , [] , [] )
+    [ Str "Multi-line" , Space , Str "Definition" ]
+, DefinitionList
+    [ ( [ Str "Term" , Space , Str "1" ]
+      , [ [ Plain
+              [ Str "First"
+              , Space
+              , Str "line"
+              , Space
+              , Str "of"
+              , Space
+              , Str "definition"
+              , SoftBreak
+              , Str "continues"
+              , Space
+              , Str "here"
+              , Space
+              , Str "with"
+              , Space
+              , Str "proper"
+              , Space
+              , Str "indent"
+              , SoftBreak
+              , Str "and"
+              , Space
+              , Str "even"
+              , Space
+              , Str "a"
+              , Space
+              , Str "third"
+              , Space
+              , Str "line."
+              ]
+          ]
+        ]
+      )
+    , ( [ Str "Term" , Space , Str "2" ]
+      , [ [ Plain
+              [ Str "Single"
+              , Space
+              , Str "line"
+              , Space
+              , Str "definition."
+              ]
+          ]
+        ]
+      )
+    ]
+, Header
+    2
+    ( "definition-with-blank-lines" , [] , [] )
+    [ Str "Definition"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Blank"
+    , Space
+    , Str "Lines"
+    ]
+, DefinitionList
+    [ ( [ Str "Term"
+        , Space
+        , Str "with"
+        , Space
+        , Str "blank"
+        ]
+      , [ [ Plain
+              [ Str "Definition"
+              , Space
+              , Str "starts"
+              , Space
+              , Str "here"
+              ]
+          , Plain
+              [ Str "Continues"
+              , Space
+              , Str "after"
+              , Space
+              , Str "blank"
+              , Space
+              , Str "line"
+              , SoftBreak
+              , Str "with"
+              , Space
+              , Str "more"
+              , Space
+              , Str "content."
+              ]
+          ]
+        ]
+      )
+    ]
+, Header
+    2
+    ( "definition-followed-by-nested-list" , [] , [] )
+    [ Str "Definition"
+    , Space
+    , Str "Followed"
+    , Space
+    , Str "by"
+    , Space
+    , Str "Nested"
+    , Space
+    , Str "List"
+    ]
+, DefinitionList
+    [ ( [ Str "Term"
+        , Space
+        , Str "before"
+        , Space
+        , Str "list"
+        ]
+      , [ [ Plain
+              [ Str "Definition"
+              , Space
+              , Str "content"
+              , Space
+              , Str "here"
+              , SoftBreak
+              , Str "continues"
+              , Space
+              , Str "on"
+              , Space
+              , Str "next"
+              , Space
+              , Str "line"
+              ]
+          , BulletList
+              [ [ Plain
+                    [ Str "Nested"
+                    , Space
+                    , Str "list"
+                    , Space
+                    , Str "inside"
+                    , Space
+                    , Str "definition"
+                    ]
+                ]
+              , [ Plain [ Str "Second" , Space , Str "item" ] ]
+              ]
+          ]
+        ]
+      )
+    ]
+, Header
+    2
+    ( "definition-with-inline-markup" , [] , [] )
+    [ Str "Definition"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Inline"
+    , Space
+    , Str "Markup"
+    ]
+, DefinitionList
+    [ ( [ Strong [ Str "Bold" , Space , Str "term" ] ]
+      , [ [ Plain
+              [ Str "Definition"
+              , Space
+              , Str "with"
+              , Space
+              , Emph [ Str "emphasis" ]
+              , Space
+              , Str "and"
+              , Space
+              , Strong [ Str "bold" ]
+              , SoftBreak
+              , Str "continues"
+              , Space
+              , Str "with"
+              , Space
+              , Code ( "" , [] , [] ) "code"
+              , Space
+              , Str "on"
+              , Space
+              , Str "next"
+              , Space
+              , Str "line"
+              , SoftBreak
+              , Str "and"
+              , Space
+              , Link
+                  ( "" , [] , [] )
+                  [ Str "link" ]
+                  ( "http://example.com" , "" )
+              , Space
+              , Str "here."
+              ]
+          ]
+        ]
+      )
+    ]
+, Header
+    2
+    ( "definition-followed-by-blockquote" , [] , [] )
+    [ Str "Definition"
+    , Space
+    , Str "Followed"
+    , Space
+    , Str "by"
+    , Space
+    , Str "Blockquote"
+    ]
+, DefinitionList
+    [ ( [ Str "Regular" , Space , Str "term" ]
+      , [ [ Plain
+              [ Str "Definition"
+              , Space
+              , Str "text"
+              , SoftBreak
+              , Str "continues"
+              , Space
+              , Str "here"
+              ]
+          ]
+        ]
+      )
+    ]
+, BlockQuote
+    [ Para
+        [ Str "Blockquote"
+        , Space
+        , Str "after"
+        , Space
+        , Str "definition"
+        ]
+    ]
+, Header
+    2
+    ( "lazy-continuation" , [] , [] )
+    [ Str "Lazy" , Space , Str "Continuation" ]
+, DefinitionList
+    [ ( [ Str "Lazy" , Space , Str "term" ]
+      , [ [ Plain
+              [ Str "Definition"
+              , Space
+              , Str "line"
+              , Space
+              , Str "one"
+              , SoftBreak
+              , Str "continues"
+              , Space
+              , Str "without"
+              , Space
+              , Str "indent"
+              , Space
+              , Str "(lazy"
+              , Space
+              , Str "continuation)"
+              , SoftBreak
+              , Str "still"
+              , Space
+              , Str "part"
+              , Space
+              , Str "of"
+              , Space
+              , Str "the"
+              , Space
+              , Str "definition."
+              ]
+          ]
+        ]
+      )
+    ]
+, Header
+    2
+    ( "multiple-definitions-for-same-term" , [] , [] )
+    [ Str "Multiple"
+    , Space
+    , Str "Definitions"
+    , Space
+    , Str "for"
+    , Space
+    , Str "Same"
+    , Space
+    , Str "Term"
+    ]
+, DefinitionList
+    [ ( [ Str "Shared" , Space , Str "term" ]
+      , [ [ Plain
+              [ Str "First"
+              , Space
+              , Str "definition"
+              , SoftBreak
+              , Str "continues"
+              , Space
+              , Str "here"
+              ]
+          ]
+        , [ Plain
+              [ Str "Second"
+              , Space
+              , Str "definition"
+              , SoftBreak
+              , Str "also"
+              , Space
+              , Str "continues"
+              ]
+          ]
+        ]
+      )
+    , ( [ Str "Shared"
+        , Space
+        , Str "loose"
+        , Space
+        , Str "term"
+        ]
+      , [ [ Para
+              [ Str "First"
+              , Space
+              , Str "definition"
+              , SoftBreak
+              , Str "continues"
+              , Space
+              , Str "here"
+              ]
+          ]
+        , [ Para
+              [ Str "Second"
+              , Space
+              , Str "definition"
+              , SoftBreak
+              , Str "also"
+              , Space
+              , Str "continues"
+              ]
+          ]
+        ]
+      )
+    ]
+, Header
+    2
+    ( "end-with-definition" , [] , [] )
+    [ Str "End"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Definition"
+    ]
+, DefinitionList
+    [ ( [ Str "Final" , Space , Str "term" ]
+      , [ [ Plain
+              [ Str "Last"
+              , Space
+              , Str "definition"
+              , Space
+              , Str "continues"
+              , SoftBreak
+              , Str "to"
+              , Space
+              , Str "the"
+              , Space
+              , Str "very"
+              , Space
+              , Str "end."
+              ]
+          ]
+        ]
+      )
+    ]
+]

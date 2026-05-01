@@ -1,0 +1,50 @@
+[ Header
+    1
+    ( "display-math-with-escaped-dollars" , [] , [] )
+    [ Str "Display"
+    , Space
+    , Str "Math"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Escaped"
+    , Space
+    , Str "Dollars"
+    ]
+, Para
+    [ Str "Testing"
+    , Space
+    , Str "that"
+    , Space
+    , Str "escaped"
+    , Space
+    , Str "dollars"
+    , Space
+    , Str "inside"
+    , Space
+    , Str "display"
+    , Space
+    , Str "math"
+    , Space
+    , Str "are"
+    , Space
+    , Str "preserved."
+    ]
+, Para
+    [ Math DisplayMath "\n\\text{Price} = \\$100 + \\$50\n" ]
+, Para
+    [ Str "And"
+    , Space
+    , Str "inline:"
+    , Space
+    , Math DisplayMath "\\text{Cost: } \\$200"
+    , Space
+    , Str "in"
+    , Space
+    , Str "the"
+    , Space
+    , Str "paragraph."
+    ]
+, Para [ Str "Multiple" , Space , Str "escapes:" ]
+, Para [ Math DisplayMath "\na = \\$x + \\$y \\neq \\$z\n" ]
+]

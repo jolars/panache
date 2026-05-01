@@ -1,0 +1,38 @@
+[ BulletList
+    [ [ Plain
+          [ Str "First"
+          , Space
+          , Str "item"
+          , Space
+          , Str "sentence."
+          , Space
+          , Str "Second"
+          , Space
+          , Str "item"
+          , Space
+          , Str "sentence;"
+          , Space
+          , Str "third"
+          , Space
+          , Str "item"
+          , Space
+          , Str "sentence."
+          ]
+      ]
+    ]
+, BlockQuote
+    [ Para
+        [ Str "Quoted"
+        , Space
+        , Str "first"
+        , Space
+        , Str "sentence?"
+        , Space
+        , Str "Quoted"
+        , Space
+        , Str "second"
+        , Space
+        , Str "sentence."
+        ]
+    ]
+]

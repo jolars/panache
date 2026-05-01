@@ -1,0 +1,13 @@
+[ Para
+    [ Str "an"
+    , Space
+    , Str "image:"
+    , Space
+    , Image
+        ( "" , [] , [] )
+        [ Str "alt" , Space , Str "text" ]
+        ( "pic.png" , "" )
+    , Space
+    , Str "inline"
+    ]
+]

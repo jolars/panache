@@ -1,0 +1,5 @@
+[ BlockQuote
+    [ BulletList
+        [ [ Plain [ Str "foo" ] ] , [ Plain [ Str "bar" ] ] ]
+    ]
+]

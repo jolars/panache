@@ -1,0 +1,10 @@
+[ BlockQuote
+    [ Para
+        [ Str "aaa"
+        , SoftBreak
+        , Str "***"
+        , SoftBreak
+        , Str "bbb"
+        ]
+    ]
+]

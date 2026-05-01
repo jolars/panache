@@ -1,0 +1,8 @@
+# Pandoc-native conformance blocked list.
+#
+# Cases we deliberately do not target yet. One ID per line plus a comment
+# explaining the reason and the concrete parser/projector gap each entry
+# exposes. Do NOT use this file to silence regressions — fix the underlying
+# cause and keep the case in the allowlist instead.
+#
+# Empty for the seed.

@@ -1,0 +1,9 @@
+[ Para
+    [ Str "Foo"
+    , SoftBreak
+    , Str "[bar]:"
+    , Space
+    , Str "/baz"
+    ]
+, Para [ Str "[bar]" ]
+]

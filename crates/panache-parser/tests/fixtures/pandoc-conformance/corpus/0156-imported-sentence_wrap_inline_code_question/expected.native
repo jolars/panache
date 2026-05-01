@@ -1,0 +1,77 @@
+[ Para
+    [ Code ( "" , [] , [] ) "?"
+    , Space
+    , Str "and"
+    , Space
+    , Code ( "" , [] , [] ) "help()"
+    , Space
+    , Str "look"
+    , Space
+    , Str "for"
+    , Space
+    , Str "topic"
+    , Space
+    , Str "aliases;"
+    , Space
+    , Code ( "" , [] , [] ) "?foo"
+    , Space
+    , Str "will"
+    , Space
+    , Str "find"
+    , Space
+    , Str "any"
+    , Space
+    , Str "topic"
+    , Space
+    , Str "that"
+    , Space
+    , Str "contains"
+    , Space
+    , Str "the"
+    , Space
+    , Code ( "" , [] , [] ) "foo"
+    , Space
+    , Str "alias."
+    , Space
+    , Str "As"
+    , Space
+    , Str "well"
+    , Space
+    , Str "as"
+    , Space
+    , Str "looking"
+    , Space
+    , Str "in"
+    , Space
+    , Str "the"
+    , Space
+    , Str "aliases,"
+    , Space
+    , Code ( "" , [] , [] ) "help.search()"
+    , Space
+    , Str "and"
+    , Space
+    , Code ( "" , [] , [] ) "???"
+    , Space
+    , Str "also"
+    , Space
+    , Str "look"
+    , Space
+    , Str "in"
+    , Space
+    , Str "the"
+    , Space
+    , Code ( "" , [] , [] ) "@title"
+    , Str ","
+    , Space
+    , Code ( "" , [] , [] ) "@keywords"
+    , Str ","
+    , Space
+    , Str "and"
+    , Space
+    , Code ( "" , [] , [] ) "@concept"
+    , Str "s"
+    , Space
+    , Str "tags."
+    ]
+]

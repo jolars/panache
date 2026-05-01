@@ -1,0 +1,41 @@
+[ Header
+    1
+    ( "code-blocks-with-explicit-style" , [] , [] )
+    [ Str "Code"
+    , Space
+    , Str "Blocks"
+    , Space
+    , Str "with"
+    , Space
+    , Str "Explicit"
+    , Space
+    , Str "Style"
+    ]
+, Para
+    [ Str "Basic"
+    , Space
+    , Str "shortcut"
+    , Space
+    , Str "syntax:"
+    ]
+, CodeBlock ( "" , [ "python" ] , [] ) "print(\"hello\")"
+, Para
+    [ Str "Shortcut"
+    , Space
+    , Str "with"
+    , Space
+    , Str "attributes:"
+    ]
+, CodeBlock
+    ( "" , [ "python" , "numberLines" ] , [] ) "x = 42"
+, Para [ Str "Already" , Space , Str "explicit:" ]
+, CodeBlock
+    ( "mycode" , [ "haskell" ] , [] ) "qsort [] = []"
+, Para [ Str "Multiple" , Space , Str "classes:" ]
+, CodeBlock
+    ( ""
+    , [ "python" , "numberLines" ]
+    , [ ( "startFrom" , "10" ) ]
+    )
+    "def foo():\n    pass"
+]

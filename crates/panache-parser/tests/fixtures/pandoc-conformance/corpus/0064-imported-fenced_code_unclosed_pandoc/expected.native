@@ -1,0 +1,8 @@
+[ Para
+    [ Str "text"
+    , SoftBreak
+    , Str "```"
+    , SoftBreak
+    , Str "code"
+    ]
+]

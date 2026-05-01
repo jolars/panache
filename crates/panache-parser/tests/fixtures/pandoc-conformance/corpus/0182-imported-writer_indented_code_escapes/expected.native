@@ -1,0 +1,21 @@
+[ RawBlock
+    (Format "html")
+    "<!-- Source: pandoc/test/writer.markdown:L82-L100 -->"
+, Header
+    1
+    ( "indented-code-blocks-escapes" , [] , [] )
+    [ Str "Indented"
+    , Space
+    , Str "code"
+    , Space
+    , Str "blocks"
+    , Space
+    , Str "+"
+    , Space
+    , Str "escapes"
+    ]
+, Para [ Str "Code:" ]
+, CodeBlock
+    ( "" , [] , [] )
+    "---- (should be four hyphens)\n\nsub status {\n    print \"working\";\n}\n\nThese should not be escaped:  $ \\\\ > [ {"
+]

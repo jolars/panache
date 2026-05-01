@@ -1,0 +1,71 @@
+[ Header
+    1
+    ( "inline-math" , [] , [] )
+    [ Str "Inline" , Space , Str "Math" ]
+, Para
+    [ Str "Simple"
+    , Space
+    , Str "math:"
+    , Space
+    , Math InlineMath "x = y"
+    ]
+, Para
+    [ Str "With"
+    , Space
+    , Str "spaces:"
+    , Space
+    , Str "$"
+    , Space
+    , Str "a"
+    , Space
+    , Str "+"
+    , Space
+    , Str "b"
+    , Space
+    , Str "="
+    , Space
+    , Str "c"
+    , Space
+    , Str "$"
+    ]
+, Para
+    [ Str "Math"
+    , Space
+    , Str "in"
+    , Space
+    , Str "emphasis:"
+    , Space
+    , Emph
+        [ Str "equation"
+        , Space
+        , Math InlineMath "E = mc^2"
+        , Space
+        , Str "here"
+        ]
+    ]
+, Para
+    [ Str "Adjacent"
+    , Space
+    , Str "math:"
+    , Space
+    , Math InlineMath "x"
+    , Space
+    , Str "and"
+    , Space
+    , Math InlineMath "y"
+    , Space
+    , Str "variables"
+    ]
+, Para
+    [ Str "Complex:"
+    , Space
+    , Math InlineMath "\\frac{n!}{k!(n-k)!}"
+    ]
+, Para
+    [ Str "Multiple"
+    , Space
+    , Str "dollars:"
+    , Space
+    , Math DisplayMath "\\text{display math}"
+    ]
+]

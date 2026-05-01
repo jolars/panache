@@ -1,0 +1,8 @@
+[ Para
+    [ Str "Foo"
+    , SoftBreak
+    , Str "Bar"
+    , SoftBreak
+    , Str "\8212"
+    ]
+]

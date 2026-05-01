@@ -1,0 +1,6 @@
+[ BulletList
+    [ [ Para [ Str "one" ] ]
+    , [ Para [ Str "two" ] ]
+    , [ Para [ Str "three" ] ]
+    ]
+]

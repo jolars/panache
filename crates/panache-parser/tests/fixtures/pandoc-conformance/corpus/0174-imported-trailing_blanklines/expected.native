@@ -1,0 +1,20 @@
+[ Para
+    [ Str "A"
+    , Space
+    , Str "document"
+    , Space
+    , Str "with"
+    , Space
+    , Str "many"
+    , Space
+    , Str "blank"
+    , Space
+    , Str "lines"
+    , Space
+    , Str "at"
+    , Space
+    , Str "the"
+    , Space
+    , Str "end."
+    ]
+]

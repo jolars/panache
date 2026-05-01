@@ -1,0 +1,8 @@
+[ Para
+    [ Str "use"
+    , Space
+    , Code ( "" , [] , [] ) "printf(\"hi\")"
+    , Space
+    , Str "here"
+    ]
+]

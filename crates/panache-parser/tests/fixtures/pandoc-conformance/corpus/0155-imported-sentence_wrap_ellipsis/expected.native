@@ -1,0 +1,22 @@
+[ Para
+    [ Str "He"
+    , Space
+    , Str "paused\8230"
+    , Space
+    , Str "then"
+    , Space
+    , Str "said,"
+    , Space
+    , Quoted
+        DoubleQuote
+        [ Str "A" , Space , Str "full" , Space , Str "sentence." ]
+    , Space
+    , Str "Another"
+    , Space
+    , Str "one\8230"
+    , Space
+    , Str "with"
+    , Space
+    , Str "unicode."
+    ]
+]

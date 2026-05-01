@@ -1,0 +1,16 @@
+[ DefinitionList
+    [ ( [ Str "Term" ] , [ [ Plain [ Str "Def" ] ] ] )
+    , ( [ Str "Term" ]
+      , [ [ Plain [ Str "Def" ] ] , [ Plain [ Str "Def" ] ] ]
+      )
+    , ( [ Str "Term" ]
+      , [ [ Header 1 ( "heading" , [] , [] ) [ Str "Heading" ]
+          , Plain [ Str "Continuation" ]
+          ]
+        ]
+      )
+    , ( [ Str "Term" ]
+      , [ [ BulletList [ [ Plain [ Str "List" ] ] ] ] ]
+      )
+    ]
+]

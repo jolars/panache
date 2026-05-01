@@ -1,0 +1,10 @@
+[ Para
+    [ Link
+        ( "" , [] , [] )
+        [ Str "outer"
+        , Space
+        , Image ( "" , [] , [] ) [ Str "inner" ] ( "u2" , "" )
+        ]
+        ( "u1" , "" )
+    ]
+]

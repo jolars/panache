@@ -1,0 +1,147 @@
+[ Header
+    1
+    ( "simple-heading" , [] , [] )
+    [ Str "Simple" , Space , Str "Heading" ]
+, Header
+    2
+    ( "heading-with-emphasis" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Emph [ Str "emphasis" ]
+    ]
+, Header
+    3
+    ( "heading-with-strong-emphasis" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Strong [ Str "strong" , Space , Str "emphasis" ]
+    ]
+, Header
+    4
+    ( "heading-with-code" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Code ( "" , [] , [] ) "code"
+    ]
+, Header
+    5
+    ( "heading-with-link" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Link
+        ( "" , [] , [] )
+        [ Str "link" ]
+        ( "https://example.com" , "" )
+    ]
+, Header
+    6
+    ( "heading-with-nested-strong-emphasis" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Emph
+        [ Str "nested"
+        , Space
+        , Strong [ Str "strong" ]
+        , Space
+        , Str "emphasis"
+        ]
+    ]
+, Header
+    1
+    ( "heading-with-multiple-emphasis-and-strong-elements"
+    , []
+    , []
+    )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Str "multiple"
+    , Space
+    , Emph [ Str "emphasis" ]
+    , Space
+    , Str "and"
+    , Space
+    , Strong [ Str "strong" ]
+    , Space
+    , Str "elements"
+    ]
+, Header
+    2
+    ( "heading-with-code-and-emphasis" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Code ( "" , [] , [] ) "code"
+    , Space
+    , Str "and"
+    , Space
+    , Emph [ Str "emphasis" ]
+    ]
+, Header
+    3
+    ( "heading-with-strikeout" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Strikeout [ Str "strikeout" ]
+    ]
+, Header
+    4
+    ( "heading-with-superscript-and-subscript" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Str "super"
+    , Superscript [ Str "script" ]
+    , Space
+    , Str "and"
+    , Space
+    , Str "sub"
+    , Subscript [ Str "script" ]
+    ]
+, Header
+    1
+    ( "custom-id" , [] , [] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Str "attributes"
+    ]
+, Header
+    2
+    ( "heading-with-classes"
+    , [ "important" , "highlight" ]
+    , []
+    )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Str "classes"
+    ]
+, Header
+    3
+    ( "heading-with-key-value" , [] , [ ( "width" , "100" ) ] )
+    [ Str "Heading"
+    , Space
+    , Str "with"
+    , Space
+    , Str "key-value"
+    ]
+, Header 1 ( "id" , [] , [] ) [ Str "Test" ]
+]
