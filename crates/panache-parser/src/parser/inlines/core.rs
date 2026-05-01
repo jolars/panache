@@ -896,22 +896,11 @@ fn parse_inline_range_impl(
             }
         }
 
-        // Try subscript: ~text~
-        if byte == b'~'
-            && config.extensions.subscript
-            && let Some((len, content)) = try_parse_subscript(&text[pos..])
-        {
-            if pos > text_start {
-                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
-            }
-            log::trace!("Matched subscript at pos {}", pos);
-            emit_subscript(builder, content, config);
-            pos += len;
-            text_start = pos;
-            continue;
-        }
-
         // Try strikeout: ~~text~~
+        // Must run before subscript so `~~text~~` is matched as a single
+        // Strikeout rather than two empty Subscripts. Subscript falls back
+        // to consuming `~~` as an empty subscript only when strikeout
+        // didn't match (e.g. `~~unclosed`).
         if byte == b'~'
             && config.extensions.strikeout
             && let Some((len, content)) = try_parse_strikeout(&text[pos..])
@@ -921,6 +910,22 @@ fn parse_inline_range_impl(
             }
             log::trace!("Matched strikeout at pos {}", pos);
             emit_strikeout(builder, content, config);
+            pos += len;
+            text_start = pos;
+            continue;
+        }
+
+        // Try subscript: ~text~ or `~~` as empty subscript when strikeout
+        // didn't match (matches pandoc: `~~unclosed` → `Subscript [] + text`).
+        if byte == b'~'
+            && config.extensions.subscript
+            && let Some((len, content)) = try_parse_subscript(&text[pos..])
+        {
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            }
+            log::trace!("Matched subscript at pos {}", pos);
+            emit_subscript(builder, content, config);
             pos += len;
             text_start = pos;
             continue;

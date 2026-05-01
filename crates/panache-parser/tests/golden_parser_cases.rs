@@ -366,6 +366,7 @@ golden_test_cases!(
     rmarkdown_math,
     simple_table,
     standardize_bullets,
+    subscript_unclosed_double_tilde_pandoc,
     sentence_wrap_basic,
     sentence_wrap_abbreviations,
     sentence_wrap_contextual_abbrev,

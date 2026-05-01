@@ -24,9 +24,15 @@ pub fn try_parse_subscript(text: &str) -> Option<(usize, &str)> {
         return None;
     }
 
-    // Check that it's not ~~ (strikeout)
+    // Pandoc fallback: when strikeout (`~~text~~`) doesn't match, `~~` is
+    // consumed as an empty Subscript (`Subscript []`), with the second `~`
+    // closing the first. Probed against `pandoc -f markdown` for
+    // `~~unclosed`, `*x ~~y*`, `a ~~b`, `~~ a ~~`. Dispatch order in
+    // `inlines/core.rs` runs strikeout before subscript so a real
+    // strikeout (`~~hello~~`) is not misinterpreted as two empty
+    // subscripts.
     if bytes.len() > 1 && bytes[1] == b'~' {
-        return None;
+        return Some((2, ""));
     }
 
     // Content cannot start with whitespace
@@ -143,7 +149,10 @@ mod tests {
 
     #[test]
     fn test_empty_content() {
-        assert_eq!(try_parse_subscript("~~"), None);
+        // `~~` is consumed as an empty Subscript (pandoc strikeout-fallback);
+        // a single space between tildes is still rejected as a degenerate
+        // form (pandoc: `~ ~` → plain text).
+        assert_eq!(try_parse_subscript("~~"), Some((2, "")));
         assert_eq!(try_parse_subscript("~ ~"), None);
     }
 
@@ -154,9 +163,17 @@ mod tests {
     }
 
     #[test]
-    fn test_not_confused_with_strikeout() {
-        // ~~ should not be parsed as subscript
-        assert_eq!(try_parse_subscript("~~text~~"), None);
+    fn test_double_tilde_unclosed_is_empty_subscript() {
+        // Pandoc strikeout-fallback: when `~~text~~` would otherwise match
+        // strikeout, the dispatch order in `inlines/core.rs` ensures
+        // strikeout fires first. When strikeout would not match (no closing
+        // `~~`), `~~` is consumed as an empty Subscript, leaving the rest
+        // of the input for downstream parsing. Probed against pandoc:
+        // `~~unclosed` → `Subscript [] , Str "unclosed"`. The standalone
+        // `try_parse_subscript("~~text~~")` now returns the empty form;
+        // real strikeout matching is the dispatcher's responsibility.
+        assert_eq!(try_parse_subscript("~~text~~"), Some((2, "")));
+        assert_eq!(try_parse_subscript("~~unclosed"), Some((2, "")));
     }
 
     #[test]

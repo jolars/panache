@@ -15,20 +15,19 @@ count of currently-failing imports remaining under that bucket in the latest
    Most citation-bearing cases pass via Example-list carve-out; #38 is the
    single remaining real-citation showcase. Smaller leverage than the \~14
    occurrence count would suggest (one case, not many).
-2. **Tables --- remaining (\~5)** --- Simple/Multiline/Headerless basics landed
-   (+9 cases). What remains:
+2. **Tables --- remaining (\~4)** --- Simple/Multiline/Headerless basics landed
+   plus multiline inline-formatting (+10 cases). What remains:
    - **#94** (simple_table_short_header) --- parser emits 0-width
      `TABLE_CELL@x..x` artifacts when header words don't align with the table's
      leading/trailing dashes. Needs a parser-shape fix or a stricter projector
      skip rule.
-   - **#126** (multiline inline_formatting) --- multiline-cell content is sliced
-     out of raw row text via column boundaries, so `**bold**`, `` `code` ``,
-     `[link](url)` aren't parsed as Strong/Code/Link --- they're emitted as raw
-     `Str`. Needs an inline-parser pass on the cell-text strings (re-parse).
    - **#68/#70/#71** (grid_table) --- grid cells need block-level reparse (e.g.
      `B` → CodeBlock, multi-line cells → SoftBreak/LineBreak, complex span
      tables); requires running panache's block parser on each cell's content.
-     #71 also has rowspan/colspan layout. Heavy.
+     #71 also has rowspan/colspan layout. Heavy. The new
+     `parse_cell_text_inlines` helper proves the inline-reparse pattern; an
+     analogous block-reparse helper using `panache_parser::parse` and walking
+     children for blocks would unlock these.
    - **#171** (tables_in_divs) --- pipe table inside fenced div with custom
      caption form `: Caption {#tbl-foo}` isn't recognized as pandoc's
      `+caption_attributes` Caption-with-attr shape.
@@ -66,8 +65,6 @@ count of currently-failing imports remaining under that bucket in the latest
      unresolved reference Link, whose projection drops the leading space
      inside LINK_TEXT. Either fix would need to be paired with the other to
      unlock.
-   - `emphasis_nested_inlines` (#56) --- single edge case where unclosed `~~` is
-     split as `Subscript [] + Str`. Niche.
    - `nested_headings_in_containers` (#128) --- parser doesn't parse `# Heading`
      inside list items / definition items as Header.
    - Several blockquote/list/definition-list nesting cases where blockquote/list
@@ -131,7 +128,171 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-01 (single-char upper Roman period 2-space gate)
+- **Date**: 2026-05-01 (multiline-table inline reparse + `~~`
+  empty-subscript fallback)
+- **Pass before → after**: 163 → 165 / 187 (+2 imports: #126, #56).
+  One projector-only fix (multiline-table cells run through the
+  inline parser) and one parser-shape fix (the unclosed-`~~`
+  strikeout fallback now lands on an empty `Subscript` per pandoc).
+  CommonMark allowlist stayed green; full parser-crate suite green;
+  workspace tests green; clippy + fmt clean.
+- **What landed**:
+  - **#126 multiline_table_inline_formatting (projector-only)** ---
+    `crates/panache-parser/tests/pandoc/native_projector.rs`. The
+    multiline-table cell builder previously used a cheap
+    `push_plain_text_inlines` whitespace tokenizer that emitted
+    `Str` + `Space` only --- inline markup like `**bold**`,
+    `` `code` ``, `[link](url)` inside multiline cells projected as
+    raw `Str`. Replaced with `parse_cell_text_inlines`: joins the
+    column's per-line trimmed segments with `\n`, calls
+    `panache_parser::parse(joined, Some(pandoc_options))`, and
+    walks `descendants()` for the first `PARAGRAPH`/`PLAIN` node to
+    extract inlines via the existing `inlines_from`. The new helper
+    uses `panache_parser::ParserOptions` directly (no shared
+    constructor with `pandoc.rs::pandoc_options()` --- the projector
+    is a sibling module, and threading a constructor through the
+    `project()` API would have meant rewriting every callsite). The
+    re-parse goes through `coalesce_inlines` afterward for smart
+    quotes, abbreviations, and edge whitespace trim. Empty/all-WS
+    cell text returns `Vec::new()` directly; the rest is unchanged.
+  - **#56 emphasis_nested_inlines (parser-shape)** ---
+    - `crates/panache-parser/src/parser/inlines/subscript.rs`:
+      `try_parse_subscript` previously bailed when the second byte
+      was `~` (to avoid mis-matching strikeout). Replaced with a
+      `Some((2, ""))` early-return: `~~` is consumed as an empty
+      `Subscript`, matching pandoc's strikeout-fallback (verified:
+      `~~unclosed` → `Subscript [] , Str "unclosed"`,
+      `a ~~b` → `Str "a" , Space , Subscript [] , Str "b"`,
+      `~~ a ~~` → `Subscript [] , Space , Str "a" , Space ,
+      Subscript []`). Single-tilde flow (`~text~`,
+      `~text\ with\ escapes~`) is unchanged because the `~~` early
+      return only fires when bytes[1] == b'~'.
+    - `crates/panache-parser/src/parser/inlines/core.rs`: reordered
+      the dispatch so strikeout is tried *before* subscript at
+      `~`-bytes. With subscript now accepting `~~` as empty, real
+      `~~text~~` strikeouts must match before subscript can claim
+      the `~~` opener. The subscript-after-strikeout order is the
+      complement of the change: strikeout's `try_parse` already
+      requires both an opening `~~` and a closing `~~`, so it
+      naturally fails on unclosed forms and lets subscript pick up
+      `~~`.
+    - Unit tests in `subscript.rs`:
+      - `test_empty_content` updated --- `~~` is now `Some((2,
+        ""))`, `~ ~` is still `None` (pandoc rejects single-space
+        between tildes).
+      - `test_not_confused_with_strikeout` renamed to
+        `test_double_tilde_unclosed_is_empty_subscript` and
+        rewritten --- documents the dispatch-order rationale and
+        asserts `~~text~~` and `~~unclosed` both produce
+        `Some((2, ""))` standalone (real strikeout matching is the
+        dispatcher's job).
+  - **New parser fixture** ---
+    `crates/panache-parser/tests/fixtures/cases/subscript_unclosed_double_tilde_pandoc/`
+    with `parser-options.toml` (`flavor = "pandoc"`) and an
+    `input.md` covering five cases: bare `~~unclosed strike`,
+    `*text ~~unclosed strike end*` (the #56 driver),
+    `~~hello~~` (real strikeout still works under reorder),
+    `~text~` (single-tilde subscript unchanged), and `a ~~b`
+    (mid-paragraph empty subscript). Snapshot pinned at
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_subscript_unclosed_double_tilde_pandoc.snap`.
+    Wired into `tests/golden_parser_cases.rs` between
+    `standardize_bullets` and `sentence_wrap_basic` (preserving the
+    file's loose-alphabetical ordering).
+  - **Existing parser fixture snapshot updated** ---
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_emphasis_nested_inlines.snap`.
+    The unclosed-`~~` paragraph inside `*...*` now contains an empty
+    `SUBSCRIPT` between the `text ` and `unclosed strike end` text
+    runs (was a single `TEXT@1229..1255 "text ~~unclosed strike end"`
+    span). The legacy snapshot pinned the buggy single-text shape;
+    per `.claude/rules/parser.md`, fixed toward pandoc-native rather
+    than preserving the legacy bug.
+  - **Formatter golden updated** ---
+    `tests/fixtures/cases/emphasis_nested_inlines/expected.md`. The
+    line `*text \~\~unclosed strike end*` (with escaped tildes) is
+    now `*text ~~unclosed strike end*` (unescaped). The formatter's
+    Subscript renderer emits the markers without escaping, and the
+    output is idempotent (re-parses to the same EMPHASIS containing
+    SUBSCRIPT empty + TEXT). The legacy expected pinned the
+    over-escaped form that came out of the buggy-text-only parse;
+    updated to match the corrected parser shape.
+- **Cases unlocked** (+2, allowlisted under `# imported`):
+  - 56 (emphasis_nested_inlines)
+  - 126 (multiline_table_inline_formatting)
+- **Files changed (classified)**:
+  - **projector**: `crates/panache-parser/tests/pandoc/native_projector.rs`
+    (multiline_row_cells_blocks now calls a new
+    `parse_cell_text_inlines` helper; removed unused
+    `push_plain_text_inlines`)
+  - **parser-shape**:
+    `crates/panache-parser/src/parser/inlines/subscript.rs`,
+    `crates/panache-parser/src/parser/inlines/core.rs`
+  - **new parser fixture**:
+    `crates/panache-parser/tests/fixtures/cases/subscript_unclosed_double_tilde_pandoc/`
+    (`input.md`, `parser-options.toml`),
+    `crates/panache-parser/tests/golden_parser_cases.rs` (registration)
+  - **parser snapshots**:
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_emphasis_nested_inlines.snap`,
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_subscript_unclosed_double_tilde_pandoc.snap`
+    (new)
+  - **formatter golden**:
+    `tests/fixtures/cases/emphasis_nested_inlines/expected.md`
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+2: 56, 126)
+- **Don't redo**:
+  - The dispatch reorder in `inlines/core.rs` is load-bearing for
+    the subscript change. With subscript now accepting `~~` as
+    empty, swapping the order back would break every real
+    strikeout (`~~text~~` → empty subscript + text + empty
+    subscript). If you ever need to gate the empty-subscript form
+    further, keep the strikeout-first order and refine the
+    early-return condition inside `try_parse_subscript`, not the
+    dispatcher.
+  - `parse_cell_text_inlines` constructs `ParserOptions` inline
+    rather than reusing `pandoc.rs::pandoc_options()`. The two
+    files are sibling modules attached via `#[path = ...]` from
+    `tests/pandoc.rs`; sharing a constructor would require
+    plumbing it through `project()`. The duplication is 5 lines
+    and matches a recurring pattern --- don't refactor it for
+    its own sake.
+  - `parse_cell_text_inlines` walks `descendants()` not just direct
+    children. Pandoc cell text is normally a single paragraph at
+    the top, but a wider re-parse (e.g. a stray reference def at
+    top followed by Para) won't strand the inlines; we still find
+    the first PARAGRAPH/PLAIN. Don't switch to direct `.children()`
+    --- it'll silently return empty for any document whose first
+    block isn't PARAGRAPH/PLAIN.
+  - The trim-then-join order in the multiline cell loop is
+    intentional. Per-line slice → trim → push to `col_lines[i]`
+    drops both leading-pad whitespace (column boundaries are not
+    word boundaries; the slice may start mid-word, but the parser
+    handles that for strict slices). Final join with `\n` makes
+    each segment a separate paragraph line that the inline parser
+    sees as a SoftBreak boundary. Don't switch to a `\n\n` join
+    --- pandoc emits `SoftBreak` between cell lines, not a
+    paragraph break.
+  - `~~` empty-subscript fallback is gated on
+    `config.extensions.subscript`. CommonMark/GFM disable subscript
+    by default, so the fallback never fires there (verified
+    against pandoc: under `-f commonmark`/`-f gfm`, `~~unclosed`
+    stays as `Str "~~unclosed"`). Don't widen the gate to all
+    flavors.
+  - The fixture's `a ~~b` line tests mid-paragraph empty-subscript
+    (no preceding `*`). It's there to pin that the fallback works
+    at *any* `~~` position, not just inside emphasis. Pandoc:
+    `[ Str "a" , Space , Subscript [] , Str "b" ]`. Don't drop
+    that test --- it guards a different code path than the
+    `*...*` case (the inline parser's outer dispatch, not the
+    emphasis recursion).
+  - The formatter golden change for `emphasis_nested_inlines`
+    flipped `\~\~` → `~~` in the unclosed-strikeout line. This is
+    a side effect of the parser change: the old text-only shape
+    triggered the formatter's text-escape pass on `~`; the new
+    SUBSCRIPT-node shape uses the subscript renderer which emits
+    bare `~`. Don't add an explicit `\~` formatting rule --- the
+    new output is idempotent and matches pandoc-native shape.
+
+## Earlier session (2026-05-01, single-char upper Roman period 2-space gate)
+
 - **Pass before → after**: 162 → 163 / 187 (+1 import: #115). One
   parser-shape fix: pandoc requires single-character uppercase Roman
   numerals followed by `.` (the seven values `I, V, X, L, C, D, M`)

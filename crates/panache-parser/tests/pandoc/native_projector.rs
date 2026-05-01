@@ -1848,18 +1848,43 @@ fn multiline_row_cells_blocks(row: &SyntaxNode, cols: &[(usize, usize)]) -> Vec<
             if segments.is_empty() {
                 return Vec::new();
             }
-            // Build inlines: each segment becomes a string parsed via
-            // pandoc-ish Str/Space splitting; SoftBreak between segments.
-            let mut inlines: Vec<Inline> = Vec::new();
-            for (k, seg) in segments.iter().enumerate() {
-                if k > 0 {
-                    inlines.push(Inline::SoftBreak);
-                }
-                push_plain_text_inlines(seg, &mut inlines);
+            // Re-parse the cell's joined text through panache's inline parser
+            // so that `**bold**`, `` `code` ``, `[link](url)` etc. inside
+            // multiline-table cells project as Strong/Code/Link rather than
+            // raw Str (matches pandoc's `multilineTableHeader` behavior of
+            // joining lines per column and parsing as Markdown).
+            let joined = segments.join("\n");
+            let inlines = parse_cell_text_inlines(&joined);
+            if inlines.is_empty() {
+                return Vec::new();
             }
             vec![Block::Plain(coalesce_inlines(inlines))]
         })
         .collect()
+}
+
+/// Parse a cell text fragment through panache's inline parser and return its
+/// inline content. Used for multiline-table cells whose per-line slices are
+/// not seen by the outer parser as inline-bearing TABLE_CELLs (the parser
+/// holds raw TEXT for lines past the first). Empty or whitespace-only input
+/// returns an empty vec.
+fn parse_cell_text_inlines(text: &str) -> Vec<Inline> {
+    if text.trim().is_empty() {
+        return Vec::new();
+    }
+    let opts = panache_parser::ParserOptions {
+        flavor: panache_parser::Flavor::Pandoc,
+        dialect: panache_parser::Dialect::for_flavor(panache_parser::Flavor::Pandoc),
+        extensions: panache_parser::Extensions::for_flavor(panache_parser::Flavor::Pandoc),
+        ..panache_parser::ParserOptions::default()
+    };
+    let doc = panache_parser::parse(text, Some(opts));
+    for node in doc.descendants() {
+        if matches!(node.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN) {
+            return inlines_from(&node);
+        }
+    }
+    Vec::new()
 }
 
 fn char_slice(s: &str, start_char: usize, end_char: usize) -> &str {
@@ -1878,23 +1903,6 @@ fn char_slice(s: &str, start_char: usize, end_char: usize) -> &str {
         return "";
     }
     &s[start_byte..end_byte]
-}
-
-/// Cheap text → inlines splitter for multiline-table cell segments. Splits
-/// on whitespace runs, pushes `Str` for each word and `Space` between
-/// them. Does not parse markdown — multiline cells are typically plain
-/// text. (The body of a multi-line cell is not exposed via the existing
-/// inline pipeline because the parser holds raw TEXT spans across the
-/// whole row, not per-cell.)
-fn push_plain_text_inlines(s: &str, out: &mut Vec<Inline>) {
-    let mut first = true;
-    for word in s.split_whitespace() {
-        if !first {
-            out.push(Inline::Space);
-        }
-        first = false;
-        out.push(Inline::Str(word.to_string()));
-    }
 }
 
 fn list_block(node: &SyntaxNode) -> Block {

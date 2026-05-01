@@ -90,7 +90,7 @@
 
 *text \[unclosed link end*
 
-*text \~\~unclosed strike end*
+*text ~~unclosed strike end*
 
 ## Multiple Nesting Levels
 

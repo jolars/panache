@@ -1,0 +1,58 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..74
+  PARAGRAPH@0..18
+    SUBSCRIPT@0..2
+      SUBSCRIPT_MARKER@0..1
+        SUBSCRIPT_MARKER@0..1 "~"
+      SUBSCRIPT_MARKER@1..2
+        SUBSCRIPT_MARKER@1..2 "~"
+    TEXT@2..17 "unclosed strike"
+    NEWLINE@17..18 "\n"
+  BLANK_LINE@18..19
+    BLANK_LINE@18..19 "\n"
+  PARAGRAPH@19..48
+    EMPHASIS@19..47
+      EMPHASIS_MARKER@19..20 "*"
+      TEXT@20..25 "text "
+      SUBSCRIPT@25..27
+        SUBSCRIPT_MARKER@25..26
+          SUBSCRIPT_MARKER@25..26 "~"
+        SUBSCRIPT_MARKER@26..27
+          SUBSCRIPT_MARKER@26..27 "~"
+      TEXT@27..46 "unclosed strike end"
+      EMPHASIS_MARKER@46..47 "*"
+    NEWLINE@47..48 "\n"
+  BLANK_LINE@48..49
+    BLANK_LINE@48..49 "\n"
+  PARAGRAPH@49..59
+    STRIKEOUT@49..58
+      STRIKEOUT_MARKER@49..51
+        STRIKEOUT_MARKER@49..51 "~~"
+      TEXT@51..56 "hello"
+      STRIKEOUT_MARKER@56..58
+        STRIKEOUT_MARKER@56..58 "~~"
+    NEWLINE@58..59 "\n"
+  BLANK_LINE@59..60
+    BLANK_LINE@59..60 "\n"
+  PARAGRAPH@60..67
+    SUBSCRIPT@60..66
+      SUBSCRIPT_MARKER@60..61
+        SUBSCRIPT_MARKER@60..61 "~"
+      TEXT@61..65 "text"
+      SUBSCRIPT_MARKER@65..66
+        SUBSCRIPT_MARKER@65..66 "~"
+    NEWLINE@66..67 "\n"
+  BLANK_LINE@67..68
+    BLANK_LINE@67..68 "\n"
+  PARAGRAPH@68..74
+    TEXT@68..70 "a "
+    SUBSCRIPT@70..72
+      SUBSCRIPT_MARKER@70..71
+        SUBSCRIPT_MARKER@70..71 "~"
+      SUBSCRIPT_MARKER@71..72
+        SUBSCRIPT_MARKER@71..72 "~"
+    TEXT@72..73 "b"
+    NEWLINE@73..74 "\n"
