@@ -25,6 +25,11 @@ use rowan::NodeOrToken;
 struct RefsCtx {
     refs: HashMap<String, (String, String)>,
     heading_ids: HashSet<String>,
+    /// Heading text-range start → final disambiguated id. Lets
+    /// `heading_block` look up the document-level id (with `section`
+    /// fallback for empty slugs and `-1`/`-2` suffixes for duplicates)
+    /// that was computed during the pre-pass.
+    heading_id_by_offset: HashMap<u32, String>,
     /// Footnote label → parsed body blocks. Lookup keyed by the raw label
     /// id text (no normalization needed — pandoc footnote labels are
     /// case-sensitive and not whitespace-collapsed).
@@ -38,8 +43,7 @@ thread_local! {
 pub fn project(tree: &SyntaxNode) -> String {
     let ctx = build_refs_ctx(tree);
     REFS_CTX.with(|c| *c.borrow_mut() = ctx);
-    let mut blocks = blocks_from_doc(tree);
-    fixup_empty_heading_ids(&mut blocks);
+    let blocks = blocks_from_doc(tree);
     let mut out = String::new();
     out.push('[');
     for (i, b) in blocks.iter().enumerate() {
@@ -56,11 +60,16 @@ pub fn project(tree: &SyntaxNode) -> String {
 
 fn build_refs_ctx(tree: &SyntaxNode) -> RefsCtx {
     let mut ctx = RefsCtx::default();
-    collect_refs_and_headings(tree, &mut ctx);
+    let mut seen_ids: HashMap<String, u32> = HashMap::new();
+    collect_refs_and_headings(tree, &mut ctx, &mut seen_ids);
     ctx
 }
 
-fn collect_refs_and_headings(node: &SyntaxNode, ctx: &mut RefsCtx) {
+fn collect_refs_and_headings(
+    node: &SyntaxNode,
+    ctx: &mut RefsCtx,
+    seen_ids: &mut HashMap<String, u32>,
+) {
     for child in node.children() {
         match child.kind() {
             SyntaxKind::REFERENCE_DEFINITION => {
@@ -76,15 +85,62 @@ fn collect_refs_and_headings(node: &SyntaxNode, ctx: &mut RefsCtx) {
                 }
             }
             SyntaxKind::HEADING => {
-                let id = heading_implicit_id(&child);
-                if !id.is_empty() {
-                    ctx.heading_ids.insert(id);
+                let (id, was_explicit) = heading_id_with_explicitness(&child);
+                let final_id = if was_explicit {
+                    // Explicit `{#x}` ids are kept verbatim; pandoc only
+                    // warns on conflicts but does not auto-disambiguate.
+                    seen_ids.entry(id.clone()).or_insert(0);
+                    id
+                } else {
+                    let mut base = id;
+                    if base.is_empty() {
+                        base = "section".to_string();
+                    }
+                    let count = seen_ids.entry(base.clone()).or_insert(0);
+                    let id = if *count == 0 {
+                        base
+                    } else {
+                        format!("{base}-{count}")
+                    };
+                    *count += 1;
+                    id
+                };
+                if !final_id.is_empty() {
+                    let offset: u32 = child.text_range().start().into();
+                    ctx.heading_ids.insert(final_id.clone());
+                    ctx.heading_id_by_offset.insert(offset, final_id);
                 }
-                collect_refs_and_headings(&child, ctx);
+                collect_refs_and_headings(&child, ctx, seen_ids);
             }
-            _ => collect_refs_and_headings(&child, ctx),
+            _ => collect_refs_and_headings(&child, ctx, seen_ids),
         }
     }
+}
+
+/// Returns `(id, was_explicit)` for a HEADING node. Explicit ids come from
+/// `{#id}` attributes; the auto-id is the slugified plaintext (which may be
+/// empty for headings whose text contains no slug-eligible characters).
+fn heading_id_with_explicitness(node: &SyntaxNode) -> (String, bool) {
+    let inlines = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::HEADING_CONTENT)
+        .map(|c| coalesce_inlines(inlines_from(&c)))
+        .unwrap_or_default();
+    let attr = node.children_with_tokens().find_map(|el| match el {
+        NodeOrToken::Node(n) if n.kind() == SyntaxKind::ATTRIBUTE => Some(n.text().to_string()),
+        NodeOrToken::Token(t) if t.kind() == SyntaxKind::ATTRIBUTE => Some(t.text().to_string()),
+        _ => None,
+    });
+    if let Some(raw) = attr {
+        let trimmed = raw.trim();
+        if let Some(inner) = trimmed.strip_prefix('{').and_then(|s| s.strip_suffix('}')) {
+            let parsed = parse_attr_block(inner);
+            if !parsed.id.is_empty() {
+                return (parsed.id, true);
+            }
+        }
+    }
+    (pandoc_slugify(&inlines_to_plaintext(&inlines)), false)
 }
 
 fn parse_footnote_def(node: &SyntaxNode) -> Option<(String, Vec<Block>)> {
@@ -111,7 +167,11 @@ fn parse_footnote_def(node: &SyntaxNode) -> Option<(String, Vec<Block>)> {
 }
 
 fn indented_code_block_with_extra_strip(node: &SyntaxNode, extra: usize) -> Block {
+    let raw_format = code_block_raw_format(node);
     let attr = code_block_attr(node);
+    let is_fenced = node
+        .children()
+        .any(|c| c.kind() == SyntaxKind::CODE_FENCE_OPEN);
     let mut content = String::new();
     for child in node.children() {
         if child.kind() == SyntaxKind::CODE_CONTENT {
@@ -121,8 +181,22 @@ fn indented_code_block_with_extra_strip(node: &SyntaxNode, extra: usize) -> Bloc
     while content.ends_with('\n') {
         content.pop();
     }
+    // Pandoc expands tabs (4-col stops) on code-block bodies before any
+    // indent stripping, so a `:\t` marker followed by `\t\t\tcode` correctly
+    // becomes `"        code"` after the 4-col definition-content offset is
+    // stripped. Apply expansion first, then strip.
+    content = content
+        .split('\n')
+        .map(expand_tabs_to_4)
+        .collect::<Vec<_>>()
+        .join("\n");
     content = strip_leading_spaces_per_line(&content, extra);
-    content = strip_indented_code_indent(&content);
+    if !is_fenced {
+        content = strip_indented_code_indent(&content);
+    }
+    if let Some(fmt) = raw_format {
+        return Block::RawBlock(fmt, content);
+    }
     Block::CodeBlock(attr, content)
 }
 
@@ -236,29 +310,6 @@ fn normalize_ref_label(label: &str) -> String {
     out
 }
 
-fn heading_implicit_id(node: &SyntaxNode) -> String {
-    let inlines = node
-        .children()
-        .find(|c| c.kind() == SyntaxKind::HEADING_CONTENT)
-        .map(|c| coalesce_inlines(inlines_from(&c)))
-        .unwrap_or_default();
-    let attr = node.children_with_tokens().find_map(|el| match el {
-        NodeOrToken::Node(n) if n.kind() == SyntaxKind::ATTRIBUTE => Some(n.text().to_string()),
-        NodeOrToken::Token(t) if t.kind() == SyntaxKind::ATTRIBUTE => Some(t.text().to_string()),
-        _ => None,
-    });
-    if let Some(raw) = attr {
-        let trimmed = raw.trim();
-        if let Some(inner) = trimmed.strip_prefix('{').and_then(|s| s.strip_suffix('}')) {
-            let parsed = parse_attr_block(inner);
-            if !parsed.id.is_empty() {
-                return parsed.id;
-            }
-        }
-    }
-    pandoc_slugify(&inlines_to_plaintext(&inlines))
-}
-
 fn lookup_ref(label: &str) -> Option<(String, String)> {
     let key = normalize_ref_label(label);
     REFS_CTX.with(|c| c.borrow().refs.get(&key).cloned())
@@ -276,26 +327,6 @@ fn lookup_heading_id(label: &str) -> Option<String> {
             None
         }
     })
-}
-
-/// Pandoc auto-numbers consecutive empty headings as `section`, `section-1`,
-/// `section-2`, ... — our slugifier returns `""` for empty input, so fix the
-/// IDs up after the fact at document level.
-fn fixup_empty_heading_ids(blocks: &mut [Block]) {
-    let mut count = 0u32;
-    for block in blocks.iter_mut() {
-        if let Block::Header(_, attr, inlines) = block
-            && inlines.is_empty()
-            && attr.id.is_empty()
-        {
-            attr.id = if count == 0 {
-                "section".to_string()
-            } else {
-                format!("section-{count}")
-            };
-            count += 1;
-        }
-    }
 }
 
 /// Canonical form of a Pandoc-native AST string. Tokenizes the input and
@@ -464,6 +495,13 @@ fn heading_block(node: &SyntaxNode) -> Block {
         .find(|c| c.kind() == SyntaxKind::HEADING_CONTENT)
         .map(|c| coalesce_inlines(inlines_from(&c)))
         .unwrap_or_default();
+    // Auto-id and disambiguation are computed in the `RefsCtx` pre-pass so
+    // duplicate slugs and `section`-fallbacks are document-wide consistent.
+    // Explicit attributes still need their classes/kvs parsed here.
+    let offset: u32 = node.text_range().start().into();
+    let final_id = REFS_CTX
+        .with(|c| c.borrow().heading_id_by_offset.get(&offset).cloned())
+        .unwrap_or_default();
     let attr = node
         .children_with_tokens()
         .find_map(|el| match el {
@@ -478,14 +516,14 @@ fn heading_block(node: &SyntaxNode) -> Block {
             if let Some(inner) = trimmed.strip_prefix('{').and_then(|s| s.strip_suffix('}')) {
                 let mut attr = parse_attr_block(inner);
                 if attr.id.is_empty() {
-                    attr.id = pandoc_slugify(&inlines_to_plaintext(&inlines));
+                    attr.id = final_id.clone();
                 }
                 attr
             } else {
-                Attr::with_id(pandoc_slugify(&inlines_to_plaintext(&inlines)))
+                Attr::with_id(final_id.clone())
             }
         })
-        .unwrap_or_else(|| Attr::with_id(pandoc_slugify(&inlines_to_plaintext(&inlines))));
+        .unwrap_or_else(|| Attr::with_id(final_id));
     Block::Header(level, attr, inlines)
 }
 
@@ -526,6 +564,7 @@ fn blockquote_blocks(node: &SyntaxNode) -> Vec<Block> {
 }
 
 fn code_block(node: &SyntaxNode) -> Block {
+    let raw_format = code_block_raw_format(node);
     let attr = code_block_attr(node);
     let is_fenced = node
         .children()
@@ -540,10 +579,47 @@ fn code_block(node: &SyntaxNode) -> Block {
     while content.ends_with('\n') {
         content.pop();
     }
-    if !is_fenced {
+    if is_fenced {
+        // Pandoc tab-expands code-block bodies before emission. For indented
+        // code, the expansion happens inside `strip_indented_code_indent`
+        // before the 4-col strip; for fenced code there is no strip, so do
+        // it directly here.
+        content = content
+            .split('\n')
+            .map(expand_tabs_to_4)
+            .collect::<Vec<_>>()
+            .join("\n");
+    } else {
         content = strip_indented_code_indent(&content);
     }
+    if let Some(fmt) = raw_format {
+        return Block::RawBlock(fmt, content);
+    }
     Block::CodeBlock(attr, content)
+}
+
+/// Pandoc's raw-attribute syntax (`Ext_raw_attribute`) treats a fenced code
+/// block whose info string is exactly `{=format}` as a `RawBlock` of that
+/// format rather than a `CodeBlock`. The brace contents must start with `=`
+/// followed by a non-empty token, with no other classes/ids/key-value pairs.
+fn code_block_raw_format(node: &SyntaxNode) -> Option<String> {
+    let open = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::CODE_FENCE_OPEN)?;
+    let info = open
+        .children()
+        .find(|c| c.kind() == SyntaxKind::CODE_INFO)?;
+    let raw = info.text().to_string();
+    let trimmed = raw.trim();
+    let inner = trimmed
+        .strip_prefix('{')
+        .and_then(|s| s.strip_suffix('}'))?;
+    let inner = inner.trim();
+    let format = inner.strip_prefix('=')?.trim();
+    if format.is_empty() || format.contains(char::is_whitespace) {
+        return None;
+    }
+    Some(format.to_string())
 }
 
 fn code_block_attr(node: &SyntaxNode) -> Attr {
@@ -570,18 +646,30 @@ fn code_block_attr(node: &SyntaxNode) -> Attr {
         let attr_inner = &trimmed[brace + 1..trimmed.len() - 1];
         let mut attr = parse_attr_block(attr_inner);
         if !lang.is_empty() {
-            attr.classes.insert(0, lang.to_string());
+            attr.classes.insert(0, normalize_lang_id(lang));
         }
         return attr;
     }
     if !trimmed.is_empty() {
         return Attr {
             id: String::new(),
-            classes: vec![trimmed.to_string()],
+            classes: vec![normalize_lang_id(trimmed)],
             kvs: Vec::new(),
         };
     }
     Attr::default()
+}
+
+/// Mirrors pandoc's `toLanguageId` (Markdown reader): lowercases the language
+/// identifier and applies the GitHub-syntax-highlighting normalizations
+/// (`c++` → `cpp`, `objective-c` → `objectivec`).
+fn normalize_lang_id(lang: &str) -> String {
+    let lower = lang.to_ascii_lowercase();
+    match lower.as_str() {
+        "c++" => "cpp".to_string(),
+        "objective-c" => "objectivec".to_string(),
+        _ => lower,
+    }
 }
 
 /// Pandoc strips up to four leading spaces (or one tab) from each line of an
@@ -593,17 +681,42 @@ fn strip_indented_code_indent(s: &str) -> String {
         if i > 0 {
             out.push('\n');
         }
-        let stripped = if let Some(rest) = line.strip_prefix("    ") {
-            rest
-        } else if let Some(rest) = line.strip_prefix('\t') {
-            rest
+        // Pandoc expands tabs to 4-column tab stops *before* stripping the
+        // 4-column indent. Mixed `  \tfoo` therefore becomes `    foo` →
+        // `foo` after strip, which is what `pandoc -t native` emits.
+        let expanded = expand_tabs_to_4(line);
+        let stripped = if let Some(rest) = expanded.strip_prefix("    ") {
+            rest.to_string()
+        } else if let Some(rest) = expanded.strip_prefix('\t') {
+            rest.to_string()
         } else {
             // Strip up to 3 leading spaces if present (pandoc tolerates short
             // indentation only on blank lines, which we don't try to detect
             // here — safer to leave non-conforming lines alone).
-            line
+            expanded
         };
-        out.push_str(stripped);
+        out.push_str(&stripped);
+    }
+    out
+}
+
+/// Expand `\t` to spaces using 4-column tab stops, starting from column 0
+/// of `line`. Pandoc applies this to indented code blocks before stripping
+/// the leading 4-column indent so the body byte-equals what pandoc emits.
+fn expand_tabs_to_4(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut col = 0usize;
+    for c in line.chars() {
+        if c == '\t' {
+            let next = (col / 4 + 1) * 4;
+            for _ in col..next {
+                out.push(' ');
+            }
+            col = next;
+        } else {
+            out.push(c);
+            col += 1;
+        }
     }
     out
 }
@@ -737,6 +850,67 @@ fn parse_attr_block(s: &str) -> Attr {
     Attr { id, classes, kvs }
 }
 
+/// Parse HTML-style attributes `class="x" id="y" key="z"` into `Attr`,
+/// mapping `class` (whitespace-split) → classes, `id` → id, others → kvs.
+fn parse_html_attrs(s: &str) -> Attr {
+    let mut id = String::new();
+    let mut classes: Vec<String> = Vec::new();
+    let mut kvs: Vec<(String, String)> = Vec::new();
+    let bytes = s.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        match bytes[i] {
+            b' ' | b'\t' | b'\n' | b'\r' => {
+                i += 1;
+            }
+            _ => {
+                let key_start = i;
+                while i < bytes.len() && !matches!(bytes[i], b' ' | b'\t' | b'\n' | b'\r' | b'=') {
+                    i += 1;
+                }
+                let key = s[key_start..i].to_string();
+                let value = if i < bytes.len() && bytes[i] == b'=' {
+                    i += 1;
+                    if i < bytes.len() && (bytes[i] == b'"' || bytes[i] == b'\'') {
+                        let quote = bytes[i];
+                        i += 1;
+                        let v_start = i;
+                        while i < bytes.len() && bytes[i] != quote {
+                            i += 1;
+                        }
+                        let v = s[v_start..i].to_string();
+                        if i < bytes.len() {
+                            i += 1;
+                        }
+                        v
+                    } else {
+                        let v_start = i;
+                        while i < bytes.len() && !matches!(bytes[i], b' ' | b'\t' | b'\n' | b'\r') {
+                            i += 1;
+                        }
+                        s[v_start..i].to_string()
+                    }
+                } else {
+                    String::new()
+                };
+                if key.is_empty() {
+                    continue;
+                }
+                match key.as_str() {
+                    "class" => {
+                        for c in value.split_ascii_whitespace() {
+                            classes.push(c.to_string());
+                        }
+                    }
+                    "id" => id = value,
+                    _ => kvs.push((key, value)),
+                }
+            }
+        }
+    }
+    Attr { id, classes, kvs }
+}
+
 fn definition_list(node: &SyntaxNode) -> Block {
     let items: Vec<(Vec<Inline>, Vec<Vec<Block>>)> = node
         .children()
@@ -747,10 +921,11 @@ fn definition_list(node: &SyntaxNode) -> Block {
                 .find(|c| c.kind() == SyntaxKind::TERM)
                 .map(|t| coalesce_inlines(inlines_from(&t)))
                 .unwrap_or_default();
+            let loose = is_loose_definition_item(&item);
             let defs: Vec<Vec<Block>> = item
                 .children()
                 .filter(|c| c.kind() == SyntaxKind::DEFINITION)
-                .map(|d| definition_blocks(&d))
+                .map(|d| definition_blocks(&d, loose))
                 .collect();
             (term, defs)
         })
@@ -758,15 +933,54 @@ fn definition_list(node: &SyntaxNode) -> Block {
     Block::DefinitionList(items)
 }
 
-fn definition_blocks(def_node: &SyntaxNode) -> Vec<Block> {
+/// A `DEFINITION_ITEM` is "loose" iff there is a `BLANK_LINE` between the
+/// `TERM` (or its preceding term continuations) and the first `DEFINITION`.
+/// Pandoc renders loose definitions with `Para` blocks; tight ones use
+/// `Plain`. The looseness is per-item (per-term group), not per-definition,
+/// and applies to *all* definitions in the item — see pandoc's behavior.
+fn is_loose_definition_item(item: &SyntaxNode) -> bool {
+    let mut saw_term = false;
+    for child in item.children_with_tokens() {
+        if let NodeOrToken::Node(n) = child {
+            match n.kind() {
+                SyntaxKind::TERM => {
+                    saw_term = true;
+                }
+                SyntaxKind::BLANK_LINE if saw_term => {
+                    return true;
+                }
+                SyntaxKind::DEFINITION => {
+                    return false;
+                }
+                _ => {}
+            }
+        }
+    }
+    false
+}
+
+fn definition_blocks(def_node: &SyntaxNode, loose: bool) -> Vec<Block> {
+    // Definition body content lives at the marker's content offset (`: ` →
+    // 2 columns by default). The CST keeps that indent on each line, so any
+    // CODE_BLOCK descendant needs the offset stripped before pandoc-native
+    // projection.
+    let extra = definition_content_offset(def_node);
     let mut out = Vec::new();
     for child in def_node.children() {
         match child.kind() {
             SyntaxKind::PLAIN => {
-                out.push(Block::Plain(coalesce_inlines(inlines_from(&child))));
+                let inlines = coalesce_inlines(inlines_from(&child));
+                if loose {
+                    out.push(Block::Para(inlines));
+                } else {
+                    out.push(Block::Plain(inlines));
+                }
             }
             SyntaxKind::PARAGRAPH => {
                 out.push(Block::Para(coalesce_inlines(inlines_from(&child))));
+            }
+            SyntaxKind::CODE_BLOCK if extra > 0 => {
+                out.push(indented_code_block_with_extra_strip(&child, extra));
             }
             _ => {
                 if let Some(b) = block_from(&child) {
@@ -776,6 +990,47 @@ fn definition_blocks(def_node: &SyntaxNode) -> Vec<Block> {
         }
     }
     out
+}
+
+/// Visual column where definition body content starts. The strip later runs
+/// against the *tab-expanded* body, so this offset must be measured in
+/// columns (tabs round to the next 4-col stop), not raw chars: `:\t` reaches
+/// col 4, which is the column the body's strip should remove.
+fn definition_content_offset(def_node: &SyntaxNode) -> usize {
+    let mut col = 0usize;
+    let mut saw_marker = false;
+    for el in def_node.children_with_tokens() {
+        if let NodeOrToken::Token(t) = el {
+            match t.kind() {
+                SyntaxKind::DEFINITION_MARKER => {
+                    col = advance_col(col, t.text());
+                    saw_marker = true;
+                }
+                SyntaxKind::WHITESPACE if saw_marker => {
+                    return advance_col(col, t.text());
+                }
+                _ if saw_marker => return col,
+                _ => {}
+            }
+        } else if saw_marker {
+            return col;
+        }
+    }
+    col
+}
+
+/// Advance a column counter by `s`, treating `\t` as moving to the next
+/// 4-column tab stop and any other character as a single column.
+fn advance_col(start: usize, s: &str) -> usize {
+    let mut col = start;
+    for c in s.chars() {
+        if c == '\t' {
+            col = (col / 4 + 1) * 4;
+        } else {
+            col += 1;
+        }
+    }
+    col
 }
 
 fn line_block(node: &SyntaxNode) -> Block {
@@ -805,21 +1060,25 @@ fn latex_command_inline(node: &SyntaxNode) -> Inline {
 }
 
 fn bracketed_span_inline(node: &SyntaxNode) -> Inline {
-    // Detect HTML-style `<span>...</span>` (parser quirk) — for now, leave as
-    // Unsupported so the report still flags it; pandoc would emit RawInline.
     let is_html = node
         .children_with_tokens()
         .any(|el| matches!(&el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::SPAN_BRACKET_OPEN && t.text().starts_with('<')));
-    if is_html {
-        return Inline::Unsupported("BRACKETED_SPAN".to_string());
-    }
-    let attr = node
-        .children()
-        .find(|c| c.kind() == SyntaxKind::SPAN_ATTRIBUTES)
-        .map(|n| {
-            let raw = n.text().to_string();
+    let attr_text = node.children_with_tokens().find_map(|el| match el {
+        NodeOrToken::Token(t) if t.kind() == SyntaxKind::SPAN_ATTRIBUTES => {
+            Some(t.text().to_string())
+        }
+        NodeOrToken::Node(n) if n.kind() == SyntaxKind::SPAN_ATTRIBUTES => {
+            Some(n.text().to_string())
+        }
+        _ => None,
+    });
+    let attr = attr_text
+        .map(|raw| {
             let trimmed = raw.trim();
-            if let Some(inner) = trimmed.strip_prefix('{').and_then(|s| s.strip_suffix('}')) {
+            if is_html {
+                parse_html_attrs(trimmed)
+            } else if let Some(inner) = trimmed.strip_prefix('{').and_then(|s| s.strip_suffix('}'))
+            {
                 parse_attr_block(inner)
             } else {
                 Attr::default()
@@ -996,31 +1255,165 @@ fn ordered_list_attrs(node: &SyntaxNode) -> (usize, &'static str, &'static str) 
                 .map(|t| t.text().to_string())
         })
         .unwrap_or_default();
-    let trimmed = marker.trim();
-    let digits: String = trimmed.chars().take_while(|c| c.is_ascii_digit()).collect();
-    let start: usize = digits.parse().unwrap_or(1);
-    // The seed corpus only exercises Decimal/Period. Broader styles (roman,
-    // alpha, two-paren delim) are projector-gap follow-ups.
-    let style = "Decimal";
-    let delim = if trimmed.ends_with(')') {
-        "OneParen"
-    } else {
-        "Period"
+    classify_ordered_marker(marker.trim())
+}
+
+/// Map a list-marker token (e.g. `1.`, `iv)`, `(A)`, `#.`, `(@)`) to the
+/// pandoc-native `(start, style, delim)` tuple. Mirrors pandoc's parser logic
+/// in `Text/Pandoc/Parsing/Lists.hs`: try `decimal`, then `exampleNum` (`@`),
+/// then `defaultNum` (`#`), then `romanOne` (single `i`/`I`), then alpha,
+/// then multi-char roman, in that order; the first matching form wins. The
+/// start value for Example lists is left at 1 — pandoc tracks numbering
+/// across lists at the document level, which we don't model.
+fn classify_ordered_marker(trimmed: &str) -> (usize, &'static str, &'static str) {
+    // Strip surrounding parens / trailing period or paren to get (body, delim).
+    let (body, delim) =
+        if let Some(inner) = trimmed.strip_prefix('(').and_then(|s| s.strip_suffix(')')) {
+            (inner, "TwoParens")
+        } else if let Some(inner) = trimmed.strip_suffix(')') {
+            (inner, "OneParen")
+        } else if let Some(inner) = trimmed.strip_suffix('.') {
+            (inner, "Period")
+        } else {
+            (trimmed, "DefaultDelim")
+        };
+
+    // All-digit body → Decimal.
+    if !body.is_empty() && body.chars().all(|c| c.is_ascii_digit()) {
+        let start: usize = body.parse().unwrap_or(1);
+        return (start, "Decimal", delim);
+    }
+
+    // `#` (DefaultStyle) — when style is DefaultStyle pandoc forces
+    // DefaultDelim regardless of the actual punctuation.
+    if body == "#" {
+        return (1, "DefaultStyle", "DefaultDelim");
+    }
+
+    // `@` or `@label` (Example list).
+    if let Some(rest) = body.strip_prefix('@')
+        && rest
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        return (1, "Example", delim);
+    }
+
+    // Single `i`/`I` is romanOne (tried before alpha, so `i.`/`I.` is Roman 1).
+    if body == "i" {
+        return (1, "LowerRoman", delim);
+    }
+    if body == "I" {
+        return (1, "UpperRoman", delim);
+    }
+
+    // Single lowercase / uppercase letter → alpha.
+    if body.len() == 1
+        && let Some(c) = body.chars().next()
+    {
+        if c.is_ascii_lowercase() {
+            return ((c as u8 - b'a') as usize + 1, "LowerAlpha", delim);
+        }
+        if c.is_ascii_uppercase() {
+            return ((c as u8 - b'A') as usize + 1, "UpperAlpha", delim);
+        }
+    }
+
+    // Multi-char roman lowercase/uppercase.
+    if body
+        .chars()
+        .all(|c| matches!(c, 'i' | 'v' | 'x' | 'l' | 'c' | 'd' | 'm'))
+        && let Some(n) = roman_to_int(body, false)
+    {
+        return (n, "LowerRoman", delim);
+    }
+    if body
+        .chars()
+        .all(|c| matches!(c, 'I' | 'V' | 'X' | 'L' | 'C' | 'D' | 'M'))
+        && let Some(n) = roman_to_int(body, true)
+    {
+        return (n, "UpperRoman", delim);
+    }
+
+    // Fallback — the parser accepted some marker we don't classify; emit
+    // Decimal/Period so the list renders rather than dropping coverage.
+    (1, "Decimal", delim)
+}
+
+/// Convert a roman numeral string to its integer value. Returns `None` if the
+/// string isn't a syntactically-valid roman numeral. Mirrors pandoc's
+/// `romanNumeral` (greedy left-to-right with subtractive pairs).
+fn roman_to_int(s: &str, upper: bool) -> Option<usize> {
+    let normalize = |c: char| if upper { c } else { c.to_ascii_uppercase() };
+    let value = |c: char| match c {
+        'I' => 1,
+        'V' => 5,
+        'X' => 10,
+        'L' => 50,
+        'C' => 100,
+        'D' => 500,
+        'M' => 1000,
+        _ => 0,
     };
-    (start, style, delim)
+    let chars: Vec<char> = s.chars().map(normalize).collect();
+    if chars.is_empty() {
+        return None;
+    }
+    let mut total = 0usize;
+    let mut i = 0;
+    while i < chars.len() {
+        let v = value(chars[i]);
+        if v == 0 {
+            return None;
+        }
+        let next = chars.get(i + 1).copied().map(value).unwrap_or(0);
+        if v < next {
+            total += next - v;
+            i += 2;
+        } else {
+            total += v;
+            i += 1;
+        }
+    }
+    Some(total)
 }
 
 fn list_item_blocks(item: &SyntaxNode, loose: bool) -> Vec<Block> {
     let mut out = Vec::new();
+    let item_indent = list_item_content_offset(item);
+    let task_checkbox = task_checkbox_for_item(item);
+    let mut checkbox_emitted = false;
     for child in item.children() {
         match child.kind() {
             SyntaxKind::PLAIN => {
-                let inlines = coalesce_inlines(inlines_from(&child));
+                let mut inlines = coalesce_inlines(inlines_from(&child));
+                // Skip empty Plain blocks. The parser emits a PLAIN node for
+                // any line under a list item, including the bare-marker line
+                // (`-` followed by blank then indented content); pandoc only
+                // counts blocks with actual inline content.
+                if inlines.is_empty() {
+                    continue;
+                }
+                if !checkbox_emitted && let Some(glyph) = task_checkbox {
+                    inlines.insert(0, Inline::Space);
+                    inlines.insert(0, Inline::Str(glyph.to_string()));
+                    checkbox_emitted = true;
+                }
                 if loose {
                     out.push(Block::Para(inlines));
                 } else {
                     out.push(Block::Plain(inlines));
                 }
+            }
+            SyntaxKind::CODE_BLOCK => {
+                // Both fenced and indented code blocks inside list items
+                // carry the item-content indent on every body line in the
+                // CST. Strip that offset so pandoc sees the same body it
+                // would in a flat document. (For indented code, the helper
+                // also strips the 4-space code-block indent on top of the
+                // item offset; for fenced code, the offset strip alone is
+                // sufficient.)
+                out.push(indented_code_block_with_extra_strip(&child, item_indent));
             }
             _ => {
                 if let Some(b) = block_from(&child) {
@@ -1030,6 +1423,64 @@ fn list_item_blocks(item: &SyntaxNode, loose: bool) -> Vec<Block> {
         }
     }
     out
+}
+
+/// Pandoc renders `- [ ] foo` as `Plain [Str "\u{2610}", Space, Str "foo"]`
+/// (and `[x]`/`[X]` as `\u{2612}`). The parser keeps `[ ]`/`[x]`/`[X]` as a
+/// dedicated `TASK_CHECKBOX` token on the `LIST_ITEM`; this helper returns
+/// the matching ballot-box glyph if one is present.
+fn task_checkbox_for_item(item: &SyntaxNode) -> Option<&'static str> {
+    item.children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .find(|t| t.kind() == SyntaxKind::TASK_CHECKBOX)
+        .map(|t| {
+            let text = t.text();
+            if text.contains('x') || text.contains('X') {
+                "\u{2612}"
+            } else {
+                "\u{2610}"
+            }
+        })
+}
+
+/// Number of leading-space columns each body-content line of `item` carries
+/// in the CST. Mirrors pandoc's list-item content offset:
+///   - bare-marker line (no WHITESPACE after LIST_MARKER): offset = marker
+///     width (e.g. `1` for `-`, `2` for `1.`).
+///   - marker followed by space(s): offset = marker width + WS width (the
+///     visual column where content starts on the marker's line).
+///
+/// Nested list items also carry leading WHITESPACE *before* the LIST_MARKER
+/// (the outer item's content offset). Include that so the cumulative depth
+/// is captured — required for correctly stripping nested fenced/indented
+/// code blocks.
+fn list_item_content_offset(item: &SyntaxNode) -> usize {
+    let mut marker_width = 0usize;
+    let mut leading_ws = 0usize;
+    let mut saw_marker = false;
+    for el in item.children_with_tokens() {
+        if let NodeOrToken::Token(t) = el {
+            match t.kind() {
+                SyntaxKind::WHITESPACE if !saw_marker => {
+                    leading_ws += t.text().chars().count();
+                }
+                SyntaxKind::LIST_MARKER => {
+                    marker_width += t.text().chars().count();
+                    saw_marker = true;
+                }
+                SyntaxKind::WHITESPACE if saw_marker => {
+                    return leading_ws + marker_width + t.text().chars().count();
+                }
+                _ if saw_marker => {
+                    return leading_ws + marker_width;
+                }
+                _ => {}
+            }
+        } else if saw_marker {
+            return leading_ws + marker_width;
+        }
+    }
+    leading_ws + marker_width
 }
 
 fn is_loose_list(node: &SyntaxNode) -> bool {
@@ -1055,8 +1506,47 @@ fn is_loose_list(node: &SyntaxNode) -> bool {
         if item.children().any(|c| c.kind() == SyntaxKind::PARAGRAPH) {
             return true;
         }
+        // Per CommonMark/pandoc: a list is loose if any item directly
+        // contains a blank line between two block-level children. The
+        // single-item form (`- a\n\n  b`) only manifests as a BLANK_LINE
+        // sandwiched between non-blank block children inside the item.
+        if has_internal_blank_between_blocks(&item) {
+            return true;
+        }
     }
     false
+}
+
+fn has_internal_blank_between_blocks(item: &SyntaxNode) -> bool {
+    let mut saw_block_before = false;
+    let mut pending_blank = false;
+    for child in item.children() {
+        match child.kind() {
+            SyntaxKind::BLANK_LINE => {
+                if saw_block_before {
+                    pending_blank = true;
+                }
+            }
+            // Bare-marker line emits an empty PLAIN (NEWLINE only); pandoc
+            // doesn't count that as a block — its first real block is what
+            // comes after the blank line.
+            SyntaxKind::PLAIN if child_is_empty_plain(&child) => {}
+            _ => {
+                if pending_blank {
+                    return true;
+                }
+                saw_block_before = true;
+            }
+        }
+    }
+    false
+}
+
+fn child_is_empty_plain(node: &SyntaxNode) -> bool {
+    !node.children_with_tokens().any(|el| match el {
+        NodeOrToken::Token(t) => !matches!(t.kind(), SyntaxKind::NEWLINE | SyntaxKind::WHITESPACE),
+        NodeOrToken::Node(_) => true,
+    })
 }
 
 // ----- inline walking -----------------------------------------------------
@@ -1131,11 +1621,21 @@ fn push_text(text: &str, out: &mut Vec<Inline>) {
 
 fn inline_from_node(node: &SyntaxNode) -> Inline {
     match node.kind() {
-        SyntaxKind::EMPHASIS => Inline::Emph(coalesce_inlines(inlines_from_marked(node))),
-        SyntaxKind::STRONG => Inline::Strong(coalesce_inlines(inlines_from_marked(node))),
-        SyntaxKind::STRIKEOUT => Inline::Strikeout(coalesce_inlines(inlines_from_marked(node))),
-        SyntaxKind::SUPERSCRIPT => Inline::Superscript(coalesce_inlines(inlines_from_marked(node))),
-        SyntaxKind::SUBSCRIPT => Inline::Subscript(coalesce_inlines(inlines_from_marked(node))),
+        SyntaxKind::EMPHASIS => {
+            Inline::Emph(coalesce_inlines_keep_edges(inlines_from_marked(node)))
+        }
+        SyntaxKind::STRONG => {
+            Inline::Strong(coalesce_inlines_keep_edges(inlines_from_marked(node)))
+        }
+        SyntaxKind::STRIKEOUT => {
+            Inline::Strikeout(coalesce_inlines_keep_edges(inlines_from_marked(node)))
+        }
+        SyntaxKind::SUPERSCRIPT => {
+            Inline::Superscript(coalesce_inlines_keep_edges(inlines_from_marked(node)))
+        }
+        SyntaxKind::SUBSCRIPT => {
+            Inline::Subscript(coalesce_inlines_keep_edges(inlines_from_marked(node)))
+        }
         SyntaxKind::INLINE_CODE => {
             let content: String = node
                 .children_with_tokens()
@@ -1343,6 +1843,10 @@ fn render_image_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
 /// disambiguate the leading backtick when the code starts with a backtick).
 /// `` ` foo ` `` → `Code "foo"`; `` ` ` `` (single space) → `Code " "`.
 fn strip_inline_code_padding(s: &str) -> String {
+    // Pandoc strips an all-whitespace inline code span to the empty string.
+    if !s.is_empty() && s.bytes().all(|b| b == b' ') {
+        return String::new();
+    }
     if s.len() >= 2 && s.starts_with(' ') && s.ends_with(' ') && s.chars().any(|c| c != ' ') {
         return s[1..s.len() - 1].to_string();
     }
@@ -1383,6 +1887,12 @@ fn autolink_inline(node: &SyntaxNode) -> Inline {
         let dest = format!("mailto:{url}");
         return Inline::Link(attr, vec![Inline::Str(url)], dest, String::new());
     }
+    // Pandoc only treats `<scheme:body>` as a URI autolink when `scheme` is
+    // in its known-schemes allowlist (see pandoc/src/Text/Pandoc/URI.hs).
+    // Otherwise the original `<...>` bytes are emitted as raw HTML.
+    if !is_known_uri_scheme(&url) {
+        return Inline::RawInline("html".to_string(), node.text().to_string());
+    }
     let attr = Attr {
         id: String::new(),
         classes: vec!["uri".to_string()],
@@ -1390,6 +1900,68 @@ fn autolink_inline(node: &SyntaxNode) -> Inline {
     };
     Inline::Link(attr, vec![Inline::Str(url.clone())], url, String::new())
 }
+
+/// Pandoc's URI scheme allowlist (IANA + a few unofficial ones). Mirrors
+/// `pandoc/src/Text/Pandoc/URI.hs`. Lowercase comparison.
+fn is_known_uri_scheme(url: &str) -> bool {
+    let scheme_end = url.find(':');
+    let Some(end) = scheme_end else {
+        return false;
+    };
+    let scheme = url[..end].to_ascii_lowercase();
+    PANDOC_KNOWN_SCHEMES.binary_search(&scheme.as_str()).is_ok()
+}
+
+/// Pandoc-known URI schemes, sorted for `binary_search`. Mirrors
+/// `pandoc/src/Text/Pandoc/URI.hs`'s `schemes` set.
+#[rustfmt::skip]
+const PANDOC_KNOWN_SCHEMES: &[&str] = &[
+    "aaa", "aaas", "about", "acap", "acct", "acr",
+    "adiumxtra", "afp", "afs", "aim", "appdata", "apt",
+    "attachment", "aw", "barion", "beshare", "bitcoin", "blob",
+    "bolo", "browserext", "callto", "cap", "chrome", "chrome-extension",
+    "cid", "coap", "coaps", "com-eventbrite-attendee", "content", "crid",
+    "cvs", "data", "dav", "dict", "dis", "dlna-playcontainer",
+    "dlna-playsingle", "dns", "dntp", "doi", "dtn", "dvb",
+    "ed2k", "example", "facetime", "fax", "feed", "feedready",
+    "file", "filesystem", "finger", "fish", "ftp", "gemini",
+    "geo", "gg", "git", "gizmoproject", "go", "gopher",
+    "graph", "gtalk", "h323", "ham", "hcp", "http",
+    "https", "hxxp", "hxxps", "hydrazone", "iax", "icap",
+    "icon", "im", "imap", "info", "iotdisco", "ipn",
+    "ipp", "ipps", "irc", "irc6", "ircs", "iris",
+    "iris.beep", "iris.lwz", "iris.xpc", "iris.xpcs", "isbn", "isostore",
+    "itms", "jabber", "jar", "javascript", "jms", "keyparc",
+    "lastfm", "ldap", "ldaps", "lvlt", "magnet", "mailserver",
+    "mailto", "maps", "market", "message", "mid", "mms",
+    "modem", "mongodb", "moz", "ms-access", "ms-browser-extension", "ms-drive-to",
+    "ms-enrollment", "ms-excel", "ms-gamebarservices", "ms-getoffice", "ms-help", "ms-infopath",
+    "ms-media-stream-id", "ms-officeapp", "ms-powerpoint", "ms-project", "ms-publisher", "ms-search-repair",
+    "ms-secondary-screen-controller", "ms-secondary-screen-setup", "ms-settings", "ms-settings-airplanemode", "ms-settings-bluetooth", "ms-settings-camera",
+    "ms-settings-cellular", "ms-settings-cloudstorage", "ms-settings-connectabledevices", "ms-settings-displays-topology", "ms-settings-emailandaccounts", "ms-settings-language",
+    "ms-settings-location", "ms-settings-lock", "ms-settings-nfctransactions", "ms-settings-notifications", "ms-settings-power", "ms-settings-privacy",
+    "ms-settings-proximity", "ms-settings-screenrotation", "ms-settings-wifi", "ms-settings-workplace", "ms-spd", "ms-sttoverlay",
+    "ms-transit-to", "ms-virtualtouchpad", "ms-visio", "ms-walk-to", "ms-whiteboard", "ms-whiteboard-cmd",
+    "ms-word", "msnim", "msrp", "msrps", "mtqp", "mumble",
+    "mupdate", "mvn", "news", "nfs", "ni", "nih",
+    "nntp", "notes", "ocf", "oid", "onenote", "onenote-cmd",
+    "opaquelocktoken", "pack", "palm", "paparazzi", "pkcs11", "platform",
+    "pmid", "pop", "pres", "prospero", "proxy", "psyc",
+    "pwid", "qb", "query", "redis", "rediss", "reload",
+    "res", "resource", "rmi", "rsync", "rtmfp", "rtmp",
+    "rtsp", "rtsps", "rtspu", "secondlife", "service", "session",
+    "sftp", "sgn", "shttp", "sieve", "sip", "sips",
+    "skype", "smb", "sms", "smtp", "snews", "snmp",
+    "soap.beep", "soap.beeps", "soldat", "spotify", "ssh", "steam",
+    "stun", "stuns", "submit", "svn", "tag", "teamspeak",
+    "tel", "teliaeid", "telnet", "tftp", "things", "thismessage",
+    "tip", "tn3270", "tool", "turn", "turns", "tv",
+    "udp", "unreal", "urn", "ut2004", "v-event", "vemmi",
+    "ventrilo", "videotex", "view-source", "vnc", "wais", "webcal",
+    "wpid", "ws", "wss", "wtai", "wyciwyg", "xcon",
+    "xcon-userid", "xfire", "xmlrpc.beep", "xmlrpc.beeps", "xmpp", "xri",
+    "ymsgr", "z39.50", "z39.50r", "z39.50s",
+];
 
 fn footnote_reference_inline(node: &SyntaxNode) -> Inline {
     let Some(label) = footnote_label(node) else {
@@ -1419,18 +1991,68 @@ fn inline_footnote_inline(node: &SyntaxNode) -> Inline {
 }
 
 fn parse_link_dest(node: &SyntaxNode) -> (String, String) {
-    // LINK_DEST currently holds the raw bytes between `(` and `)`. Split on
-    // whitespace into URL and optional quoted title.
+    // LINK_DEST holds the raw bytes between `(` and `)`. Split into URL and
+    // optional quoted title, then percent-escape unsafe characters in the URL
+    // to match pandoc's `escapeURI`.
     let raw = node.text().to_string();
     let trimmed = raw.trim();
-    if let Some(idx) = trimmed.find([' ', '\t']) {
-        let url = trimmed[..idx].to_string();
-        let rest = trimmed[idx..].trim();
-        let title = parse_dest_title(rest);
-        (url, title)
-    } else {
-        (trimmed.to_string(), String::new())
+    // `<URL>` form: pandoc strips the angle brackets, even if the URL
+    // contains otherwise-ambiguous characters like spaces or parens.
+    if let Some(rest) = trimmed.strip_prefix('<')
+        && let Some(end) = rest.find('>')
+    {
+        let url = &rest[..end];
+        let after = rest[end + 1..].trim();
+        let title = parse_dest_title(after);
+        return (escape_link_dest(url), title);
     }
+    // URL/title boundary: a title starts with `"`, `'`, or `(` after
+    // whitespace. Without one, the entire string is the URL — internal
+    // spaces still get percent-escaped.
+    let bytes = trimmed.as_bytes();
+    let mut url_end = trimmed.len();
+    let mut i = 0;
+    while i < bytes.len() {
+        if matches!(bytes[i], b' ' | b'\t' | b'\n') {
+            let mut j = i;
+            while j < bytes.len() && matches!(bytes[j], b' ' | b'\t' | b'\n') {
+                j += 1;
+            }
+            if j < bytes.len() && matches!(bytes[j], b'"' | b'\'' | b'(') {
+                url_end = i;
+                break;
+            }
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+    let url_raw = &trimmed[..url_end];
+    let title = parse_dest_title(trimmed[url_end..].trim());
+    (escape_link_dest(url_raw), title)
+}
+
+/// Mirrors pandoc's `escapeURI`: percent-escape ASCII whitespace and the
+/// punctuation `<>|"{}[]^\``. Other ASCII and all non-ASCII chars are
+/// preserved as-is.
+fn escape_link_dest(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        let needs_escape = ch.is_whitespace()
+            || matches!(
+                ch,
+                '<' | '>' | '|' | '"' | '{' | '}' | '[' | ']' | '^' | '`'
+            );
+        if needs_escape {
+            let mut buf = [0u8; 4];
+            for &b in ch.encode_utf8(&mut buf).as_bytes() {
+                out.push_str(&format!("%{b:02X}"));
+            }
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 fn parse_dest_title(s: &str) -> String {
@@ -1456,6 +2078,18 @@ fn parse_dest_title(s: &str) -> String {
 // ----- coalescing & helpers ----------------------------------------------
 
 fn coalesce_inlines(input: Vec<Inline>) -> Vec<Inline> {
+    coalesce_inlines_inner(input, true)
+}
+
+/// Inside markup atoms (Emph/Strong/Strikeout/Sup/Sub), pandoc preserves
+/// leading/trailing whitespace inside the wrapper — e.g. `*foo bar *` projects
+/// as `Emph [Str "foo", Space, Str "bar", Space]`. Block-level paragraphs and
+/// headers strip edge whitespace, but inline markup wrappers do not.
+fn coalesce_inlines_keep_edges(input: Vec<Inline>) -> Vec<Inline> {
+    coalesce_inlines_inner(input, false)
+}
+
+fn coalesce_inlines_inner(input: Vec<Inline>, trim_edges: bool) -> Vec<Inline> {
     let mut out: Vec<Inline> = Vec::with_capacity(input.len());
     for inline in input {
         if let Inline::Str(s) = inline {
@@ -1482,13 +2116,15 @@ fn coalesce_inlines(input: Vec<Inline>) -> Vec<Inline> {
             out.push(inline);
         }
     }
-    // Trim leading Space/SoftBreak — pandoc does not emit leading whitespace
-    // inside a paragraph.
-    while matches!(out.first(), Some(Inline::Space) | Some(Inline::SoftBreak)) {
-        out.remove(0);
-    }
-    while matches!(out.last(), Some(Inline::Space) | Some(Inline::SoftBreak)) {
-        out.pop();
+    if trim_edges {
+        // Trim leading/trailing Space/SoftBreak — pandoc does not emit edge
+        // whitespace inside a paragraph or header.
+        while matches!(out.first(), Some(Inline::Space) | Some(Inline::SoftBreak)) {
+            out.remove(0);
+        }
+        while matches!(out.last(), Some(Inline::Space) | Some(Inline::SoftBreak)) {
+            out.pop();
+        }
     }
     // Pandoc's `smart` extension is on by default for markdown. Apply the
     // simple in-Str substitutions here (apostrophe, dashes, ellipsis), then
@@ -1500,7 +2136,82 @@ fn coalesce_inlines(input: Vec<Inline>) -> Vec<Inline> {
             *s = t;
         }
     }
-    smart_quote_pairs(out)
+    let out = smart_quote_pairs(out);
+    apply_abbreviations(out)
+}
+
+/// Pandoc's default abbreviation list (from `pandoc/data/abbreviations`).
+/// When a Str token *exactly equal to* one of these (i.e. the abbrev is a
+/// suffix of the projected Str preceded by a non-letter / non-dot char or the
+/// start of the Str) is followed by a `Space`, pandoc replaces the space with
+/// a non-breaking space appended to the Str. Sorted to allow `binary_search`.
+const PANDOC_ABBREVIATIONS: &[&str] = &[
+    "Apr.", "Aug.", "Bros.", "Capt.", "Co.", "Corp.", "Dec.", "Dr.", "Feb.", "Fr.", "Gen.", "Gov.",
+    "Hon.", "Inc.", "Jan.", "Jr.", "Jul.", "Jun.", "Ltd.", "M.A.", "M.D.", "Mar.", "Mr.", "Mrs.",
+    "Ms.", "No.", "Nov.", "Oct.", "Ph.D.", "Pres.", "Prof.", "Rep.", "Rev.", "Sen.", "Sep.",
+    "Sept.", "Sgt.", "Sr.", "St.", "aet.", "aetat.", "al.", "bk.", "c.", "cf.", "ch.", "chap.",
+    "chs.", "col.", "cp.", "d.", "e.g.", "ed.", "eds.", "esp.", "f.", "fasc.", "ff.", "fig.",
+    "fl.", "fol.", "fols.", "i.e.", "ill.", "incl.", "n.", "n.b.", "nn.", "p.", "pp.", "pt.",
+    "q.v.", "s.v.", "s.vv.", "saec.", "sec.", "univ.", "viz.", "vol.", "vs.",
+];
+
+fn matches_abbreviation_suffix(s: &str) -> bool {
+    for &abbr in PANDOC_ABBREVIATIONS {
+        if let Some(prefix) = s.strip_suffix(abbr) {
+            if prefix.is_empty() {
+                return true;
+            }
+            let last = prefix.chars().next_back().unwrap();
+            if !last.is_alphanumeric() && last != '.' {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Apply pandoc's `+abbreviations` extension as a post-pass over a flat inline
+/// list. For each `Str` ending in a known abbreviation followed by `Space`,
+/// drop the `Space`, append `\u{a0}` (NBSP) to the `Str`, and merge the
+/// following `Str` (if any) into it. Recurses into `Quoted` content because
+/// `Quoted` is built inside `smart_quote_pairs` after the parent
+/// `coalesce_inlines_inner` already ran on its source list, so its content
+/// won't have been abbreviation-processed yet. Other inline wrappers (`Emph`,
+/// `Strong`, `Link`, `Image`, `Note`, …) are constructed via their own
+/// `coalesce_inlines_*` call, so their contents are already processed.
+fn apply_abbreviations(inlines: Vec<Inline>) -> Vec<Inline> {
+    let inlines: Vec<Inline> = inlines
+        .into_iter()
+        .map(|inline| match inline {
+            Inline::Quoted(kind, content) => Inline::Quoted(kind, apply_abbreviations(content)),
+            other => other,
+        })
+        .collect();
+    let mut out: Vec<Inline> = Vec::with_capacity(inlines.len());
+    let mut iter = inlines.into_iter().peekable();
+    while let Some(inline) = iter.next() {
+        if let Inline::Str(ref s) = inline
+            && matches_abbreviation_suffix(s)
+            && matches!(iter.peek(), Some(Inline::Space))
+        {
+            // Drop the Space.
+            iter.next();
+            let Inline::Str(mut new_s) = inline else {
+                unreachable!()
+            };
+            new_s.push('\u{a0}');
+            // Merge with the following Str if present.
+            if let Some(Inline::Str(_)) = iter.peek()
+                && let Some(Inline::Str(next_s)) = iter.next()
+            {
+                new_s.push_str(&next_s);
+            }
+            out.push(Inline::Str(new_s));
+        } else {
+            out.push(inline);
+        }
+    }
+    out
 }
 
 fn smart_quote_pairs(inlines: Vec<Inline>) -> Vec<Inline> {
@@ -1538,19 +2249,30 @@ fn smart_quote_pairs(inlines: Vec<Inline>) -> Vec<Inline> {
             Some('\'') => Some('\''),
             _ => None,
         };
-        // Open quote condition: previous inline is boundary, AND there is at
-        // least one more char after the quote in this Str OR there is a next
-        // inline that's not a boundary (so the quote is "leading").
+        // Open quote condition: previous inline is boundary, AND either
+        // (a) the Str has more chars after the quote and the next char is
+        //     non-space (open quote attaches to a word in the same Str), or
+        // (b) the Str is *only* the quote and the next inline is a markup
+        //     atom (Emph/Strong/...), so the quote attaches across atoms.
         let prev_is_boundary = is_boundary(out.last());
         let str_has_more = s.chars().count() > 1;
-        // For the simplest reliable heuristic: only treat as open if the very
-        // next char after the quote is non-space (open quote attaches to a
-        // word).
         let next_char_is_word = s.chars().nth(1).is_some_and(|c| !c.is_whitespace());
+        let next_is_markup_atom = matches!(
+            inlines.get(i + 1),
+            Some(
+                Inline::Emph(_)
+                    | Inline::Strong(_)
+                    | Inline::Strikeout(_)
+                    | Inline::Superscript(_)
+                    | Inline::Subscript(_)
+                    | Inline::Code(_, _)
+            )
+        );
+        let attaches =
+            (str_has_more && next_char_is_word) || (!str_has_more && next_is_markup_atom);
         if let Some(q) = quote
             && prev_is_boundary
-            && str_has_more
-            && next_char_is_word
+            && attaches
         {
             // Find the matching close.
             if let Some(close_idx) = find_matching_close(&inlines, i, q, &consumed) {
@@ -1568,7 +2290,20 @@ fn smart_quote_pairs(inlines: Vec<Inline>) -> Vec<Inline> {
                         continue;
                     }
                     let inline = &inlines[j];
-                    if j == i {
+                    if j == i && j == close_idx {
+                        // Open and close in the same Str — strip both ends.
+                        if let Inline::Str(s) = inline {
+                            let mut chars: Vec<char> = s.chars().collect();
+                            if chars.len() >= 2 {
+                                chars.remove(0);
+                                chars.pop();
+                            }
+                            let stripped: String = chars.into_iter().collect();
+                            if !stripped.is_empty() {
+                                content.push(Inline::Str(stripped));
+                            }
+                        }
+                    } else if j == i {
                         if let Inline::Str(s) = inline {
                             let stripped: String = s.chars().skip(1).collect();
                             if !stripped.is_empty() {
