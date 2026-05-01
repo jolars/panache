@@ -11,6 +11,22 @@ use crate::parser::utils::inline_emission;
 /// Returns Some((marker_char, indent_cols, spaces_after_cols, spaces_after_bytes)) if found, None otherwise.
 /// The marker can be indented 0-3 spaces and must be followed by whitespace.
 pub(crate) fn try_parse_definition_marker(line: &str) -> Option<(char, usize, usize, usize)> {
+    // Cheap byte-level leading-byte gate: a definition marker is `:` or
+    // `~` after up to 3 ASCII spaces. Avoid the `leading_indent`
+    // (Unicode char walk + tab-aware column count) on the common
+    // non-marker line.
+    {
+        let bytes = line.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() && i < 3 && bytes[i] == b' ' {
+            i += 1;
+        }
+        match bytes.get(i) {
+            Some(&b':') | Some(&b'~') => {}
+            _ => return None,
+        }
+    }
+
     // Count leading whitespace in columns (0-3 allowed)
     let (indent_cols, indent_bytes) = leading_indent(line);
     if indent_cols > 3 {
