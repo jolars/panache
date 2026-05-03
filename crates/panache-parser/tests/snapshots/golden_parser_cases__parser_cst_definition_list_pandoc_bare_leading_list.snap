@@ -1,0 +1,55 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..63
+  DEFINITION_LIST@0..63
+    DEFINITION_ITEM@0..14
+      TERM@0..5
+        TEXT@0..4 "Term"
+        NEWLINE@4..5 "\n"
+      BLANK_LINE@5..6
+        BLANK_LINE@5..6 "\n"
+      DEFINITION@6..14
+        DEFINITION_MARKER@6..7 ":"
+        WHITESPACE@7..10 "   "
+        PLAIN@10..14
+          TEXT@10..13 "Def"
+          NEWLINE@13..14 "\n"
+    BLANK_LINE@14..15
+      BLANK_LINE@14..15 "\n"
+    DEFINITION_ITEM@15..48
+      TERM@15..20
+        TEXT@15..19 "Term"
+        NEWLINE@19..20 "\n"
+      DEFINITION@20..48
+        DEFINITION_MARKER@20..21 ":"
+        WHITESPACE@21..22 " "
+        HEADING@22..32
+          ATX_HEADING_MARKER@22..23
+            ATX_HEADING_MARKER@22..23 "#"
+          WHITESPACE@23..24 " "
+          HEADING_CONTENT@24..31
+            TEXT@24..31 "Heading"
+          NEWLINE@31..32 "\n"
+        BLANK_LINE@32..33
+          BLANK_LINE@32..33 "\n"
+        PLAIN@33..48
+          TEXT@33..47 "  Continuation"
+          NEWLINE@47..48 "\n"
+    BLANK_LINE@48..49
+      BLANK_LINE@48..49 "\n"
+    DEFINITION_ITEM@49..63
+      TERM@49..54
+        TEXT@49..53 "Term"
+        NEWLINE@53..54 "\n"
+      DEFINITION@54..63
+        DEFINITION_MARKER@54..55 ":"
+        WHITESPACE@55..56 " "
+        LIST@56..63
+          LIST_ITEM@56..63
+            LIST_MARKER@56..57 "-"
+            WHITESPACE@57..58 " "
+            PLAIN@58..63
+              TEXT@58..62 "List"
+              NEWLINE@62..63 "\n"

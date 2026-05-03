@@ -35,13 +35,16 @@ count of currently-failing imports remaining under that bucket in the latest
    basic Note resolver landed; what remains in this bucket is the parser-shape
    gap where a definition list inside a footnote body isn't parsed as
    `DefinitionList`. Parser fix territory, not projector.
-4. **Definition list nesting (\~2 --- cases #43, #44, #45)** ---
-   `definition_list_nesting`, `*_pandoc_loose_compact`, `definition_list`.
-   Per-item loose/tight detection landed (#179); #44 still has a
+4. **Definition list nesting (\~2 --- cases #43, #44)** ---
+   `definition_list_nesting`, `definition_list`.
+   Per-item loose/tight detection landed (#179); the bare-leading-list-marker
+   gate was relaxed (#45 unlocked, 2026-05-03); #44 still has a
    nested-list-inside-definition offset propagation gap (the `LIST` carries a
-   leading WHITESPACE sibling that `list_item_content_offset` doesn't see); #43
-   / #45 have parser-shape issues where nested bullets inside definitions aren't
-   parsed as `BulletList`.
+   leading WHITESPACE sibling that `list_item_content_offset` doesn't see);
+   #43 has parser-shape issues where nested bullets inside definitions aren't
+   parsed as `BulletList` in *some* contexts (the bare-leading-list path now
+   handles the simple case but the `Orange\n: > a / : - List with lazy
+   continuation` paths inside #43 still fail).
 5. **HTML blocks / fenced divs with raw HTML adjacency (\~3)** ---
    `writer_html_blocks`, `html_block` cases with adjacent HTML. Pandoc splits
    each `<tag>` line into its own `RawBlock`; we coalesce them into one block.
@@ -117,7 +120,111 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-01 (ATX heading inside list-item / definition buffer)
+- **Date**: 2026-05-03 (definition with bare leading list marker)
+- **Pass before → after**: 167 → 168 / 187 (+1 import: #45). One
+  parser-shape fix to relax the `should_start_list_from_first_line`
+  guard inside the definition-content emission path so a definition
+  whose first content line is a bare `- X` (list marker) opens a
+  `BulletList` even when the next line is blank or EOF. The previous
+  guard only allowed list-emission when the next line was indented at
+  `content_col`, which silently dropped pandoc-shape for the trailing
+  single-item case. Pandoc's behavior is uniform: `: - X` always opens
+  a `BulletList`, regardless of what (or nothing) follows. The
+  formatter already handled the `DEFINITION > LIST` shape correctly
+  via the existing list child arm; only the formatter golden fixture
+  for `definition_list_pandoc_loose_compact` needed an updated
+  expected output (an extra blank line before `:   - List` matches
+  pandoc's `pandoc -t markdown` round-trip and now lands as the loose
+  formatting that the new shape implies). CommonMark allowlist green;
+  full parser-crate suite green; full workspace tests green; clippy +
+  fmt clean.
+- **What landed**:
+  - **Parser-shape: relax bare-leading-list-marker gate inside
+    definitions (`crates/panache-parser/src/parser/core.rs`)** ---
+    the `should_start_list_from_first_line` closure inside the
+    `DefinitionPrepared::Definition` arm previously returned `false`
+    when the next line was blank/empty AND defaulted to `false` on
+    EOF (`unwrap_or(false)`). Both flipped to `true`. The other
+    branch (next line non-blank but with insufficient indent) is
+    unchanged --- pandoc *does* treat unindented next-line content as
+    lazy continuation of the list's `Plain`, but our parser's
+    list-continuation path doesn't yet handle that exact shape, so
+    leaving the existing `next_indent_cols >= content_col` check in
+    place avoids regressing that case. Verified against pandoc:
+    - `Term\n: - List\n` (EOF after list) → `BulletList [Plain
+      "List"]` (was `Plain "- List"`).
+    - `Term\n: - List\n\nNext\n` (blank line, then unrelated para) →
+      `BulletList [Plain "List"]` then top-level `Para "Next"` (was
+      `Plain "- List"` then `Para "Next"`).
+    - `:   Here comes a list...\n    - A\n    - B\n` (the existing
+      `definition_list_plain_does_not_start_list_without_blank_line`
+      test) is unaffected --- the first content line starts with
+      "Here", not a list marker, so the list-emission path doesn't
+      trigger at all.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 45 (definition_list_pandoc_loose_compact)
+- **Files changed (classified)**:
+  - **parser-shape**:
+    `crates/panache-parser/src/parser/core.rs`
+    (`should_start_list_from_first_line` closure: blank-next-line
+    branch flipped `false` → `true`; `unwrap_or(false)` flipped to
+    `unwrap_or(true)` for the EOF case)
+  - **parser fixture (new)**:
+    `crates/panache-parser/tests/fixtures/cases/definition_list_pandoc_bare_leading_list/input.md`
+    plus snapshot
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_definition_list_pandoc_bare_leading_list.snap`
+    pinning the new behavior. Registered in
+    `crates/panache-parser/tests/golden_parser_cases.rs` between
+    `definition_list_nesting` and `definition_list_pandoc_loose_compact`.
+  - **parser snapshot updated**:
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_definition_list_pandoc_loose_compact.snap`
+    --- previously pinned the buggy `PLAIN [TEXT "- List"]` shape for
+    the trailing definition; now pins the pandoc-native
+    `LIST [LIST_ITEM [LIST_MARKER, WHITESPACE, PLAIN [TEXT "List"]]]`
+    shape. Per `.claude/rules/parser.md`, fixed toward pandoc-native
+    rather than preserving the legacy bug.
+  - **formatter golden expected updated**:
+    `tests/fixtures/cases/definition_list_pandoc_loose_compact/expected.md`
+    --- the trailing `Term\n:   - List\n` became
+    `Term\n\n:   - List\n` (extra blank line before the loose
+    definition). Verified against `pandoc -f markdown -t markdown`:
+    pandoc round-trips `Term\n: - List\n` to `Term\n\n:   - List\n`,
+    confirming the new format output matches pandoc.
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 45
+    inserted between 42 and 46 under `# imported`)
+- **Don't redo**:
+  - The relaxation only flips the **blank-line** and **EOF** cases.
+    The `next_indent_cols < content_col` (non-blank-but-unindented)
+    case is intentionally unchanged. Pandoc *does* treat that as a
+    list with lazy continuation (e.g., `Term\n: - List\nNo indent\n`
+    → `BulletList` with `Plain [Str "List", SoftBreak, Str "No",
+    Space, Str "indent"]`), but our list-continuation machinery
+    doesn't currently feed unindented post-`: -` text into the inner
+    list's `Plain`. Flipping that case would need parallel work in
+    the list-continuation path; left for a future session to avoid
+    scope creep.
+  - The formatter's `format_list_item` LIST-arm at
+    `crates/panache-formatter/src/formatter/lists.rs:836` already
+    handles the `DEFINITION > LIST` shape. No formatter code change
+    was needed --- only the golden expected output. If you ever
+    revisit list-inside-definition formatting, the existing path
+    routes through `format_node_sync(&child, list_indent.hanging_
+    indent(total_indent))`. That works because LIST is not a direct
+    "first content child needs a marker" container --- the LIST's
+    own children (LIST_ITEMs) carry their own markers.
+  - The companion formatter blank-line is **not** added by the
+    parser fix --- it's an artifact of the existing loose-list
+    detection that triggers on `DEFINITION_ITEM` containing a
+    `BLANK_LINE` between TERM and DEFINITION (added when a
+    `DEFINITION > LIST` shape is present). This loose-detection
+    behavior was already in place; the new shape just exposes it
+    for the bare-leading-list case. Don't try to "tighten" the
+    output back to no-blank-line --- that would diverge from
+    pandoc.
+
+## Earlier session (2026-05-01, ATX heading inside list-item / definition buffer)
+
 - **Pass before → after**: 166 → 167 / 187 (+1 import: #128). One
   parser-shape fix that detects a leading ATX-heading line in buffered
   list-item / definition content and emits HEADING + PLAIN instead of a

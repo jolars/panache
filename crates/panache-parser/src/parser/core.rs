@@ -1101,13 +1101,13 @@ impl<'a> Parser<'a> {
                         .map(|next_line| {
                             let (next_without_newline, _) = strip_newline(next_line);
                             if next_without_newline.trim().is_empty() {
-                                return false;
+                                return true;
                             }
 
                             let (next_indent_cols, _) = leading_indent(next_without_newline);
                             next_indent_cols >= content_col
                         })
-                        .unwrap_or(false);
+                        .unwrap_or(true);
 
                     if blockquote_depth > 0 {
                         self.containers.push(Container::Definition {

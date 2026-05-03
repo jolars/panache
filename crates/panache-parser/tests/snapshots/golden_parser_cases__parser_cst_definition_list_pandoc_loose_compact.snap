@@ -64,6 +64,10 @@ DOCUMENT@0..81
       DEFINITION@72..81
         DEFINITION_MARKER@72..73 ":"
         WHITESPACE@73..74 " "
-        PLAIN@74..81
-          TEXT@74..80 "- List"
-          NEWLINE@80..81 "\n"
+        LIST@74..81
+          LIST_ITEM@74..81
+            LIST_MARKER@74..75 "-"
+            WHITESPACE@75..76 " "
+            PLAIN@76..81
+              TEXT@76..80 "List"
+              NEWLINE@80..81 "\n"

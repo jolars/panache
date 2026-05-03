@@ -1,9 +1,9 @@
 {
   "blocked": 0,
-  "failing": 20,
+  "failing": 19,
   "pandoc_version": "3.9.0.2",
-  "pass_pct": 89.3,
-  "passing": 167,
+  "pass_pct": 89.8,
+  "passing": 168,
   "passing_ids": [
     1,
     2,
@@ -45,6 +45,7 @@
     40,
     41,
     42,
+    45,
     46,
     47,
     48,
@@ -180,9 +181,9 @@
       "pass": 12
     },
     {
-      "fail": 20,
+      "fail": 19,
       "name": "imported",
-      "pass": 142
+      "pass": 143
     },
     {
       "fail": 0,

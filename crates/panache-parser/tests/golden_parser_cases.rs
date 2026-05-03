@@ -191,6 +191,7 @@ golden_test_cases!(
     citations,
     definition_list,
     definition_list_nesting,
+    definition_list_pandoc_bare_leading_list,
     definition_list_pandoc_loose_compact,
     definition_list_wrapping,
     display_math,
