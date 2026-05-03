@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
-assertion_line: 96
 expression: cst_output
 ---
 DOCUMENT@0..432
@@ -22,18 +21,23 @@ DOCUMENT@0..432
         NEWLINE@148..149 "\n"
     BLANK_LINE@149..150
       BLANK_LINE@149..150 "\n"
-    LIST_ITEM@150..196
+    LIST_ITEM@150..341
       LIST_MARKER@150..151 "-"
       WHITESPACE@151..153 "  "
-      PLAIN@153..196
-        TEXT@153..195 "> - 0: Opposition par ..."
-        NEWLINE@195..196 "\n"
-    LIST_ITEM@196..432
-      LIST_MARKER@196..197 "-"
-      WHITESPACE@197..199 "  "
-      PLAIN@199..336
-        TEXT@199..335 "> - 1: There are no a ..."
-        NEWLINE@335..336 "\n"
-      PARAGRAPH@336..432
-        TEXT@336..431 "   > - 2: At least so ..."
+      BLOCK_QUOTE@153..341
+        BLOCK_QUOTE_MARKER@153..154 ">"
+        WHITESPACE@154..155 " "
+        PARAGRAPH@155..341
+          TEXT@155..195 "- 0: Opposition parti ..."
+          NEWLINE@195..196 "\n"
+          TEXT@196..335 "-  > - 1: There are n ..."
+          NEWLINE@335..336 "\n"
+          WHITESPACE@336..339 "   "
+          BLOCK_QUOTE_MARKER@339..340 ">"
+          WHITESPACE@340..341 " "
+    LIST_ITEM@341..432
+      LIST_MARKER@341..342 "-"
+      WHITESPACE@342..343 " "
+      PLAIN@343..432
+        TEXT@343..431 "2: At least some oppo ..."
         NEWLINE@431..432 "\n"

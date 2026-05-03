@@ -666,7 +666,7 @@ fn definition_list_list_blockquote_continuation_stays_structural() {
         .filter_map(|el| el.into_token())
         .filter(|token| token.kind() == SyntaxKind::BLOCK_QUOTE_MARKER)
         .count();
-    assert_eq!(marker_count, 2);
+    assert_eq!(marker_count, 3);
 
     let has_text_with_raw_marker = blockquote
         .descendants_with_tokens()

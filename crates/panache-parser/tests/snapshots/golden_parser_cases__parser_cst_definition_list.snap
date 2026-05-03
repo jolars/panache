@@ -430,14 +430,15 @@ DOCUMENT@0..1703
           LIST_ITEM@1677..1703
             LIST_MARKER@1677..1678 "-"
             WHITESPACE@1678..1679 " "
-            PLAIN@1679..1683
-              TEXT@1679..1682 "> a"
-              NEWLINE@1682..1683 "\n"
-            BLOCK_QUOTE@1683..1703
-              WHITESPACE@1683..1689 "      "
-              BLOCK_QUOTE_MARKER@1689..1690 ">"
-              WHITESPACE@1690..1691 " "
-              PARAGRAPH@1691..1703
+            BLOCK_QUOTE@1679..1703
+              BLOCK_QUOTE_MARKER@1679..1680 ">"
+              WHITESPACE@1680..1681 " "
+              PARAGRAPH@1681..1703
+                TEXT@1681..1682 "a"
+                NEWLINE@1682..1683 "\n"
+                WHITESPACE@1683..1689 "      "
+                BLOCK_QUOTE_MARKER@1689..1690 ">"
+                WHITESPACE@1690..1691 " "
                 TEXT@1691..1692 "b"
                 NEWLINE@1692..1693 "\n"
                 WHITESPACE@1693..1699 "      "

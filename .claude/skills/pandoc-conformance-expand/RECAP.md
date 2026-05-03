@@ -54,14 +54,16 @@ count of currently-failing imports remaining under that bucket in the latest
    shorter Paras. Parser-shape gap in HTML_BLOCK detection: a comment that abuts
    a paragraph boundary should not always start a new block.
 7. **Misc remaining**:
-   - **Same-line BLOCK_QUOTE marker (#93, #108)** --- the
-     `text_to_buffer.starts_with('>')` branch in
-     `finish_list_item_with_optional_nested` is still
-     CommonMark-only. Blocked on `BlockQuote::depth()`
-     double-counting when a nested BQ is rendered to a temp
-     buffer (see latest session's "Don't redo"). Needs a
-     formatter-side fix that subtracts container-context depth
-     before flipping the gate.
+   - **Same-line BLOCK_QUOTE marker (#93, #108) --- DONE 2026-05-03**.
+     Parser ungated for Pandoc; companion `format_list_item`
+     leading-BLOCK_QUOTE arm added so the LIST_MARKER survives
+     round-trip. The previously-feared `BlockQuote::depth()`
+     over-count for outer-BQ contexts (#108) didn't actually block
+     conformance: the projector renders from the CST, which is now
+     correctly nested, so the projector match works regardless of
+     whether the formatter's depth path is right. (If a formatter
+     idempotency case for `> 1. > foo\n> bar` shows up later, the
+     depth offset will need to land then.)
    - Other blockquote/list/definition-list nesting cases (#34,
      #91, #96) where blank lines or lazy continuation cross
      container boundaries differently from pandoc.
@@ -123,81 +125,106 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-03 (List-item indent: include parent-LIST leading WHITESPACE in content offset)
-- **Pass before → after**: 173 → 174 / 187 (+1 import: #44). One narrow
-  projector fix to `list_item_content_offset` in
-  `crates/panache-parser/tests/pandoc/native_projector.rs`. When a LIST is
-  the direct child of an outer container (e.g. a DEFINITION body where
-  the `- item` line is indented to the def-content column), the per-item
-  leading indent lives on the parent LIST as a WHITESPACE token preceding
-  each LIST_ITEM rather than inside the item's own children. The function
-  was only walking the item's tokens, so for #44's
-  `:   Definition 2 ... -  Bullet ... \`\`\`code\`\`\`` shape it returned
-  `1 + 2 = 3` (marker + own ws), missing the 4-space def-body indent on
-  the parent LIST. The downstream
-  `indented_code_block_with_extra_strip(&child, item_indent)` call then
-  stripped only 3 of the 7 leading spaces from each fenced-code body
-  line, leaving `"    code"` instead of `"code"`. New helper
-  `parent_list_leading_ws(item)` reads the WHITESPACE token immediately
-  preceding `item` on its parent (`prev_sibling_or_token`); the offset
-  is added to all four return paths in `list_item_content_offset`.
-  Existing nested-list cases are unaffected because their leading
-  WHITESPACE lives inside the LIST_ITEM (already handled), and the
-  parent-LIST in those cases has no preceding WHITESPACE token to add.
-  CommonMark allowlist green; pandoc allowlist green; full parser-crate
-  suite green; full workspace tests green; clippy + fmt clean.
+- **Date**: 2026-05-03 (Same-line BLOCK_QUOTE inside LIST_ITEM ungated for Pandoc)
+- **Pass before → after**: 174 → 176 / 187 (+2 imports: #93, #108).
+  Two-step fix: (1) parser ungates the same-line `>`-after-list-marker
+  branch in `finish_list_item_with_optional_nested` so Pandoc also
+  emits `LIST_ITEM > BLOCK_QUOTE > PARAGRAPH` for `- > foo` shapes;
+  (2) formatter adds a leading-`BLOCK_QUOTE` arm to `format_list_item`
+  so the LIST_MARKER survives round-trip (was being dropped because no
+  arm emitted the marker before delegating to the BQ child). The
+  projector already renders the new CST correctly without depth
+  juggling, so #108's outer-BQ context (`> 1. > foo`) passed too —
+  the previously-feared `BlockQuote::depth()` over-count never
+  triggered because the conformance harness compares projector
+  output, not formatter output. CommonMark allowlist green; pandoc
+  allowlist green; full parser-crate suite green; full workspace
+  tests green; clippy + fmt clean.
 - **What landed**:
-  - **Projector: include parent-LIST leading WHITESPACE in
-    `list_item_content_offset`
-    (`crates/panache-parser/tests/pandoc/native_projector.rs`)** ---
-    new `parent_list_leading_ws(item)` helper returns the char-count of
-    the WHITESPACE token immediately preceding `item` on its parent
-    (or 0 if the prev sibling is a node, a non-WHITESPACE token, or
-    `None`). `list_item_content_offset` now hoists `parent_ws =
-    parent_list_leading_ws(item)` once at the top and adds it to every
-    return path (early returns on WHITESPACE-after-marker, on
-    non-marker token, on inline-node-after-marker, and the
-    fall-through). Doc-comment expanded to describe the
-    parent-container-indent case (LIST inside DEFINITION body, etc).
-- **Cases unlocked** (+1, allowlisted under `# imported`):
-  - 44 (definition_list_nesting)
+  - **Parser: ungate same-line BQ inside LIST_ITEM
+    (`crates/panache-parser/src/parser/blocks/lists.rs`)** —
+    deleted `let dialect_allows_nested = config.dialect ==
+    Dialect::CommonMark;` and the `dialect_allows_nested &&` guard
+    on the `text_to_buffer.starts_with('>')` branch. Both dialects
+    now emit the nested-BQ shape pandoc-native expects.
+  - **Formatter: leading-BLOCK_QUOTE arm in `format_list_item`
+    (`crates/panache-formatter/src/formatter/lists.rs`)** — mirrors
+    the leading-LIST and leading-HEADING arms. When
+    `first_non_blank_child` is a BLOCK_QUOTE and there's no PLAIN/
+    PARAGRAPH content, emits `total_indent + marker_padding +
+    marker + spaces_after + checkbox?` and then calls
+    `format_node_sync(leading_bq, 0)` so the BQ's `> ` abuts the
+    list marker on the same output line.
+  - **Test pin update: parser unit test
+    (`crates/panache-parser/src/parser/blocks/tests/blockquotes.rs`)**
+    — `definition_list_list_blockquote_continuation_stays_structural`
+    pinned the OLD (broken) shape with 2 BQ markers; updated to the
+    new correct count of 3 (each `> a/b/c` line now contributes a
+    marker inside the single BQ rather than `> a` being TEXT and
+    only `> b/c` being the BQ).
+  - **Snapshots regenerated**: 4 parser CST snapshots updated to
+    reflect the new same-line BQ shape:
+    `definition_list`,
+    `issue_174_blockquote_list_reorder_losslessness`,
+    `issue_209_definition_list_blockquote_continuation`,
+    `list_item_same_line_blockquote_marker_pandoc`.
+- **Cases unlocked** (+2, allowlisted under `# imported`):
+  - 93 (issue_209_definition_list_blockquote_continuation)
+  - 108 (list_item_same_line_blockquote_marker_pandoc)
 - **Files changed (classified)**:
-  - **projector**:
-    `crates/panache-parser/tests/pandoc/native_projector.rs`
-    (`list_item_content_offset` hoists parent-WS into all four return
-    paths; new `parent_list_leading_ws` helper; doc-comment update)
+  - **parser-shape**:
+    `crates/panache-parser/src/parser/blocks/lists.rs` (drop
+    CommonMark-only gate on same-line BQ inside LIST_ITEM)
+  - **formatter** (companion to parser-shape change, required for
+    idempotency of the new CST):
+    `crates/panache-formatter/src/formatter/lists.rs`
+    (leading-BLOCK_QUOTE arm in `format_list_item`)
+  - **test pin**:
+    `crates/panache-parser/src/parser/blocks/tests/blockquotes.rs`
+    (marker count updated 2 → 3 in
+    `definition_list_list_blockquote_continuation_stays_structural`)
+  - **snapshots**: 4 `.snap` files updated under
+    `crates/panache-parser/tests/snapshots/`
   - **allowlist**:
-    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 44 inserted
-    between 42 and 45 under `# imported`)
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+2: 93
+    inserted between 92 and 94, 108 inserted between 107 and 109,
+    both under `# imported`)
 - **Don't redo**:
-  - `parent_list_leading_ws` only inspects a single immediately-prior
-    sibling. The CST shape for `LIST_ITEM, BLANK_LINE, WHITESPACE,
-    LIST_ITEM` puts WHITESPACE directly before the second item (so it
-    is found). The shape for `LIST_ITEM, WHITESPACE, BLANK_LINE,
-    LIST_ITEM` would not hit this path, but that ordering is not what
-    the parser emits for indented continuation lists. Don't iterate
-    backward across multiple siblings — the WS is always immediately
-    adjacent in the shapes we see, and a multi-sibling walk would
-    risk double-counting blank-line whitespace.
-  - The fix is added to *every* return path in
-    `list_item_content_offset`, not just the fall-through. The
-    function exits early on the first content-delimiter token after
-    the marker (the most common path), so missing the early returns
-    means the fix doesn't fire — verified by an initial commit that
-    only added it to the fall-through. Don't refactor to add it once
-    at the bottom; the early returns are load-bearing.
-  - The helper is intentionally narrow: it returns 0 on `None`, on a
-    node sibling, and on a non-WHITESPACE token. The CST sometimes has
-    BLANK_LINE *node* between items rather than a WHITESPACE token, so
-    matching only WHITESPACE tokens keeps the offset semantically
-    correct (BLANK_LINE doesn't represent content-line indent).
-  - The pinned parser fixture
-    `crates/panache-parser/tests/fixtures/cases/definition_list_nesting/`
-    already exercises this exact CST shape (LIST inside DEFINITION
-    body, with leading WHITESPACE on the LIST), so this projector-only
-    fix did not need a new parser golden case.
+  - The CommonMark same-line nested LIST gating comment block
+    (`dialect_allows_nested ... is kept for the BLOCK_QUOTE
+    same-line case below`) was removed entirely with the parser
+    change. The same-line nested LIST emission was always
+    dialect-agnostic; the variable existed solely for the BQ
+    branch. Don't reintroduce it.
+  - #108 passes via the projector even though the formatter still
+    has a `BlockQuote::depth()` over-count for outer-BQ nested
+    contexts. The formatter currently produces a wrong shape for
+    `> 1. > foo` style inputs (extra `>` prefixes from
+    depth-2-counted ancestor) but no formatter golden case exercises
+    it. **If a formatter idempotency case lands later that surfaces
+    this, the fix is to subtract the outer-BQ render-depth context
+    when computing inner BQ's `depth` in
+    `crates/panache-formatter/src/formatter/core.rs::SyntaxKind::BLOCK_QUOTE`
+    arm.** Don't try to land that pre-emptively here — the conformance
+    win is independent.
+  - The leading-BLOCK_QUOTE arm intentionally calls
+    `format_node_sync(leading_bq, 0)` without stripping a leading
+    newline (unlike the leading-LIST arm which strips one). The BQ
+    formatter doesn't emit a leading newline; only `format_list`
+    does. Verified empirically — the output `1. > foo\n` was correct
+    on first run.
+  - Snapshot for `issue_174_blockquote_list_reorder_losslessness`
+    (#91) DID change shape with this work but #91 still fails
+    conformance — the new CST has the first BQ-bearing list item
+    swallowing subsequent items into its BQ paragraph. That's a
+    deeper continuation-policy bug (recursive same-line nested
+    detection inside BQ content); the snapshot was accepted because
+    it accurately captures current parser behavior, not because the
+    shape is correct. Re-tackling #91 means recursing
+    `try_parse_list_marker` inside the BQ branch (similar to the
+    same-line nested LIST recursion already there).
 
-## Earlier session (2026-05-03, Pipe-table caption attributes + indented-separator alignment)
+## Earlier session (2026-05-03, List-item indent: include parent-LIST leading WHITESPACE in content offset)
 
 ## Prior sessions
 

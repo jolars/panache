@@ -1354,11 +1354,6 @@ fn finish_list_item_with_optional_nested(
     // -t native` and `pandoc -f commonmark -t native`). The companion
     // formatter arm in `format_list_item` handles the LIST-first-child
     // shape so the round-trip stays idempotent.
-    //
-    // The `dialect_allows_nested` flag is kept for the BLOCK_QUOTE
-    // same-line case below, which still needs formatter work before it
-    // can be ungated under Pandoc.
-    let dialect_allows_nested = config.dialect == crate::Dialect::CommonMark;
 
     if !buffered_is_thematic_break
         && let Some(inner_match) = try_parse_list_marker(&text_to_buffer, config)
@@ -1412,14 +1407,11 @@ fn finish_list_item_with_optional_nested(
     // opens a BLOCK_QUOTE inside the LIST_ITEM, with the post-marker text
     // becoming the first line of the blockquote's paragraph. Both
     // CommonMark and Pandoc-markdown agree on this shape (verified via
-    // `pandoc -f commonmark` and `pandoc -f markdown`), but emission is
-    // gated to CommonMark for now: the formatter does not yet preserve a
-    // LIST_ITEM whose first structural child is a BLOCK_QUOTE through a
-    // round-trip (the LIST_MARKER gets dropped on re-format, breaking
-    // idempotency). Gating mirrors the same-line nested LIST gate above
-    // and is tracked alongside that formatter work.
-    if dialect_allows_nested
-        && !buffered_is_thematic_break
+    // `pandoc -f commonmark` and `pandoc -f markdown`). The companion
+    // arm in `format_list_item` emits the LIST_MARKER and the BLOCK_QUOTE
+    // contents on the same output line so the round-trip stays
+    // idempotent.
+    if !buffered_is_thematic_break
         && text_to_buffer.starts_with('>')
         && !text_to_buffer.starts_with(">>")
     {

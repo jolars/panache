@@ -571,6 +571,36 @@ impl Formatter {
             return;
         }
 
+        // Same-line nested-blockquote case: a LIST_ITEM whose first
+        // non-blank child is a BLOCK_QUOTE (no preceding PLAIN/PARAGRAPH).
+        // Examples: `- > foo`, `1. > bar`. Emit the outer marker without
+        // a trailing newline, then format the BQ at indent=0 so its `>`
+        // marker abuts the outer marker on the same line. Mirrors the
+        // leading-LIST same-line path below.
+        if let Some(leading_bq) = first_non_blank_child.as_ref()
+            && leading_bq.kind() == SyntaxKind::BLOCK_QUOTE
+            && Self::find_content_node(node).is_none()
+        {
+            self.output.push_str(&" ".repeat(total_indent));
+            self.output
+                .push_str(&" ".repeat(list_indent.marker_padding));
+            self.output.push_str(&marker);
+            self.output.push_str(&" ".repeat(list_indent.spaces_after));
+            if let Some(ref cb) = checkbox {
+                self.output.push_str(cb);
+                self.output.push(' ');
+            }
+            self.format_node_sync(leading_bq, 0);
+
+            for child in node.children() {
+                if &child == leading_bq || child.kind() == SyntaxKind::BLANK_LINE {
+                    continue;
+                }
+                self.format_node_sync(&child, hanging);
+            }
+            return;
+        }
+
         // Same-line nested-marker case: a LIST_ITEM whose first non-blank
         // child is a non-empty nested LIST (no preceding PLAIN/PARAGRAPH).
         // Examples: `- - foo`, `1. - 2. foo`. Emit the outer marker without
