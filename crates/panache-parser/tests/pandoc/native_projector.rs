@@ -2230,7 +2230,15 @@ fn task_checkbox_for_item(item: &SyntaxNode) -> Option<&'static str> {
 /// (the outer item's content offset). Include that so the cumulative depth
 /// is captured — required for correctly stripping nested fenced/indented
 /// code blocks.
+///
+/// When the LIST is itself a child of an outer container (e.g. a DEFINITION
+/// body where the `- item` line is indented to the def-content column), the
+/// per-item leading indent lives on the parent LIST as a WHITESPACE token
+/// preceding each LIST_ITEM rather than inside the item. Pick that up too —
+/// without it, code blocks nested inside such items would only have the
+/// item-local indent stripped, leaving the outer-container offset behind.
 fn list_item_content_offset(item: &SyntaxNode) -> usize {
+    let parent_ws = parent_list_leading_ws(item);
     let mut marker_width = 0usize;
     let mut leading_ws = 0usize;
     let mut saw_marker = false;
@@ -2245,18 +2253,32 @@ fn list_item_content_offset(item: &SyntaxNode) -> usize {
                     saw_marker = true;
                 }
                 SyntaxKind::WHITESPACE if saw_marker => {
-                    return leading_ws + marker_width + t.text().chars().count();
+                    return parent_ws + leading_ws + marker_width + t.text().chars().count();
                 }
                 _ if saw_marker => {
-                    return leading_ws + marker_width;
+                    return parent_ws + leading_ws + marker_width;
                 }
                 _ => {}
             }
         } else if saw_marker {
-            return leading_ws + marker_width;
+            return parent_ws + leading_ws + marker_width;
         }
     }
-    leading_ws + marker_width
+    parent_ws + leading_ws + marker_width
+}
+
+/// WHITESPACE token immediately preceding `item` on its parent LIST node, if
+/// any. Used to recover the outer-container indent when the parser stores it
+/// on the parent LIST (e.g. LIST inside DEFINITION) rather than as the item's
+/// own leading WHITESPACE.
+fn parent_list_leading_ws(item: &SyntaxNode) -> usize {
+    let prev = item.prev_sibling_or_token();
+    match prev {
+        Some(NodeOrToken::Token(t)) if t.kind() == SyntaxKind::WHITESPACE => {
+            t.text().chars().count()
+        }
+        _ => 0,
+    }
 }
 
 fn is_loose_list(node: &SyntaxNode) -> bool {
