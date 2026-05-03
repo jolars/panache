@@ -817,6 +817,16 @@ impl Formatter {
                                 }
                                 continue;
                             }
+                        } else if child.kind() == SyntaxKind::DEFINITION_LIST {
+                            // Pandoc allows the first content line of a footnote
+                            // body to be a definition-list term, e.g.
+                            // `[^1]: Term\n\n    :   Def`. The TERM node emits
+                            // no leading indent, so it follows the marker+space
+                            // naturally; subsequent DEFINITION lines are
+                            // indented at child_indent by the inner formatter.
+                            self.output.push(' ');
+                            self.format_node_sync(child, child_indent);
+                            continue;
                         }
                     }
 

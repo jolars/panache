@@ -28,13 +28,13 @@ DOCUMENT@0..95
     FOOTNOTE_LABEL_END@31..32 "]"
     FOOTNOTE_LABEL_COLON@32..33 ":"
     WHITESPACE@33..34 " "
-    PARAGRAPH@34..48
-      TEXT@34..47 "Footnote text"
-      NEWLINE@47..48 "\n"
-    BLANK_LINE@48..49
-      BLANK_LINE@48..49 "\n"
-    DEFINITION_LIST@49..68
-      DEFINITION_ITEM@49..68
+    DEFINITION_LIST@34..68
+      DEFINITION_ITEM@34..68
+        TERM@34..48
+          TEXT@34..47 "Footnote text"
+          NEWLINE@47..48 "\n"
+        BLANK_LINE@48..49
+          BLANK_LINE@48..49 "\n"
         DEFINITION@49..68
           WHITESPACE@49..53 "    "
           DEFINITION_MARKER@53..54 ":"

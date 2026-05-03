@@ -52,6 +52,25 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         let next_is_definition_term = !is_blank_line(next_inner)
             && definition_lists::next_line_is_definition_marker(lines, next_line_pos).is_some();
 
+        // Re-detect the definition marker after stripping a content-container
+        // indent (e.g. the 4-space footnote body indent). Without this, a `:`
+        // line nested inside a footnote body fails the 0-3-space marker test
+        // and the parent DefinitionList/DefinitionItem incorrectly closes
+        // across blank lines, splitting one logical item into many.
+        let stripped_is_definition_marker = |content_indent_so_far: usize| -> bool {
+            if content_indent_so_far == 0 || raw_indent_cols < content_indent_so_far {
+                return false;
+            }
+            let strip_bytes = crate::parser::utils::container_stack::byte_index_at_column(
+                next_inner,
+                content_indent_so_far,
+            );
+            if strip_bytes > next_inner.len() {
+                return false;
+            }
+            definition_lists::try_parse_definition_marker(&next_inner[strip_bytes..]).is_some()
+        };
+
         // `current_bq_depth` is used for proper indent calculation when the next line
         // increases blockquote nesting.
 
@@ -101,12 +120,15 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                     content_indent_so_far += *content_col;
                 }
                 crate::parser::utils::container_stack::Container::DefinitionItem { .. }
-                    if next_is_definition_marker =>
+                    if next_is_definition_marker
+                        || stripped_is_definition_marker(content_indent_so_far) =>
                 {
                     keep_level = i + 1;
                 }
                 crate::parser::utils::container_stack::Container::DefinitionList { .. }
-                    if next_is_definition_marker || next_is_definition_term =>
+                    if next_is_definition_marker
+                        || next_is_definition_term
+                        || stripped_is_definition_marker(content_indent_so_far) =>
                 {
                     keep_level = i + 1;
                 }

@@ -31,10 +31,14 @@ count of currently-failing imports remaining under that bucket in the latest
    - **#171** (tables_in_divs) --- pipe table inside fenced div with custom
      caption form `: Caption {#tbl-foo}` isn't recognized as pandoc's
      `+caption_attributes` Caption-with-attr shape.
-3. **Footnotes --- DefinitionList-inside-Note (\~2 --- cases #66, #67)** --- the
-   basic Note resolver landed; what remains in this bucket is the parser-shape
-   gap where a definition list inside a footnote body isn't parsed as
-   `DefinitionList`. Parser fix territory, not projector.
+3. **Footnotes --- DefinitionList-inside-Note (DONE 2026-05-03)** --- both #66
+   and #67 unlocked. Parser-shape fix in `handle_footnote_open_effect` to
+   detect that the first content line is a term, plus a continuation-policy
+   fix so blank lines inside a footnote-body don't close the
+   DefinitionList/DefinitionItem when the next `:` marker still sits at the
+   footnote's content column. Companion formatter arm added for the new
+   `FOOTNOTE_DEFINITION > DEFINITION_LIST` first-child shape so the term
+   stays on the same line as `[^id]:`.
 4. **Definition list nesting (\~2 --- cases #43, #44)** ---
    `definition_list_nesting`, `definition_list`.
    Per-item loose/tight detection landed (#179); the bare-leading-list-marker
@@ -120,7 +124,135 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-03 (definition with bare leading list marker)
+- **Date**: 2026-05-03 (DefinitionList-inside-footnote: term detection + blank-line continuation)
+- **Pass before → after**: 168 → 170 / 187 (+2 imports: #66, #67).
+  Two parser-shape fixes plus one formatter companion. The footnote body's
+  first content line now opens as a `TERM` of a `DEFINITION_LIST` when
+  upcoming lines (after blanks, with the footnote's 4-col body indent
+  stripped) form a `:`/`~` definition marker — matching pandoc-native's
+  treatment of `[^1]: Term\n\n    :   Def`. Separately, the blank-line
+  continuation policy now strips outer content-container indent when
+  re-detecting whether the next non-blank line is a definition marker, so
+  `    \n` blanks between two `:` lines inside a footnote body keep the
+  `DefinitionList`/`DefinitionItem` open and let subsequent `:` lines
+  become sibling definitions inside the same item (instead of three
+  separate one-definition lists). The formatter gained a `DEFINITION_LIST`
+  first-child arm for `FOOTNOTE_DEFINITION` so the new term stays on the
+  same line as `[^id]:` (matching the prior `[^1]: Footnote text` output).
+  CommonMark allowlist green; full parser-crate suite green; full workspace
+  tests green; clippy + fmt clean.
+- **What landed**:
+  - **Parser-shape: footnote-first-line term detection
+    (`crates/panache-parser/src/parser/core.rs`)** ---
+    `handle_footnote_open_effect` previously always called
+    `start_paragraph_if_needed` + `append_paragraph_line` for the
+    same-line content. Added a lookahead via the new free helper
+    `footnote_first_line_term_lookahead(lines, pos, content_col,
+    table_captions_enabled)` that walks forward from `pos+1`, skips
+    blank lines, and on the first non-blank line strips
+    `content_col=4` cols and runs
+    `definition_lists::try_parse_definition_marker`. Returns
+    `Some(blank_count)` on success. When set, the effect handler opens
+    `DEFINITION_LIST` + `DEFINITION_ITEM`, calls `emit_term`, and
+    eagerly emits the consumed blank lines as `BLANK_LINE` nodes
+    *inside* the `DEFINITION_ITEM` (mirroring
+    `DefinitionPrepared::Term`). The lookahead also reuses the
+    existing `is_caption_followed_by_table` gate so a `:` table
+    caption inside a footnote doesn't get mistaken for a definition.
+  - **Parser-shape: continuation policy strips content-container indent
+    when re-detecting `:` markers
+    (`crates/panache-parser/src/parser/utils/continuation.rs`)** ---
+    `compute_levels_to_keep` precomputes
+    `next_is_definition_marker` from the unstripped `next_inner`, so a
+    `    :   Def` line inside a footnote (4-col indent) fails the 0-3
+    space-marker test and the parent `DefinitionList`/`DefinitionItem`
+    closes across blank lines. Added a closure
+    `stripped_is_definition_marker(content_indent_so_far)` that strips
+    that many cols off `next_inner` and re-tests
+    `try_parse_definition_marker`. Wired into the
+    `Container::DefinitionItem` and `Container::DefinitionList`
+    arms so `content_indent_so_far` (which the loop already
+    accumulates as it walks the FootnoteDefinition container) keeps
+    those containers open across `    \n` blanks. The
+    `Container::Definition` arm is unchanged on purpose --- the
+    Definition itself *should* close at the `:` boundary, since each
+    `:` opens a new sibling Definition.
+  - **Formatter: DEFINITION_LIST as FOOTNOTE_DEFINITION first child
+    (`crates/panache-formatter/src/formatter/core.rs`)** --- the
+    `FOOTNOTE_DEFINITION` arm has a special "first child can join the
+    marker line" branch but only handled `PARAGRAPH`. Added a parallel
+    `DEFINITION_LIST` arm: emit a single space, then call
+    `format_node_sync(child, child_indent)`. This works because the
+    `TERM` formatter emits no leading indent, so the first term sits
+    flush against `[^id]: `; subsequent `DEFINITION` children carry
+    their own `child_indent=4` indentation via the existing `DEFINITION`
+    formatter arm. The `is_compact` logic in `DEFINITION_ITEM` already
+    handles the `\n\n` separator between `TERM` and the first
+    `DEFINITION` (loose, per the BLANK_LINE between them).
+- **Cases unlocked** (+2, allowlisted under `# imported`):
+  - 66 (footnote_definition_list)
+  - 67 (footnote_def_paragraph)
+- **Files changed (classified)**:
+  - **parser-shape**:
+    `crates/panache-parser/src/parser/core.rs`
+    (handle_footnote_open_effect refactor + new
+    `footnote_first_line_term_lookahead` helper at module bottom),
+    `crates/panache-parser/src/parser/utils/continuation.rs`
+    (`stripped_is_definition_marker` closure wired into
+    `DefinitionItem`/`DefinitionList` arms)
+  - **formatter (companion)**:
+    `crates/panache-formatter/src/formatter/core.rs`
+    (`DEFINITION_LIST` arm in the `FOOTNOTE_DEFINITION` first-child
+    branch)
+  - **parser snapshots updated**:
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_footnote_def_paragraph.snap`
+    (was: PARAGRAPH "Footnote text" + separate DEFINITION_LIST without
+    TERM. Now: single DEFINITION_LIST with proper TERM + DEFINITION
+    inside DEFINITION_ITEM),
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_footnote_definition_list.snap`
+    (was: three separate DEFINITION_LIST nodes for the three `:`
+    lines, all without TERM. Now: one DEFINITION_LIST > one
+    DEFINITION_ITEM > TERM + three sibling DEFINITION children with
+    BLANK_LINE separators. Per `.claude/rules/parser.md`, fixed toward
+    pandoc-native rather than preserving the legacy bug.)
+  - **formatter golden expected unchanged**:
+    `tests/fixtures/cases/footnote_def_paragraph/expected.md` and
+    `tests/fixtures/cases/footnote_definition_list/expected.md`
+    --- the user-visible formatted output is byte-identical before and
+    after the change (verified by `cargo test --test golden_cases
+    footnote`). The companion formatter arm exists specifically to
+    preserve this output under the new CST shape.
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+2: 66 and 67
+    inserted between 65 and 69 under `# imported`)
+- **Don't redo**:
+  - `footnote_first_line_term_lookahead` is intentionally limited to the
+    first non-blank line after the marker. If that line isn't a
+    definition marker, we fall through to the existing paragraph path.
+    Don't extend it to walk past intermediate non-marker non-blank
+    lines --- pandoc only treats the first content line as a term when
+    the *immediately* following content (after blanks) is a `:`/`~`
+    marker.
+  - The `stripped_is_definition_marker` closure walks
+    `content_indent_so_far` (the *outer* container's content indent), not
+    the marker's own column. Don't conflate with `raw_indent_cols`
+    --- raw_indent_cols includes the marker line's leading spaces, which
+    is not what we want to strip.
+  - The `Container::Definition` arm is intentionally NOT updated: a `:`
+    line should close the previous `Definition` and start a new one as
+    a sibling. Keeping the previous Definition open would produce a
+    nested-definition shape that pandoc never emits.
+  - The formatter `DEFINITION_LIST` first-child branch passes
+    `child_indent` (=4) to `format_node_sync`. The TERM emits no leading
+    indent (so it sits flush against `[^id]: `); the DEFINITION emits
+    `indent` cols of leading spaces before its `:` marker, then computes
+    `def_indent = indent + 4` for its *body content* lines (the body
+    offset, not the marker indent). With `indent=4` we get the desired
+    `    :   Definition` shape. Don't read `def_indent = indent + 4` as
+    "DEFINITION over-indents its marker" — it's only the body offset.
+
+## Earlier session (2026-05-03, definition with bare leading list marker)
+
 - **Pass before → after**: 167 → 168 / 187 (+1 import: #45). One
   parser-shape fix to relax the `should_start_list_from_first_line`
   guard inside the definition-content emission path so a definition

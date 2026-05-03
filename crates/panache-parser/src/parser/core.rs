@@ -664,23 +664,52 @@ impl<'a> Parser<'a> {
         self.containers
             .push(Container::FootnoteDefinition { content_col });
 
-        if content_start > 0 {
-            let first_line_content = &content[content_start..];
-            if !first_line_content.trim().is_empty() {
-                paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
-                paragraphs::append_paragraph_line(
-                    &mut self.containers,
-                    &mut self.builder,
-                    first_line_content,
-                    self.config,
-                );
-            } else {
-                let (_, newline_str) = strip_newline(content);
-                if !newline_str.is_empty() {
-                    self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+        if content_start == 0 {
+            return;
+        }
+        let first_line_content = &content[content_start..];
+        if first_line_content.trim().is_empty() {
+            let (_, newline_str) = strip_newline(content);
+            if !newline_str.is_empty() {
+                self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+            }
+            return;
+        }
+
+        if self.config.extensions.definition_lists
+            && let Some(blank_count) = footnote_first_line_term_lookahead(
+                &self.lines,
+                self.pos,
+                content_col,
+                self.config.extensions.table_captions,
+            )
+        {
+            self.builder.start_node(SyntaxKind::DEFINITION_LIST.into());
+            self.containers.push(Container::DefinitionList {});
+            self.builder.start_node(SyntaxKind::DEFINITION_ITEM.into());
+            self.containers.push(Container::DefinitionItem {});
+            emit_term(&mut self.builder, first_line_content, self.config);
+            for i in 0..blank_count {
+                let blank_pos = self.pos + 1 + i;
+                if blank_pos < self.lines.len() {
+                    let blank_line = self.lines[blank_pos];
+                    self.builder.start_node(SyntaxKind::BLANK_LINE.into());
+                    self.builder
+                        .token(SyntaxKind::BLANK_LINE.into(), blank_line);
+                    self.builder.finish_node();
                 }
             }
+            self.pos += blank_count;
+            return;
         }
+
+        paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
+        paragraphs::append_paragraph_line(
+            &mut self.containers,
+            &mut self.builder,
+            first_line_content,
+            self.config,
+        );
     }
 
     /// CommonMark spec example #312: handle a detected list marker that's
@@ -2964,4 +2993,54 @@ fn emit_definition_plain_or_heading(
     builder.start_node(SyntaxKind::PLAIN.into());
     inline_emission::emit_inlines(builder, text, config);
     builder.finish_node();
+}
+
+/// Look ahead from `pos+1` past blank lines for a definition marker line at
+/// `content_col` indent. Returns the blank-line count consumed before the
+/// marker, or `None` if no marker is found at the next non-blank line.
+///
+/// Used by `handle_footnote_open_effect` to decide whether the first content
+/// line of a footnote body should open a definition-list term: pandoc treats
+/// `[^1]: Term\n\n    :   Definition\n` as a `Note [DefinitionList ...]`,
+/// not as a paragraph followed by a separate def list with no term.
+fn footnote_first_line_term_lookahead(
+    lines: &[&str],
+    pos: usize,
+    content_col: usize,
+    table_captions_enabled: bool,
+) -> Option<usize> {
+    let mut check_pos = pos + 1;
+    let mut blank_count = 0;
+    while check_pos < lines.len() {
+        let line = lines[check_pos];
+        let (trimmed, _) = strip_newline(line);
+        if trimmed.trim().is_empty() {
+            blank_count += 1;
+            check_pos += 1;
+            continue;
+        }
+        let (line_indent_cols, _) = leading_indent(trimmed);
+        if line_indent_cols < content_col {
+            return None;
+        }
+        let strip_bytes = byte_index_at_column(trimmed, content_col);
+        if strip_bytes > trimmed.len() {
+            return None;
+        }
+        let stripped = &trimmed[strip_bytes..];
+        if let Some((marker, ..)) = definition_lists::try_parse_definition_marker(stripped) {
+            // A `:` line that is actually a table caption shouldn't open a
+            // definition list. Mirror the gate from
+            // `next_line_is_definition_marker`.
+            if marker == ':'
+                && table_captions_enabled
+                && super::blocks::tables::is_caption_followed_by_table(lines, check_pos)
+            {
+                return None;
+            }
+            return Some(blank_count);
+        }
+        return None;
+    }
+    None
 }

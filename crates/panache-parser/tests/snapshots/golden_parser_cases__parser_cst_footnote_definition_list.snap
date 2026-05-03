@@ -28,13 +28,13 @@ DOCUMENT@0..340
     FOOTNOTE_LABEL_END@79..80 "]"
     FOOTNOTE_LABEL_COLON@80..81 ":"
     WHITESPACE@81..82 " "
-    PARAGRAPH@82..121
-      TEXT@82..120 "Footnote containing a ..."
-      NEWLINE@120..121 "\n"
-    BLANK_LINE@121..122
-      BLANK_LINE@121..122 "\n"
-    DEFINITION_LIST@122..147
-      DEFINITION_ITEM@122..147
+    DEFINITION_LIST@82..283
+      DEFINITION_ITEM@82..283
+        TERM@82..121
+          TEXT@82..120 "Footnote containing a ..."
+          NEWLINE@120..121 "\n"
+        BLANK_LINE@121..122
+          BLANK_LINE@121..122 "\n"
         DEFINITION@122..147
           WHITESPACE@122..126 "    "
           DEFINITION_MARKER@126..127 ":"
@@ -42,10 +42,8 @@ DOCUMENT@0..340
           PLAIN@130..147
             TEXT@130..146 "First definition"
             NEWLINE@146..147 "\n"
-    BLANK_LINE@147..152
-      BLANK_LINE@147..152 "    \n"
-    DEFINITION_LIST@152..253
-      DEFINITION_ITEM@152..253
+        BLANK_LINE@147..152
+          BLANK_LINE@147..152 "    \n"
         DEFINITION@152..253
           WHITESPACE@152..156 "    "
           DEFINITION_MARKER@156..157 ":"
@@ -70,10 +68,8 @@ DOCUMENT@0..340
               PLAIN@237..253
                 TEXT@237..252 "Nested bullet 2"
                 NEWLINE@252..253 "\n"
-    BLANK_LINE@253..258
-      BLANK_LINE@253..258 "    \n"
-    DEFINITION_LIST@258..283
-      DEFINITION_ITEM@258..283
+        BLANK_LINE@253..258
+          BLANK_LINE@253..258 "    \n"
         DEFINITION@258..283
           WHITESPACE@258..262 "    "
           DEFINITION_MARKER@262..263 ":"
