@@ -508,6 +508,10 @@ enum Block {
 
 #[derive(Debug)]
 struct TableData {
+    /// Pandoc's `+caption_attributes` extension lifts a trailing
+    /// `{#id .class kv=...}` from the caption text into the Table's outer
+    /// attribute. Default-empty for tables without caption attributes.
+    attr: Attr,
     caption: Vec<Inline>,
     aligns: Vec<&'static str>,
     /// Per-column width. `None` → `ColWidthDefault`, `Some(f)` → `ColWidth f`.
@@ -1297,7 +1301,9 @@ fn pipe_table(node: &SyntaxNode) -> Option<TableData> {
         .into_iter()
         .map(|cells| cells_to_plain_blocks(cells, cols))
         .collect();
+    let (attr, caption_inlines) = extract_caption_attrs(caption_inlines);
     Some(TableData {
+        attr,
         caption: caption_inlines,
         aligns,
         widths: vec![None; cols],
@@ -1311,6 +1317,66 @@ fn pipe_table_cells(row: &SyntaxNode) -> Vec<Vec<Inline>> {
         .filter(|c| c.kind() == SyntaxKind::TABLE_CELL)
         .map(|cell| coalesce_inlines(inlines_from(&cell)))
         .collect()
+}
+
+/// Pandoc's `+caption_attributes` extension lifts a trailing `{...}` from a
+/// table caption into the Table's outer attribute. Walk the caption inlines
+/// from the right looking for a balanced trailing `{...}` span: a Str
+/// ending with `}` plus zero or more (Space, Str) pairs back until a Str
+/// starts with `{`. If found, parse the brace contents as an attribute
+/// block and drop those inlines (plus any preceding Space) from the caption
+/// text.
+fn extract_caption_attrs(mut inlines: Vec<Inline>) -> (Attr, Vec<Inline>) {
+    let last_str_end = inlines
+        .iter()
+        .rposition(|i| matches!(i, Inline::Str(s) if s.ends_with('}')));
+    let Some(end_idx) = last_str_end else {
+        return (Attr::default(), inlines);
+    };
+    // Walk back to find the Str starting with `{`. Allow only Str/Space
+    // between (no structural inlines like Emph), since attribute blocks
+    // are plain text.
+    let mut start_idx = end_idx;
+    let mut found_open = false;
+    loop {
+        match &inlines[start_idx] {
+            Inline::Str(s) => {
+                if s.starts_with('{') {
+                    found_open = true;
+                    break;
+                }
+            }
+            Inline::Space => {}
+            _ => return (Attr::default(), inlines),
+        }
+        if start_idx == 0 {
+            break;
+        }
+        start_idx -= 1;
+    }
+    if !found_open {
+        return (Attr::default(), inlines);
+    }
+    // Concatenate the Str/Space slice into a flat string, then strip the
+    // outer braces.
+    let mut raw = String::new();
+    for el in &inlines[start_idx..=end_idx] {
+        match el {
+            Inline::Str(s) => raw.push_str(s),
+            Inline::Space => raw.push(' '),
+            _ => return (Attr::default(), inlines),
+        }
+    }
+    if !(raw.starts_with('{') && raw.ends_with('}')) {
+        return (Attr::default(), inlines);
+    }
+    let inner = &raw[1..raw.len() - 1];
+    let attr = parse_attr_block(inner);
+    inlines.truncate(start_idx);
+    if matches!(inlines.last(), Some(Inline::Space)) {
+        inlines.pop();
+    }
+    (attr, inlines)
 }
 
 fn pipe_table_caption(node: &SyntaxNode) -> Vec<Inline> {
@@ -1343,7 +1409,11 @@ fn pipe_table_caption(node: &SyntaxNode) -> Vec<Inline> {
 }
 
 fn pipe_separator_aligns(raw: &str) -> Vec<&'static str> {
-    let trimmed = raw.trim_matches(|c: char| c == '\n' || c == '\r');
+    // Strip surrounding whitespace before pipe-stripping so an indented
+    // pipe-table separator (e.g. fenced-div content at column ≥1) doesn't
+    // leave a leading whitespace segment that then counts as a phantom
+    // column.
+    let trimmed = raw.trim();
     let inner = trimmed.trim_start_matches('|').trim_end_matches('|');
     inner
         .split('|')
@@ -1475,7 +1545,9 @@ fn simple_table(node: &SyntaxNode) -> Option<TableData> {
         .find(|c| c.kind() == SyntaxKind::TABLE_CAPTION)
         .map(|n| pipe_table_caption(&n))
         .unwrap_or_default();
+    let (attr, caption_inlines) = extract_caption_attrs(caption_inlines);
     Some(TableData {
+        attr,
         caption: caption_inlines,
         aligns,
         widths: vec![None; cols.len()],
@@ -1643,7 +1715,9 @@ fn grid_table(node: &SyntaxNode) -> Option<TableData> {
         .find(|c| c.kind() == SyntaxKind::TABLE_CAPTION)
         .map(|n| pipe_table_caption(&n))
         .unwrap_or_default();
+    let (attr, caption_inlines) = extract_caption_attrs(caption_inlines);
     Some(TableData {
+        attr,
         caption: caption_inlines,
         aligns,
         widths: widths.into_iter().map(Some).collect(),
@@ -1801,7 +1875,9 @@ fn multiline_table(node: &SyntaxNode) -> Option<TableData> {
         .find(|c| c.kind() == SyntaxKind::TABLE_CAPTION)
         .map(|n| pipe_table_caption(&n))
         .unwrap_or_default();
+    let (attr, caption_inlines) = extract_caption_attrs(caption_inlines);
     Some(TableData {
+        attr,
         caption: caption_inlines,
         aligns,
         widths: widths.into_iter().map(Some).collect(),
@@ -3523,7 +3599,9 @@ fn write_block(b: &Block, out: &mut String) {
 }
 
 fn write_table(data: &TableData, out: &mut String) {
-    out.push_str("Table ( \"\" , [ ] , [ ] ) ( Caption Nothing [");
+    out.push_str("Table (");
+    write_attr(&data.attr, out);
+    out.push_str(") ( Caption Nothing [");
     if !data.caption.is_empty() {
         out.push_str(" Plain [");
         write_inline_list(&data.caption, out);

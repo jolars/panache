@@ -16,7 +16,8 @@ count of currently-failing imports remaining under that bucket in the latest
    single remaining real-citation showcase. Smaller leverage than the \~14
    occurrence count would suggest (one case, not many).
 2. **Tables --- remaining (\~3)** --- Simple/Multiline/Headerless basics landed
-   plus multiline inline-formatting and short-header (+11 cases). What remains:
+   plus multiline inline-formatting, short-header, and
+   indented-pipe-table-with-caption-attributes (+12 cases). What remains:
    - **#68/#70/#71** (grid_table) --- grid cells need block-level reparse (e.g.
      `B` → CodeBlock, multi-line cells → SoftBreak/LineBreak, complex span
      tables); requires running panache's block parser on each cell's content.
@@ -24,9 +25,6 @@ count of currently-failing imports remaining under that bucket in the latest
      `parse_cell_text_inlines` helper proves the inline-reparse pattern; an
      analogous block-reparse helper using `panache_parser::parse` and walking
      children for blocks would unlock these.
-   - **#171** (tables_in_divs) --- pipe table inside fenced div with custom
-     caption form `: Caption {#tbl-foo}` isn't recognized as pandoc's
-     `+caption_attributes` Caption-with-attr shape.
 3. **Footnotes --- DefinitionList-inside-Note (DONE 2026-05-03)** --- both #66
    and #67 unlocked. Parser-shape fix in `handle_footnote_open_effect` to
    detect that the first content line is a term, plus a continuation-policy
@@ -128,7 +126,94 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-03 (Same-line nested LIST marker: parser gate + formatter inline-emit)
+- **Date**: 2026-05-03 (Pipe-table caption attributes + indented-separator alignment)
+- **Pass before → after**: 172 → 173 / 187 (+1 import: #171). Two narrow
+  projector fixes flipped `tables_in_divs`. First, `pipe_separator_aligns`
+  was reading the `TABLE_SEPARATOR`'s leading whitespace as a phantom
+  column — when a pipe table sits inside a fenced div the separator line
+  is indented (e.g. `"  | --- | --- | --- |\n"`), and `trim_start_matches('|')`
+  doesn't peel spaces, so the eventual `split('|')` produced an extra
+  segment for the indent and `cols` was inflated by one. Adding a
+  `raw.trim()` before the pipe-strip closes that gap. Second, the
+  `+caption_attributes` extension was unimplemented in the projector: a
+  trailing `{#tbl:foo-1}` on a `: My Caption ...` line was emitted as
+  literal Str text in the caption with the Table id staying empty. New
+  `extract_caption_attrs` walks back through the caption inlines for a
+  balanced trailing `{...}` (Str/Space sequence only), parses it via
+  the existing `parse_attr_block`, drops the brace span (and any
+  preceding Space), and returns the resulting `Attr` for the Table's
+  outer attribute slot. `TableData` gained an `attr` field, `write_table`
+  emits it instead of the hardcoded empty triple, and all four table
+  builders (`pipe_table` / `simple_table` / `grid_table` /
+  `multiline_table`) feed their captions through the helper. CommonMark
+  allowlist green; pandoc allowlist green; full parser-crate suite
+  green; clippy + fmt clean.
+- **What landed**:
+  - **Projector: trim before pipe-strip in
+    `pipe_separator_aligns`
+    (`crates/panache-parser/tests/pandoc/native_projector.rs`)** ---
+    swapped `trim_matches('\n' | '\r')` for plain `trim()` so that an
+    indented separator (table inside a fenced div, etc.) doesn't
+    contribute a leading-whitespace phantom column. The trailing
+    `trim_end_matches('|')` already coped with trailing whitespace
+    after the strip.
+  - **Projector: caption-attribute extraction
+    (same file)** --- new `extract_caption_attrs(inlines) ->
+    (Attr, Vec<Inline>)` helper. Right-walks the caption inline list
+    for the closing brace-bearing Str, then walks back across only
+    Str/Space inlines to find an opening `{`-bearing Str, concatenates
+    the span (Space → ' ') into a flat `{...}` text, peels the outer
+    braces, and parses the inner via `parse_attr_block`. Returns
+    `Attr::default()` and the original inlines unchanged when the
+    pattern doesn't match (incl. when a non-text inline like Emph sits
+    inside the candidate span). On match it truncates the inlines at
+    `start_idx` and pops a trailing Space, so the caption text
+    matches pandoc's "strip the attr span and one space" behavior.
+  - **Projector: `TableData` carries an `Attr`
+    (same file)** --- new `attr: Attr` field. All four builders
+    (`pipe_table`, `simple_table`, `grid_table`, `multiline_table`)
+    now feed `caption_inlines` through `extract_caption_attrs` and
+    populate `attr` from the result. `write_table` writes the parsed
+    attr via `write_attr` instead of the previous `( "" , [ ] , [ ] )`.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 171 (tables_in_divs)
+- **Files changed (classified)**:
+  - **projector**:
+    `crates/panache-parser/tests/pandoc/native_projector.rs`
+    (`pipe_separator_aligns` trim; `extract_caption_attrs` new helper;
+    `TableData` gains `attr`; all four table builders updated;
+    `write_table` writes attr)
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 171
+    inserted between 170 and 172 under `# imported`)
+- **Don't redo**:
+  - `extract_caption_attrs` short-circuits to
+    `(Attr::default(), inlines)` when a non-Str/Space inline sits
+    between the candidate `{` and `}`. Pandoc's caption_attributes
+    extension only applies when the brace span is plain text — an
+    Emph/Strong/Link inside the candidate region means the trailing
+    "attribute" is literal caption content, not a real attribute. Keep
+    that guard; relaxing it would over-eagerly swallow markup-bearing
+    captions.
+  - The Space drop after truncation is intentional — pandoc rule is
+    "strip one separating space before the brace span". Don't loop and
+    drop multiple — `[Str "x", Space, Space, Str "{#id}"]` is unusual
+    in practice and pandoc keeps any extra spaces in the caption text.
+  - `pipe_separator_aligns` now uses `trim()` (whitespace + newlines)
+    rather than the prior `trim_matches('\n' | '\r')`. This is safe
+    because every other path that needed trailing whitespace gone was
+    already calling `trim_end_matches('|')` after, but a pipe-bearing
+    separator with trailing spaces (`"| --- | --- |    "`) was already
+    losing the spaces post-`|`-strip due to nothing reading them.
+    Don't revert to the narrower trim — it just reintroduces the
+    leading-whitespace phantom-column bug.
+  - All four table builders share the helper. Currently-passing
+    captions never end in `{...}` so the helper is a no-op for them.
+    Don't try to special-case "only call this for pipe_table" — keeping
+    one path means future caption-attribute support is uniform.
+
+## Earlier session (2026-05-03, Same-line nested LIST marker: parser gate + formatter inline-emit)
+
 - **Pass before → after**: 171 → 172 / 187 (+1 import: #111). The
   Pandoc-dialect gate on the same-line nested LIST emission path
   (`finish_list_item_with_optional_nested` in
