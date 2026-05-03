@@ -1508,15 +1508,13 @@ fn simple_table_dash_runs(separator: &SyntaxNode) -> Vec<(usize, usize)> {
 }
 
 fn simple_table_row_cells(row: &SyntaxNode) -> Vec<Vec<Inline>> {
+    // Zero-width TABLE_CELL nodes represent positionally-empty columns
+    // (e.g. case 0094, where header words land in only some of the
+    // dash-defined columns). Keep them as empty cells so the row's
+    // column ordering matches the dash separator.
     row.children()
         .filter(|c| c.kind() == SyntaxKind::TABLE_CELL)
-        .filter_map(|cell| {
-            // Skip 0-width parser artifacts (case 0094).
-            if cell.text_range().is_empty() {
-                return None;
-            }
-            Some(coalesce_inlines(inlines_from(&cell)))
-        })
+        .map(|cell| coalesce_inlines(inlines_from(&cell)))
         .collect()
 }
 

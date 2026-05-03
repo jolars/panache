@@ -15,12 +15,8 @@ count of currently-failing imports remaining under that bucket in the latest
    Most citation-bearing cases pass via Example-list carve-out; #38 is the
    single remaining real-citation showcase. Smaller leverage than the \~14
    occurrence count would suggest (one case, not many).
-2. **Tables --- remaining (\~4)** --- Simple/Multiline/Headerless basics landed
-   plus multiline inline-formatting (+10 cases). What remains:
-   - **#94** (simple_table_short_header) --- parser emits 0-width
-     `TABLE_CELL@x..x` artifacts when header words don't align with the table's
-     leading/trailing dashes. Needs a parser-shape fix or a stricter projector
-     skip rule.
+2. **Tables --- remaining (\~3)** --- Simple/Multiline/Headerless basics landed
+   plus multiline inline-formatting and short-header (+11 cases). What remains:
    - **#68/#70/#71** (grid_table) --- grid cells need block-level reparse (e.g.
      `B` → CodeBlock, multi-line cells → SoftBreak/LineBreak, complex span
      tables); requires running panache's block parser on each cell's content.
@@ -124,7 +120,55 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-03 (DefinitionList-inside-footnote: term detection + blank-line continuation)
+- **Date**: 2026-05-03 (Simple-table short-header zero-width cells)
+- **Pass before → after**: 170 → 171 / 187 (+1 import: #94). One projector
+  fix: `simple_table_row_cells` was filtering out zero-width `TABLE_CELL`
+  nodes as "parser artifacts", but those nodes are actually *meaningful* —
+  they represent positionally-empty columns when header words land in only
+  some of the dash-defined columns (case 0094 had a 6-column simple table
+  with header words populating only columns 2–4, leaving cols 1, 5, 6
+  empty). Dropping them collapsed the row to 3 cells, which `cells_to_
+  plain_blocks` then padded to 6 by appending empty cells *at the end* —
+  putting the empties on the wrong side. Keeping the zero-width cells
+  preserves the parser's correct positional ordering. CommonMark
+  allowlist green; full parser-crate suite green; full workspace tests
+  green; clippy + fmt clean.
+- **What landed**:
+  - **Projector: keep zero-width simple-table cells
+    (`crates/panache-parser/tests/pandoc/native_projector.rs`)** ---
+    `simple_table_row_cells` removed the `cell.text_range().is_empty()`
+    skip and now maps every `TABLE_CELL` child to its inlines (which
+    coalesce to an empty `Vec` for zero-width cells, projected to
+    `Cell ... []` by `cells_to_plain_blocks`). The dropped explanatory
+    comment is replaced with one explaining *why* zero-width cells are
+    preserved.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 94 (issue_224_simple_table_short_header_losslessness)
+- **Files changed (classified)**:
+  - **projector**:
+    `crates/panache-parser/tests/pandoc/native_projector.rs`
+    (`simple_table_row_cells` body)
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 94 inserted
+    between 92 and 95 under `# imported`)
+- **Don't redo**:
+  - The parser CST is correct here — zero-width `TABLE_CELL` nodes are
+    by design when a header/data row leaves a dash-defined column
+    visually empty. Don't try to "fix" the parser to omit them; the
+    projector consuming them as empty cells is the right contract.
+  - `simple_table_aligns` keeps its own `cell.text_range().is_empty()`
+    skip (line ~1556) — that's correct because alignment is derived
+    from cells *with content* relative to dash boundaries; an empty
+    cell contributes no alignment signal. Don't unify the two filters.
+  - `cells_to_plain_blocks` still pads at the end if `cells.len() <
+    cols`. That's the right fallback for the case where the parser
+    really did produce too few cells (different shape gap). The padded
+    empties only land at the end *when the leading positions were
+    already filled*, so the new behavior here doesn't conflict with
+    the existing fallback.
+
+## Earlier session (2026-05-03, DefinitionList-inside-footnote: term detection + blank-line continuation)
+
 - **Pass before → after**: 168 → 170 / 187 (+2 imports: #66, #67).
   Two parser-shape fixes plus one formatter companion. The footnote body's
   first content line now opens as a `TERM` of a `DEFINITION_LIST` when
