@@ -59,10 +59,18 @@ count of currently-failing imports remaining under that bucket in the latest
    shorter Paras. Parser-shape gap in HTML_BLOCK detection: a comment that abuts
    a paragraph boundary should not always start a new block.
 7. **Misc remaining**:
-   - Several blockquote/list/definition-list nesting cases where blockquote/list
-     markers on the same line as another container marker aren't recognized
-     (#34, #91, #93, #96, #108, #111). Parser-shape gaps shared across that
-     bucket.
+   - **Same-line BLOCK_QUOTE marker (#93, #108)** --- the
+     `text_to_buffer.starts_with('>')` branch in
+     `finish_list_item_with_optional_nested` is still
+     CommonMark-only. Blocked on `BlockQuote::depth()`
+     double-counting when a nested BQ is rendered to a temp
+     buffer (see latest session's "Don't redo"). Needs a
+     formatter-side fix that subtracts container-context depth
+     before flipping the gate.
+   - Other blockquote/list/definition-list nesting cases (#34,
+     #91, #96) where blank lines or lazy continuation cross
+     container boundaries differently from pandoc.
+     Parser-shape gaps in continuation policy.
 
 Suggested first session: **#1 (Citations proper)** is still the largest
 single-fix unlock (14 cases) and the heaviest projector entry. After
@@ -120,7 +128,135 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-03 (Simple-table short-header zero-width cells)
+- **Date**: 2026-05-03 (Same-line nested LIST marker: parser gate + formatter inline-emit)
+- **Pass before → after**: 171 → 172 / 187 (+1 import: #111). The
+  Pandoc-dialect gate on the same-line nested LIST emission path
+  (`finish_list_item_with_optional_nested` in
+  `crates/panache-parser/src/parser/blocks/lists.rs`) was flipped, so
+  `- - foo` and `1. - 2. foo` now produce the pandoc-native nested
+  shape under `Flavor::Pandoc` (matching the existing CommonMark
+  output). The formatter side gained a new arm in
+  `format_list_item` for the case where the LIST_ITEM has no
+  PLAIN/PARAGRAPH content node and a non-empty leading nested LIST —
+  it emits the outer marker without a newline, then formats the
+  nested LIST at indent=0 (stripping the leading `\n` that
+  `format_list` otherwise injects at top-level). The companion gate
+  for same-line BLOCK_QUOTE (`text_to_buffer.starts_with('>')`) is
+  intentionally left CommonMark-only — that path needs additional
+  formatter work because of `BlockQuote::depth()` double-counting
+  ancestors when a nested BQ is rendered to a temp buffer (see
+  `Don't redo` for details). CommonMark allowlist green; pandoc
+  allowlist green; full parser-crate suite green; full workspace
+  tests green; clippy + fmt clean.
+- **What landed**:
+  - **Parser-shape: ungate same-line nested LIST under Pandoc
+    (`crates/panache-parser/src/parser/blocks/lists.rs`)** ---
+    removed `dialect_allows_nested &&` from the
+    `try_parse_list_marker(&text_to_buffer, config)` branch in
+    `finish_list_item_with_optional_nested`. The gate variable is
+    still computed because the BLOCK_QUOTE same-line case below
+    still uses it. Comment expanded to explain that the LIST path
+    is dialect-agnostic but the BLOCK_QUOTE path is still gated
+    pending depth-aware blockquote rendering.
+  - **Formatter: inline-emit leading nested LIST inside LIST_ITEM
+    (`crates/panache-formatter/src/formatter/lists.rs`)** ---
+    `format_list_item` previously emitted nothing when there was no
+    `PLAIN/PARAGRAPH` content node (so the outer marker was
+    silently dropped, then the children loop emitted the nested
+    LIST at hanging-indent on a new line). New branch added before
+    the `find_content_node` call: if `first_non_blank_child` is a
+    non-empty LIST (and `find_content_node` is None), emit the
+    outer marker + spaces (no newline), then `format_node_sync` the
+    nested LIST at indent=0. `format_list` injects a leading `\n`
+    when `indent==0 && !output.ends_with("\n\n")`; the new arm
+    detects-and-strips that `\n` post-hoc by saving
+    `self.output.len()` before the call and removing the byte at
+    that index if it's `\n`. Trailing children (blank lines,
+    further nested blocks) are then emitted at the outer's hanging
+    indent.
+  - **Helper sig change: `first_non_blank_child` borrowed not moved
+    (`crates/panache-formatter/src/formatter/lists.rs`)** --- the
+    leading-heading branch above the new arm previously moved
+    `first_non_blank_child`, blocking the new arm from re-borrowing.
+    Updated to `if let Some(leading_heading) =
+    first_non_blank_child.as_ref()` and the two existing `==
+    leading_heading` comparisons inside that arm reborrowed.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 111 (list_nested_same_line_marker_pandoc)
+- **Files changed (classified)**:
+  - **parser-shape**:
+    `crates/panache-parser/src/parser/blocks/lists.rs`
+    (gate flip on the `try_parse_list_marker` branch of
+    `finish_list_item_with_optional_nested`)
+  - **formatter (companion)**:
+    `crates/panache-formatter/src/formatter/lists.rs`
+    (new leading-nested-LIST arm in `format_list_item`; borrow
+    cleanup in the leading-heading arm)
+  - **parser snapshot updated**:
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_list_nested_same_line_marker_pandoc.snap`
+    --- previously pinned the buggy `LIST > LIST_ITEM > LIST_MARKER
+    + WS + PLAIN [TEXT "- foo"]` shape (and the legacy
+    `1. - 2. foo` flat plain). Now pins the pandoc-native nested
+    `LIST > LIST_ITEM > LIST_MARKER + WS + LIST > LIST_ITEM > ...`
+    shape, matching the existing CommonMark snapshot byte-for-byte.
+  - **formatter golden case (new)**:
+    `tests/fixtures/cases/list_nested_same_line_marker/`
+    (input: `- - foo\n1. - 2. foo\n`; expected: same with a
+    blank line inserted between the two top-level lists since
+    they have different marker types). Registered in
+    `tests/golden_cases.rs` between
+    `list_nested_roman_idempotency_136` and `line_ending_crlf`.
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 111
+    inserted between 110 and 112 under `# imported`)
+- **Don't redo**:
+  - The same-line BLOCK_QUOTE gate (`text_to_buffer.starts_with('>')`
+    branch) is intentionally still CommonMark-only. Flipping it
+    requires fixing `BlockQuote::depth()` rendering: when the
+    outer BLOCK_QUOTE renders a child LIST to a temp buffer and
+    inside the LIST the formatter tries to render a *nested*
+    BLOCK_QUOTE, the inner BQ's depth() walks AST ancestors
+    (which include the outer BQ) and yields 2 — so it emits
+    `> > content`. Then the outer BQ's
+    `append_blockquote_prefixed_list_output` doesn't strip those,
+    only base-indents lines that already start with `> `. Result:
+    triple `>` prefix where pandoc emits double. Verified
+    under CommonMark: `> 1. > Blockquote\ncontinued.` formats to
+    `>    > > Blockquote continued here.` (4-space gap, double
+    inner `>`). Until `format_blockquote` learns to subtract its
+    container-context depth (e.g., a `containing_blockquote_depth`
+    parameter or output-prefix counting via the existing
+    `BlockquoteContext`), don't flip the BLOCK_QUOTE gate. Cases
+    #93 and #108 remain blocked on this.
+  - The `format_list` leading-`\n` strip is intentionally
+    post-hoc, not a flag on `format_list`. Adding a flag would
+    propagate through the recursive call chain and is a larger
+    refactor; the post-hoc strip is a one-byte fixup that fires
+    only when the output we just appended was a leading newline
+    (the most common case at indent=0). Don't refactor to a
+    plumbed flag without a clear second use.
+  - The new leading-nested-LIST arm sits *before* the
+    `find_content_node` call so it overrides the wrap path. Don't
+    move it after — the wrap path's `lines.is_empty()` branch
+    silently emits no marker, which is exactly the bug the new
+    arm fixes.
+  - The `is_empty_nested_list` short-circuit is preserved: when
+    the leading nested LIST is empty (e.g., `- *`), the existing
+    `has_only_empty_nested_list` path handles it. The new arm
+    explicitly excludes that case via
+    `!Self::is_empty_nested_list(leading_list)`.
+  - `1. b. WHERE firstName LIKE...` no longer round-trips as
+    `- b. WHERE...` — this is **correct**: with the gate flipped,
+    `b.` is now recognized as an alphabetic ordered marker (Pandoc
+    `fancy_lists` default is on), so the inner LIST shape applies.
+    The formatter golden test
+    `escaped_double_underscore_in_list_item_stays_idempotent` was
+    already exercising this and now passes via the new arm. Don't
+    "revert" toward the old plain-text shape — it was a gate
+    artifact, not a deliberate behavior.
+
+## Earlier session (2026-05-03, Simple-table short-header zero-width cells)
+
 - **Pass before → after**: 170 → 171 / 187 (+1 import: #94). One projector
   fix: `simple_table_row_cells` was filtering out zero-width `TABLE_CELL`
   nodes as "parser artifacts", but those nodes are actually *meaningful* —

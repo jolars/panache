@@ -1348,16 +1348,19 @@ fn finish_list_item_with_optional_nested(
         super::horizontal_rules::try_parse_horizontal_rule(trim_end_newlines(&text_to_buffer))
             .is_some();
 
-    // Recursive same-line nested list emission is gated to CommonMark.
-    // Pandoc-markdown also nests in this position (e.g. `- b. foo` is a
-    // bullet wrapping an alpha-ordered list), but the formatter does not
-    // yet support emitting an outer LIST_ITEM whose only child is a
-    // nested LIST, so producing the nested CST under Pandoc breaks
-    // formatter idempotency. Tracked as future work.
+    // Recursive same-line nested list emission applies to both dialects:
+    // pandoc-markdown and CommonMark agree on the nested LIST_ITEM shape
+    // for `- - foo`, `1. - 2. foo`, etc. (verified via `pandoc -f markdown
+    // -t native` and `pandoc -f commonmark -t native`). The companion
+    // formatter arm in `format_list_item` handles the LIST-first-child
+    // shape so the round-trip stays idempotent.
+    //
+    // The `dialect_allows_nested` flag is kept for the BLOCK_QUOTE
+    // same-line case below, which still needs formatter work before it
+    // can be ungated under Pandoc.
     let dialect_allows_nested = config.dialect == crate::Dialect::CommonMark;
 
-    if dialect_allows_nested
-        && !buffered_is_thematic_break
+    if !buffered_is_thematic_break
         && let Some(inner_match) = try_parse_list_marker(&text_to_buffer, config)
     {
         let inner_content_start = inner_match.marker_len + inner_match.spaces_after_bytes;

@@ -526,7 +526,7 @@ impl Formatter {
         let first_non_blank_child = node
             .children()
             .find(|child| child.kind() != SyntaxKind::BLANK_LINE);
-        if let Some(leading_heading) = first_non_blank_child
+        if let Some(leading_heading) = first_non_blank_child.as_ref()
             && leading_heading.kind() == SyntaxKind::HEADING
         {
             self.output.push_str(&" ".repeat(total_indent));
@@ -538,18 +538,18 @@ impl Formatter {
                 self.output.push_str(cb);
                 self.output.push(' ');
             }
-            self.output.push_str(&self.format_heading(&leading_heading));
+            self.output.push_str(&self.format_heading(leading_heading));
             self.output.push('\n');
 
             let has_following_blocks = node
                 .children()
-                .any(|child| child != leading_heading && child.kind() != SyntaxKind::BLANK_LINE);
+                .any(|child| &child != leading_heading && child.kind() != SyntaxKind::BLANK_LINE);
             if has_following_blocks {
                 self.output.push('\n');
             }
 
             for child in node.children() {
-                if child == leading_heading || child.kind() == SyntaxKind::BLANK_LINE {
+                if &child == leading_heading || child.kind() == SyntaxKind::BLANK_LINE {
                     continue;
                 }
 
@@ -567,6 +567,45 @@ impl Formatter {
                         self.format_node_sync(&child, hanging);
                     }
                 }
+            }
+            return;
+        }
+
+        // Same-line nested-marker case: a LIST_ITEM whose first non-blank
+        // child is a non-empty nested LIST (no preceding PLAIN/PARAGRAPH).
+        // Examples: `- - foo`, `1. - 2. foo`. Emit the outer marker without
+        // a trailing newline, then format the nested LIST at indent=0 so
+        // its inner LIST_ITEM marker abuts the outer marker on the same
+        // line. `format_list` adds a leading `\n` when called at indent=0
+        // outside a fenced div; strip it post-hoc since we explicitly
+        // *want* the inner LIST flush against the outer marker.
+        if let Some(leading_list) = first_non_blank_child.as_ref()
+            && leading_list.kind() == SyntaxKind::LIST
+            && !Self::is_empty_nested_list(leading_list)
+            && Self::find_content_node(node).is_none()
+        {
+            self.output.push_str(&" ".repeat(total_indent));
+            self.output
+                .push_str(&" ".repeat(list_indent.marker_padding));
+            self.output.push_str(&marker);
+            self.output.push_str(&" ".repeat(list_indent.spaces_after));
+            if let Some(ref cb) = checkbox {
+                self.output.push_str(cb);
+                self.output.push(' ');
+            }
+            let saved_len = self.output.len();
+            self.format_node_sync(leading_list, 0);
+            if self.output.as_bytes().get(saved_len) == Some(&b'\n') {
+                self.output.remove(saved_len);
+            }
+
+            // Emit any trailing children (blank lines, continuation paragraphs,
+            // further nested blocks) at hanging indent.
+            for child in node.children() {
+                if &child == leading_list || child.kind() == SyntaxKind::BLANK_LINE {
+                    continue;
+                }
+                self.format_node_sync(&child, hanging);
             }
             return;
         }
