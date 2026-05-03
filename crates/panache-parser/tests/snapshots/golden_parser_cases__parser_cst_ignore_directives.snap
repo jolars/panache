@@ -21,15 +21,14 @@ DOCUMENT@0..773
     HTML_BLOCK_TAG@93..130
       TEXT@93..129 "<!-- panache-ignore-f ..."
       NEWLINE@129..130 "\n"
-  PARAGRAPH@130..216
+  PARAGRAPH@130..251
     TEXT@130..181 "This    paragraph   h ..."
     NEWLINE@181..182 "\n"
     TEXT@182..215 "should  be   preserve ..."
     NEWLINE@215..216 "\n"
-  HTML_BLOCK@216..251
-    HTML_BLOCK_TAG@216..251
-      TEXT@216..250 "<!-- panache-ignore-f ..."
-      NEWLINE@250..251 "\n"
+    INLINE_HTML@216..250
+      INLINE_HTML_CONTENT@216..250 "<!-- panache-ignore-f ..."
+    NEWLINE@250..251 "\n"
   BLANK_LINE@251..252
     BLANK_LINE@251..252 "\n"
   PARAGRAPH@252..317
@@ -58,15 +57,14 @@ DOCUMENT@0..773
     HTML_BLOCK_TAG@432..462
       TEXT@432..461 "<!-- panache-ignore-s ..."
       NEWLINE@461..462 "\n"
-  PARAGRAPH@462..548
+  PARAGRAPH@462..576
     TEXT@462..514 "Both    formatting    ..."
     NEWLINE@514..515 "\n"
     TEXT@515..547 "##### Another heading ..."
     NEWLINE@547..548 "\n"
-  HTML_BLOCK@548..576
-    HTML_BLOCK_TAG@548..576
-      TEXT@548..575 "<!-- panache-ignore-e ..."
-      NEWLINE@575..576 "\n"
+    INLINE_HTML@548..575
+      INLINE_HTML_CONTENT@548..575 "<!-- panache-ignore-e ..."
+    NEWLINE@575..576 "\n"
   BLANK_LINE@576..577
     BLANK_LINE@576..577 "\n"
   PARAGRAPH@577..609
@@ -84,20 +82,19 @@ DOCUMENT@0..773
     LIST_ITEM@624..752
       LIST_MARKER@624..625 "-"
       WHITESPACE@625..626 " "
-      PLAIN@626..638
+      PLAIN@626..752
         TEXT@626..637 "List item 2"
         NEWLINE@637..638 "\n"
-      HTML_BLOCK@638..677
-        HTML_BLOCK_TAG@638..677
-          TEXT@638..676 "  <!-- panache-ignore ..."
-          NEWLINE@676..677 "\n"
-      PLAIN@677..715
+        TEXT@638..640 "  "
+        INLINE_HTML@640..676
+          INLINE_HTML_CONTENT@640..676 "<!-- panache-ignore-f ..."
+        NEWLINE@676..677 "\n"
         TEXT@677..714 "  Nested    content   ..."
         NEWLINE@714..715 "\n"
-      HTML_BLOCK@715..752
-        HTML_BLOCK_TAG@715..752
-          TEXT@715..751 "  <!-- panache-ignore ..."
-          NEWLINE@751..752 "\n"
+        TEXT@715..717 "  "
+        INLINE_HTML@717..751
+          INLINE_HTML_CONTENT@717..751 "<!-- panache-ignore-f ..."
+        NEWLINE@751..752 "\n"
     LIST_ITEM@752..766
       LIST_MARKER@752..753 "-"
       WHITESPACE@753..754 " "

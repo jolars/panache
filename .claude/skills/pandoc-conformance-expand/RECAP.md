@@ -48,11 +48,13 @@ count of currently-failing imports remaining under that bucket in the latest
    related parser gap: pandoc parses as `Div ( "" , [ "container" ] , [ ] )`
    with markdown-parsed content; we wrap as a single RawBlock.
 6. **Block-level cases where parser splits paragraphs around inline HTML
-   comments (#79 ignore_directives)** --- pandoc keeps the comment as
-   `RawInline (Format "html") "<!-- ... -->"` inside the surrounding paragraph
-   (or as the trailing inline of a Para); we split into separate RawBlock and
-   shorter Paras. Parser-shape gap in HTML_BLOCK detection: a comment that abuts
-   a paragraph boundary should not always start a new block.
+   comments --- DONE 2026-05-03 (#79 unlocked)**. Parser dispatcher gates
+   Comment Type-2 paragraph-interrupt on `Dialect::CommonMark`; under
+   Pandoc, an `<!-- ... -->` line abutting a paragraph stays inline as
+   `INLINE_HTML` rather than splitting into `HTML_BLOCK`. Companion
+   formatter changes wire the directive system (panache-ignore-*) to also
+   recognize INLINE_HTML directives so existing ignore-region tests still
+   work — see Don't-redo entry on `collect_inline_directives`.
 7. **Misc remaining**:
    - **Same-line BLOCK_QUOTE marker (#93, #108) --- DONE 2026-05-03**.
      Parser ungated for Pandoc; companion `format_list_item`
@@ -125,7 +127,131 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-03 (Same-line BLOCK_QUOTE inside LIST_ITEM ungated for Pandoc)
+- **Date**: 2026-05-03 (HTML comment paragraph-interrupt gated by dialect;
+  directive system extended to INLINE_HTML)
+- **Pass before → after**: 176 → 177 / 187 (+1 import: #79).
+  Parser-shape fix: under `Dialect::Pandoc`, an HTML comment (Type 2) no
+  longer interrupts a paragraph — `\n<!-- ... -->\n` between two
+  paragraph lines stays as `INLINE_HTML` instead of splitting into a
+  sibling `HTML_BLOCK`. CommonMark dialect retains the existing
+  paragraph-interrupting behavior (CommonMark §4.6 allows Type 2 to
+  interrupt). Companion formatter work: the panache-ignore directive
+  system now also extracts directives from `INLINE_HTML` nodes, so
+  ignore-format/lint regions still close correctly when the END marker
+  inlines into the surrounding paragraph. CommonMark allowlist green;
+  pandoc allowlist green; full workspace tests green; clippy + fmt clean.
+- **What landed**:
+  - **Parser: dialect-gate Comment paragraph-interrupt
+    (`crates/panache-parser/src/parser/block_dispatcher.rs`)** — in
+    `HtmlBlockParser::detect_prepared`, mark Comment as
+    `cannot_interrupt` when `dialect == Dialect::Pandoc`, mirroring
+    Type 7. With `has_blank_before || at_document_start`, comments
+    still emit as `HTML_BLOCK`; otherwise return None and let the
+    paragraph absorb the comment line, where `try_parse_inline_html`
+    later picks it up as `INLINE_HTML`.
+  - **Formatter: directive extraction now accepts `INLINE_HTML`
+    (`crates/panache-formatter/src/directives.rs` and the top-level
+    duplicate at `src/directives.rs`)** — `extract_directive_from_node`
+    additionally matches `SyntaxKind::INLINE_HTML`. New helper
+    `collect_inline_directives(node)` scans descendants for
+    INLINE_HTML directives in document order; only added to the
+    formatter crate (the linter walks via `preorder()` and picks up
+    INLINE_HTML directives directly through `extract_directive_from_node`).
+  - **Formatter: paragraph/plain inline-directive handling
+    (`crates/panache-formatter/src/formatter/core.rs`)** — at
+    `format_node_sync` entry, after the existing ignored-mode
+    short-circuit, two new branches:
+    1. If we're in ignored mode and the verbatim node contains
+       INLINE_HTML directives, replay them in the tracker AFTER
+       outputting verbatim (so subsequent blocks see the END's
+       transition).
+    2. If the node is a `PARAGRAPH | PLAIN` carrying inline
+       directives that AFFECT FORMATTING (ignore-format / ignore-both),
+       output the whole node verbatim and replay all directives.
+       Lint-only directives don't need verbatim output: replay them
+       upfront and fall through to the normal render path (lint state
+       doesn't change rendering).
+  - **Formatter: list item content with inline format-directive
+    (`crates/panache-formatter/src/formatter/lists.rs`)** — list-item
+    content goes through its own wrap pipeline (`inline_layout::
+    wrapped_lines_for_node`), not `format_node_sync`. Added
+    `content_has_format_directive` check that, when true, populates
+    `preserve_lines` with the verbatim content lines (mirroring the
+    `WrapMode::Preserve` path) so multi-space content between an
+    inline START and END isn't reflowed.
+  - **New parser fixtures (paired)**:
+    `crates/panache-parser/tests/fixtures/cases/html_comment_after_paragraph_pandoc/`
+    and `..._commonmark/` — pin the dialect divergence: same `input.md`
+    (Para line + comment line + Para line + standalone comment + Para
+    line + trailing comment), different `parser-options.toml`. Pandoc
+    snapshot has comments inline within paragraphs except the
+    blank-separated standalone; CommonMark snapshot has every comment
+    as a sibling `HTML_BLOCK`.
+  - **Snapshot regeneration**: 1 parser CST snapshot updated to reflect
+    the new shape — `parser_cst_ignore_directives.snap` (the parser's
+    own ignore_directives fixture) where four formerly-HTML_BLOCK
+    comments now sit inline as INLINE_HTML inside their surrounding
+    PARAGRAPH/PLAIN. The two new fixtures' snapshots are net-new.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 79 (imported-ignore_directives)
+- **Files changed (classified)**:
+  - **parser-shape** (Dialect::Pandoc only):
+    `crates/panache-parser/src/parser/block_dispatcher.rs`
+    (`HtmlBlockParser::detect_prepared` cannot_interrupt branch)
+  - **formatter / linter directive infra** (companion to parser-shape;
+    required so existing ignore-directive tests keep passing under
+    the new INLINE_HTML shape):
+    - `crates/panache-formatter/src/directives.rs`
+    - `src/directives.rs` (top-level duplicate kept in sync)
+    - `crates/panache-formatter/src/formatter/core.rs`
+      (paragraph/plain inline-directive replay path)
+    - `crates/panache-formatter/src/formatter/lists.rs`
+      (list-item content preserve-on-format-directive)
+  - **fixtures (parser-only)**: two new dirs under
+    `crates/panache-parser/tests/fixtures/cases/html_comment_after_paragraph_*`
+    + registered in `crates/panache-parser/tests/golden_parser_cases.rs`
+  - **snapshots**: 3 `.snap` files
+    (`parser_cst_ignore_directives` updated; two new for the paired
+    fixtures) under `crates/panache-parser/tests/snapshots/`
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 79
+    inserted between 77 and 80, under `# imported`)
+- **Don't redo**:
+  - Top-level `src/directives.rs` and
+    `crates/panache-formatter/src/directives.rs` are duplicate copies
+    — the formatter crate has the same module copied because the
+    formatter is dependency-lean (no top-level dep). The
+    `extract_directive_from_node` change must be mirrored in BOTH
+    files for both the linter (top-level) and the formatter to
+    recognize INLINE_HTML directives. `collect_inline_directives` is
+    only in the formatter copy because only the formatter needs it
+    (the linter's `preorder()` walk visits INLINE_HTML descendants
+    directly).
+  - The parser fix is gated specifically to `HtmlBlockType::Comment`
+    (Type 2). Other types (Type 1 `<script>`/`<pre>`, Type 6 block
+    tags like `<div>`, Type 7 generic tags, declarations, CDATA, PIs)
+    retain their existing dispatcher behavior. Pandoc-native shows
+    that `<style>` *also* doesn't interrupt and `<script>` does — a
+    finer-grained Type-1 split could land later but isn't required
+    for the cases currently under test.
+  - The PARAGRAPH/PLAIN inline-directive branch in
+    `format_node_sync` only short-circuits to verbatim when at least
+    one inline directive **affects formatting**. Lint-only directives
+    are processed upfront (tracker state updated) and rendering
+    continues normally — so reflow still happens around `panache-
+    ignore-lint-*` markers. Don't unify these paths or you'll
+    reintroduce the regression where `test_ignore_lint_does_not_
+    affect_formatting` fails.
+  - The list-item path
+    (`format_list_item` in `lists.rs`) needs its OWN check because
+    list-item content_node is wrapped via `inline_layout::
+    wrapped_lines_for_node`, NOT through `format_node_sync`. Don't
+    assume the format_node_sync branch alone covers list items.
+  - The new paired parser fixtures pin the dialect divergence. If
+    pandoc-native ever changes its Comment Type-2 behavior, regenerate
+    `expected.native` for #79 before adjusting the fixtures.
+
+## Earlier session (2026-05-03, Same-line BLOCK_QUOTE inside LIST_ITEM ungated for Pandoc)
 - **Pass before → after**: 174 → 176 / 187 (+2 imports: #93, #108).
   Two-step fix: (1) parser ungates the same-line `>`-after-list-marker
   branch in `finish_list_item_with_optional_nested` so Pandoc also

@@ -520,7 +520,44 @@ impl Formatter {
         {
             let text = node.text().to_string();
             self.output.push_str(&text);
+            // Replay any inline directives nested in this verbatim node so the
+            // tracker stays in sync (under Pandoc dialect, an HTML comment that
+            // closes an ignore region inlines into the surrounding paragraph
+            // rather than splitting into a sibling HTML_BLOCK).
+            for directive in crate::directives::collect_inline_directives(node) {
+                self.directive_tracker.process_directive(&directive);
+            }
             return;
+        }
+
+        // Pandoc-dialect inlining: a paragraph or plain block can carry an
+        // ignore directive as inline raw HTML. If any of those directives
+        // affects formatting, output the whole node verbatim (we don't try
+        // to format around inline directives mid-paragraph). Lint-only
+        // directives don't change rendering, so process them upfront and
+        // fall through to the normal render path.
+        if matches!(node.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN) {
+            let inline_directives = crate::directives::collect_inline_directives(node);
+            if !inline_directives.is_empty() {
+                let affects_formatting = inline_directives.iter().any(|d| match d {
+                    crate::directives::Directive::Start(kind)
+                    | crate::directives::Directive::End(kind) => kind.affects_formatting(),
+                });
+                if affects_formatting {
+                    let text = node.text().to_string();
+                    self.output.push_str(&text);
+                    if !text.ends_with('\n') {
+                        self.output.push('\n');
+                    }
+                    for directive in inline_directives {
+                        self.directive_tracker.process_directive(&directive);
+                    }
+                    return;
+                }
+                for directive in inline_directives {
+                    self.directive_tracker.process_directive(&directive);
+                }
+            }
         }
 
         // Reset blank line counter when we hit a non-blank node

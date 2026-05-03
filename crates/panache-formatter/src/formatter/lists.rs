@@ -682,8 +682,31 @@ impl Formatter {
                 })
                 .unwrap_or_default(),
         };
+        // Pandoc-dialect inlining: if the content_node carries an inline
+        // ignore-format directive (Pandoc keeps `<!-- ... -->` inline rather
+        // than splitting paragraphs), preserve the original content lines
+        // verbatim — wrapping/reflow would lose the intentional spacing.
+        let content_has_format_directive = content_node
+            .as_ref()
+            .map(|content| {
+                crate::directives::collect_inline_directives(content)
+                    .iter()
+                    .any(|d| match d {
+                        crate::directives::Directive::Start(kind)
+                        | crate::directives::Directive::End(kind) => kind.affects_formatting(),
+                    })
+            })
+            .unwrap_or(false);
+
         let preserve_lines = match wrap_mode {
             WrapMode::Preserve => {
+                let source = content_node
+                    .as_ref()
+                    .map(|content| content.text().to_string())
+                    .unwrap_or_default();
+                Some(source.lines().map(ToString::to_string).collect::<Vec<_>>())
+            }
+            _ if content_has_format_directive => {
                 let source = content_node
                     .as_ref()
                     .map(|content| content.text().to_string())

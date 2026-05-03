@@ -1,0 +1,27 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..121
+  PARAGRAPH@0..50
+    TEXT@0..14 "Paragraph one."
+    NEWLINE@14..15 "\n"
+    INLINE_HTML@15..38
+      INLINE_HTML_CONTENT@15..38 "<!-- inline comment -->"
+    NEWLINE@38..39 "\n"
+    TEXT@39..49 "Continued."
+    NEWLINE@49..50 "\n"
+  BLANK_LINE@50..51
+    BLANK_LINE@50..51 "\n"
+  HTML_BLOCK@51..79
+    HTML_BLOCK_TAG@51..79
+      TEXT@51..78 "<!-- standalone comme ..."
+      NEWLINE@78..79 "\n"
+  BLANK_LINE@79..80
+    BLANK_LINE@79..80 "\n"
+  PARAGRAPH@80..121
+    TEXT@80..94 "Paragraph two."
+    NEWLINE@94..95 "\n"
+    INLINE_HTML@95..120
+      INLINE_HTML_CONTENT@95..120 "<!-- trailing comment ..."
+    NEWLINE@120..121 "\n"

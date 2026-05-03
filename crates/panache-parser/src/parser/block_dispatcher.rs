@@ -1749,9 +1749,14 @@ impl BlockParser for HtmlBlockParser {
         let block_type = try_parse_html_block_start(ctx.content, is_commonmark)?;
 
         // Type 7 cannot interrupt a paragraph (CommonMark §4.6). Other
-        // types can. Match prior behavior otherwise: HTML blocks may
-        // interrupt paragraphs; blank lines are not required.
-        let detection = if matches!(block_type, HtmlBlockType::Type7) {
+        // types can. Pandoc-dialect additionally treats HTML comments as
+        // non-interrupting: a comment line directly following a paragraph
+        // line (no blank above) stays inline as `RawInline (Format "html")`
+        // rather than splitting the paragraph into a `RawBlock`.
+        let cannot_interrupt = matches!(block_type, HtmlBlockType::Type7)
+            || (matches!(block_type, HtmlBlockType::Comment)
+                && ctx.config.dialect == crate::options::Dialect::Pandoc);
+        let detection = if cannot_interrupt {
             if ctx.has_blank_before || ctx.at_document_start {
                 BlockDetectionResult::Yes
             } else {

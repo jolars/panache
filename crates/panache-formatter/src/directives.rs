@@ -168,17 +168,41 @@ impl Default for DirectiveTracker {
     }
 }
 
-/// Extract directive from a COMMENT or HTML_BLOCK syntax node.
+/// Extract directive from a COMMENT, HTML_BLOCK, or INLINE_HTML syntax node.
 pub fn extract_directive_from_node(node: &SyntaxNode) -> Option<Directive> {
     use crate::syntax::SyntaxKind;
 
-    // HTML comments can be parsed as either COMMENT or HTML_BLOCK
-    if node.kind() != SyntaxKind::COMMENT && node.kind() != SyntaxKind::HTML_BLOCK {
+    // HTML comments can be parsed as COMMENT, HTML_BLOCK, or INLINE_HTML
+    // depending on context (block-level vs inline) and dialect.
+    if node.kind() != SyntaxKind::COMMENT
+        && node.kind() != SyntaxKind::HTML_BLOCK
+        && node.kind() != SyntaxKind::INLINE_HTML
+    {
         return None;
     }
 
     let text = node.text().to_string();
     parse_directive(&text)
+}
+
+/// Collect all inline-html directives nested inside `node`, in document order.
+///
+/// Returns each (directive, INLINE_HTML node text) pair. Used by the formatter
+/// to replay inline directive transitions after a paragraph/plain emits, so
+/// the tracker stays in sync when comments inline into a paragraph (the
+/// Pandoc-dialect default).
+pub fn collect_inline_directives(node: &SyntaxNode) -> Vec<Directive> {
+    use crate::syntax::SyntaxKind;
+
+    let mut out = Vec::new();
+    for descendant in node.descendants() {
+        if descendant.kind() == SyntaxKind::INLINE_HTML
+            && let Some(directive) = extract_directive_from_node(&descendant)
+        {
+            out.push(directive);
+        }
+    }
+    out
 }
 
 #[cfg(test)]
