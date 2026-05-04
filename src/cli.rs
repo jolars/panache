@@ -22,6 +22,10 @@ const STYLES: Styles = Styles::styled()
     Prettier and mdformat struggle with, including fenced divs, tables, and math formatting."
 )]
 #[command(after_help = "For help with a specific command, see: `panache help <command>`.")]
+#[command(
+    after_long_help = "For help with a specific command, see: `panache help <command>`.\n\n\
+    Homepage and downloads (including .deb and .rpm packages): <https://panache.bz>"
+)]
 #[command(arg_required_else_help = true)]
 pub struct Cli {
     #[command(subcommand)]

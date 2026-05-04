@@ -16,6 +16,8 @@ Panache is a CLI formatter and LSP for Quarto (.qmd), Pandoc, and Markdown files
 
 For help with a specific command, see: `panache help <command>`.
 
+Homepage and downloads (including .deb and .rpm packages): <https://panache.bz>
+
 ###### **Subcommands:**
 
 * `format` — Format a Quarto, Pandoc, or Markdown document
