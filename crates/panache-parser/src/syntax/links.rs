@@ -342,6 +342,79 @@ impl Figure {
     }
 }
 
+/// A bracket-shape pattern (`[foo]`, `[text][label]`, `[text][]`,
+/// `![alt]`, ...) that did not resolve as a link or image — i.e. no
+/// matching reference definition was found.
+///
+/// Distinct from `Link` / `ImageLink` so downstream tools (linter, LSP,
+/// formatter, salsa, pandoc-ast projector) can attach behavior to
+/// unresolved bracket-shape patterns without the parser having to lie
+/// about resolution. Use `is_image()` to discriminate `[foo]` from
+/// `![foo]` shapes.
+pub struct UnresolvedReference(SyntaxNode);
+
+impl AstNode for UnresolvedReference {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::UNRESOLVED_REFERENCE
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self(syntax))
+        } else {
+            None
+        }
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl UnresolvedReference {
+    /// `true` if this is an image-shape reference (`![alt]...`),
+    /// `false` for a link-shape reference (`[text]...`). Determined
+    /// from the leading byte of the node's source text.
+    pub fn is_image(&self) -> bool {
+        self.0.text().to_string().as_bytes().first() == Some(&b'!')
+    }
+
+    /// The bracket-text content (the bytes between the outer `[` and
+    /// `]`). For `[foo]` this is `"foo"`; for `[text][label]` this is
+    /// `"text"`.
+    pub fn text(&self) -> String {
+        // Mirror Link::text behavior: collect TEXT tokens from the
+        // primary text wrapper if present, falling back to all TEXT
+        // tokens under the node.
+        if let Some(link_text) = support::child::<LinkText>(&self.0) {
+            return link_text.text_content();
+        }
+        if let Some(image_alt) = support::child::<ImageAlt>(&self.0) {
+            return image_alt.text();
+        }
+        self.0
+            .descendants_with_tokens()
+            .filter_map(|it| it.into_token())
+            .filter(|token| token.kind() == SyntaxKind::TEXT)
+            .map(|token| token.text().to_string())
+            .collect()
+    }
+
+    /// The reference label for full / collapsed forms
+    /// (`[text][label]` → `Some("label")`; `[text][]` → `Some("text")`;
+    /// `[text]` shortcut → `None`).
+    pub fn label(&self) -> Option<String> {
+        support::child::<LinkRef>(&self.0).map(|r| r.label())
+    }
+
+    /// Source range of the node.
+    pub fn text_range(&self) -> rowan::TextRange {
+        self.0.text_range()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{AstNode, ImageLink};

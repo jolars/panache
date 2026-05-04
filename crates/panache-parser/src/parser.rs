@@ -4,6 +4,7 @@
 //! Quarto documents.
 
 use crate::options::ParserOptions;
+use crate::parser::inlines::refdef_map::{RefdefMap, collect_refdef_labels};
 use crate::range_utils::find_incremental_restart_offset;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::{GreenNode, GreenToken, NodeOrToken};
@@ -23,6 +24,11 @@ pub use core::Parser;
 ///
 /// Single-pass architecture: blocks emit inline structure during parsing.
 ///
+/// Convenience wrapper that scans the input for reference-definition
+/// labels via [`collect_refdef_labels`] before parsing. Callers that
+/// already have a precomputed [`RefdefMap`] (e.g. salsa-cached) should
+/// use [`parse_with_refdefs`] instead to skip the scan.
+///
 /// # Examples
 ///
 /// ```rust
@@ -41,6 +47,25 @@ pub fn parse(input: &str, config: Option<ParserOptions>) -> SyntaxNode {
     let mut config = config.unwrap_or_default();
     populate_refdef_labels(input, &mut config);
     Parser::new(input, &config).parse()
+}
+
+/// Parse with a caller-supplied refdef set.
+///
+/// Skips the [`collect_refdef_labels`] scan that [`parse`] performs.
+/// Use this when the caller already has a cached [`RefdefMap`] for
+/// `input` — e.g. from a salsa-tracked query — to avoid a redundant
+/// document-level scan on every parse.
+///
+/// The supplied `refdefs` becomes the parser's refdef set, overriding
+/// any value previously set on `options.refdef_labels`.
+pub fn parse_with_refdefs(
+    input: &str,
+    options: Option<ParserOptions>,
+    refdefs: RefdefMap,
+) -> SyntaxNode {
+    let mut options = options.unwrap_or_default();
+    options.refdef_labels = Some(refdefs);
+    Parser::new(input, &options).parse()
 }
 
 /// Pre-compute the document-level reference link label set.
@@ -63,10 +88,7 @@ fn populate_refdef_labels(input: &str, config: &mut ParserOptions) {
     if config.refdef_labels.is_some() {
         return;
     }
-    config.refdef_labels = Some(self::inlines::refdef_map::collect_refdef_labels(
-        input,
-        config.dialect,
-    ));
+    config.refdef_labels = Some(collect_refdef_labels(input, config.dialect));
 }
 
 pub struct IncrementalParseResult {
@@ -77,6 +99,11 @@ pub struct IncrementalParseResult {
 
 /// Incrementally update a syntax tree by reparsing either a bounded section
 /// window (between top-level headings) or from a safe restart boundary to EOF.
+///
+/// Convenience wrapper that scans `input` for refdef labels via
+/// [`collect_refdef_labels`] before reparsing. Callers that already have
+/// a precomputed [`RefdefMap`] (e.g. salsa-cached) should use
+/// [`parse_incremental_suffix_with_refdefs`] to skip the scan.
 pub fn parse_incremental_suffix(
     input: &str,
     config: Option<ParserOptions>,
@@ -86,6 +113,34 @@ pub fn parse_incremental_suffix(
 ) -> IncrementalParseResult {
     let mut config = config.unwrap_or_default();
     populate_refdef_labels(input, &mut config);
+    parse_incremental_suffix_inner(input, config, old_tree, old_edit_range, new_edit_range)
+}
+
+/// Incremental reparse with a caller-supplied refdef set.
+///
+/// See [`parse_with_refdefs`] for the rationale; this is the
+/// incremental-parse counterpart. The supplied `refdefs` overrides any
+/// value previously set on `options.refdef_labels`.
+pub fn parse_incremental_suffix_with_refdefs(
+    input: &str,
+    options: Option<ParserOptions>,
+    refdefs: RefdefMap,
+    old_tree: &SyntaxNode,
+    old_edit_range: (usize, usize),
+    new_edit_range: (usize, usize),
+) -> IncrementalParseResult {
+    let mut options = options.unwrap_or_default();
+    options.refdef_labels = Some(refdefs);
+    parse_incremental_suffix_inner(input, options, old_tree, old_edit_range, new_edit_range)
+}
+
+fn parse_incremental_suffix_inner(
+    input: &str,
+    config: ParserOptions,
+    old_tree: &SyntaxNode,
+    old_edit_range: (usize, usize),
+    new_edit_range: (usize, usize),
+) -> IncrementalParseResult {
     let input_len = input.len();
 
     let Some(old_edit) = normalize_range(old_edit_range) else {

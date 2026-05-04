@@ -239,6 +239,13 @@ pub enum SyntaxKind {
     DIV_INFO,
     DIV_CONTENT,
     EMOJI, // :alias:
+
+    // Bracket-shape pattern that did not resolve as a link/image.
+    // Distinct from LINK/IMAGE_LINK so downstream tools (linter, LSP) can
+    // walk a typed wrapper without the parser having to lie about
+    // resolution. `is_image()` on the typed wrapper distinguishes
+    // `[foo]` from `![foo]` shapes.
+    UNRESOLVED_REFERENCE,
 }
 
 impl From<SyntaxKind> for rowan::SyntaxKind {

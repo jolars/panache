@@ -57,6 +57,23 @@ pub fn resolve_label(db: &dyn Db, label: InternedLabel<'_>) -> String {
     label.label(db).clone()
 }
 
+/// Document-scoped reference-definition label set for `(file, config)`.
+///
+/// Lifted out of [`parsed_tree`] so downstream semantic queries can
+/// invalidate independently from CST recomputation. The dialect comes
+/// from the config (Pandoc and CommonMark agree on the document-scoped
+/// lookup rule, but normalization details may differ in the future).
+///
+/// Salsa value-equality on `Arc<HashSet<String>>` is set-equality
+/// (order-independent), so a paragraph edit that doesn't change refdefs
+/// short-circuits at this query and downstream consumers don't see an
+/// invalidation pulse.
+#[salsa::tracked(returns(ref), lru = 64)]
+pub fn refdef_set(db: &dyn Db, file: FileText, config: FileConfig) -> crate::parser::RefdefMap {
+    let dialect = panache_parser::Dialect::for_flavor(config.config(db).flavor);
+    crate::parser::collect_refdef_labels(file.text(db), dialect)
+}
+
 /// Parse a `(file, config)` pair to a CST exactly once per `SalsaDb`. All
 /// salsa-tracked queries below funnel their parses through this entry point so
 /// a single document's lint pipeline (built-in plan, project graph, metadata,
@@ -69,9 +86,14 @@ pub fn resolve_label(db: &dyn Db, label: InternedLabel<'_>) -> String {
 /// in a fresh `SyntaxNode` via [`parsed_tree_root`] — that is cheap (a single
 /// atomic clone) and gives each caller its own cursor without leaking the
 /// salsa cell.
+///
+/// The refdef set is consumed via the [`refdef_set`] query so that
+/// edits which don't change refdefs short-circuit at the refdef layer
+/// without re-scanning the document inside `parse`.
 #[salsa::tracked(returns(ref), lru = 64)]
 pub fn parsed_tree(db: &dyn Db, file: FileText, config: FileConfig) -> rowan::GreenNode {
-    crate::parse(file.text(db), Some(config.config(db).clone()))
+    let refdefs = refdef_set(db, file, config).clone();
+    crate::parser::parse_with_refdefs(file.text(db), Some(config.config(db).clone()), refdefs)
         .green()
         .into_owned()
 }
