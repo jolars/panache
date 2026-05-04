@@ -16,7 +16,7 @@ use cache::{
     CachedLintDocument, CliCache, FormatCacheMode, FormatStoreArgs, global_cache_base_dir,
     resolve_cache_dir_for_cli,
 };
-use cli::{Cli, ColorMode, Commands, DebugChecks, DebugCommands};
+use cli::{Cli, ColorMode, Commands, DebugChecks, DebugCommands, ParseOutput};
 use diagnostic_renderer::print_diagnostics;
 
 /// Supported file extensions for formatting
@@ -670,7 +670,12 @@ fn main() -> io::Result<()> {
     init_logger(debug_log.as_deref());
 
     match cli.command {
-        Commands::Parse { file, json, verify } => {
+        Commands::Parse {
+            file,
+            to,
+            json,
+            verify,
+        } => {
             if verify {
                 eprintln!(
                     "Warning: `panache parse --verify` is deprecated; use `panache debug format --checks losslessness`."
@@ -710,8 +715,14 @@ fn main() -> io::Result<()> {
                 let json_output =
                     serde_json::to_string_pretty(&json_value).map_err(io::Error::other)?;
                 fs::write(json_path, json_output)?;
-            } else if !cli.quiet {
-                println!("{:#?}", tree);
+            }
+            if !cli.quiet {
+                match to {
+                    ParseOutput::Cst => println!("{:#?}", tree),
+                    ParseOutput::PandocAst => {
+                        println!("{}", panache::parser::to_pandoc_ast(&tree));
+                    }
+                }
             }
             Ok(())
         }

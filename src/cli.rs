@@ -215,12 +215,24 @@ pub enum Commands {
         )]
         file: Option<PathBuf>,
 
+        /// Output format printed to stdout
+        #[arg(long, value_enum, default_value_t = ParseOutput::Cst, value_name = "FORMAT")]
+        #[arg(help = "Output format: cst (default) or pandoc-ast")]
+        #[arg(long_help = "Choose what to print to stdout:\n\
+            - cst (default): debug-format CST tree, useful for parser debugging.\n\
+            - pandoc-ast: pandoc-native AST text, the same shape produced by \
+              `pandoc -f markdown -t native`. Unsupported constructs emit visible \
+              `Unsupported \"<KIND>\"` sentinels rather than being silently dropped.")]
+        to: ParseOutput,
+
         /// Write CST JSON output to the given file
         #[arg(long, value_name = "PATH")]
         #[arg(help = "Write CST JSON output to PATH")]
         #[arg(
-            long_help = "Write the parsed CST to the given JSON file instead of printing the debug tree. \
-            The output includes node kinds, text ranges, and token text."
+            long_help = "Write the parsed CST to the given JSON file in addition to \
+            printing the selected --to format to stdout. The JSON output is always \
+            CST-shaped regardless of --to; it includes node kinds, text ranges, and \
+            token text."
         )]
         json: Option<PathBuf>,
 
@@ -355,6 +367,12 @@ pub enum DebugChecks {
     Idempotency,
     Losslessness,
     All,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum ParseOutput {
+    Cst,
+    PandocAst,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]

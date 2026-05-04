@@ -83,7 +83,15 @@ Parse a document and display its Concrete Syntax Tree (CST) for debugging and un
 
 ###### **Options:**
 
-* `--json <PATH>` — Write the parsed CST to the given JSON file instead of printing the debug tree. The output includes node kinds, text ranges, and token text.
+* `--to <FORMAT>` — Choose what to print to stdout:
+   - cst (default): debug-format CST tree, useful for parser debugging.
+   - pandoc-ast: pandoc-native AST text, the same shape produced by `pandoc -f markdown -t native`. Unsupported constructs emit visible `Unsupported "<KIND>"` sentinels rather than being silently dropped.
+
+  Default value: `cst`
+
+  Possible values: `cst`, `pandoc-ast`
+
+* `--json <PATH>` — Write the parsed CST to the given JSON file in addition to printing the selected --to format to stdout. The JSON output is always CST-shaped regardless of --to; it includes node kinds, text ranges, and token text.
 * `--verify` — Run parser losslessness verification (input == parsed CST text). Exits with code 1 when verification fails. 
 
    Deprecated: prefer `panache debug format --checks losslessness`.

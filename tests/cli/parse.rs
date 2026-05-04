@@ -149,3 +149,57 @@ fn test_parse_stdin_filename_infers_quarto_flavor() {
         .success()
         .stdout(predicate::str::contains("SHORTCODE"));
 }
+
+#[test]
+fn test_parse_to_pandoc_ast_stdin() {
+    cargo_bin_cmd!("panache")
+        .args(["parse", "--to", "pandoc-ast"])
+        .write_stdin("# Heading\n\nA **bold** word.")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Header 1"))
+        .stdout(predicate::str::contains("Para"))
+        .stdout(predicate::str::contains("Strong"))
+        .stdout(predicate::str::contains("Str \"bold\""))
+        // Make sure we did not also dump the CST debug tree.
+        .stdout(predicate::str::contains("DOCUMENT").not());
+}
+
+#[test]
+fn test_parse_default_format_is_cst() {
+    cargo_bin_cmd!("panache")
+        .arg("parse")
+        .write_stdin("# Heading")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("DOCUMENT"))
+        .stdout(predicate::str::contains("HEADING"))
+        // CST debug output, not pandoc-ast.
+        .stdout(predicate::str::contains("Header 1").not());
+}
+
+#[test]
+fn test_parse_to_pandoc_ast_with_json_writes_both() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    let output_file = temp_dir.path().join("cst.json");
+
+    fs::write(&test_file, "# Heading").unwrap();
+
+    // --to controls stdout, --json keeps writing CST JSON to file.
+    cargo_bin_cmd!("panache")
+        .args([
+            "parse",
+            "--to",
+            "pandoc-ast",
+            "--json",
+            output_file.to_str().unwrap(),
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Header 1"));
+
+    let json_output = fs::read_to_string(&output_file).unwrap();
+    assert!(json_output.contains("\"DOCUMENT\""));
+}

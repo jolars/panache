@@ -6,6 +6,7 @@ pub use panache_parser::parser::blocks;
 pub use panache_parser::parser::inlines;
 pub use panache_parser::parser::utils;
 pub use panache_parser::parser::yaml;
+pub use panache_parser::to_pandoc_ast;
 
 use crate::config::Config;
 use crate::syntax::SyntaxNode;
