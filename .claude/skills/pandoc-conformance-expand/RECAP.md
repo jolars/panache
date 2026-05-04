@@ -5,18 +5,20 @@ state; this file is judgment calls only.
 
 ## Suggested next targets
 
-Ranked by likely shared root cause and leverage. Numbers in parentheses are the
-count of currently-failing imports remaining under that bucket in the latest
-`report.txt`. 1 import remains failing total (186 / 187 passing).
+Corpus is at **187 / 187 passing (100%)**. There are no failing imports left
+in the seed. Future work should focus on **growing the corpus**:
 
-1. **Tables --- #71 grid_table_planets (1)** --- rowspan/colspan layout.
-   Pandoc emits `RowSpan N` / `ColSpan N` for cells whose `+   +-----+`-style
-   separators omit the column-divider `+` to span the cell into the next
-   row, and similarly for column merges. Our `grid_column_ranges` helper
-   currently skips empty `+`-to-`+` ranges (which represent spans), so
-   spanned cells produce wrong column ordering. Heavy — needs a layout
-   model that assigns cells to specific columns and tracks RowSpan/ColSpan
-   counts per cell. The single remaining failure.
+1. **Expand corpus with new pandoc-markdown constructs.** Pick areas not
+   yet covered — e.g. `definition_list_with_continuation_paragraphs`,
+   `figure_with_attribute_id_and_caption_attrs`, `nested_block_quotes`,
+   `inline_math_with_attrs`, larger walking-skeleton-style mixed-flavor
+   corner cases. Add `<NNNN>-<section>-<slug>/` dirs with `input.md` and
+   `expected.native` regenerated via `pandoc -f markdown -t native`.
+   Allowlist when green; otherwise leave un-allowlisted and triage.
+2. **Re-run with a newer pandoc build** (intentional pin bump only).
+   `scripts/update-pandoc-conformance-corpus.sh` regenerates every
+   `expected.native` from local pandoc; review the full diff before
+   committing — drift in pandoc's output is information, not a bug.
 
 ## Don't redo
 
@@ -64,14 +66,111 @@ count of currently-failing imports remaining under that bucket in the latest
   outside, `.0` suffix on whole-number mantissas). Don't reach for
   `format!("{:.16}", x)` or hand-rolled rendering — both diverge from
   pandoc's `ppShow` output for `ColWidth N`, `citationNoteNum`, etc.
+- Grid-table layout (`grid_table` + `find_grid_cell` in
+  `native_projector.rs`) is the `gridtables`-style 2D pass: union of `+`
+  positions across all sep-style lines (full + partial) gives canonical
+  column boundaries; indices of those sep-style lines give canonical row
+  boundaries. Cells are detected by walking unoccupied (block_row,
+  col) in scan order and finding the smallest valid bounding rectangle
+  (top/bottom in `{-,=,:,+}`, left/right in `{|,+}`, no fully-spanning
+  interior separator). Don't go back to range-based row slicing — it
+  can't represent ColSpan ≥ 2 cells whose canonical column positions
+  are missing on the row's top separator. The `interior_split` check
+  is load-bearing: it's what stops a tall cell from being chosen when
+  a partial separator inside it would split the cell at a fully
+  spanning row.
+- Per-cell `RowSpan`/`ColSpan` lives on `GridCell`, not on
+  `TableData`. Pipe/simple/multiline tables wrap their cells via
+  `GridCell::no_span(...)`. Don't add a parallel `Vec<Vec<(u32,u32)>>`
+  next to `head_rows`/`body_rows`; the struct stays in sync.
 
 ## Latest session
 
-- **Date**: 2026-05-04 (Same-line BQ inside LIST_ITEM: recurse list-marker
-  detection inside the BQ's content, sibling-list-marker continuation
-  across the BQ prefix when the deepest container is an inner LIST
-  inside the BQ, and matching formatter fix to emit outer continuation
-  indent on BQ continuation lines)
+- **Date**: 2026-05-04 (Grid-table layout pass: canonical col/row
+  boundaries from union of `+` positions in sep-style lines, scan-order
+  cell detection with smallest-valid-rectangle search and interior-split
+  guard. Closes the seed corpus.)
+- **Pass before → after**: 186 → 187 / 187 (+1 import: #71,
+  `imported-grid_table_planets`). 100% pass rate.
+- **What landed**:
+  - **Projector: layout-aware grid table**
+    (`crates/panache-parser/tests/pandoc/native_projector.rs` —
+    `grid_table` rewritten, new `find_grid_cell`, new
+    `parse_grid_cell_text`). Old per-row `grid_row_cells_blocks` /
+    `grid_column_ranges` / `parse_cell_text_blocks` removed — the new
+    function consumes the whole `GRID_TABLE` node and tags each line
+    with the parent `SyntaxKind` (TABLE_HEADER/ROW/FOOTER) so head/foot
+    classification still works after the row-block re-discretization.
+    Lines split on `\n` (not `split_inclusive`); padded to a 2D char
+    grid; sep-style lines = "has `+` AND only `+/-/=/:/|/space`";
+    canonical cols/rows derived from those. Cells found by scan-order
+    `for sr in 0..nrows / for sc in 0..ncols` with an `occupied[sr][sc]`
+    grid; `find_grid_cell` does a `for ec / for er` search picking the
+    smallest valid (er, ec) and rejects rectangles whose top edge runs
+    into a `|`/space (early `break` on top-edge fail), whose left/right
+    edges aren't `|` or `+`, whose bottom edge isn't `-/=/:/+`, or
+    that contain a fully-spanning interior partial separator.
+  - **Projector: `GridCell` struct + per-cell spans on `TableData`**.
+    `head_rows`/`body_rows`/`foot_rows` flipped from
+    `Vec<Vec<Vec<Block>>>` to `Vec<Vec<GridCell>>`.
+    `cells_to_plain_blocks` returns `Vec<GridCell>`. Pipe / simple /
+    multiline table builders wrap their cells via `GridCell::no_span`;
+    `write_table_row` emits `RowSpan {n}` / `ColSpan {n}` from the
+    cell instead of the literal `RowSpan 1 ColSpan 1`.
+  - **Allowlist**: `crates/panache-parser/tests/pandoc/allowlist.txt`
+    (+1: 71 inserted between 70 and 72, under `# imported`).
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 71 (imported-grid_table_planets)
+- **Files changed (classified)**:
+  - **projector**:
+    `crates/panache-parser/tests/pandoc/native_projector.rs` —
+    `TableData` field types, new `GridCell` struct, full grid_table
+    rewrite, `find_grid_cell` + `parse_grid_cell_text` helpers,
+    `write_table_row` reads cell spans, `cells_to_plain_blocks`
+    returns `Vec<GridCell>`, pipe / simple / multiline builders wrap
+    cells via `GridCell::no_span`.
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 71).
+- **Don't redo**:
+  - The `interior_split` rejection inside `find_grid_cell` walks rows
+    `(i+1)..l` looking for a row that has `+` at BOTH col j and col k
+    *and* sep-only chars between. If only one of the two corners has
+    `+` (or if the inner span has any `|`), that's a partial sep that
+    splits SOME cells (the one bounded at that col) but does NOT split
+    THIS cell. Don't tighten to "any `+` between" — multi-row cells
+    legitimately step over partial seps that don't fully cross them.
+  - Header / body / foot classification reads the `SyntaxKind` of each
+    interior line in a row block, not the row block's bounding
+    separators. The bounding separator's parent in the CST is whichever
+    node it falls into syntactically; using the *interior* lines is
+    robust because the parser tags TABLE_HEADER on the actual header
+    content, TABLE_ROW on body content, TABLE_FOOTER on foot content.
+    Don't reach for the bounding sep's parent — it's brittle and
+    sometimes ambiguous (a sep can be a sibling of both).
+  - Column widths and alignments come from the alignment-bearing
+    separator (the one with `:`s) when present, falling back to the
+    first separator. The first separator may be a partial-cols header
+    border (e.g. planets case has 11 `+`s on line 1 but 13 on line 5,
+    and line 5 is the canonical) so don't lock width/align extraction
+    to the first separator just because both are `TABLE_SEPARATOR`s.
+  - The cell-content extraction strips ONE leading space (the cell
+    pad inside `| `) per interior line and trims trailing whitespace,
+    matching the old `grid_row_cells_blocks` rule. Don't switch to
+    `trim_start()` — a 4-space-indented cell needs to remain
+    indented-by-3 after stripping the single pad space, which is what
+    pandoc treats as a code block.
+  - The `for r in (i+1)..l` / `for c in sc..ec` style indexed loops
+    in `grid_table` and `find_grid_cell` are gated by
+    `#[allow(clippy::needless_range_loop)]`. The lint complains
+    because `r`/`c` index multiple parallel arrays (`grid`,
+    `occupied`); the iterator rewrite would lose readability for no
+    win. Don't strip the allow.
+
+## Earlier session (2026-05-04, Same-line BQ inside LIST_ITEM: recurse
+  list-marker detection inside the BQ's content, sibling-list-marker
+  continuation across the BQ prefix when the deepest container is an
+  inner LIST inside the BQ, and matching formatter fix to emit outer
+  continuation indent on BQ continuation lines)
 - **Pass before → after**: 185 → 186 / 187 (+1 import: #91). Two
   parser-shape fixes plus one formatter fix that compose to unlock #91:
   1. **Recursive list-marker open inside same-line BQ-in-list-item**:
@@ -239,264 +338,6 @@ count of currently-failing imports remaining under that bucket in the latest
     markdown` and `pandoc -f commonmark`), so no per-dialect
     branching was added.
 
-## Earlier session (2026-05-04, Lazy ListItem continuation in BQ-list:
-  no-`>` plain-text line folds into the deepest open list item's buffer
-  rather than closing the outer blockquote)
-- **Pass before → after**: 184 → 185 / 187 (+1 import: #96).
-  Parser-shape fix in `parse_line`'s `bq_depth < current_bq_depth`
-  branch (`core.rs`): added a new lazy-continuation check that fires
-  when the deepest container is a `ListItem` inside a blockquote and
-  the line is plain text (not a list marker, not an HR/fence in
-  CommonMark). The line is appended to the open `ListItemBuffer` (the
-  buffered analogue of an open Paragraph) so the BQ stays open and the
-  list item's PLAIN absorbs the lazy line as a SoftBreak-joined
-  continuation, matching pandoc-native. This single fix cascades:
-  in #96, keeping the outer BQ open also prevented the spurious
-  sibling BQ that line 6 (`> > And...`) was creating, and the
-  subsequent `> Back...` Para and `> - Second item` inner BulletList
-  fall into place inside the same outer BQ. Three blocks of changes:
-  parser core, parser CST snapshot for the existing
-  `lazy_continuation_deep` fixture, and the formatter golden expected
-  for the same case (the lazy line now reflows inside the list item
-  with `>   ` continuation indent at line-width).
-- **What landed**:
-  - **Parser: lazy ListItem buffer continuation in BQ-list**
-    (`crates/panache-parser/src/parser/core.rs` — `parse_line`,
-    inserted between the existing lazy-paragraph and lazy-list-marker
-    continuation blocks). Mirrors the lazy-paragraph branch's
-    structure: bq_depth>0 path buffers any explicit `>` markers via
-    `buffer.push_blockquote_marker` then appends `inner_content`;
-    bq_depth==0 path appends the original `line`. Both clear
-    `marker_only` when content is non-blank. HR/fence interrupt
-    checks gated on Dialect::CommonMark mirror the paragraph branch.
-  - **New parser fixture**:
-    `crates/panache-parser/tests/fixtures/cases/blockquote_list_lazy_continuation_no_marker/`
-    (`> - foo / bar`) — pins the minimal lazy ListItem continuation
-    shape: BLOCK_QUOTE > LIST > LIST_ITEM > PLAIN with both `foo` and
-    `bar` as TEXT siblings inside one PLAIN. Wired into
-    `golden_parser_cases.rs` between `blockquote_list_blockquote` and
-    `blockquote_list_no_marker_closes_commonmark`.
-  - **Snapshot regeneration**: 1 parser CST snapshot
-    (`parser_cst_lazy_continuation_deep`) updated to reflect the new
-    shape — the lazy line `lazy continuation across the first level`
-    now sits inside the BQ's BulletList item PLAIN, and the entire
-    document is one outer BLOCK_QUOTE (prior snapshot had three
-    sibling top-level nodes: BQ + PARAGRAPH + BQ).
-  - **Formatter golden update**:
-    `tests/fixtures/cases/lazy_continuation_deep/expected.md`
-    regenerated. The first item now reflows as
-    `> - This is a blockquoted list item with lazy continuation across the first / >   level`
-    (continuation at hanging indent) instead of the prior
-    `> - … with / lazy continuation …` shape that preserved the
-    original lossy line break.
-- **Cases unlocked** (+1, allowlisted under `# imported`):
-  - 96 (imported-lazy_continuation_deep)
-- **Files changed (classified)**:
-  - **parser-shape**:
-    `crates/panache-parser/src/parser/core.rs` (`parse_line` —
-    new lazy ListItem buffer continuation block, ~58 lines).
-  - **parser fixture**: new
-    `blockquote_list_lazy_continuation_no_marker/` directory under
-    `crates/panache-parser/tests/fixtures/cases/` and a matching
-    `parser_cst_blockquote_list_lazy_continuation_no_marker.snap`.
-    Wired into `golden_parser_cases.rs`.
-  - **snapshot**:
-    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_lazy_continuation_deep.snap`
-    (existing parser fixture pinned to the pandoc-correct shape).
-  - **formatter golden**:
-    `tests/fixtures/cases/lazy_continuation_deep/expected.md`.
-  - **allowlist**:
-    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 96
-    inserted between 95 and 97, under `# imported`).
-- **Don't redo**:
-  - The new branch fires *only* when the deepest container is
-    `ListItem` AND we're `in_blockquote_list`. The `in_blockquote_list`
-    guard matters: a top-level `- foo / bar` (no BQ) reaches a
-    different code path entirely (the `bq_depth == current_bq_depth ==
-    0` else-if at the bottom of `parse_line`) which already handles
-    lazy ListItem continuation via `parse_inner_content`. Don't
-    generalize this branch to fire outside BQ — it would double-fire.
-  - The `try_parse_list_marker(line, self.config).is_none()` guard
-    prevents this branch from stealing list-marker lines (e.g.
-    `- bar`) from the existing lazy list-marker continuation block
-    immediately below it. Don't remove the guard — the order matters
-    too (this branch is positioned *before* the lazy list-marker
-    branch, but the list-marker branch is `bq_depth == 0` only and
-    Pandoc-only; the guard keeps the two branches non-overlapping).
-  - The HR/fence interrupt checks intentionally mirror the lazy
-    *paragraph* continuation branch's `is_commonmark` gate. Pandoc's
-    actual behavior is more permissive than CommonMark (HR doesn't
-    interrupt; fence interrupts even outside lazy contexts because it
-    opens at column 0). Don't tighten the gate to fire fence interrupt
-    in Pandoc here — fence opening at column 0 is handled elsewhere
-    (paragraph closing on fence detection in dispatcher), and the
-    lazy-continuation branch is just consistent with the paragraph
-    sibling in this file.
-  - Verified pandoc-native behavior: `# Heading`, table separators,
-    and other paragraph-interrupting lines do NOT interrupt lazy
-    continuation in pandoc — they are absorbed as text into the
-    PLAIN. So the conservative HR/fence-only interrupt check matches
-    pandoc, not just CommonMark. Don't add ATX-heading or
-    table-shape interrupts.
-  - Setext underline (`===`, `---`) lines below a `> - foo`
-    pattern cause pandoc to *retroactively* reparse the entire prior
-    block as a setext heading (treating `>` and `-` as text). This is
-    a pandoc quirk we don't model. The current fix doesn't try to
-    handle it — if a corpus case ever lands that depends on it,
-    that's a separate setext-reparse session.
-  - Case #91 still fails. It's a structurally different bug:
-    list-marker inside BQ-prefixed content (`-  > - 0:`) needs to be
-    detected as opening a nested BulletList inside the outer item's
-    BlockQuote. Different code path (the `> -` content gets parsed
-    as Paragraph text instead of recursing into list parsing). The
-    new lazy-continuation branch doesn't help.
-
-## Earlier session (2026-05-04, Definition-list continuation: `>`
-  continuation markers and bullet-list openings recognized at the
-  definition's content column)
-- **Pass before → after**: 183 → 184 / 187 (+1 import: #43).
-  Parser-shape: two narrow continuation-policy gaps inside `Definition`
-  containers. (1) `shifted_blockquote_from_list` early-out
-  `if !lists::in_list(...)` blocked the column-shift detection when the
-  enclosing content container was a `Definition` (or `FootnoteDefinition`)
-  rather than a `ListItem`. With the early-out gone, the existing
-  `marker_col == 0` guard still handles the top-level case, and a `>`
-  at the Definition's content column is recognized as a BQ continuation
-  marker (e.g. `:   > a / > b` inside a definition). (2) In
-  `definition_plain_can_continue`, a list marker (already followed by
-  the existing prev-blank / in_list checks) now also returns false when
-  `raw_indent_cols >= content_indent` — meaning a list marker indented
-  to the definition's content column opens a nested BulletList inside
-  the definition even without a separating blank line, matching
-  pandoc-native. CommonMark allowlist green; pandoc allowlist green;
-  full parser-crate suite green; full workspace tests green; clippy +
-  fmt clean.
-- **What landed**:
-  - **Parser: drop list-only gate on column-shifted BQ detection**
-    (`crates/panache-parser/src/parser/core.rs` —
-    `shifted_blockquote_from_list`). Removed
-    `if !lists::in_list(&self.containers) { return None; }`. The
-    `marker_col == 0` guard already handles top-level / no-content-
-    container cases. Function name kept (the old "from_list"
-    framing is now historical; the math via
-    `current_content_col + content_container_indent_to_strip`
-    naturally generalizes).
-  - **Parser: list marker at content_col opens inner list**
-    (`crates/panache-parser/src/parser/utils/continuation.rs` —
-    `definition_plain_can_continue`). Added a
-    `content_indent > 0 && raw_indent_cols >= content_indent` short-
-    circuit for the list-marker branch, returning false so the
-    normal block dispatcher emits the LIST instead of buffering the
-    line into the open PLAIN.
-  - **Unit test flip**:
-    `parser/blocks/tests/definition_lists.rs` —
-    `definition_list_plain_does_not_start_list_without_blank_line`
-    pinned the *broken* legacy behavior. Renamed to
-    `definition_list_plain_starts_list_at_content_column_without_blank_line`
-    and flipped the assertions to require PLAIN + LIST inside the
-    Definition. Verified against pandoc-native.
-  - **Snapshot regeneration**: 1 parser CST snapshot
-    (`parser_cst_definition_list`) updated to reflect both fixes —
-    `> b` / `> c` now tokenize as continuation markers, and the
-    "A definition list with nested items" definition now contains
-    PLAIN + LIST instead of one fat PLAIN.
-  - **Formatter golden update**:
-    `tests/fixtures/cases/definition_list/expected.md` regenerated.
-    The "nested items" definition now formats as
-    `:   Here comes a list (or wait, is it?)\n    - A\n    - B`
-    instead of the collapsed `- A - B` plain text.
-  - **New parser fixtures**: two minimal pin-down cases:
-    - `crates/panache-parser/tests/fixtures/cases/definition_list_blockquote_continuation/`
-      (`Term // : > a / > b / > c`) — pins BQ-marker recognition.
-    - `crates/panache-parser/tests/fixtures/cases/definition_list_inner_list_no_blank/`
-      (`Term / : plain content / - A / - B` indented at content col)
-      — pins inner BulletList without separating blank.
-    Both wired into `golden_parser_cases.rs` between
-    `definition_list` and `definition_list_nesting`.
-- **Cases unlocked** (+1, allowlisted under `# imported`):
-  - 43 (imported-definition_list)
-- **Files changed (classified)**:
-  - **parser-shape**:
-    `crates/panache-parser/src/parser/core.rs`
-    (`shifted_blockquote_from_list`),
-    `crates/panache-parser/src/parser/utils/continuation.rs`
-    (`definition_plain_can_continue`).
-  - **unit test**:
-    `crates/panache-parser/src/parser/blocks/tests/definition_lists.rs`
-    (rename + flip the assertions).
-  - **snapshot**:
-    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_definition_list.snap`
-    (+ two new snapshots from the new fixtures).
-  - **parser fixtures**: new `definition_list_blockquote_continuation/`
-    and `definition_list_inner_list_no_blank/` directories under
-    `crates/panache-parser/tests/fixtures/cases/`, wired into
-    `golden_parser_cases.rs`.
-  - **formatter golden**:
-    `tests/fixtures/cases/definition_list/expected.md`.
-  - **allowlist**:
-    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 43
-    inserted between 42 and 44, under `# imported`).
-- **Don't redo**:
-  - The `lists::in_list` early-out in `shifted_blockquote_from_list`
-    was redundant with the `marker_col == 0` check. The function's
-    math (`current_content_col` (innermost ListItem/FootnoteDefinition)
-    + `content_container_indent_to_strip` (sum of FootnoteDefinition +
-    Definition `content_col`s)) generalizes to definitions/footnotes
-    naturally — `marker_col` ends up at the absolute column where a
-    shifted `>` should sit. Don't reinstate the gate; the function
-    name is historical, the behavior is "any indented content
-    container".
-  - Pandoc-native treats a list marker at the Definition's content
-    column as opening a nested BulletList *regardless of whether a
-    blank line precedes it*. The legacy unit test pinning the
-    "no-list-without-blank" shape was preserving the parser's old
-    bug. Don't revert.
-  - The `content_indent > 0` part of the new continuation check is
-    load-bearing: at top level (`content_indent == 0`,
-    e.g. paragraph not inside a Definition) `definition_plain_can_continue`
-    is only called when the last container is a Definition, so this
-    is a defensive guard rather than a hot path — but dropping it
-    would let a 0-indent list marker short-circuit the rest of the
-    function in unexpected ways.
-  - The `raw_indent_cols >= content_indent` check is intentionally
-    "≥", not "==". Pandoc accepts list markers at any indent ≥
-    content_col as opening the inner list; if the marker is more
-    deeply indented (e.g. column 5 inside a `:   ` definition
-    starting at column 4), pandoc still opens a list and uses the
-    column for the list's own indent. Don't tighten to "==".
-  - Cases #91 and #96 still fail. Both are different continuation-
-    policy issues (lazy continuation across BQ depth boundaries;
-    list-item closure mid-blockquote). The fixes here don't help
-    them — they involve real non-blank lines with policy outcomes
-    diverging from pandoc.
-
-## Earlier session (2026-05-04, Blank-line peek-loop inside blockquote: skip blank-in-BQ lines so multi-blank-then-continuation list items don't prematurely close)
-
-- **Pass before → after**: 182 → 183 / 187 (+1 import: #34). Parser-shape
-  fix in `parse_line`'s blank-line branch (`core.rs`): the peek-ahead
-  loop that skips trailing blank lines now also skips lines that are
-  functionally blank in the current blockquote context (e.g. `>` or
-  `>   ` when inside a `> ` blockquote). The fix peels off `bq_depth`
-  markers via `strip_n_blockquote_markers` and skips when the inner
-  content `is_blank_line`. Required updating one parser CST snapshot
-  and one formatter golden expected.
-- **Cases unlocked**: 34 (imported-blockquote_list_blockquote)
-- **Files changed**:
-  - parser-shape: `crates/panache-parser/src/parser/core.rs` (blank-line peek loop)
-  - snapshot: `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_blockquote_list_blockquote.snap`
-  - formatter golden: `tests/fixtures/cases/blockquote_list_blockquote/expected.md`
-  - allowlist: `crates/panache-parser/tests/pandoc/allowlist.txt`
-- **Don't redo**:
-  - The peek-loop guard requires both `peek_bq >= bq_depth` AND
-    `is_blank_line(peek_inner)` to skip. Don't drop the depth check —
-    a line with `peek_bq < bq_depth` (e.g. plain text after BQ close)
-    is a real container-close event that
-    `compute_levels_to_keep` needs to see.
-  - The check uses `bq_depth` (current line's BQ depth) rather than
-    `current_bq_depth` (container-stack depth). For the blank-in-BQ
-    case both happen to match because the current line carries `>`
-    markers and `current_bq_depth` reflects the open BQ container.
-
 ## Prior sessions
 
 Older session logs were pruned to keep the recap scannable. Use `git log` on
@@ -504,6 +345,21 @@ Older session logs were pruned to keep the recap scannable. Use `git log` on
 trace which case unlocked when. Cross-session lessons that still apply have
 been folded into the global "Don't redo" section above.
 
+- 2026-05-04: Definition-list continuation — `>` continuation markers
+  and bullet-list openings recognized at the definition's content
+  column (#43 unlocked) — see git log on
+  `crates/panache-parser/src/parser/utils/continuation.rs` and
+  `crates/panache-parser/src/parser/core.rs`
+  (`shifted_blockquote_from_list`).
+- 2026-05-04: Lazy ListItem continuation in BQ-list — no-`>`
+  plain-text line folds into the deepest open list item's buffer
+  rather than closing the outer blockquote (#96 unlocked) — see git
+  log on `crates/panache-parser/src/parser/core.rs` (`parse_line`
+  lazy ListItem buffer continuation block).
+- 2026-05-04: Blank-line peek-loop inside blockquote — skip
+  blank-in-BQ lines so multi-blank-then-continuation list items don't
+  prematurely close (#34 unlocked) — see git log on
+  `crates/panache-parser/src/parser/core.rs` (blank-line peek loop).
 - 2026-05-04: Citations proper — `Cite [Citation, ...] [Inline, ...]`
   projection with prefix/suffix inline parsing, `@key [locator]`
   AuthorInText absorption, and doc-order noteNum pre-pass (#38 unlocked) —

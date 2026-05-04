@@ -597,11 +597,31 @@ struct TableData {
     aligns: Vec<&'static str>,
     /// Per-column width. `None` → `ColWidthDefault`, `Some(f)` → `ColWidth f`.
     widths: Vec<Option<f64>>,
-    head_rows: Vec<Vec<Vec<Block>>>,
-    body_rows: Vec<Vec<Vec<Block>>>,
+    head_rows: Vec<Vec<GridCell>>,
+    body_rows: Vec<Vec<GridCell>>,
     /// Footer rows. Currently only populated for grid tables with a
     /// trailing `+===+===+` separator before the final body row(s).
-    foot_rows: Vec<Vec<Vec<Block>>>,
+    foot_rows: Vec<Vec<GridCell>>,
+}
+
+/// One cell in a `TableData` row. `row_span`/`col_span` default to 1 for
+/// pipe/simple/multiline tables (which don't model spans). Grid tables
+/// compute proper span counts via the layout algorithm in `grid_table`.
+#[derive(Debug)]
+struct GridCell {
+    row_span: u32,
+    col_span: u32,
+    blocks: Vec<Block>,
+}
+
+impl GridCell {
+    fn no_span(blocks: Vec<Block>) -> Self {
+        Self {
+            row_span: 1,
+            col_span: 1,
+            blocks,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -1594,7 +1614,7 @@ fn pipe_table(node: &SyntaxNode) -> Option<TableData> {
     } else {
         vec![cells_to_plain_blocks(header_cells, cols)]
     };
-    let body_rows: Vec<Vec<Vec<Block>>> = body_rows
+    let body_rows: Vec<Vec<GridCell>> = body_rows
         .into_iter()
         .map(|cells| cells_to_plain_blocks(cells, cols))
         .collect();
@@ -1729,19 +1749,20 @@ fn pipe_separator_aligns(raw: &str) -> Vec<&'static str> {
         .collect()
 }
 
-fn cells_to_plain_blocks(cells: Vec<Vec<Inline>>, cols: usize) -> Vec<Vec<Block>> {
-    let mut out: Vec<Vec<Block>> = cells
+fn cells_to_plain_blocks(cells: Vec<Vec<Inline>>, cols: usize) -> Vec<GridCell> {
+    let mut out: Vec<GridCell> = cells
         .into_iter()
         .map(|inlines| {
-            if inlines.is_empty() {
+            let blocks = if inlines.is_empty() {
                 Vec::new()
             } else {
                 vec![Block::Plain(inlines)]
-            }
+            };
+            GridCell::no_span(blocks)
         })
         .collect();
     while out.len() < cols {
-        out.push(Vec::new());
+        out.push(GridCell::no_span(Vec::new()));
     }
     out
 }
@@ -1834,7 +1855,7 @@ fn simple_table(node: &SyntaxNode) -> Option<TableData> {
         }
         None => Vec::new(),
     };
-    let body_rows: Vec<Vec<Vec<Block>>> = body_rows_nodes
+    let body_rows: Vec<Vec<GridCell>> = body_rows_nodes
         .iter()
         .map(|r| cells_to_plain_blocks(simple_table_row_cells(r), cols.len()))
         .collect();
@@ -1966,64 +1987,203 @@ fn simple_table_aligns(row: &SyntaxNode, cols: &[(usize, usize)]) -> Vec<&'stati
 
 // ----- grid table ---------------------------------------------------------
 
-/// Project a `GRID_TABLE` node. Pandoc-native column widths are
-/// `(dash_count + 1) / 72`, where 72 is pandoc's reference width (default
-/// `--columns`). Alignment colons in a `:===:` separator follow the same
-/// rules as pipe tables. We use the *first* alignment-bearing separator —
-/// the one immediately following the header — as the canonical alignment;
-/// pandoc falls back to `AlignDefault` when no separator carries colons.
+/// Project a `GRID_TABLE` node into pandoc-native shape. Implements a
+/// `gridtables`-style 2D layout pass:
 ///
-/// Cells slice the row's text by the `+`-derived column ranges from the
-/// first separator and reparse each column's content as block-level
-/// markdown. This preserves multi-line content (joined by `\n`) so
-/// `Population\<NL>(in 2018)` becomes `[Str "Population", LineBreak, ...]`
-/// and indented-by-4 cell content like `      B` becomes a `CodeBlock`.
+/// 1. Collect every line of the table (excluding caption) into a padded
+///    char grid, tracking which `TABLE_HEADER` / `TABLE_ROW` /
+///    `TABLE_FOOTER` parent each line came from.
+/// 2. The canonical column boundaries are the union of `+` positions
+///    across every "sep-style" line (lines made of `+`/`-`/`=`/`:`/`|`/`
+///    `). The canonical row boundaries are the indices of those
+///    sep-style lines. So a partial separator like
+///    `|        +----+----+` contributes both to canonical column
+///    positions and to row block boundaries (it ends some cells and
+///    starts others mid-row).
+/// 3. Cells are detected by walking `(row_block, col)` in scan order and,
+///    at each unoccupied position whose top-left `+` is real, finding the
+///    smallest valid bounding rectangle: top/bottom edges in
+///    `{-,=,:,+}`, left/right edges in `{|,+}`, no fully-spanning
+///    interior separator that would split it. RowSpan/ColSpan are
+///    derived from the canonical row/col indices of the cell's corners.
+///
+/// Column widths use the alignment separator (the one carrying `:`s) if
+/// present, else the first separator — both via `grid_dash_widths`. The
+/// alignment row also drives per-column alignment via
+/// `grid_separator_aligns`.
+#[allow(clippy::needless_range_loop)]
 fn grid_table(node: &SyntaxNode) -> Option<TableData> {
-    let first_sep = node
-        .children()
-        .find(|c| c.kind() == SyntaxKind::TABLE_SEPARATOR)?;
-    let widths = grid_dash_widths(&first_sep);
-    let cols = widths.len();
-    if cols == 0 {
-        return None;
-    }
-    let col_ranges = grid_column_ranges(&first_sep);
-    // Alignment separator: scan all separators, prefer one with `:` markers.
-    let mut aligns: Vec<&'static str> = vec!["AlignDefault"; cols];
-    for sep in node
-        .children()
-        .filter(|c| c.kind() == SyntaxKind::TABLE_SEPARATOR)
-    {
-        let raw = sep.text().to_string();
-        if raw.contains(':') {
-            aligns = grid_separator_aligns(&raw, cols);
-            break;
+    // Collect all lines except the caption, tagged with their parent kind.
+    let mut tagged: Vec<(SyntaxKind, String)> = Vec::new();
+    for child in node.children() {
+        if child.kind() == SyntaxKind::TABLE_CAPTION {
+            continue;
+        }
+        let text = child.text().to_string();
+        for line in text.split_inclusive('\n') {
+            let trimmed = line.trim_end_matches('\n');
+            tagged.push((child.kind(), trimmed.to_string()));
         }
     }
-    let header = node
+    if tagged.is_empty() {
+        return None;
+    }
+
+    // Pad lines into a 2D char grid.
+    let max_width = tagged
+        .iter()
+        .map(|(_, l)| l.chars().count())
+        .max()
+        .unwrap_or(0);
+    let grid: Vec<Vec<char>> = tagged
+        .iter()
+        .map(|(_, l)| {
+            let mut chars: Vec<char> = l.chars().collect();
+            chars.resize(max_width, ' ');
+            chars
+        })
+        .collect();
+    let nlines = grid.len();
+
+    // A line is "sep-style" if it contains at least one `+` and no chars
+    // outside `+`/`-`/`=`/`:`/`|`/` `. Partial separators (lines mixing
+    // `|` and `+`) qualify; content lines do not.
+    let is_sep_line: Vec<bool> = grid
+        .iter()
+        .map(|row| {
+            row.contains(&'+')
+                && row
+                    .iter()
+                    .all(|&c| matches!(c, '+' | '-' | '=' | ':' | '|' | ' '))
+        })
+        .collect();
+
+    // Canonical column boundaries: union of `+` columns across all sep-style lines.
+    let mut col_set: std::collections::BTreeSet<usize> = std::collections::BTreeSet::new();
+    for (i, row) in grid.iter().enumerate() {
+        if !is_sep_line[i] {
+            continue;
+        }
+        for (j, &c) in row.iter().enumerate() {
+            if c == '+' {
+                col_set.insert(j);
+            }
+        }
+    }
+    let cols_pos: Vec<usize> = col_set.into_iter().collect();
+    if cols_pos.len() < 2 {
+        return None;
+    }
+    let ncols = cols_pos.len() - 1;
+
+    // Canonical row boundaries: line indices of sep-style lines.
+    let row_seps: Vec<usize> = (0..nlines).filter(|&i| is_sep_line[i]).collect();
+    if row_seps.len() < 2 {
+        return None;
+    }
+    let nrows = row_seps.len() - 1;
+
+    // Block kind per row block: head if any non-sep line in the block came
+    // from a TABLE_HEADER, foot if from TABLE_FOOTER, else body.
+    let mut block_kind: Vec<&'static str> = vec!["body"; nrows];
+    for r in 0..nrows {
+        let start = row_seps[r];
+        let end = row_seps[r + 1];
+        for i in (start + 1)..end {
+            match tagged[i].0 {
+                SyntaxKind::TABLE_HEADER => block_kind[r] = "head",
+                SyntaxKind::TABLE_FOOTER => block_kind[r] = "foot",
+                _ => {}
+            }
+        }
+    }
+
+    // Detect cells.
+    let mut occupied = vec![vec![false; ncols]; nrows];
+    // (start_row, start_col, row_span, col_span, content_text)
+    let mut cells: Vec<(usize, usize, u32, u32, String)> = Vec::new();
+    for sr in 0..nrows {
+        for sc in 0..ncols {
+            if occupied[sr][sc] {
+                continue;
+            }
+            let i = row_seps[sr];
+            let j = cols_pos[sc];
+            if grid[i][j] != '+' {
+                // No corner here — the canonical column is missing on this
+                // sep line, meaning the cell that owns this position must
+                // have been emitted earlier and `occupied` should already be
+                // set. If not, the table is malformed; skip.
+                continue;
+            }
+            let Some((er, ec, content)) = find_grid_cell(&grid, i, j, sr, sc, &cols_pos, &row_seps)
+            else {
+                continue;
+            };
+            let row_span = (er - sr) as u32;
+            let col_span = (ec - sc) as u32;
+            for r in sr..er {
+                for c in sc..ec {
+                    occupied[r][c] = true;
+                }
+            }
+            cells.push((sr, sc, row_span, col_span, content));
+        }
+    }
+
+    // Group cells by row block and convert to GridCells. Within each block,
+    // emit cells in canonical column order.
+    let mut head_rows: Vec<Vec<GridCell>> = Vec::new();
+    let mut body_rows: Vec<Vec<GridCell>> = Vec::new();
+    let mut foot_rows: Vec<Vec<GridCell>> = Vec::new();
+    for r in 0..nrows {
+        let mut row_cells: Vec<&(usize, usize, u32, u32, String)> =
+            cells.iter().filter(|(sr, _, _, _, _)| *sr == r).collect();
+        row_cells.sort_by_key(|(_, sc, _, _, _)| *sc);
+        let row: Vec<GridCell> = row_cells
+            .into_iter()
+            .map(|(_, _, rs, cs, text)| {
+                let blocks = parse_grid_cell_text(text);
+                GridCell {
+                    row_span: *rs,
+                    col_span: *cs,
+                    blocks,
+                }
+            })
+            .collect();
+        match block_kind[r] {
+            "head" => head_rows.push(row),
+            "foot" => foot_rows.push(row),
+            _ => body_rows.push(row),
+        }
+    }
+
+    // Column widths and alignments. Pick the alignment-bearing separator
+    // for both (or fall back to the first separator).
+    let alignment_sep = node
         .children()
-        .find(|c| c.kind() == SyntaxKind::TABLE_HEADER);
-    let head_rows = match &header {
-        Some(h) => vec![grid_row_cells_blocks(h, &col_ranges, cols)],
-        None => Vec::new(),
+        .filter(|c| c.kind() == SyntaxKind::TABLE_SEPARATOR)
+        .find(|c| c.text().to_string().contains(':'))
+        .or_else(|| {
+            node.children()
+                .find(|c| c.kind() == SyntaxKind::TABLE_SEPARATOR)
+        })?;
+    let widths = grid_dash_widths(&alignment_sep);
+    let aligns_raw = alignment_sep.text().to_string();
+    let aligns = if aligns_raw.contains(':') {
+        grid_separator_aligns(&aligns_raw, ncols)
+    } else {
+        vec!["AlignDefault"; ncols]
     };
-    let body_rows: Vec<Vec<Vec<Block>>> = node
-        .children()
-        .filter(|c| c.kind() == SyntaxKind::TABLE_ROW)
-        .map(|r| grid_row_cells_blocks(&r, &col_ranges, cols))
-        .collect();
-    let foot_rows: Vec<Vec<Vec<Block>>> = node
-        .children()
-        .filter(|c| c.kind() == SyntaxKind::TABLE_FOOTER)
-        .map(|r| grid_row_cells_blocks(&r, &col_ranges, cols))
-        .collect();
-    // Caption: a TABLE_CAPTION child of the GRID_TABLE.
+
+    // Caption.
     let caption_inlines = node
         .children()
         .find(|c| c.kind() == SyntaxKind::TABLE_CAPTION)
         .map(|n| pipe_table_caption(&n))
         .unwrap_or_default();
     let (attr, caption_inlines) = extract_caption_attrs(caption_inlines);
+
     Some(TableData {
         attr,
         caption: caption_inlines,
@@ -2035,83 +2195,96 @@ fn grid_table(node: &SyntaxNode) -> Option<TableData> {
     })
 }
 
-/// Compute (start_char, end_char) inclusive ranges for each grid table
-/// column based on `+` positions in a separator. Empty ranges (consecutive
-/// `+`s) are skipped — those represent rowspan/colspan separators we don't
-/// model yet.
-fn grid_column_ranges(separator: &SyntaxNode) -> Vec<(usize, usize)> {
-    let raw = separator.text().to_string();
-    let line = raw.trim_end_matches(['\n', '\r']);
-    let plus_chars: Vec<usize> = line
-        .chars()
-        .enumerate()
-        .filter_map(|(i, ch)| if ch == '+' { Some(i) } else { None })
-        .collect();
-    plus_chars
-        .windows(2)
-        .filter_map(|w| {
-            if w[1] > w[0] + 1 {
-                Some((w[0] + 1, w[1] - 1))
-            } else {
-                None
+/// Find the smallest valid grid-table cell with its top-left `+` at
+/// `(i, j)` in the char grid, where `(sr, sc)` are the canonical row /
+/// column indices of that corner.
+///
+/// Returns `(end_row_idx, end_col_idx, content_text)` where the cell
+/// occupies canonical rows `sr..end_row_idx` and canonical columns
+/// `sc..end_col_idx`. Content is the text inside the cell, with one
+/// leading-space pad stripped per line and trailing whitespace trimmed,
+/// joined with `\n`.
+#[allow(clippy::needless_range_loop)]
+fn find_grid_cell(
+    grid: &[Vec<char>],
+    i: usize,
+    j: usize,
+    sr: usize,
+    sc: usize,
+    cols_pos: &[usize],
+    row_seps: &[usize],
+) -> Option<(usize, usize, String)> {
+    let nrows = row_seps.len() - 1;
+    let ncols = cols_pos.len() - 1;
+
+    for ec in (sc + 1)..=ncols {
+        let k = cols_pos[ec];
+        // Top edge (i, j+1..k) must be all sep chars (intermediate `+`s OK).
+        let top_ok = (j + 1..k).all(|c| matches!(grid[i][c], '-' | '=' | ':' | '+'));
+        if !top_ok {
+            // Hit a `|` or ` `; can't extend further right.
+            break;
+        }
+        for er in (sr + 1)..=nrows {
+            let l = row_seps[er];
+            // Left edge col j from i+1..l: chars in {|, +}.
+            let left_ok = (i + 1..l).all(|r| matches!(grid[r][j], '|' | '+'));
+            if !left_ok {
+                break;
             }
-        })
-        .collect()
-}
+            // Right edge col k from i+1..l: chars in {|, +}.
+            let right_ok = (i + 1..l).all(|r| matches!(grid[r][k], '|' | '+'));
+            if !right_ok {
+                continue;
+            }
+            // Bottom edge (l, j+1..k): chars in {-, =, :, +}.
+            let bot_ok = (j + 1..k).all(|c| matches!(grid[l][c], '-' | '=' | ':' | '+'));
+            if !bot_ok {
+                continue;
+            }
+            if grid[l][j] != '+' || grid[l][k] != '+' {
+                continue;
+            }
+            // No interior partial separator that fully spans this cell.
+            // A line m strictly between i and l splits the cell if it has
+            // `+` at both col j and col k AND all chars between are sep
+            // chars (i.e., the partial sep extends across the whole cell
+            // horizontally).
+            let interior_split = (i + 1..l).any(|m| {
+                grid[m][j] == '+'
+                    && grid[m][k] == '+'
+                    && (j + 1..k).all(|c| matches!(grid[m][c], '-' | '=' | ':' | '+'))
+            });
+            if interior_split {
+                continue;
+            }
 
-/// Slice each line of a grid-table row by column ranges, then per column
-/// strip the 1-char `| ` padding (one leading space) and trailing
-/// whitespace, join lines with `\n`, and reparse the joined text as
-/// block-level markdown via panache. `cols` is the column count from
-/// `grid_dash_widths` (used to pad short rows so cell ordering matches).
-fn grid_row_cells_blocks(
-    row: &SyntaxNode,
-    col_ranges: &[(usize, usize)],
-    cols: usize,
-) -> Vec<Vec<Block>> {
-    let raw = row.text().to_string();
-    let lines: Vec<&str> = raw.split_inclusive('\n').collect();
-    let mut col_lines: Vec<Vec<String>> = vec![Vec::new(); col_ranges.len()];
-    for line in lines {
-        let line_no_nl = line.trim_end_matches('\n');
-        if line_no_nl.is_empty() {
-            continue;
-        }
-        for (i, &(cs, ce)) in col_ranges.iter().enumerate() {
-            let slice = char_slice(line_no_nl, cs, ce + 1);
-            // Strip exactly one leading space (the padding inside `| `).
-            // If the cell is empty (just spaces) the slice will trim to "".
-            let stripped = slice.strip_prefix(' ').unwrap_or(slice);
-            // Trim trailing whitespace; keep leading whitespace beyond the
-            // padding so a 4-space-indented cell projects as a CodeBlock.
-            let trimmed = stripped.trim_end();
-            col_lines[i].push(trimmed.to_string());
-        }
-    }
-    let mut out: Vec<Vec<Block>> = col_lines
-        .into_iter()
-        .map(|segments| {
-            // Trim leading and trailing all-empty lines.
-            let first = segments.iter().position(|s| !s.is_empty());
-            let last = segments.iter().rposition(|s| !s.is_empty());
-            let trimmed: &[String] = match (first, last) {
-                (Some(f), Some(l)) => &segments[f..=l],
-                _ => return Vec::new(),
+            // Extract content text. For each interior line, take chars
+            // [j+1..k], strip one leading space (cell padding), trim
+            // trailing whitespace.
+            let mut content_lines: Vec<String> = Vec::new();
+            for r in (i + 1)..l {
+                let slice: String = grid[r][j + 1..k].iter().collect();
+                let stripped = slice.strip_prefix(' ').unwrap_or(&slice).to_string();
+                content_lines.push(stripped.trim_end().to_string());
+            }
+            // Drop leading/trailing empty lines.
+            let first = content_lines.iter().position(|s| !s.is_empty());
+            let last = content_lines.iter().rposition(|s| !s.is_empty());
+            let content = match (first, last) {
+                (Some(f), Some(l)) => content_lines[f..=l].join("\n"),
+                _ => String::new(),
             };
-            let joined = trimmed.join("\n");
-            parse_cell_text_blocks(&joined)
-        })
-        .collect();
-    while out.len() < cols {
-        out.push(Vec::new());
+            return Some((er, ec, content));
+        }
     }
-    out
+    None
 }
 
-/// Parse cell text as block-level markdown via panache and convert
-/// top-level `Para` to `Plain` (pandoc's grid-table cell rule). Other
-/// block kinds (CodeBlock, BulletList, BlockQuote, etc.) round-trip as-is.
-fn parse_cell_text_blocks(text: &str) -> Vec<Block> {
+/// Parse a grid-table cell's extracted text as block-level markdown via
+/// panache, then convert top-level `Para`s to `Plain` (pandoc's
+/// grid-table cell rule).
+fn parse_grid_cell_text(text: &str) -> Vec<Block> {
     if text.trim().is_empty() {
         return Vec::new();
     }
@@ -2125,9 +2298,6 @@ fn parse_cell_text_blocks(text: &str) -> Vec<Block> {
     let mut out = Vec::new();
     for child in doc.children() {
         if let Some(block) = block_from(&child) {
-            // Pandoc grid-table cells emit `Plain` for paragraph-only
-            // content; only explicit block constructs (code, list,
-            // blockquote, ...) keep their block kind.
             let block = match block {
                 Block::Para(inlines) => Block::Plain(inlines),
                 other => other,
@@ -2267,13 +2437,23 @@ fn multiline_table(node: &SyntaxNode) -> Option<TableData> {
         vec!["AlignDefault"; cols.len()]
     };
     let head_rows = match &header {
-        Some(h) => vec![multiline_row_cells_blocks(h, &cols)],
+        Some(h) => vec![
+            multiline_row_cells_blocks(h, &cols)
+                .into_iter()
+                .map(GridCell::no_span)
+                .collect(),
+        ],
         None => Vec::new(),
     };
-    let body_rows: Vec<Vec<Vec<Block>>> = node
+    let body_rows: Vec<Vec<GridCell>> = node
         .children()
         .filter(|c| c.kind() == SyntaxKind::TABLE_ROW)
-        .map(|r| multiline_row_cells_blocks(&r, &cols))
+        .map(|r| {
+            multiline_row_cells_blocks(&r, &cols)
+                .into_iter()
+                .map(GridCell::no_span)
+                .collect()
+        })
         .collect();
     let caption_inlines = node
         .children()
@@ -4365,15 +4545,18 @@ fn write_table(data: &TableData, out: &mut String) {
     out.push_str(" ] )");
 }
 
-fn write_table_row(cells: &[Vec<Block>], out: &mut String) {
+fn write_table_row(cells: &[GridCell], out: &mut String) {
     out.push_str("Row ( \"\" , [ ] , [ ] ) [");
     for (i, cell) in cells.iter().enumerate() {
         if i > 0 {
             out.push(',');
         }
-        out.push_str(" Cell ( \"\" , [ ] , [ ] ) AlignDefault ( RowSpan 1 ) ( ColSpan 1 ) [");
-        if !cell.is_empty() {
-            write_block_list(cell, out);
+        out.push_str(&format!(
+            " Cell ( \"\" , [ ] , [ ] ) AlignDefault ( RowSpan {} ) ( ColSpan {} ) [",
+            cell.row_span, cell.col_span
+        ));
+        if !cell.blocks.is_empty() {
+            write_block_list(&cell.blocks, out);
         }
         out.push_str(" ]");
     }
