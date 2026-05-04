@@ -590,7 +590,28 @@ impl Formatter {
                 self.output.push_str(cb);
                 self.output.push(' ');
             }
+            // Format the BQ at indent=0 so its first `>` abuts the outer
+            // marker on the same line. Subsequent lines need the outer
+            // item's hanging indent prefix (pandoc emits `  > foo` for
+            // continuation, not `> foo`); without this, re-parsing the
+            // formatter output drops the outer item context. We splice
+            // the indent in post-hoc rather than threading a new arg
+            // through the BQ formatter.
+            let bq_start = self.output.len();
             self.format_node_sync(leading_bq, 0);
+            if hanging > 0 {
+                let bq_block = self.output.split_off(bq_start);
+                let prefix = " ".repeat(hanging);
+                let mut first = true;
+                for line in bq_block.split_inclusive('\n') {
+                    let is_blank = line.trim_end_matches('\n').is_empty();
+                    if !first && !is_blank {
+                        self.output.push_str(&prefix);
+                    }
+                    self.output.push_str(line);
+                    first = false;
+                }
+            }
 
             for child in node.children() {
                 if &child == leading_bq || child.kind() == SyntaxKind::BLANK_LINE {

@@ -214,6 +214,7 @@ golden_test_cases!(
     footnote_defs_consecutive_no_blanks,
     atx_interrupts_paragraph_commonmark,
     list_interrupts_paragraph_commonmark,
+    list_item_blockquote_inner_list_siblings,
     list_mixed_bullets_commonmark,
     headings,
     setext_headings,

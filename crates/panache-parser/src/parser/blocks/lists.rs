@@ -1437,11 +1437,56 @@ fn finish_list_item_with_optional_nested(
         }
         containers.push(Container::BlockQuote {});
 
+        let trimmed = trim_end_newlines(remaining);
+
+        // If the BlockQuote content begins with another list marker
+        // followed by real content, recursively open a nested LIST inside
+        // the BLOCK_QUOTE. Both Pandoc-markdown and CommonMark agree:
+        // `- > - foo` produces
+        // `BulletList [BlockQuote [BulletList [[Plain "foo"]]]]`
+        // (verified via `pandoc -f markdown` and `pandoc -f commonmark`).
+        let inner_is_thematic_break =
+            super::horizontal_rules::try_parse_horizontal_rule(trimmed).is_some();
+        if !inner_is_thematic_break
+            && let Some(inner_match) = try_parse_list_marker(remaining, config)
+        {
+            let inner_content_start = inner_match.marker_len + inner_match.spaces_after_bytes;
+            let after_inner = trim_end_newlines(remaining.get(inner_content_start..).unwrap_or(""));
+            if !after_inner.is_empty() {
+                let bq_content_col = content_col + content_offset;
+                builder.start_node(SyntaxKind::LIST.into());
+                containers.push(Container::List {
+                    marker: inner_match.marker.clone(),
+                    base_indent_cols: bq_content_col,
+                    has_blank_between_items: false,
+                });
+                let inner_item = ListItemEmissionInput {
+                    content: remaining,
+                    marker_len: inner_match.marker_len,
+                    spaces_after_cols: inner_match.spaces_after_cols,
+                    spaces_after_bytes: inner_match.spaces_after_bytes,
+                    indent_cols: bq_content_col,
+                    indent_bytes: 0,
+                    virtual_marker_space: inner_match.virtual_marker_space,
+                };
+                let (inner_content_col, inner_text_to_buffer) =
+                    emit_list_item(builder, &inner_item);
+                finish_list_item_with_optional_nested(
+                    containers,
+                    builder,
+                    inner_content_col,
+                    inner_text_to_buffer,
+                    inner_match.virtual_marker_space,
+                    config,
+                );
+                return;
+            }
+        }
+
         // If there is content after `> `, start a paragraph and buffer
         // the first line; subsequent lines flow in via the parser's main
         // loop (lazy continuation handles the no-marker continuation
         // line in cases like #292).
-        let trimmed = trim_end_newlines(remaining);
         if !trimmed.is_empty() {
             crate::parser::blocks::paragraphs::start_paragraph_if_needed(containers, builder);
             crate::parser::blocks::paragraphs::append_paragraph_line(

@@ -2099,6 +2099,104 @@ impl<'a> Parser<'a> {
             );
             let has_explicit_same_depth_marker = same_depth_marker_info.len() >= bq_depth;
 
+            // Sibling-list-marker continuation across BQ prefix: when the
+            // BQ-stripped content is a list marker that matches an open
+            // inner LIST in the container stack, add a sibling LIST_ITEM
+            // at that level. Pandoc tracks columns through BQ markers, so
+            // a line like `   > - 2:` (column-aligned) and `> - 2:` (lazy,
+            // dropped outer continuation indent) are both siblings of an
+            // open inner LIST inside the BQ. Without this, the dispatcher
+            // sees the post-strip `- 2:` at column 0 and incorrectly
+            // opens a new outer-level LIST_ITEM. The lazy form is what
+            // our own formatter emits — without this branch round-trips
+            // would not be idempotent.
+            let (inner_indent_cols_raw, inner_indent_bytes) = leading_indent(inner_content);
+            if let Some(marker_match) = try_parse_list_marker(inner_content, self.config) {
+                // Don't steal lines whose leading whitespace inside the BQ
+                // would push the marker into the previous inner LIST_ITEM's
+                // content area — those are nested lists, not siblings.
+                let inner_content_threshold =
+                    marker_match.marker_len + marker_match.spaces_after_cols;
+                let is_sibling_candidate = inner_indent_cols_raw < inner_content_threshold;
+                let sibling_list_level = if is_sibling_candidate {
+                    self.containers
+                        .stack
+                        .iter()
+                        .enumerate()
+                        .rev()
+                        .find_map(|(i, c)| match c {
+                            Container::List { marker, .. }
+                                if lists::markers_match(
+                                    &marker_match.marker,
+                                    marker,
+                                    self.config.dialect,
+                                ) && self.containers.stack[..i]
+                                    .iter()
+                                    .filter(|x| matches!(x, Container::BlockQuote { .. }))
+                                    .count()
+                                    == bq_depth =>
+                            {
+                                Some(i)
+                            }
+                            _ => None,
+                        })
+                } else {
+                    None
+                };
+                if let Some(list_level) = sibling_list_level {
+                    // Read the matched LIST's base column before mutating
+                    // the stack. We use it as the new sibling item's
+                    // `indent_cols` so subsequent lines can match by
+                    // source column even when the current line was lazy
+                    // (its source column wouldn't have lined up).
+                    let sibling_base_indent_cols = match self.containers.stack.get(list_level) {
+                        Some(Container::List {
+                            base_indent_cols, ..
+                        }) => *base_indent_cols,
+                        _ => 0,
+                    };
+
+                    // Flush any pending ListItem buffer before closing.
+                    self.emit_list_item_buffer_if_needed();
+                    // Close down to the inner LIST level (closing the open
+                    // inner LIST_ITEM and anything nested inside it).
+                    self.close_containers_to(list_level + 1);
+
+                    // Emit the BQ markers as direct children of the inner
+                    // LIST node (the builder is currently positioned inside
+                    // it).
+                    for i in 0..bq_depth {
+                        if let Some(info) = same_depth_marker_info.get(i) {
+                            self.emit_or_buffer_blockquote_marker(
+                                info.leading_spaces,
+                                info.has_trailing_space,
+                            );
+                        }
+                    }
+
+                    // Add the new sibling LIST_ITEM to the inner LIST.
+                    let list_item = ListItemEmissionInput {
+                        content: inner_content,
+                        marker_len: marker_match.marker_len,
+                        spaces_after_cols: marker_match.spaces_after_cols,
+                        spaces_after_bytes: marker_match.spaces_after_bytes,
+                        indent_cols: sibling_base_indent_cols,
+                        indent_bytes: inner_indent_bytes,
+                        virtual_marker_space: marker_match.virtual_marker_space,
+                    };
+                    lists::add_list_item(
+                        &mut self.containers,
+                        &mut self.builder,
+                        &list_item,
+                        self.config,
+                    );
+                    self.maybe_open_fenced_code_in_new_list_item();
+                    self.maybe_open_indented_code_in_new_list_item();
+                    self.pos += 1;
+                    return true;
+                }
+            }
+
             // Check if we should close the ListItem
             // ListItem should continue if the line is properly indented for continuation
             if matches!(

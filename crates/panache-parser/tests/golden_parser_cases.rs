@@ -310,6 +310,7 @@ golden_test_cases!(
     list_item_indented_code,
     list_item_indented_code_marker_line_partial_overflow,
     list_item_indented_code_tabs_commonmark,
+    list_item_blockquote_inner_list,
     list_item_same_line_blockquote_marker_commonmark,
     list_item_same_line_blockquote_marker_pandoc,
     list_marker_indent_4_below_content_col,

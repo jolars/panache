@@ -7,7 +7,7 @@ state; this file is judgment calls only.
 
 Ranked by likely shared root cause and leverage. Numbers in parentheses are the
 count of currently-failing imports remaining under that bucket in the latest
-`report.txt`. 2 imports remain failing total (185 / 187 passing).
+`report.txt`. 1 import remains failing total (186 / 187 passing).
 
 1. **Tables --- #71 grid_table_planets (1)** --- rowspan/colspan layout.
    Pandoc emits `RowSpan N` / `ColSpan N` for cells whose `+   +-----+`-style
@@ -16,18 +16,7 @@ count of currently-failing imports remaining under that bucket in the latest
    currently skips empty `+`-to-`+` ranges (which represent spans), so
    spanned cells produce wrong column ordering. Heavy — needs a layout
    model that assigns cells to specific columns and tracks RowSpan/ColSpan
-   counts per cell.
-
-2. **#91 sibling-list-marker recursion inside BQ-content (1)** ---
-   `-  > -` siblings + indented `   > -` continuation: parser merges item
-   content into one BlockQuote/Para instead of splitting into 3 outer items
-   each containing a BlockQuote with an inner BulletList. Wants recursion
-   of list-marker detection inside `>`-prefixed list-item content. Bounded
-   continuation-policy fix.
-
-Suggested first session: **#1 (Tables — #71)** is the single remaining
-"feature" gap (rowspan/colspan in grid tables); **#2 (#91)** is the
-remaining bounded continuation-policy fix.
+   counts per cell. The single remaining failure.
 
 ## Don't redo
 
@@ -78,8 +67,180 @@ remaining bounded continuation-policy fix.
 
 ## Latest session
 
-- **Date**: 2026-05-04 (Lazy ListItem continuation in BQ-list: no-`>`
-  plain-text line folds into the deepest open list item's buffer
+- **Date**: 2026-05-04 (Same-line BQ inside LIST_ITEM: recurse list-marker
+  detection inside the BQ's content, sibling-list-marker continuation
+  across the BQ prefix when the deepest container is an inner LIST
+  inside the BQ, and matching formatter fix to emit outer continuation
+  indent on BQ continuation lines)
+- **Pass before → after**: 185 → 186 / 187 (+1 import: #91). Two
+  parser-shape fixes plus one formatter fix that compose to unlock #91:
+  1. **Recursive list-marker open inside same-line BQ-in-list-item**:
+     `finish_list_item_with_optional_nested` (`lists.rs`)'s existing
+     same-line BLOCK_QUOTE branch (`text_to_buffer.starts_with('>')`)
+     unconditionally opened a PARAGRAPH for the post-`>` content. Now,
+     when the post-`>` content begins with another list marker followed
+     by real content, recursively open a nested LIST + LIST_ITEM inside
+     the BLOCK_QUOTE so `- > - foo` produces
+     `BulletList [BlockQuote [BulletList [[Plain "foo"]]]]` instead of
+     `BulletList [BlockQuote [Para [Str "- foo"]]]`. Both pandoc-markdown
+     and CommonMark agree (verified via `pandoc -f markdown` /
+     `pandoc -f commonmark`). Mirrors the pattern of the same-line
+     nested-list block immediately above it (`- - foo`). The bare-marker
+     case (`after_inner.is_empty()`) and thematic-break case fall through
+     to the existing PARAGRAPH path, matching pandoc.
+  2. **Sibling-list-marker continuation across BQ prefix**: in
+     `parse_line` (`core.rs`)'s `bq_depth == current_bq_depth > 0`
+     branch, before the existing close-LIST_ITEM logic, check whether
+     the BQ-stripped content is a list marker matching an open inner
+     LIST in the container stack. If so — and the marker's leading
+     whitespace inside the BQ is below the marker's threshold (i.e.
+     wouldn't push it into the previous inner item's content area) —
+     close down to the inner LIST level, emit BQ markers as direct
+     children of the inner LIST, and add a sibling LIST_ITEM. The
+     match deliberately ignores the marker's source column (just
+     marker-type + bq-depth alignment) so both column-aligned
+     continuation (`-  > - 0:` then `   > - 2:`, case #91 input) and
+     lazy continuation (`- > - foo` then `> - bar`, our own formatter
+     output) attach as siblings. Without this, the dispatcher saw the
+     post-strip `- 2:` at column 0 and opened a new outer LIST_ITEM,
+     and re-parsing the formatter output broke idempotency.
+- **What landed**:
+  - **Parser: recursive list-marker inside BQ-in-list content**
+    (`crates/panache-parser/src/parser/blocks/lists.rs` —
+    `finish_list_item_with_optional_nested`, inserted inside the
+    existing same-line `text_to_buffer.starts_with('>')` branch, after
+    the BLOCK_QUOTE node opens and the BlockQuote container is pushed,
+    before the fallback `start_paragraph_if_needed` call). Mirrors the
+    nested-list recursion pattern at the top of the function; sets
+    `indent_cols: bq_content_col, indent_bytes: 0` so the new inner
+    LIST's `base_indent_cols` reflects the inner content's source
+    column.
+  - **Parser: sibling-list continuation across BQ prefix**
+    (`crates/panache-parser/src/parser/core.rs` — `parse_line`'s
+    `bq_depth > 0` branch, inserted at the very start of the branch
+    before the existing close-LIST_ITEM check). Walks the stack
+    deepest-first to find a matching LIST whose BQ-count == bq_depth,
+    gated by `inner_indent_cols_raw < marker_len + spaces_after_cols`
+    so leading whitespace inside the BQ that would push the marker
+    into the previous inner LIST_ITEM's content area falls through
+    (those are nested-list cases, not siblings). On match: close down
+    to the LIST level, emit BQ markers as direct children, then
+    `add_list_item` with `indent_cols = matched LIST.base_indent_cols`
+    so subsequent lines at the matched column still see the LIST in
+    `find_matching_list_level`.
+  - **New parser fixture**:
+    `crates/panache-parser/tests/fixtures/cases/list_item_blockquote_inner_list/`
+    (`- > - foo`) — pins the recursive shape: LIST > LIST_ITEM >
+    BLOCK_QUOTE > LIST > LIST_ITEM > PLAIN. Wired into
+    `golden_parser_cases.rs` between
+    `list_item_same_line_blockquote_marker_commonmark` and
+    `list_item_same_line_blockquote_marker_pandoc`.
+  - **Snapshot regeneration**: 1 parser CST snapshot
+    (`parser_cst_issue_174_blockquote_list_reorder_losslessness`)
+    updated to reflect the new shape (3 outer LIST_ITEMs each with
+    BLOCK_QUOTE > inner LIST, instead of one big PARAGRAPH).
+  - **Formatter: outer-indent prefix on BQ continuation lines in
+    same-line BQ-in-list-item case**
+    (`crates/panache-formatter/src/formatter/lists.rs` —
+    `format_list_item`'s leading-BQ branch). Captures the BQ output
+    starting from `bq_start = self.output.len()`, then post-processes
+    `split_off(bq_start)` to splice `&" ".repeat(hanging)` before each
+    non-first non-blank line. Pandoc emits `  > foo` (with outer
+    indent) for continuation, not `> foo`. Without this, the `>`
+    BLOCK_QUOTE prefix sits at column 0 on subsequent lines, and
+    re-parsing drops the outer LIST_ITEM context (idempotency fails).
+    Localized to format_list_item rather than threading a new arg
+    through the BQ formatter.
+  - **New formatter golden case**:
+    `tests/fixtures/cases/list_item_blockquote_inner_list_siblings/`
+    (input `- > - foo / [2 spaces]> - bar`, expected `- > - foo /
+    [2 spaces]> - bar`) — pins the pandoc-equivalent formatter output
+    and exercises idempotency for the new structural shape. Wired
+    into `tests/golden_cases.rs` between
+    `list_interrupts_paragraph_commonmark` and
+    `list_mixed_bullets_commonmark`.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 91 (imported-issue_174_blockquote_list_reorder_losslessness)
+- **Files changed (classified)**:
+  - **parser-shape**:
+    `crates/panache-parser/src/parser/blocks/lists.rs`
+    (`finish_list_item_with_optional_nested` — recursive list open in
+    same-line BQ-in-list branch),
+    `crates/panache-parser/src/parser/core.rs` (`parse_line`'s
+    `bq_depth > 0` branch — sibling-list-marker continuation block).
+  - **formatter**:
+    `crates/panache-formatter/src/formatter/lists.rs`
+    (`format_list_item`'s leading-BQ branch — outer-indent prefix on
+    BQ continuation lines via post-process splice).
+  - **parser fixture**: new `list_item_blockquote_inner_list/`
+    directory under `crates/panache-parser/tests/fixtures/cases/` and
+    matching `parser_cst_list_item_blockquote_inner_list.snap`. Wired
+    into `golden_parser_cases.rs`.
+  - **snapshot**:
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_issue_174_blockquote_list_reorder_losslessness.snap`
+    (existing parser fixture pinned to the pandoc-correct shape).
+  - **formatter golden**: new
+    `tests/fixtures/cases/list_item_blockquote_inner_list_siblings/`
+    with `input.md` + `expected.md`. Wired into
+    `tests/golden_cases.rs`.
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 91
+    inserted between 90 and 92, under `# imported`).
+- **Don't redo**:
+  - The recursive-list branch fires *only* in the same-line BQ-in-list
+    path (i.e. `text_to_buffer.starts_with('>')`). The bare-marker
+    case (e.g. `- > -` with no content after the inner `-`) and the
+    thematic-break-shaped case (`- > * * *`) fall through to the
+    fallback `start_paragraph_if_needed` path, matching pandoc only
+    partially (the thematic-break case still produces a Para in our
+    parser, not a HorizontalRule). If a future case needs the
+    thematic-break-inside-BQ-inside-LIST shape, that's a separate
+    sub-task — don't try to fold it into this branch.
+  - The sibling-continuation matching is intentionally lenient: it
+    matches by marker type + bq-depth, NOT by exact source column.
+    The threshold gate
+    (`inner_indent_cols_raw < marker_len + spaces_after_cols`) is the
+    safety check: it prevents stealing the nested-list case
+    (`>   - bar` with 2+ spaces inside BQ, which pandoc treats as a
+    nested LIST inside the previous item, not a sibling). Don't
+    tighten the match to require exact column equality — even though
+    the formatter now emits properly-indented continuation lines
+    (`  > - bar`), pandoc itself permits the dropped-indent form
+    (`> - bar`) as lazy continuation. Both should attach as siblings.
+  - The formatter post-process splice in the leading-BQ branch uses
+    `bq_block.split_inclusive('\n')` so the trailing `\n` stays with
+    each line, and skips prefix on blank lines (otherwise blank lines
+    in BQs would gain trailing whitespace). The `first` flag skips
+    the very first line because the outer `- ` marker is already
+    emitted before the BQ formatter runs. Don't switch to
+    `lines()` — it strips the trailing newline and breaks
+    reconstruction.
+  - The matched-LIST's `base_indent_cols` is read BEFORE
+    `close_containers_to(list_level + 1)` because the close mutates
+    the stack. Don't move the read after the close — the stack slice
+    indexing would point at a different container.
+  - The sibling LIST_ITEM is added with
+    `indent_cols = matched LIST.base_indent_cols` (not the new line's
+    source column). This is load-bearing for subsequent
+    `find_matching_list_level` calls — if we passed the lazy line's
+    actual source column (e.g. 2 for `> - bar`), a later
+    column-aligned line wouldn't find this LIST as the right level.
+  - Pandoc's BQ-relative column semantics are NOT fully modeled by
+    this fix. Cases like `>   - bar` (2 spaces inside BQ) where
+    pandoc opens a nested LIST inside the previous inner item still
+    produce the wrong shape in our parser (it falls through and
+    likely starts a new outer item). If a future conformance case
+    surfaces that shape, the fix is a separate session — not a
+    relaxation of this branch's threshold gate.
+  - Case #91's parser fixture
+    (`crates/panache-parser/tests/fixtures/cases/issue_174_blockquote_list_reorder_losslessness/`)
+    has no `parser-options.toml` — it defaults to Pandoc dialect.
+    Both fixes apply to CommonMark too (verified by both `pandoc -f
+    markdown` and `pandoc -f commonmark`), so no per-dialect
+    branching was added.
+
+## Earlier session (2026-05-04, Lazy ListItem continuation in BQ-list:
+  no-`>` plain-text line folds into the deepest open list item's buffer
   rather than closing the outer blockquote)
 - **Pass before → after**: 184 → 185 / 187 (+1 import: #96).
   Parser-shape fix in `parse_line`'s `bq_depth < current_bq_depth`
@@ -336,126 +497,17 @@ remaining bounded continuation-policy fix.
     case both happen to match because the current line carries `>`
     markers and `current_bq_depth` reflects the open BQ container.
 
-## Earlier session (2026-05-04, Citations proper — `Cite [Citation, ...] [Inline,
-  ...]` projection with prefix/suffix inline parsing, `@key [locator]`
-  AuthorInText absorption, and doc-order noteNum pre-pass)
-- **Pass before → after**: 181 → 182 / 187 (+1 import: #38). Projector-only
-  fix. Six new helpers landed in `native_projector.rs`:
-  - `Inline::Cite(Vec<Citation>, Vec<Inline>)` variant + `Citation` struct
-    + `CitationMode` enum, with matching `clone_inline` / `write_inline` /
-    `inlines_to_plaintext` arms.
-  - `render_citation_inline(node, out, extra_suffix_text)` — full
-    projection. Walks CITATION tokens (LINK_START / CITATION_MARKER /
-    CITATION_KEY / CITATION_BRACE_OPEN/CLOSE / CITATION_CONTENT /
-    CITATION_SEPARATOR / LINK_DEST) into a `CitationBuilder` per-citation,
-    splitting CITATION_CONTENT into prefix-of-next vs suffix-of-current at
-    each `@`. Mode dispatch: bracketed + `-@` → SuppressAuthor; bracketed +
-    `@` → NormalCitation; bare → AuthorInText. Falls back to the legacy
-    Example-list carve-out (Str "N") if the first key resolves to a
-    `(@label)` Example item.
-  - `parse_cite_affix_inlines(raw, is_prefix)` — reparses prefix/suffix
-    raw text as Pandoc-flavored inlines and runs through
-    `coalesce_inlines` (which applies smart-quotes, smart-dashes, and
-    abbreviation NBSP). Wraps input with a `Z ` sentinel and strips the
-    sentinel from the result so block-level list-marker detection
-    (e.g. `p. 33` → LIST with marker `p.`) cannot eat the leading word.
-    Suffix-side preserves leading whitespace as `Inline::Space`; prefix-side
-    trims both ends.
-  - `literal_inlines(text)` — tokenizes raw input into `Str` + `Space` +
-    `SoftBreak` (no markup, no smart). Used for the literal `[Inline]`
-    payload that pandoc emits as the second arg of `Cite`.
-  - `emit_citation_with_absorb(node, iter, out)` — wired into
-    `inlines_from`'s match (alongside the existing LATEX_COMMAND arm).
-    For bare AuthorInText CITATIONs, uses rowan sibling navigation
-    (`next_sibling_or_token`) to verify both peeked elements (TEXT
-    starting with space + LINK with no LINK_DEST_START) before consuming
-    the iter. The verified locator's `LINK_TEXT` becomes the absorbed
-    suffix; the literal text gets `" [<locator>]"` appended so the
-    `[Inline]` payload reflects the absorbed bytes.
-  - `collect_cite_note_nums(tree, ctx)` + `visit_for_cite_nums(...)` —
-    new pre-pass populating `RefsCtx.cite_note_num_by_offset`. Walks
-    document blocks (skipping top-level FOOTNOTE_DEFINITIONs since they
-    are visited via FOOTNOTE_REFERENCE recursion). Each CITATION node
-    gets one counter increment outside footnotes; each
-    FOOTNOTE_REFERENCE bumps the counter once on entry, then all cites
-    inside the footnote share that fixed number.
-  Build-order matters: `collect_cite_note_nums` and
-  `collect_example_numbering` now run BEFORE `collect_refs_and_headings`,
-  and the partial ctx is mirrored into `REFS_CTX` thread-local before
-  refs gathering — because `parse_footnote_def` (called from refs
-  gathering) eagerly parses footnote bodies through `inlines_from`,
-  which calls `render_citation_inline`, which reads the noteNum lookup.
-  Without the early mirror, footnote-body cites all fall back to
-  noteNum=1. Single allowlist add (#38 inserted between 37 and 39 under
-  `# imported`). CommonMark allowlist green; pandoc allowlist green;
-  full parser-crate suite green; clippy + fmt clean.
-- **Cases unlocked** (+1, allowlisted under `# imported`):
-  - 38 (imported-citations)
-- **Files changed (classified)**:
-  - **projector**:
-    `crates/panache-parser/tests/pandoc/native_projector.rs`
-    (Cite/Citation types; render_citation_inline rewritten;
-    parse_cite_affix_inlines + literal_inlines + emit_citation_with_absorb
-    + collect_cite_note_nums helpers; build_refs_ctx ordering rework;
-    clone_inline / write_inline / inlines_to_plaintext arms updated;
-    inlines_from CITATION arm wired to the absorb path)
-  - **allowlist**:
-    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 38 inserted
-    between 37 and 39, under `# imported`)
-- **Don't redo**:
-  - The `Z `-sentinel wrap in `parse_cite_affix_inlines` is load-bearing.
-    Without it, `p. 33` (or any text starting with an alphabetical
-    list-marker pattern like `a.`, `b.`, `i.`, `IV.`, etc.) reparses as a
-    `LIST` — the first token is consumed as `LIST_MARKER`, the second as
-    list-item content, and the prefix-word disappears entirely from the
-    inline stream. Don't switch to feeding `raw` directly through
-    `parse_cell_text_inlines`. If a future case lands a citation with an
-    affix that legitimately starts with `Z ` (highly unlikely but
-    theoretically possible), pick a different ASCII-letter sentinel and
-    update the strip check; keep the wrap-strip pattern.
-  - `literal_inlines` does NOT apply pandoc smart-typography. The
-    `[Inline]` payload of `Cite` is a verbatim representation of the
-    original bytes (including `*see*`, `**32**`, `[`, `;`, `]`). Don't
-    route it through `coalesce_inlines` or `parse_cell_text_inlines` —
-    pandoc's expected output preserves the raw markdown spelling, not
-    the smart-converted form. Newline → SoftBreak, runs of space/tab → a
-    single Space, everything else (including `*`, `_`, etc.) is a plain
-    `Str`.
-  - The build-order rework in `build_refs_ctx` matters because
-    `parse_footnote_def` eagerly parses blocks through `inlines_from` →
-    `render_citation_inline`, which reads `REFS_CTX.cite_note_num_by_offset`.
-    The thread-local must be populated with the cite-note-num map BEFORE
-    footnote bodies are parsed, otherwise cites inside footnotes get
-    noteNum=1 fallback. The fix: run the cite-num pre-pass first, mirror
-    the partial ctx into REFS_CTX, then run refs gathering. Don't move
-    `collect_refs_and_headings` back to run first — the dependency is
-    real and the ordering matters.
-  - `emit_citation_with_absorb` uses rowan's `next_sibling_or_token` for
-    the look-ahead rather than `iter.next()`, because rowan iterators
-    don't support push-back. The pattern: navigate via the SyntaxNode
-    tree to verify both peeked elements satisfy the absorption shape
-    (whitespace TEXT + LINK without LINK_DEST_START), then advance the
-    iter (`iter.next()` twice) only on commit. Don't try a "consume,
-    then maybe re-emit" flow — the consumed TEXT can't be put back into
-    the inlines stream cleanly.
-  - The `noteNum` pre-pass increments the counter on every
-    FOOTNOTE_REFERENCE entry, regardless of whether the footnote contains
-    cites. This matches pandoc — verified by probe: a footnote with no
-    cites still bumps the counter for the next outside cite. Don't
-    optimize "skip increment if no inner cites" — it would break the
-    counter alignment for any document with mixed cite/no-cite footnotes.
-  - The `apply_abbreviations` post-pass already handles `pp.`, `chap.`,
-    `p.` etc. inserting NBSP after the abbreviation. The
-    `parse_cite_affix_inlines` helper just calls into `coalesce_inlines`
-    (which calls `apply_abbreviations`) — don't re-implement abbreviation
-    handling in the citation projector.
-
 ## Prior sessions
 
 Older session logs were pruned to keep the recap scannable. Use `git log` on
 `crates/panache-parser/tests/pandoc/allowlist.txt` and the projector to
 trace which case unlocked when. Cross-session lessons that still apply have
 been folded into the global "Don't redo" section above.
+
+- 2026-05-04: Citations proper — `Cite [Citation, ...] [Inline, ...]`
+  projection with prefix/suffix inline parsing, `@key [locator]`
+  AuthorInText absorption, and doc-order noteNum pre-pass (#38 unlocked) —
+  see git log on `tests/pandoc/native_projector.rs`.
 
 - 2026-05-04: HTML block per-line splitting projector via
   `markdown_in_html_blocks` (#181 unlocked) — see git log on
