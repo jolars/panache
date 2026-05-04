@@ -116,6 +116,14 @@ pub(crate) struct BlockContext<'a> {
     /// the indented line.
     pub in_marker_only_list_item: bool,
 
+    /// Whether a `Container::Paragraph` is currently open and buffering
+    /// content. When `true`, the *previous* source line was buffered as
+    /// paragraph text — even if its shape would have been a heading or HR
+    /// in isolation — so paragraph-non-interrupting blocks (notably
+    /// indented code under Pandoc) must treat it as paragraph continuation,
+    /// not as a "terminal one-liner" that opens a new section.
+    pub paragraph_open: bool,
+
     /// Next line content for lookahead (used by setext headings)
     pub next_line: Option<&'a str>,
 }
@@ -2255,8 +2263,17 @@ impl BlockParser for IndentedCodeBlockParser {
             // line; lazy-blockquote-continuation cases are still rejected
             // because their previous line is paragraph-like content, not a
             // self-contained block.
+            //
+            // The one-liner shortcut is purely textual, so it must additionally
+            // require that no `Container::Paragraph` is currently buffering
+            // content: if the parser already absorbed the heading-shaped line
+            // as paragraph text (e.g. Pandoc's `blank_before_header` is on, or
+            // the buffered line was indented past the heading limit), the
+            // indented line that follows is paragraph continuation, not a new
+            // code block.
             ctx.has_blank_before_strict
-                || prev_line_is_terminal_one_liner(_lines, line_pos, ctx.blockquote_depth)
+                || (!ctx.paragraph_open
+                    && prev_line_is_terminal_one_liner(_lines, line_pos, ctx.blockquote_depth))
         };
         if !allow {
             return None;
@@ -2472,8 +2489,14 @@ fn prev_line_is_terminal_one_liner(
         return false;
     }
     let (prev_inner_no_nl, _) = strip_newline(prev_inner);
-    let trimmed = prev_inner_no_nl.trim_start();
-    try_parse_atx_heading(trimmed).is_some() || try_parse_horizontal_rule(trimmed).is_some()
+    // Don't trim_start: the ATX/HR detectors enforce the ≤3-leading-space rule
+    // themselves, and indented paragraph continuation lines that *look* like
+    // headings (e.g. `                ## comment` inside buffered paragraph
+    // text) must not be reported as terminal one-liners — otherwise an
+    // indented code line that follows is wrongly allowed to interrupt the
+    // open paragraph.
+    try_parse_atx_heading(prev_inner_no_nl).is_some()
+        || try_parse_horizontal_rule(prev_inner_no_nl).is_some()
 }
 
 // ============================================================================

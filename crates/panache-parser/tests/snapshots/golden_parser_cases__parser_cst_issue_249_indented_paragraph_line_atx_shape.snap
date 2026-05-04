@@ -1,0 +1,76 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..232
+  PARAGRAPH@0..13
+    TEXT@0..12 "Para before."
+    NEWLINE@12..13 "\n"
+  BLANK_LINE@13..14
+    BLANK_LINE@13..14 "\n"
+  BLANK_LINE@14..15
+    BLANK_LINE@14..15 "\n"
+  PARAGRAPH@15..219
+    TEXT@15..33 "{line-numbers=off}"
+    NEWLINE@33..34 "\n"
+    SUBSCRIPT@34..36
+      SUBSCRIPT_MARKER@34..35
+        SUBSCRIPT_MARKER@34..35 "~"
+      SUBSCRIPT_MARKER@35..36
+        SUBSCRIPT_MARKER@35..36 "~"
+    SUBSCRIPT@36..38
+      SUBSCRIPT_MARKER@36..37
+        SUBSCRIPT_MARKER@36..37 "~"
+      SUBSCRIPT_MARKER@37..38
+        SUBSCRIPT_MARKER@37..38 "~"
+    SUBSCRIPT@38..40
+      SUBSCRIPT_MARKER@38..39
+        SUBSCRIPT_MARKER@38..39 "~"
+      SUBSCRIPT_MARKER@39..40
+        SUBSCRIPT_MARKER@39..40 "~"
+    SUBSCRIPT@40..42
+      SUBSCRIPT_MARKER@40..41
+        SUBSCRIPT_MARKER@40..41 "~"
+      SUBSCRIPT_MARKER@41..42
+        SUBSCRIPT_MARKER@41..42 "~"
+    NEWLINE@42..43 "\n"
+    TEXT@43..60 "for(i in 1:100) {"
+    NEWLINE@60..61 "\n"
+    TEXT@61..82 "        if(i <= 20) {"
+    NEWLINE@82..83 "\n"
+    TEXT@83..130 "                ## Sk ..."
+    NEWLINE@130..131 "\n"
+    TEXT@131..151 "                next"
+    HARD_LINE_BREAK@151..169 "                 \n"
+    TEXT@169..178 "        }"
+    NEWLINE@178..179 "\n"
+    TEXT@179..207 "        ## Do somethi ..."
+    NEWLINE@207..208 "\n"
+    TEXT@208..209 "}"
+    NEWLINE@209..210 "\n"
+    SUBSCRIPT@210..212
+      SUBSCRIPT_MARKER@210..211
+        SUBSCRIPT_MARKER@210..211 "~"
+      SUBSCRIPT_MARKER@211..212
+        SUBSCRIPT_MARKER@211..212 "~"
+    SUBSCRIPT@212..214
+      SUBSCRIPT_MARKER@212..213
+        SUBSCRIPT_MARKER@212..213 "~"
+      SUBSCRIPT_MARKER@213..214
+        SUBSCRIPT_MARKER@213..214 "~"
+    SUBSCRIPT@214..216
+      SUBSCRIPT_MARKER@214..215
+        SUBSCRIPT_MARKER@214..215 "~"
+      SUBSCRIPT_MARKER@215..216
+        SUBSCRIPT_MARKER@215..216 "~"
+    SUBSCRIPT@216..218
+      SUBSCRIPT_MARKER@216..217
+        SUBSCRIPT_MARKER@216..217 "~"
+      SUBSCRIPT_MARKER@217..218
+        SUBSCRIPT_MARKER@217..218 "~"
+    NEWLINE@218..219 "\n"
+  BLANK_LINE@219..220
+    BLANK_LINE@219..220 "\n"
+  PARAGRAPH@220..232
+    TEXT@220..231 "Para after."
+    NEWLINE@231..232 "\n"

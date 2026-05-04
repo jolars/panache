@@ -1512,6 +1512,7 @@ impl<'a> Parser<'a> {
                         ..
                     })
                 ),
+                paragraph_open: self.is_paragraph_open(),
                 next_line: if self.pos + 1 < self.lines.len() {
                     Some(self.lines[self.pos + 1])
                 } else {
@@ -2483,6 +2484,7 @@ impl<'a> Parser<'a> {
                                 ..
                             })
                         ),
+                        paragraph_open: self.is_paragraph_open(),
                         next_line: if self.pos + 1 < self.lines.len() {
                             Some(self.lines[self.pos + 1])
                         } else {
@@ -2658,6 +2660,7 @@ impl<'a> Parser<'a> {
                     ..
                 })
             ),
+            paragraph_open: self.is_paragraph_open(),
             next_line,
         };
 
