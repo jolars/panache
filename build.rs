@@ -349,6 +349,11 @@ fn generate_external_linter_table() -> Result<()> {
     Ok(())
 }
 
+fn format_see_also(refs: &[String]) -> String {
+    let formatted: Vec<String> = refs.iter().map(|r| format!("\\fB{}\\fR(1)", r)).collect();
+    format!(".SH \"SEE ALSO\"\n{}\n", formatted.join(", "))
+}
+
 fn generate_man_pages() -> Result<()> {
     // Create man directory if it doesn't exist
     let out_dir = PathBuf::from("target/man");
@@ -357,11 +362,20 @@ fn generate_man_pages() -> Result<()> {
     // Generate main man page and all subcommand pages (like git/cargo do)
     let cmd = Cli::command();
 
+    // Collect top-level subcommand names (skip "help") for SEE ALSO sections
+    let subcommand_names: Vec<String> = cmd
+        .get_subcommands()
+        .filter(|s| s.get_name() != "help")
+        .map(|s| format!("panache-{}", s.get_name()))
+        .collect();
+
     // Generate main page
     let man = Man::new(cmd.clone());
     let mut buffer = Vec::new();
     man.render(&mut buffer)?;
-    fs::write(out_dir.join("panache.1"), buffer)?;
+    let main_content =
+        String::from_utf8_lossy(&buffer).into_owned() + &format_see_also(&subcommand_names);
+    fs::write(out_dir.join("panache.1"), main_content.as_bytes())?;
 
     // Generate pages for each top-level subcommand
     for subcommand in cmd.get_subcommands() {
@@ -391,9 +405,14 @@ fn generate_man_pages() -> Result<()> {
                 &format!("panache\\-{}\\-", subcommand_name),
             );
 
+        // SEE ALSO: panache(1) plus sibling subcommand pages
+        let mut see_also_refs: Vec<String> = vec!["panache".to_string()];
+        see_also_refs.extend(subcommand_names.iter().filter(|n| *n != &name).cloned());
+        let with_see_also = fixed_content + &format_see_also(&see_also_refs);
+
         fs::write(
             out_dir.join(format!("{}.1", name)),
-            fixed_content.as_bytes(),
+            with_see_also.as_bytes(),
         )?;
 
         // Generate pages for nested subcommands (e.g., daemon start -> panache-daemon-start)
@@ -420,9 +439,16 @@ fn generate_man_pages() -> Result<()> {
                     &format!("\\fBpanache {} {}\\fR", subcommand_name, nested_name),
                 );
 
+            // SEE ALSO: parent subcommand page and panache(1)
+            let see_also_refs = vec![
+                format!("panache-{}", subcommand_name),
+                "panache".to_string(),
+            ];
+            let with_see_also = fixed_content + &format_see_also(&see_also_refs);
+
             fs::write(
                 out_dir.join(format!("{}.1", full_name)),
-                fixed_content.as_bytes(),
+                with_see_also.as_bytes(),
             )?;
         }
     }
