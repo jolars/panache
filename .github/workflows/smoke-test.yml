@@ -447,6 +447,64 @@ jobs:
             fi
           done
 
+      - name: Comment on issues that no longer reproduce
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESULTS_DIR="$RUNNER_TEMP/panache-debug-format-scan"
+          FAILURES_TSV="$RESULTS_DIR/failures.tsv"
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          # Build the set of (repo, failure_type) pairs that failed in this run.
+          current_keys="$RUNNER_TEMP/panache-current-keys.txt"
+          : > "$current_keys"
+          if [ -f "$FAILURES_TSV" ]; then
+            tail -n +2 "$FAILURES_TSV" \
+              | awk -F '\t' 'NF >= 2 && $1 != "" && $2 != "" {printf "panache-debug-format-key:repo=%s;type=%s\n", $1, $2}' \
+              | sort -u > "$current_keys"
+          fi
+
+          # List open issues that carry our marker, then check each one.
+          open_issues_json="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --search 'in:body "panache-debug-format-key:"' \
+            --limit 500 \
+            --json number,body)"
+
+          echo "$open_issues_json" | jq -c '.[]' | while IFS= read -r issue; do
+            number="$(jq -r '.number' <<< "$issue")"
+            body="$(jq -r '.body' <<< "$issue")"
+            marker="$(grep -Eo 'panache-debug-format-key:repo=[^;]+;type=[^[:space:]<>-]+' <<< "$body" | head -n 1 || true)"
+            if [ -z "$marker" ]; then
+              continue
+            fi
+            if grep -Fxq "$marker" "$current_keys"; then
+              # Still reproducing — handled by the create/update step above.
+              continue
+            fi
+
+            # Avoid spamming: skip if the latest comment already reports a green run.
+            latest_comment="$(gh issue view "$number" --repo "$GITHUB_REPOSITORY" --json comments \
+              --jq '.comments | last | .body // ""')"
+            if grep -Fq 'No longer reproducing' <<< "$latest_comment"; then
+              continue
+            fi
+
+            comment_file="$RUNNER_TEMP/panache-issue-green-comment.md"
+            {
+              echo "No longer reproducing in the latest scan."
+              echo ""
+              echo "- Marker: \`$marker\`"
+              echo "- Workflow run: $RUN_URL"
+              echo ""
+              echo "If this stays green over the next few weekly scans, this issue can be closed."
+            } > "$comment_file"
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file "$comment_file"
+          done
+
       - name: Fail workflow when regressions are detected
         if: needs.debug-format-repo-scan.outputs.failure_count != '0'
         shell: bash
