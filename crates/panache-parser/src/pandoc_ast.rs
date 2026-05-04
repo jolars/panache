@@ -1,13 +1,14 @@
-//! Test-only CST → Pandoc-native AST text projector.
+//! CST → Pandoc-native AST text projector.
 //!
-//! This is **not** a public API. It mirrors the role of `html_renderer.rs` in
-//! the CommonMark conformance harness: walk the panache CST and emit a string
-//! that, after `normalize_native()`, byte-equals the corresponding output of
-//! `pandoc -f markdown -t native`.
+//! Walks a panache [`SyntaxNode`] and emits a string in the textual shape of
+//! pandoc's `Pandoc [Block]` AST — the same format produced by
+//! `pandoc -f markdown -t native`. Exposed via [`to_pandoc_ast`] and the
+//! `panache parse --to pandoc-ast` CLI mode; also drives the pandoc
+//! conformance harness in `tests/pandoc.rs`.
 //!
 //! Coverage is intentionally narrow. Unsupported nodes emit
-//! `Unsupported "<KIND>"` so a failing case stays visibly failing in the
-//! report; expand coverage as the corpus grows.
+//! `Unsupported "<KIND>"` so a failing case stays visibly failing rather
+//! than silently dropping content; expand coverage as the corpus grows.
 //!
 //! Output shape matches pandoc 3.9.0.2 with default-standalone-off behavior:
 //! the document is rendered as a bare block list `[ <block>, ... ]`. The
@@ -17,8 +18,8 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
-use panache_parser::SyntaxNode;
-use panache_parser::syntax::SyntaxKind;
+use crate::SyntaxNode;
+use crate::syntax::SyntaxKind;
 use rowan::NodeOrToken;
 
 #[derive(Default)]
@@ -54,7 +55,14 @@ thread_local! {
     static REFS_CTX: RefCell<RefsCtx> = RefCell::new(RefsCtx::default());
 }
 
-pub fn project(tree: &SyntaxNode) -> String {
+/// Render the given panache CST as pandoc-native AST text.
+///
+/// Output mirrors `pandoc -f markdown -t native` for supported constructs.
+/// Unsupported nodes emit a visible `Unsupported "<KIND>"` sentinel rather
+/// than silently dropping content. Pair with [`normalize_native`] when
+/// comparing against captured pandoc output to ignore pretty-print
+/// whitespace differences.
+pub fn to_pandoc_ast(tree: &SyntaxNode) -> String {
     let ctx = build_refs_ctx(tree);
     REFS_CTX.with(|c| *c.borrow_mut() = ctx);
     let blocks = blocks_from_doc(tree);
@@ -1191,13 +1199,13 @@ fn parse_pandoc_blocks(text: &str) -> Vec<Block> {
     if text.trim().is_empty() {
         return Vec::new();
     }
-    let opts = panache_parser::ParserOptions {
-        flavor: panache_parser::Flavor::Pandoc,
-        dialect: panache_parser::Dialect::for_flavor(panache_parser::Flavor::Pandoc),
-        extensions: panache_parser::Extensions::for_flavor(panache_parser::Flavor::Pandoc),
-        ..panache_parser::ParserOptions::default()
+    let opts = crate::ParserOptions {
+        flavor: crate::Flavor::Pandoc,
+        dialect: crate::Dialect::for_flavor(crate::Flavor::Pandoc),
+        extensions: crate::Extensions::for_flavor(crate::Flavor::Pandoc),
+        ..crate::ParserOptions::default()
     };
-    let doc = panache_parser::parse(text, Some(opts));
+    let doc = crate::parse(text, Some(opts));
     let mut out = Vec::new();
     for child in doc.children() {
         collect_block(&child, &mut out);
@@ -2293,13 +2301,13 @@ fn parse_grid_cell_text(text: &str) -> Vec<Block> {
     if text.trim().is_empty() {
         return Vec::new();
     }
-    let opts = panache_parser::ParserOptions {
-        flavor: panache_parser::Flavor::Pandoc,
-        dialect: panache_parser::Dialect::for_flavor(panache_parser::Flavor::Pandoc),
-        extensions: panache_parser::Extensions::for_flavor(panache_parser::Flavor::Pandoc),
-        ..panache_parser::ParserOptions::default()
+    let opts = crate::ParserOptions {
+        flavor: crate::Flavor::Pandoc,
+        dialect: crate::Dialect::for_flavor(crate::Flavor::Pandoc),
+        extensions: crate::Extensions::for_flavor(crate::Flavor::Pandoc),
+        ..crate::ParserOptions::default()
     };
-    let doc = panache_parser::parse(text, Some(opts));
+    let doc = crate::parse(text, Some(opts));
     let mut out = Vec::new();
     for child in doc.children() {
         if let Some(block) = block_from(&child) {
@@ -2537,13 +2545,13 @@ fn parse_cell_text_inlines(text: &str) -> Vec<Inline> {
     if text.trim().is_empty() {
         return Vec::new();
     }
-    let opts = panache_parser::ParserOptions {
-        flavor: panache_parser::Flavor::Pandoc,
-        dialect: panache_parser::Dialect::for_flavor(panache_parser::Flavor::Pandoc),
-        extensions: panache_parser::Extensions::for_flavor(panache_parser::Flavor::Pandoc),
-        ..panache_parser::ParserOptions::default()
+    let opts = crate::ParserOptions {
+        flavor: crate::Flavor::Pandoc,
+        dialect: crate::Dialect::for_flavor(crate::Flavor::Pandoc),
+        extensions: crate::Extensions::for_flavor(crate::Flavor::Pandoc),
+        ..crate::ParserOptions::default()
     };
-    let doc = panache_parser::parse(text, Some(opts));
+    let doc = crate::parse(text, Some(opts));
     for node in doc.descendants() {
         if matches!(node.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN) {
             return inlines_from(&node);
@@ -2972,7 +2980,7 @@ fn emit_citation_with_absorb<I>(
     iter: &mut std::iter::Peekable<I>,
     out: &mut Vec<Inline>,
 ) where
-    I: Iterator<Item = rowan::SyntaxElement<panache_parser::syntax::PanacheLanguage>>,
+    I: Iterator<Item = rowan::SyntaxElement<crate::syntax::PanacheLanguage>>,
 {
     let bracketed = node
         .children_with_tokens()
@@ -3031,7 +3039,7 @@ fn emit_latex_command_with_absorb<I>(
     iter: &mut std::iter::Peekable<I>,
     out: &mut Vec<Inline>,
 ) where
-    I: Iterator<Item = rowan::SyntaxElement<panache_parser::syntax::PanacheLanguage>>,
+    I: Iterator<Item = rowan::SyntaxElement<crate::syntax::PanacheLanguage>>,
 {
     let mut content = node.text().to_string();
     let ends_in_letter = content
@@ -3311,7 +3319,7 @@ fn literal_inlines(text: &str) -> Vec<Inline> {
 }
 
 fn push_token_inline(
-    t: &rowan::SyntaxToken<panache_parser::syntax::PanacheLanguage>,
+    t: &rowan::SyntaxToken<crate::syntax::PanacheLanguage>,
     out: &mut Vec<Inline>,
 ) {
     match t.kind() {

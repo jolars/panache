@@ -17,12 +17,10 @@
 #[path = "pandoc/corpus_loader.rs"]
 mod corpus_loader;
 
-#[path = "pandoc/native_projector.rs"]
-mod native_projector;
-
 use corpus_loader::{PandocCase, read_corpus};
-use native_projector::{normalize_native, project};
-use panache_parser::{Dialect, Extensions, Flavor, ParserOptions, parse};
+use panache_parser::{
+    Dialect, Extensions, Flavor, ParserOptions, pandoc_ast::normalize_native, parse, to_pandoc_ast,
+};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -51,7 +49,7 @@ fn pandoc_options() -> ParserOptions {
 
 fn render_case(case: &PandocCase) -> String {
     let tree = parse(&case.markdown, Some(pandoc_options()));
-    project(&tree)
+    to_pandoc_ast(&tree)
 }
 
 fn matches_expected(case: &PandocCase, rendered: &str) -> bool {

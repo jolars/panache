@@ -17,11 +17,13 @@
 //! # Main entry points
 //!
 //! - [`parse`]: Parse input text into a [`SyntaxNode`].
+//! - [`to_pandoc_ast`]: Project a [`SyntaxNode`] into pandoc-native AST text.
 //! - [`ParserOptions`]: Parser configuration and extension toggles.
 //! - [`syntax`]: Typed syntax wrappers and syntax kinds.
 //! - [`parser`]: Lower-level parser modules and incremental helpers.
 //!
 mod options;
+pub mod pandoc_ast;
 pub mod parser;
 pub mod range_utils;
 pub mod syntax;
@@ -31,5 +33,6 @@ pub use options::Extensions;
 pub use options::Flavor;
 pub use options::PandocCompat;
 pub use options::ParserOptions;
+pub use pandoc_ast::to_pandoc_ast;
 pub use parser::parse;
 pub use syntax::SyntaxNode;
