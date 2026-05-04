@@ -371,7 +371,7 @@ fn generate_man_pages() -> Result<()> {
         }
 
         let name = format!("panache-{}", subcommand_name);
-        let man = Man::new(subcommand.clone()).title(&name);
+        let man = Man::new(subcommand.clone().version(env!("CARGO_PKG_VERSION"))).title(&name);
         let mut buffer = Vec::new();
         man.render(&mut buffer)?;
 
@@ -404,7 +404,7 @@ fn generate_man_pages() -> Result<()> {
             }
 
             let full_name = format!("panache-{}-{}", subcommand_name, nested_name);
-            let man = Man::new(nested.clone()).title(&full_name);
+            let man = Man::new(nested.clone().version(env!("CARGO_PKG_VERSION"))).title(&full_name);
             let mut buffer = Vec::new();
             man.render(&mut buffer)?;
 
