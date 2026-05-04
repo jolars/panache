@@ -8,7 +8,7 @@ use super::conversions::{apply_content_change, apply_content_change_with_edit_ra
 use super::handlers::diagnostics::lint_and_publish;
 use super::helpers::get_config;
 use crate::lsp::{DocumentState, LspRuntimeSettings};
-use crate::parser::parse_incremental_suffix;
+use crate::parser::{parse_incremental_suffix_with_refdefs, parse_with_refdefs};
 use crate::syntax::SyntaxNode;
 use rowan::GreenNode;
 use salsa::{Durability, Setter};
@@ -202,91 +202,95 @@ pub(crate) async fn did_change(
                 .experimental_incremental_parsing
         };
 
-        let (updated_text, green, strategy) = if params.content_changes.len() == 1 {
-            let change = &params.content_changes[0];
-            if !incremental_enabled {
-                let text = apply_content_change(&original_text, change);
-                let parsed = crate::parse(&text, Some(config.clone()));
-                (
-                    text,
-                    GreenNode::from(parsed.green()),
-                    "full_reparse_single_change_incremental_disabled",
-                )
-            } else {
-                match apply_content_change_with_edit_ranges(&original_text, change) {
-                    Some((text, old_edit, new_edit)) => {
-                        let updated = {
-                            let old_tree = SyntaxNode::new_root(original_tree_green);
-                            parse_incremental_suffix(
-                                &text,
-                                Some(config.clone()),
-                                &old_tree,
-                                old_edit,
-                                new_edit,
-                            )
-                        };
-                        let strategy = match updated.strategy {
-                            "section_window" => "section_window_single_change_experimental",
-                            "suffix_window" => "suffix_incremental_single_change_experimental",
-                            _ => "full_reparse_single_change_incremental_fallback",
-                        };
-                        (text, GreenNode::from(updated.tree.green()), strategy)
-                    }
-                    None => {
-                        let text = apply_content_change(&original_text, change);
-                        let parsed = crate::parse(&text, Some(config.clone()));
-                        (
-                            text,
-                            GreenNode::from(parsed.green()),
-                            "full_reparse_single_change_fallback",
-                        )
-                    }
-                }
+        // Compute the post-edit text and (when incremental parsing is
+        // enabled and edit ranges can be derived) the old/new edit
+        // ranges. Decoupling this from the parse call lets us update
+        // salsa's `FileText` early so the parser and downstream salsa
+        // queries share one cached `refdef_set` per text change.
+        let change_count = params.content_changes.len();
+        let (updated_text, edit_ranges) = if !incremental_enabled {
+            let mut text = original_text.clone();
+            for change in params.content_changes.iter() {
+                text = apply_content_change(&text, change);
             }
-        } else if incremental_enabled {
-            if let Some((text, old_edit, new_edit)) = apply_changes_descending_with_combined_ranges(
+            (text, None)
+        } else if change_count == 1 {
+            let change = &params.content_changes[0];
+            match apply_content_change_with_edit_ranges(&original_text, change) {
+                Some((text, old_edit, new_edit)) => (text, Some((old_edit, new_edit))),
+                None => (apply_content_change(&original_text, change), None),
+            }
+        } else {
+            match apply_changes_descending_with_combined_ranges(
                 &original_text,
                 &params.content_changes,
             ) {
-                let updated = {
-                    let old_tree = SyntaxNode::new_root(original_tree_green);
-                    parse_incremental_suffix(
-                        &text,
-                        Some(config.clone()),
-                        &old_tree,
-                        old_edit,
-                        new_edit,
-                    )
-                };
-                let strategy = match updated.strategy {
-                    "section_window" => "section_window_multi_change_coalesced_experimental",
-                    "suffix_window" => "suffix_incremental_multi_change_coalesced_experimental",
-                    _ => "full_reparse_multi_change_incremental_fallback",
-                };
-                (text, GreenNode::from(updated.tree.green()), strategy)
-            } else {
-                let mut updated_text = original_text.clone();
-                for change in params.content_changes.iter() {
-                    updated_text = apply_content_change(&updated_text, change);
+                Some((text, old_edit, new_edit)) => (text, Some((old_edit, new_edit))),
+                None => {
+                    let mut text = original_text.clone();
+                    for change in params.content_changes.iter() {
+                        text = apply_content_change(&text, change);
+                    }
+                    (text, None)
                 }
-                let parsed = crate::parse(&updated_text, Some(config.clone()));
-                (
-                    updated_text,
-                    GreenNode::from(parsed.green()),
-                    "full_reparse_multi_change_incremental_fallback",
-                )
             }
+        };
+
+        // Push the new text into salsa first so `refdef_set` reflects
+        // it; then the parser reuses the cached refdef map and
+        // downstream salsa queries (linter, project graph, ...) hit
+        // the same cache instead of re-scanning the document.
+        let doc_path_for_salsa = params
+            .text_document
+            .uri
+            .to_file_path()
+            .map(|p| p.into_owned());
+        let refdefs = {
+            let mut db = salsa_db.lock().await;
+            if let Some(path) = doc_path_for_salsa.as_ref() {
+                db.update_file_text(path.clone(), updated_text.clone());
+            } else {
+                salsa_file
+                    .set_text(&mut *db)
+                    .with_durability(Durability::LOW)
+                    .to(updated_text.clone());
+            }
+            crate::salsa::refdef_set(&*db, salsa_file, salsa_config).clone()
+        };
+
+        let (green, strategy) = if let Some((old_edit, new_edit)) = edit_ranges {
+            let old_tree = SyntaxNode::new_root(original_tree_green);
+            let updated = parse_incremental_suffix_with_refdefs(
+                &updated_text,
+                Some(config.clone()),
+                refdefs.clone(),
+                &old_tree,
+                old_edit,
+                new_edit,
+            );
+            let label = match (change_count, updated.strategy) {
+                (1, "section_window") => "section_window_single_change_experimental",
+                (1, "suffix_window") => "suffix_incremental_single_change_experimental",
+                (1, _) => "full_reparse_single_change_incremental_fallback",
+                (_, "section_window") => "section_window_multi_change_coalesced_experimental",
+                (_, "suffix_window") => "suffix_incremental_multi_change_coalesced_experimental",
+                (_, _) => "full_reparse_multi_change_incremental_fallback",
+            };
+            (GreenNode::from(updated.tree.green()), label)
         } else {
-            let mut updated_text = original_text.clone();
-            for change in params.content_changes.iter() {
-                updated_text = apply_content_change(&updated_text, change);
-            }
-            let parsed = crate::parse(&updated_text, Some(config.clone()));
-            (
-                updated_text,
-                GreenNode::from(parsed.green()),
-                "full_reparse_multi_change",
-            )
+            let parsed = parse_with_refdefs(&updated_text, Some(config.clone()), refdefs);
+            let label = if !incremental_enabled {
+                if change_count == 1 {
+                    "full_reparse_single_change_incremental_disabled"
+                } else {
+                    "full_reparse_multi_change"
+                }
+            } else if change_count == 1 {
+                "full_reparse_single_change_fallback"
+            } else {
+                "full_reparse_multi_change_incremental_fallback"
+            };
+            (GreenNode::from(parsed.green()), label)
         };
 
         log::debug!(
@@ -318,18 +322,12 @@ pub(crate) async fn did_change(
             salsa_config,
         )
     };
+    // File text was already pushed into salsa before the parse to
+    // populate the `refdef_set` cache; only the config and any
+    // downstream-tracked side state remain to be updated here.
+    let _ = graph_text;
     {
         let mut db = salsa_db.lock().await;
-        if let Some(text) = graph_text.as_ref() {
-            if let Some(path) = graph_path.clone() {
-                db.update_file_text(path, text.clone());
-            } else {
-                salsa_file
-                    .set_text(&mut *db)
-                    .with_durability(Durability::LOW)
-                    .to(text.clone());
-            }
-        }
         salsa_config
             .set_config(&mut *db)
             .with_durability(Durability::MEDIUM)
