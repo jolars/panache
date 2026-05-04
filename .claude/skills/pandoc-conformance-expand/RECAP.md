@@ -9,12 +9,15 @@ Ranked by likely shared root cause and leverage. Numbers in parentheses are the
 count of currently-failing imports remaining under that bucket in the latest
 `report.txt`.
 
-1. **Citations proper (\~14 Unsupported "CITATION", but only #38 is currently
-   failing)** --- embedded inline cites need full pandoc shape:
-   `Cite [Citation { citationId, citationPrefix,    citationSuffix, citationMode = AuthorInText | NormalCitation |    SuppressAuthor, citationNoteNum, citationHash }] [Inline]`.
-   Most citation-bearing cases pass via Example-list carve-out; #38 is the
-   single remaining real-citation showcase. Smaller leverage than the \~14
-   occurrence count would suggest (one case, not many).
+1. **Citations proper (DONE 2026-05-04 --- #38 unlocked)**. Projector
+   now emits full `Cite [Citation { citationId, citationPrefix,
+   citationSuffix, citationMode, citationNoteNum, citationHash }]
+   [Inline]` shape with prefix/suffix inline parsing (smart-typography
+   applied), `@key [locator]` AuthorInText absorption via
+   `inlines_from`-level look-ahead, and a doc-order `noteNum` pre-pass
+   that increments per Cite group outside footnotes and once per
+   FOOTNOTE_REFERENCE entry (all cites inside a footnote share that
+   number).
 2. **Tables --- remaining (\~1)** --- Simple/Multiline/Headerless basics
    landed, plus multiline inline-formatting, short-header,
    indented-pipe-table-with-caption-attributes, **grid_table multi-line
@@ -133,8 +136,122 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-04 (HTML block per-line splitting projector via
-  `markdown_in_html_blocks` — verbatim constructs vs splittable block tags)
+- **Date**: 2026-05-04 (Citations proper — `Cite [Citation, ...] [Inline,
+  ...]` projection with prefix/suffix inline parsing, `@key [locator]`
+  AuthorInText absorption, and doc-order noteNum pre-pass)
+- **Pass before → after**: 181 → 182 / 187 (+1 import: #38). Projector-only
+  fix. Six new helpers landed in `native_projector.rs`:
+  - `Inline::Cite(Vec<Citation>, Vec<Inline>)` variant + `Citation` struct
+    + `CitationMode` enum, with matching `clone_inline` / `write_inline` /
+    `inlines_to_plaintext` arms.
+  - `render_citation_inline(node, out, extra_suffix_text)` — full
+    projection. Walks CITATION tokens (LINK_START / CITATION_MARKER /
+    CITATION_KEY / CITATION_BRACE_OPEN/CLOSE / CITATION_CONTENT /
+    CITATION_SEPARATOR / LINK_DEST) into a `CitationBuilder` per-citation,
+    splitting CITATION_CONTENT into prefix-of-next vs suffix-of-current at
+    each `@`. Mode dispatch: bracketed + `-@` → SuppressAuthor; bracketed +
+    `@` → NormalCitation; bare → AuthorInText. Falls back to the legacy
+    Example-list carve-out (Str "N") if the first key resolves to a
+    `(@label)` Example item.
+  - `parse_cite_affix_inlines(raw, is_prefix)` — reparses prefix/suffix
+    raw text as Pandoc-flavored inlines and runs through
+    `coalesce_inlines` (which applies smart-quotes, smart-dashes, and
+    abbreviation NBSP). Wraps input with a `Z ` sentinel and strips the
+    sentinel from the result so block-level list-marker detection
+    (e.g. `p. 33` → LIST with marker `p.`) cannot eat the leading word.
+    Suffix-side preserves leading whitespace as `Inline::Space`; prefix-side
+    trims both ends.
+  - `literal_inlines(text)` — tokenizes raw input into `Str` + `Space` +
+    `SoftBreak` (no markup, no smart). Used for the literal `[Inline]`
+    payload that pandoc emits as the second arg of `Cite`.
+  - `emit_citation_with_absorb(node, iter, out)` — wired into
+    `inlines_from`'s match (alongside the existing LATEX_COMMAND arm).
+    For bare AuthorInText CITATIONs, uses rowan sibling navigation
+    (`next_sibling_or_token`) to verify both peeked elements (TEXT
+    starting with space + LINK with no LINK_DEST_START) before consuming
+    the iter. The verified locator's `LINK_TEXT` becomes the absorbed
+    suffix; the literal text gets `" [<locator>]"` appended so the
+    `[Inline]` payload reflects the absorbed bytes.
+  - `collect_cite_note_nums(tree, ctx)` + `visit_for_cite_nums(...)` —
+    new pre-pass populating `RefsCtx.cite_note_num_by_offset`. Walks
+    document blocks (skipping top-level FOOTNOTE_DEFINITIONs since they
+    are visited via FOOTNOTE_REFERENCE recursion). Each CITATION node
+    gets one counter increment outside footnotes; each
+    FOOTNOTE_REFERENCE bumps the counter once on entry, then all cites
+    inside the footnote share that fixed number.
+  Build-order matters: `collect_cite_note_nums` and
+  `collect_example_numbering` now run BEFORE `collect_refs_and_headings`,
+  and the partial ctx is mirrored into `REFS_CTX` thread-local before
+  refs gathering — because `parse_footnote_def` (called from refs
+  gathering) eagerly parses footnote bodies through `inlines_from`,
+  which calls `render_citation_inline`, which reads the noteNum lookup.
+  Without the early mirror, footnote-body cites all fall back to
+  noteNum=1. Single allowlist add (#38 inserted between 37 and 39 under
+  `# imported`). CommonMark allowlist green; pandoc allowlist green;
+  full parser-crate suite green; clippy + fmt clean.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 38 (imported-citations)
+- **Files changed (classified)**:
+  - **projector**:
+    `crates/panache-parser/tests/pandoc/native_projector.rs`
+    (Cite/Citation types; render_citation_inline rewritten;
+    parse_cite_affix_inlines + literal_inlines + emit_citation_with_absorb
+    + collect_cite_note_nums helpers; build_refs_ctx ordering rework;
+    clone_inline / write_inline / inlines_to_plaintext arms updated;
+    inlines_from CITATION arm wired to the absorb path)
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 38 inserted
+    between 37 and 39, under `# imported`)
+- **Don't redo**:
+  - The `Z `-sentinel wrap in `parse_cite_affix_inlines` is load-bearing.
+    Without it, `p. 33` (or any text starting with an alphabetical
+    list-marker pattern like `a.`, `b.`, `i.`, `IV.`, etc.) reparses as a
+    `LIST` — the first token is consumed as `LIST_MARKER`, the second as
+    list-item content, and the prefix-word disappears entirely from the
+    inline stream. Don't switch to feeding `raw` directly through
+    `parse_cell_text_inlines`. If a future case lands a citation with an
+    affix that legitimately starts with `Z ` (highly unlikely but
+    theoretically possible), pick a different ASCII-letter sentinel and
+    update the strip check; keep the wrap-strip pattern.
+  - `literal_inlines` does NOT apply pandoc smart-typography. The
+    `[Inline]` payload of `Cite` is a verbatim representation of the
+    original bytes (including `*see*`, `**32**`, `[`, `;`, `]`). Don't
+    route it through `coalesce_inlines` or `parse_cell_text_inlines` —
+    pandoc's expected output preserves the raw markdown spelling, not
+    the smart-converted form. Newline → SoftBreak, runs of space/tab → a
+    single Space, everything else (including `*`, `_`, etc.) is a plain
+    `Str`.
+  - The build-order rework in `build_refs_ctx` matters because
+    `parse_footnote_def` eagerly parses blocks through `inlines_from` →
+    `render_citation_inline`, which reads `REFS_CTX.cite_note_num_by_offset`.
+    The thread-local must be populated with the cite-note-num map BEFORE
+    footnote bodies are parsed, otherwise cites inside footnotes get
+    noteNum=1 fallback. The fix: run the cite-num pre-pass first, mirror
+    the partial ctx into REFS_CTX, then run refs gathering. Don't move
+    `collect_refs_and_headings` back to run first — the dependency is
+    real and the ordering matters.
+  - `emit_citation_with_absorb` uses rowan's `next_sibling_or_token` for
+    the look-ahead rather than `iter.next()`, because rowan iterators
+    don't support push-back. The pattern: navigate via the SyntaxNode
+    tree to verify both peeked elements satisfy the absorption shape
+    (whitespace TEXT + LINK without LINK_DEST_START), then advance the
+    iter (`iter.next()` twice) only on commit. Don't try a "consume,
+    then maybe re-emit" flow — the consumed TEXT can't be put back into
+    the inlines stream cleanly.
+  - The `noteNum` pre-pass increments the counter on every
+    FOOTNOTE_REFERENCE entry, regardless of whether the footnote contains
+    cites. This matches pandoc — verified by probe: a footnote with no
+    cites still bumps the counter for the next outside cite. Don't
+    optimize "skip increment if no inner cites" — it would break the
+    counter alignment for any document with mixed cite/no-cite footnotes.
+  - The `apply_abbreviations` post-pass already handles `pp.`, `chap.`,
+    `p.` etc. inserting NBSP after the abbreviation. The
+    `parse_cite_affix_inlines` helper just calls into `coalesce_inlines`
+    (which calls `apply_abbreviations`) — don't re-implement abbreviation
+    handling in the citation projector.
+
+## Earlier session (2026-05-04, HTML block per-line splitting projector via `markdown_in_html_blocks`)
+
 - **Pass before → after**: 180 → 181 / 187 (+1 import: #181). Projector-only
   fix: `emit_html_block` splits multi-line HTML_BLOCKs into per-line Blocks
   (each tag-only line → RawBlock; each text line → Plain with parsed

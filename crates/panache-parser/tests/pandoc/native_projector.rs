@@ -44,6 +44,10 @@ struct RefsCtx {
     /// item's number — picking up where the previous Example list left
     /// off rather than restarting at 1.
     example_list_start_by_offset: HashMap<u32, usize>,
+    /// Note number per `CITATION` text-range start. Pandoc assigns each
+    /// inline-cite group (and each footnote, regardless of inner cites)
+    /// a position-counter value; cites inside a footnote share its number.
+    cite_note_num_by_offset: HashMap<u32, i64>,
 }
 
 thread_local! {
@@ -70,11 +74,88 @@ pub fn project(tree: &SyntaxNode) -> String {
 
 fn build_refs_ctx(tree: &SyntaxNode) -> RefsCtx {
     let mut ctx = RefsCtx::default();
-    let mut seen_ids: HashMap<String, u32> = HashMap::new();
-    collect_refs_and_headings(tree, &mut ctx, &mut seen_ids);
+    // Cite note-num assignment runs first so it is populated before footnote
+    // bodies are parsed (which would otherwise call `render_citation_inline`
+    // with the lookup map empty and fall back to noteNum=1).
+    collect_cite_note_nums(tree, &mut ctx);
+    // Same reason: example-list numbering and the resolved heading-id lookup
+    // are also referenced from `inlines_from` paths that run during
+    // `parse_footnote_def` below — populate them up-front.
     let mut example_counter: usize = 0;
     collect_example_numbering(tree, &mut ctx, &mut example_counter);
+    // Promoting the in-progress ctx into REFS_CTX lets the footnote-body
+    // parser see the cite-note and example-numbering maps that were just
+    // computed. Without this, `parse_footnote_def` (called transitively from
+    // `collect_refs_and_headings` below) reads an empty thread-local.
+    REFS_CTX.with(|c| {
+        let mut borrowed = c.borrow_mut();
+        borrowed.cite_note_num_by_offset = ctx.cite_note_num_by_offset.clone();
+        borrowed.example_label_to_num = ctx.example_label_to_num.clone();
+        borrowed.example_list_start_by_offset = ctx.example_list_start_by_offset.clone();
+    });
+    let mut seen_ids: HashMap<String, u32> = HashMap::new();
+    collect_refs_and_headings(tree, &mut ctx, &mut seen_ids);
     ctx
+}
+
+/// Walk every inline tree under `tree` and assign a `citationNoteNum` to
+/// each `CITATION` node. Pandoc's rule: outside footnotes, each Cite group
+/// (one CITATION node, regardless of internal `;`-separated keys) gets a
+/// fresh counter value; footnotes increment the counter once on entry,
+/// then ALL cites inside the footnote share that value.
+fn collect_cite_note_nums(tree: &SyntaxNode, ctx: &mut RefsCtx) {
+    let mut footnote_def_nodes: HashMap<String, SyntaxNode> = HashMap::new();
+    for child in tree.descendants() {
+        if child.kind() == SyntaxKind::FOOTNOTE_DEFINITION
+            && let Some(label) = footnote_label(&child)
+        {
+            footnote_def_nodes.entry(label).or_insert(child);
+        }
+    }
+    let mut counter: i64 = 0;
+    for child in tree.children() {
+        if child.kind() == SyntaxKind::FOOTNOTE_DEFINITION {
+            continue;
+        }
+        visit_for_cite_nums(&child, &footnote_def_nodes, &mut counter, None, ctx);
+    }
+}
+
+fn visit_for_cite_nums(
+    node: &SyntaxNode,
+    fn_defs: &HashMap<String, SyntaxNode>,
+    counter: &mut i64,
+    in_fn: Option<i64>,
+    ctx: &mut RefsCtx,
+) {
+    for el in node.children_with_tokens() {
+        if let NodeOrToken::Node(n) = el {
+            match n.kind() {
+                SyntaxKind::CITATION => {
+                    let offset: u32 = n.text_range().start().into();
+                    let num = if let Some(fn_num) = in_fn {
+                        fn_num
+                    } else {
+                        *counter += 1;
+                        *counter
+                    };
+                    ctx.cite_note_num_by_offset.insert(offset, num);
+                }
+                SyntaxKind::FOOTNOTE_REFERENCE => {
+                    if in_fn.is_none() {
+                        *counter += 1;
+                        let fn_num = *counter;
+                        if let Some(label) = footnote_label(&n)
+                            && let Some(def) = fn_defs.get(&label)
+                        {
+                            visit_for_cite_nums(def, fn_defs, counter, Some(fn_num), ctx);
+                        }
+                    }
+                }
+                _ => visit_for_cite_nums(&n, fn_defs, counter, in_fn, ctx),
+            }
+        }
+    }
 }
 
 /// Walk every `LIST` in document order and assign Example-list numbers.
@@ -543,7 +624,25 @@ enum Inline {
     RawInline(String, String),
     Quoted(&'static str, Vec<Inline>),
     Note(Vec<Block>),
+    Cite(Vec<Citation>, Vec<Inline>),
     Unsupported(String),
+}
+
+#[derive(Debug)]
+struct Citation {
+    id: String,
+    prefix: Vec<Inline>,
+    suffix: Vec<Inline>,
+    mode: CitationMode,
+    note_num: i64,
+    hash: i64,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum CitationMode {
+    AuthorInText,
+    NormalCitation,
+    SuppressAuthor,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -2661,6 +2760,9 @@ fn inlines_from(parent: &SyntaxNode) -> Vec<Inline> {
             NodeOrToken::Node(n) if n.kind() == SyntaxKind::LATEX_COMMAND => {
                 emit_latex_command_with_absorb(&n, &mut iter, &mut out);
             }
+            NodeOrToken::Node(n) if n.kind() == SyntaxKind::CITATION => {
+                emit_citation_with_absorb(&n, &mut iter, &mut out);
+            }
             NodeOrToken::Node(n) => push_inline_node(&n, &mut out),
         }
     }
@@ -2671,6 +2773,66 @@ fn inlines_from(parent: &SyntaxNode) -> Vec<Inline> {
         out.pop();
     }
     out
+}
+
+/// Pandoc absorbs `@key [locator]` into a single AuthorInText `Cite` with
+/// the bracketed text becoming the citation's suffix. The parser emits two
+/// separate nodes: `CITATION` (bare `@key`, no surrounding brackets) and an
+/// adjacent `LINK` whose bracketed text has no destination. When the
+/// CITATION is bare and we can verify both the next siblings (a single
+/// `TEXT` whitespace token followed by a `LINK` node lacking
+/// `LINK_DEST_START`), consume both and absorb the link's text as suffix.
+fn emit_citation_with_absorb<I>(
+    node: &SyntaxNode,
+    iter: &mut std::iter::Peekable<I>,
+    out: &mut Vec<Inline>,
+) where
+    I: Iterator<Item = rowan::SyntaxElement<panache_parser::syntax::PanacheLanguage>>,
+{
+    let bracketed = node
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .any(|t| t.kind() == SyntaxKind::LINK_START);
+    if bracketed {
+        render_citation_inline(node, out, None);
+        return;
+    }
+    // Bare AuthorInText form. Use rowan's sibling navigation (not the iter
+    // peek) to verify the absorption pattern without consuming anything we
+    // can't put back. Then if confirmed, advance the iter to skip both.
+    let next_sibling_pair = node.next_sibling_or_token().and_then(|el1| {
+        let t = el1.as_token().cloned()?;
+        if t.kind() != SyntaxKind::TEXT || !t.text().starts_with(' ') {
+            return None;
+        }
+        let space_text = t.text().to_string();
+        let link_el = t.next_sibling_or_token()?;
+        let link = link_el.as_node().cloned()?;
+        if link.kind() != SyntaxKind::LINK {
+            return None;
+        }
+        let has_dest = link
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .any(|tok| tok.kind() == SyntaxKind::LINK_DEST_START);
+        if has_dest {
+            return None;
+        }
+        let link_text = link
+            .children()
+            .find(|c| c.kind() == SyntaxKind::LINK_TEXT)
+            .map(|tt| tt.text().to_string())
+            .unwrap_or_default();
+        Some((space_text, link_text))
+    });
+    if let Some((_space_text, locator_text)) = next_sibling_pair {
+        // Advance the iter past the consumed TEXT and LINK.
+        iter.next();
+        iter.next();
+        render_citation_inline(node, out, Some(&locator_text));
+    } else {
+        render_citation_inline(node, out, None);
+    }
 }
 
 /// Pandoc's tex inline reader absorbs trailing horizontal whitespace into the
@@ -2719,7 +2881,7 @@ fn push_inline_node(node: &SyntaxNode, out: &mut Vec<Inline>) {
     match node.kind() {
         SyntaxKind::LINK => render_link_inline(node, out),
         SyntaxKind::IMAGE_LINK => render_image_inline(node, out),
-        SyntaxKind::CITATION => render_citation_inline(node, out),
+        SyntaxKind::CITATION => render_citation_inline(node, out, None),
         _ => out.push(inline_from_node(node)),
     }
 }
@@ -2727,22 +2889,240 @@ fn push_inline_node(node: &SyntaxNode, out: &mut Vec<Inline>) {
 /// Pandoc treats `(@label)` and bare `@label` as Example-list references
 /// when the label was defined as an Example item; the inline becomes
 /// `Str "N"` (just the digits — surrounding parens come from adjacent
-/// source bytes which our coalesce pass merges back in). Citations
-/// without an Example match still emit `Unsupported "CITATION"` until
-/// general citation support lands.
-fn render_citation_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
-    let key = node
+/// source bytes which our coalesce pass merges back in). Otherwise we
+/// project the CITATION node as a proper `Cite [Citation, ...] [Inline,
+/// ...]` per pandoc's citation reader. `extra_suffix_text` carries an
+/// absorbed `[locator]` (pandoc absorbs `@key [locator]` into the Cite as
+/// the citation's suffix); the literal text reflects the absorbed bytes.
+fn render_citation_inline(
+    node: &SyntaxNode,
+    out: &mut Vec<Inline>,
+    extra_suffix_text: Option<&str>,
+) {
+    // Example-list resolution short-circuit (legacy carve-out).
+    let first_key = node
         .children_with_tokens()
         .filter_map(|el| el.into_token())
         .find(|t| t.kind() == SyntaxKind::CITATION_KEY)
         .map(|t| t.text().to_string())
         .unwrap_or_default();
-    let resolved = REFS_CTX.with(|c| c.borrow().example_label_to_num.get(&key).copied());
-    if let Some(n) = resolved {
+    let example_resolution =
+        REFS_CTX.with(|c| c.borrow().example_label_to_num.get(&first_key).copied());
+    if let Some(n) = example_resolution {
         out.push(Inline::Str(n.to_string()));
-    } else {
-        out.push(Inline::Unsupported("CITATION".to_string()));
+        return;
     }
+
+    let bracketed = node
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .any(|t| t.kind() == SyntaxKind::LINK_START);
+
+    let mut builders: Vec<CitationBuilder> = Vec::new();
+    let mut current: Option<CitationBuilder> = None;
+    let mut pending_prefix = String::new();
+    for el in node.children_with_tokens() {
+        let token = match el {
+            NodeOrToken::Token(t) => t,
+            _ => continue,
+        };
+        match token.kind() {
+            SyntaxKind::LINK_START | SyntaxKind::LINK_DEST => {}
+            SyntaxKind::CITATION_BRACE_OPEN | SyntaxKind::CITATION_BRACE_CLOSE => {}
+            SyntaxKind::CITATION_MARKER => {
+                if let Some(c) = current.take() {
+                    builders.push(c);
+                }
+                let mode = if token.text() == "-@" {
+                    CitationMode::SuppressAuthor
+                } else if bracketed {
+                    CitationMode::NormalCitation
+                } else {
+                    CitationMode::AuthorInText
+                };
+                current = Some(CitationBuilder::new(
+                    std::mem::take(&mut pending_prefix),
+                    mode,
+                ));
+            }
+            SyntaxKind::CITATION_KEY => {
+                if let Some(c) = &mut current {
+                    c.id.push_str(token.text());
+                }
+            }
+            SyntaxKind::CITATION_CONTENT => {
+                if let Some(c) = &mut current {
+                    c.suffix_raw.push_str(token.text());
+                } else {
+                    pending_prefix.push_str(token.text());
+                }
+            }
+            SyntaxKind::CITATION_SEPARATOR => {
+                if let Some(c) = current.take() {
+                    builders.push(c);
+                }
+            }
+            _ => {}
+        }
+    }
+    if let Some(c) = current.take() {
+        builders.push(c);
+    }
+
+    // Absorbed `[locator]` text becomes additional suffix on the LAST
+    // citation in the group (pandoc only absorbs into AuthorInText cites
+    // anyway, which always have one citation in the group).
+    if let Some(extra) = extra_suffix_text
+        && let Some(last) = builders.last_mut()
+    {
+        if !last.suffix_raw.is_empty() && !extra.starts_with(' ') {
+            last.suffix_raw.push(' ');
+        }
+        last.suffix_raw.push_str(extra);
+    }
+
+    let note_offset: u32 = node.text_range().start().into();
+    let note_num = REFS_CTX
+        .with(|c| {
+            c.borrow()
+                .cite_note_num_by_offset
+                .get(&note_offset)
+                .copied()
+        })
+        .unwrap_or(1);
+
+    let projected: Vec<Citation> = builders
+        .into_iter()
+        .map(|b| b.into_citation(note_num))
+        .collect();
+
+    // Build literal text from CITATION node text + any absorbed suffix.
+    let mut literal = node.text().to_string();
+    if let Some(extra) = extra_suffix_text {
+        literal.push(' ');
+        literal.push('[');
+        literal.push_str(extra);
+        literal.push(']');
+    }
+    let text_inlines = literal_inlines(&literal);
+
+    out.push(Inline::Cite(projected, text_inlines));
+}
+
+/// Internal builder for a single Citation while walking the CITATION node's
+/// tokens. `prefix_raw` and `suffix_raw` capture the raw `CITATION_CONTENT`
+/// text segments before / after the key; they are inline-parsed (with smart
+/// transformations applied via `coalesce_inlines`) once the builder is
+/// finalized.
+struct CitationBuilder {
+    id: String,
+    prefix_raw: String,
+    suffix_raw: String,
+    mode: CitationMode,
+}
+
+impl CitationBuilder {
+    fn new(prefix_raw: String, mode: CitationMode) -> Self {
+        Self {
+            id: String::new(),
+            prefix_raw,
+            suffix_raw: String::new(),
+            mode,
+        }
+    }
+
+    fn into_citation(self, note_num: i64) -> Citation {
+        let prefix = parse_cite_affix_inlines(self.prefix_raw.trim_end(), true);
+        let suffix = parse_cite_affix_inlines(&self.suffix_raw, false);
+        Citation {
+            id: self.id,
+            prefix,
+            suffix,
+            mode: self.mode,
+            note_num,
+            hash: 0,
+        }
+    }
+}
+
+/// Parse a citation prefix or suffix raw-text fragment as inlines, applying
+/// pandoc's smart transformations (NBSP after abbreviations, en-dash for
+/// `--`, smart apostrophes/quotes). For prefixes, we trim leading whitespace
+/// (pandoc's prefix never starts with Space). For suffixes, leading whitespace
+/// is preserved so `[@key, suffix]` produces `[Str ",", Space, Str "suffix"]`.
+///
+/// We wrap the raw text with a benign `Z ` prefix before reparsing, then
+/// strip the resulting leading `Str "Z"` + `Space`. This is necessary because
+/// panache's block parser would otherwise misclassify text starting with
+/// (e.g.) `p. ` as an alphabetical list marker, dropping the `p.` from the
+/// resulting inline stream entirely.
+fn parse_cite_affix_inlines(raw: &str, is_prefix: bool) -> Vec<Inline> {
+    if raw.is_empty() {
+        return Vec::new();
+    }
+    let trimmed = if is_prefix { raw.trim_start() } else { raw };
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    let leading_space = !is_prefix && trimmed.starts_with([' ', '\t']);
+    let work = trimmed.trim_start_matches([' ', '\t']);
+    if work.is_empty() {
+        return if leading_space {
+            vec![Inline::Space]
+        } else {
+            Vec::new()
+        };
+    }
+    let wrapped = format!("Z {work}");
+    let inlines = parse_cell_text_inlines(&wrapped);
+    let mut coalesced = coalesce_inlines(inlines);
+    // Strip the leading `Z` sentinel + Space.
+    if matches!(coalesced.first(), Some(Inline::Str(s)) if s == "Z") {
+        coalesced.remove(0);
+        if matches!(coalesced.first(), Some(Inline::Space)) {
+            coalesced.remove(0);
+        }
+    }
+    if leading_space {
+        coalesced.insert(0, Inline::Space);
+    }
+    coalesced
+}
+
+/// Tokenize raw input into the literal `[Inline]` payload that pandoc emits
+/// as the second argument of `Cite`. This is a lossless representation of
+/// the original bytes (including brackets, semicolons, `*`, `**`, etc.) —
+/// no markup parsing, no smart-typography. Newlines become `SoftBreak`,
+/// runs of spaces/tabs become a single `Space`.
+fn literal_inlines(text: &str) -> Vec<Inline> {
+    let mut out: Vec<Inline> = Vec::new();
+    let mut buf = String::new();
+    for ch in text.chars() {
+        match ch {
+            ' ' | '\t' => {
+                if !buf.is_empty() {
+                    out.push(Inline::Str(std::mem::take(&mut buf)));
+                }
+                if !matches!(out.last(), Some(Inline::Space) | Some(Inline::SoftBreak)) {
+                    out.push(Inline::Space);
+                }
+            }
+            '\n' => {
+                if !buf.is_empty() {
+                    out.push(Inline::Str(std::mem::take(&mut buf)));
+                }
+                if matches!(out.last(), Some(Inline::Space)) {
+                    out.pop();
+                }
+                out.push(Inline::SoftBreak);
+            }
+            _ => buf.push(ch),
+        }
+    }
+    if !buf.is_empty() {
+        out.push(Inline::Str(buf));
+    }
+    out
 }
 
 fn push_token_inline(
@@ -3607,6 +3987,20 @@ fn clone_inline(inline: &Inline) -> Inline {
         Inline::RawInline(f, c) => Inline::RawInline(f.clone(), c.clone()),
         Inline::Quoted(k, c) => Inline::Quoted(k, c.iter().map(clone_inline).collect()),
         Inline::Note(blocks) => Inline::Note(blocks.iter().map(clone_block).collect()),
+        Inline::Cite(citations, text) => Inline::Cite(
+            citations
+                .iter()
+                .map(|c| Citation {
+                    id: c.id.clone(),
+                    prefix: c.prefix.iter().map(clone_inline).collect(),
+                    suffix: c.suffix.iter().map(clone_inline).collect(),
+                    mode: c.mode,
+                    note_num: c.note_num,
+                    hash: c.hash,
+                })
+                .collect(),
+            text.iter().map(clone_inline).collect(),
+        ),
         Inline::Unsupported(s) => Inline::Unsupported(s.clone()),
     }
 }
@@ -3760,6 +4154,7 @@ fn inlines_to_plaintext(inlines: &[Inline]) -> String {
             Inline::RawInline(_, _) => {}
             Inline::Quoted(_, children) => s.push_str(&inlines_to_plaintext(children)),
             Inline::Note(_) => {}
+            Inline::Cite(_, text) => s.push_str(&inlines_to_plaintext(text)),
             Inline::Unsupported(_) => {}
         }
     }
@@ -4096,6 +4491,33 @@ fn write_inline(inline: &Inline, out: &mut String) {
         Inline::Note(blocks) => {
             out.push_str("Note [");
             write_block_list(blocks, out);
+            out.push_str(" ]");
+        }
+        Inline::Cite(citations, text) => {
+            out.push_str("Cite [");
+            for (i, c) in citations.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                out.push_str(" Citation { citationId = ");
+                write_haskell_string(&c.id, out);
+                out.push_str(" , citationPrefix = [");
+                write_inline_list(&c.prefix, out);
+                out.push_str(" ] , citationSuffix = [");
+                write_inline_list(&c.suffix, out);
+                out.push_str(" ] , citationMode = ");
+                out.push_str(match c.mode {
+                    CitationMode::AuthorInText => "AuthorInText",
+                    CitationMode::NormalCitation => "NormalCitation",
+                    CitationMode::SuppressAuthor => "SuppressAuthor",
+                });
+                out.push_str(&format!(
+                    " , citationNoteNum = {} , citationHash = {} }}",
+                    c.note_num, c.hash
+                ));
+            }
+            out.push_str(" ] [");
+            write_inline_list(text, out);
             out.push_str(" ]");
         }
         Inline::Unsupported(name) => {
