@@ -127,6 +127,7 @@ impl Formatter {
                 | SyntaxKind::CODE_BLOCK
                 | SyntaxKind::BLOCK_QUOTE
                 | SyntaxKind::HORIZONTAL_RULE
+                | SyntaxKind::LIST
         )
     }
 
@@ -338,11 +339,30 @@ impl Formatter {
                 )
             })
         });
-        let is_loose = (has_blank_between_items
+        // When source has blank lines between outer items of a list whose
+        // items lead with a nested LIST (the same-line nested-marker shape),
+        // the parser parks the BLANK_LINE inside the *inner* LIST as a
+        // trailing child rather than between the outer items. Treat that
+        // shape as a blank-between-items signal so the outer list renders
+        // loose to match pandoc.
+        let has_trailing_blank_in_nested_list = list_children.iter().any(|child| {
+            if child.kind() != SyntaxKind::LIST_ITEM {
+                return false;
+            }
+            child.children().any(|item_child| {
+                item_child.kind() == SyntaxKind::LIST
+                    && item_child
+                        .children()
+                        .last()
+                        .is_some_and(|c| c.kind() == SyntaxKind::BLANK_LINE)
+            })
+        });
+        let is_loose = has_blank_between_items
             || has_blockquote_children
             || has_blank_within_item
-            || has_structural_multi_block)
-            && !has_nested_lists;
+            || has_structural_multi_block
+            || has_trailing_blank_in_nested_list;
+        let _ = has_nested_lists;
 
         log::trace!("Formatting list: is_loose={}", is_loose);
 
@@ -644,10 +664,28 @@ impl Formatter {
                 self.output.push_str(cb);
                 self.output.push(' ');
             }
+            // Format the inner LIST at indent=0 so its first item's marker
+            // abuts the outer marker on the same line, then splice the outer
+            // item's hanging indent into all subsequent (non-blank) lines so
+            // items 2..N and continuation content sit under the inner marker
+            // column rather than column 0. Mirrors the leading-BQ path above.
             let saved_len = self.output.len();
             self.format_node_sync(leading_list, 0);
             if self.output.as_bytes().get(saved_len) == Some(&b'\n') {
                 self.output.remove(saved_len);
+            }
+            if hanging > 0 {
+                let inner_block = self.output.split_off(saved_len);
+                let prefix = " ".repeat(hanging);
+                let mut first = true;
+                for line in inner_block.split_inclusive('\n') {
+                    let is_blank = line.trim_end_matches('\n').is_empty();
+                    if !first && !is_blank {
+                        self.output.push_str(&prefix);
+                    }
+                    self.output.push_str(line);
+                    first = false;
+                }
             }
 
             // Emit any trailing children (blank lines, continuation paragraphs,

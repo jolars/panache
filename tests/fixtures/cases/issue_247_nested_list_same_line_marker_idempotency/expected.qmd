@@ -1,0 +1,19 @@
+::: {.list-table}
+- - Function
+  - Description
+
+- - `sum()`
+
+  - Add values:
+
+    ```python
+    sum([1, 2, 3])
+    ```
+
+- - `len()`
+
+  - Count items:
+
+    - Works on lists
+    - Works on strings
+:::

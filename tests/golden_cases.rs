@@ -328,6 +328,7 @@ golden_test_cases!(
     issue_192_chunk_options_idempotency,
     issue_186_list_blockquote_lazy_idempotency,
     issue_177_list_blockquote_idempotency,
+    issue_247_nested_list_same_line_marker_idempotency,
     issue_185_hashpipe_double_space_idempotency,
     issue_193_cluster_a_fancy_markers_idempotency,
     issue_193_cluster_b_inline_footnote_citation_spacing,
