@@ -37,10 +37,21 @@ or `debug format` CI issues (especially idempotency/losslessness regressions).
    - keep source syntax realistic (especially chunk/hashpipe/YAML edge cases)
    - confirm reproduction is deterministic across repeated runs
 
-4. Classify the failure before fixing:
-   - First determine whether this is primarily a parser issue or formatter
-     issue.
-   - Quick heuristic:
+4. Classify the failure before fixing — and **verify against pandoc-native
+   before any formatter-side fix**:
+   - **Mandatory pandoc check.** On the minimized reproducer, run:
+     ```
+     pandoc <repro>.md -f markdown -t native
+     ```
+     and compare to panache's CST (`cargo run -- parse < <repro>.md`).
+     Pandoc-native is the behavioral reference (per `.claude/rules/parser.md`).
+     If panache's CST differs *structurally* from pandoc — different block
+     types (e.g. BulletList where pandoc has CodeBlock), missing/extra
+     nesting, wrong attribute attachment — **the bug is parser-side, no
+     matter which pass shows the symptom**. Idempotency is a downstream
+     symptom of upstream shape divergence.
+   - Quick heuristic for the *initial* hypothesis (still subject to the
+     pandoc check above):
      - parser issue: losslessness mismatch, CST/marker/trivia dropped, parse
        shape changes, syntax not captured correctly.
      - formatter issue: idempotency drift, wrapping/whitespace churn,
@@ -49,7 +60,16 @@ or `debug format` CI issues (especially idempotency/losslessness regressions).
    - Use debug artifacts (`--dump-passes`) to compare:
      - input vs parsed output (parser/losslessness boundary)
      - first format vs second format (formatter/idempotency boundary)
-   - If uncertain, state the best hypothesis and why before implementing.
+   - **Anti-pattern: fixing in the formatter because the symptom lives there.**
+     If you find yourself reaching for a formatter helper to make pass1 ==
+     pass2 (e.g. propagating looseness, normalizing markers, injecting
+     separators), stop and re-run the pandoc check. A formatter fix is only
+     correct when panache's CST already matches pandoc's structure and the
+     divergence is purely in rendering. If the CST is wrong, the formatter
+     fix is papering over a parser bug — route to `pandoc-conformance-expand`
+     and add a corpus case there instead.
+   - If uncertain, state the best hypothesis and why before implementing —
+     and include the pandoc-native output in the hypothesis.
 
 5. Add regression fixture(s):
    - Formatter user-visible cases:
