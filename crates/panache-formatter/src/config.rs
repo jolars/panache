@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 pub use panache_parser::Dialect;
+pub use panache_parser::Extensions;
 pub use panache_parser::Extensions as ParserExtensions;
 pub use panache_parser::Flavor;
 pub use panache_parser::PandocCompat;

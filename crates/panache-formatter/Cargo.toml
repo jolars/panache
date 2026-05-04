@@ -22,3 +22,5 @@ unicode-width = "0.2"
 
 [dev-dependencies]
 insta = { version = "1.47.2", features = ["json"] }
+similar-asserts = "2.0.0"
+toml = "1.1.2"

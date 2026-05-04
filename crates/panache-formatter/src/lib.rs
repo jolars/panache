@@ -56,3 +56,7 @@ pub fn format(input: &str, config: Option<Config>, range: Option<(usize, usize)>
     let out = formatter::format_tree(&tree, &config, range);
     apply_line_ending(&out, target_line_ending)
 }
+
+pub fn format_with_defaults(input: &str) -> String {
+    format(input, None, None)
+}

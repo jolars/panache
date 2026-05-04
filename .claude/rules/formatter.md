@@ -2,8 +2,8 @@
 paths:
   - "src/formatter.rs"
   - "crates/panache-formatter/**/*.rs"
+  - "crates/panache-formatter/tests/format/**/*.rs"
   - "tests/fixtures/cases/**/expected.md"
-  - "tests/format/**/*.rs"
 ---
 
 Formatter changes should preserve idempotency and avoid parser-side workarounds.

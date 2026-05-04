@@ -331,9 +331,17 @@ Instead of listing every file, understand the patterns:
 
 **Top-level tests** (`tests/`):
 
-- `cases/*/`: Formatter golden scenarios (use `view` to explore)
+- `fixtures/cases/*/`: Formatter golden scenarios + `golden_cases.rs` runner.
+  Lives at top-level (rather than in the formatter crate) because each case's
+  optional `panache.toml` uses the host config schema (sub-tables like
+  `[format]`, `[code-blocks]`, `[formatters.python]`) which the dependency-lean
+  formatter `Config` doesn't parse on its own.
 - `cli/`: CLI integration tests
-- `format/`: Feature-specific unit tests
+- `lsp/` + `lsp.rs`: LSP integration tests
+- `linting/` + `linting.rs`: Linter integration tests
+- `external_formatters.rs`, `external_linters.rs`: Tests that exercise external
+  tool execution (shfmt etc.) --- kept here because the formatter crate doesn't
+  invoke external tools; that's a host concern.
 - YAML suite groundwork uses vendored fixtures under
   `tests/fixtures/yaml-test-suite/` refreshed via
   `scripts/update-yaml-test-suite-fixtures.sh`; incremental coverage is tracked
@@ -348,6 +356,11 @@ Instead of listing every file, understand the patterns:
 
 - `fixtures/cases/*/` + `golden_parser_cases.rs`: parser golden scenarios
   (losslessness + CST snapshots), separate from formatter golden cases.
+
+**Formatter-crate tests** (`crates/panache-formatter/tests/`):
+
+- `format/`: Feature-specific formatter unit tests (programmatic Config, no TOML
+  parsing) --- wire new modules into `format/main.rs`.
 
 **Editor extension** (`editors/code/`):
 

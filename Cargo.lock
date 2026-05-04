@@ -896,6 +896,8 @@ dependencies = [
  "panache-parser",
  "pretty_yaml",
  "rowan",
+ "similar-asserts",
+ "toml",
  "unicode-width",
  "yaml_parser",
 ]
