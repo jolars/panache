@@ -191,8 +191,7 @@ Hierarchical lookup:
 
 **Key settings:**
 
-- `flavor`: Pandoc, Quarto, RMarkdown, GFM, CommonMark (affects enabled
-  extensions)
+- `flavor`: Pandoc, Quarto, RMarkdown, GFM, CommonMark
 - `line-width`: Default 80 - `wrap`: reflow (default), preserve, or sentence.
 - `extensions`: many bool flags for Pandoc extensions
 - `[format]` section for formatting preferences
