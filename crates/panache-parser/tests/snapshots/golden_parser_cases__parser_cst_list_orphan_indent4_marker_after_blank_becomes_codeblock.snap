@@ -1,0 +1,45 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..101
+  LIST@0..42
+    LIST_ITEM@0..18
+      WHITESPACE@0..2 "  "
+      LIST_MARKER@2..3 "*"
+      WHITESPACE@3..4 " "
+      PLAIN@4..18
+        TEXT@4..17 "Outer item 1."
+        NEWLINE@17..18 "\n"
+    BLANK_LINE@18..19
+      BLANK_LINE@18..19 "\n"
+    LIST_ITEM@19..42
+      WHITESPACE@19..22 "   "
+      LIST_MARKER@22..23 "*"
+      WHITESPACE@23..24 " "
+      PLAIN@24..42
+        TEXT@24..41 "Misindented item."
+        NEWLINE@41..42 "\n"
+  BLANK_LINE@42..43
+    BLANK_LINE@42..43 "\n"
+  CODE_BLOCK@43..82
+    CODE_CONTENT@43..82
+      WHITESPACE@43..47 "    "
+      TEXT@47..55 "+ Sub a."
+      NEWLINE@55..56 "\n"
+      WHITESPACE@56..60 "    "
+      TEXT@60..68 "+ Sub b."
+      NEWLINE@68..69 "\n"
+      WHITESPACE@69..73 "    "
+      TEXT@73..81 "+ Sub c."
+      NEWLINE@81..82 "\n"
+  BLANK_LINE@82..83
+    BLANK_LINE@82..83 "\n"
+  LIST@83..101
+    LIST_ITEM@83..101
+      WHITESPACE@83..85 "  "
+      LIST_MARKER@85..86 "*"
+      WHITESPACE@86..87 " "
+      PLAIN@87..101
+        TEXT@87..100 "Outer item 2."
+        NEWLINE@100..101 "\n"

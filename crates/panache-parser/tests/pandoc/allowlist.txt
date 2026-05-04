@@ -39,6 +39,7 @@
 24
 188
 189
+192
 
 # imported (machine-imported via scripts/import-pandoc-conformance-from-parser-fixtures.sh)
 26

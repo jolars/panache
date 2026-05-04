@@ -5,7 +5,7 @@ state; this file is judgment calls only.
 
 ## Suggested next targets
 
-Corpus is at **191 / 191 passing (100%)**. There are no failing imports left
+Corpus is at **192 / 192 passing (100%)**. There are no failing imports left
 in the seed. Future work should focus on **growing the corpus**:
 
 1. **Smart typography case** — pandoc's `markdown` flavor enables `smart`
@@ -110,10 +110,106 @@ in the seed. Future work should focus on **growing the corpus**:
 
 ## Latest session
 
-- **Date**: 2026-05-04 (Corpus growth +4: nested blockquotes, figure
-  with `{#fig:label}`, link with attrs, code-span with attrs. Two
-  small projector fixes: figure id-migration clears image id; inline
-  code now reads ATTRIBUTE child.)
+- **Date**: 2026-05-04 (Parser-shape fix: bullet marker at indent ≥ 4
+  cannot continue a shallow-base list across a blank line. Closes #192,
+  the orphan list-marker case where pandoc emits a CodeBlock between two
+  BulletLists rather than a sibling BulletList.)
+- **Pass before → after**: 191 → 192 / 192 (+1 hand-curated case,
+  parser-shape fix). 100% pass rate.
+- **What landed**:
+  - **Parser-shape fix**
+    (`crates/panache-parser/src/parser/utils/continuation.rs` —
+    `compute_levels_to_keep`'s LIST/Bullet branch). Previous logic
+    kept a bullet LIST open across a blank line whenever
+    `effective_indent` fell within `[base, base+3]`, even when
+    `effective_indent ≥ 4` and `base < 4`. That kept the list open in
+    a state where no LIST_ITEM could absorb the deeper indent (item
+    content_col > 4), and `handle_list_open_effect`'s "close all,
+    start new top-level LIST" fallback then produced a sibling
+    BulletList where pandoc emits a CodeBlock. Added a
+    `jumps_out_of_shallow_list` guard: a bullet at indent ≥ 4 cannot
+    continue a list whose `base_indent_cols < 4`. The LIST_ITEM
+    branch below still rescues the LIST when the previous item's
+    content column accommodates the deeper indent (keep_level is
+    monotonic), so this only closes the list when no item can absorb
+    it. Verified against pandoc on `* a / blank / "    + sub"`
+    (sublist of a, item rescues), `  * a / "    * b"` (sublist, item
+    rescues), `  * a 1 / "   * misindented" / blank /
+    "    + sub"` (CodeBlock, no rescue — the failing case).
+  - **Corpus +1**:
+    - `0192-block-list-orphan-marker-codeblock/` — pandoc emits
+      `BulletList[item1, Misindented], CodeBlock "+ Sub a.\n+ Sub b.\n+ Sub c.", BulletList[Outer 2]`
+      from the misindented-list-then-deeper-indent input. The `+`
+      lines are not a sibling/sublist; they're an indented code
+      block once the surrounding list closes.
+  - **Parser fixture**:
+    `crates/panache-parser/tests/fixtures/cases/list_orphan_indent4_marker_after_blank_becomes_codeblock/`
+    pins the new CST shape (LIST → CODE_BLOCK → LIST) before the
+    allowlist guard.
+  - **Formatter fixture**:
+    `tests/fixtures/cases/list_orphan_indent4_marker_after_blank_becomes_codeblock/`
+    pins the formatter output (indented code converts to fenced
+    code) and exercises idempotency on the new structural shape.
+  - **Allowlist**: `crates/panache-parser/tests/pandoc/allowlist.txt`
+    (+1: 192 inserted under `# block` after 189). Block section now
+    15 entries.
+- **Cases unlocked** (+1):
+  - 192 (block-list-orphan-marker-codeblock) — needed parser-shape fix
+- **Files changed (classified)**:
+  - **parser-shape**:
+    `crates/panache-parser/src/parser/utils/continuation.rs` —
+    `compute_levels_to_keep`'s Bullet branch in the LIST container,
+    new `jumps_out_of_shallow_list` guard.
+  - **corpus**: 1 new directory under
+    `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/`
+    (`0192-block-list-orphan-marker-codeblock/`) with `input.md` +
+    `expected.native` (regenerated via `pandoc -f markdown -t
+    native`).
+  - **parser fixture**: 1 new directory under
+    `crates/panache-parser/tests/fixtures/cases/`
+    (`list_orphan_indent4_marker_after_blank_becomes_codeblock/`)
+    with `input.md`; CST snapshot under `tests/snapshots/`.
+  - **formatter fixture**: 1 new directory under
+    `tests/fixtures/cases/`
+    (`list_orphan_indent4_marker_after_blank_becomes_codeblock/`)
+    with `input.md` + `expected.md`.
+  - **wiring**: `crates/panache-parser/tests/golden_parser_cases.rs`
+    (+1 entry), `tests/golden_cases.rs` (+1 entry).
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 192).
+- **Don't redo**:
+  - `compute_levels_to_keep`'s `keep_level` is **monotonic** — a LIST
+    that says "don't keep me" can still be kept open if an enclosed
+    LIST_ITEM at a deeper index says "keep me". That's the load-bearing
+    interaction behind the new `jumps_out_of_shallow_list` guard: it's
+    safe to set `continues_list = false` for the LIST whenever the
+    indent jumps to ≥ 4 from a shallow base, because the LIST_ITEM
+    branch's `effective_indent >= content_col` check still rescues the
+    LIST (and starts a sublist of the open item) whenever the open
+    item's content column can accommodate the deeper indent. The LIST
+    only genuinely closes when *no* item can absorb the line.
+  - The fix lives in `compute_levels_to_keep`, not in
+    `block_dispatcher`'s `if indent_cols >= 4 && !ctx.in_list`
+    gate. Tightening the dispatcher gate to also reject
+    `(in_list && list_indent_info.is_none())` would work but would
+    leave the LIST open in containers — the resulting CodeBlock
+    would end up inside `LIST` instead of as a top-level sibling of
+    `BulletList`, which doesn't match pandoc-native. Closing the LIST
+    in `compute_levels_to_keep` keeps the structural placement correct.
+  - When verifying this kind of indent-vs-marker rule, the
+    discriminator is **not** "marker at indent ≥ 4" alone. It's
+    "marker at indent ≥ 4 with a shallow-base parent list AND no open
+    item whose content column accommodates the indent." Probe pandoc
+    with both a content-col-4 parent (`*   item / blank /
+    "    + sub"` — sublist) and a content-col-5 parent (`   * item /
+    blank / "    + sub"` — CodeBlock) before rejecting the change as
+    "too aggressive."
+
+## Earlier session (2026-05-04, Corpus growth +4: nested blockquotes,
+  figure with `{#fig:label}`, link with attrs, code-span with attrs.
+  Two small projector fixes: figure id-migration clears image id;
+  inline code now reads ATTRIBUTE child.)
+
 - **Pass before → after**: 187 → 191 / 191 (+4 hand-curated cases).
   100% pass rate.
 - **What landed**:

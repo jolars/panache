@@ -250,6 +250,7 @@ golden_test_cases!(
     list_deep_roman_idempotency_137,
     list_nested_roman_idempotency_136,
     list_nested_same_line_marker,
+    list_orphan_indent4_marker_after_blank_becomes_codeblock,
     line_ending_crlf,
     line_ending_lf,
     link_inside_link_text_commonmark,

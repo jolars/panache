@@ -168,7 +168,20 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                                 effective_indent.abs_diff(*base_indent_cols) <= 3
                             }
                             lists::ListMarker::Bullet(_) => {
-                                effective_indent >= *base_indent_cols
+                                // A bullet marker at indent ≥ 4 cannot continue
+                                // a shallow-base bullet list across a blank line:
+                                // pandoc treats the would-be marker as the start
+                                // of an indented code block once the list is
+                                // ineligible to absorb it as a sublist of the
+                                // open item. The LIST_ITEM branch below still
+                                // rescues the LIST when the previous item's
+                                // content column accommodates the new indent
+                                // (keep_level is monotonic), so this guard only
+                                // closes the list when no item can absorb it.
+                                let jumps_out_of_shallow_list =
+                                    effective_indent >= 4 && *base_indent_cols < 4;
+                                !jumps_out_of_shallow_list
+                                    && effective_indent >= *base_indent_cols
                                     && effective_indent <= base_indent_cols + 3
                             }
                         };

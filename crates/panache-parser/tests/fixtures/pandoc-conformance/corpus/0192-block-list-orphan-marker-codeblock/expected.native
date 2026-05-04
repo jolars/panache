@@ -1,0 +1,13 @@
+[ BulletList
+    [ [ Para
+          [ Str "Outer" , Space , Str "item" , Space , Str "1." ]
+      ]
+    , [ Para [ Str "Misindented" , Space , Str "item." ] ]
+    ]
+, CodeBlock ( "" , [] , [] ) "+ Sub a.\n+ Sub b.\n+ Sub c."
+, BulletList
+    [ [ Plain
+          [ Str "Outer" , Space , Str "item" , Space , Str "2." ]
+      ]
+    ]
+]
