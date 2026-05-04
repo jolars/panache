@@ -417,11 +417,12 @@ impl UnresolvedReference {
 
 #[cfg(test)]
 mod tests {
-    use super::{AstNode, ImageLink};
+    use super::{AstNode, ImageLink, UnresolvedReference};
 
     #[test]
     fn image_reference_label_and_range_are_extracted() {
-        let input = "![Alt text][img]";
+        // Refdef present: parses as ImageLink so the wrapper accessors apply.
+        let input = "![Alt text][img]\n\n[img]: /url\n";
         let tree = crate::parse(input, None);
         let image = tree
             .descendants()
@@ -434,5 +435,46 @@ mod tests {
         let start: usize = range.start().into();
         let end: usize = range.end().into();
         assert_eq!(&input[start..end], "img");
+    }
+
+    #[test]
+    fn unresolved_image_reference_label_is_extracted() {
+        // No matching refdef: parses as UnresolvedReference under Pandoc.
+        // Confirms `is_image()` and `label()` accessors.
+        let input = "![Alt text][img]";
+        let tree = crate::parse(input, None);
+        let unresolved = tree
+            .descendants()
+            .find_map(UnresolvedReference::cast)
+            .expect("unresolved reference");
+
+        assert!(unresolved.is_image(), "expected image-shape unresolved ref");
+        assert_eq!(unresolved.label().as_deref(), Some("img"));
+    }
+
+    #[test]
+    fn unresolved_link_reference_label_is_extracted() {
+        let input = "[link text][missing]";
+        let tree = crate::parse(input, None);
+        let unresolved = tree
+            .descendants()
+            .find_map(UnresolvedReference::cast)
+            .expect("unresolved reference");
+
+        assert!(!unresolved.is_image(), "expected link-shape unresolved ref");
+        assert_eq!(unresolved.label().as_deref(), Some("missing"));
+    }
+
+    #[test]
+    fn unresolved_shortcut_reference_has_no_label() {
+        let input = "[no refdef]";
+        let tree = crate::parse(input, None);
+        let unresolved = tree
+            .descendants()
+            .find_map(UnresolvedReference::cast)
+            .expect("unresolved reference");
+
+        assert!(!unresolved.is_image());
+        assert!(unresolved.label().is_none());
     }
 }

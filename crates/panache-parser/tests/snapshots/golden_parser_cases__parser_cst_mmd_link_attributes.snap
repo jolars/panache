@@ -1,11 +1,12 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..173
   PARAGRAPH@0..65
     TEXT@0..20 "This is a reference "
-    IMAGE_LINK@20..33
+    UNRESOLVED_REFERENCE@20..33
       IMAGE_LINK_START@20..22
         IMAGE_LINK_START@20..22 "!["
       IMAGE_ALT@22..27

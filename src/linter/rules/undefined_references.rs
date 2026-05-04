@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, Crossref, FootnoteReference, Link, SyntaxNode};
+use crate::syntax::{AstNode, Crossref, FootnoteReference, Link, SyntaxNode, UnresolvedReference};
 use crate::utils::{
     crossref_resolution_labels, implicit_heading_ids, normalize_anchor_label, normalize_label,
 };
@@ -45,6 +45,31 @@ impl Rule for UndefinedReferencesRule {
                 Location::from_node(&location_node, input),
                 "undefined-reference-label",
                 format!("Reference label '[{}]' not found", label_text),
+            ));
+        }
+
+        // Bracket-shape patterns whose label didn't resolve at parse
+        // time emit `UNRESOLVED_REFERENCE` (Pandoc dialect; see
+        // `crates/panache-parser/src/parser/inlines/inline_ir.rs`).
+        // Image-shape variants (`![alt][missing]`) flow through the
+        // same wrapper; flag them too.
+        for unresolved in tree.descendants().filter_map(UnresolvedReference::cast) {
+            let Some((label_text, location_node)) = extract_unresolved_label_and_node(&unresolved)
+            else {
+                continue;
+            };
+            let normalized_label = normalize_label(&label_text);
+            if normalized_label.is_empty()
+                || labels.reference_labels.contains(&normalized_label)
+                || labels.heading_text_labels.contains(&normalized_label)
+            {
+                continue;
+            }
+            let prefix = if unresolved.is_image() { "![" } else { "[" };
+            diagnostics.push(Diagnostic::warning(
+                Location::from_node(&location_node, input),
+                "undefined-reference-label",
+                format!("Reference label '{prefix}{label_text}]' not found"),
             ));
         }
 
@@ -194,6 +219,31 @@ fn extract_reference_label_and_node(link: &Link) -> Option<(String, SyntaxNode)>
 
     link.text()
         .map(|text| (text.text_content(), link.syntax().clone()))
+}
+
+/// Mirror of [`extract_reference_label_and_node`] for the
+/// `UnresolvedReference` wrapper. Full / collapsed forms expose the
+/// label via `LinkRef`; shortcut form has no `LinkRef` and uses the
+/// inner text as the label.
+fn extract_unresolved_label_and_node(
+    unresolved: &UnresolvedReference,
+) -> Option<(String, SyntaxNode)> {
+    if let Some(label) = unresolved.label()
+        && !label.trim().is_empty()
+    {
+        // Locate the LINK_REF child for the diagnostic location.
+        let link_ref_node = unresolved
+            .syntax()
+            .children()
+            .find(|c| c.kind() == crate::syntax::SyntaxKind::LINK_REF)
+            .unwrap_or_else(|| unresolved.syntax().clone());
+        return Some((label, link_ref_node));
+    }
+    let text = unresolved.text();
+    if text.trim().is_empty() {
+        return None;
+    }
+    Some((text, unresolved.syntax().clone()))
 }
 
 #[cfg(test)]

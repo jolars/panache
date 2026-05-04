@@ -4,7 +4,9 @@ use std::path::Path;
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, FootnoteReference, Link, SyntaxKind, SyntaxNode};
+use crate::syntax::{
+    AstNode, FootnoteReference, Link, SyntaxKind, SyntaxNode, UnresolvedReference,
+};
 use crate::utils::normalize_label;
 
 pub struct UnusedDefinitionsRule;
@@ -67,7 +69,7 @@ struct UsageLabels {
 }
 
 fn collect_usage_labels(tree: &SyntaxNode) -> UsageLabels {
-    let reference_labels = tree
+    let mut reference_labels: HashSet<String> = tree
         .descendants()
         .filter_map(Link::cast)
         .filter_map(|link| {
@@ -92,6 +94,31 @@ fn collect_usage_labels(tree: &SyntaxNode) -> UsageLabels {
         })
         .filter(|label| !label.is_empty())
         .collect();
+
+    // Bracket-shape patterns whose label didn't resolve as a refdef
+    // still count as a usage of the label they reference — so a
+    // `[GitHub]` shortcut counts as using the `[github]:` definition
+    // even if that definition lives in another file (or hasn't been
+    // wired into the refdef set yet). The wrapper exposes both forms.
+    reference_labels.extend(
+        tree.descendants()
+            .filter_map(UnresolvedReference::cast)
+            .filter_map(|unresolved| {
+                if let Some(label) = unresolved.label() {
+                    let normalized = normalize_label(&label);
+                    if !normalized.is_empty() {
+                        return Some(normalized);
+                    }
+                }
+                let text = unresolved.text();
+                let normalized = normalize_label(&text);
+                if normalized.is_empty() {
+                    None
+                } else {
+                    Some(normalized)
+                }
+            }),
+    );
 
     let footnote_ids = tree
         .descendants()

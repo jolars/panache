@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..520
@@ -84,7 +85,7 @@ DOCUMENT@0..520
     BLANK_LINE@215..216 "\n"
   PARAGRAPH@216..265
     TEXT@216..228 "Unresolved: "
-    IMAGE_LINK@228..251
+    UNRESOLVED_REFERENCE@228..251
       IMAGE_LINK_START@228..230
         IMAGE_LINK_START@228..230 "!["
       IMAGE_ALT@230..237

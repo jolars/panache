@@ -10,7 +10,7 @@ use crate::salsa::Db;
 use crate::syntax::{
     AstNode, AttributeNode, Citation, CodeBlock, CodeSpan, Crossref, FootnoteDefinition,
     FootnoteReference, ImageLink, InlineMath, Link, LinkRef, ParsedYamlRegionSnapshot,
-    ReferenceDefinition, SyntaxKind, SyntaxNode,
+    ReferenceDefinition, SyntaxKind, SyntaxNode, UnresolvedReference,
 };
 use crate::utils::{normalize_anchor_label, normalize_label};
 use rowan::{NodeOrToken, TextRange, TextSize};
@@ -306,19 +306,37 @@ pub(crate) fn extract_heading_id_key(node: &SyntaxNode) -> Option<String> {
 }
 
 pub(crate) fn extract_heading_link_target(node: &SyntaxNode) -> Option<String> {
-    if let Some(link) = Link::cast(node.clone()) {
-        return heading_target_from_link(&link);
+    if let Some(target) = heading_target_from_node(node) {
+        return Some(target);
     }
 
     let mut current = node.clone();
     while let Some(parent) = current.parent() {
-        if let Some(link) = Link::cast(parent.clone()) {
-            return heading_target_from_link(&link);
+        if let Some(target) = heading_target_from_node(&parent) {
+            return Some(target);
         }
         current = parent;
     }
 
     None
+}
+
+fn heading_target_from_node(node: &SyntaxNode) -> Option<String> {
+    if let Some(link) = Link::cast(node.clone()) {
+        return heading_target_from_link(&link);
+    }
+    if let Some(unresolved) = UnresolvedReference::cast(node.clone()) {
+        return heading_target_from_unresolved(&unresolved);
+    }
+    None
+}
+
+fn heading_target_from_unresolved(unresolved: &UnresolvedReference) -> Option<String> {
+    if unresolved.is_image() || unresolved.label().is_some() {
+        return None;
+    }
+    let label = normalize_label(&unresolved.text());
+    (!label.is_empty()).then_some(label)
 }
 
 pub(crate) fn extract_example_label_target_at_offset(
@@ -356,6 +374,29 @@ pub(crate) fn extract_symbol_text_range(node: &SyntaxNode) -> Option<TextRange> 
         }
         if link.reference().is_none() {
             return link.text().map(|text| text.syntax().text_range());
+        }
+    }
+
+    if let Some(unresolved) = UnresolvedReference::cast(node.clone())
+        && !unresolved.is_image()
+    {
+        if unresolved.label().is_some() {
+            // Full / collapsed form: rename target is the LINK_REF label.
+            if let Some(link_ref) = unresolved
+                .syntax()
+                .children()
+                .find(|c| c.kind() == SyntaxKind::LINK_REF)
+                .and_then(LinkRef::cast)
+            {
+                return link_ref.label_value_range();
+            }
+        } else {
+            // Shortcut form: rename target is the inner LINK_TEXT range.
+            return unresolved
+                .syntax()
+                .children()
+                .find(|c| c.kind() == SyntaxKind::LINK_TEXT)
+                .map(|n| n.text_range());
         }
     }
 

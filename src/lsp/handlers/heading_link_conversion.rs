@@ -1,11 +1,34 @@
 //! Heading link conversion utilities for code actions.
 
 use crate::config::Extensions;
-use crate::syntax::{AstNode, Heading, Link, SyntaxNode};
+use crate::syntax::{AstNode, Heading, Link, SyntaxNode, UnresolvedReference};
 use crate::utils::{implicit_heading_ids, normalize_label};
 use tower_lsp_server::ls_types::{Range, TextEdit};
 
 use super::super::conversions::offset_to_position;
+
+/// Extract the shortcut label of a `[label]`-shape link node, or
+/// `None` if the node isn't a shortcut form. Handles both `Link`
+/// (when a refdef happened to resolve the shortcut) and
+/// `UnresolvedReference` (when no refdef matches).
+fn shortcut_label(node: &SyntaxNode) -> Option<String> {
+    if let Some(link) = Link::cast(node.clone()) {
+        if link.dest().is_some() || link.reference().is_some() {
+            return None;
+        }
+        let text = link.text()?;
+        let label = normalize_label(&text.text_content());
+        if label.is_empty() { None } else { Some(label) }
+    } else if let Some(unresolved) = UnresolvedReference::cast(node.clone()) {
+        if unresolved.is_image() || unresolved.label().is_some() {
+            return None;
+        }
+        let label = normalize_label(&unresolved.text());
+        if label.is_empty() { None } else { Some(label) }
+    } else {
+        None
+    }
+}
 
 /// Find an implicit heading shortcut link at the given position.
 pub fn find_implicit_heading_link_at_position(
@@ -14,17 +37,9 @@ pub fn find_implicit_heading_link_at_position(
 ) -> Option<SyntaxNode> {
     let text_size = rowan::TextSize::from(offset as u32);
     let token = tree.token_at_offset(text_size).right_biased()?;
-    token.parent_ancestors().find_map(|node| {
-        let link = Link::cast(node)?;
-        if link.dest().is_some() || link.reference().is_some() {
-            return None;
-        }
-        let text = link.text()?;
-        if normalize_label(&text.text_content()).is_empty() {
-            return None;
-        }
-        Some(link.syntax().clone())
-    })
+    token
+        .parent_ancestors()
+        .find(|node| shortcut_label(node).is_some())
 }
 
 /// Convert an implicit heading shortcut link (`[label]`) to explicit hash link (`[label](#slug)`).
@@ -34,20 +49,9 @@ pub fn convert_to_explicit_heading_link(
     text: &str,
     extensions: &Extensions,
 ) -> Vec<TextEdit> {
-    let Some(link) = Link::cast(link_node.clone()) else {
+    let Some(normalized_label) = shortcut_label(link_node) else {
         return vec![];
     };
-    if link.dest().is_some() || link.reference().is_some() {
-        return vec![];
-    }
-
-    let Some(link_text) = link.text() else {
-        return vec![];
-    };
-    let normalized_label = normalize_label(&link_text.text_content());
-    if normalized_label.is_empty() {
-        return vec![];
-    }
 
     let Some(entry) = implicit_heading_ids(tree, extensions)
         .into_iter()

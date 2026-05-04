@@ -1,0 +1,18 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..21
+  PARAGRAPH@0..21
+    UNRESOLVED_REFERENCE@0..20
+      LINK_START@0..1
+        LINK_START@0..1 "["
+      LINK_TEXT@1..10
+        TEXT@1..10 "link text"
+      TEXT@10..11 "]"
+      TEXT@11..12 "["
+      LINK_REF@12..19
+        TEXT@12..19 "missing"
+      TEXT@19..20 "]"
+    NEWLINE@20..21 "\n"

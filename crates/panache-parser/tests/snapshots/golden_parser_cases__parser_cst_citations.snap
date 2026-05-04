@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..1707
@@ -78,7 +79,7 @@ DOCUMENT@0..1707
       CITATION_MARKER@477..478 "@"
       CITATION_KEY@478..485 "smith04"
     TEXT@485..486 " "
-    LINK@486..493
+    UNRESOLVED_REFERENCE@486..493
       LINK_START@486..487
         LINK_START@486..487 "["
       LINK_TEXT@487..492
@@ -261,7 +262,7 @@ DOCUMENT@0..1707
         CITATION_MARKER@1612..1613 "@"
         CITATION_KEY@1613..1624 "пункт3"
       TEXT@1624..1625 " "
-      LINK@1625..1632
+      UNRESOLVED_REFERENCE@1625..1632
         LINK_START@1625..1626
           LINK_START@1625..1626 "["
         LINK_TEXT@1626..1631

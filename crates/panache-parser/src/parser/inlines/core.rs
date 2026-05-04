@@ -38,8 +38,8 @@ use super::inline_html::{emit_inline_html, try_parse_inline_html};
 use super::latex::{parse_latex_command, try_parse_latex_command};
 use super::links::{
     LinkScanContext, emit_autolink, emit_bare_uri_link, emit_inline_image, emit_inline_link,
-    emit_reference_image, emit_reference_link, try_parse_autolink, try_parse_bare_uri,
-    try_parse_inline_image, try_parse_inline_link, try_parse_reference_image,
+    emit_reference_image, emit_reference_link, emit_unresolved_reference, try_parse_autolink,
+    try_parse_bare_uri, try_parse_inline_image, try_parse_inline_link, try_parse_reference_image,
     try_parse_reference_link,
 };
 use super::mark::{emit_mark, try_parse_mark};
@@ -488,6 +488,103 @@ fn parse_inline_range_impl(
         // dispatcher's len is therefore constrained to
         // `[suffix_end, end]` rather than required to equal
         // `suffix_end` exactly.
+        // IR-driven dispatch: Pandoc unresolved bracket-shape pattern.
+        // Before emitting the `UNRESOLVED_REFERENCE` wrapper, give the
+        // dispatcher's lenient inline-link / inline-image parsers a
+        // chance to override. The IR's `try_inline_suffix` is stricter
+        // than pandoc-markdown for some destination shapes (URLs with
+        // spaces, titles with embedded quotes, shortcode-style braces);
+        // the dispatcher accepts those and produces a real LINK / IMAGE
+        // node — pandoc-native agrees. Without this override, valid
+        // pandoc links would degrade to `UNRESOLVED_REFERENCE` here.
+        if let Some(super::inline_ir::BracketDispo::UnresolvedReference {
+            is_image,
+            text_start: ref_text_start,
+            text_end: ref_text_end,
+            end: ref_end,
+        }) = bracket_plan.lookup(pos)
+        {
+            let is_image = *is_image;
+            let dispo_suffix_end = *ref_end;
+            let suppress = suppress_inner_links && !is_image;
+            if !suppress {
+                let ctx = LinkScanContext::from_options(config);
+                let is_commonmark = config.dialect == Dialect::CommonMark;
+                if is_image {
+                    if config.extensions.inline_images
+                        && let Some((len, alt_text, dest, attributes)) =
+                            try_parse_inline_image(&text[pos..], ctx)
+                        && pos + len >= dispo_suffix_end
+                        && pos + len <= end
+                    {
+                        if pos > text_start {
+                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                        }
+                        log::trace!(
+                            "IR: dispatcher overrode UnresolvedReference with inline image at pos {}",
+                            pos
+                        );
+                        emit_inline_image(
+                            builder,
+                            &text[pos..pos + len],
+                            alt_text,
+                            dest,
+                            attributes,
+                            config,
+                        );
+                        pos += len;
+                        text_start = pos;
+                        continue;
+                    }
+                } else if config.extensions.inline_links
+                    && let Some((len, link_text, dest, attributes)) =
+                        try_parse_inline_link(&text[pos..], is_commonmark, ctx)
+                    && pos + len >= dispo_suffix_end
+                    && pos + len <= end
+                {
+                    if pos > text_start {
+                        builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                    }
+                    log::trace!(
+                        "IR: dispatcher overrode UnresolvedReference with inline link at pos {}",
+                        pos
+                    );
+                    emit_inline_link(
+                        builder,
+                        &text[pos..pos + len],
+                        link_text,
+                        dest,
+                        attributes,
+                        config,
+                    );
+                    pos += len;
+                    text_start = pos;
+                    continue;
+                }
+            }
+
+            // Dispatcher didn't override; emit the wrapper.
+            let inner_text = &text[*ref_text_start..*ref_text_end];
+            let suffix_start = *ref_text_end + 1;
+            let label_suffix = if suffix_start < *ref_end {
+                Some(&text[suffix_start..*ref_end])
+            } else {
+                None
+            };
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            }
+            log::trace!(
+                "IR: unresolved Pandoc reference shape at pos {}..{}",
+                pos,
+                ref_end
+            );
+            emit_unresolved_reference(builder, is_image, inner_text, label_suffix, config);
+            pos = *ref_end;
+            text_start = pos;
+            continue;
+        }
+
         if let Some(super::inline_ir::BracketDispo::Open {
             is_image,
             suffix_end,

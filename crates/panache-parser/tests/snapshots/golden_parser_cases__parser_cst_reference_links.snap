@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..1126
@@ -84,7 +85,7 @@ DOCUMENT@0..1126
     BLANK_LINE@227..228 "\n"
   PARAGRAPH@228..291
     TEXT@228..250 "Unresolved reference: "
-    LINK@250..277
+    UNRESOLVED_REFERENCE@250..277
       LINK_START@250..251
         LINK_START@250..251 "["
       LINK_TEXT@251..263
@@ -224,7 +225,7 @@ DOCUMENT@0..1126
       LIST_MARKER@683..684 "-"
       WHITESPACE@684..685 " "
       PLAIN@685..715
-        LINK@685..714
+        UNRESOLVED_REFERENCE@685..714
           LINK_START@685..686
             LINK_START@685..686 "["
           LINK_TEXT@686..713
@@ -235,7 +236,7 @@ DOCUMENT@0..1126
       LIST_MARKER@715..716 "-"
       WHITESPACE@716..717 " "
       PLAIN@717..750
-        LINK@717..748
+        UNRESOLVED_REFERENCE@717..748
           LINK_START@717..718
             LINK_START@717..718 "["
           LINK_TEXT@718..745
@@ -250,7 +251,7 @@ DOCUMENT@0..1126
       LIST_MARKER@750..751 "-"
       WHITESPACE@751..752 " "
       PLAIN@752..818
-        LINK@752..817
+        UNRESOLVED_REFERENCE@752..817
           LINK_START@752..753
             LINK_START@752..753 "["
           LINK_TEXT@753..787

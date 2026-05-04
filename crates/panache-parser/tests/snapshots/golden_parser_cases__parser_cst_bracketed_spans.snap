@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..338
@@ -100,7 +101,7 @@ DOCUMENT@0..338
     BRACKETED_SPAN@243..273
       SPAN_BRACKET_OPEN@243..244 "["
       SPAN_CONTENT@244..262
-        LINK@244..262
+        UNRESOLVED_REFERENCE@244..262
           LINK_START@244..245
             LINK_START@244..245 "["
           LINK_TEXT@245..261

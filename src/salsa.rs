@@ -696,6 +696,36 @@ pub fn symbol_usage_index_from_tree(
         }
     }
 
+    // Implicit-heading shortcut links may also surface as
+    // `UNRESOLVED_REFERENCE` (Pandoc dialect with no matching refdef).
+    // Index their inner text range so cross-file rename and
+    // goto-definition cover both wrappers uniformly.
+    for unresolved in tree
+        .descendants()
+        .filter_map(crate::syntax::UnresolvedReference::cast)
+    {
+        db.unwind_if_revision_cancelled();
+        if unresolved.is_image() || unresolved.label().is_some() {
+            continue;
+        }
+        let label = normalize_label(&unresolved.text());
+        if label.is_empty() {
+            continue;
+        }
+        let Some(text_node) = unresolved
+            .syntax()
+            .children()
+            .find(|c| c.kind() == SyntaxKind::LINK_TEXT)
+        else {
+            continue;
+        };
+        index
+            .heading_link_usages
+            .entry(label)
+            .or_default()
+            .push(text_node.text_range());
+    }
+
     for node in tree
         .descendants()
         .filter(|node| node.kind() == SyntaxKind::CITATION)

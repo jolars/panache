@@ -168,6 +168,14 @@ pub enum IrEvent {
         /// Filled in when the matching `CloseBracket` resolves the pair
         /// to a link / image.
         resolution: Option<BracketResolution>,
+        /// Pandoc-only: extents of an unresolved bracket-shape pattern
+        /// (full reference / collapsed / shortcut whose label doesn't
+        /// match a refdef). Mutually exclusive with `resolution:
+        /// Some(...)`. When `Some`, emission wraps `[start, end)` in
+        /// an `UNRESOLVED_REFERENCE` node so downstream tools can
+        /// attach behavior to the bracket-shape pattern. Always
+        /// `None` under `Dialect::CommonMark`.
+        unresolved_ref: Option<UnresolvedRefShape>,
     },
 
     /// `]` bracket marker. Resolved by [`process_brackets`].
@@ -270,6 +278,25 @@ pub struct DelimMatch {
     pub partner_offset: u8,
     /// Emphasis kind (Emph for `len == 1`, Strong for `len == 2`).
     pub kind: EmphasisKind,
+}
+
+/// Pandoc-only: extents of an unresolved bracket-shape reference
+/// pattern. Recorded on `IrEvent::OpenBracket.unresolved_ref` when the
+/// no-resolution fall-through fires under `Dialect::Pandoc`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnresolvedRefShape {
+    /// IR event index of the matching `CloseBracket`. Used by the
+    /// scoped-emphasis pass to treat the wrapper as a tree boundary.
+    pub close_event: u32,
+    /// One past the end of the inner text (the byte position of the
+    /// outer `]`). Combined with the opener's `end` field, this is the
+    /// inner text range that goes through normal inline parsing.
+    pub text_end: usize,
+    /// One past the end of the full bracket-shape pattern. For
+    /// shortcut form `[text]`: `close_pos + 1`. For collapsed
+    /// `[text][]`: `close_pos + 3`. For full `[text][label]`: the byte
+    /// after the closing `]` of `[label]`.
+    pub end: usize,
 }
 
 /// Successful bracket resolution: the `[`...`]` pair is a link or image.
@@ -655,6 +682,7 @@ pub(super) fn build_ir_into(
                 is_image: true,
                 active: true,
                 resolution: None,
+                unresolved_ref: None,
             });
             pos += 2;
             text_run_start = pos;
@@ -673,6 +701,7 @@ pub(super) fn build_ir_into(
                 is_image: false,
                 active: true,
                 resolution: None,
+                unresolved_ref: None,
             });
             pos += 1;
             text_run_start = pos;
@@ -1817,14 +1846,21 @@ fn source_start_event(event: &IrEvent) -> usize {
 /// On a miss the bracket pair stays opaque-as-literal and the closer is
 /// dropped from the bracket stack so the next `]` can re-pair.
 ///
-/// Reference-form resolution under `Dialect::Pandoc` is shape-only: any
-/// non-empty link text or label resolves regardless of refdef presence,
-/// matching the historical legacy `reference_resolves`-returns-`true`
-/// behavior. (Pandoc emits LINK nodes for unresolved shortcut/collapsed/
-/// full-reference shapes so downstream features — linter, LSP, formatter
-/// — have a typed wrapper to walk. Refdef-aware resolution under Pandoc
-/// is bug #1/#2 territory and is a parser-linter-LSP cross-cut deferred
-/// to a future workstream.)
+/// Reference-form resolution consults the refdef map under both
+/// dialects (CommonMark §6.3 and Pandoc-markdown agree on the
+/// document-scoped lookup rule). Under Pandoc, when a bracket-shape
+/// pattern (`[text][label]`, `[text][]`, `[text]`) doesn't resolve to
+/// a refdef, the opener is tagged with `unresolved_ref_end = Some(...)`
+/// and the closer's `matched` is set to `true` so that
+/// [`build_bracket_plan`] emits a [`BracketDispo::UnresolvedReference`]
+/// keyed at the opener. Emission then wraps `[start, end)` in an
+/// `UNRESOLVED_REFERENCE` node — distinct from `LINK` — so downstream
+/// tools (linter, LSP) can attach behavior to the bracket-shape
+/// pattern without the parser having to lie about resolution.
+///
+/// Under CommonMark, no `unresolved_ref_end` is recorded; the
+/// no-resolution fall-through behaves as today (opener deactivated,
+/// brackets emit as literal text).
 pub fn process_brackets(
     events: &mut [IrEvent],
     text: &str,
@@ -1837,12 +1873,9 @@ pub fn process_brackets(
         None => &empty,
     };
     let is_commonmark = dialect == crate::options::Dialect::CommonMark;
-    // Under Pandoc, any non-empty reference label resolves shape-only —
-    // matches the legacy `reference_resolves` short-circuit. Under
-    // CommonMark, the refdef map is consulted.
-    let label_resolves = |key_norm: &str| -> bool {
-        !key_norm.is_empty() && (!is_commonmark || labels.contains(key_norm))
-    };
+    // Refdef-aware label resolution under both dialects.
+    let label_resolves =
+        |key_norm: &str| -> bool { !key_norm.is_empty() && labels.contains(key_norm) };
 
     // Walk forward through events, treating it as a linear scan for `]`.
     let mut i = 0;
@@ -1986,12 +2019,51 @@ pub fn process_brackets(
             continue;
         }
 
-        // No resolution. Drop the opener — its `]` partner is this one,
-        // but since neither matched, the opener falls through to literal
-        // text. We do this by deactivating the opener (so it won't be
-        // considered for later `]` markers either).
-        if let IrEvent::OpenBracket { active, .. } = &mut events[o] {
+        // No resolution. Under Pandoc, the bracket pair is still a
+        // recognisable reference shape (full / collapsed / shortcut) —
+        // tag the opener with `unresolved_ref` so emission wraps it
+        // in an `UNRESOLVED_REFERENCE` node, and mark the closer
+        // matched so it doesn't fall through to a literal `]` token.
+        // Under CommonMark, behavior unchanged: deactivate the opener,
+        // brackets emit as literal text.
+        //
+        // Empty-component shapes (`[]`, `[][]`) aren't reference
+        // patterns even in spirit — pandoc-native treats them as
+        // literal text — so skip wrapping.
+        let unresolved_shape = if !is_commonmark {
+            let (end, has_substantive_label) =
+                if let Some((suffix_end, label_raw)) = &full_ref_suffix {
+                    (*suffix_end, !normalize_label(label_raw).is_empty())
+                } else if is_collapsed {
+                    (collapsed_suffix_end, !link_text_norm.is_empty())
+                } else {
+                    (after_close, !link_text_norm.is_empty())
+                };
+            if has_substantive_label {
+                Some(UnresolvedRefShape {
+                    close_event: i as u32,
+                    text_end,
+                    end,
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        if let IrEvent::OpenBracket {
+            active,
+            unresolved_ref,
+            ..
+        } = &mut events[o]
+        {
             *active = false;
+            *unresolved_ref = unresolved_shape;
+        }
+        if unresolved_shape.is_some()
+            && let IrEvent::CloseBracket { matched, .. } = &mut events[i]
+        {
+            *matched = true;
         }
         let _ = &mut o;
         i += 1;
@@ -2244,6 +2316,17 @@ pub enum BracketDispo {
         suffix_end: usize,
         kind: LinkKind,
     },
+    /// Pandoc-only: `[` or `![` of a bracket-shape reference pattern
+    /// whose label didn't resolve. Emission wraps `[start, end)` in an
+    /// `UNRESOLVED_REFERENCE` node so downstream tools can attach
+    /// behavior to the bracket-shape pattern. `text_start..text_end` is
+    /// the inner text range (between the outer `[`/`![` and `]`).
+    UnresolvedReference {
+        is_image: bool,
+        text_start: usize,
+        text_end: usize,
+        end: usize,
+    },
     /// Bracket byte (one of `[`, `]`, or `!`) that fell through to literal
     /// text. Emission accumulates into the surrounding text run.
     Literal,
@@ -2377,8 +2460,27 @@ pub fn build_bracket_plan(events: &[IrEvent]) -> BracketPlan {
             }
             IrEvent::OpenBracket {
                 start,
+                end,
                 is_image,
                 resolution: None,
+                unresolved_ref: Some(shape),
+                ..
+            } => {
+                by_pos.insert(
+                    *start,
+                    BracketDispo::UnresolvedReference {
+                        is_image: *is_image,
+                        text_start: *end,
+                        text_end: shape.text_end,
+                        end: shape.end,
+                    },
+                );
+            }
+            IrEvent::OpenBracket {
+                start,
+                is_image,
+                resolution: None,
+                unresolved_ref: None,
                 ..
             } => {
                 let len = if *is_image { 2 } else { 1 };
@@ -2442,6 +2544,12 @@ pub fn build_full_plans(
     // ordering matters: an outer link wraps emphasis that wraps an inner
     // link, and the inner link's inner range must be paired before the
     // outer's inner range so the top-level pass sees consistent state.
+    // Include both resolved-link bracket pairs and Pandoc unresolved-
+    // reference bracket pairs in the scoping set. The latter wrap into
+    // an `UNRESOLVED_REFERENCE` CST node, which is just as much a tree
+    // boundary for emphasis as a resolved `LINK` — emphasis must not
+    // pair across the wrapper's brackets, otherwise the emission walk
+    // produces a non-tree-shaped CST.
     bundle.bracket_pairs.extend(
         bundle
             .events
@@ -2452,6 +2560,11 @@ pub fn build_full_plans(
                     resolution: Some(res),
                     ..
                 } => Some((i, res.close_event as usize)),
+                IrEvent::OpenBracket {
+                    resolution: None,
+                    unresolved_ref: Some(shape),
+                    ..
+                } => Some((i, shape.close_event as usize)),
                 _ => None,
             }),
     );
@@ -2660,6 +2773,7 @@ mod tests {
             is_image: true,
             active: true,
             resolution: None,
+            unresolved_ref: None,
         };
         assert_eq!(open.range(), (1, 3));
     }

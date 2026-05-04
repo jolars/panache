@@ -1145,6 +1145,61 @@ pub fn emit_reference_image(
     builder.finish_node();
 }
 
+/// Emit an `UNRESOLVED_REFERENCE` node for a Pandoc bracket-shape
+/// pattern whose label didn't resolve. The wrapper covers the original
+/// bracket bytes; the inner text recurses through normal inline
+/// parsing (with inner-link suppression so a stray inner inline link
+/// doesn't reorder semantics relative to pandoc-native).
+///
+/// `source` is `text[start..end]` — the full bracket-shape pattern.
+/// `text_content` is the inner text between the outer `[` and `]`
+/// (the bytes used for inline recursion). `label_suffix` carries the
+/// `[label]` / `[]` suffix bytes verbatim, or `None` for shortcut form.
+pub fn emit_unresolved_reference(
+    builder: &mut GreenNodeBuilder,
+    is_image: bool,
+    text_content: &str,
+    label_suffix: Option<&str>,
+    config: &ParserOptions,
+) {
+    builder.start_node(SyntaxKind::UNRESOLVED_REFERENCE.into());
+
+    if is_image {
+        builder.start_node(SyntaxKind::IMAGE_LINK_START.into());
+        builder.token(SyntaxKind::IMAGE_LINK_START.into(), "![");
+        builder.finish_node();
+        builder.start_node(SyntaxKind::IMAGE_ALT.into());
+        parse_inline_text(builder, text_content, config, false);
+        builder.finish_node();
+    } else {
+        builder.start_node(SyntaxKind::LINK_START.into());
+        builder.token(SyntaxKind::LINK_START.into(), "[");
+        builder.finish_node();
+        builder.start_node(SyntaxKind::LINK_TEXT.into());
+        parse_inline_text(builder, text_content, config, true);
+        builder.finish_node();
+    }
+
+    builder.token(SyntaxKind::TEXT.into(), "]");
+
+    if let Some(suffix) = label_suffix {
+        // suffix is either "[label]" or "[]"; preserve original bytes.
+        // Split as `[` + LINK_REF(label) + `]` so wrapper accessors find
+        // the label via `support::child::<LinkRef>()`.
+        debug_assert!(suffix.starts_with('[') && suffix.ends_with(']'));
+        builder.token(SyntaxKind::TEXT.into(), "[");
+        let label = &suffix[1..suffix.len() - 1];
+        builder.start_node(SyntaxKind::LINK_REF.into());
+        if !label.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), label);
+        }
+        builder.finish_node();
+        builder.token(SyntaxKind::TEXT.into(), "]");
+    }
+
+    builder.finish_node();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

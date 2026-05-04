@@ -3001,7 +3001,11 @@ fn emit_citation_with_absorb<I>(
         let space_text = t.text().to_string();
         let link_el = t.next_sibling_or_token()?;
         let link = link_el.as_node().cloned()?;
-        if link.kind() != SyntaxKind::LINK {
+        // Pandoc absorbs `[locator]` after `@key` whether the brackets
+        // resolve as a link or not; under the new IR, an unresolved
+        // bracket-shape pattern is `UNRESOLVED_REFERENCE` rather than
+        // shape-only `LINK`. Both shapes are valid locator candidates.
+        if link.kind() != SyntaxKind::LINK && link.kind() != SyntaxKind::UNRESOLVED_REFERENCE {
             return None;
         }
         let has_dest = link
@@ -3075,8 +3079,89 @@ fn push_inline_node(node: &SyntaxNode, out: &mut Vec<Inline>) {
         SyntaxKind::LINK => render_link_inline(node, out),
         SyntaxKind::IMAGE_LINK => render_image_inline(node, out),
         SyntaxKind::CITATION => render_citation_inline(node, out, None),
+        // Pandoc-native treats unresolved bracket-shape patterns as
+        // literal text — the bracket bytes themselves are `Str "["`
+        // and `Str "]"`, but inner inline structure (emphasis, math,
+        // raw spans, etc.) survives. The Panache `UNRESOLVED_REFERENCE`
+        // wrapper is a tooling concession; emit the bracket bytes as
+        // `Str` and recurse into structural children so inner content
+        // is preserved.
+        SyntaxKind::UNRESOLVED_REFERENCE => render_unresolved_reference_inline(node, out),
         _ => out.push(inline_from_node(node)),
     }
+}
+
+/// Project an UNRESOLVED_REFERENCE node as pandoc-native inlines.
+///
+/// Mirrors the unresolved fall-through of `render_link_inline`: try
+/// `lookup_heading_id` for implicit-heading shortcut/full-reference
+/// resolution at projection time (pandoc resolves heading IDs *during
+/// inline rendering*; the parser's refdef map only carries explicit
+/// `[label]: url` definitions). On miss, emit the original bracket
+/// pattern as `Str "["`, inner inline structure (preserved via
+/// `coalesce_inlines_keep_edges` so leading/trailing whitespace
+/// survives, matching pandoc's `[ foo ]` → `Str "[", Space, Str "foo",
+/// Space, Str "]"` behavior), then `Str "]"` (or `Str "][ref]"` for
+/// full-reference form).
+fn render_unresolved_reference_inline(node: &SyntaxNode, out: &mut Vec<Inline>) {
+    let is_image = node
+        .children()
+        .any(|c| c.kind() == SyntaxKind::IMAGE_LINK_START);
+    let text_node = if is_image {
+        node.children().find(|c| c.kind() == SyntaxKind::IMAGE_ALT)
+    } else {
+        node.children().find(|c| c.kind() == SyntaxKind::LINK_TEXT)
+    };
+    let ref_node = node.children().find(|c| c.kind() == SyntaxKind::LINK_REF);
+
+    let text_label = text_node
+        .as_ref()
+        .map(|n| n.text().to_string())
+        .unwrap_or_default();
+    let (label, has_second_brackets, second_inner) = match ref_node.as_ref() {
+        Some(rn) => {
+            let inner = rn.text().to_string();
+            if inner.is_empty() {
+                (text_label.clone(), true, String::new())
+            } else {
+                (inner.clone(), true, inner)
+            }
+        }
+        None => (text_label.clone(), false, String::new()),
+    };
+
+    // Implicit-heading-id resolution at projection time. Only for
+    // link-shape (not image-shape) shortcut/full-ref/collapsed forms.
+    if !is_image && let Some(id) = lookup_heading_id(&label) {
+        let url = format!("#{id}");
+        let resolved_text_inlines = text_node
+            .as_ref()
+            .map(|n| coalesce_inlines(inlines_from(n)))
+            .unwrap_or_default();
+        out.push(Inline::Link(
+            extract_attr_from_node(node),
+            resolved_text_inlines,
+            url,
+            String::new(),
+        ));
+        return;
+    }
+
+    // Unresolved: emit the original markdown bytes, preserving inner
+    // inline structure.
+    let unresolved_text_inlines = text_node
+        .as_ref()
+        .map(|n| coalesce_inlines_keep_edges(inlines_from(n)))
+        .unwrap_or_default();
+    let opener = if is_image { "![" } else { "[" };
+    out.push(Inline::Str(opener.to_string()));
+    out.extend(unresolved_text_inlines);
+    let suffix = if has_second_brackets {
+        format!("][{second_inner}]")
+    } else {
+        "]".to_string()
+    };
+    out.push(Inline::Str(suffix));
 }
 
 /// Pandoc treats `(@label)` and bare `@label` as Example-list references
@@ -3390,11 +3475,13 @@ fn inline_from_node(node: &SyntaxNode) -> Inline {
                 strip_inline_code_padding(&content),
             )
         }
-        SyntaxKind::LINK | SyntaxKind::IMAGE_LINK => {
-            // LINK / IMAGE_LINK render through `push_inline_node` so reference
-            // resolution can emit multiple inlines (resolved Link, or unresolved
-            // Str fragments). This single-Inline path is unreachable; emit
-            // Unsupported as a guard rather than silently dropping.
+        SyntaxKind::LINK | SyntaxKind::IMAGE_LINK | SyntaxKind::UNRESOLVED_REFERENCE => {
+            // LINK / IMAGE_LINK / UNRESOLVED_REFERENCE render through
+            // `push_inline_node` so reference resolution can emit
+            // multiple inlines (resolved Link, or unresolved Str
+            // fragments). This single-Inline path is unreachable;
+            // emit Unsupported as a guard rather than silently
+            // dropping.
             Inline::Unsupported(format!("{:?}", node.kind()))
         }
         SyntaxKind::AUTO_LINK => autolink_inline(node),
