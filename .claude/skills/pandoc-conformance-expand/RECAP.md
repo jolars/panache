@@ -41,13 +41,12 @@ count of currently-failing imports remaining under that bucket in the latest
    `BulletList` in *some* contexts (the bare-leading-list path now
    handles the simple case but the `Orange\n: > a / : - List with lazy
    continuation` paths inside #43 still fail).
-5. **HTML blocks / fenced divs with raw HTML adjacency (\~3)** ---
-   `writer_html_blocks`, `html_block` cases with adjacent HTML. Pandoc splits
-   each `<tag>` line into its own `RawBlock`; we coalesce them into one block.
-   Parser-shape gap: HTML_BLOCK currently spans contiguous HTML lines; would
-   need to split on tag boundaries. `<div class="container">...</div>` is a
-   related parser gap: pandoc parses as `Div ( "" , [ "container" ] , [ ] )`
-   with markdown-parsed content; we wrap as a single RawBlock.
+5. **HTML blocks / fenced divs with raw HTML adjacency (\~1 --- case #181)**
+   --- `writer_html_blocks` is the remaining case. Pandoc splits each
+   `<tag>` line into its own `RawBlock`; we coalesce them into one block.
+   Parser-shape gap: HTML_BLOCK currently spans contiguous HTML lines;
+   would need to split on tag boundaries. `<div ...>...</div>` projector
+   conversion to `Div(attr, blocks)` (DONE 2026-05-04 — unlocked #78).
 6. **Block-level cases where parser splits paragraphs around inline HTML
    comments --- DONE 2026-05-03 (#79 unlocked)**. Parser dispatcher gates
    Comment Type-2 paragraph-interrupt on `Dialect::CommonMark`; under
@@ -128,7 +127,76 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-03 (Grid-table multi-line cells + TableFoot via
+- **Date**: 2026-05-04 (HTML `<div>` block → `Div(attr, blocks)` projector
+  conversion via `markdown_in_html_blocks`)
+- **Pass before → after**: 179 → 180 / 187 (+1 import: #78).
+  Projector-only fix: `html_block()` now detects an outer `<div ...>...</div>`
+  shape on any `HTML_BLOCK` and projects it as `Div(attr, blocks)` with the
+  inner content reparsed via the new `parse_pandoc_blocks` helper. `<div>`
+  is the only block tag pandoc treats this way under `markdown_in_html_blocks`
+  (default-on for `markdown` flavor); other block tags (`<table>`, `<hr>`,
+  ...) fall through to the existing `RawBlock` path. The reparse promotes the
+  resulting block to `Plain` only when the open tag is on the same source line
+  as the close tag (single-line `<div>foo</div>`); multi-line content keeps
+  `Para` shape. CommonMark allowlist green; pandoc allowlist green; full
+  parser-crate suite green; clippy + fmt clean.
+- **What landed**:
+  - **Projector: `<div>` HTML block → `Div`
+    (`crates/panache-parser/tests/pandoc/native_projector.rs`)** — `html_block()`
+    now delegates to a new `try_div_html_block()` helper that:
+    1. Skips leading whitespace and matches `<div` followed by a separator
+       (` `, `\t`, `\n`, `>`, or `/`).
+    2. Parses the open-tag attrs via the existing `parse_html_attrs()` after
+       trimming a trailing `/`.
+    3. Searches for a `</div>` close tag at the trailing edge (lowercase
+       suffix match) — leaves the projector's existing RawBlock path for any
+       HTML block that doesn't match this shape.
+    4. Reparses the inner content (with leading/trailing `\n` trimmed) as
+       Pandoc-flavored markdown via the new `parse_pandoc_blocks()`.
+    5. Promotes a single inner `Para` to `Plain` only when the open tag is
+       on the same source line as the close tag (`!multiline`), matching
+       pandoc's behavior for `<div>foo</div>`.
+  - **New helper `parse_pandoc_blocks` (same file)** — parses text as
+    Pandoc-flavored markdown and returns top-level blocks unchanged. Distinct
+    from `parse_cell_text_blocks` (which forces Para→Plain for grid-cell
+    contexts); per the prior Don't-redo, kept as a separate helper.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 78 (imported-html_block)
+- **Files changed (classified)**:
+  - **projector**:
+    `crates/panache-parser/tests/pandoc/native_projector.rs`
+    (new `try_div_html_block` helper, new `parse_pandoc_blocks` helper,
+    `html_block` delegates through `try_div_html_block`)
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 78 inserted
+    between 77 and 79, under `# imported`)
+- **Don't redo**:
+  - `try_div_html_block` matches `<div` only — not `<table>`, `<hr>`, or
+    other block tags. Pandoc's `markdown_in_html_blocks` is `<div>`-only
+    in practice (verified via `pandoc -f markdown -t native` probes); broader
+    matching would diverge from pandoc-native. Don't widen this without
+    pandoc-source verification.
+  - The `multiline` flag is computed by inspecting whether the byte
+    immediately after the open tag's `>` is `\n`. This is the right signal
+    for distinguishing `<div>foo</div>` (Plain) from `<div>\nfoo\n</div>`
+    (Para) — don't switch to checking inner content for newlines, since
+    inner content is later trimmed of leading/trailing `\n` and would
+    miss the boundary.
+  - The close-tag detection trims trailing whitespace/newlines from the
+    raw HTML_BLOCK content, then checks the suffix (case-insensitive)
+    ends with `</div>`. Don't switch to a forward search — partial
+    `<div>...</div>...<div>` blocks shouldn't be projected as Div even
+    though the parser may unify them; the suffix check guards against
+    that. (CommonMark spec & pandoc both close the HTML block at the
+    final `</div>` followed by a blank line, but in defensive depth this
+    keeps the projector matching pandoc's per-block decision rather than
+    trying to re-segment the parser's output.)
+  - `parse_pandoc_blocks` is the right helper for any future "reparse a
+    fragment, keep block kinds intact" projector need (e.g. fenced div
+    contents that need block-level reparse). `parse_cell_text_blocks`
+    keeps the Para→Plain conversion specific to grid/pipe table cells.
+
+## Earlier session (2026-05-03, Grid-table multi-line cells + TableFoot via
   block-reparse projector path)
 - **Pass before → after**: 177 → 179 / 187 (+2 imports: #68, #70).
   Projector-only fix: `grid_table()` now slices each row's text by

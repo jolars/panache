@@ -875,7 +875,79 @@ fn html_block(node: &SyntaxNode) -> Block {
     while content.ends_with('\n') {
         content.pop();
     }
+    if let Some(div) = try_div_html_block(&content) {
+        return div;
+    }
     Block::RawBlock("html".to_string(), content)
+}
+
+/// Detect a `<div ...>...</div>` HTML block and project it as
+/// `Div(attr, blocks)` with the inner content reparsed as Pandoc markdown.
+/// Pandoc's `markdown_in_html_blocks` extension (default-on under `markdown`
+/// flavor) treats every `<div>` block this way, regardless of whether it
+/// has attributes. Returns `None` for any HTML block whose outer tag is not
+/// `<div>` (so other block tags keep falling through to the RawBlock path).
+fn try_div_html_block(content: &str) -> Option<Block> {
+    let bytes = content.as_bytes();
+    let leading_ws = bytes
+        .iter()
+        .position(|&b| b != b' ' && b != b'\t')
+        .unwrap_or(bytes.len());
+    let head = &content[leading_ws..];
+    let head_bytes = head.as_bytes();
+    if head_bytes.len() < 4 || !head_bytes[..4].eq_ignore_ascii_case(b"<div") {
+        return None;
+    }
+    let after_div = head_bytes.get(4).copied();
+    match after_div {
+        Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'>') | Some(b'/') => {}
+        _ => return None,
+    }
+    let close_gt_rel = head[4..].find('>')?;
+    let open_attrs_raw = &head[4..4 + close_gt_rel];
+    let open_attrs = open_attrs_raw.trim_matches(|c: char| c.is_whitespace() || c == '/');
+    let attr = parse_html_attrs(open_attrs);
+    let after_open_tag = leading_ws + 4 + close_gt_rel + 1;
+    let multiline = content.as_bytes().get(after_open_tag).copied() == Some(b'\n');
+    let trailing_ws = content.as_bytes()[after_open_tag..]
+        .iter()
+        .rev()
+        .position(|&b| b != b' ' && b != b'\t' && b != b'\n')
+        .unwrap_or(0);
+    let close_end = content.len() - trailing_ws;
+    let close_search = &content[after_open_tag..close_end];
+    if !close_search.to_ascii_lowercase().ends_with("</div>") {
+        return None;
+    }
+    let close_start = after_open_tag + close_search.len() - "</div>".len();
+    let inner = content[after_open_tag..close_start].trim_matches('\n');
+    let mut blocks = parse_pandoc_blocks(inner);
+    if !multiline
+        && blocks.len() == 1
+        && let Block::Para(inlines) = blocks.remove(0)
+    {
+        blocks.push(Block::Plain(inlines));
+    }
+    Some(Block::Div(attr, blocks))
+}
+
+/// Reparse `text` as Pandoc-flavored markdown and return its top-level
+/// blocks. Unlike `parse_cell_text_blocks`, leaves `Para` as `Para` — the
+/// caller decides whether the surrounding context demands `Plain`.
+fn parse_pandoc_blocks(text: &str) -> Vec<Block> {
+    if text.trim().is_empty() {
+        return Vec::new();
+    }
+    let opts = panache_parser::ParserOptions {
+        flavor: panache_parser::Flavor::Pandoc,
+        dialect: panache_parser::Dialect::for_flavor(panache_parser::Flavor::Pandoc),
+        extensions: panache_parser::Extensions::for_flavor(panache_parser::Flavor::Pandoc),
+        ..panache_parser::ParserOptions::default()
+    };
+    let doc = panache_parser::parse(text, Some(opts));
+    doc.children()
+        .filter_map(|child| block_from(&child))
+        .collect()
 }
 
 fn tex_block(node: &SyntaxNode) -> Block {
