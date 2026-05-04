@@ -47,9 +47,7 @@ The available flavors are:
 :   GitHub-Flavored Markdown
 
 `commonmark`
-:   CommonMark (Note that we are currently **not** fully CommonMark-compliant,
-    and use this option only as a means to setup the correct set of extensions):
-    CommonMark (minimal extensions)
+:   CommonMark
 
 `multimarkdown`
 :   MultiMarkdown flavor defaults (Pandoc-compatible MultiMarkdown extension
