@@ -12,20 +12,18 @@ DOCUMENT@0..295
     NEWLINE@56..57 "\n"
   BLANK_LINE@57..58
     BLANK_LINE@57..58 "\n"
-  BLOCK_QUOTE@58..99
+  BLOCK_QUOTE@58..295
     BLOCK_QUOTE_MARKER@58..59 ">"
     WHITESPACE@59..60 " "
-    LIST@60..99
-      LIST_ITEM@60..99
+    LIST@60..140
+      LIST_ITEM@60..140
         LIST_MARKER@60..61 "-"
         WHITESPACE@61..62 " "
-        PLAIN@62..99
+        PLAIN@62..140
           TEXT@62..98 "This is a blockquoted ..."
           NEWLINE@98..99 "\n"
-  PARAGRAPH@99..140
-    TEXT@99..139 "lazy continuation acr ..."
-    NEWLINE@139..140 "\n"
-  BLOCK_QUOTE@140..295
+          TEXT@99..139 "lazy continuation acr ..."
+          NEWLINE@139..140 "\n"
     BLOCK_QUOTE_MARKER@140..141 ">"
     BLANK_LINE@141..142
       BLANK_LINE@141..142 "\n"

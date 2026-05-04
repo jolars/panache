@@ -1,11 +1,11 @@
 Pandoc-native conformance report (pandoc 3.9.0.2)
-184 / 187 cases passing (98.4%)
-3 failing
+185 / 187 cases passing (98.9%)
+2 failing
 0 blocked-list entries
 
 === Per-section pass / fail ===
   block: 12 pass / 0 fail
-  imported: 159 pass / 3 fail
+  imported: 160 pass / 2 fail
   inline: 13 pass / 0 fail
 
 === Passing case ids (allowlist candidates) ===
@@ -102,6 +102,7 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 93
 94
 95
+96
 97
 98
 99
@@ -278,6 +279,7 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 93
 94
 95
+96
 97
 98
 99
@@ -392,7 +394,4 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 # 91 (imported-issue_174_blockquote_list_reorder_losslessness)
   expected: [ BulletList [ [ Para [ Strong [ Str "Main" , Space , Str "binary" , Space , Str "explanatory" , Space , Str "variable" ] , Str ":" , Space , Str "Opposition" , Space , Str "parties" , Space , Str "autonomy" , Space , Str "(" , Code ( "" , [ ] , [ ] ) "v2psoppaut" , Space , Str "in" , Space , Str "V-Dem)." , Space , Str "This" , Space , Str "is" , Space , Str "an" , Space , Str "ordinal" , Space , Str "variable" , Space , Str "with" , Space , Str "these" , Space , Str "possible" , Space , Str "values:" ] ] , [ BlockQuote [ BulletList [ [ Plain [ Str "0:" , Space , Str "Opposition" , Space , Str "parties" , Space , Str "are" , Space , Str "not" , Space , Str "allowed." ] ] ] ] ] , [ BlockQuote [ BulletList [ [ Plain [ Str "1:" , Space , Str "There" , Space , Str "are" , Space , Str "no" , Space , Str "autonomous," , Space , Str "independent" , Space , Str "opposition" , Space , Str "parties." , Space , Str "Opposition" , Space , Str "parties" , Space , Str "are" , Space , Str "either" , Space , Str "selected" , Space , Str "or" , Space , Str "co-opted" , Space , Str "by" , Space , Str "the" , Space , Str "ruling" , Space , Str "regime." ] ] , [ Plain [ Str "2:" , Space , Str "At" , Space , Str "least" , Space , Str "some" , Space , Str "opposition" , Space , Str "parties" , Space , Str "are" , Space , Str "autonomous" , Space , Str "and" , Space , Str "independent" , Space , Str "of" , Space , Str "the" , Space , Str "ruling" , Space , Str "regime." ] ] ] ] ] ] ]
   got:      [ BulletList [ [ Para [ Strong [ Str "Main" , Space , Str "binary" , Space , Str "explanatory" , Space , Str "variable" ] , Str ":" , Space , Str "Opposition" , Space , Str "parties" , Space , Str "autonomy" , Space , Str "(" , Code ( "" , [ ] , [ ] ) "v2psoppaut" , Space , Str "in" , Space , Str "V-Dem)." , Space , Str "This" , Space , Str "is" , Space , Str "an" , Space , Str "ordinal" , Space , Str "variable" , Space , Str "with" , Space , Str "these" , Space , Str "possible" , Space , Str "values:" ] ] , [ BlockQuote [ Para [ Str "-" , Space , Str "0:" , Space , Str "Opposition" , Space , Str "parties" , Space , Str "are" , Space , Str "not" , Space , Str "allowed." , SoftBreak , Str "-" , Space , Str ">" , Space , Str "-" , Space , Str "1:" , Space , Str "There" , Space , Str "are" , Space , Str "no" , Space , Str "autonomous," , Space , Str "independent" , Space , Str "opposition" , Space , Str "parties." , Space , Str "Opposition" , Space , Str "parties" , Space , Str "are" , Space , Str "either" , Space , Str "selected" , Space , Str "or" , Space , Str "co-opted" , Space , Str "by" , Space , Str "the" , Space , Str "ruling" , Space , Str "regime." ] ] ] , [ Para [ Str "2:" , Space , Str "At" , Space , Str "least" , Space , Str "some" , Space , Str "opposition" , Space , Str "parties" , Space , Str "are" , Space , Str "autonomous" , Space , Str "and" , Space , Str "independent" , Space , Str "of" , Space , Str "the" , Space , Str "ruling" , Space , Str "regime." ] ] ] ]
-# 96 (imported-lazy_continuation_deep)
-  expected: [ Header 1 ( "test-lazy-continuation-across-multiple-nesting-levels" , [ ] , [ ] ) [ Str "Test:" , Space , Str "Lazy" , Space , Str "continuation" , Space , Str "across" , Space , Str "multiple" , Space , Str "nesting" , Space , Str "levels" ] , BlockQuote [ BulletList [ [ Plain [ Str "This" , Space , Str "is" , Space , Str "a" , Space , Str "blockquoted" , Space , Str "list" , Space , Str "item" , Space , Str "with" , SoftBreak , Str "lazy" , Space , Str "continuation" , Space , Str "across" , Space , Str "the" , Space , Str "first" , Space , Str "level" ] ] ] , BlockQuote [ Para [ Str "And" , Space , Str "a" , Space , Str "nested" , Space , Str "blockquote" , Space , Str "that" , Space , Str "also" , Space , Str "has" , Space , Str "lazy" , Space , Str "continuation" , Space , Str "text" ] ] , Para [ Str "Back" , Space , Str "to" , Space , Str "the" , Space , Str "list" , Space , Str "item," , Space , Str "this" , Space , Str "should" , Space , Str "also" , Space , Str "support" , Space , Str "lazy" , Space , Str "continuation" ] , BulletList [ [ Plain [ Str "Second" , Space , Str "item" ] ] ] ] ]
-  got:      [ Header 1 ( "test-lazy-continuation-across-multiple-nesting-levels" , [ ] , [ ] ) [ Str "Test:" , Space , Str "Lazy" , Space , Str "continuation" , Space , Str "across" , Space , Str "multiple" , Space , Str "nesting" , Space , Str "levels" ] , BlockQuote [ BulletList [ [ Plain [ Str "This" , Space , Str "is" , Space , Str "a" , Space , Str "blockquoted" , Space , Str "list" , Space , Str "item" , Space , Str "with" ] ] ] ] , Para [ Str "lazy" , Space , Str "continuation" , Space , Str "across" , Space , Str "the" , Space , Str "first" , Space , Str "level" ] , BlockQuote [ BlockQuote [ Para [ Str "And" , Space , Str "a" , Space , Str "nested" , Space , Str "blockquote" , Space , Str "that" , Space , Str "also" , Space , Str "has" , Space , Str "lazy" , Space , Str "continuation" , Space , Str "text" ] ] , Para [ Str "Back" , Space , Str "to" , Space , Str "the" , Space , Str "list" , Space , Str "item," , Space , Str "this" , Space , Str "should" , Space , Str "also" , Space , Str "support" , Space , Str "lazy" , Space , Str "continuation" ] , BulletList [ [ Plain [ Str "Second" , Space , Str "item" ] ] ] ] ]
 

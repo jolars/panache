@@ -165,6 +165,7 @@ golden_test_cases!(
     blockquote_lazy_continuation_reduced_markers,
     blockquote_list_blanks,
     blockquote_list_blockquote,
+    blockquote_list_lazy_continuation_no_marker,
     blockquote_list_no_marker_closes_commonmark,
     blockquote_list_no_marker_continues_pandoc,
     blockquotes,

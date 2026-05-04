@@ -7,7 +7,7 @@ state; this file is judgment calls only.
 
 Ranked by likely shared root cause and leverage. Numbers in parentheses are the
 count of currently-failing imports remaining under that bucket in the latest
-`report.txt`. 3 imports remain failing total (184 / 187 passing).
+`report.txt`. 2 imports remain failing total (185 / 187 passing).
 
 1. **Tables --- #71 grid_table_planets (1)** --- rowspan/colspan layout.
    Pandoc emits `RowSpan N` / `ColSpan N` for cells whose `+   +-----+`-style
@@ -18,27 +18,16 @@ count of currently-failing imports remaining under that bucket in the latest
    model that assigns cells to specific columns and tracks RowSpan/ColSpan
    counts per cell.
 
-2. **Continuation policy across container boundaries --- #91, #96 (2)**
-   --- where lazy continuation or sibling-list-item handling crosses
-   blockquote/list boundaries differently from pandoc.
-   - **#91** (`-  > -` siblings + indented `   > -` continuation):
-     parser merges item content into one BlockQuote/Para instead of
-     splitting into 3 outer items each containing a BlockQuote with an
-     inner BulletList.
-   - **#96** (lazy continuation across deep nesting): the
-     `> - This is a list item with\nlazy continuation...` lines get
-     split into a sibling Para outside the BQ instead of staying as
-     SoftBreak-joined PLAIN inside the list item.
+2. **#91 sibling-list-marker recursion inside BQ-content (1)** ---
+   `-  > -` siblings + indented `   > -` continuation: parser merges item
+   content into one BlockQuote/Para instead of splitting into 3 outer items
+   each containing a BlockQuote with an inner BulletList. Wants recursion
+   of list-marker detection inside `>`-prefixed list-item content. Bounded
+   continuation-policy fix.
 
-   Probably *not* a single shared fix. #91 wants recursion of
-   list-marker detection inside BQ-content-followed-by-`-` siblings;
-   #96 wants no-`>`-prefix lazy continuation to stay inside the
-   inner-BQ list item. Pick whichever has the simpler entrance.
-
-Suggested first session: **#1 (Tables — #71)** is the single
-remaining "feature" gap (rowspan/colspan in grid tables); the rest are
-parser continuation-policy gaps. If the rowspan model is too heavy for
-one session, **#2 (#91 or #96)** are bounded continuation-policy fixes.
+Suggested first session: **#1 (Tables — #71)** is the single remaining
+"feature" gap (rowspan/colspan in grid tables); **#2 (#91)** is the
+remaining bounded continuation-policy fix.
 
 ## Don't redo
 
@@ -89,9 +78,121 @@ one session, **#2 (#91 or #96)** are bounded continuation-policy fixes.
 
 ## Latest session
 
-- **Date**: 2026-05-04 (Definition-list continuation: `>` continuation
-  markers and bullet-list openings recognized at the definition's
-  content column)
+- **Date**: 2026-05-04 (Lazy ListItem continuation in BQ-list: no-`>`
+  plain-text line folds into the deepest open list item's buffer
+  rather than closing the outer blockquote)
+- **Pass before → after**: 184 → 185 / 187 (+1 import: #96).
+  Parser-shape fix in `parse_line`'s `bq_depth < current_bq_depth`
+  branch (`core.rs`): added a new lazy-continuation check that fires
+  when the deepest container is a `ListItem` inside a blockquote and
+  the line is plain text (not a list marker, not an HR/fence in
+  CommonMark). The line is appended to the open `ListItemBuffer` (the
+  buffered analogue of an open Paragraph) so the BQ stays open and the
+  list item's PLAIN absorbs the lazy line as a SoftBreak-joined
+  continuation, matching pandoc-native. This single fix cascades:
+  in #96, keeping the outer BQ open also prevented the spurious
+  sibling BQ that line 6 (`> > And...`) was creating, and the
+  subsequent `> Back...` Para and `> - Second item` inner BulletList
+  fall into place inside the same outer BQ. Three blocks of changes:
+  parser core, parser CST snapshot for the existing
+  `lazy_continuation_deep` fixture, and the formatter golden expected
+  for the same case (the lazy line now reflows inside the list item
+  with `>   ` continuation indent at line-width).
+- **What landed**:
+  - **Parser: lazy ListItem buffer continuation in BQ-list**
+    (`crates/panache-parser/src/parser/core.rs` — `parse_line`,
+    inserted between the existing lazy-paragraph and lazy-list-marker
+    continuation blocks). Mirrors the lazy-paragraph branch's
+    structure: bq_depth>0 path buffers any explicit `>` markers via
+    `buffer.push_blockquote_marker` then appends `inner_content`;
+    bq_depth==0 path appends the original `line`. Both clear
+    `marker_only` when content is non-blank. HR/fence interrupt
+    checks gated on Dialect::CommonMark mirror the paragraph branch.
+  - **New parser fixture**:
+    `crates/panache-parser/tests/fixtures/cases/blockquote_list_lazy_continuation_no_marker/`
+    (`> - foo / bar`) — pins the minimal lazy ListItem continuation
+    shape: BLOCK_QUOTE > LIST > LIST_ITEM > PLAIN with both `foo` and
+    `bar` as TEXT siblings inside one PLAIN. Wired into
+    `golden_parser_cases.rs` between `blockquote_list_blockquote` and
+    `blockquote_list_no_marker_closes_commonmark`.
+  - **Snapshot regeneration**: 1 parser CST snapshot
+    (`parser_cst_lazy_continuation_deep`) updated to reflect the new
+    shape — the lazy line `lazy continuation across the first level`
+    now sits inside the BQ's BulletList item PLAIN, and the entire
+    document is one outer BLOCK_QUOTE (prior snapshot had three
+    sibling top-level nodes: BQ + PARAGRAPH + BQ).
+  - **Formatter golden update**:
+    `tests/fixtures/cases/lazy_continuation_deep/expected.md`
+    regenerated. The first item now reflows as
+    `> - This is a blockquoted list item with lazy continuation across the first / >   level`
+    (continuation at hanging indent) instead of the prior
+    `> - … with / lazy continuation …` shape that preserved the
+    original lossy line break.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 96 (imported-lazy_continuation_deep)
+- **Files changed (classified)**:
+  - **parser-shape**:
+    `crates/panache-parser/src/parser/core.rs` (`parse_line` —
+    new lazy ListItem buffer continuation block, ~58 lines).
+  - **parser fixture**: new
+    `blockquote_list_lazy_continuation_no_marker/` directory under
+    `crates/panache-parser/tests/fixtures/cases/` and a matching
+    `parser_cst_blockquote_list_lazy_continuation_no_marker.snap`.
+    Wired into `golden_parser_cases.rs`.
+  - **snapshot**:
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_lazy_continuation_deep.snap`
+    (existing parser fixture pinned to the pandoc-correct shape).
+  - **formatter golden**:
+    `tests/fixtures/cases/lazy_continuation_deep/expected.md`.
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 96
+    inserted between 95 and 97, under `# imported`).
+- **Don't redo**:
+  - The new branch fires *only* when the deepest container is
+    `ListItem` AND we're `in_blockquote_list`. The `in_blockquote_list`
+    guard matters: a top-level `- foo / bar` (no BQ) reaches a
+    different code path entirely (the `bq_depth == current_bq_depth ==
+    0` else-if at the bottom of `parse_line`) which already handles
+    lazy ListItem continuation via `parse_inner_content`. Don't
+    generalize this branch to fire outside BQ — it would double-fire.
+  - The `try_parse_list_marker(line, self.config).is_none()` guard
+    prevents this branch from stealing list-marker lines (e.g.
+    `- bar`) from the existing lazy list-marker continuation block
+    immediately below it. Don't remove the guard — the order matters
+    too (this branch is positioned *before* the lazy list-marker
+    branch, but the list-marker branch is `bq_depth == 0` only and
+    Pandoc-only; the guard keeps the two branches non-overlapping).
+  - The HR/fence interrupt checks intentionally mirror the lazy
+    *paragraph* continuation branch's `is_commonmark` gate. Pandoc's
+    actual behavior is more permissive than CommonMark (HR doesn't
+    interrupt; fence interrupts even outside lazy contexts because it
+    opens at column 0). Don't tighten the gate to fire fence interrupt
+    in Pandoc here — fence opening at column 0 is handled elsewhere
+    (paragraph closing on fence detection in dispatcher), and the
+    lazy-continuation branch is just consistent with the paragraph
+    sibling in this file.
+  - Verified pandoc-native behavior: `# Heading`, table separators,
+    and other paragraph-interrupting lines do NOT interrupt lazy
+    continuation in pandoc — they are absorbed as text into the
+    PLAIN. So the conservative HR/fence-only interrupt check matches
+    pandoc, not just CommonMark. Don't add ATX-heading or
+    table-shape interrupts.
+  - Setext underline (`===`, `---`) lines below a `> - foo`
+    pattern cause pandoc to *retroactively* reparse the entire prior
+    block as a setext heading (treating `>` and `-` as text). This is
+    a pandoc quirk we don't model. The current fix doesn't try to
+    handle it — if a corpus case ever lands that depends on it,
+    that's a separate setext-reparse session.
+  - Case #91 still fails. It's a structurally different bug:
+    list-marker inside BQ-prefixed content (`-  > - 0:`) needs to be
+    detected as opening a nested BulletList inside the outer item's
+    BlockQuote. Different code path (the `> -` content gets parsed
+    as Paragraph text instead of recursing into list parsing). The
+    new lazy-continuation branch doesn't help.
+
+## Earlier session (2026-05-04, Definition-list continuation: `>`
+  continuation markers and bullet-list openings recognized at the
+  definition's content column)
 - **Pass before → after**: 183 → 184 / 187 (+1 import: #43).
   Parser-shape: two narrow continuation-policy gaps inside `Definition`
   containers. (1) `shifted_blockquote_from_list` early-out
@@ -349,89 +450,6 @@ one session, **#2 (#91 or #96)** are bounded continuation-policy fixes.
     (which calls `apply_abbreviations`) — don't re-implement abbreviation
     handling in the citation projector.
 
-## Earlier session (2026-05-04, HTML block per-line splitting projector via `markdown_in_html_blocks`)
-
-- **Pass before → after**: 180 → 181 / 187 (+1 import: #181). Projector-only
-  fix: `emit_html_block` splits multi-line HTML_BLOCKs into per-line Blocks
-  (each tag-only line → RawBlock; each text line → Plain with parsed
-  inlines). Verbatim constructs (comments, `<script>`/`<style>`/`<pre>`/
-  `<textarea>`, PIs, declarations) emit as single RawBlock with newlines
-  preserved. `<div>` keeps its existing `try_div_html_block` Div path.
-  All seven block-walker call sites that previously did
-  `if let Some(b) = block_from(&child) { out.push(b); }` switched to a new
-  `collect_block(&child, &mut out)` wrapper that dispatches to
-  `emit_html_block` for HTML_BLOCK (one→many) and to `block_from`
-  otherwise. The grid-table-cell call site (line 2028) keeps `block_from`
-  directly because its Para→Plain transform applies per-Block, and
-  HTML_BLOCK splitting inside a grid-table cell is unusual. CommonMark
-  allowlist green; pandoc allowlist green; full parser-crate suite green
-  (996 + 263 + 38 + 35 + 14 + 17 + ... passes); clippy + fmt clean.
-- **What landed**:
-  - **Projector: per-line HTML block splitting
-    (`crates/panache-parser/tests/pandoc/native_projector.rs`)** — new
-    helpers:
-    - `emit_html_block(node, out)` — entry point that decides whether
-      to split. Strips trailing newlines, delegates to `try_div_html_block`
-      first, then early-returns single-RawBlock for verbatim constructs
-      (comment / PI / declaration / `<script>` / `<style>` / `<pre>` /
-      `<textarea>`) and single-line blocks. Multi-line otherwise: split
-      lines, each line → RawBlock or Plain.
-    - `is_raw_text_element_open(s)` — case-insensitive check that the
-      first tag is `<script`, `<style`, `<pre`, or `<textarea`, followed
-      by whitespace/`>`/`/`/end.
-    - `is_complete_html_tag_line(s)` — line is a single complete `<...>`
-      with no trailing content. Skips quoted-attribute content so `>`
-      inside `class="..."` doesn't terminate early.
-    - `collect_block(node, out)` — top-level dispatcher that calls
-      `emit_html_block` for HTML_BLOCK and `block_from` otherwise.
-  - **Call-site updates** (7 sites; all simple `if let Some(b) =
-    block_from(&child) { out.push(b); }` patterns swapped to
-    `collect_block(&child, &mut out)`):
-    - `blocks_from_doc` (document body)
-    - `blockquote_blocks`
-    - `parse_pandoc_blocks` (the helper used by `try_div_html_block`)
-    - footnote-definition body collection
-    - `fenced_div` body collection
-    - definition-list body collection (`extra > 0` indented-code branch)
-    - list-item body collection (`item_indent` indented-code branch)
-- **Cases unlocked** (+1, allowlisted under `# imported`):
-  - 181 (imported-writer_html_blocks)
-- **Files changed (classified)**:
-  - **projector**:
-    `crates/panache-parser/tests/pandoc/native_projector.rs`
-    (new `emit_html_block`, `is_raw_text_element_open`,
-    `is_complete_html_tag_line`, `collect_block` helpers; 7 call sites
-    updated to `collect_block`)
-  - **allowlist**:
-    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 181 inserted
-    between 180 and 182, under `# imported`)
-- **Don't redo**:
-  - The line-by-line splitter does NOT handle multi-tag-on-one-line cases
-    (e.g. `<tr><td>foo</td></tr>` on a single line — pandoc splits into
-    4 RawBlocks + 1 Plain). For #181 each tag sits on its own line, so
-    this is acceptable. If a future case lands one with multi-tag lines,
-    the fix is to extend `is_complete_html_tag_line`-based scanner into
-    a tag-tokenizer that walks each line emitting per-tag RawBlocks
-    interleaved with text spans. Don't try to bring that in pre-emptively.
-  - The grid-table-cell call site (`parse_cell_text_blocks` body, around
-    line 2028) is intentionally left calling `block_from` directly so its
-    `Para` → `Plain` transform stays per-Block. HTML_BLOCK splitting
-    inside a grid-table cell is unusual; if it ever shows up, the fix is
-    to apply the transform after splitting (push splits into a temp Vec,
-    map Para→Plain, extend `out`).
-  - `is_raw_text_element_open` lowercases the candidate tag name for
-    matching (pandoc tags are case-insensitive). Don't switch to
-    case-sensitive comparison or `<SCRIPT>` would be projected as a
-    splittable block.
-  - The verbatim-constructs early return checks `<!--` BEFORE the generic
-    `<!` declaration check (since `<!--` is a prefix of `<!`). Order
-    matters; don't reorder these checks.
-  - Empty/whitespace-only lines in a multi-line HTML_BLOCK are skipped
-    (continue) rather than emitting a Plain. This matches pandoc's
-    behavior of not emitting blocks for blank inner lines (they break
-    paragraph context). Don't try to emit an empty Plain or
-    SoftBreak-bearing block.
-
 ## Prior sessions
 
 Older session logs were pruned to keep the recap scannable. Use `git log` on
@@ -439,6 +457,9 @@ Older session logs were pruned to keep the recap scannable. Use `git log` on
 trace which case unlocked when. Cross-session lessons that still apply have
 been folded into the global "Don't redo" section above.
 
+- 2026-05-04: HTML block per-line splitting projector via
+  `markdown_in_html_blocks` (#181 unlocked) — see git log on
+  `tests/pandoc/native_projector.rs`.
 - 2026-05-04: HTML `<div>` block → `Div(attr, blocks)` projector via
   `markdown_in_html_blocks` (#78 unlocked) — see git log on
   `tests/pandoc/native_projector.rs`.

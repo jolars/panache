@@ -1923,6 +1923,64 @@ impl<'a> Parser<'a> {
                     return true;
                 }
             }
+            // Lazy continuation of a list item's open content (its
+            // Plain/Para). Pandoc and CommonMark both fold a no-`>`
+            // (or short-`>`) plain-text line into the deepest open
+            // ListItem when the line is not itself a list marker or a
+            // paragraph-interrupting block. The ListItemBuffer is the
+            // analogue of an open Paragraph for items whose content
+            // hasn't been wrapped yet.
+            if matches!(self.containers.last(), Some(Container::ListItem { .. }))
+                && lists::in_blockquote_list(&self.containers)
+                && try_parse_list_marker(line, self.config).is_none()
+            {
+                let is_commonmark = self.config.dialect == crate::options::Dialect::CommonMark;
+                let interrupts_via_hr = is_commonmark && try_parse_horizontal_rule(line).is_some();
+                let interrupts_via_fence =
+                    is_commonmark && code_blocks::try_parse_fence_open(line).is_some();
+                if !interrupts_via_hr && !interrupts_via_fence {
+                    if bq_depth > 0 {
+                        let marker_info = self.marker_info_for_line(
+                            blockquote_payload.as_ref(),
+                            line,
+                            bq_marker_line,
+                            shifted_bq_prefix,
+                            used_shifted_bq,
+                        );
+                        if let Some(Container::ListItem {
+                            buffer,
+                            marker_only,
+                            ..
+                        }) = self.containers.stack.last_mut()
+                        {
+                            for i in 0..bq_depth {
+                                if let Some(info) = marker_info.get(i) {
+                                    buffer.push_blockquote_marker(
+                                        info.leading_spaces,
+                                        info.has_trailing_space,
+                                    );
+                                }
+                            }
+                            buffer.push_text(inner_content);
+                            if !inner_content.trim().is_empty() {
+                                *marker_only = false;
+                            }
+                        }
+                    } else if let Some(Container::ListItem {
+                        buffer,
+                        marker_only,
+                        ..
+                    }) = self.containers.stack.last_mut()
+                    {
+                        buffer.push_text(line);
+                        if !line.trim().is_empty() {
+                            *marker_only = false;
+                        }
+                    }
+                    self.pos += 1;
+                    return true;
+                }
+            }
             // CommonMark §5.1: a no-`>` line that begins a list marker
             // closes the blockquote and starts a fresh list at the outer
             // level rather than continuing the inner list. Pandoc keeps
