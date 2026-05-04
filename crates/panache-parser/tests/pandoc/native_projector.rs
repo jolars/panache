@@ -251,8 +251,8 @@ fn parse_footnote_def(node: &SyntaxNode) -> Option<(String, Vec<Block>)> {
                 .any(|c| c.kind() == SyntaxKind::CODE_FENCE_OPEN)
         {
             blocks.push(indented_code_block_with_extra_strip(&child, 4));
-        } else if let Some(b) = block_from(&child) {
-            blocks.push(b);
+        } else {
+            collect_block(&child, &mut blocks);
         }
     }
     Some((label, blocks))
@@ -558,9 +558,7 @@ struct Attr {
 fn blocks_from_doc(doc: &SyntaxNode) -> Vec<Block> {
     let mut out = Vec::new();
     for child in doc.children() {
-        if let Some(b) = block_from(&child) {
-            out.push(b);
-        }
+        collect_block(&child, &mut out);
     }
     out
 }
@@ -705,9 +703,7 @@ fn heading_level(node: &SyntaxNode) -> usize {
 fn blockquote_blocks(node: &SyntaxNode) -> Vec<Block> {
     let mut out = Vec::new();
     for child in node.children() {
-        if let Some(b) = block_from(&child) {
-            out.push(b);
-        }
+        collect_block(&child, &mut out);
     }
     out
 }
@@ -881,6 +877,139 @@ fn html_block(node: &SyntaxNode) -> Block {
     Block::RawBlock("html".to_string(), content)
 }
 
+/// Project an `HTML_BLOCK` node into one or more `Block`s. Pandoc emits each
+/// "complete tag" line of a block-level HTML_BLOCK as a separate `RawBlock`,
+/// with text content lines parsed as Markdown into `Plain` blocks (the
+/// `markdown_in_html_blocks` behavior, default-on under `markdown` flavor).
+/// Verbatim constructs (comments, `<script>` / `<style>` / `<pre>` /
+/// `<textarea>`, processing instructions, declarations, CDATA) keep their
+/// content as a single `RawBlock` with newlines preserved.
+fn emit_html_block(node: &SyntaxNode, out: &mut Vec<Block>) {
+    let mut content = node.text().to_string();
+    while content.ends_with('\n') {
+        content.pop();
+    }
+    if let Some(div) = try_div_html_block(&content) {
+        out.push(div);
+        return;
+    }
+    let leading_ws = content
+        .as_bytes()
+        .iter()
+        .position(|&b| b != b' ' && b != b'\t')
+        .unwrap_or(content.len());
+    let trimmed = &content[leading_ws..];
+    if trimmed.starts_with("<!--")
+        || trimmed.starts_with("<?")
+        || trimmed.starts_with("<![CDATA[")
+        || trimmed.starts_with("<!")
+        || is_raw_text_element_open(trimmed)
+    {
+        out.push(Block::RawBlock("html".to_string(), content));
+        return;
+    }
+    if !content.contains('\n') {
+        out.push(Block::RawBlock("html".to_string(), content));
+        return;
+    }
+    for line in content.split('\n') {
+        let line_trimmed = line.trim();
+        if line_trimmed.is_empty() {
+            continue;
+        }
+        if is_complete_html_tag_line(line_trimmed) {
+            out.push(Block::RawBlock(
+                "html".to_string(),
+                line_trimmed.to_string(),
+            ));
+        } else {
+            let inlines = coalesce_inlines(parse_cell_text_inlines(line_trimmed));
+            if !inlines.is_empty() {
+                out.push(Block::Plain(inlines));
+            }
+        }
+    }
+}
+
+/// Return true if `s` (with leading `<`) opens a raw-text HTML element where
+/// pandoc keeps the entire block verbatim — no markdown parsing inside.
+/// Lowercases the tag name for matching; matches when the tag name is
+/// followed by whitespace, `>`, `/`, or end-of-string.
+fn is_raw_text_element_open(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    if bytes.is_empty() || bytes[0] != b'<' {
+        return false;
+    }
+    let rest = &s[1..];
+    for tag in ["script", "style", "pre", "textarea"] {
+        if rest.len() < tag.len() {
+            continue;
+        }
+        if rest[..tag.len()].eq_ignore_ascii_case(tag) {
+            let after = rest.as_bytes().get(tag.len()).copied();
+            match after {
+                None => return true,
+                Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'>') | Some(b'/') => {
+                    return true;
+                }
+                _ => {}
+            }
+        }
+    }
+    false
+}
+
+/// Return true if `s` is a single complete HTML tag (or comment / declaration)
+/// with no content following the closing `>`. Quotes inside attributes are
+/// skipped so embedded `>` characters don't terminate the scan early.
+fn is_complete_html_tag_line(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    if bytes.is_empty() || bytes[0] != b'<' {
+        return false;
+    }
+    let mut i = 1;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'>' => return i == bytes.len() - 1,
+            b'"' => {
+                i += 1;
+                while i < bytes.len() && bytes[i] != b'"' {
+                    i += 1;
+                }
+                if i >= bytes.len() {
+                    return false;
+                }
+                i += 1;
+            }
+            b'\'' => {
+                i += 1;
+                while i < bytes.len() && bytes[i] != b'\'' {
+                    i += 1;
+                }
+                if i >= bytes.len() {
+                    return false;
+                }
+                i += 1;
+            }
+            _ => i += 1,
+        }
+    }
+    false
+}
+
+/// Iterate `node`'s block-level emission, handling `HTML_BLOCK` splitting
+/// (one HTML block can project as several pandoc-native blocks under
+/// `markdown_in_html_blocks`) while keeping every other kind one-block.
+fn collect_block(node: &SyntaxNode, out: &mut Vec<Block>) {
+    if node.kind() == SyntaxKind::HTML_BLOCK {
+        emit_html_block(node, out);
+        return;
+    }
+    if let Some(b) = block_from(node) {
+        out.push(b);
+    }
+}
+
 /// Detect a `<div ...>...</div>` HTML block and project it as
 /// `Div(attr, blocks)` with the inner content reparsed as Pandoc markdown.
 /// Pandoc's `markdown_in_html_blocks` extension (default-on under `markdown`
@@ -945,9 +1074,11 @@ fn parse_pandoc_blocks(text: &str) -> Vec<Block> {
         ..panache_parser::ParserOptions::default()
     };
     let doc = panache_parser::parse(text, Some(opts));
-    doc.children()
-        .filter_map(|child| block_from(&child))
-        .collect()
+    let mut out = Vec::new();
+    for child in doc.children() {
+        collect_block(&child, &mut out);
+    }
+    out
 }
 
 fn tex_block(node: &SyntaxNode) -> Block {
@@ -975,11 +1106,7 @@ fn fenced_div(node: &SyntaxNode) -> Block {
     for child in node.children() {
         match child.kind() {
             SyntaxKind::DIV_FENCE_OPEN | SyntaxKind::DIV_FENCE_CLOSE => {}
-            _ => {
-                if let Some(b) = block_from(&child) {
-                    blocks.push(b);
-                }
-            }
+            _ => collect_block(&child, &mut blocks),
         }
     }
     Block::Div(attr, blocks)
@@ -1223,11 +1350,7 @@ fn definition_blocks(def_node: &SyntaxNode, loose: bool) -> Vec<Block> {
             SyntaxKind::CODE_BLOCK if extra > 0 => {
                 out.push(indented_code_block_with_extra_strip(&child, extra));
             }
-            _ => {
-                if let Some(b) = block_from(&child) {
-                    out.push(b);
-                }
-            }
+            _ => collect_block(&child, &mut out),
         }
     }
     out
@@ -2375,11 +2498,7 @@ fn list_item_blocks(item: &SyntaxNode, loose: bool) -> Vec<Block> {
                 // sufficient.)
                 out.push(indented_code_block_with_extra_strip(&child, item_indent));
             }
-            _ => {
-                if let Some(b) = block_from(&child) {
-                    out.push(b);
-                }
-            }
+            _ => collect_block(&child, &mut out),
         }
     }
     out

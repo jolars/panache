@@ -41,12 +41,18 @@ count of currently-failing imports remaining under that bucket in the latest
    `BulletList` in *some* contexts (the bare-leading-list path now
    handles the simple case but the `Orange\n: > a / : - List with lazy
    continuation` paths inside #43 still fail).
-5. **HTML blocks / fenced divs with raw HTML adjacency (\~1 --- case #181)**
-   --- `writer_html_blocks` is the remaining case. Pandoc splits each
-   `<tag>` line into its own `RawBlock`; we coalesce them into one block.
-   Parser-shape gap: HTML_BLOCK currently spans contiguous HTML lines;
-   would need to split on tag boundaries. `<div ...>...</div>` projector
-   conversion to `Div(attr, blocks)` (DONE 2026-05-04 — unlocked #78).
+5. **HTML blocks / fenced divs with raw HTML adjacency (DONE 2026-05-04 ---
+   #181 unlocked)**. Projector now splits multi-line block-level HTML
+   blocks per line via `emit_html_block`: tag-only lines emit as RawBlock,
+   inline-text lines emit as Plain (with parsed inlines). Verbatim
+   constructs (`<!-- -->` comments, `<script>`, `<style>`, `<pre>`,
+   `<textarea>`, processing instructions, declarations) still emit as a
+   single RawBlock with newlines preserved. `<div ...>...</div>` keeps
+   its existing `try_div_html_block` path (Div block). Multi-tag-on-one-
+   line splitting (e.g. `<tr><td>foo</td></tr>` on one line — pandoc
+   splits into 4 RawBlocks + 1 Plain) is NOT yet supported; the line is
+   treated as one inline-text line. Acceptable for #181 since each tag
+   sits on its own line in the input.
 6. **Block-level cases where parser splits paragraphs around inline HTML
    comments --- DONE 2026-05-03 (#79 unlocked)**. Parser dispatcher gates
    Comment Type-2 paragraph-interrupt on `Dialect::CommonMark`; under
@@ -127,8 +133,90 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-04 (HTML `<div>` block → `Div(attr, blocks)` projector
-  conversion via `markdown_in_html_blocks`)
+- **Date**: 2026-05-04 (HTML block per-line splitting projector via
+  `markdown_in_html_blocks` — verbatim constructs vs splittable block tags)
+- **Pass before → after**: 180 → 181 / 187 (+1 import: #181). Projector-only
+  fix: `emit_html_block` splits multi-line HTML_BLOCKs into per-line Blocks
+  (each tag-only line → RawBlock; each text line → Plain with parsed
+  inlines). Verbatim constructs (comments, `<script>`/`<style>`/`<pre>`/
+  `<textarea>`, PIs, declarations) emit as single RawBlock with newlines
+  preserved. `<div>` keeps its existing `try_div_html_block` Div path.
+  All seven block-walker call sites that previously did
+  `if let Some(b) = block_from(&child) { out.push(b); }` switched to a new
+  `collect_block(&child, &mut out)` wrapper that dispatches to
+  `emit_html_block` for HTML_BLOCK (one→many) and to `block_from`
+  otherwise. The grid-table-cell call site (line 2028) keeps `block_from`
+  directly because its Para→Plain transform applies per-Block, and
+  HTML_BLOCK splitting inside a grid-table cell is unusual. CommonMark
+  allowlist green; pandoc allowlist green; full parser-crate suite green
+  (996 + 263 + 38 + 35 + 14 + 17 + ... passes); clippy + fmt clean.
+- **What landed**:
+  - **Projector: per-line HTML block splitting
+    (`crates/panache-parser/tests/pandoc/native_projector.rs`)** — new
+    helpers:
+    - `emit_html_block(node, out)` — entry point that decides whether
+      to split. Strips trailing newlines, delegates to `try_div_html_block`
+      first, then early-returns single-RawBlock for verbatim constructs
+      (comment / PI / declaration / `<script>` / `<style>` / `<pre>` /
+      `<textarea>`) and single-line blocks. Multi-line otherwise: split
+      lines, each line → RawBlock or Plain.
+    - `is_raw_text_element_open(s)` — case-insensitive check that the
+      first tag is `<script`, `<style`, `<pre`, or `<textarea`, followed
+      by whitespace/`>`/`/`/end.
+    - `is_complete_html_tag_line(s)` — line is a single complete `<...>`
+      with no trailing content. Skips quoted-attribute content so `>`
+      inside `class="..."` doesn't terminate early.
+    - `collect_block(node, out)` — top-level dispatcher that calls
+      `emit_html_block` for HTML_BLOCK and `block_from` otherwise.
+  - **Call-site updates** (7 sites; all simple `if let Some(b) =
+    block_from(&child) { out.push(b); }` patterns swapped to
+    `collect_block(&child, &mut out)`):
+    - `blocks_from_doc` (document body)
+    - `blockquote_blocks`
+    - `parse_pandoc_blocks` (the helper used by `try_div_html_block`)
+    - footnote-definition body collection
+    - `fenced_div` body collection
+    - definition-list body collection (`extra > 0` indented-code branch)
+    - list-item body collection (`item_indent` indented-code branch)
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 181 (imported-writer_html_blocks)
+- **Files changed (classified)**:
+  - **projector**:
+    `crates/panache-parser/tests/pandoc/native_projector.rs`
+    (new `emit_html_block`, `is_raw_text_element_open`,
+    `is_complete_html_tag_line`, `collect_block` helpers; 7 call sites
+    updated to `collect_block`)
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 181 inserted
+    between 180 and 182, under `# imported`)
+- **Don't redo**:
+  - The line-by-line splitter does NOT handle multi-tag-on-one-line cases
+    (e.g. `<tr><td>foo</td></tr>` on a single line — pandoc splits into
+    4 RawBlocks + 1 Plain). For #181 each tag sits on its own line, so
+    this is acceptable. If a future case lands one with multi-tag lines,
+    the fix is to extend `is_complete_html_tag_line`-based scanner into
+    a tag-tokenizer that walks each line emitting per-tag RawBlocks
+    interleaved with text spans. Don't try to bring that in pre-emptively.
+  - The grid-table-cell call site (`parse_cell_text_blocks` body, around
+    line 2028) is intentionally left calling `block_from` directly so its
+    `Para` → `Plain` transform stays per-Block. HTML_BLOCK splitting
+    inside a grid-table cell is unusual; if it ever shows up, the fix is
+    to apply the transform after splitting (push splits into a temp Vec,
+    map Para→Plain, extend `out`).
+  - `is_raw_text_element_open` lowercases the candidate tag name for
+    matching (pandoc tags are case-insensitive). Don't switch to
+    case-sensitive comparison or `<SCRIPT>` would be projected as a
+    splittable block.
+  - The verbatim-constructs early return checks `<!--` BEFORE the generic
+    `<!` declaration check (since `<!--` is a prefix of `<!`). Order
+    matters; don't reorder these checks.
+  - Empty/whitespace-only lines in a multi-line HTML_BLOCK are skipped
+    (continue) rather than emitting a Plain. This matches pandoc's
+    behavior of not emitting blocks for blank inner lines (they break
+    paragraph context). Don't try to emit an empty Plain or
+    SoftBreak-bearing block.
+
+## Earlier session (2026-05-04, HTML `<div>` block → `Div(attr, blocks)` projector conversion via `markdown_in_html_blocks`)
 - **Pass before → after**: 179 → 180 / 187 (+1 import: #78).
   Projector-only fix: `html_block()` now detects an outer `<div ...>...</div>`
   shape on any `HTML_BLOCK` and projects it as `Div(attr, blocks)` with the
