@@ -55,3 +55,42 @@ fn image_destination_title_single_quotes_normalized() {
         "An ![alt](https://example.com/img.png \"Image Title\") in text.\n"
     );
 }
+
+#[test]
+fn unresolved_shortcut_reference_round_trips() {
+    // Pandoc dialect: a `[label]` shortcut with no matching refdef is
+    // emitted as `UNRESOLVED_REFERENCE`; the formatter must round-trip
+    // it back to the original bracket bytes (idempotent).
+    let input = "See [foo].\n";
+    let output = format(input, None, None);
+    similar_asserts::assert_eq!(output, input);
+    let output2 = format(&output, None, None);
+    assert_eq!(output, output2, "format must be idempotent");
+}
+
+#[test]
+fn unresolved_full_reference_round_trips() {
+    let input = "See [link text][missing].\n";
+    let output = format(input, None, None);
+    similar_asserts::assert_eq!(output, input);
+    let output2 = format(&output, None, None);
+    assert_eq!(output, output2, "format must be idempotent");
+}
+
+#[test]
+fn unresolved_collapsed_reference_round_trips() {
+    let input = "See [link text][].\n";
+    let output = format(input, None, None);
+    similar_asserts::assert_eq!(output, input);
+    let output2 = format(&output, None, None);
+    assert_eq!(output, output2, "format must be idempotent");
+}
+
+#[test]
+fn unresolved_image_reference_round_trips() {
+    let input = "See ![alt][missing].\n";
+    let output = format(input, None, None);
+    similar_asserts::assert_eq!(output, input);
+    let output2 = format(&output, None, None);
+    assert_eq!(output, output2, "format must be idempotent");
+}

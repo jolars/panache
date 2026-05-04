@@ -45,6 +45,17 @@ Parser and syntax changes must preserve lossless CST behavior.
   require pandoc-native verification before accepting — those are the
   cases where dialect-divergence rules and fixture preservation matter.
 - Preserve all structural markers and whitespace in CST nodes/tokens.
+- **Bracket-shape patterns separate syntax from semantics.** Resolved links
+  emit `LINK`/`IMAGE_LINK`. Bracket-shape patterns whose label doesn't
+  resolve to a refdef under Pandoc emit `UNRESOLVED_REFERENCE` (a separate
+  CST kind), with an `is_image()` accessor on the typed wrapper. Downstream
+  tools (linter `undefined_references`, LSP heading-link conversion /
+  goto-def / rename, salsa `heading_link_usages`, pandoc-ast projector,
+  formatter) walk both wrappers as appropriate. Implicit-heading-id
+  resolution lives downstream (in the projector / LSP handlers), not in
+  the parser. Do not re-introduce shape-only `LINK` emission for
+  unresolved references. Empty-component shapes (`[]`, `[][]`) are
+  literal text under both dialects (no wrapper).
 - Do not move formatter policy into parser code.
 - Keep parser single-pass assumptions intact (block parsing with inline emission
   during parse).

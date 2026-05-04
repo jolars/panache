@@ -1850,7 +1850,7 @@ fn source_start_event(event: &IrEvent) -> usize {
 /// dialects (CommonMark §6.3 and Pandoc-markdown agree on the
 /// document-scoped lookup rule). Under Pandoc, when a bracket-shape
 /// pattern (`[text][label]`, `[text][]`, `[text]`) doesn't resolve to
-/// a refdef, the opener is tagged with `unresolved_ref_end = Some(...)`
+/// a refdef, the opener is tagged with `unresolved_ref = Some(...)`
 /// and the closer's `matched` is set to `true` so that
 /// [`build_bracket_plan`] emits a [`BracketDispo::UnresolvedReference`]
 /// keyed at the opener. Emission then wraps `[start, end)` in an
@@ -1858,7 +1858,7 @@ fn source_start_event(event: &IrEvent) -> usize {
 /// tools (linter, LSP) can attach behavior to the bracket-shape
 /// pattern without the parser having to lie about resolution.
 ///
-/// Under CommonMark, no `unresolved_ref_end` is recorded; the
+/// Under CommonMark, no `unresolved_ref` is recorded; the
 /// no-resolution fall-through behaves as today (opener deactivated,
 /// brackets emit as literal text).
 pub fn process_brackets(

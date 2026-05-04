@@ -11,7 +11,53 @@ what trap to avoid) are the load-bearing content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-04-30 (xv)
+## Latest session — 2026-05-04 (xvi)
+
+**Workspace test count: 0 failing → 0 failing.** **Bugs #1/#2 resolved
+out-of-band by the parser-as-source-of-truth split.** A separate,
+multi-session effort (plan at
+`/home/jola/.claude/plans/alright-let-s-commit-to-vivid-corbato.md`)
+introduced a new `UNRESOLVED_REFERENCE` SyntaxKind so the Pandoc
+parser stops emitting shape-only `LINK` nodes for unresolved
+bracket-shape patterns. Bug #1 (`[foo]` no refdef → malformed LINK)
+is **fully fixed**; bug #2 (`*foo [bar* baz]` emphasis crosses
+brackets) is **partially fixed** — the parse no longer produces a
+malformed partial LINK, but the cross-bracket emphasis pairing isn't
+reconstructed (deferred to stage 6 of that plan).
+
+This work crossed parser/linter/LSP/formatter/projector boundaries,
+exactly as the SKILL.md scope-boundary note warned ("Bugs #1/#2 are
+NOT migration-blockers ... cross-cut beyond the inline-IR
+migration's scope"). It is not part of this skill's pandoc-IR
+migration work and shouldn't be revisited here. If a Pandoc inline
+test now references `UNRESOLVED_REFERENCE` instead of `LINK` shape-
+only, the new behavior is correct — verify against
+`pandoc -f markdown -t native` per `.claude/rules/parser.md`.
+
+### Files in committable diff
+
+- `.claude/skills/pandoc-ir-migrate/RECAP.md` (this entry).
+
+### Suggested next sub-targets, ranked
+
+1. **(Optional) Sweep `assets/`, `docs/`, and `.claude/rules/` for
+   stale IR-migration phase references.** Spot-check only.
+2. **(Optional) Stage 6 of the source-of-truth plan**: bug #2's
+   emphasis-crossing fix via a 4-pass restructure of
+   `build_full_plans`. Out of scope here; tracked under that plan.
+
+### Don't redo / known traps (new this session)
+
+- **NEW: bugs #1/#2 are no longer "deferred" — they're resolved.**
+  Recaps (xii)/(xiii)/(xiv)/(xv) all listed these as the top-ranked
+  next sub-target. They've now landed via the source-of-truth
+  migration and should not appear in future recap "next sub-targets"
+  lists. The SKILL.md scope-boundary note correctly carved them out
+  as a parser-linter-LSP cross-cut.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-04-30 (xv)
 
 **Workspace test count: 0 failing → 0 failing.** **Polish: residual
 Phase-N marker sweep.** Sub-targets #2/#3 from recap-(xiv). Greppped
