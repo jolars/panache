@@ -66,8 +66,10 @@ or `debug format` CI issues (especially idempotency/losslessness regressions).
      separators), stop and re-run the pandoc check. A formatter fix is only
      correct when panache's CST already matches pandoc's structure and the
      divergence is purely in rendering. If the CST is wrong, the formatter
-     fix is papering over a parser bug — route to `pandoc-conformance-expand`
-     and add a corpus case there instead.
+     fix is papering over a parser bug — fix the parser and add a
+     corpus case under
+     `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/`
+     so the regression is guarded by the pandoc conformance harness.
    - If uncertain, state the best hypothesis and why before implementing —
      and include the pandoc-native output in the hypothesis.
 

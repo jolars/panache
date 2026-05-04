@@ -15,10 +15,11 @@ Formatter changes should preserve idempotency and avoid parser-side workarounds.
   failure, run `pandoc <repro>.md -f markdown -t native` on a minimal
   reproducer and compare against panache's CST. If the structural shape
   differs (different block types, missing/extra nesting, wrong attribute
-  attachment), the bug is parser-side — route to `pandoc-conformance-expand`
-  rather than reaching for a formatter helper (looseness propagation,
-  marker normalization, separator injection, etc.) that papers over the
-  upstream divergence.
+  attachment), the bug is parser-side — fix the parser (and add a
+  corpus case under `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/`
+  if the construct isn't covered yet) rather than reaching for a
+  formatter helper (looseness propagation, marker normalization,
+  separator injection, etc.) that papers over the upstream divergence.
 - Keep formatting deterministic: `format(format(x)) == format(x)`.
 - Reuse existing wrapping/inline/list/table helpers instead of duplicating
   rendering logic.
