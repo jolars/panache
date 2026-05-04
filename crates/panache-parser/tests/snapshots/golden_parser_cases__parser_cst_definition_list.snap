@@ -275,13 +275,24 @@ DOCUMENT@0..1703
       DEFINITION@1057..1113
         DEFINITION_MARKER@1057..1058 ":"
         WHITESPACE@1058..1061 "   "
-        PLAIN@1061..1113
+        PLAIN@1061..1097
           TEXT@1061..1096 "Here comes a list (or ..."
           NEWLINE@1096..1097 "\n"
-          TEXT@1097..1104 "    - A"
-          NEWLINE@1104..1105 "\n"
-          TEXT@1105..1112 "    - B"
-          NEWLINE@1112..1113 "\n"
+        LIST@1097..1113
+          WHITESPACE@1097..1101 "    "
+          LIST_ITEM@1101..1105
+            LIST_MARKER@1101..1102 "-"
+            WHITESPACE@1102..1103 " "
+            PLAIN@1103..1105
+              TEXT@1103..1104 "A"
+              NEWLINE@1104..1105 "\n"
+          WHITESPACE@1105..1109 "    "
+          LIST_ITEM@1109..1113
+            LIST_MARKER@1109..1110 "-"
+            WHITESPACE@1110..1111 " "
+            PLAIN@1111..1113
+              TEXT@1111..1112 "B"
+              NEWLINE@1112..1113 "\n"
     BLANK_LINE@1113..1114
       BLANK_LINE@1113..1114 "\n"
     DEFINITION_ITEM@1114..1223
@@ -373,9 +384,15 @@ DOCUMENT@0..1703
           PARAGRAPH@1537..1555
             TEXT@1537..1538 "a"
             NEWLINE@1538..1539 "\n"
-            TEXT@1539..1546 "    > b"
+            WHITESPACE@1539..1543 "    "
+            BLOCK_QUOTE_MARKER@1543..1544 ">"
+            WHITESPACE@1544..1545 " "
+            TEXT@1545..1546 "b"
             NEWLINE@1546..1547 "\n"
-            TEXT@1547..1554 "    > c"
+            WHITESPACE@1547..1551 "    "
+            BLOCK_QUOTE_MARKER@1551..1552 ">"
+            WHITESPACE@1552..1553 " "
+            TEXT@1553..1554 "c"
             NEWLINE@1554..1555 "\n"
     BLANK_LINE@1555..1556
       BLANK_LINE@1555..1556 "\n"

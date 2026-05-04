@@ -1364,9 +1364,6 @@ impl<'a> Parser<'a> {
         &self,
         line: &'b str,
     ) -> Option<(usize, &'b str, &'b str, &'b str)> {
-        if !lists::in_list(&self.containers) {
-            return None;
-        }
         let list_content_col = paragraphs::current_content_col(&self.containers);
         let content_container_indent = self.content_container_indent_to_strip();
         let marker_col = list_content_col.saturating_add(content_container_indent);

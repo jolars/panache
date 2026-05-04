@@ -7,7 +7,7 @@ state; this file is judgment calls only.
 
 Ranked by likely shared root cause and leverage. Numbers in parentheses are the
 count of currently-failing imports remaining under that bucket in the latest
-`report.txt`. 4 imports remain failing total (183 / 187 passing).
+`report.txt`. 3 imports remain failing total (184 / 187 passing).
 
 1. **Tables --- #71 grid_table_planets (1)** --- rowspan/colspan layout.
    Pandoc emits `RowSpan N` / `ColSpan N` for cells whose `+   +-----+`-style
@@ -18,14 +18,7 @@ count of currently-failing imports remaining under that bucket in the latest
    model that assigns cells to specific columns and tracks RowSpan/ColSpan
    counts per cell.
 
-2. **Definition list nesting --- #43 (1)** --- `definition_list`. Nested
-   bullets inside definitions aren't parsed as `BulletList` in *some*
-   contexts (the bare-leading-list path handles the simple case but the
-   `Orange\n: > a / : - List with lazy continuation` paths inside #43
-   still fail). Parser-shape gap in definition-list continuation across
-   blockquote/list-marker lines.
-
-3. **Continuation policy across container boundaries --- #91, #96 (2)**
+2. **Continuation policy across container boundaries --- #91, #96 (2)**
    --- where lazy continuation or sibling-list-item handling crosses
    blockquote/list boundaries differently from pandoc.
    - **#91** (`-  > -` siblings + indented `   > -` continuation):
@@ -45,16 +38,7 @@ count of currently-failing imports remaining under that bucket in the latest
 Suggested first session: **#1 (Tables — #71)** is the single
 remaining "feature" gap (rowspan/colspan in grid tables); the rest are
 parser continuation-policy gaps. If the rowspan model is too heavy for
-one session, **#2 (#43)** is bounded — it's the same definition-list
-continuation family that produced #44 in 2026-05-03, just one more
-context to handle.
-
-Suggested first session: **#1 (Citations proper)** is still the largest
-single-fix unlock (14 cases) and the heaviest projector entry. After
-Example-list numbering proved the document-level counter pre-pass shape
-(`example_list_start_by_offset`), the Citation projector can lean on the same
-`RefsCtx` pre-pass to assign `citationNoteNum` per inline-occurrence. After
-that, the table buckets (#2) are the next largest leverage.
+one session, **#2 (#91 or #96)** are bounded continuation-policy fixes.
 
 ## Don't redo
 
@@ -105,79 +89,151 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-04 (Blank-line peek-loop inside blockquote: skip
-  blank-in-BQ lines so multi-blank-then-continuation list items don't
-  prematurely close)
-- **Pass before → after**: 182 → 183 / 187 (+1 import: #34). Parser-shape
-  fix: in `parse_line`'s blank-line branch in `core.rs`, the peek-ahead
-  loop that skips trailing blank lines now also skips lines that are
-  functionally blank in the current blockquote context (e.g. `>` or
-  `>   ` when inside a `> ` blockquote). Previously the loop only used
-  `is_blank_line(self.lines[peek])`, which treats `>\n` as non-blank;
-  the next-line context fed to `compute_levels_to_keep` was therefore a
-  blank-in-BQ line with `raw_indent_cols=0`, prompting the policy to
-  close the parent List+ListItem prematurely. The fix peels off
-  `bq_depth` markers via `strip_n_blockquote_markers` and skips when
-  the inner content `is_blank_line`. CommonMark allowlist green;
-  pandoc allowlist green; full parser-crate suite green; full
-  workspace tests green; clippy + fmt clean.
+- **Date**: 2026-05-04 (Definition-list continuation: `>` continuation
+  markers and bullet-list openings recognized at the definition's
+  content column)
+- **Pass before → after**: 183 → 184 / 187 (+1 import: #43).
+  Parser-shape: two narrow continuation-policy gaps inside `Definition`
+  containers. (1) `shifted_blockquote_from_list` early-out
+  `if !lists::in_list(...)` blocked the column-shift detection when the
+  enclosing content container was a `Definition` (or `FootnoteDefinition`)
+  rather than a `ListItem`. With the early-out gone, the existing
+  `marker_col == 0` guard still handles the top-level case, and a `>`
+  at the Definition's content column is recognized as a BQ continuation
+  marker (e.g. `:   > a / > b` inside a definition). (2) In
+  `definition_plain_can_continue`, a list marker (already followed by
+  the existing prev-blank / in_list checks) now also returns false when
+  `raw_indent_cols >= content_indent` — meaning a list marker indented
+  to the definition's content column opens a nested BulletList inside
+  the definition even without a separating blank line, matching
+  pandoc-native. CommonMark allowlist green; pandoc allowlist green;
+  full parser-crate suite green; full workspace tests green; clippy +
+  fmt clean.
 - **What landed**:
-  - **Parser: blank-line peek skips blank-in-BQ lines
-    (`crates/panache-parser/src/parser/core.rs` blank-line branch in
-    `parse_line`)** — replaced the simple `while is_blank_line(...)`
-    peek loop with one that also skips lines whose
-    `strip_n_blockquote_markers(line, bq_depth)` is blank, when
-    `bq_depth > 0` and `peek_bq >= bq_depth`. The depth condition
-    avoids skipping a `<` -depth line (which is a real BQ-close
-    event).
-  - **Snapshot regeneration**: 1 parser CST snapshot updated to
-    reflect the new shape — `parser_cst_blockquote_list_blockquote`
-    now shows the LIST containing two `LIST_ITEM`s (instead of one
-    item + a sibling PARAGRAPH + a second LIST). The previous
-    snapshot was an "accept current state" capture, not a deliberate
-    pin.
-  - **Formatter golden update**: `tests/fixtures/cases/blockquote_list_blockquote/expected.md`
-    regenerated. The new formatted output indents `Back to list item
-    content` to match the (now-correct) list-item continuation, and
-    is idempotent.
+  - **Parser: drop list-only gate on column-shifted BQ detection**
+    (`crates/panache-parser/src/parser/core.rs` —
+    `shifted_blockquote_from_list`). Removed
+    `if !lists::in_list(&self.containers) { return None; }`. The
+    `marker_col == 0` guard already handles top-level / no-content-
+    container cases. Function name kept (the old "from_list"
+    framing is now historical; the math via
+    `current_content_col + content_container_indent_to_strip`
+    naturally generalizes).
+  - **Parser: list marker at content_col opens inner list**
+    (`crates/panache-parser/src/parser/utils/continuation.rs` —
+    `definition_plain_can_continue`). Added a
+    `content_indent > 0 && raw_indent_cols >= content_indent` short-
+    circuit for the list-marker branch, returning false so the
+    normal block dispatcher emits the LIST instead of buffering the
+    line into the open PLAIN.
+  - **Unit test flip**:
+    `parser/blocks/tests/definition_lists.rs` —
+    `definition_list_plain_does_not_start_list_without_blank_line`
+    pinned the *broken* legacy behavior. Renamed to
+    `definition_list_plain_starts_list_at_content_column_without_blank_line`
+    and flipped the assertions to require PLAIN + LIST inside the
+    Definition. Verified against pandoc-native.
+  - **Snapshot regeneration**: 1 parser CST snapshot
+    (`parser_cst_definition_list`) updated to reflect both fixes —
+    `> b` / `> c` now tokenize as continuation markers, and the
+    "A definition list with nested items" definition now contains
+    PLAIN + LIST instead of one fat PLAIN.
+  - **Formatter golden update**:
+    `tests/fixtures/cases/definition_list/expected.md` regenerated.
+    The "nested items" definition now formats as
+    `:   Here comes a list (or wait, is it?)\n    - A\n    - B`
+    instead of the collapsed `- A - B` plain text.
+  - **New parser fixtures**: two minimal pin-down cases:
+    - `crates/panache-parser/tests/fixtures/cases/definition_list_blockquote_continuation/`
+      (`Term // : > a / > b / > c`) — pins BQ-marker recognition.
+    - `crates/panache-parser/tests/fixtures/cases/definition_list_inner_list_no_blank/`
+      (`Term / : plain content / - A / - B` indented at content col)
+      — pins inner BulletList without separating blank.
+    Both wired into `golden_parser_cases.rs` between
+    `definition_list` and `definition_list_nesting`.
 - **Cases unlocked** (+1, allowlisted under `# imported`):
-  - 34 (imported-blockquote_list_blockquote)
+  - 43 (imported-definition_list)
 - **Files changed (classified)**:
   - **parser-shape**:
-    `crates/panache-parser/src/parser/core.rs` (blank-line peek
-    loop)
+    `crates/panache-parser/src/parser/core.rs`
+    (`shifted_blockquote_from_list`),
+    `crates/panache-parser/src/parser/utils/continuation.rs`
+    (`definition_plain_can_continue`).
+  - **unit test**:
+    `crates/panache-parser/src/parser/blocks/tests/definition_lists.rs`
+    (rename + flip the assertions).
   - **snapshot**:
-    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_blockquote_list_blockquote.snap`
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_definition_list.snap`
+    (+ two new snapshots from the new fixtures).
+  - **parser fixtures**: new `definition_list_blockquote_continuation/`
+    and `definition_list_inner_list_no_blank/` directories under
+    `crates/panache-parser/tests/fixtures/cases/`, wired into
+    `golden_parser_cases.rs`.
   - **formatter golden**:
-    `tests/fixtures/cases/blockquote_list_blockquote/expected.md`
+    `tests/fixtures/cases/definition_list/expected.md`.
   - **allowlist**:
-    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 34
-    inserted between 33 and 35, under `# imported`)
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 43
+    inserted between 42 and 44, under `# imported`).
+- **Don't redo**:
+  - The `lists::in_list` early-out in `shifted_blockquote_from_list`
+    was redundant with the `marker_col == 0` check. The function's
+    math (`current_content_col` (innermost ListItem/FootnoteDefinition)
+    + `content_container_indent_to_strip` (sum of FootnoteDefinition +
+    Definition `content_col`s)) generalizes to definitions/footnotes
+    naturally — `marker_col` ends up at the absolute column where a
+    shifted `>` should sit. Don't reinstate the gate; the function
+    name is historical, the behavior is "any indented content
+    container".
+  - Pandoc-native treats a list marker at the Definition's content
+    column as opening a nested BulletList *regardless of whether a
+    blank line precedes it*. The legacy unit test pinning the
+    "no-list-without-blank" shape was preserving the parser's old
+    bug. Don't revert.
+  - The `content_indent > 0` part of the new continuation check is
+    load-bearing: at top level (`content_indent == 0`,
+    e.g. paragraph not inside a Definition) `definition_plain_can_continue`
+    is only called when the last container is a Definition, so this
+    is a defensive guard rather than a hot path — but dropping it
+    would let a 0-indent list marker short-circuit the rest of the
+    function in unexpected ways.
+  - The `raw_indent_cols >= content_indent` check is intentionally
+    "≥", not "==". Pandoc accepts list markers at any indent ≥
+    content_col as opening the inner list; if the marker is more
+    deeply indented (e.g. column 5 inside a `:   ` definition
+    starting at column 4), pandoc still opens a list and uses the
+    column for the list's own indent. Don't tighten to "==".
+  - Cases #91 and #96 still fail. Both are different continuation-
+    policy issues (lazy continuation across BQ depth boundaries;
+    list-item closure mid-blockquote). The fixes here don't help
+    them — they involve real non-blank lines with policy outcomes
+    diverging from pandoc.
+
+## Earlier session (2026-05-04, Blank-line peek-loop inside blockquote: skip blank-in-BQ lines so multi-blank-then-continuation list items don't prematurely close)
+
+- **Pass before → after**: 182 → 183 / 187 (+1 import: #34). Parser-shape
+  fix in `parse_line`'s blank-line branch (`core.rs`): the peek-ahead
+  loop that skips trailing blank lines now also skips lines that are
+  functionally blank in the current blockquote context (e.g. `>` or
+  `>   ` when inside a `> ` blockquote). The fix peels off `bq_depth`
+  markers via `strip_n_blockquote_markers` and skips when the inner
+  content `is_blank_line`. Required updating one parser CST snapshot
+  and one formatter golden expected.
+- **Cases unlocked**: 34 (imported-blockquote_list_blockquote)
+- **Files changed**:
+  - parser-shape: `crates/panache-parser/src/parser/core.rs` (blank-line peek loop)
+  - snapshot: `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_blockquote_list_blockquote.snap`
+  - formatter golden: `tests/fixtures/cases/blockquote_list_blockquote/expected.md`
+  - allowlist: `crates/panache-parser/tests/pandoc/allowlist.txt`
 - **Don't redo**:
   - The peek-loop guard requires both `peek_bq >= bq_depth` AND
     `is_blank_line(peek_inner)` to skip. Don't drop the depth check —
-    a line with `peek_bq < bq_depth` (e.g. plain text after BQ close,
-    or `>` instead of `> >`) is a real container-close event that
-    `compute_levels_to_keep` needs to see. Skipping it would silently
-    keep deeper containers open across BQ boundaries.
+    a line with `peek_bq < bq_depth` (e.g. plain text after BQ close)
+    is a real container-close event that
+    `compute_levels_to_keep` needs to see.
   - The check uses `bq_depth` (current line's BQ depth) rather than
     `current_bq_depth` (container-stack depth). For the blank-in-BQ
     case both happen to match because the current line carries `>`
     markers and `current_bq_depth` reflects the open BQ container.
-    If a divergence shows up (e.g. shifted blockquote prefixes inside
-    list-item content), revisit this — but for now `bq_depth` is the
-    natural "what depth is this `>` line at" signal.
-  - The previous fixture snapshot for `blockquote_list_blockquote`
-    pinned the broken shape. It WAS a known-broken pin (recap noted
-    it). The new snapshot pins pandoc-correct shape: LIST with two
-    LIST_ITEMs (first contains both segments, second contains only
-    "Second list item"). Don't revert.
-  - Cases #91 and #96 still fail. Both involve different
-    continuation-policy issues (lazy continuation across blockquote
-    depth boundaries; list-item closure mid-blockquote). The
-    blank-in-BQ peek fix doesn't help them — they involve real
-    non-blank lines whose ContinuationPolicy outcome differs from
-    pandoc.
 
 ## Earlier session (2026-05-04, Citations proper — `Cite [Citation, ...] [Inline,
   ...]` projection with prefix/suffix inline parsing, `@key [locator]`
@@ -376,74 +432,6 @@ that, the table buckets (#2) are the next largest leverage.
     paragraph context). Don't try to emit an empty Plain or
     SoftBreak-bearing block.
 
-## Earlier session (2026-05-04, HTML `<div>` block → `Div(attr, blocks)` projector conversion via `markdown_in_html_blocks`)
-- **Pass before → after**: 179 → 180 / 187 (+1 import: #78).
-  Projector-only fix: `html_block()` now detects an outer `<div ...>...</div>`
-  shape on any `HTML_BLOCK` and projects it as `Div(attr, blocks)` with the
-  inner content reparsed via the new `parse_pandoc_blocks` helper. `<div>`
-  is the only block tag pandoc treats this way under `markdown_in_html_blocks`
-  (default-on for `markdown` flavor); other block tags (`<table>`, `<hr>`,
-  ...) fall through to the existing `RawBlock` path. The reparse promotes the
-  resulting block to `Plain` only when the open tag is on the same source line
-  as the close tag (single-line `<div>foo</div>`); multi-line content keeps
-  `Para` shape. CommonMark allowlist green; pandoc allowlist green; full
-  parser-crate suite green; clippy + fmt clean.
-- **What landed**:
-  - **Projector: `<div>` HTML block → `Div`
-    (`crates/panache-parser/tests/pandoc/native_projector.rs`)** — `html_block()`
-    now delegates to a new `try_div_html_block()` helper that:
-    1. Skips leading whitespace and matches `<div` followed by a separator
-       (` `, `\t`, `\n`, `>`, or `/`).
-    2. Parses the open-tag attrs via the existing `parse_html_attrs()` after
-       trimming a trailing `/`.
-    3. Searches for a `</div>` close tag at the trailing edge (lowercase
-       suffix match) — leaves the projector's existing RawBlock path for any
-       HTML block that doesn't match this shape.
-    4. Reparses the inner content (with leading/trailing `\n` trimmed) as
-       Pandoc-flavored markdown via the new `parse_pandoc_blocks()`.
-    5. Promotes a single inner `Para` to `Plain` only when the open tag is
-       on the same source line as the close tag (`!multiline`), matching
-       pandoc's behavior for `<div>foo</div>`.
-  - **New helper `parse_pandoc_blocks` (same file)** — parses text as
-    Pandoc-flavored markdown and returns top-level blocks unchanged. Distinct
-    from `parse_cell_text_blocks` (which forces Para→Plain for grid-cell
-    contexts); per the prior Don't-redo, kept as a separate helper.
-- **Cases unlocked** (+1, allowlisted under `# imported`):
-  - 78 (imported-html_block)
-- **Files changed (classified)**:
-  - **projector**:
-    `crates/panache-parser/tests/pandoc/native_projector.rs`
-    (new `try_div_html_block` helper, new `parse_pandoc_blocks` helper,
-    `html_block` delegates through `try_div_html_block`)
-  - **allowlist**:
-    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 78 inserted
-    between 77 and 79, under `# imported`)
-- **Don't redo**:
-  - `try_div_html_block` matches `<div` only — not `<table>`, `<hr>`, or
-    other block tags. Pandoc's `markdown_in_html_blocks` is `<div>`-only
-    in practice (verified via `pandoc -f markdown -t native` probes); broader
-    matching would diverge from pandoc-native. Don't widen this without
-    pandoc-source verification.
-  - The `multiline` flag is computed by inspecting whether the byte
-    immediately after the open tag's `>` is `\n`. This is the right signal
-    for distinguishing `<div>foo</div>` (Plain) from `<div>\nfoo\n</div>`
-    (Para) — don't switch to checking inner content for newlines, since
-    inner content is later trimmed of leading/trailing `\n` and would
-    miss the boundary.
-  - The close-tag detection trims trailing whitespace/newlines from the
-    raw HTML_BLOCK content, then checks the suffix (case-insensitive)
-    ends with `</div>`. Don't switch to a forward search — partial
-    `<div>...</div>...<div>` blocks shouldn't be projected as Div even
-    though the parser may unify them; the suffix check guards against
-    that. (CommonMark spec & pandoc both close the HTML block at the
-    final `</div>` followed by a blank line, but in defensive depth this
-    keeps the projector matching pandoc's per-block decision rather than
-    trying to re-segment the parser's output.)
-  - `parse_pandoc_blocks` is the right helper for any future "reparse a
-    fragment, keep block kinds intact" projector need (e.g. fenced div
-    contents that need block-level reparse). `parse_cell_text_blocks`
-    keeps the Para→Plain conversion specific to grid/pipe table cells.
-
 ## Prior sessions
 
 Older session logs were pruned to keep the recap scannable. Use `git log` on
@@ -451,6 +439,9 @@ Older session logs were pruned to keep the recap scannable. Use `git log` on
 trace which case unlocked when. Cross-session lessons that still apply have
 been folded into the global "Don't redo" section above.
 
+- 2026-05-04: HTML `<div>` block → `Div(attr, blocks)` projector via
+  `markdown_in_html_blocks` (#78 unlocked) — see git log on
+  `tests/pandoc/native_projector.rs`.
 - 2026-05-03: Grid-table multi-line cells + TableFoot via block-reparse
   projector path (#68, #70 unlocked).
 - 2026-05-03: HTML comment paragraph-interrupt gated by dialect; directive

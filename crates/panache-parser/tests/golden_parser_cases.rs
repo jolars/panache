@@ -190,6 +190,8 @@ golden_test_cases!(
     crlf_yaml_metadata,
     citations,
     definition_list,
+    definition_list_blockquote_continuation,
+    definition_list_inner_list_no_blank,
     definition_list_nesting,
     definition_list_pandoc_bare_leading_list,
     definition_list_pandoc_loose_compact,

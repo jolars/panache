@@ -14,15 +14,28 @@ fn definition_list_allows_nested_list_after_blank_line() {
 }
 
 #[test]
-fn definition_list_plain_does_not_start_list_without_blank_line() {
+fn definition_list_plain_starts_list_at_content_column_without_blank_line() {
+    // A list marker indented to the definition's content column starts a nested
+    // list inside the definition, even without a separating blank line. Matches
+    // pandoc-native (`pandoc -f markdown -t native`).
     let input = "A definition list with nested items\n:   Here comes a list (or wait, is it?)\n    - A\n    - B\n";
     let tree = parse_blocks(input);
 
     assert_block_kinds(input, &[SyntaxKind::DEFINITION_LIST]);
 
+    let definition = find_first(&tree, SyntaxKind::DEFINITION).expect("definition");
     assert!(
-        find_first(&tree, SyntaxKind::LIST).is_none(),
-        "Expected no list without blank line in definition"
+        find_first(&definition, SyntaxKind::PLAIN).is_some(),
+        "definition should contain PLAIN for the leading text"
+    );
+    let nested_list = find_first(&definition, SyntaxKind::LIST).expect("nested list");
+    assert_eq!(
+        nested_list
+            .children()
+            .filter(|child| child.kind() == SyntaxKind::LIST_ITEM)
+            .count(),
+        2,
+        "nested list should contain both items"
     );
 }
 

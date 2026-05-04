@@ -292,6 +292,13 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
             if block_ctx.in_list {
                 return false;
             }
+            // A list marker indented to the definition's content column opens a
+            // nested list inside the definition (matches pandoc-native), even
+            // without a separating blank line.
+            let (raw_indent_cols, _) = leading_indent(raw_content);
+            if content_indent > 0 && raw_indent_cols >= content_indent {
+                return false;
+            }
         }
         if count_blockquote_markers(stripped_content).0 > 0 {
             return false;
