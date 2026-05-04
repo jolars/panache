@@ -21,6 +21,8 @@
 11
 12
 25
+190
+191
 
 # block
 13
@@ -35,6 +37,8 @@
 22
 23
 24
+188
+189
 
 # imported (machine-imported via scripts/import-pandoc-conformance-from-parser-fixtures.sh)
 26

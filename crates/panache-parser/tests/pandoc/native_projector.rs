@@ -738,9 +738,14 @@ fn figure_block(node: &SyntaxNode) -> Block {
             image_inline = Some(first);
         }
     }
-    let figure_attr = match &image_inline {
-        Some(Inline::Image(attr, _, _, _)) if !attr.id.is_empty() => Attr::with_id(attr.id.clone()),
-        _ => Attr::default(),
+    // Pandoc's `implicit_figures` migrates only the image's id to the Figure
+    // attr; the image keeps its classes and key-value pairs but loses the id.
+    let (figure_attr, image_inline) = match image_inline {
+        Some(Inline::Image(mut attr, alt_inlines, url, title)) if !attr.id.is_empty() => {
+            let fig_attr = Attr::with_id(std::mem::take(&mut attr.id));
+            (fig_attr, Some(Inline::Image(attr, alt_inlines, url, title)))
+        }
+        other => (Attr::default(), other),
     };
     let caption = if alt.is_empty() {
         Vec::new()
@@ -3372,7 +3377,10 @@ fn inline_from_node(node: &SyntaxNode) -> Inline {
                 .filter(|t| t.kind() == SyntaxKind::INLINE_CODE_CONTENT)
                 .map(|t| t.text().to_string())
                 .collect();
-            Inline::Code(Attr::default(), strip_inline_code_padding(&content))
+            Inline::Code(
+                extract_attr_from_node(node),
+                strip_inline_code_padding(&content),
+            )
         }
         SyntaxKind::LINK | SyntaxKind::IMAGE_LINK => {
             // LINK / IMAGE_LINK render through `push_inline_node` so reference

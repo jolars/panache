@@ -1,0 +1,29 @@
+[ Para
+    [ Str "A"
+    , Space
+    , Str "line"
+    , Space
+    , Str "with"
+    , Space
+    , Code ( "" , [ "c" ] , [] ) "printf(\"hi\")"
+    , Space
+    , Str "as"
+    , Space
+    , Str "a"
+    , Space
+    , Str "code"
+    , Space
+    , Str "span."
+    ]
+, Para
+    [ Str "Multiple"
+    , Space
+    , Code ( "cs1" , [ "raw" ] , [] ) "bit"
+    , Space
+    , Str "and"
+    , Space
+    , Code ( "" , [ "python" , "numberLines" ] , [] ) "chunks"
+    , Space
+    , Str "together."
+    ]
+]

@@ -1,0 +1,21 @@
+[ Para
+    [ Str "External"
+    , Space
+    , Link
+        ( "" , [ "external" ] , [ ( "title" , "ext" ) ] )
+        [ Str "link" ]
+        ( "https://example.com" , "" )
+    , Space
+    , Str "reference."
+    ]
+, Para
+    [ Str "Plain"
+    , Space
+    , Link
+        ( "link1" , [ "ref" ] , [ ( "key" , "value" ) ] )
+        [ Str "link" ]
+        ( "https://example.com" , "" )
+    , Space
+    , Str "too."
+    ]
+]

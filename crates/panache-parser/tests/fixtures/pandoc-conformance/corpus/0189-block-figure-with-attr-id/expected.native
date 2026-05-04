@@ -1,0 +1,15 @@
+[ Figure
+    ( "fig:label" , [] , [] )
+    (Caption
+       Nothing
+       [ Plain
+           [ Str "A" , Space , Str "captioned" , Space , Str "figure" ]
+       ])
+    [ Plain
+        [ Image
+            ( "" , [] , [] )
+            [ Str "A" , Space , Str "captioned" , Space , Str "figure" ]
+            ( "image.png" , "" )
+        ]
+    ]
+]

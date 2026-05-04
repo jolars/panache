@@ -1,0 +1,26 @@
+[ Para [ Str "First" , Space , Str "paragraph." ]
+, BlockQuote
+    [ Para
+        [ Str "Outer" , Space , Str "quote" , Space , Str "line." ]
+    , BlockQuote
+        [ Para [ Str "Inner" , Space , Str "quote." ]
+        , Para
+            [ Str "Inner"
+            , Space
+            , Str "second"
+            , Space
+            , Str "paragraph."
+            ]
+        ]
+    , Para
+        [ Str "Back"
+        , Space
+        , Str "to"
+        , Space
+        , Str "outer."
+        , SoftBreak
+        , Str "Continued."
+        ]
+    ]
+, Para [ Str "After." ]
+]
