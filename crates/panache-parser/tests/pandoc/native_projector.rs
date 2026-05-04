@@ -518,6 +518,9 @@ struct TableData {
     widths: Vec<Option<f64>>,
     head_rows: Vec<Vec<Vec<Block>>>,
     body_rows: Vec<Vec<Vec<Block>>>,
+    /// Footer rows. Currently only populated for grid tables with a
+    /// trailing `+===+===+` separator before the final body row(s).
+    foot_rows: Vec<Vec<Vec<Block>>>,
 }
 
 #[derive(Debug)]
@@ -1309,6 +1312,7 @@ fn pipe_table(node: &SyntaxNode) -> Option<TableData> {
         widths: vec![None; cols],
         head_rows,
         body_rows,
+        foot_rows: Vec::new(),
     })
 }
 
@@ -1553,6 +1557,7 @@ fn simple_table(node: &SyntaxNode) -> Option<TableData> {
         widths: vec![None; cols.len()],
         head_rows,
         body_rows,
+        foot_rows: Vec::new(),
     })
 }
 
@@ -1673,6 +1678,12 @@ fn simple_table_aligns(row: &SyntaxNode, cols: &[(usize, usize)]) -> Vec<&'stati
 /// rules as pipe tables. We use the *first* alignment-bearing separator —
 /// the one immediately following the header — as the canonical alignment;
 /// pandoc falls back to `AlignDefault` when no separator carries colons.
+///
+/// Cells slice the row's text by the `+`-derived column ranges from the
+/// first separator and reparse each column's content as block-level
+/// markdown. This preserves multi-line content (joined by `\n`) so
+/// `Population\<NL>(in 2018)` becomes `[Str "Population", LineBreak, ...]`
+/// and indented-by-4 cell content like `      B` becomes a `CodeBlock`.
 fn grid_table(node: &SyntaxNode) -> Option<TableData> {
     let first_sep = node
         .children()
@@ -1682,6 +1693,7 @@ fn grid_table(node: &SyntaxNode) -> Option<TableData> {
     if cols == 0 {
         return None;
     }
+    let col_ranges = grid_column_ranges(&first_sep);
     // Alignment separator: scan all separators, prefer one with `:` markers.
     let mut aligns: Vec<&'static str> = vec!["AlignDefault"; cols];
     for sep in node
@@ -1698,16 +1710,18 @@ fn grid_table(node: &SyntaxNode) -> Option<TableData> {
         .children()
         .find(|c| c.kind() == SyntaxKind::TABLE_HEADER);
     let head_rows = match &header {
-        Some(h) => {
-            let cells = grid_row_cells(h);
-            vec![cells_to_plain_blocks(cells, cols)]
-        }
+        Some(h) => vec![grid_row_cells_blocks(h, &col_ranges, cols)],
         None => Vec::new(),
     };
     let body_rows: Vec<Vec<Vec<Block>>> = node
         .children()
         .filter(|c| c.kind() == SyntaxKind::TABLE_ROW)
-        .map(|r| cells_to_plain_blocks(grid_row_cells(&r), cols))
+        .map(|r| grid_row_cells_blocks(&r, &col_ranges, cols))
+        .collect();
+    let foot_rows: Vec<Vec<Vec<Block>>> = node
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::TABLE_FOOTER)
+        .map(|r| grid_row_cells_blocks(&r, &col_ranges, cols))
         .collect();
     // Caption: a TABLE_CAPTION child of the GRID_TABLE.
     let caption_inlines = node
@@ -1723,14 +1737,111 @@ fn grid_table(node: &SyntaxNode) -> Option<TableData> {
         widths: widths.into_iter().map(Some).collect(),
         head_rows,
         body_rows,
+        foot_rows,
     })
 }
 
-fn grid_row_cells(row: &SyntaxNode) -> Vec<Vec<Inline>> {
-    row.children()
-        .filter(|c| c.kind() == SyntaxKind::TABLE_CELL)
-        .map(|cell| coalesce_inlines(inlines_from(&cell)))
+/// Compute (start_char, end_char) inclusive ranges for each grid table
+/// column based on `+` positions in a separator. Empty ranges (consecutive
+/// `+`s) are skipped — those represent rowspan/colspan separators we don't
+/// model yet.
+fn grid_column_ranges(separator: &SyntaxNode) -> Vec<(usize, usize)> {
+    let raw = separator.text().to_string();
+    let line = raw.trim_end_matches(['\n', '\r']);
+    let plus_chars: Vec<usize> = line
+        .chars()
+        .enumerate()
+        .filter_map(|(i, ch)| if ch == '+' { Some(i) } else { None })
+        .collect();
+    plus_chars
+        .windows(2)
+        .filter_map(|w| {
+            if w[1] > w[0] + 1 {
+                Some((w[0] + 1, w[1] - 1))
+            } else {
+                None
+            }
+        })
         .collect()
+}
+
+/// Slice each line of a grid-table row by column ranges, then per column
+/// strip the 1-char `| ` padding (one leading space) and trailing
+/// whitespace, join lines with `\n`, and reparse the joined text as
+/// block-level markdown via panache. `cols` is the column count from
+/// `grid_dash_widths` (used to pad short rows so cell ordering matches).
+fn grid_row_cells_blocks(
+    row: &SyntaxNode,
+    col_ranges: &[(usize, usize)],
+    cols: usize,
+) -> Vec<Vec<Block>> {
+    let raw = row.text().to_string();
+    let lines: Vec<&str> = raw.split_inclusive('\n').collect();
+    let mut col_lines: Vec<Vec<String>> = vec![Vec::new(); col_ranges.len()];
+    for line in lines {
+        let line_no_nl = line.trim_end_matches('\n');
+        if line_no_nl.is_empty() {
+            continue;
+        }
+        for (i, &(cs, ce)) in col_ranges.iter().enumerate() {
+            let slice = char_slice(line_no_nl, cs, ce + 1);
+            // Strip exactly one leading space (the padding inside `| `).
+            // If the cell is empty (just spaces) the slice will trim to "".
+            let stripped = slice.strip_prefix(' ').unwrap_or(slice);
+            // Trim trailing whitespace; keep leading whitespace beyond the
+            // padding so a 4-space-indented cell projects as a CodeBlock.
+            let trimmed = stripped.trim_end();
+            col_lines[i].push(trimmed.to_string());
+        }
+    }
+    let mut out: Vec<Vec<Block>> = col_lines
+        .into_iter()
+        .map(|segments| {
+            // Trim leading and trailing all-empty lines.
+            let first = segments.iter().position(|s| !s.is_empty());
+            let last = segments.iter().rposition(|s| !s.is_empty());
+            let trimmed: &[String] = match (first, last) {
+                (Some(f), Some(l)) => &segments[f..=l],
+                _ => return Vec::new(),
+            };
+            let joined = trimmed.join("\n");
+            parse_cell_text_blocks(&joined)
+        })
+        .collect();
+    while out.len() < cols {
+        out.push(Vec::new());
+    }
+    out
+}
+
+/// Parse cell text as block-level markdown via panache and convert
+/// top-level `Para` to `Plain` (pandoc's grid-table cell rule). Other
+/// block kinds (CodeBlock, BulletList, BlockQuote, etc.) round-trip as-is.
+fn parse_cell_text_blocks(text: &str) -> Vec<Block> {
+    if text.trim().is_empty() {
+        return Vec::new();
+    }
+    let opts = panache_parser::ParserOptions {
+        flavor: panache_parser::Flavor::Pandoc,
+        dialect: panache_parser::Dialect::for_flavor(panache_parser::Flavor::Pandoc),
+        extensions: panache_parser::Extensions::for_flavor(panache_parser::Flavor::Pandoc),
+        ..panache_parser::ParserOptions::default()
+    };
+    let doc = panache_parser::parse(text, Some(opts));
+    let mut out = Vec::new();
+    for child in doc.children() {
+        if let Some(block) = block_from(&child) {
+            // Pandoc grid-table cells emit `Plain` for paragraph-only
+            // content; only explicit block constructs (code, list,
+            // blockquote, ...) keep their block kind.
+            let block = match block {
+                Block::Para(inlines) => Block::Plain(inlines),
+                other => other,
+            };
+            out.push(block);
+        }
+    }
+    out
 }
 
 /// Compute per-column widths from a grid-table separator like
@@ -1883,6 +1994,7 @@ fn multiline_table(node: &SyntaxNode) -> Option<TableData> {
         widths: widths.into_iter().map(Some).collect(),
         head_rows,
         body_rows,
+        foot_rows: Vec::new(),
     })
 }
 
@@ -3656,7 +3768,15 @@ fn write_table(data: &TableData, out: &mut String) {
         out.push(' ');
         write_table_row(row, out);
     }
-    out.push_str(" ] ] ( TableFoot ( \"\" , [ ] , [ ] ) [ ] )");
+    out.push_str(" ] ] ( TableFoot ( \"\" , [ ] , [ ] ) [");
+    for (i, row) in data.foot_rows.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push(' ');
+        write_table_row(row, out);
+    }
+    out.push_str(" ] )");
 }
 
 fn write_table_row(cells: &[Vec<Block>], out: &mut String) {

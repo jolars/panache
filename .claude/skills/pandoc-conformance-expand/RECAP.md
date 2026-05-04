@@ -15,16 +15,17 @@ count of currently-failing imports remaining under that bucket in the latest
    Most citation-bearing cases pass via Example-list carve-out; #38 is the
    single remaining real-citation showcase. Smaller leverage than the \~14
    occurrence count would suggest (one case, not many).
-2. **Tables --- remaining (\~3)** --- Simple/Multiline/Headerless basics landed
-   plus multiline inline-formatting, short-header, and
-   indented-pipe-table-with-caption-attributes (+12 cases). What remains:
-   - **#68/#70/#71** (grid_table) --- grid cells need block-level reparse (e.g.
-     `B` → CodeBlock, multi-line cells → SoftBreak/LineBreak, complex span
-     tables); requires running panache's block parser on each cell's content.
-     #71 also has rowspan/colspan layout. Heavy. The new
-     `parse_cell_text_inlines` helper proves the inline-reparse pattern; an
-     analogous block-reparse helper using `panache_parser::parse` and walking
-     children for blocks would unlock these.
+2. **Tables --- remaining (\~1)** --- Simple/Multiline/Headerless basics
+   landed, plus multiline inline-formatting, short-header,
+   indented-pipe-table-with-caption-attributes, **grid_table multi-line
+   cells / TableFoot / block-reparse (DONE 2026-05-03 — unlocked #68 and
+   #70)**. What remains:
+   - **#71** (grid_table_planets) --- rowspan/colspan layout. Pandoc emits
+     `RowSpan N` / `ColSpan N` for cells whose `+   +-----+`-style
+     separators omit the column-divider `+` to span the cell into the next
+     row, and similarly for column merges. Our `grid_column_ranges`
+     helper currently skips empty `+`-to-`+` ranges (which represent
+     spans), so spanned cells produce wrong column ordering. Heavy.
 3. **Footnotes --- DefinitionList-inside-Note (DONE 2026-05-03)** --- both #66
    and #67 unlocked. Parser-shape fix in `handle_footnote_open_effect` to
    detect that the first content line is a term, plus a continuation-policy
@@ -127,8 +128,91 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-03 (HTML comment paragraph-interrupt gated by dialect;
-  directive system extended to INLINE_HTML)
+- **Date**: 2026-05-03 (Grid-table multi-line cells + TableFoot via
+  block-reparse projector path)
+- **Pass before → after**: 177 → 179 / 187 (+2 imports: #68, #70).
+  Projector-only fix: `grid_table()` now slices each row's text by
+  `+`-derived column ranges (one per column, via new
+  `grid_column_ranges` helper), strips the `| ` 1-space padding, joins
+  multi-line content per column with `\n`, and reparses the joined text
+  as block-level Pandoc markdown via the new `parse_cell_text_blocks`.
+  This unlocks: (a) `Population\<NL>(in 2018)` projecting as
+  `Plain [Str "Population", LineBreak, Str "(in", Space, Str "2018)"]`
+  for #70's multi-line header cells; (b) `      B` (5+ leading spaces
+  after padding strip) projecting as `CodeBlock ("",[],[]) " B"` for
+  #68's table 2; (c) the existing `Plain [Str "X"]` shape for ordinary
+  cells (Para → Plain conversion in `parse_cell_text_blocks`).
+  TableFoot rendering also added: `TableData` got a `foot_rows` field;
+  `grid_table()` collects `TABLE_FOOTER` children alongside
+  `TABLE_HEADER` and `TABLE_ROW`; `write_table()` emits foot rows
+  inside the previously-empty `( TableFoot ( "" , [ ] , [ ] ) [ ] )`
+  slot. Pipe / simple / multiline tables initialize `foot_rows` to
+  `Vec::new()` since none currently expose footer rows.
+  CommonMark allowlist green; pandoc allowlist green; full
+  parser-crate suite green; full workspace tests green; clippy + fmt
+  clean.
+- **What landed**:
+  - **Projector: TableData gets `foot_rows`
+    (`crates/panache-parser/tests/pandoc/native_projector.rs`)** — new
+    field; pipe/simple/multiline TableData constructors initialize to
+    `Vec::new()`. `write_table()` now emits foot rows in the
+    `TableFoot ( "" , [ ] , [ ] ) [ <rows> ]` slot.
+  - **Projector: `grid_table` switched to multi-line slicing
+    (same file)** — replaced the `grid_row_cells` (TABLE_CELL-only,
+    inline-coalescing) helper with `grid_row_cells_blocks` that:
+    splits the row's `.text()` by `\n`, slices each line by char
+    ranges from `grid_column_ranges`, strips one leading space (cell
+    padding), trims trailing whitespace, joins surviving lines with
+    `\n`, and reparses via `parse_cell_text_blocks`. Top-level Para
+    inside a cell becomes Plain (pandoc grid-cell rule); other block
+    kinds (CodeBlock, BulletList, ...) round-trip as-is.
+  - **Projector: TABLE_FOOTER children are now collected** as
+    `foot_rows` using the same row helper, so #70's `Total` row lands
+    in the table foot rather than being dropped.
+- **Cases unlocked** (+2, allowlisted under `# imported`):
+  - 68 (imported-grid_table)
+  - 70 (imported-grid_table_nordics)
+- **Files changed (classified)**:
+  - **projector**:
+    `crates/panache-parser/tests/pandoc/native_projector.rs`
+    (TableData.foot_rows; new helpers `grid_column_ranges`,
+    `grid_row_cells_blocks`, `parse_cell_text_blocks`; rewrote
+    `grid_table()`; updated `write_table()`)
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+2: 68
+    inserted between 67 and 69, 70 inserted between 69 and 72, both
+    under `# imported`)
+- **Don't redo**:
+  - `grid_column_ranges` skips empty `+`-to-`+` segments (cases where
+    two `+` characters are adjacent or only whitespace separates them).
+    These represent rowspan/colspan separators in #71 — see Suggested
+    next targets entry under "Tables — remaining". Don't fold #71's
+    span handling into this helper without a new layout model;
+    `grid_row_cells_blocks` would also need to assign cells to the
+    correct columns when rows have fewer cells than the column count.
+  - `parse_cell_text_blocks` always converts top-level `Para` to
+    `Plain`. This is correct for grid (and pipe) table cells where
+    pandoc emits Plain rather than Para, but **don't** reuse this
+    helper for blockquote / list-item / footnote-definition contexts
+    — there pandoc DOES use Para. If you need a generic block-reparse,
+    add a separate helper instead of generalizing this one.
+  - The cell padding strip is "exactly one leading space" via
+    `strip_prefix(' ')`. Don't switch to `trim_start()` or it will
+    eat the 4+ leading spaces that signal an indented code block
+    inside a cell (e.g. #68's `|      B |` → `CodeBlock " B"`).
+  - The header is detected via the *first* `TABLE_SEPARATOR` child
+    for column-range purposes. If pandoc ever changes which separator
+    defines column widths for grid tables, only the canonical-aligns
+    selection needs to update — the column-range derivation is
+    independent (always uses first separator's `+` positions).
+  - The previous `grid_row_cells(row)` helper was deleted entirely;
+    the multi-line path is the only path now. If a regression appears
+    where a complex inline construct (e.g. nested emphasis spanning a
+    cell) re-projects differently, the fix is in
+    `parse_cell_text_blocks`, NOT to bring back the old
+    inlines-from-CST helper.
+
+## Earlier session (2026-05-03, HTML comment paragraph-interrupt gated by dialect; directive system extended to INLINE_HTML)
 - **Pass before → after**: 176 → 177 / 187 (+1 import: #79).
   Parser-shape fix: under `Dialect::Pandoc`, an HTML comment (Type 2) no
   longer interrupts a paragraph — `\n<!-- ... -->\n` between two
