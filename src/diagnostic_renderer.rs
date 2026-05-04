@@ -71,7 +71,7 @@ pub(crate) fn print_diagnostics(
             print_subdiag(
                 "help",
                 &format!(
-                    "for further information visit https://jolars.github.io/panache/linting.html#{}",
+                    "for further information visit https://panache.bz/reference/linter-rules.html#{}",
                     diag.code
                 ),
             );
