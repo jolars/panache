@@ -7,78 +7,47 @@ state; this file is judgment calls only.
 
 Ranked by likely shared root cause and leverage. Numbers in parentheses are the
 count of currently-failing imports remaining under that bucket in the latest
-`report.txt`.
+`report.txt`. 4 imports remain failing total (183 / 187 passing).
 
-1. **Citations proper (DONE 2026-05-04 --- #38 unlocked)**. Projector
-   now emits full `Cite [Citation { citationId, citationPrefix,
-   citationSuffix, citationMode, citationNoteNum, citationHash }]
-   [Inline]` shape with prefix/suffix inline parsing (smart-typography
-   applied), `@key [locator]` AuthorInText absorption via
-   `inlines_from`-level look-ahead, and a doc-order `noteNum` pre-pass
-   that increments per Cite group outside footnotes and once per
-   FOOTNOTE_REFERENCE entry (all cites inside a footnote share that
-   number).
-2. **Tables --- remaining (\~1)** --- Simple/Multiline/Headerless basics
-   landed, plus multiline inline-formatting, short-header,
-   indented-pipe-table-with-caption-attributes, **grid_table multi-line
-   cells / TableFoot / block-reparse (DONE 2026-05-03 — unlocked #68 and
-   #70)**. What remains:
-   - **#71** (grid_table_planets) --- rowspan/colspan layout. Pandoc emits
-     `RowSpan N` / `ColSpan N` for cells whose `+   +-----+`-style
-     separators omit the column-divider `+` to span the cell into the next
-     row, and similarly for column merges. Our `grid_column_ranges`
-     helper currently skips empty `+`-to-`+` ranges (which represent
-     spans), so spanned cells produce wrong column ordering. Heavy.
-3. **Footnotes --- DefinitionList-inside-Note (DONE 2026-05-03)** --- both #66
-   and #67 unlocked. Parser-shape fix in `handle_footnote_open_effect` to
-   detect that the first content line is a term, plus a continuation-policy
-   fix so blank lines inside a footnote-body don't close the
-   DefinitionList/DefinitionItem when the next `:` marker still sits at the
-   footnote's content column. Companion formatter arm added for the new
-   `FOOTNOTE_DEFINITION > DEFINITION_LIST` first-child shape so the term
-   stays on the same line as `[^id]:`.
-4. **Definition list nesting (\~1 --- case #43)** ---
-   `definition_list`. #44 unlocked 2026-05-03 (parent-LIST WHITESPACE
-   added to `list_item_content_offset`). #43 still has parser-shape
-   issues where nested bullets inside definitions aren't parsed as
-   `BulletList` in *some* contexts (the bare-leading-list path now
-   handles the simple case but the `Orange\n: > a / : - List with lazy
-   continuation` paths inside #43 still fail).
-5. **HTML blocks / fenced divs with raw HTML adjacency (DONE 2026-05-04 ---
-   #181 unlocked)**. Projector now splits multi-line block-level HTML
-   blocks per line via `emit_html_block`: tag-only lines emit as RawBlock,
-   inline-text lines emit as Plain (with parsed inlines). Verbatim
-   constructs (`<!-- -->` comments, `<script>`, `<style>`, `<pre>`,
-   `<textarea>`, processing instructions, declarations) still emit as a
-   single RawBlock with newlines preserved. `<div ...>...</div>` keeps
-   its existing `try_div_html_block` path (Div block). Multi-tag-on-one-
-   line splitting (e.g. `<tr><td>foo</td></tr>` on one line — pandoc
-   splits into 4 RawBlocks + 1 Plain) is NOT yet supported; the line is
-   treated as one inline-text line. Acceptable for #181 since each tag
-   sits on its own line in the input.
-6. **Block-level cases where parser splits paragraphs around inline HTML
-   comments --- DONE 2026-05-03 (#79 unlocked)**. Parser dispatcher gates
-   Comment Type-2 paragraph-interrupt on `Dialect::CommonMark`; under
-   Pandoc, an `<!-- ... -->` line abutting a paragraph stays inline as
-   `INLINE_HTML` rather than splitting into `HTML_BLOCK`. Companion
-   formatter changes wire the directive system (panache-ignore-*) to also
-   recognize INLINE_HTML directives so existing ignore-region tests still
-   work — see Don't-redo entry on `collect_inline_directives`.
-7. **Misc remaining**:
-   - **Same-line BLOCK_QUOTE marker (#93, #108) --- DONE 2026-05-03**.
-     Parser ungated for Pandoc; companion `format_list_item`
-     leading-BLOCK_QUOTE arm added so the LIST_MARKER survives
-     round-trip. The previously-feared `BlockQuote::depth()`
-     over-count for outer-BQ contexts (#108) didn't actually block
-     conformance: the projector renders from the CST, which is now
-     correctly nested, so the projector match works regardless of
-     whether the formatter's depth path is right. (If a formatter
-     idempotency case for `> 1. > foo\n> bar` shows up later, the
-     depth offset will need to land then.)
-   - Other blockquote/list/definition-list nesting cases (#34,
-     #91, #96) where blank lines or lazy continuation cross
-     container boundaries differently from pandoc.
-     Parser-shape gaps in continuation policy.
+1. **Tables --- #71 grid_table_planets (1)** --- rowspan/colspan layout.
+   Pandoc emits `RowSpan N` / `ColSpan N` for cells whose `+   +-----+`-style
+   separators omit the column-divider `+` to span the cell into the next
+   row, and similarly for column merges. Our `grid_column_ranges` helper
+   currently skips empty `+`-to-`+` ranges (which represent spans), so
+   spanned cells produce wrong column ordering. Heavy — needs a layout
+   model that assigns cells to specific columns and tracks RowSpan/ColSpan
+   counts per cell.
+
+2. **Definition list nesting --- #43 (1)** --- `definition_list`. Nested
+   bullets inside definitions aren't parsed as `BulletList` in *some*
+   contexts (the bare-leading-list path handles the simple case but the
+   `Orange\n: > a / : - List with lazy continuation` paths inside #43
+   still fail). Parser-shape gap in definition-list continuation across
+   blockquote/list-marker lines.
+
+3. **Continuation policy across container boundaries --- #91, #96 (2)**
+   --- where lazy continuation or sibling-list-item handling crosses
+   blockquote/list boundaries differently from pandoc.
+   - **#91** (`-  > -` siblings + indented `   > -` continuation):
+     parser merges item content into one BlockQuote/Para instead of
+     splitting into 3 outer items each containing a BlockQuote with an
+     inner BulletList.
+   - **#96** (lazy continuation across deep nesting): the
+     `> - This is a list item with\nlazy continuation...` lines get
+     split into a sibling Para outside the BQ instead of staying as
+     SoftBreak-joined PLAIN inside the list item.
+
+   Probably *not* a single shared fix. #91 wants recursion of
+   list-marker detection inside BQ-content-followed-by-`-` siblings;
+   #96 wants no-`>`-prefix lazy continuation to stay inside the
+   inner-BQ list item. Pick whichever has the simpler entrance.
+
+Suggested first session: **#1 (Tables — #71)** is the single
+remaining "feature" gap (rowspan/colspan in grid tables); the rest are
+parser continuation-policy gaps. If the rowspan model is too heavy for
+one session, **#2 (#43)** is bounded — it's the same definition-list
+continuation family that produced #44 in 2026-05-03, just one more
+context to handle.
 
 Suggested first session: **#1 (Citations proper)** is still the largest
 single-fix unlock (14 cases) and the heaviest projector entry. After
@@ -136,7 +105,81 @@ that, the table buckets (#2) are the next largest leverage.
 
 ## Latest session
 
-- **Date**: 2026-05-04 (Citations proper — `Cite [Citation, ...] [Inline,
+- **Date**: 2026-05-04 (Blank-line peek-loop inside blockquote: skip
+  blank-in-BQ lines so multi-blank-then-continuation list items don't
+  prematurely close)
+- **Pass before → after**: 182 → 183 / 187 (+1 import: #34). Parser-shape
+  fix: in `parse_line`'s blank-line branch in `core.rs`, the peek-ahead
+  loop that skips trailing blank lines now also skips lines that are
+  functionally blank in the current blockquote context (e.g. `>` or
+  `>   ` when inside a `> ` blockquote). Previously the loop only used
+  `is_blank_line(self.lines[peek])`, which treats `>\n` as non-blank;
+  the next-line context fed to `compute_levels_to_keep` was therefore a
+  blank-in-BQ line with `raw_indent_cols=0`, prompting the policy to
+  close the parent List+ListItem prematurely. The fix peels off
+  `bq_depth` markers via `strip_n_blockquote_markers` and skips when
+  the inner content `is_blank_line`. CommonMark allowlist green;
+  pandoc allowlist green; full parser-crate suite green; full
+  workspace tests green; clippy + fmt clean.
+- **What landed**:
+  - **Parser: blank-line peek skips blank-in-BQ lines
+    (`crates/panache-parser/src/parser/core.rs` blank-line branch in
+    `parse_line`)** — replaced the simple `while is_blank_line(...)`
+    peek loop with one that also skips lines whose
+    `strip_n_blockquote_markers(line, bq_depth)` is blank, when
+    `bq_depth > 0` and `peek_bq >= bq_depth`. The depth condition
+    avoids skipping a `<` -depth line (which is a real BQ-close
+    event).
+  - **Snapshot regeneration**: 1 parser CST snapshot updated to
+    reflect the new shape — `parser_cst_blockquote_list_blockquote`
+    now shows the LIST containing two `LIST_ITEM`s (instead of one
+    item + a sibling PARAGRAPH + a second LIST). The previous
+    snapshot was an "accept current state" capture, not a deliberate
+    pin.
+  - **Formatter golden update**: `tests/fixtures/cases/blockquote_list_blockquote/expected.md`
+    regenerated. The new formatted output indents `Back to list item
+    content` to match the (now-correct) list-item continuation, and
+    is idempotent.
+- **Cases unlocked** (+1, allowlisted under `# imported`):
+  - 34 (imported-blockquote_list_blockquote)
+- **Files changed (classified)**:
+  - **parser-shape**:
+    `crates/panache-parser/src/parser/core.rs` (blank-line peek
+    loop)
+  - **snapshot**:
+    `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_blockquote_list_blockquote.snap`
+  - **formatter golden**:
+    `tests/fixtures/cases/blockquote_list_blockquote/expected.md`
+  - **allowlist**:
+    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 34
+    inserted between 33 and 35, under `# imported`)
+- **Don't redo**:
+  - The peek-loop guard requires both `peek_bq >= bq_depth` AND
+    `is_blank_line(peek_inner)` to skip. Don't drop the depth check —
+    a line with `peek_bq < bq_depth` (e.g. plain text after BQ close,
+    or `>` instead of `> >`) is a real container-close event that
+    `compute_levels_to_keep` needs to see. Skipping it would silently
+    keep deeper containers open across BQ boundaries.
+  - The check uses `bq_depth` (current line's BQ depth) rather than
+    `current_bq_depth` (container-stack depth). For the blank-in-BQ
+    case both happen to match because the current line carries `>`
+    markers and `current_bq_depth` reflects the open BQ container.
+    If a divergence shows up (e.g. shifted blockquote prefixes inside
+    list-item content), revisit this — but for now `bq_depth` is the
+    natural "what depth is this `>` line at" signal.
+  - The previous fixture snapshot for `blockquote_list_blockquote`
+    pinned the broken shape. It WAS a known-broken pin (recap noted
+    it). The new snapshot pins pandoc-correct shape: LIST with two
+    LIST_ITEMs (first contains both segments, second contains only
+    "Second list item"). Don't revert.
+  - Cases #91 and #96 still fail. Both involve different
+    continuation-policy issues (lazy continuation across blockquote
+    depth boundaries; list-item closure mid-blockquote). The
+    blank-in-BQ peek fix doesn't help them — they involve real
+    non-blank lines whose ContinuationPolicy outcome differs from
+    pandoc.
+
+## Earlier session (2026-05-04, Citations proper — `Cite [Citation, ...] [Inline,
   ...]` projection with prefix/suffix inline parsing, `@key [locator]`
   AuthorInText absorption, and doc-order noteNum pre-pass)
 - **Pass before → after**: 181 → 182 / 187 (+1 import: #38). Projector-only
@@ -401,317 +444,18 @@ that, the table buckets (#2) are the next largest leverage.
     contents that need block-level reparse). `parse_cell_text_blocks`
     keeps the Para→Plain conversion specific to grid/pipe table cells.
 
-## Earlier session (2026-05-03, Grid-table multi-line cells + TableFoot via
-  block-reparse projector path)
-- **Pass before → after**: 177 → 179 / 187 (+2 imports: #68, #70).
-  Projector-only fix: `grid_table()` now slices each row's text by
-  `+`-derived column ranges (one per column, via new
-  `grid_column_ranges` helper), strips the `| ` 1-space padding, joins
-  multi-line content per column with `\n`, and reparses the joined text
-  as block-level Pandoc markdown via the new `parse_cell_text_blocks`.
-  This unlocks: (a) `Population\<NL>(in 2018)` projecting as
-  `Plain [Str "Population", LineBreak, Str "(in", Space, Str "2018)"]`
-  for #70's multi-line header cells; (b) `      B` (5+ leading spaces
-  after padding strip) projecting as `CodeBlock ("",[],[]) " B"` for
-  #68's table 2; (c) the existing `Plain [Str "X"]` shape for ordinary
-  cells (Para → Plain conversion in `parse_cell_text_blocks`).
-  TableFoot rendering also added: `TableData` got a `foot_rows` field;
-  `grid_table()` collects `TABLE_FOOTER` children alongside
-  `TABLE_HEADER` and `TABLE_ROW`; `write_table()` emits foot rows
-  inside the previously-empty `( TableFoot ( "" , [ ] , [ ] ) [ ] )`
-  slot. Pipe / simple / multiline tables initialize `foot_rows` to
-  `Vec::new()` since none currently expose footer rows.
-  CommonMark allowlist green; pandoc allowlist green; full
-  parser-crate suite green; full workspace tests green; clippy + fmt
-  clean.
-- **What landed**:
-  - **Projector: TableData gets `foot_rows`
-    (`crates/panache-parser/tests/pandoc/native_projector.rs`)** — new
-    field; pipe/simple/multiline TableData constructors initialize to
-    `Vec::new()`. `write_table()` now emits foot rows in the
-    `TableFoot ( "" , [ ] , [ ] ) [ <rows> ]` slot.
-  - **Projector: `grid_table` switched to multi-line slicing
-    (same file)** — replaced the `grid_row_cells` (TABLE_CELL-only,
-    inline-coalescing) helper with `grid_row_cells_blocks` that:
-    splits the row's `.text()` by `\n`, slices each line by char
-    ranges from `grid_column_ranges`, strips one leading space (cell
-    padding), trims trailing whitespace, joins surviving lines with
-    `\n`, and reparses via `parse_cell_text_blocks`. Top-level Para
-    inside a cell becomes Plain (pandoc grid-cell rule); other block
-    kinds (CodeBlock, BulletList, ...) round-trip as-is.
-  - **Projector: TABLE_FOOTER children are now collected** as
-    `foot_rows` using the same row helper, so #70's `Total` row lands
-    in the table foot rather than being dropped.
-- **Cases unlocked** (+2, allowlisted under `# imported`):
-  - 68 (imported-grid_table)
-  - 70 (imported-grid_table_nordics)
-- **Files changed (classified)**:
-  - **projector**:
-    `crates/panache-parser/tests/pandoc/native_projector.rs`
-    (TableData.foot_rows; new helpers `grid_column_ranges`,
-    `grid_row_cells_blocks`, `parse_cell_text_blocks`; rewrote
-    `grid_table()`; updated `write_table()`)
-  - **allowlist**:
-    `crates/panache-parser/tests/pandoc/allowlist.txt` (+2: 68
-    inserted between 67 and 69, 70 inserted between 69 and 72, both
-    under `# imported`)
-- **Don't redo**:
-  - `grid_column_ranges` skips empty `+`-to-`+` segments (cases where
-    two `+` characters are adjacent or only whitespace separates them).
-    These represent rowspan/colspan separators in #71 — see Suggested
-    next targets entry under "Tables — remaining". Don't fold #71's
-    span handling into this helper without a new layout model;
-    `grid_row_cells_blocks` would also need to assign cells to the
-    correct columns when rows have fewer cells than the column count.
-  - `parse_cell_text_blocks` always converts top-level `Para` to
-    `Plain`. This is correct for grid (and pipe) table cells where
-    pandoc emits Plain rather than Para, but **don't** reuse this
-    helper for blockquote / list-item / footnote-definition contexts
-    — there pandoc DOES use Para. If you need a generic block-reparse,
-    add a separate helper instead of generalizing this one.
-  - The cell padding strip is "exactly one leading space" via
-    `strip_prefix(' ')`. Don't switch to `trim_start()` or it will
-    eat the 4+ leading spaces that signal an indented code block
-    inside a cell (e.g. #68's `|      B |` → `CodeBlock " B"`).
-  - The header is detected via the *first* `TABLE_SEPARATOR` child
-    for column-range purposes. If pandoc ever changes which separator
-    defines column widths for grid tables, only the canonical-aligns
-    selection needs to update — the column-range derivation is
-    independent (always uses first separator's `+` positions).
-  - The previous `grid_row_cells(row)` helper was deleted entirely;
-    the multi-line path is the only path now. If a regression appears
-    where a complex inline construct (e.g. nested emphasis spanning a
-    cell) re-projects differently, the fix is in
-    `parse_cell_text_blocks`, NOT to bring back the old
-    inlines-from-CST helper.
-
-## Earlier session (2026-05-03, HTML comment paragraph-interrupt gated by dialect; directive system extended to INLINE_HTML)
-- **Pass before → after**: 176 → 177 / 187 (+1 import: #79).
-  Parser-shape fix: under `Dialect::Pandoc`, an HTML comment (Type 2) no
-  longer interrupts a paragraph — `\n<!-- ... -->\n` between two
-  paragraph lines stays as `INLINE_HTML` instead of splitting into a
-  sibling `HTML_BLOCK`. CommonMark dialect retains the existing
-  paragraph-interrupting behavior (CommonMark §4.6 allows Type 2 to
-  interrupt). Companion formatter work: the panache-ignore directive
-  system now also extracts directives from `INLINE_HTML` nodes, so
-  ignore-format/lint regions still close correctly when the END marker
-  inlines into the surrounding paragraph. CommonMark allowlist green;
-  pandoc allowlist green; full workspace tests green; clippy + fmt clean.
-- **What landed**:
-  - **Parser: dialect-gate Comment paragraph-interrupt
-    (`crates/panache-parser/src/parser/block_dispatcher.rs`)** — in
-    `HtmlBlockParser::detect_prepared`, mark Comment as
-    `cannot_interrupt` when `dialect == Dialect::Pandoc`, mirroring
-    Type 7. With `has_blank_before || at_document_start`, comments
-    still emit as `HTML_BLOCK`; otherwise return None and let the
-    paragraph absorb the comment line, where `try_parse_inline_html`
-    later picks it up as `INLINE_HTML`.
-  - **Formatter: directive extraction now accepts `INLINE_HTML`
-    (`crates/panache-formatter/src/directives.rs` and the top-level
-    duplicate at `src/directives.rs`)** — `extract_directive_from_node`
-    additionally matches `SyntaxKind::INLINE_HTML`. New helper
-    `collect_inline_directives(node)` scans descendants for
-    INLINE_HTML directives in document order; only added to the
-    formatter crate (the linter walks via `preorder()` and picks up
-    INLINE_HTML directives directly through `extract_directive_from_node`).
-  - **Formatter: paragraph/plain inline-directive handling
-    (`crates/panache-formatter/src/formatter/core.rs`)** — at
-    `format_node_sync` entry, after the existing ignored-mode
-    short-circuit, two new branches:
-    1. If we're in ignored mode and the verbatim node contains
-       INLINE_HTML directives, replay them in the tracker AFTER
-       outputting verbatim (so subsequent blocks see the END's
-       transition).
-    2. If the node is a `PARAGRAPH | PLAIN` carrying inline
-       directives that AFFECT FORMATTING (ignore-format / ignore-both),
-       output the whole node verbatim and replay all directives.
-       Lint-only directives don't need verbatim output: replay them
-       upfront and fall through to the normal render path (lint state
-       doesn't change rendering).
-  - **Formatter: list item content with inline format-directive
-    (`crates/panache-formatter/src/formatter/lists.rs`)** — list-item
-    content goes through its own wrap pipeline (`inline_layout::
-    wrapped_lines_for_node`), not `format_node_sync`. Added
-    `content_has_format_directive` check that, when true, populates
-    `preserve_lines` with the verbatim content lines (mirroring the
-    `WrapMode::Preserve` path) so multi-space content between an
-    inline START and END isn't reflowed.
-  - **New parser fixtures (paired)**:
-    `crates/panache-parser/tests/fixtures/cases/html_comment_after_paragraph_pandoc/`
-    and `..._commonmark/` — pin the dialect divergence: same `input.md`
-    (Para line + comment line + Para line + standalone comment + Para
-    line + trailing comment), different `parser-options.toml`. Pandoc
-    snapshot has comments inline within paragraphs except the
-    blank-separated standalone; CommonMark snapshot has every comment
-    as a sibling `HTML_BLOCK`.
-  - **Snapshot regeneration**: 1 parser CST snapshot updated to reflect
-    the new shape — `parser_cst_ignore_directives.snap` (the parser's
-    own ignore_directives fixture) where four formerly-HTML_BLOCK
-    comments now sit inline as INLINE_HTML inside their surrounding
-    PARAGRAPH/PLAIN. The two new fixtures' snapshots are net-new.
-- **Cases unlocked** (+1, allowlisted under `# imported`):
-  - 79 (imported-ignore_directives)
-- **Files changed (classified)**:
-  - **parser-shape** (Dialect::Pandoc only):
-    `crates/panache-parser/src/parser/block_dispatcher.rs`
-    (`HtmlBlockParser::detect_prepared` cannot_interrupt branch)
-  - **formatter / linter directive infra** (companion to parser-shape;
-    required so existing ignore-directive tests keep passing under
-    the new INLINE_HTML shape):
-    - `crates/panache-formatter/src/directives.rs`
-    - `src/directives.rs` (top-level duplicate kept in sync)
-    - `crates/panache-formatter/src/formatter/core.rs`
-      (paragraph/plain inline-directive replay path)
-    - `crates/panache-formatter/src/formatter/lists.rs`
-      (list-item content preserve-on-format-directive)
-  - **fixtures (parser-only)**: two new dirs under
-    `crates/panache-parser/tests/fixtures/cases/html_comment_after_paragraph_*`
-    + registered in `crates/panache-parser/tests/golden_parser_cases.rs`
-  - **snapshots**: 3 `.snap` files
-    (`parser_cst_ignore_directives` updated; two new for the paired
-    fixtures) under `crates/panache-parser/tests/snapshots/`
-  - **allowlist**:
-    `crates/panache-parser/tests/pandoc/allowlist.txt` (+1: 79
-    inserted between 77 and 80, under `# imported`)
-- **Don't redo**:
-  - Top-level `src/directives.rs` and
-    `crates/panache-formatter/src/directives.rs` are duplicate copies
-    — the formatter crate has the same module copied because the
-    formatter is dependency-lean (no top-level dep). The
-    `extract_directive_from_node` change must be mirrored in BOTH
-    files for both the linter (top-level) and the formatter to
-    recognize INLINE_HTML directives. `collect_inline_directives` is
-    only in the formatter copy because only the formatter needs it
-    (the linter's `preorder()` walk visits INLINE_HTML descendants
-    directly).
-  - The parser fix is gated specifically to `HtmlBlockType::Comment`
-    (Type 2). Other types (Type 1 `<script>`/`<pre>`, Type 6 block
-    tags like `<div>`, Type 7 generic tags, declarations, CDATA, PIs)
-    retain their existing dispatcher behavior. Pandoc-native shows
-    that `<style>` *also* doesn't interrupt and `<script>` does — a
-    finer-grained Type-1 split could land later but isn't required
-    for the cases currently under test.
-  - The PARAGRAPH/PLAIN inline-directive branch in
-    `format_node_sync` only short-circuits to verbatim when at least
-    one inline directive **affects formatting**. Lint-only directives
-    are processed upfront (tracker state updated) and rendering
-    continues normally — so reflow still happens around `panache-
-    ignore-lint-*` markers. Don't unify these paths or you'll
-    reintroduce the regression where `test_ignore_lint_does_not_
-    affect_formatting` fails.
-  - The list-item path
-    (`format_list_item` in `lists.rs`) needs its OWN check because
-    list-item content_node is wrapped via `inline_layout::
-    wrapped_lines_for_node`, NOT through `format_node_sync`. Don't
-    assume the format_node_sync branch alone covers list items.
-  - The new paired parser fixtures pin the dialect divergence. If
-    pandoc-native ever changes its Comment Type-2 behavior, regenerate
-    `expected.native` for #79 before adjusting the fixtures.
-
-## Earlier session (2026-05-03, Same-line BLOCK_QUOTE inside LIST_ITEM ungated for Pandoc)
-- **Pass before → after**: 174 → 176 / 187 (+2 imports: #93, #108).
-  Two-step fix: (1) parser ungates the same-line `>`-after-list-marker
-  branch in `finish_list_item_with_optional_nested` so Pandoc also
-  emits `LIST_ITEM > BLOCK_QUOTE > PARAGRAPH` for `- > foo` shapes;
-  (2) formatter adds a leading-`BLOCK_QUOTE` arm to `format_list_item`
-  so the LIST_MARKER survives round-trip (was being dropped because no
-  arm emitted the marker before delegating to the BQ child). The
-  projector already renders the new CST correctly without depth
-  juggling, so #108's outer-BQ context (`> 1. > foo`) passed too —
-  the previously-feared `BlockQuote::depth()` over-count never
-  triggered because the conformance harness compares projector
-  output, not formatter output. CommonMark allowlist green; pandoc
-  allowlist green; full parser-crate suite green; full workspace
-  tests green; clippy + fmt clean.
-- **What landed**:
-  - **Parser: ungate same-line BQ inside LIST_ITEM
-    (`crates/panache-parser/src/parser/blocks/lists.rs`)** —
-    deleted `let dialect_allows_nested = config.dialect ==
-    Dialect::CommonMark;` and the `dialect_allows_nested &&` guard
-    on the `text_to_buffer.starts_with('>')` branch. Both dialects
-    now emit the nested-BQ shape pandoc-native expects.
-  - **Formatter: leading-BLOCK_QUOTE arm in `format_list_item`
-    (`crates/panache-formatter/src/formatter/lists.rs`)** — mirrors
-    the leading-LIST and leading-HEADING arms. When
-    `first_non_blank_child` is a BLOCK_QUOTE and there's no PLAIN/
-    PARAGRAPH content, emits `total_indent + marker_padding +
-    marker + spaces_after + checkbox?` and then calls
-    `format_node_sync(leading_bq, 0)` so the BQ's `> ` abuts the
-    list marker on the same output line.
-  - **Test pin update: parser unit test
-    (`crates/panache-parser/src/parser/blocks/tests/blockquotes.rs`)**
-    — `definition_list_list_blockquote_continuation_stays_structural`
-    pinned the OLD (broken) shape with 2 BQ markers; updated to the
-    new correct count of 3 (each `> a/b/c` line now contributes a
-    marker inside the single BQ rather than `> a` being TEXT and
-    only `> b/c` being the BQ).
-  - **Snapshots regenerated**: 4 parser CST snapshots updated to
-    reflect the new same-line BQ shape:
-    `definition_list`,
-    `issue_174_blockquote_list_reorder_losslessness`,
-    `issue_209_definition_list_blockquote_continuation`,
-    `list_item_same_line_blockquote_marker_pandoc`.
-- **Cases unlocked** (+2, allowlisted under `# imported`):
-  - 93 (issue_209_definition_list_blockquote_continuation)
-  - 108 (list_item_same_line_blockquote_marker_pandoc)
-- **Files changed (classified)**:
-  - **parser-shape**:
-    `crates/panache-parser/src/parser/blocks/lists.rs` (drop
-    CommonMark-only gate on same-line BQ inside LIST_ITEM)
-  - **formatter** (companion to parser-shape change, required for
-    idempotency of the new CST):
-    `crates/panache-formatter/src/formatter/lists.rs`
-    (leading-BLOCK_QUOTE arm in `format_list_item`)
-  - **test pin**:
-    `crates/panache-parser/src/parser/blocks/tests/blockquotes.rs`
-    (marker count updated 2 → 3 in
-    `definition_list_list_blockquote_continuation_stays_structural`)
-  - **snapshots**: 4 `.snap` files updated under
-    `crates/panache-parser/tests/snapshots/`
-  - **allowlist**:
-    `crates/panache-parser/tests/pandoc/allowlist.txt` (+2: 93
-    inserted between 92 and 94, 108 inserted between 107 and 109,
-    both under `# imported`)
-- **Don't redo**:
-  - The CommonMark same-line nested LIST gating comment block
-    (`dialect_allows_nested ... is kept for the BLOCK_QUOTE
-    same-line case below`) was removed entirely with the parser
-    change. The same-line nested LIST emission was always
-    dialect-agnostic; the variable existed solely for the BQ
-    branch. Don't reintroduce it.
-  - #108 passes via the projector even though the formatter still
-    has a `BlockQuote::depth()` over-count for outer-BQ nested
-    contexts. The formatter currently produces a wrong shape for
-    `> 1. > foo` style inputs (extra `>` prefixes from
-    depth-2-counted ancestor) but no formatter golden case exercises
-    it. **If a formatter idempotency case lands later that surfaces
-    this, the fix is to subtract the outer-BQ render-depth context
-    when computing inner BQ's `depth` in
-    `crates/panache-formatter/src/formatter/core.rs::SyntaxKind::BLOCK_QUOTE`
-    arm.** Don't try to land that pre-emptively here — the conformance
-    win is independent.
-  - The leading-BLOCK_QUOTE arm intentionally calls
-    `format_node_sync(leading_bq, 0)` without stripping a leading
-    newline (unlike the leading-LIST arm which strips one). The BQ
-    formatter doesn't emit a leading newline; only `format_list`
-    does. Verified empirically — the output `1. > foo\n` was correct
-    on first run.
-  - Snapshot for `issue_174_blockquote_list_reorder_losslessness`
-    (#91) DID change shape with this work but #91 still fails
-    conformance — the new CST has the first BQ-bearing list item
-    swallowing subsequent items into its BQ paragraph. That's a
-    deeper continuation-policy bug (recursive same-line nested
-    detection inside BQ content); the snapshot was accepted because
-    it accurately captures current parser behavior, not because the
-    shape is correct. Re-tackling #91 means recursing
-    `try_parse_list_marker` inside the BQ branch (similar to the
-    same-line nested LIST recursion already there).
-
-## Earlier session (2026-05-03, List-item indent: include parent-LIST leading WHITESPACE in content offset)
-
 ## Prior sessions
 
 Older session logs were pruned to keep the recap scannable. Use `git log` on
 `crates/panache-parser/tests/pandoc/allowlist.txt` and the projector to
 trace which case unlocked when. Cross-session lessons that still apply have
 been folded into the global "Don't redo" section above.
+
+- 2026-05-03: Grid-table multi-line cells + TableFoot via block-reparse
+  projector path (#68, #70 unlocked).
+- 2026-05-03: HTML comment paragraph-interrupt gated by dialect; directive
+  system extended to INLINE_HTML (#79 unlocked).
+- 2026-05-03: Same-line BLOCK_QUOTE inside LIST_ITEM ungated for Pandoc
+  (#93, #108 unlocked).
+- 2026-05-03: List-item indent — include parent-LIST leading WHITESPACE in
+  content offset (#44 unlocked).

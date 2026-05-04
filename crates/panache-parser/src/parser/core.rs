@@ -1599,10 +1599,31 @@ impl<'a> Parser<'a> {
                 self.close_blockquotes_to_depth(bq_depth);
             }
 
-            // Peek ahead to determine what containers to keep open
+            // Peek ahead to determine what containers to keep open. Skip
+            // truly blank lines and, when this blank line is inside a
+            // blockquote, blank-inside-blockquote lines too (e.g. `>` or
+            // `>   `) so multiple consecutive `>`-blank lines don't make
+            // the next non-blank line look like it's outside the
+            // blockquote's continuation context.
             let mut peek = self.pos + 1;
-            while peek < self.lines.len() && is_blank_line(self.lines[peek]) {
-                peek += 1;
+            while peek < self.lines.len() {
+                let peek_line = self.lines[peek];
+                if is_blank_line(peek_line) {
+                    peek += 1;
+                    continue;
+                }
+                if bq_depth > 0 {
+                    let (peek_bq, _) = count_blockquote_markers(peek_line);
+                    if peek_bq >= bq_depth {
+                        let peek_inner =
+                            blockquotes::strip_n_blockquote_markers(peek_line, bq_depth);
+                        if is_blank_line(peek_inner) {
+                            peek += 1;
+                            continue;
+                        }
+                    }
+                }
+                break;
             }
 
             // Determine what containers to keep open based on next line

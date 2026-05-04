@@ -2,9 +2,7 @@
 
 > - First list item
 >
->
->
-> Back to list item content
+>   Back to list item content
 >
 > - Second list item
 >

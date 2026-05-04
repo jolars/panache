@@ -176,6 +176,26 @@ between sessions — short, judgment-call-only, not a duplicate of
   ranked next targets. Keep it terse — a fresh session should be able to
   pick up from this entry plus `report.txt` without scrolling the prior
   conversation.
+- **Prune "Suggested next targets" of completed items.** The list is for
+  what's still actionable, not a session changelog. After landing a
+  target, *remove* its bullet from the list (don't leave a "(DONE
+  YYYY-MM-DD — #N unlocked)" stub) — the details belong in the matching
+  "Earlier session" entry below, not in the forward-looking ranking. A
+  reader scanning "Suggested next targets" should see only open work.
+- **Cap the session log at the most recent 3 entries.** Each session
+  appends one new "Earlier session" block (the prior "Latest session"
+  pushed down). Before saving, count: if there are now more than three
+  "Earlier session" entries, fold the oldest into the **Prior sessions**
+  trailing section as a one-line pointer
+  (`- YYYY-MM-DD: <one-line summary> (#N unlocked) — see git log on
+  allowlist.txt`) and delete its body. Cross-session lessons that still
+  apply should already live in the global "Don't redo" section, so
+  pruning the body is safe.
+- **Hard size guardrail**: if `RECAP.md` exceeds ~600 lines or ~25 KB at
+  end-of-session, prune more aggressively (collapse two more "Earlier
+  session" entries into Prior-sessions pointers). The recap is a
+  handoff, not an archive — git log on `allowlist.txt` and the
+  projector/parser files is the long-term record.
 - Treat `RECAP.md` as the canonical handoff. Only echo a recap into the
   conversation if the user asks for one explicitly.
 
