@@ -10,6 +10,10 @@ description: >
   the Panache command line interface, including all available commands, options,
   and examples for using the formatter and linter from the terminal.
 
+- In [Lint Rules](linter-rules.qmd) you can find the catalogue of every built-in
+  lint rule, the diagnostic codes each rule emits, severity, auto-fix support,
+  and any configuration requirements.
+
 - In [External Formatter Presets](formatter-presets.qmd) you can find
   documentation for using external formatter presets with Panache, such as
   Prettier and Blackfriday, to customize the formatting behavior to match your

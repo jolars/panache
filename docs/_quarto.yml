@@ -100,6 +100,8 @@ website:
           contents:
             - href: reference/cli.qmd
               text: Command Line Interface
+            - href: reference/linter-rules.qmd
+              text: Lint Rules
             - href: reference/formatter-presets.qmd
               text: External Formatter Presets
             - href: reference/linter-presets.qmd

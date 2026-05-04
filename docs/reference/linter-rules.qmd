@@ -1,0 +1,496 @@
+---
+title: Lint Rules
+description: >
+  Reference catalogue of every built-in Panache lint rule, the diagnostic codes
+  each rule emits, severity, auto-fix availability, and configuration
+  requirements.
+---
+
+This page documents every built-in lint rule that Panache ships with. Each
+section lists the rule's configuration name (used in `[lint.rules]`), the
+diagnostic codes the rule may emit at runtime, severity, auto-fix support, and
+any extension or metadata requirements.
+
+For a user-friendly introduction to the linter, CLI usage, and configuration,
+see the [Linting guide](../guide/linting.qmd).
+
+## Diagnostic format
+
+Diagnostics are displayed in a compiler-style format:
+
+```
+severity[diagnostic-code]: message
+  --> file:line:column
+```
+
+Components:
+
+`severity`
+:   `error`, `warning`, or `info`
+
+`diagnostic-code`
+:   The specific code emitted (e.g., `undefined-reference-label`). A single rule
+    may emit several distinct codes.
+
+`message`
+:   Human-readable description of the issue
+
+`location`
+:   File path, line number, and column number
+
+Some diagnostics include additional notes pointing at related locations:
+
+```
+warning[duplicate-reference-labels]: Duplicate reference definition 'link1'
+  --> document.qmd:4:1
+note: First defined here:
+  --> document.qmd:3:1
+```
+
+## Severity levels
+
+Panache uses three severity levels:
+
+`error`
+:   Critical issues that prevent correct parsing or rendering
+
+`warning`
+:   Likely mistakes or best practice violations
+
+`info`
+:   Informational messages (currently unused, reserved for future use)
+
+## Rules
+
+### `heading-hierarchy` {#heading-hierarchy}
+
+Detects skipped heading levels that violate document structure best practices.
+
+Severity
+:   Warning
+
+Auto-fix
+:   Yes
+
+Diagnostic codes
+:   [`heading-hierarchy`](#heading-hierarchy)
+
+Description
+:   Headings should increment by at most one level (e.g., H1 → H2 → H3).
+    Skipping levels (H1 → H3) makes the document structure unclear and can break
+    table-of-contents generation.
+
+**Example violation:**
+
+```markdown
+# Main Title
+
+### Subsection
+```
+
+**Diagnostic:**
+
+```
+warning[heading-hierarchy]: Heading level skipped from h1 to h3; expected h2
+ --> document.qmd:3:1
+  |
+3 | ### Subsection
+  | ^^^^^^^^^^^^^^
+```
+
+**Auto-fix:** Changes `### Subsection` to `## Subsection`.
+
+### `duplicate-reference-labels` {#duplicate-reference-labels}
+
+Detects duplicate reference link and footnote definitions.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Diagnostic codes
+:   [`duplicate-reference-labels`](#duplicate-reference-labels)
+
+Description
+:   Each reference label and footnote ID must be unique within a document.
+    Duplicate definitions cause ambiguity---only the first definition is used,
+    making the others ineffective.
+
+**Example violation:**
+
+```markdown
+See [link1] and [link2].
+
+[link1]: https://example.com
+[link1]: https://different.com
+```
+
+**Diagnostic:**
+
+```
+warning[duplicate-reference-labels]: Duplicate reference definition 'link1'
+  --> document.qmd:4:1
+note: First defined here:
+  --> document.qmd:3:1
+```
+
+**Resolution:** Rename or remove the duplicate definition.
+
+### `undefined-references` {#undefined-references}
+
+Detects reference links and footnotes that point to missing definitions.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Diagnostic codes
+:   [`undefined-reference-label`](#undefined-reference-label),
+    [`undefined-footnote-id`](#undefined-footnote-id)
+
+Description
+:   Flags unresolved reference-style links (including shortcut/collapsed forms)
+    and unresolved footnote references. This helps catch broken cross-references
+    early in editing and CI.
+
+**Example violation:**
+
+```markdown
+See [missing][nope] and note[^missing].
+
+[ok]: https://example.com
+```
+
+**Diagnostic:**
+
+```
+warning[undefined-reference-label]: Reference label '[nope]' not found
+  --> document.qmd:1:15
+warning[undefined-footnote-id]: Footnote '[^missing]' not found
+  --> document.qmd:1:31
+```
+
+#### `undefined-reference-label` {#undefined-reference-label}
+
+Emitted when a reference-style link points to a label that has no matching
+definition.
+
+#### `undefined-footnote-id` {#undefined-footnote-id}
+
+Emitted when a footnote reference points to an ID that has no matching footnote
+definition.
+
+### `unused-definitions` {#unused-definitions}
+
+Detects reference labels and footnote definitions that are declared but never
+referenced.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Diagnostic codes
+:   [`unused-definition-label`](#unused-definition-label),
+    [`unused-footnote-id`](#unused-footnote-id)
+
+Description
+:   Flags unused reference definitions (`[label]: ...`) and unused footnote
+    definitions (`[^id]: ...`). This helps keep documents tidy and avoids dead
+    references that can accumulate over time. When project metadata is available
+    (for example in Quarto/Bookdown project lint runs), usage is resolved across
+    project documents to reduce cross-file false positives.
+
+**Example violation:**
+
+```markdown
+Text with one note[^1].
+
+[^1]: Used note.
+[^2]: Unused note.
+
+[used]: https://example.com
+[unused]: https://unused.example.com
+```
+
+**Diagnostic:**
+
+```
+warning[unused-footnote-id]: Footnote '[^2]' is never used
+  --> document.qmd:4:1
+warning[unused-definition-label]: Reference definition '[unused]' is never used
+  --> document.qmd:7:1
+```
+
+#### `unused-definition-label` {#unused-definition-label}
+
+Emitted when a reference definition (`[label]: ...`) is declared but never
+referenced anywhere in the document (or project, when project metadata is
+available).
+
+#### `unused-footnote-id` {#unused-footnote-id}
+
+Emitted when a footnote definition (`[^id]: ...`) is declared but never
+referenced.
+
+### `citation-keys` {#citation-keys}
+
+Validates citation keys against loaded bibliographies and detects conflicts in
+inline bibliography entries.
+
+Severity
+:   Error for bibliography load/parse failures, Warning for undefined keys and
+    duplicates
+
+Auto-fix
+:   No
+
+Requirements
+:   Requires `extensions.citations = true` in configuration
+
+Diagnostic codes
+:   [`bibliography-load-error`](#bibliography-load-error),
+    [`bibliography-parse-error`](#bibliography-parse-error),
+    [`missing-bibliography-key`](#missing-bibliography-key),
+    [`duplicate-bibliography-key`](#duplicate-bibliography-key),
+    [`duplicate-inline-reference-id`](#duplicate-inline-reference-id)
+
+Description
+:   Checks that all cited keys (`[@key]`) exist in the configured bibliography
+    files. Also validates inline bibliography entries for duplicates and
+    conflicts.
+
+**Example violation (undefined key):**
+
+```markdown
+---
+bibliography: refs.bib
+---
+
+See @smith2020 and @jones2021.
+```
+
+If `jones2021` doesn't exist in `refs.bib`:
+
+```
+warning[missing-bibliography-key]: Citation key 'jones2021' not found in bibliography
+  --> document.qmd:5:17
+```
+
+**Example violation (bibliography load error):**
+
+```markdown
+---
+bibliography: nonexistent.bib
+---
+```
+
+```
+error[bibliography-load-error]: Failed to load bibliography nonexistent.bib: File not found
+  --> document.qmd:1:1
+```
+
+**When it runs:** Only when document metadata includes bibliography
+configuration and the citation extension is enabled.
+
+#### `bibliography-load-error` {#bibliography-load-error}
+
+Emitted when a configured bibliography file cannot be opened (missing,
+unreadable, etc.).
+
+#### `bibliography-parse-error` {#bibliography-parse-error}
+
+Emitted when a bibliography file is opened successfully but contains entries
+that fail to parse.
+
+#### `missing-bibliography-key` {#missing-bibliography-key}
+
+Emitted when a `@cite` reference does not match any key in the loaded
+bibliography.
+
+#### `duplicate-bibliography-key` {#duplicate-bibliography-key}
+
+Emitted when the same key appears more than once across loaded bibliography
+files.
+
+#### `duplicate-inline-reference-id` {#duplicate-inline-reference-id}
+
+Emitted when an inline bibliography entry collides with another inline entry or
+with a key from a loaded bibliography file.
+
+### `chunk-label-spaces` {#chunk-label-spaces}
+
+Detects executable chunk labels containing whitespace (for example
+`{r several words}` or `label="several words"`).
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Diagnostic codes
+:   [`chunk-label-spaces`](#chunk-label-spaces)
+
+Description
+:   Labels with spaces are accepted by Quarto execution, but cross-references
+    often fail to resolve reliably. Use a stable identifier such as
+    `several-words` or `several_words` instead.
+
+### `missing-chunk-labels` {#missing-chunk-labels}
+
+Detects executable chunks that do not define a `label` (either inline or
+hashpipe style).
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Diagnostic codes
+:   [`missing-chunk-labels`](#missing-chunk-labels)
+
+Description
+:   Labels facilitate debugging. Add a label with either `#| label: my-chunk` or
+    inline `label=my-chunk`.
+
+### `figure-crossref-captions` {#figure-crossref-captions}
+
+Detects figure cross-references that point to chunk labels without a figure
+caption option.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Diagnostic codes
+:   [`figure-crossref-captions`](#figure-crossref-captions)
+
+Description
+:   Bookdown figure cross-references (`\@ref(fig:...)`) require a captioned
+    chunk to create a resolvable figure label at render time. When the target
+    chunk has a `label` but no `fig-cap`/`fig.cap`, the crossref will not
+    resolve.
+
+### `unknown-emoji-alias` {#unknown-emoji-alias}
+
+Detects `:alias:` emoji shortcodes that are not recognized.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Requirements
+:   Requires `extensions.emoji = true` in configuration
+
+Diagnostic codes
+:   [`unknown-emoji-alias`](#unknown-emoji-alias)
+
+Description
+:   Checks parsed emoji aliases against the emoji shortcode dataset and warns
+    when an alias is unknown.
+
+**Example violation:**
+
+```markdown
+Looks good :smile:, but this one is wrong :not-a-real-emoji:.
+```
+
+**Diagnostic:**
+
+```
+warning[unknown-emoji-alias]: Unknown emoji alias ':not-a-real-emoji:'
+  --> document.qmd:1:40
+```
+
+### `adjacent-footnote-refs` {#adjacent-footnote-refs}
+
+Detects footnote references placed back-to-back (`[^a][^b]`) where the rendered
+superscripts run together (e.g. footnotes 7 and 8 look like footnote 78).
+
+Severity
+:   Warning
+
+Auto-fix
+:   Yes (inserts a space between the references)
+
+Requirements
+:   Requires `extensions.footnotes = true` in configuration
+
+Diagnostic codes
+:   [`adjacent-footnote-refs`](#adjacent-footnote-refs)
+
+Description
+:   When two footnote references appear with no intervening character, most
+    renderers emit the superscript markers as a single visually-merged run.
+    Inserting a single space between them keeps the markers distinct without
+    changing the prose.
+
+**Example violation:**
+
+```markdown
+See the prior reports[^a][^b] for context.
+```
+
+**Auto-fix output:**
+
+```markdown
+See the prior reports[^a] [^b] for context.
+```
+
+## YAML diagnostics
+
+Panache emits YAML diagnostics when embedded YAML content is invalid. These
+apply to both document frontmatter (`--- ... ---`) and executable chunk hashpipe
+options (`#| ...`).
+
+### `yaml-parse-error` {#yaml-parse-error}
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Description
+:   The YAML lexer/parser could not interpret the content (malformed flow
+    sequences, unterminated strings, etc.).
+
+**Example (hashpipe):**
+
+````markdown
+```{{r}}
+#| echo: [
+1 + 1
+```
+````
+
+**Diagnostic:**
+
+```
+warning[yaml-parse-error]: YAML parse error: ...
+  --> document.qmd:2:10
+```
+
+### `yaml-structure-error` {#yaml-structure-error}
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Description
+:   The YAML parsed successfully but its top-level shape is not valid for the
+    context (for example, frontmatter that is not a mapping, or a hashpipe block
+    that does not produce a mapping of options).
