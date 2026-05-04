@@ -21,13 +21,13 @@ pub(crate) fn print_diagnostics(
     for diag in diagnostics {
         if matches!(message_format, MessageFormat::Short) {
             println!(
-                "{}[{}]: {} at {}:{}:{}",
+                "{}:{}:{}: {}[{}]: {}",
+                file_name,
+                diag.location.line,
+                diag.location.column,
                 severity_name(&diag.severity),
                 diag.code,
                 diag.message,
-                file_name,
-                diag.location.line,
-                diag.location.column
             );
             continue;
         }

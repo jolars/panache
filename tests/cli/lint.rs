@@ -275,7 +275,7 @@ fn test_lint_stdin_short_message_format() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "warning[heading-hierarchy]: Heading level skipped from h1 to h3; expected h2 at <stdin>:3:1",
+            "<stdin>:3:1: warning[heading-hierarchy]: Heading level skipped from h1 to h3; expected h2",
         ))
         .stdout(predicate::str::contains("3 | ### Subheading").not())
         .stdout(predicate::str::contains("= note:").not());
@@ -299,7 +299,7 @@ fn test_lint_file_short_message_format() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "warning[heading-hierarchy]: Heading level skipped",
+            ":3:1: warning[heading-hierarchy]: Heading level skipped",
         ))
         .stdout(predicate::str::contains("short.qmd:3:1"))
         .stdout(predicate::str::contains("3 | ### Subheading").not())

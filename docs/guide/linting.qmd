@@ -103,7 +103,7 @@ Use `--message-format` to control diagnostic verbosity:
 
 ```bash
 panache lint --message-format human document.qmd # default rich output
-panache lint --message-format short document.qmd # compact one-line diagnostics
+panache lint --message-format short document.qmd # GNU-style one-line diagnostics
 ```
 
 ## Lint Rules
