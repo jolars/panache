@@ -1,0 +1,34 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..19
+  BLOCK_QUOTE@0..19
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    PARAGRAPH@2..19
+      TEXT@2..7 "first"
+      NEWLINE@7..8 "\n"
+      BLOCK_QUOTE_MARKER@8..9 ">"
+      WHITESPACE@9..10 " "
+      SUBSCRIPT@10..12
+        SUBSCRIPT_MARKER@10..11
+          SUBSCRIPT_MARKER@10..11 "~"
+        SUBSCRIPT_MARKER@11..12
+          SUBSCRIPT_MARKER@11..12 "~"
+      SUBSCRIPT@12..14
+        SUBSCRIPT_MARKER@12..13
+          SUBSCRIPT_MARKER@12..13 "~"
+        SUBSCRIPT_MARKER@13..14
+          SUBSCRIPT_MARKER@13..14 "~"
+      SUBSCRIPT@14..16
+        SUBSCRIPT_MARKER@14..15
+          SUBSCRIPT_MARKER@14..15 "~"
+        SUBSCRIPT_MARKER@15..16
+          SUBSCRIPT_MARKER@15..16 "~"
+      SUBSCRIPT@16..18
+        SUBSCRIPT_MARKER@16..17
+          SUBSCRIPT_MARKER@16..17 "~"
+        SUBSCRIPT_MARKER@17..18
+          SUBSCRIPT_MARKER@17..18 "~"
+      NEWLINE@18..19 "\n"

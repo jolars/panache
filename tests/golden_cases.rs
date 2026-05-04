@@ -345,6 +345,8 @@ golden_test_cases!(
     issue_214_mixed_marker_nested_ordered_idempotency,
     issue_225_chunk_option_nested_quotes_idempotency,
     issue_235_gfm_bare_uri_in_link_text_idempotency,
+    issue_248_tilde_fence_paragraph_idempotency,
+    issue_248_blockquote_subscript_marker_idempotency,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

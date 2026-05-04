@@ -1,0 +1,57 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..173
+  PARAGRAPH@0..173
+    TEXT@0..24 "First line of paragraph."
+    NEWLINE@24..25 "\n"
+    SUBSCRIPT@25..27
+      SUBSCRIPT_MARKER@25..26
+        SUBSCRIPT_MARKER@25..26 "~"
+      SUBSCRIPT_MARKER@26..27
+        SUBSCRIPT_MARKER@26..27 "~"
+    SUBSCRIPT@27..29
+      SUBSCRIPT_MARKER@27..28
+        SUBSCRIPT_MARKER@27..28 "~"
+      SUBSCRIPT_MARKER@28..29
+        SUBSCRIPT_MARKER@28..29 "~"
+    SUBSCRIPT@29..31
+      SUBSCRIPT_MARKER@29..30
+        SUBSCRIPT_MARKER@29..30 "~"
+      SUBSCRIPT_MARKER@30..31
+        SUBSCRIPT_MARKER@30..31 "~"
+    SUBSCRIPT@31..33
+      SUBSCRIPT_MARKER@31..32
+        SUBSCRIPT_MARKER@31..32 "~"
+      SUBSCRIPT_MARKER@32..33
+        SUBSCRIPT_MARKER@32..33 "~"
+    TEXT@33..65 " Note that the warnin ..."
+    NEWLINE@65..66 "\n"
+    TEXT@66..105 "that this looks like  ..."
+    NEWLINE@105..106 "\n"
+    TEXT@106..145 "should be paragraph c ..."
+    NEWLINE@145..146 "\n"
+    SUBSCRIPT@146..148
+      SUBSCRIPT_MARKER@146..147
+        SUBSCRIPT_MARKER@146..147 "~"
+      SUBSCRIPT_MARKER@147..148
+        SUBSCRIPT_MARKER@147..148 "~"
+    SUBSCRIPT@148..150
+      SUBSCRIPT_MARKER@148..149
+        SUBSCRIPT_MARKER@148..149 "~"
+      SUBSCRIPT_MARKER@149..150
+        SUBSCRIPT_MARKER@149..150 "~"
+    SUBSCRIPT@150..152
+      SUBSCRIPT_MARKER@150..151
+        SUBSCRIPT_MARKER@150..151 "~"
+      SUBSCRIPT_MARKER@151..152
+        SUBSCRIPT_MARKER@151..152 "~"
+    SUBSCRIPT@152..154
+      SUBSCRIPT_MARKER@152..153
+        SUBSCRIPT_MARKER@152..153 "~"
+      SUBSCRIPT_MARKER@153..154
+        SUBSCRIPT_MARKER@153..154 "~"
+    NEWLINE@154..155 "\n"
+    TEXT@155..172 "End of paragraph."
+    NEWLINE@172..173 "\n"

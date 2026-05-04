@@ -1554,8 +1554,17 @@ impl<'a> Parser<'a> {
         );
 
         // Handle blank lines specially (including blank lines inside blockquotes)
-        // A line like ">" with nothing after is a blank line inside a blockquote
-        let is_blank = is_blank_line(line) || (bq_depth > 0 && is_blank_line(inner_content));
+        // A line like ">" with nothing after is a blank line inside a blockquote —
+        // but only when we're already inside one (or one can legitimately start
+        // here under the active blank_before_blockquote rule). Otherwise treating
+        // it as blank would silently open a blockquote mid-paragraph, diverging
+        // from pandoc which keeps the whole thing as one paragraph.
+        let inner_blank_in_blockquote = bq_depth > 0
+            && is_blank_line(inner_content)
+            && (current_bq_depth > 0
+                || !self.config.extensions.blank_before_blockquote
+                || blockquotes::can_start_blockquote(self.pos, &self.lines));
+        let is_blank = is_blank_line(line) || inner_blank_in_blockquote;
 
         if is_blank {
             if self.is_paragraph_open()

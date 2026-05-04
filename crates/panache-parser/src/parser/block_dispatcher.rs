@@ -1649,7 +1649,18 @@ impl BlockParser for FencedCodeBlockParser {
             && line_pos > 0
             && is_closing_fence(lines[line_pos - 1], &fence);
 
-        let detection = if has_info
+        // In Pandoc dialect, tilde fences require a blank line before — they
+        // never interrupt a paragraph. CommonMark allows tilde fences with
+        // info strings to interrupt paragraphs (spec §4.5).
+        let tilde_requires_blank_before = fence.fence_char == '~' && !common_mark_dialect;
+
+        let detection = if tilde_requires_blank_before {
+            if ctx.has_blank_before {
+                BlockDetectionResult::Yes
+            } else {
+                BlockDetectionResult::No
+            }
+        } else if has_info
             || bare_fence_before_command_with_closer
             || bare_fence_after_colon_with_closer
             || bare_fence_in_list_with_closer

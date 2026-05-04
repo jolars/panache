@@ -344,6 +344,11 @@ impl ParagraphBuffer {
             ) {
                 match el {
                     NodeOrToken::Node(n) => {
+                        // Emit any markers at the current offset *outside* this
+                        // node — otherwise they end up nested inside (e.g. a
+                        // BLOCK_QUOTE_MARKER inside a SUBSCRIPT_MARKER), which
+                        // confuses lossless reconstruction during reformatting.
+                        self.emit_markers_at_current(builder);
                         builder.start_node(n.kind().into());
                         for child in n.children_with_tokens() {
                             self.emit_element(builder, child);
