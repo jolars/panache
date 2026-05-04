@@ -155,8 +155,25 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
 
                     let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
                     let continues_list = if let Some(ref marker_match) = next_marker {
+                        // Ordered markers can be right-aligned across items
+                        // (e.g. `i.`, `ii.`, `iii.`), so they need a symmetric
+                        // drift tolerance. Bullets are directional: a marker
+                        // outdented from the list's base indent belongs to an
+                        // outer list, not this one. Without that lower bound,
+                        // a blank line followed by an outer-level marker keeps
+                        // the inner list open and parks the BLANK_LINE inside
+                        // it, breaking idempotency for nested-list outputs.
+                        let indent_in_range = match marker {
+                            lists::ListMarker::Ordered(_) => {
+                                effective_indent.abs_diff(*base_indent_cols) <= 3
+                            }
+                            lists::ListMarker::Bullet(_) => {
+                                effective_indent >= *base_indent_cols
+                                    && effective_indent <= base_indent_cols + 3
+                            }
+                        };
                         lists::markers_match(marker, &marker_match.marker, self.config.dialect)
-                            && effective_indent <= base_indent_cols + 3
+                            && indent_in_range
                     } else {
                         let item_content_col = containers
                             .stack

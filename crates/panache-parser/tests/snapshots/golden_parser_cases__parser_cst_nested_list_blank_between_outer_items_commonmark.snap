@@ -1,16 +1,17 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..33
   LIST@0..33
-    LIST_ITEM@0..17
+    LIST_ITEM@0..16
       LIST_MARKER@0..1 "-"
       WHITESPACE@1..2 " "
       PLAIN@2..4
         TEXT@2..3 "a"
         NEWLINE@3..4 "\n"
-      LIST@4..17
+      LIST@4..16
         LIST_ITEM@4..10
           WHITESPACE@4..6 "  "
           LIST_MARKER@6..7 "-"
@@ -25,8 +26,8 @@ DOCUMENT@0..33
           PLAIN@14..16
             TEXT@14..15 "c"
             NEWLINE@15..16 "\n"
-        BLANK_LINE@16..17
-          BLANK_LINE@16..17 "\n"
+    BLANK_LINE@16..17
+      BLANK_LINE@16..17 "\n"
     LIST_ITEM@17..33
       LIST_MARKER@17..18 "-"
       WHITESPACE@18..19 " "
