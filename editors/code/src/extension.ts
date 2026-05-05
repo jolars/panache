@@ -119,7 +119,12 @@ async function startClient(
   }
 
   const serverArgs = config.get<string[]>("serverArgs", []);
-  const serverEnv = config.get<Record<string, string>>("serverEnv", {});
+  const userServerEnv = config.get<Record<string, string>>("serverEnv", {});
+  const logLevel = config.get<string | null>("logLevel", null);
+  const serverEnv: Record<string, string> = {
+    ...(logLevel ? { RUST_LOG: logLevel } : {}),
+    ...userServerEnv,
+  };
   const extraPath = config.get<string[]>("extraPath", []);
   const traceLevel = config.get<"off" | "messages" | "verbose">(
     "trace.server",

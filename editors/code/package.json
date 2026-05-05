@@ -116,6 +116,23 @@
           "default": [],
           "description": "Extra PATH entries prepended for the Panache language server process (useful for external tools like air, ruff, or black)."
         },
+        "panache.logLevel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            null,
+            "off",
+            "error",
+            "warn",
+            "info",
+            "debug",
+            "trace"
+          ],
+          "default": null,
+          "markdownDescription": "Log level for the Panache language server. Maps to the `RUST_LOG` environment variable. Leave unset to use the server's default. If `panache.serverEnv.RUST_LOG` is also set, it takes precedence."
+        },
         "panache.trace.server": {
           "type": "string",
           "enum": [

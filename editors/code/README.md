@@ -102,6 +102,9 @@ Panache registers itself as the default formatter for `[quarto]` and
 - `panache.serverEnv`: extra environment variables
 - `panache.extraPath`: extra PATH entries prepended for the language server
   process
+- `panache.logLevel`: log level for the language server, mapped to `RUST_LOG`
+  (`off`, `error`, `warn`, `info`, `debug`, `trace`; unset by default).
+  `panache.serverEnv.RUST_LOG` overrides this if both are set.
 - `panache.trace.server`: LSP trace level (`off`, `messages`, `verbose`)
 - `panache.experimental.incrementalParsing`: enable experimental incremental
   parsing in LSP (default: `false`)
