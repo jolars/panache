@@ -132,6 +132,14 @@
           "description": "Enable experimental incremental parsing in the Panache language server. This may improve didChange performance but can be unstable."
         }
       }
+    },
+    "configurationDefaults": {
+      "[quarto]": {
+        "editor.defaultFormatter": "jolars.panache"
+      },
+      "[rmarkdown]": {
+        "editor.defaultFormatter": "jolars.panache"
+      }
     }
   },
   "scripts": {

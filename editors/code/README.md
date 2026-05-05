@@ -82,6 +82,10 @@ Use `panache.releaseTag` only if you need an exact tag override:
 
 ## Settings
 
+Panache registers itself as the default formatter for `[quarto]` and
+`[rmarkdown]` files. Plain `[markdown]` is left alone --- opt in with
+`"editor.defaultFormatter": "jolars.panache"` in your settings if you want it.
+
 - `panache.downloadBinary`: auto-download Panache binary (default: `true`)
 - `panache.version`: version to install (default: `"latest"`)
 - `panache.releaseTag`: advanced exact tag override (takes precedence if
