@@ -492,6 +492,7 @@ impl Extensions {
         ext.alerts = true;
         ext.auto_identifiers = true;
         ext.autolink_bare_uris = true;
+        ext.autolinks = true;
         ext.backtick_code_blocks = true;
         ext.emoji = true;
         ext.fenced_code_blocks = true;
