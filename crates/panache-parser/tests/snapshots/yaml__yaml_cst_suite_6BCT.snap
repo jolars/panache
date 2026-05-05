@@ -1,0 +1,35 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: 6BCT
+input: "- foo:\t bar\n- - baz\n  -\tbaz\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..28
+  YAML_METADATA_CONTENT@0..28
+    YAML_STREAM@0..28
+      YAML_DOCUMENT@0..28
+        YAML_BLOCK_SEQUENCE@0..28
+          YAML_BLOCK_SEQUENCE_ITEM@0..12
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_SCALAR@2..11 "foo:\t bar"
+            NEWLINE@11..12 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@12..28
+            YAML_BLOCK_SEQ_ENTRY@12..13 "-"
+            WHITESPACE@13..14 " "
+            YAML_BLOCK_SEQUENCE@14..28
+              YAML_BLOCK_SEQUENCE_ITEM@14..20
+                YAML_BLOCK_SEQ_ENTRY@14..15 "-"
+                WHITESPACE@15..16 " "
+                YAML_SCALAR@16..19 "baz"
+                NEWLINE@19..20 "\n"
+              WHITESPACE@20..22 "  "
+              YAML_BLOCK_SEQUENCE_ITEM@22..28
+                YAML_BLOCK_SEQ_ENTRY@22..23 "-"
+                WHITESPACE@23..24 "\t"
+                YAML_SCALAR@24..27 "baz"
+                NEWLINE@27..28 "\n"

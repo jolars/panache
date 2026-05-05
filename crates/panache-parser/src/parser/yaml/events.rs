@@ -824,6 +824,91 @@ fn project_flow_sequence_items_cst(
     }
 }
 
+/// Locate a key/colon split in a block-context scalar. Honors a leading
+/// quoted body (`"key": value`, `'key': value`) and percent-encoded URIs by
+/// only treating `:` as a key indicator when followed by whitespace, a flow
+/// indicator, or end-of-input. Per YAML 1.2 §7.4.3.1, embedded `"` / `'`
+/// inside plain scalars are literal, so no quote-toggling occurs after the
+/// leading-quote phase.
+fn find_block_scalar_kv_split(text: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let lead = bytes
+        .iter()
+        .position(|b| !matches!(b, b' ' | b'\t'))
+        .unwrap_or(bytes.len());
+    let mut idx = lead;
+    match bytes.get(idx) {
+        Some(b'"') => {
+            idx += 1;
+            let mut escaped = false;
+            while idx < bytes.len() {
+                let b = bytes[idx];
+                idx += 1;
+                if escaped {
+                    escaped = false;
+                    continue;
+                }
+                if b == b'\\' {
+                    escaped = true;
+                    continue;
+                }
+                if b == b'"' {
+                    break;
+                }
+            }
+        }
+        Some(b'\'') => {
+            idx += 1;
+            while idx < bytes.len() {
+                let b = bytes[idx];
+                idx += 1;
+                if b == b'\'' {
+                    if bytes.get(idx) == Some(&b'\'') {
+                        idx += 1;
+                        continue;
+                    }
+                    break;
+                }
+            }
+        }
+        _ => {}
+    }
+    while idx < bytes.len() {
+        if bytes[idx] == b':' {
+            let after = idx + 1;
+            let next = bytes.get(after);
+            // In block context (which is where this helper runs) only
+            // whitespace or end-of-input qualifies as the key/value
+            // indicator's trailing context. The flow-collection terminators
+            // (`,`, `}`, `]`) are literal here — `- :,` is a single scalar
+            // `:,`, not an empty-key map.
+            let is_separator = matches!(next, None | Some(b' ' | b'\t' | b'\n' | b'\r'));
+            if is_separator {
+                return Some(idx);
+            }
+        }
+        idx += 1;
+    }
+    None
+}
+
+/// Project a single scalar (without surrounding `+MAP`/`-MAP`) for an inline
+/// map key or value position. Anchors/tags are decomposed in canonical order;
+/// alias references (`*name`) emit `=ALI`. An empty body emits `=VAL :`.
+fn project_inline_scalar(text: &str, handles: &TagHandles, out: &mut Vec<String>) {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        out.push("=VAL :".to_string());
+        return;
+    }
+    if trimmed.starts_with('*') {
+        out.push(format!("=ALI {trimmed}"));
+        return;
+    }
+    let (anchor, body_tag, body) = decompose_scalar(trimmed, handles);
+    out.push(scalar_event(anchor, body_tag.as_deref(), body));
+}
+
 fn project_block_sequence_items(
     seq_node: &SyntaxNode,
     handles: &TagHandles,
@@ -840,6 +925,29 @@ fn project_block_sequence_items(
             out.push("+SEQ".to_string());
             project_block_sequence_items(&nested_seq, handles, out);
             out.push("-SEQ".to_string());
+            continue;
+        }
+        // Inline-map sequence item: `- key: value` (with optional continuation
+        // lines that the parser captures as a nested YAML_BLOCK_MAP). The
+        // direct YAML_SCALAR token chain encodes the first entry; subsequent
+        // entries live in the nested map node.
+        let direct_scalar: String = item
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+            .map(|tok| tok.text().to_string())
+            .collect();
+        if let Some(colon_idx) = find_block_scalar_kv_split(&direct_scalar) {
+            let nested_map = item
+                .children()
+                .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP);
+            out.push("+MAP".to_string());
+            project_inline_scalar(&direct_scalar[..colon_idx], handles, out);
+            project_inline_scalar(&direct_scalar[colon_idx + 1..], handles, out);
+            if let Some(nm) = nested_map {
+                project_block_map_entries(&nm, handles, out);
+            }
+            out.push("-MAP".to_string());
             continue;
         }
         if let Some(nested_map) = item
@@ -1012,17 +1120,26 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
         .map(|tok| tok.text().trim_end().to_string())
         .expect("key token");
 
-    let key_event = if key_text.starts_with('*') {
-        format!("=ALI {}", key_text.trim_end())
+    let key_trimmed = key_text.trim();
+    if key_trimmed.starts_with('[')
+        && key_trimmed.ends_with(']')
+        && let Some(items) = simple_flow_sequence_items(key_trimmed)
+    {
+        out.push("+SEQ []".to_string());
+        for item in items {
+            project_flow_seq_item(&item, handles, out);
+        }
+        out.push("-SEQ".to_string());
+    } else if key_trimmed.starts_with('*') {
+        out.push(format!("=ALI {key_trimmed}"));
     } else {
         let key_long_tag = key_tag
             .as_deref()
             .and_then(|t| resolve_long_tag(t, handles));
-        let (anchor, body_tag, body) = decompose_scalar(key_text.trim(), handles);
+        let (anchor, body_tag, body) = decompose_scalar(key_trimmed, handles);
         let long_tag = key_long_tag.or(body_tag);
-        scalar_event(anchor, long_tag.as_deref(), body)
-    };
-    out.push(key_event);
+        out.push(scalar_event(anchor, long_tag.as_deref(), body));
+    }
 
     if let Some(nested_map) = value_node
         .children()

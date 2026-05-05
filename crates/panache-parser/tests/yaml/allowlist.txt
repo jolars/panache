@@ -211,3 +211,13 @@ J3BT
 9DXL
 # Empty-body doc whose `---` and `...` are separated by a `# Empty` comment at EOF.
 UT92
+# Block-seq item with inline `key: value` (`- key: value?`) projected as `+MAP ... -MAP`.
+JR7V
+# Block-seq item with tab between `:` and value (`- foo:\t bar`); tab counts as separator.
+6BCT
+# Plain block-seq inline-map keys containing literal `"` and `]` (`- bla"keks: foo`).
+AZW3
+# Leading-space-indented block sequence with `- key: value` items + continuation entries.
+93JH
+# Flow sequence as a block-map key (`[flow]: block`) projected as `+SEQ [] ... -SEQ`.
+LX3P

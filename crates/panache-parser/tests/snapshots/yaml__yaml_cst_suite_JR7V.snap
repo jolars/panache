@@ -1,0 +1,87 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: JR7V
+input: "- a?string\n- another ? string\n- key: value?\n- [a?string]\n- [another ? string]\n- {key: value? }\n- {key: value?}\n- {key?: value }\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..128
+  YAML_METADATA_CONTENT@0..128
+    YAML_STREAM@0..128
+      YAML_DOCUMENT@0..128
+        YAML_BLOCK_SEQUENCE@0..128
+          YAML_BLOCK_SEQUENCE_ITEM@0..11
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_SCALAR@2..10 "a?string"
+            NEWLINE@10..11 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@11..30
+            YAML_BLOCK_SEQ_ENTRY@11..12 "-"
+            WHITESPACE@12..13 " "
+            YAML_SCALAR@13..29 "another ? string"
+            NEWLINE@29..30 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@30..44
+            YAML_BLOCK_SEQ_ENTRY@30..31 "-"
+            WHITESPACE@31..32 " "
+            YAML_SCALAR@32..43 "key: value?"
+            NEWLINE@43..44 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@44..57
+            YAML_BLOCK_SEQ_ENTRY@44..45 "-"
+            WHITESPACE@45..46 " "
+            YAML_FLOW_SEQUENCE@46..56
+              YAML_SCALAR@46..47 "["
+              YAML_FLOW_SEQUENCE_ITEM@47..55
+                YAML_SCALAR@47..55 "a?string"
+              YAML_SCALAR@55..56 "]"
+            NEWLINE@56..57 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@57..78
+            YAML_BLOCK_SEQ_ENTRY@57..58 "-"
+            WHITESPACE@58..59 " "
+            YAML_FLOW_SEQUENCE@59..77
+              YAML_SCALAR@59..60 "["
+              YAML_FLOW_SEQUENCE_ITEM@60..76
+                YAML_SCALAR@60..76 "another ? string"
+              YAML_SCALAR@76..77 "]"
+            NEWLINE@77..78 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@78..95
+            YAML_BLOCK_SEQ_ENTRY@78..79 "-"
+            WHITESPACE@79..80 " "
+            YAML_FLOW_MAP@80..94
+              YAML_SCALAR@80..81 "{"
+              YAML_FLOW_MAP_ENTRY@81..93
+                YAML_FLOW_MAP_KEY@81..85
+                  YAML_KEY@81..84 "key"
+                  YAML_COLON@84..85 ":"
+                YAML_FLOW_MAP_VALUE@85..93
+                  YAML_SCALAR@85..93 " value? "
+              YAML_SCALAR@93..94 "}"
+            NEWLINE@94..95 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@95..111
+            YAML_BLOCK_SEQ_ENTRY@95..96 "-"
+            WHITESPACE@96..97 " "
+            YAML_FLOW_MAP@97..110
+              YAML_SCALAR@97..98 "{"
+              YAML_FLOW_MAP_ENTRY@98..109
+                YAML_FLOW_MAP_KEY@98..102
+                  YAML_KEY@98..101 "key"
+                  YAML_COLON@101..102 ":"
+                YAML_FLOW_MAP_VALUE@102..109
+                  YAML_SCALAR@102..109 " value?"
+              YAML_SCALAR@109..110 "}"
+            NEWLINE@110..111 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@111..128
+            YAML_BLOCK_SEQ_ENTRY@111..112 "-"
+            WHITESPACE@112..113 " "
+            YAML_FLOW_MAP@113..127
+              YAML_SCALAR@113..114 "{"
+              YAML_FLOW_MAP_ENTRY@114..126
+                YAML_FLOW_MAP_KEY@114..119
+                  YAML_KEY@114..118 "key?"
+                  YAML_COLON@118..119 ":"
+                YAML_FLOW_MAP_VALUE@119..126
+                  YAML_SCALAR@119..126 " value "
+              YAML_SCALAR@126..127 "}"
+            NEWLINE@127..128 "\n"

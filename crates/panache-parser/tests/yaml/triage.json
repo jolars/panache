@@ -727,12 +727,6 @@
       "tree": false
     },
     {
-      "case_id": "6BCT",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "6BFJ",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -923,12 +917,6 @@
       "tree": false
     },
     {
-      "case_id": "93JH",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "93WF",
       "diagnostic_codes": [
         "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START"
@@ -1045,12 +1033,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "AZW3",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "B3HG",
@@ -1281,12 +1263,6 @@
       "tree": false
     },
     {
-      "case_id": "JR7V",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "JTV5",
       "diagnostic_codes": [
         "YAML_LEX_ERROR"
@@ -1355,12 +1331,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "LX3P",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "M5C3",
@@ -1791,6 +1761,7 @@
     "5T43",
     "652Z",
     "65WH",
+    "6BCT",
     "6CK3",
     "6H3V",
     "6KGN",
@@ -1806,12 +1777,14 @@
     "8KB6",
     "8MK2",
     "8XYN",
+    "93JH",
     "98YD",
     "9DXL",
     "9FMG",
     "9J7A",
     "9SHH",
     "9WXW",
+    "AZW3",
     "C2DT",
     "CC74",
     "CFD4",
@@ -1834,6 +1807,7 @@
     "J5UC",
     "J7VC",
     "JHB9",
+    "JR7V",
     "JS2J",
     "K4SU",
     "KMK3",
@@ -1841,6 +1815,7 @@
     "LE5A",
     "LP6E",
     "LQZ7",
+    "LX3P",
     "M29M",
     "M7NX",
     "MXS3",
@@ -1873,8 +1848,8 @@
   "summary": {
     "error_contract_ok_count": 54,
     "fails_needs_error_path_count": 24,
-    "fails_needs_feature_count": 158,
-    "passes_now_count": 97,
+    "fails_needs_feature_count": 153,
+    "passes_now_count": 102,
     "total_cases": 352
   }
 }
