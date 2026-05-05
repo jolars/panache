@@ -6,6 +6,7 @@ paths:
   - "tests/linting.rs"
   - "tests/cli/lint.rs"
   - "docs/guide/linting.qmd"
+  - "docs/reference/linter-rules.qmd"
 ---
 
 Linter changes should prioritize diagnostic correctness, actionable fixes, and
@@ -16,8 +17,8 @@ stable CLI/LSP behavior.
   preserves document intent.
 - Maintain rustc-like diagnostic UX in CLI output (clear primary span, optional
   context, and concise help/note text).
-- Keep lint docs in sync: update `docs/guide/linting.qmd` whenever lint rules,
-  diagnostics, fix behavior, or CLI lint message format changes.
+- Keep lint docs in sync: update `docs/reference/linting.qmd` whenever lint
+  rules, diagnostics, fix behavior, or CLI lint message format changes.
 - Preserve LSP compatibility: CLI rendering changes must not alter
   `src/lsp/conversions.rs` behavior unless explicitly intended.
 - Reuse shared orchestration paths (including Salsa-backed lint/diagnostic
