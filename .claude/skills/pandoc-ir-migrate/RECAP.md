@@ -11,49 +11,58 @@ what trap to avoid) are the load-bearing content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-04 (xvi)
+## Latest session — 2026-05-05 (xvii)
 
-**Workspace test count: 0 failing → 0 failing.** **Bugs #1/#2 resolved
-out-of-band by the parser-as-source-of-truth split.** A separate,
-multi-session effort (plan at
-`/home/jola/.claude/plans/alright-let-s-commit-to-vivid-corbato.md`)
-introduced a new `UNRESOLVED_REFERENCE` SyntaxKind so the Pandoc
-parser stops emitting shape-only `LINK` nodes for unresolved
-bracket-shape patterns. Bug #1 (`[foo]` no refdef → malformed LINK)
-is **fully fixed**; bug #2 (`*foo [bar* baz]` emphasis crosses
-brackets) is **partially fixed** — the parse no longer produces a
-malformed partial LINK, but the cross-bracket emphasis pairing isn't
-reconstructed (deferred to stage 6 of that plan).
+**Workspace test count: 0 failing → 0 failing.** **Bug #2 fully
+resolved** (was partially-fixed after recap-(xvi)). Stage 6 of the
+source-of-truth plan landed: `build_full_plans` now degrades the
+`UNRESOLVED_REFERENCE` wrapper to literal `[`/`]` bytes when the
+bracket's interior left any delim-run byte unmatched after the
+scoped emphasis pass. Two small additions:
 
-This work crossed parser/linter/LSP/formatter/projector boundaries,
-exactly as the SKILL.md scope-boundary note warned ("Bugs #1/#2 are
-NOT migration-blockers ... cross-cut beyond the inline-IR
-migration's scope"). It is not part of this skill's pandoc-IR
-migration work and shouldn't be revisited here. If a Pandoc inline
-test now references `UNRESOLVED_REFERENCE` instead of `LINK` shape-
-only, the new behavior is correct — verify against
-`pandoc -f markdown -t native` per `.claude/rules/parser.md`.
+1. Post-scoped-pass scan in `build_full_plans` flips
+   `OpenBracket.unresolved_ref → None` and
+   `CloseBracket.matched → false` on degrade, so
+   `build_bracket_plan` emits `BracketDispo::Literal` for the
+   bracket bytes. The pair stays in `bracket_pairs` only so the
+   inner delims remain in the top-level exclusion mask.
+2. `pandoc_cascade_invalidate` now takes the `excluded` mask and
+   skips excluded events in its triggering scan — otherwise
+   degraded-bracket interior delims would falsely cascade-invalidate
+   outer Emph pairs (which is what initially blocked
+   `*foo [bar*] baz*` from forming the outer Emph).
+
+Heuristic justification: "wrapper-vs-literal where pandoc has nothing
+structural" is benign; "pandoc forms emphasis where we don't" is a
+real semantic loss. Stage 6 enforces the rule by demoting the wrapper
+exactly when keeping it would cost us emphasis pandoc would form.
+Verified with ~13 pandoc-native variants (single/nested/image/`_`
+forms, both-direction asymmetric cases). Bug_2 fixture snapshot
+updated to pandoc-native parity.
 
 ### Files in committable diff
 
+- `crates/panache-parser/src/parser/inlines/inline_ir.rs` (degrade
+  pass + cascade `excluded` plumbing + 2 new unit tests)
+- `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_bug_2_emphasis_crosses_brackets_pandoc.snap`
 - `.claude/skills/pandoc-ir-migrate/RECAP.md` (this entry).
 
 ### Suggested next sub-targets, ranked
 
 1. **(Optional) Sweep `assets/`, `docs/`, and `.claude/rules/` for
    stale IR-migration phase references.** Spot-check only.
-2. **(Optional) Stage 6 of the source-of-truth plan**: bug #2's
-   emphasis-crossing fix via a 4-pass restructure of
-   `build_full_plans`. Out of scope here; tracked under that plan.
 
 ### Don't redo / known traps (new this session)
 
-- **NEW: bugs #1/#2 are no longer "deferred" — they're resolved.**
-  Recaps (xii)/(xiii)/(xiv)/(xv) all listed these as the top-ranked
-  next sub-target. They've now landed via the source-of-truth
-  migration and should not appear in future recap "next sub-targets"
-  lists. The SKILL.md scope-boundary note correctly carved them out
-  as a parser-linter-LSP cross-cut.
+- **The cascade invalidator must respect the `excluded` mask.**
+  Without it, degrading an unresolved bracket leaves the inner
+  unmatched delim in the events array; the cascade sees it has both
+  `can_open && can_close` (Pandoc flanking is permissive) and
+  invalidates the outer pair. Symptom: degrade fires correctly
+  (`brackets.lookup → Literal`) but `emphasis.lookup → Literal`
+  for the outer markers and the test fails the
+  `DelimChar::Open` assertion. Fix: thread `excluded` through to
+  `pandoc_cascade_invalidate` and skip excluded `k` in the scan.
 
 --------------------------------------------------------------------------------
 

@@ -1206,7 +1206,7 @@ fn process_emphasis_in_range_filtered(
     loop {
         let strict = iter > 0;
         run_emphasis_pass(events, lo, hi, excluded, dialect, &rejected, strict);
-        let invalidations = pandoc_cascade_invalidate(events);
+        let invalidations = pandoc_cascade_invalidate(events, excluded);
         if invalidations.is_empty() {
             break;
         }
@@ -1519,7 +1519,10 @@ fn run_emphasis_pass(
 /// between-removal (e.g. `*foo **bar* baz**` → after the outer
 /// `ev0..ev2` Emph is invalidated, `ev1..ev3` matches as Strong on the
 /// next iteration).
-fn pandoc_cascade_invalidate(events: &mut [IrEvent]) -> Vec<(usize, usize)> {
+fn pandoc_cascade_invalidate(
+    events: &mut [IrEvent],
+    excluded: Option<&[bool]>,
+) -> Vec<(usize, usize)> {
     let mut invalidated_pairs: Vec<(usize, usize)> = Vec::new();
     // Early-exit: if there are no `DelimRun` events at all, the cascade
     // pass is a no-op. Avoids allocating the two scratch vecs below for
@@ -1528,6 +1531,7 @@ fn pandoc_cascade_invalidate(events: &mut [IrEvent]) -> Vec<(usize, usize)> {
     if !events.iter().any(|e| matches!(e, IrEvent::DelimRun { .. })) {
         return invalidated_pairs;
     }
+    let is_excluded = |k: usize| excluded.is_some_and(|ex| ex.get(k).copied() == Some(true));
     // Reuse two scratch vecs across the inner loop iterations instead
     // of `.collect()` each time. These are tiny per-paragraph
     // allocations but the function is called for every Pandoc inline
@@ -1576,6 +1580,9 @@ fn pandoc_cascade_invalidate(events: &mut [IrEvent]) -> Vec<(usize, usize)> {
                 // never have tried as a nested-strong opener — those
                 // shouldn't cascade-invalidate the surrounding pair.
                 for k in (opener_idx + 1)..closer_idx {
+                    if is_excluded(k) {
+                        continue;
+                    }
                     if let IrEvent::DelimRun {
                         ch: ch_k,
                         can_open: co_k,
@@ -2579,6 +2586,41 @@ pub fn build_full_plans(
         process_emphasis_in_range(&mut bundle.events, open_idx + 1, close_idx, config.dialect);
     }
 
+    // Pandoc-only degrade pass for unresolved bracket-shape patterns
+    // whose interior left any delim-run byte unmatched after the scoped
+    // emphasis pass. Pandoc-native degrades such brackets to literal `[`
+    // / `]` text — the user's intent was clearly not a reference. The
+    // bracket_pairs entry stays so the inner delims remain in the
+    // top-level exclusion mask (otherwise they'd re-enter pairing and
+    // could form Emph spans with delims outside, which pandoc never
+    // does — see the bug_2_emphasis_crosses_brackets_pandoc fixture).
+    // Flipping `unresolved_ref` to `None` makes `build_bracket_plan`
+    // emit `BracketDispo::Literal` for the bracket bytes; flipping
+    // `CloseBracket.matched` to `false` does the same for the `]`.
+    for i in 0..bundle.bracket_pairs.len() {
+        let (open_idx, close_idx) = bundle.bracket_pairs[i];
+        let is_unresolved = matches!(
+            &bundle.events[open_idx],
+            IrEvent::OpenBracket {
+                resolution: None,
+                unresolved_ref: Some(_),
+                ..
+            }
+        );
+        if !is_unresolved {
+            continue;
+        }
+        if !range_has_unmatched_delim_bytes(&bundle.events, open_idx + 1, close_idx) {
+            continue;
+        }
+        if let IrEvent::OpenBracket { unresolved_ref, .. } = &mut bundle.events[open_idx] {
+            *unresolved_ref = None;
+        }
+        if let IrEvent::CloseBracket { matched, .. } = &mut bundle.events[close_idx] {
+            *matched = false;
+        }
+    }
+
     // Top-level emphasis pass: handles delim runs that fall outside any
     // resolved bracket pair.
     let len = bundle.events.len();
@@ -2617,6 +2659,31 @@ pub fn build_full_plans(
         brackets: build_bracket_plan(&bundle.events),
         constructs: build_construct_plan(&bundle.events),
     }
+}
+
+/// Returns true if any [`IrEvent::DelimRun`] in the event range
+/// `[lo, hi)` has byte coverage from its `matches` vec that is less
+/// than the run length — i.e. at least one byte of the run failed to
+/// pair as emphasis. Used by the Pandoc unresolved-reference degrade
+/// pass in [`build_full_plans`].
+fn range_has_unmatched_delim_bytes(events: &[IrEvent], lo: usize, hi: usize) -> bool {
+    let hi = hi.min(events.len());
+    for ev in &events[lo..hi] {
+        if let IrEvent::DelimRun {
+            start,
+            end,
+            matches,
+            ..
+        } = ev
+        {
+            let total = end - start;
+            let matched: usize = matches.iter().map(|m| m.len as usize).sum();
+            if matched < total {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// Thread-local pool of scratch buffers used by [`build_full_plans`].
@@ -2955,6 +3022,54 @@ mod tests {
         assert!(
             matches!(plans.brackets.lookup(1), Some(BracketDispo::Open { .. })),
             "link [bar*](/url) must resolve at byte 1"
+        );
+    }
+
+    fn pandoc_opts() -> ParserOptions {
+        let flavor = Flavor::Pandoc;
+        ParserOptions {
+            flavor,
+            dialect: crate::options::Dialect::for_flavor(flavor),
+            extensions: crate::options::Extensions::for_flavor(flavor),
+            pandoc_compat: crate::options::PandocCompat::default(),
+            refdef_labels: None,
+        }
+    }
+
+    /// Bug #2 (a): unresolved Pandoc bracket-shape with unmatched delim
+    /// inside its text degrades to literal `[`/`]`. Outer emphasis pair
+    /// across the (now-literal) brackets must form.
+    #[test]
+    fn full_plans_unresolved_bracket_degrades_when_inner_delim_unmatched() {
+        let opts = pandoc_opts();
+        let text = "*foo [bar*] baz*";
+        let plans = build_full_plans(text, 0, text.len(), &opts);
+        assert!(
+            matches!(plans.brackets.lookup(5), Some(BracketDispo::Literal) | None),
+            "degraded `[` at byte 5 must be Literal/None, got {:?}",
+            plans.brackets.lookup(5)
+        );
+        assert!(
+            matches!(plans.emphasis.lookup(0), Some(DelimChar::Open { .. })),
+            "outer `*` at byte 0 must open Emph after degrade, got {:?}",
+            plans.emphasis.lookup(0)
+        );
+    }
+
+    /// Bug #2 (b): unresolved Pandoc bracket whose interior emphasis
+    /// pairs cleanly keeps the wrapper (linter/LSP hook).
+    #[test]
+    fn full_plans_unresolved_bracket_keeps_wrapper_when_inner_paired() {
+        let opts = pandoc_opts();
+        let text = "[foo *bar*]";
+        let plans = build_full_plans(text, 0, text.len(), &opts);
+        assert!(
+            matches!(
+                plans.brackets.lookup(0),
+                Some(BracketDispo::UnresolvedReference { .. })
+            ),
+            "wrapper must be preserved when inner emph pairs, got {:?}",
+            plans.brackets.lookup(0)
         );
     }
 
