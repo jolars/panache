@@ -898,12 +898,6 @@
       "tree": true
     },
     {
-      "case_id": "9YRD",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "A2M4",
       "diagnostic_codes": [
         "YAML_LEX_ERROR"
@@ -1012,12 +1006,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "EX5H",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "EXG3",
@@ -1622,6 +1610,7 @@
     "9SHH",
     "9U5K",
     "9WXW",
+    "9YRD",
     "A6F9",
     "AZW3",
     "B3HG",
@@ -1637,6 +1626,7 @@
     "DFF7",
     "DHP8",
     "E76Z",
+    "EX5H",
     "F2C7",
     "FH7J",
     "FP8R",
@@ -1696,8 +1686,8 @@
   "summary": {
     "error_contract_ok_count": 53,
     "fails_needs_error_path_count": 25,
-    "fails_needs_feature_count": 134,
-    "passes_now_count": 121,
+    "fails_needs_feature_count": 132,
+    "passes_now_count": 123,
     "total_cases": 352
   }
 }

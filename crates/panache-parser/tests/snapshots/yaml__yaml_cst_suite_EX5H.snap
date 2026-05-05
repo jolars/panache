@@ -1,0 +1,30 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: EX5H
+input: "---\na\nb  \n  c\nd\n\ne\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..19
+  YAML_METADATA_CONTENT@0..19
+    YAML_STREAM@0..19
+      YAML_DOCUMENT@0..19
+        YAML_DOCUMENT_START@0..3 "---"
+        NEWLINE@3..4 "\n"
+        YAML_SCALAR@4..5 "a"
+        NEWLINE@5..6 "\n"
+        YAML_SCALAR@6..9 "b  "
+        NEWLINE@9..10 "\n"
+        YAML_SCALAR@10..10 ""
+        WHITESPACE@10..12 "  "
+        YAML_SCALAR@12..13 "c"
+        NEWLINE@13..14 "\n"
+        YAML_SCALAR@14..14 ""
+        YAML_SCALAR@14..15 "d"
+        NEWLINE@15..16 "\n"
+        NEWLINE@16..17 "\n"
+        YAML_SCALAR@17..18 "e"
+        NEWLINE@18..19 "\n"

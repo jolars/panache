@@ -263,13 +263,56 @@ fn scalar_document_value(doc: &SyntaxNode, handles: &TagHandles) -> Option<Strin
     } else if trimmed_text.starts_with('"') || trimmed_text.starts_with('\'') {
         quoted_val_event(&text)
     } else {
-        plain_val_event(&text)
+        let folded = fold_plain_document_lines(doc);
+        format!("=VAL :{}", escape_block_scalar_text(&folded))
     };
     Some(event)
 }
 
 fn plain_val_event(text: &str) -> String {
     format!("=VAL :{}", text.replace('\\', "\\\\"))
+}
+
+/// Fold the YAML-1.2 plain-scalar body of a top-level scalar `YAML_DOCUMENT`
+/// into its canonical value: walk `YAML_SCALAR` and `NEWLINE` tokens in order
+/// (skipping directive lines), then apply plain-scalar folding —
+/// non-empty-line breaks fold to a single space, runs of `n` empty lines fold
+/// to `n` line feeds. Leading/trailing empty lines are stripped.
+fn fold_plain_document_lines(doc: &SyntaxNode) -> String {
+    let raw: String = doc
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::NEWLINE))
+        .filter(|tok| !tok.text().trim_start().starts_with('%'))
+        .map(|tok| tok.text().to_string())
+        .collect();
+
+    let mut out = String::with_capacity(raw.len());
+    let mut empty_run: usize = 0;
+    let mut have_content = false;
+    for line in raw.split('\n') {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            if have_content {
+                empty_run += 1;
+            }
+            continue;
+        }
+        if !have_content {
+            out.push_str(trimmed);
+            have_content = true;
+        } else if empty_run == 0 {
+            out.push(' ');
+            out.push_str(trimmed);
+        } else {
+            for _ in 0..empty_run {
+                out.push('\n');
+            }
+            out.push_str(trimmed);
+        }
+        empty_run = 0;
+    }
+    out
 }
 
 /// Project a flow-collection scalar token, preserving quoted-scalar

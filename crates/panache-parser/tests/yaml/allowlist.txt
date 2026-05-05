@@ -254,3 +254,6 @@ T5N4
 753E
 # Block scalar header packed onto directive-end line: literal with keep chomp (`--- |+`).
 6FWR
+# Multi-line plain scalar at top level: line breaks fold to spaces, blank lines fold to newlines.
+9YRD
+EX5H
