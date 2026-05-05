@@ -158,6 +158,18 @@ support.
 - [ ] Auto-fix capability per rule (infrastructure exists, rules need
       implementation)
 
+### Shared utilities
+
+- [ ] Lift the Levenshtein-based "did you mean…?" helper out of
+      `src/linter/rules/html_entities.rs` into a shared utils module once a
+      second rule wants fuzzy matching. Likely candidates: `citation-keys`
+      (suggest the closest bibliography entry), `undefined-references`
+      (suggest the closest defined label), and `unknown-emoji-alias` (suggest
+      the closest emoji shortcode). Decide the API shape (raw `levenshtein`
+      vs. a `nearest_match(target, candidates, max_distance)` helper that
+      bundles the distance cap and alphabetical tie-break) at the second
+      caller, not before.
+
 ### Open Questions
 
 - How to balance parser error recovery vs. strict linting?
