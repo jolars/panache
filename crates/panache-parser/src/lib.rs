@@ -28,6 +28,11 @@ pub mod parser;
 pub mod range_utils;
 pub mod syntax;
 
+/// Re-export of the [`entities`] crate (HTML5 named-entity table). Downstream
+/// crates should consume the table through this re-export so the parser remains
+/// the single source of truth for HTML entity data.
+pub use entities;
+
 pub use options::Dialect;
 pub use options::Extensions;
 pub use options::Flavor;

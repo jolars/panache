@@ -139,5 +139,8 @@ fn default_registry(config: &Config) -> RuleRegistry {
     if ext.emoji && config.lint.is_rule_enabled("unknown-emoji-alias") {
         registry.register(Box::new(rules::emoji_aliases::EmojiAliasesRule));
     }
+    if config.lint.is_rule_enabled("html-entities") {
+        registry.register(Box::new(rules::html_entities::HtmlEntitiesRule));
+    }
     registry
 }

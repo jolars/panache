@@ -413,6 +413,56 @@ warning[unknown-emoji-alias]: Unknown emoji alias ':not-a-real-emoji:'
   --> document.qmd:1:40
 ```
 
+### `html-entities` {#html-entities}
+
+Detects malformed HTML named entity references in inline prose.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Diagnostic codes
+:   [`html-entities`](#html-entities)
+
+Description
+:   Pandoc and Quarto pass HTML named entities like `&hellip;` through to the
+    output unchanged, so a typo (`&ellips;`) or a missing trailing semicolon
+    (`&numero` instead of `&numero;`) silently produces wrong output. This rule
+    flags two conservative cases:
+
+    - `&NAME;` where `NAME` is not in the [HTML5 named-entity
+      table](https://html.spec.whatwg.org/multipage/named-characters.html).
+    - `&NAME` (no semicolon) where adding the semicolon would produce a known
+      entity. This avoids firing on plain prose like "Tom & Jerry" or "AT&T",
+      since those words are not entity names.
+
+    The rule deliberately ignores numeric character references (`&#123;`,
+    `&#xABCD;`) for now and does not scan code spans, code blocks, raw HTML,
+    inline/display math, link destinations, attributes, YAML metadata, or
+    comments.
+
+**Example violations:**
+
+```markdown
+This is &ellips; wrong.
+
+Section &numero 5 of the report.
+```
+
+**Diagnostics:**
+
+```
+warning[html-entities]: Unknown HTML entity '&ellips;'
+ --> document.qmd:1:9
+  = help: did you mean '&hellip;'?
+
+warning[html-entities]: HTML entity '&numero' is missing a trailing ';'
+ --> document.qmd:3:9
+  = help: write '&numero;' to encode the character
+```
+
 ### `adjacent-footnote-refs` {#adjacent-footnote-refs}
 
 Detects footnote references placed back-to-back (`[^a][^b]`) where the rendered

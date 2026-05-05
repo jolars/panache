@@ -522,6 +522,52 @@ fn test_unused_definitions_resolved_across_project_files() {
 }
 
 #[test]
+fn test_html_entities_default_on() {
+    let diagnostics = lint_file("html_entities.md");
+    let issues: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "html-entities")
+        .collect();
+
+    assert_eq!(
+        issues.len(),
+        2,
+        "expected exactly 2 html-entities diagnostics (typo + missing-semi), got {:?}",
+        issues.iter().map(|d| &d.message).collect::<Vec<_>>()
+    );
+
+    let typo = issues
+        .iter()
+        .find(|d| d.message.contains("&ellips;"))
+        .expect("typo diagnostic for &ellips;");
+    assert_eq!(typo.location.line, 1);
+
+    let missing_semi = issues
+        .iter()
+        .find(|d| d.message.contains("&numero"))
+        .expect("missing-semicolon diagnostic for &numero");
+    assert_eq!(missing_semi.location.line, 3);
+    assert!(missing_semi.message.contains("missing"));
+}
+
+#[test]
+fn test_html_entities_can_be_disabled() {
+    let diagnostics = lint_file_with_config(
+        "html_entities.md",
+        r#"
+[lint.rules]
+html-entities = false
+"#,
+    );
+
+    let issues: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "html-entities")
+        .collect();
+    assert!(issues.is_empty());
+}
+
+#[test]
 fn test_adjacent_footnote_refs() {
     let diagnostics = lint_file("adjacent_footnote_refs.md");
     let issues: Vec<_> = diagnostics
