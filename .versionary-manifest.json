@@ -1,6 +1,6 @@
 {
   "manifest-version": 1,
-  "baseline-sha": "884a3c4d851904b01f5644ad1ca350f013636247",
+  "baseline-sha": "89ce11d1121845530fd0ade7cb4c85829a2bb49c",
   "release-targets": [
     {
       "path": ".",
@@ -19,8 +19,8 @@
     },
     {
       "path": "editors/code",
-      "version": "2.35.0",
-      "tag": "panache-code-v2.35.0"
+      "version": "2.35.1",
+      "tag": "panache-code-v2.35.1"
     },
     {
       "path": "editors/zed",

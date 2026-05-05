@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.42.1](https://github.com/jolars/panache/compare/v2.42.0...v2.42.1) (2026-05-05)
+
+### Bug Fixes
+- **editors:** remove links in docs to pass vs code check ([`f9240fb`](https://github.com/jolars/panache/commit/f9240fb2b478ad136359625ed898c587bc82eaa0))
 ## [2.42.0](https://github.com/jolars/panache/compare/v2.41.1...v2.42.0) (2026-05-05)
 
 ### Features
