@@ -45,6 +45,101 @@ function isReleaseTagExplicitlyConfigured(
   );
 }
 
+function isExecutableStrategyExplicitlyConfigured(
+  config: vscode.WorkspaceConfiguration,
+): boolean {
+  const value = config.inspect<string>("executableStrategy");
+  return (
+    value?.globalValue !== undefined ||
+    value?.workspaceValue !== undefined ||
+    value?.workspaceFolderValue !== undefined
+  );
+}
+
+type ExecutableStrategy = "bundled" | "environment" | "path";
+
+async function resolveCommandPath(
+  context: vscode.ExtensionContext,
+  config: vscode.WorkspaceConfiguration,
+  outputChannel: vscode.OutputChannel,
+): Promise<string> {
+  const githubRepo = config.get<string>("githubRepo", "jolars/panache");
+  const version = config.get<string>("version", "latest");
+  const releaseTag = config.get<string>("releaseTag", "latest");
+  const releaseTagExplicit = isReleaseTagExplicitlyConfigured(config);
+  const selectedRelease = releaseTagExplicit ? releaseTag : version;
+
+  if (isExecutableStrategyExplicitlyConfigured(config)) {
+    const strategy = config.get<ExecutableStrategy>(
+      "executableStrategy",
+      "bundled",
+    );
+    const executablePath = config.get<string | null>("executablePath", null);
+
+    if (strategy === "path") {
+      if (!executablePath || executablePath.trim().length === 0) {
+        void vscode.window.showWarningMessage(
+          "panache.executableStrategy is set to 'path' but panache.executablePath is empty. Falling back to 'panache' on PATH.",
+        );
+        return "panache";
+      }
+      return executablePath;
+    }
+
+    if (strategy === "environment") {
+      return "panache";
+    }
+
+    // strategy === "bundled"
+    try {
+      return await resolvePanacheBinary(
+        context.globalStorageUri.fsPath,
+        githubRepo,
+        selectedRelease,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown download error";
+      void vscode.window.showWarningMessage(
+        `Panache binary download failed (${message}). Falling back to 'panache' on PATH.`,
+      );
+      return "panache";
+    }
+  }
+
+  // Legacy path: respects the deprecated downloadBinary + commandPath settings.
+  const fallbackCommandPath = config.get<string>("commandPath", "panache");
+  const downloadBinary = config.get<boolean>("downloadBinary", true);
+  const downloadBinaryExplicit = isDownloadBinaryExplicitlyConfigured(config);
+  const nixOs = await isNixOs();
+  const shouldDownloadBinary =
+    downloadBinary && (!nixOs || downloadBinaryExplicit);
+
+  if (nixOs && !downloadBinaryExplicit) {
+    outputChannel.appendLine(
+      "Detected NixOS; skipping binary download and using panache.commandPath.",
+    );
+  }
+
+  if (shouldDownloadBinary) {
+    try {
+      return await resolvePanacheBinary(
+        context.globalStorageUri.fsPath,
+        githubRepo,
+        selectedRelease,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown download error";
+      void vscode.window.showWarningMessage(
+        `Panache binary download failed (${message}). Falling back to '${fallbackCommandPath}'.`,
+      );
+    }
+  }
+
+  return fallbackCommandPath;
+}
+
 function mergeServerEnvironment(
   baseEnv: NodeJS.ProcessEnv,
   overrides: Record<string, string>,
@@ -83,40 +178,7 @@ async function startClient(
   outputChannel: vscode.OutputChannel,
 ): Promise<void> {
   const config = vscode.workspace.getConfiguration("panache");
-  const fallbackCommandPath = config.get<string>("commandPath", "panache");
-  const downloadBinary = config.get<boolean>("downloadBinary", true);
-  const downloadBinaryExplicit = isDownloadBinaryExplicitlyConfigured(config);
-  const version = config.get<string>("version", "latest");
-  const releaseTag = config.get<string>("releaseTag", "latest");
-  const releaseTagExplicit = isReleaseTagExplicitlyConfigured(config);
-  const githubRepo = config.get<string>("githubRepo", "jolars/panache");
-  const selectedRelease = releaseTagExplicit ? releaseTag : version;
-  let commandPath = fallbackCommandPath;
-  const nixOs = await isNixOs();
-  const shouldDownloadBinary =
-    downloadBinary && (!nixOs || downloadBinaryExplicit);
-
-  if (nixOs && !downloadBinaryExplicit) {
-    outputChannel.appendLine(
-      "Detected NixOS; skipping binary download and using panache.commandPath.",
-    );
-  }
-
-  if (shouldDownloadBinary) {
-    try {
-      commandPath = await resolvePanacheBinary(
-        context.globalStorageUri.fsPath,
-        githubRepo,
-        selectedRelease,
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown download error";
-      void vscode.window.showWarningMessage(
-        `Panache binary download failed (${message}). Falling back to '${fallbackCommandPath}'.`,
-      );
-    }
-  }
+  const commandPath = await resolveCommandPath(context, config, outputChannel);
 
   const serverArgs = config.get<string[]>("serverArgs", []);
   const userServerEnv = config.get<Record<string, string>>("serverEnv", {});

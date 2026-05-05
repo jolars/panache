@@ -67,15 +67,40 @@
     "configuration": {
       "title": "Panache",
       "properties": {
+        "panache.executableStrategy": {
+          "type": "string",
+          "enum": [
+            "bundled",
+            "environment",
+            "path"
+          ],
+          "enumDescriptions": [
+            "Download and use a Panache binary from GitHub releases (default).",
+            "Look for `panache` on the system PATH.",
+            "Use the binary at `panache.executablePath`."
+          ],
+          "default": "bundled",
+          "markdownDescription": "Strategy used to locate the `panache` executable for the language server. Takes precedence over the deprecated `panache.downloadBinary` and `panache.commandPath` when explicitly set."
+        },
+        "panache.executablePath": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "markdownDescription": "Path to the `panache` executable. Only used when `panache.executableStrategy` is set to `path`."
+        },
         "panache.commandPath": {
           "type": "string",
           "default": "panache",
-          "description": "Path to the panache binary used to launch the language server (fallback if auto-download is enabled)."
+          "markdownDeprecationMessage": "Deprecated: use `panache.executableStrategy` (set to `path`) together with `panache.executablePath` instead.",
+          "markdownDescription": "Path to the panache binary used to launch the language server (fallback if auto-download is enabled)."
         },
         "panache.downloadBinary": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically download a platform-specific Panache binary from GitHub releases."
+          "markdownDeprecationMessage": "Deprecated: use `panache.executableStrategy` instead (`bundled` to download, `environment` to use PATH).",
+          "markdownDescription": "Automatically download a platform-specific Panache binary from GitHub releases."
         },
         "panache.version": {
           "type": "string",
