@@ -531,8 +531,8 @@ fn test_html_entities_default_on() {
 
     assert_eq!(
         issues.len(),
-        2,
-        "expected exactly 2 html-entities diagnostics (typo + missing-semi), got {:?}",
+        3,
+        "expected exactly 3 html-entities diagnostics (typo + missing-semi + near-miss), got {:?}",
         issues.iter().map(|d| &d.message).collect::<Vec<_>>()
     );
 
@@ -548,6 +548,18 @@ fn test_html_entities_default_on() {
         .expect("missing-semicolon diagnostic for &numero");
     assert_eq!(missing_semi.location.line, 3);
     assert!(missing_semi.message.contains("missing"));
+
+    let near_miss = issues
+        .iter()
+        .find(|d| d.message.contains("&hellp"))
+        .expect("near-miss diagnostic for &hellp");
+    assert_eq!(near_miss.location.line, 5);
+    assert!(
+        near_miss
+            .notes
+            .iter()
+            .any(|n| n.message.contains("&hellip;"))
+    );
 }
 
 #[test]

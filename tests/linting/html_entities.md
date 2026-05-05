@@ -2,6 +2,8 @@ Typo with semicolon: &ellips; should be flagged.
 
 Missing semicolon: section &numero 5 should be flagged.
 
+Near-miss without semicolon: &hellp here should be flagged.
+
 Valid entity &hellip; should not be flagged.
 
 Tom & Jerry are friends — should not be flagged.

@@ -70,6 +70,20 @@ impl Rule for HtmlEntitiesRule {
                         DiagnosticNoteKind::Help,
                         format!("write '&{};' to encode the character", hit.name),
                     ),
+                    Verdict::UnknownNoSemicolon => {
+                        let mut d = Diagnostic::warning(
+                            location,
+                            "html-entities",
+                            format!("Unknown HTML entity '&{}'", hit.name),
+                        );
+                        if let Some(suggestion) = nearest_named_entity(hit.name) {
+                            d = d.with_note(
+                                DiagnosticNoteKind::Help,
+                                format!("did you mean '&{};'?", suggestion),
+                            );
+                        }
+                        d
+                    }
                 };
 
                 diagnostics.push(diag);
@@ -92,6 +106,7 @@ struct EntityHit<'a> {
 enum Verdict {
     UnknownNamed,
     MissingSemicolon,
+    UnknownNoSemicolon,
 }
 
 fn scan_entity_candidates(text: &str) -> Vec<EntityHit<'_>> {
@@ -136,6 +151,16 @@ fn scan_entity_candidates(text: &str) -> Vec<EntityHit<'_>> {
                     end: j,
                     name,
                     kind: Verdict::MissingSemicolon,
+                });
+            } else if !is_known_with_semi(name)
+                && !is_known_without_semi(name)
+                && looks_like_entity_typo(name)
+            {
+                hits.push(EntityHit {
+                    start: i,
+                    end: j,
+                    name,
+                    kind: Verdict::UnknownNoSemicolon,
                 });
             }
             i = j.max(i + 1);
@@ -217,6 +242,21 @@ fn is_known_with_semi(name: &str) -> bool {
 
 fn is_known_without_semi(name: &str) -> bool {
     entity_sets().1.contains(name)
+}
+
+fn looks_like_entity_typo(name: &str) -> bool {
+    if name.len() < 4 {
+        return false;
+    }
+    for candidate in entity_sets().0.iter() {
+        if candidate.len().abs_diff(name.len()) > 1 {
+            continue;
+        }
+        if levenshtein(name, candidate) == 1 {
+            return true;
+        }
+    }
+    false
 }
 
 fn nearest_named_entity(name: &str) -> Option<&'static str> {
@@ -345,6 +385,37 @@ mod tests {
             "expected suggestion note pointing to &hellip;, got: {:?}",
             d.notes
         );
+    }
+
+    #[test]
+    fn flags_unknown_no_semicolon_when_close_to_known_entity() {
+        // `&hellp` is one edit away from `&hellip;`, so flag it even without `;`.
+        let diagnostics = parse_and_lint("Try &hellp here.");
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "html-entities");
+        assert!(diagnostics[0].message.contains("&hellp"));
+        assert!(
+            diagnostics[0]
+                .notes
+                .iter()
+                .any(|n| n.message.contains("&hellip;"))
+        );
+    }
+
+    #[test]
+    fn does_not_flag_unknown_no_semicolon_far_from_entities() {
+        // `&barfo` isn't within edit distance 1 of any known entity → don't flag.
+        // Conservative on purpose: prose like `Procter &Gamble` must stay quiet.
+        let diagnostics = parse_and_lint("Hello &barfo world.");
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn does_not_flag_short_unknown_no_semicolon() {
+        // Min length 4 keeps prose like `Tom &Jay` quiet even if `Jay` happens
+        // to be one edit from a 3-char entity.
+        let diagnostics = parse_and_lint("Tom &Jay went home.");
+        assert!(diagnostics.is_empty());
     }
 
     #[test]

@@ -431,13 +431,16 @@ Description
 :   Pandoc and Quarto pass HTML named entities like `&hellip;` through to the
     output unchanged, so a typo (`&ellips;`) or a missing trailing semicolon
     (`&numero` instead of `&numero;`) silently produces wrong output. This rule
-    flags two conservative cases:
+    flags three conservative cases:
 
     - `&NAME;` where `NAME` is not in the [HTML5 named-entity
       table](https://html.spec.whatwg.org/multipage/named-characters.html).
     - `&NAME` (no semicolon) where adding the semicolon would produce a known
       entity. This avoids firing on plain prose like "Tom & Jerry" or "AT&T",
       since those words are not entity names.
+    - `&NAME` (no semicolon, length ≥ 4) where `NAME` is one edit away from a
+      known entity (e.g. `&hellp` → `&hellip;`). Far-from-anything words are
+      left alone to keep prose like "Procter &Gamble" quiet.
 
     The rule deliberately ignores numeric character references (`&#123;`,
     `&#xABCD;`) for now and does not scan code spans, code blocks, raw HTML,
