@@ -1,0 +1,42 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: K858
+input: "strip: >-\n\nclip: >\n\nkeep: |+\n\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..30
+  YAML_METADATA_CONTENT@0..30
+    YAML_STREAM@0..30
+      YAML_DOCUMENT@0..30
+        YAML_BLOCK_MAP@0..30
+          YAML_BLOCK_MAP_ENTRY@0..11
+            YAML_BLOCK_MAP_KEY@0..6
+              YAML_KEY@0..5 "strip"
+              YAML_COLON@5..6 ":"
+            YAML_BLOCK_MAP_VALUE@6..11
+              WHITESPACE@6..7 " "
+              YAML_SCALAR@7..9 ">-"
+              NEWLINE@9..10 "\n"
+              NEWLINE@10..11 "\n"
+          YAML_BLOCK_MAP_ENTRY@11..20
+            YAML_BLOCK_MAP_KEY@11..16
+              YAML_KEY@11..15 "clip"
+              YAML_COLON@15..16 ":"
+            YAML_BLOCK_MAP_VALUE@16..20
+              WHITESPACE@16..17 " "
+              YAML_SCALAR@17..18 ">"
+              NEWLINE@18..19 "\n"
+              NEWLINE@19..20 "\n"
+          YAML_BLOCK_MAP_ENTRY@20..30
+            YAML_BLOCK_MAP_KEY@20..25
+              YAML_KEY@20..24 "keep"
+              YAML_COLON@24..25 ":"
+            YAML_BLOCK_MAP_VALUE@25..30
+              WHITESPACE@25..26 " "
+              YAML_SCALAR@26..28 "|+"
+              NEWLINE@28..29 "\n"
+              NEWLINE@29..30 "\n"

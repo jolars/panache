@@ -1,0 +1,52 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: FH7J
+input: "- !!str\n-\n  !!null : a\n  b: !!str\n- !!str : !!null\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..51
+  YAML_METADATA_CONTENT@0..51
+    YAML_STREAM@0..51
+      YAML_DOCUMENT@0..51
+        YAML_BLOCK_SEQUENCE@0..51
+          YAML_BLOCK_SEQUENCE_ITEM@0..8
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_TAG@2..7 "!!str"
+            NEWLINE@7..8 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@8..34
+            YAML_BLOCK_SEQ_ENTRY@8..9 "-"
+            NEWLINE@9..10 "\n"
+            YAML_BLOCK_MAP@10..34
+              YAML_BLOCK_MAP_ENTRY@10..23
+                YAML_BLOCK_MAP_KEY@10..20
+                  WHITESPACE@10..12 "  "
+                  YAML_TAG@12..18 "!!null"
+                  WHITESPACE@18..19 " "
+                  YAML_KEY@19..19 ""
+                  YAML_COLON@19..20 ":"
+                YAML_BLOCK_MAP_VALUE@20..22
+                  WHITESPACE@20..21 " "
+                  YAML_SCALAR@21..22 "a"
+                NEWLINE@22..23 "\n"
+              YAML_BLOCK_MAP_ENTRY@23..34
+                YAML_BLOCK_MAP_KEY@23..27
+                  WHITESPACE@23..25 "  "
+                  YAML_KEY@25..26 "b"
+                  YAML_COLON@26..27 ":"
+                YAML_BLOCK_MAP_VALUE@27..33
+                  WHITESPACE@27..28 " "
+                  YAML_TAG@28..33 "!!str"
+                  YAML_SCALAR@33..33 ""
+                NEWLINE@33..34 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@34..51
+            YAML_BLOCK_SEQ_ENTRY@34..35 "-"
+            WHITESPACE@35..36 " "
+            YAML_TAG@36..41 "!!str"
+            WHITESPACE@41..42 " "
+            YAML_SCALAR@42..50 ": !!null"
+            NEWLINE@50..51 "\n"

@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 245
+expression: snapshot
+---
+case_id: 9U5K
+input: "---\n# Products purchased\n- item    : Super Hoop\n  quantity: 1\n- item    : Basketball\n  quantity: 4\n- item    : Big Shoes\n  quantity: 1\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

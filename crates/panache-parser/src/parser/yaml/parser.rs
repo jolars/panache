@@ -475,6 +475,30 @@ fn emit_block_seq<'a>(
                 builder.token(SyntaxKind::WHITESPACE.into(), tokens[*i].text);
                 *i += 1;
             }
+            // A comment between/before block-seq items is sequence-level
+            // trivia — absorb it so the sequence isn't split into two
+            // documents at the stream level. Only absorb when another
+            // BlockSeqEntry follows; if a document boundary follows the
+            // comment, the sequence has ended and the comment belongs at
+            // the document/stream level (the snapshot for case JHB9 pins
+            // this).
+            YamlToken::Comment => {
+                let mut peek = *i + 1;
+                while peek < tokens.len()
+                    && matches!(
+                        tokens[peek].kind,
+                        YamlToken::Newline | YamlToken::Whitespace | YamlToken::Comment
+                    )
+                {
+                    peek += 1;
+                }
+                if peek < tokens.len() && tokens[peek].kind == YamlToken::BlockSeqEntry {
+                    builder.token(SyntaxKind::YAML_COMMENT.into(), tokens[*i].text);
+                    *i += 1;
+                } else {
+                    break;
+                }
+            }
             YamlToken::Dedent => {
                 if stop_on_dedent {
                     *i += 1;

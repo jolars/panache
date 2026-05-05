@@ -973,12 +973,6 @@
       "tree": false
     },
     {
-      "case_id": "9U5K",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "9YRD",
       "diagnostic_codes": [
         "YAML_PARSE_UNEXPECTED_INDENT"
@@ -990,14 +984,6 @@
       "case_id": "A2M4",
       "diagnostic_codes": [
         "YAML_LEX_ERROR"
-      ],
-      "event_parity": false,
-      "tree": false
-    },
-    {
-      "case_id": "A6F9",
-      "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
       ],
       "event_parity": false,
       "tree": false
@@ -1083,12 +1069,6 @@
       "tree": false
     },
     {
-      "case_id": "DBG4",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "DC7X",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_KEY_TOKEN"
@@ -1147,7 +1127,7 @@
     {
       "case_id": "F6MC",
       "diagnostic_codes": [
-        "YAML_LEX_ERROR"
+        "YAML_PARSE_INVALID_KEY_TOKEN"
       ],
       "event_parity": false,
       "tree": false
@@ -1155,7 +1135,7 @@
     {
       "case_id": "F8F9",
       "diagnostic_codes": [
-        "YAML_LEX_ERROR"
+        "YAML_PARSE_INVALID_KEY_TOKEN"
       ],
       "event_parity": false,
       "tree": false
@@ -1167,12 +1147,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "FH7J",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "FP8R",
@@ -1293,12 +1267,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "K858",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "KK5P",
@@ -1783,7 +1751,9 @@
     "9FMG",
     "9J7A",
     "9SHH",
+    "9U5K",
     "9WXW",
+    "A6F9",
     "AZW3",
     "C2DT",
     "CC74",
@@ -1793,10 +1763,12 @@
     "CUP7",
     "D88J",
     "D9TU",
+    "DBG4",
     "DFF7",
     "DHP8",
     "E76Z",
     "F2C7",
+    "FH7J",
     "FQ7F",
     "FRK4",
     "G4RS",
@@ -1810,6 +1782,7 @@
     "JR7V",
     "JS2J",
     "K4SU",
+    "K858",
     "KMK3",
     "L9U5",
     "LE5A",
@@ -1848,8 +1821,8 @@
   "summary": {
     "error_contract_ok_count": 54,
     "fails_needs_error_path_count": 24,
-    "fails_needs_feature_count": 153,
-    "passes_now_count": 102,
+    "fails_needs_feature_count": 148,
+    "passes_now_count": 107,
     "total_cases": 352
   }
 }

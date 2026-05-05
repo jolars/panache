@@ -1,0 +1,64 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: 9U5K
+input: "---\n# Products purchased\n- item    : Super Hoop\n  quantity: 1\n- item    : Basketball\n  quantity: 4\n- item    : Big Shoes\n  quantity: 1\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..135
+  YAML_METADATA_CONTENT@0..135
+    YAML_STREAM@0..135
+      YAML_DOCUMENT@0..135
+        YAML_DOCUMENT_START@0..3 "---"
+        NEWLINE@3..4 "\n"
+        YAML_BLOCK_SEQUENCE@4..135
+          YAML_COMMENT@4..24 "# Products purchased"
+          NEWLINE@24..25 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@25..62
+            YAML_BLOCK_SEQ_ENTRY@25..26 "-"
+            WHITESPACE@26..27 " "
+            YAML_SCALAR@27..47 "item    : Super Hoop"
+            NEWLINE@47..48 "\n"
+            YAML_BLOCK_MAP@48..62
+              YAML_BLOCK_MAP_ENTRY@48..62
+                YAML_BLOCK_MAP_KEY@48..59
+                  WHITESPACE@48..50 "  "
+                  YAML_KEY@50..58 "quantity"
+                  YAML_COLON@58..59 ":"
+                YAML_BLOCK_MAP_VALUE@59..61
+                  WHITESPACE@59..60 " "
+                  YAML_SCALAR@60..61 "1"
+                NEWLINE@61..62 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@62..99
+            YAML_BLOCK_SEQ_ENTRY@62..63 "-"
+            WHITESPACE@63..64 " "
+            YAML_SCALAR@64..84 "item    : Basketball"
+            NEWLINE@84..85 "\n"
+            YAML_BLOCK_MAP@85..99
+              YAML_BLOCK_MAP_ENTRY@85..99
+                YAML_BLOCK_MAP_KEY@85..96
+                  WHITESPACE@85..87 "  "
+                  YAML_KEY@87..95 "quantity"
+                  YAML_COLON@95..96 ":"
+                YAML_BLOCK_MAP_VALUE@96..98
+                  WHITESPACE@96..97 " "
+                  YAML_SCALAR@97..98 "4"
+                NEWLINE@98..99 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@99..135
+            YAML_BLOCK_SEQ_ENTRY@99..100 "-"
+            WHITESPACE@100..101 " "
+            YAML_SCALAR@101..120 "item    : Big Shoes"
+            NEWLINE@120..121 "\n"
+            YAML_BLOCK_MAP@121..135
+              YAML_BLOCK_MAP_ENTRY@121..135
+                YAML_BLOCK_MAP_KEY@121..132
+                  WHITESPACE@121..123 "  "
+                  YAML_KEY@123..131 "quantity"
+                  YAML_COLON@131..132 ":"
+                YAML_BLOCK_MAP_VALUE@132..134
+                  WHITESPACE@132..133 " "
+                  YAML_SCALAR@133..134 "1"
+                NEWLINE@134..135 "\n"

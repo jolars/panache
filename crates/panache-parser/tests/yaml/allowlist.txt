@@ -221,3 +221,13 @@ AZW3
 93JH
 # Flow sequence as a block-map key (`[flow]: block`) projected as `+SEQ [] ... -SEQ`.
 LX3P
+# Comment between block-sequence items absorbed as seq-level trivia (Spec 2.12 compact nested mapping).
+9U5K
+# Comment between block-sequence items where the second item is a flow seq (Spec 7.10 plain characters).
+DBG4
+# Block-seq inline-map item with tagged empty key/value (`- !!str : !!null`); tag preserved across colon.
+FH7J
+# Block-scalar header with explicit chomping/indent indicators (`>-`, `|+`); empty body honors keep chomp.
+K858
+# Block-scalar chomping spec example: strip/clip/keep applied to non-empty body (`|-`, `|`, `|+`).
+A6F9

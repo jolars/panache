@@ -585,8 +585,9 @@ fn escape_block_scalar_text(text: &str) -> String {
 }
 
 /// If `value_node` encodes a literal (`|`) or folded (`>`) block scalar,
-/// return the folded scalar body (no escaping applied yet). Scope: default
-/// clip chomping, auto-detected content indent, no explicit indicators.
+/// return the folded scalar body. Headers with explicit chomping (`-` strip,
+/// `+` keep) or indent indicators are recognized; chomping is applied to the
+/// final body. Default chomping is "clip" (single trailing newline).
 fn extract_block_scalar_body(value_node: &SyntaxNode) -> Option<(char, String)> {
     let tokens: Vec<_> = value_node
         .descendants_with_tokens()
@@ -597,11 +598,7 @@ fn extract_block_scalar_body(value_node: &SyntaxNode) -> Option<(char, String)> 
     if first.kind() != SyntaxKind::YAML_SCALAR {
         return None;
     }
-    let indicator = match first.text() {
-        "|" => '|',
-        ">" => '>',
-        _ => return None,
-    };
+    let (indicator, chomp) = parse_block_scalar_indicator(first.text())?;
 
     let mut raw = String::new();
     let mut seen_header = false;
@@ -614,6 +611,10 @@ fn extract_block_scalar_body(value_node: &SyntaxNode) -> Option<(char, String)> 
         }
         raw.push_str(tok.text());
     }
+
+    // Count trailing newlines from `raw` so the keep chomping can recover
+    // them after `lines.pop()` discards the trailing empty line.
+    let raw_trailing_newlines = raw.chars().rev().take_while(|c| *c == '\n').count();
 
     let mut lines: Vec<&str> = raw.split('\n').collect();
     if lines.last().is_some_and(|s| s.is_empty()) {
@@ -661,12 +662,54 @@ fn extract_block_scalar_body(value_node: &SyntaxNode) -> Option<(char, String)> 
     };
 
     let trimmed = folded.trim_end_matches('\n');
-    let body = if trimmed.is_empty() {
-        String::new()
-    } else {
-        format!("{trimmed}\n")
+    let body = match chomp {
+        BlockScalarChomp::Strip => trimmed.to_string(),
+        BlockScalarChomp::Clip => {
+            if trimmed.is_empty() {
+                String::new()
+            } else {
+                format!("{trimmed}\n")
+            }
+        }
+        BlockScalarChomp::Keep => {
+            format!("{trimmed}{}", "\n".repeat(raw_trailing_newlines))
+        }
     };
     Some((indicator, body))
+}
+
+#[derive(Clone, Copy)]
+enum BlockScalarChomp {
+    Clip,
+    Strip,
+    Keep,
+}
+
+fn parse_block_scalar_indicator(text: &str) -> Option<(char, BlockScalarChomp)> {
+    let mut chars = text.chars();
+    let indicator = match chars.next()? {
+        '|' => '|',
+        '>' => '>',
+        _ => return None,
+    };
+    let mut chomp = BlockScalarChomp::Clip;
+    let mut seen_chomp = false;
+    let mut seen_indent = false;
+    for ch in chars {
+        match ch {
+            '+' if !seen_chomp => {
+                chomp = BlockScalarChomp::Keep;
+                seen_chomp = true;
+            }
+            '-' if !seen_chomp => {
+                chomp = BlockScalarChomp::Strip;
+                seen_chomp = true;
+            }
+            '1'..='9' if !seen_indent => seen_indent = true,
+            _ => return None,
+        }
+    }
+    Some((indicator, chomp))
 }
 
 fn fold_plain_scalar(text: &str) -> String {
@@ -929,12 +972,23 @@ fn project_block_sequence_items(
         }
         // Inline-map sequence item: `- key: value` (with optional continuation
         // lines that the parser captures as a nested YAML_BLOCK_MAP). The
-        // direct YAML_SCALAR token chain encodes the first entry; subsequent
-        // entries live in the nested map node.
+        // direct YAML_SCALAR/YAML_TAG/whitespace token chain encodes the first
+        // entry; subsequent entries live in the nested map node. Including
+        // YAML_TAG keeps tagged empty keys/values (`- !!str : !!null`) intact
+        // so `decompose_scalar` can recover the tag.
         let direct_scalar: String = item
             .children_with_tokens()
             .filter_map(|el| el.into_token())
-            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+            .filter(|tok| {
+                matches!(
+                    tok.kind(),
+                    SyntaxKind::YAML_SCALAR
+                        | SyntaxKind::YAML_TAG
+                        | SyntaxKind::YAML_KEY
+                        | SyntaxKind::YAML_COLON
+                        | SyntaxKind::WHITESPACE,
+                )
+            })
             .map(|tok| tok.text().to_string())
             .collect();
         if let Some(colon_idx) = find_block_scalar_kv_split(&direct_scalar) {

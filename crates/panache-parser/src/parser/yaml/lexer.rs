@@ -257,6 +257,28 @@ fn contains_unquoted_mapping_indicator(text: &str) -> bool {
     false
 }
 
+/// Recognize a YAML 1.2 block-scalar header on the value side of a mapping
+/// line: `|` or `>` optionally followed by a chomping indicator (`+` / `-`)
+/// and/or a single-digit indent indicator (`1`–`9`), in either order, each
+/// at most once. Examples: `|`, `>`, `>-`, `|+`, `|2`, `>2-`, `|-2`.
+fn is_block_scalar_header(text: &str) -> bool {
+    let mut chars = text.chars();
+    match chars.next() {
+        Some('|' | '>') => {}
+        _ => return false,
+    }
+    let mut seen_chomp = false;
+    let mut seen_indent = false;
+    for ch in chars {
+        match ch {
+            '+' | '-' if !seen_chomp => seen_chomp = true,
+            '1'..='9' if !seen_indent => seen_indent = true,
+            _ => return false,
+        }
+    }
+    true
+}
+
 fn is_valid_double_quote_escape(ch: char) -> bool {
     matches!(
         ch,
@@ -767,7 +789,7 @@ fn lex_mapping_line_tokens<'a>(
                 byte_end: line_start + line.len(),
             });
         }
-        if scalar_part == "|" || scalar_part == ">" {
+        if is_block_scalar_header(scalar_part) {
             push_token(out, YamlToken::BlockScalarHeader, scalar_part);
         } else {
             emit_scalar_like_tokens(scalar_part, out);
