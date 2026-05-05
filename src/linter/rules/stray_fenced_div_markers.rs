@@ -35,7 +35,7 @@ impl Rule for StrayFencedDivMarkersRule {
 
             let mut line_offset = 0usize;
             for line in slice.split_inclusive('\n') {
-                let raw_line = line.trim_end_matches('\n');
+                let raw_line = line.trim_end_matches('\n').trim_end_matches('\r');
                 if let Some(hit) = match_stray_fence(raw_line) {
                     let abs_start = para_start + (line_offset + hit.start) as u32;
                     let abs_end = para_start + (line_offset + hit.end) as u32;
@@ -181,6 +181,13 @@ mod tests {
     #[test]
     fn flags_trailing_whitespace_after_colons() {
         let input = "p\n\n:::   \n\nmore\n";
+        let diagnostics = parse_and_lint(input);
+        assert_eq!(diagnostics.len(), 1);
+    }
+
+    #[test]
+    fn flags_crlf_line_endings() {
+        let input = "p\r\n\r\n:::\r\n\r\nmore\r\n";
         let diagnostics = parse_and_lint(input);
         assert_eq!(diagnostics.len(), 1);
     }
