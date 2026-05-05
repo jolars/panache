@@ -151,4 +151,4 @@ downloaded from GitHub releases configured by `panache.githubRepo` and either
 ## Links
 
 - Main repository: <https://github.com/jolars/panache>
-- Documentation: <https://panache.bz/>
+- Documentation: <https://jolars.github.io/panache/>
