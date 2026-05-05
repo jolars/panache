@@ -501,6 +501,60 @@ See the prior reports[^a][^b] for context.
 See the prior reports[^a] [^b] for context.
 ```
 
+### `stray-fenced-div-markers` {#stray-fenced-div-markers}
+
+Detects stray closing fenced div markers (`:::` or longer runs of colons) that
+do not pair with an opening fence and consequently land inside paragraph text.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Requirements
+:   Requires `extensions.fenced-divs = true` in configuration (default for
+    Pandoc, Quarto, and R Markdown flavors).
+
+Diagnostic codes
+:   [`stray-fenced-div-markers`](#stray-fenced-div-markers)
+
+Description
+
+:   Pandoc fenced divs use `:::` (or longer colon runs) for both openers (with
+    an attribute or class) and closers (bare colons). When a closer-shaped line
+    has no matching opener in scope, Pandoc treats it as ordinary paragraph text
+    instead of as a div marker. This is almost always a typo---a mismatched
+    fence count between opener and closer, an accidentally deleted opener, or a
+    copy/paste artifact---and the document silently renders with `:::` showing
+    up in the prose.
+
+    Quarto's runtime emits a warning when it sees stray `:::`, but exits 0, which
+    makes the issue invisible to CI/Makefile workflows. This rule fills that gap by
+    flagging the same condition at lint time.
+
+    The rule fires when, after up to three leading spaces, a line in a paragraph
+    consists of three or more colons followed only by trailing whitespace. It does
+    **not** flag mid-line `:::`, code spans containing `:::`, or indented code
+    blocks---those are not closing-fence shapes.
+
+**Example violation:**
+
+```markdown
+::: warning
+The fence count on the opener and closer don't match.
+::::
+```
+
+**Diagnostic:**
+
+```
+warning[stray-fenced-div-markers]: Stray fenced div marker '::::' has no matching opener
+ --> document.qmd:3:1
+  = help: if this is meant to close a div, check the opener's class/attributes;
+          otherwise escape the colons or rewrite the line
+```
+
 ## YAML diagnostics
 
 Panache emits YAML diagnostics when embedded YAML content is invalid. These

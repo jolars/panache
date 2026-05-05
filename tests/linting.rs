@@ -595,3 +595,21 @@ fn test_adjacent_footnote_refs() {
         assert_eq!(fix.edits[0].replacement, " ");
     }
 }
+
+#[test]
+fn test_stray_fenced_div_markers() {
+    let diagnostics = lint_file("stray_fenced_div_markers.md");
+    let issues: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "stray-fenced-div-markers")
+        .collect();
+
+    assert_eq!(issues.len(), 2, "expected 2 diagnostics, got {:#?}", issues);
+    let lines: Vec<usize> = issues.iter().map(|d| d.location.line).collect();
+    assert_eq!(lines, vec![9, 23]);
+    assert!(issues.iter().all(|d| d.fix.is_none()));
+    assert!(
+        issues[0].message.contains(":::"),
+        "message should mention the marker"
+    );
+}

@@ -142,5 +142,10 @@ fn default_registry(config: &Config) -> RuleRegistry {
     if config.lint.is_rule_enabled("html-entities") {
         registry.register(Box::new(rules::html_entities::HtmlEntitiesRule));
     }
+    if ext.fenced_divs && config.lint.is_rule_enabled("stray-fenced-div-markers") {
+        registry.register(Box::new(
+            rules::stray_fenced_div_markers::StrayFencedDivMarkersRule,
+        ));
+    }
     registry
 }
