@@ -147,8 +147,3 @@ directory:
 When `panache.executableStrategy` is `bundled` (the default), binaries are
 downloaded from GitHub releases configured by `panache.githubRepo` and either
 `panache.version` or `panache.releaseTag` (if explicitly set).
-
-## Links
-
-- Main repository: <https://github.com/jolars/panache>
-- Documentation: <https://panache.bz/>
