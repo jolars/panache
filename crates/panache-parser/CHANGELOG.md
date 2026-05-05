@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.7.0](https://github.com/jolars/panache/compare/panache-parser-v0.6.1...panache-parser-v0.7.0) (2026-05-05)
+
+### Features
+- **linter:** add linting rule for bad HTML entities ([`93aa280`](https://github.com/jolars/panache/commit/93aa2804dcd6d874d2c02b149ecead83233d9bc0)), closes [#251](https://github.com/jolars/panache/issues/251)
+- wire new reference impl into salsa and CST ([`3ba22c1`](https://github.com/jolars/panache/commit/3ba22c1700591cd6d1c173d74416c97987a33fa0))
+- add `parse_with_refdefs` and `UNRESOLVED_REFERENCE` ([`e6c17fb`](https://github.com/jolars/panache/commit/e6c17fb6f2903c74bbe547b19200abcb381dcc4d))
+- **parser:** expose pandoc-native projector as public API ([`5b79b92`](https://github.com/jolars/panache/commit/5b79b92647fe889fcd1179e1145902bb4588f22e))
+
+### Bug Fixes
+- **parser:** degrade unresolved bracket if inner emph leaks ([`e1c291b`](https://github.com/jolars/panache/commit/e1c291b0b2f478324e91e90e4895333d099c89e9)), closes [#250](https://github.com/jolars/panache/issues/250)
+- handle ambiguous markers and indented code block ([`8d3db6d`](https://github.com/jolars/panache/commit/8d3db6d5937137ae825523f0f8141edcdd200fa4))
+- **parser:** allow drift tolerance for list parsing ([`1836a7b`](https://github.com/jolars/panache/commit/1836a7b748c127ffe794a137df91940f30567382)), closes [#246](https://github.com/jolars/panache/issues/246)
+- **parser:** handle tilde-fences dispatch correctly ([`519abd1`](https://github.com/jolars/panache/commit/519abd1c12dff37331e9aad3d2baefe4b7701fb9)), closes [#248](https://github.com/jolars/panache/issues/248)
+- **parser:** fix byte-order breakage in tilde-fenced code ([`18ca6c2`](https://github.com/jolars/panache/commit/18ca6c2bec5e46ee241df774e772f2e37105ed5a)), closes [#249](https://github.com/jolars/panache/issues/249)
+- recursive into linst/blockquote/list ([`175d78e`](https://github.com/jolars/panache/commit/175d78e6ce5287578fe7c7ee5c3c079e674f2663))
+- handle lazy-continuation for blockquote + list ([`4a490ff`](https://github.com/jolars/panache/commit/4a490ff25df2d09b8405aef3756a51f85b925e39))
+- allow continuation list without blank line in definition ([`daed645`](https://github.com/jolars/panache/commit/daed645a295715108ad25a4c36f1d18bad00a57f))
+- peek-ahead in blankline in blockquote ([`74adea6`](https://github.com/jolars/panache/commit/74adea62a08920d021c514ef4c58e92fca0a93f8))
+- handle pandoc-commonmark divergence on html comments ([`ca301f9`](https://github.com/jolars/panache/commit/ca301f99a4dc74d7d40ad087d59f97928cff5fc4))
+- handle same-line block quote marker ([`3c6c3dd`](https://github.com/jolars/panache/commit/3c6c3dd7739ed592d3f6e6c7305a9d616a953fb2))
+- **parser:** handle direct list-in-lis correctly ([`5c6a4ae`](https://github.com/jolars/panache/commit/5c6a4ae6ac476232ef6040df586610cfc13f44ef))
+- correctly handle definition inside footnote ([`3a30b05`](https://github.com/jolars/panache/commit/3a30b0588acb6a023389fc04604b0ff01d3d6ce4))
+- correctly parse and format definition with bare list ([`72c9a2b`](https://github.com/jolars/panache/commit/72c9a2ba960eaf2431e2b81f9fc2f3ace5f1920b))
+- parse and format headings inside lists ([`d7e714e`](https://github.com/jolars/panache/commit/d7e714ebab500156d6e5a3b5887173f9ea1e6402))
+- **parser:** fix early-bail to not fire incor for strikeout ([`f486309`](https://github.com/jolars/panache/commit/f486309b4c32699be3beef9f181936f809ac3b10))
+- **parser:** require two spaces after roman marker ([`8d7255f`](https://github.com/jolars/panache/commit/8d7255f1bd5476e7e8c0af50a932f1f7593afde4))
+- **parser:** allow unindented block to follow atx heading ([`bf84aa1`](https://github.com/jolars/panache/commit/bf84aa1667655456ab45716fe0a9aa3110854d9e))
+
 ## [0.6.1](https://github.com/jolars/panache/compare/panache-parser-v0.6.0...panache-parser-v0.6.1) (2026-05-01)
 
 ### Bug Fixes

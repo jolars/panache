@@ -1,6 +1,6 @@
 {
   "name": "@panache-cli/panache",
-  "version": "2.41.1",
+  "version": "2.42.0",
   "description": "An LSP, formatter, and linter for Pandoc markdown, Quarto, and RMarkdown",
   "keywords": [
     "quarto",
@@ -30,13 +30,13 @@
     "node": ">=20"
   },
   "optionalDependencies": {
-    "@panache-cli/linux-x64-gnu": "2.41.1",
-    "@panache-cli/linux-arm64-gnu": "2.41.1",
-    "@panache-cli/linux-x64-musl": "2.41.1",
-    "@panache-cli/linux-arm64-musl": "2.41.1",
-    "@panache-cli/darwin-x64": "2.41.1",
-    "@panache-cli/darwin-arm64": "2.41.1",
-    "@panache-cli/win32-x64": "2.41.1",
-    "@panache-cli/win32-arm64": "2.41.1"
+    "@panache-cli/linux-x64-gnu": "2.42.0",
+    "@panache-cli/linux-arm64-gnu": "2.42.0",
+    "@panache-cli/linux-x64-musl": "2.42.0",
+    "@panache-cli/linux-arm64-musl": "2.42.0",
+    "@panache-cli/darwin-x64": "2.42.0",
+    "@panache-cli/darwin-arm64": "2.42.0",
+    "@panache-cli/win32-x64": "2.42.0",
+    "@panache-cli/win32-arm64": "2.42.0"
   }
 }
