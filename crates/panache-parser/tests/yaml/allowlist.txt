@@ -231,3 +231,26 @@ FH7J
 K858
 # Block-scalar chomping spec example: strip/clip/keep applied to non-empty body (`|-`, `|`, `|+`).
 A6F9
+# Plain scalar packed onto the directive-end marker line (`--- text`).
+27NA
+# Tab-separated payload after directive-end marker (`---<TAB>scalar`).
+K54U
+# Plain scalar with trailing comment after directive-end marker (`--- foo  # comment`).
+L383
+# Comment-only payload after directive-end marker (`--- # comment`) with %TAG directive.
+5TYM
+# Block scalar header packed onto directive-end line: folded scalar (`--- >`).
+4Q9F
+96L6
+B3HG
+FP8R
+# Block scalar header packed onto directive-end line: folded scalar with strip chomp (`--- >-`).
+93WF
+# Block scalar header packed onto directive-end line: literal scalar (`--- |`).
+6JQW
+T26H
+T5N4
+# Block scalar header packed onto directive-end line: literal with strip chomp (`--- |-`).
+753E
+# Block scalar header packed onto directive-end line: literal with keep chomp (`--- |+`).
+6FWR

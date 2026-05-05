@@ -1,0 +1,24 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: 6JQW
+input: "# ASCII Art\n--- |\n  \\//||\\/||\n  // ||  ||__\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..44
+  YAML_METADATA_CONTENT@0..44
+    YAML_STREAM@0..44
+      YAML_COMMENT@0..11 "# ASCII Art"
+      NEWLINE@11..12 "\n"
+      YAML_DOCUMENT@12..44
+        YAML_DOCUMENT_START@12..15 "---"
+        WHITESPACE@15..16 " "
+        YAML_SCALAR@16..17 "|"
+        NEWLINE@17..18 "\n"
+        YAML_SCALAR@18..29 "  \\//||\\/||"
+        NEWLINE@29..30 "\n"
+        YAML_SCALAR@30..43 "  // ||  ||__"
+        NEWLINE@43..44 "\n"

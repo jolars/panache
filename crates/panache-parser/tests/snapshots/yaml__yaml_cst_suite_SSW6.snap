@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
 expression: snapshot
 ---
 case_id: SSW6
@@ -13,6 +14,5 @@ DOCUMENT@0..26
       YAML_DOCUMENT@0..26
         YAML_DOCUMENT_START@0..3 "---"
         NEWLINE@3..4 "\n"
-        YAML_BLOCK_MAP@4..26
-          YAML_SCALAR@4..25 "'here''s to \"quotes\"'"
-          NEWLINE@25..26 "\n"
+        YAML_SCALAR@4..25 "'here''s to \"quotes\"'"
+        NEWLINE@25..26 "\n"

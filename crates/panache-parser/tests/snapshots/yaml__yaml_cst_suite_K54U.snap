@@ -1,0 +1,18 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: K54U
+input: "---\tscalar\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..11
+  YAML_METADATA_CONTENT@0..11
+    YAML_STREAM@0..11
+      YAML_DOCUMENT@0..11
+        YAML_DOCUMENT_START@0..3 "---"
+        WHITESPACE@3..4 "\t"
+        YAML_SCALAR@4..10 "scalar"
+        NEWLINE@10..11 "\n"

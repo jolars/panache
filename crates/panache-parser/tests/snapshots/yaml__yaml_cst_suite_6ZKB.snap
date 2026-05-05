@@ -12,9 +12,8 @@ DOCUMENT@0..53
   YAML_METADATA_CONTENT@0..53
     YAML_STREAM@0..53
       YAML_DOCUMENT@0..9
-        YAML_BLOCK_MAP@0..9
-          YAML_SCALAR@0..8 "Document"
-          NEWLINE@8..9 "\n"
+        YAML_SCALAR@0..8 "Document"
+        NEWLINE@8..9 "\n"
       YAML_DOCUMENT@9..25
         YAML_DOCUMENT_START@9..12 "---"
         NEWLINE@12..13 "\n"

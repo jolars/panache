@@ -487,6 +487,87 @@ fn emit_scalar_like_tokens<'a>(text: &'a str, out: &mut Vec<YamlTokenSpan<'a>>) 
     }
 }
 
+/// Emit tokens for content packed onto a directive-end line (e.g. `--- text`,
+/// `--- !!set`, `--- >`, `--- # comment`). The caller has already emitted
+/// `DocumentStart` and any leading whitespace; this helper handles the
+/// remaining payload and trailing newline. Indent tracking is intentionally
+/// suppressed since we are still on the same physical line.
+fn emit_directive_end_payload<'a>(
+    payload: &'a str,
+    newline: &'a str,
+    payload_start: usize,
+    out: &mut Vec<YamlTokenSpan<'a>>,
+) -> Result<(), YamlDiagnostic> {
+    if payload.is_empty() {
+        if !newline.is_empty() {
+            push_token(out, YamlToken::Newline, newline);
+        }
+        return Ok(());
+    }
+    if payload.starts_with('#') {
+        push_token(out, YamlToken::Comment, payload);
+        if !newline.is_empty() {
+            push_token(out, YamlToken::Newline, newline);
+        }
+        return Ok(());
+    }
+    let (scalar_tag, after_tag) = split_tag_prefix(payload);
+    if let Some(tag) = scalar_tag {
+        push_token(out, YamlToken::Tag, tag);
+        let ws_len = leading_indent(after_tag);
+        if ws_len > 0 {
+            push_token(out, YamlToken::Whitespace, &after_tag[..ws_len]);
+        }
+        let body = &after_tag[ws_len..];
+        if body.is_empty() {
+            if !newline.is_empty() {
+                push_token(out, YamlToken::Newline, newline);
+            }
+            return Ok(());
+        }
+        let body_start = payload_start + tag.len() + ws_len;
+        return emit_directive_end_body(body, newline, body_start, out);
+    }
+    emit_directive_end_body(payload, newline, payload_start, out)
+}
+
+/// Tail-end of [`emit_directive_end_payload`] after any tag prefix has been
+/// peeled off. Handles block-scalar headers, plain/quoted scalars, and a
+/// trailing comment (`--- foo  # comment`).
+fn emit_directive_end_body<'a>(
+    body: &'a str,
+    newline: &'a str,
+    body_start: usize,
+    out: &mut Vec<YamlTokenSpan<'a>>,
+) -> Result<(), YamlDiagnostic> {
+    let (value_part, comment_part) = split_value_and_comment(body);
+    if is_block_scalar_header(value_part) {
+        push_token(out, YamlToken::BlockScalarHeader, value_part);
+    } else if !value_part.is_empty() {
+        if let Some(rel_idx) = invalid_double_quote_escape_offset(value_part) {
+            return Err(YamlDiagnostic {
+                code: diagnostic_codes::LEX_INVALID_DOUBLE_QUOTED_ESCAPE,
+                message: "invalid escape in double quoted scalar",
+                byte_start: body_start + rel_idx,
+                byte_end: body_start + rel_idx + 1,
+            });
+        }
+        emit_scalar_like_tokens(value_part, out);
+    }
+    if let Some(comment) = comment_part {
+        let ws_skip = body.len() - comment.len() - value_part.len();
+        if ws_skip > 0 {
+            let start = value_part.len();
+            push_token(out, YamlToken::Whitespace, &body[start..start + ws_skip]);
+        }
+        push_token(out, YamlToken::Comment, comment);
+    }
+    if !newline.is_empty() {
+        push_token(out, YamlToken::Newline, newline);
+    }
+    Ok(())
+}
+
 fn lex_mapping_line_tokens<'a>(
     line: &'a str,
     newline: &'a str,
@@ -550,6 +631,43 @@ fn lex_mapping_line_tokens<'a>(
         return Ok(());
     }
     if trimmed.starts_with("---") {
+        // YAML 1.2 §9.1.2: `---` is the directive-end marker only when followed
+        // by whitespace or end-of-line. `--- payload` packs the first node of
+        // the document onto the same line as the marker. We emit `DocumentStart`
+        // then re-process the payload with no further indent tracking (we are
+        // still on the same physical line).
+        //
+        // A compact block mapping starting on the marker line (`--- key: val`,
+        // `--- &a key: val`) is rejected here to preserve the
+        // mapping-on-marker-line error contract — yaml-test-suite cases 9KBC
+        // and CXX2 pin this behavior.
+        let after = &content[3..];
+        let next_byte = after.as_bytes().first().copied();
+        if matches!(next_byte, Some(b' ' | b'\t')) {
+            let ws_len = after
+                .bytes()
+                .take_while(|b| matches!(b, b' ' | b'\t'))
+                .count();
+            let payload = &after[ws_len..];
+            let payload_for_check = match split_tag_prefix(payload) {
+                (Some(_), rest) => rest.trim_start_matches([' ', '\t']),
+                (None, p) => p,
+            };
+            if parse_raw_mapping_line(payload_for_check).is_some() {
+                return Err(YamlDiagnostic {
+                    code: diagnostic_codes::LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START,
+                    message: "trailing content after document start marker",
+                    byte_start: line_start + line_indent,
+                    byte_end: line_start + line.len(),
+                });
+            }
+            push_token(out, YamlToken::DocumentStart, "---");
+            if ws_len > 0 {
+                push_token(out, YamlToken::Whitespace, &after[..ws_len]);
+            }
+            let payload_offset = line_start + line_indent + 3 + ws_len;
+            return emit_directive_end_payload(payload, newline, payload_offset, out);
+        }
         return Err(YamlDiagnostic {
             code: diagnostic_codes::LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START,
             message: "trailing content after document start marker",

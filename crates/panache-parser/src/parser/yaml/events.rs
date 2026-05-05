@@ -11,7 +11,7 @@
 
 use std::collections::HashMap;
 
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 use super::parser::parse_yaml_tree;
 
@@ -213,6 +213,13 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
 }
 
 fn scalar_document_value(doc: &SyntaxNode, handles: &TagHandles) -> Option<String> {
+    // `--- |` / `--- >` packs a block-scalar header onto the directive-end
+    // marker line. Detect that pattern first so the folded body (with proper
+    // chomping) is emitted instead of a single-line plain scalar.
+    if let Some((indicator, body)) = extract_scalar_doc_block_body(doc) {
+        let escaped = escape_block_scalar_text(&body);
+        return Some(format!("=VAL {indicator}{escaped}"));
+    }
     // Skip `%TAG`/`%YAML` directive lines: those are document-level metadata,
     // not part of the scalar body.
     let text = doc
@@ -594,6 +601,35 @@ fn extract_block_scalar_body(value_node: &SyntaxNode) -> Option<(char, String)> 
         .filter_map(|el| el.into_token())
         .filter(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::NEWLINE))
         .collect();
+    fold_block_scalar_tokens(&tokens)
+}
+
+/// Variant of [`extract_block_scalar_body`] that walks a full `YAML_DOCUMENT`
+/// node and applies block-scalar folding to the tokens *after* a
+/// `YAML_DOCUMENT_START` marker. Used for the directive-end-with-payload
+/// pattern (`--- |\n  ab\n  cd\n`) where the block-scalar header is packed
+/// onto the marker line itself rather than being a block-map value.
+fn extract_scalar_doc_block_body(doc: &SyntaxNode) -> Option<(char, String)> {
+    let mut started = false;
+    let mut tokens = Vec::new();
+    for el in doc.descendants_with_tokens() {
+        let Some(tok) = el.into_token() else { continue };
+        if !started {
+            if tok.kind() == SyntaxKind::YAML_DOCUMENT_START {
+                started = true;
+            }
+            continue;
+        }
+        match tok.kind() {
+            SyntaxKind::YAML_DOCUMENT_END => break,
+            SyntaxKind::YAML_SCALAR | SyntaxKind::NEWLINE => tokens.push(tok),
+            _ => {}
+        }
+    }
+    fold_block_scalar_tokens(&tokens)
+}
+
+fn fold_block_scalar_tokens(tokens: &[SyntaxToken]) -> Option<(char, String)> {
     let first = tokens.first()?;
     if first.kind() != SyntaxKind::YAML_SCALAR {
         return None;

@@ -1,0 +1,24 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: B3HG
+input: "--- >\n folded\n text\n\n\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..22
+  YAML_METADATA_CONTENT@0..22
+    YAML_STREAM@0..22
+      YAML_DOCUMENT@0..22
+        YAML_DOCUMENT_START@0..3 "---"
+        WHITESPACE@3..4 " "
+        YAML_SCALAR@4..5 ">"
+        NEWLINE@5..6 "\n"
+        YAML_SCALAR@6..13 " folded"
+        NEWLINE@13..14 "\n"
+        YAML_SCALAR@14..19 " text"
+        NEWLINE@19..20 "\n"
+        NEWLINE@20..21 "\n"
+        NEWLINE@21..22 "\n"

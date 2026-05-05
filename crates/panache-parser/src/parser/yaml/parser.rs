@@ -1011,21 +1011,40 @@ fn emit_document<'a>(
         Some(YamlToken::DocumentStart) | Some(YamlToken::DocumentEnd) | None => DocumentBody::Empty,
         Some(YamlToken::BlockSeqEntry) => DocumentBody::BlockSequence,
         _ => {
-            // Tagless scalar documents continue to dispatch to the block-map
-            // emitter for byte-level CST stability. Tagged scalar documents
-            // (e.g. `! a`, `!!str foo`) take the dedicated path because they
-            // lack a colon and would trip the key/colon expectation.
+            // Body classification scans up to the next document boundary. A
+            // colon (block-map indicator) or any flow-collection indicator
+            // routes to the block-map emitter, which already accommodates
+            // tagless mapping/flow content. A tag with no colon routes to
+            // the dedicated scalar path (`! a`, `!!str foo`); plain content
+            // with no colon (e.g. `--- text`, `--- "quoted"`, `--- |` with
+            // following content) is also a scalar document. Without the
+            // scalar branch, a bare `--- text` would dispatch to BlockMap
+            // and fail with INVALID_KEY_TOKEN.
             let mut has_colon = false;
             let mut has_tag = false;
+            let mut has_scalar = false;
+            let mut has_flow = false;
             for tok in &tokens[*i..] {
                 match tok.kind {
                     YamlToken::DocumentStart | YamlToken::DocumentEnd => break,
                     YamlToken::Colon => has_colon = true,
                     YamlToken::Tag => has_tag = true,
+                    YamlToken::Scalar
+                    | YamlToken::BlockScalarHeader
+                    | YamlToken::BlockScalarContent => {
+                        has_scalar = true;
+                    }
+                    YamlToken::FlowMapStart
+                    | YamlToken::FlowMapEnd
+                    | YamlToken::FlowSeqStart
+                    | YamlToken::FlowSeqEnd
+                    | YamlToken::Comma => has_flow = true,
                     _ => {}
                 }
             }
-            if !has_colon && has_tag {
+            if has_colon || has_flow {
+                DocumentBody::BlockMap
+            } else if has_tag || has_scalar {
                 DocumentBody::Scalar
             } else {
                 DocumentBody::BlockMap
