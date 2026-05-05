@@ -140,7 +140,14 @@
       "[rmarkdown]": {
         "editor.defaultFormatter": "jolars.panache"
       }
-    }
+    },
+    "commands": [
+      {
+        "command": "panache.restart",
+        "title": "Restart Server",
+        "category": "Panache"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run clean && npm run check-types && npm run bundle:prod",

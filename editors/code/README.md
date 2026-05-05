@@ -22,6 +22,12 @@ GitHub releases on first use.
 - Works for regular Markdown (`.md`, Pandoc-style), Quarto (`.qmd`), and R
   Markdown (`.Rmd`, `.rmd`).
 
+## Commands
+
+- `Panache: Restart Server` --- stops and restarts the Panache language server
+  (re-reads settings and re-resolves the binary). Useful if the LSP gets wedged
+  or after changing settings such as `panache.version` or `panache.commandPath`.
+
 ## Binary Installation
 
 By default, the extension downloads a platform-specific `panache` binary from

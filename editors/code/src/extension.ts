@@ -78,11 +78,10 @@ function mergeServerEnvironment(
   return env;
 }
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const outputChannel = vscode.window.createOutputChannel(
-    "Panache Language Server",
-  );
-  context.subscriptions.push(outputChannel);
+async function startClient(
+  context: vscode.ExtensionContext,
+  outputChannel: vscode.OutputChannel,
+): Promise<void> {
   const config = vscode.workspace.getConfiguration("panache");
   const fallbackCommandPath = config.get<string>("commandPath", "panache");
   const downloadBinary = config.get<boolean>("downloadBinary", true);
@@ -174,7 +173,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     clientOptions,
   );
 
-  context.subscriptions.push(client);
   try {
     await client.start();
   } catch (error) {
@@ -183,6 +181,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     void vscode.window.showErrorMessage(
       `Panache language server failed to start: ${message}`,
     );
+    client = undefined;
     return;
   }
   if (traceLevel === "messages") {
@@ -190,6 +189,37 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   } else if (traceLevel === "verbose") {
     void client.setTrace(Trace.Verbose);
   }
+}
+
+async function restartClient(
+  context: vscode.ExtensionContext,
+  outputChannel: vscode.OutputChannel,
+): Promise<void> {
+  if (client) {
+    try {
+      await client.stop();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      outputChannel.appendLine(`Error stopping Panache language server: ${message}`);
+    }
+    client = undefined;
+  }
+  await startClient(context, outputChannel);
+}
+
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  const outputChannel = vscode.window.createOutputChannel(
+    "Panache Language Server",
+  );
+  context.subscriptions.push(outputChannel);
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("panache.restart", () =>
+      restartClient(context, outputChannel),
+    ),
+  );
+
+  await startClient(context, outputChannel);
 }
 
 export async function deactivate(): Promise<void> {
