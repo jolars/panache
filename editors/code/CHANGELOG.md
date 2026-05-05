@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.35.1](https://github.com/jolars/panache/compare/panache-code-v2.35.0...panache-code-v2.35.1) (2026-05-05)
+
+### Bug Fixes
+- **editors:** change URL to appease vscode suspicious check ([`2ff1e21`](https://github.com/jolars/panache/commit/2ff1e215c7a263812027ecc9711e5f607028e7fc))
+
 ## [2.35.0](https://github.com/jolars/panache/compare/panache-code-v2.34.2...panache-code-v2.35.0) (2026-05-05)
 
 ### Features
