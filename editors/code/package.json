@@ -75,7 +75,7 @@
             "path"
           ],
           "enumDescriptions": [
-            "Download and use a Panache binary from GitHub releases (default).",
+            "Use the binary bundled inside the extension; fall back to downloading from GitHub if none is bundled or `panache.version`/`panache.releaseTag` is set explicitly (default).",
             "Look for `panache` on the system PATH.",
             "Use the binary at `panache.executablePath`."
           ],

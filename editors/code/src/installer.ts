@@ -160,32 +160,56 @@ export async function resolvePanacheBinary(
   tag: string,
 ): Promise<string> {
   const target = detectTargetAsset();
-  const tagCandidates =
+  type Candidate =
+    | { kind: "latest-pointer" }
+    | { kind: "latest-list" }
+    | { kind: "tag"; tag: string };
+  const candidates: Candidate[] =
     tag === "latest"
-      ? ["latest"]
+      ? [{ kind: "latest-pointer" }, { kind: "latest-list" }]
       : [
-          tag,
+          { kind: "tag", tag },
           ...(tag.startsWith("v")
-            ? [`panache-${tag}`]
+            ? [{ kind: "tag" as const, tag: `panache-${tag}` }]
             : tag.startsWith("panache-v")
-              ? [tag.replace(/^panache-/, "")]
+              ? [{ kind: "tag" as const, tag: tag.replace(/^panache-/, "") }]
               : []),
         ];
-  const uniqueTagCandidates = [...new Set(tagCandidates)];
+  const seenTags = new Set<string>();
+  const uniqueCandidates = candidates.filter((candidate) => {
+    if (candidate.kind !== "tag") {
+      return true;
+    }
+    if (seenTags.has(candidate.tag)) {
+      return false;
+    }
+    seenTags.add(candidate.tag);
+    return true;
+  });
+
+  const findAsset = (assets: ReleaseAsset[] | undefined): ReleaseAsset | undefined =>
+    target.archiveNames
+      .map((archiveName) => assets?.find((item) => item.name === archiveName))
+      .find((item): item is ReleaseAsset => item !== undefined);
+
+  const candidateLabel = (candidate: Candidate): string =>
+    candidate.kind === "tag" ? candidate.tag : candidate.kind;
 
   let selectedRelease: { release: ReleaseResponse; asset: ReleaseAsset } | undefined;
   const candidateErrors: string[] = [];
 
-  for (const candidateTag of uniqueTagCandidates) {
+  for (const candidate of uniqueCandidates) {
     const releasesUrl =
-      candidateTag === "latest"
-        ? `https://api.github.com/repos/${repo}/releases?per_page=100`
-        : `https://api.github.com/repos/${repo}/releases/tags/${encodeURIComponent(candidateTag)}`;
+      candidate.kind === "latest-pointer"
+        ? `https://api.github.com/repos/${repo}/releases/latest`
+        : candidate.kind === "latest-list"
+          ? `https://api.github.com/repos/${repo}/releases?per_page=100`
+          : `https://api.github.com/repos/${repo}/releases/tags/${encodeURIComponent(candidate.tag)}`;
     try {
       selectedRelease = await withRetries(
         async () => {
           const releaseBody = await httpGet(releasesUrl);
-          if (candidateTag === "latest") {
+          if (candidate.kind === "latest-list") {
             const releases = JSON.parse(releaseBody.toString("utf8")) as ReleaseResponse[];
             if (!Array.isArray(releases)) {
               throw new Error(
@@ -203,11 +227,7 @@ export async function resolvePanacheBinary(
               if (!Array.isArray(release.assets) || release.assets.length === 0) {
                 continue;
               }
-              const latestAsset = target.archiveNames
-                .map((archiveName) =>
-                  release.assets.find((item) => item.name === archiveName),
-                )
-                .find((item): item is ReleaseAsset => item !== undefined);
+              const latestAsset = findAsset(release.assets);
               if (latestAsset) {
                 return { release, asset: latestAsset };
               }
@@ -219,14 +239,22 @@ export async function resolvePanacheBinary(
           }
 
           const release = JSON.parse(releaseBody.toString("utf8")) as ReleaseResponse;
-          const asset = target.archiveNames
-            .map((archiveName) =>
-              release.assets.find((item) => item.name === archiveName),
-            )
-            .find((item): item is ReleaseAsset => item !== undefined);
-          if (!asset) {
+          if (
+            candidate.kind === "latest-pointer" &&
+            !isCandidatePanacheCliReleaseTag(release.tag_name)
+          ) {
             throw new Error(
-              `No release asset '${target.archiveNames.join("' or '")}' found for ${repo}@${candidateTag}`,
+              `${repo}/releases/latest points at '${release.tag_name}', which is not a Panache CLI release`,
+            );
+          }
+          const asset = findAsset(release.assets);
+          if (!asset) {
+            const ref =
+              candidate.kind === "tag"
+                ? `${repo}@${candidate.tag}`
+                : `${repo}@${release.tag_name}`;
+            throw new Error(
+              `No release asset '${target.archiveNames.join("' or '")}' found for ${ref}`,
             );
           }
           return { release, asset };
@@ -236,13 +264,13 @@ export async function resolvePanacheBinary(
       break;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      candidateErrors.push(`${candidateTag}: ${reason}`);
+      candidateErrors.push(`${candidateLabel(candidate)}: ${reason}`);
     }
   }
 
   if (!selectedRelease) {
     throw new Error(
-      `Unable to resolve release '${tag}' for ${repo}. Tried: ${uniqueTagCandidates.join(", ")}. ${candidateErrors.join(" | ")}`,
+      `Unable to resolve release '${tag}' for ${repo}. Tried: ${uniqueCandidates.map(candidateLabel).join(", ")}. ${candidateErrors.join(" | ")}`,
     );
   }
 

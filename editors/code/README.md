@@ -31,18 +31,24 @@ GitHub releases on first use.
 
 ## Binary Installation
 
-By default, the extension downloads a platform-specific `panache` binary from
-GitHub releases and uses that binary for the language server. This is controlled
-by `panache.executableStrategy`, which has three modes:
+By default, the extension uses a `panache` binary that ships inside the
+extension itself (one platform-specific VSIX per OS/architecture). No download,
+no GitHub round-trip, and the language server starts on first activation even on
+restricted or offline networks. Behavior is controlled by
+`panache.executableStrategy`:
 
-- `bundled` (default) --- download a platform-specific binary from GitHub
-  releases.
+- `bundled` (default) --- use the binary that ships inside the extension. If
+  you're on a platform without a platform-specific build (or you've installed
+  the universal VSIX), the extension falls back to downloading a matching binary
+  from GitHub releases.
 - `environment` --- look for `panache` on the system `PATH`.
 - `path` --- use the binary at `panache.executablePath`.
 
-When `panache.version` is set to `latest`, the extension automatically skips
-component-only tags and selects the most recent stable CLI release that contains
-a matching platform asset.
+If you set `panache.version` or `panache.releaseTag` explicitly, the bundled
+binary is skipped and the requested version is downloaded from GitHub. When
+`panache.version` is `latest`, the extension automatically skips component-only
+tags and selects the most recent stable CLI release that contains a matching
+platform asset.
 
 You can also provide your own path to the binary:
 
@@ -91,14 +97,16 @@ Use `panache.releaseTag` only if you need an exact tag override:
 
 ## Requirements and troubleshooting
 
-- **NixOS**: auto-download is skipped by default unless explicitly configured.
-  Set `panache.executableStrategy` to `path` and provide
-  `panache.executablePath`, or set it to `environment` if `panache` is on your
-  `PATH`.
-- **Offline / restricted networks / proxies**: set `panache.executableStrategy`
-  to `path` (with `panache.executablePath`) or `environment`.
-- If download fails, the extension shows a warning and falls back to looking up
-  `panache` on the system `PATH`.
+- **NixOS**: the bundled binary won't run because of the dynamic loader path.
+  Set `panache.executableStrategy` to `path` (with `panache.executablePath`) or
+  `environment` if `panache` is on your `PATH`. On the legacy
+  `panache.downloadBinary` path the auto-download is also skipped on NixOS by
+  default.
+- **Offline / restricted networks / proxies**: the bundled-binary default works
+  without network access. Only the explicit-version download paths
+  (`panache.version` / `panache.releaseTag`) require GitHub connectivity.
+- If a download fall-through fails, the extension shows a warning and falls back
+  to looking up `panache` on the system `PATH`.
 - The extension contributes `quarto` (`.qmd`) and `rmarkdown` (`.Rmd`, `.rmd`)
   language registrations, so it works even without installing a separate Quarto
   extension. If Quarto is also installed, both can coexist.
@@ -144,6 +152,8 @@ directory:
 
 ## Security and trust
 
-When `panache.executableStrategy` is `bundled` (the default), binaries are
-downloaded from GitHub releases configured by `panache.githubRepo` and either
-`panache.version` or `panache.releaseTag` (if explicitly set).
+When `panache.executableStrategy` is `bundled` (the default), the extension
+prefers the binary that shipped inside the VSIX. If no bundled binary is
+available, or `panache.version` / `panache.releaseTag` is set explicitly, it
+downloads from GitHub releases configured by `panache.githubRepo` (default
+`jolars/panache`).

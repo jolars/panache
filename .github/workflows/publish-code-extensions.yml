@@ -7,13 +7,99 @@ on:
       - "panache-code-v*"
 
 jobs:
-  publish:
+  build-binaries:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            binary: panache
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+            binary: panache
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            binary: panache
+            musl: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+            binary: panache
+            musl: true
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+            binary: panache
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            binary: panache
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            binary: panache.exe
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
+            binary: panache.exe
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.1
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: vscode-${{ matrix.target }}
+
+      - name: Install musl tools
+        if: matrix.musl
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Build binary
+        run: cargo build --release --bin panache --target ${{ matrix.target }} --locked
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: vscode-binary-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/${{ matrix.binary }}
+          if-no-files-found: error
+
+  publish-platform:
+    name: Publish ${{ matrix.vsce_target }}
+    needs: build-binaries
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: editors/code
-
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - vsce_target: win32-x64
+            rust_target: x86_64-pc-windows-msvc
+            binary: panache.exe
+          - vsce_target: win32-arm64
+            rust_target: aarch64-pc-windows-msvc
+            binary: panache.exe
+          - vsce_target: linux-x64
+            rust_target: x86_64-unknown-linux-gnu
+            binary: panache
+          - vsce_target: linux-arm64
+            rust_target: aarch64-unknown-linux-gnu
+            binary: panache
+          - vsce_target: alpine-x64
+            rust_target: x86_64-unknown-linux-musl
+            binary: panache
+          - vsce_target: alpine-arm64
+            rust_target: aarch64-unknown-linux-musl
+            binary: panache
+          - vsce_target: darwin-x64
+            rust_target: x86_64-apple-darwin
+            binary: panache
+          - vsce_target: darwin-arm64
+            rust_target: aarch64-apple-darwin
+            binary: panache
     steps:
       - uses: actions/checkout@v6
 
@@ -24,9 +110,20 @@ jobs:
           cache-dependency-path: editors/code/package-lock.json
 
       - name: Install dependencies
+        working-directory: editors/code
         run: npm ci
 
+      - name: Download binary artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: vscode-binary-${{ matrix.rust_target }}
+          path: editors/code/server
+
+      - name: Mark binary executable
+        run: chmod +x editors/code/server/${{ matrix.binary }}
+
       - name: Compile extension
+        working-directory: editors/code
         run: npm run compile
 
       - name: Publish to Open VSX Registry
@@ -34,6 +131,7 @@ jobs:
         with:
           pat: ${{ secrets.OVSX_PAT }}
           packagePath: editors/code
+          target: ${{ matrix.vsce_target }}
 
       - name: Publish to Visual Studio Marketplace
         uses: HaaLeo/publish-vscode-extension@v2
@@ -41,3 +139,4 @@ jobs:
           pat: ${{ secrets.VSCE_PAT }}
           registryUrl: https://marketplace.visualstudio.com
           packagePath: editors/code
+          target: ${{ matrix.vsce_target }}

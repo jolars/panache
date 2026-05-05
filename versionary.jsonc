@@ -42,7 +42,8 @@
     "crates/panache-formatter": {},
     "editors/code": {
       "release-type": "node",
-      "package-name": "panache-code"
+      "package-name": "panache-code",
+      "follows": ["."]
     },
     "editors/zed": {
       "package-name": "panache-zed",

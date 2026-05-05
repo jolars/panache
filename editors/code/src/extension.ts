@@ -58,6 +58,20 @@ function isExecutableStrategyExplicitlyConfigured(
 
 type ExecutableStrategy = "bundled" | "environment" | "path";
 
+async function findBundledBinary(
+  context: vscode.ExtensionContext,
+): Promise<string | undefined> {
+  const binaryName =
+    process.platform === "win32" ? "panache.exe" : "panache";
+  const candidate = path.join(context.extensionPath, "server", binaryName);
+  try {
+    await fs.access(candidate);
+    return candidate;
+  } catch {
+    return undefined;
+  }
+}
+
 async function resolveCommandPath(
   context: vscode.ExtensionContext,
   config: vscode.WorkspaceConfiguration,
@@ -68,6 +82,11 @@ async function resolveCommandPath(
   const releaseTag = config.get<string>("releaseTag", "latest");
   const releaseTagExplicit = isReleaseTagExplicitlyConfigured(config);
   const selectedRelease = releaseTagExplicit ? releaseTag : version;
+  const versionPinExplicit =
+    releaseTagExplicit ||
+    config.inspect<string>("version")?.globalValue !== undefined ||
+    config.inspect<string>("version")?.workspaceValue !== undefined ||
+    config.inspect<string>("version")?.workspaceFolderValue !== undefined;
 
   if (isExecutableStrategyExplicitlyConfigured(config)) {
     const strategy = config.get<ExecutableStrategy>(
@@ -91,6 +110,13 @@ async function resolveCommandPath(
     }
 
     // strategy === "bundled"
+    if (!versionPinExplicit) {
+      const bundled = await findBundledBinary(context);
+      if (bundled) {
+        outputChannel.appendLine(`Using bundled Panache binary at ${bundled}.`);
+        return bundled;
+      }
+    }
     try {
       return await resolvePanacheBinary(
         context.globalStorageUri.fsPath,
@@ -122,6 +148,13 @@ async function resolveCommandPath(
   }
 
   if (shouldDownloadBinary) {
+    if (!versionPinExplicit) {
+      const bundled = await findBundledBinary(context);
+      if (bundled) {
+        outputChannel.appendLine(`Using bundled Panache binary at ${bundled}.`);
+        return bundled;
+      }
+    }
     try {
       return await resolvePanacheBinary(
         context.globalStorageUri.fsPath,
