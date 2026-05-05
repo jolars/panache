@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.35.0](https://github.com/jolars/panache/compare/panache-code-v2.34.2...panache-code-v2.35.0) (2026-05-05)
+
+### Features
+- **editors:** add `executableStrategy`, deprecate old options ([`884a3c4`](https://github.com/jolars/panache/commit/884a3c4d851904b01f5644ad1ca350f013636247))
+- **editors:** add log-level setting ([`a6cf4c7`](https://github.com/jolars/panache/commit/a6cf4c711074073ce7e71046806edebdbad058fd))
+- **editors:** add restart server command ([`ab5cfb0`](https://github.com/jolars/panache/commit/ab5cfb043bf56586952f726b4344b71eb8d7604a))
+- **editors:** register as default formatter for rmd & qmd ([`889d640`](https://github.com/jolars/panache/commit/889d640d165a5b7eb98caf5424b2573a486e1720))
+
+### Bug Fixes
+- **editors:** update package lock file and get rid off uuid ([`b02ef2c`](https://github.com/jolars/panache/commit/b02ef2cf9f946500a07fdb421a0262062a47dcc5))
+
 ## [2.34.0](https://github.com/jolars/panache/compare/panache-code-v2.33.0...panache-code-v2.34.0) (2026-04-14)
 
 

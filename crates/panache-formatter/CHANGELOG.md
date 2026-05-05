@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.2](https://github.com/jolars/panache/compare/panache-formatter-v0.4.1...panache-formatter-v0.4.2) (2026-05-05)
+
+### Bug Fixes
+- **formatter:** handle nexted list with same line marker ([`8d0653a`](https://github.com/jolars/panache/commit/8d0653a69c1dda3b3a0f07a813c7a44e4efe3766)), closes [#247](https://github.com/jolars/panache/issues/247)
+- recursive into linst/blockquote/list ([`175d78e`](https://github.com/jolars/panache/commit/175d78e6ce5287578fe7c7ee5c3c079e674f2663))
+- handle pandoc-commonmark divergence on html comments ([`ca301f9`](https://github.com/jolars/panache/commit/ca301f99a4dc74d7d40ad087d59f97928cff5fc4))
+- handle same-line block quote marker ([`3c6c3dd`](https://github.com/jolars/panache/commit/3c6c3dd7739ed592d3f6e6c7305a9d616a953fb2))
+- **parser:** handle direct list-in-lis correctly ([`5c6a4ae`](https://github.com/jolars/panache/commit/5c6a4ae6ac476232ef6040df586610cfc13f44ef))
+- correctly handle definition inside footnote ([`3a30b05`](https://github.com/jolars/panache/commit/3a30b0588acb6a023389fc04604b0ff01d3d6ce4))
+- parse and format headings inside lists ([`d7e714e`](https://github.com/jolars/panache/commit/d7e714ebab500156d6e5a3b5887173f9ea1e6402))
+
 ## [0.4.1](https://github.com/jolars/panache/compare/panache-formatter-v0.4.0...panache-formatter-v0.4.1) (2026-05-01)
 
 ### Bug Fixes
