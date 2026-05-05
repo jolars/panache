@@ -427,6 +427,7 @@ Diagnostic codes
 :   [`html-entities`](#html-entities)
 
 Description
+
 :   Pandoc and Quarto pass HTML named entities like `&hellip;` through to the
     output unchanged, so a typo (`&ellips;`) or a missing trailing semicolon
     (`&numero` instead of `&numero;`) silently produces wrong output. This rule
@@ -440,8 +441,7 @@ Description
 
     The rule deliberately ignores numeric character references (`&#123;`,
     `&#xABCD;`) for now and does not scan code spans, code blocks, raw HTML,
-    inline/display math, link destinations, attributes, YAML metadata, or
-    comments.
+    inline/display math, link destinations, attributes, YAML metadata, or comments.
 
 **Example violations:**
 
