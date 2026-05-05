@@ -107,3 +107,22 @@ jobs:
       tag: ${{ needs.versionary.outputs.tag_name }}
     permissions:
       contents: write
+
+  publish-npm:
+    name: Publish npm
+    needs: [versionary, build-release-assets]
+    if: ${{ needs.versionary.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/publish-npm.yml
+    secrets: inherit
+    permissions:
+      id-token: write
+      contents: read
+
+  publish-code-extensions:
+    name: Publish Code Extensions
+    needs: [versionary, build-release-assets]
+    if: ${{ needs.versionary.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/publish-code-extensions.yml
+    secrets: inherit
+    permissions:
+      contents: read

@@ -1,100 +1,43 @@
 name: Publish npm
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       dry-run:
         description: "Build and assemble packages but do not publish"
         type: boolean
         default: false
-  push:
-    tags:
-      - "v*"
+      release-tag:
+        description: "If set, download binaries from this GitHub release tag instead of same-run workflow artifacts"
+        type: string
+        required: false
+        default: ""
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: "Release tag to download binaries from"
+        type: string
+        required: true
+      dry-run:
+        description: "Build and assemble packages but do not publish"
+        type: boolean
+        default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.release-tag || github.ref }}
   cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-binaries:
-    name: Build binary ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            npm_name: linux-x64-gnu
-            binary: panache
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-24.04-arm
-            npm_name: linux-arm64-gnu
-            binary: panache
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            npm_name: linux-x64-musl
-            binary: panache
-            musl: true
-          - target: aarch64-unknown-linux-musl
-            os: ubuntu-24.04-arm
-            npm_name: linux-arm64-musl
-            binary: panache
-            musl: true
-          - target: x86_64-apple-darwin
-            os: macos-15-intel
-            npm_name: darwin-x64
-            binary: panache
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            npm_name: darwin-arm64
-            binary: panache
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            npm_name: win32-x64
-            binary: panache.exe
-          - target: aarch64-pc-windows-msvc
-            os: windows-11-arm
-            npm_name: win32-arm64
-            binary: panache.exe
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.94.1
-          targets: ${{ matrix.target }}
-
-      - name: Cache Rust artifacts
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: npm-${{ matrix.target }}
-
-      - name: Install musl tools
-        if: matrix.musl
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
-
-      - name: Build binary
-        run: cargo build --release --bin panache --target ${{ matrix.target }} --locked
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: binary-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/${{ matrix.binary }}
-          if-no-files-found: error
-
   publish-platform-packages:
     name: Publish @panache-cli/${{ matrix.npm_name }}
-    needs: build-binaries
     runs-on: ubuntu-latest
     environment: release
     permissions:
       id-token: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -151,11 +94,31 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: Download binary
+      - name: Download binary (workflow artifact)
+        if: ${{ inputs.release-tag == '' }}
         uses: actions/download-artifact@v8
         with:
-          name: binary-${{ matrix.target }}
+          name: panache-binary-${{ matrix.target }}
           path: binary
+
+      - name: Download binary (release asset)
+        if: ${{ inputs.release-tag != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p binary
+          cd binary
+          if [[ "${{ matrix.binary }}" == *.exe ]]; then
+            gh release download "${{ inputs.release-tag }}" -p "panache-${{ matrix.target }}.zip" --repo "${{ github.repository }}"
+            unzip -j "panache-${{ matrix.target }}.zip" "${{ matrix.binary }}"
+            rm "panache-${{ matrix.target }}.zip"
+          else
+            gh release download "${{ inputs.release-tag }}" -p "panache-${{ matrix.target }}.tar.gz" --repo "${{ github.repository }}"
+            tar -xzf "panache-${{ matrix.target }}.tar.gz" "${{ matrix.binary }}"
+            rm "panache-${{ matrix.target }}.tar.gz"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Read package version
         id: version

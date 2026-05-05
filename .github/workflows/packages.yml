@@ -102,6 +102,13 @@ jobs:
         if: runner.os != 'Windows'
         run: strip target/${{ matrix.target }}/release/panache
 
+      - name: Upload raw binary artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: panache-binary-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/panache${{ runner.os == 'Windows' && '.exe' || '' }}
+          if-no-files-found: error
+
       - name: Create archive (Unix)
         if: runner.os != 'Windows'
         run: |
