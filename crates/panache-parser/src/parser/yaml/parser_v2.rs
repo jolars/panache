@@ -30,11 +30,18 @@ use super::scanner::{Scanner, TokenKind, TriviaKind};
 /// Drive the scanner over `input` and build a CST. Always returns a
 /// `SyntaxNode` — the scanner is permissive and the v2 builder
 /// preserves bytes regardless of well-formedness.
-pub(crate) fn parse_v2(input: &str) -> SyntaxNode {
+pub fn parse_v2(input: &str) -> SyntaxNode {
     let mut builder = GreenNodeBuilder::new();
     builder.start_node(SyntaxKind::YAML_STREAM.into());
     let mut scanner = Scanner::new(input);
     let mut doc_open = false;
+    // True when the open YAML_DOCUMENT has only seen directives + trivia
+    // (no body content yet, no `---`). YAML 1.2 says directives belong to
+    // the document the following `---` opens, so when DocumentStart
+    // arrives in this state the marker stays inside the same document
+    // rather than splitting it. Cleared as soon as any non-directive
+    // body content lands.
+    let mut doc_only_has_directives = false;
     // Stack of currently-open block containers. Each frame tracks
     // whether its current `YAML_BLOCK_MAP_ENTRY` / `YAML_BLOCK_SEQUENCE_ITEM`
     // sub-wrapper is still open and waiting to be closed (by the next
@@ -45,6 +52,7 @@ pub(crate) fn parse_v2(input: &str) -> SyntaxNode {
             TokenKind::StreamStart | TokenKind::StreamEnd => continue,
             TokenKind::BlockMappingStart => {
                 ensure_doc_open(&mut builder, &mut doc_open);
+                doc_only_has_directives = false;
                 ensure_flow_seq_item_open(&mut builder, &mut block_stack);
                 builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
                 block_stack.push(BlockFrame::BlockMap {
@@ -55,6 +63,7 @@ pub(crate) fn parse_v2(input: &str) -> SyntaxNode {
             }
             TokenKind::BlockSequenceStart => {
                 ensure_doc_open(&mut builder, &mut doc_open);
+                doc_only_has_directives = false;
                 ensure_flow_seq_item_open(&mut builder, &mut block_stack);
                 builder.start_node(SyntaxKind::YAML_BLOCK_SEQUENCE.into());
                 block_stack.push(BlockFrame::BlockSequence { item_open: false });
@@ -72,6 +81,7 @@ pub(crate) fn parse_v2(input: &str) -> SyntaxNode {
             }
             TokenKind::FlowSequenceStart => {
                 ensure_doc_open(&mut builder, &mut doc_open);
+                doc_only_has_directives = false;
                 ensure_flow_seq_item_open(&mut builder, &mut block_stack);
                 // If nested inside a Map's open KEY/VALUE wrapper, the
                 // current open scope is the appropriate parent.
@@ -96,6 +106,7 @@ pub(crate) fn parse_v2(input: &str) -> SyntaxNode {
             }
             TokenKind::FlowMappingStart => {
                 ensure_doc_open(&mut builder, &mut doc_open);
+                doc_only_has_directives = false;
                 ensure_flow_seq_item_open(&mut builder, &mut block_stack);
                 builder.start_node(SyntaxKind::YAML_FLOW_MAP.into());
                 block_stack.push(BlockFrame::FlowMap {
@@ -230,18 +241,29 @@ pub(crate) fn parse_v2(input: &str) -> SyntaxNode {
         let kind = map_token_to_syntax_kind(tok.kind);
         match tok.kind {
             TokenKind::DocumentStart => {
-                // `---` always begins a fresh document. Close any
-                // still-open block containers (the scanner unwinds the
-                // indent stack at column 0, but a same-indent map at
-                // indent==0 leaves them open) and the previous doc
-                // before opening the new one.
-                close_block_containers(&mut builder, &mut block_stack);
-                if doc_open {
-                    builder.finish_node();
+                // `---` begins a fresh document. Two cases:
+                //  - The currently-open document only has directives so
+                //    far: per YAML 1.2 the directives belong to the doc
+                //    that this `---` opens. Stay inside, just emit the
+                //    marker.
+                //  - Otherwise: close the previous doc (and any open
+                //    block containers) and open a new YAML_DOCUMENT.
+                //    The scanner unwinds the indent stack at column 0,
+                //    but a same-indent map at indent==0 leaves them
+                //    open, so close them defensively.
+                if doc_open && doc_only_has_directives {
+                    builder.token(kind.into(), text);
+                    doc_only_has_directives = false;
+                } else {
+                    close_block_containers(&mut builder, &mut block_stack);
+                    if doc_open {
+                        builder.finish_node();
+                    }
+                    builder.start_node(SyntaxKind::YAML_DOCUMENT.into());
+                    doc_open = true;
+                    doc_only_has_directives = false;
+                    builder.token(kind.into(), text);
                 }
-                builder.start_node(SyntaxKind::YAML_DOCUMENT.into());
-                doc_open = true;
-                builder.token(kind.into(), text);
             }
             TokenKind::DocumentEnd => {
                 // `...` closes the current document. Close any open
@@ -254,6 +276,7 @@ pub(crate) fn parse_v2(input: &str) -> SyntaxNode {
                 builder.token(kind.into(), text);
                 builder.finish_node();
                 doc_open = false;
+                doc_only_has_directives = false;
             }
             TokenKind::Trivia(_) => {
                 // Trivia goes to whichever level is currently open;
@@ -262,10 +285,23 @@ pub(crate) fn parse_v2(input: &str) -> SyntaxNode {
                 // block container, or the open ENTRY/ITEM sub-wrapper.
                 builder.token(kind.into(), text);
             }
+            TokenKind::Directive => {
+                // Directives belong inside a YAML_DOCUMENT but don't by
+                // themselves count as body content — a following `---`
+                // should not split into a separate doc.
+                let was_open = doc_open;
+                ensure_doc_open(&mut builder, &mut doc_open);
+                if !was_open {
+                    doc_only_has_directives = true;
+                }
+                builder.token(kind.into(), text);
+            }
             _ => {
                 // Any non-trivia content opens an implicit document
-                // when one isn't already in progress.
+                // when one isn't already in progress and counts as
+                // body content (clears the directives-only flag).
                 ensure_doc_open(&mut builder, &mut doc_open);
+                doc_only_has_directives = false;
                 builder.token(kind.into(), text);
             }
         }
@@ -356,18 +392,29 @@ fn open_map_entry_with_key(builder: &mut GreenNodeBuilder<'_>, stack: &mut [Bloc
 
 /// Close the top-of-stack frame's entry/item sub-wrapper if still open
 /// and clear the flag. For maps, this closes the inner KEY/VALUE
-/// node and the surrounding ENTRY (two `finish_node` calls). For
-/// sequences it closes the ITEM. Caller decides whether to also pop
-/// the frame itself.
+/// node and the surrounding ENTRY. If we're closing while the entry
+/// is still in its KEY phase (i.e. the entry never received a `:`,
+/// e.g. a `?`-only explicit-key entry), an empty VALUE wrapper is
+/// inserted before the ENTRY closes so every ENTRY has the same
+/// `KEY + VALUE` child shape — the projection layer relies on that
+/// invariant. For sequences it closes the ITEM. Caller decides whether
+/// to also pop the frame itself.
 fn close_open_sub_wrapper(builder: &mut GreenNodeBuilder<'_>, stack: &mut [BlockFrame]) {
     let Some(frame) = stack.last_mut() else {
         return;
     };
     match frame {
         BlockFrame::BlockMap {
-            entry_open: true, ..
+            entry_open: true,
+            in_value,
         } => {
-            builder.finish_node(); // close KEY or VALUE
+            if *in_value {
+                builder.finish_node(); // close VALUE
+            } else {
+                builder.finish_node(); // close KEY
+                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_VALUE.into());
+                builder.finish_node(); // empty VALUE for shape parity
+            }
             builder.finish_node(); // close ENTRY
             *frame = BlockFrame::BlockMap {
                 entry_open: false,
@@ -375,9 +422,16 @@ fn close_open_sub_wrapper(builder: &mut GreenNodeBuilder<'_>, stack: &mut [Block
             };
         }
         BlockFrame::FlowMap {
-            entry_open: true, ..
+            entry_open: true,
+            in_value,
         } => {
-            builder.finish_node();
+            if *in_value {
+                builder.finish_node();
+            } else {
+                builder.finish_node();
+                builder.start_node(SyntaxKind::YAML_FLOW_MAP_VALUE.into());
+                builder.finish_node();
+            }
             builder.finish_node();
             *frame = BlockFrame::FlowMap {
                 entry_open: false,
@@ -400,13 +454,29 @@ fn close_block_containers(builder: &mut GreenNodeBuilder<'_>, stack: &mut Vec<Bl
     while let Some(frame) = stack.pop() {
         match frame {
             BlockFrame::BlockMap {
-                entry_open: true, ..
-            }
-            | BlockFrame::FlowMap {
-                entry_open: true, ..
+                entry_open: true,
+                in_value,
             } => {
-                // Close inner KEY/VALUE then ENTRY before the container.
-                builder.finish_node();
+                if in_value {
+                    builder.finish_node(); // close VALUE
+                } else {
+                    builder.finish_node(); // close KEY
+                    builder.start_node(SyntaxKind::YAML_BLOCK_MAP_VALUE.into());
+                    builder.finish_node();
+                }
+                builder.finish_node(); // close ENTRY
+            }
+            BlockFrame::FlowMap {
+                entry_open: true,
+                in_value,
+            } => {
+                if in_value {
+                    builder.finish_node();
+                } else {
+                    builder.finish_node();
+                    builder.start_node(SyntaxKind::YAML_FLOW_MAP_VALUE.into());
+                    builder.finish_node();
+                }
                 builder.finish_node();
             }
             BlockFrame::BlockSequence { item_open: true }
@@ -1013,6 +1083,52 @@ mod tests {
                 .any(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP),
             "flow map should be nested under outer block map's VALUE",
         );
+        assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn directive_prelude_stays_inside_document_opened_by_marker() {
+        // YAML 1.2 §6.8.1: directives belong to the document the
+        // following `---` opens. The v2 builder must not split the
+        // directive line into a separate doc — the entire input is one
+        // YAML_DOCUMENT.
+        let input = "%TAG !e! tag:example.com,2000:app/\n---\n!e!foo \"bar\"\n";
+        let tree = parse_v2(input);
+        assert_eq!(document_count(&tree), 1);
+        let doc = first_document(&tree);
+        let has_doc_start = doc.children_with_tokens().any(|el| {
+            el.as_token()
+                .is_some_and(|t| t.kind() == SyntaxKind::YAML_DOCUMENT_START)
+        });
+        assert!(has_doc_start, "the `---` should live inside the same doc");
+        assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn explicit_key_without_value_emits_empty_value_for_shape_parity() {
+        // `? a\n? b\n` — neither entry has a `:`. Each ENTRY must still
+        // hold both KEY and VALUE children (VALUE empty) so projection
+        // walkers don't have to special-case missing children.
+        let input = "? a\n? b\n";
+        let tree = parse_v2(input);
+        let doc = first_document(&tree);
+        let map = block_map_under(&doc).expect("YAML_BLOCK_MAP");
+        let entries = block_map_entries(&map);
+        assert_eq!(entries.len(), 2);
+        for entry in &entries {
+            assert!(
+                entry
+                    .children()
+                    .any(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY),
+                "ENTRY missing KEY child",
+            );
+            assert!(
+                entry
+                    .children()
+                    .any(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE),
+                "ENTRY missing VALUE child",
+            );
+        }
         assert_eq!(tree.text().to_string(), input);
     }
 }

@@ -108,7 +108,13 @@ pub fn project_events(input: &str) -> Vec<String> {
     let Some(tree) = parse_yaml_tree(input) else {
         return Vec::new();
     };
+    project_events_from_tree(&tree)
+}
 
+/// Walk a shadow-parser CST and return the projected yaml-test-suite event
+/// stream. Decoupled from `parse_yaml_tree` so the v2 parser can reuse the
+/// same projection for parity comparisons.
+pub fn project_events_from_tree(tree: &SyntaxNode) -> Vec<String> {
     let mut events = vec!["+STR".to_string()];
     let stream = tree
         .descendants()
@@ -1785,12 +1791,33 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
         .filter_map(|el| el.into_token())
         .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
         .map(|tok| tok.text().to_string());
+    // The key text lives in either a `YAML_KEY` token (v1's emission, used
+    // both for the explicit `?` indicator and for implicit key text) or
+    // a `YAML_SCALAR` token (v2's emission, where wrapper position
+    // carries the role and the explicit `?` is the only `YAML_KEY`).
+    // Concatenate matching tokens — interleave WHITESPACE / NEWLINE so the
+    // explicit `?` and any subsequent key scalar are separated by their
+    // original trivia, letting `strip_explicit_key_indicator` recognize
+    // the `?<sp>` pattern. Stops at the trailing `:` (`YAML_COLON`).
+    // Falls back to empty for the empty-implicit-key shorthand
+    // (`: value` — KEY wrapper holds only the colon).
     let key_text = key_node
         .children_with_tokens()
         .filter_map(|el| el.into_token())
-        .find(|tok| tok.kind() == SyntaxKind::YAML_KEY)
-        .map(|tok| tok.text().trim_end().to_string())
-        .expect("key token");
+        .take_while(|tok| tok.kind() != SyntaxKind::YAML_COLON)
+        .filter(|tok| {
+            matches!(
+                tok.kind(),
+                SyntaxKind::YAML_KEY
+                    | SyntaxKind::YAML_SCALAR
+                    | SyntaxKind::WHITESPACE
+                    | SyntaxKind::NEWLINE
+            )
+        })
+        .map(|tok| tok.text().to_string())
+        .collect::<Vec<_>>()
+        .join("");
+    let key_text = key_text.trim_end().to_string();
 
     let key_trimmed = key_text.trim();
     if key_trimmed.starts_with('[')

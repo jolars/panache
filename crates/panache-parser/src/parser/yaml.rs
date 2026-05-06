@@ -21,14 +21,14 @@ mod parser_v2;
 #[path = "yaml/scanner.rs"]
 mod scanner;
 
-pub use events::project_events;
+pub use events::{project_events, project_events_from_tree};
 pub use lexer::lex_mapping_tokens;
 pub use model::{
     ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
     YamlParseReport, YamlToken, YamlTokenSpan, diagnostic_codes,
 };
 pub use parser::{parse_shadow, parse_yaml_report, parse_yaml_tree};
-pub use parser_v2::{ShadowParserV2Report, shadow_parser_v2_check};
+pub use parser_v2::{ShadowParserV2Report, parse_v2, shadow_parser_v2_check};
 pub use scanner::{ShadowScannerReport, shadow_scanner_check};
 
 #[cfg(test)]
