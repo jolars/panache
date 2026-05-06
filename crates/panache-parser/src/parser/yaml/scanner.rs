@@ -6,9 +6,10 @@
 //!
 //! Currently implements: trivia, document markers, directives, flow
 //! indicators, block indicators (`-`/`?`/`:`) with the simple-key
-//! table, single-line plain scalars, and quoted scalars (`'…'`,
-//! `"…"`) with escape diagnostics. Block scalars and multi-line plain
-//! continuation land in steps 8–9; the parser-side cutover is step 12.
+//! table, single-line plain scalars, quoted scalars (`'…'`, `"…"`)
+//! with escape diagnostics, and block scalars (`|` literal, `>`
+//! folded). Multi-line plain continuation lands in step 9; the
+//! parser-side cutover is step 12.
 
 // No production callers yet — the line-based lexer remains the live
 // path until step 12. Remove once the scanner is wired into parsing.
@@ -254,11 +255,19 @@ impl<'a> Scanner<'a> {
                 self.fetch_flow_scalar(ScalarStyle::DoubleQuoted);
                 return;
             }
+            Some('|') if self.flow_level == 0 => {
+                self.fetch_block_scalar(ScalarStyle::Literal);
+                return;
+            }
+            Some('>') if self.flow_level == 0 => {
+                self.fetch_block_scalar(ScalarStyle::Folded);
+                return;
+            }
             _ => {}
         }
-        // Default: anything else opens a plain scalar. Block scalars
-        // (`|`/`>`) and anchors/tags/aliases land in later steps and
-        // will be dispatched here before this default.
+        // Default: anything else opens a plain scalar.
+        // Anchors/tags/aliases land in later steps and will be
+        // dispatched here before this default.
         self.fetch_plain_scalar();
     }
 
@@ -627,6 +636,207 @@ impl<'a> Scanner<'a> {
                 | 'L'
                 | 'P'
         )
+    }
+
+    /// Block scalar (`|` literal, `>` folded). The header is `|`/`>`
+    /// optionally followed by an indent indicator (`1`–`9`) and/or a
+    /// chomping indicator (`+`/`-`), then trailing spaces/comment, then
+    /// a line break. Content lines whose indentation falls below the
+    /// resolved minimum terminate the scalar — at which point the
+    /// cursor is left at the start of the dedented line so the main
+    /// loop can pick up the next token.
+    ///
+    /// As with quoted scalars, the source span is emitted raw; folding
+    /// and chomping live in projection.
+    fn fetch_block_scalar(&mut self, style: ScalarStyle) {
+        // Block scalars are values, not keys, so they don't register
+        // a simple-key candidate; but they DO close any pending
+        // candidate at the current level (e.g. `key: |` confirms `key`
+        // as the candidate before we get here).
+        self.allow_simple_key = true;
+        self.remove_simple_key();
+        let start = self.cursor;
+        let parent_indent = self.indent;
+        // Header indicator (`|` or `>`).
+        self.advance();
+        // Optional indent + chomping indicators (in either order).
+        let mut explicit_increment: Option<u32> = None;
+        for _ in 0..2 {
+            match self.peek_char() {
+                Some('+' | '-') => {
+                    self.advance();
+                }
+                Some(d @ '1'..='9') if explicit_increment.is_none() => {
+                    explicit_increment = Some(d.to_digit(10).expect("hex digit"));
+                    self.advance();
+                }
+                _ => break,
+            }
+        }
+        // Header trailing whitespace.
+        while matches!(self.peek_char(), Some(' ' | '\t')) {
+            self.advance();
+        }
+        // Optional trailing comment on the header line.
+        if self.peek_char() == Some('#') {
+            while !matches!(self.peek_char(), None | Some('\n' | '\r')) {
+                self.advance();
+            }
+        }
+        // The header must end at a line break (or EOF, for an empty
+        // body). Non-blank trailing content is malformed; libyaml
+        // diagnoses but we just consume to end-of-line for resilience.
+        match self.peek_char() {
+            Some('\n') => {
+                self.advance();
+            }
+            Some('\r') => {
+                self.advance();
+                if self.peek_char() == Some('\n') {
+                    self.advance();
+                }
+            }
+            None => {
+                // Empty body at EOF.
+                let end = self.cursor;
+                self.tokens.push_back(Token {
+                    kind: TokenKind::Scalar(style),
+                    start,
+                    end,
+                });
+                return;
+            }
+            Some(_) => {
+                // Trailing junk on header — skip to end of line.
+                while !matches!(self.peek_char(), None | Some('\n' | '\r')) {
+                    self.advance();
+                }
+                match self.peek_char() {
+                    Some('\n') => {
+                        self.advance();
+                    }
+                    Some('\r') => {
+                        self.advance();
+                        if self.peek_char() == Some('\n') {
+                            self.advance();
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        // Determine the minimum content indent. The libyaml rule:
+        // base = max(parent_indent, 0); explicit indicator m yields
+        // base + m; otherwise auto-detect from the first non-blank
+        // content line, falling back to base + 1.
+        let base = parent_indent.max(0);
+        let min_indent = match explicit_increment {
+            Some(m) => base + m as i32,
+            None => self
+                .auto_detect_block_scalar_indent()
+                .unwrap_or(base + 1)
+                .max(base + 1),
+        };
+        // Walk content lines via lookahead so a dedented line stays
+        // unconsumed and the main fetch loop sees it.
+        loop {
+            let line_start = self.cursor.index;
+            let bytes = self.input.as_bytes();
+            let mut probe = line_start;
+            while bytes.get(probe) == Some(&b' ') {
+                probe += 1;
+            }
+            let leading_spaces = probe - line_start;
+            match bytes.get(probe) {
+                None => break,
+                Some(b'\n' | b'\r') => {
+                    // Blank line — entirely whitespace. Consume the
+                    // spaces and the line break as content.
+                    while self.cursor.index < probe {
+                        self.advance();
+                    }
+                    self.consume_one_line_break();
+                    continue;
+                }
+                _ => {}
+            }
+            if (leading_spaces as i32) < min_indent {
+                // Dedent below content — terminate without consuming.
+                break;
+            }
+            if leading_spaces == 0
+                && (bytes.get(probe..probe + 3) == Some(b"---")
+                    || bytes.get(probe..probe + 3) == Some(b"..."))
+                && matches!(
+                    bytes.get(probe + 3),
+                    None | Some(b' ' | b'\t' | b'\n' | b'\r')
+                )
+            {
+                // Document marker terminates the scalar.
+                break;
+            }
+            // Consume the rest of the line as content.
+            while !matches!(self.peek_char(), None | Some('\n' | '\r')) {
+                self.advance();
+            }
+            self.consume_one_line_break();
+            if self.at_eof() {
+                break;
+            }
+        }
+        let end = self.cursor;
+        self.tokens.push_back(Token {
+            kind: TokenKind::Scalar(style),
+            start,
+            end,
+        });
+    }
+
+    /// Look ahead through blank lines to find the first non-blank
+    /// content line, returning its leading-space count. Pure peek;
+    /// the cursor does not move.
+    fn auto_detect_block_scalar_indent(&self) -> Option<i32> {
+        let bytes = self.input.as_bytes();
+        let mut i = self.cursor.index;
+        while i < bytes.len() {
+            let line_start = i;
+            while bytes.get(i) == Some(&b' ') {
+                i += 1;
+            }
+            match bytes.get(i) {
+                None => return None,
+                Some(b'\n') => {
+                    i += 1;
+                    continue;
+                }
+                Some(b'\r') => {
+                    i += 1;
+                    if bytes.get(i) == Some(&b'\n') {
+                        i += 1;
+                    }
+                    continue;
+                }
+                _ => {
+                    return Some((i - line_start) as i32);
+                }
+            }
+        }
+        None
+    }
+
+    fn consume_one_line_break(&mut self) {
+        match self.peek_char() {
+            Some('\n') => {
+                self.advance();
+            }
+            Some('\r') => {
+                self.advance();
+                if self.peek_char() == Some('\n') {
+                    self.advance();
+                }
+            }
+            _ => {}
+        }
     }
 
     fn fetch_stream_end(&mut self) {
@@ -2048,5 +2258,147 @@ mod tests {
             ],
         );
         assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn literal_block_scalar_at_top_level_spans_to_eof() {
+        let input = "|\n  hello\n  world\n";
+        let tokens = collect_tokens(input);
+        let scalar = tokens
+            .iter()
+            .find(|t| t.kind == TokenKind::Scalar(ScalarStyle::Literal))
+            .expect("literal scalar");
+        // The scalar covers the header `|`, line break, both content
+        // lines, and their trailing newlines.
+        assert_eq!(scalar.start.index, 0);
+        assert_eq!(scalar.end.index, input.len());
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn folded_block_scalar_emits_folded_style() {
+        let input = ">\n  hello\n";
+        let tokens = collect_tokens(input);
+        assert!(
+            tokens
+                .iter()
+                .any(|t| t.kind == TokenKind::Scalar(ScalarStyle::Folded)),
+            "got {tokens:?}",
+        );
+    }
+
+    #[test]
+    fn block_scalar_terminates_on_dedent_to_parent_indent() {
+        // key: |
+        //   line1
+        //   line2
+        // next: x
+        //
+        // The block scalar's content indent is 2; `next:` at column 0
+        // is below that, so the scalar terminates without consuming
+        // `next` and the outer mapping continues.
+        let input = "key: |\n  line1\n  line2\nnext: x\n";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        // Find the block scalar's span; everything before "next" must
+        // be inside it.
+        let scalar = tokens
+            .iter()
+            .find(|t| t.kind == TokenKind::Scalar(ScalarStyle::Literal))
+            .expect("literal scalar");
+        let next_idx = input.find("next:").expect("next key in fixture");
+        assert!(
+            scalar.end.index <= next_idx,
+            "scalar should end before `next:` at {next_idx}: scalar ends at {}",
+            scalar.end.index,
+        );
+        // The outer mapping must produce two key/value pairs.
+        let key_count = kinds.iter().filter(|&&k| k == TokenKind::Key).count();
+        assert_eq!(key_count, 2, "got {kinds:?}");
+    }
+
+    #[test]
+    fn block_scalar_with_keep_chomping_indicator_in_header() {
+        let input = "|+\n  text\n\n";
+        let tokens = collect_tokens(input);
+        let scalar = tokens
+            .iter()
+            .find(|t| t.kind == TokenKind::Scalar(ScalarStyle::Literal))
+            .expect("literal scalar");
+        // The header `|+` and the empty trailing line are part of the
+        // scalar's source span.
+        assert_eq!(scalar.start.index, 0);
+        assert_eq!(scalar.end.index, input.len());
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn block_scalar_with_explicit_indent_indicator_uses_that_indent() {
+        // `|2` declares the content indent is 2. Lines at less than
+        // 2 spaces terminate. The single content line at indent 2
+        // is included; `bye` at indent 0 is not.
+        let input = "key: |2\n  hi\nbye: x\n";
+        let tokens = collect_tokens(input);
+        let scalar = tokens
+            .iter()
+            .find(|t| t.kind == TokenKind::Scalar(ScalarStyle::Literal))
+            .expect("literal scalar");
+        let bye_idx = input.find("bye:").expect("bye key in fixture");
+        assert!(
+            scalar.end.index <= bye_idx,
+            "scalar must end before `bye`: {} vs {}",
+            scalar.end.index,
+            bye_idx,
+        );
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn block_scalar_at_eof_without_trailing_newline_still_emits() {
+        let input = "|\n  text";
+        let tokens = collect_tokens(input);
+        let scalar = tokens
+            .iter()
+            .find(|t| t.kind == TokenKind::Scalar(ScalarStyle::Literal))
+            .expect("literal scalar");
+        assert_eq!(scalar.end.index, input.len());
+    }
+
+    #[test]
+    fn block_scalar_with_internal_blank_lines_includes_them() {
+        // Blank lines inside the block scalar are part of content.
+        let input = "|\n  a\n\n  b\n";
+        let tokens = collect_tokens(input);
+        let scalar = tokens
+            .iter()
+            .find(|t| t.kind == TokenKind::Scalar(ScalarStyle::Literal))
+            .expect("literal scalar");
+        assert_eq!(scalar.end.index, input.len());
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn pipe_inside_flow_context_is_part_of_plain_scalar_not_block() {
+        // `[|]` — `|` in flow context is plain text.
+        let input = "[|]";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        // Should NOT see a Literal-style scalar — flow context disables
+        // the block-scalar dispatch.
+        assert!(
+            !kinds.contains(&TokenKind::Scalar(ScalarStyle::Literal)),
+            "got {kinds:?}",
+        );
+        assert_eq!(kinds[1], TokenKind::FlowSequenceStart);
+        assert!(kinds.contains(&TokenKind::Scalar(ScalarStyle::Plain)));
+    }
+
+    #[test]
+    fn block_scalar_terminates_on_document_marker() {
+        let input = "|\n  text\n---\nnext\n";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        // The scalar must NOT swallow the `---` marker.
+        assert!(kinds.contains(&TokenKind::DocumentStart), "got {kinds:?}");
     }
 }
