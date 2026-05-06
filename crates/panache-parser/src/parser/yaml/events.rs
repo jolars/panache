@@ -145,7 +145,7 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
         .descendants()
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE)
     {
-        out.push("+SEQ".to_string());
+        out.push(seq_open_event(&seq_node, &handles));
         project_block_sequence_items(&seq_node, &handles, out);
         out.push("-SEQ".to_string());
     } else if let Some(root_map) = doc
@@ -1465,6 +1465,54 @@ fn project_block_sequence_items(
 /// Decompose a node-property + scalar string into `(anchor, long_tag, body)`,
 /// peeling off any leading `&anchor` and tag shorthand in either order
 /// (`&a !!str foo` or `!!str &a foo`). Returns the raw body trimmed.
+/// Build the `+SEQ` open event for a YAML_BLOCK_SEQUENCE, attaching any
+/// document-level node properties (a tag, or a `&anchor` carried by the
+/// block-sequence header line) that precede the first sequence item. The
+/// parser stores those properties as YAML_TAG / YAML_SCALAR siblings of
+/// the YAML_BLOCK_SEQUENCE_ITEM children, in source order.
+fn seq_open_event(seq_node: &SyntaxNode, handles: &TagHandles) -> String {
+    let mut anchor: Option<String> = None;
+    let mut long_tag: Option<String> = None;
+    for child in seq_node.children_with_tokens() {
+        if let Some(node) = child.as_node()
+            && node.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
+        {
+            break;
+        }
+        let Some(tok) = child.as_token() else {
+            continue;
+        };
+        match tok.kind() {
+            SyntaxKind::YAML_TAG => {
+                if long_tag.is_none()
+                    && let Some(long) = resolve_long_tag(tok.text(), handles)
+                {
+                    long_tag = Some(long);
+                }
+            }
+            SyntaxKind::YAML_SCALAR => {
+                let trimmed = tok.text().trim();
+                if anchor.is_none()
+                    && let Some(name) = trimmed.strip_prefix('&')
+                {
+                    anchor = Some(name.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut event = String::from("+SEQ");
+    if let Some(t) = long_tag {
+        event.push(' ');
+        event.push_str(&t);
+    }
+    if let Some(a) = anchor {
+        event.push_str(" &");
+        event.push_str(&a);
+    }
+    event
+}
+
 fn decompose_scalar<'a>(
     text: &'a str,
     handles: &TagHandles,

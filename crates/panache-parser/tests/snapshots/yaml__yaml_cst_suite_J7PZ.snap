@@ -1,0 +1,48 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
+expression: snapshot
+---
+case_id: J7PZ
+input: "# The !!omap tag is one of the optional types\n# introduced for YAML 1.1. In 1.2, it is not\n# part of the standard tags and should not be\n# enabled by default.\n# Ordered maps are represented as\n# A sequence of mappings, with\n# each mapping having one key\n--- !!omap\n- Mark McGwire: 65\n- Sammy Sosa: 63\n- Ken Griffy: 58\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..318
+  YAML_METADATA_CONTENT@0..318
+    YAML_STREAM@0..318
+      YAML_COMMENT@0..45 "# The !!omap tag is o ..."
+      NEWLINE@45..46 "\n"
+      YAML_COMMENT@46..90 "# introduced for YAML ..."
+      NEWLINE@90..91 "\n"
+      YAML_COMMENT@91..136 "# part of the standar ..."
+      NEWLINE@136..137 "\n"
+      YAML_COMMENT@137..158 "# enabled by default."
+      NEWLINE@158..159 "\n"
+      YAML_COMMENT@159..192 "# Ordered maps are re ..."
+      NEWLINE@192..193 "\n"
+      YAML_COMMENT@193..223 "# A sequence of mappi ..."
+      NEWLINE@223..224 "\n"
+      YAML_COMMENT@224..253 "# each mapping having ..."
+      NEWLINE@253..254 "\n"
+      YAML_DOCUMENT@254..318
+        YAML_DOCUMENT_START@254..257 "---"
+        YAML_BLOCK_SEQUENCE@257..318
+          WHITESPACE@257..258 " "
+          YAML_TAG@258..264 "!!omap"
+          NEWLINE@264..265 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@265..284
+            YAML_BLOCK_SEQ_ENTRY@265..266 "-"
+            WHITESPACE@266..267 " "
+            YAML_SCALAR@267..283 "Mark McGwire: 65"
+            NEWLINE@283..284 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@284..301
+            YAML_BLOCK_SEQ_ENTRY@284..285 "-"
+            WHITESPACE@285..286 " "
+            YAML_SCALAR@286..300 "Sammy Sosa: 63"
+            NEWLINE@300..301 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@301..318
+            YAML_BLOCK_SEQ_ENTRY@301..302 "-"
+            WHITESPACE@302..303 " "
+            YAML_SCALAR@303..317 "Ken Griffy: 58"
+            NEWLINE@317..318 "\n"

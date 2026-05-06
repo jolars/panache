@@ -461,6 +461,38 @@ fn emit_block_seq<'a>(
     i: &mut usize,
     stop_on_dedent: bool,
 ) -> Result<(), YamlDiagnostic> {
+    // Consume leading document-level node properties (a tag, or a scalar
+    // that is just `&anchor`) that the classifier has already routed into
+    // a BlockSequence body — patterns like `&seq\n- a` and
+    // `--- !!omap\n- a`. They become siblings of the
+    // YAML_BLOCK_SEQUENCE_ITEM nodes; projection picks them up to attach
+    // anchor/tag info onto the `+SEQ` event.
+    let mut header_done = false;
+    while !header_done && *i < tokens.len() {
+        match tokens[*i].kind {
+            YamlToken::Tag => {
+                builder.token(SyntaxKind::YAML_TAG.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Scalar if tokens[*i].text.trim_start().starts_with('&') => {
+                builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Whitespace => {
+                builder.token(SyntaxKind::WHITESPACE.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Newline => {
+                builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Comment => {
+                builder.token(SyntaxKind::YAML_COMMENT.into(), tokens[*i].text);
+                *i += 1;
+            }
+            _ => header_done = true,
+        }
+    }
     while *i < tokens.len() {
         match tokens[*i].kind {
             YamlToken::Newline => {
@@ -1024,6 +1056,15 @@ fn emit_document<'a>(
             let mut has_tag = false;
             let mut has_scalar = false;
             let mut has_flow = false;
+            let mut has_block_seq = false;
+            // Track whether all significant tokens BEFORE the first
+            // BlockSeqEntry look like document-level node properties (a tag,
+            // or a scalar starting with `&` — i.e. a bare anchor on its own
+            // line). This lets `&seq\n- a` and `--- !!omap\n- a` route to a
+            // BlockSequence body even though their first significant token is
+            // a Tag/Scalar rather than the BlockSeqEntry itself.
+            let mut pre_seq_only_properties = true;
+            let mut seen_block_seq = false;
             for tok in &tokens[*i..] {
                 match tok.kind {
                     YamlToken::DocumentStart | YamlToken::DocumentEnd => break,
@@ -1033,17 +1074,26 @@ fn emit_document<'a>(
                     | YamlToken::BlockScalarHeader
                     | YamlToken::BlockScalarContent => {
                         has_scalar = true;
+                        if !seen_block_seq && !tok.text.trim_start().starts_with('&') {
+                            pre_seq_only_properties = false;
+                        }
                     }
                     YamlToken::FlowMapStart
                     | YamlToken::FlowMapEnd
                     | YamlToken::FlowSeqStart
                     | YamlToken::FlowSeqEnd
                     | YamlToken::Comma => has_flow = true,
+                    YamlToken::BlockSeqEntry => {
+                        has_block_seq = true;
+                        seen_block_seq = true;
+                    }
                     _ => {}
                 }
             }
             if has_colon || has_flow {
                 DocumentBody::BlockMap
+            } else if has_block_seq && pre_seq_only_properties {
+                DocumentBody::BlockSequence
             } else if has_tag || has_scalar {
                 DocumentBody::Scalar
             } else {

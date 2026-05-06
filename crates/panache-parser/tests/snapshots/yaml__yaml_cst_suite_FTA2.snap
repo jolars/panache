@@ -1,0 +1,24 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
+expression: snapshot
+---
+case_id: FTA2
+input: "--- &sequence\n- a\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..18
+  YAML_METADATA_CONTENT@0..18
+    YAML_STREAM@0..18
+      YAML_DOCUMENT@0..18
+        YAML_DOCUMENT_START@0..3 "---"
+        YAML_BLOCK_SEQUENCE@3..18
+          WHITESPACE@3..4 " "
+          YAML_SCALAR@4..13 "&sequence"
+          NEWLINE@13..14 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@14..18
+            YAML_BLOCK_SEQ_ENTRY@14..15 "-"
+            WHITESPACE@15..16 " "
+            YAML_SCALAR@16..17 "a"
+            NEWLINE@17..18 "\n"

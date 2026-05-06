@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: J7PZ
+input: "# The !!omap tag is one of the optional types\n# introduced for YAML 1.1. In 1.2, it is not\n# part of the standard tags and should not be\n# enabled by default.\n# Ordered maps are represented as\n# A sequence of mappings, with\n# each mapping having one key\n--- !!omap\n- Mark McGwire: 65\n- Sammy Sosa: 63\n- Ken Griffy: 58\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

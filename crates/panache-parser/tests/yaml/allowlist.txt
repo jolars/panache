@@ -270,3 +270,9 @@ DK3J
 T4YY
 # Two-document stream with a multi-line double-quoted scalar followed by an anchored plain scalar.
 KSS4
+# Document-level anchor on its own header line before a block sequence (no `---`).
+3R3P
+# Document-level anchor packed onto the `---` marker line, preceding a block sequence.
+FTA2
+# Document-level tag packed onto the `---` marker line, preceding a block sequence (e.g. `--- !!omap`).
+J7PZ

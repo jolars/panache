@@ -596,12 +596,6 @@
       "tree": false
     },
     {
-      "case_id": "3R3P",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "4CQQ",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_KEY_TOKEN"
@@ -1024,12 +1018,6 @@
       "tree": false
     },
     {
-      "case_id": "FTA2",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "FUP4",
       "diagnostic_codes": [
         "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END"
@@ -1068,12 +1056,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "J7PZ",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "J9HZ",
@@ -1523,6 +1505,7 @@
     "33X3",
     "3ALJ",
     "3GZX",
+    "3R3P",
     "3UYS",
     "4ABK",
     "4GC6",
@@ -1594,6 +1577,7 @@
     "FP8R",
     "FQ7F",
     "FRK4",
+    "FTA2",
     "G4RS",
     "G992",
     "H3Z8",
@@ -1601,6 +1585,7 @@
     "HWV9",
     "J3BT",
     "J5UC",
+    "J7PZ",
     "J7VC",
     "JHB9",
     "JR7V",
@@ -1651,8 +1636,8 @@
   "summary": {
     "error_contract_ok_count": 53,
     "fails_needs_error_path_count": 25,
-    "fails_needs_feature_count": 125,
-    "passes_now_count": 130,
+    "fails_needs_feature_count": 122,
+    "passes_now_count": 133,
     "total_cases": 352
   }
 }
