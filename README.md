@@ -315,12 +315,19 @@ Then add Panache to your `.pre-commit-config.yaml`:
 
 ```yaml
 repos:
-  - repo: https://github.com/jolars/panache
-    rev: v2.16.0 # Use the latest version
+  - repo: https://github.com/jolars/panache-pre-commit
+    rev: v2.43.1 # Use the latest version
     hooks:
       - id: panache-format # Format files
       - id: panache-lint # Lint and auto-fix issues
 ```
+
+> **Note:** The hooks live in
+> [`jolars/panache-pre-commit`](https://github.com/jolars/panache-pre-commit), a
+> thin shim repo. This avoids `pre-commit autoupdate` resolving to unrelated
+> sub-package tags from this monorepo (e.g. `panache-code-*`). If you currently
+> point at `https://github.com/jolars/panache`, update the `repo:` URL and run
+> `pre-commit autoupdate`.
 
 Install the hooks:
 

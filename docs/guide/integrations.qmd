@@ -12,11 +12,17 @@ description: >
 maintaining multi-language pre-commit hooks. It runs checks on your code before
 each commit to ensure quality and consistency.
 
+The hooks are published from
+[`jolars/panache-pre-commit`](https://github.com/jolars/panache-pre-commit), a
+shim repo that carries only `vX.Y.Z` tags so `pre-commit autoupdate` resolves
+correctly. (The main panache repo also tags sub-packages like `panache-code-*`,
+which would otherwise confuse autoupdate.)
+
 Create a `.pre-commit-config.yaml` file in your repository root:
 
 ```yaml
 repos:
-  - repo: https://github.com/jolars/panache
+  - repo: https://github.com/jolars/panache-pre-commit
     rev: v{{< meta version >}}
     hooks:
       - id: panache-format
@@ -41,7 +47,7 @@ Pass additional arguments to Panache:
 
 ```yaml
 repos:
-  - repo: https://github.com/jolars/panache
+  - repo: https://github.com/jolars/panache-pre-commit
     rev: v{{< meta version >}}
     hooks:
       - id: panache-format
@@ -56,7 +62,7 @@ and `.Rmd`:
 
 ```yaml
 repos:
-  - repo: https://github.com/jolars/panache
+  - repo: https://github.com/jolars/panache-pre-commit
     rev: v{{< meta version >}}
     hooks:
       - id: panache-format

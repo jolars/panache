@@ -2,8 +2,8 @@
 # Save this as .pre-commit-config.yaml in your project root
 
 repos:
-  - repo: https://github.com/jolars/panache
-    rev: v2.6.3 # Use the latest version from releases
+  - repo: https://github.com/jolars/panache-pre-commit
+    rev: v2.43.1 # Use the latest version from releases
     hooks:
       # Format Markdown, Quarto, and RMarkdown files
       - id: panache-format
@@ -13,8 +13,8 @@ repos:
 
 # You can pass additional arguments to panache:
 # repos:
-#   - repo: https://github.com/jolars/panache
-#     rev: v2.6.3
+#   - repo: https://github.com/jolars/panache-pre-commit
+#     rev: v2.43.1
 #     hooks:
 #       - id: panache-format
 #         args: [--config, custom-config.toml]

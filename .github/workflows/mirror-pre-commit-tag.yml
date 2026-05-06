@@ -1,0 +1,81 @@
+name: Mirror pre-commit tag
+
+# Mirrors panache's `vX.Y.Z` release tags to jolars/panache-pre-commit so that
+# `pre-commit autoupdate` resolves cleanly. The shim repo exists because this
+# repo carries multiple tag namespaces (panache-code-*, panache-formatter-*,
+# panache-parser-*) and pre-commit autoupdate picks the nearest tag by commit
+# graph distance, not by name. See issue #260.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to mirror (e.g. v2.43.1)"
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout panache at tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.tag.outputs.name }}
+          path: panache
+
+      - name: Checkout panache-pre-commit
+        uses: actions/checkout@v6
+        with:
+          repository: jolars/panache-pre-commit
+          token: ${{ secrets.PANACHE_PRE_COMMIT_TOKEN }}
+          path: panache-pre-commit
+
+      - name: Sync hook files
+        run: |
+          set -euo pipefail
+          cp panache/.pre-commit-hooks.yaml panache-pre-commit/.pre-commit-hooks.yaml
+          cp panache/package.json           panache-pre-commit/package.json
+          mkdir -p panache-pre-commit/bin
+          cp panache/bin/panache-precommit.js panache-pre-commit/bin/panache-precommit.js
+          chmod +x panache-pre-commit/bin/panache-precommit.js
+
+      - name: Commit, tag, and push
+        working-directory: panache-pre-commit
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists locally — nothing to do."
+            exit 0
+          fi
+
+          if ! git diff --quiet; then
+            git add .pre-commit-hooks.yaml package.json bin/panache-precommit.js
+            git commit -m "sync hook files from panache $TAG"
+            git push origin main
+          fi
+
+          git tag "$TAG"
+          git push origin "refs/tags/$TAG"
