@@ -54,6 +54,13 @@ When you hit these, prefer a structural fix over another shortcut —
 even if that means deferring the case until the rewrite. Allowlisting
 via shortcut is debt that has to be unwound at cutover.
 
+The concrete plan for the streaming-scanner rewrite — including
+resolved design decisions (trivia model, token enum lifetime, scalar
+cooking, diagnostic channel) and the step-by-step migration sequence
+that lands on `main` without a long-lived branch — lives in
+`scanner-rewrite.md` alongside this file. Consult it before starting
+work that the line-based lexer can't represent cleanly.
+
 ## Key files
 
 - `crates/panache-parser/src/parser/yaml/lexer.rs` — indentation-aware lexer,
