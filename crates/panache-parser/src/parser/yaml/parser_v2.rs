@@ -1,12 +1,12 @@
 //! Step-11 parser scaffold — a CST builder that consumes the streaming
-//! scanner. Initially produces a flat `YAML_STREAM` whose children are
-//! the scanner's tokens mapped to the closest existing `SyntaxKind`.
-//! Sub-commits in step 11 replace the flat shape with proper nesting
-//! (documents, block maps, block sequences, flow containers) so that
-//! `project_events` over the resulting CST matches each fixture's
-//! `test.event`.
+//! scanner. Currently wraps each contiguous run of body content in a
+//! `YAML_DOCUMENT` node, with `---` / `...` markers consumed inside the
+//! document they delimit. Inner containers (block maps, block sequences,
+//! flow containers) remain flat — subsequent sub-commits introduce that
+//! nesting so `project_events` over the resulting CST matches each
+//! fixture's `test.event`.
 //!
-//! Until that nesting is in place this module's output is byte-lossless
+//! Until inner nesting is in place this module's output is byte-lossless
 //! but structurally inadequate for event parity. The harness in
 //! `tests/yaml.rs` (`shadow_parser_v2_text_losslessness_over_allowlist`)
 //! gates the byte-completeness invariant on every commit.
@@ -26,6 +26,7 @@ pub(crate) fn parse_v2(input: &str) -> SyntaxNode {
     let mut builder = GreenNodeBuilder::new();
     builder.start_node(SyntaxKind::YAML_STREAM.into());
     let mut scanner = Scanner::new(input);
+    let mut doc_open = false;
     while let Some(tok) = scanner.next_token() {
         // Truly synthetic markers carry no source bytes; skip in the
         // flat shape. Sub-commits will use them to drive node
@@ -54,7 +55,47 @@ pub(crate) fn parse_v2(input: &str) -> SyntaxNode {
             continue;
         }
         let kind = map_token_to_syntax_kind(tok.kind);
-        builder.token(kind.into(), text);
+        match tok.kind {
+            TokenKind::DocumentStart => {
+                // `---` always begins a fresh document. Close any open
+                // doc first, then emit the marker inside the new one.
+                if doc_open {
+                    builder.finish_node();
+                }
+                builder.start_node(SyntaxKind::YAML_DOCUMENT.into());
+                doc_open = true;
+                builder.token(kind.into(), text);
+            }
+            TokenKind::DocumentEnd => {
+                // `...` closes the current document. If none is open
+                // (bare `...` at stream start), open a synthetic empty
+                // document so the marker has somewhere lossless to live.
+                if !doc_open {
+                    builder.start_node(SyntaxKind::YAML_DOCUMENT.into());
+                }
+                builder.token(kind.into(), text);
+                builder.finish_node();
+                doc_open = false;
+            }
+            TokenKind::Trivia(_) => {
+                // Trivia goes to whichever level is currently open;
+                // pre-document trivia stays at YAML_STREAM, in-document
+                // trivia stays inside the YAML_DOCUMENT.
+                builder.token(kind.into(), text);
+            }
+            _ => {
+                // Any non-trivia content opens an implicit document
+                // when one isn't already in progress.
+                if !doc_open {
+                    builder.start_node(SyntaxKind::YAML_DOCUMENT.into());
+                    doc_open = true;
+                }
+                builder.token(kind.into(), text);
+            }
+        }
+    }
+    if doc_open {
+        builder.finish_node();
     }
     builder.finish_node();
     SyntaxNode::new_root(builder.finish())
@@ -180,5 +221,95 @@ mod tests {
         let input = "{a: 42\n}\n";
         let report = shadow_parser_v2_check(input);
         assert!(report.text_lossless, "input {input:?} not preserved");
+    }
+
+    fn document_count(tree: &SyntaxNode) -> usize {
+        tree.children()
+            .filter(|n| n.kind() == SyntaxKind::YAML_DOCUMENT)
+            .count()
+    }
+
+    #[test]
+    fn implicit_document_wraps_body_with_no_markers() {
+        // No explicit `---` or `...` — the body still belongs to one
+        // YAML_DOCUMENT so projection has a node to walk.
+        let input = "key: value\n";
+        let tree = parse_v2(input);
+        assert_eq!(document_count(&tree), 1);
+        assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn explicit_doc_start_opens_document_marker_lives_inside() {
+        let input = "---\nkey: value\n";
+        let tree = parse_v2(input);
+        assert_eq!(document_count(&tree), 1);
+        let doc = tree
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_DOCUMENT)
+            .expect("document node");
+        assert!(
+            doc.children_with_tokens().any(|el| el
+                .as_token()
+                .is_some_and(|t| t.kind() == SyntaxKind::YAML_DOCUMENT_START)),
+            "`---` token should live inside YAML_DOCUMENT"
+        );
+        assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn explicit_doc_end_closes_document_marker_lives_inside() {
+        let input = "key: value\n...\n";
+        let tree = parse_v2(input);
+        assert_eq!(document_count(&tree), 1);
+        let doc = tree
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_DOCUMENT)
+            .expect("document node");
+        assert!(
+            doc.children_with_tokens().any(|el| el
+                .as_token()
+                .is_some_and(|t| t.kind() == SyntaxKind::YAML_DOCUMENT_END)),
+            "`...` token should live inside YAML_DOCUMENT"
+        );
+        assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn consecutive_doc_starts_emit_two_documents() {
+        let input = "---\na\n---\nb\n";
+        let tree = parse_v2(input);
+        assert_eq!(document_count(&tree), 2);
+        assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn pre_document_trivia_stays_at_stream_level() {
+        // A leading newline before the first document content should
+        // sit under YAML_STREAM, not inside a YAML_DOCUMENT — there is
+        // no document yet at that point.
+        let input = "\n---\nkey: value\n";
+        let tree = parse_v2(input);
+        let stream_token_kinds: Vec<SyntaxKind> = tree
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .map(|t| t.kind())
+            .collect();
+        assert!(
+            stream_token_kinds.contains(&SyntaxKind::NEWLINE),
+            "leading newline should be a direct child of YAML_STREAM, got {stream_token_kinds:?}"
+        );
+        assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn bare_doc_end_at_stream_start_opens_synthetic_empty_document() {
+        // Pathological but lossless: a stream that begins with `...`
+        // wraps the marker in an empty YAML_DOCUMENT so no source
+        // bytes leak out at YAML_STREAM level uncoupled from a doc.
+        let input = "...\n";
+        let tree = parse_v2(input);
+        assert_eq!(document_count(&tree), 1);
+        assert_eq!(tree.text().to_string(), input);
     }
 }
