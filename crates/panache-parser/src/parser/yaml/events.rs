@@ -2204,7 +2204,16 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
             // space. Without this, joining YAML_SCALAR tokens directly drops
             // line structure (yaml-test-suite case XV9V).
             let multi_line_text = collect_value_scalar_text_with_newlines(&value_node);
-            let is_multi_line = multi_line_text.contains('\n');
+            // Strip trailing whitespace/newlines that come AFTER the
+            // closing quote. v2 keeps a single quoted-scalar token so
+            // those bytes are post-value trivia (NEWLINE) — they don't
+            // make the scalar body multi-line. Without this trim, a
+            // single-line quoted with trailing significant whitespace
+            // (J3BT's `"Quoted \t"`) hits the multi-line folder which
+            // strips trailing tabs/spaces from the scalar body.
+            let is_multi_line = multi_line_text
+                .trim_end_matches(['\n', '\r', ' ', '\t'])
+                .contains('\n');
             let quoted = if is_multi_line {
                 quoted_val_event_multi_line(&multi_line_text)
             } else {
