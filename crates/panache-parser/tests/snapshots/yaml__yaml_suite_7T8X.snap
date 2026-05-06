@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 245
+expression: snapshot
+---
+case_id: 7T8X
+input: ">\n\n folded\n line\n\n next\n line\n   * bullet\n\n   * list\n   * lines\n\n last\n line\n\n# Comment\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

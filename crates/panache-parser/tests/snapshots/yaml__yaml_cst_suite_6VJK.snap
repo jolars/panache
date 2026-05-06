@@ -1,0 +1,37 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: 6VJK
+input: ">\n Sammy Sosa completed another\n fine season with great stats.\n\n   63 Home Runs\n   0.288 Batting Average\n\n What a year!\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..120
+  YAML_METADATA_CONTENT@0..120
+    YAML_STREAM@0..120
+      YAML_DOCUMENT@0..120
+        YAML_SCALAR@0..1 ">"
+        NEWLINE@1..2 "\n"
+        YAML_SCALAR@2..2 ""
+        WHITESPACE@2..3 " "
+        YAML_SCALAR@3..31 "Sammy Sosa completed  ..."
+        NEWLINE@31..32 "\n"
+        WHITESPACE@32..33 " "
+        YAML_SCALAR@33..62 "fine season with grea ..."
+        NEWLINE@62..63 "\n"
+        NEWLINE@63..64 "\n"
+        YAML_SCALAR@64..64 ""
+        WHITESPACE@64..67 "   "
+        YAML_SCALAR@67..79 "63 Home Runs"
+        NEWLINE@79..80 "\n"
+        WHITESPACE@80..83 "   "
+        YAML_SCALAR@83..104 "0.288 Batting Average"
+        NEWLINE@104..105 "\n"
+        NEWLINE@105..106 "\n"
+        YAML_SCALAR@106..106 ""
+        WHITESPACE@106..107 " "
+        YAML_SCALAR@107..119 "What a year!"
+        NEWLINE@119..120 "\n"
+        YAML_SCALAR@120..120 ""

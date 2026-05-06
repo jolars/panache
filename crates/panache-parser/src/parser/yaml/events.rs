@@ -220,6 +220,14 @@ fn scalar_document_value(doc: &SyntaxNode, handles: &TagHandles) -> Option<Strin
         let escaped = escape_block_scalar_text(&body);
         return Some(format!("=VAL {indicator}{escaped}"));
     }
+    // Bare top-level block scalar (no `---` marker) — e.g. a doc that begins
+    // with `>\n …` or `|\n …`. Reuse the same folder; the only difference vs
+    // the directive-end-packed form is the absence of a `YAML_DOCUMENT_START`
+    // sentinel separating the header from the body.
+    if let Some((indicator, body)) = extract_top_level_block_body(doc) {
+        let escaped = escape_block_scalar_text(&body);
+        return Some(format!("=VAL {indicator}{escaped}"));
+    }
     // Skip `%TAG`/`%YAML` directive lines: those are document-level metadata,
     // not part of the scalar body.
     let text = doc
@@ -250,23 +258,53 @@ fn scalar_document_value(doc: &SyntaxNode, handles: &TagHandles) -> Option<Strin
         .filter_map(|el| el.into_token())
         .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
         .map(|tok| tok.text().to_string());
+    let multi_line_text = collect_doc_scalar_text_with_newlines(doc);
+    let is_multi_line_quoted = multi_line_text.contains('\n')
+        && (trimmed_text.starts_with('"') || trimmed_text.starts_with('\''));
     let event = if let Some(tag) = tag_text
         && let Some(long) = resolve_long_tag(&tag, handles)
     {
         if trimmed_text.starts_with('"') || trimmed_text.starts_with('\'') {
-            let quoted = quoted_val_event(trimmed_text);
+            let quoted = if is_multi_line_quoted {
+                quoted_val_event_multi_line(&multi_line_text)
+            } else {
+                quoted_val_event(trimmed_text)
+            };
             // quoted_val_event returns `=VAL "body` — splice the tag in.
             quoted.replacen("=VAL ", &format!("=VAL {long} "), 1)
         } else {
             format!("=VAL {long} :{trimmed_text}")
         }
+    } else if is_multi_line_quoted {
+        quoted_val_event_multi_line(&multi_line_text)
     } else if trimmed_text.starts_with('"') || trimmed_text.starts_with('\'') {
         quoted_val_event(&text)
     } else {
         let folded = fold_plain_document_lines(doc);
-        format!("=VAL :{}", escape_block_scalar_text(&folded))
+        // Plain top-level scalars may carry node properties (`&anchor`,
+        // `!tag`) before the actual scalar body; decompose so events project
+        // them in canonical `&anchor <tag> :body` order.
+        let (anchor, body_tag, body) = decompose_scalar(folded.trim_start(), handles);
+        if anchor.is_some() || body_tag.is_some() {
+            scalar_event(anchor, body_tag.as_deref(), &escape_block_scalar_text(body))
+        } else {
+            format!("=VAL :{}", escape_block_scalar_text(&folded))
+        }
     };
     Some(event)
+}
+
+/// Reconstruct the doc's scalar text with line breaks intact: walk
+/// `YAML_SCALAR` + `NEWLINE` tokens in order (skipping directive lines).
+/// Required for multi-line quoted folding because `YAML_SCALAR`-only joins
+/// throw away the line structure that drives YAML 1.2 §7.3.2/§7.3.3 folding.
+fn collect_doc_scalar_text_with_newlines(doc: &SyntaxNode) -> String {
+    doc.descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::NEWLINE))
+        .filter(|tok| !tok.text().trim_start().starts_with('%'))
+        .map(|tok| tok.text().to_string())
+        .collect()
 }
 
 fn plain_val_event(text: &str) -> String {
@@ -450,6 +488,161 @@ fn quoted_val_event(text: &str) -> String {
         let inner = decode_double_quoted(text);
         format!("=VAL \"{}", escape_for_event(&inner))
     }
+}
+
+/// Multi-line quoted scalar projection: applies YAML 1.2 §7.3.2 / §7.3.3 line
+/// folding (single line break → space, blank-line run of `n` blanks → `n`
+/// `\n`s) before escape decoding. Required when a top-level quoted document
+/// spans more than one source line — the single-line `quoted_val_event`
+/// concatenates `YAML_SCALAR` tokens directly and would lose all line
+/// structure.
+fn quoted_val_event_multi_line(raw: &str) -> String {
+    let trimmed = raw.trim_start_matches([' ', '\t', '\n']);
+    if trimmed.starts_with('\'') {
+        let inner_with_breaks = strip_quoted_wrapper(trimmed, '\'');
+        let folded = fold_quoted_inner(&inner_with_breaks);
+        let decoded = folded.replace("''", "'");
+        format!("=VAL '{}", escape_for_event(&decoded))
+    } else {
+        let inner_with_breaks = strip_quoted_wrapper(trimmed, '"');
+        let folded = fold_quoted_inner(&inner_with_breaks);
+        let decoded = decode_double_quoted_inner(&folded);
+        format!("=VAL \"{}", escape_for_event(&decoded))
+    }
+}
+
+/// Strip the surrounding quote characters from a multi-line quoted scalar's
+/// raw source. Walks until the first un-escaped (for `"`) or non-doubled
+/// (for `'`) closing quote so embedded `\"` / `''` don't terminate early.
+fn strip_quoted_wrapper(text: &str, quote: char) -> String {
+    let body = text.strip_prefix(quote).unwrap_or(text);
+    let mut out = String::with_capacity(body.len());
+    let mut chars = body.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if quote == '"' {
+            if ch == '\\' {
+                out.push(ch);
+                if let Some(next) = chars.next() {
+                    out.push(next);
+                }
+                continue;
+            }
+            if ch == '"' {
+                break;
+            }
+        } else if ch == '\'' {
+            if chars.peek() == Some(&'\'') {
+                out.push('\'');
+                out.push('\'');
+                chars.next();
+                continue;
+            }
+            break;
+        }
+        out.push(ch);
+    }
+    out
+}
+
+/// Fold the inner body of a multi-line quoted scalar per YAML §7.3:
+/// - On the first line, leading whitespace is preserved as-is.
+/// - On continuation lines, leading whitespace is stripped.
+/// - Trailing whitespace from the running output is dropped before folding.
+/// - A run of `n` consecutive empty lines folds to `n` `\n` chars.
+/// - A single line break (no blank between) folds to a single space.
+/// - Trailing whitespace of the final line is stripped (matching
+///   yaml-test-suite event expectations for multi-line quoted scalars).
+fn fold_quoted_inner(inner: &str) -> String {
+    let mut out = String::new();
+    let mut blanks = 0usize;
+    let mut have_first = false;
+    for (idx, line) in inner.split('\n').enumerate() {
+        if idx == 0 {
+            out.push_str(line);
+            have_first = true;
+            continue;
+        }
+        let stripped = line.trim_start_matches([' ', '\t']);
+        if stripped.is_empty() {
+            blanks += 1;
+            continue;
+        }
+        let trimmed_end = out.trim_end_matches([' ', '\t']);
+        out.truncate(trimmed_end.len());
+        if !have_first {
+            // No content yet, so prepend nothing — first-line leading
+            // whitespace is preserved later by the `idx == 0` branch only.
+        } else if blanks == 0 {
+            out.push(' ');
+        } else {
+            for _ in 0..blanks {
+                out.push('\n');
+            }
+        }
+        out.push_str(stripped);
+        blanks = 0;
+        have_first = true;
+    }
+    let trimmed_tail = out.trim_end_matches([' ', '\t']);
+    out.truncate(trimmed_tail.len());
+    out
+}
+
+/// Inner-only variant of [`decode_double_quoted`]: the input has no
+/// surrounding quote characters and is consumed in full. Shares escape
+/// decoding semantics with the wrapped form.
+fn decode_double_quoted_inner(body: &str) -> String {
+    let mut out = String::with_capacity(body.len());
+    let mut chars = body.chars();
+    while let Some(ch) = chars.next() {
+        if ch != '\\' {
+            out.push(ch);
+            continue;
+        }
+        let Some(next) = chars.next() else {
+            out.push('\\');
+            break;
+        };
+        match next {
+            '0' => out.push('\0'),
+            'a' => out.push('\u{07}'),
+            'b' => out.push('\u{08}'),
+            't' | '\t' => out.push('\t'),
+            'n' => out.push('\n'),
+            'v' => out.push('\u{0B}'),
+            'f' => out.push('\u{0C}'),
+            'r' => out.push('\r'),
+            'e' => out.push('\u{1B}'),
+            ' ' => out.push(' '),
+            '"' => out.push('"'),
+            '/' => out.push('/'),
+            '\\' => out.push('\\'),
+            'N' => out.push('\u{85}'),
+            '_' => out.push('\u{A0}'),
+            'L' => out.push('\u{2028}'),
+            'P' => out.push('\u{2029}'),
+            'x' => {
+                if let Some(c) = take_hex_char(&mut chars, 2) {
+                    out.push(c);
+                }
+            }
+            'u' => {
+                if let Some(c) = take_hex_char(&mut chars, 4) {
+                    out.push(c);
+                }
+            }
+            'U' => {
+                if let Some(c) = take_hex_char(&mut chars, 8) {
+                    out.push(c);
+                }
+            }
+            other => {
+                out.push('\\');
+                out.push(other);
+            }
+        }
+    }
+    out
 }
 
 fn decode_single_quoted(text: &str) -> String {
@@ -642,7 +835,15 @@ fn extract_block_scalar_body(value_node: &SyntaxNode) -> Option<(char, String)> 
     let tokens: Vec<_> = value_node
         .descendants_with_tokens()
         .filter_map(|el| el.into_token())
-        .filter(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::NEWLINE))
+        .filter(|tok| {
+            matches!(
+                tok.kind(),
+                SyntaxKind::YAML_SCALAR
+                    | SyntaxKind::NEWLINE
+                    | SyntaxKind::WHITESPACE
+                    | SyntaxKind::YAML_COMMENT,
+            )
+        })
         .collect();
     fold_block_scalar_tokens(&tokens)
 }
@@ -665,78 +866,135 @@ fn extract_scalar_doc_block_body(doc: &SyntaxNode) -> Option<(char, String)> {
         }
         match tok.kind() {
             SyntaxKind::YAML_DOCUMENT_END => break,
-            SyntaxKind::YAML_SCALAR | SyntaxKind::NEWLINE => tokens.push(tok),
+            SyntaxKind::YAML_SCALAR
+            | SyntaxKind::NEWLINE
+            | SyntaxKind::WHITESPACE
+            | SyntaxKind::YAML_COMMENT => tokens.push(tok),
             _ => {}
         }
     }
     fold_block_scalar_tokens(&tokens)
 }
 
-fn fold_block_scalar_tokens(tokens: &[SyntaxToken]) -> Option<(char, String)> {
-    let first = tokens.first()?;
-    if first.kind() != SyntaxKind::YAML_SCALAR {
+/// Detect a top-level (no `YAML_DOCUMENT_START` marker) block-scalar document
+/// of the form `>\n …` or `|\n …`. Walks the document's content tokens and
+/// applies block-scalar folding when the first scalar token is a bare
+/// block-scalar header. Returns `None` otherwise so plain / quoted scalar
+/// handling can proceed.
+fn extract_top_level_block_body(doc: &SyntaxNode) -> Option<(char, String)> {
+    if doc
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .any(|tok| tok.kind() == SyntaxKind::YAML_DOCUMENT_START)
+    {
         return None;
     }
-    let (indicator, chomp) = parse_block_scalar_indicator(first.text())?;
+    let tokens: Vec<_> = doc
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|tok| {
+            matches!(
+                tok.kind(),
+                SyntaxKind::YAML_SCALAR
+                    | SyntaxKind::NEWLINE
+                    | SyntaxKind::WHITESPACE
+                    | SyntaxKind::YAML_COMMENT,
+            )
+        })
+        .collect();
+    let first = tokens.iter().find(|tok| {
+        tok.kind() == SyntaxKind::YAML_SCALAR && parse_block_scalar_indicator(tok.text()).is_some()
+    })?;
+    let _ = first;
+    fold_block_scalar_tokens(&tokens)
+}
 
+fn fold_block_scalar_tokens(tokens: &[SyntaxToken]) -> Option<(char, String)> {
+    let header_idx = tokens.iter().position(|t| {
+        t.kind() == SyntaxKind::YAML_SCALAR && parse_block_scalar_indicator(t.text()).is_some()
+    })?;
+    let (indicator, chomp) = parse_block_scalar_indicator(tokens[header_idx].text())?;
+
+    // Reconstruct the body source by stitching every token AFTER the header
+    // and its trailing newline. Including `WHITESPACE` and `YAML_COMMENT`
+    // tokens preserves the indentation needed for content-indent calculation
+    // and lets a `# ...` line at column 0 (DK3J) land inside the body, while
+    // a less-indented `# Comment` after a fully-indented body region (7T8X)
+    // gets recognized as a body terminator.
     let mut raw = String::new();
-    let mut seen_header = false;
     let mut skipped_header_newline = false;
-    for tok in tokens.iter().skip(1) {
-        if !seen_header && !skipped_header_newline && tok.kind() == SyntaxKind::NEWLINE {
+    for tok in &tokens[header_idx + 1..] {
+        if !skipped_header_newline && tok.kind() == SyntaxKind::NEWLINE {
             skipped_header_newline = true;
-            seen_header = true;
             continue;
         }
         raw.push_str(tok.text());
     }
 
-    // Count trailing newlines from `raw` so the keep chomping can recover
-    // them after `lines.pop()` discards the trailing empty line.
     let raw_trailing_newlines = raw.chars().rev().take_while(|c| *c == '\n').count();
 
-    let mut lines: Vec<&str> = raw.split('\n').collect();
-    if lines.last().is_some_and(|s| s.is_empty()) {
-        lines.pop();
-    }
+    let lines: Vec<&str> = raw.split('\n').collect();
 
+    // Per YAML 1.2 §8.1.1.1, the content indentation level is set by the
+    // first non-empty line of the contents.
     let content_indent = lines
         .iter()
-        .filter(|l| !l.trim().is_empty())
+        .find(|l| !l.trim().is_empty())
         .map(|l| l.chars().take_while(|c| *c == ' ').count())
-        .min()
         .unwrap_or(0);
 
-    let stripped: Vec<String> = lines
+    // Truncate at the first non-empty line whose indentation drops below the
+    // content indent — that's where the block scalar's body ends per spec.
+    // Trailing blanks (and the final empty split-tail) are kept; chomping
+    // re-derives the right number of trailing newlines below.
+    let mut body_lines: Vec<&str> = Vec::new();
+    let mut seen_content = false;
+    for line in lines.iter() {
+        let is_blank = line.trim().is_empty();
+        let indent = line.chars().take_while(|c| *c == ' ').count();
+        if !is_blank && seen_content && indent < content_indent {
+            break;
+        }
+        body_lines.push(line);
+        if !is_blank {
+            seen_content = true;
+        }
+    }
+    if body_lines.last().is_some_and(|s| s.is_empty()) {
+        body_lines.pop();
+    }
+
+    let stripped: Vec<BlockBodyLine> = body_lines
         .iter()
         .map(|l| {
-            if l.len() >= content_indent {
+            let is_blank = l.trim().is_empty();
+            let indent = l.chars().take_while(|c| *c == ' ').count();
+            // Always strip up to `content_indent` columns; for `|` style this
+            // preserves trailing spaces past the content indent (T26H).
+            let text = if l.len() >= content_indent {
                 l[content_indent..].to_string()
             } else {
                 String::new()
+            };
+            // More-indented lines (per §8.1.3) keep literal line breaks in
+            // folded scalars. Blank lines are not flagged MI here; the folder
+            // counts them and applies the surrounding-line rule.
+            let is_mi = !is_blank && indent > content_indent;
+            BlockBodyLine {
+                text,
+                is_blank,
+                is_mi,
             }
         })
         .collect();
 
     let folded = match indicator {
-        '|' => stripped.join("\n"),
-        '>' => {
-            let mut result = String::new();
-            let mut last_blank = false;
-            for (idx, line) in stripped.iter().enumerate() {
-                if line.is_empty() {
-                    result.push('\n');
-                    last_blank = true;
-                } else {
-                    if idx > 0 && !last_blank {
-                        result.push(' ');
-                    }
-                    result.push_str(line);
-                    last_blank = false;
-                }
-            }
-            result
-        }
+        '|' => stripped
+            .iter()
+            .map(|l| l.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n"),
+        '>' => fold_greater_lines(&stripped),
         _ => unreachable!(),
     };
 
@@ -755,6 +1013,64 @@ fn fold_block_scalar_tokens(tokens: &[SyntaxToken]) -> Option<(char, String)> {
         }
     };
     Some((indicator, body))
+}
+
+struct BlockBodyLine {
+    text: String,
+    is_blank: bool,
+    is_mi: bool,
+}
+
+/// Apply the YAML 1.2 §8.1.3 folded-scalar rules to a sequence of
+/// content-indent-stripped body lines:
+/// - Each leading blank line contributes a single `\n` to the output.
+/// - Between two adjacent non-MI content lines, a single line break folds to
+///   ` `; a run of `n` blank lines folds to `n` `\n` chars.
+/// - When either side of the boundary is more-indented, *all* line breaks
+///   between the two content lines are preserved literally.
+fn fold_greater_lines(lines: &[BlockBodyLine]) -> String {
+    let mut out = String::new();
+    let mut idx = 0usize;
+
+    while idx < lines.len() && lines[idx].is_blank {
+        out.push('\n');
+        idx += 1;
+    }
+    if idx >= lines.len() {
+        return out;
+    }
+
+    out.push_str(&lines[idx].text);
+    let mut prev_is_mi = lines[idx].is_mi;
+    idx += 1;
+
+    while idx < lines.len() {
+        let mut empty_count = 0usize;
+        while idx < lines.len() && lines[idx].is_blank {
+            empty_count += 1;
+            idx += 1;
+        }
+        if idx >= lines.len() {
+            break;
+        }
+        let line = &lines[idx];
+        let mi_involved = prev_is_mi || line.is_mi;
+        if mi_involved {
+            for _ in 0..(empty_count + 1) {
+                out.push('\n');
+            }
+        } else if empty_count == 0 {
+            out.push(' ');
+        } else {
+            for _ in 0..empty_count {
+                out.push('\n');
+            }
+        }
+        out.push_str(&line.text);
+        prev_is_mi = line.is_mi;
+        idx += 1;
+    }
+    out
 }
 
 #[derive(Clone, Copy)]

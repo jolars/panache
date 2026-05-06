@@ -1,0 +1,25 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: KSS4
+input: "--- \"quoted\nstring\"\n--- &node foo\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..34
+  YAML_METADATA_CONTENT@0..34
+    YAML_STREAM@0..34
+      YAML_DOCUMENT@0..20
+        YAML_DOCUMENT_START@0..3 "---"
+        WHITESPACE@3..4 " "
+        YAML_SCALAR@4..11 "\"quoted"
+        NEWLINE@11..12 "\n"
+        YAML_SCALAR@12..19 "string\""
+        NEWLINE@19..20 "\n"
+      YAML_DOCUMENT@20..34
+        YAML_DOCUMENT_START@20..23 "---"
+        WHITESPACE@23..24 " "
+        YAML_SCALAR@24..33 "&node foo"
+        NEWLINE@33..34 "\n"

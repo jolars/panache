@@ -45,7 +45,6 @@ CXX2
 EB22
 H7J7
 HRE5
-55WF
 JY7Z
 LHL4
 N4JP
@@ -257,3 +256,17 @@ T5N4
 # Multi-line plain scalar at top level: line breaks fold to spaces, blank lines fold to newlines.
 9YRD
 EX5H
+# Bare top-level folded block scalar (`>` with no `---` marker), simple body.
+G992
+# Bare top-level folded block scalar with more-indented "literal" lines surrounded by blanks.
+6VJK
+# Bare top-level folded block scalar; trailing less-indented comment terminates body.
+7T8X
+# Folded block scalar where a line beginning with `#` at content-indent is body, not a comment.
+DK3J
+# Multi-line double-quoted top-level scalar: single line breaks fold to space, blank lines to `\n`.
+9TFX
+# Multi-line single-quoted top-level scalar with the same line-folding contract as `9TFX`.
+T4YY
+# Two-document stream with a multi-line double-quoted scalar followed by an anchored plain scalar.
+KSS4
