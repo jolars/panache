@@ -60,24 +60,21 @@ longer accepts.
 
 ::: {.column-page}
 
-  | Tool              | CommonMark | GFM   | Pandoc | Quarto | R Markdown | MultiMarkdown | MDX | Wikilinks |
-  | ----------------- | :--------: | :---: | :----: | :----: | :--------: | :-----------: | :-: | :-------: |
-  | Panache           |     ●      |   ●   |   ●    |   ●    |     ●      |       ●       |  ○  |   ◐[^5]   |
-  | mado              |     ●      |   ●   |   ○    |   ○    |     ○      |       ○       |  ○  |     ○     |
-  | markdownlint      |   ◐[^6]    | ◐[^6] |   ○    |   ○    |     ○      |       ○       |  ○  |     ○     |
-  | markdownlint-cli2 |     ●      |   ●   |   ○    |   ○    |     ○      |       ○       |  ○  |     ○     |
-  | marksman          |     ●      |   ●   | ◐[^7]  |   ○    |     ○      |       ○       |  ○  |     ●     |
-  | mdformat          |     ●      | ◐[^8] |   ○    |   ○    |     ○      |       ○       |  ○  |     ○     |
-  | Pandoc            |     ●      |   ●   |   ●    | ◐[^9]  |   ◐[^9]    |    ◐[^10]     |  ○  |  ◐[^11]   |
-  | Prettier          |     ●      |   ●   |   ○    |   ○    |     ○      |       ○       |  ●  |     ○     |
-  | rumdl             |     ●      |   ●   |   ○    | ◐[^12] |   ◐[^12]   |       ○       |  ○  |     ○     |
+  | Tool              | CommonMark | GFM   | Pandoc | Quarto | R Markdown | MultiMarkdown | MDX |
+  | ----------------- | :--------- | :---- | :----- | :----- | :--------- | :------------ | :-- |
+  | Panache           | ●          | ●     | ●      | ●      | ●          | ●             | ○   |
+  | mado              | ●          | ●     | ○      | ○      | ○          | ○             | ○   |
+  | markdownlint      | ◐[^6]      | ◐[^6] | ○      | ○      | ○          | ○             | ○   |
+  | markdownlint-cli2 | ●          | ●     | ○      | ○      | ○          | ○             | ○   |
+  | marksman          | ●          | ●     | ◐[^7]  | ○      | ○          | ○             | ○   |
+  | mdformat          | ●          | ◐[^8] | ○      | ○      | ○          | ○             | ○   |
+  | Pandoc            | ●          | ●     | ●      | ◐[^9]  | ◐[^9]      | ◐[^10]        | ○   |
+  | Prettier          | ●          | ●     | ○      | ○      | ○          | ○             | ●   |
+  | rumdl             | ●          | ●     | ○      | ◐[^12] | ◐[^12]     | ○             | ○   |
 
   : Markdown dialect coverage across the tools.
 
 :::
-
-[^5]: Obsidian/Foam-style `[[wikilinks]]`. Panache preserves them verbatim;
-    marksman builds its cross-reference graph around them.
 
 [^6]: markdownlint (the Ruby `mdl` gem) targets generic Markdown style rather
     than a specific spec; rules apply equally to CommonMark and GFM input but
@@ -98,9 +95,6 @@ longer accepts.
 [^10]: Pandoc reads `markdown_mmd` but its writer emits its own dialect;
     round-tripping a MultiMarkdown document does not preserve MMD-specific
     syntax.
-
-[^11]: Pandoc supports wikilinks via the `+wikilinks_title_after_pipe` /
-    `+wikilinks_title_before_pipe` extensions, off by default.
 
 [^12]: rumdl will lint `.qmd` and `.Rmd` files and skip YAML frontmatter, but it
     does not parse Quarto/R Markdown executable code blocks, shortcodes, or
