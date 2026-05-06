@@ -35,4 +35,4 @@ jobs:
       - name: Publish workspace
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-        run: cargo workspaces publish --from-git --skip-published --no-verify --yes --token "$CARGO_REGISTRY_TOKEN"
+        run: cargo workspaces publish --from-git --skip-published --no-verify --yes
