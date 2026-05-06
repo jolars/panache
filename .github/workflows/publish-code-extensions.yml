@@ -86,7 +86,7 @@ jobs:
             rm "panache-${{ matrix.rust_target }}.zip"
           else
             gh release download "${{ inputs.release-tag }}" -p "panache-${{ matrix.rust_target }}.tar.gz" --repo "${{ github.repository }}"
-            tar -xzf "panache-${{ matrix.rust_target }}.tar.gz" "${{ matrix.binary }}"
+            tar -xzf "panache-${{ matrix.rust_target }}.tar.gz" "./${{ matrix.binary }}"
             rm "panache-${{ matrix.rust_target }}.tar.gz"
           fi
         env:
