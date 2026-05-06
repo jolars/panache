@@ -1,6 +1,6 @@
 use panache_parser::parser::yaml::{
     ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_shadow, parse_yaml_report,
-    parse_yaml_tree, project_events,
+    parse_yaml_tree, project_events, shadow_scanner_check,
 };
 use panache_parser::syntax::SyntaxNode as ParserSyntaxNode;
 use serde_json::json;
@@ -668,6 +668,55 @@ fn yaml_empty_stream_projects_no_document_events() {
             events,
             vec!["+STR", "-STR"],
             "input {input:?} should project to an empty stream"
+        );
+    }
+}
+
+/// Manual harness: run the new streaming scanner over every allowlisted
+/// fixture and assert byte-completeness (no gaps, no overlaps, last
+/// non-synthetic token reaches `input.len()`). This gates the
+/// step-12 cutover — the new scanner cannot replace the line-based
+/// lexer until every allowlisted case is byte-complete. Ignored by
+/// default so the regular test run stays fast; invoke with
+/// `cargo test -p panache-parser --test yaml -- --ignored
+/// shadow_scanner_byte_completeness_over_allowlist` after each scanner
+/// step.
+#[test]
+#[ignore = "manual scanner-completeness check over allowlisted fixtures"]
+fn shadow_scanner_byte_completeness_over_allowlist() {
+    let mut failures: Vec<(String, String)> = Vec::new();
+    for (case_id, case_path) in allowlisted_case_paths() {
+        let input_path = case_path.join("in.yaml");
+        if !input_path.exists() {
+            continue;
+        }
+        let input = fs::read_to_string(&input_path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
+        let report = shadow_scanner_check(&input);
+        if !report.byte_complete {
+            failures.push((
+                case_id,
+                format!(
+                    "byte_complete=false: last_token_end={}, input_len={}, gap_at={:?}, \
+                     overlapping={}, diagnostic_codes={:?}",
+                    report.last_token_end,
+                    report.input_len,
+                    report.gap_at,
+                    report.overlapping,
+                    report.diagnostic_codes,
+                ),
+            ));
+        }
+    }
+    if !failures.is_empty() {
+        let summary = failures
+            .iter()
+            .map(|(id, msg)| format!("- {id}: {msg}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        panic!(
+            "scanner not byte-complete over {} allowlisted case(s):\n{summary}",
+            failures.len(),
         );
     }
 }

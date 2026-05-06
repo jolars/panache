@@ -26,6 +26,7 @@ pub use model::{
     YamlParseReport, YamlToken, YamlTokenSpan, diagnostic_codes,
 };
 pub use parser::{parse_shadow, parse_yaml_report, parse_yaml_tree};
+pub use scanner::{ShadowScannerReport, shadow_scanner_check};
 
 #[cfg(test)]
 mod tests {
