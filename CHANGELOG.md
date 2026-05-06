@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.43.0](https://github.com/jolars/panache/compare/v2.42.0...v2.43.0) (2026-05-06)
+
+### Features
+- **linter:** add rule for stray fenced div markers ([`3b6ebe9`](https://github.com/jolars/panache/commit/3b6ebe9a12f99adefeba1452eec681a54fc20e88)), closes [#255](https://github.com/jolars/panache/issues/255)
+- **linter:** flag near-misses too in html entity rule ([`ce47752`](https://github.com/jolars/panache/commit/ce477525b03f52927cd7c0ef5b89747df6069984)), closes [#251](https://github.com/jolars/panache/issues/251)
+- **editors:** bundle binaries in VSIX extension ([`8a98d01`](https://github.com/jolars/panache/commit/8a98d014aaa6d50779bf944656b0350cd445a2d5))
+
+### Bug Fixes
+- enable `autolinks` for GFM ([`aeda13c`](https://github.com/jolars/panache/commit/aeda13cdc71a002bf0326cab9c1354abec321b2a)), closes [#258](https://github.com/jolars/panache/issues/258)
+
+### Dependencies
+- updated crates/panache-parser to v0.7.1
 ## [2.42.1](https://github.com/jolars/panache/compare/v2.42.0...v2.42.1) (2026-05-05)
 
 ### Bug Fixes

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.36.0](https://github.com/jolars/panache/compare/panache-code-v2.35.1...panache-code-v2.36.0) (2026-05-06)
+
+### Features
+- **editors:** bundle binaries in VSIX extension ([`8a98d01`](https://github.com/jolars/panache/commit/8a98d014aaa6d50779bf944656b0350cd445a2d5))
+
+### Dependencies
+- updated . to v2.43.0
+
 ## [2.35.1](https://github.com/jolars/panache/compare/panache-code-v2.35.0...panache-code-v2.35.1) (2026-05-05)
 
 ### Bug Fixes
