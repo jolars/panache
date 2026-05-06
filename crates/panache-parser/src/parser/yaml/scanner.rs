@@ -1119,6 +1119,19 @@ impl<'a> Scanner<'a> {
     }
 
     fn fetch_document_marker(&mut self, kind: TokenKind) {
+        // A document marker terminates the previous document's block
+        // structure: any indent levels held by an open block map or
+        // sequence must close before the marker so the next document
+        // starts from a clean indent stack. Without this, a
+        // multi-document stream where doc N closed at column 0 leaves
+        // `self.indent == 0`, which prevents `add_indent(0)` from
+        // emitting a fresh `BlockMappingStart` / `BlockSequenceStart`
+        // for doc N+1's body — its content lands at document level
+        // instead of inside a container. Mirrors libyaml/PyYAML's
+        // `fetch_document_indicator`.
+        self.unwind_indent(-1);
+        self.remove_simple_key();
+        self.allow_simple_key = false;
         let start = self.cursor;
         self.advance();
         self.advance();
