@@ -1427,13 +1427,28 @@ fn project_flow_sequence_items_cst(
             out.push("-MAP".to_string());
             continue;
         }
-        // Build the item text from scalar/key tokens only so embedded
-        // `YAML_COMMENT` tokens (e.g. `[ word1\n# comment\n, word2]`) do not
-        // leak into the projected scalar value.
+        // Build the item text from scalar/key/colon tokens plus
+        // structural whitespace so an embedded `:` (e.g. an implicit
+        // flow-map entry like `'k' : v` written inside `[...]`, see
+        // 87E4 / L9U5 / LQZ7) survives into `flow_kv_split`. Skipping
+        // colons collapsed the entry into a single `=VAL :scalar` and
+        // hid the `+MAP {} ... -MAP` wrap; preserving them lets
+        // `project_flow_seq_item` recognize the kv pattern.
+        // `YAML_COMMENT` tokens stay excluded so leading/trailing
+        // comments inside multi-line items don't leak into the value.
         let item_text: String = item
             .descendants_with_tokens()
             .filter_map(|el| el.into_token())
-            .filter(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_KEY))
+            .filter(|tok| {
+                matches!(
+                    tok.kind(),
+                    SyntaxKind::YAML_SCALAR
+                        | SyntaxKind::YAML_KEY
+                        | SyntaxKind::YAML_COLON
+                        | SyntaxKind::WHITESPACE
+                        | SyntaxKind::NEWLINE
+                )
+            })
             .map(|tok| tok.text().to_string())
             .collect();
         project_flow_seq_item(&item_text, handles, out);
@@ -2084,6 +2099,21 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
         out.push("+MAP {}".to_string());
         project_flow_map_entries(&flow_map, handles, out);
         out.push("-MAP".to_string());
+        return;
+    }
+
+    // A flow-sequence value with embedded `:` (an implicit flow-map
+    // entry inside `[...]`, e.g. 87E4 / L9U5 / LQZ7) needs the
+    // CST-walking item projector — the text-based fallback below
+    // strips colons during `value_text` assembly so `flow_kv_split`
+    // never sees them and the entry collapses into one bare scalar.
+    if let Some(flow_seq) = value_node
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
+    {
+        out.push("+SEQ []".to_string());
+        project_flow_sequence_items_cst(&flow_seq, handles, out);
+        out.push("-SEQ".to_string());
         return;
     }
 
