@@ -13,11 +13,46 @@ yaml-test-suite case to the allowlist, or pick "the next best case" to work on.
 - Target is the incremental shadow YAML parser in
   `crates/panache-parser/src/parser/yaml/` and the event-parity harness in
   `crates/panache-parser/tests/yaml.rs`.
-- This is a **long-horizon effort**. Do not frame it as a near-term replacement
-  for the existing `yaml_parser` dependency.
+- This is a **long-horizon, staged replacement** of the existing
+  `yaml_parser` dependency, not a forever-shadow. Each session grows
+  spec coverage toward that cutover. Don't promise near-term replacement
+  and don't block incremental wins on the eventual rewrite — but don't
+  read this as "we're keeping the current lexer indefinitely" either.
 - Stay parser-crate scoped. Do not leak YAML parser changes into the formatter
   or CLI.
 - Keep CST lossless (markers, whitespace, comments, scalar trivia preserved).
+
+## Architecture trajectory
+
+The current `lexer.rs` is line-by-line: it classifies each line by shape
+(mapping line, sequence entry, doc marker, comment, block-scalar header)
+and emits tokens for it, with an indent stack threaded across lines. That
+was a startup simplification. It does not match how YAML 1.2 actually
+tokenizes — YAML's rules are stateful in ways that ignore line boundaries
+(simple-key candidacy, multi-line plain scalars, multi-line quoted
+scalars, explicit-key key continuations).
+
+The production target is a streaming, char-by-char scanner modeled on
+libyaml / PyYAML / snakeyaml: position-tracked, indent-stack driven,
+**simple-key-table** based, with a token queue and lookahead. Trivia
+(whitespace, comments, newlines) interleaved in the queue rather than
+dropped, so the CST stays lossless. Once that lands, key/value pairing,
+multi-line scalars, and explicit-key (`?` / `:`) entries unify under one
+mechanism. The projection's `*_with_newlines` / `*_multi_line`
+re-stitching helpers in `events.rs` and the flat-token shortcuts in
+`emit_block_map` for `? key` / `: value` go away.
+
+Watch for symptoms that the line-based lexer is reaching its limit and
+flag them rather than papering over with another shortcut:
+
+- New re-stitching helpers in `events.rs` that fold cross-line content.
+- New string-prefix peeks in body classification (e.g. `has_explicit_key`).
+- Flat-token shortcuts in `emit_block_map` that can't express
+  nested-collection bodies under explicit keys (e.g. `? - item\n: value`).
+
+When you hit these, prefer a structural fix over another shortcut —
+even if that means deferring the case until the rewrite. Allowlisting
+via shortcut is debt that has to be unwound at cutover.
 
 ## Key files
 
