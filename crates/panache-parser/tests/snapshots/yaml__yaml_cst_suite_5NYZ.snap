@@ -1,0 +1,26 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: 5NYZ
+input: "key:    # Comment\n  value\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..26
+  YAML_METADATA_CONTENT@0..26
+    YAML_STREAM@0..26
+      YAML_DOCUMENT@0..26
+        YAML_BLOCK_MAP@0..26
+          YAML_BLOCK_MAP_ENTRY@0..26
+            YAML_BLOCK_MAP_KEY@0..4
+              YAML_KEY@0..3 "key"
+              YAML_COLON@3..4 ":"
+            YAML_BLOCK_MAP_VALUE@4..26
+              WHITESPACE@4..8 "    "
+              YAML_COMMENT@8..17 "# Comment"
+              NEWLINE@17..18 "\n"
+              WHITESPACE@18..20 "  "
+              YAML_SCALAR@20..25 "value"
+              NEWLINE@25..26 "\n"

@@ -276,3 +276,5 @@ KSS4
 FTA2
 # Document-level tag packed onto the `---` marker line, preceding a block sequence (e.g. `--- !!omap`).
 J7PZ
+# Block-map entry whose value is empty inline (only trivia after `:`) and continued by an indented plain scalar on the next line.
+5NYZ

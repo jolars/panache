@@ -364,12 +364,15 @@ mod tests {
 
     #[test]
     fn parse_yaml_report_emits_error_code_for_invalid_yaml() {
+        // `this` at the top of a block-map context is a stray scalar with no
+        // following colon — flagged at the leading scalar rather than at the
+        // later indent that surfaced as a side-effect.
         let report = parse_yaml_report("this\n is\n  invalid: x\n");
         assert!(report.tree.is_none());
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
             report.diagnostics[0].code,
-            diagnostic_codes::PARSE_UNEXPECTED_INDENT
+            diagnostic_codes::PARSE_INVALID_KEY_TOKEN
         );
     }
 

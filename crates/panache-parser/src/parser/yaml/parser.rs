@@ -634,6 +634,21 @@ fn emit_block_map<'a>(
                 builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
                 *i += 1;
             }
+            YamlToken::Scalar
+                if !tokens[*i].text.trim_start().starts_with("? ")
+                    && tokens[*i].text.trim_start() != "?" =>
+            {
+                // A bare scalar without a key/colon at the top of a block
+                // map is invalid YAML — the document ended an entry's
+                // value but a non-key node appears at the parent indent.
+                // Explicit-key scalars (`? key`) remain absorbed below so
+                // the projection can recognise them.
+                return Err(diag_at_token(
+                    &tokens[*i],
+                    diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
+                    "unexpected scalar at block-map level (no key)",
+                ));
+            }
             YamlToken::Scalar | YamlToken::Comment => {
                 while *i < tokens.len() && tokens[*i].kind != YamlToken::Newline {
                     if matches!(
@@ -762,29 +777,41 @@ fn emit_block_map_value<'a>(
     i: &mut usize,
 ) -> Result<Option<&'a str>, YamlDiagnostic> {
     builder.start_node(SyntaxKind::YAML_BLOCK_MAP_VALUE.into());
+    let mut inline_has_content = false;
     while *i < tokens.len() {
         match tokens[*i].kind {
             YamlToken::Scalar => {
                 builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
                 *i += 1;
+                inline_has_content = true;
             }
-            YamlToken::FlowMapStart => emit_flow_map(builder, tokens, i)?,
-            YamlToken::FlowSeqStart => emit_flow_sequence(builder, tokens, i)?,
+            YamlToken::FlowMapStart => {
+                emit_flow_map(builder, tokens, i)?;
+                inline_has_content = true;
+            }
+            YamlToken::FlowSeqStart => {
+                emit_flow_sequence(builder, tokens, i)?;
+                inline_has_content = true;
+            }
             YamlToken::Anchor | YamlToken::Alias => {
                 builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
                 *i += 1;
+                inline_has_content = true;
             }
             YamlToken::BlockScalarHeader => {
                 consume_block_scalar(builder, tokens, i);
+                inline_has_content = true;
             }
             YamlToken::BlockScalarContent => {
                 builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
                 *i += 1;
+                inline_has_content = true;
             }
             YamlToken::FlowMapEnd | YamlToken::FlowSeqEnd | YamlToken::Comma => break,
             YamlToken::Tag => {
                 builder.token(SyntaxKind::YAML_TAG.into(), tokens[*i].text);
                 *i += 1;
+                inline_has_content = true;
             }
             YamlToken::Comment => {
                 builder.token(SyntaxKind::YAML_COMMENT.into(), tokens[*i].text);
@@ -805,18 +832,87 @@ fn emit_block_map_value<'a>(
     }
 
     if *i < tokens.len() && tokens[*i].kind == YamlToken::Indent {
-        *i += 1;
-        // Emit trailing newline before nested content to preserve byte order.
-        if let Some(newline) = trailing_newline.take() {
-            builder.token(SyntaxKind::NEWLINE.into(), newline);
+        let continuation = if inline_has_content {
+            None
+        } else {
+            scan_plain_scalar_continuation(tokens, *i + 1)
+        };
+        if let Some(dedent_idx) = continuation {
+            // Empty inline value followed by an indented plain-scalar
+            // continuation (no colon / structural markers before the
+            // matching dedent). Treat the indented content as the value
+            // rather than opening a nested block map.
+            if let Some(newline) = trailing_newline.take() {
+                builder.token(SyntaxKind::NEWLINE.into(), newline);
+            }
+            *i += 1; // skip Indent
+            while *i < dedent_idx {
+                let kind = match tokens[*i].kind {
+                    YamlToken::Whitespace => SyntaxKind::WHITESPACE,
+                    YamlToken::Comment => SyntaxKind::YAML_COMMENT,
+                    YamlToken::Newline => SyntaxKind::NEWLINE,
+                    YamlToken::Indent | YamlToken::Dedent => {
+                        // Nested indent/dedent inside the scalar run carry
+                        // empty text; advance without emitting a token.
+                        *i += 1;
+                        continue;
+                    }
+                    _ => SyntaxKind::YAML_SCALAR,
+                };
+                builder.token(kind.into(), tokens[*i].text);
+                *i += 1;
+            }
+            *i = dedent_idx + 1; // skip Dedent
+        } else {
+            *i += 1;
+            // Emit trailing newline before nested content to preserve byte order.
+            if let Some(newline) = trailing_newline.take() {
+                builder.token(SyntaxKind::NEWLINE.into(), newline);
+            }
+            builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
+            emit_block_map(builder, tokens, i, true)?;
+            builder.finish_node(); // YAML_BLOCK_MAP
         }
-        builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
-        emit_block_map(builder, tokens, i, true)?;
-        builder.finish_node(); // YAML_BLOCK_MAP
     }
 
     builder.finish_node(); // YAML_BLOCK_MAP_VALUE
     Ok(trailing_newline)
+}
+
+/// Scan tokens starting at `start` for a plain-scalar continuation block:
+/// content composed only of whitespace, scalars, comments, and newlines that
+/// terminates at a matching `Dedent`. Nested `Indent`/`Dedent` pairs are
+/// permitted (they may appear inside multi-paragraph plain scalars).
+///
+/// Returns the index of the terminating `Dedent` if the run is a pure
+/// scalar continuation; returns `None` if any structural token (colons,
+/// flow markers, block-sequence entries, block-scalar headers, tags,
+/// anchors, aliases, document boundaries) is encountered, in which case
+/// the indented region is a nested collection and the caller should fall
+/// back to the regular block-map path.
+fn scan_plain_scalar_continuation(tokens: &[YamlTokenSpan<'_>], start: usize) -> Option<usize> {
+    let mut depth: usize = 0;
+    let mut idx = start;
+    while idx < tokens.len() {
+        match tokens[idx].kind {
+            YamlToken::Whitespace | YamlToken::Scalar | YamlToken::Comment | YamlToken::Newline => {
+                idx += 1;
+            }
+            YamlToken::Indent => {
+                depth += 1;
+                idx += 1;
+            }
+            YamlToken::Dedent => {
+                if depth == 0 {
+                    return Some(idx);
+                }
+                depth -= 1;
+                idx += 1;
+            }
+            _ => return None,
+        }
+    }
+    None
 }
 
 /// Consume a literal/folded block-scalar header (`|` / `>`) and the
