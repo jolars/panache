@@ -4,18 +4,19 @@
 //! and resolved design decisions live in
 //! `.claude/skills/yaml-shadow-expand/scanner-rewrite.md`.
 //!
-//! This is the step-1 scaffold: types and a `next_token` stub that
-//! emits `StreamStart` then `StreamEnd`. Real scanning is added in
-//! subsequent steps; until cutover, the line-based lexer remains the
-//! live path.
+//! Currently implements: trivia, document markers, directives, flow
+//! indicators, block indicators (`-`/`?`/`:`) with the simple-key
+//! table, and a single-line plain scalar. Quoted scalars, block
+//! scalars, and multi-line plain continuation land in steps 7–9; the
+//! parser-side cutover is step 12.
 
-// Scaffold for the staged rewrite: variants and fields below are
-// consumed as steps 2–9 land. Remove this once the scanner has callers.
+// No production callers yet — the line-based lexer remains the live
+// path until step 12. Remove once the scanner is wired into parsing.
 #![allow(dead_code)]
 
 use std::collections::VecDeque;
 
-use super::model::YamlDiagnostic;
+use super::model::{YamlDiagnostic, diagnostic_codes};
 
 /// Position in the input stream. Lines and columns are 0-indexed,
 /// matching PyYAML / libyaml convention.
@@ -96,56 +97,102 @@ pub(crate) struct Scanner<'a> {
     input: &'a str,
     cursor: Mark,
     tokens: VecDeque<Token>,
+    /// Count of tokens that have been popped via `next_token`. Together
+    /// with `tokens.len()` it gives the global index of the next token
+    /// that will be added to the queue — the value `save_simple_key`
+    /// records so `fetch_value` can splice `Key`/`BlockMappingStart`
+    /// before the candidate even after intervening trivia is popped.
     tokens_taken: usize,
+    /// Current block-context indent column. `-1` represents "before the
+    /// first block container" and matches PyYAML's sentinel.
     indent: i32,
+    /// Stack of prior `indent` values; popped during `unwind_indent`.
     indent_stack: Vec<i32>,
+    /// Per-flow-level simple-key candidate slot. Index 0 is block
+    /// context; each `[`/`{` pushes a new slot.
     simple_keys: Vec<Option<SimpleKey>>,
     flow_level: usize,
+    /// Whether the next non-trivia token may register a simple-key
+    /// candidate. Reset by indicators that close key candidacy
+    /// (`fetch_value`, plain/quoted scalar emission) and reopened by
+    /// indicators that re-enable it (`fetch_key`, `fetch_block_entry`,
+    /// `fetch_flow_entry`, line breaks in block context).
     allow_simple_key: bool,
     diagnostics: Vec<YamlDiagnostic>,
-    stream_start_emitted: bool,
     stream_end_emitted: bool,
 }
 
 impl<'a> Scanner<'a> {
     pub(crate) fn new(input: &'a str) -> Self {
-        Self {
+        let mut scanner = Self {
             input,
             cursor: Mark::default(),
             tokens: VecDeque::new(),
             tokens_taken: 0,
             indent: -1,
             indent_stack: Vec::new(),
-            simple_keys: Vec::new(),
+            // Slot for the implicit block-context level (flow_level 0).
+            // Each flow open pushes another slot; flow close pops.
+            simple_keys: vec![None],
             flow_level: 0,
             allow_simple_key: true,
             diagnostics: Vec::new(),
-            stream_start_emitted: false,
             stream_end_emitted: false,
-        }
+        };
+        let mark = scanner.cursor;
+        scanner.tokens.push_back(Token {
+            kind: TokenKind::StreamStart,
+            start: mark,
+            end: mark,
+        });
+        scanner
     }
 
     pub(crate) fn next_token(&mut self) -> Option<Token> {
-        if !self.stream_start_emitted {
-            self.stream_start_emitted = true;
-            return Some(Token {
-                kind: TokenKind::StreamStart,
-                start: self.cursor,
-                end: self.cursor,
-            });
-        }
-        if self.tokens.is_empty() && !self.stream_end_emitted {
+        while self.need_more_tokens() {
             self.fetch_more_tokens();
         }
-        self.tokens.pop_front()
+        let tok = self.tokens.pop_front();
+        if tok.is_some() {
+            self.tokens_taken += 1;
+        }
+        tok
     }
 
-    /// Drain any pending trivia and meaningful tokens into the queue.
-    /// Steps 5+ extend this with flow/block indicators, anchors/tags,
-    /// and scalars; today it handles trivia plus the column-0
-    /// directives and document markers.
+    /// Should the caller fetch more tokens before popping the queue
+    /// head? True when the queue is empty (and the stream is still
+    /// open), or when the queue head is itself a registered simple-key
+    /// candidate that may still be spliced before. The latter is what
+    /// makes `Key` / `BlockMappingStart` splicing work — we keep
+    /// fetching past the candidate until either a `:` confirms it
+    /// (cancelling the slot) or a stale check expires it.
+    fn need_more_tokens(&mut self) -> bool {
+        if self.stream_end_emitted {
+            return false;
+        }
+        if self.tokens.is_empty() {
+            return true;
+        }
+        self.stale_simple_keys();
+        matches!(
+            self.next_possible_simple_key_index(),
+            Some(min) if min == self.tokens_taken
+        )
+    }
+
+    fn next_possible_simple_key_index(&self) -> Option<usize> {
+        self.simple_keys
+            .iter()
+            .filter_map(|slot| slot.as_ref().map(|k| k.token_number))
+            .min()
+    }
+
+    /// Drain trivia and one meaningful token into the queue. Called
+    /// repeatedly from `next_token` while `need_more_tokens` is true.
     fn fetch_more_tokens(&mut self) {
         self.scan_trivia();
+        self.stale_simple_keys();
+        self.unwind_indent(self.cursor.column as i32);
         if self.at_eof() {
             self.fetch_stream_end();
             return;
@@ -187,12 +234,24 @@ impl<'a> Scanner<'a> {
                 self.fetch_flow_entry();
                 return;
             }
+            Some('-') if self.check_block_entry() => {
+                self.fetch_block_entry();
+                return;
+            }
+            Some('?') if self.check_key() => {
+                self.fetch_key();
+                return;
+            }
+            Some(':') if self.check_value() => {
+                self.fetch_value();
+                return;
+            }
             _ => {}
         }
-        // Step 5 placeholder: scalars, anchors/tags, and block
-        // indicators land in steps 6–9. For now, terminate the stream
-        // when we hit an unhandled meaningful char.
-        self.fetch_stream_end();
+        // Default: anything else opens a plain scalar. Quoted scalars
+        // (`'`/`"`), block scalars (`|`/`>`), anchors/tags/aliases land
+        // in later steps and will be dispatched here before this default.
+        self.fetch_plain_scalar();
     }
 
     fn fetch_flow_collection_start(&mut self, kind: TokenKind) {
@@ -218,6 +277,10 @@ impl<'a> Scanner<'a> {
     }
 
     fn fetch_flow_entry(&mut self) {
+        // `,` separates flow items. Subsequent entries can be implicit
+        // keys, so re-open candidacy and clear the current slot.
+        self.allow_simple_key = true;
+        self.remove_simple_key();
         let start = self.cursor;
         self.advance();
         let end = self.cursor;
@@ -228,16 +291,329 @@ impl<'a> Scanner<'a> {
         });
     }
 
+    fn fetch_block_entry(&mut self) {
+        if self.flow_level == 0 {
+            if !self.allow_simple_key {
+                self.push_diagnostic(
+                    diagnostic_codes::LEX_BLOCK_ENTRY_NOT_ALLOWED,
+                    "block sequence entry not allowed here",
+                );
+            }
+            if self.add_indent(self.cursor.column as i32) {
+                let mark = self.cursor;
+                self.tokens.push_back(Token {
+                    kind: TokenKind::BlockSequenceStart,
+                    start: mark,
+                    end: mark,
+                });
+            }
+        }
+        self.allow_simple_key = true;
+        self.remove_simple_key();
+        let start = self.cursor;
+        self.advance();
+        let end = self.cursor;
+        self.tokens.push_back(Token {
+            kind: TokenKind::BlockEntry,
+            start,
+            end,
+        });
+    }
+
+    fn fetch_key(&mut self) {
+        if self.flow_level == 0 {
+            if !self.allow_simple_key {
+                self.push_diagnostic(
+                    diagnostic_codes::LEX_KEY_INDICATOR_NOT_ALLOWED,
+                    "explicit key indicator not allowed here",
+                );
+            }
+            if self.add_indent(self.cursor.column as i32) {
+                let mark = self.cursor;
+                self.tokens.push_back(Token {
+                    kind: TokenKind::BlockMappingStart,
+                    start: mark,
+                    end: mark,
+                });
+            }
+        }
+        // After `?`, the next thing in block context can itself be an
+        // implicit key (the explicit-key path opens a fresh entry).
+        self.allow_simple_key = self.flow_level == 0;
+        self.remove_simple_key();
+        let start = self.cursor;
+        self.advance();
+        let end = self.cursor;
+        self.tokens.push_back(Token {
+            kind: TokenKind::Key,
+            start,
+            end,
+        });
+    }
+
+    fn fetch_value(&mut self) {
+        if let Some(key) = self.simple_keys[self.flow_level].take() {
+            // Implicit key confirmed: splice `Key` (and possibly
+            // `BlockMappingStart`) before the candidate token in the
+            // queue. Both go at the same queue index, with
+            // `BlockMappingStart` inserted last so it ends up first.
+            let queue_pos = key.token_number.saturating_sub(self.tokens_taken);
+            self.tokens.insert(
+                queue_pos,
+                Token {
+                    kind: TokenKind::Key,
+                    start: key.mark,
+                    end: key.mark,
+                },
+            );
+            if self.flow_level == 0 && self.add_indent(key.mark.column as i32) {
+                self.tokens.insert(
+                    queue_pos,
+                    Token {
+                        kind: TokenKind::BlockMappingStart,
+                        start: key.mark,
+                        end: key.mark,
+                    },
+                );
+            }
+            self.allow_simple_key = false;
+        } else {
+            // No candidate: explicit `:` (e.g. `? key\n: value`) or
+            // an empty-key shorthand. In block context this needs to
+            // be at a position where a fresh key could appear.
+            if self.flow_level == 0 {
+                if !self.allow_simple_key {
+                    self.push_diagnostic(
+                        diagnostic_codes::LEX_VALUE_INDICATOR_NOT_ALLOWED,
+                        "value indicator not allowed here",
+                    );
+                }
+                if self.add_indent(self.cursor.column as i32) {
+                    let mark = self.cursor;
+                    self.tokens.push_back(Token {
+                        kind: TokenKind::BlockMappingStart,
+                        start: mark,
+                        end: mark,
+                    });
+                }
+            }
+            self.allow_simple_key = self.flow_level == 0;
+            self.remove_simple_key();
+        }
+        let start = self.cursor;
+        self.advance();
+        let end = self.cursor;
+        self.tokens.push_back(Token {
+            kind: TokenKind::Value,
+            start,
+            end,
+        });
+    }
+
+    /// Minimal single-line plain scalar. Step 9 extends this to handle
+    /// internal whitespace and multi-line continuation; for now a plain
+    /// scalar runs from the current cursor up to the first whitespace,
+    /// line break, `: ` (key indicator), or — in flow context — flow
+    /// indicator.
+    fn fetch_plain_scalar(&mut self) {
+        self.save_simple_key();
+        self.allow_simple_key = false;
+        let start = self.cursor;
+        while let Some(c) = self.peek_char() {
+            match c {
+                '\n' | '\r' | ' ' | '\t' => break,
+                ':' => {
+                    let next = self.peek_at(1);
+                    if matches!(next, None | Some(' ' | '\t' | '\n' | '\r')) {
+                        break;
+                    }
+                    if self.flow_level > 0 && matches!(next, Some(',' | ']' | '}')) {
+                        break;
+                    }
+                    self.advance();
+                }
+                ',' | '[' | ']' | '{' | '}' if self.flow_level > 0 => break,
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+        let end = self.cursor;
+        if start.index == end.index {
+            // Pathological: dispatch landed here on a char we can't
+            // consume (e.g. a stray `?` not followed by whitespace at
+            // EOF). Advance one codepoint so the loop makes progress
+            // and we don't infinite-loop. The resulting empty/short
+            // scalar may surface a downstream parse diagnostic.
+            self.advance();
+            let end = self.cursor;
+            self.tokens.push_back(Token {
+                kind: TokenKind::Scalar(ScalarStyle::Plain),
+                start,
+                end,
+            });
+            return;
+        }
+        self.tokens.push_back(Token {
+            kind: TokenKind::Scalar(ScalarStyle::Plain),
+            start,
+            end,
+        });
+    }
+
     fn fetch_stream_end(&mut self) {
         if self.stream_end_emitted {
             return;
         }
+        self.unwind_indent(-1);
+        // Drain any pending simple-key candidates. Required candidates
+        // that never met a `:` are diagnosed; non-required ones are
+        // dropped silently.
+        for slot in self.simple_keys.iter_mut() {
+            if let Some(key) = slot.take()
+                && key.required
+            {
+                self.diagnostics.push(YamlDiagnostic {
+                    code: diagnostic_codes::LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND,
+                    message: "could not find expected ':' for required simple key",
+                    byte_start: key.mark.index,
+                    byte_end: key.mark.index,
+                });
+            }
+        }
+        self.allow_simple_key = false;
         self.stream_end_emitted = true;
         let mark = self.cursor;
         self.tokens.push_back(Token {
             kind: TokenKind::StreamEnd,
             start: mark,
             end: mark,
+        });
+    }
+
+    fn check_block_entry(&self) -> bool {
+        matches!(self.peek_at(1), None | Some(' ' | '\t' | '\n' | '\r'))
+    }
+
+    /// `?` opens an explicit key when followed by whitespace/EOL in
+    /// block context, or unconditionally in flow context (where flow
+    /// terminators delimit the key on their own).
+    fn check_key(&self) -> bool {
+        if self.flow_level > 0 {
+            return true;
+        }
+        matches!(self.peek_at(1), None | Some(' ' | '\t' | '\n' | '\r'))
+    }
+
+    /// `:` is a value indicator in the same conditions as `?`. In flow
+    /// context it's always structural; in block context only when
+    /// followed by whitespace/EOL (otherwise it's part of a plain
+    /// scalar like `https://example.com`).
+    fn check_value(&self) -> bool {
+        if self.flow_level > 0 {
+            return true;
+        }
+        matches!(self.peek_at(1), None | Some(' ' | '\t' | '\n' | '\r'))
+    }
+
+    /// Push a new indent level if `column` exceeds the current one.
+    /// Returns true if the level was newly opened, signalling the
+    /// caller should emit a `BlockSequenceStart` / `BlockMappingStart`.
+    fn add_indent(&mut self, column: i32) -> bool {
+        if self.indent < column {
+            self.indent_stack.push(self.indent);
+            self.indent = column;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Pop indent levels above `column`, emitting `BlockEnd` for each.
+    /// Flow context never owns indent levels, so this is a no-op there.
+    fn unwind_indent(&mut self, column: i32) {
+        if self.flow_level > 0 {
+            return;
+        }
+        while self.indent > column {
+            let mark = self.cursor;
+            self.indent = self.indent_stack.pop().unwrap_or(-1);
+            self.tokens.push_back(Token {
+                kind: TokenKind::BlockEnd,
+                start: mark,
+                end: mark,
+            });
+        }
+    }
+
+    /// Tentatively register a simple-key candidate at the current flow
+    /// level. The candidate's `token_number` is the global index where
+    /// the next token will be appended — i.e. the scalar/anchor that
+    /// triggered registration. A subsequent `:` confirms the candidate
+    /// (splicing `Key` before that token); a line break or required
+    /// expiration cancels it.
+    fn save_simple_key(&mut self) {
+        if !self.allow_simple_key {
+            return;
+        }
+        let required = self.flow_level == 0 && self.indent == self.cursor.column as i32;
+        self.remove_simple_key();
+        let token_number = self.tokens_taken + self.tokens.len();
+        self.simple_keys[self.flow_level] = Some(SimpleKey {
+            token_number,
+            required,
+            mark: self.cursor,
+        });
+    }
+
+    /// Cancel the simple-key candidate at the current flow level. If it
+    /// was required, surface a diagnostic — required candidates that
+    /// fail to confirm indicate malformed YAML (e.g. an indent change
+    /// before the expected `:`).
+    fn remove_simple_key(&mut self) {
+        if let Some(key) = self.simple_keys[self.flow_level].take()
+            && key.required
+        {
+            self.diagnostics.push(YamlDiagnostic {
+                code: diagnostic_codes::LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND,
+                message: "could not find expected ':' for required simple key",
+                byte_start: key.mark.index,
+                byte_end: key.mark.index,
+            });
+        }
+    }
+
+    /// Expire candidates whose registration line lies behind the
+    /// cursor — a simple key cannot span a line break. Required
+    /// candidates that age out get a diagnostic; others are dropped
+    /// silently.
+    fn stale_simple_keys(&mut self) {
+        let line = self.cursor.line;
+        for slot in self.simple_keys.iter_mut() {
+            let stale = match slot {
+                Some(key) => key.mark.line != line,
+                None => false,
+            };
+            if stale
+                && let Some(key) = slot.take()
+                && key.required
+            {
+                self.diagnostics.push(YamlDiagnostic {
+                    code: diagnostic_codes::LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND,
+                    message: "could not find expected ':' for required simple key",
+                    byte_start: key.mark.index,
+                    byte_end: key.mark.index,
+                });
+            }
+        }
+    }
+
+    fn push_diagnostic(&mut self, code: &'static str, message: &'static str) {
+        self.diagnostics.push(YamlDiagnostic {
+            code,
+            message,
+            byte_start: self.cursor.index,
+            byte_end: self.cursor.index,
         });
     }
 
@@ -325,6 +701,13 @@ impl<'a> Scanner<'a> {
             _ => unreachable!("scan_newline called on non-newline char"),
         }
         let end = self.cursor;
+        // Line breaks in block context re-open simple-key candidacy:
+        // the next non-trivia token starts a fresh line and may be a
+        // key. Flow context ignores indentation, so candidacy is
+        // governed by `,`/`[`/`{` instead.
+        if self.flow_level == 0 {
+            self.allow_simple_key = true;
+        }
         self.tokens.push_back(Token {
             kind: TokenKind::Trivia(TriviaKind::Newline),
             start,
@@ -409,7 +792,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn stub_emits_stream_start_then_stream_end_on_empty_input() {
+    fn empty_input_emits_stream_start_then_stream_end() {
         let mut scanner = Scanner::new("");
         assert_eq!(
             scanner.next_token().map(|t| t.kind),
@@ -423,17 +806,17 @@ mod tests {
     }
 
     #[test]
-    fn stub_emits_stream_markers_regardless_of_input_content() {
+    fn first_and_last_tokens_are_always_stream_markers() {
         let mut scanner = Scanner::new("foo: bar\n");
         assert_eq!(
             scanner.next_token().map(|t| t.kind),
             Some(TokenKind::StreamStart)
         );
-        assert_eq!(
-            scanner.next_token().map(|t| t.kind),
-            Some(TokenKind::StreamEnd)
-        );
-        assert_eq!(scanner.next_token(), None);
+        let mut last = None;
+        while let Some(tok) = scanner.next_token() {
+            last = Some(tok);
+        }
+        assert_eq!(last.map(|t| t.kind), Some(TokenKind::StreamEnd));
     }
 
     #[test]
@@ -811,11 +1194,13 @@ mod tests {
     #[test]
     fn three_dashes_followed_by_non_break_is_not_a_marker() {
         // `---abc` at col 0 is a plain scalar starter, not a marker.
-        // Step 4 doesn't yet emit scalars, so this terminates after
-        // StreamStart with no DocumentStart token.
         let tokens = collect_tokens("---abc\n");
         let kinds = meaningful_kinds(&tokens);
         assert!(!kinds.contains(&TokenKind::DocumentStart), "got {kinds:?}",);
+        assert!(
+            kinds.contains(&TokenKind::Scalar(ScalarStyle::Plain)),
+            "got {kinds:?}",
+        );
     }
 
     #[test]
@@ -883,19 +1268,16 @@ mod tests {
     }
 
     #[test]
-    fn document_marker_followed_by_space_terminates_at_step_4_placeholder() {
-        // `--- ` is a valid DocumentStart followed by content; content
-        // tokens land in steps 5+. For now verify the marker is
-        // recognized (and that " " is consumed as trivia).
+    fn document_marker_followed_by_space_emits_marker_then_content_scalar() {
         let input = "--- foo\n";
         let tokens = collect_tokens(input);
         let kinds = meaningful_kinds(&tokens);
         assert_eq!(kinds[0], TokenKind::StreamStart);
         assert_eq!(kinds[1], TokenKind::DocumentStart);
-        // After DocumentStart, " " is whitespace trivia; "foo" is
-        // unsupported in step 4, so the scanner terminates with
-        // StreamEnd before consuming it.
+        // " " is whitespace trivia; "foo" is now a plain scalar.
+        assert_eq!(kinds[2], TokenKind::Scalar(ScalarStyle::Plain));
         assert_eq!(*kinds.last().unwrap(), TokenKind::StreamEnd);
+        assert_byte_complete(input, &tokens);
     }
 
     #[test]
@@ -985,9 +1367,8 @@ mod tests {
     }
 
     #[test]
-    fn comma_outside_flow_terminates_at_placeholder() {
-        // Outside flow context, `,` isn't a recognized indicator. The
-        // step-5 placeholder stops at it.
+    fn comma_outside_flow_is_not_a_flow_entry() {
+        // Outside flow context, `,` is plain text, not an indicator.
         let tokens = collect_tokens(",");
         let kinds = meaningful_kinds(&tokens);
         assert!(!kinds.contains(&TokenKind::FlowEntry), "got {kinds:?}");
@@ -996,8 +1377,7 @@ mod tests {
     #[test]
     fn doc_markers_inside_flow_context_are_not_recognized() {
         // `[---]` — the `---` inside flow context is plain text, not a
-        // doc marker. Even though step 5 doesn't yet emit scalars, we
-        // can verify no DocumentStart was produced before the placeholder.
+        // doc marker.
         let tokens = collect_tokens("[---]");
         let kinds = meaningful_kinds(&tokens);
         assert!(!kinds.contains(&TokenKind::DocumentStart), "got {kinds:?}");
@@ -1024,5 +1404,252 @@ mod tests {
             ],
         );
         assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn block_mapping_implicit_key_splices_block_mapping_start_and_key() {
+        // The classic case: `key: value` registers `key` as a simple-key
+        // candidate; the `:` confirms it, splicing BlockMappingStart and
+        // Key before the scalar.
+        let input = "key: value";
+        let tokens = collect_tokens(input);
+        assert_eq!(
+            meaningful_kinds(&tokens),
+            vec![
+                TokenKind::StreamStart,
+                TokenKind::BlockMappingStart,
+                TokenKind::Key,
+                TokenKind::Scalar(ScalarStyle::Plain),
+                TokenKind::Value,
+                TokenKind::Scalar(ScalarStyle::Plain),
+                TokenKind::BlockEnd,
+                TokenKind::StreamEnd,
+            ],
+        );
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn block_sequence_emits_block_sequence_start_then_entries() {
+        let input = "- a\n- b\n";
+        let tokens = collect_tokens(input);
+        assert_eq!(
+            meaningful_kinds(&tokens),
+            vec![
+                TokenKind::StreamStart,
+                TokenKind::BlockSequenceStart,
+                TokenKind::BlockEntry,
+                TokenKind::Scalar(ScalarStyle::Plain),
+                TokenKind::BlockEntry,
+                TokenKind::Scalar(ScalarStyle::Plain),
+                TokenKind::BlockEnd,
+                TokenKind::StreamEnd,
+            ],
+        );
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn explicit_key_indicator_emits_key_and_value_without_splice() {
+        // `? a\n: b` — the `?` opens an explicit-key entry, so when `:`
+        // arrives there's no implicit-key candidate to confirm (the
+        // candidate registered for `a` aged out at the line break).
+        let input = "? a\n: b\n";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        assert_eq!(
+            kinds,
+            vec![
+                TokenKind::StreamStart,
+                TokenKind::BlockMappingStart,
+                TokenKind::Key,
+                TokenKind::Scalar(ScalarStyle::Plain),
+                TokenKind::Value,
+                TokenKind::Scalar(ScalarStyle::Plain),
+                TokenKind::BlockEnd,
+                TokenKind::StreamEnd,
+            ],
+        );
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn multi_line_plain_scalar_does_not_confirm_simple_key_on_next_line() {
+        // `a` on line 0 registers a candidate; the line break ages it
+        // out (stale_simple_keys), so the `:` on line 1 confirms only
+        // its own line's candidate (`b`) — the line-0 scalar must not
+        // be retroactively keyed.
+        let input = "a\nb: c\n";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        // Expected order: StreamStart, Scalar(a), BlockMappingStart,
+        // Key, Scalar(b), Value, Scalar(c), BlockEnd, StreamEnd.
+        // Crucially, BlockMappingStart appears AFTER Scalar(a), not
+        // before — proving the line-0 candidate was discarded.
+        assert_eq!(kinds[0], TokenKind::StreamStart);
+        assert_eq!(kinds[1], TokenKind::Scalar(ScalarStyle::Plain));
+        assert_eq!(kinds[2], TokenKind::BlockMappingStart);
+        assert_eq!(kinds[3], TokenKind::Key);
+        assert_eq!(kinds[4], TokenKind::Scalar(ScalarStyle::Plain));
+        assert_eq!(kinds[5], TokenKind::Value);
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn flow_mapping_with_implicit_key_emits_only_flow_indicators() {
+        // Inside `{}`, `a: b` triggers the simple-key splice for `a`
+        // but DOES NOT emit BlockMappingStart (we're in flow context).
+        let input = "{a: b}";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        assert_eq!(
+            kinds,
+            vec![
+                TokenKind::StreamStart,
+                TokenKind::FlowMappingStart,
+                TokenKind::Key,
+                TokenKind::Scalar(ScalarStyle::Plain),
+                TokenKind::Value,
+                TokenKind::Scalar(ScalarStyle::Plain),
+                TokenKind::FlowMappingEnd,
+                TokenKind::StreamEnd,
+            ],
+        );
+        assert!(
+            !kinds.contains(&TokenKind::BlockMappingStart),
+            "got {kinds:?}",
+        );
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn flow_explicit_key_indicator_emits_key_token() {
+        // `?` inside flow context is always a key indicator (no
+        // whitespace lookahead needed).
+        let input = "{? a: b}";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        assert_eq!(kinds[0], TokenKind::StreamStart);
+        assert_eq!(kinds[1], TokenKind::FlowMappingStart);
+        assert_eq!(kinds[2], TokenKind::Key);
+        // After the `?`, the rest is implicit-key-style: candidate for
+        // `a` is confirmed by `:`.
+        assert!(kinds.contains(&TokenKind::Value));
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn nested_block_mapping_emits_block_end_on_dedent() {
+        // outer:
+        //   inner: x
+        // y: z
+        // The dedent before `y` must emit BlockEnd, popping the inner
+        // mapping's indent level.
+        let input = "outer:\n  inner: x\ny: z\n";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        let block_ends = kinds.iter().filter(|&&k| k == TokenKind::BlockEnd).count();
+        // One BlockEnd for the inner mapping (popped before `y`),
+        // one for the outer mapping at stream end.
+        assert_eq!(block_ends, 2, "got {kinds:?}");
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn nested_block_sequence_inside_mapping_unwinds_correctly() {
+        // items:
+        //   - a
+        //   - b
+        // status: ok
+        //
+        // The dedent before `status:` pops the inner sequence's indent
+        // level, emitting BlockEnd before the next outer mapping key.
+        let input = "items:\n  - a\n  - b\nstatus: ok\n";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        // Find the position of the SECOND Key (`status`) and the
+        // BlockEnd that should precede it (closing the sequence).
+        let key_positions: Vec<_> = kinds
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &k)| (k == TokenKind::Key).then_some(i))
+            .collect();
+        assert_eq!(key_positions.len(), 2, "expected 2 keys: {kinds:?}");
+        let second_key = key_positions[1];
+        let preceding_block_end = kinds[..second_key]
+            .iter()
+            .rposition(|&k| k == TokenKind::BlockEnd);
+        assert!(
+            preceding_block_end.is_some(),
+            "BlockEnd must precede second key: {kinds:?}",
+        );
+        // Final two tokens are BlockEnd (outer mapping), StreamEnd.
+        let n = kinds.len();
+        assert_eq!(kinds[n - 1], TokenKind::StreamEnd);
+        assert_eq!(kinds[n - 2], TokenKind::BlockEnd);
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn value_indicator_with_no_simple_key_emits_block_mapping_start() {
+        // A bare `: value` at column 0 (empty key shorthand) opens a
+        // block mapping with no Key splice; the parser will treat it
+        // as "empty implicit key, then value".
+        let input = ": value\n";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        assert_eq!(kinds[0], TokenKind::StreamStart);
+        assert_eq!(kinds[1], TokenKind::BlockMappingStart);
+        assert_eq!(kinds[2], TokenKind::Value);
+        // No Key token before Value — the parser handles empty key.
+        assert!(!kinds[..3].contains(&TokenKind::Key), "got {kinds:?}",);
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn block_mapping_unwinds_indents_at_stream_end() {
+        // a:
+        //   b: c
+        // (no trailing newline) — must still emit two BlockEnd tokens
+        // before StreamEnd as the indent stack unwinds.
+        let input = "a:\n  b: c";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        // Last meaningful tokens should be BlockEnd, BlockEnd, StreamEnd.
+        let n = kinds.len();
+        assert_eq!(kinds[n - 1], TokenKind::StreamEnd);
+        assert_eq!(kinds[n - 2], TokenKind::BlockEnd);
+        assert_eq!(kinds[n - 3], TokenKind::BlockEnd);
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn colon_inside_plain_scalar_token_does_not_break_scalar() {
+        // `https://example.com` — the `:` is not followed by whitespace
+        // so it stays inside the plain scalar.
+        let input = "https://example.com";
+        let tokens = collect_tokens(input);
+        let scalar = tokens
+            .iter()
+            .find(|t| matches!(t.kind, TokenKind::Scalar(_)))
+            .expect("plain scalar token");
+        assert_eq!(
+            &input[scalar.start.index..scalar.end.index],
+            "https://example.com",
+        );
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn diagnostics_remain_empty_for_well_formed_inputs() {
+        for input in ["key: value", "- a\n- b\n", "{a: b, c: d}", "? k\n: v\n"] {
+            let mut scanner = Scanner::new(input);
+            while scanner.next_token().is_some() {}
+            assert!(
+                scanner.diagnostics().is_empty(),
+                "{input:?} produced unexpected diagnostics: {:?}",
+                scanner.diagnostics(),
+            );
+        }
     }
 }
