@@ -95,21 +95,19 @@ jobs:
       - name: Mark binary executable
         run: chmod +x editors/code/server/${{ matrix.binary }}
 
-      - name: Compile extension
+      - name: Package VSIX
         working-directory: editors/code
-        run: npm run compile
+        run: npx vsce package --target ${{ matrix.vsce_target }} -o panache-${{ matrix.vsce_target }}.vsix
 
       - name: Publish to Open VSX Registry
         uses: HaaLeo/publish-vscode-extension@v2
         with:
           pat: ${{ secrets.OVSX_PAT }}
-          packagePath: editors/code
-          target: ${{ matrix.vsce_target }}
+          extensionFile: editors/code/panache-${{ matrix.vsce_target }}.vsix
 
       - name: Publish to Visual Studio Marketplace
         uses: HaaLeo/publish-vscode-extension@v2
         with:
           pat: ${{ secrets.VSCE_PAT }}
           registryUrl: https://marketplace.visualstudio.com
-          packagePath: editors/code
-          target: ${{ matrix.vsce_target }}
+          extensionFile: editors/code/panache-${{ matrix.vsce_target }}.vsix
