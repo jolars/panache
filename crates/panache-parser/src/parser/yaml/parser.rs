@@ -593,12 +593,86 @@ fn emit_block_seq_item<'a>(
     Ok(())
 }
 
+/// Lookahead for `emit_block_map`'s header phase: returns `true` when the
+/// tokens starting at `start` describe a doc-level node property — a Tag or
+/// a bare `&anchor` scalar followed by inline whitespace/comments and then
+/// a Newline. Used to keep `!!str a: b` (tag belongs to the key) out of the
+/// header phase.
+fn doc_level_property_present(tokens: &[YamlTokenSpan<'_>], start: usize) -> bool {
+    let mut i = start;
+    // Skip leading horizontal whitespace; an opening newline already
+    // belongs to the doc layer above so we don't expect to see it here.
+    while i < tokens.len() && tokens[i].kind == YamlToken::Whitespace {
+        i += 1;
+    }
+    if i >= tokens.len() {
+        return false;
+    }
+    let is_property = match tokens[i].kind {
+        YamlToken::Tag => true,
+        YamlToken::Scalar => tokens[i].text.trim_start().starts_with('&'),
+        _ => false,
+    };
+    if !is_property {
+        return false;
+    }
+    let mut j = i + 1;
+    while j < tokens.len() && matches!(tokens[j].kind, YamlToken::Whitespace | YamlToken::Comment) {
+        j += 1;
+    }
+    j < tokens.len() && tokens[j].kind == YamlToken::Newline
+}
+
 fn emit_block_map<'a>(
     builder: &mut GreenNodeBuilder<'_>,
     tokens: &[YamlTokenSpan<'a>],
     i: &mut usize,
     stop_on_dedent: bool,
 ) -> Result<(), YamlDiagnostic> {
+    // Consume leading document-level node properties (a tag, or a bare
+    // `&anchor` scalar) that the classifier has already routed into a
+    // BlockMap body — e.g. `--- !!set\n? a\n? b`. They become siblings of
+    // the YAML_BLOCK_MAP_ENTRY nodes; projection picks them up to attach
+    // anchor/tag info onto the `+MAP` event. Mirrors the header phase in
+    // `emit_block_seq`, but with one extra constraint: a property is
+    // doc-level only when its next significant token (skipping inline
+    // whitespace/comments) is a Newline. That keeps `!!str a: b` — where
+    // `!!str` tags the *key* — out of this phase, and differs from
+    // emit_block_seq where a `BlockSeqEntry` token cleanly separates the
+    // header from any per-item property. Only runs at top level (not for
+    // nested maps that start after an Indent token).
+    if !stop_on_dedent && doc_level_property_present(tokens, *i) {
+        let mut header_done = false;
+        while !header_done && *i < tokens.len() {
+            match tokens[*i].kind {
+                YamlToken::Tag => {
+                    builder.token(SyntaxKind::YAML_TAG.into(), tokens[*i].text);
+                    *i += 1;
+                }
+                YamlToken::Scalar if tokens[*i].text.trim_start().starts_with('&') => {
+                    builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
+                    *i += 1;
+                }
+                YamlToken::Whitespace => {
+                    builder.token(SyntaxKind::WHITESPACE.into(), tokens[*i].text);
+                    *i += 1;
+                }
+                YamlToken::Newline => {
+                    builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
+                    *i += 1;
+                    // Stop after the newline that terminates the property
+                    // line; the next entry parses normally below.
+                    header_done = true;
+                }
+                YamlToken::Comment => {
+                    builder.token(SyntaxKind::YAML_COMMENT.into(), tokens[*i].text);
+                    *i += 1;
+                }
+                _ => header_done = true,
+            }
+        }
+    }
+
     let mut closed_by_dedent = false;
     while *i < tokens.len() {
         match tokens[*i].kind {
@@ -1153,6 +1227,12 @@ fn emit_document<'a>(
             let mut has_scalar = false;
             let mut has_flow = false;
             let mut has_block_seq = false;
+            // Track whether any scalar carries an explicit-key indicator
+            // (`? key` at line start). The lexer leaves this prefix on the
+            // YAML_SCALAR token text, so a `? `-prefixed scalar with no
+            // colon (e.g. `--- !!set\n? Mark\n? Sosa`) still indicates a
+            // block map — just one whose values are implicit nulls.
+            let mut has_explicit_key = false;
             // Track whether all significant tokens BEFORE the first
             // BlockSeqEntry look like document-level node properties (a tag,
             // or a scalar starting with `&` — i.e. a bare anchor on its own
@@ -1170,7 +1250,11 @@ fn emit_document<'a>(
                     | YamlToken::BlockScalarHeader
                     | YamlToken::BlockScalarContent => {
                         has_scalar = true;
-                        if !seen_block_seq && !tok.text.trim_start().starts_with('&') {
+                        let trimmed = tok.text.trim_start();
+                        if trimmed.starts_with("? ") || trimmed == "?" {
+                            has_explicit_key = true;
+                        }
+                        if !seen_block_seq && !trimmed.starts_with('&') {
                             pre_seq_only_properties = false;
                         }
                     }
@@ -1186,7 +1270,7 @@ fn emit_document<'a>(
                     _ => {}
                 }
             }
-            if has_colon || has_flow {
+            if has_colon || has_flow || has_explicit_key {
                 DocumentBody::BlockMap
             } else if has_block_seq && pre_seq_only_properties {
                 DocumentBody::BlockSequence

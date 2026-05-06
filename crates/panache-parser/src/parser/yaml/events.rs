@@ -155,7 +155,7 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
         let mut values = Vec::new();
         project_block_map_entries(&root_map, &handles, &mut values);
         if !values.is_empty() {
-            out.push("+MAP".to_string());
+            out.push(map_open_event_for_block_map(&root_map, &handles));
             out.append(&mut values);
             out.push("-MAP".to_string());
         } else if let Some(flow_map) = doc
@@ -1540,6 +1540,60 @@ fn map_open_event_for_value(value_node: &SyntaxNode, handles: &TagHandles) -> St
             }
             SyntaxKind::YAML_SCALAR => {
                 let trimmed = tok.text().trim();
+                if anchor.is_none()
+                    && let Some(name) = trimmed.strip_prefix('&')
+                {
+                    anchor = Some(name.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut event = String::from("+MAP");
+    if let Some(t) = long_tag {
+        event.push(' ');
+        event.push_str(&t);
+    }
+    if let Some(a) = anchor {
+        event.push_str(" &");
+        event.push_str(&a);
+    }
+    event
+}
+
+/// Build the `+MAP` open event for a YAML_BLOCK_MAP rooted directly under
+/// a YAML_DOCUMENT. Captures any anchor (`&name`) or tag (`!!str`,
+/// `!shorthand`, etc.) tokens that the parser absorbed at the top of the
+/// block map (header phase mirroring `emit_block_seq`) so that documents
+/// like `--- !!set\n? a\n? b` project as `+MAP <tag:yaml.org,2002:set>`.
+fn map_open_event_for_block_map(map_node: &SyntaxNode, handles: &TagHandles) -> String {
+    let mut anchor: Option<String> = None;
+    let mut long_tag: Option<String> = None;
+    for child in map_node.children_with_tokens() {
+        if let Some(node) = child.as_node()
+            && node.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY
+        {
+            break;
+        }
+        let Some(tok) = child.as_token() else {
+            continue;
+        };
+        match tok.kind() {
+            SyntaxKind::YAML_TAG => {
+                if long_tag.is_none()
+                    && let Some(long) = resolve_long_tag(tok.text(), handles)
+                {
+                    long_tag = Some(long);
+                }
+            }
+            SyntaxKind::YAML_SCALAR => {
+                let trimmed = tok.text().trim();
+                // A `? `-prefixed scalar is the first key of the map; stop
+                // scanning header tokens at that point so we don't pick up
+                // entry-level data as document-level node properties.
+                if trimmed.starts_with("? ") || trimmed == "?" {
+                    break;
+                }
                 if anchor.is_none()
                     && let Some(name) = trimmed.strip_prefix('&')
                 {

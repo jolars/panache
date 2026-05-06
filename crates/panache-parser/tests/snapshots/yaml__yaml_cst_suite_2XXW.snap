@@ -1,0 +1,31 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: 2XXW
+input: "# Sets are represented as a\n# Mapping where each key is\n# associated with a null value\n--- !!set\n? Mark McGwire\n? Sammy Sosa\n? Ken Griff\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..137
+  YAML_METADATA_CONTENT@0..137
+    YAML_STREAM@0..137
+      YAML_COMMENT@0..27 "# Sets are represente ..."
+      NEWLINE@27..28 "\n"
+      YAML_COMMENT@28..55 "# Mapping where each  ..."
+      NEWLINE@55..56 "\n"
+      YAML_COMMENT@56..86 "# associated with a n ..."
+      NEWLINE@86..87 "\n"
+      YAML_DOCUMENT@87..137
+        YAML_DOCUMENT_START@87..90 "---"
+        YAML_BLOCK_MAP@90..137
+          WHITESPACE@90..91 " "
+          YAML_TAG@91..96 "!!set"
+          NEWLINE@96..97 "\n"
+          YAML_SCALAR@97..111 "? Mark McGwire"
+          NEWLINE@111..112 "\n"
+          YAML_SCALAR@112..124 "? Sammy Sosa"
+          NEWLINE@124..125 "\n"
+          YAML_SCALAR@125..136 "? Ken Griff"
+          NEWLINE@136..137 "\n"

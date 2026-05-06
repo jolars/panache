@@ -49,7 +49,6 @@ JY7Z
 LHL4
 N4JP
 N782
-QLJ7
 RHX7
 S4GJ
 S98Z
@@ -296,3 +295,5 @@ P2EQ
 QB6E
 # Error-contract: block-sequence item under-indented relative to its parent block-map entry — rejected with YAML_PARSE_INVALID_KEY_TOKEN.
 ZVH3
+# Document-level tag packed onto the `---` marker line, preceding a block map of explicit-key (`? key`) entries with implicit null values (e.g. `--- !!set`).
+2XXW

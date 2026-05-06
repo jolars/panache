@@ -316,13 +316,6 @@
       "event_parity": false
     },
     {
-      "case_id": "QLJ7",
-      "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
-      ],
-      "event_parity": false
-    },
-    {
       "case_id": "RHX7",
       "diagnostic_codes": [
         "YAML_PARSE_DIRECTIVE_AFTER_CONTENT"
@@ -467,6 +460,12 @@
       "tree": true
     },
     {
+      "case_id": "QLJ7",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
       "case_id": "RXY3",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -559,12 +558,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "2XXW",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "35KP",
@@ -672,11 +665,9 @@
     },
     {
       "case_id": "6BFJ",
-      "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "6CA3",
@@ -824,11 +815,9 @@
     },
     {
       "case_id": "9KAX",
-      "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "9MMW",
@@ -905,7 +894,7 @@
     {
       "case_id": "C4HZ",
       "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
+        "YAML_PARSE_UNEXPECTED_INDENT"
       ],
       "event_parity": false,
       "tree": false
@@ -1468,6 +1457,7 @@
     "26DV",
     "27NA",
     "2AUY",
+    "2XXW",
     "33X3",
     "3ALJ",
     "3GZX",
@@ -1604,10 +1594,10 @@
     "ZWK4"
   ],
   "summary": {
-    "error_contract_ok_count": 56,
-    "fails_needs_error_path_count": 22,
-    "fails_needs_feature_count": 117,
-    "passes_now_count": 138,
+    "error_contract_ok_count": 55,
+    "fails_needs_error_path_count": 23,
+    "fails_needs_feature_count": 116,
+    "passes_now_count": 139,
     "total_cases": 352
   }
 }
