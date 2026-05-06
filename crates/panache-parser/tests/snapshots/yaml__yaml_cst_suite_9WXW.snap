@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 278
 expression: snapshot
 ---
 case_id: 9WXW
@@ -13,13 +12,11 @@ DOCUMENT@0..82
     YAML_STREAM@0..82
       YAML_COMMENT@0..9 "# Private"
       NEWLINE@9..10 "\n"
-      YAML_DOCUMENT@10..25
-        YAML_TAG@10..14 "!foo"
-        WHITESPACE@14..15 " "
-        YAML_SCALAR@15..20 "\"bar\""
+      YAML_DOCUMENT@10..24
+        YAML_SCALAR@10..20 "!foo \"bar\""
         NEWLINE@20..21 "\n"
         YAML_DOCUMENT_END@21..24 "..."
-        NEWLINE@24..25 "\n"
+      NEWLINE@24..25 "\n"
       YAML_COMMENT@25..33 "# Global"
       NEWLINE@33..34 "\n"
       YAML_DOCUMENT@34..82
@@ -27,7 +24,5 @@ DOCUMENT@0..82
         NEWLINE@66..67 "\n"
         YAML_DOCUMENT_START@67..70 "---"
         NEWLINE@70..71 "\n"
-        YAML_TAG@71..75 "!foo"
-        WHITESPACE@75..76 " "
-        YAML_SCALAR@76..81 "\"bar\""
+        YAML_SCALAR@71..81 "!foo \"bar\""
         NEWLINE@81..82 "\n"

@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 278
 expression: snapshot
 ---
 case_id: LX3P
@@ -12,12 +11,16 @@ DOCUMENT@0..14
   YAML_METADATA_CONTENT@0..14
     YAML_STREAM@0..14
       YAML_DOCUMENT@0..14
-        YAML_BLOCK_MAP@0..14
-          YAML_BLOCK_MAP_ENTRY@0..14
-            YAML_BLOCK_MAP_KEY@0..7
-              YAML_KEY@0..6 "[flow]"
+        YAML_FLOW_SEQUENCE@0..6
+          YAML_SCALAR@0..1 "["
+          YAML_FLOW_SEQUENCE_ITEM@1..5
+            YAML_SCALAR@1..5 "flow"
+          YAML_SCALAR@5..6 "]"
+        YAML_BLOCK_MAP@6..14
+          YAML_BLOCK_MAP_ENTRY@6..14
+            YAML_BLOCK_MAP_KEY@6..7
               YAML_COLON@6..7 ":"
-            YAML_BLOCK_MAP_VALUE@7..13
+            YAML_BLOCK_MAP_VALUE@7..14
               WHITESPACE@7..8 " "
               YAML_SCALAR@8..13 "block"
-            NEWLINE@13..14 "\n"
+              NEWLINE@13..14 "\n"

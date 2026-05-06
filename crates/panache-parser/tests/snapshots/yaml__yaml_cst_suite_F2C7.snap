@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 278
 expression: snapshot
 ---
 case_id: F2C7
@@ -14,28 +13,24 @@ DOCUMENT@0..47
       WHITESPACE@0..1 " "
       YAML_DOCUMENT@1..47
         YAML_BLOCK_SEQUENCE@1..47
-          YAML_BLOCK_SEQUENCE_ITEM@1..14
+          YAML_BLOCK_SEQUENCE_ITEM@1..15
             YAML_BLOCK_SEQ_ENTRY@1..2 "-"
             WHITESPACE@2..3 " "
             YAML_SCALAR@3..13 "&a !!str a"
             NEWLINE@13..14 "\n"
-          WHITESPACE@14..15 " "
-          YAML_BLOCK_SEQUENCE_ITEM@15..25
+            WHITESPACE@14..15 " "
+          YAML_BLOCK_SEQUENCE_ITEM@15..26
             YAML_BLOCK_SEQ_ENTRY@15..16 "-"
             WHITESPACE@16..17 " "
-            YAML_TAG@17..22 "!!int"
-            WHITESPACE@22..23 " "
-            YAML_SCALAR@23..24 "2"
+            YAML_SCALAR@17..24 "!!int 2"
             NEWLINE@24..25 "\n"
-          WHITESPACE@25..26 " "
-          YAML_BLOCK_SEQUENCE_ITEM@26..39
+            WHITESPACE@25..26 " "
+          YAML_BLOCK_SEQUENCE_ITEM@26..40
             YAML_BLOCK_SEQ_ENTRY@26..27 "-"
             WHITESPACE@27..28 " "
-            YAML_TAG@28..33 "!!int"
-            WHITESPACE@33..34 " "
-            YAML_SCALAR@34..38 "&c 4"
+            YAML_SCALAR@28..38 "!!int &c 4"
             NEWLINE@38..39 "\n"
-          WHITESPACE@39..40 " "
+            WHITESPACE@39..40 " "
           YAML_BLOCK_SEQUENCE_ITEM@40..47
             YAML_BLOCK_SEQ_ENTRY@40..41 "-"
             WHITESPACE@41..42 " "

@@ -10,26 +10,14 @@ cst:
 DOCUMENT@0..26
   YAML_METADATA_CONTENT@0..26
     YAML_STREAM@0..26
-      YAML_DOCUMENT@0..26
+      YAML_DOCUMENT@0..25
         YAML_BLOCK_MAP@0..22
           YAML_BLOCK_MAP_ENTRY@0..22
             YAML_BLOCK_MAP_KEY@0..2
-              YAML_KEY@0..1 "a"
+              YAML_SCALAR@0..1 "a"
               YAML_COLON@1..2 ":"
             YAML_BLOCK_MAP_VALUE@2..22
               WHITESPACE@2..3 " "
-              YAML_SCALAR@3..4 "|"
-              NEWLINE@4..5 "\n"
-              YAML_SCALAR@5..8 " ab"
-              NEWLINE@8..9 "\n"
-              YAML_SCALAR@9..10 " "
-              NEWLINE@10..11 "\n"
-              YAML_SCALAR@11..14 " cd"
-              NEWLINE@14..15 "\n"
-              YAML_SCALAR@15..18 " ef"
-              NEWLINE@18..19 "\n"
-              YAML_SCALAR@19..20 " "
-              NEWLINE@20..21 "\n"
-              NEWLINE@21..22 "\n"
+              YAML_SCALAR@3..22 "|\n ab\n \n cd\n ef\n \n\n"
         YAML_DOCUMENT_END@22..25 "..."
-        NEWLINE@25..26 "\n"
+      NEWLINE@25..26 "\n"

@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 278
 expression: snapshot
 ---
 case_id: JR7V
@@ -26,8 +25,15 @@ DOCUMENT@0..128
           YAML_BLOCK_SEQUENCE_ITEM@30..44
             YAML_BLOCK_SEQ_ENTRY@30..31 "-"
             WHITESPACE@31..32 " "
-            YAML_SCALAR@32..43 "key: value?"
-            NEWLINE@43..44 "\n"
+            YAML_BLOCK_MAP@32..44
+              YAML_BLOCK_MAP_ENTRY@32..44
+                YAML_BLOCK_MAP_KEY@32..36
+                  YAML_SCALAR@32..35 "key"
+                  YAML_COLON@35..36 ":"
+                YAML_BLOCK_MAP_VALUE@36..44
+                  WHITESPACE@36..37 " "
+                  YAML_SCALAR@37..43 "value?"
+                  NEWLINE@43..44 "\n"
           YAML_BLOCK_SEQUENCE_ITEM@44..57
             YAML_BLOCK_SEQ_ENTRY@44..45 "-"
             WHITESPACE@45..46 " "
@@ -53,10 +59,11 @@ DOCUMENT@0..128
               YAML_SCALAR@80..81 "{"
               YAML_FLOW_MAP_ENTRY@81..93
                 YAML_FLOW_MAP_KEY@81..85
-                  YAML_KEY@81..84 "key"
+                  YAML_SCALAR@81..84 "key"
                   YAML_COLON@84..85 ":"
                 YAML_FLOW_MAP_VALUE@85..93
-                  YAML_SCALAR@85..93 " value? "
+                  WHITESPACE@85..86 " "
+                  YAML_SCALAR@86..93 "value? "
               YAML_SCALAR@93..94 "}"
             NEWLINE@94..95 "\n"
           YAML_BLOCK_SEQUENCE_ITEM@95..111
@@ -66,10 +73,11 @@ DOCUMENT@0..128
               YAML_SCALAR@97..98 "{"
               YAML_FLOW_MAP_ENTRY@98..109
                 YAML_FLOW_MAP_KEY@98..102
-                  YAML_KEY@98..101 "key"
+                  YAML_SCALAR@98..101 "key"
                   YAML_COLON@101..102 ":"
                 YAML_FLOW_MAP_VALUE@102..109
-                  YAML_SCALAR@102..109 " value?"
+                  WHITESPACE@102..103 " "
+                  YAML_SCALAR@103..109 "value?"
               YAML_SCALAR@109..110 "}"
             NEWLINE@110..111 "\n"
           YAML_BLOCK_SEQUENCE_ITEM@111..128
@@ -79,9 +87,10 @@ DOCUMENT@0..128
               YAML_SCALAR@113..114 "{"
               YAML_FLOW_MAP_ENTRY@114..126
                 YAML_FLOW_MAP_KEY@114..119
-                  YAML_KEY@114..118 "key?"
+                  YAML_SCALAR@114..118 "key?"
                   YAML_COLON@118..119 ":"
                 YAML_FLOW_MAP_VALUE@119..126
-                  YAML_SCALAR@119..126 " value "
+                  WHITESPACE@119..120 " "
+                  YAML_SCALAR@120..126 "value "
               YAML_SCALAR@126..127 "}"
             NEWLINE@127..128 "\n"

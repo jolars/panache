@@ -16,9 +16,9 @@ DOCUMENT@0..35
         YAML_BLOCK_MAP@4..35
           YAML_BLOCK_MAP_ENTRY@4..35
             YAML_BLOCK_MAP_KEY@4..11
-              YAML_KEY@4..10 "wanted"
+              YAML_SCALAR@4..10 "wanted"
               YAML_COLON@10..11 ":"
-            YAML_BLOCK_MAP_VALUE@11..34
+            YAML_BLOCK_MAP_VALUE@11..35
               WHITESPACE@11..12 " "
               YAML_SCALAR@12..34 "love ♥ and peace ☮"
-            NEWLINE@34..35 "\n"
+              NEWLINE@34..35 "\n"

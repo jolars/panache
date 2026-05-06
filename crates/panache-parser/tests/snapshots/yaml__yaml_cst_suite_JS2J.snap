@@ -14,17 +14,17 @@ DOCUMENT@0..59
         YAML_BLOCK_MAP@0..59
           YAML_BLOCK_MAP_ENTRY@0..32
             YAML_BLOCK_MAP_KEY@0..17
-              YAML_KEY@0..16 "First occurrence"
+              YAML_SCALAR@0..16 "First occurrence"
               YAML_COLON@16..17 ":"
-            YAML_BLOCK_MAP_VALUE@17..31
+            YAML_BLOCK_MAP_VALUE@17..32
               WHITESPACE@17..18 " "
               YAML_SCALAR@18..31 "&anchor Value"
-            NEWLINE@31..32 "\n"
+              NEWLINE@31..32 "\n"
           YAML_BLOCK_MAP_ENTRY@32..59
             YAML_BLOCK_MAP_KEY@32..50
-              YAML_KEY@32..49 "Second occurrence"
+              YAML_SCALAR@32..49 "Second occurrence"
               YAML_COLON@49..50 ":"
-            YAML_BLOCK_MAP_VALUE@50..58
+            YAML_BLOCK_MAP_VALUE@50..59
               WHITESPACE@50..51 " "
               YAML_SCALAR@51..58 "*anchor"
-            NEWLINE@58..59 "\n"
+              NEWLINE@58..59 "\n"

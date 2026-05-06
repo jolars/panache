@@ -14,17 +14,17 @@ DOCUMENT@0..27
         YAML_BLOCK_MAP@0..27
           YAML_BLOCK_MAP_ENTRY@0..27
             YAML_BLOCK_MAP_KEY@0..14
-              YAML_KEY@0..13 "block mapping"
+              YAML_SCALAR@0..13 "block mapping"
               YAML_COLON@13..14 ":"
             YAML_BLOCK_MAP_VALUE@14..27
               NEWLINE@14..15 "\n"
-              YAML_BLOCK_MAP@15..27
-                YAML_BLOCK_MAP_ENTRY@15..27
-                  YAML_BLOCK_MAP_KEY@15..20
-                    WHITESPACE@15..16 " "
-                    YAML_KEY@16..19 "key"
+              WHITESPACE@15..16 " "
+              YAML_BLOCK_MAP@16..27
+                YAML_BLOCK_MAP_ENTRY@16..27
+                  YAML_BLOCK_MAP_KEY@16..20
+                    YAML_SCALAR@16..19 "key"
                     YAML_COLON@19..20 ":"
-                  YAML_BLOCK_MAP_VALUE@20..26
+                  YAML_BLOCK_MAP_VALUE@20..27
                     WHITESPACE@20..21 " "
                     YAML_SCALAR@21..26 "value"
-                  NEWLINE@26..27 "\n"
+                    NEWLINE@26..27 "\n"

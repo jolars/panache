@@ -11,30 +11,33 @@ DOCUMENT@0..42
   YAML_METADATA_CONTENT@0..42
     YAML_STREAM@0..42
       YAML_DOCUMENT@0..42
-        YAML_BLOCK_MAP@0..42
-          YAML_FLOW_MAP@0..41
-            YAML_SCALAR@0..1 "{"
-            YAML_SCALAR@1..2 "\n"
-            YAML_FLOW_MAP_ENTRY@2..19
-              YAML_FLOW_MAP_KEY@2..13
-                YAML_KEY@2..12 "? explicit"
-                YAML_COLON@12..13 ":"
-              YAML_FLOW_MAP_VALUE@13..19
-                YAML_SCALAR@13..19 " entry"
-            YAML_SCALAR@19..20 ","
-            YAML_SCALAR@20..21 "\n"
-            YAML_FLOW_MAP_ENTRY@21..36
-              YAML_FLOW_MAP_KEY@21..30
-                YAML_KEY@21..29 "implicit"
-                YAML_COLON@29..30 ":"
-              YAML_FLOW_MAP_VALUE@30..36
-                YAML_SCALAR@30..36 " entry"
-            YAML_SCALAR@36..37 ","
-            YAML_SCALAR@37..38 "\n"
-            YAML_FLOW_MAP_ENTRY@38..40
-              YAML_FLOW_MAP_KEY@38..39
-                YAML_SCALAR@38..39 "?"
-              YAML_FLOW_MAP_VALUE@39..40
-                YAML_SCALAR@39..40 "\n"
-            YAML_SCALAR@40..41 "}"
-          NEWLINE@41..42 "\n"
+        YAML_FLOW_MAP@0..41
+          YAML_SCALAR@0..1 "{"
+          NEWLINE@1..2 "\n"
+          YAML_FLOW_MAP_ENTRY@2..19
+            YAML_FLOW_MAP_KEY@2..13
+              YAML_KEY@2..3 "?"
+              WHITESPACE@3..4 " "
+              YAML_SCALAR@4..12 "explicit"
+              YAML_COLON@12..13 ":"
+            YAML_FLOW_MAP_VALUE@13..19
+              WHITESPACE@13..14 " "
+              YAML_SCALAR@14..19 "entry"
+          YAML_SCALAR@19..20 ","
+          NEWLINE@20..21 "\n"
+          YAML_FLOW_MAP_ENTRY@21..36
+            YAML_FLOW_MAP_KEY@21..30
+              YAML_SCALAR@21..29 "implicit"
+              YAML_COLON@29..30 ":"
+            YAML_FLOW_MAP_VALUE@30..36
+              WHITESPACE@30..31 " "
+              YAML_SCALAR@31..36 "entry"
+          YAML_SCALAR@36..37 ","
+          NEWLINE@37..38 "\n"
+          YAML_FLOW_MAP_ENTRY@38..40
+            YAML_FLOW_MAP_KEY@38..40
+              YAML_KEY@38..39 "?"
+              NEWLINE@39..40 "\n"
+            YAML_FLOW_MAP_VALUE@40..40
+          YAML_SCALAR@40..41 "}"
+        NEWLINE@41..42 "\n"

@@ -17,13 +17,15 @@ DOCUMENT@0..32
             WHITESPACE@1..2 " "
             YAML_FLOW_SEQUENCE@2..15
               YAML_SCALAR@2..3 "["
-              YAML_FLOW_SEQUENCE_ITEM@3..7
-                YAML_SCALAR@3..7 " one"
+              WHITESPACE@3..4 " "
+              YAML_FLOW_SEQUENCE_ITEM@4..7
+                YAML_SCALAR@4..7 "one"
               YAML_SCALAR@7..8 ","
-              YAML_FLOW_SEQUENCE_ITEM@8..12
-                YAML_SCALAR@8..12 " two"
+              WHITESPACE@8..9 " "
+              YAML_FLOW_SEQUENCE_ITEM@9..12
+                YAML_SCALAR@9..12 "two"
               YAML_SCALAR@12..13 ","
-              YAML_SCALAR@13..14 " "
+              WHITESPACE@13..14 " "
               YAML_SCALAR@14..15 "]"
             NEWLINE@15..16 "\n"
           YAML_BLOCK_SEQUENCE_ITEM@16..32

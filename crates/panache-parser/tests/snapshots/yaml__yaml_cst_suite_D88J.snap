@@ -14,16 +14,17 @@ DOCUMENT@0..10
         YAML_BLOCK_MAP@0..10
           YAML_BLOCK_MAP_ENTRY@0..10
             YAML_BLOCK_MAP_KEY@0..2
-              YAML_KEY@0..1 "a"
+              YAML_SCALAR@0..1 "a"
               YAML_COLON@1..2 ":"
-            YAML_BLOCK_MAP_VALUE@2..9
+            YAML_BLOCK_MAP_VALUE@2..10
               WHITESPACE@2..3 " "
               YAML_FLOW_SEQUENCE@3..9
                 YAML_SCALAR@3..4 "["
                 YAML_FLOW_SEQUENCE_ITEM@4..5
                   YAML_SCALAR@4..5 "b"
                 YAML_SCALAR@5..6 ","
-                YAML_FLOW_SEQUENCE_ITEM@6..8
-                  YAML_SCALAR@6..8 " c"
+                WHITESPACE@6..7 " "
+                YAML_FLOW_SEQUENCE_ITEM@7..8
+                  YAML_SCALAR@7..8 "c"
                 YAML_SCALAR@8..9 "]"
-            NEWLINE@9..10 "\n"
+              NEWLINE@9..10 "\n"

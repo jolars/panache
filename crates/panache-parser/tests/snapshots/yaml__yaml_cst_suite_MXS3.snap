@@ -19,9 +19,10 @@ DOCUMENT@0..9
               YAML_SCALAR@2..3 "{"
               YAML_FLOW_MAP_ENTRY@3..7
                 YAML_FLOW_MAP_KEY@3..5
-                  YAML_KEY@3..4 "a"
+                  YAML_SCALAR@3..4 "a"
                   YAML_COLON@4..5 ":"
                 YAML_FLOW_MAP_VALUE@5..7
-                  YAML_SCALAR@5..7 " b"
+                  WHITESPACE@5..6 " "
+                  YAML_SCALAR@6..7 "b"
               YAML_SCALAR@7..8 "}"
             NEWLINE@8..9 "\n"

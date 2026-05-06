@@ -16,9 +16,9 @@ DOCUMENT@0..20
         YAML_BLOCK_MAP@4..20
           YAML_BLOCK_MAP_ENTRY@4..20
             YAML_BLOCK_MAP_KEY@4..8
-              YAML_KEY@4..7 "tab"
+              YAML_SCALAR@4..7 "tab"
               YAML_COLON@7..8 ":"
-            YAML_BLOCK_MAP_VALUE@8..19
+            YAML_BLOCK_MAP_VALUE@8..20
               WHITESPACE@8..9 " "
               YAML_SCALAR@9..19 "\"\\tstring\""
-            NEWLINE@19..20 "\n"
+              NEWLINE@19..20 "\n"

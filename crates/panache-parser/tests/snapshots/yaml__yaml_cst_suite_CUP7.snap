@@ -14,19 +14,17 @@ DOCUMENT@0..46
         YAML_BLOCK_MAP@0..46
           YAML_BLOCK_MAP_ENTRY@0..31
             YAML_BLOCK_MAP_KEY@0..9
-              YAML_KEY@0..8 "anchored"
+              YAML_SCALAR@0..8 "anchored"
               YAML_COLON@8..9 ":"
-            YAML_BLOCK_MAP_VALUE@9..30
+            YAML_BLOCK_MAP_VALUE@9..31
               WHITESPACE@9..10 " "
-              YAML_TAG@10..16 "!local"
-              WHITESPACE@16..17 " "
-              YAML_SCALAR@17..30 "&anchor value"
-            NEWLINE@30..31 "\n"
+              YAML_SCALAR@10..30 "!local &anchor value"
+              NEWLINE@30..31 "\n"
           YAML_BLOCK_MAP_ENTRY@31..46
             YAML_BLOCK_MAP_KEY@31..37
-              YAML_KEY@31..36 "alias"
+              YAML_SCALAR@31..36 "alias"
               YAML_COLON@36..37 ":"
-            YAML_BLOCK_MAP_VALUE@37..45
+            YAML_BLOCK_MAP_VALUE@37..46
               WHITESPACE@37..38 " "
               YAML_SCALAR@38..45 "*anchor"
-            NEWLINE@45..46 "\n"
+              NEWLINE@45..46 "\n"

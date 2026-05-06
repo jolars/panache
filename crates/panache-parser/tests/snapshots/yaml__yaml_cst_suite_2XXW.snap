@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 278
 expression: snapshot
 ---
 case_id: 2XXW
@@ -19,13 +18,28 @@ DOCUMENT@0..137
       NEWLINE@86..87 "\n"
       YAML_DOCUMENT@87..137
         YAML_DOCUMENT_START@87..90 "---"
-        YAML_BLOCK_MAP@90..137
-          WHITESPACE@90..91 " "
-          YAML_TAG@91..96 "!!set"
-          NEWLINE@96..97 "\n"
-          YAML_SCALAR@97..111 "? Mark McGwire"
-          NEWLINE@111..112 "\n"
-          YAML_SCALAR@112..124 "? Sammy Sosa"
-          NEWLINE@124..125 "\n"
-          YAML_SCALAR@125..136 "? Ken Griff"
-          NEWLINE@136..137 "\n"
+        WHITESPACE@90..91 " "
+        YAML_SCALAR@91..96 "!!set"
+        NEWLINE@96..97 "\n"
+        YAML_BLOCK_MAP@97..137
+          YAML_BLOCK_MAP_ENTRY@97..112
+            YAML_BLOCK_MAP_KEY@97..112
+              YAML_KEY@97..98 "?"
+              WHITESPACE@98..99 " "
+              YAML_SCALAR@99..111 "Mark McGwire"
+              NEWLINE@111..112 "\n"
+            YAML_BLOCK_MAP_VALUE@112..112
+          YAML_BLOCK_MAP_ENTRY@112..125
+            YAML_BLOCK_MAP_KEY@112..125
+              YAML_KEY@112..113 "?"
+              WHITESPACE@113..114 " "
+              YAML_SCALAR@114..124 "Sammy Sosa"
+              NEWLINE@124..125 "\n"
+            YAML_BLOCK_MAP_VALUE@125..125
+          YAML_BLOCK_MAP_ENTRY@125..137
+            YAML_BLOCK_MAP_KEY@125..137
+              YAML_KEY@125..126 "?"
+              WHITESPACE@126..127 " "
+              YAML_SCALAR@127..136 "Ken Griff"
+              NEWLINE@136..137 "\n"
+            YAML_BLOCK_MAP_VALUE@137..137

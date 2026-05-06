@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 278
 expression: snapshot
 ---
 case_id: 7T8X
@@ -12,43 +11,6 @@ DOCUMENT@0..88
   YAML_METADATA_CONTENT@0..88
     YAML_STREAM@0..88
       YAML_DOCUMENT@0..88
-        YAML_SCALAR@0..1 ">"
-        NEWLINE@1..2 "\n"
-        NEWLINE@2..3 "\n"
-        YAML_SCALAR@3..3 ""
-        WHITESPACE@3..4 " "
-        YAML_SCALAR@4..10 "folded"
-        NEWLINE@10..11 "\n"
-        WHITESPACE@11..12 " "
-        YAML_SCALAR@12..16 "line"
-        NEWLINE@16..17 "\n"
-        NEWLINE@17..18 "\n"
-        WHITESPACE@18..19 " "
-        YAML_SCALAR@19..23 "next"
-        NEWLINE@23..24 "\n"
-        WHITESPACE@24..25 " "
-        YAML_SCALAR@25..29 "line"
-        NEWLINE@29..30 "\n"
-        YAML_SCALAR@30..30 ""
-        WHITESPACE@30..33 "   "
-        YAML_SCALAR@33..41 "* bullet"
-        NEWLINE@41..42 "\n"
-        NEWLINE@42..43 "\n"
-        WHITESPACE@43..46 "   "
-        YAML_SCALAR@46..52 "* list"
-        NEWLINE@52..53 "\n"
-        WHITESPACE@53..56 "   "
-        YAML_SCALAR@56..63 "* lines"
-        NEWLINE@63..64 "\n"
-        NEWLINE@64..65 "\n"
-        YAML_SCALAR@65..65 ""
-        WHITESPACE@65..66 " "
-        YAML_SCALAR@66..70 "last"
-        NEWLINE@70..71 "\n"
-        WHITESPACE@71..72 " "
-        YAML_SCALAR@72..76 "line"
-        NEWLINE@76..77 "\n"
-        NEWLINE@77..78 "\n"
-        YAML_SCALAR@78..78 ""
+        YAML_SCALAR@0..78 ">\n\n folded\n line\n\n ne ..."
         YAML_COMMENT@78..87 "# Comment"
         NEWLINE@87..88 "\n"

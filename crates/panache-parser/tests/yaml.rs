@@ -607,7 +607,7 @@ fn yaml_nested_map_lossless() {
     let key_text = outer_key
         .children_with_tokens()
         .filter_map(|el| el.into_token())
-        .find(|tok| tok.kind() == SyntaxKind::YAML_KEY)
+        .find(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
         .expect("key token")
         .text()
         .to_string();

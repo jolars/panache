@@ -14,31 +14,31 @@ DOCUMENT@0..80
         YAML_BLOCK_MAP@0..80
           YAML_BLOCK_MAP_ENTRY@0..23
             YAML_BLOCK_MAP_KEY@0..3
-              YAML_KEY@0..2 "hr"
+              YAML_SCALAR@0..2 "hr"
               YAML_COLON@2..3 ":"
-            YAML_BLOCK_MAP_VALUE@3..22
+            YAML_BLOCK_MAP_VALUE@3..23
               WHITESPACE@3..5 "  "
               YAML_SCALAR@5..7 "65"
               WHITESPACE@7..11 "    "
               YAML_COMMENT@11..22 "# Home runs"
-            NEWLINE@22..23 "\n"
+              NEWLINE@22..23 "\n"
           YAML_BLOCK_MAP_ENTRY@23..52
             YAML_BLOCK_MAP_KEY@23..27
-              YAML_KEY@23..26 "avg"
+              YAML_SCALAR@23..26 "avg"
               YAML_COLON@26..27 ":"
-            YAML_BLOCK_MAP_VALUE@27..51
+            YAML_BLOCK_MAP_VALUE@27..52
               WHITESPACE@27..28 " "
               YAML_SCALAR@28..33 "0.278"
               WHITESPACE@33..34 " "
               YAML_COMMENT@34..51 "# Batting average"
-            NEWLINE@51..52 "\n"
+              NEWLINE@51..52 "\n"
           YAML_BLOCK_MAP_ENTRY@52..80
             YAML_BLOCK_MAP_KEY@52..56
-              YAML_KEY@52..55 "rbi"
+              YAML_SCALAR@52..55 "rbi"
               YAML_COLON@55..56 ":"
-            YAML_BLOCK_MAP_VALUE@56..79
+            YAML_BLOCK_MAP_VALUE@56..80
               WHITESPACE@56..57 " "
               YAML_SCALAR@57..60 "147"
               WHITESPACE@60..63 "   "
               YAML_COMMENT@63..79 "# Runs Batted In"
-            NEWLINE@79..80 "\n"
+              NEWLINE@79..80 "\n"

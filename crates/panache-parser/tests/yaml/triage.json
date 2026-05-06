@@ -558,12 +558,6 @@
       "tree": false
     },
     {
-      "case_id": "35KP",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "36F6",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_KEY_TOKEN"
@@ -1419,6 +1413,7 @@
     "2AUY",
     "2XXW",
     "33X3",
+    "35KP",
     "3ALJ",
     "3GZX",
     "3MYT",
@@ -1560,8 +1555,8 @@
   "summary": {
     "error_contract_ok_count": 55,
     "fails_needs_error_path_count": 23,
-    "fails_needs_feature_count": 112,
-    "passes_now_count": 143,
+    "fails_needs_feature_count": 111,
+    "passes_now_count": 144,
     "total_cases": 352
   }
 }

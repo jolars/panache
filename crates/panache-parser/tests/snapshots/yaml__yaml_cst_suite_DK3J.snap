@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 278
 expression: snapshot
 ---
 case_id: DK3J
@@ -14,8 +13,7 @@ DOCUMENT@0..31
       YAML_DOCUMENT@0..31
         YAML_DOCUMENT_START@0..3 "---"
         WHITESPACE@3..4 " "
-        YAML_SCALAR@4..5 ">"
-        NEWLINE@5..6 "\n"
+        YAML_SCALAR@4..6 ">\n"
         YAML_SCALAR@6..11 "line1"
         NEWLINE@11..12 "\n"
         YAML_COMMENT@12..24 "# no comment"

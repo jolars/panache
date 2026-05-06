@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 278
 expression: snapshot
 ---
 case_id: U9NS
@@ -11,63 +10,63 @@ cst:
 DOCUMENT@0..125
   YAML_METADATA_CONTENT@0..125
     YAML_STREAM@0..125
-      YAML_DOCUMENT@0..64
+      YAML_DOCUMENT@0..63
         YAML_DOCUMENT_START@0..3 "---"
         NEWLINE@3..4 "\n"
         YAML_BLOCK_MAP@4..60
           YAML_BLOCK_MAP_ENTRY@4..19
             YAML_BLOCK_MAP_KEY@4..9
-              YAML_KEY@4..8 "time"
+              YAML_SCALAR@4..8 "time"
               YAML_COLON@8..9 ":"
-            YAML_BLOCK_MAP_VALUE@9..18
+            YAML_BLOCK_MAP_VALUE@9..19
               WHITESPACE@9..10 " "
               YAML_SCALAR@10..18 "20:03:20"
-            NEWLINE@18..19 "\n"
+              NEWLINE@18..19 "\n"
           YAML_BLOCK_MAP_ENTRY@19..38
             YAML_BLOCK_MAP_KEY@19..26
-              YAML_KEY@19..25 "player"
+              YAML_SCALAR@19..25 "player"
               YAML_COLON@25..26 ":"
-            YAML_BLOCK_MAP_VALUE@26..37
+            YAML_BLOCK_MAP_VALUE@26..38
               WHITESPACE@26..27 " "
               YAML_SCALAR@27..37 "Sammy Sosa"
-            NEWLINE@37..38 "\n"
+              NEWLINE@37..38 "\n"
           YAML_BLOCK_MAP_ENTRY@38..60
             YAML_BLOCK_MAP_KEY@38..45
-              YAML_KEY@38..44 "action"
+              YAML_SCALAR@38..44 "action"
               YAML_COLON@44..45 ":"
-            YAML_BLOCK_MAP_VALUE@45..59
+            YAML_BLOCK_MAP_VALUE@45..60
               WHITESPACE@45..46 " "
               YAML_SCALAR@46..59 "strike (miss)"
-            NEWLINE@59..60 "\n"
+              NEWLINE@59..60 "\n"
         YAML_DOCUMENT_END@60..63 "..."
-        NEWLINE@63..64 "\n"
-      YAML_DOCUMENT@64..125
+      NEWLINE@63..64 "\n"
+      YAML_DOCUMENT@64..124
         YAML_DOCUMENT_START@64..67 "---"
         NEWLINE@67..68 "\n"
         YAML_BLOCK_MAP@68..121
           YAML_BLOCK_MAP_ENTRY@68..83
             YAML_BLOCK_MAP_KEY@68..73
-              YAML_KEY@68..72 "time"
+              YAML_SCALAR@68..72 "time"
               YAML_COLON@72..73 ":"
-            YAML_BLOCK_MAP_VALUE@73..82
+            YAML_BLOCK_MAP_VALUE@73..83
               WHITESPACE@73..74 " "
               YAML_SCALAR@74..82 "20:03:47"
-            NEWLINE@82..83 "\n"
+              NEWLINE@82..83 "\n"
           YAML_BLOCK_MAP_ENTRY@83..102
             YAML_BLOCK_MAP_KEY@83..90
-              YAML_KEY@83..89 "player"
+              YAML_SCALAR@83..89 "player"
               YAML_COLON@89..90 ":"
-            YAML_BLOCK_MAP_VALUE@90..101
+            YAML_BLOCK_MAP_VALUE@90..102
               WHITESPACE@90..91 " "
               YAML_SCALAR@91..101 "Sammy Sosa"
-            NEWLINE@101..102 "\n"
+              NEWLINE@101..102 "\n"
           YAML_BLOCK_MAP_ENTRY@102..121
             YAML_BLOCK_MAP_KEY@102..109
-              YAML_KEY@102..108 "action"
+              YAML_SCALAR@102..108 "action"
               YAML_COLON@108..109 ":"
-            YAML_BLOCK_MAP_VALUE@109..120
+            YAML_BLOCK_MAP_VALUE@109..121
               WHITESPACE@109..110 " "
               YAML_SCALAR@110..120 "grand slam"
-            NEWLINE@120..121 "\n"
+              NEWLINE@120..121 "\n"
         YAML_DOCUMENT_END@121..124 "..."
-        NEWLINE@124..125 "\n"
+      NEWLINE@124..125 "\n"

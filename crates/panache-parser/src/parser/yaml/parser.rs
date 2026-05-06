@@ -1059,6 +1059,12 @@ pub fn parse_yaml_tree(input: &str) -> Option<SyntaxNode> {
 }
 
 /// Parse prototype YAML tree structure and include diagnostics on failure.
+///
+/// Detects malformed input via a sniff over the v1 token stream
+/// (directive ordering + structural validation), then builds the
+/// returned tree from the v2 scanner+builder. The v1 sniff path is
+/// kept for diagnostic surface; only the tree shape is provided by
+/// v2.
 pub fn parse_yaml_report(input: &str) -> YamlParseReport {
     let tokens = match lex_mapping_tokens_with_diagnostic(input) {
         Ok(tokens) => tokens,
@@ -1105,15 +1111,39 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
         };
     }
 
-    let mut builder = GreenNodeBuilder::new();
-    builder.start_node(SyntaxKind::DOCUMENT.into());
-    builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
-    builder.start_node(SyntaxKind::YAML_STREAM.into());
-    if let Err(err) = parse_stream(&mut builder, &tokens) {
+    // v1 structural validation: reject inputs the v1 emitters classify
+    // as malformed (unterminated flow, trailing content, invalid keys,
+    // unexpected indent/dedent, etc.). The tree this produces is
+    // discarded — we only consume its diagnostic verdict.
+    let mut sniff_builder = GreenNodeBuilder::new();
+    sniff_builder.start_node(SyntaxKind::DOCUMENT.into());
+    sniff_builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
+    sniff_builder.start_node(SyntaxKind::YAML_STREAM.into());
+    if let Err(err) = parse_stream(&mut sniff_builder, &tokens) {
         return YamlParseReport {
             tree: None,
             diagnostics: vec![err],
         };
+    }
+
+    // Build the returned tree from the v2 scanner+builder. v2 wraps
+    // the YAML_STREAM in a DOCUMENT/YAML_METADATA_CONTENT envelope so
+    // descendants() walks find the stream identically to the v1 path.
+    let v2_stream = super::parser_v2::parse_v2(input);
+    let mut builder = GreenNodeBuilder::new();
+    builder.start_node(SyntaxKind::DOCUMENT.into());
+    builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
+    let stream_green = v2_stream.green().into_owned();
+    builder.start_node(SyntaxKind::YAML_STREAM.into());
+    for child in stream_green.children() {
+        match child {
+            rowan::NodeOrToken::Node(n) => {
+                push_green_node(&mut builder, n);
+            }
+            rowan::NodeOrToken::Token(t) => {
+                builder.token(t.kind(), t.text());
+            }
+        }
     }
     builder.finish_node(); // YAML_STREAM
     builder.finish_node(); // YAML_METADATA_CONTENT
@@ -1122,6 +1152,17 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
         tree: Some(SyntaxNode::new_root(builder.finish())),
         diagnostics: Vec::new(),
     }
+}
+
+fn push_green_node(builder: &mut GreenNodeBuilder<'_>, node: &rowan::GreenNodeData) {
+    builder.start_node(node.kind());
+    for child in node.children() {
+        match child {
+            rowan::NodeOrToken::Node(n) => push_green_node(builder, n),
+            rowan::NodeOrToken::Token(t) => builder.token(t.kind(), t.text()),
+        }
+    }
+    builder.finish_node();
 }
 
 /// Outer stream loop. Walks every token and emits zero or more `YAML_DOCUMENT`

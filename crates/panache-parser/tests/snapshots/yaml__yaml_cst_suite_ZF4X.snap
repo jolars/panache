@@ -14,55 +14,58 @@ DOCUMENT@0..80
         YAML_BLOCK_MAP@0..80
           YAML_BLOCK_MAP_ENTRY@0..35
             YAML_BLOCK_MAP_KEY@0..13
-              YAML_KEY@0..12 "Mark McGwire"
+              YAML_SCALAR@0..12 "Mark McGwire"
               YAML_COLON@12..13 ":"
-            YAML_BLOCK_MAP_VALUE@13..34
+            YAML_BLOCK_MAP_VALUE@13..35
               WHITESPACE@13..14 " "
               YAML_FLOW_MAP@14..34
                 YAML_SCALAR@14..15 "{"
-                YAML_FLOW_MAP_ENTRY@15..21
-                  YAML_FLOW_MAP_KEY@15..18
-                    YAML_KEY@15..17 "hr"
+                YAML_SCALAR@15..17 "hr"
+                YAML_FLOW_MAP_ENTRY@17..21
+                  YAML_FLOW_MAP_KEY@17..18
                     YAML_COLON@17..18 ":"
                   YAML_FLOW_MAP_VALUE@18..21
-                    YAML_SCALAR@18..21 " 65"
+                    WHITESPACE@18..19 " "
+                    YAML_SCALAR@19..21 "65"
                 YAML_SCALAR@21..22 ","
-                YAML_FLOW_MAP_ENTRY@22..33
-                  YAML_FLOW_MAP_KEY@22..27
-                    YAML_KEY@22..26 " avg"
+                WHITESPACE@22..23 " "
+                YAML_FLOW_MAP_ENTRY@23..33
+                  YAML_FLOW_MAP_KEY@23..27
+                    YAML_SCALAR@23..26 "avg"
                     YAML_COLON@26..27 ":"
                   YAML_FLOW_MAP_VALUE@27..33
-                    YAML_SCALAR@27..33 " 0.278"
+                    WHITESPACE@27..28 " "
+                    YAML_SCALAR@28..33 "0.278"
                 YAML_SCALAR@33..34 "}"
-            NEWLINE@34..35 "\n"
+              NEWLINE@34..35 "\n"
           YAML_BLOCK_MAP_ENTRY@35..80
             YAML_BLOCK_MAP_KEY@35..46
-              YAML_KEY@35..45 "Sammy Sosa"
+              YAML_SCALAR@35..45 "Sammy Sosa"
               YAML_COLON@45..46 ":"
-            YAML_BLOCK_MAP_VALUE@46..79
+            YAML_BLOCK_MAP_VALUE@46..80
               WHITESPACE@46..47 " "
               YAML_FLOW_MAP@47..79
                 YAML_SCALAR@47..48 "{"
-                YAML_SCALAR@48..49 "\n"
-                YAML_SCALAR@49..49 ""
+                NEWLINE@48..49 "\n"
                 WHITESPACE@49..53 "    "
-                YAML_FLOW_MAP_ENTRY@53..59
-                  YAML_FLOW_MAP_KEY@53..56
-                    YAML_KEY@53..55 "hr"
+                YAML_SCALAR@53..55 "hr"
+                YAML_FLOW_MAP_ENTRY@55..59
+                  YAML_FLOW_MAP_KEY@55..56
                     YAML_COLON@55..56 ":"
                   YAML_FLOW_MAP_VALUE@56..59
-                    YAML_SCALAR@56..59 " 63"
+                    WHITESPACE@56..57 " "
+                    YAML_SCALAR@57..59 "63"
                 YAML_SCALAR@59..60 ","
-                YAML_SCALAR@60..61 "\n"
+                NEWLINE@60..61 "\n"
                 WHITESPACE@61..65 "    "
                 YAML_FLOW_MAP_ENTRY@65..78
                   YAML_FLOW_MAP_KEY@65..69
-                    YAML_KEY@65..68 "avg"
+                    YAML_SCALAR@65..68 "avg"
                     YAML_COLON@68..69 ":"
                   YAML_FLOW_MAP_VALUE@69..78
-                    YAML_SCALAR@69..75 " 0.288"
-                    YAML_SCALAR@75..76 "\n"
-                    YAML_SCALAR@76..76 ""
+                    WHITESPACE@69..70 " "
+                    YAML_SCALAR@70..75 "0.288"
+                    NEWLINE@75..76 "\n"
                     WHITESPACE@76..78 "  "
                 YAML_SCALAR@78..79 "}"
-            NEWLINE@79..80 "\n"
+              NEWLINE@79..80 "\n"

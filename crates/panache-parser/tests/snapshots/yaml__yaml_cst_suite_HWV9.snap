@@ -10,5 +10,6 @@ cst:
 DOCUMENT@0..4
   YAML_METADATA_CONTENT@0..4
     YAML_STREAM@0..4
-      YAML_DOCUMENT_END@0..3 "..."
+      YAML_DOCUMENT@0..3
+        YAML_DOCUMENT_END@0..3 "..."
       NEWLINE@3..4 "\n"

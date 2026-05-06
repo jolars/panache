@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 278
 expression: snapshot
 ---
 case_id: 2AUY
@@ -14,28 +13,24 @@ DOCUMENT@0..33
       WHITESPACE@0..1 " "
       YAML_DOCUMENT@1..33
         YAML_BLOCK_SEQUENCE@1..33
-          YAML_BLOCK_SEQUENCE_ITEM@1..11
+          YAML_BLOCK_SEQUENCE_ITEM@1..12
             YAML_BLOCK_SEQ_ENTRY@1..2 "-"
             WHITESPACE@2..3 " "
-            YAML_TAG@3..8 "!!str"
-            WHITESPACE@8..9 " "
-            YAML_SCALAR@9..10 "a"
+            YAML_SCALAR@3..10 "!!str a"
             NEWLINE@10..11 "\n"
-          WHITESPACE@11..12 " "
-          YAML_BLOCK_SEQUENCE_ITEM@12..16
+            WHITESPACE@11..12 " "
+          YAML_BLOCK_SEQUENCE_ITEM@12..17
             YAML_BLOCK_SEQ_ENTRY@12..13 "-"
             WHITESPACE@13..14 " "
             YAML_SCALAR@14..15 "b"
             NEWLINE@15..16 "\n"
-          WHITESPACE@16..17 " "
-          YAML_BLOCK_SEQUENCE_ITEM@17..28
+            WHITESPACE@16..17 " "
+          YAML_BLOCK_SEQUENCE_ITEM@17..29
             YAML_BLOCK_SEQ_ENTRY@17..18 "-"
             WHITESPACE@18..19 " "
-            YAML_TAG@19..24 "!!int"
-            WHITESPACE@24..25 " "
-            YAML_SCALAR@25..27 "42"
+            YAML_SCALAR@19..27 "!!int 42"
             NEWLINE@27..28 "\n"
-          WHITESPACE@28..29 " "
+            WHITESPACE@28..29 " "
           YAML_BLOCK_SEQUENCE_ITEM@29..33
             YAML_BLOCK_SEQ_ENTRY@29..30 "-"
             WHITESPACE@30..31 " "

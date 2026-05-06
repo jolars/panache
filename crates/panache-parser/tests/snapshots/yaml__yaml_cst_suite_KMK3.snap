@@ -14,25 +14,25 @@ DOCUMENT@0..21
         YAML_BLOCK_MAP@0..21
           YAML_BLOCK_MAP_ENTRY@0..14
             YAML_BLOCK_MAP_KEY@0..4
-              YAML_KEY@0..3 "foo"
+              YAML_SCALAR@0..3 "foo"
               YAML_COLON@3..4 ":"
             YAML_BLOCK_MAP_VALUE@4..14
               NEWLINE@4..5 "\n"
-              YAML_BLOCK_MAP@5..14
-                YAML_BLOCK_MAP_ENTRY@5..14
-                  YAML_BLOCK_MAP_KEY@5..11
-                    WHITESPACE@5..7 "  "
-                    YAML_KEY@7..10 "bar"
+              WHITESPACE@5..7 "  "
+              YAML_BLOCK_MAP@7..14
+                YAML_BLOCK_MAP_ENTRY@7..14
+                  YAML_BLOCK_MAP_KEY@7..11
+                    YAML_SCALAR@7..10 "bar"
                     YAML_COLON@10..11 ":"
-                  YAML_BLOCK_MAP_VALUE@11..13
+                  YAML_BLOCK_MAP_VALUE@11..14
                     WHITESPACE@11..12 " "
                     YAML_SCALAR@12..13 "1"
-                  NEWLINE@13..14 "\n"
+                    NEWLINE@13..14 "\n"
           YAML_BLOCK_MAP_ENTRY@14..21
             YAML_BLOCK_MAP_KEY@14..18
-              YAML_KEY@14..17 "baz"
+              YAML_SCALAR@14..17 "baz"
               YAML_COLON@17..18 ":"
-            YAML_BLOCK_MAP_VALUE@18..20
+            YAML_BLOCK_MAP_VALUE@18..21
               WHITESPACE@18..19 " "
               YAML_SCALAR@19..20 "2"
-            NEWLINE@20..21 "\n"
+              NEWLINE@20..21 "\n"

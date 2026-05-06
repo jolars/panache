@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 278
 expression: snapshot
 ---
 case_id: AZW3
@@ -16,12 +15,24 @@ DOCUMENT@0..32
           YAML_BLOCK_SEQUENCE_ITEM@0..16
             YAML_BLOCK_SEQ_ENTRY@0..1 "-"
             WHITESPACE@1..2 " "
-            YAML_SCALAR@2..15 "bla\"keks: foo"
-            NEWLINE@15..16 "\n"
+            YAML_BLOCK_MAP@2..16
+              YAML_BLOCK_MAP_ENTRY@2..16
+                YAML_BLOCK_MAP_KEY@2..11
+                  YAML_SCALAR@2..10 "bla\"keks"
+                  YAML_COLON@10..11 ":"
+                YAML_BLOCK_MAP_VALUE@11..16
+                  WHITESPACE@11..12 " "
+                  YAML_SCALAR@12..15 "foo"
+                  NEWLINE@15..16 "\n"
           YAML_BLOCK_SEQUENCE_ITEM@16..32
             YAML_BLOCK_SEQ_ENTRY@16..17 "-"
             WHITESPACE@17..18 " "
-            YAML_SCALAR@18..21 "bla"
-            YAML_SCALAR@21..22 "]"
-            YAML_SCALAR@22..31 "keks: foo"
-            NEWLINE@31..32 "\n"
+            YAML_BLOCK_MAP@18..32
+              YAML_BLOCK_MAP_ENTRY@18..32
+                YAML_BLOCK_MAP_KEY@18..27
+                  YAML_SCALAR@18..26 "bla]keks"
+                  YAML_COLON@26..27 ":"
+                YAML_BLOCK_MAP_VALUE@27..32
+                  WHITESPACE@27..28 " "
+                  YAML_SCALAR@28..31 "foo"
+                  NEWLINE@31..32 "\n"

@@ -19,12 +19,14 @@ DOCUMENT@0..53
             WHITESPACE@5..6 " "
             YAML_FLOW_MAP@6..27
               YAML_SCALAR@6..7 "{"
-              YAML_FLOW_MAP_ENTRY@7..26
-                YAML_FLOW_MAP_KEY@7..20
-                  YAML_KEY@7..19 " single line"
+              WHITESPACE@7..8 " "
+              YAML_FLOW_MAP_ENTRY@8..26
+                YAML_FLOW_MAP_KEY@8..20
+                  YAML_SCALAR@8..19 "single line"
                   YAML_COLON@19..20 ":"
                 YAML_FLOW_MAP_VALUE@20..26
-                  YAML_SCALAR@20..26 " value"
+                  WHITESPACE@20..21 " "
+                  YAML_SCALAR@21..26 "value"
               YAML_SCALAR@26..27 "}"
             NEWLINE@27..28 "\n"
           YAML_BLOCK_SEQUENCE_ITEM@28..53
@@ -32,15 +34,13 @@ DOCUMENT@0..53
             WHITESPACE@29..30 " "
             YAML_FLOW_MAP@30..52
               YAML_SCALAR@30..31 "{"
-              YAML_FLOW_MAP_ENTRY@31..51
-                YAML_FLOW_MAP_KEY@31..45
-                  YAML_SCALAR@31..37 " multi"
-                  YAML_SCALAR@37..38 "\n"
-                  YAML_SCALAR@38..38 ""
-                  WHITESPACE@38..40 "  "
-                  YAML_KEY@40..44 "line"
+              WHITESPACE@31..32 " "
+              YAML_SCALAR@32..44 "multi\n  line"
+              YAML_FLOW_MAP_ENTRY@44..51
+                YAML_FLOW_MAP_KEY@44..45
                   YAML_COLON@44..45 ":"
                 YAML_FLOW_MAP_VALUE@45..51
-                  YAML_SCALAR@45..51 " value"
+                  WHITESPACE@45..46 " "
+                  YAML_SCALAR@46..51 "value"
               YAML_SCALAR@51..52 "}"
             NEWLINE@52..53 "\n"

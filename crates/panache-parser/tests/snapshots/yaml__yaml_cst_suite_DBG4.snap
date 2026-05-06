@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 278
 expression: snapshot
 ---
 case_id: DBG4
@@ -28,49 +27,47 @@ DOCUMENT@0..218
           YAML_BLOCK_SEQUENCE_ITEM@49..69
             YAML_BLOCK_SEQ_ENTRY@49..50 "-"
             WHITESPACE@50..51 " "
-            YAML_SCALAR@51..53 "Up"
-            YAML_SCALAR@53..54 ","
-            YAML_SCALAR@54..57 " up"
-            YAML_SCALAR@57..58 ","
-            YAML_SCALAR@58..68 " and away!"
+            YAML_SCALAR@51..68 "Up, up, and away!"
             NEWLINE@68..69 "\n"
           YAML_BLOCK_SEQUENCE_ITEM@69..76
             YAML_BLOCK_SEQ_ENTRY@69..70 "-"
             WHITESPACE@70..71 " "
             YAML_SCALAR@71..75 "-123"
             NEWLINE@75..76 "\n"
-          YAML_BLOCK_SEQUENCE_ITEM@76..105
+          YAML_BLOCK_SEQUENCE_ITEM@76..131
             YAML_BLOCK_SEQ_ENTRY@76..77 "-"
             WHITESPACE@77..78 " "
             YAML_SCALAR@78..104 "http://example.com/fo ..."
             NEWLINE@104..105 "\n"
-          YAML_COMMENT@105..130 "# Inside flow collect ..."
-          NEWLINE@130..131 "\n"
+            YAML_COMMENT@105..130 "# Inside flow collect ..."
+            NEWLINE@130..131 "\n"
           YAML_BLOCK_SEQUENCE_ITEM@131..218
             YAML_BLOCK_SEQ_ENTRY@131..132 "-"
             WHITESPACE@132..133 " "
             YAML_FLOW_SEQUENCE@133..217
               YAML_SCALAR@133..134 "["
-              YAML_FLOW_SEQUENCE_ITEM@134..143
-                YAML_SCALAR@134..143 " ::vector"
+              WHITESPACE@134..135 " "
+              YAML_FLOW_SEQUENCE_ITEM@135..143
+                YAML_COLON@135..136 ":"
+                YAML_COLON@136..137 ":"
+                YAML_SCALAR@137..143 "vector"
               YAML_SCALAR@143..144 ","
-              YAML_SCALAR@144..145 "\n"
-              YAML_SCALAR@145..145 ""
+              NEWLINE@144..145 "\n"
               WHITESPACE@145..147 "  "
               YAML_FLOW_SEQUENCE_ITEM@147..155
                 YAML_SCALAR@147..155 "\": - ()\""
               YAML_SCALAR@155..156 ","
-              YAML_SCALAR@156..157 "\n"
+              NEWLINE@156..157 "\n"
               WHITESPACE@157..159 "  "
               YAML_FLOW_SEQUENCE_ITEM@159..177
                 YAML_SCALAR@159..177 "\"Up, up and away!\""
               YAML_SCALAR@177..178 ","
-              YAML_SCALAR@178..179 "\n"
+              NEWLINE@178..179 "\n"
               WHITESPACE@179..181 "  "
               YAML_FLOW_SEQUENCE_ITEM@181..185
                 YAML_SCALAR@181..185 "-123"
               YAML_SCALAR@185..186 ","
-              YAML_SCALAR@186..187 "\n"
+              NEWLINE@186..187 "\n"
               WHITESPACE@187..189 "  "
               YAML_FLOW_SEQUENCE_ITEM@189..216
                 YAML_SCALAR@189..216 "http://example.com/fo ..."

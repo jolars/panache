@@ -12,21 +12,21 @@ DOCUMENT@0..18
     YAML_STREAM@0..18
       YAML_DOCUMENT@0..18
         YAML_BLOCK_MAP@0..18
-          YAML_BLOCK_MAP_ENTRY@0..7
+          YAML_BLOCK_MAP_ENTRY@0..9
             YAML_BLOCK_MAP_KEY@0..4
-              YAML_KEY@0..3 "one"
+              YAML_SCALAR@0..3 "one"
               YAML_COLON@3..4 ":"
-            YAML_BLOCK_MAP_VALUE@4..6
+            YAML_BLOCK_MAP_VALUE@4..9
               WHITESPACE@4..5 " "
               YAML_SCALAR@5..6 "2"
-            NEWLINE@6..7 "\n"
-          NEWLINE@7..8 "\n"
-          NEWLINE@8..9 "\n"
+              NEWLINE@6..7 "\n"
+              NEWLINE@7..8 "\n"
+              NEWLINE@8..9 "\n"
           YAML_BLOCK_MAP_ENTRY@9..18
             YAML_BLOCK_MAP_KEY@9..15
-              YAML_KEY@9..14 "three"
+              YAML_SCALAR@9..14 "three"
               YAML_COLON@14..15 ":"
-            YAML_BLOCK_MAP_VALUE@15..17
+            YAML_BLOCK_MAP_VALUE@15..18
               WHITESPACE@15..16 " "
               YAML_SCALAR@16..17 "4"
-            NEWLINE@17..18 "\n"
+              NEWLINE@17..18 "\n"

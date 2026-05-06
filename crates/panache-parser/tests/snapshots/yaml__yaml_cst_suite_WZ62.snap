@@ -11,29 +11,28 @@ DOCUMENT@0..34
   YAML_METADATA_CONTENT@0..34
     YAML_STREAM@0..34
       YAML_DOCUMENT@0..34
-        YAML_BLOCK_MAP@0..34
-          YAML_FLOW_MAP@0..33
-            YAML_SCALAR@0..1 "{"
-            YAML_SCALAR@1..2 "\n"
-            YAML_SCALAR@2..2 ""
-            WHITESPACE@2..4 "  "
-            YAML_FLOW_MAP_ENTRY@4..15
-              YAML_FLOW_MAP_KEY@4..9
-                YAML_KEY@4..8 "foo "
-                YAML_COLON@8..9 ":"
-              YAML_FLOW_MAP_VALUE@9..15
-                YAML_SCALAR@9..15 " !!str"
-            YAML_SCALAR@15..16 ","
-            YAML_SCALAR@16..17 "\n"
-            WHITESPACE@17..19 "  "
-            YAML_FLOW_MAP_ENTRY@19..30
-              YAML_FLOW_MAP_KEY@19..26
-                YAML_KEY@19..25 "!!str "
-                YAML_COLON@25..26 ":"
-              YAML_FLOW_MAP_VALUE@26..30
-                YAML_SCALAR@26..30 " bar"
-            YAML_SCALAR@30..31 ","
-            YAML_SCALAR@31..32 "\n"
-            YAML_SCALAR@32..32 ""
-            YAML_SCALAR@32..33 "}"
-          NEWLINE@33..34 "\n"
+        YAML_FLOW_MAP@0..33
+          YAML_SCALAR@0..1 "{"
+          NEWLINE@1..2 "\n"
+          WHITESPACE@2..4 "  "
+          YAML_FLOW_MAP_ENTRY@4..15
+            YAML_FLOW_MAP_KEY@4..9
+              YAML_SCALAR@4..8 "foo "
+              YAML_COLON@8..9 ":"
+            YAML_FLOW_MAP_VALUE@9..15
+              WHITESPACE@9..10 " "
+              YAML_SCALAR@10..15 "!!str"
+          YAML_SCALAR@15..16 ","
+          NEWLINE@16..17 "\n"
+          WHITESPACE@17..19 "  "
+          YAML_FLOW_MAP_ENTRY@19..30
+            YAML_FLOW_MAP_KEY@19..26
+              YAML_SCALAR@19..25 "!!str "
+              YAML_COLON@25..26 ":"
+            YAML_FLOW_MAP_VALUE@26..30
+              WHITESPACE@26..27 " "
+              YAML_SCALAR@27..30 "bar"
+          YAML_SCALAR@30..31 ","
+          NEWLINE@31..32 "\n"
+          YAML_SCALAR@32..33 "}"
+        NEWLINE@33..34 "\n"

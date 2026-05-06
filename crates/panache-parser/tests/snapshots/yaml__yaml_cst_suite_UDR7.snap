@@ -14,41 +14,47 @@ DOCUMENT@0..59
         YAML_BLOCK_MAP@0..59
           YAML_BLOCK_MAP_ENTRY@0..24
             YAML_BLOCK_MAP_KEY@0..9
-              YAML_KEY@0..8 "sequence"
+              YAML_SCALAR@0..8 "sequence"
               YAML_COLON@8..9 ":"
-            YAML_BLOCK_MAP_VALUE@9..23
+            YAML_BLOCK_MAP_VALUE@9..24
               WHITESPACE@9..10 " "
               YAML_FLOW_SEQUENCE@10..23
                 YAML_SCALAR@10..11 "["
-                YAML_FLOW_SEQUENCE_ITEM@11..15
-                  YAML_SCALAR@11..15 " one"
+                WHITESPACE@11..12 " "
+                YAML_FLOW_SEQUENCE_ITEM@12..15
+                  YAML_SCALAR@12..15 "one"
                 YAML_SCALAR@15..16 ","
-                YAML_FLOW_SEQUENCE_ITEM@16..20
-                  YAML_SCALAR@16..20 " two"
+                WHITESPACE@16..17 " "
+                YAML_FLOW_SEQUENCE_ITEM@17..20
+                  YAML_SCALAR@17..20 "two"
                 YAML_SCALAR@20..21 ","
-                YAML_SCALAR@21..22 " "
+                WHITESPACE@21..22 " "
                 YAML_SCALAR@22..23 "]"
-            NEWLINE@23..24 "\n"
+              NEWLINE@23..24 "\n"
           YAML_BLOCK_MAP_ENTRY@24..59
             YAML_BLOCK_MAP_KEY@24..32
-              YAML_KEY@24..31 "mapping"
+              YAML_SCALAR@24..31 "mapping"
               YAML_COLON@31..32 ":"
-            YAML_BLOCK_MAP_VALUE@32..58
+            YAML_BLOCK_MAP_VALUE@32..59
               WHITESPACE@32..33 " "
               YAML_FLOW_MAP@33..58
                 YAML_SCALAR@33..34 "{"
-                YAML_FLOW_MAP_ENTRY@34..44
-                  YAML_FLOW_MAP_KEY@34..39
-                    YAML_KEY@34..38 " sky"
+                WHITESPACE@34..35 " "
+                YAML_SCALAR@35..38 "sky"
+                YAML_FLOW_MAP_ENTRY@38..44
+                  YAML_FLOW_MAP_KEY@38..39
                     YAML_COLON@38..39 ":"
                   YAML_FLOW_MAP_VALUE@39..44
-                    YAML_SCALAR@39..44 " blue"
+                    WHITESPACE@39..40 " "
+                    YAML_SCALAR@40..44 "blue"
                 YAML_SCALAR@44..45 ","
-                YAML_FLOW_MAP_ENTRY@45..57
-                  YAML_FLOW_MAP_KEY@45..50
-                    YAML_KEY@45..49 " sea"
+                WHITESPACE@45..46 " "
+                YAML_FLOW_MAP_ENTRY@46..57
+                  YAML_FLOW_MAP_KEY@46..50
+                    YAML_SCALAR@46..49 "sea"
                     YAML_COLON@49..50 ":"
                   YAML_FLOW_MAP_VALUE@50..57
-                    YAML_SCALAR@50..57 " green "
+                    WHITESPACE@50..51 " "
+                    YAML_SCALAR@51..57 "green "
                 YAML_SCALAR@57..58 "}"
-            NEWLINE@58..59 "\n"
+              NEWLINE@58..59 "\n"

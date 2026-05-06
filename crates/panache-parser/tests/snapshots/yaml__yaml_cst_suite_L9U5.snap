@@ -14,20 +14,21 @@ DOCUMENT@0..55
         YAML_BLOCK_MAP@0..55
           YAML_BLOCK_MAP_ENTRY@0..55
             YAML_BLOCK_MAP_KEY@0..20
-              YAML_KEY@0..19 "implicit block key "
+              YAML_SCALAR@0..19 "implicit block key "
               YAML_COLON@19..20 ":"
-            YAML_BLOCK_MAP_VALUE@20..54
+            YAML_BLOCK_MAP_VALUE@20..55
               WHITESPACE@20..21 " "
               YAML_FLOW_SEQUENCE@21..54
                 YAML_SCALAR@21..22 "["
-                YAML_SCALAR@22..23 "\n"
-                YAML_SCALAR@23..23 ""
+                NEWLINE@22..23 "\n"
                 WHITESPACE@23..25 "  "
                 YAML_FLOW_SEQUENCE_ITEM@25..50
-                  YAML_SCALAR@25..50 "implicit flow key : v ..."
+                  YAML_SCALAR@25..43 "implicit flow key "
+                  YAML_COLON@43..44 ":"
+                  WHITESPACE@44..45 " "
+                  YAML_SCALAR@45..50 "value"
                 YAML_SCALAR@50..51 ","
-                YAML_SCALAR@51..52 "\n"
-                YAML_SCALAR@52..52 ""
+                NEWLINE@51..52 "\n"
                 WHITESPACE@52..53 " "
                 YAML_SCALAR@53..54 "]"
-            NEWLINE@54..55 "\n"
+              NEWLINE@54..55 "\n"

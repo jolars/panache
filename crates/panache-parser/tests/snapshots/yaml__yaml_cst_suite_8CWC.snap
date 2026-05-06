@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 278
 expression: snapshot
 ---
 case_id: 8CWC
@@ -17,9 +16,9 @@ DOCUMENT@0..38
         YAML_BLOCK_MAP@4..38
           YAML_BLOCK_MAP_ENTRY@4..38
             YAML_BLOCK_MAP_KEY@4..31
-              YAML_KEY@4..30 "key ends with two col ..."
+              YAML_SCALAR@4..30 "key ends with two col ..."
               YAML_COLON@30..31 ":"
-            YAML_BLOCK_MAP_VALUE@31..37
+            YAML_BLOCK_MAP_VALUE@31..38
               WHITESPACE@31..32 " "
               YAML_SCALAR@32..37 "value"
-            NEWLINE@37..38 "\n"
+              NEWLINE@37..38 "\n"

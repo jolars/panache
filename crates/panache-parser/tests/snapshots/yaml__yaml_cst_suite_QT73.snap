@@ -12,5 +12,6 @@ DOCUMENT@0..14
     YAML_STREAM@0..14
       YAML_COMMENT@0..9 "# comment"
       NEWLINE@9..10 "\n"
-      YAML_DOCUMENT_END@10..13 "..."
+      YAML_DOCUMENT@10..13
+        YAML_DOCUMENT_END@10..13 "..."
       NEWLINE@13..14 "\n"

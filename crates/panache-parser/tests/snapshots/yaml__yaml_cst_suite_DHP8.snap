@@ -11,16 +11,17 @@ DOCUMENT@0..15
   YAML_METADATA_CONTENT@0..15
     YAML_STREAM@0..15
       YAML_DOCUMENT@0..15
-        YAML_BLOCK_MAP@0..15
-          YAML_FLOW_SEQUENCE@0..14
-            YAML_SCALAR@0..1 "["
-            YAML_FLOW_SEQUENCE_ITEM@1..4
-              YAML_SCALAR@1..4 "foo"
-            YAML_SCALAR@4..5 ","
-            YAML_FLOW_SEQUENCE_ITEM@5..9
-              YAML_SCALAR@5..9 " bar"
-            YAML_SCALAR@9..10 ","
-            YAML_FLOW_SEQUENCE_ITEM@10..13
-              YAML_SCALAR@10..13 " 42"
-            YAML_SCALAR@13..14 "]"
-          NEWLINE@14..15 "\n"
+        YAML_FLOW_SEQUENCE@0..14
+          YAML_SCALAR@0..1 "["
+          YAML_FLOW_SEQUENCE_ITEM@1..4
+            YAML_SCALAR@1..4 "foo"
+          YAML_SCALAR@4..5 ","
+          WHITESPACE@5..6 " "
+          YAML_FLOW_SEQUENCE_ITEM@6..9
+            YAML_SCALAR@6..9 "bar"
+          YAML_SCALAR@9..10 ","
+          WHITESPACE@10..11 " "
+          YAML_FLOW_SEQUENCE_ITEM@11..13
+            YAML_SCALAR@11..13 "42"
+          YAML_SCALAR@13..14 "]"
+        NEWLINE@14..15 "\n"
