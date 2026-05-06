@@ -24,16 +24,16 @@ LSP role.
 ### Roles
 
   | Tool              | Formatter | Linter | LSP | Implementation |
-  | ----------------- | :-------: | :----: | :-: | -------------- |
-  | Panache           |     ●     |   ●    |  ●  | Rust           |
-  | mado              |     ○     |   ●    |  ○  | Rust           |
-  | markdownlint      |     ○     |   ●    |  ○  | Ruby           |
-  | markdownlint-cli2 |   ◐[^1]   |   ●    |  ○  | JavaScript     |
-  | marksman          |     ○     | ◐[^2]  |  ●  | F# / .NET      |
-  | mdformat          |     ●     |   ○    |  ○  | Python         |
-  | Pandoc            |   ◐[^3]   |   ○    |  ○  | Haskell        |
-  | Prettier          |     ●     |   ○    |  ○  | JavaScript     |
-  | rumdl             |   ◐[^4]   |   ●    |  ●  | Rust           |
+  | ----------------- | :-------- | :----- | :-- | -------------- |
+  | Panache           | ●         | ●      | ●   | Rust           |
+  | mado              | ○         | ●      | ○   | Rust           |
+  | markdownlint      | ○         | ●      | ○   | Ruby           |
+  | markdownlint-cli2 | ◐[^1]     | ●      | ○   | JavaScript     |
+  | marksman          | ○         | ◐[^2]  | ●   | F# / .NET      |
+  | mdformat          | ●         | ○      | ○   | Python         |
+  | Pandoc            | ◐[^3]     | ○      | ○   | Haskell        |
+  | Prettier          | ●         | ○      | ○   | JavaScript     |
+  | rumdl             | ◐[^4]     | ●      | ●   | Rust           |
 
   : Tooling roles covered by each project. Marks: ● full, ◐ partial, ○ none.
 
