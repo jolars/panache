@@ -305,3 +305,5 @@ RR7F
 L94M
 # Explicit-key block-map entry with a comment line between the `? key` and `: value` lines.
 X8DW
+# Multi-document stream where each `---` marker carries a type-tag shorthand (`!!map` / `!!seq` / `!!str`); covers tagged maps, tagged sequences, and tagged plain scalars folded across multiple lines.
+35KP

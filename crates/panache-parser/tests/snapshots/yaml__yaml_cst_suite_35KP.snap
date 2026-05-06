@@ -1,0 +1,45 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: 35KP
+input: "--- !!map\n? a\n: b\n--- !!seq\n- !!str c\n--- !!str\nd\ne\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..52
+  YAML_METADATA_CONTENT@0..52
+    YAML_STREAM@0..52
+      YAML_DOCUMENT@0..18
+        YAML_DOCUMENT_START@0..3 "---"
+        WHITESPACE@3..4 " "
+        YAML_SCALAR@4..9 "!!map"
+        NEWLINE@9..10 "\n"
+        YAML_BLOCK_MAP@10..18
+          YAML_BLOCK_MAP_ENTRY@10..18
+            YAML_BLOCK_MAP_KEY@10..15
+              YAML_KEY@10..11 "?"
+              WHITESPACE@11..12 " "
+              YAML_SCALAR@12..13 "a"
+              NEWLINE@13..14 "\n"
+              YAML_COLON@14..15 ":"
+            YAML_BLOCK_MAP_VALUE@15..18
+              WHITESPACE@15..16 " "
+              YAML_SCALAR@16..17 "b"
+              NEWLINE@17..18 "\n"
+      YAML_DOCUMENT@18..38
+        YAML_DOCUMENT_START@18..21 "---"
+        WHITESPACE@21..22 " "
+        YAML_SCALAR@22..27 "!!seq"
+        NEWLINE@27..28 "\n"
+        YAML_BLOCK_SEQUENCE@28..38
+          YAML_BLOCK_SEQUENCE_ITEM@28..38
+            YAML_BLOCK_SEQ_ENTRY@28..29 "-"
+            WHITESPACE@29..30 " "
+            YAML_SCALAR@30..37 "!!str c"
+            NEWLINE@37..38 "\n"
+      YAML_DOCUMENT@38..52
+        YAML_DOCUMENT_START@38..41 "---"
+        WHITESPACE@41..42 " "
+        YAML_SCALAR@42..51 "!!str\nd\ne"
+        NEWLINE@51..52 "\n"
