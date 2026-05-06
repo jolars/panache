@@ -1164,74 +1164,201 @@ fn fold_plain_scalar(text: &str) -> String {
 }
 
 fn project_flow_map_entries(flow_map: &SyntaxNode, handles: &TagHandles, out: &mut Vec<String>) {
-    for entry in flow_map
+    // Walk the flow_map's children left-to-right, tracking any orphan
+    // scalar text (`pending`) that sits between entries. A scalar that
+    // isn't enclosed in a `YAML_FLOW_MAP_ENTRY` reaches us in two
+    // shapes:
+    //
+    //   1. A multi-line plain scalar that the v2 scanner couldn't
+    //      register as a simple-key candidate before the `:` arrived
+    //      (NJ66, ZF4X, UDR7's `sky`, 8KB6, ...). In that case the
+    //      following entry has an empty `KEY` (just the `:`), and the
+    //      orphan IS the key — we merge them.
+    //
+    //   2. A standalone scalar with no `:` at all (`{a, b: c}` shape;
+    //      8KB6's `single line, ...`). YAML 1.2 says this is a key with
+    //      an implicit empty value, projecting as `=VAL :a` then
+    //      `=VAL :`.
+    //
+    // Both shapes resolve to flushing `pending` either as the key of
+    // the next empty-key entry or as a value-less standalone entry
+    // (when we hit a `,` or `}` before a matching empty-key entry).
+    let mut pending = String::new();
+    let mut pending_has_content = false;
+    for child in flow_map.children_with_tokens() {
+        match child {
+            rowan::NodeOrToken::Token(tok) => match tok.kind() {
+                SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::YAML_COMMENT => {
+                    if pending_has_content {
+                        pending.push_str(tok.text());
+                    }
+                }
+                SyntaxKind::YAML_SCALAR => {
+                    let text = tok.text();
+                    match text {
+                        "{" | "}" => {}
+                        "," => {
+                            if pending_has_content {
+                                flush_pending_orphan(&pending, handles, out);
+                                pending.clear();
+                                pending_has_content = false;
+                            }
+                        }
+                        _ => {
+                            pending.push_str(text);
+                            pending_has_content = true;
+                        }
+                    }
+                }
+                SyntaxKind::YAML_KEY => {
+                    pending.push_str(tok.text());
+                    pending_has_content = true;
+                }
+                _ => {}
+            },
+            rowan::NodeOrToken::Node(entry) if entry.kind() == SyntaxKind::YAML_FLOW_MAP_ENTRY => {
+                project_flow_map_entry(
+                    &entry,
+                    if pending_has_content {
+                        Some(pending.as_str())
+                    } else {
+                        None
+                    },
+                    handles,
+                    out,
+                );
+                pending.clear();
+                pending_has_content = false;
+            }
+            _ => {}
+        }
+    }
+    if pending_has_content {
+        flush_pending_orphan(&pending, handles, out);
+    }
+}
+
+/// Flush an orphan scalar that wasn't followed by a matching
+/// empty-key entry. YAML 1.2 treats this as an implicit-value entry
+/// (`{a, b: c}` ≡ `{a: ~, b: c}`), so the projection emits the key
+/// then an empty value.
+fn flush_pending_orphan(pending: &str, handles: &TagHandles, out: &mut Vec<String>) {
+    let trimmed = pending.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    if trimmed.starts_with('"') || trimmed.starts_with('\'') {
+        out.push(quoted_val_event(trimmed));
+    } else {
+        let folded = fold_plain_scalar(trimmed);
+        let stripped = strip_explicit_key_indicator(&folded);
+        if stripped.is_empty() {
+            out.push("=VAL :".to_string());
+        } else {
+            // Resolve a leading anchor/tag/handle on the orphan key the
+            // same way `flow_scalar_event` does for in-entry scalars.
+            out.push(flow_scalar_event(stripped, handles));
+        }
+    }
+    out.push("=VAL :".to_string());
+}
+
+fn project_flow_map_entry(
+    entry: &SyntaxNode,
+    external_key: Option<&str>,
+    handles: &TagHandles,
+    out: &mut Vec<String>,
+) {
+    let key_node = entry
         .children()
-        .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_ENTRY)
+        .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_KEY)
+        .expect("flow map key");
+    let value_node = entry
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_VALUE)
+        .expect("flow map value");
+
+    let has_explicit_colon = key_node
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .any(|tok| tok.kind() == SyntaxKind::YAML_COLON);
+    let key_has_content = key_node
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .any(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_KEY));
+
+    // Include WHITESPACE / NEWLINE so v2's separately-emitted `?`
+    // (`YAML_KEY`) and key scalar (`YAML_SCALAR`) keep the original
+    // trivia between them, letting `strip_explicit_key_indicator`
+    // recognize the `?<sp>` pattern. v1 emitted both as a single
+    // `YAML_KEY` token so the join was already a no-op there.
+    let mut raw_key = key_node
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|tok| {
+            matches!(
+                tok.kind(),
+                SyntaxKind::YAML_SCALAR
+                    | SyntaxKind::YAML_KEY
+                    | SyntaxKind::WHITESPACE
+                    | SyntaxKind::NEWLINE
+            )
+        })
+        .map(|tok| tok.text().to_string())
+        .collect::<Vec<_>>()
+        .join("");
+
+    // External key prepends only when the entry's own key is empty
+    // (the v2-scanner orphan-merge case): the orphan provides the key
+    // bytes, the entry just contributes the `:` and the value.
+    if let Some(ext) = external_key
+        && !key_has_content
     {
-        let key_node = entry
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_KEY)
-            .expect("flow map key");
-        let value_node = entry
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_VALUE)
-            .expect("flow map value");
+        raw_key = format!("{ext}{raw_key}");
+    } else if let Some(ext) = external_key {
+        // Pending was non-empty but this entry already has a real
+        // key — flush pending as a standalone implicit-value entry
+        // first so neither side gets dropped.
+        flush_pending_orphan(ext, handles, out);
+    }
 
-        let has_explicit_colon = key_node
-            .children_with_tokens()
-            .filter_map(|el| el.into_token())
-            .any(|tok| tok.kind() == SyntaxKind::YAML_COLON);
-
-        // Include WHITESPACE / NEWLINE so v2's separately-emitted `?`
-        // (`YAML_KEY`) and key scalar (`YAML_SCALAR`) keep the original
-        // trivia between them, letting `strip_explicit_key_indicator`
-        // recognize the `?<sp>` pattern. v1 emitted both as a single
-        // `YAML_KEY` token so the join was already a no-op there.
-        let raw_key = key_node
+    if has_explicit_colon {
+        // Strip the explicit-key `?` indicator (`{ ? foo : v }`) from
+        // the projected key text. A bare `? :` entry (key reduces to
+        // empty after stripping) projects to an empty `=VAL :`.
+        let key_for_classify = raw_key.trim();
+        let stripped_key = strip_explicit_key_indicator(key_for_classify);
+        if stripped_key.is_empty() {
+            out.push("=VAL :".to_string());
+        } else if stripped_key.starts_with('"') || stripped_key.starts_with('\'') {
+            out.push(quoted_val_event(stripped_key));
+        } else {
+            // Multi-line plain key text needs folding before
+            // resolution; flow_scalar_event does it for plain text but
+            // bypasses folding when the input contains explicit tag
+            // bytes — handle the plain branch here so multi-line
+            // orphans collapse to a single line.
+            let folded = fold_plain_scalar(stripped_key);
+            out.push(flow_scalar_event(&folded, handles));
+        }
+        project_flow_map_value(&value_node, handles, out);
+    } else {
+        let raw_value = value_node
             .descendants_with_tokens()
             .filter_map(|el| el.into_token())
-            .filter(|tok| {
-                matches!(
-                    tok.kind(),
-                    SyntaxKind::YAML_SCALAR
-                        | SyntaxKind::YAML_KEY
-                        | SyntaxKind::WHITESPACE
-                        | SyntaxKind::NEWLINE
-                )
-            })
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
             .map(|tok| tok.text().to_string())
             .collect::<Vec<_>>()
             .join("");
-
-        if has_explicit_colon {
-            // Strip the explicit-key `?` indicator (`{ ? foo : v }`) from
-            // the projected key text. A bare `? :` entry (key reduces to
-            // empty after stripping) projects to an empty `=VAL :`.
-            let stripped_key = strip_explicit_key_indicator(raw_key.trim());
-            if stripped_key.is_empty() {
-                out.push("=VAL :".to_string());
-            } else {
-                out.push(flow_scalar_event(stripped_key, handles));
-            }
-            project_flow_map_value(&value_node, handles, out);
-        } else {
-            let raw_value = value_node
-                .descendants_with_tokens()
-                .filter_map(|el| el.into_token())
-                .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
-                .map(|tok| tok.text().to_string())
-                .collect::<Vec<_>>()
-                .join("");
-            let combined = format!("{raw_key}{raw_value}");
-            let folded = fold_plain_scalar(&combined);
-            let stripped = strip_explicit_key_indicator(&folded);
-            if stripped.is_empty() {
-                out.push("=VAL :".to_string());
-            } else {
-                out.push(plain_val_event(stripped));
-            }
+        let combined = format!("{raw_key}{raw_value}");
+        let folded = fold_plain_scalar(&combined);
+        let stripped = strip_explicit_key_indicator(&folded);
+        if stripped.is_empty() {
             out.push("=VAL :".to_string());
+        } else {
+            out.push(plain_val_event(stripped));
         }
+        out.push("=VAL :".to_string());
     }
 }
 
