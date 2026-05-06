@@ -2233,6 +2233,77 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
     project_block_map_entry_value(&value_node, handles, out);
 }
 
+/// W5VH support: detect the shape where a YAML_BLOCK_MAP_VALUE's leading
+/// YAML_SCALAR begins with `&` (anchor) or `*` (alias) and is immediately
+/// followed — with no whitespace — by a YAML_BLOCK_MAP whose first entry
+/// has an empty key. The scanner consumed the boundary `:` as a value
+/// indicator, but yaml-test-suite considers it part of the anchor/alias
+/// name. Returns the projected events (`=VAL` / `=ALI`) when the shape
+/// matches, or `None` otherwise.
+fn rebuild_anchor_alias_with_trailing_colon(
+    value_node: &SyntaxNode,
+    nested_map: &SyntaxNode,
+    _handles: &TagHandles,
+) -> Option<Vec<String>> {
+    let scalar = value_node
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .find(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)?;
+    let text = scalar.text();
+    if !(text.starts_with('&') || text.starts_with('*')) {
+        return None;
+    }
+    if scalar.text_range().end() != nested_map.text_range().start() {
+        return None;
+    }
+    // Anchor/alias names are bounded by whitespace. If the scalar text
+    // after the leading `&`/`*` contains a whitespace boundary, the
+    // scalar isn't a single anchor/alias-with-trailing-colon — it's the
+    // 26DV shape (`&node3 \n  *alias1`) handled by the residual-splice
+    // path above. Skip the rebuild here to keep that path active.
+    let body = &text[1..];
+    if body.is_empty() || body.chars().any(char::is_whitespace) {
+        return None;
+    }
+    let mut entries = nested_map
+        .children()
+        .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY);
+    let first_entry = entries.next()?;
+    if entries.next().is_some() {
+        return None;
+    }
+    if !block_map_entry_key_is_empty(&first_entry) {
+        return None;
+    }
+
+    let inner_value_node = first_entry
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE);
+    let body_text = inner_value_node
+        .as_ref()
+        .map(|v| {
+            v.descendants_with_tokens()
+                .filter_map(|el| el.into_token())
+                .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+                .map(|tok| tok.text().to_string())
+                .collect::<Vec<_>>()
+                .join("")
+        })
+        .unwrap_or_default();
+    let body_trimmed = body_text.trim();
+
+    if let Some(rest) = text.strip_prefix('*') {
+        if !body_trimmed.is_empty() {
+            return None;
+        }
+        return Some(vec![format!("=ALI *{rest}:")]);
+    }
+
+    let anchor_name = text.strip_prefix('&')?;
+    let composed = format!("&{anchor_name}:");
+    Some(vec![scalar_event(Some(&composed[1..]), None, body_trimmed)])
+}
+
 fn project_block_map_entry_value(
     value_node: &SyntaxNode,
     handles: &TagHandles,
@@ -2242,6 +2313,21 @@ fn project_block_map_entry_value(
         .children()
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
     {
+        // W5VH: an anchor or alias whose name contains a literal `:`
+        // (`&:@*!$"<foo>:` / `*:@*!$"<foo>:`) lands in the v2 CST as a
+        // YAML_SCALAR ending in `<foo>` followed by a YAML_BLOCK_MAP
+        // starting at the colon that the scanner mistakenly read as a
+        // value indicator. yaml-test-suite includes the trailing colon
+        // in the anchor/alias name, so reconstruct that here when the
+        // shape matches: scalar starts with `&`/`*`, the nested map
+        // starts at the scalar's exact end byte, and the nested map's
+        // single entry has an empty key.
+        if let Some(rebuilt) =
+            rebuild_anchor_alias_with_trailing_colon(value_node, &nested_map, handles)
+        {
+            out.extend(rebuilt);
+            return;
+        }
         // 26DV: a value scalar like `&node3 \n  *alias1 ` lands as a
         // single YAML_SCALAR before the nested YAML_BLOCK_MAP. Strip the
         // anchor name, then splice any residual text (e.g. `*alias1`) in
