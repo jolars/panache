@@ -537,11 +537,9 @@
     },
     {
       "case_id": "2JQS",
-      "diagnostic_codes": [
-        "YAML_LEX_ERROR"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "2LFX",
@@ -561,11 +559,9 @@
     },
     {
       "case_id": "35KP",
-      "diagnostic_codes": [
-        "YAML_LEX_ERROR"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "36F6",
@@ -658,7 +654,7 @@
     {
       "case_id": "5WE3",
       "diagnostic_codes": [
-        "YAML_LEX_ERROR"
+        "YAML_PARSE_UNEXPECTED_INDENT"
       ],
       "event_parity": false,
       "tree": false
@@ -703,11 +699,9 @@
     },
     {
       "case_id": "6M2F",
-      "diagnostic_codes": [
-        "YAML_LEX_ERROR"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "6PBE",
@@ -838,7 +832,7 @@
     {
       "case_id": "A2M4",
       "diagnostic_codes": [
-        "YAML_LEX_ERROR"
+        "YAML_PARSE_UNEXPECTED_INDENT"
       ],
       "event_parity": false,
       "tree": false
@@ -988,14 +982,6 @@
       "tree": false
     },
     {
-      "case_id": "GH63",
-      "diagnostic_codes": [
-        "YAML_LEX_ERROR"
-      ],
-      "event_parity": false,
-      "tree": false
-    },
-    {
       "case_id": "H2RW",
       "diagnostic_codes": [
         "YAML_LEX_ERROR"
@@ -1038,7 +1024,7 @@
     {
       "case_id": "JTV5",
       "diagnostic_codes": [
-        "YAML_LEX_ERROR"
+        "YAML_PARSE_UNEXPECTED_INDENT"
       ],
       "event_parity": false,
       "tree": false
@@ -1061,14 +1047,6 @@
     },
     {
       "case_id": "KK5P",
-      "diagnostic_codes": [
-        "YAML_LEX_ERROR"
-      ],
-      "event_parity": false,
-      "tree": false
-    },
-    {
-      "case_id": "L94M",
       "diagnostic_codes": [
         "YAML_LEX_ERROR"
       ],
@@ -1222,7 +1200,7 @@
     {
       "case_id": "PW8X",
       "diagnostic_codes": [
-        "YAML_LEX_ERROR"
+        "YAML_PARSE_INVALID_KEY_TOKEN"
       ],
       "event_parity": false,
       "tree": false
@@ -1276,14 +1254,6 @@
       "tree": false
     },
     {
-      "case_id": "RR7F",
-      "diagnostic_codes": [
-        "YAML_LEX_ERROR"
-      ],
-      "event_parity": false,
-      "tree": false
-    },
-    {
       "case_id": "RTP8",
       "diagnostic_codes": [
         "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_END"
@@ -1318,7 +1288,7 @@
     {
       "case_id": "S9E8",
       "diagnostic_codes": [
-        "YAML_LEX_ERROR"
+        "YAML_PARSE_INVALID_KEY_TOKEN"
       ],
       "event_parity": false,
       "tree": false
@@ -1381,11 +1351,9 @@
     },
     {
       "case_id": "V9D5",
-      "diagnostic_codes": [
-        "YAML_LEX_ERROR"
-      ],
-      "event_parity": false,
-      "tree": false
+      "diagnostic_codes": [],
+      "event_parity": null,
+      "tree": true
     },
     {
       "case_id": "W42U",
@@ -1407,14 +1375,6 @@
       "case_id": "X38W",
       "diagnostic_codes": [
         "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END"
-      ],
-      "event_parity": false,
-      "tree": false
-    },
-    {
-      "case_id": "X8DW",
-      "diagnostic_codes": [
-        "YAML_LEX_ERROR"
       ],
       "event_parity": false,
       "tree": false
@@ -1539,6 +1499,7 @@
     "FTA2",
     "G4RS",
     "G992",
+    "GH63",
     "H3Z8",
     "HMK4",
     "HWV9",
@@ -1555,6 +1516,7 @@
     "KMK3",
     "KSS4",
     "L383",
+    "L94M",
     "L9U5",
     "LE5A",
     "LP6E",
@@ -1568,6 +1530,7 @@
     "Q88A",
     "QF4Y",
     "QT73",
+    "RR7F",
     "S4JQ",
     "S4T7",
     "S7BG",
@@ -1585,6 +1548,7 @@
     "V55R",
     "W5VH",
     "WZ62",
+    "X8DW",
     "XV9V",
     "Y2GN",
     "YD5X",
@@ -1596,8 +1560,8 @@
   "summary": {
     "error_contract_ok_count": 55,
     "fails_needs_error_path_count": 23,
-    "fails_needs_feature_count": 116,
-    "passes_now_count": 139,
+    "fails_needs_feature_count": 112,
+    "passes_now_count": 143,
     "total_cases": 352
   }
 }

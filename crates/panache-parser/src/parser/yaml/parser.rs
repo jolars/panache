@@ -739,6 +739,35 @@ fn emit_block_map<'a>(
                     *i += 1;
                 }
             }
+            // `: value` line — value half of an explicit-key entry. The
+            // matching `? key` was absorbed earlier by the Scalar arm
+            // above; here we just dump the colon plus the trailing tokens
+            // (whitespace, scalar, tag, comment) so the projection can
+            // pair them up. Any deeper structure (multi-line block scalar,
+            // nested sequence/map after the colon) is out of scope for
+            // the simple flat case and would route through the regular
+            // entry path instead.
+            YamlToken::Colon => {
+                builder.token(SyntaxKind::YAML_COLON.into(), tokens[*i].text);
+                *i += 1;
+                while *i < tokens.len() && tokens[*i].kind != YamlToken::Newline {
+                    match tokens[*i].kind {
+                        YamlToken::FlowMapEnd | YamlToken::FlowSeqEnd => {
+                            return Err(diag_at_token(
+                                &tokens[*i],
+                                diagnostic_codes::PARSE_UNEXPECTED_FLOW_CLOSER,
+                                "unexpected flow closing token",
+                            ));
+                        }
+                        YamlToken::FlowMapStart => emit_flow_map(builder, tokens, i)?,
+                        YamlToken::FlowSeqStart => emit_flow_sequence(builder, tokens, i)?,
+                        _ => {
+                            emit_token_as_yaml(builder, &tokens[*i]);
+                            *i += 1;
+                        }
+                    }
+                }
+            }
             YamlToken::Indent => {
                 return Err(diag_at_token(
                     &tokens[*i],

@@ -1674,25 +1674,98 @@ fn scalar_event(anchor: Option<&str>, long_tag: Option<&str>, body: &str) -> Str
 }
 
 fn project_block_map_entries(map_node: &SyntaxNode, handles: &TagHandles, out: &mut Vec<String>) {
-    for child in map_node.children_with_tokens() {
-        match child {
+    let children: Vec<_> = map_node.children_with_tokens().collect();
+    let mut idx = 0;
+    while idx < children.len() {
+        match &children[idx] {
             rowan::NodeOrToken::Token(tok)
                 if tok.kind() == SyntaxKind::YAML_SCALAR
-                    && tok.text().trim_start().starts_with("? ") =>
+                    && (tok.text().trim_start().starts_with("? ")
+                        || tok.text().trim_start() == "?") =>
             {
-                let body = tok.text().trim_start().trim_start_matches("? ").trim();
+                let body = tok.text().trim_start().trim_start_matches('?').trim();
                 if body.is_empty() {
                     out.push("=VAL :".to_string());
                 } else {
                     let (anchor, body_tag, rest) = decompose_scalar(body, handles);
                     out.push(scalar_event(anchor, body_tag.as_deref(), rest));
                 }
-                out.push("=VAL :".to_string());
+                idx += 1;
+                // Look ahead for the matching `:value` line. Skip
+                // intervening newlines, whitespace, and comments. Stop at
+                // anything else — that means the value is implicitly null.
+                let mut peek = idx;
+                while peek < children.len() {
+                    if let rowan::NodeOrToken::Token(t) = &children[peek] {
+                        if matches!(
+                            t.kind(),
+                            SyntaxKind::NEWLINE | SyntaxKind::WHITESPACE | SyntaxKind::YAML_COMMENT
+                        ) {
+                            peek += 1;
+                            continue;
+                        }
+                        if t.kind() == SyntaxKind::YAML_COLON {
+                            // Colon found: collect value tokens up to the
+                            // next NEWLINE.
+                            let mut value_tag: Option<String> = None;
+                            let mut value_text = String::new();
+                            let mut value_end = peek + 1;
+                            while value_end < children.len() {
+                                if let rowan::NodeOrToken::Token(vt) = &children[value_end] {
+                                    if vt.kind() == SyntaxKind::NEWLINE {
+                                        break;
+                                    }
+                                    if vt.kind() == SyntaxKind::YAML_TAG && value_tag.is_none() {
+                                        value_tag = Some(vt.text().to_string());
+                                    } else if vt.kind() == SyntaxKind::YAML_SCALAR {
+                                        value_text.push_str(vt.text());
+                                    }
+                                    value_end += 1;
+                                } else {
+                                    break;
+                                }
+                            }
+                            let trimmed = value_text.trim();
+                            let value_long_tag = value_tag
+                                .as_deref()
+                                .and_then(|t| resolve_long_tag(t, handles));
+                            if trimmed.is_empty() {
+                                if let Some(long) = value_long_tag {
+                                    out.push(format!("=VAL {long} :"));
+                                } else {
+                                    out.push("=VAL :".to_string());
+                                }
+                            } else if trimmed.starts_with('"') || trimmed.starts_with('\'') {
+                                let quoted = quoted_val_event(trimmed);
+                                if let Some(long) = value_long_tag {
+                                    out.push(quoted.replacen("=VAL ", &format!("=VAL {long} "), 1));
+                                } else {
+                                    out.push(quoted);
+                                }
+                            } else {
+                                let (anchor, body_tag, body) = decompose_scalar(trimmed, handles);
+                                let long_tag = value_long_tag.or(body_tag);
+                                out.push(scalar_event(anchor, long_tag.as_deref(), body));
+                            }
+                            idx = value_end;
+                            break;
+                        }
+                    }
+                    // Non-trivia, non-colon: implicit null value.
+                    out.push("=VAL :".to_string());
+                    break;
+                }
+                if peek >= children.len() {
+                    out.push("=VAL :".to_string());
+                }
             }
             rowan::NodeOrToken::Node(entry) if entry.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY => {
-                project_block_map_entry(&entry, handles, out);
+                project_block_map_entry(entry, handles, out);
+                idx += 1;
             }
-            _ => {}
+            _ => {
+                idx += 1;
+            }
         }
     }
 }

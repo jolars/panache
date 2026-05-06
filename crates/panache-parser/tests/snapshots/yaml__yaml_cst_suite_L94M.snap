@@ -1,0 +1,31 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: L94M
+input: "? !!str a\n: !!int 47\n? c\n: !!str d\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..35
+  YAML_METADATA_CONTENT@0..35
+    YAML_STREAM@0..35
+      YAML_DOCUMENT@0..35
+        YAML_BLOCK_MAP@0..35
+          YAML_SCALAR@0..9 "? !!str a"
+          NEWLINE@9..10 "\n"
+          YAML_COLON@10..11 ":"
+          WHITESPACE@11..12 " "
+          YAML_TAG@12..17 "!!int"
+          WHITESPACE@17..18 " "
+          YAML_SCALAR@18..20 "47"
+          NEWLINE@20..21 "\n"
+          YAML_SCALAR@21..24 "? c"
+          NEWLINE@24..25 "\n"
+          YAML_COLON@25..26 ":"
+          WHITESPACE@26..27 " "
+          YAML_TAG@27..32 "!!str"
+          WHITESPACE@32..33 " "
+          YAML_SCALAR@33..34 "d"
+          NEWLINE@34..35 "\n"

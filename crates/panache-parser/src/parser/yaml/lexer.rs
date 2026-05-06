@@ -749,6 +749,46 @@ fn lex_mapping_line_tokens<'a>(
         if let Some((key_part, rest)) = split_once_unquoted_key_colon(content) {
             let key_trimmed = key_part.trim();
             let rest_no_ws = rest.trim_start_matches([' ', '\t']);
+            // `: value` — value half of an explicit-key entry. The matching
+            // `? key` was tokenized on a previous line; here we just emit
+            // the colon plus the value/comment tokens. The parser pairs
+            // them up at the YAML_BLOCK_MAP level.
+            if key_trimmed.is_empty() && !rest_no_ws.is_empty() && !rest_no_ws.starts_with('#') {
+                push_token(out, YamlToken::Colon, ":");
+                let (value_part, comment_part) = split_value_and_comment(rest);
+                let leading_ws_len = leading_indent(value_part);
+                if leading_ws_len > 0 {
+                    push_token(out, YamlToken::Whitespace, &value_part[..leading_ws_len]);
+                }
+                let scalar_part = &value_part[leading_ws_len..];
+                let (value_tag, value_text) = split_tag_prefix(scalar_part);
+                if let Some(tag) = value_tag {
+                    push_token(out, YamlToken::Tag, tag);
+                    let ws_len = leading_indent(value_text);
+                    if ws_len > 0 {
+                        push_token(out, YamlToken::Whitespace, &value_text[..ws_len]);
+                    }
+                    let tagged_scalar = &value_text[ws_len..];
+                    if !tagged_scalar.is_empty() {
+                        push_token(out, YamlToken::Scalar, tagged_scalar);
+                    }
+                } else if !scalar_part.is_empty() {
+                    emit_scalar_like_tokens(scalar_part, out);
+                }
+                if let Some(comment) = comment_part {
+                    let leading_comment_ws_len = rest.len() - comment.len() - value_part.len();
+                    if leading_comment_ws_len > 0 {
+                        let start = value_part.len();
+                        let end = start + leading_comment_ws_len;
+                        push_token(out, YamlToken::Whitespace, &rest[start..end]);
+                    }
+                    push_token(out, YamlToken::Comment, comment);
+                }
+                if !newline.is_empty() {
+                    push_token(out, YamlToken::Newline, newline);
+                }
+                return Ok(());
+            }
             if !key_trimmed.is_empty() && (rest_no_ws.is_empty() || rest_no_ws.starts_with('#')) {
                 let (key_tag, key_text) = split_tag_prefix(key_part);
                 if let Some(tag) = key_tag {

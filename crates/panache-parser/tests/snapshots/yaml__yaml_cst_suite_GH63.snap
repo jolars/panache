@@ -1,0 +1,29 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: GH63
+input: "? a\n: 1.3\nfifteen: d\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..21
+  YAML_METADATA_CONTENT@0..21
+    YAML_STREAM@0..21
+      YAML_DOCUMENT@0..21
+        YAML_BLOCK_MAP@0..21
+          YAML_SCALAR@0..3 "? a"
+          NEWLINE@3..4 "\n"
+          YAML_COLON@4..5 ":"
+          WHITESPACE@5..6 " "
+          YAML_SCALAR@6..9 "1.3"
+          NEWLINE@9..10 "\n"
+          YAML_BLOCK_MAP_ENTRY@10..21
+            YAML_BLOCK_MAP_KEY@10..18
+              YAML_KEY@10..17 "fifteen"
+              YAML_COLON@17..18 ":"
+            YAML_BLOCK_MAP_VALUE@18..20
+              WHITESPACE@18..19 " "
+              YAML_SCALAR@19..20 "d"
+            NEWLINE@20..21 "\n"
