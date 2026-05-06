@@ -1352,7 +1352,7 @@
     {
       "case_id": "V9D5",
       "diagnostic_codes": [],
-      "event_parity": null,
+      "event_parity": false,
       "tree": true
     },
     {

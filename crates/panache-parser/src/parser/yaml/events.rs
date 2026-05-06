@@ -151,6 +151,43 @@ fn doc_is_marker_only(doc: &SyntaxNode) -> bool {
     true
 }
 
+/// LX3P: a `[flow]` sequence written as a block-map key lands in the v2 CST
+/// as a YAML_FLOW_SEQUENCE that's a direct child of the YAML_DOCUMENT,
+/// preceding the YAML_BLOCK_MAP that the trailing `:` opens. Returns that
+/// flow-sequence when this shape is present.
+fn flow_seq_preceding_block_map_at_doc_level(
+    doc: &SyntaxNode,
+    block_map: &SyntaxNode,
+) -> Option<SyntaxNode> {
+    let block_map_offset = block_map.text_range().start();
+    doc.children()
+        .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
+        .find(|n| n.text_range().end() <= block_map_offset)
+}
+
+/// True when a YAML_BLOCK_MAP_ENTRY's KEY wrapper carries no key text —
+/// only structural trivia and the `:` indicator. Used to detect the
+/// implicit-empty-key shape (`: value`) and the LX3P pattern where the
+/// real key lives in a sibling node preceding the map.
+fn block_map_entry_key_is_empty(entry: &SyntaxNode) -> bool {
+    let Some(key_node) = entry
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)
+    else {
+        return false;
+    };
+    !key_node
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .take_while(|tok| tok.kind() != SyntaxKind::YAML_COLON)
+        .any(|tok| {
+            matches!(
+                tok.kind(),
+                SyntaxKind::YAML_KEY | SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_TAG
+            ) && !tok.text().trim().is_empty()
+        })
+}
+
 fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
     let has_doc_start = doc
         .children_with_tokens()
@@ -187,35 +224,69 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
         .descendants()
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
     {
-        let mut values = Vec::new();
-        project_block_map_entries(&root_map, &handles, &mut values);
-        if !values.is_empty() {
+        // Flow-sequence used as a block-map key (LX3P: `[flow]: block`).
+        // v2 lands the `[flow]` flow-sequence as a sibling preceding the
+        // YAML_BLOCK_MAP (the colon opens an empty-key entry inside the
+        // map), but yaml-test-suite expects `+MAP +SEQ []…-SEQ value -MAP`.
+        // Splice the flow-seq in as the first entry's key when this shape
+        // is present.
+        if let Some(flow_seq) = flow_seq_preceding_block_map_at_doc_level(doc, &root_map)
+            && let Some(first_entry) = root_map
+                .children()
+                .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+            && block_map_entry_key_is_empty(&first_entry)
+        {
             out.push(map_open_event_for_block_map(&root_map, &handles));
-            out.append(&mut values);
-            out.push("-MAP".to_string());
-        } else if let Some(flow_map) = doc
-            .descendants()
-            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
-        {
-            let mut flow_values = Vec::new();
-            project_flow_map_entries(&flow_map, &handles, &mut flow_values);
-            out.push("+MAP {}".to_string());
-            out.append(&mut flow_values);
-            out.push("-MAP".to_string());
-        } else if let Some(flow_seq) = doc
-            .descendants()
-            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
-            && let Some(items) = simple_flow_sequence_items(&flow_seq.text().to_string())
-        {
             out.push("+SEQ []".to_string());
-            for item in items {
-                project_flow_seq_item(&item, &handles, out);
-            }
+            project_flow_sequence_items_cst(&flow_seq, &handles, out);
             out.push("-SEQ".to_string());
-        } else if let Some(scalar) = scalar_document_value(doc, &handles) {
-            out.push(scalar);
+            if let Some(value_node) = first_entry
+                .children()
+                .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
+            {
+                project_block_map_entry_value(&value_node, &handles, out);
+            } else {
+                out.push("=VAL :".to_string());
+            }
+            for entry in root_map
+                .children()
+                .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+                .skip(1)
+            {
+                project_block_map_entry(&entry, &handles, out);
+            }
+            out.push("-MAP".to_string());
         } else {
-            out.push("=VAL :".to_string());
+            let mut values = Vec::new();
+            project_block_map_entries(&root_map, &handles, &mut values);
+            if !values.is_empty() {
+                out.push(map_open_event_for_block_map(&root_map, &handles));
+                out.append(&mut values);
+                out.push("-MAP".to_string());
+            } else if let Some(flow_map) = doc
+                .descendants()
+                .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
+            {
+                let mut flow_values = Vec::new();
+                project_flow_map_entries(&flow_map, &handles, &mut flow_values);
+                out.push("+MAP {}".to_string());
+                out.append(&mut flow_values);
+                out.push("-MAP".to_string());
+            } else if let Some(flow_seq) = doc
+                .descendants()
+                .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
+                && let Some(items) = simple_flow_sequence_items(&flow_seq.text().to_string())
+            {
+                out.push("+SEQ []".to_string());
+                for item in items {
+                    project_flow_seq_item(&item, &handles, out);
+                }
+                out.push("-SEQ".to_string());
+            } else if let Some(scalar) = scalar_document_value(doc, &handles) {
+                out.push(scalar);
+            } else {
+                out.push("=VAL :".to_string());
+            }
         }
     } else if let Some(flow_map) = doc
         .descendants()
@@ -2119,11 +2190,19 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
         out.push(scalar_event(anchor, long_tag.as_deref(), body));
     }
 
+    project_block_map_entry_value(&value_node, handles, out);
+}
+
+fn project_block_map_entry_value(
+    value_node: &SyntaxNode,
+    handles: &TagHandles,
+    out: &mut Vec<String>,
+) {
     if let Some(nested_map) = value_node
         .children()
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
     {
-        out.push(map_open_event_for_value(&value_node, handles));
+        out.push(map_open_event_for_value(value_node, handles));
         project_block_map_entries(&nested_map, handles, out);
         out.push("-MAP".to_string());
         return;
@@ -2154,7 +2233,7 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
         return;
     }
 
-    if let Some((indicator, body)) = extract_block_scalar_body(&value_node) {
+    if let Some((indicator, body)) = extract_block_scalar_body(value_node) {
         let escaped = escape_block_scalar_text(&body);
         out.push(format!("=VAL {indicator}{escaped}"));
         return;
@@ -2203,7 +2282,7 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
             // rules so blank lines fold to `\n` and single breaks fold to
             // space. Without this, joining YAML_SCALAR tokens directly drops
             // line structure (yaml-test-suite case XV9V).
-            let multi_line_text = collect_value_scalar_text_with_newlines(&value_node);
+            let multi_line_text = collect_value_scalar_text_with_newlines(value_node);
             // Strip trailing whitespace/newlines that come AFTER the
             // closing quote. v2 keeps a single quoted-scalar token so
             // those bytes are post-value trivia (NEWLINE) — they don't
