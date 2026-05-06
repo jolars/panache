@@ -131,6 +131,26 @@ pub fn project_events_from_tree(tree: &SyntaxNode) -> Vec<String> {
     events
 }
 
+/// True when the document holds no content beyond a `DocumentEnd`
+/// marker and surrounding trivia (whitespace, newlines, comments).
+/// Used to distinguish a real (possibly empty) document from a
+/// synthetic doc the v2 builder wrapped around a bare `...`.
+fn doc_is_marker_only(doc: &SyntaxNode) -> bool {
+    for el in doc.descendants_with_tokens() {
+        if let Some(tok) = el.as_token() {
+            match tok.kind() {
+                SyntaxKind::WHITESPACE
+                | SyntaxKind::NEWLINE
+                | SyntaxKind::YAML_COMMENT
+                | SyntaxKind::YAML_DOCUMENT_END
+                | SyntaxKind::YAML_DOCUMENT_START => {}
+                _ => return false,
+            }
+        }
+    }
+    true
+}
+
 fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
     let has_doc_start = doc
         .children_with_tokens()
@@ -140,6 +160,15 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
         .children_with_tokens()
         .filter_map(|el| el.into_token())
         .any(|tok| tok.kind() == SyntaxKind::YAML_DOCUMENT_END);
+    // A v2 builder synthesizes a `YAML_DOCUMENT` around a bare `...`
+    // (or comments preceding it) to keep the marker inside a document
+    // for losslessness. v1 / yaml-test-suite considers such input an
+    // empty stream — no `+DOC`/`-DOC` events. Skip the projection when
+    // the only structural content is a `DocumentEnd` marker (HWV9,
+    // QT73).
+    if !has_doc_start && doc_is_marker_only(doc) {
+        return;
+    }
     out.push(if has_doc_start {
         "+DOC ---".to_string()
     } else {
