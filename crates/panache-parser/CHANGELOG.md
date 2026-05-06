@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.1](https://github.com/jolars/panache/compare/panache-parser-v0.7.0...panache-parser-v0.7.1) (2026-05-06)
+
+### Bug Fixes
+- enable `autolinks` for GFM ([`aeda13c`](https://github.com/jolars/panache/commit/aeda13cdc71a002bf0326cab9c1354abec321b2a)), closes [#258](https://github.com/jolars/panache/issues/258)
+
 ## [0.7.0](https://github.com/jolars/panache/compare/panache-parser-v0.6.1...panache-parser-v0.7.0) (2026-05-05)
 
 ### Features
