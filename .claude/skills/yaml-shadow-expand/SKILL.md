@@ -161,3 +161,19 @@ When done, report:
 3. Files changed and the root cause addressed.
 4. Any cases unlocked but not yet allowlisted (candidates for follow-up).
 5. Suggested next targets grouped by shared root cause.
+6. **Session continuation recommendation** — close with one of:
+   - **Continue here** — when the next target builds directly on this
+     session's fix (same code paths, same mental model still loaded) and
+     the conversation hasn't accumulated much one-off scratch state. Also
+     fine when the user has explicitly queued follow-up targets.
+   - **Compact, then continue** — when the next target is in the same
+     skill but the conversation has accumulated long tool outputs (full
+     CST dumps, multi-file reads, large diffs) that would crowd context.
+     Compaction preserves the cluster knowledge but drops the noise.
+   - **New session** — when the next target shifts to an unrelated root
+     cause (e.g. lexer indent state vs. projection helpers), or when the
+     current session ended on a structural decision worth re-grounding
+     against fresh triage. Also recommend this if the user is pausing and
+     the work won't resume within the prompt-cache window.
+
+   Don't default to one answer; pick based on what the next target needs.
