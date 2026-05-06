@@ -20,6 +20,8 @@ mod parser;
 mod parser_v2;
 #[path = "yaml/scanner.rs"]
 mod scanner;
+#[path = "yaml/validator.rs"]
+mod validator;
 
 pub use events::{project_events, project_events_from_tree};
 pub use lexer::lex_mapping_tokens;
@@ -30,6 +32,11 @@ pub use model::{
 pub use parser::{parse_shadow, parse_yaml_report, parse_yaml_tree};
 pub use parser_v2::{ShadowParserV2Report, parse_v2, shadow_parser_v2_check};
 pub use scanner::{ShadowScannerReport, shadow_scanner_check};
+
+#[doc(hidden)]
+pub fn validate_yaml_for_test(input: &str) -> Option<YamlDiagnostic> {
+    validator::validate_yaml(input)
+}
 
 #[cfg(test)]
 mod tests {
