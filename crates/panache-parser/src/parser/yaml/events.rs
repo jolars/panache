@@ -1415,10 +1415,18 @@ fn project_flow_map_value(value_node: &SyntaxNode, handles: &TagHandles, out: &m
         return;
     }
 
+    // Include `YAML_COLON` tokens alongside `YAML_SCALAR` so a
+    // plain-scalar value that begins with `:` (e.g. 5T43's
+    // `{ "key"::value }` and 58MP's `{x: :x}` — leading `:` after
+    // the entry's key indicator) carries its colon into the event
+    // body. The scanner emits the leading `:` as a stray Value token
+    // that the v2 builder lands inside the VALUE wrapper; without
+    // collecting `YAML_COLON` here the projection drops it and the
+    // event becomes `=VAL :value` instead of `=VAL ::value`.
     let raw_value = value_node
         .descendants_with_tokens()
         .filter_map(|el| el.into_token())
-        .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+        .filter(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_COLON))
         .map(|tok| tok.text().to_string())
         .collect::<Vec<_>>()
         .join("");
