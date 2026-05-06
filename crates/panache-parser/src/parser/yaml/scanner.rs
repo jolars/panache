@@ -515,7 +515,7 @@ impl<'a> Scanner<'a> {
                     }
                     self.advance();
                 }
-                Some(',' | '[' | ']' | '{' | '}' | '?') if self.flow_level > 0 => break,
+                Some(',' | '[' | ']' | '{' | '}') if self.flow_level > 0 => break,
                 _ => {
                     self.advance();
                 }
@@ -984,13 +984,12 @@ impl<'a> Scanner<'a> {
         matches!(self.peek_at(1), None | Some(' ' | '\t' | '\n' | '\r'))
     }
 
-    /// `?` opens an explicit key when followed by whitespace/EOL in
-    /// block context, or unconditionally in flow context (where flow
-    /// terminators delimit the key on their own).
+    /// `?` opens an explicit key only when followed by whitespace,
+    /// end-of-input, or end-of-line — in both block and flow context.
+    /// A `?` that's followed by any other character is plain-scalar
+    /// text (e.g. `value?`, `another ? string`, `?key`). yaml-test-suite
+    /// JR7V pins this for flow context; libyaml `check_key` agrees.
     fn check_key(&self) -> bool {
-        if self.flow_level > 0 {
-            return true;
-        }
         matches!(self.peek_at(1), None | Some(' ' | '\t' | '\n' | '\r'))
     }
 
