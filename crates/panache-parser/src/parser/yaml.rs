@@ -16,6 +16,8 @@ mod lexer;
 mod model;
 #[path = "yaml/parser.rs"]
 mod parser;
+#[path = "yaml/scanner.rs"]
+mod scanner;
 
 pub use events::project_events;
 pub use lexer::lex_mapping_tokens;
