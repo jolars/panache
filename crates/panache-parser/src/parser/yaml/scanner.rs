@@ -575,6 +575,13 @@ impl<'a> Scanner<'a> {
                             self.cursor = saved;
                             return false;
                         }
+                    } else if matches!(self.peek_char(), Some(',' | ']' | '}')) {
+                        // In flow context, a flow terminator/separator
+                        // at the head of the next line closes the
+                        // surrounding container — it doesn't continue
+                        // the scalar.
+                        self.cursor = saved;
+                        return false;
                     }
                     return true;
                 }
@@ -2744,6 +2751,23 @@ mod tests {
             .filter(|&&k| k == TokenKind::BlockEntry)
             .count();
         assert!(block_entry_count >= 1, "got {kinds:?}");
+    }
+
+    #[test]
+    fn flow_context_plain_scalar_does_not_absorb_terminator_line_break() {
+        // `{a: 42\n}\n` — the `\n` between `42` and `}` must NOT be
+        // swallowed into the scalar's continuation. The plain scalar
+        // ends at `42`; the line break is trivia between scalar and
+        // closer.
+        let input = "{a: 42\n}\n";
+        let tokens = collect_tokens(input);
+        let scalars: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.kind, TokenKind::Scalar(ScalarStyle::Plain)))
+            .map(|t| &input[t.start.index..t.end.index])
+            .collect();
+        assert!(scalars.contains(&"42"), "got {scalars:?}");
+        assert_byte_complete(input, &tokens);
     }
 
     #[test]

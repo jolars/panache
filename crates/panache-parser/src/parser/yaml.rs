@@ -16,6 +16,8 @@ mod lexer;
 mod model;
 #[path = "yaml/parser.rs"]
 mod parser;
+#[path = "yaml/parser_v2.rs"]
+mod parser_v2;
 #[path = "yaml/scanner.rs"]
 mod scanner;
 
@@ -26,6 +28,7 @@ pub use model::{
     YamlParseReport, YamlToken, YamlTokenSpan, diagnostic_codes,
 };
 pub use parser::{parse_shadow, parse_yaml_report, parse_yaml_tree};
+pub use parser_v2::{ShadowParserV2Report, shadow_parser_v2_check};
 pub use scanner::{ShadowScannerReport, shadow_scanner_check};
 
 #[cfg(test)]

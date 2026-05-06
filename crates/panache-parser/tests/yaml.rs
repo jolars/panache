@@ -1,6 +1,6 @@
 use panache_parser::parser::yaml::{
     ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_shadow, parse_yaml_report,
-    parse_yaml_tree, project_events, shadow_scanner_check,
+    parse_yaml_tree, project_events, shadow_parser_v2_check, shadow_scanner_check,
 };
 use panache_parser::syntax::SyntaxNode as ParserSyntaxNode;
 use serde_json::json;
@@ -717,6 +717,40 @@ fn shadow_scanner_byte_completeness_over_allowlist() {
         panic!(
             "scanner not byte-complete over {} allowlisted case(s):\n{summary}",
             failures.len(),
+        );
+    }
+}
+
+/// Manual harness: run the v2 parser scaffold over every allowlisted
+/// fixture and assert text-losslessness — i.e. `tree.text() == input`.
+/// This is the byte-completeness invariant the v2 builder must hold
+/// every step of step-11 sub-commits, even before structural parity
+/// with the existing parser is reached. Ignored by default; invoke
+/// with:
+///
+///   cargo test -p panache-parser --test yaml -- --ignored \
+///     shadow_parser_v2_text_losslessness_over_allowlist
+#[test]
+#[ignore = "manual v2 parser losslessness check over allowlisted fixtures"]
+fn shadow_parser_v2_text_losslessness_over_allowlist() {
+    let mut failures: Vec<String> = Vec::new();
+    for (case_id, case_path) in allowlisted_case_paths() {
+        let input_path = case_path.join("in.yaml");
+        if !input_path.exists() {
+            continue;
+        }
+        let input = fs::read_to_string(&input_path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
+        let report = shadow_parser_v2_check(&input);
+        if !report.text_lossless {
+            failures.push(format!("- {case_id}"));
+        }
+    }
+    if !failures.is_empty() {
+        panic!(
+            "v2 parser not text-lossless over {} allowlisted case(s):\n{}",
+            failures.len(),
+            failures.join("\n"),
         );
     }
 }
