@@ -83,7 +83,7 @@ RUST_LOG=info ./target/release/panache lsp
 
 ## Commits and Releases
 
-This project uses Conventional Commits and semantic-release.
+This project uses Conventional Commits and versionary.
 
 - `feat:` typically results in a **minor** release bump.
 - `fix:` typically results in a **patch** release bump.
