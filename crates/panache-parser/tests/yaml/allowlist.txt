@@ -278,3 +278,7 @@ FTA2
 J7PZ
 # Block-map entry whose value is empty inline (only trivia after `:`) and continued by an indented plain scalar on the next line.
 5NYZ
+# Anchor-only scalar in a block-map value followed by an indented nested block map; anchor annotates the nested `+MAP &name`.
+26DV
+# Multi-line double-quoted scalar in a block-map value; blank line folds to `\n`, single break folds to space.
+XV9V

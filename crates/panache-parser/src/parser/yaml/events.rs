@@ -1513,6 +1513,54 @@ fn seq_open_event(seq_node: &SyntaxNode, handles: &TagHandles) -> String {
     event
 }
 
+/// Build the `+MAP` open event for a nested YAML_BLOCK_MAP that lives inside
+/// a YAML_BLOCK_MAP_VALUE. Captures any anchor (`&name`) or tag (`!!str`,
+/// `!shorthand`, etc.) tokens that precede the inner block map so that
+/// projected events match patterns like `+MAP &node3` from yaml-test-suite
+/// case 26DV (`top3: &node3` followed by an indented nested block map).
+fn map_open_event_for_value(value_node: &SyntaxNode, handles: &TagHandles) -> String {
+    let mut anchor: Option<String> = None;
+    let mut long_tag: Option<String> = None;
+    for child in value_node.children_with_tokens() {
+        if let Some(node) = child.as_node()
+            && node.kind() == SyntaxKind::YAML_BLOCK_MAP
+        {
+            break;
+        }
+        let Some(tok) = child.as_token() else {
+            continue;
+        };
+        match tok.kind() {
+            SyntaxKind::YAML_TAG => {
+                if long_tag.is_none()
+                    && let Some(long) = resolve_long_tag(tok.text(), handles)
+                {
+                    long_tag = Some(long);
+                }
+            }
+            SyntaxKind::YAML_SCALAR => {
+                let trimmed = tok.text().trim();
+                if anchor.is_none()
+                    && let Some(name) = trimmed.strip_prefix('&')
+                {
+                    anchor = Some(name.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut event = String::from("+MAP");
+    if let Some(t) = long_tag {
+        event.push(' ');
+        event.push_str(&t);
+    }
+    if let Some(a) = anchor {
+        event.push_str(" &");
+        event.push_str(&a);
+    }
+    event
+}
+
 fn decompose_scalar<'a>(
     text: &'a str,
     handles: &TagHandles,
@@ -1642,7 +1690,7 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
         .children()
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
     {
-        out.push("+MAP".to_string());
+        out.push(map_open_event_for_value(&value_node, handles));
         project_block_map_entries(&nested_map, handles, out);
         out.push("-MAP".to_string());
         return;
@@ -1699,8 +1747,43 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
         let value_long_tag = value_tag
             .as_deref()
             .and_then(|t| resolve_long_tag(t, handles));
-        let (anchor, body_tag, body) = decompose_scalar(value_text.trim(), handles);
-        let long_tag = value_long_tag.or(body_tag);
-        out.push(scalar_event(anchor, long_tag.as_deref(), body));
+        let trimmed = value_text.trim();
+        if trimmed.starts_with('"') || trimmed.starts_with('\'') {
+            // Multi-line quoted scalar value: rebuild the source text with
+            // newlines intact (parser splits each physical line into its own
+            // YAML_SCALAR token), then run the YAML 1.2 §7.3 line-folding
+            // rules so blank lines fold to `\n` and single breaks fold to
+            // space. Without this, joining YAML_SCALAR tokens directly drops
+            // line structure (yaml-test-suite case XV9V).
+            let multi_line_text = collect_value_scalar_text_with_newlines(&value_node);
+            let is_multi_line = multi_line_text.contains('\n');
+            let quoted = if is_multi_line {
+                quoted_val_event_multi_line(&multi_line_text)
+            } else {
+                quoted_val_event(trimmed)
+            };
+            if let Some(long) = value_long_tag {
+                out.push(quoted.replacen("=VAL ", &format!("=VAL {long} "), 1));
+            } else {
+                out.push(quoted);
+            }
+        } else {
+            let (anchor, body_tag, body) = decompose_scalar(trimmed, handles);
+            let long_tag = value_long_tag.or(body_tag);
+            out.push(scalar_event(anchor, long_tag.as_deref(), body));
+        }
     }
+}
+
+/// Reconstruct a YAML_BLOCK_MAP_VALUE's scalar text with line breaks intact
+/// for multi-line quoted-scalar folding. Mirrors
+/// [`collect_doc_scalar_text_with_newlines`] but bounded to a single
+/// block-map value so it doesn't pull in scalars from nested blocks.
+fn collect_value_scalar_text_with_newlines(value_node: &SyntaxNode) -> String {
+    value_node
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::NEWLINE))
+        .map(|tok| tok.text().to_string())
+        .collect()
 }

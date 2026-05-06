@@ -529,12 +529,6 @@
   ],
   "fails_needs_feature": [
     {
-      "case_id": "26DV",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "2EBW",
       "diagnostic_codes": [
         "YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE"
@@ -1459,12 +1453,6 @@
       "tree": false
     },
     {
-      "case_id": "XV9V",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "XW4D",
       "diagnostic_codes": [
         "YAML_LEX_ERROR"
@@ -1491,6 +1479,7 @@
   ],
   "passes_now": [
     "229Q",
+    "26DV",
     "27NA",
     "2AUY",
     "33X3",
@@ -1618,6 +1607,7 @@
     "V55R",
     "W5VH",
     "WZ62",
+    "XV9V",
     "Y2GN",
     "YD5X",
     "Z9M4",
@@ -1628,8 +1618,8 @@
   "summary": {
     "error_contract_ok_count": 56,
     "fails_needs_error_path_count": 22,
-    "fails_needs_feature_count": 121,
-    "passes_now_count": 134,
+    "fails_needs_feature_count": 119,
+    "passes_now_count": 136,
     "total_cases": 352
   }
 }
