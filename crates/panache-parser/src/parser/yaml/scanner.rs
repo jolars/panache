@@ -6,9 +6,9 @@
 //!
 //! Currently implements: trivia, document markers, directives, flow
 //! indicators, block indicators (`-`/`?`/`:`) with the simple-key
-//! table, and a single-line plain scalar. Quoted scalars, block
-//! scalars, and multi-line plain continuation land in steps 7–9; the
-//! parser-side cutover is step 12.
+//! table, single-line plain scalars, and quoted scalars (`'…'`,
+//! `"…"`) with escape diagnostics. Block scalars and multi-line plain
+//! continuation land in steps 8–9; the parser-side cutover is step 12.
 
 // No production callers yet — the line-based lexer remains the live
 // path until step 12. Remove once the scanner is wired into parsing.
@@ -246,11 +246,19 @@ impl<'a> Scanner<'a> {
                 self.fetch_value();
                 return;
             }
+            Some('\'') => {
+                self.fetch_flow_scalar(ScalarStyle::SingleQuoted);
+                return;
+            }
+            Some('"') => {
+                self.fetch_flow_scalar(ScalarStyle::DoubleQuoted);
+                return;
+            }
             _ => {}
         }
-        // Default: anything else opens a plain scalar. Quoted scalars
-        // (`'`/`"`), block scalars (`|`/`>`), anchors/tags/aliases land
-        // in later steps and will be dispatched here before this default.
+        // Default: anything else opens a plain scalar. Block scalars
+        // (`|`/`>`) and anchors/tags/aliases land in later steps and
+        // will be dispatched here before this default.
         self.fetch_plain_scalar();
     }
 
@@ -459,6 +467,166 @@ impl<'a> Scanner<'a> {
             start,
             end,
         });
+    }
+
+    /// Quoted scalar (`'...'` or `"..."`). Both styles can span
+    /// multiple lines and can be implicit keys; the scanner emits the
+    /// raw source span and surfaces escape/termination diagnostics.
+    /// Cooking (escape decoding, line folding) is the projection
+    /// layer's job.
+    fn fetch_flow_scalar(&mut self, style: ScalarStyle) {
+        self.save_simple_key();
+        self.allow_simple_key = false;
+        let start = self.cursor;
+        let quote = match style {
+            ScalarStyle::SingleQuoted => '\'',
+            ScalarStyle::DoubleQuoted => '"',
+            _ => unreachable!("fetch_flow_scalar called with non-quoted style"),
+        };
+        // Opening quote.
+        self.advance();
+        let mut closed = false;
+        while let Some(c) = self.peek_char() {
+            if c == quote {
+                if style == ScalarStyle::SingleQuoted && self.peek_at(1) == Some('\'') {
+                    // `''` is a literal single quote inside a
+                    // single-quoted scalar — not a terminator.
+                    self.advance();
+                    self.advance();
+                    continue;
+                }
+                self.advance();
+                closed = true;
+                break;
+            }
+            if style == ScalarStyle::DoubleQuoted && c == '\\' {
+                self.advance();
+                self.consume_double_quoted_escape();
+                continue;
+            }
+            // Document markers at column 0 inside an unterminated
+            // quoted scalar abort the scalar (libyaml convention) so
+            // we don't swallow the next document. Bail out before
+            // consuming the marker.
+            if self.flow_level == 0
+                && self.cursor.column == 0
+                && (self.check_document_indicator(b"---") || self.check_document_indicator(b"..."))
+            {
+                break;
+            }
+            self.advance();
+        }
+        if !closed {
+            self.diagnostics.push(YamlDiagnostic {
+                code: diagnostic_codes::LEX_UNTERMINATED_QUOTED_SCALAR,
+                message: "unterminated quoted scalar",
+                byte_start: start.index,
+                byte_end: self.cursor.index,
+            });
+        }
+        let end = self.cursor;
+        self.tokens.push_back(Token {
+            kind: TokenKind::Scalar(style),
+            start,
+            end,
+        });
+    }
+
+    /// Consume one escape sequence inside a double-quoted scalar,
+    /// starting AFTER the introducing `\`. Recognised escapes follow
+    /// YAML 1.2 §5.7 (`\0`, `\a`, …, `\xHH`, `\uHHHH`, `\UHHHHHHHH`,
+    /// and `\<line-break>` for continuation). Unrecognised escapes
+    /// emit a diagnostic; the cursor still advances by one codepoint
+    /// to make progress.
+    fn consume_double_quoted_escape(&mut self) {
+        // The backslash is already past the cursor; record its index
+        // for diagnostic spans (one byte before).
+        let backslash_index = self.cursor.index.saturating_sub(1);
+        match self.peek_char() {
+            None => {
+                // EOF after backslash; the unterminated-scalar branch
+                // will fire.
+            }
+            Some('\n') => {
+                self.advance();
+            }
+            Some('\r') => {
+                self.advance();
+                if self.peek_char() == Some('\n') {
+                    self.advance();
+                }
+            }
+            Some('x') => {
+                self.advance();
+                self.consume_hex_digits(2, backslash_index);
+            }
+            Some('u') => {
+                self.advance();
+                self.consume_hex_digits(4, backslash_index);
+            }
+            Some('U') => {
+                self.advance();
+                self.consume_hex_digits(8, backslash_index);
+            }
+            Some(c) if Self::is_double_quoted_single_byte_escape(c) => {
+                self.advance();
+            }
+            Some(_) => {
+                let invalid_end = self.cursor.index + self.peek_char().unwrap().len_utf8();
+                self.diagnostics.push(YamlDiagnostic {
+                    code: diagnostic_codes::LEX_INVALID_DOUBLE_QUOTED_ESCAPE,
+                    message: "invalid double-quoted escape",
+                    byte_start: backslash_index,
+                    byte_end: invalid_end,
+                });
+                self.advance();
+            }
+        }
+    }
+
+    fn consume_hex_digits(&mut self, count: usize, backslash_index: usize) {
+        let mut consumed = 0;
+        while consumed < count {
+            match self.peek_char() {
+                Some(c) if c.is_ascii_hexdigit() => {
+                    self.advance();
+                    consumed += 1;
+                }
+                _ => break,
+            }
+        }
+        if consumed < count {
+            self.diagnostics.push(YamlDiagnostic {
+                code: diagnostic_codes::LEX_INVALID_DOUBLE_QUOTED_ESCAPE,
+                message: "incomplete hex escape in double-quoted scalar",
+                byte_start: backslash_index,
+                byte_end: self.cursor.index,
+            });
+        }
+    }
+
+    fn is_double_quoted_single_byte_escape(c: char) -> bool {
+        // YAML 1.2 §5.7 escape characters that take no payload.
+        matches!(
+            c,
+            '0' | 'a'
+                | 'b'
+                | 't'
+                | '\t'
+                | 'n'
+                | 'v'
+                | 'f'
+                | 'r'
+                | 'e'
+                | ' '
+                | '"'
+                | '/'
+                | '\\'
+                | 'N'
+                | '_'
+                | 'L'
+                | 'P'
+        )
     }
 
     fn fetch_stream_end(&mut self) {
@@ -1651,5 +1819,234 @@ mod tests {
                 scanner.diagnostics(),
             );
         }
+    }
+
+    fn find_scalar(tokens: &[Token]) -> &Token {
+        tokens
+            .iter()
+            .find(|t| matches!(t.kind, TokenKind::Scalar(_)))
+            .expect("expected scalar token")
+    }
+
+    #[test]
+    fn single_quoted_scalar_emits_token_spanning_quotes() {
+        let input = "'hello'";
+        let tokens = collect_tokens(input);
+        let scalar = find_scalar(&tokens);
+        assert_eq!(scalar.kind, TokenKind::Scalar(ScalarStyle::SingleQuoted));
+        assert_eq!(&input[scalar.start.index..scalar.end.index], "'hello'");
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn double_quoted_scalar_emits_token_spanning_quotes() {
+        let input = "\"hello\"";
+        let tokens = collect_tokens(input);
+        let scalar = find_scalar(&tokens);
+        assert_eq!(scalar.kind, TokenKind::Scalar(ScalarStyle::DoubleQuoted));
+        assert_eq!(&input[scalar.start.index..scalar.end.index], "\"hello\"");
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn single_quoted_scalar_treats_doubled_quote_as_escape() {
+        // `'it''s'` is a single scalar containing `it's`. The middle
+        // `''` must NOT terminate the scalar.
+        let input = "'it''s'";
+        let tokens = collect_tokens(input);
+        let scalars: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.kind, TokenKind::Scalar(_)))
+            .collect();
+        assert_eq!(scalars.len(), 1, "got {:?}", tokens);
+        assert_eq!(
+            &input[scalars[0].start.index..scalars[0].end.index],
+            "'it''s'",
+        );
+    }
+
+    #[test]
+    fn double_quoted_scalar_with_escaped_quote_does_not_terminate_early() {
+        // `"a\"b"` — the middle `\"` is an escaped quote; the closer
+        // is the final `"`.
+        let input = "\"a\\\"b\"";
+        let tokens = collect_tokens(input);
+        let scalars: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.kind, TokenKind::Scalar(_)))
+            .collect();
+        assert_eq!(scalars.len(), 1, "got {tokens:?}");
+        assert_eq!(
+            &input[scalars[0].start.index..scalars[0].end.index],
+            "\"a\\\"b\"",
+        );
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn double_quoted_scalar_recognises_common_single_byte_escapes() {
+        // Each escape advances by exactly one char after `\`.
+        let input = "\"\\n\\t\\r\\0\\\\\\\"\"";
+        let tokens = collect_tokens(input);
+        let scalar = find_scalar(&tokens);
+        assert_eq!(scalar.kind, TokenKind::Scalar(ScalarStyle::DoubleQuoted));
+        // The whole input should be the scalar.
+        assert_eq!(scalar.start.index, 0);
+        assert_eq!(scalar.end.index, input.len());
+        let mut scanner = Scanner::new(input);
+        while scanner.next_token().is_some() {}
+        assert!(scanner.diagnostics().is_empty());
+    }
+
+    #[test]
+    fn double_quoted_scalar_recognises_hex_escapes() {
+        // `\x41` is `A`; `é` is `é`; `\U0001F600` is 😀.
+        let input = "\"\\x41\\u00E9\\U0001F600\"";
+        let mut scanner = Scanner::new(input);
+        while scanner.next_token().is_some() {}
+        assert!(
+            scanner.diagnostics().is_empty(),
+            "got {:?}",
+            scanner.diagnostics()
+        );
+    }
+
+    #[test]
+    fn double_quoted_scalar_with_invalid_escape_emits_diagnostic() {
+        let input = "\"\\q\"";
+        let mut scanner = Scanner::new(input);
+        while scanner.next_token().is_some() {}
+        assert_eq!(
+            scanner.diagnostics().len(),
+            1,
+            "got {:?}",
+            scanner.diagnostics(),
+        );
+        assert_eq!(
+            scanner.diagnostics()[0].code,
+            diagnostic_codes::LEX_INVALID_DOUBLE_QUOTED_ESCAPE,
+        );
+    }
+
+    #[test]
+    fn double_quoted_scalar_with_short_hex_escape_emits_diagnostic() {
+        // `\x4` is missing one hex digit; the `"` after closes the
+        // scalar but the truncated escape is reported.
+        let input = "\"\\x4\"";
+        let mut scanner = Scanner::new(input);
+        while scanner.next_token().is_some() {}
+        assert!(
+            scanner
+                .diagnostics()
+                .iter()
+                .any(|d| d.code == diagnostic_codes::LEX_INVALID_DOUBLE_QUOTED_ESCAPE),
+            "got {:?}",
+            scanner.diagnostics(),
+        );
+    }
+
+    #[test]
+    fn double_quoted_scalar_spans_multiple_lines() {
+        // A literal newline inside the quotes is part of the scalar.
+        let input = "\"line1\nline2\"";
+        let tokens = collect_tokens(input);
+        let scalar = find_scalar(&tokens);
+        assert_eq!(scalar.kind, TokenKind::Scalar(ScalarStyle::DoubleQuoted));
+        // The entire input is the scalar (no Newline trivia between
+        // the two lines — line breaks inside quoted scalars belong to
+        // the scalar's source span).
+        assert_eq!(scalar.start.index, 0);
+        assert_eq!(scalar.end.index, input.len());
+    }
+
+    #[test]
+    fn line_continuation_escape_consumes_newline_inside_quoted_scalar() {
+        // `\<newline>` is a folding line break: the `\` plus the
+        // following newline are together one escape.
+        let input = "\"a\\\nb\"";
+        let mut scanner = Scanner::new(input);
+        while scanner.next_token().is_some() {}
+        assert!(
+            scanner.diagnostics().is_empty(),
+            "got {:?}",
+            scanner.diagnostics(),
+        );
+    }
+
+    #[test]
+    fn unterminated_quoted_scalar_emits_diagnostic() {
+        for input in ["'oops", "\"oops"] {
+            let mut scanner = Scanner::new(input);
+            while scanner.next_token().is_some() {}
+            assert!(
+                scanner
+                    .diagnostics()
+                    .iter()
+                    .any(|d| d.code == diagnostic_codes::LEX_UNTERMINATED_QUOTED_SCALAR),
+                "{input:?} produced {:?}",
+                scanner.diagnostics(),
+            );
+        }
+    }
+
+    #[test]
+    fn quoted_scalar_can_be_implicit_key() {
+        let input = "\"key\": value";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        assert_eq!(
+            kinds,
+            vec![
+                TokenKind::StreamStart,
+                TokenKind::BlockMappingStart,
+                TokenKind::Key,
+                TokenKind::Scalar(ScalarStyle::DoubleQuoted),
+                TokenKind::Value,
+                TokenKind::Scalar(ScalarStyle::Plain),
+                TokenKind::BlockEnd,
+                TokenKind::StreamEnd,
+            ],
+        );
+        assert_byte_complete(input, &tokens);
+    }
+
+    #[test]
+    fn multi_line_quoted_scalar_cannot_be_implicit_key() {
+        // The scalar opens on line 0; the simple-key candidate's mark
+        // is on line 0. After scanning across the line break the
+        // cursor is on line 1, so stale_simple_keys removes the
+        // candidate before the `:` arrives — no Key splice.
+        let input = "\"line1\nline2\": value\n";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        // Expected: StreamStart, Scalar(DoubleQuoted), BlockMappingStart,
+        // Value, Scalar(Plain), BlockEnd, StreamEnd. The Scalar comes
+        // BEFORE BlockMappingStart/Value, demonstrating no key splice.
+        assert_eq!(kinds[0], TokenKind::StreamStart);
+        assert_eq!(kinds[1], TokenKind::Scalar(ScalarStyle::DoubleQuoted));
+        assert_eq!(kinds[2], TokenKind::BlockMappingStart);
+        assert_eq!(kinds[3], TokenKind::Value);
+        assert!(!kinds[..3].contains(&TokenKind::Key), "got {kinds:?}",);
+    }
+
+    #[test]
+    fn quoted_scalar_inside_flow_mapping_terminates_at_closing_quote() {
+        let input = "{\"a\": \"b\"}";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        assert_eq!(
+            kinds,
+            vec![
+                TokenKind::StreamStart,
+                TokenKind::FlowMappingStart,
+                TokenKind::Key,
+                TokenKind::Scalar(ScalarStyle::DoubleQuoted),
+                TokenKind::Value,
+                TokenKind::Scalar(ScalarStyle::DoubleQuoted),
+                TokenKind::FlowMappingEnd,
+                TokenKind::StreamEnd,
+            ],
+        );
+        assert_byte_complete(input, &tokens);
     }
 }
