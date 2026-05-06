@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.43.1](https://github.com/jolars/panache/compare/v2.43.0...v2.43.1) (2026-05-06)
+
+### Bug Fixes
+- **editors:** vsix publishing step ([`a0d602c`](https://github.com/jolars/panache/commit/a0d602c4203cf7cf202d013ceef60ae38c3aa835))
 ## [2.43.0](https://github.com/jolars/panache/compare/v2.42.0...v2.43.0) (2026-05-06)
 
 ### Features
