@@ -282,3 +282,17 @@ J7PZ
 26DV
 # Multi-line double-quoted scalar in a block-map value; blank line folds to `\n`, single break folds to space.
 XV9V
+# Plain scalar `k:#foo` with no whitespace after the colon: not a key/value pair, must stay a single plain scalar continuing onto the next indented line.
+3MYT
+# Plain scalar key whose text contains a run of trailing colons (`key::`); only the colon followed by whitespace splits key from value.
+8CWC
+# Error-contract: bare scalar `top2` at root after a block-map entry (no trailing colon) — rejected with YAML_PARSE_INVALID_KEY_TOKEN.
+7MNF
+# Error-contract: trailing scalar at document root after a closed flow sequence — rejected with YAML_PARSE_INVALID_KEY_TOKEN.
+KS4U
+# Error-contract: inline content directly after a flow-map close (`}- invalid`) — rejected with YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END.
+P2EQ
+# Error-contract: multi-line double-quoted scalar whose continuation lines start at column 0 (less than key indent) — rejected with YAML_PARSE_INVALID_KEY_TOKEN.
+QB6E
+# Error-contract: block-sequence item under-indented relative to its parent block-map entry — rejected with YAML_PARSE_INVALID_KEY_TOKEN.
+ZVH3

@@ -63,20 +63,13 @@ fn leading_indent(text: &str) -> usize {
         .count()
 }
 
-pub(crate) fn split_once_unquoted(text: &str, separator: char) -> Option<(&str, &str)> {
-    let mut state = LexerState::default();
-    let idx = find_unquoted_char_with_state(text, separator, &mut state)?;
-    let rhs_start = idx + separator.len_utf8();
-    Some((&text[..idx], &text[rhs_start..]))
-}
-
-/// Like [`split_once_unquoted`] for `:`, but only matches a colon that is a
-/// valid YAML key/value separator: after a *plain* implicit key the colon
-/// must be followed by whitespace, EOL, or a flow-collection terminator
-/// (`,`, `}`, `]`). After a *quoted* implicit key (closing `"` or `'`
-/// immediately precedes the colon) any following character is permitted, so
-/// `"key"::value` still splits at the first colon. Protects URL-like plain
-/// scalars (`http://foo`) from being mis-split as `key:value` pairs.
+/// Splits at the first colon that is a valid YAML key/value separator: after
+/// a *plain* implicit key the colon must be followed by whitespace, EOL, or a
+/// flow-collection terminator (`,`, `}`, `]`). After a *quoted* implicit key
+/// (closing `"` or `'` immediately precedes the colon) any following
+/// character is permitted, so `"key"::value` still splits at the first colon.
+/// Protects URL-like plain scalars (`http://foo`) and constructs like
+/// `k:#foo` from being mis-split as `key:value` pairs.
 pub(crate) fn split_once_unquoted_key_colon(text: &str) -> Option<(&str, &str)> {
     let mut state = LexerState::default();
     let mut search_from = 0usize;
@@ -100,7 +93,7 @@ pub(crate) fn split_once_unquoted_key_colon(text: &str) -> Option<(&str, &str)> 
 }
 
 fn parse_raw_mapping_line(line: &str) -> Option<(&str, &str)> {
-    let (raw_key, raw_value) = split_once_unquoted(line, ':')?;
+    let (raw_key, raw_value) = split_once_unquoted_key_colon(line)?;
     if raw_key.trim().is_empty() || raw_value.trim().is_empty() {
         return None;
     }
@@ -753,7 +746,7 @@ fn lex_mapping_line_tokens<'a>(
     }
 
     let Some((raw_key, raw_value)) = parse_raw_mapping_line(content) else {
-        if let Some((key_part, rest)) = split_once_unquoted(content, ':') {
+        if let Some((key_part, rest)) = split_once_unquoted_key_colon(content) {
             let key_trimmed = key_part.trim();
             let rest_no_ws = rest.trim_start_matches([' ', '\t']);
             if !key_trimmed.is_empty() && (rest_no_ws.is_empty() || rest_no_ws.starts_with('#')) {

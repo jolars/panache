@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 245
 expression: snapshot
 ---
 case_id: P2EQ
 input: "---\n- { y: z }- invalid\n"
 has_error_contract: true
-parsed_mapping_tree: true
-diagnostics: []
+parsed_mapping_tree: false
+diagnostics: [YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END:trailing content after flow map end@14..23]

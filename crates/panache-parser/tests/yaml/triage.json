@@ -583,12 +583,6 @@
       "tree": false
     },
     {
-      "case_id": "3MYT",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "4CQQ",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_KEY_TOKEN"
@@ -792,14 +786,6 @@
       "case_id": "82AN",
       "diagnostic_codes": [
         "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START"
-      ],
-      "event_parity": false,
-      "tree": false
-    },
-    {
-      "case_id": "8CWC",
-      "diagnostic_codes": [
-        "YAML_LEX_ERROR"
       ],
       "event_parity": false,
       "tree": false
@@ -1391,7 +1377,7 @@
     {
       "case_id": "UGM3",
       "diagnostic_codes": [
-        "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START"
+        "YAML_PARSE_INVALID_KEY_TOKEN"
       ],
       "event_parity": false,
       "tree": false
@@ -1485,6 +1471,7 @@
     "33X3",
     "3ALJ",
     "3GZX",
+    "3MYT",
     "3R3P",
     "3UYS",
     "4ABK",
@@ -1521,6 +1508,7 @@
     "7W2P",
     "7Z25",
     "87E4",
+    "8CWC",
     "8KB6",
     "8MK2",
     "8XYN",
@@ -1618,8 +1606,8 @@
   "summary": {
     "error_contract_ok_count": 56,
     "fails_needs_error_path_count": 22,
-    "fails_needs_feature_count": 119,
-    "passes_now_count": 136,
+    "fails_needs_feature_count": 117,
+    "passes_now_count": 138,
     "total_cases": 352
   }
 }
