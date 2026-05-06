@@ -908,33 +908,65 @@ fn extract_top_level_block_body(doc: &SyntaxNode) -> Option<(char, String)> {
             )
         })
         .collect();
+    // Same shape tolerance as `fold_block_scalar_tokens`: v1 emits the
+    // header as a standalone scalar, v2 emits the whole block scalar
+    // (header + newline + body) as a single token. Detect the header by
+    // inspecting up to the first newline.
     let first = tokens.iter().find(|tok| {
-        tok.kind() == SyntaxKind::YAML_SCALAR && parse_block_scalar_indicator(tok.text()).is_some()
+        if tok.kind() != SyntaxKind::YAML_SCALAR {
+            return false;
+        }
+        let header_part = tok.text().split('\n').next().unwrap_or("");
+        parse_block_scalar_indicator(header_part).is_some()
     })?;
     let _ = first;
     fold_block_scalar_tokens(&tokens)
 }
 
 fn fold_block_scalar_tokens(tokens: &[SyntaxToken]) -> Option<(char, String)> {
+    // Locate the header. v1 emits the header (`|`, `|+`, `>1` …) as a
+    // standalone YAML_SCALAR token and the body as separate per-line
+    // tokens. v2 emits the entire block scalar (header + newline + body)
+    // as a single YAML_SCALAR token. Detect either shape by inspecting
+    // the chars before the first `\n` of the candidate token.
     let header_idx = tokens.iter().position(|t| {
-        t.kind() == SyntaxKind::YAML_SCALAR && parse_block_scalar_indicator(t.text()).is_some()
-    })?;
-    let (indicator, chomp) = parse_block_scalar_indicator(tokens[header_idx].text())?;
-
-    // Reconstruct the body source by stitching every token AFTER the header
-    // and its trailing newline. Including `WHITESPACE` and `YAML_COMMENT`
-    // tokens preserves the indentation needed for content-indent calculation
-    // and lets a `# ...` line at column 0 (DK3J) land inside the body, while
-    // a less-indented `# Comment` after a fully-indented body region (7T8X)
-    // gets recognized as a body terminator.
-    let mut raw = String::new();
-    let mut skipped_header_newline = false;
-    for tok in &tokens[header_idx + 1..] {
-        if !skipped_header_newline && tok.kind() == SyntaxKind::NEWLINE {
-            skipped_header_newline = true;
-            continue;
+        if t.kind() != SyntaxKind::YAML_SCALAR {
+            return false;
         }
-        raw.push_str(tok.text());
+        let header_part = t.text().split('\n').next().unwrap_or("");
+        parse_block_scalar_indicator(header_part).is_some()
+    })?;
+    let header_text = tokens[header_idx].text();
+    let header_part = header_text.split('\n').next().unwrap_or("");
+    let (indicator, chomp) = parse_block_scalar_indicator(header_part)?;
+
+    // Reconstruct the body source. Including `WHITESPACE` and
+    // `YAML_COMMENT` tokens preserves the indentation needed for
+    // content-indent calculation and lets a `# ...` line at column 0
+    // (DK3J) land inside the body, while a less-indented `# Comment`
+    // after a fully-indented body region (7T8X) gets recognized as a
+    // body terminator.
+    let mut raw = String::new();
+    let unified_token = header_text.len() > header_part.len();
+    if unified_token {
+        // v2 shape: peel the header and its trailing newline out of the
+        // single token, keep the rest as the body prefix. Then append
+        // any later tokens verbatim.
+        raw.push_str(&header_text[header_part.len() + 1..]);
+        for tok in &tokens[header_idx + 1..] {
+            raw.push_str(tok.text());
+        }
+    } else {
+        // v1 shape: skip the standalone header's trailing NEWLINE and
+        // stitch every later token verbatim.
+        let mut skipped_header_newline = false;
+        for tok in &tokens[header_idx + 1..] {
+            if !skipped_header_newline && tok.kind() == SyntaxKind::NEWLINE {
+                skipped_header_newline = true;
+                continue;
+            }
+            raw.push_str(tok.text());
+        }
     }
 
     let raw_trailing_newlines = raw.chars().rev().take_while(|c| *c == '\n').count();
@@ -1150,10 +1182,23 @@ fn project_flow_map_entries(flow_map: &SyntaxNode, handles: &TagHandles, out: &m
             .filter_map(|el| el.into_token())
             .any(|tok| tok.kind() == SyntaxKind::YAML_COLON);
 
+        // Include WHITESPACE / NEWLINE so v2's separately-emitted `?`
+        // (`YAML_KEY`) and key scalar (`YAML_SCALAR`) keep the original
+        // trivia between them, letting `strip_explicit_key_indicator`
+        // recognize the `?<sp>` pattern. v1 emitted both as a single
+        // `YAML_KEY` token so the join was already a no-op there.
         let raw_key = key_node
             .descendants_with_tokens()
             .filter_map(|el| el.into_token())
-            .filter(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_KEY))
+            .filter(|tok| {
+                matches!(
+                    tok.kind(),
+                    SyntaxKind::YAML_SCALAR
+                        | SyntaxKind::YAML_KEY
+                        | SyntaxKind::WHITESPACE
+                        | SyntaxKind::NEWLINE
+                )
+            })
             .map(|tok| tok.text().to_string())
             .collect::<Vec<_>>()
             .join("");
@@ -1479,6 +1524,13 @@ fn project_block_sequence_items(
 fn seq_open_event(seq_node: &SyntaxNode, handles: &TagHandles) -> String {
     let mut anchor: Option<String> = None;
     let mut long_tag: Option<String> = None;
+    // v2 emits anchors/tags as siblings of the YAML_BLOCK_SEQUENCE within
+    // the parent container (e.g. directly under a YAML_DOCUMENT for the
+    // top-level `&anchor\n- a` shape) — not as inner-prefix tokens like
+    // v1. Scan parent siblings preceding the SEQ first.
+    absorb_preceding_anchor_and_tag(seq_node, handles, &mut anchor, &mut long_tag);
+    // v1 emits anchors/tags as inner-prefix tokens of the SEQ before the
+    // first BLOCK_SEQUENCE_ITEM. Also walk those for backward compat.
     for child in seq_node.children_with_tokens() {
         if let Some(node) = child.as_node()
             && node.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
@@ -1488,24 +1540,7 @@ fn seq_open_event(seq_node: &SyntaxNode, handles: &TagHandles) -> String {
         let Some(tok) = child.as_token() else {
             continue;
         };
-        match tok.kind() {
-            SyntaxKind::YAML_TAG => {
-                if long_tag.is_none()
-                    && let Some(long) = resolve_long_tag(tok.text(), handles)
-                {
-                    long_tag = Some(long);
-                }
-            }
-            SyntaxKind::YAML_SCALAR => {
-                let trimmed = tok.text().trim();
-                if anchor.is_none()
-                    && let Some(name) = trimmed.strip_prefix('&')
-                {
-                    anchor = Some(name.to_string());
-                }
-            }
-            _ => {}
-        }
+        absorb_anchor_or_tag(tok, handles, &mut anchor, &mut long_tag);
     }
     let mut event = String::from("+SEQ");
     if let Some(t) = long_tag {
@@ -1517,6 +1552,77 @@ fn seq_open_event(seq_node: &SyntaxNode, handles: &TagHandles) -> String {
         event.push_str(&a);
     }
     event
+}
+
+/// Walk the parent's children and absorb `YAML_TAG`/`YAML_SCALAR` tokens
+/// (carrying a `&...` anchor or `!...` tag) that appear *before* the
+/// `child` node, stopping at `child`. Used by `seq_open_event` /
+/// `map_open_event_for_block_map` to capture v2's emission of leading
+/// anchor/tag tokens at the parent level rather than inside the
+/// container.
+fn absorb_preceding_anchor_and_tag(
+    child: &SyntaxNode,
+    handles: &TagHandles,
+    anchor: &mut Option<String>,
+    long_tag: &mut Option<String>,
+) {
+    let Some(parent) = child.parent() else {
+        return;
+    };
+    let target_range = child.text_range();
+    for el in parent.children_with_tokens() {
+        if let Some(node) = el.as_node() {
+            if node.text_range() == target_range {
+                break;
+            }
+            continue;
+        }
+        if let Some(tok) = el.as_token() {
+            absorb_anchor_or_tag(tok, handles, anchor, long_tag);
+        }
+    }
+}
+
+/// Inspect a single token for an anchor or tag and update the
+/// respective slot. Recognizes both v1's and v2's emission shape:
+/// - v1 emits anchors as `YAML_SCALAR` tokens whose text starts with `&`.
+/// - v2 emits anchors as `YAML_TAG` tokens (the synthesis of anchor and
+///   tag into a single SyntaxKind), distinguishable by the leading byte.
+fn absorb_anchor_or_tag(
+    tok: &SyntaxToken,
+    handles: &TagHandles,
+    anchor: &mut Option<String>,
+    long_tag: &mut Option<String>,
+) {
+    match tok.kind() {
+        SyntaxKind::YAML_TAG => {
+            let trimmed = tok.text().trim();
+            if let Some(name) = trimmed.strip_prefix('&') {
+                if anchor.is_none() {
+                    *anchor = Some(name.to_string());
+                }
+            } else if trimmed.starts_with('!')
+                && long_tag.is_none()
+                && let Some(long) = resolve_long_tag(trimmed, handles)
+            {
+                *long_tag = Some(long);
+            }
+        }
+        SyntaxKind::YAML_SCALAR => {
+            let trimmed = tok.text().trim();
+            if anchor.is_none()
+                && let Some(name) = trimmed.strip_prefix('&')
+            {
+                *anchor = Some(name.to_string());
+            } else if long_tag.is_none()
+                && trimmed.starts_with('!')
+                && let Some(long) = resolve_long_tag(trimmed, handles)
+            {
+                *long_tag = Some(long);
+            }
+        }
+        _ => {}
+    }
 }
 
 /// Build the `+MAP` open event for a nested YAML_BLOCK_MAP that lives inside
@@ -1575,6 +1681,9 @@ fn map_open_event_for_value(value_node: &SyntaxNode, handles: &TagHandles) -> St
 fn map_open_event_for_block_map(map_node: &SyntaxNode, handles: &TagHandles) -> String {
     let mut anchor: Option<String> = None;
     let mut long_tag: Option<String> = None;
+    // Mirror `seq_open_event`: scan parent siblings preceding this MAP
+    // first (v2 emission), then the MAP's inner-prefix tokens (v1).
+    absorb_preceding_anchor_and_tag(map_node, handles, &mut anchor, &mut long_tag);
     for child in map_node.children_with_tokens() {
         if let Some(node) = child.as_node()
             && node.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY
@@ -1584,30 +1693,16 @@ fn map_open_event_for_block_map(map_node: &SyntaxNode, handles: &TagHandles) -> 
         let Some(tok) = child.as_token() else {
             continue;
         };
-        match tok.kind() {
-            SyntaxKind::YAML_TAG => {
-                if long_tag.is_none()
-                    && let Some(long) = resolve_long_tag(tok.text(), handles)
-                {
-                    long_tag = Some(long);
-                }
+        if tok.kind() == SyntaxKind::YAML_SCALAR {
+            let trimmed = tok.text().trim();
+            // A `? `-prefixed scalar is the first key of the map; stop
+            // scanning header tokens at that point so we don't pick up
+            // entry-level data as document-level node properties.
+            if trimmed.starts_with("? ") || trimmed == "?" {
+                break;
             }
-            SyntaxKind::YAML_SCALAR => {
-                let trimmed = tok.text().trim();
-                // A `? `-prefixed scalar is the first key of the map; stop
-                // scanning header tokens at that point so we don't pick up
-                // entry-level data as document-level node properties.
-                if trimmed.starts_with("? ") || trimmed == "?" {
-                    break;
-                }
-                if anchor.is_none()
-                    && let Some(name) = trimmed.strip_prefix('&')
-                {
-                    anchor = Some(name.to_string());
-                }
-            }
-            _ => {}
         }
+        absorb_anchor_or_tag(tok, handles, &mut anchor, &mut long_tag);
     }
     let mut event = String::from("+MAP");
     if let Some(t) = long_tag {
@@ -1819,7 +1914,12 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
         .join("");
     let key_text = key_text.trim_end().to_string();
 
-    let key_trimmed = key_text.trim();
+    // Strip an explicit-key `?` indicator that precedes the actual key
+    // text. v2 emits the `?` as a `YAML_KEY` token sibling of the
+    // `YAML_SCALAR`, so it ends up in `key_text` after the join above.
+    // v1 wouldn't reach this strip because its v1-shape `YAML_KEY`
+    // token carried only the implicit key body.
+    let key_trimmed = strip_explicit_key_indicator(key_text.trim());
     if key_trimmed.starts_with('[')
         && key_trimmed.ends_with(']')
         && let Some(items) = simple_flow_sequence_items(key_trimmed)
