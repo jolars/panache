@@ -415,3 +415,6 @@ MZX3
 P2AD
 # Block-sequence containing a `|` block-scalar followed by compact mapping/sequence items (`- |\n block node`); same root cause as 4QFQ.
 W42U
+# Folded `>` scalar containing tab-prefixed or tab-only lines (`  \t bar`, ` \t`); is_blank/is_mi for folding now decided on the content-indent-stripped text rather than `trim().is_empty()` and leading-spaces count, so a stripped `\t` is content (and more-indented) per §8.1.3 instead of being collapsed into the surrounding blanks.
+MJS9
+R4YG

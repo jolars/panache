@@ -1160,8 +1160,6 @@ fn fold_block_scalar_tokens(
     let stripped: Vec<BlockBodyLine> = body_lines
         .iter()
         .map(|l| {
-            let is_blank = l.trim().is_empty();
-            let indent = l.chars().take_while(|c| *c == ' ').count();
             // Always strip up to `content_indent` columns; for `|` style this
             // preserves trailing spaces past the content indent (T26H).
             let text = if l.len() >= content_indent {
@@ -1169,10 +1167,17 @@ fn fold_block_scalar_tokens(
             } else {
                 String::new()
             };
-            // More-indented lines (per §8.1.3) keep literal line breaks in
-            // folded scalars. Blank lines are not flagged MI here; the folder
-            // counts them and applies the surrounding-line rule.
-            let is_mi = !is_blank && indent > content_indent;
+            // "Blank" for folding is decided on the stripped text, not the
+            // raw line: a line of pure whitespace less-indented than content
+            // (e.g. ` ` with content_indent=2) strips to empty and is blank,
+            // while a stripped tab (` \t` with content_indent=1 → `\t`) is
+            // content, not blank. More-indented lines (per §8.1.3) preserve
+            // literal line breaks; the spec defines them as content lines
+            // beginning with extra whitespace, so we test the stripped text's
+            // first character rather than counting only leading spaces (which
+            // would miss tab-prefixed content like R4YG/MJS9).
+            let is_blank = text.is_empty();
+            let is_mi = !is_blank && text.starts_with([' ', '\t']);
             BlockBodyLine {
                 text,
                 is_blank,

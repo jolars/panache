@@ -736,12 +736,6 @@
       "tree": false
     },
     {
-      "case_id": "MJS9",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "NAT4",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -773,12 +767,6 @@
     },
     {
       "case_id": "Q9WF",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "R4YG",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -1024,6 +1012,7 @@
     "M6YH",
     "M7NX",
     "M9B4",
+    "MJS9",
     "MXS3",
     "MYW6",
     "MZX3",
@@ -1041,6 +1030,7 @@
     "Q88A",
     "QF4Y",
     "QT73",
+    "R4YG",
     "R52L",
     "RR7F",
     "RTP8",
@@ -1080,8 +1070,8 @@
   "summary": {
     "error_contract_ok_count": 53,
     "fails_needs_error_path_count": 25,
-    "fails_needs_feature_count": 50,
-    "passes_now_count": 205,
+    "fails_needs_feature_count": 48,
+    "passes_now_count": 207,
     "total_cases": 352
   }
 }
