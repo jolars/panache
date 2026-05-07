@@ -93,7 +93,7 @@ async fn candidate_documents_for_scan(
         let has_bookdown = root.join("_bookdown.yml").exists();
 
         let candidate_paths = if has_quarto || has_bookdown {
-            let cfg = match crate::config::load(None, root, None) {
+            let cfg = match crate::config::load(None, root, None, None) {
                 Ok((cfg, _)) => cfg,
                 Err(_) => crate::Config::default(),
             };

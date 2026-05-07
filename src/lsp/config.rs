@@ -19,7 +19,7 @@ pub(crate) async fn load_config(
     };
 
     if let Some(root) = workspace_root.as_ref() {
-        match crate::config::load(None, root, input_file.as_deref()) {
+        match crate::config::load(None, root, input_file.as_deref(), None) {
             Ok((config, path)) => {
                 if let Some(p) = path {
                     client

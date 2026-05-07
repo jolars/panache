@@ -16,8 +16,22 @@ use cache::{
     CachedLintDocument, CliCache, FormatCacheMode, FormatStoreArgs, global_cache_base_dir,
     resolve_cache_dir_for_cli,
 };
-use cli::{Cli, ColorMode, Commands, DebugChecks, DebugCommands, ParseOutput};
+use cli::{Cli, CliFlavor, ColorMode, Commands, DebugChecks, DebugCommands, ParseOutput};
 use diagnostic_renderer::print_diagnostics;
+use panache::config::Flavor;
+
+impl From<CliFlavor> for Flavor {
+    fn from(value: CliFlavor) -> Self {
+        match value {
+            CliFlavor::Pandoc => Flavor::Pandoc,
+            CliFlavor::Quarto => Flavor::Quarto,
+            CliFlavor::RMarkdown => Flavor::RMarkdown,
+            CliFlavor::Gfm => Flavor::Gfm,
+            CliFlavor::CommonMark => Flavor::CommonMark,
+            CliFlavor::MultiMarkdown => Flavor::MultiMarkdown,
+        }
+    }
+}
 
 /// Supported file extensions for formatting
 const SUPPORTED_EXTENSIONS: &[&str] = &[
@@ -126,6 +140,7 @@ fn expand_paths(
     cfg: &panache::Config,
     filter_root: &Path,
     force_exclude: bool,
+    accept_any_extension: bool,
 ) -> io::Result<Vec<PathBuf>> {
     use ignore::WalkBuilder;
 
@@ -153,8 +168,9 @@ fn expand_paths(
             {
                 continue;
             }
-            // Check if file has a supported extension
-            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            if accept_any_extension {
+                files.push(path.clone());
+            } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 if SUPPORTED_EXTENSIONS.contains(&ext) {
                     files.push(path.clone());
                 } else {
@@ -369,25 +385,27 @@ fn load_config_for_cli(
     cli_cache_dir: Option<&Path>,
     start_dir: &Path,
     input_path: Option<&Path>,
+    flavor_override: Option<Flavor>,
 ) -> io::Result<(panache::Config, Option<PathBuf>)> {
     let mut loaded = if !isolated {
-        panache::config::load(config_path, start_dir, input_path)?
+        panache::config::load(config_path, start_dir, input_path, flavor_override)?
     } else {
         let mut cfg = panache::Config::default();
-        if let Some(input_path) = input_path
-            && let Some(ext) = input_path.extension().and_then(|e| e.to_str())
-        {
-            let detected_flavor = match ext.to_lowercase().as_str() {
-                "qmd" => Some(panache::config::Flavor::Quarto),
-                "rmd" | "rmarkdown" => Some(panache::config::Flavor::RMarkdown),
-                "md" => Some(cfg.flavor),
-                _ => None,
-            };
+        let isolated_flavor = flavor_override.or_else(|| {
+            input_path
+                .and_then(|p| p.extension())
+                .and_then(|e| e.to_str())
+                .and_then(|ext| match ext.to_lowercase().as_str() {
+                    "qmd" => Some(panache::config::Flavor::Quarto),
+                    "rmd" | "rmarkdown" => Some(panache::config::Flavor::RMarkdown),
+                    "md" => Some(cfg.flavor),
+                    _ => None,
+                })
+        });
 
-            if let Some(flavor) = detected_flavor {
-                cfg.flavor = flavor;
-                cfg.extensions = panache::config::Extensions::for_flavor(flavor);
-            }
+        if let Some(flavor) = isolated_flavor {
+            cfg.flavor = flavor;
+            cfg.extensions = panache::config::Extensions::for_flavor(flavor);
         }
         (cfg, None)
     };
@@ -715,6 +733,7 @@ fn main() -> io::Result<()> {
                 cli.cache_dir.as_deref(),
                 &start_dir,
                 input_path,
+                cli.flavor.map(Flavor::from),
             )?;
 
             if let Some(path) = &cfg_path {
@@ -797,6 +816,7 @@ fn main() -> io::Result<()> {
                     cli.cache_dir.as_deref(),
                     &start_dir,
                     cli.stdin_filename.as_deref(),
+                    cli.flavor.map(Flavor::from),
                 )?;
 
                 if let Some(path) = &cfg_path {
@@ -859,14 +879,20 @@ fn main() -> io::Result<()> {
                 cli.cache_dir.as_deref(),
                 &traversal_start_dir,
                 traversal_anchor,
+                cli.flavor.map(Flavor::from),
             )?;
             let matching_root = path_matching_root(
                 cli.config.as_deref(),
                 traversal_cfg_path.as_deref(),
                 &traversal_start_dir,
             )?;
-            let expanded_files =
-                expand_paths(&files, &traversal_cfg, &matching_root, force_exclude)?;
+            let expanded_files = expand_paths(
+                &files,
+                &traversal_cfg,
+                &matching_root,
+                force_exclude,
+                cli.flavor.is_some(),
+            )?;
             let mut cache = if cli.no_cache {
                 None
             } else {
@@ -915,6 +941,7 @@ fn main() -> io::Result<()> {
                     cli.cache_dir.as_deref(),
                     &start_dir,
                     Some(file_path),
+                    cli.flavor.map(Flavor::from),
                 )?;
                 if parallel {
                     cfg.external_max_parallel = 1;
@@ -1110,6 +1137,7 @@ fn main() -> io::Result<()> {
                 cli.cache_dir.as_deref(),
                 &start_dir,
                 None,
+                cli.flavor.map(Flavor::from),
             )?;
 
             let report_clean = |message: String| {
@@ -1218,13 +1246,20 @@ fn main() -> io::Result<()> {
                         cli.cache_dir.as_deref(),
                         &traversal_start_dir,
                         traversal_anchor,
+                        cli.flavor.map(Flavor::from),
                     )?;
                     let matching_root = path_matching_root(
                         cli.config.as_deref(),
                         traversal_cfg_path.as_deref(),
                         &traversal_start_dir,
                     )?;
-                    expand_paths(&files, &traversal_cfg, &matching_root, force_exclude)?
+                    expand_paths(
+                        &files,
+                        &traversal_cfg,
+                        &matching_root,
+                        force_exclude,
+                        cli.flavor.is_some(),
+                    )?
                 };
 
                 if !use_stdin && targets.is_empty() {
@@ -1262,6 +1297,7 @@ fn main() -> io::Result<()> {
                         cli.cache_dir.as_deref(),
                         &start_dir,
                         cli.stdin_filename.as_deref(),
+                        cli.flavor.map(Flavor::from),
                     )?;
                     let input = read_all(None)?;
                     files_checked += 1;
@@ -1294,6 +1330,7 @@ fn main() -> io::Result<()> {
                             cli.cache_dir.as_deref(),
                             &start_dir,
                             Some(file_path),
+                            cli.flavor.map(Flavor::from),
                         )?;
                         let input = fs::read_to_string(file_path)?;
                         files_checked += 1;
@@ -1400,6 +1437,7 @@ fn main() -> io::Result<()> {
                     cli.cache_dir.as_deref(),
                     &start_dir,
                     cli.stdin_filename.as_deref(),
+                    cli.flavor.map(Flavor::from),
                 )?;
 
                 if let Some(path) = &cfg_path {
@@ -1473,14 +1511,20 @@ fn main() -> io::Result<()> {
                 cli.cache_dir.as_deref(),
                 &traversal_start_dir,
                 traversal_anchor,
+                cli.flavor.map(Flavor::from),
             )?;
             let matching_root = path_matching_root(
                 cli.config.as_deref(),
                 traversal_cfg_path.as_deref(),
                 &traversal_start_dir,
             )?;
-            let expanded_files =
-                expand_paths(&files, &traversal_cfg, &matching_root, force_exclude)?;
+            let expanded_files = expand_paths(
+                &files,
+                &traversal_cfg,
+                &matching_root,
+                force_exclude,
+                cli.flavor.is_some(),
+            )?;
             let mut cache = if cli.no_cache {
                 None
             } else {
@@ -1525,6 +1569,7 @@ fn main() -> io::Result<()> {
                     cli.cache_dir.as_deref(),
                     &start_dir,
                     Some(file_path),
+                    cli.flavor.map(Flavor::from),
                 )?;
                 if parallel {
                     cfg.external_max_parallel = 1;

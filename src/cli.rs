@@ -56,6 +56,25 @@ pub struct Cli {
     )]
     pub stdin_filename: Option<PathBuf>,
 
+    /// Override the markdown flavor for this invocation
+    #[arg(
+        long,
+        global = true,
+        value_enum,
+        value_name = "FLAVOR",
+        help_heading = "Global options"
+    )]
+    #[arg(help = "Override the markdown flavor (overrides config and file extension)")]
+    #[arg(
+        long_help = "Override the markdown flavor for this invocation. Takes the highest \
+        precedence: it overrides any value in panache.toml, the [flavor-overrides] glob \
+        table, and the flavor inferred from the file extension. Extension overrides from \
+        [extensions] in panache.toml still merge on top of the flavor's defaults. Useful \
+        when the file extension is unknown (e.g. a .txt file containing markdown) or when \
+        you want to force a one-off interpretation."
+    )]
+    pub flavor: Option<CliFlavor>,
+
     /// Control when colored output is used
     #[arg(
         long,
@@ -389,4 +408,17 @@ pub enum ColorMode {
 pub enum MessageFormat {
     Human,
     Short,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum CliFlavor {
+    Pandoc,
+    Quarto,
+    #[value(name = "rmarkdown")]
+    RMarkdown,
+    Gfm,
+    #[value(name = "commonmark")]
+    CommonMark,
+    #[value(name = "multimarkdown")]
+    MultiMarkdown,
 }

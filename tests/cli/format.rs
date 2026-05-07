@@ -367,6 +367,85 @@ fn test_format_stdin_filename_infers_quarto_flavor() {
 }
 
 #[test]
+fn test_format_flavor_quarto_enables_quarto_sugar() {
+    cargo_bin_cmd!("panache")
+        .args(["format", "--flavor", "quarto"])
+        .write_stdin("```{r, echo=FALSE}\n1 + 1\n```\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("#| echo: false"));
+}
+
+#[test]
+fn test_format_flavor_overrides_stdin_filename() {
+    // --stdin-filename suggests Quarto, but --flavor pandoc wins, so the Quarto
+    // code-cell sugar (#| options) should NOT be emitted.
+    cargo_bin_cmd!("panache")
+        .args([
+            "format",
+            "--flavor",
+            "pandoc",
+            "--stdin-filename",
+            "doc.qmd",
+        ])
+        .write_stdin("```{r, echo=FALSE}\n1 + 1\n```\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("#| echo: false").not());
+}
+
+#[test]
+fn test_format_flavor_overrides_discovered_config() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_file = temp_dir.path().join(".panache.toml");
+    fs::write(&config_file, "flavor = \"quarto\"").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["format", "--flavor", "pandoc"])
+        .write_stdin("```{r, echo=FALSE}\n1 + 1\n```\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("#| echo: false").not());
+}
+
+#[test]
+fn test_format_flavor_accepts_unsupported_extension_for_explicit_path() {
+    // The original use case from #262: a .txt file containing markdown.
+    // Without --flavor the file is rejected; with --flavor it is processed.
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("notes.txt");
+    fs::write(&test_file, "# Heading\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "format",
+            "--flavor",
+            "pandoc",
+            "--check",
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    cargo_bin_cmd!("panache")
+        .args(["format", "--check", test_file.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unsupported file type"));
+}
+
+#[test]
+fn test_format_flavor_invalid_value_errors() {
+    cargo_bin_cmd!("panache")
+        .args(["format", "--flavor", "bogus"])
+        .write_stdin("# Heading\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid value"));
+}
+
+#[test]
 fn test_format_color_always_shows_ansi_diff() {
     cargo_bin_cmd!("panache")
         .args(["format", "--check", "--color", "always"])

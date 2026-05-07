@@ -31,6 +31,10 @@ Homepage and downloads (including .deb and .rpm packages): <https://panache.bz>
 
 * `--config <CONFIG>` — Path to a custom configuration file. If not specified, Panache will search for .panache.toml or panache.toml in the current directory and its parents, then fall back to ~/.config/panache/config.toml.
 * `--stdin-filename <PATH>` — Synthetic filename to associate with stdin input. This is useful for editor integrations that pipe content via stdin but still need Panache to infer flavor/extensions from file extension (for example: --stdin-filename doc.qmd).
+* `--flavor <FLAVOR>` — Override the markdown flavor for this invocation. Takes the highest precedence: it overrides any value in panache.toml, the [flavor-overrides] glob table, and the flavor inferred from the file extension. Extension overrides from [extensions] in panache.toml still merge on top of the flavor's defaults. Useful when the file extension is unknown (e.g. a .txt file containing markdown) or when you want to force a one-off interpretation.
+
+  Possible values: `pandoc`, `quarto`, `rmarkdown`, `gfm`, `commonmark`, `multimarkdown`
+
 * `--color <WHEN>` — Control when colored output is used
 
   Default value: `auto`

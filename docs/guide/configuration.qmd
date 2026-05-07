@@ -53,6 +53,12 @@ The available flavors are:
 :   MultiMarkdown flavor defaults (Pandoc-compatible MultiMarkdown extension
     set)
 
+The `--flavor` CLI flag (see the [CLI reference](../reference/cli.qmd))
+overrides this setting for a single invocation. It also overrides
+[`[flavor-overrides]`](#flavor-overrides) and the flavor inferred from the file
+extension. `[extensions]` overrides from `panache.toml` still merge on top of
+the selected flavor's defaults.
+
 ### Line Width
 
 Set the maximum line width for text wrapping:
@@ -76,11 +82,12 @@ flavor = "quarto"
 
 Panache applies flavor in this order:
 
-1. `.qmd` files always use `quarto`
-2. `.Rmd` files always use `rmarkdown`
-3. Markdown-family files use the most specific matching `flavor-overrides`
+1. The `--flavor` CLI flag, if supplied, overrides everything below
+2. `.qmd` files always use `quarto`
+3. `.Rmd` files always use `rmarkdown`
+4. Markdown-family files use the most specific matching `flavor-overrides`
    pattern
-4. Otherwise, Panache falls back to top-level `flavor`
+5. Otherwise, Panache falls back to top-level `flavor`
 
 ### File Selection (Directory Traversal)
 

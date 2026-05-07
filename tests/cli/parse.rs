@@ -151,6 +151,30 @@ fn test_parse_stdin_filename_infers_quarto_flavor() {
 }
 
 #[test]
+fn test_parse_flavor_quarto_enables_chunk_options() {
+    // Quarto enables executable_code, so ```{r, echo=FALSE} is parsed as a
+    // CODE_BLOCK with CHUNK_OPTIONS rather than the plain Pandoc fallback.
+    cargo_bin_cmd!("panache")
+        .args(["parse", "--flavor", "quarto"])
+        .write_stdin("```{r, echo=FALSE}\n1 + 1\n```\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("CHUNK_OPTIONS"));
+}
+
+#[test]
+fn test_parse_flavor_overrides_stdin_filename() {
+    // --stdin-filename suggests Quarto (which would emit CHUNK_OPTIONS), but
+    // --flavor pandoc forces pandoc, so chunk options are not recognized.
+    cargo_bin_cmd!("panache")
+        .args(["parse", "--flavor", "pandoc", "--stdin-filename", "doc.qmd"])
+        .write_stdin("```{r, echo=FALSE}\n1 + 1\n```\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("CHUNK_OPTIONS").not());
+}
+
+#[test]
 fn test_parse_to_pandoc_ast_stdin() {
     cargo_bin_cmd!("panache")
         .args(["parse", "--to", "pandoc-ast"])

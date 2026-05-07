@@ -255,6 +255,7 @@ pub fn load(
     explicit: Option<&Path>,
     start_dir: &Path,
     input_file: Option<&Path>,
+    flavor_override: Option<Flavor>,
 ) -> io::Result<(Config, Option<PathBuf>)> {
     let (mut cfg, cfg_path) = if let Some(path) = explicit {
         let cfg = read_config(path)?;
@@ -272,28 +273,35 @@ pub fn load(
         (Config::default(), None)
     };
 
-    if let Some(flavor) = detect_flavor(input_file, cfg_path.as_deref(), &cfg) {
-        cfg.flavor = flavor;
-        if let Some(path) = cfg_path.as_deref() {
-            fs::read_to_string(path)
-                .ok()
-                .and_then(|s| toml::from_str::<toml::Value>(&s).ok())
-                .map(|root| {
-                    cfg.extensions = resolve_extensions_for_flavor(root.get("extensions"), flavor);
-                    cfg.formatter_extensions =
-                        resolve_formatter_extensions_for_flavor(root.get("extensions"), flavor);
-                })
-                .unwrap_or_else(|| {
-                    cfg.extensions = Extensions::for_flavor(flavor);
-                    cfg.formatter_extensions = FormatterExtensions::for_flavor(flavor);
-                });
-        } else {
-            cfg.extensions = Extensions::for_flavor(flavor);
-            cfg.formatter_extensions = FormatterExtensions::for_flavor(flavor);
-        }
+    let resolved_flavor =
+        flavor_override.or_else(|| detect_flavor(input_file, cfg_path.as_deref(), &cfg));
+
+    if let Some(flavor) = resolved_flavor {
+        apply_flavor(&mut cfg, flavor, cfg_path.as_deref());
     }
 
     Ok((cfg, cfg_path))
+}
+
+fn apply_flavor(cfg: &mut Config, flavor: Flavor, cfg_path: Option<&Path>) {
+    cfg.flavor = flavor;
+    if let Some(path) = cfg_path {
+        fs::read_to_string(path)
+            .ok()
+            .and_then(|s| toml::from_str::<toml::Value>(&s).ok())
+            .map(|root| {
+                cfg.extensions = resolve_extensions_for_flavor(root.get("extensions"), flavor);
+                cfg.formatter_extensions =
+                    resolve_formatter_extensions_for_flavor(root.get("extensions"), flavor);
+            })
+            .unwrap_or_else(|| {
+                cfg.extensions = Extensions::for_flavor(flavor);
+                cfg.formatter_extensions = FormatterExtensions::for_flavor(flavor);
+            });
+    } else {
+        cfg.extensions = Extensions::for_flavor(flavor);
+        cfg.formatter_extensions = FormatterExtensions::for_flavor(flavor);
+    }
 }
 
 fn parse_flavor_key(s: &str) -> Option<Flavor> {
@@ -530,5 +538,75 @@ mod tests {
         let cfg = Config::default();
         let detected = detect_flavor(Some(Path::new("doc.Rmarkdown")), None, &cfg);
         assert_eq!(detected, Some(Flavor::RMarkdown));
+    }
+
+    #[test]
+    fn flavor_override_beats_extension_inference() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let qmd = tmp.path().join("doc.qmd");
+        std::fs::write(&qmd, "").unwrap();
+
+        let (cfg, _) = load(None, tmp.path(), Some(&qmd), Some(Flavor::Pandoc)).expect("load");
+        assert_eq!(cfg.flavor, Flavor::Pandoc);
+    }
+
+    #[test]
+    fn flavor_override_beats_config_flavor_key() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let cfg_path = tmp.path().join("panache.toml");
+        std::fs::write(&cfg_path, "flavor = \"quarto\"\n").unwrap();
+
+        let (cfg, _) = load(None, tmp.path(), None, Some(Flavor::Gfm)).expect("load");
+        assert_eq!(cfg.flavor, Flavor::Gfm);
+    }
+
+    #[test]
+    fn flavor_override_beats_flavor_overrides_glob() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let cfg_path = tmp.path().join("panache.toml");
+        std::fs::write(&cfg_path, "[flavor-overrides]\n\"*.md\" = \"quarto\"\n").unwrap();
+        let md = tmp.path().join("doc.md");
+        std::fs::write(&md, "").unwrap();
+
+        let (cfg, _) = load(None, tmp.path(), Some(&md), Some(Flavor::Gfm)).expect("load");
+        assert_eq!(cfg.flavor, Flavor::Gfm);
+    }
+
+    #[test]
+    fn flavor_override_still_merges_extensions_overrides() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let cfg_path = tmp.path().join("panache.toml");
+        // Disable an extension that is normally on for Pandoc.
+        std::fs::write(
+            &cfg_path,
+            "flavor = \"quarto\"\n\n[extensions]\nfenced-divs = false\n",
+        )
+        .unwrap();
+
+        let (cfg, _) = load(None, tmp.path(), None, Some(Flavor::Pandoc)).expect("load");
+        assert_eq!(cfg.flavor, Flavor::Pandoc);
+        // The user override turns off fenced_divs even though Pandoc default would enable it.
+        assert!(!cfg.extensions.fenced_divs);
+    }
+
+    #[test]
+    fn flavor_override_uses_overridden_flavor_table() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let cfg_path = tmp.path().join("panache.toml");
+        // The config's flavor key says quarto, with a quarto-specific override that
+        // enables fenced_divs and a pandoc-specific override that disables it.
+        // When --flavor pandoc is supplied, only the [extensions.pandoc] table should
+        // apply (not the quarto one).
+        std::fs::write(
+            &cfg_path,
+            "flavor = \"quarto\"\n\n\
+             [extensions.quarto]\nfenced-divs = true\n\n\
+             [extensions.pandoc]\nfenced-divs = false\n",
+        )
+        .unwrap();
+
+        let (cfg, _) = load(None, tmp.path(), None, Some(Flavor::Pandoc)).expect("load");
+        assert_eq!(cfg.flavor, Flavor::Pandoc);
+        assert!(!cfg.extensions.fenced_divs);
     }
 }
