@@ -1,0 +1,20 @@
+[package]
+name = "dprint-plugin-panache"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/jolars/panache"
+homepage = "https://panache.bz"
+authors = ["Johan Larsson <johan@jolars.co>"]
+description = "dprint Wasm plugin that wraps the Panache formatter for Quarto, Pandoc, and Markdown."
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+anyhow = "1.0"
+dprint-core = { version = "0.67", features = ["wasm"] }
+panache-formatter = { path = "../panache-formatter" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

@@ -36,6 +36,8 @@ lcov.info
 # WASM build artifacts
 crates/panache-wasm/pkg/
 docs/playground/pkg/
+crates/panache-dprint/target/
+crates/panache-dprint/Cargo.lock
 
 # Pre-commit / node wrapper
 /node_modules

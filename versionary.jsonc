@@ -13,6 +13,7 @@
         "crates/panache-formatter",
         "crates/panache-parser",
         "crates/panache-wasm",
+        "crates/panache-dprint",
         "editors"
       ],
       "extra-files": [
@@ -30,6 +31,7 @@
     },
     "crates/panache-parser": {},
     "crates/panache-formatter": {},
+    "crates/panache-dprint": {},
     "editors/code": {
       "release-type": "node",
       "package-name": "panache-code",

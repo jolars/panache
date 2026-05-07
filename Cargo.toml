@@ -29,6 +29,14 @@ members = [
     "crates/panache-formatter",
     "crates/panache-wasm",
 ]
+# Excluded because this crate must be compiled to wasm32-unknown-unknown to work
+# (it relies on `dprint_core::generate_plugin_code!`, which is only defined on
+# that target). Build with:
+#   cargo build --manifest-path crates/panache-dprint/Cargo.toml \
+#     --release --target wasm32-unknown-unknown
+exclude = [
+    "crates/panache-dprint",
+]
 
 [lib]
 doctest = false

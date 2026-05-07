@@ -1,0 +1,76 @@
+name: Publish dprint Wasm Plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to upload to (e.g. v2.43.1). Leave empty to skip upload."
+        required: false
+        type: string
+  push:
+    tags:
+      - "dprint-plugin-panache-v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-wasm:
+    name: Build dprint Wasm plugin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.1
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: dprint-wasm
+          workspaces: crates/panache-dprint -> target
+
+      - name: Build dprint plugin
+        run: |
+          cargo build \
+            --manifest-path crates/panache-dprint/Cargo.toml \
+            --release \
+            --target wasm32-unknown-unknown
+
+      - name: Stage release artifact
+        run: |
+          mkdir -p dist
+          cp crates/panache-dprint/target/wasm32-unknown-unknown/release/dprint_plugin_panache.wasm \
+            dist/panache.wasm
+          (cd dist && sha256sum panache.wasm > panache.wasm.sha256)
+          ls -la dist/
+
+      - name: Upload artifact (for inspection)
+        uses: actions/upload-artifact@v7
+        with:
+          name: panache-dprint-wasm
+          path: |
+            dist/panache.wasm
+            dist/panache.wasm.sha256
+          if-no-files-found: error
+
+      - name: Upload to GitHub release
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+        shell: bash
+        run: |
+          TAG="${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}"
+          gh release upload --clobber "$TAG" \
+            dist/panache.wasm \
+            dist/panache.wasm.sha256
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
