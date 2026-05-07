@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.44.0](https://github.com/jolars/panache/compare/v2.43.1...v2.44.0) (2026-05-07)
+
+### Features
+- **linter:** add `undefined-achor` rule ([`729d6be`](https://github.com/jolars/panache/commit/729d6be461ab981285fb07406a46091735cec894)), closes [#263](https://github.com/jolars/panache/issues/263)
+- **cli:** report if no autofix is available with `--fix` ([`fb8e20b`](https://github.com/jolars/panache/commit/fb8e20bab922f831976e20e87bab834185bcf196))
+- add dprint plugin crate ([`d4b5fc5`](https://github.com/jolars/panache/commit/d4b5fc5df454e89a54c0b9fb5bd9e7518fe35f2d))
+- **cli:** add `--flavor` argument to set flavor ([`7d84561`](https://github.com/jolars/panache/commit/7d84561ac869c1321fc97a11ecd1fdaf630623e8)), closes [#262](https://github.com/jolars/panache/issues/262)
+- **cli:** allow `-` as argument for stdin ([`c720c2e`](https://github.com/jolars/panache/commit/c720c2e920d078fa16fd8b987b54dc1c23881447))
+
+### Bug Fixes
+- **cli,linter:** only report and write if there are fixes ([`b8255b7`](https://github.com/jolars/panache/commit/b8255b7f8d9f92df511f2a448848e667152cbb32))
+- don't overwrite flavor ([`84364a4`](https://github.com/jolars/panache/commit/84364a4abfcf10193f57e416d32a8b7685790da0))
 ## [2.43.1](https://github.com/jolars/panache/compare/v2.43.0...v2.43.1) (2026-05-06)
 
 ### Bug Fixes
