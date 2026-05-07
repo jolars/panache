@@ -1,0 +1,47 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: 8UDB
+input: "[\n\"double\n quoted\", 'single\n           quoted',\nplain\n text, [ nested ],\nsingle: pair,\n]\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..89
+  YAML_METADATA_CONTENT@0..89
+    YAML_STREAM@0..89
+      YAML_DOCUMENT@0..89
+        YAML_FLOW_SEQUENCE@0..88
+          YAML_SCALAR@0..1 "["
+          NEWLINE@1..2 "\n"
+          YAML_FLOW_SEQUENCE_ITEM@2..18
+            YAML_SCALAR@2..18 "\"double\n quoted\""
+          YAML_SCALAR@18..19 ","
+          WHITESPACE@19..20 " "
+          YAML_FLOW_SEQUENCE_ITEM@20..46
+            YAML_SCALAR@20..46 "'single\n           qu ..."
+          YAML_SCALAR@46..47 ","
+          NEWLINE@47..48 "\n"
+          YAML_FLOW_SEQUENCE_ITEM@48..59
+            YAML_SCALAR@48..59 "plain\n text"
+          YAML_SCALAR@59..60 ","
+          WHITESPACE@60..61 " "
+          YAML_FLOW_SEQUENCE_ITEM@61..71
+            YAML_FLOW_SEQUENCE@61..71
+              YAML_SCALAR@61..62 "["
+              WHITESPACE@62..63 " "
+              YAML_FLOW_SEQUENCE_ITEM@63..70
+                YAML_SCALAR@63..70 "nested "
+              YAML_SCALAR@70..71 "]"
+          YAML_SCALAR@71..72 ","
+          NEWLINE@72..73 "\n"
+          YAML_FLOW_SEQUENCE_ITEM@73..85
+            YAML_SCALAR@73..79 "single"
+            YAML_COLON@79..80 ":"
+            WHITESPACE@80..81 " "
+            YAML_SCALAR@81..85 "pair"
+          YAML_SCALAR@85..86 ","
+          NEWLINE@86..87 "\n"
+          YAML_SCALAR@87..88 "]"
+        NEWLINE@88..89 "\n"

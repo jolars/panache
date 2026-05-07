@@ -1,0 +1,32 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: FUP4
+input: "[a, [b, c]]\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..12
+  YAML_METADATA_CONTENT@0..12
+    YAML_STREAM@0..12
+      YAML_DOCUMENT@0..12
+        YAML_FLOW_SEQUENCE@0..11
+          YAML_SCALAR@0..1 "["
+          YAML_FLOW_SEQUENCE_ITEM@1..2
+            YAML_SCALAR@1..2 "a"
+          YAML_SCALAR@2..3 ","
+          WHITESPACE@3..4 " "
+          YAML_FLOW_SEQUENCE_ITEM@4..10
+            YAML_FLOW_SEQUENCE@4..10
+              YAML_SCALAR@4..5 "["
+              YAML_FLOW_SEQUENCE_ITEM@5..6
+                YAML_SCALAR@5..6 "b"
+              YAML_SCALAR@6..7 ","
+              WHITESPACE@7..8 " "
+              YAML_FLOW_SEQUENCE_ITEM@8..9
+                YAML_SCALAR@8..9 "c"
+              YAML_SCALAR@9..10 "]"
+          YAML_SCALAR@10..11 "]"
+        NEWLINE@11..12 "\n"

@@ -1,0 +1,53 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: 9BXH
+input: "---\n- { \"single line\", a: b}\n- { \"multi\n  line\", a: b}\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..55
+  YAML_METADATA_CONTENT@0..55
+    YAML_STREAM@0..55
+      YAML_DOCUMENT@0..55
+        YAML_DOCUMENT_START@0..3 "---"
+        NEWLINE@3..4 "\n"
+        YAML_BLOCK_SEQUENCE@4..55
+          YAML_BLOCK_SEQUENCE_ITEM@4..29
+            YAML_BLOCK_SEQ_ENTRY@4..5 "-"
+            WHITESPACE@5..6 " "
+            YAML_FLOW_MAP@6..28
+              YAML_SCALAR@6..7 "{"
+              WHITESPACE@7..8 " "
+              YAML_SCALAR@8..21 "\"single line\""
+              YAML_SCALAR@21..22 ","
+              WHITESPACE@22..23 " "
+              YAML_FLOW_MAP_ENTRY@23..27
+                YAML_FLOW_MAP_KEY@23..25
+                  YAML_SCALAR@23..24 "a"
+                  YAML_COLON@24..25 ":"
+                YAML_FLOW_MAP_VALUE@25..27
+                  WHITESPACE@25..26 " "
+                  YAML_SCALAR@26..27 "b"
+              YAML_SCALAR@27..28 "}"
+            NEWLINE@28..29 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@29..55
+            YAML_BLOCK_SEQ_ENTRY@29..30 "-"
+            WHITESPACE@30..31 " "
+            YAML_FLOW_MAP@31..54
+              YAML_SCALAR@31..32 "{"
+              WHITESPACE@32..33 " "
+              YAML_SCALAR@33..47 "\"multi\n  line\""
+              YAML_SCALAR@47..48 ","
+              WHITESPACE@48..49 " "
+              YAML_FLOW_MAP_ENTRY@49..53
+                YAML_FLOW_MAP_KEY@49..51
+                  YAML_SCALAR@49..50 "a"
+                  YAML_COLON@50..51 ":"
+                YAML_FLOW_MAP_VALUE@51..53
+                  WHITESPACE@51..52 " "
+                  YAML_SCALAR@52..53 "b"
+              YAML_SCALAR@53..54 "}"
+            NEWLINE@54..55 "\n"

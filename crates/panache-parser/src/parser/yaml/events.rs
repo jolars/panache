@@ -303,12 +303,9 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
     } else if let Some(flow_seq) = doc
         .descendants()
         .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
-        && let Some(items) = simple_flow_sequence_items(&flow_seq.text().to_string())
     {
         out.push("+SEQ []".to_string());
-        for item in items {
-            project_flow_seq_item(&item, &handles, out);
-        }
+        project_flow_sequence_items_cst(&flow_seq, &handles, out);
         out.push("-SEQ".to_string());
     } else if let Some(scalar) = scalar_document_value(doc, &handles) {
         out.push(scalar);
@@ -578,7 +575,17 @@ fn project_flow_seq_item(item: &str, handles: &TagHandles, out: &mut Vec<String>
         }
         out.push("-MAP".to_string());
     } else if item.trim_start().starts_with('"') || item.trim_start().starts_with('\'') {
-        out.push(quoted_val_event(item.trim()));
+        let trimmed = item.trim();
+        // Multi-line quoted scalar inside a flow sequence: apply YAML
+        // 1.2 §7.3 line-folding rules so embedded newlines fold to a
+        // space (or `\n` for blank-line runs) before the event's escape
+        // pass. Without this, joining tokens directly leaves the literal
+        // newline inside the body.
+        if trimmed.contains('\n') {
+            out.push(quoted_val_event_multi_line(trimmed));
+        } else {
+            out.push(quoted_val_event(trimmed));
+        }
     } else {
         out.push(plain_val_event(&fold_plain_scalar(item)));
     }
@@ -1445,7 +1452,11 @@ fn flush_pending_orphan(pending: &str, handles: &TagHandles, out: &mut Vec<Strin
         return;
     }
     if trimmed.starts_with('"') || trimmed.starts_with('\'') {
-        out.push(quoted_val_event(trimmed));
+        if trimmed.contains('\n') {
+            out.push(quoted_val_event_multi_line(trimmed));
+        } else {
+            out.push(quoted_val_event(trimmed));
+        }
     } else {
         let folded = fold_plain_scalar(trimmed);
         let stripped = strip_explicit_key_indicator(&folded);
@@ -1805,7 +1816,7 @@ fn project_block_sequence_items(
             .children()
             .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
         {
-            out.push("+MAP".to_string());
+            out.push(map_open_event_for_block_map(&nested_map, handles));
             project_block_map_entries(&nested_map, handles, out);
             out.push("-MAP".to_string());
             continue;
@@ -1863,7 +1874,14 @@ fn project_block_sequence_items(
                 .and_then(|t| resolve_long_tag(t, handles));
             let (anchor, body_tag, body) = decompose_scalar(scalar_trimmed, handles);
             let long_tag = item_long_tag.or(body_tag);
-            scalar_event(anchor, long_tag.as_deref(), body)
+            let folded;
+            let body_for_event: &str = if body.contains('\n') {
+                folded = fold_plain_scalar(body);
+                &folded
+            } else {
+                body
+            };
+            scalar_event(anchor, long_tag.as_deref(), body_for_event)
         };
         out.push(event);
     }
@@ -2167,7 +2185,10 @@ fn scalar_event(anchor: Option<&str>, long_tag: Option<&str>, body: &str) -> Str
         let quoted = quoted_val_event(body);
         return quoted.replacen("=VAL ", &format!("=VAL {prefix}"), 1);
     }
-    format!("=VAL {prefix}:{body}")
+    // yaml-test-suite events escape `\`, control characters, and embedded
+    // newlines in plain-scalar bodies. Apply that here so callers can pass
+    // raw (or fold-only) text and not pre-escape.
+    format!("=VAL {prefix}:{}", escape_for_event(body))
 }
 
 fn project_block_map_entries(map_node: &SyntaxNode, handles: &TagHandles, out: &mut Vec<String>) {
@@ -2335,7 +2356,7 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
         let long_tag = key_long_tag.or(body_tag);
         let folded;
         let body_for_event: &str = if body.contains('\n') {
-            folded = escape_for_event(&fold_quoted_inner(body));
+            folded = fold_quoted_inner(body);
             &folded
         } else {
             body
@@ -2595,7 +2616,7 @@ fn project_block_map_entry_value(
             let long_tag = value_long_tag.or(body_tag);
             let folded;
             let body_for_event: &str = if body.contains('\n') {
-                folded = escape_for_event(&fold_quoted_inner(body));
+                folded = fold_quoted_inner(body);
                 &folded
             } else {
                 body

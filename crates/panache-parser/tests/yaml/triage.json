@@ -526,12 +526,6 @@
   ],
   "fails_needs_feature": [
     {
-      "case_id": "2EBW",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "2JQS",
       "diagnostic_codes": [
         "YAML_PARSE_UNEXPECTED_DEDENT"
@@ -604,12 +598,6 @@
       "tree": false
     },
     {
-      "case_id": "735Y",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "7FWL",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -622,18 +610,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "8UDB",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "9BXH",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "9KAX",
@@ -700,12 +676,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "FUP4",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "KK5P",
@@ -820,12 +790,6 @@
       "tree": false
     },
     {
-      "case_id": "UV7Q",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "V9D5",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -863,6 +827,7 @@
     "26DV",
     "27NA",
     "2AUY",
+    "2EBW",
     "2LFX",
     "2XXW",
     "33X3",
@@ -911,6 +876,7 @@
     "6WPF",
     "6XDY",
     "6ZKB",
+    "735Y",
     "74H7",
     "753E",
     "7A4E",
@@ -927,11 +893,13 @@
     "8KB6",
     "8MK2",
     "8QBE",
+    "8UDB",
     "8XYN",
     "93JH",
     "93WF",
     "96L6",
     "98YD",
+    "9BXH",
     "9DXL",
     "9FMG",
     "9J7A",
@@ -975,6 +943,7 @@
     "FQ7F",
     "FRK4",
     "FTA2",
+    "FUP4",
     "G4RS",
     "G992",
     "GH63",
@@ -1052,6 +1021,7 @@
     "UDM2",
     "UDR7",
     "UT92",
+    "UV7Q",
     "V55R",
     "W42U",
     "W5VH",
@@ -1070,8 +1040,8 @@
   "summary": {
     "error_contract_ok_count": 53,
     "fails_needs_error_path_count": 25,
-    "fails_needs_feature_count": 48,
-    "passes_now_count": 207,
+    "fails_needs_feature_count": 42,
+    "passes_now_count": 213,
     "total_cases": 352
   }
 }

@@ -418,3 +418,16 @@ W42U
 # Folded `>` scalar containing tab-prefixed or tab-only lines (`  \t bar`, ` \t`); is_blank/is_mi for folding now decided on the content-indent-stripped text rather than `trim().is_empty()` and leading-spaces count, so a stripped `\t` is content (and more-indented) per §8.1.3 instead of being collapsed into the surrounding blanks.
 MJS9
 R4YG
+
+# Plain-scalar bodies in scalar_event now go through escape_for_event so backslashes (and other control chars) emit as `\\`/`\n`/etc. — yaml-test-suite event escaping for plain scalars.
+2EBW
+# Block-sequence items shaped `- !!map\n  k: v` now propagate the `!!map` (and other) tag onto the `+MAP` event by routing through map_open_event_for_block_map.
+735Y
+# Multi-line quoted scalars inside flow sequences fold their newlines per YAML §7.3 (single break -> space) before the event escape pass — `quoted_val_event_multi_line` is now picked when a flow-seq item contains `\n`.
+8UDB
+# Flow-map orphan keys (`{ "multi\n  line", a: b}`) fold multi-line quoted keys before emitting; flush_pending_orphan now picks `quoted_val_event_multi_line` for newline-bearing quoted text.
+9BXH
+# Nested flow sequences inside a flow sequence (`[a, [b, c]]`) project as nested `+SEQ []` because the doc-level flow-seq path now uses the CST-walking projector instead of the text-based item splitter.
+FUP4
+# Multi-line plain scalars on block-sequence items (`- x\n  \tx`) now fold to a single space before scalar_event; project_block_sequence_items applies fold_plain_scalar when the body contains a newline.
+UV7Q
