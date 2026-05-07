@@ -399,3 +399,19 @@ DC7X
 RZT7
 # Block-map with anchors/aliases on nested block-sequence values (`hr:\n  - &SS Sammy Sosa`); top-level direct-child detection now keeps the outer map.
 7BUB
+# Block-sequence items containing `|` literal block-scalar values (`- |\n detected`); project_block_sequence_items now routes through the block-scalar folder before the plain-scalar fallback.
+4QFQ
+# Block-sequence items containing `|2-` / `|-2` block scalars (explicit indent + chomp combined in either order); same root cause as 4QFQ — the new block-scalar branch in sequence-item projection picks them up.
+D83L
+# Block-map values with explicit indent indicators on `>` folded scalars (`a: >2\n   more indented`); explicit indent indicator now sets content_indent to parent_col + m instead of being silently discarded.
+F6MC
+# Block-map with literal block-scalar values whose content begins with `#` (`strip: |-\n  # text`); keep-chomp counting now uses trailing-empty body lines (computed on stripped text) so `|+` preserves the right number of trailing newlines.
+F8F9
+# Block-sequence with mixed item kinds including a `|` literal scalar (`- |\n x`); same fix as 4QFQ — block-scalar dispatch in sequence-item projection.
+M6YH
+# Block-sequence containing a folded `>` block-scalar mixed with plain/quoted scalars (`- >\n  block`); block-scalar dispatch in sequence-item projection picks up the folded scalar.
+MZX3
+# Block-scalar headers carrying trailing comments (`| # Empty header`, `>1 # Indentation indicator`, `|+ # Chomping indicator`, `>1- # Both indicators`); parse_block_scalar_indicator now consumes optional trailing whitespace + comment after the chomp/indent characters.
+P2AD
+# Block-sequence containing a `|` block-scalar followed by compact mapping/sequence items (`- |\n block node`); same root cause as 4QFQ.
+W42U

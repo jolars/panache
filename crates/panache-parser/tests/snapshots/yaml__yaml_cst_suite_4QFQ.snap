@@ -1,0 +1,31 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: 4QFQ
+input: "- |\n detected\n- >\n \n  \n  # detected\n- |1\n  explicit\n- >\n detected\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..66
+  YAML_METADATA_CONTENT@0..66
+    YAML_STREAM@0..66
+      YAML_DOCUMENT@0..66
+        YAML_BLOCK_SEQUENCE@0..66
+          YAML_BLOCK_SEQUENCE_ITEM@0..14
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_SCALAR@2..14 "|\n detected\n"
+          YAML_BLOCK_SEQUENCE_ITEM@14..36
+            YAML_BLOCK_SEQ_ENTRY@14..15 "-"
+            WHITESPACE@15..16 " "
+            YAML_SCALAR@16..36 ">\n \n  \n  # detected\n"
+          YAML_BLOCK_SEQUENCE_ITEM@36..52
+            YAML_BLOCK_SEQ_ENTRY@36..37 "-"
+            WHITESPACE@37..38 " "
+            YAML_SCALAR@38..52 "|1\n  explicit\n"
+          YAML_BLOCK_SEQUENCE_ITEM@52..66
+            YAML_BLOCK_SEQ_ENTRY@52..53 "-"
+            WHITESPACE@53..54 " "
+            YAML_SCALAR@54..66 ">\n detected\n"

@@ -1,0 +1,42 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: M6YH
+input: "- |\n x\n-\n foo: bar\n-\n - 42\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..27
+  YAML_METADATA_CONTENT@0..27
+    YAML_STREAM@0..27
+      YAML_DOCUMENT@0..27
+        YAML_BLOCK_SEQUENCE@0..27
+          YAML_BLOCK_SEQUENCE_ITEM@0..7
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_SCALAR@2..7 "|\n x\n"
+          YAML_BLOCK_SEQUENCE_ITEM@7..19
+            YAML_BLOCK_SEQ_ENTRY@7..8 "-"
+            NEWLINE@8..9 "\n"
+            WHITESPACE@9..10 " "
+            YAML_BLOCK_MAP@10..19
+              YAML_BLOCK_MAP_ENTRY@10..19
+                YAML_BLOCK_MAP_KEY@10..14
+                  YAML_SCALAR@10..13 "foo"
+                  YAML_COLON@13..14 ":"
+                YAML_BLOCK_MAP_VALUE@14..19
+                  WHITESPACE@14..15 " "
+                  YAML_SCALAR@15..18 "bar"
+                  NEWLINE@18..19 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@19..27
+            YAML_BLOCK_SEQ_ENTRY@19..20 "-"
+            NEWLINE@20..21 "\n"
+            WHITESPACE@21..22 " "
+            YAML_BLOCK_SEQUENCE@22..27
+              YAML_BLOCK_SEQUENCE_ITEM@22..27
+                YAML_BLOCK_SEQ_ENTRY@22..23 "-"
+                WHITESPACE@23..24 " "
+                YAML_SCALAR@24..26 "42"
+                NEWLINE@26..27 "\n"

@@ -1,0 +1,57 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: W42U
+input: "- # Empty\n- |\n block node\n- - one # Compact\n  - two # sequence\n- one: two # Compact mapping\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..92
+  YAML_METADATA_CONTENT@0..92
+    YAML_STREAM@0..92
+      YAML_DOCUMENT@0..92
+        YAML_BLOCK_SEQUENCE@0..92
+          YAML_BLOCK_SEQUENCE_ITEM@0..10
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_COMMENT@2..9 "# Empty"
+            NEWLINE@9..10 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@10..26
+            YAML_BLOCK_SEQ_ENTRY@10..11 "-"
+            WHITESPACE@11..12 " "
+            YAML_SCALAR@12..26 "|\n block node\n"
+          YAML_BLOCK_SEQUENCE_ITEM@26..63
+            YAML_BLOCK_SEQ_ENTRY@26..27 "-"
+            WHITESPACE@27..28 " "
+            YAML_BLOCK_SEQUENCE@28..63
+              YAML_BLOCK_SEQUENCE_ITEM@28..46
+                YAML_BLOCK_SEQ_ENTRY@28..29 "-"
+                WHITESPACE@29..30 " "
+                YAML_SCALAR@30..33 "one"
+                WHITESPACE@33..34 " "
+                YAML_COMMENT@34..43 "# Compact"
+                NEWLINE@43..44 "\n"
+                WHITESPACE@44..46 "  "
+              YAML_BLOCK_SEQUENCE_ITEM@46..63
+                YAML_BLOCK_SEQ_ENTRY@46..47 "-"
+                WHITESPACE@47..48 " "
+                YAML_SCALAR@48..51 "two"
+                WHITESPACE@51..52 " "
+                YAML_COMMENT@52..62 "# sequence"
+                NEWLINE@62..63 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@63..92
+            YAML_BLOCK_SEQ_ENTRY@63..64 "-"
+            WHITESPACE@64..65 " "
+            YAML_BLOCK_MAP@65..92
+              YAML_BLOCK_MAP_ENTRY@65..92
+                YAML_BLOCK_MAP_KEY@65..69
+                  YAML_SCALAR@65..68 "one"
+                  YAML_COLON@68..69 ":"
+                YAML_BLOCK_MAP_VALUE@69..92
+                  WHITESPACE@69..70 " "
+                  YAML_SCALAR@70..73 "two"
+                  WHITESPACE@73..74 " "
+                  YAML_COMMENT@74..91 "# Compact mapping"
+                  NEWLINE@91..92 "\n"

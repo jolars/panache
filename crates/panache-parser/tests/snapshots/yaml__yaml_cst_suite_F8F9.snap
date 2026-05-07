@@ -1,0 +1,62 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: F8F9
+input: " # Strip\n  # Comments:\nstrip: |-\n  # text\n  \n # Clip\n  # comments:\n\nclip: |\n  # text\n \n # Keep\n  # comments:\n\nkeep: |+\n  # text\n\n # Trail\n  # comments.\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..152
+  YAML_METADATA_CONTENT@0..152
+    YAML_STREAM@0..152
+      WHITESPACE@0..1 " "
+      YAML_COMMENT@1..8 "# Strip"
+      NEWLINE@8..9 "\n"
+      WHITESPACE@9..11 "  "
+      YAML_COMMENT@11..22 "# Comments:"
+      NEWLINE@22..23 "\n"
+      YAML_DOCUMENT@23..152
+        YAML_BLOCK_MAP@23..152
+          YAML_BLOCK_MAP_ENTRY@23..68
+            YAML_BLOCK_MAP_KEY@23..29
+              YAML_SCALAR@23..28 "strip"
+              YAML_COLON@28..29 ":"
+            YAML_BLOCK_MAP_VALUE@29..68
+              WHITESPACE@29..30 " "
+              YAML_SCALAR@30..45 "|-\n  # text\n  \n"
+              WHITESPACE@45..46 " "
+              YAML_COMMENT@46..52 "# Clip"
+              NEWLINE@52..53 "\n"
+              WHITESPACE@53..55 "  "
+              YAML_COMMENT@55..66 "# comments:"
+              NEWLINE@66..67 "\n"
+              NEWLINE@67..68 "\n"
+          YAML_BLOCK_MAP_ENTRY@68..110
+            YAML_BLOCK_MAP_KEY@68..73
+              YAML_SCALAR@68..72 "clip"
+              YAML_COLON@72..73 ":"
+            YAML_BLOCK_MAP_VALUE@73..110
+              WHITESPACE@73..74 " "
+              YAML_SCALAR@74..87 "|\n  # text\n \n"
+              WHITESPACE@87..88 " "
+              YAML_COMMENT@88..94 "# Keep"
+              NEWLINE@94..95 "\n"
+              WHITESPACE@95..97 "  "
+              YAML_COMMENT@97..108 "# comments:"
+              NEWLINE@108..109 "\n"
+              NEWLINE@109..110 "\n"
+          YAML_BLOCK_MAP_ENTRY@110..152
+            YAML_BLOCK_MAP_KEY@110..115
+              YAML_SCALAR@110..114 "keep"
+              YAML_COLON@114..115 ":"
+            YAML_BLOCK_MAP_VALUE@115..152
+              WHITESPACE@115..116 " "
+              YAML_SCALAR@116..129 "|+\n  # text\n\n"
+              WHITESPACE@129..130 " "
+              YAML_COMMENT@130..137 "# Trail"
+              NEWLINE@137..138 "\n"
+              WHITESPACE@138..140 "  "
+              YAML_COMMENT@140..151 "# comments."
+              NEWLINE@151..152 "\n"

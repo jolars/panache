@@ -959,7 +959,39 @@ fn extract_block_scalar_body(value_node: &SyntaxNode) -> Option<(char, String)> 
             )
         })
         .collect();
-    fold_block_scalar_tokens(&tokens)
+    fold_block_scalar_tokens(&tokens, block_scalar_parent_indent(value_node))
+}
+
+/// Compute the column of the start-of-line for the parent scope of a
+/// block-scalar value, used to anchor explicit indent indicators per
+/// YAML 1.2 §8.1.1.1: when a block-scalar header carries an indentation
+/// indicator `m`, the absolute content indent is `parent_indent + m`.
+///
+/// Walks up to the YAML_BLOCK_MAP_ENTRY (for map values) or treats a
+/// passed YAML_BLOCK_SEQUENCE_ITEM as its own parent. Other shapes
+/// (e.g. top-level YAML_DOCUMENT) fall back to the node's own column,
+/// which is 0 at the document level.
+fn block_scalar_parent_indent(value_node: &SyntaxNode) -> usize {
+    let target = match value_node.kind() {
+        SyntaxKind::YAML_BLOCK_MAP_VALUE => value_node
+            .parent()
+            .filter(|p| p.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+            .unwrap_or_else(|| value_node.clone()),
+        _ => value_node.clone(),
+    };
+    column_of_node_start(&target)
+}
+
+fn column_of_node_start(node: &SyntaxNode) -> usize {
+    let offset: usize = node.text_range().start().into();
+    let root = node.ancestors().last().unwrap_or_else(|| node.clone());
+    let text = root.text().to_string();
+    let cap = offset.min(text.len());
+    let prefix = &text[..cap];
+    match prefix.rfind('\n') {
+        Some(nl) => offset.saturating_sub(nl + 1),
+        None => offset,
+    }
 }
 
 /// Variant of [`extract_block_scalar_body`] that walks a full `YAML_DOCUMENT`
@@ -987,7 +1019,7 @@ fn extract_scalar_doc_block_body(doc: &SyntaxNode) -> Option<(char, String)> {
             _ => {}
         }
     }
-    fold_block_scalar_tokens(&tokens)
+    fold_block_scalar_tokens(&tokens, 0)
 }
 
 /// Detect a top-level (no `YAML_DOCUMENT_START` marker) block-scalar document
@@ -1028,10 +1060,13 @@ fn extract_top_level_block_body(doc: &SyntaxNode) -> Option<(char, String)> {
         parse_block_scalar_indicator(header_part).is_some()
     })?;
     let _ = first;
-    fold_block_scalar_tokens(&tokens)
+    fold_block_scalar_tokens(&tokens, 0)
 }
 
-fn fold_block_scalar_tokens(tokens: &[SyntaxToken]) -> Option<(char, String)> {
+fn fold_block_scalar_tokens(
+    tokens: &[SyntaxToken],
+    parent_indent: usize,
+) -> Option<(char, String)> {
     // Locate the header. v1 emits the header (`|`, `|+`, `>1` …) as a
     // standalone YAML_SCALAR token and the body as separate per-line
     // tokens. v2 emits the entire block scalar (header + newline + body)
@@ -1046,7 +1081,7 @@ fn fold_block_scalar_tokens(tokens: &[SyntaxToken]) -> Option<(char, String)> {
     })?;
     let header_text = tokens[header_idx].text();
     let header_part = header_text.split('\n').next().unwrap_or("");
-    let (indicator, chomp) = parse_block_scalar_indicator(header_part)?;
+    let (indicator, chomp, explicit_indent) = parse_block_scalar_indicator(header_part)?;
 
     // Reconstruct the body source. Including `WHITESPACE` and
     // `YAML_COMMENT` tokens preserves the indentation needed for
@@ -1082,23 +1117,35 @@ fn fold_block_scalar_tokens(tokens: &[SyntaxToken]) -> Option<(char, String)> {
     let lines: Vec<&str> = raw.split('\n').collect();
 
     // Per YAML 1.2 §8.1.1.1, the content indentation level is set by the
-    // first non-empty line of the contents.
-    let content_indent = lines
-        .iter()
-        .find(|l| !l.trim().is_empty())
-        .map(|l| l.chars().take_while(|c| *c == ' ').count())
-        .unwrap_or(0);
+    // first non-empty line of the contents — unless an explicit indent
+    // indicator is given in the header, in which case the absolute
+    // content indent is `parent_indent + m`. `parent_indent` is the
+    // column of the parent block (block-map-entry or block-sequence-item)
+    // that contains the block-scalar; nested map/seq values pick up
+    // the right anchor (e.g. `- aaa: |2` → parent col 2 + 2 → 4).
+    let content_indent = match explicit_indent {
+        Some(m) => parent_indent + m,
+        None => lines
+            .iter()
+            .find(|l| !l.trim().is_empty())
+            .map(|l| l.chars().take_while(|c| *c == ' ').count())
+            .unwrap_or(0),
+    };
 
     // Truncate at the first non-empty line whose indentation drops below the
     // content indent — that's where the block scalar's body ends per spec.
-    // Trailing blanks (and the final empty split-tail) are kept; chomping
-    // re-derives the right number of trailing newlines below.
+    // Trailing blanks coming from the source are kept; only the synthetic
+    // final empty produced by `split('\n')` over a trailing newline is
+    // dropped (and only when we walked off the end of the input — when we
+    // broke out early on a dedented line, the trailing blank is real).
     let mut body_lines: Vec<&str> = Vec::new();
     let mut seen_content = false;
+    let mut broke_out = false;
     for line in lines.iter() {
         let is_blank = line.trim().is_empty();
         let indent = line.chars().take_while(|c| *c == ' ').count();
         if !is_blank && seen_content && indent < content_indent {
+            broke_out = true;
             break;
         }
         body_lines.push(line);
@@ -1106,7 +1153,7 @@ fn fold_block_scalar_tokens(tokens: &[SyntaxToken]) -> Option<(char, String)> {
             seen_content = true;
         }
     }
-    if body_lines.last().is_some_and(|s| s.is_empty()) {
+    if !broke_out && body_lines.last().is_some_and(|s| s.is_empty()) {
         body_lines.pop();
     }
 
@@ -1155,7 +1202,24 @@ fn fold_block_scalar_tokens(tokens: &[SyntaxToken]) -> Option<(char, String)> {
             }
         }
         BlockScalarChomp::Keep => {
-            format!("{trimmed}{}", "\n".repeat(raw_trailing_newlines))
+            // Keep chomping preserves the line break after the last
+            // content line plus one line break per trailing empty line.
+            // "Empty" is checked on the stripped text (so a raw `  `
+            // line stripped to ` ` is content, not empty). Falling back
+            // on `raw_trailing_newlines` for content-free bodies keeps
+            // bare-blank-keep cases (`|+\n\n\n`) producing the right
+            // count without a spurious extra newline.
+            let body_trailing_empty = stripped
+                .iter()
+                .rev()
+                .take_while(|l| l.text.is_empty())
+                .count();
+            let count = if seen_content {
+                body_trailing_empty + 1
+            } else {
+                raw_trailing_newlines
+            };
+            format!("{trimmed}{}", "\n".repeat(count))
         }
     };
     Some((indicator, body))
@@ -1226,8 +1290,8 @@ enum BlockScalarChomp {
     Keep,
 }
 
-fn parse_block_scalar_indicator(text: &str) -> Option<(char, BlockScalarChomp)> {
-    let mut chars = text.chars();
+fn parse_block_scalar_indicator(text: &str) -> Option<(char, BlockScalarChomp, Option<usize>)> {
+    let mut chars = text.chars().peekable();
     let indicator = match chars.next()? {
         '|' => '|',
         '>' => '>',
@@ -1235,22 +1299,42 @@ fn parse_block_scalar_indicator(text: &str) -> Option<(char, BlockScalarChomp)> 
     };
     let mut chomp = BlockScalarChomp::Clip;
     let mut seen_chomp = false;
-    let mut seen_indent = false;
-    for ch in chars {
+    let mut indent: Option<usize> = None;
+    while let Some(&ch) = chars.peek() {
         match ch {
             '+' if !seen_chomp => {
                 chomp = BlockScalarChomp::Keep;
                 seen_chomp = true;
+                chars.next();
             }
             '-' if !seen_chomp => {
                 chomp = BlockScalarChomp::Strip;
                 seen_chomp = true;
+                chars.next();
             }
-            '1'..='9' if !seen_indent => seen_indent = true,
+            '1'..='9' if indent.is_none() => {
+                indent = Some(ch.to_digit(10).unwrap() as usize);
+                chars.next();
+            }
+            ' ' | '\t' => {
+                // Trailing whitespace + optional comment is allowed after
+                // the indicators per YAML 1.2 §8.1.1 (the header line
+                // can carry a comment, e.g. `| # description`).
+                for rest in chars.by_ref() {
+                    if rest == '#' {
+                        // Rest of the header line is a comment — ignore.
+                        return Some((indicator, chomp, indent));
+                    }
+                    if rest != ' ' && rest != '\t' {
+                        return None;
+                    }
+                }
+                return Some((indicator, chomp, indent));
+            }
             _ => return None,
         }
     }
-    Some((indicator, chomp))
+    Some((indicator, chomp, indent))
 }
 
 fn fold_plain_scalar(text: &str) -> String {
@@ -1742,6 +1826,11 @@ fn project_block_sequence_items(
             out.push("+MAP {}".to_string());
             project_flow_map_entries(&flow_map, handles, out);
             out.push("-MAP".to_string());
+            continue;
+        }
+        if let Some((indicator, body)) = extract_block_scalar_body(&item) {
+            let escaped = escape_block_scalar_text(&body);
+            out.push(format!("=VAL {indicator}{escaped}"));
             continue;
         }
         let item_tag = item

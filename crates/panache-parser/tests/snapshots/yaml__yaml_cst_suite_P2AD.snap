@@ -1,0 +1,31 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: P2AD
+input: "- | # Empty header↓\n literal\n- >1 # Indentation indicator↓\n  folded\n- |+ # Chomping indicator↓\n keep\n\n- >1- # Both indicators↓\n  strip\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..143
+  YAML_METADATA_CONTENT@0..143
+    YAML_STREAM@0..143
+      YAML_DOCUMENT@0..143
+        YAML_BLOCK_SEQUENCE@0..143
+          YAML_BLOCK_SEQUENCE_ITEM@0..31
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_SCALAR@2..31 "| # Empty header↓\n  ..."
+          YAML_BLOCK_SEQUENCE_ITEM@31..72
+            YAML_BLOCK_SEQ_ENTRY@31..32 "-"
+            WHITESPACE@32..33 " "
+            YAML_SCALAR@33..72 ">1 # Indentation indi ..."
+          YAML_BLOCK_SEQUENCE_ITEM@72..108
+            YAML_BLOCK_SEQ_ENTRY@72..73 "-"
+            WHITESPACE@73..74 " "
+            YAML_SCALAR@74..108 "|+ # Chomping indicat ..."
+          YAML_BLOCK_SEQUENCE_ITEM@108..143
+            YAML_BLOCK_SEQ_ENTRY@108..109 "-"
+            WHITESPACE@109..110 " "
+            YAML_SCALAR@110..143 ">1- # Both indicators ..."

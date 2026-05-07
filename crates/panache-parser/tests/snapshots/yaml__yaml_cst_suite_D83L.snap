@@ -1,0 +1,23 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: D83L
+input: "- |2-\n  explicit indent and chomp\n- |-2\n  chomp and explicit indent\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..68
+  YAML_METADATA_CONTENT@0..68
+    YAML_STREAM@0..68
+      YAML_DOCUMENT@0..68
+        YAML_BLOCK_SEQUENCE@0..68
+          YAML_BLOCK_SEQUENCE_ITEM@0..34
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_SCALAR@2..34 "|2-\n  explicit indent ..."
+          YAML_BLOCK_SEQUENCE_ITEM@34..68
+            YAML_BLOCK_SEQ_ENTRY@34..35 "-"
+            WHITESPACE@35..36 " "
+            YAML_SCALAR@36..68 "|-2\n  chomp and expli ..."
