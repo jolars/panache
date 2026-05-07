@@ -38,7 +38,22 @@
 //!   allowed by YAML 1.2 and is intentionally not flagged. Covers
 //!   fixtures 9MAG, CTN5.
 //!
-//! - B, D, E, G, H, I — pending.
+//! - **B. Unterminated flow at EOF** — implemented: a
+//!   `YAML_FLOW_SEQUENCE` or `YAML_FLOW_MAP` whose direct children do
+//!   not include a closing `]` / `}` token. Covers fixture 6JTT. The
+//!   sibling case T833 (`{ foo: 1\n bar: 2 }` — flow map missing a
+//!   comma between entries) is *not* an unterminated flow — the v2
+//!   builder closes the map and produces a malformed
+//!   `FLOW_MAP_ENTRY` with two colons inside its value. T833 belongs
+//!   in cluster G (flow context anomalies) and is deferred until that
+//!   lands.
+//!
+//! - D, E, G, H, I — pending.
+//!
+//! Cluster I (LHL4 — invalid tag syntax) is also deferred: the v2
+//! scanner currently absorbs `!invalid{}tag scalar` as a single bare
+//! scalar with no Tag token, so the validator has nothing to inspect.
+//! The fix belongs in the scanner.
 //!
 //! See `.claude/skills/yaml-shadow-expand/scanner-rewrite.md` for the
 //! cutover plan and per-cluster detection scope.
@@ -66,6 +81,9 @@ pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
         return Some(diag);
     }
     if let Some(diag) = check_flow_commas(&tree) {
+        return Some(diag);
+    }
+    if let Some(diag) = check_unterminated_flow(&tree) {
         return Some(diag);
     }
     None
@@ -404,6 +422,55 @@ fn check_flow_node_commas(flow: &SyntaxNode) -> Option<YamlDiagnostic> {
     None
 }
 
+/// Cluster B — unterminated flow collection at EOF.
+///
+/// A `YAML_FLOW_SEQUENCE` whose direct children include no `]` token,
+/// or a `YAML_FLOW_MAP` whose direct children include no `}` token,
+/// reached EOF without closing. Note that nested flow brackets live
+/// inside `YAML_FLOW_SEQUENCE_ITEM` / `YAML_FLOW_MAP_ENTRY` wrappers,
+/// not as direct children — so an inner `]` does not satisfy an
+/// outer flow's close requirement.
+///
+/// Covers fixture 6JTT.
+fn check_unterminated_flow(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    for flow in tree.descendants().filter(|n| {
+        matches!(
+            n.kind(),
+            SyntaxKind::YAML_FLOW_SEQUENCE | SyntaxKind::YAML_FLOW_MAP
+        )
+    }) {
+        let close = if flow.kind() == SyntaxKind::YAML_FLOW_SEQUENCE {
+            "]"
+        } else {
+            "}"
+        };
+        let has_close = flow.children_with_tokens().any(|c| {
+            c.as_token()
+                .is_some_and(|t| t.kind() == SyntaxKind::YAML_SCALAR && t.text() == close)
+        });
+        if !has_close {
+            let (code, message) = if flow.kind() == SyntaxKind::YAML_FLOW_SEQUENCE {
+                (
+                    diagnostic_codes::PARSE_UNTERMINATED_FLOW_SEQUENCE,
+                    "flow sequence reached end of input without `]`",
+                )
+            } else {
+                (
+                    diagnostic_codes::PARSE_UNTERMINATED_FLOW_MAP,
+                    "flow mapping reached end of input without `}`",
+                )
+            };
+            return Some(diag_at_range(
+                flow.text_range().start().into(),
+                flow.text_range().end().into(),
+                code,
+                message,
+            ));
+        }
+    }
+    None
+}
+
 fn diag_at_range(
     byte_start: usize,
     byte_end: usize,
@@ -672,6 +739,40 @@ mod tests {
         // YAML_FLOW_MAP_ENTRY. The validator must recognize that bare
         // scalar as item evidence so the following comma is legal.
         let input = "---\n- { single line, a: b}\n- { multi\n  line, a: b}\n";
+        assert!(run(input).is_none());
+    }
+
+    // ---- Cluster B: unterminated flow at EOF ----
+
+    #[test]
+    fn unterminated_flow_seq_6jtt() {
+        // 6JTT: `[ [ a, b, c ]` — outer `[` never closes (inner does).
+        let input = "---\n[ [ a, b, c ]\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(
+            diag.code,
+            diagnostic_codes::PARSE_UNTERMINATED_FLOW_SEQUENCE
+        );
+    }
+
+    #[test]
+    fn unterminated_flow_map() {
+        // `{ foo: 1` — flow map open, no close.
+        let input = "---\n{ foo: 1\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_UNTERMINATED_FLOW_MAP);
+    }
+
+    #[test]
+    fn balanced_nested_flow_passes() {
+        let input = "---\n[ [ a, b, c ] ]\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn empty_flow_seq_terminated_passes() {
+        // Sanity: `[ ]` closes immediately.
+        let input = "---\n[ ]\n";
         assert!(run(input).is_none());
     }
 
