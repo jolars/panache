@@ -2,7 +2,7 @@
   "name": "panache",
   "displayName": "Panache",
   "description": "Language server for Pandoc, Quarto, and R Markdown documents",
-  "version": "2.36.1",
+  "version": "2.37.0",
   "publisher": "jolars",
   "license": "MIT",
   "icon": "icon.png",
