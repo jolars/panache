@@ -1966,8 +1966,8 @@ fn extract_value_node_properties(
 /// Build the `+MAP` open event for a YAML_BLOCK_MAP rooted directly under
 /// a YAML_DOCUMENT. Captures any anchor (`&name`) or tag (`!!str`,
 /// `!shorthand`, etc.) tokens that the parser absorbed at the top of the
-/// block map (header phase mirroring `emit_block_seq`) so that documents
-/// like `--- !!set\n? a\n? b` project as `+MAP <tag:yaml.org,2002:set>`.
+/// block map so that documents like `--- !!set\n? a\n? b` project as
+/// `+MAP <tag:yaml.org,2002:set>`.
 fn map_open_event_for_block_map(map_node: &SyntaxNode, handles: &TagHandles) -> String {
     let mut anchor: Option<String> = None;
     let mut long_tag: Option<String> = None;
