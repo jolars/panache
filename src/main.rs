@@ -1681,13 +1681,31 @@ fn main() -> io::Result<()> {
                     total_issues += root_doc.diagnostics.len();
 
                     if fix {
-                        let fixed_output = apply_fixes(&root_doc.input, &root_doc.diagnostics);
-                        fs::write(&file_path, fixed_output)?;
-                        if !cli.quiet {
-                            println!(
-                                "Fixed {} issue(s) in {}",
-                                root_doc.diagnostics.len(),
-                                file_path.display()
+                        let fixable = root_doc
+                            .diagnostics
+                            .iter()
+                            .filter(|d| d.fix.is_some())
+                            .count();
+                        if fixable > 0 {
+                            let fixed_output = apply_fixes(&root_doc.input, &root_doc.diagnostics);
+                            fs::write(&file_path, fixed_output)?;
+                            if !cli.quiet {
+                                println!("Fixed {} issue(s) in {}", fixable, file_path.display());
+                            }
+                        }
+                        let remaining: Vec<_> = root_doc
+                            .diagnostics
+                            .iter()
+                            .filter(|d| d.fix.is_none())
+                            .cloned()
+                            .collect();
+                        if !remaining.is_empty() && !cli.quiet {
+                            print_diagnostics(
+                                &remaining,
+                                Some(file_path.as_path()),
+                                Some(&root_doc.input),
+                                use_color,
+                                message_format,
                             );
                         }
                     } else if !cli.quiet {

@@ -94,6 +94,26 @@ fn test_lint_fix_stdin() {
 }
 
 #[test]
+fn test_lint_fix_skips_unfixable_diagnostics() {
+    // Diagnostics without an auto-fix (e.g. missing-chunk-labels) must not
+    // be reported as "Fixed" and must not silently rewrite the file.
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    let original = "---\ntitle: \"Test\"\n---\n\n```{r}\nx <- 1\n```\n";
+    fs::write(&test_file, original).unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--fix", test_file.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Fixed").not())
+        .stdout(predicate::str::contains("missing-chunk-labels"));
+
+    let after = fs::read_to_string(&test_file).unwrap();
+    assert_eq!(after, original, "unfixable diagnostic must not modify file");
+}
+
+#[test]
 fn test_lint_multiple_files() {
     let temp_dir = TempDir::new().unwrap();
     let file1 = temp_dir.path().join("test1.qmd");
