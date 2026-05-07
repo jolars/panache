@@ -929,3 +929,39 @@ fn test_lint_no_cache_skips_cache_file_creation() {
         "--no-cache should disable cache reads and writes"
     );
 }
+
+#[test]
+fn test_lint_dash_reads_stdin() {
+    cargo_bin_cmd!("panache")
+        .args(["lint", "-"])
+        .write_stdin("# Heading\n\n### Subheading")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning"))
+        .stdout(predicate::str::contains("heading-hierarchy"));
+}
+
+#[test]
+fn test_lint_dash_with_fix_writes_to_stdout() {
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--fix", "-"])
+        .write_stdin("# Heading\n\n### Subheading")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("## Subheading"));
+}
+
+#[test]
+fn test_lint_dash_mixed_with_path_errors() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(&test_file, "# Heading\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", "-", test_file.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "'-' (stdin) cannot be combined with file path arguments",
+        ));
+}

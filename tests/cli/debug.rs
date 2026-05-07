@@ -188,3 +188,28 @@ fn test_debug_format_dump_passes_writes_artifacts() {
         "missing idempotency second-pass artifact"
     );
 }
+
+#[test]
+fn test_debug_format_dash_reads_stdin() {
+    cargo_bin_cmd!("panache")
+        .args(["debug", "format", "-"])
+        .write_stdin("# Heading\n\nParagraph.\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("All checks passed"));
+}
+
+#[test]
+fn test_debug_format_dash_mixed_with_path_errors() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("doc.md");
+    fs::write(&test_file, "# Heading\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["debug", "format", "-", test_file.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "'-' (stdin) cannot be combined with file path arguments",
+        ));
+}

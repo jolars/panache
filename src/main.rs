@@ -275,6 +275,31 @@ fn read_all(path: Option<&PathBuf>) -> io::Result<String> {
     }
 }
 
+/// Treat the `-` argument as the conventional Unix stdin sentinel: collapse
+/// `["-"]` to an empty list (which the subcommands already interpret as
+/// "read from stdin"). Mixing `-` with real paths is ambiguous, so reject it.
+fn normalize_input_paths(files: Vec<PathBuf>) -> io::Result<Vec<PathBuf>> {
+    let has_dash = files.iter().any(|p| p.as_os_str() == "-");
+    if !has_dash {
+        return Ok(files);
+    }
+    if files.len() > 1 {
+        return Err(io::Error::other(
+            "'-' (stdin) cannot be combined with file path arguments",
+        ));
+    }
+    Ok(Vec::new())
+}
+
+/// Same convention as `normalize_input_paths` for the `parse` subcommand,
+/// which takes a single optional path.
+fn normalize_parse_path(file: Option<PathBuf>) -> Option<PathBuf> {
+    match file {
+        Some(p) if p.as_os_str() == "-" => None,
+        other => other,
+    }
+}
+
 fn file_count_label(count: usize, singular: &str, plural: &str) -> String {
     if count == 1 {
         format!("{count} {singular}")
@@ -681,6 +706,7 @@ fn main() -> io::Result<()> {
                     "Warning: `panache parse --verify` is deprecated; use `panache debug format --checks losslessness`."
                 );
             }
+            let file = normalize_parse_path(file);
             let input_path = file.as_deref().or(cli.stdin_filename.as_deref());
             let start_dir = start_dir_for(input_path)?;
             let (cfg, cfg_path) = load_config_for_cli(
@@ -738,6 +764,13 @@ fn main() -> io::Result<()> {
                     "Warning: `panache format --verify` is deprecated; use `panache debug format --checks all`."
                 );
             }
+            let files = match normalize_input_paths(files) {
+                Ok(files) => files,
+                Err(err) => {
+                    eprintln!("Error: {}", err);
+                    std::process::exit(1);
+                }
+            };
             // Parse range if provided (only valid for single file or stdin)
             let parsed_range = if let Some(range_str) = range {
                 if files.len() > 1 {
@@ -1158,6 +1191,13 @@ fn main() -> io::Result<()> {
                     std::process::exit(1);
                 }
 
+                let files = match normalize_input_paths(files) {
+                    Ok(files) => files,
+                    Err(err) => {
+                        eprintln!("Error: {}", err);
+                        std::process::exit(1);
+                    }
+                };
                 let use_stdin = files.is_empty();
                 let targets = if use_stdin {
                     vec![]
@@ -1344,6 +1384,13 @@ fn main() -> io::Result<()> {
             message_format,
             force_exclude,
         } => {
+            let files = match normalize_input_paths(files) {
+                Ok(files) => files,
+                Err(err) => {
+                    eprintln!("Error: {}", err);
+                    std::process::exit(1);
+                }
+            };
             // Handle stdin case
             if files.is_empty() {
                 let start_dir = start_dir_for(cli.stdin_filename.as_deref())?;

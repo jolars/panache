@@ -179,6 +179,27 @@ fn test_parse_default_format_is_cst() {
 }
 
 #[test]
+fn test_parse_dash_reads_stdin() {
+    cargo_bin_cmd!("panache")
+        .args(["parse", "-"])
+        .write_stdin("# Heading\n\nParagraph.")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("DOCUMENT"))
+        .stdout(predicate::str::contains("HEADING"));
+}
+
+#[test]
+fn test_parse_dash_with_stdin_filename_infers_flavor() {
+    cargo_bin_cmd!("panache")
+        .args(["parse", "--stdin-filename", "doc.qmd", "-"])
+        .write_stdin("{{< include _child.qmd >}}")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("SHORTCODE"));
+}
+
+#[test]
 fn test_parse_to_pandoc_ast_with_json_writes_both() {
     let temp_dir = TempDir::new().unwrap();
     let test_file = temp_dir.path().join("test.qmd");

@@ -151,14 +151,16 @@ pub enum Commands {
         writing changes to disk. Stdin input always outputs to stdout."
     )]
     Format {
-        /// Input file(s) (stdin if not provided)
-        #[arg(help = "Input file path(s) or directories")]
+        /// Input file(s) (stdin if not provided, or pass `-`)
+        #[arg(help = "Input file path(s) or directories (use `-` for stdin)")]
         #[arg(
-            long_help = "Path(s) to the input file(s) or directories to format. If not provided, reads from stdin. \
+            long_help = "Path(s) to the input file(s) or directories to format. If not provided, or if \
+            the single argument `-` is given, reads from stdin. \
             Supports .qmd, .md, .Rmd/.Rmarkdown, and other Markdown-based formats. When file paths are \
             provided, the files are formatted in place by default. Stdin input always outputs \
             to stdout. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). \
-            Directories are traversed recursively, respecting .gitignore files."
+            Directories are traversed recursively, respecting .gitignore files. \
+            `-` cannot be combined with other paths."
         )]
         files: Vec<PathBuf>,
 
@@ -207,10 +209,10 @@ pub enum Commands {
         and inline elements detected by the parser."
     )]
     Parse {
-        /// Input file (stdin if not provided)
-        #[arg(help = "Input file path")]
+        /// Input file (stdin if not provided, or pass `-`)
+        #[arg(help = "Input file path (use `-` for stdin)")]
         #[arg(
-            long_help = "Path to the input file to parse. If not provided, reads from stdin. \
+            long_help = "Path to the input file to parse. If not provided, or if `-` is given, reads from stdin. \
             The parser respects extension flags from the configuration file."
         )]
         file: Option<PathBuf>,
@@ -276,13 +278,14 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
     )]
     #[command(after_help = "Configure rules in panache.toml with [lint] section.")]
     Lint {
-        /// Input file(s) or directories (stdin if not provided)
-        #[arg(help = "Input file path(s) or directories")]
+        /// Input file(s) or directories (stdin if not provided, or pass `-`)
+        #[arg(help = "Input file path(s) or directories (use `-` for stdin)")]
         #[arg(
-            long_help = "Path(s) to the input file(s) or directories to check. If not provided, reads from stdin. \
+            long_help = "Path(s) to the input file(s) or directories to check. If not provided, or if \
+            the single argument `-` is given, reads from stdin. \
             Supports .qmd, .md, .Rmd/.Rmarkdown, and other Markdown-based formats. Supports glob patterns \
             (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, \
-            respecting .gitignore files."
+            respecting .gitignore files. `-` cannot be combined with other paths."
         )]
         files: Vec<PathBuf>,
 
@@ -330,8 +333,8 @@ pub enum DebugCommands {
     /// Run parser+formatter checks and emit diagnostics
     #[command(name = "format")]
     Format {
-        /// Input file(s) or directories (stdin if not provided)
-        #[arg(help = "Input file path(s) or directories")]
+        /// Input file(s) or directories (stdin if not provided, or pass `-`)
+        #[arg(help = "Input file path(s) or directories (use `-` for stdin)")]
         files: Vec<PathBuf>,
 
         /// Which checks to run

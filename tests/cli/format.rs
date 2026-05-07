@@ -629,3 +629,40 @@ fn test_format_quiet_global_flag_before_subcommand() {
         .success()
         .stdout(predicate::str::is_empty());
 }
+
+#[test]
+fn test_format_dash_reads_stdin() {
+    cargo_bin_cmd!("panache")
+        .args(["format", "-"])
+        .write_stdin("# Heading\n\nParagraph.")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("# Heading"))
+        .stdout(predicate::str::contains("Paragraph."));
+}
+
+#[test]
+fn test_format_dash_with_stdin_filename_infers_flavor() {
+    // .qmd flavor enables Quarto code-cell sugar (#| options).
+    cargo_bin_cmd!("panache")
+        .args(["format", "--stdin-filename", "doc.qmd", "-"])
+        .write_stdin("```{r, echo=FALSE}\n1 + 1\n```\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("#| echo: false"));
+}
+
+#[test]
+fn test_format_dash_mixed_with_path_errors() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(&test_file, "# Heading\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["format", "-", test_file.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "'-' (stdin) cannot be combined with file path arguments",
+        ));
+}

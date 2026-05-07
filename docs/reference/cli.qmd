@@ -56,7 +56,7 @@ Format a Quarto, Pandoc, or R Markdown document according to Panache's formattin
 
 ###### **Arguments:**
 
-* `<FILES>` — Path(s) to the input file(s) or directories to format. If not provided, reads from stdin. Supports .qmd, .md, .Rmd/.Rmarkdown, and other Markdown-based formats. When file paths are provided, the files are formatted in place by default. Stdin input always outputs to stdout. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, respecting .gitignore files.
+* `<FILES>` — Path(s) to the input file(s) or directories to format. If not provided, or if the single argument `-` is given, reads from stdin. Supports .qmd, .md, .Rmd/.Rmarkdown, and other Markdown-based formats. When file paths are provided, the files are formatted in place by default. Stdin input always outputs to stdout. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, respecting .gitignore files. `-` cannot be combined with other paths.
 
 ###### **Options:**
 
@@ -79,7 +79,7 @@ Parse a document and display its Concrete Syntax Tree (CST) for debugging and un
 
 ###### **Arguments:**
 
-* `<FILE>` — Path to the input file to parse. If not provided, reads from stdin. The parser respects extension flags from the configuration file.
+* `<FILE>` — Path to the input file to parse. If not provided, or if `-` is given, reads from stdin. The parser respects extension flags from the configuration file.
 
 ###### **Options:**
 
@@ -124,7 +124,7 @@ Configure rules in panache.toml with [lint] section.
 
 ###### **Arguments:**
 
-* `<FILES>` — Path(s) to the input file(s) or directories to check. If not provided, reads from stdin. Supports .qmd, .md, .Rmd/.Rmarkdown, and other Markdown-based formats. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, respecting .gitignore files.
+* `<FILES>` — Path(s) to the input file(s) or directories to check. If not provided, or if the single argument `-` is given, reads from stdin. Supports .qmd, .md, .Rmd/.Rmarkdown, and other Markdown-based formats. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, respecting .gitignore files. `-` cannot be combined with other paths.
 
 ###### **Options:**
 
@@ -172,7 +172,7 @@ Run parser+formatter checks and emit diagnostics
 
 ###### **Arguments:**
 
-* `<FILES>` — Input file path(s) or directories
+* `<FILES>` — Input file path(s) or directories (use `-` for stdin)
 
 ###### **Options:**
 
