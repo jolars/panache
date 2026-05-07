@@ -57,7 +57,12 @@
 //!     line-start positional context that the validator does not
 //!     yet maintain.
 //!
-//! - D, E, H, I — pending.
+//! - **H. Multi-line quoted scalar under-indent** — implemented:
+//!   a quoted (double- or single-quoted) `YAML_SCALAR` inside a
+//!   `YAML_BLOCK_MAP_VALUE` whose continuation lines are indented
+//!   less than the column where the scalar starts. Covers QB6E.
+//!
+//! - D, E, I — pending.
 //!
 //! Cluster I (LHL4 — invalid tag syntax) is also deferred: the v2
 //! scanner currently absorbs `!invalid{}tag scalar` as a single bare
@@ -96,6 +101,9 @@ pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
         return Some(diag);
     }
     if let Some(diag) = check_flow_context_anomalies(&tree) {
+        return Some(diag);
+    }
+    if let Some(diag) = check_multiline_quoted_indent(&tree, input) {
         return Some(diag);
     }
     None
@@ -587,6 +595,105 @@ fn check_flow_map_value_extra_colon(value: &SyntaxNode) -> Option<YamlDiagnostic
     None
 }
 
+/// Cluster H — multi-line quoted scalar under-indented.
+///
+/// A quoted (double- or single-quoted) `YAML_SCALAR` whose text spans
+/// a newline is a multi-line scalar. YAML 1.2 spec 7.3.1 requires
+/// every continuation line to be indented strictly more than the
+/// surrounding block context's indent — i.e. the column of the
+/// enclosing block-mapping's first key. A continuation line whose
+/// first non-whitespace char sits at or before that column is
+/// rejected with `PARSE_UNEXPECTED_DEDENT`.
+///
+/// Note: this is *not* a comparison against the scalar's start column
+/// — a continuation indented less than the scalar but still greater
+/// than the parent's indent is well-formed.
+///
+/// Covers fixture QB6E.
+fn check_multiline_quoted_indent(tree: &SyntaxNode, input: &str) -> Option<YamlDiagnostic> {
+    for value in tree
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
+    {
+        let Some(entry) = value.parent() else {
+            continue;
+        };
+        let Some(block_map) = entry.parent() else {
+            continue;
+        };
+        if block_map.kind() != SyntaxKind::YAML_BLOCK_MAP {
+            continue;
+        }
+        let block_map_start: usize = block_map.text_range().start().into();
+        let parent_indent = column_of(input, block_map_start);
+        for child in value.children_with_tokens() {
+            let NodeOrToken::Token(t) = child else {
+                continue;
+            };
+            if t.kind() != SyntaxKind::YAML_SCALAR {
+                continue;
+            }
+            let text = t.text();
+            if !text.contains('\n') {
+                continue;
+            }
+            let starts_quoted = text.starts_with('"') || text.starts_with('\'');
+            if !starts_quoted {
+                continue;
+            }
+            let scalar_start: usize = t.text_range().start().into();
+            let mut offset = 0usize;
+            let bytes = text.as_bytes();
+            while offset < bytes.len() {
+                if bytes[offset] != b'\n' {
+                    offset += 1;
+                    continue;
+                }
+                let line_start_in_src = scalar_start + offset + 1;
+                let line_end_in_text = text[offset + 1..]
+                    .find('\n')
+                    .map(|i| offset + 1 + i)
+                    .unwrap_or(text.len());
+                let line_end_in_src = scalar_start + line_end_in_text.min(text.len());
+                let line_text_in_src = &input[line_start_in_src..line_end_in_src];
+                let leading_ws = line_text_in_src
+                    .bytes()
+                    .take_while(|b| *b == b' ' || *b == b'\t')
+                    .count();
+                // Blank continuation lines do not impose indent
+                // (line folding consumes them).
+                if leading_ws == line_text_in_src.len() {
+                    offset += 1;
+                    continue;
+                }
+                let first_non_ws_col = leading_ws;
+                let first_non_ws_byte = line_start_in_src + leading_ws;
+                if first_non_ws_col <= parent_indent {
+                    return Some(diag_at_range(
+                        first_non_ws_byte,
+                        first_non_ws_byte + 1,
+                        diagnostic_codes::PARSE_UNEXPECTED_DEDENT,
+                        "multi-line quoted scalar continuation indented at or below parent block indent",
+                    ));
+                }
+                offset += 1;
+            }
+        }
+    }
+    None
+}
+
+/// Compute the byte-based column (zero-indexed) of `byte_offset`
+/// relative to the previous newline in `input`. Tabs are not
+/// width-expanded; this is byte-distance, sufficient for indent
+/// comparisons in space-indented YAML.
+fn column_of(input: &str, byte_offset: usize) -> usize {
+    match input[..byte_offset].rfind('\n') {
+        Some(nl) => byte_offset - nl - 1,
+        None => byte_offset,
+    }
+}
+
 fn diag_at_range(
     byte_start: usize,
     byte_end: usize,
@@ -974,5 +1081,38 @@ mod tests {
         // that begin with YAML_KEY.
         let input = "[\n? foo\n bar : baz\n]\n";
         assert!(run(input).is_none());
+    }
+
+    // ---- Cluster H: multi-line quoted scalar under-indent ----
+
+    #[test]
+    fn multiline_quoted_under_indent_qb6e() {
+        // QB6E: `quoted: "a\nb\nc"` — continuation lines `b` and `c`
+        // sit at column 0, less than the scalar's start column 8.
+        let input = "---\nquoted: \"a\nb\nc\"\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_UNEXPECTED_DEDENT);
+    }
+
+    #[test]
+    fn multiline_quoted_properly_indented_passes() {
+        // Sanity: continuation lines at column >= scalar-start col.
+        let input = "---\nquoted: \"a\n  b\n  c\"\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn singleline_quoted_passes() {
+        // No newline in scalar text — no continuation rule applies.
+        let input = "---\nquoted: \"a b c\"\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn multiline_single_quoted_under_indent_rejects() {
+        // Same shape as QB6E with single quotes.
+        let input = "---\nquoted: 'a\nb\nc'\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_UNEXPECTED_DEDENT);
     }
 }
