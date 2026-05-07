@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
 expression: snapshot
 ---
 case_id: 6S55
 input: "key:\n - bar\n - baz\n invalid\n"
 diagnostics:
-YAML_PARSE_INVALID_KEY_TOKEN:invalid token while parsing block map key@6..7
+YAML_PARSE_INVALID_KEY_TOKEN:stray content following a block sequence item at its indent level@20..27
 cst:

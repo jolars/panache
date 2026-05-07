@@ -1,10 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 245
+assertion_line: 246
 expression: snapshot
 ---
 case_id: QB6E
 input: "---\nquoted: \"a\nb\nc\"\n"
 has_error_contract: true
 parsed_mapping_tree: false
-diagnostics: [YAML_PARSE_INVALID_KEY_TOKEN:unexpected scalar at block-map level (no key)@15..16]
+diagnostics: [YAML_PARSE_UNEXPECTED_DEDENT:multi-line quoted scalar continuation indented at or below parent block indent@15..16]

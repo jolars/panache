@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
 expression: snapshot
 ---
 case_id: CTN5
 input: "---\n[ a, b, c, , ]\n"
 diagnostics:
-YAML_PARSE_INVALID_FLOW_SEQUENCE_COMMA:invalid comma position in flow sequence@15..16
+YAML_PARSE_INVALID_FLOW_SEQUENCE_COMMA:comma must follow a flow-collection item@15..16
 cst:

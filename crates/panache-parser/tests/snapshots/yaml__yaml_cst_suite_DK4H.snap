@@ -1,10 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 740
+assertion_line: 279
 expression: snapshot
 ---
 case_id: DK4H
 input: "---\n[ key\n  : value ]\n"
 diagnostics:
-YAML_PARSE_UNEXPECTED_DEDENT:unexpected dedent token while parsing block map@22..22
+YAML_PARSE_INVALID_KEY_TOKEN:implicit key in flow context cannot span lines@12..13
 cst:

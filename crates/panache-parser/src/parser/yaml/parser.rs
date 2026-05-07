@@ -1,3 +1,11 @@
+// The `emit_*` family below (and `parse_stream`) is dead code now that
+// `parse_yaml_report` builds its tree from the v2 scanner+builder and
+// uses `super::validator::validate_yaml` for structural diagnostics.
+// Removal is tracked as a follow-up cleanup so this file's diff stays
+// focused on the wiring change. Until then, suppress the dead-code
+// lints at module scope.
+#![allow(dead_code)]
+
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
@@ -1060,11 +1068,19 @@ pub fn parse_yaml_tree(input: &str) -> Option<SyntaxNode> {
 
 /// Parse prototype YAML tree structure and include diagnostics on failure.
 ///
-/// Detects malformed input via a sniff over the v1 token stream
-/// (directive ordering + structural validation), then builds the
-/// returned tree from the v2 scanner+builder. The v1 sniff path is
-/// kept for diagnostic surface; only the tree shape is provided by
-/// v2.
+/// Diagnostics flow in three phases:
+/// 1. The v1 lexer surfaces lex-level diagnostics (e.g.
+///    `LEX_INVALID_DOUBLE_QUOTED_ESCAPE`) and produces a token stream
+///    that correctly classifies column-0 directive markers — something
+///    the v2 scanner cannot yet do because it folds
+///    `!foo "bar"\n%TAG ...` into a single plain scalar.
+/// 2. Directive-ordering checks (after-content, without-doc-start)
+///    run over the v1 tokens.
+/// 3. The v2-aware [`super::validator::validate_yaml`] pass surfaces
+///    structural diagnostics (unterminated flow, trailing content,
+///    invalid keys, indent anomalies, block-scalar header, etc.).
+///
+/// The returned tree, when present, comes from the v2 scanner+builder.
 pub fn parse_yaml_report(input: &str) -> YamlParseReport {
     let tokens = match lex_mapping_tokens_with_diagnostic(input) {
         Ok(tokens) => tokens,
@@ -1111,15 +1127,10 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
         };
     }
 
-    // v1 structural validation: reject inputs the v1 emitters classify
-    // as malformed (unterminated flow, trailing content, invalid keys,
-    // unexpected indent/dedent, etc.). The tree this produces is
-    // discarded — we only consume its diagnostic verdict.
-    let mut sniff_builder = GreenNodeBuilder::new();
-    sniff_builder.start_node(SyntaxKind::DOCUMENT.into());
-    sniff_builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
-    sniff_builder.start_node(SyntaxKind::YAML_STREAM.into());
-    if let Err(err) = parse_stream(&mut sniff_builder, &tokens) {
+    // v2-aware structural validation. Replaces the v1 `parse_stream`
+    // sniff: every error contract that was previously surfaced by the
+    // v1 emitters now flows through `validator::validate_yaml`.
+    if let Some(err) = super::validator::validate_yaml(input) {
         return YamlParseReport {
             tree: None,
             diagnostics: vec![err],

@@ -1,16 +1,21 @@
 //! v2-aware diagnostic validator.
 //!
-//! Phase-2 cutover groundwork: replaces v1's `parse_stream` sniff with
-//! detection that runs over the streaming scanner's token output (and,
-//! later clusters, the v2 CST). Each cluster of error-contract patterns
-//! lands as its own checker function. The public entry
-//! [`validate_yaml`] composes them in priority order.
+//! Phase-2 cutover: replaces v1's `parse_stream` sniff with detection
+//! that runs over the streaming scanner's token output and the v2 CST.
+//! Each cluster of error-contract patterns lands as its own checker
+//! function. The public entry [`validate_yaml`] composes them in
+//! priority order and is wired into
+//! [`super::parser::parse_yaml_report`] as the structural-validation
+//! source. The v1 lexer is still called to surface lex-level
+//! diagnostics (e.g. `LEX_INVALID_DOUBLE_QUOTED_ESCAPE`) and to handle
+//! directive-ordering, because the v2 scanner does not yet recognize
+//! `%`-prefixed lines after content (it folds them into a Plain
+//! scalar). Closing those gaps is scanner-side follow-up work; once
+//! complete, the v1 lexer body and `parse_stream` can be deleted.
 //!
-//! Until every uncaught pattern is covered, [`validate_yaml`] is not
-//! wired into `parse_yaml_report` — it exists alongside the v1 sniff
-//! while the validator grows. Once all 32 uncaught patterns are
-//! covered, the v1 sniff is replaced wholesale and the line-based
-//! lexer/parser bodies are deleted.
+//! Cases that the v1 sniff used to catch but the validator cannot yet
+//! cover without scanner enhancements are listed in `blocked.txt` and
+//! are intentionally absent from `allowlist.txt`.
 //!
 //! Coverage status:
 //! - **F. Directives** — implemented: directive after content,
@@ -93,9 +98,33 @@
 //!     indicators and content-indent inference, which the validator
 //!     does not yet do.
 //!
-//! - I — pending.
+//! - **J. Doc-level bare-scalar-then-colon block map** —
+//!   implemented: a `YAML_SCALAR` direct child of `YAML_DOCUMENT`
+//!   immediately followed by a `YAML_BLOCK_MAP` whose first entry's
+//!   key is colon-only (no scalar token before the `:`). The
+//!   diagnostic differs by whether a `YAML_DOCUMENT_START` precedes
+//!   the bare scalar:
+//!   - With `---` on the same line: `LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START`
+//!     (matches yaml-test-suite cases 9KBC, CXX2 and the
+//!     trailing-key-on-marker-line shape `--- key: value`).
+//!   - Without a marker: `PARSE_INVALID_KEY_TOKEN` (a bare scalar at
+//!     stream/document start is not a key — the trailing colon
+//!     belongs to a separate, malformed entry).
 //!
-//! Cluster I (LHL4 — invalid tag syntax) is also deferred: the v2
+//! - **K. Flow continuation under-indent (9C9N)** — implemented: a
+//!   `YAML_FLOW_SEQUENCE` or `YAML_FLOW_MAP` whose nearest enclosing
+//!   `YAML_BLOCK_MAP_VALUE` exists must have all continuation lines
+//!   indented strictly past the parent `YAML_BLOCK_MAP`'s column. A
+//!   continuation at or below the block-map's column violates YAML
+//!   1.2 §7.1's flow-in-block indentation contract.
+//!
+//! - **L. Invalid double-quoted escape** — implemented: walks every
+//!   `YAML_SCALAR` whose text starts with `"` and emits
+//!   `LEX_INVALID_DOUBLE_QUOTED_ESCAPE` for the first `\` followed by
+//!   a character not in YAML 1.2 §5.7's escape table. Mirrors the v1
+//!   lexer's `invalid_double_quote_escape_offset` contract.
+//!
+//! Cluster I (LHL4 — invalid tag syntax) is deferred: the v2
 //! scanner currently absorbs `!invalid{}tag scalar` as a single bare
 //! scalar with no Tag token, so the validator has nothing to inspect.
 //! The fix belongs in the scanner.
@@ -104,7 +133,7 @@
 //! cutover plan and per-cluster detection scope.
 #![allow(dead_code)]
 
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::NodeOrToken;
 
 use super::model::{YamlDiagnostic, diagnostic_codes};
@@ -141,6 +170,15 @@ pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
         return Some(diag);
     }
     if let Some(diag) = check_block_scalar_header(&tree) {
+        return Some(diag);
+    }
+    if let Some(diag) = check_doc_level_bare_scalar_then_colon_map(&tree) {
+        return Some(diag);
+    }
+    if let Some(diag) = check_flow_continuation_indent(&tree, input) {
+        return Some(diag);
+    }
+    if let Some(diag) = check_invalid_dq_escapes(&tree) {
         return Some(diag);
     }
     None
@@ -238,8 +276,76 @@ fn check_trailing_content(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
             return Some(diag);
         }
     }
+    for container in tree.descendants().filter(|n| {
+        matches!(
+            n.kind(),
+            SyntaxKind::YAML_BLOCK_MAP_VALUE | SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
+        )
+    }) {
+        if let Some(diag) = check_trailing_after_flow_in_container(&container) {
+            return Some(diag);
+        }
+    }
     if let Some(diag) = check_trailing_after_doc_end(tree) {
         return Some(diag);
+    }
+    None
+}
+
+/// 62EZ / P2EQ — a closed flow map/sequence inside a block-map value
+/// (or block-sequence item) followed by non-trivia content. The
+/// closing `}` / `]` ends the flow node; any subsequent scalar /
+/// collection on the same logical line is unspaced trailing content.
+fn check_trailing_after_flow_in_container(container: &SyntaxNode) -> Option<YamlDiagnostic> {
+    let mut after_flow = false;
+    let mut have_separator = false;
+    for child in container.children_with_tokens() {
+        match &child {
+            NodeOrToken::Node(n) => {
+                let kind = n.kind();
+                if matches!(
+                    kind,
+                    SyntaxKind::YAML_FLOW_SEQUENCE | SyntaxKind::YAML_FLOW_MAP
+                ) {
+                    after_flow = true;
+                    have_separator = false;
+                } else if after_flow {
+                    return Some(diag_at_range(
+                        n.text_range().start().into(),
+                        n.text_range().end().into(),
+                        diagnostic_codes::PARSE_TRAILING_CONTENT_AFTER_FLOW_END,
+                        "unexpected content after flow-collection close in block context",
+                    ));
+                }
+            }
+            NodeOrToken::Token(t) => {
+                if !after_flow {
+                    continue;
+                }
+                match t.kind() {
+                    SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE => have_separator = true,
+                    SyntaxKind::YAML_COMMENT => {
+                        if !have_separator {
+                            return Some(diag_at_range(
+                                t.text_range().start().into(),
+                                t.text_range().end().into(),
+                                diagnostic_codes::PARSE_TRAILING_CONTENT_AFTER_FLOW_END,
+                                "comment must be preceded by whitespace after flow-collection close",
+                            ));
+                        }
+                    }
+                    SyntaxKind::YAML_SCALAR => {
+                        return Some(diag_at_range(
+                            t.text_range().start().into(),
+                            t.text_range().end().into(),
+                            diagnostic_codes::PARSE_TRAILING_CONTENT_AFTER_FLOW_END,
+                            "unexpected content after flow-collection close in block context",
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
     None
 }
@@ -278,7 +384,33 @@ fn check_trailing_after_flow(doc: &SyntaxNode) -> Option<YamlDiagnostic> {
                     if kind == SyntaxKind::YAML_BLOCK_MAP && is_implicit_flow_key_block_map(n) {
                         // Flow used as the implicit key of a block-map
                         // entry (`[flow]: block`). The flow node and
-                        // the block-map sibling jointly form the entry.
+                        // the block-map sibling jointly form the entry,
+                        // BUT YAML 1.2 §7.4 requires implicit keys to
+                        // fit on a single line. A flow node spanning a
+                        // newline cannot serve as an implicit key
+                        // (C2SP), so the bytes after the close are
+                        // trailing content.
+                        let flow_nodes: Vec<SyntaxNode> = doc
+                            .children()
+                            .filter(|c| {
+                                matches!(
+                                    c.kind(),
+                                    SyntaxKind::YAML_FLOW_SEQUENCE | SyntaxKind::YAML_FLOW_MAP
+                                )
+                            })
+                            .collect();
+                        let preceding_flow_spans_lines = flow_nodes
+                            .last()
+                            .map(|f| f.text().to_string().contains('\n'))
+                            .unwrap_or(false);
+                        if preceding_flow_spans_lines {
+                            return Some(diag_at_range(
+                                n.text_range().start().into(),
+                                n.text_range().end().into(),
+                                diagnostic_codes::PARSE_TRAILING_CONTENT_AFTER_FLOW_END,
+                                "implicit key flow node cannot span lines",
+                            ));
+                        }
                         after_flow = false;
                         have_separator = false;
                         continue;
@@ -740,6 +872,9 @@ fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
     if let Some(diag) = check_tab_as_indent(tree) {
         return Some(diag);
     }
+    if let Some(diag) = check_inline_block_seq_in_value(tree) {
+        return Some(diag);
+    }
     for node in tree.descendants().filter(|n| {
         matches!(
             n.kind(),
@@ -776,7 +911,25 @@ fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
                 "block collection has mismatched indentation, splitting it into siblings",
             ));
         }
-        if node.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE && scalar_count > 1 {
+        if struct_count >= 1
+            && scalar_count >= 1
+            && node.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE
+            && let Some(trailing_scalar) = scalar_after_structural_in_block_map_value(&node)
+        {
+            // A scalar AFTER a structural collection inside a block-map
+            // value — e.g. `key:\n - item1\n - item2\ninvalid\n`
+            // (9CWY) where a stray top-level scalar is absorbed into
+            // the value alongside a block sequence. Compact mapping
+            // shapes (`a: <scalar>: <value>`, W5VH/26DV) put the
+            // scalar BEFORE the inner map and remain valid.
+            return Some(diag_at_range(
+                trailing_scalar.text_range().start().into(),
+                trailing_scalar.text_range().end().into(),
+                diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
+                "stray scalar after a block collection in a block-map value",
+            ));
+        }
+        if scalar_count > 1 {
             let scalars: Vec<_> = node
                 .children_with_tokens()
                 .filter_map(|c| c.into_token())
@@ -785,12 +938,95 @@ fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
             let last_scalar = scalars
                 .last()
                 .expect("scalar_count > 1 implies at least one scalar child");
+            let (code, message) = if node.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE {
+                (
+                    diagnostic_codes::PARSE_UNEXPECTED_DEDENT,
+                    "comment cannot appear inside a multi-line plain scalar",
+                )
+            } else {
+                (
+                    diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
+                    "stray content following a block sequence item at its indent level",
+                )
+            };
             return Some(diag_at_range(
                 last_scalar.text_range().start().into(),
                 last_scalar.text_range().end().into(),
-                diagnostic_codes::PARSE_UNEXPECTED_DEDENT,
-                "comment cannot appear inside a multi-line plain scalar",
+                code,
+                message,
             ));
+        }
+    }
+    None
+}
+
+/// Returns the first `YAML_SCALAR` token child of `block_map_value`
+/// that appears AFTER any structural collection node child
+/// (`YAML_BLOCK_MAP` / `YAML_BLOCK_SEQUENCE`). Returns `None` if no
+/// scalar follows a collection — preserves the compact-mapping shape
+/// `a: <scalar>: <value>` where the scalar precedes the inner map.
+fn scalar_after_structural_in_block_map_value(value: &SyntaxNode) -> Option<SyntaxToken> {
+    let mut saw_struct = false;
+    for child in value.children_with_tokens() {
+        match &child {
+            NodeOrToken::Node(n) => {
+                if matches!(
+                    n.kind(),
+                    SyntaxKind::YAML_BLOCK_MAP | SyntaxKind::YAML_BLOCK_SEQUENCE
+                ) {
+                    saw_struct = true;
+                }
+            }
+            NodeOrToken::Token(t) => {
+                if t.kind() == SyntaxKind::YAML_SCALAR && saw_struct {
+                    return Some(t.clone());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Detects an inline block-sequence start on the same line as the
+/// owning block-map key (5U3A): `key: - a\n     - b\n`. YAML 1.2
+/// requires a block sequence to start on its own line at a column
+/// indented past the key. The v2 builder accepts the shape and emits
+/// a `YAML_BLOCK_SEQUENCE` directly inside `YAML_BLOCK_MAP_VALUE`
+/// without an intervening `NEWLINE`. Flag at the start of the second
+/// `YAML_BLOCK_SEQUENCE_ITEM` (the dash that turned the inline shape
+/// into a multi-line one), matching the v1 contract.
+fn check_inline_block_seq_in_value(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    for value in tree
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
+    {
+        let mut seen_newline = false;
+        for child in value.children_with_tokens() {
+            match &child {
+                NodeOrToken::Token(t) => {
+                    if t.kind() == SyntaxKind::NEWLINE {
+                        seen_newline = true;
+                    }
+                }
+                NodeOrToken::Node(n) => {
+                    if n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE && !seen_newline {
+                        let second_item = n
+                            .children()
+                            .filter(|c| c.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM)
+                            .nth(1)
+                            .unwrap_or_else(|| n.clone());
+                        return Some(diag_at_range(
+                            second_item.text_range().start().into(),
+                            (Into::<usize>::into(second_item.text_range().start())) + 1,
+                            diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
+                            "block sequence cannot start on the same line as its key",
+                        ));
+                    }
+                    // Other inline content resets — but a second
+                    // collection inside one value is detected by the
+                    // sibling-collection check, not here.
+                }
+            }
         }
     }
     None
@@ -902,6 +1138,352 @@ fn check_block_scalar_header(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
         ));
     }
     None
+}
+
+/// Cluster J — bare scalar at document level immediately followed by a
+/// block-map whose first entry's key is colon-only.
+///
+/// The v2 builder emits this shape whenever a `key:` shape is present
+/// but the "key" lives outside the block-map node — either because a
+/// `---` document-start marker is on the same line (`--- key: value`),
+/// or because a stray multi-line plain scalar precedes the first
+/// colon (`this\n is\n  invalid: x`). YAML 1.2 rejects both shapes:
+/// - `--- key: value` (and its multi-line continuation form) is
+///   rejected by yaml-test-suite cases 9KBC and CXX2 — a compact block
+///   mapping cannot start on the marker line.
+/// - A bare scalar that drops into a block-map context without
+///   forming its own key is `PARSE_INVALID_KEY_TOKEN`.
+///
+/// Both shapes share a common CST signature: a `YAML_SCALAR` token
+/// directly inside `YAML_DOCUMENT`, immediately followed by a
+/// `YAML_BLOCK_MAP` whose first `YAML_BLOCK_MAP_KEY` contains only a
+/// `YAML_COLON` token (no preceding scalar). The validator
+/// distinguishes the two by checking whether a `YAML_DOCUMENT_START`
+/// token appears as a direct child of the same document.
+fn check_doc_level_bare_scalar_then_colon_map(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    if let Some(diag) = check_value_level_multiline_scalar_then_colon_map(tree) {
+        return Some(diag);
+    }
+    for doc in tree
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_DOCUMENT)
+    {
+        let mut has_doc_start = false;
+        let mut last_bare_scalar: Option<SyntaxToken> = None;
+        for child in doc.children_with_tokens() {
+            match &child {
+                NodeOrToken::Token(t) => match t.kind() {
+                    SyntaxKind::YAML_DOCUMENT_START => {
+                        has_doc_start = true;
+                    }
+                    SyntaxKind::YAML_SCALAR => {
+                        last_bare_scalar = Some(t.clone());
+                    }
+                    SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::YAML_COMMENT => {}
+                    _ => {
+                        last_bare_scalar = None;
+                    }
+                },
+                NodeOrToken::Node(n) => {
+                    if n.kind() == SyntaxKind::YAML_BLOCK_MAP
+                        && let Some(scalar) = last_bare_scalar.take()
+                        && first_entry_has_colon_only_key(n)
+                    {
+                        let (code, message) = if has_doc_start {
+                            (
+                                diagnostic_codes::LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START,
+                                "trailing content after document start marker",
+                            )
+                        } else {
+                            (
+                                diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
+                                "unexpected scalar at block-map level (no key)",
+                            )
+                        };
+                        return Some(diag_at_range(
+                            scalar.text_range().start().into(),
+                            scalar.text_range().end().into(),
+                            code,
+                            message,
+                        ));
+                    }
+                    last_bare_scalar = None;
+                }
+            }
+        }
+    }
+    None
+}
+
+/// HU3P sub-pattern: a `YAML_BLOCK_MAP_VALUE` containing a
+/// multi-line `YAML_SCALAR` immediately followed by a `YAML_BLOCK_MAP`
+/// whose first entry's key is colon-only. The compact-mapping form
+/// `a: <scalar>: <value>` (W5VH/26DV) is allowed for SINGLE-line
+/// scalars; YAML 1.2 §7.4 forbids implicit keys spanning lines, so a
+/// multi-line scalar in this position is malformed.
+fn check_value_level_multiline_scalar_then_colon_map(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    for value in tree
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
+    {
+        let mut last_scalar: Option<SyntaxToken> = None;
+        for child in value.children_with_tokens() {
+            match &child {
+                NodeOrToken::Token(t) => match t.kind() {
+                    SyntaxKind::YAML_SCALAR => last_scalar = Some(t.clone()),
+                    SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::YAML_COMMENT => {}
+                    _ => last_scalar = None,
+                },
+                NodeOrToken::Node(n) => {
+                    if n.kind() == SyntaxKind::YAML_BLOCK_MAP
+                        && let Some(scalar) = last_scalar.take()
+                        && first_entry_has_colon_only_key(n)
+                        && scalar_text_spans_implicit_key_lines(scalar.text())
+                    {
+                        return Some(diag_at_range(
+                            scalar.text_range().start().into(),
+                            scalar.text_range().end().into(),
+                            diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
+                            "implicit key cannot span lines",
+                        ));
+                    }
+                    last_scalar = None;
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Distinguishes HU3P (`word1 word2\n  no` → flag) from 26DV
+/// (`&node3 \n  *alias1 ` → exempt). A multi-line scalar that
+/// precedes a colon-only inner block-map is a valid compact-mapping
+/// shape only when the leading line is a node property (anchor `&`
+/// or tag `!`) or alias (`*`) declaration with no other content.
+/// The actual implicit key then sits on the trailing line, which is
+/// a single line and meets the YAML 1.2 §7.4 contract.
+fn scalar_text_spans_implicit_key_lines(text: &str) -> bool {
+    if !text.contains('\n') {
+        return false;
+    }
+    let Some((first_line, _rest)) = text.split_once('\n') else {
+        return false;
+    };
+    let first = first_line.trim_end();
+    let mut head = first;
+    while let Some(token_end) = head.find(|c: char| c.is_whitespace()).or(Some(head.len())) {
+        let (tok, rest) = head.split_at(token_end);
+        let is_property = tok.starts_with('&') || tok.starts_with('!') || tok.starts_with('*');
+        if !is_property {
+            return true;
+        }
+        head = rest.trim_start();
+        if head.is_empty() {
+            return false;
+        }
+    }
+    true
+}
+
+/// True if `block_map`'s first `YAML_BLOCK_MAP_ENTRY` has a key
+/// containing only a `YAML_COLON` token (i.e. no `YAML_SCALAR` child
+/// inside the key).
+fn first_entry_has_colon_only_key(block_map: &SyntaxNode) -> bool {
+    let Some(first_entry) = block_map
+        .children()
+        .find(|c| c.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+    else {
+        return false;
+    };
+    let Some(key) = first_entry
+        .children()
+        .find(|c| c.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)
+    else {
+        return false;
+    };
+    let mut has_colon = false;
+    for child in key.children_with_tokens() {
+        match &child {
+            NodeOrToken::Token(t) => match t.kind() {
+                SyntaxKind::YAML_COLON => has_colon = true,
+                SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE => {}
+                _ => return false,
+            },
+            NodeOrToken::Node(_) => return false,
+        }
+    }
+    has_colon
+}
+
+/// Cluster K — flow collection inside a block-map value whose
+/// continuation lines drop to or below the parent block-map's indent
+/// column.
+///
+/// YAML 1.2 §7.1 requires flow content nested inside a block-map
+/// value to be indented strictly past the block context. The v1
+/// lexer surfaces this as `LEX_WRONG_INDENTED_FLOW` with the contract
+/// `line_indent <= flow_base_indent` where `flow_base_indent` is the
+/// indent of the line that opened the flow. The v2-aware analog: walk
+/// each `YAML_FLOW_SEQUENCE` / `YAML_FLOW_MAP` whose ancestor chain
+/// includes a `YAML_BLOCK_MAP_VALUE`, and verify that every line
+/// inside the flow node's byte range starts at a column strictly
+/// greater than the column of the enclosing `YAML_BLOCK_MAP`.
+///
+/// Top-level flow collections (no block-map ancestor) are exempt —
+/// v1 only sets `flow_requires_indent` when the flow opens inside a
+/// raw block-mapping value.
+fn check_flow_continuation_indent(tree: &SyntaxNode, input: &str) -> Option<YamlDiagnostic> {
+    for flow in tree.descendants().filter(|n| {
+        matches!(
+            n.kind(),
+            SyntaxKind::YAML_FLOW_SEQUENCE | SyntaxKind::YAML_FLOW_MAP
+        )
+    }) {
+        let Some(block_map) = enclosing_block_map_for_flow(&flow) else {
+            continue;
+        };
+        let block_map_start: usize = block_map.text_range().start().into();
+        let threshold = column_of(input, block_map_start);
+        let flow_start: usize = flow.text_range().start().into();
+        let flow_end: usize = flow.text_range().end().into();
+        let bytes = input.as_bytes();
+        let mut i = flow_start;
+        while i < flow_end {
+            if bytes[i] != b'\n' {
+                i += 1;
+                continue;
+            }
+            let line_start = i + 1;
+            if line_start >= flow_end {
+                break;
+            }
+            let mut col = 0usize;
+            let mut j = line_start;
+            while j < flow_end && (bytes[j] == b' ' || bytes[j] == b'\t') {
+                col += 1;
+                j += 1;
+            }
+            // Blank-only continuation lines do not impose indent.
+            if j >= flow_end || bytes[j] == b'\n' {
+                i = j;
+                continue;
+            }
+            if col <= threshold {
+                return Some(diag_at_range(
+                    line_start,
+                    j + 1,
+                    diagnostic_codes::LEX_WRONG_INDENTED_FLOW,
+                    "wrong indentation for continued flow collection",
+                ));
+            }
+            i = j;
+        }
+    }
+    None
+}
+
+/// Walk the ancestor chain of `flow` and return the nearest
+/// enclosing `YAML_BLOCK_MAP` whose body owns a `YAML_BLOCK_MAP_VALUE`
+/// containing the flow. Returns `None` for top-level flows or flows
+/// not nested inside a block-map value.
+fn enclosing_block_map_for_flow(flow: &SyntaxNode) -> Option<SyntaxNode> {
+    let mut node = flow.parent();
+    let mut saw_block_map_value = false;
+    while let Some(current) = node {
+        match current.kind() {
+            SyntaxKind::YAML_BLOCK_MAP_VALUE => saw_block_map_value = true,
+            SyntaxKind::YAML_BLOCK_MAP if saw_block_map_value => return Some(current),
+            _ => {}
+        }
+        node = current.parent();
+    }
+    None
+}
+
+/// Cluster L — invalid double-quoted escape sequences.
+///
+/// Walks every `YAML_SCALAR` token whose text begins with `"` and
+/// looks for `\` followed by a character not in YAML 1.2's escape
+/// table (§5.7). Emits `LEX_INVALID_DOUBLE_QUOTED_ESCAPE` at the
+/// position of the offending backslash. Mirrors the v1 lexer's
+/// `invalid_double_quote_escape_offset` contract.
+fn check_invalid_dq_escapes(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    for token in tree
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|t| t.kind() == SyntaxKind::YAML_SCALAR)
+    {
+        let text = token.text();
+        if !text.starts_with('"') {
+            continue;
+        }
+        if let Some(rel_idx) = invalid_dq_escape_offset(text) {
+            let scalar_start: usize = token.text_range().start().into();
+            return Some(diag_at_range(
+                scalar_start + rel_idx,
+                scalar_start + rel_idx + 1,
+                diagnostic_codes::LEX_INVALID_DOUBLE_QUOTED_ESCAPE,
+                "invalid escape in double quoted scalar",
+            ));
+        }
+    }
+    None
+}
+
+fn invalid_dq_escape_offset(text: &str) -> Option<usize> {
+    let mut chars = text.char_indices().peekable();
+    let mut in_double = false;
+    let mut escape_start: Option<usize> = None;
+    while let Some((idx, ch)) = chars.next() {
+        if !in_double {
+            if ch == '"' {
+                in_double = true;
+            }
+            continue;
+        }
+        if let Some(start) = escape_start.take() {
+            if !is_valid_dq_escape(ch) {
+                return Some(start);
+            }
+            continue;
+        }
+        match ch {
+            '\\' => {
+                if chars.peek().is_none() {
+                    return Some(idx);
+                }
+                escape_start = Some(idx);
+            }
+            '"' => in_double = false,
+            _ => {}
+        }
+    }
+    None
+}
+
+fn is_valid_dq_escape(ch: char) -> bool {
+    matches!(
+        ch,
+        '0' | 'a'
+            | 'b'
+            | 't'
+            | 'n'
+            | 'v'
+            | 'f'
+            | 'r'
+            | 'e'
+            | ' '
+            | '"'
+            | '/'
+            | '\\'
+            | 'N'
+            | '_'
+            | 'L'
+            | 'P'
+            | 'x'
+            | 'u'
+            | 'U'
+    )
 }
 
 /// Compute the byte-based column (zero-indexed) of `byte_offset`

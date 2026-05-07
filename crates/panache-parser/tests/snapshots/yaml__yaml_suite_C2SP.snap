@@ -1,10 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 707
+assertion_line: 246
 expression: snapshot
 ---
 case_id: C2SP
 input: "[23\n]: 42\n"
 has_error_contract: true
 parsed_mapping_tree: false
-diagnostics: [YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END:trailing content after flow sequence end@5..9]
+diagnostics: [YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END:implicit key flow node cannot span lines@5..10]

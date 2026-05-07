@@ -710,7 +710,7 @@ mod tests {
 
     #[test]
     fn parser_builds_nested_block_map_from_indent_tokens() {
-        let input = "root: 1\n  child: 2\n";
+        let input = "root:\n  child: 2\n";
         let tree = parse_yaml_tree(input).expect("tree");
 
         let outer_map = tree

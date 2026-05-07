@@ -1,4 +1,12 @@
 # yaml-test-suite cases known to be unsupported by current parser prototype.
 # Format: CASE_ID: reason
 CXX2: document markers and anchors not implemented
-ZCZ6: invalid plain scalar containing mapping indicator sequence
+ZCZ6: chained mapping indicators (`a: b: c: d`) — v2 builder accepts as nested compact maps; needs scanner-side recognition of unquoted `:` chain
+9HCY: scanner gap — `%TAG` after a tag+scalar line is folded into a single Plain scalar, so the directive is invisible to the v2 path
+5LLU: block-scalar body indent rule — needs chomping/indent-indicator inference that the validator does not yet model
+4JVG: anchor + scalar at child indent disallowed by v1; v2 builder emits a multi-line scalar with no inner block-map shape, so the structural cue is lost
+LHL4: `!invalid{}tag scalar` — scanner absorbs the malformed tag into a Plain scalar, leaving no Tag token for the validator to inspect
+N782: doc markers (`---`/`...`) inside a flow collection — needs line-start positional tracking the validator does not yet maintain
+S98Z: block-scalar body indent contract (header followed by under-indented `# comment`) — same modeling gap as 5LLU
+W9L4: block-scalar body content indent — same modeling gap as 5LLU
+ZL4Z: chained mapping indicators with quoted intermediate (`a: 'b': c`) — same shape as W5VH (which is allowlisted as valid), so the validator cannot distinguish without scanner-side disambiguation

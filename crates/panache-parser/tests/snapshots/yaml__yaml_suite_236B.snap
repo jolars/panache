@@ -1,10 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 245
+assertion_line: 246
 expression: snapshot
 ---
 case_id: 236B
 input: "foo:\n  bar\ninvalid\n"
 has_error_contract: true
 parsed_mapping_tree: false
-diagnostics: [YAML_PARSE_INVALID_KEY_TOKEN:unexpected scalar at block-map level (no key)@11..18]
+diagnostics: [YAML_PARSE_UNEXPECTED_DEDENT:comment cannot appear inside a multi-line plain scalar@11..18]

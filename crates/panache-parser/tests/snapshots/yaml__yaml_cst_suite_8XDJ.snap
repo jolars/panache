@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
 expression: snapshot
 ---
 case_id: 8XDJ
 input: "key: word1\n#  xxx\n  word2\n"
 diagnostics:
-YAML_PARSE_UNEXPECTED_INDENT:unexpected indent token while parsing block map@18..18
+YAML_PARSE_UNEXPECTED_DEDENT:comment cannot appear inside a multi-line plain scalar@20..25
 cst:

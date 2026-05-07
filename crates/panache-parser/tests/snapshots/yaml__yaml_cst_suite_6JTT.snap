@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
 expression: snapshot
 ---
 case_id: 6JTT
 input: "---\n[ [ a, b, c ]\n"
 diagnostics:
-YAML_PARSE_UNTERMINATED_FLOW_SEQUENCE:unterminated flow sequence@4..18
+YAML_PARSE_UNTERMINATED_FLOW_SEQUENCE:flow sequence reached end of input without `]`@4..18
 cst:

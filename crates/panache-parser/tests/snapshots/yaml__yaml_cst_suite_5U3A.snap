@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
 expression: snapshot
 ---
 case_id: 5U3A
 input: "key: - a\n     - b\n"
 diagnostics:
-YAML_PARSE_INVALID_KEY_TOKEN:invalid token while parsing block map key@14..15
+YAML_PARSE_INVALID_KEY_TOKEN:block sequence cannot start on the same line as its key@14..15
 cst:
