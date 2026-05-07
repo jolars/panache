@@ -1,0 +1,33 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: 4CQQ
+input: "plain:\n  This unquoted scalar\n  spans many lines.\n\nquoted: \"So does this\n  quoted scalar.\\n\"\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..93
+  YAML_METADATA_CONTENT@0..93
+    YAML_STREAM@0..93
+      YAML_DOCUMENT@0..93
+        YAML_BLOCK_MAP@0..93
+          YAML_BLOCK_MAP_ENTRY@0..51
+            YAML_BLOCK_MAP_KEY@0..6
+              YAML_SCALAR@0..5 "plain"
+              YAML_COLON@5..6 ":"
+            YAML_BLOCK_MAP_VALUE@6..51
+              NEWLINE@6..7 "\n"
+              WHITESPACE@7..9 "  "
+              YAML_SCALAR@9..49 "This unquoted scalar\n ..."
+              NEWLINE@49..50 "\n"
+              NEWLINE@50..51 "\n"
+          YAML_BLOCK_MAP_ENTRY@51..93
+            YAML_BLOCK_MAP_KEY@51..58
+              YAML_SCALAR@51..57 "quoted"
+              YAML_COLON@57..58 ":"
+            YAML_BLOCK_MAP_VALUE@58..93
+              WHITESPACE@58..59 " "
+              YAML_SCALAR@59..92 "\"So does this\n  quote ..."
+              NEWLINE@92..93 "\n"

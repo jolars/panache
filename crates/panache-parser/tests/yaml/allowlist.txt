@@ -369,3 +369,19 @@ U3XV
 HMQ5
 # Anchors on otherwise-empty scalars in a block sequence: `- &a` (sequence entry with anchor only) and `&a : a` (anchor on empty implicit key).
 PW8X
+# Multi-line plain scalar in block-map value: single line break folds to space (`b\n c` → `b c`).
+A984
+# Multi-line plain scalar with blank-line continuation: blanks fold to `\n` between non-empty lines (`a\n b\n\n c` → `a b\nc`).
+36F6
+# Multi-line plain scalar where the value begins on the line after `key:` (continuation indented under the key).
+4CQQ
+# Block-map mixing multi-line plain, multi-line double-quoted, and literal block-scalar values.
+4ZYM
+# Multi-line plain scalar with safe special characters (`?`, `:`, `-`, `#`, brackets) that don't terminate the scalar; backslash escaped to `\\` in event body.
+FBC9
+# Multi-line plain scalar where a tab-only line counts as a blank line and folds to `\n`.
+NB6Z
+# Multi-line double-quoted scalar as a flow-map key (`{ "multi\n  line": value }`) with explicit-colon entry.
+9SA2
+# Explicit-block-key entries (`? key\n: value`) with multi-line plain key and value text — both fold to single-line via continuation-line stripping.
+JTV5

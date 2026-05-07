@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: NB6Z
+input: "key:\n  value\n  with\n  \t\n  tabs\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

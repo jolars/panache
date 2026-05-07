@@ -1,0 +1,24 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: NB6Z
+input: "key:\n  value\n  with\n  \t\n  tabs\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..31
+  YAML_METADATA_CONTENT@0..31
+    YAML_STREAM@0..31
+      YAML_DOCUMENT@0..31
+        YAML_BLOCK_MAP@0..31
+          YAML_BLOCK_MAP_ENTRY@0..31
+            YAML_BLOCK_MAP_KEY@0..4
+              YAML_SCALAR@0..3 "key"
+              YAML_COLON@3..4 ":"
+            YAML_BLOCK_MAP_VALUE@4..31
+              NEWLINE@4..5 "\n"
+              WHITESPACE@5..7 "  "
+              YAML_SCALAR@7..30 "value\n  with\n  \t\n  tabs"
+              NEWLINE@30..31 "\n"

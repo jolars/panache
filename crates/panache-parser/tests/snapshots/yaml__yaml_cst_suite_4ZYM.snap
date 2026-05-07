@@ -1,0 +1,38 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: 4ZYM
+input: "plain: text\n  lines\nquoted: \"text\n  \tlines\"\nblock: |\n  text\n   \tlines\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..70
+  YAML_METADATA_CONTENT@0..70
+    YAML_STREAM@0..70
+      YAML_DOCUMENT@0..70
+        YAML_BLOCK_MAP@0..70
+          YAML_BLOCK_MAP_ENTRY@0..20
+            YAML_BLOCK_MAP_KEY@0..6
+              YAML_SCALAR@0..5 "plain"
+              YAML_COLON@5..6 ":"
+            YAML_BLOCK_MAP_VALUE@6..20
+              WHITESPACE@6..7 " "
+              YAML_SCALAR@7..19 "text\n  lines"
+              NEWLINE@19..20 "\n"
+          YAML_BLOCK_MAP_ENTRY@20..44
+            YAML_BLOCK_MAP_KEY@20..27
+              YAML_SCALAR@20..26 "quoted"
+              YAML_COLON@26..27 ":"
+            YAML_BLOCK_MAP_VALUE@27..44
+              WHITESPACE@27..28 " "
+              YAML_SCALAR@28..43 "\"text\n  \tlines\""
+              NEWLINE@43..44 "\n"
+          YAML_BLOCK_MAP_ENTRY@44..70
+            YAML_BLOCK_MAP_KEY@44..50
+              YAML_SCALAR@44..49 "block"
+              YAML_COLON@49..50 ":"
+            YAML_BLOCK_MAP_VALUE@50..70
+              WHITESPACE@50..51 " "
+              YAML_SCALAR@51..70 "|\n  text\n   \tlines\n"

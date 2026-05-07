@@ -1,0 +1,47 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: FBC9
+input: "safe: a!\"#$%&'()*+,-./09:;<=>?@AZ[\\]^_`az{|}~\n     !\"#$%&'()*+,-./09:;<=>?@AZ[\\]^_`az{|}~\nsafe question mark: ?foo\nsafe colon: :foo\nsafe dash: -foo\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..148
+  YAML_METADATA_CONTENT@0..148
+    YAML_STREAM@0..148
+      YAML_DOCUMENT@0..148
+        YAML_BLOCK_MAP@0..148
+          YAML_BLOCK_MAP_ENTRY@0..90
+            YAML_BLOCK_MAP_KEY@0..5
+              YAML_SCALAR@0..4 "safe"
+              YAML_COLON@4..5 ":"
+            YAML_BLOCK_MAP_VALUE@5..90
+              WHITESPACE@5..6 " "
+              YAML_SCALAR@6..89 "a!\"#$%&'()*+,-./09:;< ..."
+              NEWLINE@89..90 "\n"
+          YAML_BLOCK_MAP_ENTRY@90..115
+            YAML_BLOCK_MAP_KEY@90..109
+              YAML_SCALAR@90..108 "safe question mark"
+              YAML_COLON@108..109 ":"
+            YAML_BLOCK_MAP_VALUE@109..115
+              WHITESPACE@109..110 " "
+              YAML_SCALAR@110..114 "?foo"
+              NEWLINE@114..115 "\n"
+          YAML_BLOCK_MAP_ENTRY@115..132
+            YAML_BLOCK_MAP_KEY@115..126
+              YAML_SCALAR@115..125 "safe colon"
+              YAML_COLON@125..126 ":"
+            YAML_BLOCK_MAP_VALUE@126..132
+              WHITESPACE@126..127 " "
+              YAML_SCALAR@127..131 ":foo"
+              NEWLINE@131..132 "\n"
+          YAML_BLOCK_MAP_ENTRY@132..148
+            YAML_BLOCK_MAP_KEY@132..142
+              YAML_SCALAR@132..141 "safe dash"
+              YAML_COLON@141..142 ":"
+            YAML_BLOCK_MAP_VALUE@142..148
+              WHITESPACE@142..143 " "
+              YAML_SCALAR@143..147 "-foo"
+              NEWLINE@147..148 "\n"

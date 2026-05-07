@@ -466,6 +466,9 @@ fn fold_plain_document_lines(doc: &SyntaxNode) -> String {
 fn flow_scalar_event(text: &str, handles: &TagHandles) -> String {
     let trimmed = text.trim();
     if trimmed.starts_with('"') || trimmed.starts_with('\'') {
+        if trimmed.contains('\n') {
+            return quoted_val_event_multi_line(trimmed);
+        }
         return quoted_val_event(trimmed);
     }
     let (anchor, long_tag, body) = decompose_scalar(trimmed, handles);
@@ -1431,7 +1434,11 @@ fn project_flow_map_entry(
         if stripped_key.is_empty() {
             out.push("=VAL :".to_string());
         } else if stripped_key.starts_with('"') || stripped_key.starts_with('\'') {
-            out.push(quoted_val_event(stripped_key));
+            if stripped_key.contains('\n') {
+                out.push(quoted_val_event_multi_line(stripped_key));
+            } else {
+                out.push(quoted_val_event(stripped_key));
+            }
         } else {
             // Multi-line plain key text needs folding before
             // resolution; flow_scalar_event does it for plain text but
@@ -2227,7 +2234,14 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
             .and_then(|t| resolve_long_tag(t, handles));
         let (anchor, body_tag, body) = decompose_scalar(key_trimmed, handles);
         let long_tag = key_long_tag.or(body_tag);
-        out.push(scalar_event(anchor, long_tag.as_deref(), body));
+        let folded;
+        let body_for_event: &str = if body.contains('\n') {
+            folded = escape_for_event(&fold_quoted_inner(body));
+            &folded
+        } else {
+            body
+        };
+        out.push(scalar_event(anchor, long_tag.as_deref(), body_for_event));
     }
 
     project_block_map_entry_value(&value_node, handles, out);
@@ -2470,7 +2484,14 @@ fn project_block_map_entry_value(
         } else {
             let (anchor, body_tag, body) = decompose_scalar(trimmed, handles);
             let long_tag = value_long_tag.or(body_tag);
-            out.push(scalar_event(anchor, long_tag.as_deref(), body));
+            let folded;
+            let body_for_event: &str = if body.contains('\n') {
+                folded = escape_for_event(&fold_quoted_inner(body));
+                &folded
+            } else {
+                body
+            };
+            out.push(scalar_event(anchor, long_tag.as_deref(), body_for_event));
         }
     }
 }

@@ -546,18 +546,6 @@
       "tree": true
     },
     {
-      "case_id": "36F6",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "4CQQ",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "4FJ6",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -565,12 +553,6 @@
     },
     {
       "case_id": "4QFQ",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "4ZYM",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -686,24 +668,12 @@
       "tree": true
     },
     {
-      "case_id": "9SA2",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "A2M4",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_KEY_TOKEN"
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "A984",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "AB8U",
@@ -774,12 +744,6 @@
       "tree": true
     },
     {
-      "case_id": "FBC9",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "FUP4",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -793,12 +757,6 @@
     },
     {
       "case_id": "JQ4R",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "JTV5",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -851,12 +809,6 @@
     },
     {
       "case_id": "NAT4",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "NB6Z",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -1017,18 +969,21 @@
     "2XXW",
     "33X3",
     "35KP",
+    "36F6",
     "3ALJ",
     "3GZX",
     "3MYT",
     "3R3P",
     "3UYS",
     "4ABK",
+    "4CQQ",
     "4GC6",
     "4Q9F",
     "4RWC",
     "4UYU",
     "4V8U",
     "4WA9",
+    "4ZYM",
     "52DL",
     "54T7",
     "58MP",
@@ -1079,12 +1034,14 @@
     "9DXL",
     "9FMG",
     "9J7A",
+    "9SA2",
     "9SHH",
     "9TFX",
     "9U5K",
     "9WXW",
     "9YRD",
     "A6F9",
+    "A984",
     "AVM7",
     "AZW3",
     "B3HG",
@@ -1107,6 +1064,7 @@
     "EXG3",
     "F2C7",
     "F3CP",
+    "FBC9",
     "FH7J",
     "FP8R",
     "FQ7F",
@@ -1128,6 +1086,7 @@
     "JHB9",
     "JR7V",
     "JS2J",
+    "JTV5",
     "K3WX",
     "K4SU",
     "K527",
@@ -1147,6 +1106,7 @@
     "M9B4",
     "MXS3",
     "MYW6",
+    "NB6Z",
     "NHX8",
     "NJ66",
     "P76L",
@@ -1195,8 +1155,8 @@
   "summary": {
     "error_contract_ok_count": 53,
     "fails_needs_error_path_count": 25,
-    "fails_needs_feature_count": 73,
-    "passes_now_count": 182,
+    "fails_needs_feature_count": 65,
+    "passes_now_count": 190,
     "total_cases": 352
   }
 }
