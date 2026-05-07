@@ -150,18 +150,26 @@ fn parse_line_ending(
         other => {
             diagnostics.push(ConfigurationDiagnostic {
                 property_name: "lineEnding".to_string(),
-                message: format!(
-                    "Unknown line ending '{other}'. Expected one of: auto, lf, crlf."
-                ),
+                message: format!("Unknown line ending '{other}'. Expected one of: auto, lf, crlf."),
             });
             Some(LineEnding::Auto)
         }
     }
 }
 
-fn build_panache_config(cfg: &Configuration) -> Config {
+fn detect_flavor_from_path(path: &std::path::Path) -> Option<Flavor> {
+    let ext = path.extension().and_then(|e| e.to_str())?;
+    match ext.to_ascii_lowercase().as_str() {
+        "qmd" => Some(Flavor::Quarto),
+        "rmd" | "rmarkdown" => Some(Flavor::RMarkdown),
+        _ => None,
+    }
+}
+
+fn build_panache_config(cfg: &Configuration, file_path: &std::path::Path) -> Config {
     let mut throwaway = Vec::new();
-    let flavor = parse_flavor(&cfg.flavor, &mut throwaway);
+    let flavor = detect_flavor_from_path(file_path)
+        .unwrap_or_else(|| parse_flavor(&cfg.flavor, &mut throwaway));
     Config {
         flavor,
         parser_extensions: ParserExtensions::for_flavor(flavor),
@@ -200,10 +208,13 @@ impl SyncPluginHandler<Configuration> for PanacheHandler {
             &mut diagnostics,
         );
 
-        let flavor: String =
-            get_value(&mut config, "flavor", "pandoc".to_string(), &mut diagnostics);
-        let wrap: String =
-            get_value(&mut config, "wrap", "reflow".to_string(), &mut diagnostics);
+        let flavor: String = get_value(
+            &mut config,
+            "flavor",
+            "pandoc".to_string(),
+            &mut diagnostics,
+        );
+        let wrap: String = get_value(&mut config, "wrap", "reflow".to_string(), &mut diagnostics);
         let blank_lines: String = get_value(
             &mut config,
             "blankLines",
@@ -271,9 +282,7 @@ impl SyncPluginHandler<Configuration> for PanacheHandler {
             config_schema_url: format!(
                 "https://plugins.dprint.dev/jolars/panache/{version}/schema.json"
             ),
-            update_url: Some(
-                "https://plugins.dprint.dev/jolars/panache/latest.json".to_string(),
-            ),
+            update_url: Some("https://plugins.dprint.dev/jolars/panache/latest.json".to_string()),
         }
     }
 
@@ -296,7 +305,7 @@ impl SyncPluginHandler<Configuration> for PanacheHandler {
         let file_text = String::from_utf8(request.file_bytes)
             .map_err(|e| anyhow!("input is not valid UTF-8: {e}"))?;
 
-        let panache_config = build_panache_config(request.config);
+        let panache_config = build_panache_config(request.config, request.file_path);
         let range = request.range.as_ref().map(|r| (r.start, r.end));
 
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
