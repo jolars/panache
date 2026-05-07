@@ -1,0 +1,32 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: HMQ5
+input: "!!str &a1 \"foo\":\n  !!str bar\n&a2 baz : *a1\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..43
+  YAML_METADATA_CONTENT@0..43
+    YAML_STREAM@0..43
+      YAML_DOCUMENT@0..43
+        YAML_BLOCK_MAP@0..43
+          YAML_BLOCK_MAP_ENTRY@0..29
+            YAML_BLOCK_MAP_KEY@0..16
+              YAML_SCALAR@0..15 "!!str &a1 \"foo\""
+              YAML_COLON@15..16 ":"
+            YAML_BLOCK_MAP_VALUE@16..29
+              NEWLINE@16..17 "\n"
+              WHITESPACE@17..19 "  "
+              YAML_SCALAR@19..28 "!!str bar"
+              NEWLINE@28..29 "\n"
+          YAML_BLOCK_MAP_ENTRY@29..43
+            YAML_BLOCK_MAP_KEY@29..38
+              YAML_SCALAR@29..37 "&a2 baz "
+              YAML_COLON@37..38 ":"
+            YAML_BLOCK_MAP_VALUE@38..43
+              WHITESPACE@38..39 " "
+              YAML_SCALAR@39..42 "*a1"
+              NEWLINE@42..43 "\n"

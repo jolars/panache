@@ -1,0 +1,29 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: 5MUD
+input: "---\n{ \"foo\"\n  :bar }\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..21
+  YAML_METADATA_CONTENT@0..21
+    YAML_STREAM@0..21
+      YAML_DOCUMENT@0..21
+        YAML_DOCUMENT_START@0..3 "---"
+        NEWLINE@3..4 "\n"
+        YAML_FLOW_MAP@4..20
+          YAML_SCALAR@4..5 "{"
+          WHITESPACE@5..6 " "
+          YAML_SCALAR@6..11 "\"foo\""
+          NEWLINE@11..12 "\n"
+          WHITESPACE@12..14 "  "
+          YAML_FLOW_MAP_ENTRY@14..19
+            YAML_FLOW_MAP_KEY@14..15
+              YAML_COLON@14..15 ":"
+            YAML_FLOW_MAP_VALUE@15..19
+              YAML_SCALAR@15..19 "bar "
+          YAML_SCALAR@19..20 "}"
+        NEWLINE@20..21 "\n"

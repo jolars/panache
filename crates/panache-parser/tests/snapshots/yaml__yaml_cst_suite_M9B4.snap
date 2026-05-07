@@ -1,0 +1,15 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: M9B4
+input: "|\n literal\n \ttext\n\n\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..20
+  YAML_METADATA_CONTENT@0..20
+    YAML_STREAM@0..20
+      YAML_DOCUMENT@0..20
+        YAML_SCALAR@0..20 "|\n literal\n \ttext\n\n\n"

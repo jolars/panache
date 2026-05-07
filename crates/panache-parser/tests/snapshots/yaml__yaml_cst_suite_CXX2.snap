@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
 expression: snapshot
 ---
 case_id: CXX2
 input: "--- &anchor a: b\n"
 diagnostics:
-YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START:trailing content after document start marker@0..16
+YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START:trailing content after document start marker@4..13
 cst:

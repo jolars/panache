@@ -1,0 +1,22 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: P76L
+input: "%TAG !! tag:example.com,2000:app/\n---\n!!int 1 - 3 # Interval, not integer\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..74
+  YAML_METADATA_CONTENT@0..74
+    YAML_STREAM@0..74
+      YAML_DOCUMENT@0..74
+        YAML_SCALAR@0..33 "%TAG !! tag:example.c ..."
+        NEWLINE@33..34 "\n"
+        YAML_DOCUMENT_START@34..37 "---"
+        NEWLINE@37..38 "\n"
+        YAML_SCALAR@38..49 "!!int 1 - 3"
+        WHITESPACE@49..50 " "
+        YAML_COMMENT@50..73 "# Interval, not integer"
+        NEWLINE@73..74 "\n"

@@ -2,57 +2,60 @@
 
 ## Status (as of 2026-05)
 
-The scanner rewrite has largely landed. The headline migration is done:
-v2 `scanner.rs` + `parser_v2.rs` build the returned tree, structural
-diagnostics flow through `validator.rs`, and the v1 `emit_*` /
-`parse_stream` graph that built the tree from the line-based lexer is
-gone.
+The scanner rewrite has fully landed. v2 `scanner.rs` + `parser_v2.rs`
+build the returned tree, structural diagnostics flow through
+`validator.rs`, and **the v1 line-based lexer is deleted**. The live
+diagnostic path is `parse_yaml_report` → `validate_yaml` →
+`parse_v2`. There is no v1 directive-ordering pass.
 
-What landed (steps 1–12 below, with one deviation at cutover):
+What landed:
 
 - Steps 1–10: scanner scaffolded, `Mark`/`SimpleKey`/trivia/directives/
   flow indicators/block indicators/quoted/block/plain scalars all
-  implemented in `scanner.rs` (now ~2,851 LOC).
-- Step 11: `parser_v2.rs` (~1,134 LOC) consumes the scanner and emits
-  the rowan green tree. Wired in via `super::parser_v2::parse_v2` from
-  `parser.rs::parse_yaml_report`.
-- Step 12 (cutover, with deviation): `parse_yaml_report` builds the
-  returned tree from the v2 scanner+builder; structural diagnostics
-  route through `validator::validate_yaml`; the v1 `emit_*` family,
-  `parse_stream`, `emit_document`, `has_explicit_key`,
-  `doc_level_property_present`, the flat `? key`/`: value` shortcut,
-  and the `DocumentBody` enum are all deleted (commit `9b442587`).
-  `parser.rs` shrank from 1,432 to 188 LOC.
+  implemented in `scanner.rs`.
+- Step 11: `parser_v2.rs` consumes the scanner and emits the rowan
+  green tree.
+- Step 12a (initial cutover, commit `9b442587`): `parse_yaml_report`
+  builds the returned tree from the v2 scanner+builder; structural
+  diagnostics route through `validator::validate_yaml`; the v1
+  `emit_*` family, `parse_stream`, `emit_document`,
+  `has_explicit_key`, `doc_level_property_present`, the flat `? key`/
+  `: value` shortcut, and the `DocumentBody` enum are deleted.
+- Step 12b (final cutover, this session): the validator's
+  `check_directives` cluster (driven off scanner-emitted `Directive`
+  tokens) covers what the v1 directive-ordering pass used to do, and
+  `check_invalid_dq_escapes` plus the scanner's own `push_diagnostic`
+  calls cover `LEX_INVALID_DOUBLE_QUOTED_ESCAPE` and friends. With
+  parity confirmed, `parse_yaml_report` no longer calls the v1 lexer,
+  and `lexer.rs` + `model.rs::YamlToken` / `YamlTokenSpan` are
+  deleted.
 
-**Deviation from the original step-12 plan:** `lexer.rs` is **retained**.
-`parse_yaml_report` still calls `lex_mapping_tokens_with_diagnostic` to
-surface lex-level diagnostics (e.g. `LEX_INVALID_DOUBLE_QUOTED_ESCAPE`)
-and to run the directive-ordering pass, because the v2 scanner does not
-yet recognize column-0 `%`-prefixed lines after content (it folds them
-into a Plain scalar). `model.rs::YamlToken` is correspondingly retained
-because the directive pass consumes it.
+What is still deferred (residual work):
 
-What is still deferred (residual cutover work):
+- Tag/anchor/alias dispatch (`!`, `&`, `*`) in `scanner.rs`. These
+  characters currently fall through to plain scalar at token start.
+  The user-visible consequence: malformed inputs like
+  `!foo "bar"\n%TAG ...\n---\n` are parsed as one big plain scalar
+  followed by a doc-start (no `Directive` token, no
+  `PARSE_DIRECTIVE_AFTER_CONTENT` diagnostic). The
+  `parse_yaml_report_detects_directive_after_content` test was
+  switched to an EB22-shape input (comment terminates the scalar, so
+  the `%`-prefixed line is dispatched fresh and emits a `Directive`
+  token) until tag dispatch lands.
+- `events.rs` projection helpers
+  `collect_doc_scalar_text_with_newlines`,
+  `collect_value_scalar_text_with_newlines`, and
+  `quoted_val_event_multi_line` still re-stitch multi-line scalars
+  in projection because the scanner emits per-segment scalar tokens.
+  Unifying these into a single styled `Scalar` token is a follow-up.
+- Step 13 (recover unlocked cases) is partially done — the lexer
+  removal alone moved triage by +38 cases (`passes_now_count`:
+  144 → 182). More can likely be allowlisted by walking the
+  `passes_now` bucket against the current `allowlist.txt`.
 
-- Scanner-side recognition of `%TAG` / `%YAML` after content, so the
-  directive-ordering pass can move off the v1 lexer.
-- Once that lands: deletion of `lexer.rs` and `model.rs::YamlToken`
-  (and the import in `parser.rs`).
-- `events.rs` projection helpers `collect_doc_scalar_text_with_newlines`
-  (line 407), `collect_value_scalar_text_with_newlines` (line 2482),
-  and `quoted_val_event_multi_line` (line 605) still re-stitch
-  multi-line scalars in projection. They survived cutover because the
-  v2 scanner emits per-segment scalar tokens that match the v1 shape;
-  unifying these into a single styled `Scalar` token is a follow-up.
-- Step 13 (recover unlocked cases) remains open; `triage.json` should
-  be regenerated and any cleanly-passing cases moved into
-  `allowlist.txt`.
-
-The plan below remains accurate as a record of the design decisions and
-the migration sequence; refer to it when picking up residual work, and
-treat the line numbers as historical (the named functions in `parser.rs`
-no longer exist — see "Architecture" and "What is deleted at cutover"
-sections for the specific names).
+The plan below remains accurate as a record of the design decisions
+and the migration sequence; refer to it when picking up residual
+work.
 
 ## Context
 
@@ -281,13 +284,19 @@ What was **deleted at cutover** (commit `9b442587`):
 
 What is still **live** (deferred to a follow-up cutover step):
 
-- `lexer.rs` — used by `parse_yaml_report` for directive recognition
-  and lex-level diagnostics
-- `model.rs::YamlToken` — consumed by the directive-ordering pass
 - `events.rs::collect_doc_scalar_text_with_newlines`,
   `collect_value_scalar_text_with_newlines`,
   `quoted_val_event_multi_line` — projection still re-stitches
   multi-line scalars
+
+What was deleted in step 12b (this session):
+
+- `lexer.rs` and the `lex_mapping_tokens` / `lex_mapping_tokens_with_diagnostic`
+  / `split_once_unquoted_key_colon` functions
+- `model.rs::YamlToken`, `model.rs::YamlTokenSpan`
+- The `lex_mapping_tokens` / `YamlToken` / `YamlTokenSpan` re-exports in
+  `parser/yaml.rs`
+- All `lexer_*` tests in `parser/yaml.rs`'s test module
 
 ### CST kinds
 
@@ -358,20 +367,25 @@ old lexer remains the live path until step 8.
     the flat `? key`/`: value` shortcut, and the `DocumentBody` enum
     in `parser.rs`. Run the full allowlist; every case must pass.
 
-    **Deviation that landed:** `lexer.rs`, `model.rs::YamlToken`, and
-    the `events.rs` projection helpers (`collect_*_with_newlines`,
-    `quoted_val_event_multi_line`) are **not** deleted in this step.
-    The v1 lexer is still called for directive ordering and lex-level
-    diagnostics; the events helpers still re-stitch per-segment
-    scalars. Their deletion is split into a separate residual step
-    (12b) once the v2 scanner recognizes `%`-prefixed directives after
-    content and emits unified styled scalars.
+    **Step 12 was split into 12a / 12b:**
+
+    - 12a (commit `9b442587`) cut the tree-build path over to v2 but
+      kept `lexer.rs` for directive ordering and lex-level
+      diagnostics, and kept the `events.rs` re-stitching helpers.
+    - 12b (this session) finished the lexer-side cutover: the
+      validator's `check_directives` cluster is the live
+      directive-ordering check, lex-level diagnostics flow through
+      the scanner's `push_diagnostic` and the validator's
+      `check_invalid_dq_escapes`, and `lexer.rs` plus
+      `model.rs::YamlToken` / `YamlTokenSpan` are deleted.
 
 13. **Recover unlocked cases** — regenerate
     `crates/panache-parser/tests/yaml/triage.json` via
     `cargo test -p panache-parser --test yaml yaml_suite_generate_triage_report -- --ignored`.
     Allowlist any cases newly in `passes_now` with rationale comments,
-    one per shared root cause.
+    one per shared root cause. Step 12b alone moved `passes_now_count`
+    from 144 to 182 (+38), so a re-walk of `passes_now` against the
+    current `allowlist.txt` is high-leverage follow-up work.
 
 Steps 1–11 land on `main` without changing live behavior. Step 12 is the
 single risky commit; by then the comparison harness has burned down the
@@ -387,18 +401,14 @@ surprises. Step 13 is pure win.
   structural validator. Each `check_*` function is one cluster of
   error contracts; `validate_yaml` composes them.
 - `crates/panache-parser/src/parser/yaml/parser.rs` — slim
-  orchestrator (~188 LOC). Calls v1 lexer for directive ordering,
-  validator for structural diagnostics, and parser_v2 for tree
-  construction.
+  orchestrator. Calls validator for structural diagnostics, then
+  parser_v2 for tree construction.
 - `crates/panache-parser/src/parser/yaml/events.rs` — projection
   helpers; the `*_with_newlines` / `*_multi_line` helpers are still
   live (deferred deletion).
 - `crates/panache-parser/src/parser/yaml/model.rs` — `YamlDiagnostic`,
-  `diagnostic_codes`, `YamlParseReport` (unchanged); `YamlToken` and
-  `YamlTokenSpan` retained for the directive-ordering pass.
-- `crates/panache-parser/src/parser/yaml/lexer.rs` — retained as a
-  directive-recognition / lex-diagnostic shim. Deletion is deferred
-  until the v2 scanner recognizes column-0 directives after content.
+  `diagnostic_codes`, `YamlParseReport`. (`YamlToken` /
+  `YamlTokenSpan` deleted in step 12b.)
 - `crates/panache-parser/src/parser/yaml/mod.rs` — wiring.
 - `crates/panache-parser/tests/yaml.rs` — fixture-driven harness;
   unchanged in role.

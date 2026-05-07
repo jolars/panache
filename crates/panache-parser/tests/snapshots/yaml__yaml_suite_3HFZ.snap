@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 246
 expression: snapshot
 ---
 case_id: 3HFZ
 input: "---\nkey: value\n... invalid\n"
 has_error_contract: true
 parsed_mapping_tree: false
-diagnostics: [YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_END:trailing content after document end marker@15..26]
+diagnostics: [YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_END:unexpected content on the same line as document end marker@19..26]

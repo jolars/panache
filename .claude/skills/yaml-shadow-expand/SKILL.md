@@ -24,41 +24,44 @@ yaml-test-suite case to the allowlist, or pick "the next best case" to work on.
 
 ## Architecture trajectory
 
-The streaming scanner rewrite has landed. The live tree-building path
-is now:
+The streaming scanner rewrite has landed and the legacy line-based
+lexer is gone. The live tree-building path is now:
 
-1. `parser.rs::parse_yaml_report` — slim orchestrator (~188 LOC).
-2. `lexer.rs::lex_mapping_tokens_with_diagnostic` (the legacy
-   line-based lexer) — still called for column-0 directive recognition
-   and lex-level diagnostics (`LEX_INVALID_DOUBLE_QUOTED_ESCAPE` etc.)
-   that the v2 scanner doesn't yet handle.
-3. Directive-ordering pass over the v1 tokens.
-4. `validator.rs::validate_yaml` — v2-aware structural validator.
-   Each `check_*` function is one cluster of error contracts (trailing
-   content, unterminated flow, flow comma anomalies, multi-line
-   quoted indent, block indent anomalies, block-scalar header,
-   doc-level/value-level mixed scalar+map, flow continuation indent,
-   invalid double-quoted escapes, etc.).
-5. `parser_v2.rs::parse_v2` — consumes the streaming
-   `scanner.rs` and emits the rowan green tree.
+1. `parser.rs::parse_yaml_report` — slim orchestrator. Calls the
+   validator, then builds the tree from `parser_v2`.
+2. `validator.rs::validate_yaml` — v2-aware structural validator.
+   Each `check_*` function is one cluster of error contracts
+   (directive ordering, trailing content, unterminated flow, flow
+   comma anomalies, multi-line quoted indent, block indent anomalies,
+   block-scalar header, doc-level/value-level mixed scalar+map, flow
+   continuation indent, invalid double-quoted escapes, etc.). Runs
+   the scanner internally for token-level checks.
+3. `parser_v2.rs::parse_v2` — consumes the streaming `scanner.rs`
+   and emits the rowan green tree.
 
-`scanner.rs` (~2,851 LOC) is the streaming, char-by-char scanner
-modeled on libyaml / PyYAML / snakeyaml: position-tracked, indent-stack
-driven, **simple-key-table** based, with a token queue and lookahead.
-Trivia (whitespace, comments, newlines) is interleaved in the queue
-rather than dropped, so the CST stays lossless. Key/value pairing,
+`scanner.rs` is the streaming, char-by-char scanner modeled on
+libyaml / PyYAML / snakeyaml: position-tracked, indent-stack driven,
+**simple-key-table** based, with a token queue and lookahead. Trivia
+(whitespace, comments, newlines) is interleaved in the queue rather
+than dropped, so the CST stays lossless. Key/value pairing,
 multi-line scalars, and explicit-key (`?` / `:`) entries unify under
 one mechanism.
 
 Residual cutover work (deferred):
 
-- `lexer.rs` and `model.rs::YamlToken` — kept until the v2 scanner
-  recognizes `%`-prefixed directives after content (currently folded
-  into Plain scalars).
 - `events.rs::collect_doc_scalar_text_with_newlines`,
   `collect_value_scalar_text_with_newlines`,
   `quoted_val_event_multi_line` — projection still re-stitches
   multi-line scalars.
+- Tag/anchor/alias dispatch (`!`, `&`, `*`) is not yet implemented in
+  the scanner; these characters fall through to plain scalar at the
+  start of a token. The validator-driven directive-ordering pass
+  inherits the scanner's view, so cases like
+  `!foo "bar"\n%TAG ...\n---\n` are currently parsed as one big plain
+  scalar followed by a doc-start marker. Adding tag dispatch is the
+  next large scanner feature; once it lands the
+  `parse_yaml_report_detects_directive_after_content` test should be
+  switched back to the tag-shaped input.
 
 The concrete plan and design decisions for the rewrite — including
 trivia model, token enum lifetime, scalar cooking, diagnostic channel,
@@ -80,24 +83,18 @@ the rationale behind the validator-driven cutover.
   diagnostic clusters here as `check_*` functions and wire them into
   `validate_yaml`.
 - `crates/panache-parser/src/parser/yaml/parser.rs` — slim
-  orchestrator (~188 LOC). `parse_yaml_report` runs the v1 lex pass
-  for directive ordering, then `validate_yaml`, then
+  orchestrator. `parse_yaml_report` runs `validate_yaml`, then
   `parser_v2::parse_v2`, and wraps the v2 stream in the
   `DOCUMENT > YAML_METADATA_CONTENT > YAML_STREAM` envelope. **No
   emitter logic lives here** — work in `parser_v2.rs` or `scanner.rs`
   for tree-shape changes.
-- `crates/panache-parser/src/parser/yaml/lexer.rs` — legacy
-  indentation-aware lexer; retained as a directive-recognition shim
-  for `parse_yaml_report`. **Do not extend.** New lexing belongs in
-  `scanner.rs`.
 - `crates/panache-parser/src/parser/yaml/events.rs` — event projection
   (`project_events` plus `project_*` helpers). Walks the CST and
   produces a yaml-test-suite event stream. The `*_with_newlines` /
   `*_multi_line` re-stitching helpers are technical debt awaiting
   unification once the scanner emits styled scalars as single tokens.
 - `crates/panache-parser/src/parser/yaml/model.rs` — `YamlDiagnostic`,
-  `diagnostic_codes`, `YamlParseReport`, `YamlToken` (consumed by
-  the directive pass), shadow report shape.
+  `diagnostic_codes`, `YamlParseReport`, shadow report shape.
 - `crates/panache-parser/tests/yaml.rs` — fixture-driven tests, including:
   - `yaml_allowlist_cases_snapshot` — diagnostic/tree snapshot per case
   - `yaml_allowlist_cases_cst_snapshot` — full CST snapshot per case
@@ -175,10 +172,10 @@ case is in before touching it:
      contracts. New diagnostic codes go in
      `model.rs::diagnostic_codes` first.
    - Lex-level diagnostic gap (e.g. invalid escape, malformed
-     directive) → edit `parser/yaml/lexer.rs` only if the diagnostic
-     genuinely belongs to the v1 directive-recognition pass; for
-     anything else, prefer surfacing the diagnostic from the scanner
-     or validator and leave `lexer.rs` alone.
+     directive) → push the diagnostic onto `Scanner::diagnostics`
+     from `parser/yaml/scanner.rs` (use `push_diagnostic`), or, if
+     it requires CST inspection, add a `check_*` cluster in
+     `validator.rs`.
 
 5. **Apply the smallest focused change.** Keep changes parser-crate scoped,
    CST-lossless, and don't regress already-allowlisted cases.
@@ -224,7 +221,7 @@ case is in before touching it:
 - **Don't** hand-edit `triage.json` — it is derived output.
 - **Don't** drift into formatter territory. Parser/CST only.
 - **Don't** introduce parser styles that hide indentation or recovery state.
-  The lexer is explicitly indentation-aware by design.
+  The scanner is explicitly indentation-aware by design.
 
 ## Report-back format
 

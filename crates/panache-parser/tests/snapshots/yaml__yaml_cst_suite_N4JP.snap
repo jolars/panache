@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
 expression: snapshot
 ---
 case_id: N4JP
 input: "map:\n  key1: \"quoted1\"\n key2: \"bad indentation\"\n"
 diagnostics:
-YAML_LEX_ERROR:invalid indentation level for YAML block mapping@23..47
+YAML_PARSE_UNEXPECTED_DEDENT:block collection has mismatched indentation, splitting it into siblings@24..48
 cst:

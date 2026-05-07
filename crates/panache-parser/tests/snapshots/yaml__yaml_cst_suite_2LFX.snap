@@ -1,0 +1,23 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: 2LFX
+input: "%FOO  bar baz # Should be ignored\n              # with a warning.\n---\n\"foo\"\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..76
+  YAML_METADATA_CONTENT@0..76
+    YAML_STREAM@0..76
+      YAML_DOCUMENT@0..76
+        YAML_SCALAR@0..33 "%FOO  bar baz # Shoul ..."
+        NEWLINE@33..34 "\n"
+        WHITESPACE@34..48 "              "
+        YAML_COMMENT@48..65 "# with a warning."
+        NEWLINE@65..66 "\n"
+        YAML_DOCUMENT_START@66..69 "---"
+        NEWLINE@69..70 "\n"
+        YAML_SCALAR@70..75 "\"foo\""
+        NEWLINE@75..76 "\n"

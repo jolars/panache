@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
 expression: snapshot
 ---
 case_id: 4HVU
 input: "key:\n   - ok\n   - also ok\n  - wrong\n"
 diagnostics:
-YAML_LEX_ERROR:invalid indentation level for YAML block mapping@26..35
+YAML_PARSE_UNEXPECTED_DEDENT:block collection has mismatched indentation, splitting it into siblings@28..36
 cst:

@@ -1,0 +1,15 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: K527
+input: ">-\n  trimmed\n  \n \n\n  as\n  space\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..32
+  YAML_METADATA_CONTENT@0..32
+    YAML_STREAM@0..32
+      YAML_DOCUMENT@0..32
+        YAML_SCALAR@0..32 ">-\n  trimmed\n  \n \n\n   ..."

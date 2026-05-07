@@ -1,0 +1,16 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: 7A4E
+input: "\" 1st non-empty\n\n 2nd non-empty \n\t3rd non-empty \"\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..50
+  YAML_METADATA_CONTENT@0..50
+    YAML_STREAM@0..50
+      YAML_DOCUMENT@0..50
+        YAML_SCALAR@0..49 "\" 1st non-empty\n\n 2nd ..."
+        NEWLINE@49..50 "\n"

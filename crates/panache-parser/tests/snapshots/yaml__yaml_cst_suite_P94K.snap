@@ -1,0 +1,31 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: P94K
+input: "key:    # Comment\n        # lines\n  value\n\n\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..44
+  YAML_METADATA_CONTENT@0..44
+    YAML_STREAM@0..44
+      YAML_DOCUMENT@0..44
+        YAML_BLOCK_MAP@0..44
+          YAML_BLOCK_MAP_ENTRY@0..44
+            YAML_BLOCK_MAP_KEY@0..4
+              YAML_SCALAR@0..3 "key"
+              YAML_COLON@3..4 ":"
+            YAML_BLOCK_MAP_VALUE@4..44
+              WHITESPACE@4..8 "    "
+              YAML_COMMENT@8..17 "# Comment"
+              NEWLINE@17..18 "\n"
+              WHITESPACE@18..26 "        "
+              YAML_COMMENT@26..33 "# lines"
+              NEWLINE@33..34 "\n"
+              WHITESPACE@34..36 "  "
+              YAML_SCALAR@36..41 "value"
+              NEWLINE@41..42 "\n"
+              NEWLINE@42..43 "\n"
+              NEWLINE@43..44 "\n"

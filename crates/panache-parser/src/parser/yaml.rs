@@ -10,8 +10,6 @@
 
 #[path = "yaml/events.rs"]
 mod events;
-#[path = "yaml/lexer.rs"]
-mod lexer;
 #[path = "yaml/model.rs"]
 mod model;
 #[path = "yaml/parser.rs"]
@@ -24,10 +22,9 @@ mod scanner;
 mod validator;
 
 pub use events::{project_events, project_events_from_tree};
-pub use lexer::lex_mapping_tokens;
 pub use model::{
     ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
-    YamlParseReport, YamlToken, YamlTokenSpan, diagnostic_codes,
+    YamlParseReport, diagnostic_codes,
 };
 pub use parser::{parse_shadow, parse_yaml_report, parse_yaml_tree};
 pub use parser_v2::{ShadowParserV2Report, parse_v2, shadow_parser_v2_check};
@@ -170,129 +167,6 @@ mod tests {
         let tree = parse_yaml_tree(input).expect("tree");
         assert_eq!(tree.text().to_string(), input);
         assert_eq!(block_map_key_texts(&tree), vec!["'foo'':bar'".to_string()]);
-    }
-
-    #[test]
-    fn lexer_emits_tokens_for_quoted_keys_and_inline_comments() {
-        let input = "\"foo:bar\": 23 # note\n'x:y': 'z' # ok\n";
-        let tokens = lex_mapping_tokens(input).expect("tokens");
-        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
-        assert_eq!(
-            kinds,
-            vec![
-                YamlToken::Key,
-                YamlToken::Colon,
-                YamlToken::Whitespace,
-                YamlToken::Scalar,
-                YamlToken::Whitespace,
-                YamlToken::Comment,
-                YamlToken::Newline,
-                YamlToken::Key,
-                YamlToken::Colon,
-                YamlToken::Whitespace,
-                YamlToken::Scalar,
-                YamlToken::Whitespace,
-                YamlToken::Comment,
-                YamlToken::Newline,
-            ]
-        );
-        let comments: Vec<_> = tokens
-            .iter()
-            .filter(|t| t.kind == YamlToken::Comment)
-            .map(|t| t.text)
-            .collect();
-        assert_eq!(comments, vec!["# note", "# ok"]);
-    }
-
-    #[test]
-    fn lexer_emits_indent_and_dedent_for_indented_entries() {
-        let input = "root: 1\n  child: 2\n";
-        let tokens = lex_mapping_tokens(input).expect("tokens");
-        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
-        assert!(kinds.contains(&YamlToken::Indent));
-        assert!(kinds.contains(&YamlToken::Dedent));
-    }
-
-    #[test]
-    fn lexer_emits_document_start_marker_token() {
-        let input = "---\n";
-        let tokens = lex_mapping_tokens(input).expect("tokens");
-        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
-        assert_eq!(kinds, vec![YamlToken::DocumentStart, YamlToken::Newline,]);
-    }
-
-    #[test]
-    fn lexer_emits_flow_tokens_for_standalone_flow_mapping() {
-        let input = "{foo: bar}\n";
-        let tokens = lex_mapping_tokens(input).expect("tokens");
-        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
-        assert_eq!(
-            kinds,
-            vec![
-                YamlToken::FlowMapStart,
-                YamlToken::Scalar,
-                YamlToken::FlowMapEnd,
-                YamlToken::Newline,
-            ]
-        );
-    }
-
-    #[test]
-    fn lexer_emits_flow_sequence_tokens_in_mapping_value() {
-        let input = "a: [b, c]\n";
-        let tokens = lex_mapping_tokens(input).expect("tokens");
-        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
-        assert_eq!(
-            kinds,
-            vec![
-                YamlToken::Key,
-                YamlToken::Colon,
-                YamlToken::Whitespace,
-                YamlToken::FlowSeqStart,
-                YamlToken::Scalar,
-                YamlToken::Comma,
-                YamlToken::Scalar,
-                YamlToken::FlowSeqEnd,
-                YamlToken::Newline,
-            ]
-        );
-    }
-
-    #[test]
-    fn lexer_tokens_round_trip_input_bytes_for_supported_cases() {
-        let cases = [
-            "foo: bar\n",
-            "a: [b, c]\n",
-            "---\nfoo: bar\n...\n",
-            "%YAML 1.2\nfoo: \"a#b\"\n",
-        ];
-
-        for input in cases {
-            let tokens = lex_mapping_tokens(input).expect("tokens");
-            let rebuilt = tokens.iter().map(|t| t.text).collect::<String>();
-            assert_eq!(rebuilt, input);
-        }
-    }
-
-    #[test]
-    fn lexer_emits_monotonic_byte_ranges() {
-        let input = "root: 1\n  child: 2\n";
-        let tokens = lex_mapping_tokens(input).expect("tokens");
-
-        let mut offset = 0usize;
-        for token in tokens {
-            if token.text.is_empty() {
-                assert_eq!(token.byte_start, offset);
-                assert_eq!(token.byte_end, offset);
-                continue;
-            }
-
-            assert_eq!(token.byte_start, offset);
-            assert_eq!(&input[token.byte_start..token.byte_end], token.text);
-            offset = token.byte_end;
-        }
-
-        assert_eq!(offset, input.len());
     }
 
     #[test]
@@ -455,7 +329,9 @@ mod tests {
 
     #[test]
     fn parse_yaml_report_detects_directive_after_content() {
-        let report = parse_yaml_report("!foo \"bar\"\n%TAG ! tag:example.com,2000:app/\n---\n");
+        // EB22-shape: a comment terminates the plain scalar, leaving
+        // `%YAML 1.2` at column 0 in directive position after content.
+        let report = parse_yaml_report("---\nscalar1 # comment\n%YAML 1.2\n---\nscalar2\n");
         assert!(report.tree.is_none());
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
@@ -518,32 +394,6 @@ mod tests {
         assert!(
             value_text.contains("line1") && value_text.contains("line2"),
             "value should absorb block scalar content, got {value_text:?}"
-        );
-    }
-
-    #[test]
-    fn lexer_emits_literal_block_scalar_header_and_content() {
-        let input = "a: |\n  line1\n  line2\n";
-        let tokens = lex_mapping_tokens(input).expect("tokens");
-        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
-        assert_eq!(
-            kinds,
-            vec![
-                YamlToken::Key,
-                YamlToken::Colon,
-                YamlToken::Whitespace,
-                YamlToken::BlockScalarHeader,
-                YamlToken::Newline,
-                YamlToken::BlockScalarContent,
-                YamlToken::Newline,
-                YamlToken::BlockScalarContent,
-                YamlToken::Newline,
-            ]
-        );
-        let texts: Vec<_> = tokens.iter().map(|t| t.text).collect();
-        assert_eq!(
-            texts,
-            vec!["a", ":", " ", "|", "\n", "  line1", "\n", "  line2", "\n"]
         );
     }
 
@@ -623,23 +473,6 @@ mod tests {
     }
 
     #[test]
-    fn lexer_recognizes_single_bang_tag_in_top_level_scalar() {
-        let tokens = lex_mapping_tokens("! a\n").expect("tokens");
-        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
-        assert_eq!(
-            kinds,
-            vec![
-                YamlToken::Tag,
-                YamlToken::Whitespace,
-                YamlToken::Scalar,
-                YamlToken::Newline,
-            ]
-        );
-        let texts: Vec<_> = tokens.iter().map(|t| t.text).collect();
-        assert_eq!(texts, vec!["!", " ", "a", "\n"]);
-    }
-
-    #[test]
     fn parser_emits_scalar_document_for_tag_without_colon() {
         let input = "! a\n";
         let tree = parse_yaml_tree(input).expect("tree");
@@ -660,25 +493,6 @@ mod tests {
             .filter_map(|el| el.into_token())
             .any(|tok| tok.kind() == SyntaxKind::YAML_SCALAR && tok.text().starts_with('!'));
         assert!(has_tagged_scalar, "tree should contain tag bytes in scalar");
-    }
-
-    #[test]
-    fn lexer_extracts_explicit_tag_before_block_sequence_scalar() {
-        let tokens = lex_mapping_tokens("- !!int 1\n").expect("tokens");
-        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
-        assert_eq!(
-            kinds,
-            vec![
-                YamlToken::BlockSeqEntry,
-                YamlToken::Whitespace,
-                YamlToken::Tag,
-                YamlToken::Whitespace,
-                YamlToken::Scalar,
-                YamlToken::Newline,
-            ]
-        );
-        let texts: Vec<_> = tokens.iter().map(|t| t.text).collect();
-        assert_eq!(texts, vec!["-", " ", "!!int", " ", "1", "\n"]);
     }
 
     #[test]
@@ -774,9 +588,11 @@ mod tests {
 
     #[test]
     fn shadow_parse_reports_prototype_rejected_when_enabled() {
-        // Tab indentation is prohibited by YAML spec for block structures
+        // An unterminated flow sequence is rejected by the v2-aware
+        // structural validator, which is the rejection signal exercised
+        // by the shadow parse plumbing.
         let report = parse_shadow(
-            "\ttitle: value",
+            "[ a, b",
             ShadowYamlOptions {
                 enabled: true,
                 input_kind: YamlInputKind::Plain,

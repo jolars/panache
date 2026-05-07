@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
 expression: snapshot
 ---
 case_id: 9C9N
 input: "---\nflow: [a,\nb,\nc]\n"
 diagnostics:
-YAML_LEX_WRONG_INDENTED_FLOW:wrong indentation for continued flow collection@14..16
+YAML_LEX_WRONG_INDENTED_FLOW:wrong indentation for continued flow collection@14..15
 cst:

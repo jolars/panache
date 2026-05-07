@@ -1,10 +1,8 @@
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
-use super::lexer::lex_mapping_tokens_with_diagnostic;
 use super::model::{
-    ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
-    YamlParseReport, YamlToken, YamlTokenSpan, diagnostic_codes,
+    ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlInputKind, YamlParseReport,
 };
 
 /// Parse YAML in shadow mode using prototype groundwork only.
@@ -65,19 +63,6 @@ fn strip_hashpipe_prefix(line: &str) -> &str {
     line
 }
 
-fn diag_at_token(
-    token: &YamlTokenSpan<'_>,
-    code: &'static str,
-    message: &'static str,
-) -> YamlDiagnostic {
-    YamlDiagnostic {
-        code,
-        message,
-        byte_start: token.byte_start,
-        byte_end: token.byte_end,
-    }
-}
-
 /// Parse prototype YAML tree structure from input
 pub fn parse_yaml_tree(input: &str) -> Option<SyntaxNode> {
     parse_yaml_report(input).tree
@@ -85,65 +70,15 @@ pub fn parse_yaml_tree(input: &str) -> Option<SyntaxNode> {
 
 /// Parse prototype YAML tree structure and include diagnostics on failure.
 ///
-/// Diagnostics flow in three phases:
-/// 1. The v1 lexer surfaces lex-level diagnostics (e.g.
-///    `LEX_INVALID_DOUBLE_QUOTED_ESCAPE`) and produces a token stream
-///    that correctly classifies column-0 directive markers — something
-///    the v2 scanner cannot yet do because it folds
-///    `!foo "bar"\n%TAG ...` into a single plain scalar.
-/// 2. Directive-ordering checks (after-content, without-doc-start)
-///    run over the v1 tokens.
-/// 3. The v2-aware [`super::validator::validate_yaml`] pass surfaces
-///    structural diagnostics (unterminated flow, trailing content,
-///    invalid keys, indent anomalies, block-scalar header, etc.).
+/// Diagnostics flow through the v2-aware
+/// [`super::validator::validate_yaml`] pass, which composes per-cluster
+/// `check_*` functions covering directive ordering, structural shape
+/// (unterminated flow, trailing content, invalid keys, indent
+/// anomalies, block-scalar header, etc.), and lex-level checks like
+/// `LEX_INVALID_DOUBLE_QUOTED_ESCAPE`.
 ///
 /// The returned tree, when present, comes from the v2 scanner+builder.
 pub fn parse_yaml_report(input: &str) -> YamlParseReport {
-    let tokens = match lex_mapping_tokens_with_diagnostic(input) {
-        Ok(tokens) => tokens,
-        Err(err) => {
-            return YamlParseReport {
-                tree: None,
-                diagnostics: vec![err],
-            };
-        }
-    };
-
-    let mut seen_content = false;
-    for token in &tokens {
-        match token.kind {
-            YamlToken::Directive if seen_content => {
-                return YamlParseReport {
-                    tree: None,
-                    diagnostics: vec![diag_at_token(
-                        token,
-                        diagnostic_codes::PARSE_DIRECTIVE_AFTER_CONTENT,
-                        "directive requires document end before subsequent directives",
-                    )],
-                };
-            }
-            YamlToken::Directive
-            | YamlToken::Newline
-            | YamlToken::Whitespace
-            | YamlToken::Comment => {}
-            YamlToken::DocumentEnd => seen_content = false,
-            _ => seen_content = true,
-        }
-    }
-
-    if let Some(directive) = tokens.iter().find(|t| t.kind == YamlToken::Directive)
-        && !tokens.iter().any(|t| t.kind == YamlToken::DocumentStart)
-    {
-        return YamlParseReport {
-            tree: None,
-            diagnostics: vec![diag_at_token(
-                directive,
-                diagnostic_codes::PARSE_DIRECTIVE_WITHOUT_DOCUMENT_START,
-                "directive requires an explicit document start marker",
-            )],
-        };
-    }
-
     if let Some(err) = super::validator::validate_yaml(input) {
         return YamlParseReport {
             tree: None,

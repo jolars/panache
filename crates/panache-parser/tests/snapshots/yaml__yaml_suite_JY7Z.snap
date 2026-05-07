@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 246
 expression: snapshot
 ---
 case_id: JY7Z
 input: "key1: \"quoted1\"\nkey2: \"quoted2\" no key: nor value\nkey3: \"quoted3\"\n"
 has_error_contract: true
 parsed_mapping_tree: false
-diagnostics: [YAML_LEX_ERROR:invalid plain scalar containing mapping indicator sequence@21..49]
+diagnostics: [YAML_PARSE_UNEXPECTED_DEDENT:comment cannot appear inside a multi-line plain scalar@32..38]

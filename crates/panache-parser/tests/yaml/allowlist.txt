@@ -298,3 +298,74 @@ L94M
 X8DW
 # Multi-document stream where each `---` marker carries a type-tag shorthand (`!!map` / `!!seq` / `!!str`); covers tagged maps, tagged sequences, and tagged plain scalars folded across multiple lines.
 35KP
+# Empty stream: zero documents, zero events between +STR/-STR.
+AVM7
+# Stream of comment-only lines and blank lines: no documents emitted.
+8G76
+# Reserved (unrecognized) directive `%FOO …` is ignored; following document parses normally.
+2LFX
+6LVF
+# Recognized future-version YAML directive (`%YAML 1.3`) accepted with warning; document body parses.
+BEC7
+# `%YAML 1.2` directive followed by `---` marker, document body, and `... # suffix` end-marker with trailing comment.
+RTP8
+# `%TAG !! tag:example.com,2000:app/` secondary handle; body uses the rebound `!!` shorthand on a plain scalar.
+P76L
+# Three-dashes immediately followed by content with no space (`---word1\nword2`) is a multi-line plain scalar, not a directive-end marker.
+82AN
+EXG3
+# Multi-line plain scalar at top level whose continuation line happens to look like a YAML directive (`%YAML 1.2`); the scalar continues uninterrupted.
+XLQ9
+# Tab character at the start of a line followed by a flow indicator (`\t[`, `\t{`) is leading whitespace, not block-context indent.
+6CA3
+Q5MG
+# Trailing whitespace on the line after a closed flow collection (`[1, 2, 3]  \n  `) is consumed as trivia; no further content.
+4RWC
+# Deeply nested flow collections on one line: maps inside sequences inside maps (`{ a: [b, c, { d: [e, f] } ] }`).
+F3CP
+R52L
+# Nested flow collections split across lines with the closing-brace stack on a single line (`{ key: [[[\n  value\n ]]]\n}`).
+ZK9H
+# Flow-map entry where the key and value indicator are on different lines (`{ "foo"\n  :bar }`); colon-adjacent value still binds.
+5MUD
+# Flow-map entry where a comment intervenes between key and the colon-adjacent value on the next line (`{ "foo" # comment\n  :bar }`).
+K3WX
+# Block-map entry whose value is a comment after the colon and the actual value lives on the next indented line (`key:    # Comment\n  value`).
+P94K
+# Block-map with `:` key whose value section contains only blank lines (no value); subsequent blanks are document trivia.
+NHX8
+# Spec example 6.1: indentation spaces — block-map values include literal block scalar and flow sequence with mixed tab/space leading whitespace.
+6HB6
+# Multi-line double-quoted scalar with single line breaks folding to space and blank lines folding to `\n` (spec 7.6).
+7A4E
+# Multi-line single-quoted scalar with the same line-folding contract as 7A4E (spec 7.9).
+PRH3
+# Multi-line plain scalar with blank lines folding to `\n` and tab-prefixed continuation (spec 7.12).
+HS5T
+# Spec example 6.5: multi-line double-quoted block-map value where blank/whitespace-only lines fold to `\n` and clipped block scalar follows.
+5GBF
+# Spec example 6.8 [1.3]: bare top-level multi-line double-quoted scalar where leading/trailing whitespace is stripped and blank lines fold to `\n`.
+6WPF
+# Spec example 6.8: same flow-folding contract as 6WPF without the `---` marker, including a tab-prefixed continuation line.
+TL85
+# Top-level literal block scalar (`|`) whose body contains blank-only and comment-prefixed indented lines preserved as content (spec 8.8).
+DWX9
+# Top-level folded block scalar (`>-`) with strip chomp; trimmed content with internal blank lines folds to a single `\n` separator (spec 6.6).
+K527
+# Top-level literal block scalar (`|`) with tab-indented body line preserved verbatim (spec 8.7).
+M9B4
+# Top-level literal block scalar with strip chomp (`|-`) terminated by document-end marker (`...`).
+MYW6
+# Top-level folded block scalar (`>`) with internal blank lines and a re-indented continuation block.
+TS54
+# Block sequence whose items are block maps, each value a literal block scalar (`|2`, `|`); covers block-scalar inside block-map inside block-sequence nesting.
+4WA9
+# Block-map with blank lines between entries and a literal block scalar value containing internal blanks/whitespace-only lines.
+H2RW
+# Anchors on block-map keys (`&k1 key1: one`) and on map values (`top1: &node1\n …`); anchors interleave with comment trivia.
+7BMT
+U3XV
+# Tag and anchor on a double-quoted block-map key (`!!str &a1 "foo": …`) and tag on the value scalar (`!!str bar`).
+HMQ5
+# Anchors on otherwise-empty scalars in a block sequence: `- &a` (sequence entry with anchor only) and `&a : a` (anchor on empty implicit key).
+PW8X

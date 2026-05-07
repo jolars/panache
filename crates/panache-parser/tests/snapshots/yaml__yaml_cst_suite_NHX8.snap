@@ -1,0 +1,22 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: NHX8
+input: ":\n\n\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..4
+  YAML_METADATA_CONTENT@0..4
+    YAML_STREAM@0..4
+      YAML_DOCUMENT@0..4
+        YAML_BLOCK_MAP@0..4
+          YAML_BLOCK_MAP_ENTRY@0..4
+            YAML_BLOCK_MAP_KEY@0..1
+              YAML_COLON@0..1 ":"
+            YAML_BLOCK_MAP_VALUE@1..4
+              NEWLINE@1..2 "\n"
+              NEWLINE@2..3 "\n"
+              NEWLINE@3..4 "\n"

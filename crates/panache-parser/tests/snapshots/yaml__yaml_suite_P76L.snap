@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 246
+expression: snapshot
+---
+case_id: P76L
+input: "%TAG !! tag:example.com,2000:app/\n---\n!!int 1 - 3 # Interval, not integer\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

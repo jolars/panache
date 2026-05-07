@@ -1,0 +1,41 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: H2RW
+input: "foo: 1\n\nbar: 2\n    \ntext: |\n  a\n    \n  b\n\n  c\n \n  d\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..52
+  YAML_METADATA_CONTENT@0..52
+    YAML_STREAM@0..52
+      YAML_DOCUMENT@0..52
+        YAML_BLOCK_MAP@0..52
+          YAML_BLOCK_MAP_ENTRY@0..8
+            YAML_BLOCK_MAP_KEY@0..4
+              YAML_SCALAR@0..3 "foo"
+              YAML_COLON@3..4 ":"
+            YAML_BLOCK_MAP_VALUE@4..8
+              WHITESPACE@4..5 " "
+              YAML_SCALAR@5..6 "1"
+              NEWLINE@6..7 "\n"
+              NEWLINE@7..8 "\n"
+          YAML_BLOCK_MAP_ENTRY@8..20
+            YAML_BLOCK_MAP_KEY@8..12
+              YAML_SCALAR@8..11 "bar"
+              YAML_COLON@11..12 ":"
+            YAML_BLOCK_MAP_VALUE@12..20
+              WHITESPACE@12..13 " "
+              YAML_SCALAR@13..14 "2"
+              NEWLINE@14..15 "\n"
+              WHITESPACE@15..19 "    "
+              NEWLINE@19..20 "\n"
+          YAML_BLOCK_MAP_ENTRY@20..52
+            YAML_BLOCK_MAP_KEY@20..25
+              YAML_SCALAR@20..24 "text"
+              YAML_COLON@24..25 ":"
+            YAML_BLOCK_MAP_VALUE@25..52
+              WHITESPACE@25..26 " "
+              YAML_SCALAR@26..52 "|\n  a\n    \n  b\n\n  c\n  ..."

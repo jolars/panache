@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
 expression: snapshot
 ---
 case_id: 9KBC
 input: "--- key1: value1\n    key2: value2\n"
 diagnostics:
-YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START:trailing content after document start marker@0..16
+YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START:trailing content after document start marker@4..8
 cst:

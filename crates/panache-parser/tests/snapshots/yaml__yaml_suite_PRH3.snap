@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 246
+expression: snapshot
+---
+case_id: PRH3
+input: "' 1st non-empty\n\n 2nd non-empty \n\t3rd non-empty '\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

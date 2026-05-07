@@ -1,0 +1,24 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: RTP8
+input: "%YAML 1.2\n---\nDocument\n... # Suffix\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..36
+  YAML_METADATA_CONTENT@0..36
+    YAML_STREAM@0..36
+      YAML_DOCUMENT@0..26
+        YAML_SCALAR@0..9 "%YAML 1.2"
+        NEWLINE@9..10 "\n"
+        YAML_DOCUMENT_START@10..13 "---"
+        NEWLINE@13..14 "\n"
+        YAML_SCALAR@14..22 "Document"
+        NEWLINE@22..23 "\n"
+        YAML_DOCUMENT_END@23..26 "..."
+      WHITESPACE@26..27 " "
+      YAML_COMMENT@27..35 "# Suffix"
+      NEWLINE@35..36 "\n"

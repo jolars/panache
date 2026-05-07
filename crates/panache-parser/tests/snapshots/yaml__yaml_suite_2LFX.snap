@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 246
+expression: snapshot
+---
+case_id: 2LFX
+input: "%FOO  bar baz # Should be ignored\n              # with a warning.\n---\n\"foo\"\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

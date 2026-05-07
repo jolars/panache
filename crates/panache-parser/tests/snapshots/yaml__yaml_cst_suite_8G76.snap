@@ -1,0 +1,20 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: 8G76
+input: "  # Comment\n   \n\n\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..18
+  YAML_METADATA_CONTENT@0..18
+    YAML_STREAM@0..18
+      WHITESPACE@0..2 "  "
+      YAML_COMMENT@2..11 "# Comment"
+      NEWLINE@11..12 "\n"
+      WHITESPACE@12..15 "   "
+      NEWLINE@15..16 "\n"
+      NEWLINE@16..17 "\n"
+      NEWLINE@17..18 "\n"

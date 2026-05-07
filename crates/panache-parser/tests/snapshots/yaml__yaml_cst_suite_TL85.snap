@@ -1,0 +1,16 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: TL85
+input: "\"\n  foo \n \n  \t bar\n\n  baz\n\"\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..28
+  YAML_METADATA_CONTENT@0..28
+    YAML_STREAM@0..28
+      YAML_DOCUMENT@0..28
+        YAML_SCALAR@0..27 "\"\n  foo \n \n  \t bar\n\n  ..."
+        NEWLINE@27..28 "\n"

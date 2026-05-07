@@ -1,0 +1,31 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: K3WX
+input: "---\n{ \"foo\" # comment\n  :bar }\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..31
+  YAML_METADATA_CONTENT@0..31
+    YAML_STREAM@0..31
+      YAML_DOCUMENT@0..31
+        YAML_DOCUMENT_START@0..3 "---"
+        NEWLINE@3..4 "\n"
+        YAML_FLOW_MAP@4..30
+          YAML_SCALAR@4..5 "{"
+          WHITESPACE@5..6 " "
+          YAML_SCALAR@6..11 "\"foo\""
+          WHITESPACE@11..12 " "
+          YAML_COMMENT@12..21 "# comment"
+          NEWLINE@21..22 "\n"
+          WHITESPACE@22..24 "  "
+          YAML_FLOW_MAP_ENTRY@24..29
+            YAML_FLOW_MAP_KEY@24..25
+              YAML_COLON@24..25 ":"
+            YAML_FLOW_MAP_VALUE@25..29
+              YAML_SCALAR@25..29 "bar "
+          YAML_SCALAR@29..30 "}"
+        NEWLINE@30..31 "\n"

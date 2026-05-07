@@ -1,0 +1,18 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: DWX9
+input: "|\n \n  \n  literal\n   \n  \n  text\n\n # Comment\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..43
+  YAML_METADATA_CONTENT@0..43
+    YAML_STREAM@0..43
+      YAML_DOCUMENT@0..43
+        YAML_SCALAR@0..32 "|\n \n  \n  literal\n   \n ..."
+        WHITESPACE@32..33 " "
+        YAML_COMMENT@33..42 "# Comment"
+        NEWLINE@42..43 "\n"

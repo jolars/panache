@@ -1,0 +1,58 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: R52L
+input: "---\n{ top1: [item1, {key2: value2}, item3], top2: value2 }\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..59
+  YAML_METADATA_CONTENT@0..59
+    YAML_STREAM@0..59
+      YAML_DOCUMENT@0..59
+        YAML_DOCUMENT_START@0..3 "---"
+        NEWLINE@3..4 "\n"
+        YAML_FLOW_MAP@4..58
+          YAML_SCALAR@4..5 "{"
+          WHITESPACE@5..6 " "
+          YAML_FLOW_MAP_ENTRY@6..42
+            YAML_FLOW_MAP_KEY@6..11
+              YAML_SCALAR@6..10 "top1"
+              YAML_COLON@10..11 ":"
+            YAML_FLOW_MAP_VALUE@11..42
+              WHITESPACE@11..12 " "
+              YAML_FLOW_SEQUENCE@12..42
+                YAML_SCALAR@12..13 "["
+                YAML_FLOW_SEQUENCE_ITEM@13..18
+                  YAML_SCALAR@13..18 "item1"
+                YAML_SCALAR@18..19 ","
+                WHITESPACE@19..20 " "
+                YAML_FLOW_SEQUENCE_ITEM@20..34
+                  YAML_FLOW_MAP@20..34
+                    YAML_SCALAR@20..21 "{"
+                    YAML_FLOW_MAP_ENTRY@21..33
+                      YAML_FLOW_MAP_KEY@21..26
+                        YAML_SCALAR@21..25 "key2"
+                        YAML_COLON@25..26 ":"
+                      YAML_FLOW_MAP_VALUE@26..33
+                        WHITESPACE@26..27 " "
+                        YAML_SCALAR@27..33 "value2"
+                    YAML_SCALAR@33..34 "}"
+                YAML_SCALAR@34..35 ","
+                WHITESPACE@35..36 " "
+                YAML_FLOW_SEQUENCE_ITEM@36..41
+                  YAML_SCALAR@36..41 "item3"
+                YAML_SCALAR@41..42 "]"
+          YAML_SCALAR@42..43 ","
+          WHITESPACE@43..44 " "
+          YAML_FLOW_MAP_ENTRY@44..57
+            YAML_FLOW_MAP_KEY@44..49
+              YAML_SCALAR@44..48 "top2"
+              YAML_COLON@48..49 ":"
+            YAML_FLOW_MAP_VALUE@49..57
+              WHITESPACE@49..50 " "
+              YAML_SCALAR@50..57 "value2 "
+          YAML_SCALAR@57..58 "}"
+        NEWLINE@58..59 "\n"

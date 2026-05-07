@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 246
+expression: snapshot
+---
+case_id: HMQ5
+input: "!!str &a1 \"foo\":\n  !!str bar\n&a2 baz : *a1\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

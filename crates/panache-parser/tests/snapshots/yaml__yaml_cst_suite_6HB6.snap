@@ -1,0 +1,75 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: 6HB6
+input: "  # Leading comment line spaces are\n   # neither content nor indentation.\n    \nNot indented:\n By one space: |\n    By four\n      spaces\n Flow style: [    # Leading spaces\n   By two,        # in flow style\n  Also by two,    # are neither\n  \tStill by two   # content nor\n    ]             # indentation.\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..301
+  YAML_METADATA_CONTENT@0..301
+    YAML_STREAM@0..301
+      WHITESPACE@0..2 "  "
+      YAML_COMMENT@2..35 "# Leading comment lin ..."
+      NEWLINE@35..36 "\n"
+      WHITESPACE@36..39 "   "
+      YAML_COMMENT@39..73 "# neither content nor ..."
+      NEWLINE@73..74 "\n"
+      WHITESPACE@74..78 "    "
+      NEWLINE@78..79 "\n"
+      YAML_DOCUMENT@79..301
+        YAML_BLOCK_MAP@79..301
+          YAML_BLOCK_MAP_ENTRY@79..301
+            YAML_BLOCK_MAP_KEY@79..92
+              YAML_SCALAR@79..91 "Not indented"
+              YAML_COLON@91..92 ":"
+            YAML_BLOCK_MAP_VALUE@92..301
+              NEWLINE@92..93 "\n"
+              WHITESPACE@93..94 " "
+              YAML_BLOCK_MAP@94..301
+                YAML_BLOCK_MAP_ENTRY@94..136
+                  YAML_BLOCK_MAP_KEY@94..107
+                    YAML_SCALAR@94..106 "By one space"
+                    YAML_COLON@106..107 ":"
+                  YAML_BLOCK_MAP_VALUE@107..136
+                    WHITESPACE@107..108 " "
+                    YAML_SCALAR@108..135 "|\n    By four\n      s ..."
+                    WHITESPACE@135..136 " "
+                YAML_BLOCK_MAP_ENTRY@136..301
+                  YAML_BLOCK_MAP_KEY@136..147
+                    YAML_SCALAR@136..146 "Flow style"
+                    YAML_COLON@146..147 ":"
+                  YAML_BLOCK_MAP_VALUE@147..301
+                    WHITESPACE@147..148 " "
+                    YAML_FLOW_SEQUENCE@148..273
+                      YAML_SCALAR@148..149 "["
+                      WHITESPACE@149..153 "    "
+                      YAML_COMMENT@153..169 "# Leading spaces"
+                      NEWLINE@169..170 "\n"
+                      WHITESPACE@170..173 "   "
+                      YAML_FLOW_SEQUENCE_ITEM@173..179
+                        YAML_SCALAR@173..179 "By two"
+                      YAML_SCALAR@179..180 ","
+                      WHITESPACE@180..188 "        "
+                      YAML_COMMENT@188..203 "# in flow style"
+                      NEWLINE@203..204 "\n"
+                      WHITESPACE@204..206 "  "
+                      YAML_FLOW_SEQUENCE_ITEM@206..217
+                        YAML_SCALAR@206..217 "Also by two"
+                      YAML_SCALAR@217..218 ","
+                      WHITESPACE@218..222 "    "
+                      YAML_COMMENT@222..235 "# are neither"
+                      NEWLINE@235..236 "\n"
+                      WHITESPACE@236..239 "  \t"
+                      YAML_FLOW_SEQUENCE_ITEM@239..272
+                        YAML_SCALAR@239..251 "Still by two"
+                        WHITESPACE@251..254 "   "
+                        YAML_COMMENT@254..267 "# content nor"
+                        NEWLINE@267..268 "\n"
+                        WHITESPACE@268..272 "    "
+                      YAML_SCALAR@272..273 "]"
+                    WHITESPACE@273..286 "             "
+                    YAML_COMMENT@286..300 "# indentation."
+                    NEWLINE@300..301 "\n"

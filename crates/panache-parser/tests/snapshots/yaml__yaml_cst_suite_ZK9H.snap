@@ -1,0 +1,43 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: ZK9H
+input: "{ key: [[[\n  value\n ]]]\n}\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..26
+  YAML_METADATA_CONTENT@0..26
+    YAML_STREAM@0..26
+      YAML_DOCUMENT@0..26
+        YAML_FLOW_MAP@0..25
+          YAML_SCALAR@0..1 "{"
+          WHITESPACE@1..2 " "
+          YAML_FLOW_MAP_ENTRY@2..24
+            YAML_FLOW_MAP_KEY@2..6
+              YAML_SCALAR@2..5 "key"
+              YAML_COLON@5..6 ":"
+            YAML_FLOW_MAP_VALUE@6..24
+              WHITESPACE@6..7 " "
+              YAML_FLOW_SEQUENCE@7..23
+                YAML_SCALAR@7..8 "["
+                YAML_FLOW_SEQUENCE_ITEM@8..22
+                  YAML_FLOW_SEQUENCE@8..22
+                    YAML_SCALAR@8..9 "["
+                    YAML_FLOW_SEQUENCE_ITEM@9..21
+                      YAML_FLOW_SEQUENCE@9..21
+                        YAML_SCALAR@9..10 "["
+                        NEWLINE@10..11 "\n"
+                        WHITESPACE@11..13 "  "
+                        YAML_FLOW_SEQUENCE_ITEM@13..20
+                          YAML_SCALAR@13..18 "value"
+                          NEWLINE@18..19 "\n"
+                          WHITESPACE@19..20 " "
+                        YAML_SCALAR@20..21 "]"
+                    YAML_SCALAR@21..22 "]"
+                YAML_SCALAR@22..23 "]"
+              NEWLINE@23..24 "\n"
+          YAML_SCALAR@24..25 "}"
+        NEWLINE@25..26 "\n"

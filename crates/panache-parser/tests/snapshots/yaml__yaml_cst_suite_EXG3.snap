@@ -1,0 +1,18 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: EXG3
+input: "---\n---word1\nword2\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..19
+  YAML_METADATA_CONTENT@0..19
+    YAML_STREAM@0..19
+      YAML_DOCUMENT@0..19
+        YAML_DOCUMENT_START@0..3 "---"
+        NEWLINE@3..4 "\n"
+        YAML_SCALAR@4..18 "---word1\nword2"
+        NEWLINE@18..19 "\n"

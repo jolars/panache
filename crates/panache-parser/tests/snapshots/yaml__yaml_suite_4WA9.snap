@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 246
+expression: snapshot
+---
+case_id: 4WA9
+input: "- aaa: |2\n    xxx\n  bbb: |\n    xxx\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

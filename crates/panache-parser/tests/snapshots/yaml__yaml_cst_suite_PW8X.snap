@@ -1,0 +1,89 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: PW8X
+input: "- &a\n- a\n-\n  &a : a\n  b: &b\n-\n  &c : &a\n-\n  ? &d\n-\n  ? &e\n  : &a\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..65
+  YAML_METADATA_CONTENT@0..65
+    YAML_STREAM@0..65
+      YAML_DOCUMENT@0..65
+        YAML_BLOCK_SEQUENCE@0..65
+          YAML_BLOCK_SEQUENCE_ITEM@0..5
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_SCALAR@2..4 "&a"
+            NEWLINE@4..5 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@5..9
+            YAML_BLOCK_SEQ_ENTRY@5..6 "-"
+            WHITESPACE@6..7 " "
+            YAML_SCALAR@7..8 "a"
+            NEWLINE@8..9 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@9..28
+            YAML_BLOCK_SEQ_ENTRY@9..10 "-"
+            NEWLINE@10..11 "\n"
+            WHITESPACE@11..13 "  "
+            YAML_BLOCK_MAP@13..28
+              YAML_BLOCK_MAP_ENTRY@13..22
+                YAML_BLOCK_MAP_KEY@13..17
+                  YAML_SCALAR@13..16 "&a "
+                  YAML_COLON@16..17 ":"
+                YAML_BLOCK_MAP_VALUE@17..22
+                  WHITESPACE@17..18 " "
+                  YAML_SCALAR@18..19 "a"
+                  NEWLINE@19..20 "\n"
+                  WHITESPACE@20..22 "  "
+              YAML_BLOCK_MAP_ENTRY@22..28
+                YAML_BLOCK_MAP_KEY@22..24
+                  YAML_SCALAR@22..23 "b"
+                  YAML_COLON@23..24 ":"
+                YAML_BLOCK_MAP_VALUE@24..28
+                  WHITESPACE@24..25 " "
+                  YAML_SCALAR@25..27 "&b"
+                  NEWLINE@27..28 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@28..40
+            YAML_BLOCK_SEQ_ENTRY@28..29 "-"
+            NEWLINE@29..30 "\n"
+            WHITESPACE@30..32 "  "
+            YAML_BLOCK_MAP@32..40
+              YAML_BLOCK_MAP_ENTRY@32..40
+                YAML_BLOCK_MAP_KEY@32..36
+                  YAML_SCALAR@32..35 "&c "
+                  YAML_COLON@35..36 ":"
+                YAML_BLOCK_MAP_VALUE@36..40
+                  WHITESPACE@36..37 " "
+                  YAML_SCALAR@37..39 "&a"
+                  NEWLINE@39..40 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@40..49
+            YAML_BLOCK_SEQ_ENTRY@40..41 "-"
+            NEWLINE@41..42 "\n"
+            WHITESPACE@42..44 "  "
+            YAML_BLOCK_MAP@44..49
+              YAML_BLOCK_MAP_ENTRY@44..49
+                YAML_BLOCK_MAP_KEY@44..49
+                  YAML_KEY@44..45 "?"
+                  WHITESPACE@45..46 " "
+                  YAML_SCALAR@46..48 "&d"
+                  NEWLINE@48..49 "\n"
+                YAML_BLOCK_MAP_VALUE@49..49
+          YAML_BLOCK_SEQUENCE_ITEM@49..65
+            YAML_BLOCK_SEQ_ENTRY@49..50 "-"
+            NEWLINE@50..51 "\n"
+            WHITESPACE@51..53 "  "
+            YAML_BLOCK_MAP@53..65
+              YAML_BLOCK_MAP_ENTRY@53..65
+                YAML_BLOCK_MAP_KEY@53..61
+                  YAML_KEY@53..54 "?"
+                  WHITESPACE@54..55 " "
+                  YAML_SCALAR@55..57 "&e"
+                  NEWLINE@57..58 "\n"
+                  WHITESPACE@58..60 "  "
+                  YAML_COLON@60..61 ":"
+                YAML_BLOCK_MAP_VALUE@61..65
+                  WHITESPACE@61..62 " "
+                  YAML_SCALAR@62..64 "&a"
+                  NEWLINE@64..65 "\n"

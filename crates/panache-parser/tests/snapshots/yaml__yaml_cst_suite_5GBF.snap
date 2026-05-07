@@ -1,0 +1,31 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: 5GBF
+input: "Folding:\n  \"Empty line\n   \t\n  as a line feed\"\nChomping: |\n  Clipped empty lines\n \n\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..83
+  YAML_METADATA_CONTENT@0..83
+    YAML_STREAM@0..83
+      YAML_DOCUMENT@0..83
+        YAML_BLOCK_MAP@0..83
+          YAML_BLOCK_MAP_ENTRY@0..46
+            YAML_BLOCK_MAP_KEY@0..8
+              YAML_SCALAR@0..7 "Folding"
+              YAML_COLON@7..8 ":"
+            YAML_BLOCK_MAP_VALUE@8..46
+              NEWLINE@8..9 "\n"
+              WHITESPACE@9..11 "  "
+              YAML_SCALAR@11..45 "\"Empty line\n   \t\n  as ..."
+              NEWLINE@45..46 "\n"
+          YAML_BLOCK_MAP_ENTRY@46..83
+            YAML_BLOCK_MAP_KEY@46..55
+              YAML_SCALAR@46..54 "Chomping"
+              YAML_COLON@54..55 ":"
+            YAML_BLOCK_MAP_VALUE@55..83
+              WHITESPACE@55..56 " "
+              YAML_SCALAR@56..83 "|\n  Clipped empty lin ..."

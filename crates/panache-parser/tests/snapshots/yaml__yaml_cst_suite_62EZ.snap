@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
 expression: snapshot
 ---
 case_id: 62EZ
 input: "---\nx: { y: z }in: valid\n"
 diagnostics:
-YAML_LEX_ERROR:invalid plain scalar containing mapping indicator sequence@6..24
+YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END:unexpected content after flow-collection close in block context@15..17
 cst:
