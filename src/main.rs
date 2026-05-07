@@ -1484,7 +1484,14 @@ fn main() -> io::Result<()> {
                     let fixed_output = apply_fixes(&input, &diagnostics);
                     print!("{}", fixed_output);
                 } else if !cli.quiet {
-                    print_diagnostics(&diagnostics, None, Some(&input), use_color, message_format);
+                    print_diagnostics(
+                        &diagnostics,
+                        None,
+                        Some(&input),
+                        use_color,
+                        message_format,
+                        true,
+                    );
                 }
 
                 if check {
@@ -1686,19 +1693,16 @@ fn main() -> io::Result<()> {
                             .iter()
                             .filter(|d| d.fix.is_some())
                             .count();
-                        if fixable > 0 {
-                            let fixed_output = apply_fixes(&root_doc.input, &root_doc.diagnostics);
-                            fs::write(&file_path, fixed_output)?;
-                            if !cli.quiet {
-                                println!("Fixed {} issue(s) in {}", fixable, file_path.display());
-                            }
-                        }
                         let remaining: Vec<_> = root_doc
                             .diagnostics
                             .iter()
                             .filter(|d| d.fix.is_none())
                             .cloned()
                             .collect();
+                        if fixable > 0 {
+                            let fixed_output = apply_fixes(&root_doc.input, &root_doc.diagnostics);
+                            fs::write(&file_path, fixed_output)?;
+                        }
                         if !remaining.is_empty() && !cli.quiet {
                             print_diagnostics(
                                 &remaining,
@@ -1706,7 +1710,11 @@ fn main() -> io::Result<()> {
                                 Some(&root_doc.input),
                                 use_color,
                                 message_format,
+                                false,
                             );
+                        }
+                        if !cli.quiet {
+                            print_fix_summary(fixable, remaining.len(), &file_path);
                         }
                     } else if !cli.quiet {
                         print_diagnostics(
@@ -1715,6 +1723,7 @@ fn main() -> io::Result<()> {
                             Some(&root_doc.input),
                             use_color,
                             message_format,
+                            true,
                         );
                     }
                 }
@@ -1733,6 +1742,7 @@ fn main() -> io::Result<()> {
                                 Some(&doc.input),
                                 use_color,
                                 message_format,
+                                true,
                             );
                         }
                     }
@@ -1914,6 +1924,24 @@ fn lint_loaded_document_with_includes(
 
     active.remove(doc_path);
     Ok(())
+}
+
+fn print_fix_summary(fixed: usize, remaining: usize, file: &Path) {
+    match (fixed, remaining) {
+        (0, 0) => {}
+        (0, _) => println!(
+            "Found {} issue(s) in {} (no auto-fix available)",
+            remaining,
+            file.display()
+        ),
+        (_, 0) => println!("Fixed {} issue(s) in {}", fixed, file.display()),
+        (_, _) => println!(
+            "Fixed {} issue(s) in {} ({} remaining; no auto-fix available)",
+            fixed,
+            file.display(),
+            remaining
+        ),
+    }
 }
 
 fn apply_fixes(input: &str, diagnostics: &[panache::linter::Diagnostic]) -> String {

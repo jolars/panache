@@ -107,10 +107,31 @@ fn test_lint_fix_skips_unfixable_diagnostics() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Fixed").not())
-        .stdout(predicate::str::contains("missing-chunk-labels"));
+        .stdout(predicate::str::contains("missing-chunk-labels"))
+        .stdout(predicate::str::contains("no auto-fix available"));
 
     let after = fs::read_to_string(&test_file).unwrap();
     assert_eq!(after, original, "unfixable diagnostic must not modify file");
+}
+
+#[test]
+fn test_lint_fix_reports_remaining_when_some_fixed() {
+    // Mixed case: heading-hierarchy is auto-fixable, missing-chunk-labels is not.
+    // Expect "Fixed N ... K remaining; no auto-fix available".
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(
+        &test_file,
+        "# Heading\n\n### Skipped\n\n```{r}\n1 + 1\n```\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--fix", test_file.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Fixed 1 issue(s)"))
+        .stdout(predicate::str::contains("remaining; no auto-fix available"));
 }
 
 #[test]

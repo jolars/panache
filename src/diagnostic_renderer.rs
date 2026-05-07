@@ -10,6 +10,7 @@ pub(crate) fn print_diagnostics(
     source: Option<&str>,
     use_color: bool,
     message_format: MessageFormat,
+    show_summary: bool,
 ) {
     let file_name = file.and_then(Path::to_str).unwrap_or("<stdin>");
     let renderer = if use_color {
@@ -78,7 +79,9 @@ pub(crate) fn print_diagnostics(
         }
     }
 
-    println!("\nFound {} issue(s)", diagnostics.len());
+    if show_summary {
+        println!("\nFound {} issue(s)", diagnostics.len());
+    }
 }
 
 fn print_source_snippet(
