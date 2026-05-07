@@ -40,15 +40,24 @@
 //!
 //! - **B. Unterminated flow at EOF** — implemented: a
 //!   `YAML_FLOW_SEQUENCE` or `YAML_FLOW_MAP` whose direct children do
-//!   not include a closing `]` / `}` token. Covers fixture 6JTT. The
-//!   sibling case T833 (`{ foo: 1\n bar: 2 }` — flow map missing a
-//!   comma between entries) is *not* an unterminated flow — the v2
-//!   builder closes the map and produces a malformed
-//!   `FLOW_MAP_ENTRY` with two colons inside its value. T833 belongs
-//!   in cluster G (flow context anomalies) and is deferred until that
-//!   lands.
+//!   not include a closing `]` / `}` token. Covers fixture 6JTT.
 //!
-//! - D, E, G, H, I — pending.
+//! - **G. Flow context anomalies** — implemented (partial):
+//!   - DK4H / ZXT5: an implicit-key entry inside a `YAML_FLOW_SEQUENCE_ITEM`
+//!     whose key shape spans a newline (either embedded `\n` in the
+//!     plain key text, or a `NEWLINE` token between the key scalar
+//!     and its colon). YAML 1.2 requires implicit keys in flow
+//!     context to fit on a single line.
+//!   - T833: a `YAML_FLOW_MAP_VALUE` containing a stray `YAML_COLON`
+//!     token directly — indicating a missing comma between flow-map
+//!     entries (the v2 builder folds two entries into one malformed
+//!     entry with two colons in its value).
+//!   - 9C9N (wrongly-indented flow seq) and N782 (doc markers inside
+//!     flow) are deferred: 9C9N needs column tracking; N782 needs
+//!     line-start positional context that the validator does not
+//!     yet maintain.
+//!
+//! - D, E, H, I — pending.
 //!
 //! Cluster I (LHL4 — invalid tag syntax) is also deferred: the v2
 //! scanner currently absorbs `!invalid{}tag scalar` as a single bare
@@ -84,6 +93,9 @@ pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
         return Some(diag);
     }
     if let Some(diag) = check_unterminated_flow(&tree) {
+        return Some(diag);
+    }
+    if let Some(diag) = check_flow_context_anomalies(&tree) {
         return Some(diag);
     }
     None
@@ -471,6 +483,110 @@ fn check_unterminated_flow(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
     None
 }
 
+/// Cluster G — flow context anomalies (partial coverage).
+///
+/// Two malformed shapes are detected:
+/// - A `YAML_FLOW_SEQUENCE_ITEM` whose direct children include a
+///   `YAML_COLON` AND a newline preceding it (covering DK4H plain-key
+///   form `[ key\n  : value ]` and ZXT5 quoted-key form
+///   `[ "key"\n  :value ]`). YAML 1.2 forbids an implicit key in flow
+///   context from spanning lines.
+/// - A `YAML_FLOW_MAP_VALUE` containing a stray `YAML_COLON` token
+///   directly (covering T833 `{ foo: 1\n bar: 2 }`). The v2 builder
+///   folds two entries into a single malformed entry whose value
+///   contains a second colon — that second colon is the symptom of
+///   a missing comma between flow-map entries.
+fn check_flow_context_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    for item in tree
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE_ITEM)
+    {
+        if let Some(diag) = check_flow_seq_item_multiline_key(&item) {
+            return Some(diag);
+        }
+    }
+    for value in tree
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_VALUE)
+    {
+        if let Some(diag) = check_flow_map_value_extra_colon(&value) {
+            return Some(diag);
+        }
+    }
+    None
+}
+
+/// Detects an implicit key in a `YAML_FLOW_SEQUENCE_ITEM` whose key
+/// shape contains a newline before its colon (multi-line implicit key).
+///
+/// Explicit-key entries (CT4Q's `? foo\n bar : baz` shape) are allowed
+/// to span lines and are skipped via the `YAML_KEY` indicator check.
+fn check_flow_seq_item_multiline_key(item: &SyntaxNode) -> Option<YamlDiagnostic> {
+    let starts_with_explicit_key = item.children_with_tokens().any(|c| {
+        c.as_token()
+            .is_some_and(|t| t.kind() == SyntaxKind::YAML_KEY)
+    });
+    if starts_with_explicit_key {
+        return None;
+    }
+    let mut saw_newline_before_colon = false;
+    for child in item.children_with_tokens() {
+        match &child {
+            NodeOrToken::Token(t) => match t.kind() {
+                SyntaxKind::NEWLINE => saw_newline_before_colon = true,
+                SyntaxKind::YAML_SCALAR if t.text().contains('\n') => {
+                    saw_newline_before_colon = true;
+                }
+                SyntaxKind::YAML_COLON => {
+                    if saw_newline_before_colon {
+                        return Some(diag_at_range(
+                            t.text_range().start().into(),
+                            t.text_range().end().into(),
+                            diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
+                            "implicit key in flow context cannot span lines",
+                        ));
+                    }
+                    break;
+                }
+                _ => {}
+            },
+            NodeOrToken::Node(_) => {}
+        }
+    }
+    None
+}
+
+/// Detects a `YAML_FLOW_MAP_VALUE` whose direct children include a
+/// scalar followed by a stray `YAML_COLON` token — the T833 pattern
+/// where a missing comma between entries causes the v2 builder to
+/// fold two entries into one malformed value.
+///
+/// A leading colon in the value (`{x: :x}`, `{"key"::value}`) is *not*
+/// flagged: the v2 builder tokenizes the leading `:` as `YAML_COLON`
+/// even though semantically it is part of the value scalar text. The
+/// "scalar before colon" guard distinguishes T833's two-entry fold
+/// from this benign tokenization quirk.
+fn check_flow_map_value_extra_colon(value: &SyntaxNode) -> Option<YamlDiagnostic> {
+    let mut saw_scalar = false;
+    for child in value.children_with_tokens() {
+        if let NodeOrToken::Token(t) = &child {
+            match t.kind() {
+                SyntaxKind::YAML_SCALAR => saw_scalar = true,
+                SyntaxKind::YAML_COLON if saw_scalar => {
+                    return Some(diag_at_range(
+                        t.text_range().start().into(),
+                        t.text_range().end().into(),
+                        diagnostic_codes::PARSE_INVALID_FLOW_SEQUENCE_COMMA,
+                        "expected comma between flow-mapping entries",
+                    ));
+                }
+                _ => {}
+            }
+        }
+    }
+    None
+}
+
 fn diag_at_range(
     byte_start: usize,
     byte_end: usize,
@@ -783,6 +899,80 @@ mod tests {
         // null. Same shape concern as 8KB6: a comma after an unwrapped
         // bare scalar must not be flagged.
         let input = "{\nunquoted : \"separate\",\nhttp://foo.com,\nomitted value:,\n}\n";
+        assert!(run(input).is_none());
+    }
+
+    // ---- Cluster G: flow context anomalies ----
+
+    #[test]
+    fn flow_seq_implicit_key_spans_lines_dk4h() {
+        // DK4H: `[ key\n  : value ]` — plain-key implicit entry where
+        // the key spans a newline before its colon.
+        let input = "---\n[ key\n  : value ]\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_INVALID_KEY_TOKEN);
+    }
+
+    #[test]
+    fn flow_seq_implicit_key_quoted_spans_lines_zxt5() {
+        // ZXT5: `[ "key"\n  :value ]` — quoted-key form of DK4H.
+        let input = "[ \"key\"\n  :value ]\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_INVALID_KEY_TOKEN);
+    }
+
+    #[test]
+    fn flow_map_missing_comma_t833() {
+        // T833: `{\n foo: 1\n bar: 2 }` — missing comma between
+        // entries; v2 builder folds them into one malformed entry
+        // with two colons in its value.
+        let input = "---\n{\n foo: 1\n bar: 2 }\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(
+            diag.code,
+            diagnostic_codes::PARSE_INVALID_FLOW_SEQUENCE_COMMA
+        );
+    }
+
+    #[test]
+    fn flow_seq_single_line_implicit_key_passes() {
+        // Sanity: `[ key: value ]` — single-line implicit key is fine.
+        let input = "---\n[ key: value ]\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn flow_map_well_formed_multiline_passes() {
+        // `{ foo: 1, bar: 2 }` split across lines with proper commas
+        // is well-formed.
+        let input = "---\n{\n foo: 1,\n bar: 2\n}\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn flow_map_value_starting_with_colon_passes_58mp() {
+        // 58MP: `{x: :x}` — value is the scalar `:x`. v2 tokenizes the
+        // leading `:` as YAML_COLON, but no scalar precedes it inside
+        // the value, so it must not be confused with T833.
+        let input = "{x: :x}\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn flow_map_value_starting_with_double_colon_passes_5t43() {
+        // 5T43: `{ "key"::value }` — value is the scalar `:value`.
+        // Same shape as 58MP at the value level (leading colon, no
+        // preceding scalar in the value).
+        let input = "- { \"key\":value }\n- { \"key\"::value }\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn flow_seq_explicit_key_spans_lines_passes_ct4q() {
+        // CT4Q: `[ ? foo\n bar : baz ]` — explicit-key indicator (`?`)
+        // permits the key to span lines. The check must skip items
+        // that begin with YAML_KEY.
+        let input = "[\n? foo\n bar : baz\n]\n";
         assert!(run(input).is_none());
     }
 }
