@@ -24,56 +24,80 @@ yaml-test-suite case to the allowlist, or pick "the next best case" to work on.
 
 ## Architecture trajectory
 
-The current `lexer.rs` is line-by-line: it classifies each line by shape
-(mapping line, sequence entry, doc marker, comment, block-scalar header)
-and emits tokens for it, with an indent stack threaded across lines. That
-was a startup simplification. It does not match how YAML 1.2 actually
-tokenizes — YAML's rules are stateful in ways that ignore line boundaries
-(simple-key candidacy, multi-line plain scalars, multi-line quoted
-scalars, explicit-key key continuations).
+The streaming scanner rewrite has landed. The live tree-building path
+is now:
 
-The production target is a streaming, char-by-char scanner modeled on
-libyaml / PyYAML / snakeyaml: position-tracked, indent-stack driven,
-**simple-key-table** based, with a token queue and lookahead. Trivia
-(whitespace, comments, newlines) interleaved in the queue rather than
-dropped, so the CST stays lossless. Once that lands, key/value pairing,
-multi-line scalars, and explicit-key (`?` / `:`) entries unify under one
-mechanism. The projection's `*_with_newlines` / `*_multi_line`
-re-stitching helpers in `events.rs` and the flat-token shortcuts in
-`emit_block_map` for `? key` / `: value` go away.
+1. `parser.rs::parse_yaml_report` — slim orchestrator (~188 LOC).
+2. `lexer.rs::lex_mapping_tokens_with_diagnostic` (the legacy
+   line-based lexer) — still called for column-0 directive recognition
+   and lex-level diagnostics (`LEX_INVALID_DOUBLE_QUOTED_ESCAPE` etc.)
+   that the v2 scanner doesn't yet handle.
+3. Directive-ordering pass over the v1 tokens.
+4. `validator.rs::validate_yaml` — v2-aware structural validator.
+   Each `check_*` function is one cluster of error contracts (trailing
+   content, unterminated flow, flow comma anomalies, multi-line
+   quoted indent, block indent anomalies, block-scalar header,
+   doc-level/value-level mixed scalar+map, flow continuation indent,
+   invalid double-quoted escapes, etc.).
+5. `parser_v2.rs::parse_v2` — consumes the streaming
+   `scanner.rs` and emits the rowan green tree.
 
-Watch for symptoms that the line-based lexer is reaching its limit and
-flag them rather than papering over with another shortcut:
+`scanner.rs` (~2,851 LOC) is the streaming, char-by-char scanner
+modeled on libyaml / PyYAML / snakeyaml: position-tracked, indent-stack
+driven, **simple-key-table** based, with a token queue and lookahead.
+Trivia (whitespace, comments, newlines) is interleaved in the queue
+rather than dropped, so the CST stays lossless. Key/value pairing,
+multi-line scalars, and explicit-key (`?` / `:`) entries unify under
+one mechanism.
 
-- New re-stitching helpers in `events.rs` that fold cross-line content.
-- New string-prefix peeks in body classification (e.g. `has_explicit_key`).
-- Flat-token shortcuts in `emit_block_map` that can't express
-  nested-collection bodies under explicit keys (e.g. `? - item\n: value`).
+Residual cutover work (deferred):
 
-When you hit these, prefer a structural fix over another shortcut —
-even if that means deferring the case until the rewrite. Allowlisting
-via shortcut is debt that has to be unwound at cutover.
+- `lexer.rs` and `model.rs::YamlToken` — kept until the v2 scanner
+  recognizes `%`-prefixed directives after content (currently folded
+  into Plain scalars).
+- `events.rs::collect_doc_scalar_text_with_newlines`,
+  `collect_value_scalar_text_with_newlines`,
+  `quoted_val_event_multi_line` — projection still re-stitches
+  multi-line scalars.
 
-The concrete plan for the streaming-scanner rewrite — including
-resolved design decisions (trivia model, token enum lifetime, scalar
-cooking, diagnostic channel) and the step-by-step migration sequence
-that lands on `main` without a long-lived branch — lives in
-`scanner-rewrite.md` alongside this file. Consult it before starting
-work that the line-based lexer can't represent cleanly.
+The concrete plan and design decisions for the rewrite — including
+trivia model, token enum lifetime, scalar cooking, diagnostic channel,
+and the step-by-step migration sequence — live in `scanner-rewrite.md`
+alongside this file. Consult it for context on residual work and for
+the rationale behind the validator-driven cutover.
 
 ## Key files
 
-- `crates/panache-parser/src/parser/yaml/lexer.rs` — indentation-aware lexer,
-  block/flow token emission, block-scalar handling.
-- `crates/panache-parser/src/parser/yaml/parser.rs` — rowan CST builder. Outer
-  `parse_stream` / `emit_document` produce `YAML_STREAM > YAML_DOCUMENT*`;
-  `emit_block_map` / `emit_block_seq` / `emit_scalar_document` build per-doc
-  bodies and break on `---` / `...` boundaries.
+- `crates/panache-parser/src/parser/yaml/scanner.rs` — streaming
+  char-by-char scanner with simple-key table (~2,851 LOC). Emits the
+  token stream consumed by `parser_v2`.
+- `crates/panache-parser/src/parser/yaml/parser_v2.rs` — consumes the
+  scanner and builds the rowan green tree (~1,134 LOC). `parse_v2`
+  is the entry point.
+- `crates/panache-parser/src/parser/yaml/validator.rs` — v2-aware
+  structural-diagnostic validator. `validate_yaml(input)` composes
+  per-cluster `check_*` functions in priority order. Add new
+  diagnostic clusters here as `check_*` functions and wire them into
+  `validate_yaml`.
+- `crates/panache-parser/src/parser/yaml/parser.rs` — slim
+  orchestrator (~188 LOC). `parse_yaml_report` runs the v1 lex pass
+  for directive ordering, then `validate_yaml`, then
+  `parser_v2::parse_v2`, and wraps the v2 stream in the
+  `DOCUMENT > YAML_METADATA_CONTENT > YAML_STREAM` envelope. **No
+  emitter logic lives here** — work in `parser_v2.rs` or `scanner.rs`
+  for tree-shape changes.
+- `crates/panache-parser/src/parser/yaml/lexer.rs` — legacy
+  indentation-aware lexer; retained as a directive-recognition shim
+  for `parse_yaml_report`. **Do not extend.** New lexing belongs in
+  `scanner.rs`.
 - `crates/panache-parser/src/parser/yaml/events.rs` — event projection
-  (`project_events` plus `project_*` helpers). Walks the CST and produces a
-  yaml-test-suite event stream.
-- `crates/panache-parser/src/parser/yaml/model.rs` — token enum, diagnostic
-  codes, shadow report shape.
+  (`project_events` plus `project_*` helpers). Walks the CST and
+  produces a yaml-test-suite event stream. The `*_with_newlines` /
+  `*_multi_line` re-stitching helpers are technical debt awaiting
+  unification once the scanner emits styled scalars as single tokens.
+- `crates/panache-parser/src/parser/yaml/model.rs` — `YamlDiagnostic`,
+  `diagnostic_codes`, `YamlParseReport`, `YamlToken` (consumed by
+  the directive pass), shadow report shape.
 - `crates/panache-parser/tests/yaml.rs` — fixture-driven tests, including:
   - `yaml_allowlist_cases_snapshot` — diagnostic/tree snapshot per case
   - `yaml_allowlist_cases_cst_snapshot` — full CST snapshot per case
@@ -136,16 +160,25 @@ case is in before touching it:
      (`project_document`, `project_block_map_entries`,
      `project_block_sequence_items`, `project_flow_map_entries`,
      `scalar_document_value`).
-   - Parser-shape issue → edit `parser/yaml/parser.rs` emitters. Outer:
-     `parse_stream`, `emit_document`. Bodies: `emit_block_map`
-     (+ `emit_block_map_entry` / `_key` / `_value` / `consume_block_scalar`),
-     `emit_block_seq` (+ `emit_block_seq_item`), `emit_flow_map`,
-     `emit_flow_sequence`, `emit_scalar_document`. Body emitters break on
-     `DocumentStart` / `DocumentEnd`; the stream loop owns boundaries.
-   - Lexer gap → edit `lexer.rs`; consider indent/flow/block-scalar state
-     interactions.
-   - Diagnostic gap → add a code in `model.rs::diagnostic_codes` and surface
-     it at the right point.
+   - Parser-shape issue (tree built doesn't match spec) → edit
+     `parser/yaml/parser_v2.rs`. The v2 emitter is keyed on the
+     scanner's token kinds (`BlockMappingStart` / `Key` / `Value` /
+     `BlockEntry` / `BlockEnd` / flow indicators); trivia is consumed
+     inline. **Do not edit `parser.rs`** — it's a slim orchestrator
+     and contains no emitter logic.
+   - Tokenization gap (scanner doesn't recognize a construct) → edit
+     `parser/yaml/scanner.rs`. Consider indent/flow/block-scalar/
+     simple-key-table state interactions.
+   - Structural-diagnostic gap (spec error not caught) → add a
+     `check_*` function in `parser/yaml/validator.rs` and wire it
+     into `validate_yaml`. Each check is one cluster of error
+     contracts. New diagnostic codes go in
+     `model.rs::diagnostic_codes` first.
+   - Lex-level diagnostic gap (e.g. invalid escape, malformed
+     directive) → edit `parser/yaml/lexer.rs` only if the diagnostic
+     genuinely belongs to the v1 directive-recognition pass; for
+     anything else, prefer surfacing the diagnostic from the scanner
+     or validator and leave `lexer.rs` alone.
 
 5. **Apply the smallest focused change.** Keep changes parser-crate scoped,
    CST-lossless, and don't regress already-allowlisted cases.

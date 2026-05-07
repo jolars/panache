@@ -1,5 +1,59 @@
 # YAML shadow scanner rewrite
 
+## Status (as of 2026-05)
+
+The scanner rewrite has largely landed. The headline migration is done:
+v2 `scanner.rs` + `parser_v2.rs` build the returned tree, structural
+diagnostics flow through `validator.rs`, and the v1 `emit_*` /
+`parse_stream` graph that built the tree from the line-based lexer is
+gone.
+
+What landed (steps 1–12 below, with one deviation at cutover):
+
+- Steps 1–10: scanner scaffolded, `Mark`/`SimpleKey`/trivia/directives/
+  flow indicators/block indicators/quoted/block/plain scalars all
+  implemented in `scanner.rs` (now ~2,851 LOC).
+- Step 11: `parser_v2.rs` (~1,134 LOC) consumes the scanner and emits
+  the rowan green tree. Wired in via `super::parser_v2::parse_v2` from
+  `parser.rs::parse_yaml_report`.
+- Step 12 (cutover, with deviation): `parse_yaml_report` builds the
+  returned tree from the v2 scanner+builder; structural diagnostics
+  route through `validator::validate_yaml`; the v1 `emit_*` family,
+  `parse_stream`, `emit_document`, `has_explicit_key`,
+  `doc_level_property_present`, the flat `? key`/`: value` shortcut,
+  and the `DocumentBody` enum are all deleted (commit `9b442587`).
+  `parser.rs` shrank from 1,432 to 188 LOC.
+
+**Deviation from the original step-12 plan:** `lexer.rs` is **retained**.
+`parse_yaml_report` still calls `lex_mapping_tokens_with_diagnostic` to
+surface lex-level diagnostics (e.g. `LEX_INVALID_DOUBLE_QUOTED_ESCAPE`)
+and to run the directive-ordering pass, because the v2 scanner does not
+yet recognize column-0 `%`-prefixed lines after content (it folds them
+into a Plain scalar). `model.rs::YamlToken` is correspondingly retained
+because the directive pass consumes it.
+
+What is still deferred (residual cutover work):
+
+- Scanner-side recognition of `%TAG` / `%YAML` after content, so the
+  directive-ordering pass can move off the v1 lexer.
+- Once that lands: deletion of `lexer.rs` and `model.rs::YamlToken`
+  (and the import in `parser.rs`).
+- `events.rs` projection helpers `collect_doc_scalar_text_with_newlines`
+  (line 407), `collect_value_scalar_text_with_newlines` (line 2482),
+  and `quoted_val_event_multi_line` (line 605) still re-stitch
+  multi-line scalars in projection. They survived cutover because the
+  v2 scanner emits per-segment scalar tokens that match the v1 shape;
+  unifying these into a single styled `Scalar` token is a follow-up.
+- Step 13 (recover unlocked cases) remains open; `triage.json` should
+  be regenerated and any cleanly-passing cases moved into
+  `allowlist.txt`.
+
+The plan below remains accurate as a record of the design decisions and
+the migration sequence; refer to it when picking up residual work, and
+treat the line numbers as historical (the named functions in `parser.rs`
+no longer exist — see "Architecture" and "What is deleted at cutover"
+sections for the specific names).
+
 ## Context
 
 The YAML shadow parser in `crates/panache-parser/src/parser/yaml/` is built
@@ -13,20 +67,22 @@ actually tokenizes — a correct YAML scanner is stateful in ways that
 ignore line boundaries: simple-key candidacy, multi-line plain scalars,
 multi-line quoted scalars, explicit-key (`?`/`:`) continuations.
 
-The line-based design has accumulated workarounds that the skill
-explicitly flags as cutover debt:
+The line-based design accumulated workarounds that motivated the
+rewrite (line numbers omitted — the parser-side workarounds have since
+been deleted; see the Status section above):
 
-- `collect_doc_scalar_text_with_newlines` (events.rs:301), 
-  `collect_value_scalar_text_with_newlines` (events.rs:1909),
-  `quoted_val_event_multi_line` (events.rs:499) — re-stitch multi-line
-  scalars in projection because they were lexed as separate per-line tokens.
-- `has_explicit_key` (parser.rs:1264) — string-prefix lookahead to
-  classify document body as block map vs scalar.
-- `doc_level_property_present` peek (parser.rs:644 area) — guards
-  property absorption.
-- Flat `? key` + `: value` shortcut (parser.rs:712–770) — only handles
+- `collect_doc_scalar_text_with_newlines`,
+  `collect_value_scalar_text_with_newlines`,
+  `quoted_val_event_multi_line` in `events.rs` — re-stitch multi-line
+  scalars in projection because they were lexed as separate per-line
+  tokens. Still present (deferred deletion).
+- `has_explicit_key` in `parser.rs` — string-prefix lookahead to
+  classify document body as block map vs scalar. **Deleted at cutover.**
+- `doc_level_property_present` peek in `parser.rs` — guarded property
+  absorption. **Deleted at cutover.**
+- Flat `? key` + `: value` shortcut in `parser.rs` — only handled
   single-line explicit-key entries; nested-collection bodies under
-  explicit keys cannot be expressed.
+  explicit keys could not be expressed. **Deleted at cutover.**
 
 The trigger to rewrite is multi-line plain scalars: the
 "is this line a continuation of a scalar or a new mapping key?"
@@ -196,27 +252,42 @@ candidate token in the queue, emit `Key`, then emit `Value`. If not, emit
 `Value` only. Candidates expire on next-line-at-same-or-less-indent,
 on a blank line, or on flow boundaries.
 
-### Parser-side coupling (`parser.rs`)
+### Parser-side coupling (`parser.rs` / `parser_v2.rs`)
 
-The body emitters keep their shape but consume the new token stream:
+The body emitters were *not* refactored in place. Instead, a parallel
+`parser_v2.rs` was built that consumes the scanner's token stream and
+emits the rowan green tree directly, keyed on `BlockMappingStart` /
+`Key` / `Value` / `BlockEntry` / `BlockEnd` / flow indicators. Trivia
+tokens are consumed inline into the CST. Explicit-key entries (`Key`
+token) route through the same path as implicit keys, with
+nested-collection bodies handled recursively.
 
-- `parse_stream`, `emit_document` — unchanged in role (document boundaries).
-- `emit_block_map`, `emit_block_seq`, `emit_flow_map`, `emit_flow_sequence`,
-  `emit_scalar_document` — replace line-classifier loops with token-driven
-  loops keyed on `BlockMappingStart` / `Key` / `Value` / `BlockEntry` /
-  `BlockEnd` / flow indicators. Trivia tokens consumed inline into the CST.
-- `emit_block_map_entry` and friends — driven by the token stream;
-  explicit-key entries (`Key` token) route through the same path as
-  implicit keys, with nested-collection bodies handled recursively.
+`parser.rs` shrank to a slim orchestrator that calls v1 lex + v2
+scanner + validator and stitches the v2 stream into the
+`DOCUMENT > YAML_METADATA_CONTENT > YAML_STREAM` envelope expected by
+downstream consumers.
 
-What is **deleted** at cutover:
+What was **deleted at cutover** (commit `9b442587`):
 
-- `events.rs::collect_doc_scalar_text_with_newlines` (events.rs:301)
-- `events.rs::collect_value_scalar_text_with_newlines` (events.rs:1909)
-- `events.rs::quoted_val_event_multi_line` (events.rs:499)
-- `parser.rs::has_explicit_key` (parser.rs:1264)
-- The flat `? key` / `: value` shortcut (parser.rs:712–770)
-- `lexer.rs` in its entirety
+- `parser.rs::parse_stream`, `emit_document`, `emit_block_map`,
+  `emit_block_seq`, `emit_block_seq_item`, `emit_block_map_entry`,
+  `emit_block_map_key`, `emit_block_map_value`, `emit_flow_map`,
+  `emit_flow_map_entry`, `emit_flow_value_tokens`,
+  `emit_flow_sequence`, `emit_scalar_document`, `emit_token_as_yaml`
+- `parser.rs::has_explicit_key`, `doc_level_property_present`,
+  `document_follows`, `scan_plain_scalar_continuation`,
+  `consume_block_scalar`, the `DocumentBody` enum
+- The flat `? key` / `: value` shortcut path
+
+What is still **live** (deferred to a follow-up cutover step):
+
+- `lexer.rs` — used by `parse_yaml_report` for directive recognition
+  and lex-level diagnostics
+- `model.rs::YamlToken` — consumed by the directive-ordering pass
+- `events.rs::collect_doc_scalar_text_with_newlines`,
+  `collect_value_scalar_text_with_newlines`,
+  `quoted_val_event_multi_line` — projection still re-stitches
+  multi-line scalars
 
 ### CST kinds
 
@@ -280,12 +351,21 @@ old lexer remains the live path until step 8.
     the allowlist. Build out the body emitters incrementally; each
     sub-commit may flip a few cases at a time on the v2 path.
 
-12. **Cutover** — switch `parse_shadow` (`parser.rs`) to consume the
-    scanner. Delete `lexer.rs`, the workarounds in `events.rs` and
-    `parser.rs` enumerated above, and any now-dead helpers in `model.rs`.
-    Replace `YamlToken` in `model.rs` with the scanner's `Token` enum
-    (move it from `scanner.rs` to `model.rs` if that's the natural home).
-    Run the full allowlist; every case must pass.
+12. **Cutover** — switch `parse_yaml_report` (`parser.rs`) to consume
+    the scanner-built tree and route structural diagnostics through
+    `validator.rs`. Delete the v1 `emit_*` family, `parse_stream`,
+    `emit_document`, `has_explicit_key`, `doc_level_property_present`,
+    the flat `? key`/`: value` shortcut, and the `DocumentBody` enum
+    in `parser.rs`. Run the full allowlist; every case must pass.
+
+    **Deviation that landed:** `lexer.rs`, `model.rs::YamlToken`, and
+    the `events.rs` projection helpers (`collect_*_with_newlines`,
+    `quoted_val_event_multi_line`) are **not** deleted in this step.
+    The v1 lexer is still called for directive ordering and lex-level
+    diagnostics; the events helpers still re-stitch per-segment
+    scalars. Their deletion is split into a separate residual step
+    (12b) once the v2 scanner recognizes `%`-prefixed directives after
+    content and emits unified styled scalars.
 
 13. **Recover unlocked cases** — regenerate
     `crates/panache-parser/tests/yaml/triage.json` via
@@ -299,21 +379,32 @@ surprises. Step 13 is pure win.
 
 ## Critical files
 
-- `crates/panache-parser/src/parser/yaml/scanner.rs` — **new**, the rewrite.
-- `crates/panache-parser/src/parser/yaml/parser.rs` — modified at step 11
-  (add `parser_v2`), rewritten at step 12 (cutover).
-- `crates/panache-parser/src/parser/yaml/events.rs` — modified at step 12
-  (delete `*_with_newlines`, `*_multi_line` helpers).
-- `crates/panache-parser/src/parser/yaml/model.rs` — modified at step 12
-  (replace `YamlToken`; keep `YamlDiagnostic`, `diagnostic_codes`,
-  `YamlParseReport`).
-- `crates/panache-parser/src/parser/yaml/lexer.rs` — **deleted at step 12**.
-- `crates/panache-parser/src/parser/yaml/mod.rs` — small wiring updates
-  per step.
-- `crates/panache-parser/tests/yaml.rs` — comparison harness at step 10;
-  no other changes.
-- `crates/panache-parser/tests/yaml/allowlist.txt` — new entries at
-  step 13 only.
+- `crates/panache-parser/src/parser/yaml/scanner.rs` — the rewrite
+  (~2,851 LOC). Streaming char-by-char scanner with simple-key table.
+- `crates/panache-parser/src/parser/yaml/parser_v2.rs` — consumes the
+  scanner and emits the rowan green tree (~1,134 LOC).
+- `crates/panache-parser/src/parser/yaml/validator.rs` — v2-aware
+  structural validator. Each `check_*` function is one cluster of
+  error contracts; `validate_yaml` composes them.
+- `crates/panache-parser/src/parser/yaml/parser.rs` — slim
+  orchestrator (~188 LOC). Calls v1 lexer for directive ordering,
+  validator for structural diagnostics, and parser_v2 for tree
+  construction.
+- `crates/panache-parser/src/parser/yaml/events.rs` — projection
+  helpers; the `*_with_newlines` / `*_multi_line` helpers are still
+  live (deferred deletion).
+- `crates/panache-parser/src/parser/yaml/model.rs` — `YamlDiagnostic`,
+  `diagnostic_codes`, `YamlParseReport` (unchanged); `YamlToken` and
+  `YamlTokenSpan` retained for the directive-ordering pass.
+- `crates/panache-parser/src/parser/yaml/lexer.rs` — retained as a
+  directive-recognition / lex-diagnostic shim. Deletion is deferred
+  until the v2 scanner recognizes column-0 directives after content.
+- `crates/panache-parser/src/parser/yaml/mod.rs` — wiring.
+- `crates/panache-parser/tests/yaml.rs` — fixture-driven harness;
+  unchanged in role.
+- `crates/panache-parser/tests/yaml/allowlist.txt` and `blocked.txt` —
+  curated coverage list and the parallel record of cases the validator
+  cannot yet catch without scanner-side enhancements.
 
 ## Reuse from existing code
 
