@@ -62,7 +62,25 @@
 //!   `YAML_BLOCK_MAP_VALUE` whose continuation lines are indented
 //!   less than the column where the scalar starts. Covers QB6E.
 //!
-//! - D, E, I — pending.
+//! - **D. Block indentation anomalies** — implemented:
+//!   - 4EJS: a `WHITESPACE` token used as indent (i.e., immediately
+//!     after a `NEWLINE` inside a structural node) whose text begins
+//!     with a tab character. YAML 1.2 forbids tabs for indentation.
+//!   - 4HVU / DMG6 / N4JP: a `YAML_BLOCK_MAP_VALUE` whose direct
+//!     children include more than one structural collection node
+//!     (multiple `YAML_BLOCK_MAP` / `YAML_BLOCK_SEQUENCE` siblings).
+//!     The v2 builder splits a malformed single value into two
+//!     sibling collections when an entry is dedented mid-collection.
+//!   - ZVH3: a `YAML_BLOCK_SEQUENCE_ITEM` with mixed structural
+//!     children (e.g. a `YAML_BLOCK_MAP` followed by a
+//!     `YAML_BLOCK_SEQUENCE`) — a sequence item must contain a
+//!     single value, not two collections.
+//!   - 8XDJ / BF9H: a `YAML_BLOCK_MAP_VALUE` with more than one
+//!     `YAML_SCALAR` token child — symptom of a comment splitting a
+//!     multi-line plain scalar. YAML forbids comments inside plain
+//!     scalars.
+//!
+//! - E, I — pending.
 //!
 //! Cluster I (LHL4 — invalid tag syntax) is also deferred: the v2
 //! scanner currently absorbs `!invalid{}tag scalar` as a single bare
@@ -104,6 +122,9 @@ pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
         return Some(diag);
     }
     if let Some(diag) = check_multiline_quoted_indent(&tree, input) {
+        return Some(diag);
+    }
+    if let Some(diag) = check_block_indent_anomalies(&tree) {
         return Some(diag);
     }
     None
@@ -683,6 +704,124 @@ fn check_multiline_quoted_indent(tree: &SyntaxNode, input: &str) -> Option<YamlD
     None
 }
 
+/// Cluster D — block indentation anomalies.
+///
+/// Three sub-shapes are detected:
+/// - Tabs used for indentation (4EJS): a `WHITESPACE` token that
+///   follows a `NEWLINE` inside a `YAML_BLOCK_MAP_VALUE` /
+///   `YAML_BLOCK_MAP_KEY` / `YAML_BLOCK_SEQUENCE_ITEM` and starts
+///   with `\t`.
+/// - Sibling collections inside one block-map value or sequence item
+///   (4HVU, DMG6, N4JP, ZVH3): a `YAML_BLOCK_MAP_VALUE` (or
+///   `YAML_BLOCK_SEQUENCE_ITEM`) whose direct children include more
+///   than one of `YAML_BLOCK_MAP` / `YAML_BLOCK_SEQUENCE`, or one of
+///   each — symptom of a dedent or over-indent that broke the parent
+///   collection.
+/// - Multiple `YAML_SCALAR` token children inside a single
+///   `YAML_BLOCK_MAP_VALUE` (8XDJ, BF9H): a comment line split a
+///   multi-line plain scalar into two pieces.
+fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    if let Some(diag) = check_tab_as_indent(tree) {
+        return Some(diag);
+    }
+    for node in tree.descendants().filter(|n| {
+        matches!(
+            n.kind(),
+            SyntaxKind::YAML_BLOCK_MAP_VALUE | SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
+        )
+    }) {
+        let mut struct_count = 0usize;
+        let mut scalar_count = 0usize;
+        let mut last_struct = None;
+        for child in node.children_with_tokens() {
+            match &child {
+                NodeOrToken::Node(n) => {
+                    if matches!(
+                        n.kind(),
+                        SyntaxKind::YAML_BLOCK_MAP | SyntaxKind::YAML_BLOCK_SEQUENCE
+                    ) {
+                        struct_count += 1;
+                        last_struct = Some(n.clone());
+                    }
+                }
+                NodeOrToken::Token(t) => {
+                    if t.kind() == SyntaxKind::YAML_SCALAR {
+                        scalar_count += 1;
+                    }
+                }
+            }
+        }
+        if struct_count > 1 {
+            let n = last_struct.expect("struct_count > 1 implies last_struct set");
+            return Some(diag_at_range(
+                n.text_range().start().into(),
+                n.text_range().end().into(),
+                diagnostic_codes::PARSE_UNEXPECTED_DEDENT,
+                "block collection has mismatched indentation, splitting it into siblings",
+            ));
+        }
+        if node.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE && scalar_count > 1 {
+            let scalars: Vec<_> = node
+                .children_with_tokens()
+                .filter_map(|c| c.into_token())
+                .filter(|t| t.kind() == SyntaxKind::YAML_SCALAR)
+                .collect();
+            let last_scalar = scalars
+                .last()
+                .expect("scalar_count > 1 implies at least one scalar child");
+            return Some(diag_at_range(
+                last_scalar.text_range().start().into(),
+                last_scalar.text_range().end().into(),
+                diagnostic_codes::PARSE_UNEXPECTED_DEDENT,
+                "comment cannot appear inside a multi-line plain scalar",
+            ));
+        }
+    }
+    None
+}
+
+/// Detects a `WHITESPACE` token that begins with a tab, used as
+/// indent (i.e. immediately preceded by a `NEWLINE` token within a
+/// structural block-context node).
+fn check_tab_as_indent(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    for node in tree.descendants().filter(|n| {
+        matches!(
+            n.kind(),
+            SyntaxKind::YAML_BLOCK_MAP_VALUE
+                | SyntaxKind::YAML_BLOCK_MAP_KEY
+                | SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
+                | SyntaxKind::YAML_BLOCK_MAP
+                | SyntaxKind::YAML_BLOCK_SEQUENCE
+        )
+    }) {
+        let mut prev_was_newline = false;
+        for child in node.children_with_tokens() {
+            if let NodeOrToken::Token(t) = &child {
+                match t.kind() {
+                    SyntaxKind::NEWLINE => prev_was_newline = true,
+                    SyntaxKind::WHITESPACE if prev_was_newline => {
+                        if t.text().starts_with('\t') {
+                            return Some(diag_at_range(
+                                t.text_range().start().into(),
+                                t.text_range().end().into(),
+                                diagnostic_codes::PARSE_UNEXPECTED_INDENT,
+                                "tab character used as indentation is not allowed in YAML",
+                            ));
+                        }
+                        prev_was_newline = false;
+                    }
+                    _ => {
+                        prev_was_newline = false;
+                    }
+                }
+            } else {
+                prev_was_newline = false;
+            }
+        }
+    }
+    None
+}
+
 /// Compute the byte-based column (zero-indexed) of `byte_offset`
 /// relative to the previous newline in `input`. Tabs are not
 /// width-expanded; this is byte-distance, sufficient for indent
@@ -1114,5 +1253,83 @@ mod tests {
         let input = "---\nquoted: 'a\nb\nc'\n";
         let diag = run(input).expect("expected diagnostic");
         assert_eq!(diag.code, diagnostic_codes::PARSE_UNEXPECTED_DEDENT);
+    }
+
+    // ---- Cluster D: block indentation anomalies ----
+
+    #[test]
+    fn tab_as_indent_4ejs() {
+        // 4EJS: tabs used for indentation are not allowed in YAML.
+        let input = "---\na:\n\tb:\n\t\tc: value\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_UNEXPECTED_INDENT);
+    }
+
+    #[test]
+    fn map_under_indent_dmg6() {
+        // DMG6: `key:\n  ok: 1\n wrong: 2` — `wrong` dedented to col 1.
+        let input = "key:\n  ok: 1\n wrong: 2\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_UNEXPECTED_DEDENT);
+    }
+
+    #[test]
+    fn map_under_indent_quoted_n4jp() {
+        // N4JP: same as DMG6 but with quoted values.
+        let input = "map:\n  key1: \"quoted1\"\n key2: \"bad indentation\"\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_UNEXPECTED_DEDENT);
+    }
+
+    #[test]
+    fn seq_under_indent_4hvu() {
+        // 4HVU: sequence items at col 3, then a `wrong` item at col 2.
+        let input = "key:\n   - ok\n   - also ok\n  - wrong\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_UNEXPECTED_DEDENT);
+    }
+
+    #[test]
+    fn seq_item_with_extra_subseq_zvh3() {
+        // ZVH3: `- key: value\n - item1` — over-indented `- item1`
+        // appears as a sibling sub-sequence inside the first item.
+        let input = "- key: value\n - item1\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_UNEXPECTED_DEDENT);
+    }
+
+    #[test]
+    fn comment_in_multiline_plain_8xdj() {
+        // 8XDJ: comment line splitting a multi-line plain scalar.
+        let input = "key: word1\n#  xxx\n  word2\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_UNEXPECTED_DEDENT);
+    }
+
+    #[test]
+    fn trailing_comment_in_multiline_plain_bf9h() {
+        // BF9H: trailing comment on a continuation line splits the scalar.
+        let input = "---\nplain: a\n       b # end of scalar\n       c\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_UNEXPECTED_DEDENT);
+    }
+
+    #[test]
+    fn block_map_with_well_formed_entries_passes() {
+        let input = "key:\n  a: 1\n  b: 2\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn block_seq_with_well_formed_items_passes() {
+        let input = "key:\n  - a\n  - b\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn nested_block_seq_in_seq_item_passes() {
+        // `- - x` (nested sequence in single item) is well-formed.
+        let input = "- - x\n  - y\n- z\n";
+        assert!(run(input).is_none());
     }
 }
