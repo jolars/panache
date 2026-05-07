@@ -808,6 +808,39 @@ matching Pandoc's AST structure exactly.
 - [x] Split out WASM support into a separate crate (`crates/panache-wasm`).
 - [ ] Separate additional functionality into dedicated crates (long-term).
 
+## dprint Plugin
+
+A Wasm plugin so dprint users can install Panache via
+`dprint add jolars/panache`. The new `crates/panache-dprint` crate wraps
+`panache_formatter::format(..)` behind dprint's `SyncPluginHandler` protocol;
+released independently of the main Panache version.
+
+- [x] Add `crates/panache-dprint` crate (excluded from workspace, builds for
+      `wasm32-unknown-unknown` only).
+- [x] CI workflow `publish-dprint-wasm.yml` triggered on
+      `dprint-plugin-panache-v*` tags; builds the `.wasm`, computes SHA256,
+      uploads to the GitHub release.
+- [x] Track in `versionary.jsonc` as its own package (independent versioning).
+- [x] Local end-to-end smoke test against `dprint fmt`: parity with the panache
+      CLI on `.md`/`.qmd`/`.Rmd` and idempotency confirmed.
+- [ ] Generate `schema.json` from the plugin's `Configuration` struct (add
+      `schemars` derive + a build/CI step), upload alongside the `.wasm` so
+      `config_schema_url` resolves.
+- [ ] Cut the first plugin release: land a `feat(dprint): ...` commit so
+      versionary tags `dprint-plugin-panache-vX.Y.Z`, and confirm the publish
+      workflow attaches `panache.wasm` + `schema.json` + `.sha256`.
+- [ ] Open PR to `dprint/plugins` registry (separate repo from `dprint/dprint`):
+      add `jolars/panache` to `info.json` and wire up the `latest.json`
+      redirect. **Gating step** --- without this, `dprint add jolars/panache`
+      cannot resolve.
+- [ ] Open PR to `dprint/dprint` (docs only): add Panache to `README.md`'s
+      third-party plugins list and `website/src/plugins.md`; add
+      `website/src/plugins/panache.md` and
+      `website/src/plugins/panache/config.md` (model on
+      `website/src/plugins/malva.md` and the corresponding `malva/config.md`).
+- [ ] Decide whether to expand the curated config surface (currently 9 keys)
+      once the plugin has real usage feedback. Defer until requested.
+
 ## Caching
 
 - [ ] Investigate caching strategies for improved performance, particularly for
