@@ -1,0 +1,64 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: PBJ2
+input: "american:\n  - Boston Red Sox\n  - Detroit Tigers\n  - New York Yankees\nnational:\n  - New York Mets\n  - Chicago Cubs\n  - Atlanta Braves\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..133
+  YAML_METADATA_CONTENT@0..133
+    YAML_STREAM@0..133
+      YAML_DOCUMENT@0..133
+        YAML_BLOCK_MAP@0..133
+          YAML_BLOCK_MAP_ENTRY@0..69
+            YAML_BLOCK_MAP_KEY@0..9
+              YAML_SCALAR@0..8 "american"
+              YAML_COLON@8..9 ":"
+            YAML_BLOCK_MAP_VALUE@9..69
+              NEWLINE@9..10 "\n"
+              WHITESPACE@10..12 "  "
+              YAML_BLOCK_SEQUENCE@12..69
+                YAML_BLOCK_SEQUENCE_ITEM@12..31
+                  YAML_BLOCK_SEQ_ENTRY@12..13 "-"
+                  WHITESPACE@13..14 " "
+                  YAML_SCALAR@14..28 "Boston Red Sox"
+                  NEWLINE@28..29 "\n"
+                  WHITESPACE@29..31 "  "
+                YAML_BLOCK_SEQUENCE_ITEM@31..50
+                  YAML_BLOCK_SEQ_ENTRY@31..32 "-"
+                  WHITESPACE@32..33 " "
+                  YAML_SCALAR@33..47 "Detroit Tigers"
+                  NEWLINE@47..48 "\n"
+                  WHITESPACE@48..50 "  "
+                YAML_BLOCK_SEQUENCE_ITEM@50..69
+                  YAML_BLOCK_SEQ_ENTRY@50..51 "-"
+                  WHITESPACE@51..52 " "
+                  YAML_SCALAR@52..68 "New York Yankees"
+                  NEWLINE@68..69 "\n"
+          YAML_BLOCK_MAP_ENTRY@69..133
+            YAML_BLOCK_MAP_KEY@69..78
+              YAML_SCALAR@69..77 "national"
+              YAML_COLON@77..78 ":"
+            YAML_BLOCK_MAP_VALUE@78..133
+              NEWLINE@78..79 "\n"
+              WHITESPACE@79..81 "  "
+              YAML_BLOCK_SEQUENCE@81..133
+                YAML_BLOCK_SEQUENCE_ITEM@81..99
+                  YAML_BLOCK_SEQ_ENTRY@81..82 "-"
+                  WHITESPACE@82..83 " "
+                  YAML_SCALAR@83..96 "New York Mets"
+                  NEWLINE@96..97 "\n"
+                  WHITESPACE@97..99 "  "
+                YAML_BLOCK_SEQUENCE_ITEM@99..116
+                  YAML_BLOCK_SEQ_ENTRY@99..100 "-"
+                  WHITESPACE@100..101 " "
+                  YAML_SCALAR@101..113 "Chicago Cubs"
+                  NEWLINE@113..114 "\n"
+                  WHITESPACE@114..116 "  "
+                YAML_BLOCK_SEQUENCE_ITEM@116..133
+                  YAML_BLOCK_SEQ_ENTRY@116..117 "-"
+                  WHITESPACE@117..118 " "
+                  YAML_SCALAR@118..132 "Atlanta Braves"
+                  NEWLINE@132..133 "\n"

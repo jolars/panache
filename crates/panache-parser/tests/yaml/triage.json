@@ -616,12 +616,6 @@
       "tree": true
     },
     {
-      "case_id": "7BUB",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "7FWL",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -634,12 +628,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "8QBE",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "8UDB",
@@ -718,12 +706,6 @@
       "tree": true
     },
     {
-      "case_id": "DC7X",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "EHF6",
       "diagnostic_codes": [
         "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END"
@@ -745,18 +727,6 @@
     },
     {
       "case_id": "FUP4",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "J9HZ",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "JQ4R",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -836,12 +806,6 @@
       "tree": true
     },
     {
-      "case_id": "PBJ2",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "Q8AD",
       "diagnostic_codes": [
         "YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE"
@@ -869,12 +833,6 @@
     },
     {
       "case_id": "RZP5",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "RZT7",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -1016,6 +974,7 @@
     "753E",
     "7A4E",
     "7BMT",
+    "7BUB",
     "7T8X",
     "7TMG",
     "7W2P",
@@ -1026,6 +985,7 @@
     "8G76",
     "8KB6",
     "8MK2",
+    "8QBE",
     "8XYN",
     "93JH",
     "93WF",
@@ -1055,6 +1015,7 @@
     "D88J",
     "D9TU",
     "DBG4",
+    "DC7X",
     "DFF7",
     "DHP8",
     "DK3J",
@@ -1083,7 +1044,9 @@
     "J5UC",
     "J7PZ",
     "J7VC",
+    "J9HZ",
     "JHB9",
+    "JQ4R",
     "JR7V",
     "JS2J",
     "JTV5",
@@ -1111,6 +1074,7 @@
     "NJ66",
     "P76L",
     "P94K",
+    "PBJ2",
     "PRH3",
     "PUW8",
     "PW8X",
@@ -1121,6 +1085,7 @@
     "R52L",
     "RR7F",
     "RTP8",
+    "RZT7",
     "S4JQ",
     "S4T7",
     "S7BG",
@@ -1155,8 +1120,8 @@
   "summary": {
     "error_contract_ok_count": 53,
     "fails_needs_error_path_count": 25,
-    "fails_needs_feature_count": 65,
-    "passes_now_count": 190,
+    "fails_needs_feature_count": 58,
+    "passes_now_count": 197,
     "total_cases": 352
   }
 }

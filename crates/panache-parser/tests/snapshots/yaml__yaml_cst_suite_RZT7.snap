@@ -1,0 +1,166 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: RZT7
+input: "---\nTime: 2001-11-23 15:01:42 -5\nUser: ed\nWarning:\n  This is an error message\n  for the log file\n---\nTime: 2001-11-23 15:02:31 -5\nUser: ed\nWarning:\n  A slightly different error\n  message.\n---\nDate: 2001-11-23 15:03:17 -5\nUser: ed\nFatal:\n  Unknown variable \"bar\"\nStack:\n  - file: TopClass.py\n    line: 23\n    code: |\n      x = MoreObject(\"345\\n\")\n  - file: MoreClass.py\n    line: 58\n    code: |-\n      foo = bar\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..411
+  YAML_METADATA_CONTENT@0..411
+    YAML_STREAM@0..411
+      YAML_DOCUMENT@0..97
+        YAML_DOCUMENT_START@0..3 "---"
+        NEWLINE@3..4 "\n"
+        YAML_BLOCK_MAP@4..97
+          YAML_BLOCK_MAP_ENTRY@4..33
+            YAML_BLOCK_MAP_KEY@4..9
+              YAML_SCALAR@4..8 "Time"
+              YAML_COLON@8..9 ":"
+            YAML_BLOCK_MAP_VALUE@9..33
+              WHITESPACE@9..10 " "
+              YAML_SCALAR@10..32 "2001-11-23 15:01:42 -5"
+              NEWLINE@32..33 "\n"
+          YAML_BLOCK_MAP_ENTRY@33..42
+            YAML_BLOCK_MAP_KEY@33..38
+              YAML_SCALAR@33..37 "User"
+              YAML_COLON@37..38 ":"
+            YAML_BLOCK_MAP_VALUE@38..42
+              WHITESPACE@38..39 " "
+              YAML_SCALAR@39..41 "ed"
+              NEWLINE@41..42 "\n"
+          YAML_BLOCK_MAP_ENTRY@42..97
+            YAML_BLOCK_MAP_KEY@42..50
+              YAML_SCALAR@42..49 "Warning"
+              YAML_COLON@49..50 ":"
+            YAML_BLOCK_MAP_VALUE@50..97
+              NEWLINE@50..51 "\n"
+              WHITESPACE@51..53 "  "
+              YAML_SCALAR@53..96 "This is an error mess ..."
+              NEWLINE@96..97 "\n"
+      YAML_DOCUMENT@97..188
+        YAML_DOCUMENT_START@97..100 "---"
+        NEWLINE@100..101 "\n"
+        YAML_BLOCK_MAP@101..188
+          YAML_BLOCK_MAP_ENTRY@101..130
+            YAML_BLOCK_MAP_KEY@101..106
+              YAML_SCALAR@101..105 "Time"
+              YAML_COLON@105..106 ":"
+            YAML_BLOCK_MAP_VALUE@106..130
+              WHITESPACE@106..107 " "
+              YAML_SCALAR@107..129 "2001-11-23 15:02:31 -5"
+              NEWLINE@129..130 "\n"
+          YAML_BLOCK_MAP_ENTRY@130..139
+            YAML_BLOCK_MAP_KEY@130..135
+              YAML_SCALAR@130..134 "User"
+              YAML_COLON@134..135 ":"
+            YAML_BLOCK_MAP_VALUE@135..139
+              WHITESPACE@135..136 " "
+              YAML_SCALAR@136..138 "ed"
+              NEWLINE@138..139 "\n"
+          YAML_BLOCK_MAP_ENTRY@139..188
+            YAML_BLOCK_MAP_KEY@139..147
+              YAML_SCALAR@139..146 "Warning"
+              YAML_COLON@146..147 ":"
+            YAML_BLOCK_MAP_VALUE@147..188
+              NEWLINE@147..148 "\n"
+              WHITESPACE@148..150 "  "
+              YAML_SCALAR@150..187 "A slightly different  ..."
+              NEWLINE@187..188 "\n"
+      YAML_DOCUMENT@188..411
+        YAML_DOCUMENT_START@188..191 "---"
+        NEWLINE@191..192 "\n"
+        YAML_BLOCK_MAP@192..411
+          YAML_BLOCK_MAP_ENTRY@192..221
+            YAML_BLOCK_MAP_KEY@192..197
+              YAML_SCALAR@192..196 "Date"
+              YAML_COLON@196..197 ":"
+            YAML_BLOCK_MAP_VALUE@197..221
+              WHITESPACE@197..198 " "
+              YAML_SCALAR@198..220 "2001-11-23 15:03:17 -5"
+              NEWLINE@220..221 "\n"
+          YAML_BLOCK_MAP_ENTRY@221..230
+            YAML_BLOCK_MAP_KEY@221..226
+              YAML_SCALAR@221..225 "User"
+              YAML_COLON@225..226 ":"
+            YAML_BLOCK_MAP_VALUE@226..230
+              WHITESPACE@226..227 " "
+              YAML_SCALAR@227..229 "ed"
+              NEWLINE@229..230 "\n"
+          YAML_BLOCK_MAP_ENTRY@230..262
+            YAML_BLOCK_MAP_KEY@230..236
+              YAML_SCALAR@230..235 "Fatal"
+              YAML_COLON@235..236 ":"
+            YAML_BLOCK_MAP_VALUE@236..262
+              NEWLINE@236..237 "\n"
+              WHITESPACE@237..239 "  "
+              YAML_SCALAR@239..261 "Unknown variable \"bar\""
+              NEWLINE@261..262 "\n"
+          YAML_BLOCK_MAP_ENTRY@262..411
+            YAML_BLOCK_MAP_KEY@262..268
+              YAML_SCALAR@262..267 "Stack"
+              YAML_COLON@267..268 ":"
+            YAML_BLOCK_MAP_VALUE@268..411
+              NEWLINE@268..269 "\n"
+              WHITESPACE@269..271 "  "
+              YAML_BLOCK_SEQUENCE@271..411
+                YAML_BLOCK_SEQUENCE_ITEM@271..348
+                  YAML_BLOCK_SEQ_ENTRY@271..272 "-"
+                  WHITESPACE@272..273 " "
+                  YAML_BLOCK_MAP@273..348
+                    YAML_BLOCK_MAP_ENTRY@273..295
+                      YAML_BLOCK_MAP_KEY@273..278
+                        YAML_SCALAR@273..277 "file"
+                        YAML_COLON@277..278 ":"
+                      YAML_BLOCK_MAP_VALUE@278..295
+                        WHITESPACE@278..279 " "
+                        YAML_SCALAR@279..290 "TopClass.py"
+                        NEWLINE@290..291 "\n"
+                        WHITESPACE@291..295 "    "
+                    YAML_BLOCK_MAP_ENTRY@295..308
+                      YAML_BLOCK_MAP_KEY@295..300
+                        YAML_SCALAR@295..299 "line"
+                        YAML_COLON@299..300 ":"
+                      YAML_BLOCK_MAP_VALUE@300..308
+                        WHITESPACE@300..301 " "
+                        YAML_SCALAR@301..303 "23"
+                        NEWLINE@303..304 "\n"
+                        WHITESPACE@304..308 "    "
+                    YAML_BLOCK_MAP_ENTRY@308..348
+                      YAML_BLOCK_MAP_KEY@308..313
+                        YAML_SCALAR@308..312 "code"
+                        YAML_COLON@312..313 ":"
+                      YAML_BLOCK_MAP_VALUE@313..348
+                        WHITESPACE@313..314 " "
+                        YAML_SCALAR@314..346 "|\n      x = MoreObjec ..."
+                        WHITESPACE@346..348 "  "
+                YAML_BLOCK_SEQUENCE_ITEM@348..411
+                  YAML_BLOCK_SEQ_ENTRY@348..349 "-"
+                  WHITESPACE@349..350 " "
+                  YAML_BLOCK_MAP@350..411
+                    YAML_BLOCK_MAP_ENTRY@350..373
+                      YAML_BLOCK_MAP_KEY@350..355
+                        YAML_SCALAR@350..354 "file"
+                        YAML_COLON@354..355 ":"
+                      YAML_BLOCK_MAP_VALUE@355..373
+                        WHITESPACE@355..356 " "
+                        YAML_SCALAR@356..368 "MoreClass.py"
+                        NEWLINE@368..369 "\n"
+                        WHITESPACE@369..373 "    "
+                    YAML_BLOCK_MAP_ENTRY@373..386
+                      YAML_BLOCK_MAP_KEY@373..378
+                        YAML_SCALAR@373..377 "line"
+                        YAML_COLON@377..378 ":"
+                      YAML_BLOCK_MAP_VALUE@378..386
+                        WHITESPACE@378..379 " "
+                        YAML_SCALAR@379..381 "58"
+                        NEWLINE@381..382 "\n"
+                        WHITESPACE@382..386 "    "
+                    YAML_BLOCK_MAP_ENTRY@386..411
+                      YAML_BLOCK_MAP_KEY@386..391
+                        YAML_SCALAR@386..390 "code"
+                        YAML_COLON@390..391 ":"
+                      YAML_BLOCK_MAP_VALUE@391..411
+                        WHITESPACE@391..392 " "
+                        YAML_SCALAR@392..411 "|-\n      foo = bar\n"

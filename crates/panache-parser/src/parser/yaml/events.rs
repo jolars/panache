@@ -213,15 +213,20 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
     });
     let handles = collect_tag_handles(doc);
 
+    // Top-level container detection must look at direct children, not
+    // arbitrary descendants. A `descendants()` walk surfaces the first
+    // BLOCK_SEQUENCE/BLOCK_MAP it finds in document order — which for a
+    // block-map whose values contain nested block-sequences would be the
+    // inner sequence, collapsing the entire map into a bare `+SEQ`.
     if let Some(seq_node) = doc
-        .descendants()
+        .children()
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE)
     {
         out.push(seq_open_event(&seq_node, &handles));
         project_block_sequence_items(&seq_node, &handles, out);
         out.push("-SEQ".to_string());
     } else if let Some(root_map) = doc
-        .descendants()
+        .children()
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
     {
         // Flow-sequence used as a block-map key (LX3P: `[flow]: block`).
@@ -2383,6 +2388,16 @@ fn project_block_map_entry_value(
         out.push(map_open_event_for_value(value_node, handles));
         project_block_map_entries(&nested_map, handles, out);
         out.push("-MAP".to_string());
+        return;
+    }
+
+    if let Some(nested_seq) = value_node
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE)
+    {
+        out.push(seq_open_event(&nested_seq, handles));
+        project_block_sequence_items(&nested_seq, handles, out);
+        out.push("-SEQ".to_string());
         return;
     }
 

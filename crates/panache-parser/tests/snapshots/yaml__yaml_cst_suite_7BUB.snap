@@ -1,0 +1,59 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: 7BUB
+input: "---\nhr:\n  - Mark McGwire\n  # Following node labeled SS\n  - &SS Sammy Sosa\nrbi:\n  - *SS # Subsequent occurrence\n  - Ken Griffey\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..127
+  YAML_METADATA_CONTENT@0..127
+    YAML_STREAM@0..127
+      YAML_DOCUMENT@0..127
+        YAML_DOCUMENT_START@0..3 "---"
+        NEWLINE@3..4 "\n"
+        YAML_BLOCK_MAP@4..127
+          YAML_BLOCK_MAP_ENTRY@4..74
+            YAML_BLOCK_MAP_KEY@4..7
+              YAML_SCALAR@4..6 "hr"
+              YAML_COLON@6..7 ":"
+            YAML_BLOCK_MAP_VALUE@7..74
+              NEWLINE@7..8 "\n"
+              WHITESPACE@8..10 "  "
+              YAML_BLOCK_SEQUENCE@10..74
+                YAML_BLOCK_SEQUENCE_ITEM@10..57
+                  YAML_BLOCK_SEQ_ENTRY@10..11 "-"
+                  WHITESPACE@11..12 " "
+                  YAML_SCALAR@12..24 "Mark McGwire"
+                  NEWLINE@24..25 "\n"
+                  WHITESPACE@25..27 "  "
+                  YAML_COMMENT@27..54 "# Following node labe ..."
+                  NEWLINE@54..55 "\n"
+                  WHITESPACE@55..57 "  "
+                YAML_BLOCK_SEQUENCE_ITEM@57..74
+                  YAML_BLOCK_SEQ_ENTRY@57..58 "-"
+                  WHITESPACE@58..59 " "
+                  YAML_SCALAR@59..73 "&SS Sammy Sosa"
+                  NEWLINE@73..74 "\n"
+          YAML_BLOCK_MAP_ENTRY@74..127
+            YAML_BLOCK_MAP_KEY@74..78
+              YAML_SCALAR@74..77 "rbi"
+              YAML_COLON@77..78 ":"
+            YAML_BLOCK_MAP_VALUE@78..127
+              NEWLINE@78..79 "\n"
+              WHITESPACE@79..81 "  "
+              YAML_BLOCK_SEQUENCE@81..127
+                YAML_BLOCK_SEQUENCE_ITEM@81..113
+                  YAML_BLOCK_SEQ_ENTRY@81..82 "-"
+                  WHITESPACE@82..83 " "
+                  YAML_SCALAR@83..86 "*SS"
+                  WHITESPACE@86..87 " "
+                  YAML_COMMENT@87..110 "# Subsequent occurrence"
+                  NEWLINE@110..111 "\n"
+                  WHITESPACE@111..113 "  "
+                YAML_BLOCK_SEQUENCE_ITEM@113..127
+                  YAML_BLOCK_SEQ_ENTRY@113..114 "-"
+                  WHITESPACE@114..115 " "
+                  YAML_SCALAR@115..126 "Ken Griffey"
+                  NEWLINE@126..127 "\n"

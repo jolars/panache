@@ -385,3 +385,17 @@ NB6Z
 9SA2
 # Explicit-block-key entries (`? key\n: value`) with multi-line plain key and value text — both fold to single-line via continuation-line stripping.
 JTV5
+# Block-map whose value is a nested block-sequence (`key:\n - item1\n - item2`); projection now scopes top-level container detection to direct children of the document and projects nested block-sequence values explicitly.
+8QBE
+# Block-map containing two entries each with a nested block-sequence value; same root cause as 8QBE — descendants() walk previously collapsed the entire map into the inner sequence.
+PBJ2
+# Block-map entries with comments preceding the nested block-sequence value (`hr: # comment\n  - item`) — relies on direct-child top-level detection plus nested-seq value projection.
+J9HZ
+# Block-map with seq value where one item is itself a `key : value` flow-style mapping (`- two : three`) — exercises nested-seq projection inside a top-level block-map.
+JQ4R
+# Block-map with seq value containing tab-padded scalars (`seq:\t\n - a\t`) — nested-seq projection fixes the previously-collapsed shape.
+DC7X
+# Multi-document stream where each `---` doc is a block-map containing nested block-sequence values (Stack: [- file: .., line: ..]); recursive direct-children projection unlocks all three docs.
+RZT7
+# Block-map with anchors/aliases on nested block-sequence values (`hr:\n  - &SS Sammy Sosa`); top-level direct-child detection now keeps the outer map.
+7BUB

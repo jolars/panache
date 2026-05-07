@@ -1,0 +1,40 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: JQ4R
+input: "block sequence:\n  - one\n  - two : three\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..40
+  YAML_METADATA_CONTENT@0..40
+    YAML_STREAM@0..40
+      YAML_DOCUMENT@0..40
+        YAML_BLOCK_MAP@0..40
+          YAML_BLOCK_MAP_ENTRY@0..40
+            YAML_BLOCK_MAP_KEY@0..15
+              YAML_SCALAR@0..14 "block sequence"
+              YAML_COLON@14..15 ":"
+            YAML_BLOCK_MAP_VALUE@15..40
+              NEWLINE@15..16 "\n"
+              WHITESPACE@16..18 "  "
+              YAML_BLOCK_SEQUENCE@18..40
+                YAML_BLOCK_SEQUENCE_ITEM@18..26
+                  YAML_BLOCK_SEQ_ENTRY@18..19 "-"
+                  WHITESPACE@19..20 " "
+                  YAML_SCALAR@20..23 "one"
+                  NEWLINE@23..24 "\n"
+                  WHITESPACE@24..26 "  "
+                YAML_BLOCK_SEQUENCE_ITEM@26..40
+                  YAML_BLOCK_SEQ_ENTRY@26..27 "-"
+                  WHITESPACE@27..28 " "
+                  YAML_BLOCK_MAP@28..40
+                    YAML_BLOCK_MAP_ENTRY@28..40
+                      YAML_BLOCK_MAP_KEY@28..33
+                        YAML_SCALAR@28..32 "two "
+                        YAML_COLON@32..33 ":"
+                      YAML_BLOCK_MAP_VALUE@33..40
+                        WHITESPACE@33..34 " "
+                        YAML_SCALAR@34..39 "three"
+                        NEWLINE@39..40 "\n"
