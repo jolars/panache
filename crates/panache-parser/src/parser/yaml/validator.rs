@@ -31,7 +31,14 @@
 //!   level (KS4U, 4H7K, 9JBA), and content on the same line as `...`
 //!   (3HFZ).
 //!
-//! - B, C, D, E, G, H, I — pending.
+//! - **C. Empty/leading commas in flow** — implemented: a comma in a
+//!   flow sequence or flow map with no preceding item since the last
+//!   separator (covers leading-comma `[ , a ]` and consecutive
+//!   commas `[ a, , b ]`). Trailing comma before the close bracket is
+//!   allowed by YAML 1.2 and is intentionally not flagged. Covers
+//!   fixtures 9MAG, CTN5.
+//!
+//! - B, D, E, G, H, I — pending.
 //!
 //! See `.claude/skills/yaml-shadow-expand/scanner-rewrite.md` for the
 //! cutover plan and per-cluster detection scope.
@@ -56,6 +63,9 @@ pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
     }
     let tree = parse_v2(input);
     if let Some(diag) = check_trailing_content(&tree) {
+        return Some(diag);
+    }
+    if let Some(diag) = check_flow_commas(&tree) {
         return Some(diag);
     }
     None
@@ -322,6 +332,78 @@ fn check_trailing_after_doc_end(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
     None
 }
 
+/// Cluster C — empty / leading commas inside flow collections.
+///
+/// In YAML 1.2 a flow sequence or flow map separator (`,`) must be
+/// preceded by an item since the previous separator (or since the
+/// opening bracket). A leading comma (`[ , a ]`) or two consecutive
+/// commas with only whitespace between them (`[ a, , b ]`) are
+/// rejected with `PARSE_INVALID_FLOW_SEQUENCE_COMMA`.
+///
+/// A trailing comma immediately before the closing bracket
+/// (`[ a, b, ]`) is **legal** YAML and is intentionally not flagged —
+/// the check tracks "item seen since last separator" but doesn't
+/// require an item to follow the final separator.
+///
+/// The v2 builder stores `[`, `]`, `{`, `}`, and `,` as `YAML_SCALAR`
+/// children directly on the `YAML_FLOW_SEQUENCE` / `YAML_FLOW_MAP`
+/// node; real content lives inside `YAML_FLOW_SEQUENCE_ITEM` /
+/// `YAML_FLOW_MAP_ENTRY` siblings, so a structural-token vs. content
+/// distinction at this level is just a text comparison.
+///
+/// Covers fixtures 9MAG, CTN5.
+fn check_flow_commas(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    for flow in tree.descendants().filter(|n| {
+        matches!(
+            n.kind(),
+            SyntaxKind::YAML_FLOW_SEQUENCE | SyntaxKind::YAML_FLOW_MAP
+        )
+    }) {
+        if let Some(diag) = check_flow_node_commas(&flow) {
+            return Some(diag);
+        }
+    }
+    None
+}
+
+fn check_flow_node_commas(flow: &SyntaxNode) -> Option<YamlDiagnostic> {
+    let mut seen_item_since_separator = false;
+    for child in flow.children_with_tokens() {
+        match &child {
+            // Any nested node — `YAML_FLOW_MAP_ENTRY`,
+            // `YAML_FLOW_SEQUENCE_ITEM`, or a nested flow collection —
+            // is an item.
+            NodeOrToken::Node(_) => {
+                seen_item_since_separator = true;
+            }
+            NodeOrToken::Token(t) => match t.kind() {
+                SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::YAML_COMMENT => {}
+                SyntaxKind::YAML_SCALAR if t.text() == "," => {
+                    if !seen_item_since_separator {
+                        return Some(diag_at_range(
+                            t.text_range().start().into(),
+                            t.text_range().end().into(),
+                            diagnostic_codes::PARSE_INVALID_FLOW_SEQUENCE_COMMA,
+                            "comma must follow a flow-collection item",
+                        ));
+                    }
+                    seen_item_since_separator = false;
+                }
+                // Structural opener/closer brackets — neutral.
+                SyntaxKind::YAML_SCALAR if matches!(t.text(), "[" | "]" | "{" | "}") => {}
+                // Any other token — bare scalar (implicit-null map
+                // entry like `single line` in `{ single line, a: b }`,
+                // or a plain-value entry in `{ http://foo.com, … }`),
+                // anchor, tag, etc. — counts as item evidence.
+                _ => {
+                    seen_item_since_separator = true;
+                }
+            },
+        }
+    }
+    None
+}
+
 fn diag_at_range(
     byte_start: usize,
     byte_end: usize,
@@ -505,6 +587,101 @@ mod tests {
     fn doc_end_with_trailing_spaced_comment_passes() {
         // `... # comment` — comment after `...` with whitespace separator is fine.
         let input = "---\nkey: value\n... # comment\n";
+        assert!(run(input).is_none());
+    }
+
+    // ---- Cluster C: empty / leading commas in flow ----
+
+    #[test]
+    fn flow_seq_leading_comma_9mag() {
+        // 9MAG: `[ , a, b, c ]` — leading comma with no preceding item.
+        let input = "---\n[ , a, b, c ]\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(
+            diag.code,
+            diagnostic_codes::PARSE_INVALID_FLOW_SEQUENCE_COMMA
+        );
+    }
+
+    #[test]
+    fn flow_seq_double_comma_ctn5() {
+        // CTN5: `[ a, b, c, , ]` — empty entry between commas.
+        let input = "---\n[ a, b, c, , ]\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(
+            diag.code,
+            diagnostic_codes::PARSE_INVALID_FLOW_SEQUENCE_COMMA
+        );
+    }
+
+    #[test]
+    fn flow_map_leading_comma_rejects() {
+        // `{ , a: 1 }` — same shape as 9MAG but in a flow map.
+        let input = "---\n{ , a: 1 }\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(
+            diag.code,
+            diagnostic_codes::PARSE_INVALID_FLOW_SEQUENCE_COMMA
+        );
+    }
+
+    #[test]
+    fn flow_map_double_comma_rejects() {
+        // `{ a: 1, , b: 2 }` — same shape as CTN5 but in a flow map.
+        let input = "---\n{ a: 1, , b: 2 }\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(
+            diag.code,
+            diagnostic_codes::PARSE_INVALID_FLOW_SEQUENCE_COMMA
+        );
+    }
+
+    #[test]
+    fn flow_seq_trailing_comma_passes() {
+        // YAML 1.2 allows a trailing comma immediately before the close
+        // bracket — the validator must not flag this as invalid.
+        let input = "---\n[ a, b, c, ]\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn flow_map_trailing_comma_passes() {
+        // Same trailing-comma allowance for flow maps (covers fixture 5C5M).
+        let input = "---\n{ a: 1, b: 2, }\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn flow_seq_well_formed_passes() {
+        let input = "---\n[ a, b, c ]\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn flow_seq_empty_passes() {
+        // No commas at all in an empty flow sequence.
+        let input = "---\n[ ]\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn flow_map_implicit_null_entry_passes_8kb6() {
+        // 8KB6: `{ single line, a: b }` — `single line` is a key with
+        // implicit-null value. The v2 builder emits it as a bare
+        // YAML_SCALAR child of YAML_FLOW_MAP, not wrapped in
+        // YAML_FLOW_MAP_ENTRY. The validator must recognize that bare
+        // scalar as item evidence so the following comma is legal.
+        let input = "---\n- { single line, a: b}\n- { multi\n  line, a: b}\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn flow_map_plain_entry_passes_4abk() {
+        // 4ABK: `{ unquoted : "separate", http://foo.com, … }` — the
+        // bare `http://foo.com` is a plain-scalar entry with implicit
+        // null. Same shape concern as 8KB6: a comma after an unwrapped
+        // bare scalar must not be flagged.
+        let input = "{\nunquoted : \"separate\",\nhttp://foo.com,\nomitted value:,\n}\n";
         assert!(run(input).is_none());
     }
 }
