@@ -80,7 +80,20 @@
 //!     multi-line plain scalar. YAML forbids comments inside plain
 //!     scalars.
 //!
-//! - E, I — pending.
+//! - **E. Block scalar header anomalies** — implemented (partial):
+//!   - S4GJ: a block scalar (text starts with `>` or `|`, optionally
+//!     followed by chomping/indent indicators) whose header line has
+//!     non-comment content. YAML 1.2 §8.1 requires the header line
+//!     to end with end-of-line or a properly-spaced comment.
+//!   - X4QW: a block scalar header where `#` appears without a
+//!     preceding whitespace separator (e.g. `>#comment`). YAML §6.6
+//!     requires whitespace before `#`.
+//!   - W9L4 / 5LLU / S98Z (block-scalar body indent contracts) are
+//!     deferred — they require modeling the chomping/indent
+//!     indicators and content-indent inference, which the validator
+//!     does not yet do.
+//!
+//! - I — pending.
 //!
 //! Cluster I (LHL4 — invalid tag syntax) is also deferred: the v2
 //! scanner currently absorbs `!invalid{}tag scalar` as a single bare
@@ -125,6 +138,9 @@ pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
         return Some(diag);
     }
     if let Some(diag) = check_block_indent_anomalies(&tree) {
+        return Some(diag);
+    }
+    if let Some(diag) = check_block_scalar_header(&tree) {
         return Some(diag);
     }
     None
@@ -822,6 +838,72 @@ fn check_tab_as_indent(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
     None
 }
 
+/// Cluster E — block scalar header anomalies (partial coverage).
+///
+/// Inspects every `YAML_SCALAR` token whose text begins with `>` or
+/// `|` (folded / literal block scalar). After the indicator and any
+/// chomping (`+` / `-`) or explicit-indent (digit) characters, the
+/// header line must end at end-of-line or with a properly-spaced
+/// comment. Two malformed shapes:
+/// - S4GJ: non-comment content on the header line (e.g. `> first line`).
+/// - X4QW: `#` immediately after the indicator with no whitespace
+///   separator (e.g. `>#comment`).
+fn check_block_scalar_header(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    for token in tree
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|t| t.kind() == SyntaxKind::YAML_SCALAR)
+    {
+        let text = token.text();
+        if !text.starts_with('>') && !text.starts_with('|') {
+            continue;
+        }
+        let header_end = text.find('\n').unwrap_or(text.len());
+        let header = &text[..header_end];
+        let bytes = header.as_bytes();
+        // Skip indicator + chomping/indent characters.
+        let mut i = 1usize;
+        while i < bytes.len() && (bytes[i] == b'+' || bytes[i] == b'-' || bytes[i].is_ascii_digit())
+        {
+            i += 1;
+        }
+        let rest = &header[i..];
+        if rest.is_empty() {
+            continue;
+        }
+        // X4QW: `#` immediately after the indicator (no whitespace).
+        if rest.starts_with('#') {
+            let scalar_start: usize = token.text_range().start().into();
+            return Some(diag_at_range(
+                scalar_start + i,
+                scalar_start + i + 1,
+                diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
+                "comment after block scalar indicator must be preceded by whitespace",
+            ));
+        }
+        let leading_ws = rest
+            .bytes()
+            .take_while(|b| *b == b' ' || *b == b'\t')
+            .count();
+        let after_ws = &rest[leading_ws..];
+        if after_ws.is_empty() || after_ws.starts_with('#') {
+            // Blank-only or properly-spaced comment — header is fine.
+            continue;
+        }
+        // S4GJ: non-whitespace, non-comment content on the header line.
+        let scalar_start: usize = token.text_range().start().into();
+        let content_start = scalar_start + i + leading_ws;
+        let content_end = scalar_start + header_end;
+        return Some(diag_at_range(
+            content_start,
+            content_end,
+            diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
+            "block scalar header line must end at EOL or with a comment",
+        ));
+    }
+    None
+}
+
 /// Compute the byte-based column (zero-indexed) of `byte_offset`
 /// relative to the previous newline in `input`. Tabs are not
 /// width-expanded; this is byte-distance, sufficient for indent
@@ -1330,6 +1412,52 @@ mod tests {
     fn nested_block_seq_in_seq_item_passes() {
         // `- - x` (nested sequence in single item) is well-formed.
         let input = "- - x\n  - y\n- z\n";
+        assert!(run(input).is_none());
+    }
+
+    // ---- Cluster E: block scalar header anomalies ----
+
+    #[test]
+    fn block_scalar_header_content_s4gj() {
+        // S4GJ: `folded: > first line` — text after `>` is not a comment.
+        let input = "---\nfolded: > first line\n  second line\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_INVALID_KEY_TOKEN);
+    }
+
+    #[test]
+    fn block_scalar_header_unspaced_comment_x4qw() {
+        // X4QW: `block: ># comment` — `#` immediately after `>`.
+        let input = "block: ># comment\n  scalar\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_INVALID_KEY_TOKEN);
+    }
+
+    #[test]
+    fn block_scalar_with_strip_chomp_and_body_passes() {
+        // `text: |-\n  body` — `-` after `|` is a chomp indicator.
+        let input = "text: |-\n  body\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn block_scalar_with_indent_indicator_passes() {
+        // `text: |2\n  body` — `2` is an explicit indent indicator.
+        let input = "text: |2\n  body\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn block_scalar_with_spaced_comment_passes() {
+        // `text: > # ok\n  body` — comment with whitespace after `>` is fine.
+        let input = "text: > # ok\n  body\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn block_scalar_bare_header_passes() {
+        // `text: >\n  body` — no content on header line.
+        let input = "text: >\n  body\n";
         assert!(run(input).is_none());
     }
 }
