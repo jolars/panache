@@ -184,6 +184,50 @@ definition.
 Emitted when a footnote reference points to an ID that has no matching footnote
 definition.
 
+### `undefined-anchor` {#undefined-anchor}
+
+Detects inline links whose `#fragment` destination has no matching anchor in the
+document.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Diagnostic codes
+:   [`undefined-anchor`](#undefined-anchor)
+
+Description
+
+:   Flags `[text](#fragment)` links where `#fragment` does not match any anchor
+    that will exist in the rendered output. Anchor sources include explicit
+    `{#id}` attributes on headings, fenced divs, code blocks, spans, and chunk
+    labels, plus auto-generated heading IDs (when the `auto_identifiers`
+    extension is enabled). Matching is case-sensitive, mirroring how browsers
+    resolve URL fragments.
+
+    Links with a path component (`other.qmd#frag`), absolute URLs
+    (`https://example.com#frag`), and bare back-to-top links (`#`) are not flagged.
+    In bookdown projects, sibling chapters are scanned because bookdown's gitbook
+    renderer rewrites cross-chapter anchors. Quarto books render each chapter to a
+    separate HTML page and are not scanned cross-chapter.
+
+**Example violation:**
+
+```markdown
+# Real Heading {#real}
+
+See [the typo](#reel).
+```
+
+**Diagnostic:**
+
+```
+warning[undefined-anchor]: Anchor '#reel' not found in document
+  --> document.qmd:3:16
+```
+
 ### `unused-definitions` {#unused-definitions}
 
 Detects reference labels and footnote definitions that are declared but never

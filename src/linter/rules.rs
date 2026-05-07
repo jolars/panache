@@ -12,6 +12,7 @@ pub mod heading_hierarchy;
 pub mod html_entities;
 pub mod missing_chunk_labels;
 pub mod stray_fenced_div_markers;
+pub mod undefined_anchor;
 pub mod undefined_references;
 pub mod unused_definitions;
 

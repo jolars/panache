@@ -117,6 +117,9 @@ fn default_registry(config: &Config) -> RuleRegistry {
             rules::undefined_references::UndefinedReferencesRule,
         ));
     }
+    if config.lint.is_rule_enabled("undefined-anchor") {
+        registry.register(Box::new(rules::undefined_anchor::UndefinedAnchorRule));
+    }
     if config.lint.is_rule_enabled("unused-definitions") {
         registry.register(Box::new(rules::unused_definitions::UnusedDefinitionsRule));
     }

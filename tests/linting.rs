@@ -146,6 +146,19 @@ fn test_whitespace_normalization() {
 }
 
 #[test]
+fn test_undefined_anchor() {
+    let diagnostics = lint_file("undefined_anchor.md");
+    let anchors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "undefined-anchor")
+        .collect();
+
+    assert_eq!(anchors.len(), 1, "Should flag 1 unresolvable anchor");
+    assert!(anchors[0].message.contains("#reel"));
+    assert_eq!(anchors[0].location.line, 3);
+}
+
+#[test]
 fn test_missing_reference_targets() {
     let diagnostics = lint_file("missing_references.md");
     let missing_ref: Vec<_> = diagnostics
