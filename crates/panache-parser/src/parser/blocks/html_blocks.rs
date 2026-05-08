@@ -144,7 +144,7 @@ pub(crate) fn try_parse_html_block_start(
     // tag-shaped blocks); the bytes fall through to paragraph parsing.
     if is_commonmark && trimmed.starts_with("<!") && trimmed.len() > 2 {
         let after_bang = &trimmed[2..];
-        if after_bang.chars().next()?.is_ascii_uppercase() {
+        if after_bang.chars().next()?.is_ascii_alphabetic() {
             return Some(HtmlBlockType::Declaration);
         }
     }
@@ -605,9 +605,16 @@ mod tests {
             try_parse_html_block_start("<!DOCTYPE html>", true),
             Some(HtmlBlockType::Declaration)
         );
+        // CommonMark §4.6 type 4 accepts any ASCII letter after `<!`, not
+        // just uppercase. Lowercase doctype must match too.
+        assert_eq!(
+            try_parse_html_block_start("<!doctype html>", true),
+            Some(HtmlBlockType::Declaration)
+        );
         // Pandoc dialect does not — bare declarations fall through to
         // paragraph parsing.
         assert_eq!(try_parse_html_block_start("<!DOCTYPE html>", false), None);
+        assert_eq!(try_parse_html_block_start("<!doctype html>", false), None);
     }
 
     #[test]

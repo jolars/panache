@@ -11,7 +11,85 @@ reverted, what trap to avoid) are the load-bearing content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-08 (Phase 4 follow-up — gate type-4/type-5 HTML blocks under Pandoc dialect)
+## Latest session — 2026-05-08 (CommonMark type-4 lowercase declaration recognition)
+
+**html (block + inline) pass count: 47 → 47** (no corpus change — fix
+is CommonMark-side, conformance corpus is Pandoc-dialect only).
+**Workspace test count: 0 failing → 0 failing** (all green).
+**Parser-crate golden cases: 283 → 285** (2 new paired fixtures).
+
+### What landed
+
+One-line fix: `is_ascii_uppercase()` → `is_ascii_alphabetic()` at
+`crates/panache-parser/src/parser/blocks/html_blocks.rs:147` in
+`try_parse_html_block_start`'s Declaration arm. CommonMark §4.6 type-4
+spec says "line begins with the string `<!` followed by an ASCII
+letter" — uppercase-only was a pre-existing CommonMark gap. The
+existing `# CommonMark spec.txt v0.31.2` test suite (652/652) only
+exercises uppercase `<!DOCTYPE`, so this didn't show up there.
+
+End-to-end behavior:
+- `<!doctype html>` under CommonMark dialect now emits `HTML_BLOCK`
+  (and `RawBlock (Format "html") "<!doctype html>\n"` from the
+  projector), matching `pandoc -f commonmark -t native`.
+- Pandoc dialect unchanged — still falls through to `Para [Str
+  "<!doctype", Space, Str "html>"]`, matching `pandoc -f markdown`.
+- Inline path was already correct (`parse_declaration` uses
+  `is_ascii_alphabetic`).
+
+### Files in committable diff
+
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs` (1-line
+  fix + 2 new assertions in `test_try_parse_declaration` covering
+  lowercase under both dialects)
+- `crates/panache-parser/tests/golden_parser_cases.rs` (2 new case
+  registrations)
+- `crates/panache-parser/tests/fixtures/cases/html_block_doctype_lowercase_commonmark/`
+  + `_pandoc/` paired parser fixtures (+ snapshots)
+
+No corpus, no projector, no formatter, no salsa changes — pure
+CommonMark recognizer fix.
+
+### Suggested next sub-targets, ranked
+
+1. **Phase 5 / 6 — `markdown_in_html_blocks` for non-sectioning
+   block tags.** Highest-impact remaining gap. Pandoc default
+   parses markdown inside *most* HTML block tags except the four
+   verbatim ones; panache currently silently drops content inside
+   `<table>/<tr>/<td>/<dl>/<dt>/<dd>/<ul>/<ol>/<li>/<form>`. Fix
+   in `parser/blocks/html_blocks.rs` — split HTML-block scanning
+   so each balanced tag pair emits a separate `HTML_BLOCK` and
+   intermediate content is fed back to the block dispatcher. Add
+   ~6-10 corpus cases.
+2. **Phase 5 (nested div, blocked.txt id 199)** — depth-aware
+   pre-scan. Same machinery needed for #1; could ride along.
+3. **`<!ENTITY x "y">` Quoted projection gap.** Noted in earlier
+   session: pandoc emits `Quoted DoubleQuote [Str "y"]` for the
+   `"y"` part inside a declaration; panache emits `Str "\"y\">"`.
+   Smart_punctuation / Quoted feature gap, not html-conformance
+   per se. Possibly out-of-scope for this skill.
+
+### Don't redo / known traps (new this session)
+
+- **The `panache.toml` flavor key is top-level, not under
+  `[format]`.** Probe configs that use `[format]\nflavor = …`
+  silently pick up the default Pandoc flavor — the parse output
+  will look like nothing changed. Use `flavor = "common-mark"` at
+  the top of the file. (See `docs/guide/configuration.qmd:31`.)
+- **The CLI binary (`target/debug/panache`) is a separate build
+  artifact from `cargo test`.** After a parser change, `cargo
+  build --bin panache` is needed before manual probes; otherwise
+  the binary still has the old behavior even though tests pass.
+- **CommonMark spec.txt corpus only tests uppercase `<!DOCTYPE`.**
+  The CM HTML-blocks suite (44/44) doesn't exercise lowercase
+  declarations, so this gap was undetected by the spec-conformance
+  harness. When tightening parser recognizers, paired fixtures
+  under `tests/fixtures/cases/` are the right place to pin the
+  behavior.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-05-08 (Phase 4 follow-up — gate type-4/type-5 HTML blocks under Pandoc dialect)
 
 **html (block + inline) pass count: 39 → 47** (8 new corpus cases,
 all passing).
