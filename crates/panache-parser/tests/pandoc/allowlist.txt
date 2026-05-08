@@ -212,6 +212,7 @@
 196
 197
 198
+199
 200
 201
 202
@@ -277,3 +278,9 @@
 248
 249
 250
+
+# html-block (nested div — depth-aware close scan, mirrors pandoc's htmlInBalanced)
+251
+252
+253
+254

@@ -1,0 +1,28 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..65
+  HTML_BLOCK_DIV@0..65
+    HTML_BLOCK_TAG@0..17
+      TEXT@0..4 "<div"
+      WHITESPACE@4..5 " "
+      HTML_ATTRS@5..15
+        TEXT@5..15 "id=\"outer\""
+      TEXT@15..16 ">"
+      NEWLINE@16..17 "\n"
+    HTML_BLOCK_CONTENT@17..58
+      NEWLINE@17..18 "\n"
+      TEXT@18..34 "<div id=\"inner\">"
+      NEWLINE@34..35 "\n"
+      NEWLINE@35..36 "\n"
+      TEXT@36..48 "deep content"
+      NEWLINE@48..49 "\n"
+      NEWLINE@49..50 "\n"
+      TEXT@50..56 "</div>"
+      NEWLINE@56..57 "\n"
+      NEWLINE@57..58 "\n"
+    HTML_BLOCK_TAG@58..65
+      TEXT@58..64 "</div>"
+      NEWLINE@64..65 "\n"

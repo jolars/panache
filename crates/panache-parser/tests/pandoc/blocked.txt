@@ -5,11 +5,4 @@
 # exposes. Do NOT use this file to silence regressions — fix the underlying
 # cause and keep the case in the allowlist instead.
 #
-# html-block — nested <div> blocks
-# 199 (html-block-div-nested) — Pandoc's div parser is depth-aware: it
-# matches a closing </div> against the innermost open <div> tag. Our
-# CommonMark-style HTML-block scanner closes the outer block at the
-# first </div> it sees, leaving the second </div> as inline raw HTML.
-# Phase 5 of the html-conformance skill covers this; needs a depth-tracking
-# pre-scan in parser/blocks/html_blocks.rs.
-199
+# (currently empty)

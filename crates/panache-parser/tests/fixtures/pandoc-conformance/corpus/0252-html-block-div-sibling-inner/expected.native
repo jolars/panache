@@ -1,0 +1,6 @@
+[ Div
+    ( "a" , [] , [] )
+    [ Div ( "b" , [] , [] ) [ Plain [ Str "first" ] ]
+    , Div ( "c" , [] , [] ) [ Plain [ Str "second" ] ]
+    ]
+]

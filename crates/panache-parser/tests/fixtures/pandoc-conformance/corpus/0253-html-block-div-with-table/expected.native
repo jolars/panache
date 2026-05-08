@@ -1,0 +1,11 @@
+[ Div
+    ( "outer" , [] , [] )
+    [ RawBlock (Format "html") "<table>"
+    , RawBlock (Format "html") "<tr>"
+    , RawBlock (Format "html") "<td>"
+    , Plain [ Str "cell" ]
+    , RawBlock (Format "html") "</td>"
+    , RawBlock (Format "html") "</tr>"
+    , RawBlock (Format "html") "</table>"
+    ]
+]

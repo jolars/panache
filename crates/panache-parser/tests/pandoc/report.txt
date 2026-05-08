@@ -1,11 +1,11 @@
 Pandoc-native conformance report (pandoc 3.9.0.2)
-249 / 250 cases passing (99.6%)
-1 failing
-1 blocked-list entries
+254 / 254 cases passing (100.0%)
+0 failing
+0 blocked-list entries
 
 === Per-section pass / fail ===
   block: 15 pass / 0 fail
-  html: 57 pass / 1 fail
+  html: 62 pass / 0 fail
   imported: 162 pass / 0 fail
   inline: 15 pass / 0 fail
 
@@ -208,6 +208,7 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 196
 197
 198
+199
 200
 201
 202
@@ -259,6 +260,10 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 248
 249
 250
+251
+252
+253
+254
 
 === Passing cases grouped by section ===
 # block
@@ -285,6 +290,7 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 196
 197
 198
+199
 200
 201
 202
@@ -336,6 +342,10 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 248
 249
 250
+251
+252
+253
+254
 
 # imported
 26
@@ -517,9 +527,4 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 25
 190
 191
-
-=== Failing case slugs (with rendered diff hint) ===
-# 199 (html-block-div-nested)
-  expected: [ Div ( "outer" , [ ] , [ ] ) [ Div ( "inner" , [ ] , [ ] ) [ Para [ Str "deep" , Space , Str "content" ] ] ] ]
-  got:      [ Div ( "outer" , [ ] , [ ] ) [ RawBlock ( Format "html" ) "<div id=\"inner\">" , Plain [ Str "deep" , Space , Str "content" ] ] , Para [ RawInline ( Format "html" ) "</div>" ] ]
 

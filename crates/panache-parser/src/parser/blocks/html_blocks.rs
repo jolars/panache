@@ -103,10 +103,16 @@ pub(crate) enum HtmlBlockType {
     /// `BLOCK_TAGS` or `VERBATIM_TAGS`). Set `closed_by_blank_line` to use
     /// CommonMark §4.6 type-6 end semantics (block ends at blank line);
     /// otherwise the legacy "ends at matching `</tag>`" semantics apply.
+    /// `depth_aware` extends the matching-tag close path with balanced
+    /// open/close tracking of the same tag name (mirrors pandoc's
+    /// `htmlInBalanced`); used under Pandoc dialect to handle nested
+    /// `<div>...<div>...</div>...</div>` shapes correctly. Ignored when
+    /// `closed_by_blank_line` is true.
     BlockTag {
         tag_name: String,
         is_verbatim: bool,
         closed_by_blank_line: bool,
+        depth_aware: bool,
     },
     /// CommonMark §4.6 type 7: complete open or close tag on a line by
     /// itself, tag name not in the type-1 verbatim list. Block ends at
@@ -172,6 +178,7 @@ pub(crate) fn try_parse_html_block_start(
                 tag_name: tag_lower,
                 is_verbatim,
                 closed_by_blank_line: is_commonmark && !is_verbatim,
+                depth_aware: !is_commonmark,
             });
         }
 
@@ -185,6 +192,7 @@ pub(crate) fn try_parse_html_block_start(
                 tag_name: tag_lower,
                 is_verbatim: true,
                 closed_by_blank_line: false,
+                depth_aware: !is_commonmark,
             });
         }
     }
@@ -302,6 +310,84 @@ fn is_closing_marker(line: &str, block_type: &HtmlBlockType) -> bool {
     }
 }
 
+/// Count occurrences of `<tag_name ...>` (open) and `</tag_name>` (close) in
+/// `line`. Self-closing forms (`<tag .../>`) and tags whose name appears
+/// inside a quoted attribute value are NOT counted — the scanner walks
+/// `<...>` brackets and respects `"`/`'` quoting.
+///
+/// Used by [`parse_html_block_with_wrapper`] to balance nested same-name
+/// tags under Pandoc dialect (mirrors pandoc's `htmlInBalanced`).
+fn count_tag_balance(line: &str, tag_name: &str) -> (usize, usize) {
+    let bytes = line.as_bytes();
+    let lower_line = line.to_ascii_lowercase();
+    let lower_bytes = lower_line.as_bytes();
+    let tag_lower = tag_name.to_ascii_lowercase();
+    let tag_bytes = tag_lower.as_bytes();
+
+    let mut opens = 0usize;
+    let mut closes = 0usize;
+    let mut i = 0usize;
+
+    while i < bytes.len() {
+        if bytes[i] != b'<' {
+            i += 1;
+            continue;
+        }
+        let after = i + 1;
+        let is_close = after < bytes.len() && bytes[after] == b'/';
+        let name_start = if is_close { after + 1 } else { after };
+        let matched = name_start + tag_bytes.len() <= bytes.len()
+            && &lower_bytes[name_start..name_start + tag_bytes.len()] == tag_bytes;
+        let after_name = name_start + tag_bytes.len();
+        let is_boundary = matched
+            && matches!(
+                bytes.get(after_name).copied(),
+                Some(b' ' | b'\t' | b'\n' | b'\r' | b'>' | b'/') | None
+            );
+
+        // Walk forward to the closing `>` of this tag bracket, skipping
+        // inside quoted attribute values. Self-closing form ends with `/>`.
+        let mut j = if matched { after_name } else { after };
+        let mut quote: Option<u8> = None;
+        let mut self_close = false;
+        let mut found_gt = false;
+        while j < bytes.len() {
+            let b = bytes[j];
+            match (quote, b) {
+                (Some(q), x) if x == q => quote = None,
+                (None, b'"') | (None, b'\'') => quote = Some(b),
+                (None, b'>') => {
+                    found_gt = true;
+                    if j > i + 1 && bytes[j - 1] == b'/' {
+                        self_close = true;
+                    }
+                    break;
+                }
+                _ => {}
+            }
+            j += 1;
+        }
+
+        if matched && is_boundary {
+            if is_close {
+                closes += 1;
+            } else if !self_close {
+                opens += 1;
+            }
+        }
+
+        if found_gt {
+            i = j + 1;
+        } else {
+            // Unterminated `<...` — bail out to avoid an infinite loop.
+            // The remaining bytes don't form a complete tag.
+            break;
+        }
+    }
+
+    (opens, closes)
+}
+
 /// Parse an HTML block, allowing the caller to pick the wrapper SyntaxKind
 /// (`HTML_BLOCK` for opaque preservation, `HTML_BLOCK_DIV` for the
 /// Pandoc-dialect `<div>` lift). Children are emitted byte-for-byte
@@ -351,10 +437,34 @@ pub(crate) fn parse_html_block_with_wrapper(
 
     builder.finish_node(); // HtmlBlockTag
 
+    // Set up depth-aware close tracking when the block type asks for it
+    // (Pandoc dialect, balanced same-name tag matching). A `None` means
+    // we fall back to the legacy "first matching close" path via
+    // `is_closing_marker`.
+    let depth_aware_tag: Option<String> = match &block_type {
+        HtmlBlockType::BlockTag {
+            tag_name,
+            closed_by_blank_line: false,
+            depth_aware: true,
+            ..
+        } => Some(tag_name.clone()),
+        _ => None,
+    };
+    let mut depth: i64 = 1;
+    if let Some(tag_name) = &depth_aware_tag {
+        let (opens, closes) = count_tag_balance(first_inner, tag_name);
+        depth = opens as i64 - closes as i64;
+    }
+
     // Check if opening line also contains closing marker. Blank-line-terminated
     // blocks (CommonMark types 6 & 7) ignore inline close markers — they only
     // end at a blank line or end of input.
-    if !blank_terminated && is_closing_marker(first_inner, &block_type) {
+    let same_line_closed = !blank_terminated
+        && match &depth_aware_tag {
+            Some(_) => depth <= 0,
+            None => is_closing_marker(first_inner, &block_type),
+        };
+    if same_line_closed {
         log::trace!(
             "HTML block at line {} opens and closes on same line",
             start_pos + 1
@@ -383,9 +493,20 @@ pub(crate) fn parse_html_block_with_wrapper(
             break;
         }
 
-        // Check for closing marker. Match against the inner content so a `>`-
-        // prefixed continuation line still recognises e.g. `</div>`.
-        if is_closing_marker(inner, &block_type) {
+        // Check for closing marker. Under depth-aware mode (Pandoc dialect)
+        // count opens/closes of the same tag name and only close when depth
+        // returns to 0; otherwise fall back to substring-match on the line.
+        let line_closes = match &depth_aware_tag {
+            Some(tag_name) => {
+                let (opens, closes) = count_tag_balance(inner, tag_name);
+                depth += opens as i64;
+                depth -= closes as i64;
+                depth <= 0
+            }
+            None => is_closing_marker(inner, &block_type),
+        };
+
+        if line_closes {
             log::trace!("Found HTML block closing at line {}", current_pos + 1);
             found_closing = true;
 
@@ -577,6 +698,7 @@ mod tests {
                 tag_name: "div".to_string(),
                 is_verbatim: false,
                 closed_by_blank_line: false,
+                depth_aware: true,
             })
         );
         assert_eq!(
@@ -585,6 +707,7 @@ mod tests {
                 tag_name: "div".to_string(),
                 is_verbatim: false,
                 closed_by_blank_line: false,
+                depth_aware: true,
             })
         );
     }
@@ -597,6 +720,7 @@ mod tests {
                 tag_name: "script".to_string(),
                 is_verbatim: true,
                 closed_by_blank_line: false,
+                depth_aware: true,
             })
         );
     }
@@ -682,6 +806,7 @@ mod tests {
                 tag_name: "div".to_string(),
                 is_verbatim: false,
                 closed_by_blank_line: true,
+                depth_aware: false,
             })
         );
     }
@@ -725,6 +850,7 @@ mod tests {
             tag_name: "div".to_string(),
             is_verbatim: false,
             closed_by_blank_line: false,
+            depth_aware: false,
         };
         assert!(is_closing_marker("</div>", &block_type));
         assert!(is_closing_marker("</DIV>", &block_type)); // Case insensitive
@@ -788,6 +914,77 @@ mod tests {
 
         // Should consume all lines even without closing tag
         assert_eq!(new_pos, 2);
+    }
+
+    #[test]
+    fn test_parse_div_block_nested_pandoc() {
+        // Pandoc dialect: a nested `<div>...<div>...</div>...</div>` must
+        // close on the OUTER `</div>`, not the first `</div>` seen. The
+        // CommonMark-style "first close" scanner is wrong here; Pandoc's
+        // div parser is depth-aware (mirrors `htmlInBalanced`).
+        let input =
+            "<div id=\"outer\">\n\n<div id=\"inner\">\n\ndeep content\n\n</div>\n\n</div>\n";
+        let lines: Vec<&str> = input.lines().collect();
+        let mut builder = GreenNodeBuilder::new();
+
+        // is_commonmark = false → Pandoc dialect.
+        let block_type = try_parse_html_block_start(lines[0], false).unwrap();
+        let new_pos = parse_html_block_with_wrapper(
+            &mut builder,
+            &lines,
+            0,
+            block_type,
+            0,
+            SyntaxKind::HTML_BLOCK_DIV,
+        );
+
+        // 9 lines: outer-open, blank, inner-open, blank, content, blank,
+        // inner-close, blank, outer-close. All consumed.
+        assert_eq!(new_pos, 9);
+    }
+
+    #[test]
+    fn test_parse_div_block_same_line_pandoc() {
+        // <div>foo</div> on a single line: opens=1, closes=1, depth=0 →
+        // close on first line. Depth-aware tracking must not regress this.
+        let input = "<div>foo</div>\n";
+        let lines: Vec<&str> = input.lines().collect();
+        let mut builder = GreenNodeBuilder::new();
+
+        let block_type = try_parse_html_block_start(lines[0], false).unwrap();
+        let new_pos = parse_html_block_with_wrapper(
+            &mut builder,
+            &lines,
+            0,
+            block_type,
+            0,
+            SyntaxKind::HTML_BLOCK_DIV,
+        );
+        assert_eq!(new_pos, 1);
+    }
+
+    #[test]
+    fn test_commonmark_verbatim_first_close() {
+        // CommonMark verbatim tag (`<script>`): per CommonMark §4.6 type-1,
+        // ends at the first matching close — not depth-aware. Stash a
+        // bogus inner `<script>` inside a JS string; the outer block
+        // still closes at the first `</script>`.
+        let input = "<script>\nlet x = '<script>';\n</script>\n";
+        let lines: Vec<&str> = input.lines().collect();
+        let mut builder = GreenNodeBuilder::new();
+
+        // is_commonmark = true.
+        let block_type = try_parse_html_block_start(lines[0], true).unwrap();
+        let new_pos = parse_html_block_with_wrapper(
+            &mut builder,
+            &lines,
+            0,
+            block_type,
+            0,
+            SyntaxKind::HTML_BLOCK,
+        );
+        // Three lines, closed at first `</script>` (line 2). new_pos = 3.
+        assert_eq!(new_pos, 3);
     }
 
     #[test]
