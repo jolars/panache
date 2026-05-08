@@ -283,6 +283,37 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             let content = content.trim();
             format!("**{}**", content)
         }
+        SyntaxKind::INLINE_HTML_SPAN => {
+            // Inline `<span ...>...</span>` lift (Pandoc dialect). The open
+            // tag's bytes are tokenized at finer granularity (TEXT, WHITESPACE,
+            // HTML_ATTRS) — emit them verbatim. SPAN_CONTENT recurses through
+            // the inline formatter for nested markdown.
+            let mut result = String::new();
+            for child in node.children_with_tokens() {
+                match child {
+                    NodeOrToken::Token(t) => {
+                        result.push_str(t.text());
+                    }
+                    NodeOrToken::Node(n) => {
+                        if n.kind() == SyntaxKind::SPAN_CONTENT {
+                            for elem in n.children_with_tokens() {
+                                match elem {
+                                    NodeOrToken::Token(t) => result.push_str(t.text()),
+                                    NodeOrToken::Node(nested) => {
+                                        result.push_str(&format_inline_node(&nested, config));
+                                    }
+                                }
+                            }
+                        } else {
+                            // HTML_ATTRS and any other open-tag region nodes —
+                            // emit their bytes verbatim to stay lossless.
+                            result.push_str(&n.text().to_string());
+                        }
+                    }
+                }
+            }
+            result
+        }
         SyntaxKind::BRACKETED_SPAN => {
             // Format bracketed span: [content]{.attributes}
             // Need to traverse children to avoid extra spaces

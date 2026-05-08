@@ -5,7 +5,7 @@
 //! When the `native_spans` extension is enabled, HTML `<span>` tags are
 //! treated as native Pandoc Span elements instead of raw HTML.
 
-use crate::options::ParserOptions;
+use crate::options::{Dialect, ParserOptions};
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -119,32 +119,106 @@ pub(crate) fn try_parse_native_span(text: &str) -> Option<(usize, &str, String)>
 }
 
 /// Emit a native span node to the builder.
+///
+/// `raw` is the full byte slice of the matched span (`<span...>content</span>`)
+/// so the open-tag bytes can be tokenized byte-exactly. Under
+/// `Dialect::Pandoc`, the wrapper is `INLINE_HTML_SPAN` and the open tag's
+/// attribute region is exposed structurally as `HTML_ATTRS` (mirroring the
+/// `HTML_BLOCK_DIV` pattern). Under `Dialect::CommonMark` (with the
+/// `native_spans` extension explicitly enabled), the legacy `BRACKETED_SPAN`
+/// shape is preserved for backward compatibility.
 pub(crate) fn emit_native_span(
     builder: &mut GreenNodeBuilder,
+    raw: &str,
     content: &str,
-    attributes: &str,
     config: &ParserOptions,
 ) {
-    builder.start_node(SyntaxKind::BRACKETED_SPAN.into());
+    let close_tag = "</span>";
+    let open_tag_end = raw.len().saturating_sub(content.len() + close_tag.len());
+    let open_tag = &raw[..open_tag_end];
 
-    // Opening tag
+    if config.dialect == Dialect::Pandoc {
+        builder.start_node(SyntaxKind::INLINE_HTML_SPAN.into());
+        emit_span_open_tag_tokens(builder, open_tag);
+        builder.start_node(SyntaxKind::SPAN_CONTENT.into());
+        parse_inline_text(builder, content, config, false);
+        builder.finish_node();
+        builder.token(SyntaxKind::SPAN_BRACKET_CLOSE.into(), close_tag);
+        builder.finish_node();
+        return;
+    }
+
+    // Legacy CommonMark + native_spans extension path: keep the original
+    // BRACKETED_SPAN shape. (Note: this path collapses multi-whitespace
+    // attribute regions to a single space; it's a pre-existing minor
+    // losslessness divergence not worth diverging the legacy shape for.)
+    let attrs_text = open_tag
+        .strip_prefix("<span")
+        .and_then(|s| s.strip_suffix('>'))
+        .map(str::trim)
+        .unwrap_or("");
+    builder.start_node(SyntaxKind::BRACKETED_SPAN.into());
     builder.token(SyntaxKind::SPAN_BRACKET_OPEN.into(), "<span");
-    if !attributes.is_empty() {
-        // Add space before attributes
+    if !attrs_text.is_empty() {
         builder.token(SyntaxKind::WHITESPACE.into(), " ");
-        builder.token(SyntaxKind::SPAN_ATTRIBUTES.into(), attributes);
+        builder.token(SyntaxKind::SPAN_ATTRIBUTES.into(), attrs_text);
     }
     builder.token(SyntaxKind::SPAN_BRACKET_OPEN.into(), ">");
-
-    // Parse the content recursively for inline markdown
     builder.start_node(SyntaxKind::SPAN_CONTENT.into());
     parse_inline_text(builder, content, config, false);
     builder.finish_node();
-
-    // Closing tag
-    builder.token(SyntaxKind::SPAN_BRACKET_CLOSE.into(), "</span>");
-
+    builder.token(SyntaxKind::SPAN_BRACKET_CLOSE.into(), close_tag);
     builder.finish_node();
+}
+
+/// Tokenize the open tag of an inline `<span ...>` byte-exactly into:
+/// `TEXT("<span") + (WHITESPACE + HTML_ATTRS{TEXT(attrs)} + WHITESPACE?)?
+/// + TEXT(">")`.
+///
+/// Bytes are byte-identical to the source — only the tokenization
+/// granularity changes so `AttributeNode::cast(HTML_ATTRS)` can read the
+/// attribute region structurally. Mirrors `emit_div_open_tag_tokens`.
+fn emit_span_open_tag_tokens(builder: &mut GreenNodeBuilder<'_>, open_tag: &str) {
+    let Some(rest) = open_tag.strip_prefix("<span") else {
+        // Defensive — shouldn't happen since try_parse_native_span gates on
+        // <span. Fall back to a single TEXT token to stay lossless.
+        builder.token(SyntaxKind::TEXT.into(), open_tag);
+        return;
+    };
+    builder.token(SyntaxKind::TEXT.into(), "<span");
+    let Some(inside) = rest.strip_suffix('>') else {
+        builder.token(SyntaxKind::TEXT.into(), rest);
+        return;
+    };
+    let bytes = inside.as_bytes();
+    // Split into leading WS, attribute body, trailing WS.
+    let leading_ws_end = bytes
+        .iter()
+        .position(|&b| !matches!(b, b' ' | b'\t' | b'\n' | b'\r'))
+        .unwrap_or(bytes.len());
+    let leading_ws = &inside[..leading_ws_end];
+    let after_leading = &inside[leading_ws_end..];
+    let trailing_ws_start = after_leading
+        .as_bytes()
+        .iter()
+        .rposition(|&b| !matches!(b, b' ' | b'\t' | b'\n' | b'\r'))
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    let attrs_text = &after_leading[..trailing_ws_start];
+    let trailing_ws = &after_leading[trailing_ws_start..];
+
+    if !leading_ws.is_empty() {
+        builder.token(SyntaxKind::WHITESPACE.into(), leading_ws);
+    }
+    if !attrs_text.is_empty() {
+        builder.start_node(SyntaxKind::HTML_ATTRS.into());
+        builder.token(SyntaxKind::TEXT.into(), attrs_text);
+        builder.finish_node();
+    }
+    if !trailing_ws.is_empty() {
+        builder.token(SyntaxKind::WHITESPACE.into(), trailing_ws);
+    }
+    builder.token(SyntaxKind::TEXT.into(), ">");
 }
 
 #[cfg(test)]

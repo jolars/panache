@@ -1,0 +1,18 @@
+[ Para
+    [ Str "First"
+    , Space
+    , Span ( "" , [ "a" ] , [] ) [ Str "one" ]
+    , Space
+    , Str "and"
+    , Space
+    , Str "second"
+    , Space
+    , Span ( "" , [ "b" ] , [] ) [ Str "two" ]
+    , Space
+    , Str "in"
+    , Space
+    , Str "a"
+    , Space
+    , Str "row."
+    ]
+]

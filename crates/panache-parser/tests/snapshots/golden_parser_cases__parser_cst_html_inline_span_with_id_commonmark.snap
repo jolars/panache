@@ -1,0 +1,25 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..99
+  PARAGRAPH@0..49
+    TEXT@0..10 "Body with "
+    INLINE_HTML@10..28
+      INLINE_HTML_CONTENT@10..28 "<span id=\"marker\">"
+    TEXT@28..35 "flagged"
+    INLINE_HTML@35..42
+      INLINE_HTML_CONTENT@35..42 "</span>"
+    TEXT@42..48 " word."
+    NEWLINE@48..49 "\n"
+  BLANK_LINE@49..50
+    BLANK_LINE@49..50 "\n"
+  PARAGRAPH@50..99
+    TEXT@50..52 "A "
+    INLINE_HTML@52..77
+      INLINE_HTML_CONTENT@52..77 "<span id=\"x\" class=\"c ..."
+    TEXT@77..83 "tagged"
+    INLINE_HTML@83..90
+      INLINE_HTML_CONTENT@83..90 "</span>"
+    TEXT@90..98 " region."
+    NEWLINE@98..99 "\n"

@@ -197,6 +197,11 @@ pub enum SyntaxKind {
     // bytes of the span.
     INLINE_HTML,
     INLINE_HTML_CONTENT,
+    // Pandoc-dialect inline lift: a matched <span ...>...</span> tag pair,
+    // mirroring HTML_BLOCK_DIV at the inline level. The open tag's
+    // attribute region is exposed structurally as HTML_ATTRS so the
+    // existing AttributeNode walk picks up `<span id>` ids automatically.
+    INLINE_HTML_SPAN,
 
     // TeX blocks
     TEX_BLOCK, // Raw tex block (e.g., LaTeX commands)

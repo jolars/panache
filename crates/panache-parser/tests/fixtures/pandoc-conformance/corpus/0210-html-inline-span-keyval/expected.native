@@ -1,0 +1,9 @@
+[ Para
+    [ Str "Inline"
+    , Space
+    , Span
+        ( "" , [] , [ ( "data-foo" , "bar" ) ] ) [ Str "data" ]
+    , Space
+    , Str "attribute."
+    ]
+]

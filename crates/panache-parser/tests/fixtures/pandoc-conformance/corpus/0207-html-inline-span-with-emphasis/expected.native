@@ -1,0 +1,15 @@
+[ Para
+    [ Str "Wrapped"
+    , Space
+    , Span
+        ( "" , [ "hi" ] , [] )
+        [ Strong [ Str "bold" ]
+        , Space
+        , Str "and"
+        , Space
+        , Emph [ Str "emphasis" ]
+        ]
+    , Space
+    , Str "here."
+    ]
+]

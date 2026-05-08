@@ -189,6 +189,33 @@ mod tests {
     }
 
     #[test]
+    fn resolves_explicit_id_on_html_inline_span() {
+        // Issue #263 sibling for inline <span id="...">: the Pandoc-dialect
+        // parser lifts the inline tag pair to INLINE_HTML_SPAN with HTML_ATTRS
+        // exposed structurally, so the existing AttributeNode walk registers
+        // the id as a crossref declaration.
+        let input = "<span id=\"anchor-c\">marker</span>\n\nSee [link](#anchor-c).\n";
+        let diagnostics = parse_and_lint(input);
+        assert!(
+            diagnostics.is_empty(),
+            "expected no diagnostics, got {:?}",
+            diagnostics
+        );
+    }
+
+    #[test]
+    fn resolves_explicit_id_on_html_inline_span_inside_paragraph() {
+        let input =
+            "Body text with a <span id=\"sec-a\">marker</span> inline.\n\nLink: [here](#sec-a).\n";
+        let diagnostics = parse_and_lint(input);
+        assert!(
+            diagnostics.is_empty(),
+            "expected no diagnostics, got {:?}",
+            diagnostics
+        );
+    }
+
+    #[test]
     fn resolves_implicit_heading_with_auto_identifiers_on() {
         let input = "# Heading Name\n\nSee [there](#heading-name).\n";
         let diagnostics = parse_and_lint(input);

@@ -1,0 +1,8 @@
+[ Para [ Span ( "anchor-c" , [] , [] ) [ Str "marker" ] ]
+, Para
+    [ Str "See"
+    , Space
+    , Link ( "" , [] , [] ) [ Str "link" ] ( "#anchor-c" , "" )
+    , Str "."
+    ]
+]

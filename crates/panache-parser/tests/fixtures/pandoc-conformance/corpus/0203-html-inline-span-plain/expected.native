@@ -1,0 +1,10 @@
+[ Para
+    [ Str "Paragraph"
+    , Space
+    , Str "with"
+    , Space
+    , Span ( "" , [] , [] ) [ Str "plain" , Space , Str "span" ]
+    , Space
+    , Str "embedded."
+    ]
+]

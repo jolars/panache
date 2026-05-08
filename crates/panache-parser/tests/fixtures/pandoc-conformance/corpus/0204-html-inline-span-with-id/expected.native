@@ -1,0 +1,10 @@
+[ Para
+    [ Str "Body"
+    , Space
+    , Str "with"
+    , Space
+    , Span ( "marker" , [] , [] ) [ Str "flagged" ]
+    , Space
+    , Str "word."
+    ]
+]

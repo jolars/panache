@@ -1611,6 +1611,22 @@ fn bracketed_span_inline(node: &SyntaxNode) -> Inline {
     Inline::Span(attr, content)
 }
 
+fn inline_html_span_inline(node: &SyntaxNode) -> Inline {
+    let attr_text = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::HTML_ATTRS)
+        .map(|n| n.text().to_string());
+    let attr = attr_text
+        .map(|raw| parse_html_attrs(raw.trim()))
+        .unwrap_or_default();
+    let content = node
+        .children()
+        .find(|c| c.kind() == SyntaxKind::SPAN_CONTENT)
+        .map(|n| coalesce_inlines(inlines_from(&n)))
+        .unwrap_or_default();
+    Inline::Span(attr, content)
+}
+
 fn pipe_table(node: &SyntaxNode) -> Option<TableData> {
     let mut header_cells: Vec<Vec<Inline>> = Vec::new();
     let mut body_rows: Vec<Vec<Vec<Inline>>> = Vec::new();
@@ -3511,6 +3527,7 @@ fn inline_from_node(node: &SyntaxNode) -> Inline {
         SyntaxKind::DISPLAY_MATH => math_inline(node, "DisplayMath"),
         SyntaxKind::LATEX_COMMAND => latex_command_inline(node),
         SyntaxKind::BRACKETED_SPAN => bracketed_span_inline(node),
+        SyntaxKind::INLINE_HTML_SPAN => inline_html_span_inline(node),
         SyntaxKind::INLINE_HTML => Inline::RawInline("html".to_string(), node.text().to_string()),
         SyntaxKind::FOOTNOTE_REFERENCE => footnote_reference_inline(node),
         SyntaxKind::INLINE_FOOTNOTE => inline_footnote_inline(node),

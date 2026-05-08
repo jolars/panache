@@ -1,0 +1,8 @@
+[ Para
+    [ Str "A"
+    , Space
+    , Span ( "x" , [ "c" , "k" ] , [] ) [ Str "tagged" ]
+    , Space
+    , Str "word."
+    ]
+]

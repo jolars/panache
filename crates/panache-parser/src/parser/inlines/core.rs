@@ -382,7 +382,7 @@ fn parse_inline_range_impl(
                 }
                 ConstructDispo::NativeSpan { end: dispo_end } => {
                     if dispo_end <= end
-                        && let Some((len, content, attributes)) =
+                        && let Some((len, content, _attributes)) =
                             try_parse_native_span(&text[pos..])
                         && pos + len == dispo_end
                     {
@@ -390,7 +390,7 @@ fn parse_inline_range_impl(
                             builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                         }
                         log::trace!("IR: matched native span at pos {}", pos);
-                        emit_native_span(builder, content, &attributes, config);
+                        emit_native_span(builder, &text[pos..pos + len], content, config);
                         pos += len;
                         text_start = pos;
                         continue;
@@ -1188,13 +1188,13 @@ fn parse_inline_range_impl(
         if byte == b'<'
             && config.dialect == Dialect::CommonMark
             && config.extensions.native_spans
-            && let Some((len, content, attributes)) = try_parse_native_span(&text[pos..])
+            && let Some((len, content, _attributes)) = try_parse_native_span(&text[pos..])
         {
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
             log::trace!("Matched native span at pos {}", pos);
-            emit_native_span(builder, content, &attributes, config);
+            emit_native_span(builder, &text[pos..pos + len], content, config);
             pos += len;
             text_start = pos;
             continue;
