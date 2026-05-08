@@ -1,0 +1,4 @@
+[ RawBlock (Format "html") "<p>"
+, Plain [ Str "foo" , SoftBreak , Str "bar" ]
+, RawBlock (Format "html") "</p>"
+]

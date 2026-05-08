@@ -1,0 +1,4 @@
+[ RawBlock (Format "html") "<aside>"
+, Div ( "x" , [] , [] ) [ Plain [ Emph [ Str "foo" ] ] ]
+, RawBlock (Format "html") "</aside>"
+]

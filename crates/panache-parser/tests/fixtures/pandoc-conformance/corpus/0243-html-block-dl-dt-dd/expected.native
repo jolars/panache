@@ -1,0 +1,9 @@
+[ RawBlock (Format "html") "<dl>"
+, RawBlock (Format "html") "<dt>"
+, Plain [ Str "term" ]
+, RawBlock (Format "html") "</dt>"
+, RawBlock (Format "html") "<dd>"
+, Plain [ Emph [ Str "def" ] ]
+, RawBlock (Format "html") "</dd>"
+, RawBlock (Format "html") "</dl>"
+]

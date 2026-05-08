@@ -11,7 +11,191 @@ reverted, what trap to avoid) are the load-bearing content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-08 (CommonMark type-4 lowercase declaration recognition)
+## Latest session — 2026-05-08 (Phase 5/6 — projector-level `markdown_in_html_blocks` for non-sectioning block tags)
+
+**html (block + inline) pass count: 47 → 57** (10 new corpus cases,
+all passing).
+**Workspace test count: 0 failing → 0 failing** (all green).
+**Total pandoc conformance: 239/240 → 249/250** (99.6% → 99.6%).
+
+### What landed
+
+Projector-only fix to make the public `panache_parser::to_pandoc_ast`
+API split HTML blocks the way pandoc-markdown does under
+`markdown_in_html_blocks` (default-on). No parser changes — the CST
+keeps a single opaque `HTML_BLOCK` per balanced tag pair; the
+projector now walks the bytes and emits per-tag `RawBlock`s plus
+markdown-parsed `Plain`/`Para` for non-tag content between them.
+
+`emit_html_block` (`crates/panache-parser/src/pandoc_ast.rs`)
+replaces its line-based splitter with byte-aware tag scanning:
+- Walks `<` positions, tries `parse_open_tag` / `parse_close_tag`,
+  filters via the new `html_blocks::is_html_block_tag_name` so
+  inline-only tags (`<em>`, `<a>`, `<input>`, `<br>`, …) pass
+  through into the surrounding `Plain` content as RawInline.
+- Each block-level open/close tag emits its own `RawBlock`.
+- A `<div>...</div>` encountered in mid-stream gets a depth-aware
+  lookahead via the new `find_matching_html_close`. When balanced,
+  the chunk goes through the existing `try_div_html_block` lift
+  → `Block::Div` (matches pandoc's `native_divs` recursing inside
+  e.g. `<aside>` / `<table>` content).
+- Inter-tag text is reparsed via the existing `parse_pandoc_blocks`
+  helper. The new `flush_html_block_text` promotes a trailing
+  `Para` to `Plain` when no blank line separates it from the next
+  tag — matches pandoc's pattern of `Para` for blank-terminated
+  chunks vs `Plain` butted up against a closing tag.
+- Verbatim openers (`<!--`, `<?`, `<![CDATA[`, `<!`, raw-text
+  elements) keep the early-return as a single `RawBlock` — no
+  splitting inside.
+
+`is_complete_html_tag_line` (the old line-based splitter helper)
+is gone; nothing else uses it.
+
+`is_html_block_tag_name(name)` is a new `pub fn` on
+`crates/panache-parser/src/parser/blocks/html_blocks.rs`. Exposes
+the module's existing `BLOCK_TAGS` list to the projector.
+
+### Why projector-only (and not parser-level structural change)
+
+The skill RECAP suggested a parser-level fix that would split
+HTML-block scanning so each balanced tag pair emits a separate
+`HTML_BLOCK`. That's much more invasive: it changes the CST shape
+(many existing snapshots), the LSP folding ranges, and the
+formatter's HTML_BLOCK walking.
+
+Projector-only stays byte-equal in the CST (single `HTML_BLOCK`
+per balanced outer tag pair) and just reads the bytes more
+carefully on the way to pandoc-native. The conformance harness is
+the consumer that cares; LSP/formatter/salsa keep working unchanged.
+A future parser-level lift could come later if there's a concrete
+LSP/formatter need — but this session deliberately scoped to the
+smallest fix that unlocks ~10 conformance cases.
+
+### What this fix does NOT do
+
+- **Nested `<div>` (case 199) is still failing.** Root cause is
+  parser-side: the HTML-block scanner closes the outer `<div>` at
+  the FIRST `</div>` it sees, regardless of depth. The projector's
+  new `find_matching_html_close` is depth-aware but it can't fix
+  what the CST already mis-shaped. Phase 5 still pending; needs
+  depth-aware pre-scan in `parser/blocks/html_blocks.rs`.
+- **Multi-paragraph inter-tag content with mixed blank-line
+  patterns is partial.** The `Para → Plain` promotion fires only
+  on the LAST block in a chunk. So `<td>foo\n\nbar</td>` →
+  `[Para foo, Plain bar, </td>]` (correct). But edge cases with
+  more complex blank-line patterns may still drift; covered cases
+  in 0250 plus the ones above are passing.
+- **Top-level `<table>` opener with NO closing `</table>` in the
+  document.** The parser keeps it as an unclosed HTML block
+  (`found_closing = false` path); the projector sees the bytes and
+  splits them, which is fine. Not a regression, but no corpus
+  coverage yet.
+
+### Files in committable diff
+
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs`
+  — new `pub fn is_html_block_tag_name`.
+- `crates/panache-parser/src/pandoc_ast.rs`
+  — new `split_html_block_by_tags`, `flush_html_block_text`,
+  `extract_html_tag_name`, `find_matching_html_close`,
+  `trailing_newlines`. Removed `is_complete_html_tag_line`.
+  Rewrote `emit_html_block` documentation. Net +~140 lines.
+- `crates/panache-parser/tests/pandoc/allowlist.txt` — 10 new ids
+  under new `# html-block (markdown_in_html_blocks — non-sectioning
+  block tags …)` section header.
+- 10 new corpus directories under
+  `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/`:
+  - `0241-html-block-table-cell-emphasis` — `<table>/<tr>/<td>*one*</td>` minimal
+  - `0242-html-block-table-two-rows` — 2-row, 4-cell table
+  - `0243-html-block-dl-dt-dd` — `<dl>` with one `<dt>` and one `<dd>` containing `*def*`
+  - `0244-html-block-ul-li` — `<ul>` with two `<li>`s, one with emphasis
+  - `0245-html-block-p-inline` — single-line `<p>some text</p>`
+  - `0246-html-block-p-multiline` — multi-line `<p>foo\nbar</p>` with SoftBreak
+  - `0247-html-block-aside-with-p` — `<aside>` containing `<p>*foo*</p>`
+  - `0248-html-block-form-input-button` — `<form>` with `<input>` (inline-only) and `<button>` (also inline-only — pandoc treats `<button>` as inline tag)
+  - `0249-html-block-aside-with-nested-div` — `<aside>` containing a balanced `<div id="x">*foo*</div>` (verifies depth-aware Div lift inside non-div outer)
+  - `0250-html-block-table-with-paragraph` — multi-paragraph content inside `<td>` (Para+Para, then close tag)
+- `crates/panache-parser/tests/pandoc/report.txt` +
+  `docs/development/pandoc-report.json` (regenerated; pass rate
+  239/240 → 249/250).
+
+No parser, formatter, or salsa changes — pure projector + corpus.
+
+### Suggested next sub-targets, ranked
+
+1. **Phase 5 (nested `<div>`, blocked.txt id 199)** —
+   parser-side depth-aware HTML-block pre-scan in
+   `parser/blocks/html_blocks.rs::parse_html_block_with_wrapper`.
+   The current scanner uses
+   `is_closing_marker(line, &block_type)` which matches the FIRST
+   `</tag>` regardless of depth. Fix: track `<tag>...` depth as
+   we walk lines (counting opens/closes of the SAME tag name) and
+   close only when depth returns to 0. This unlocks case 199 and
+   makes panache safe for documents with nested `<div>` content.
+   Will require updating the existing `try_parse_html_block_start`
+   call sites and possibly the `HtmlBlockType::BlockTag` payload.
+2. **Add corpus coverage for "outer block tag without
+   markdown content" edge cases.** E.g. `<table>` with no
+   content, mixed inline+block tags inside a table cell, etc.
+   Most should pass with the new splitter; goal is corpus
+   coverage so future regressions are caught.
+3. **`<!ENTITY x "y">` Quoted projection gap** noted in earlier
+   sessions: pandoc emits `Quoted DoubleQuote [Str "y"]` for the
+   `"y"` part inside a declaration; panache emits `Str "\"y\">"`.
+   Probably out-of-scope for html-conformance — it's a smart-quote
+   / Quoted feature gap.
+4. **Multi-paragraph inter-tag content edge cases.** The current
+   `Para→Plain` promotion fires only on the last block. Some
+   patterns (e.g. trailing blank-then-tag, content with embedded
+   block constructs like lists/code) may need refinement. Probe
+   before committing to this; might already be covered.
+
+### Don't redo / known traps (new this session)
+
+- **`find_matching_close` was already taken** in `pandoc_ast.rs`
+  — it's the smart-quote bracket scanner that takes
+  `(&[Inline], usize, char, &[bool])`. The new HTML helper is
+  named `find_matching_html_close` to avoid collision. Don't try
+  to "merge" the two; they operate on completely different inputs
+  (Inline slice vs raw byte string). Stale rust-analyzer
+  diagnostics may keep referencing the old name after the rename
+  — `cargo check` is the truth.
+- **`<button>` is an inline tag, not a block tag.** Even though
+  semantically it forms a block in HTML, pandoc-markdown treats it
+  as inline (it's not in pandoc's block-tags list, which we mirror
+  via `BLOCK_TAGS`). So `<form><input><button>Submit</button></form>`
+  emits the `<button>` as a `RawInline` inside the surrounding
+  `Plain`, not as a separate `RawBlock`. Don't be tempted to add
+  it to `BLOCK_TAGS` — pandoc disagrees.
+- **Multi-paragraph trailing-`Plain` rule is "no trailing blank
+  line before next tag → last Para becomes Plain".** I picked the
+  threshold of "≥2 trailing newlines = blank line" via
+  `trailing_newlines(text) >= 2`. Single newline = no blank, last
+  Para → Plain. This matches pandoc for the cases I tested, but
+  pandoc's actual rule is fuzzier (it depends on the parsing
+  state); if a future case fails on this, look at
+  `flush_html_block_text` first.
+- **`try_div_html_block` requires the WHOLE content to be a single
+  `<div>...</div>`** with optional surrounding whitespace. Calling
+  it on a sub-range works ONLY if you pass exactly the
+  `<div>...</div>` slice (including the open and close tags), no
+  surrounding bytes. The new splitter slices `&content[i..div_end]`
+  before calling.
+- **`parse_pandoc_blocks` recursion is safe.** When the inter-tag
+  text contains another HTML construct (e.g. a `<div>...</div>`),
+  the recursive parse produces an `HTML_BLOCK_DIV` which projects
+  via `html_div_block`. No infinite loop because each level
+  strips at least the outer tag bytes before recursing.
+- **The line-based path emitted `RawBlock` for single-line
+  `<p>foo</p>`.** That was wrong even before this session — pandoc
+  splits it. The new byte-aware splitter fixes this. Existing
+  passing cases survived because the corpus didn't have any
+  single-line `<p>foo</p>`-style cases — they were all multi-line
+  or div-shaped.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-05-08 (CommonMark type-4 lowercase declaration recognition)
 
 **html (block + inline) pass count: 47 → 47** (no corpus change — fix
 is CommonMark-side, conformance corpus is Pandoc-dialect only).

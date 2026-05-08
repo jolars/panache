@@ -265,3 +265,15 @@
 # html-inline (declarations + CDATA — pandoc-markdown does not recognize these as inline raw HTML)
 239
 240
+
+# html-block (markdown_in_html_blocks — non-sectioning block tags split into per-tag RawBlocks with markdown-parsed content between them)
+241
+242
+243
+244
+245
+246
+247
+248
+249
+250

@@ -1,0 +1,19 @@
+[ RawBlock (Format "html") "<table>"
+, RawBlock (Format "html") "<tr>"
+, RawBlock (Format "html") "<td>"
+, Plain [ Str "one" ]
+, RawBlock (Format "html") "</td>"
+, RawBlock (Format "html") "<td>"
+, Plain [ Str "two" ]
+, RawBlock (Format "html") "</td>"
+, RawBlock (Format "html") "</tr>"
+, RawBlock (Format "html") "<tr>"
+, RawBlock (Format "html") "<td>"
+, Plain [ Str "three" ]
+, RawBlock (Format "html") "</td>"
+, RawBlock (Format "html") "<td>"
+, Plain [ Str "four" ]
+, RawBlock (Format "html") "</td>"
+, RawBlock (Format "html") "</tr>"
+, RawBlock (Format "html") "</table>"
+]

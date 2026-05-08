@@ -77,6 +77,17 @@ const BLOCK_TAGS: &[&str] = &[
 /// Tags that contain raw/verbatim content (no Markdown processing inside).
 const VERBATIM_TAGS: &[&str] = &["script", "style", "pre", "textarea"];
 
+/// Whether `name` (case-insensitive) is one of the HTML block-level tags
+/// recognized by CommonMark §4.6 type-6 (and pandoc's `markdown_in_html_blocks`
+/// splitter). Used by the pandoc-native projector to decide whether a complete
+/// HTML tag inside an `HTML_BLOCK` should split the block — block-level tags
+/// emit as separate `RawBlock` entries; inline tags (e.g. `<em>`, `<a>`,
+/// `<input>`, `<br>`) stay inline in the surrounding `Plain` content.
+pub fn is_html_block_tag_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    BLOCK_TAGS.contains(&lower.as_str())
+}
+
 /// Information about a detected HTML block opening.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum HtmlBlockType {

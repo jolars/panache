@@ -1028,13 +1028,21 @@ fn html_div_block(node: &SyntaxNode) -> Block {
     Block::RawBlock("html".to_string(), content)
 }
 
-/// Project an `HTML_BLOCK` node into one or more `Block`s. Pandoc emits each
-/// "complete tag" line of a block-level HTML_BLOCK as a separate `RawBlock`,
-/// with text content lines parsed as Markdown into `Plain` blocks (the
-/// `markdown_in_html_blocks` behavior, default-on under `markdown` flavor).
-/// Verbatim constructs (comments, `<script>` / `<style>` / `<pre>` /
-/// `<textarea>`, processing instructions, declarations, CDATA) keep their
-/// content as a single `RawBlock` with newlines preserved.
+/// Project an `HTML_BLOCK` node into one or more `Block`s.
+///
+/// Pandoc's `markdown_in_html_blocks` extension (default-on under `markdown`
+/// flavor) splits an HTML block at every complete *block-level* HTML tag:
+/// each open or close tag emits its own `RawBlock`, and intervening
+/// non-tag bytes are parsed as fresh markdown and emitted as `Plain` (or
+/// `Para` for chunks separated by blank lines). Inline-only tags
+/// (`<em>`, `<a>`, `<input>`, `<br>`, …) are not splitters — they pass
+/// through as `RawInline` inside the surrounding `Plain` content.
+///
+/// Verbatim constructs are preserved as a single `RawBlock`: comments,
+/// `<script>` / `<style>` / `<pre>` / `<textarea>`, processing
+/// instructions, declarations, and CDATA. A balanced `<div>...</div>`
+/// (anywhere in the block) lifts to `Block::Div` via `try_div_html_block`,
+/// matching pandoc's `native_divs`.
 fn emit_html_block(node: &SyntaxNode, out: &mut Vec<Block>) {
     let mut content = node.text().to_string();
     while content.ends_with('\n') {
@@ -1059,27 +1067,161 @@ fn emit_html_block(node: &SyntaxNode, out: &mut Vec<Block>) {
         out.push(Block::RawBlock("html".to_string(), content));
         return;
     }
-    if !content.contains('\n') {
-        out.push(Block::RawBlock("html".to_string(), content));
-        return;
-    }
-    for line in content.split('\n') {
-        let line_trimmed = line.trim();
-        if line_trimmed.is_empty() {
+    split_html_block_by_tags(&content, out);
+}
+
+/// Walk `content`'s bytes and split at every complete block-level HTML tag.
+/// Each tag emits its own `RawBlock`; intervening text is flushed via
+/// [`flush_html_block_text`]. Balanced `<div>...</div>` pairs (depth-aware)
+/// project to `Block::Div`.
+fn split_html_block_by_tags(content: &str, out: &mut Vec<Block>) {
+    use crate::parser::blocks::html_blocks::is_html_block_tag_name;
+    use crate::parser::inlines::inline_html::{parse_close_tag, parse_open_tag};
+
+    let bytes = content.as_bytes();
+    let mut i = 0usize;
+    let mut text_start = 0usize;
+    while i < bytes.len() {
+        if bytes[i] != b'<' {
+            i += 1;
             continue;
         }
-        if is_complete_html_tag_line(line_trimmed) {
-            out.push(Block::RawBlock(
-                "html".to_string(),
-                line_trimmed.to_string(),
-            ));
-        } else {
-            let inlines = coalesce_inlines(parse_cell_text_inlines(line_trimmed));
-            if !inlines.is_empty() {
-                out.push(Block::Plain(inlines));
-            }
+        let rest = &content[i..];
+        let open_end = parse_open_tag(rest);
+        let close_end = parse_close_tag(rest);
+        let Some((tag_end, is_close)) = open_end
+            .map(|n| (n, false))
+            .or_else(|| close_end.map(|n| (n, true)))
+        else {
+            i += 1;
+            continue;
+        };
+        let tag_text = &rest[..tag_end];
+        let Some(name) = extract_html_tag_name(tag_text) else {
+            i += 1;
+            continue;
+        };
+        if !is_html_block_tag_name(name) {
+            i += 1;
+            continue;
         }
+        // `<div>` opens a balanced span that lifts to `Block::Div` (pandoc's
+        // `native_divs`). Try depth-aware lookahead for the matching close;
+        // fall back to a single RawBlock for unbalanced openers.
+        if !is_close
+            && name.eq_ignore_ascii_case("div")
+            && let Some(div_end) = find_matching_html_close(content, i, "div")
+        {
+            if i > text_start {
+                flush_html_block_text(&content[text_start..i], out);
+            }
+            let div_chunk = &content[i..div_end];
+            if let Some(div) = try_div_html_block(div_chunk) {
+                out.push(div);
+            } else {
+                out.push(Block::RawBlock("html".to_string(), div_chunk.to_string()));
+            }
+            i = div_end;
+            text_start = i;
+            continue;
+        }
+        if i > text_start {
+            flush_html_block_text(&content[text_start..i], out);
+        }
+        out.push(Block::RawBlock("html".to_string(), tag_text.to_string()));
+        i += tag_end;
+        text_start = i;
     }
+    if text_start < bytes.len() {
+        flush_html_block_text(&content[text_start..], out);
+    }
+}
+
+/// Reparse non-tag inter-tag text as fresh Pandoc markdown and emit each
+/// resulting block. The final `Para` becomes a `Plain` when the text has
+/// no trailing blank line (i.e. a closing tag follows immediately): pandoc
+/// promotes the last paragraph to `Plain` whenever it is butted up against
+/// the next HTML tag.
+fn flush_html_block_text(text: &str, out: &mut Vec<Block>) {
+    if text.trim().is_empty() {
+        return;
+    }
+    let trailing_blank = trailing_newlines(text) >= 2;
+    let mut blocks = parse_pandoc_blocks(text);
+    if blocks.is_empty() {
+        return;
+    }
+    if !trailing_blank
+        && let Some(Block::Para(_)) = blocks.last()
+        && let Some(Block::Para(inlines)) = blocks.pop()
+    {
+        blocks.push(Block::Plain(inlines));
+    }
+    out.extend(blocks);
+}
+
+fn trailing_newlines(s: &str) -> usize {
+    s.bytes().rev().take_while(|&b| b == b'\n').count()
+}
+
+/// Extract the tag name from a complete HTML tag text (`<name ...>` or
+/// `</name>`). Used to gate splitting on block-level tag membership.
+fn extract_html_tag_name(tag_text: &str) -> Option<&str> {
+    let bytes = tag_text.as_bytes();
+    if bytes.first() != Some(&b'<') {
+        return None;
+    }
+    let start = if bytes.get(1) == Some(&b'/') { 2 } else { 1 };
+    let mut end = start;
+    while end < bytes.len() && (bytes[end].is_ascii_alphanumeric() || bytes[end] == b'-') {
+        end += 1;
+    }
+    if start == end {
+        None
+    } else {
+        Some(&tag_text[start..end])
+    }
+}
+
+/// Depth-aware scan for the matching closing tag of `name` starting at
+/// byte position `start` (the `<` of the opening tag) in `content`.
+/// Returns the byte offset of the END (exclusive) of the matching close
+/// tag, or `None` when no balanced close exists in `content`.
+fn find_matching_html_close(content: &str, start: usize, name: &str) -> Option<usize> {
+    use crate::parser::inlines::inline_html::{parse_close_tag, parse_open_tag};
+
+    let bytes = content.as_bytes();
+    let opener_end = parse_open_tag(&content[start..])?;
+    let mut i = start + opener_end;
+    let mut depth = 1usize;
+    while i < bytes.len() {
+        if bytes[i] != b'<' {
+            i += 1;
+            continue;
+        }
+        let rest = &content[i..];
+        if let Some(end) = parse_open_tag(rest) {
+            let tag = &rest[..end];
+            if extract_html_tag_name(tag).is_some_and(|n| n.eq_ignore_ascii_case(name)) {
+                depth += 1;
+            }
+            i += end;
+            continue;
+        }
+        if let Some(end) = parse_close_tag(rest) {
+            let tag = &rest[..end];
+            if extract_html_tag_name(tag).is_some_and(|n| n.eq_ignore_ascii_case(name)) {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i + end);
+                }
+            }
+            i += end;
+            continue;
+        }
+        i += 1;
+    }
+    None
 }
 
 /// Return true if `s` (with leading `<`) opens a raw-text HTML element where
@@ -1105,44 +1247,6 @@ fn is_raw_text_element_open(s: &str) -> bool {
                 }
                 _ => {}
             }
-        }
-    }
-    false
-}
-
-/// Return true if `s` is a single complete HTML tag (or comment / declaration)
-/// with no content following the closing `>`. Quotes inside attributes are
-/// skipped so embedded `>` characters don't terminate the scan early.
-fn is_complete_html_tag_line(s: &str) -> bool {
-    let bytes = s.as_bytes();
-    if bytes.is_empty() || bytes[0] != b'<' {
-        return false;
-    }
-    let mut i = 1;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'>' => return i == bytes.len() - 1,
-            b'"' => {
-                i += 1;
-                while i < bytes.len() && bytes[i] != b'"' {
-                    i += 1;
-                }
-                if i >= bytes.len() {
-                    return false;
-                }
-                i += 1;
-            }
-            b'\'' => {
-                i += 1;
-                while i < bytes.len() && bytes[i] != b'\'' {
-                    i += 1;
-                }
-                if i >= bytes.len() {
-                    return false;
-                }
-                i += 1;
-            }
-            _ => i += 1,
         }
     }
     false

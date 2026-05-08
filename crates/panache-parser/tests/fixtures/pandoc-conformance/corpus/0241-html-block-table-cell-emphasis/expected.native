@@ -1,0 +1,8 @@
+[ RawBlock (Format "html") "<table>"
+, RawBlock (Format "html") "<tr>"
+, RawBlock (Format "html") "<td>"
+, Plain [ Emph [ Str "one" ] ]
+, RawBlock (Format "html") "</td>"
+, RawBlock (Format "html") "</tr>"
+, RawBlock (Format "html") "</table>"
+]

@@ -1,0 +1,6 @@
+[ RawBlock (Format "html") "<aside>"
+, RawBlock (Format "html") "<p>"
+, Plain [ Emph [ Str "foo" ] ]
+, RawBlock (Format "html") "</p>"
+, RawBlock (Format "html") "</aside>"
+]

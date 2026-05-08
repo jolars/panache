@@ -1,0 +1,9 @@
+[ RawBlock (Format "html") "<table>"
+, RawBlock (Format "html") "<tr>"
+, RawBlock (Format "html") "<td>"
+, Para [ Str "A" , Space , Str "paragraph." ]
+, Para [ Str "Another" , Space , Str "paragraph." ]
+, RawBlock (Format "html") "</td>"
+, RawBlock (Format "html") "</tr>"
+, RawBlock (Format "html") "</table>"
+]

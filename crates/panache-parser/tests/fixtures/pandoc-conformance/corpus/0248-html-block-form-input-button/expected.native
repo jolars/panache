@@ -1,0 +1,10 @@
+[ RawBlock (Format "html") "<form>"
+, Plain
+    [ RawInline (Format "html") "<input type=\"text\">"
+    , SoftBreak
+    , RawInline (Format "html") "<button>"
+    , Str "Submit"
+    , RawInline (Format "html") "</button>"
+    ]
+, RawBlock (Format "html") "</form>"
+]
