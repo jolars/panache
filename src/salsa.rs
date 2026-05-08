@@ -817,6 +817,29 @@ pub fn symbol_usage_index_from_tree(
         }
     }
 
+    for span_attrs in tree
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::SPAN_ATTRIBUTES)
+    {
+        db.unwind_if_revision_cancelled();
+        let text = span_attrs.text().to_string();
+        let inner = text
+            .strip_prefix('{')
+            .and_then(|s| s.strip_suffix('}'))
+            .unwrap_or(text.as_str());
+        let Some(parsed) = crate::parser::utils::attributes::parse_attribute_content(inner) else {
+            continue;
+        };
+        let Some(id) = parsed.identifier.filter(|s| !s.is_empty()) else {
+            continue;
+        };
+        index
+            .crossref_declarations
+            .entry(normalize_anchor_label(&id))
+            .or_default()
+            .push(span_attrs.text_range());
+    }
+
     for block in tree.descendants().filter_map(CodeBlock::cast) {
         db.unwind_if_revision_cancelled();
         for label in block.chunk_label_entries() {

@@ -150,6 +150,17 @@ mod tests {
     }
 
     #[test]
+    fn resolves_explicit_id_on_bracketed_span() {
+        let input = "[Justin Wallace]{#APA2023}\n\nSee [the source](#APA2023).\n";
+        let diagnostics = parse_and_lint(input);
+        assert!(
+            diagnostics.is_empty(),
+            "expected no diagnostics, got {:?}",
+            diagnostics
+        );
+    }
+
+    #[test]
     fn resolves_implicit_heading_with_auto_identifiers_on() {
         let input = "# Heading Name\n\nSee [there](#heading-name).\n";
         let diagnostics = parse_and_lint(input);

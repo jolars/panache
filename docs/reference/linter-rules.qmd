@@ -213,6 +213,10 @@ Description
     renderer rewrites cross-chapter anchors. Quarto books render each chapter to a
     separate HTML page and are not scanned cross-chapter.
 
+    Anchors declared via raw HTML (e.g. `<div id="x">`, `<a id="x">`,
+    `<a name="x">`) are not currently inspected, so links to them may be flagged as
+    undefined.
+
 **Example violation:**
 
 ```markdown
