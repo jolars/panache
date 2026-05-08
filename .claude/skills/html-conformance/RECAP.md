@@ -11,7 +11,194 @@ reverted, what trap to avoid) are the load-bearing content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-08 (Phase 5/6 — projector-level `markdown_in_html_blocks` for non-sectioning block tags)
+## Latest session — 2026-05-08 (Phase 5 — depth-aware nested `<div>` close scan)
+
+**html (block + inline) pass count: 57 → 62** (5 new corpus cases —
+1 unblocked + 4 new — all passing).
+**Workspace test count: 0 failing → 0 failing** (all green).
+**Total pandoc conformance: 249/250 → 254/254 (99.6% → 100.0%)**.
+**`blocked.txt`: 1 → 0 entries** (case 199 unblocked).
+
+### What landed
+
+Parser-side depth-aware close scan for non-verbatim HTML block tags
+under `Dialect::Pandoc`. Mirrors pandoc's `htmlInBalanced`: balanced
+opens/closes of the same tag name, block ends only when depth
+returns to 0. CommonMark verbatim path (CM §4.6 type-1) keeps its
+"first close wins" semantics.
+
+`HtmlBlockType::BlockTag` gained a `depth_aware: bool` field, set
+to `!is_commonmark` at construction time in
+`try_parse_html_block_start`. New helper
+`count_tag_balance(line, tag_name) -> (opens, closes)` walks
+`<...>` brackets, respects quoted attribute values, and skips
+self-closing forms. `parse_html_block_with_wrapper` consults the
+field: when set, threads a depth counter across lines and closes
+when `depth <= 0`; otherwise falls back to the existing
+`is_closing_marker` substring path.
+
+End-to-end: case 199 `<div id="outer">…<div id="inner">…</div>…</div>`
+now projects to nested `Div("outer", …) [Div("inner", …) [Para …]]`
+matching pandoc-native exactly. Inner `<div>...</div>` stays as raw
+TEXT inside `HTML_BLOCK_CONTENT`; the projector's existing
+`try_div_html_block` recursive reparse via `parse_pandoc_blocks`
+handles the inner div correctly because the parser fix fires for
+each level.
+
+### What's covered + what's NOT
+
+Covered (with corpus cases):
+- 199 (already in corpus, was blocked) — 2-deep nested
+- 251 — 3-deep nested with attributes
+- 252 — sibling inner divs (`<div>a</div>` then `<div>b</div>` inside outer)
+- 253 — `<div>` containing a `<table>` (verifies only `<div>` counts toward depth)
+- 254 — outer with id, inner with class
+
+Not covered (still gaps):
+- **Multi-line open tags.** `<div\n  id="x">` still falls back to
+  opaque `HTML_BLOCK` because `try_parse_html_block_start` only
+  inspects the first line. Edge case.
+- **Pandoc-dialect verbatim tags with internal `<script>` strings.**
+  Now depth-aware too (since `depth_aware: !is_commonmark` applies
+  uniformly). For pathological cases like
+  `<script>let x = '<script>';</script><script>...</script>` this
+  may over-extend. Pandoc itself uses `htmlInBalanced` so behavior
+  matches. Not exercised by corpus.
+- **Mismatched depth (`</div>` without matching open).** When a
+  content line has more closes than opens, depth goes negative and
+  we close on that line. Acceptable — the orphan close text stays
+  in the closing `HTML_BLOCK_TAG`. No corpus case yet.
+
+### Why parser-side (not projector-side)
+
+Earlier projector-only sessions added byte-aware splitters that
+already handled depth correctly inside `try_div_html_block` /
+`find_matching_html_close`. But that only fires when the parser
+produces a single `HTML_BLOCK[_DIV]` containing the whole construct.
+With nested divs the parser was *closing too early*, so the inner
+`</div>` and outer `</div>` ended up in different CST nodes — the
+projector never saw the whole construct as one byte range, and the
+trailing `</div>` got reparsed as a paragraph with `RawInline`.
+
+Fix had to be in the parser. Once the parser keeps the whole
+balanced range as one `HTML_BLOCK_DIV`, the projector's existing
+recursive reparse (`parse_pandoc_blocks`) correctly handles each
+level.
+
+### Files in committable diff
+
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs`
+  — `HtmlBlockType::BlockTag.depth_aware` field; new
+  `count_tag_balance` helper; depth-aware threading in
+  `parse_html_block_with_wrapper`; 3 new unit tests
+  (`test_parse_div_block_nested_pandoc`,
+  `test_parse_div_block_same_line_pandoc`,
+  `test_commonmark_verbatim_first_close`); existing tests updated
+  to include the new field.
+- `crates/panache-parser/tests/pandoc/blocked.txt`
+  — emptied (was: 199 only).
+- `crates/panache-parser/tests/pandoc/allowlist.txt`
+  — 199 added under `# html-block`; new section
+  `# html-block (nested div — depth-aware close scan, mirrors pandoc's htmlInBalanced)`
+  with ids 251..254.
+- 4 new corpus directories under
+  `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/`:
+  - `0251-html-block-div-three-deep`
+  - `0252-html-block-div-sibling-inner`
+  - `0253-html-block-div-with-table`
+  - `0254-html-block-div-inner-class`
+- 2 paired parser fixtures + snapshots:
+  - `crates/panache-parser/tests/fixtures/cases/html_block_div_nested_pandoc/`
+  - `crates/panache-parser/tests/fixtures/cases/html_block_div_nested_commonmark/`
+  (the CommonMark fixture pins the unchanged blank-line-terminated
+  type-6 behavior — separate `HTML_BLOCK`s for each line.)
+- 1 formatter golden:
+  `tests/fixtures/cases/html_block_div_nested_idempotent/`
+  pinning `<div>` round-trip (parsed → formatted → parsed →
+  formatted is byte-identical).
+- `crates/panache-parser/tests/golden_parser_cases.rs` (2 new
+  case registrations).
+- `tests/golden_cases.rs` (1 new case registration).
+- `crates/panache-parser/tests/pandoc/report.txt` +
+  `docs/development/pandoc-report.json` (regenerated;
+  254/254 passing, 100%).
+
+No projector, salsa, or formatter logic changes — pure parser
+correctness fix + corpus.
+
+### Suggested next sub-targets, ranked
+
+1. **Bump the corpus into "harder" markdown_in_html_blocks
+   territory.** Now that conformance is 100% on the curated corpus,
+   the corpus itself is the limiter. Cases worth adding:
+   - Multi-paragraph content inside `<div>` where blank-line
+     handling matters (`<div>\n\nfoo\n\nbar\n\n</div>`) — verify
+     Para vs Plain promotion across multiple inner blocks.
+   - `<div>` with content that itself contains a `<table>` /
+     `<dl>` / `<ul>` (markdown_in_html_blocks for non-sectioning
+     tags inside a div).
+   - Mixed inline + block raw HTML inside a div (e.g. `<em>foo</em>`
+     adjacent to `<table>...</table>`).
+   - Multi-line open tags (`<div\n  id="x">\n...</div>`) — still
+     falls back to opaque `HTML_BLOCK`; would need
+     `try_parse_html_block_start` to span lines.
+2. **`<!ENTITY x "y">` Quoted projection gap** still present
+   (smart-quote / Quoted feature; out-of-scope for html-conformance).
+3. **Projector cleanup.** With case 199 now lifting structurally,
+   the projector's `find_matching_html_close` and its byte-aware
+   `<div>` lookahead could potentially be simplified — but verify
+   first: the Phase 5/6 session that added them targeted bare
+   `<div>` opens in mid-block (not at the start). Removing them
+   could regress those paths. Audit before pulling.
+
+### Don't redo / known traps (new this session)
+
+- **The block dispatcher decides the wrapper kind** in
+  `block_dispatcher.rs::parse_prepared` based on tag_name being
+  "div" + Pandoc dialect + `native_divs`. The parser's
+  `parse_html_block_with_wrapper` doesn't see the wrapper choice
+  until it's passed in; depth-aware tracking lives in the parser
+  fn and uses the **block_type's tag_name**, not the wrapper kind.
+  Keep them in sync: don't add a new tag-name branch in the
+  dispatcher without also confirming `count_tag_balance` is
+  invoked for it (today it is — depth_aware fires for all
+  BlockTag variants under Pandoc).
+- **CommonMark verbatim must keep first-close semantics.** CM §4.6
+  type-1 says the block ends with the line containing the
+  corresponding end tag — not depth-aware. Setting `depth_aware:
+  !is_commonmark` honors this; verbatim under Pandoc DOES get
+  depth tracking, which is what pandoc itself does
+  (`htmlInBalanced`). New unit test
+  `test_commonmark_verbatim_first_close` pins the non-depth-aware
+  behavior.
+- **Self-closing `<tag/>` doesn't bump depth.** The
+  `count_tag_balance` helper checks `bytes[j-1] == b'/'` at the
+  closing `>` to detect `/>`. If you tweak the helper, keep this
+  check — without it `<div/>` would erroneously be counted as a
+  net-zero open+close, breaking depth bookkeeping.
+- **Quoted attribute values can hide `<` and `>`.** The helper
+  tracks quote state inside tag brackets so `<div attr="<inner>">`
+  doesn't count `<inner>` as a tag. The probe scans `"`/`'` and
+  matches the same quote to close. Don't loosen this — pandoc's
+  parser does the same.
+- **`HtmlBlockType::BlockTag` is `Box<dyn Any>`-roundtripped via
+  the block dispatcher.** The dispatcher stores the detected type
+  in a `Box<dyn Any>` payload then downcasts in `parse_prepared`.
+  Adding a new field to `BlockTag` requires the existing
+  `Clone`/`PartialEq`/`Eq`/`Debug` derives to extend automatically;
+  no manual Any/clone work needed. Just remember to update **all**
+  test sites that build a `BlockTag` literal — `cargo check` will
+  point them out via E0063.
+- **Don't be confused by the `199` blocked.txt comment** — it said
+  "needs depth-tracking pre-scan in
+  `parser/blocks/html_blocks.rs`". The fix here is more
+  surgical than a full pre-scan: depth tracking is interleaved
+  with the existing line-walking close-marker check, not a
+  separate pre-pass. Net code change is ~70 lines added.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-05-08 (Phase 5/6 — projector-level `markdown_in_html_blocks` for non-sectioning block tags)
 
 **html (block + inline) pass count: 47 → 57** (10 new corpus cases,
 all passing).
