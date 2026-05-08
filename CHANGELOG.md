@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.44.1](https://github.com/jolars/panache/compare/v2.44.0...v2.44.1) (2026-05-08)
+
+### Bug Fixes
+- **linter:** fix undefined-anchor false positive on brackspans ([`0b1a15a`](https://github.com/jolars/panache/commit/0b1a15a5806a483b577cb6ad95aebf02898a5495)), ref [#263](https://github.com/jolars/panache/issues/263)
 ## [2.44.0](https://github.com/jolars/panache/compare/v2.43.1...v2.44.0) (2026-05-07)
 
 ### Features

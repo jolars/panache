@@ -1,11 +1,11 @@
 {
   "manifest-version": 1,
-  "baseline-sha": "84364a4abfcf10193f57e416d32a8b7685790da0",
+  "baseline-sha": "0b1a15a5806a483b577cb6ad95aebf02898a5495",
   "release-targets": [
     {
       "path": ".",
-      "version": "2.44.0",
-      "tag": "v2.44.0"
+      "version": "2.44.1",
+      "tag": "v2.44.1"
     },
     {
       "path": "crates/panache-dprint",
@@ -24,8 +24,8 @@
     },
     {
       "path": "editors/code",
-      "version": "2.37.0",
-      "tag": "panache-code-v2.37.0"
+      "version": "2.37.1",
+      "tag": "panache-code-v2.37.1"
     },
     {
       "path": "editors/zed",
