@@ -41,16 +41,16 @@ jobs:
           repository: jolars/panache-pre-commit
           token: ${{ secrets.PANACHE_PRE_COMMIT_TOKEN }}
 
-      - name: Bump package.json
+      - name: Bump pyproject.toml
         env:
           VERSION: ${{ steps.tag.outputs.version }}
         run: |
           set -euo pipefail
-          jq --arg v "$VERSION" \
-            '.version = $v | .dependencies["@panache-cli/panache"] = $v' \
-            package.json > package.json.tmp
-          mv package.json.tmp package.json
-          cat package.json
+          sed -i \
+            -e "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" \
+            -e "s/^dependencies = \[\"panache-cli==[^\"]*\"\]/dependencies = [\"panache-cli==$VERSION\"]/" \
+            pyproject.toml
+          cat pyproject.toml
 
       - name: Commit, tag, and push
         env:
@@ -67,7 +67,7 @@ jobs:
           fi
 
           if ! git diff --quiet; then
-            git add package.json
+            git add pyproject.toml
             git commit -m "release $TAG"
             git push origin main
           fi
