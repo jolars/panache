@@ -153,6 +153,11 @@ assets = [
         "usr/share/zsh/vendor-completions/_panache",
         "644",
     ],
+    [
+        "examples/*",
+        "usr/share/doc/panache/examples/",
+        "644",
+    ],
 ]
 
 [package.metadata.generate-rpm]
@@ -164,6 +169,7 @@ assets = [
     { source = "target/completions/panache.bash", dest = "/usr/share/bash-completion/completions/panache", mode = "644" },
     { source = "target/completions/panache.fish", dest = "/usr/share/fish/vendor_completions.d/panache.fish", mode = "644" },
     { source = "target/completions/_panache", dest = "/usr/share/zsh/vendor-completions/_panache", mode = "644" },
+    { source = "examples/*", dest = "/usr/share/doc/panache/examples/", mode = "644", doc = true },
 ]
 
 [[bench]]
