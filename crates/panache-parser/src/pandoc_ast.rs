@@ -1142,15 +1142,45 @@ fn emit_html_block(node: &SyntaxNode, out: &mut Vec<Block>) {
 /// Each tag emits its own `RawBlock`; intervening text is flushed via
 /// [`flush_html_block_text`]. Balanced `<div>...</div>` pairs (depth-aware)
 /// project to `Block::Div`.
+///
+/// Tag classification follows pandoc:
+/// - **Strict block tags** (pandoc's `blockHtmlTags`) always split.
+/// - **Inline-block tags** (pandoc's `eitherBlockOrInline` set —
+///   `<iframe>`, `<button>`, `<video>`, …) split with a matched-pair
+///   3-way lift only at fresh-block positions; inside an existing
+///   inline run they pass through as raw inline HTML. The
+///   `inline_pending` flag tracks whether any non-whitespace content
+///   (text bytes or non-splitting tags) has appeared since the last
+///   splitter — when true, we don't split on inline-block tags.
 fn split_html_block_by_tags(content: &str, out: &mut Vec<Block>) {
-    use crate::parser::blocks::html_blocks::is_pandoc_block_tag_name;
+    use crate::parser::blocks::html_blocks::{
+        is_pandoc_block_tag_name, is_pandoc_inline_block_tag_name,
+    };
     use crate::parser::inlines::inline_html::{parse_close_tag, parse_open_tag};
 
     let bytes = content.as_bytes();
     let mut i = 0usize;
     let mut text_start = 0usize;
+    let mut inline_pending = false;
+    let mut consecutive_newlines = 0usize;
     while i < bytes.len() {
-        if bytes[i] != b'<' {
+        let b = bytes[i];
+        if b == b'\n' {
+            consecutive_newlines += 1;
+            // A blank line resets the inline-pending state — pandoc
+            // restarts block parsing after a blank line, so subsequent
+            // inline-block tags become eligible to split again.
+            if consecutive_newlines >= 2 {
+                inline_pending = false;
+            }
+            i += 1;
+            continue;
+        }
+        consecutive_newlines = 0;
+        if b != b'<' {
+            if !b.is_ascii_whitespace() {
+                inline_pending = true;
+            }
             i += 1;
             continue;
         }
@@ -1161,44 +1191,80 @@ fn split_html_block_by_tags(content: &str, out: &mut Vec<Block>) {
             .map(|n| (n, false))
             .or_else(|| close_end.map(|n| (n, true)))
         else {
+            inline_pending = true;
             i += 1;
             continue;
         };
         let tag_text = &rest[..tag_end];
         let Some(name) = extract_html_tag_name(tag_text) else {
+            inline_pending = true;
             i += 1;
             continue;
         };
-        if !is_pandoc_block_tag_name(name) {
-            i += 1;
-            continue;
-        }
-        // `<div>` opens a balanced span that lifts to `Block::Div` (pandoc's
-        // `native_divs`). Try depth-aware lookahead for the matching close;
-        // fall back to a single RawBlock for unbalanced openers.
-        if !is_close
-            && name.eq_ignore_ascii_case("div")
-            && let Some(div_end) = find_matching_html_close(content, i, "div")
-        {
+        if is_pandoc_block_tag_name(name) {
+            // `<div>` opens a balanced span that lifts to `Block::Div` (pandoc's
+            // `native_divs`). Try depth-aware lookahead for the matching close;
+            // fall back to a single RawBlock for unbalanced openers.
+            if !is_close
+                && name.eq_ignore_ascii_case("div")
+                && let Some(div_end) = find_matching_html_close(content, i, "div")
+            {
+                if i > text_start {
+                    flush_html_block_text(&content[text_start..i], out);
+                }
+                let div_chunk = &content[i..div_end];
+                if let Some(div) = try_div_html_block(div_chunk) {
+                    out.push(div);
+                } else {
+                    out.push(Block::RawBlock("html".to_string(), div_chunk.to_string()));
+                }
+                i = div_end;
+                text_start = i;
+                inline_pending = false;
+                continue;
+            }
             if i > text_start {
                 flush_html_block_text(&content[text_start..i], out);
             }
-            let div_chunk = &content[i..div_end];
-            if let Some(div) = try_div_html_block(div_chunk) {
-                out.push(div);
-            } else {
-                out.push(Block::RawBlock("html".to_string(), div_chunk.to_string()));
-            }
-            i = div_end;
+            out.push(Block::RawBlock("html".to_string(), tag_text.to_string()));
+            i += tag_end;
             text_start = i;
+            inline_pending = false;
             continue;
         }
-        if i > text_start {
-            flush_html_block_text(&content[text_start..i], out);
+        if is_pandoc_inline_block_tag_name(name) {
+            // At a fresh-block position, lift `<tag>...</tag>` into
+            // RawBlock + interior + RawBlock. Inside inline content
+            // (`inline_pending == true`), pass through as inline raw
+            // HTML. Closing tags without a matched open also stay
+            // inline.
+            if !is_close
+                && !inline_pending
+                && let Some((close_start, close_end)) =
+                    find_matching_html_close_with_start(content, i, name)
+            {
+                if i > text_start {
+                    flush_html_block_text(&content[text_start..i], out);
+                }
+                out.push(Block::RawBlock("html".to_string(), tag_text.to_string()));
+                let interior = &content[i + tag_end..close_start];
+                flush_html_block_text(interior, out);
+                let close_text = &content[close_start..close_end];
+                out.push(Block::RawBlock("html".to_string(), close_text.to_string()));
+                i = close_end;
+                text_start = i;
+                inline_pending = false;
+                continue;
+            }
+            inline_pending = true;
+            i += tag_end;
+            continue;
         }
-        out.push(Block::RawBlock("html".to_string(), tag_text.to_string()));
+        // Non-splitting tag (truly inline-only HTML). Mark that an
+        // inline run has started so subsequent `eitherBlockOrInline`
+        // tags don't split mid-paragraph.
+        inline_pending = true;
         i += tag_end;
-        text_start = i;
     }
     if text_start < bytes.len() {
         flush_html_block_text(&content[text_start..], out);
@@ -1249,6 +1315,51 @@ fn extract_html_tag_name(tag_text: &str) -> Option<&str> {
     } else {
         Some(&tag_text[start..end])
     }
+}
+
+/// Depth-aware scan for the matching closing tag of `name` starting at
+/// byte position `start` (the `<` of the opening tag) in `content`.
+/// Returns `(close_start, close_end)` — the bounds of the matching
+/// `</name>` tag — or `None` when no balanced close exists in `content`.
+fn find_matching_html_close_with_start(
+    content: &str,
+    start: usize,
+    name: &str,
+) -> Option<(usize, usize)> {
+    use crate::parser::inlines::inline_html::{parse_close_tag, parse_open_tag};
+
+    let bytes = content.as_bytes();
+    let opener_end = parse_open_tag(&content[start..])?;
+    let mut i = start + opener_end;
+    let mut depth = 1usize;
+    while i < bytes.len() {
+        if bytes[i] != b'<' {
+            i += 1;
+            continue;
+        }
+        let rest = &content[i..];
+        if let Some(end) = parse_open_tag(rest) {
+            let tag = &rest[..end];
+            if extract_html_tag_name(tag).is_some_and(|n| n.eq_ignore_ascii_case(name)) {
+                depth += 1;
+            }
+            i += end;
+            continue;
+        }
+        if let Some(end) = parse_close_tag(rest) {
+            let tag = &rest[..end];
+            if extract_html_tag_name(tag).is_some_and(|n| n.eq_ignore_ascii_case(name)) {
+                depth -= 1;
+                if depth == 0 {
+                    return Some((i, i + end));
+                }
+            }
+            i += end;
+            continue;
+        }
+        i += 1;
+    }
+    None
 }
 
 /// Depth-aware scan for the matching closing tag of `name` starting at

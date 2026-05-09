@@ -85,17 +85,16 @@ const VERBATIM_TAGS: &[&str] = &["script", "style", "pre", "textarea"];
 /// treats as raw inline HTML, and adds a few pandoc keeps as block-level
 /// (`canvas`, `hgroup`, `isindex`, `meta`, `output`).
 ///
-/// **Not in this list**: pandoc's `eitherBlockOrInline` tags (`audio`,
-/// `button`, `iframe`, `embed`, `progress`, `map`, `noscript`, `object`,
-/// `video`, `area`, `applet`, `del`, `ins`, `svg`, `source`, `track`).
-/// Pandoc's `isBlockTag` predicate accepts these, so at top level they
-/// start an HTML block (RawBlock+Plain+RawBlock); but inside an existing
-/// HTML block they only split when they appear before any inline content
-/// — otherwise pandoc treats them as inline raw HTML in a Plain. Lifting
-/// them here would parser-recognize the top-level case but make the
-/// byte-walking projector unable to keep them inline in the nested case
-/// (see `0248-html-block-form-input-button`). Deferred until the
-/// projector's `split_html_block_by_tags` becomes context-aware.
+/// Pandoc's `eitherBlockOrInline` set (`audio`, `button`, `iframe`,
+/// `noscript`, `object`, `map`, `progress`, `video`, `del`, `ins`, `svg`,
+/// `applet`, plus the void elements `embed`, `area`, `source`, `track`
+/// and the verbatim `script`) is tracked separately as
+/// [`PANDOC_INLINE_BLOCK_TAGS`]. Those tags act as block starters at
+/// fresh-block positions but stay inline inside an existing HTML block
+/// (e.g. `<form><input><button>X</button></form>`); the projector's
+/// `split_html_block_by_tags` keys on `inline_pending` to keep them
+/// inline once an inline-only tag or text byte has been seen since the
+/// last splitter.
 const PANDOC_BLOCK_TAGS: &[&str] = &[
     "address",
     "article",
@@ -172,6 +171,41 @@ pub fn is_html_block_tag_name(name: &str) -> bool {
 pub fn is_pandoc_block_tag_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     PANDOC_BLOCK_TAGS.contains(&lower.as_str())
+}
+
+/// Pandoc's `eitherBlockOrInline` set (mirrors
+/// `pandoc/src/Text/Pandoc/Readers/HTML/TagCategories.hs`): tags that
+/// `isBlockTag` accepts as block starters but `isInlineTag` ALSO accepts
+/// (because `name ∉ blockTags`). At top level (or after a blank line)
+/// pandoc treats `<iframe>foo</iframe>` as RawBlock+Plain+RawBlock, but
+/// inside an existing HTML block once a paragraph has started parsing,
+/// the same tag stays inline as `RawInline`.
+///
+/// The projector's `split_html_block_by_tags` mirrors this with an
+/// `inline_pending` flag — strict block tags ([`PANDOC_BLOCK_TAGS`])
+/// always split; inline-block tags split only when no inline content
+/// has been buffered since the last splitter.
+///
+/// Void elements (`area`, `embed`, `source`, `track`) are intentionally
+/// omitted: with no closing tag, `find_matching_html_close` would
+/// consume to end-of-input and the projector's matched-pair lift can't
+/// produce a clean RawBlock. Treating them as inline raw HTML is wrong
+/// vs pandoc-native (pandoc emits a single RawBlock) but doesn't
+/// destroy structure; deferred until void-tag handling lands.
+/// `script` is omitted because it is already verbatim (handled by the
+/// `<script>...</script>` raw-text path) and the strict-block check
+/// fires first regardless.
+const PANDOC_INLINE_BLOCK_TAGS: &[&str] = &[
+    "applet", "audio", "button", "del", "iframe", "ins", "map", "noscript", "object", "progress",
+    "svg", "video",
+];
+
+/// Whether `name` (case-insensitive) is one of pandoc's
+/// `eitherBlockOrInline` tags (excluding void elements and `script`;
+/// see [`PANDOC_INLINE_BLOCK_TAGS`]).
+pub fn is_pandoc_inline_block_tag_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    PANDOC_INLINE_BLOCK_TAGS.contains(&lower.as_str())
 }
 
 /// Information about a detected HTML block opening.
@@ -274,6 +308,20 @@ pub(crate) fn try_parse_html_block_start(
                 is_verbatim,
                 closed_by_blank_line: is_commonmark && !is_verbatim,
                 depth_aware: !is_commonmark,
+            });
+        }
+
+        // Pandoc dialect also treats `eitherBlockOrInline` tags as block
+        // starters at fresh-block positions. The block dispatcher caller
+        // gates these as `cannot_interrupt` (mirrors pandoc — they never
+        // interrupt a running paragraph; only start a fresh block when
+        // following a blank line or at document start).
+        if !is_commonmark && !is_closing && PANDOC_INLINE_BLOCK_TAGS.contains(&tag_lower.as_str()) {
+            return Some(HtmlBlockType::BlockTag {
+                tag_name: tag_lower,
+                is_verbatim: false,
+                closed_by_blank_line: false,
+                depth_aware: true,
             });
         }
 
@@ -1139,6 +1187,54 @@ mod tests {
                     Some(HtmlBlockType::BlockTag { .. })
                 ),
                 "{pandoc_only} should be a block-tag start under Pandoc",
+            );
+        }
+    }
+
+    #[test]
+    fn test_pandoc_inline_block_tag_membership() {
+        // Pandoc's `eitherBlockOrInline` tags start an HTML block at
+        // fresh-block positions under Pandoc dialect. We list the
+        // non-void, non-script subset (verbatim `script` is handled
+        // via the verbatim path; void elements are deferred — see
+        // PANDOC_INLINE_BLOCK_TAGS docs).
+        for tag in [
+            "<button>",
+            "<iframe>",
+            "<video>",
+            "<audio>",
+            "<noscript>",
+            "<object>",
+            "<map>",
+            "<progress>",
+            "<del>",
+            "<ins>",
+            "<svg>",
+            "<applet>",
+        ] {
+            assert!(
+                matches!(
+                    try_parse_html_block_start(tag, false),
+                    Some(HtmlBlockType::BlockTag {
+                        depth_aware: true,
+                        ..
+                    })
+                ),
+                "{tag} should be a depth-aware block-tag start under Pandoc",
+            );
+        }
+        // Closing forms of inline-block tags do NOT start a block
+        // (mirrors pandoc's `htmlTag isBlockTag` which only matches
+        // open tags here).
+        assert_eq!(try_parse_html_block_start("</button>", false), None);
+        assert_eq!(try_parse_html_block_start("</iframe>", false), None);
+        // Void eitherBlockOrInline tags are intentionally skipped —
+        // they fall through to inline raw HTML.
+        for void_tag in ["<embed>", "<area>", "<source>", "<track>"] {
+            assert_eq!(
+                try_parse_html_block_start(void_tag, false),
+                None,
+                "{void_tag} (void) should NOT start an HTML block under Pandoc",
             );
         }
     }

@@ -1,0 +1,5 @@
+[ RawBlock
+    (Format "html") "<svg width=\"10\" height=\"10\">"
+, Plain [ Str "graphic" ]
+, RawBlock (Format "html") "</svg>"
+]

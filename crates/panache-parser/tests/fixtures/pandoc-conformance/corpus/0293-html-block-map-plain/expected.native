@@ -1,0 +1,4 @@
+[ RawBlock (Format "html") "<map>"
+, Plain [ Str "region" ]
+, RawBlock (Format "html") "</map>"
+]

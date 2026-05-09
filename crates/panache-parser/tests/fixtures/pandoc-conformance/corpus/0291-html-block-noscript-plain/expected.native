@@ -1,0 +1,4 @@
+[ RawBlock (Format "html") "<noscript>"
+, Plain [ Str "fallback" ]
+, RawBlock (Format "html") "</noscript>"
+]

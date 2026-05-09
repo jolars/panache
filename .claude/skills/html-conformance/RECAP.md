@@ -11,7 +11,177 @@ reverted, what trap to avoid) are the load-bearing content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-09 (Phase 3 corpus expansion — HTML5 sectioning + grouping; documented `eitherBlockOrInline` gap)
+## Latest session — 2026-05-09 (Phase 3 — `eitherBlockOrInline` lift with context-aware projector; unblocks #287)
+
+**html (block + inline) pass count: 94 → 105** (+11; 11 new corpus cases
+passing — `<iframe>` unblocked + 10 new `eitherBlockOrInline` tags).
+**Workspace test count: 0 failing → 0 failing** (all green).
+**Total pandoc conformance: 286/287 → 297/297 (99.7% → 100.0%)**.
+**New parser fixtures: 2** (paired `<button>` Pandoc / CommonMark CST
+shape).
+
+### What landed
+
+Closed the gap left by the previous session's pivot: the
+`eitherBlockOrInline` tags from
+`pandoc/src/Text/Pandoc/Readers/HTML/TagCategories.hs` (`audio`,
+`button`, `iframe`, `video`, `del`, `ins`, `progress`, `map`,
+`noscript`, `object`, `svg`, `applet`) now lift at fresh-block
+positions to RawBlock+Plain+RawBlock, while staying inline mid-paragraph
+(verified `Some text\n<button>X</button>\nmore text` → single Para)
+and inside an existing HTML block once an inline-only tag has been
+seen (case `0248-html-block-form-input-button` stays green —
+`<form><input><button>` keeps button inline).
+
+Three changes, one corpus expansion:
+
+1. **`PANDOC_INLINE_BLOCK_TAGS` constant + predicate** in
+   `parser/blocks/html_blocks.rs`. Includes the 12 non-void,
+   non-`script` tags from pandoc's `eitherBlockOrInline`. Void
+   elements (`area`, `embed`, `source`, `track`) are deferred —
+   they have no closing tag, so `find_matching_html_close` can't
+   produce a clean matched-pair lift; treating them as inline raw
+   HTML is a small cosmetic divergence vs pandoc's RawBlock but
+   doesn't destroy structure.
+
+2. **`try_parse_html_block_start`** under Pandoc dialect now
+   accepts inline-block tags as `BlockTag { depth_aware: true,
+   closed_by_blank_line: false, .. }`. Closing forms (`</button>`)
+   do NOT start a block — mirrors pandoc's `htmlTag isBlockTag`.
+
+3. **Block dispatcher** (`block_dispatcher.rs`) extends the
+   `cannot_interrupt` predicate: under Pandoc, inline-block tags
+   never interrupt a running paragraph. Without this, `Some
+   text\n<button>X</button>\nmore` would split the paragraph (it
+   doesn't in pandoc).
+
+4. **Projector** (`pandoc_ast.rs::split_html_block_by_tags`)
+   tracks `inline_pending: bool`. Strict block tags
+   (`PANDOC_BLOCK_TAGS`) always split and reset; inline-block tags
+   split with a 3-way matched-pair lift only when
+   `inline_pending == false`; non-splitting tags and non-whitespace
+   text bytes set `inline_pending = true`; two consecutive newlines
+   reset it (mirrors pandoc's "blank line restarts block parser").
+   New helper `find_matching_html_close_with_start` returns
+   `(close_start, close_end)` so the projector can flush the
+   interior bytes into a Plain via `flush_html_block_text`.
+
+11 new passing cases under `# html-block (eitherBlockOrInline …)`:
+- `0287-html-block-iframe-plain` — moved from blocked.txt
+- `0288..0297` — button, video, audio, noscript, object, map,
+  progress, del, ins, svg-with-attrs (one per tag).
+
+Plus 2 paired parser fixtures
+(`html_block_button_inline_block_pandoc` /
+`_commonmark`) pinning the new dialect-divergent CST shape:
+- Pandoc: `<button>X</button>` → HTML_BLOCK with single
+  HTML_BLOCK_TAG (same-line-closed pattern).
+- CommonMark: PARAGRAPH with INLINE_HTML.
+
+Plus a unit test
+(`test_pandoc_inline_block_tag_membership`) covering all 12
+inline-block tags + closing-form rejection + void-tag rejection.
+
+### Files in committable diff
+
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs` — new
+  `PANDOC_INLINE_BLOCK_TAGS` const + `is_pandoc_inline_block_tag_name`
+  pub fn; new branch in `try_parse_html_block_start`; doc-comment
+  update on `PANDOC_BLOCK_TAGS`; new unit test. ~80 lines.
+- `crates/panache-parser/src/parser/block_dispatcher.rs` — extend
+  `cannot_interrupt` for Pandoc inline-block tags. ~6 lines.
+- `crates/panache-parser/src/pandoc_ast.rs` — rewrite
+  `split_html_block_by_tags` with `inline_pending` tracking; new
+  helper `find_matching_html_close_with_start`. ~100 lines.
+- 11 new corpus directories
+  `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/
+  0287..0297-…/` (input.md + expected.native).
+- `crates/panache-parser/tests/pandoc/blocked.txt` — drop the
+  blocked entry for case 287 (now passing); remove the
+  `eitherBlockOrInline` rationale block.
+- `crates/panache-parser/tests/pandoc/allowlist.txt` — new
+  `# html-block (eitherBlockOrInline …)` section with ids 287..297.
+- `crates/panache-parser/tests/pandoc/report.txt` +
+  `docs/development/pandoc-report.json` — regenerated (297/297).
+- 2 new parser fixtures + 2 new CST snapshots
+  (`html_block_button_inline_block_{pandoc,commonmark}`).
+- `crates/panache-parser/tests/golden_parser_cases.rs` — register
+  the 2 new cases.
+
+No salsa, formatter, linter, LSP, or other host-side changes.
+
+### Suggested next sub-targets, ranked
+
+1. **Void-element lift for `<embed>`, `<area>`, `<source>`, `<track>`.**
+   Today they fall through to inline raw HTML in a Para, but pandoc
+   emits a single RawBlock at top level. Concretely: extend
+   `try_parse_html_block_start` (Pandoc dialect) to recognize void
+   `eitherBlockOrInline` tags as a non-depth-aware single-line block
+   shape (close at end-of-tag, not via `</…>` matching). Add a
+   `closed_by_void_self_close` flag on `BlockTag`, or special-case
+   in `parse_html_block_with_wrapper`. The projector path then needs
+   a same-line emission rule (current `flush_html_block_text` would
+   demote the whole thing to Plain, which is wrong). ~6-8 new corpus
+   cases (`<source src=...>`, `<embed src=...>`, etc.).
+2. **`<source>` / `<track>` inside lifted parents** (`<video>`,
+   `<audio>`). Pandoc emits inner `<source>` as a separate RawBlock
+   when the outer parent is a strict-block lift (verified:
+   `<video>\n<source>\nfallback\n</video>` → 3 blocks). Today
+   panache emits `<source>` as RawInline inside the video's Plain.
+   Couples to the void-element lift above.
+3. **Phase 4 — Comments, processing instructions, declarations,
+   CDATA projection.** Mostly correct (covered through 0240); probe
+   for any HTML5 additions (`<!--[if IE]>` conditionals,
+   `<?xml-stylesheet?>`).
+4. **Audit `parse_html_attrs` and `find_matching_html_close` for
+   literal-byte hazards** (still on the list from earlier sessions).
+5. **Outer-wins-on-conflict for inherited refs/footnotes** (still
+   deferred — no corpus exercises it).
+
+### Don't redo / known traps (new this session)
+
+- **`eitherBlockOrInline` is context-dependent.** Pandoc's
+  `isBlockTag` accepts these tags (so they CAN start a block) AND
+  `isInlineTag` ALSO accepts them (because they're not in
+  `blockTags`). The decision happens at the parser-state level: at
+  the start of a paragraph attempt, pandoc tries `htmlBlock` first
+  (lifts); inside an existing inline run, the inline raw HTML
+  parser uses `isInlineTag` and keeps them inline. Mirroring this
+  in panache requires BOTH a parser-side `cannot_interrupt` flag
+  AND projector-side `inline_pending` tracking. Either alone is
+  insufficient.
+- **Closing forms must be excluded from the block-start
+  recognizer.** `<button>` opens a block; `</button>` does not —
+  it falls through to inline raw HTML. The
+  `try_parse_html_block_start` branch gates on `!is_closing` for
+  this reason. Forgetting this would emit a stray RawBlock for
+  every dangling close tag in a document.
+- **Void elements (`area`, `embed`, `source`, `track`) are
+  intentionally NOT in `PANDOC_INLINE_BLOCK_TAGS`.** They have no
+  closing tag, so `find_matching_html_close` would walk to
+  end-of-input. Adding them needs a separate void-tag code path
+  (see "Suggested next sub-targets" #1).
+- **`<script>` is in pandoc's `eitherBlockOrInline` BUT also in
+  `blockHtmlTags`.** It's verbatim-handled via `VERBATIM_TAGS` /
+  `is_raw_text_element_open` and the strict-block check fires
+  first. Don't add `script` to `PANDOC_INLINE_BLOCK_TAGS` — it'd
+  be redundant and confusing.
+- **The `inline_pending` reset rule keys on consecutive newlines,
+  not on "saw a blank line in the source".** A blank line in
+  pandoc-source ends the current paragraph; in our byte walker
+  that's `\n\n` (two consecutive newlines). The walker counts
+  them and resets when count >= 2. Don't substitute "byte ==
+  whitespace" — single trailing whitespace on a non-blank line
+  shouldn't reset.
+- **Adding tags to `PANDOC_BLOCK_TAGS` (strict-block) instead of
+  `PANDOC_INLINE_BLOCK_TAGS` would re-break case
+  `0248-html-block-form-input-button`** — confirmed in the
+  previous session's pivot. The strict-block tags ALWAYS split,
+  ignoring `inline_pending`. Keep the two lists distinct.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-05-09 (Phase 3 corpus expansion — HTML5 sectioning + grouping; documented `eitherBlockOrInline` gap)
 
 **html (block + inline) pass count: 87 → 94** (+7; 7 new corpus cases passing).
 **Workspace test count: 0 failing → 0 failing** (all green).

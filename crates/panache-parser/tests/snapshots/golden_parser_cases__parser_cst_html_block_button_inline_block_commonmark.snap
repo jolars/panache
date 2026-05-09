@@ -1,0 +1,13 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..26
+  PARAGRAPH@0..26
+    INLINE_HTML@0..8
+      INLINE_HTML_CONTENT@0..8 "<button>"
+    TEXT@8..16 "Click me"
+    INLINE_HTML@16..25
+      INLINE_HTML_CONTENT@16..25 "</button>"
+    NEWLINE@25..26 "\n"

@@ -4,16 +4,3 @@
 # explaining the reason and the concrete parser/projector gap each entry
 # exposes. Do NOT use this file to silence regressions — fix the underlying
 # cause and keep the case in the allowlist instead.
-
-# eitherBlockOrInline tags (pandoc's `eitherBlockOrInline` set: audio,
-# button, iframe, embed, progress, map, noscript, object, video, area,
-# applet, del, ins, svg, source, track). Pandoc's `isBlockTag` predicate
-# treats these as block-eligible, so at top level they start an HTML
-# block (RawBlock+Plain+RawBlock); but inside an existing HTML block they
-# only split when no inline content has been buffered — otherwise pandoc
-# keeps them inline as RawInline within a Plain (see
-# 0248-html-block-form-input-button). Lifting them in PANDOC_BLOCK_TAGS
-# would parser-recognize the top-level case but break the nested case
-# because `split_html_block_by_tags` walks bytes without tracking
-# inline-content state. Unblock requires a context-aware projector.
-287

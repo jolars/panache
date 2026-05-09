@@ -1,0 +1,4 @@
+[ RawBlock (Format "html") "<progress value=\"50\">"
+, Plain [ Str "half" ]
+, RawBlock (Format "html") "</progress>"
+]
