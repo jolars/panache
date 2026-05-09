@@ -11,7 +11,183 @@ reverted, what trap to avoid) are the load-bearing content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-09 (Phase 5 — Plain/Para promotion rule for `<div>` recursive reparse)
+## Latest session — 2026-05-09 (Phase 3 — dialect-divergent `blockHtmlTags` for `<dialog>`/`<canvas>`/etc.)
+
+**html (block + inline) pass count: 80 → 87** (7 new corpus cases —
+all passing).
+**Workspace test count: 0 failing → 0 failing** (all green).
+**Total pandoc conformance: 272/272 → 279/279 (100.0% → 100.0%)**.
+
+### What landed
+
+Pandoc-markdown's `htmlBlock` reader uses pandoc's own
+`blockHtmlTags` set (see
+`pandoc/src/Text/Pandoc/Readers/HTML/TagCategories.hs`), which
+disagrees with CommonMark §4.6 type-6 in **both directions**:
+
+- **CM-only** block tags (Pandoc treats as inline raw HTML):
+  `dialog`, `legend`, `menuitem`, `optgroup`, `option`, `frame`,
+  `base`, `basefont`, `link`, `param`.
+- **Pandoc-only** block tags (CM does not type-6 recognize):
+  `canvas`, `hgroup`, `isindex`, `meta`, `output`.
+
+Until this session, `BLOCK_TAGS` was the single shared list used
+by **both** the parser's `try_parse_html_block_start` AND the
+projector's `is_html_block_tag_name` callsite in
+`split_html_block_by_tags`. So `<dialog>foo</dialog>` produced
+`Plain [Str "foo"]` flanked by `RawBlock`s under Pandoc, where
+pandoc emits `Para [RawInline "<dialog>", Str "foo", RawInline
+"</dialog>"]`.
+
+Three changes:
+
+1. **`PANDOC_BLOCK_TAGS` constant + `is_pandoc_block_tag_name`
+   predicate** in `parser/blocks/html_blocks.rs` mirror pandoc's
+   `blockHtmlTags`. The CM-list-as-`BLOCK_TAGS` stays unchanged
+   (CM still recognizes `<dialog>` as type-6).
+2. **`try_parse_html_block_start`** gates the membership check
+   on `is_commonmark`: CM uses `BLOCK_TAGS`, Pandoc uses
+   `PANDOC_BLOCK_TAGS`. The `is_commonmark` flag was already
+   plumbed end-to-end (dispatcher + continuation), so no other
+   wiring needed.
+3. **Projector** (`pandoc_ast.rs::split_html_block_by_tags`)
+   switches its `is_html_block_tag_name(name)` callsite to
+   `is_pandoc_block_tag_name(name)`. The projector only runs
+   under Pandoc dialect, so this is a direct substitution.
+
+CST losslessness preserved — this is purely a recognizer-list
+swap; the `HTML_BLOCK` byte ranges that *do* lift remain the
+same shape, only fewer tags trigger the lift now. Tags that no
+longer trigger the lift parse as paragraphs containing
+`INLINE_HTML` nodes (CommonMark-spec inline HTML, dialect-shared).
+
+All 15 divergent tags verified end-to-end (`pandoc -f markdown
+-t native` matches `panache parse --to pandoc-ast` byte-for-byte).
+
+### Files in committable diff
+
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs` —
+  add `PANDOC_BLOCK_TAGS` const + `is_pandoc_block_tag_name`
+  pub fn; gate the BLOCK_TAGS membership check by
+  `is_commonmark`; new unit test
+  `test_dialect_specific_block_tag_membership` covering all 15
+  divergent tags in both directions. Net ~80 lines.
+- `crates/panache-parser/src/pandoc_ast.rs` — projector callsite
+  swaps `is_html_block_tag_name` → `is_pandoc_block_tag_name`
+  (2-line change: import + use site).
+- 7 new corpus directories under
+  `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/`:
+  - `0273-html-inline-dialog-plain` —
+    `<dialog>foo</dialog>` (Para+RawInlines).
+  - `0274-html-inline-option-plain` —
+    `<option>foo</option>` (Para+RawInlines).
+  - `0275-html-inline-legend-with-text` — legend in
+    surrounding paragraph text.
+  - `0276-html-block-canvas-plain` —
+    `<canvas>foo</canvas>` (RawBlock+Plain+RawBlock).
+  - `0277-html-block-meta-plain`
+  - `0278-html-block-hgroup-plain`
+  - `0279-html-block-output-plain`
+- 2 new paired parser fixtures:
+  - `crates/panache-parser/tests/fixtures/cases/html_block_dialog_inline_pandoc/`
+    + snapshot pinning the Paragraph + INLINE_HTML CST shape.
+  - `crates/panache-parser/tests/fixtures/cases/html_block_dialog_inline_commonmark/`
+    + snapshot pinning the HTML_BLOCK shape (CM-side reference).
+- `crates/panache-parser/tests/golden_parser_cases.rs`
+  registers both new cases.
+- `crates/panache-parser/tests/pandoc/allowlist.txt`
+  — new section `# html-block / html-inline (Pandoc-specific
+  blockHtmlTags …)` with ids 273..279.
+- `crates/panache-parser/tests/pandoc/report.txt` +
+  `docs/development/pandoc-report.json` (regenerated; 279/279
+  passing, 100%; html 80 → 87).
+
+No salsa, formatter, linter, or other host-side changes.
+
+### Why parser- and projector-side together
+
+The projector swap alone would fix `parse --to pandoc-ast`
+output but would leave the structural CST wrong: under Pandoc,
+`<dialog>foo</dialog>` would still parse as `HTML_BLOCK`, which
+is incorrect under pandoc-markdown semantics — pandoc treats
+the line as a paragraph with raw inline HTML. The parser change
+makes the CST match what pandoc-native semantics dictate.
+Salsa, the formatter, and any LSP consumer all walk the
+structural CST, not the projection.
+
+### What's still NOT covered
+
+- **HTML5 tags pandoc doesn't list at all** — e.g. `<dialog>`
+  is in HTML5 but pandoc's `blockHtmlTags` predates HTML5; if
+  pandoc later adds it, the lists will need re-sync. Not a bug
+  today, just a "this list is frozen against pandoc 3.9.0.2".
+- **Form-element nested lists** — `<form><option>X</option>...`
+  combinations may produce different shapes than tested here;
+  no corpus case forces them.
+- **DocBook / EPUB block tag overlap** — pandoc's full
+  `blockTags` is `unions [blockHtmlTags, blockDocBookTags,
+  epubTags]`. Panache only mirrors `blockHtmlTags`. If a real
+  document needs DocBook lift (e.g. `<itemizedlist>`), add
+  separate sets. Pandoc's `htmlBlock` reader uses the union; we
+  use only the HTML subset. Edge case; defer until evidence.
+
+### Suggested next sub-targets, ranked
+
+1. **Phase 3 corpus expansion — sectioning / verbatim
+   negative-space.** Pin existing pandoc-native parity for the
+   modern HTML5 tags not yet in the corpus: `<header>`,
+   `<footer>`, `<main>`, `<details>`, `<figure>`,
+   `<figcaption>`, `<form>`, `<table>`, `<iframe>`. These
+   currently match (verified in this session's probes), but
+   without corpus cases a future regression won't be caught.
+   Pure low-risk corpus growth; ~6-10 cases.
+2. **Phase 4 — Comments, processing instructions, declarations,
+   CDATA projection.** Already mostly correct (verified earlier
+   for `<?xml>` and `<!DOCTYPE>`); just seed corpus to lock
+   behavior. Pure negative-space pinning.
+3. **Phase 5 — projector cleanup.** Audit
+   `try_div_html_block`'s remaining byte-aware close lookahead.
+   Some paths may simplify now that parser-side multi-line +
+   nested + balanced opens all lift structurally. Low risk,
+   low immediate value.
+4. **Outer-wins-on-conflict for inherited refs/footnotes**
+   (still deferred — no corpus exercises it).
+
+### Don't redo / known traps (new this session)
+
+- **CM and Pandoc have different `blockHtmlTags` lists, in
+  both directions.** Panache previously shared one list for
+  both purposes (parser type-6 detection + projector tag
+  splitting). Don't undo the split — the lists differ by 15
+  tags total. The parser's `is_commonmark` flag is the gate;
+  the projector only runs under Pandoc and should use
+  `is_pandoc_block_tag_name` directly.
+- **Pandoc 3.9.0.2's list is taken from
+  `pandoc/src/Text/Pandoc/Readers/HTML/TagCategories.hs`.**
+  When bumping the pinned pandoc version, re-check this list
+  for additions/removals. The vendored read-only pandoc
+  checkout in the workspace root is the ground truth.
+- **`<dialog>` matches CM type-7 (complete tag on a line) even
+  when removed from CM's BLOCK_TAGS.** The unit test for
+  dialect-specific membership must assert "is NOT a `BlockTag`
+  variant under CM" — not "is `None` under CM" — because
+  type-7 is a separate, valid CM HTML-block recognizer.
+- **The CM-side dialog snapshot shows `HTML_BLOCK` (type-6),
+  not `Type7`.** Why? Because `<dialog>` IS in CM's BLOCK_TAGS
+  list, so type-6 fires before type-7's fallback path. The
+  fixture intentionally captures this CM behavior alongside
+  the Pandoc one.
+- **Pandoc's `blockHtmlTags` notably includes `pre`,
+  `script`, `style`, `textarea`** even though those are
+  panache's `VERBATIM_TAGS`. Membership in
+  `PANDOC_BLOCK_TAGS` for these tags is harmless (they hit
+  the BlockTag arm first; verbatim handling kicks in
+  separately via `VERBATIM_TAGS.contains`). Don't try to
+  remove them from `PANDOC_BLOCK_TAGS`.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-05-09 (Phase 5 — Plain/Para promotion rule for `<div>` recursive reparse)
 
 **html (block + inline) pass count: 76 → 80** (4 new corpus cases —
 all passing).

@@ -1,0 +1,6 @@
+[ Para
+    [ RawInline (Format "html") "<dialog>"
+    , Str "foo"
+    , RawInline (Format "html") "</dialog>"
+    ]
+]

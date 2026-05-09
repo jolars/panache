@@ -1,0 +1,4 @@
+[ RawBlock (Format "html") "<canvas>"
+, Plain [ Str "foo" ]
+, RawBlock (Format "html") "</canvas>"
+]

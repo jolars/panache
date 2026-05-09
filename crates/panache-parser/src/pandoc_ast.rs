@@ -1143,7 +1143,7 @@ fn emit_html_block(node: &SyntaxNode, out: &mut Vec<Block>) {
 /// [`flush_html_block_text`]. Balanced `<div>...</div>` pairs (depth-aware)
 /// project to `Block::Div`.
 fn split_html_block_by_tags(content: &str, out: &mut Vec<Block>) {
-    use crate::parser::blocks::html_blocks::is_html_block_tag_name;
+    use crate::parser::blocks::html_blocks::is_pandoc_block_tag_name;
     use crate::parser::inlines::inline_html::{parse_close_tag, parse_open_tag};
 
     let bytes = content.as_bytes();
@@ -1169,7 +1169,7 @@ fn split_html_block_by_tags(content: &str, out: &mut Vec<Block>) {
             i += 1;
             continue;
         };
-        if !is_html_block_tag_name(name) {
+        if !is_pandoc_block_tag_name(name) {
             i += 1;
             continue;
         }

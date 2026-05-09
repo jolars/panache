@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..21
+  HTML_BLOCK@0..21
+    HTML_BLOCK_TAG@0..21
+      TEXT@0..20 "<dialog>foo</dialog>"
+      NEWLINE@20..21 "\n"

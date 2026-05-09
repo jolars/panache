@@ -1,0 +1,6 @@
+[ Para
+    [ RawInline (Format "html") "<option>"
+    , Str "foo"
+    , RawInline (Format "html") "</option>"
+    ]
+]

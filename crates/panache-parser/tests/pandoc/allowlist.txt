@@ -310,3 +310,12 @@
 270
 271
 272
+
+# html-block / html-inline (Pandoc-specific blockHtmlTags — pandoc-markdown's narrower block-tag set vs CommonMark §4.6 type-6: `dialog`, `legend`, `option`, etc. fall through to inline raw HTML, while `canvas`, `meta`, `hgroup`, `output` open HTML blocks)
+273
+274
+275
+276
+277
+278
+279

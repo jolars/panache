@@ -77,15 +77,89 @@ const BLOCK_TAGS: &[&str] = &[
 /// Tags that contain raw/verbatim content (no Markdown processing inside).
 const VERBATIM_TAGS: &[&str] = &["script", "style", "pre", "textarea"];
 
+/// Pandoc's `blockHtmlTags` (mirrors
+/// `pandoc/src/Text/Pandoc/Readers/HTML/TagCategories.hs`). Pandoc-markdown
+/// uses this narrower set rather than CommonMark §4.6 type-6: it omits a
+/// number of CM type-6 tags (e.g. `dialog`, `legend`, `optgroup`, `option`,
+/// `frame`, `link`, `param`, `base`, `basefont`, `menuitem`) that pandoc
+/// treats as raw inline HTML, and adds a few pandoc keeps as block-level
+/// (`canvas`, `hgroup`, `isindex`, `meta`, `output`).
+const PANDOC_BLOCK_TAGS: &[&str] = &[
+    "address",
+    "article",
+    "aside",
+    "blockquote",
+    "body",
+    "canvas",
+    "caption",
+    "center",
+    "col",
+    "colgroup",
+    "dd",
+    "details",
+    "dir",
+    "div",
+    "dl",
+    "dt",
+    "fieldset",
+    "figcaption",
+    "figure",
+    "footer",
+    "form",
+    "frameset",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "head",
+    "header",
+    "hgroup",
+    "hr",
+    "html",
+    "isindex",
+    "li",
+    "main",
+    "menu",
+    "meta",
+    "nav",
+    "noframes",
+    "ol",
+    "output",
+    "p",
+    "pre",
+    "script",
+    "section",
+    "style",
+    "summary",
+    "table",
+    "tbody",
+    "td",
+    "textarea",
+    "tfoot",
+    "th",
+    "thead",
+    "tr",
+    "ul",
+];
+
 /// Whether `name` (case-insensitive) is one of the HTML block-level tags
-/// recognized by CommonMark §4.6 type-6 (and pandoc's `markdown_in_html_blocks`
-/// splitter). Used by the pandoc-native projector to decide whether a complete
-/// HTML tag inside an `HTML_BLOCK` should split the block — block-level tags
-/// emit as separate `RawBlock` entries; inline tags (e.g. `<em>`, `<a>`,
-/// `<input>`, `<br>`) stay inline in the surrounding `Plain` content.
+/// recognized by CommonMark §4.6 type-6.
 pub fn is_html_block_tag_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     BLOCK_TAGS.contains(&lower.as_str())
+}
+
+/// Whether `name` (case-insensitive) is one of pandoc's `blockHtmlTags` —
+/// the narrower set pandoc-markdown's `htmlBlock` reader recognizes.
+/// Used by the pandoc-native projector's `split_html_block_by_tags` to
+/// decide whether a complete HTML tag inside an `HTML_BLOCK` should split
+/// the block — block-level tags emit as separate `RawBlock` entries;
+/// inline tags stay inline in the surrounding `Plain` content.
+pub fn is_pandoc_block_tag_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    PANDOC_BLOCK_TAGS.contains(&lower.as_str())
 }
 
 /// Information about a detected HTML block opening.
@@ -171,8 +245,17 @@ pub(crate) fn try_parse_html_block_start(
         let tag_lower = tag_name.to_lowercase();
         let is_closing = trimmed.starts_with("</");
 
-        // Check if it's a block-level tag
-        if BLOCK_TAGS.contains(&tag_lower.as_str()) {
+        // Check if it's a block-level tag. Pandoc and CommonMark disagree on
+        // membership: pandoc's `blockHtmlTags` (see
+        // `pandoc/src/Text/Pandoc/Readers/HTML/TagCategories.hs`) treats some
+        // CM type-6 tags as inline (e.g. `dialog`, `legend`, `option`) and
+        // some non-CM tags as block (e.g. `canvas`, `hgroup`, `meta`).
+        let is_block_tag = if is_commonmark {
+            BLOCK_TAGS.contains(&tag_lower.as_str())
+        } else {
+            PANDOC_BLOCK_TAGS.contains(&tag_lower.as_str())
+        };
+        if is_block_tag {
             let is_verbatim = VERBATIM_TAGS.contains(&tag_lower.as_str());
             return Some(HtmlBlockType::BlockTag {
                 tag_name: tag_lower,
@@ -990,6 +1073,61 @@ mod tests {
         // paragraph parsing.
         assert_eq!(try_parse_html_block_start("<!DOCTYPE html>", false), None);
         assert_eq!(try_parse_html_block_start("<!doctype html>", false), None);
+    }
+
+    #[test]
+    fn test_dialect_specific_block_tag_membership() {
+        // Pandoc-markdown's `blockHtmlTags` is a strict subset of
+        // CommonMark §4.6 type-6 plus a few additions. These tags
+        // diverge between dialects:
+        //   CM-only block tags (Pandoc treats as inline raw HTML):
+        //     dialog, legend, menuitem, optgroup, option, frame,
+        //     base, basefont, link, param
+        //   Pandoc-only block tags (CM doesn't recognize):
+        //     canvas, hgroup, isindex, meta, output
+        for cm_only in [
+            "<dialog>",
+            "<legend>",
+            "<menuitem>",
+            "<optgroup>",
+            "<option>",
+            "<frame>",
+            "<base>",
+            "<basefont>",
+            "<link>",
+            "<param>",
+        ] {
+            assert!(
+                matches!(
+                    try_parse_html_block_start(cm_only, true),
+                    Some(HtmlBlockType::BlockTag { .. })
+                ),
+                "{cm_only} should be a block-tag start under CommonMark",
+            );
+            assert_eq!(
+                try_parse_html_block_start(cm_only, false),
+                None,
+                "{cm_only} should NOT be a block-tag start under Pandoc",
+            );
+        }
+        for pandoc_only in ["<canvas>", "<hgroup>", "<isindex>", "<meta>", "<output>"] {
+            // Under CM these are not type-6 BlockTags; they may still match
+            // type-7 (complete tag on a line) which has different semantics.
+            assert!(
+                !matches!(
+                    try_parse_html_block_start(pandoc_only, true),
+                    Some(HtmlBlockType::BlockTag { .. })
+                ),
+                "{pandoc_only} should NOT be a type-6 block-tag start under CommonMark",
+            );
+            assert!(
+                matches!(
+                    try_parse_html_block_start(pandoc_only, false),
+                    Some(HtmlBlockType::BlockTag { .. })
+                ),
+                "{pandoc_only} should be a block-tag start under Pandoc",
+            );
+        }
     }
 
     #[test]

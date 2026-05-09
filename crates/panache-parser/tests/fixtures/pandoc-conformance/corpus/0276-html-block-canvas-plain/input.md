@@ -1,0 +1,1 @@
+<canvas>foo</canvas>
