@@ -1,0 +1,7 @@
+[ RawBlock (Format "html") "<details>"
+, RawBlock (Format "html") "<summary>"
+, Plain [ Str "Click" ]
+, RawBlock (Format "html") "</summary>"
+, Para [ Str "Hidden" , Space , Str "content." ]
+, RawBlock (Format "html") "</details>"
+]

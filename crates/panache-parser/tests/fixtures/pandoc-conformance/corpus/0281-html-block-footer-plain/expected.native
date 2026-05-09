@@ -1,0 +1,4 @@
+[ RawBlock (Format "html") "<footer>"
+, Plain [ Str "foo" ]
+, RawBlock (Format "html") "</footer>"
+]

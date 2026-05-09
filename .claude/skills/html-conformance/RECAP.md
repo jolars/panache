@@ -11,7 +11,133 @@ reverted, what trap to avoid) are the load-bearing content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-09 (Phase 5 audit — pivoted to losslessness regression in `<DIV>` open-tag emission)
+## Latest session — 2026-05-09 (Phase 3 corpus expansion — HTML5 sectioning + grouping; documented `eitherBlockOrInline` gap)
+
+**html (block + inline) pass count: 87 → 94** (+7; 7 new corpus cases passing).
+**Workspace test count: 0 failing → 0 failing** (all green).
+**Total pandoc conformance: 279/279 → 286/287 (100.0% → 99.7%)**. The single
+"failing" case is the deliberately-blocked iframe (#287) tracking the
+`eitherBlockOrInline` divergence.
+
+### What landed
+
+Phase 3 negative-space corpus expansion for HTML5 sectioning / grouping
+tags that ALREADY match pandoc-native. Pure corpus growth + one
+documentation-only parser-comment update; no code-shape changes.
+
+7 new passing cases under `# html-block` (HTML5 sectioning + grouping):
+- `0280-html-block-header-plain` — `<header>foo</header>`
+- `0281-html-block-footer-plain` — `<footer>foo</footer>`
+- `0282-html-block-main-plain` — `<main>foo</main>`
+- `0283-html-block-details-with-summary` — `<details><summary>...</summary>...</details>`
+- `0284-html-block-figure-with-figcaption` — figure + img + figcaption
+- `0285-html-block-header-with-attrs` — `<header class="...">Welcome</header>`
+- `0286-html-block-nav-with-list` — `<nav id>` containing markdown bullet list
+
+1 new blocked case tracking a real divergence:
+- `0287-html-block-iframe-plain` — `<iframe>foo</iframe>` should produce
+  RawBlock+Plain+RawBlock (pandoc) but panache emits Para+RawInlines.
+  Listed in `tests/pandoc/blocked.txt` with full rationale.
+
+### The pivot — what got dropped
+
+Initial scope tried to fix the iframe / video / audio / button / embed /
+map / noscript / object / progress divergence by adding the 9 tags to
+`PANDOC_BLOCK_TAGS`. **Reverted** after `pandoc_allowlist` flipped red on
+case 0248-html-block-form-input-button: with `<button>` parser-recognized
+as a block-level start, the projector's byte-walking
+`split_html_block_by_tags` splits the inner `<button>` of `<form><input>
+<button>X</button></form>` into a separate RawBlock, but pandoc keeps it
+inline because `<input>` (an inline-only HTML tag) precedes it and puts
+the block in "inline mode."
+
+The root cause: pandoc has TWO sets in
+`pandoc/src/Text/Pandoc/Readers/HTML/TagCategories.hs`:
+- `blockHtmlTags` — strict block tags. Always split.
+- `eitherBlockOrInline` — `audio`, `applet`, `button`, `iframe`, `embed`,
+  `del`, `ins`, `progress`, `map`, `area`, `noscript`, `script`, `object`,
+  `svg`, `video`, `source`, `track`. Pandoc's `isBlockTag` accepts them
+  (so they start an HTML block at top level), but `isInlineTag` ALSO
+  accepts them (because they're not in `blockTags = blockHtmlTags ∪
+  blockDocBookTags ∪ epubTags`). Their behavior is context-dependent.
+
+Panache's `PANDOC_BLOCK_TAGS` mirrors only `blockHtmlTags`. Adding the
+`eitherBlockOrInline` tags requires the projector to track inline-pending
+state — split on these tags only when no inline content has been buffered
+since the last splitter (or after a blank line). The byte-walking
+`split_html_block_by_tags` doesn't track this.
+
+Documented the gap in:
+- A doc comment on `PANDOC_BLOCK_TAGS` listing all 17
+  `eitherBlockOrInline` tags and explaining why they aren't in the list.
+- `tests/pandoc/blocked.txt` with the full reasoning + the iframe
+  exemplar (`0287`).
+
+### Files in committable diff
+
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs` —
+  doc-comment-only change on `PANDOC_BLOCK_TAGS` (12 lines added).
+- `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/0280..0287/`
+  — 8 new corpus directories (input.md + expected.native).
+- `crates/panache-parser/tests/pandoc/allowlist.txt` — new section
+  `# html-block (HTML5 sectioning + grouping ...)` with ids 280..286.
+- `crates/panache-parser/tests/pandoc/blocked.txt` — new
+  `eitherBlockOrInline` rationale block + id 287.
+- `crates/panache-parser/tests/pandoc/report.txt` +
+  `docs/development/pandoc-report.json` — regenerated.
+
+No salsa, formatter, linter, or other host-side changes.
+
+### Suggested next sub-targets, ranked
+
+1. **Context-aware `split_html_block_by_tags` for `eitherBlockOrInline`
+   tags.** This is the unblock for case 0287. Add a
+   `PANDOC_INLINE_BLOCK_TAGS` constant covering the 17 tags. Update both
+   parser detection (`is_pandoc_block_tag_name` callsites in
+   `try_parse_html_block_start`) and projector splitting
+   (`split_html_block_by_tags`). The projector change tracks
+   `inline_pending: bool`: strict block tags always split (and reset to
+   false); inline-block tags split only when `inline_pending == false`.
+   Blank lines and strict block tags reset; inline tags / non-empty text
+   set it to true. The Phase 3 corpus growth (especially 0286
+   `<nav>`-with-list) gives confidence the basic projector path is
+   solid; the inline-pending tracking is a bounded extension.
+   Roughly the same shape as the previous session's `dialog`/`canvas`
+   fix but with one extra state variable. Verify against
+   `0248-html-block-form-input-button` (must stay green) and unblock
+   `0287` (and add corpus cases for video/audio/button/etc.).
+2. **Phase 4 — Comments, processing instructions, declarations, CDATA
+   projection.** Already mostly correct (0221-0240 cover the basics);
+   probe for any HTML5 additions (e.g. `<!--[if IE]>` conditionals,
+   `<?xml-stylesheet?>`).
+3. **Audit `parse_html_attrs` and `find_matching_html_close` for
+   literal-byte hazards.** Still on the list from the prior session.
+4. **Outer-wins-on-conflict for inherited refs/footnotes** (still
+   deferred — no corpus exercises it).
+
+### Don't redo / known traps (new this session)
+
+- **Pandoc has TWO block-tag sets, not one.** Mirroring only
+  `blockHtmlTags` (as PANDOC_BLOCK_TAGS does) misses tags like
+  `<iframe>`, `<button>`, `<video>` that pandoc treats as block at the
+  top level. Naively adding them breaks the nested case in
+  `0248-html-block-form-input-button` because pandoc's behavior is
+  context-dependent (inline-mode-pending). Look up the source of
+  truth: `pandoc/src/Text/Pandoc/Readers/HTML/TagCategories.hs` (sets
+  `blockHtmlTags` and `eitherBlockOrInline`) and `Readers/HTML.hs`
+  (`isBlockTag` / `isInlineTag` predicates).
+- **`split_html_block_by_tags` is depth-unaware AND context-unaware.**
+  Already known about depth (Phase 5 work for nested divs); the
+  context-unaware part is new. Both share the same root cause: the
+  projector walks bytes without tracking parser state.
+- **Case 0248 was already correct before this session and is the
+  guard that catches naive PANDOC_BLOCK_TAGS expansion.** Future
+  sessions should run pandoc_allowlist after every parser-side block-
+  tag list change — the regression flips fast.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-05-09 (Phase 5 audit — pivoted to losslessness regression in `<DIV>` open-tag emission)
 
 **html (block + inline) pass count: 87 → 87** (no corpus change).
 **Workspace test count: 0 failing → 0 failing** (all green).

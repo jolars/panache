@@ -1,9 +1,9 @@
 {
-  "blocked": 0,
-  "failing": 0,
+  "blocked": 1,
+  "failing": 1,
   "pandoc_version": "3.9.0.2",
-  "pass_pct": 100.0,
-  "passing": 279,
+  "pass_pct": 99.7,
+  "passing": 286,
   "passing_ids": [
     1,
     2,
@@ -283,7 +283,14 @@
     276,
     277,
     278,
-    279
+    279,
+    280,
+    281,
+    282,
+    283,
+    284,
+    285,
+    286
   ],
   "sections": [
     {
@@ -292,9 +299,9 @@
       "pass": 15
     },
     {
-      "fail": 0,
+      "fail": 1,
       "name": "html",
-      "pass": 87
+      "pass": 94
     },
     {
       "fail": 0,
@@ -307,5 +314,5 @@
       "pass": 15
     }
   ],
-  "total_cases": 279
+  "total_cases": 287
 }

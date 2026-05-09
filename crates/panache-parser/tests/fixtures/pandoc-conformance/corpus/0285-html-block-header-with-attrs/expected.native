@@ -1,0 +1,4 @@
+[ RawBlock (Format "html") "<header class=\"site-header\">"
+, Plain [ Str "Welcome" ]
+, RawBlock (Format "html") "</header>"
+]

@@ -84,6 +84,18 @@ const VERBATIM_TAGS: &[&str] = &["script", "style", "pre", "textarea"];
 /// `frame`, `link`, `param`, `base`, `basefont`, `menuitem`) that pandoc
 /// treats as raw inline HTML, and adds a few pandoc keeps as block-level
 /// (`canvas`, `hgroup`, `isindex`, `meta`, `output`).
+///
+/// **Not in this list**: pandoc's `eitherBlockOrInline` tags (`audio`,
+/// `button`, `iframe`, `embed`, `progress`, `map`, `noscript`, `object`,
+/// `video`, `area`, `applet`, `del`, `ins`, `svg`, `source`, `track`).
+/// Pandoc's `isBlockTag` predicate accepts these, so at top level they
+/// start an HTML block (RawBlock+Plain+RawBlock); but inside an existing
+/// HTML block they only split when they appear before any inline content
+/// — otherwise pandoc treats them as inline raw HTML in a Plain. Lifting
+/// them here would parser-recognize the top-level case but make the
+/// byte-walking projector unable to keep them inline in the nested case
+/// (see `0248-html-block-form-input-button`). Deferred until the
+/// projector's `split_html_block_by_tags` becomes context-aware.
 const PANDOC_BLOCK_TAGS: &[&str] = &[
     "address",
     "article",

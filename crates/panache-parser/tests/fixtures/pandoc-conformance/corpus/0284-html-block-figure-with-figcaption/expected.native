@@ -1,0 +1,9 @@
+[ RawBlock (Format "html") "<figure>"
+, Plain
+    [ RawInline (Format "html") "<img src=\"x.png\" alt=\"X\">"
+    ]
+, RawBlock (Format "html") "<figcaption>"
+, Plain [ Str "cap" ]
+, RawBlock (Format "html") "</figcaption>"
+, RawBlock (Format "html") "</figure>"
+]

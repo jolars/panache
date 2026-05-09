@@ -1,0 +1,4 @@
+[ RawBlock (Format "html") "<main>"
+, Plain [ Str "foo" ]
+, RawBlock (Format "html") "</main>"
+]

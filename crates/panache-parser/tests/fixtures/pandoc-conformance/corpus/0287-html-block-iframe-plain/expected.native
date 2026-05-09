@@ -1,0 +1,4 @@
+[ RawBlock (Format "html") "<iframe>"
+, Plain [ Str "foo" ]
+, RawBlock (Format "html") "</iframe>"
+]
