@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.45.0](https://github.com/jolars/panache/compare/v2.44.0...v2.45.0) (2026-05-09)
+
+### Features
+- **cli:** add `--verbose` flag and use it in `clean` ([`a92d441`](https://github.com/jolars/panache/commit/a92d4411ab609e11f2ce5e877b945d552e4a88ee)), closes [#272](https://github.com/jolars/panache/issues/272)
+- **cli:** add a `--to pandoc-json` argument ([`b3f3785`](https://github.com/jolars/panache/commit/b3f378558ef9dab11beb15c6e2ff85cfdbffec28)), closes [#269](https://github.com/jolars/panache/issues/269)
+- **parser:** gate html declarations on dialect ([`9e0b645`](https://github.com/jolars/panache/commit/9e0b64561f39ebf7856263058947a27c7022dde8))
+- **parser:** parser inline spans granularly ([`03333d2`](https://github.com/jolars/panache/commit/03333d241000a0cbea6648967bf08fd940b4e0ab))
+- **parser:** add depth-aware html block parsing ([`2a5dcac`](https://github.com/jolars/panache/commit/2a5dcace3361acb49c222b5bdcf3ef28d3dd8e8b))
+
+### Bug Fixes
+- **parser:** add commonmark-ascii fix ([`4cfcd1c`](https://github.com/jolars/panache/commit/4cfcd1cdcc4575906faffc21b86fa1f7f52a5cb9))
+- **parser,linter:** introduce `HTML_DIV_BLOCK` parsing ([`3962e03`](https://github.com/jolars/panache/commit/3962e0329a83feb5bfbdef84fd3bf52527e7af58)), closes [#263](https://github.com/jolars/panache/issues/263)
+- **linter:** fix undefined-anchor false positive on brackspans ([`0b1a15a`](https://github.com/jolars/panache/commit/0b1a15a5806a483b577cb6ad95aebf02898a5495)), ref [#263](https://github.com/jolars/panache/issues/263)
+- correctly parser trailing attributes in equations ([`492306f`](https://github.com/jolars/panache/commit/492306f2cdaa35ef64b6e43b914797555f5681d9))
+- **parser:** parse references in captions ([`eb29a9d`](https://github.com/jolars/panache/commit/eb29a9d1dfb44c6d9626570e2015eb7898ca166e))
+
+### Dependencies
+- updated crates/panache-formatter to v0.5.0
+- updated crates/panache-parser to v0.8.0
 ## [2.44.0](https://github.com/jolars/panache/compare/v2.43.1...v2.44.0) (2026-05-07)
 
 ### Features

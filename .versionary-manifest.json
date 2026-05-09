@@ -1,11 +1,11 @@
 {
   "manifest-version": 1,
-  "baseline-sha": "84364a4abfcf10193f57e416d32a8b7685790da0",
+  "baseline-sha": "a92d4411ab609e11f2ce5e877b945d552e4a88ee",
   "release-targets": [
     {
       "path": ".",
-      "version": "2.44.0",
-      "tag": "v2.44.0"
+      "version": "2.45.0",
+      "tag": "v2.45.0"
     },
     {
       "path": "crates/panache-dprint",
@@ -14,18 +14,18 @@
     },
     {
       "path": "crates/panache-formatter",
-      "version": "0.4.3",
-      "tag": "panache-formatter-v0.4.3"
+      "version": "0.5.0",
+      "tag": "panache-formatter-v0.5.0"
     },
     {
       "path": "crates/panache-parser",
-      "version": "0.7.1",
-      "tag": "panache-parser-v0.7.1"
+      "version": "0.8.0",
+      "tag": "panache-parser-v0.8.0"
     },
     {
       "path": "editors/code",
-      "version": "2.37.0",
-      "tag": "panache-code-v2.37.0"
+      "version": "2.38.0",
+      "tag": "panache-code-v2.38.0"
     },
     {
       "path": "editors/zed",

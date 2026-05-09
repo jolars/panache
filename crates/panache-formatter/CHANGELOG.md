@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.0](https://github.com/jolars/panache/compare/panache-formatter-v0.4.3...panache-formatter-v0.5.0) (2026-05-09)
+
+### Features
+- **parser:** parser inline spans granularly ([`03333d2`](https://github.com/jolars/panache/commit/03333d241000a0cbea6648967bf08fd940b4e0ab))
+
+### Bug Fixes
+- **parser,linter:** introduce `HTML_DIV_BLOCK` parsing ([`3962e03`](https://github.com/jolars/panache/commit/3962e0329a83feb5bfbdef84fd3bf52527e7af58)), closes [#263](https://github.com/jolars/panache/issues/263)
+
+### Dependencies
+- updated crates/panache-parser to v0.8.0
 ## [0.4.3](https://github.com/jolars/panache/compare/panache-formatter-v0.4.2...panache-formatter-v0.4.3) (2026-05-06)
 
 ### Dependencies
