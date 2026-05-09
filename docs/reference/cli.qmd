@@ -175,6 +175,7 @@ Delete Panache's on-disk cache data.
 ###### **Options:**
 
 * `--all` — Remove all Panache cache buckets
+* `--dry-run` — Print the cache path(s) that would be deleted, along with a summary of file count and size, but do not modify anything on disk. The size summary is always shown in --dry-run mode (the global --verbose flag is not required). Combine with --all to preview removal of every cache bucket.
 
 
 

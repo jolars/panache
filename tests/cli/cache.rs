@@ -198,3 +198,73 @@ fn test_clean_default_omits_size_summary() {
         .stdout(predicate::str::contains("Removed cache directory"))
         .stdout(predicate::str::contains(" file").not());
 }
+
+#[test]
+fn test_clean_dry_run_preserves_cache_and_shows_summary() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    let cache_dir = temp_dir.path().join("custom-cache");
+    fs::create_dir_all(&workspace).unwrap();
+    fs::write(workspace.join("doc.qmd"), "# Heading\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(&workspace)
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "format",
+            "--check",
+            "doc.qmd",
+        ])
+        .assert()
+        .success();
+
+    assert!(
+        cache_dir.exists(),
+        "expected cache directory to exist after format run"
+    );
+
+    cargo_bin_cmd!("panache")
+        .current_dir(&workspace)
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "clean",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Would remove cache directory"))
+        .stdout(predicate::str::is_match(r"\(\d+ files?, .+\)").unwrap());
+
+    assert!(
+        cache_dir.exists(),
+        "expected cache directory to remain after --dry-run"
+    );
+}
+
+#[test]
+fn test_clean_dry_run_reports_missing_directory() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    let cache_dir = temp_dir.path().join("never-created-cache");
+    fs::create_dir_all(&workspace).unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(&workspace)
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "clean",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No cache directory found"))
+        .stdout(predicate::str::contains("Would remove").not());
+
+    assert!(
+        !cache_dir.exists(),
+        "dry-run on a missing cache must not create the directory"
+    );
+}

@@ -1189,7 +1189,7 @@ fn main() -> io::Result<()> {
 
             Ok(())
         }
-        Commands::Clean { all } => {
+        Commands::Clean { all, dry_run } => {
             let start_dir = start_dir_for(None)?;
             let (cfg, _) = load_config_for_cli(
                 cli.config.as_deref(),
@@ -1207,10 +1207,19 @@ fn main() -> io::Result<()> {
             };
 
             let summarize = |path: &Path| -> io::Result<Option<(usize, u64)>> {
-                if cli.verbose {
+                if dry_run || cli.verbose {
                     summarize_dir(path)
                 } else {
                     Ok(None)
+                }
+            };
+
+            let removed_verb = if dry_run { "Would remove" } else { "Removed" };
+            let act = |path: &Path| -> io::Result<bool> {
+                if dry_run {
+                    Ok(path.exists())
+                } else {
+                    remove_dir_if_exists(path)
                 }
             };
 
@@ -1219,10 +1228,10 @@ fn main() -> io::Result<()> {
                     let cache_dir =
                         resolve_cache_dir_for_cli(&cfg, cli.config.as_deref(), &start_dir)?;
                     let summary = summarize(&cache_dir)?;
-                    let removed = remove_dir_if_exists(&cache_dir)?;
+                    let removed = act(&cache_dir)?;
                     if removed {
                         report_clean(format!(
-                            "Removed cache directory {}{}",
+                            "{removed_verb} cache directory {}{}",
                             cache_dir.display(),
                             format_clean_summary(summary)
                         ));
@@ -1234,10 +1243,10 @@ fn main() -> io::Result<()> {
                     }
                 } else if let Some(global_base) = global_cache_base_dir() {
                     let summary = summarize(&global_base)?;
-                    let removed = remove_dir_if_exists(&global_base)?;
+                    let removed = act(&global_base)?;
                     if removed {
                         report_clean(format!(
-                            "Removed all cache buckets at {}{}",
+                            "{removed_verb} all cache buckets at {}{}",
                             global_base.display(),
                             format_clean_summary(summary)
                         ));
@@ -1251,10 +1260,10 @@ fn main() -> io::Result<()> {
                     let cache_dir =
                         resolve_cache_dir_for_cli(&cfg, cli.config.as_deref(), &start_dir)?;
                     let summary = summarize(&cache_dir)?;
-                    let removed = remove_dir_if_exists(&cache_dir)?;
+                    let removed = act(&cache_dir)?;
                     if removed {
                         report_clean(format!(
-                            "Removed cache directory {}{}",
+                            "{removed_verb} cache directory {}{}",
                             cache_dir.display(),
                             format_clean_summary(summary)
                         ));
@@ -1268,10 +1277,10 @@ fn main() -> io::Result<()> {
             } else {
                 let cache_dir = resolve_cache_dir_for_cli(&cfg, cli.config.as_deref(), &start_dir)?;
                 let summary = summarize(&cache_dir)?;
-                let removed = remove_dir_if_exists(&cache_dir)?;
+                let removed = act(&cache_dir)?;
                 if removed {
                     report_clean(format!(
-                        "Removed cache directory {}{}",
+                        "{removed_verb} cache directory {}{}",
                         cache_dir.display(),
                         format_clean_summary(summary)
                     ));

@@ -371,6 +371,17 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
         #[arg(long)]
         #[arg(help = "Remove all Panache cache buckets")]
         all: bool,
+
+        /// Show what would be removed without deleting anything
+        #[arg(long)]
+        #[arg(help = "Show what would be removed without deleting anything")]
+        #[arg(
+            long_help = "Print the cache path(s) that would be deleted, along with a summary \
+            of file count and size, but do not modify anything on disk. The size summary is \
+            always shown in --dry-run mode (the global --verbose flag is not required). \
+            Combine with --all to preview removal of every cache bucket."
+        )]
+        dry_run: bool,
     },
     /// Debug utilities for parser/formatter diagnostics
     #[command(
