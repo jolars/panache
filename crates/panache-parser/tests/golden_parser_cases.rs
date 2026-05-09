@@ -266,6 +266,7 @@ golden_test_cases!(
     html_block,
     html_block_commonmark_type6_type7_commonmark,
     html_block_commonmark_type6_type7_pandoc,
+    html_block_div_multiline_open_pandoc,
     html_block_div_nested_commonmark,
     html_block_div_nested_pandoc,
     html_block_div_with_id_commonmark,

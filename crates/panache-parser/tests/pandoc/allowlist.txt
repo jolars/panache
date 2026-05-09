@@ -301,3 +301,6 @@
 265
 266
 267
+
+# html-block (multi-line div open tag — `<div\n  attrs\n>` with the closing `>` on a separate line; structural HTML_ATTRS exposure across lines so the salsa anchor walk picks up the id)
+268

@@ -415,24 +415,39 @@ pub(crate) fn parse_html_block_with_wrapper(
         first_line
     };
 
-    // Emit opening line
+    // Detect a multi-line `<div>` open tag (e.g. `<div\n  id="x"\n>`).
+    // When the open `>` isn't on the first line, the open tag spans
+    // multiple lines — we tokenize each one structurally so the salsa
+    // anchor walk picks up `id` from the attribute region instead of
+    // letting it fall into raw `HTML_BLOCK_CONTENT` text.
+    let multiline_open_end = if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV && bq_depth == 0 {
+        find_multiline_div_open_end(lines, start_pos, first_inner)
+    } else {
+        None
+    };
+
+    // Emit opening line(s)
     builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
 
-    let (line_without_newline, newline_str) = strip_newline(first_inner);
-    if !line_without_newline.is_empty() {
-        // For HTML_BLOCK_DIV, expose the open tag's attributes
-        // structurally so `AttributeNode::cast(HTML_ATTRS)` finds them
-        // via the same descendants walk that handles fenced-div /
-        // heading attrs. CST bytes stay byte-equal to source — we only
-        // tokenize at finer granularity for matched div opens.
-        if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
-            emit_div_open_tag_tokens(builder, line_without_newline);
-        } else {
-            builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+    if let Some(end_line_idx) = multiline_open_end {
+        emit_multiline_div_open_tag(builder, lines, start_pos, end_line_idx);
+    } else {
+        let (line_without_newline, newline_str) = strip_newline(first_inner);
+        if !line_without_newline.is_empty() {
+            // For HTML_BLOCK_DIV, expose the open tag's attributes
+            // structurally so `AttributeNode::cast(HTML_ATTRS)` finds them
+            // via the same descendants walk that handles fenced-div /
+            // heading attrs. CST bytes stay byte-equal to source — we only
+            // tokenize at finer granularity for matched div opens.
+            if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
+                emit_div_open_tag_tokens(builder, line_without_newline);
+            } else {
+                builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+            }
         }
-    }
-    if !newline_str.is_empty() {
-        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+        if !newline_str.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+        }
     }
 
     builder.finish_node(); // HtmlBlockTag
@@ -452,7 +467,21 @@ pub(crate) fn parse_html_block_with_wrapper(
     };
     let mut depth: i64 = 1;
     if let Some(tag_name) = &depth_aware_tag {
-        let (opens, closes) = count_tag_balance(first_inner, tag_name);
+        // Sum opens/closes across all open-tag lines (single-line: just
+        // line 0; multi-line: lines 0..=end_line_idx).
+        let last_open_line = multiline_open_end.unwrap_or(start_pos);
+        let mut opens = 0usize;
+        let mut closes = 0usize;
+        for line in &lines[start_pos..=last_open_line] {
+            let inner = if bq_depth > 0 {
+                strip_n_blockquote_markers(line, bq_depth)
+            } else {
+                line
+            };
+            let (o, c) = count_tag_balance(inner, tag_name);
+            opens += o;
+            closes += c;
+        }
         depth = opens as i64 - closes as i64;
     }
 
@@ -460,6 +489,7 @@ pub(crate) fn parse_html_block_with_wrapper(
     // blocks (CommonMark types 6 & 7) ignore inline close markers — they only
     // end at a blank line or end of input.
     let same_line_closed = !blank_terminated
+        && multiline_open_end.is_none()
         && match &depth_aware_tag {
             Some(_) => depth <= 0,
             None => is_closing_marker(first_inner, &block_type),
@@ -473,7 +503,9 @@ pub(crate) fn parse_html_block_with_wrapper(
         return start_pos + 1;
     }
 
-    let mut current_pos = start_pos + 1;
+    let mut current_pos = multiline_open_end
+        .map(|end| end + 1)
+        .unwrap_or(start_pos + 1);
     let mut content_lines: Vec<&str> = Vec::new();
     let mut found_closing = false;
 
@@ -640,6 +672,214 @@ fn emit_div_open_tag_tokens(builder: &mut GreenNodeBuilder<'static>, line: &str)
     let after_gt = &after_name[tag_close + 1..];
     if !after_gt.is_empty() {
         builder.token(SyntaxKind::TEXT.into(), after_gt);
+    }
+}
+
+/// Detect a multi-line `<div>` open tag. Returns `Some(end_line_idx)` when
+/// the open tag's closing `>` is on a line *after* `start_pos` and within
+/// `lines`; `None` for single-line opens (handled by the existing path) or
+/// when the `>` is missing entirely.
+///
+/// Quoted attribute values (`"..."`, `'...'`) are honored so a `>` inside an
+/// attribute value doesn't terminate the open tag. Quote state carries
+/// across line boundaries.
+fn find_multiline_div_open_end(
+    lines: &[&str],
+    start_pos: usize,
+    first_inner: &str,
+) -> Option<usize> {
+    // Locate the `<div` literal in `first_inner` to start scanning past it.
+    let trimmed = strip_leading_spaces(first_inner);
+    if !trimmed.starts_with('<') || trimmed.len() < 4 || !trimmed[1..4].eq_ignore_ascii_case("div")
+    {
+        return None;
+    }
+    let leading_indent = first_inner.len() - trimmed.len();
+    let mut i = leading_indent + 4; // past `<div`
+    let mut quote: Option<u8> = None;
+
+    // Scan first line for an unquoted `>`.
+    let line0_bytes = first_inner.as_bytes();
+    while i < line0_bytes.len() {
+        match (quote, line0_bytes[i]) {
+            (None, b'"') | (None, b'\'') => quote = Some(line0_bytes[i]),
+            (Some(q), x) if x == q => quote = None,
+            (None, b'>') => return None, // single-line case
+            _ => {}
+        }
+        i += 1;
+    }
+
+    // No `>` on first line. Scan subsequent lines.
+    let mut line_idx = start_pos + 1;
+    while line_idx < lines.len() {
+        let bytes = lines[line_idx].as_bytes();
+        for &b in bytes {
+            match (quote, b) {
+                (None, b'"') | (None, b'\'') => quote = Some(b),
+                (Some(q), x) if x == q => quote = None,
+                (None, b'>') => return Some(line_idx),
+                _ => {}
+            }
+        }
+        line_idx += 1;
+    }
+
+    None
+}
+
+/// Emit a multi-line `<div>` open tag spanning `lines[start_pos..=end_line_idx]`
+/// as structural CST tokens. Bytes are byte-identical to the source — only
+/// tokenization granularity changes so `AttributeNode::cast(HTML_ATTRS)` finds
+/// the attribute region.
+///
+/// Per-line layout:
+/// - Line 0: TEXT("<div") + (optional WHITESPACE + HTML_ATTRS) + NEWLINE
+/// - Lines 1..N-1: (optional WHITESPACE indent) + HTML_ATTRS + NEWLINE
+/// - Line N (last): (optional WHITESPACE indent) + (HTML_ATTRS + WHITESPACE)?
+///   + TEXT(">") + (TEXT(trailing))? + NEWLINE
+///
+/// Bytes inside HTML_ATTRS may include trailing whitespace before the next
+/// newline; `parse_html_attribute_list` tolerates whitespace.
+fn emit_multiline_div_open_tag(
+    builder: &mut GreenNodeBuilder<'static>,
+    lines: &[&str],
+    start_pos: usize,
+    end_line_idx: usize,
+) {
+    for (line_idx, line) in lines
+        .iter()
+        .enumerate()
+        .take(end_line_idx + 1)
+        .skip(start_pos)
+    {
+        let (line_no_nl, newline_str) = strip_newline(line);
+
+        if line_idx == start_pos {
+            // Line 0: leading indent (if any) + "<div" + (whitespace +
+            // attrs)?. The closing `>` is on a later line, so any
+            // remaining bytes after "<div" on this line are the start of
+            // the attribute region.
+            let bytes = line_no_nl.as_bytes();
+            let indent_end = bytes.iter().position(|&b| b != b' ').unwrap_or(bytes.len());
+            if indent_end > 0 {
+                builder.token(SyntaxKind::WHITESPACE.into(), &line_no_nl[..indent_end]);
+            }
+            // Defensive: caller verified the line starts with `<div`.
+            let after_indent = &line_no_nl[indent_end..];
+            if after_indent.len() >= 4 {
+                builder.token(SyntaxKind::TEXT.into(), &after_indent[..4]); // "<div"
+                let rest = &after_indent[4..];
+                emit_attr_region(builder, rest);
+            } else {
+                builder.token(SyntaxKind::TEXT.into(), after_indent);
+            }
+        } else if line_idx < end_line_idx {
+            // Pure attribute line.
+            let bytes = line_no_nl.as_bytes();
+            let indent_end = bytes
+                .iter()
+                .position(|&b| !matches!(b, b' ' | b'\t'))
+                .unwrap_or(bytes.len());
+            if indent_end > 0 {
+                builder.token(SyntaxKind::WHITESPACE.into(), &line_no_nl[..indent_end]);
+            }
+            let attrs_text = &line_no_nl[indent_end..];
+            if !attrs_text.is_empty() {
+                builder.start_node(SyntaxKind::HTML_ATTRS.into());
+                builder.token(SyntaxKind::TEXT.into(), attrs_text);
+                builder.finish_node();
+            }
+        } else {
+            // Last line: indent + attrs + ">" + trailing.
+            let bytes = line_no_nl.as_bytes();
+            let indent_end = bytes
+                .iter()
+                .position(|&b| !matches!(b, b' ' | b'\t'))
+                .unwrap_or(bytes.len());
+            if indent_end > 0 {
+                builder.token(SyntaxKind::WHITESPACE.into(), &line_no_nl[..indent_end]);
+            }
+            // Find the unquoted `>` byte position in this line.
+            let mut quote: Option<u8> = None;
+            let mut gt_pos: Option<usize> = None;
+            for (j, &b) in line_no_nl.as_bytes()[indent_end..].iter().enumerate() {
+                let actual_j = indent_end + j;
+                match (quote, b) {
+                    (None, b'"') | (None, b'\'') => quote = Some(b),
+                    (Some(q), x) if x == q => quote = None,
+                    (None, b'>') => {
+                        gt_pos = Some(actual_j);
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            let Some(gt) = gt_pos else {
+                // Defensive — caller said `>` is on this line.
+                builder.token(SyntaxKind::TEXT.into(), &line_no_nl[indent_end..]);
+                if !newline_str.is_empty() {
+                    builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+                }
+                continue;
+            };
+            // Attribute region: between indent_end and gt, with possibly
+            // trailing whitespace before `>`.
+            let attrs_region = &line_no_nl[indent_end..gt];
+            let region_bytes = attrs_region.as_bytes();
+            // Strip trailing whitespace from attrs region; emit as
+            // separate WHITESPACE so HTML_ATTRS only contains attribute
+            // bytes.
+            let mut attr_end = region_bytes.len();
+            while attr_end > 0 && matches!(region_bytes[attr_end - 1], b' ' | b'\t') {
+                attr_end -= 1;
+            }
+            let attrs_text = &attrs_region[..attr_end];
+            let trailing_ws = &attrs_region[attr_end..];
+            if !attrs_text.is_empty() {
+                builder.start_node(SyntaxKind::HTML_ATTRS.into());
+                builder.token(SyntaxKind::TEXT.into(), attrs_text);
+                builder.finish_node();
+            }
+            if !trailing_ws.is_empty() {
+                builder.token(SyntaxKind::WHITESPACE.into(), trailing_ws);
+            }
+            builder.token(SyntaxKind::TEXT.into(), ">");
+            let after_gt = &line_no_nl[gt + 1..];
+            if !after_gt.is_empty() {
+                builder.token(SyntaxKind::TEXT.into(), after_gt);
+            }
+        }
+
+        if !newline_str.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+        }
+    }
+}
+
+/// Emit the trailing portion of `<div`'s line 0 — i.e. anything after the
+/// `<div` literal up to end-of-line. Called only from
+/// `emit_multiline_div_open_tag`. The `>` is on a later line, so this is
+/// pure attribute (and possibly inter-attribute whitespace).
+fn emit_attr_region(builder: &mut GreenNodeBuilder<'static>, region: &str) {
+    if region.is_empty() {
+        return;
+    }
+    let bytes = region.as_bytes();
+    // Split a leading run of whitespace into a WHITESPACE token so the
+    // HTML_ATTRS node holds only attribute bytes.
+    let ws_end = bytes
+        .iter()
+        .position(|&b| !matches!(b, b' ' | b'\t'))
+        .unwrap_or(bytes.len());
+    if ws_end > 0 {
+        builder.token(SyntaxKind::WHITESPACE.into(), &region[..ws_end]);
+    }
+    let attrs_text = &region[ws_end..];
+    if !attrs_text.is_empty() {
+        builder.start_node(SyntaxKind::HTML_ATTRS.into());
+        builder.token(SyntaxKind::TEXT.into(), attrs_text);
+        builder.finish_node();
     }
 }
 
@@ -861,7 +1101,7 @@ mod tests {
     #[test]
     fn test_parse_html_comment_block() {
         let input = "<!-- comment -->\n";
-        let lines: Vec<&str> = input.lines().collect();
+        let lines: Vec<&str> = crate::parser::utils::helpers::split_lines_inclusive(input);
         let mut builder = GreenNodeBuilder::new();
 
         let block_type = try_parse_html_block_start(lines[0], false).unwrap();
@@ -880,7 +1120,7 @@ mod tests {
     #[test]
     fn test_parse_div_block() {
         let input = "<div>\ncontent\n</div>\n";
-        let lines: Vec<&str> = input.lines().collect();
+        let lines: Vec<&str> = crate::parser::utils::helpers::split_lines_inclusive(input);
         let mut builder = GreenNodeBuilder::new();
 
         let block_type = try_parse_html_block_start(lines[0], false).unwrap();
@@ -899,7 +1139,7 @@ mod tests {
     #[test]
     fn test_parse_html_block_no_closing() {
         let input = "<div>\ncontent\n";
-        let lines: Vec<&str> = input.lines().collect();
+        let lines: Vec<&str> = crate::parser::utils::helpers::split_lines_inclusive(input);
         let mut builder = GreenNodeBuilder::new();
 
         let block_type = try_parse_html_block_start(lines[0], false).unwrap();
@@ -924,7 +1164,7 @@ mod tests {
         // div parser is depth-aware (mirrors `htmlInBalanced`).
         let input =
             "<div id=\"outer\">\n\n<div id=\"inner\">\n\ndeep content\n\n</div>\n\n</div>\n";
-        let lines: Vec<&str> = input.lines().collect();
+        let lines: Vec<&str> = crate::parser::utils::helpers::split_lines_inclusive(input);
         let mut builder = GreenNodeBuilder::new();
 
         // is_commonmark = false → Pandoc dialect.
@@ -948,7 +1188,7 @@ mod tests {
         // <div>foo</div> on a single line: opens=1, closes=1, depth=0 →
         // close on first line. Depth-aware tracking must not regress this.
         let input = "<div>foo</div>\n";
-        let lines: Vec<&str> = input.lines().collect();
+        let lines: Vec<&str> = crate::parser::utils::helpers::split_lines_inclusive(input);
         let mut builder = GreenNodeBuilder::new();
 
         let block_type = try_parse_html_block_start(lines[0], false).unwrap();
@@ -970,7 +1210,7 @@ mod tests {
         // bogus inner `<script>` inside a JS string; the outer block
         // still closes at the first `</script>`.
         let input = "<script>\nlet x = '<script>';\n</script>\n";
-        let lines: Vec<&str> = input.lines().collect();
+        let lines: Vec<&str> = crate::parser::utils::helpers::split_lines_inclusive(input);
         let mut builder = GreenNodeBuilder::new();
 
         // is_commonmark = true.
@@ -988,9 +1228,99 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_div_block_multiline_open_close_separate_line_pandoc() {
+        // Multi-line open tag with the closing `>` on its own line:
+        //
+        //   <div
+        //     id="x"
+        //     class="y"
+        //   >
+        //
+        //   foo
+        //
+        //   </div>
+        //
+        // Open tag spans lines 0..=3. Content starts at line 4.
+        let input = "<div\n  id=\"x\"\n  class=\"y\"\n>\n\nfoo\n\n</div>\n";
+        let lines: Vec<&str> = crate::parser::utils::helpers::split_lines_inclusive(input);
+        let mut builder = GreenNodeBuilder::new();
+
+        let block_type = try_parse_html_block_start(lines[0], false).unwrap();
+        let new_pos = parse_html_block_with_wrapper(
+            &mut builder,
+            &lines,
+            0,
+            block_type,
+            0,
+            SyntaxKind::HTML_BLOCK_DIV,
+        );
+
+        // 8 lines: open-line 0, open-line 1 (`  id="x"`), open-line 2
+        // (`  class="y"`), open-line 3 (`>`), blank, foo, blank, </div>.
+        assert_eq!(new_pos, 8);
+
+        // CST must contain a structural HTML_ATTRS region holding the
+        // attribute bytes (so the salsa anchor walk picks up `id="x"`).
+        let green = builder.finish();
+        let root = crate::syntax::SyntaxNode::new_root(green);
+        let attrs_count = root
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::HTML_ATTRS)
+            .count();
+        assert!(attrs_count >= 1, "expected at least one HTML_ATTRS node");
+
+        // Byte-identical losslessness check.
+        let collected: String = root
+            .descendants_with_tokens()
+            .filter_map(|n| n.into_token())
+            .map(|t| t.text().to_string())
+            .collect();
+        assert_eq!(collected, input);
+    }
+
+    #[test]
+    fn test_parse_div_block_multiline_open_close_inline_pandoc() {
+        // Multi-line open tag with the closing `>` on the last attribute
+        // line (case 0262 already covers this pattern; pin behavior to
+        // also ensure HTML_ATTRS structural exposure).
+        let input = "<div\n  id=\"x\"\n  class=\"y\">\nfoo\n</div>\n";
+        let lines: Vec<&str> = crate::parser::utils::helpers::split_lines_inclusive(input);
+        let mut builder = GreenNodeBuilder::new();
+
+        let block_type = try_parse_html_block_start(lines[0], false).unwrap();
+        let new_pos = parse_html_block_with_wrapper(
+            &mut builder,
+            &lines,
+            0,
+            block_type,
+            0,
+            SyntaxKind::HTML_BLOCK_DIV,
+        );
+
+        // 5 lines: open-line 0, open-line 1, open-line 2 (with `>`), foo,
+        // </div>.
+        assert_eq!(new_pos, 5);
+
+        let green = builder.finish();
+        let root = crate::syntax::SyntaxNode::new_root(green);
+        let attrs_count = root
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::HTML_ATTRS)
+            .count();
+        assert!(attrs_count >= 1, "expected at least one HTML_ATTRS node");
+
+        let collected: String = root
+            .descendants_with_tokens()
+            .filter_map(|n| n.into_token())
+            .map(|t| t.text().to_string())
+            .collect();
+        assert_eq!(collected, input);
+    }
+
+    #[test]
     fn test_commonmark_type6_blank_line_terminates() {
         let input = "<div>\nfoo\n\nbar\n";
-        let lines: Vec<&str> = input.lines().collect();
+        let lines: Vec<&str> = crate::parser::utils::helpers::split_lines_inclusive(input);
         let mut builder = GreenNodeBuilder::new();
 
         let block_type = try_parse_html_block_start(lines[0], true).unwrap();
