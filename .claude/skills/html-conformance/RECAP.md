@@ -11,7 +11,143 @@ reverted, what trap to avoid) are the load-bearing content here.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-09 (Phase 3 — dialect-divergent `blockHtmlTags` for `<dialog>`/`<canvas>`/etc.)
+## Latest session — 2026-05-09 (Phase 5 audit — pivoted to losslessness regression in `<DIV>` open-tag emission)
+
+**html (block + inline) pass count: 87 → 87** (no corpus change).
+**Workspace test count: 0 failing → 0 failing** (all green).
+**Total pandoc conformance: 279/279 → 279/279 (100.0% → 100.0%)**.
+**New parser fixture: 1** (uppercase `<DIV>` losslessness regression guard).
+
+### What landed
+
+Started a Phase 5 projector-cleanup audit (option #3 from the previous
+recap). While probing `try_div_html_block` callsites, discovered a
+**parser-side losslessness regression**: `<DIV>foo</DIV>` formatted as
+`<div>foo</DIV>` because `emit_div_open_tag_tokens` in
+`crates/panache-parser/src/parser/blocks/html_blocks.rs` hardcoded the
+literal string `"<div"` when emitting the TEXT token for the opening
+tag name, instead of using the original 4 source bytes. The
+multi-line div emitter (`emit_multiline_div_open_tag`) already used
+original bytes, so only the same-line + multi-attr-on-line-0 path was
+affected.
+
+Per AGENTS.md ("Parsing failures take priority over formatting issues
+— the parser must be robust and lossless"), pivoted to the
+losslessness fix:
+
+- One-line change in `emit_div_open_tag_tokens`: `"<div"` →
+  `&rest[..4]`. The byte range is already verified by the case-
+  insensitive prefix check at the top of the function, so this is
+  source-byte-equivalent.
+- Added paired parser fixture
+  `crates/panache-parser/tests/fixtures/cases/html_block_div_uppercase_pandoc/`
+  covering same-line, multi-line-content, and multi-line-open shapes
+  with `<DIV>`/`<DiV>` casings. Snapshot pins the structural CST
+  preserving original casing.
+
+### Why the projector cleanup was set aside
+
+The audit found genuine but **marginal** simplification opportunities:
+
+- **Most callsites of `try_div_html_block` are still load-bearing.**
+  The byte-aware close lookahead in `find_matching_html_close` is
+  needed for inner `<div>` inside outer non-div HTML blocks (e.g.
+  `<aside><div>...</div></aside>` — verified against pandoc-native).
+- **The same-line `<div>foo</div>` shape packs everything into a
+  single `HTML_BLOCK_TAG`** (see `tests/snapshots/...uppercase_pandoc.snap`
+  for the structural shape). Walking the CST to extract inner content
+  for this case still requires byte-level `</div>` finding inside the
+  TEXT child. So full structural CST-walking in `html_div_block`
+  duplicates code rather than reducing it.
+- **The early `try_div_html_block` calls in `html_block` and
+  `emit_html_block`** (lines 1075, 1119) are *probably* dead under
+  Pandoc dialect because the parser's `<div>` lift always retags to
+  HTML_BLOCK_DIV. Removing them is plausibly safe but offers little
+  beyond cosmetics, with non-zero risk of breaking edge cases the
+  corpus doesn't exercise (e.g. malformed `<div>` blocks the parser
+  fell back to `HTML_BLOCK` for).
+
+The recap's own characterization — "Low risk, low immediate value" —
+held up. The losslessness fix was unambiguously higher value, so the
+session shipped that and left the cleanup deferred.
+
+### Files in committable diff
+
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs` —
+  one-line fix in `emit_div_open_tag_tokens` to use original
+  source bytes for the opening tag name (`<div` literal →
+  `&rest[..4]`). Comment added.
+- `crates/panache-parser/tests/fixtures/cases/html_block_div_uppercase_pandoc/input.md`
+  — 13-line fixture covering three uppercase-div shapes.
+- `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_html_block_div_uppercase_pandoc.snap`
+  — pinned CST snapshot.
+- `crates/panache-parser/tests/golden_parser_cases.rs` —
+  registers the new case (one line).
+
+No projector, salsa, formatter, or linter changes.
+
+### Suggested next sub-targets, ranked
+
+1. **Phase 3 corpus expansion — sectioning / verbatim
+   negative-space.** Pin existing pandoc-native parity for the
+   modern HTML5 tags not yet in the corpus: `<header>`, `<footer>`,
+   `<main>`, `<details>`, `<figure>`, `<figcaption>`, `<form>`,
+   `<table>`, `<iframe>`. These currently match (verified in the
+   prior session's probes), but without corpus cases a future
+   regression won't be caught. Pure low-risk corpus growth; ~6-10
+   cases.
+2. **Phase 4 — Comments, processing instructions, declarations,
+   CDATA projection.** Already mostly correct (verified earlier
+   for `<?xml>` and `<!DOCTYPE>`); seed corpus to lock behavior.
+3. **Audit `parse_html_attrs` and `find_matching_html_close` for
+   similar literal-byte hazards.** This session found one hardcoded
+   literal that violated losslessness; it's worth grep'ing the
+   parser's HTML paths for other places where literal strings are
+   emitted into the CST instead of source-byte slices. Low-medium
+   value.
+4. **Outer-wins-on-conflict for inherited refs/footnotes** (still
+   deferred — no corpus exercises it).
+
+The original "Phase 5 projector cleanup" target is now removed
+from the ranked list — the audit concluded its value is genuinely
+low and the same-line CST shape limits how clean the simplification
+can be made.
+
+### Don't redo / known traps (new this session)
+
+- **`emit_div_open_tag_tokens` had a literal `"<div"` token, not a
+  source-byte slice.** Any path that emits TEXT tokens for HTML
+  must use `&source[range]`, never literal strings — the
+  case-insensitive prefix match at the top of the function gives a
+  false sense of byte-identity. Other HTML emitters in
+  `html_blocks.rs` look correct (multi-line uses
+  `&after_indent[..4]`), but a sweep is on the next-targets list.
+- **Same-line `<div>foo</div>` is one `HTML_BLOCK_TAG` token, not
+  open + content + close.** The structural shape is:
+  ```
+  HTML_BLOCK_DIV
+    HTML_BLOCK_TAG  ← only one!
+      TEXT "<div"
+      WHITESPACE " "?
+      HTML_ATTRS?
+      TEXT ">"
+      TEXT "foo</div>"  ← inner + close packed together
+      NEWLINE
+  ```
+  Any structural CST-walking projector needs to handle the case where
+  the close `</div>` lives inside a TEXT child of the open
+  `HTML_BLOCK_TAG`, not as a sibling tag. This is why the byte-aware
+  `try_div_html_block` is the cleanest projector code path despite
+  feeling redundant against the parser-side lift.
+- **The recap option labeled "Phase 5 — projector cleanup" turned
+  out to be a low-yield audit.** Don't reopen it without a concrete
+  failing case that the projector cleanup would unblock; the
+  redundancy with the parser-side lift is *real* but the
+  refactor cost dominates the readability gain.
+
+--------------------------------------------------------------------------------
+
+## Earlier session — 2026-05-09 (Phase 3 — dialect-divergent `blockHtmlTags` for `<dialog>`/`<canvas>`/etc.)
 
 **html (block + inline) pass count: 80 → 87** (7 new corpus cases —
 all passing).

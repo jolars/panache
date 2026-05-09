@@ -736,7 +736,8 @@ fn emit_div_open_tag_tokens(builder: &mut GreenNodeBuilder<'static>, line: &str)
     let trailing_text = &attrs_after_ws[attr_end..self_close_start.max(attr_end)];
     let after_self_close = &attrs_after_ws[self_close_start..];
 
-    builder.token(SyntaxKind::TEXT.into(), "<div");
+    // Use the original 4 source bytes (preserves source casing — losslessness).
+    builder.token(SyntaxKind::TEXT.into(), &rest[..4]);
     if !leading_ws.is_empty() {
         builder.token(SyntaxKind::WHITESPACE.into(), leading_ws);
     }
