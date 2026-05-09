@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0](https://github.com/jolars/panache/compare/panache-parser-v0.7.1...panache-parser-v0.8.0) (2026-05-09)
+
+### Features
+- **parser:** add depth-aware html block parsing ([`2a5dcac`](https://github.com/jolars/panache/commit/2a5dcace3361acb49c222b5bdcf3ef28d3dd8e8b))
+- **cli:** add a `--to pandoc-json` argument ([`b3f3785`](https://github.com/jolars/panache/commit/b3f378558ef9dab11beb15c6e2ff85cfdbffec28)), closes [#269](https://github.com/jolars/panache/issues/269)
+- **parser:** gate html declarations on dialect ([`9e0b645`](https://github.com/jolars/panache/commit/9e0b64561f39ebf7856263058947a27c7022dde8))
+- **parser:** parser inline spans granularly ([`03333d2`](https://github.com/jolars/panache/commit/03333d241000a0cbea6648967bf08fd940b4e0ab))
+
+### Bug Fixes
+- correctly parser trailing attributes in equations ([`492306f`](https://github.com/jolars/panache/commit/492306f2cdaa35ef64b6e43b914797555f5681d9))
+- **parser:** parse references in captions ([`eb29a9d`](https://github.com/jolars/panache/commit/eb29a9d1dfb44c6d9626570e2015eb7898ca166e))
+- **parser:** add commonmark-ascii fix ([`4cfcd1c`](https://github.com/jolars/panache/commit/4cfcd1cdcc4575906faffc21b86fa1f7f52a5cb9))
+- **parser,linter:** introduce `HTML_DIV_BLOCK` parsing ([`3962e03`](https://github.com/jolars/panache/commit/3962e0329a83feb5bfbdef84fd3bf52527e7af58)), closes [#263](https://github.com/jolars/panache/issues/263)
 ## [0.7.1](https://github.com/jolars/panache/compare/panache-parser-v0.7.0...panache-parser-v0.7.1) (2026-05-06)
 
 ### Bug Fixes
