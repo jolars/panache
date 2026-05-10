@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..72
+  HTML_BLOCK@0..72
+    HTML_BLOCK_TAG@0..29
+      TEXT@0..28 "<video controls width ..."
+      NEWLINE@28..29 "\n"
+    HTML_BLOCK_CONTENT@29..63
+      TEXT@29..53 "<source src=\"movie.mp4\">"
+      NEWLINE@53..54 "\n"
+      TEXT@54..62 "fallback"
+      NEWLINE@62..63 "\n"
+    HTML_BLOCK_TAG@63..72
+      TEXT@63..71 "</video>"
+      NEWLINE@71..72 "\n"

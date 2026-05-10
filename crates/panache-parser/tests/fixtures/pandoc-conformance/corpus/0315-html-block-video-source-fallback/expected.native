@@ -1,0 +1,8 @@
+[ RawBlock (Format "html") "<video controls width=\"320\">"
+, RawBlock (Format "html") "<source src=\"movie.mp4\">"
+, Para
+    [ Str "fallback"
+    , SoftBreak
+    , RawInline (Format "html") "</video>"
+    ]
+]

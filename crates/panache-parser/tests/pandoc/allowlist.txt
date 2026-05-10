@@ -364,3 +364,9 @@
 312
 313
 314
+
+# html-block (inline-block matched-pair lift abandons when interior starts with a void block tag — `<video>\n<source>...\nfallback\n</video>` projects as separate RawBlocks for `<video>` and `<source>` plus a Para[fallback, SoftBreak, RawInline</video>] (per pandoc-native), instead of the prior lift that demoted to Plain[fallback] and emitted `</video>` as RawBlock. Closing forms of inline-block / void tags (`</video>`, `</button>`, `</embed>`, ...) now also start a single-line RawBlock at fresh-block positions, fixing standalone-close-tag recursion and matching pandoc's `htmlBlock` behavior. Cases 316–318 cover the standalone-close + open-without-close shapes.)
+315
+316
+317
+318

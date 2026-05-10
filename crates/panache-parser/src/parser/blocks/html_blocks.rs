@@ -313,10 +313,25 @@ pub(crate) fn try_parse_html_block_start(
         }
     }
 
-    // Try to parse as opening tag (or closing tag, under CommonMark)
-    if let Some(tag_name) = extract_block_tag_name(trimmed, is_commonmark) {
+    // Try to parse as opening tag (or closing tag, under CommonMark and Pandoc).
+    // Pandoc-native recognizes a standalone `</video>`, `</button>`, `</embed>`
+    // etc. as a single-line `RawBlock`; the strict-block close path (`</p>`,
+    // `</nav>`) and verbatim close path (`</pre>`) still fall through to inline
+    // here — those still diverge from pandoc-native and are tracked separately.
+    if let Some(tag_name) = extract_block_tag_name(trimmed, true) {
         let tag_lower = tag_name.to_lowercase();
         let is_closing = trimmed.starts_with("</");
+
+        // Under Pandoc, only inline-block + void closing forms are recognized
+        // as block starts; everything else falls through to the existing
+        // inline-html path.
+        if !is_commonmark
+            && is_closing
+            && !PANDOC_INLINE_BLOCK_TAGS.contains(&tag_lower.as_str())
+            && !PANDOC_VOID_BLOCK_TAGS.contains(&tag_lower.as_str())
+        {
+            return None;
+        }
 
         // Check if it's a block-level tag. Pandoc and CommonMark disagree on
         // membership: pandoc's `blockHtmlTags` (see
@@ -343,14 +358,16 @@ pub(crate) fn try_parse_html_block_start(
         // starters at fresh-block positions. The block dispatcher caller
         // gates these as `cannot_interrupt` (mirrors pandoc — they never
         // interrupt a running paragraph; only start a fresh block when
-        // following a blank line or at document start).
-        if !is_commonmark && !is_closing && PANDOC_INLINE_BLOCK_TAGS.contains(&tag_lower.as_str()) {
+        // following a blank line or at document start). Closing forms
+        // (`</video>`) emit as a single-line `RawBlock` with no balanced
+        // match — pandoc-native pins this for standalone closes.
+        if !is_commonmark && PANDOC_INLINE_BLOCK_TAGS.contains(&tag_lower.as_str()) {
             return Some(HtmlBlockType::BlockTag {
                 tag_name: tag_lower,
                 is_verbatim: false,
                 closed_by_blank_line: false,
-                depth_aware: true,
-                closes_at_open_tag: false,
+                depth_aware: !is_closing,
+                closes_at_open_tag: is_closing,
             });
         }
 
@@ -362,8 +379,10 @@ pub(crate) fn try_parse_html_block_start(
         // (e.g. `<embed src="a"> trailing` → RawBlock + Para). Like
         // non-void inline-block tags, void tags never interrupt a
         // running paragraph (gated as `cannot_interrupt` in the
-        // dispatcher).
-        if !is_commonmark && !is_closing && PANDOC_VOID_BLOCK_TAGS.contains(&tag_lower.as_str()) {
+        // dispatcher). Closing forms (`</embed>`) — semantically
+        // nonsensical for void elements — pandoc still emits as a
+        // single-line `RawBlock`; mirror that.
+        if !is_commonmark && PANDOC_VOID_BLOCK_TAGS.contains(&tag_lower.as_str()) {
             return Some(HtmlBlockType::BlockTag {
                 tag_name: tag_lower,
                 is_verbatim: false,
@@ -1398,11 +1417,24 @@ mod tests {
                 "{tag} should be a depth-aware block-tag start under Pandoc",
             );
         }
-        // Closing forms of inline-block tags do NOT start a block
-        // (mirrors pandoc's `htmlTag isBlockTag` which only matches
-        // open tags here).
-        assert_eq!(try_parse_html_block_start("</button>", false), None);
-        assert_eq!(try_parse_html_block_start("</iframe>", false), None);
+        // Closing forms of inline-block tags also start a block under
+        // Pandoc — pandoc-native pins `</button>` standalone as a
+        // single-line `RawBlock`. These use `closes_at_open_tag: true`
+        // (no balanced match — the close emits as a one-line block on
+        // its own).
+        for closing in ["</button>", "</iframe>", "</video>", "</audio>"] {
+            assert!(
+                matches!(
+                    try_parse_html_block_start(closing, false),
+                    Some(HtmlBlockType::BlockTag {
+                        depth_aware: false,
+                        closes_at_open_tag: true,
+                        ..
+                    })
+                ),
+                "{closing} (closing form) should be a single-line block-tag start under Pandoc",
+            );
+        }
     }
 
     #[test]
@@ -1431,15 +1463,22 @@ mod tests {
                 "{tag} should be a void block-tag start under Pandoc",
             );
         }
-        // Closing forms of void tags must NOT start a block. Void
-        // elements have no closing tag in HTML, but `</embed>` could
-        // appear in the wild — pandoc's `htmlTag isBlockTag` only
-        // matches open tags here, so we mirror that.
+        // Closing forms of void tags also start a single-line block
+        // under Pandoc. Void elements have no closing tag in HTML, but
+        // `</embed>` etc. can appear in the wild — pandoc-native still
+        // emits them as `RawBlock`s at fresh-block positions; mirror
+        // that with the same `closes_at_open_tag: true` shape.
         for closing in ["</area>", "</embed>", "</source>", "</track>"] {
-            assert_eq!(
-                try_parse_html_block_start(closing, false),
-                None,
-                "{closing} (closing form) should NOT start a void block under Pandoc",
+            assert!(
+                matches!(
+                    try_parse_html_block_start(closing, false),
+                    Some(HtmlBlockType::BlockTag {
+                        depth_aware: false,
+                        closes_at_open_tag: true,
+                        ..
+                    })
+                ),
+                "{closing} (closing form) should be a single-line void block-tag start under Pandoc",
             );
         }
         // Under CommonMark dialect, the void-tag block-start path is

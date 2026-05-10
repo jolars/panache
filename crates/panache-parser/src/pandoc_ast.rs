@@ -1233,25 +1233,48 @@ fn split_html_block_by_tags(content: &str, out: &mut Vec<Block>) {
             continue;
         }
         if is_pandoc_inline_block_tag_name(name) {
-            // At a fresh-block position, lift `<tag>...</tag>` into
-            // RawBlock + interior + RawBlock. Inside inline content
-            // (`inline_pending == true`), pass through as inline raw
-            // HTML. Closing tags without a matched open also stay
-            // inline.
-            if !is_close
-                && !inline_pending
-                && let Some((close_start, close_end)) =
-                    find_matching_html_close_with_start(content, i, name)
-            {
+            // At a fresh-block position (!inline_pending):
+            //
+            // - Open tag with matched close, interior not opening with a
+            //   void block tag: lift `<tag>...</tag>` into RawBlock +
+            //   interior + RawBlock.
+            // - Open tag with no matched close, or open tag whose interior
+            //   begins (after any indent) with a void block tag at column
+            //   0: emit the open tag as a single RawBlock and continue
+            //   scanning. Pandoc-native treats `<video>\n<source>...` as
+            //   per-tag emission rather than a balanced span; once
+            //   `<source>` interrupts the run, the closing `</video>` ends
+            //   up as `RawInline` inside the trailing paragraph.
+            // - Close tag at fresh-block: emit as a single RawBlock.
+            //   Pandoc-native pins `</video>` standalone as a RawBlock.
+            //
+            // Inside an existing inline run (`inline_pending == true`),
+            // pass through as inline raw HTML (pandoc's `cannot_interrupt`
+            // semantics for `eitherBlockOrInline` tags).
+            if !inline_pending {
+                if !is_close
+                    && let Some((close_start, close_end)) =
+                        find_matching_html_close_with_start(content, i, name)
+                    && !interior_starts_with_void_block_tag(content, i + tag_end)
+                {
+                    if i > text_start {
+                        flush_html_block_text(&content[text_start..i], out);
+                    }
+                    out.push(Block::RawBlock("html".to_string(), tag_text.to_string()));
+                    let interior = &content[i + tag_end..close_start];
+                    flush_html_block_text(interior, out);
+                    let close_text = &content[close_start..close_end];
+                    out.push(Block::RawBlock("html".to_string(), close_text.to_string()));
+                    i = close_end;
+                    text_start = i;
+                    inline_pending = false;
+                    continue;
+                }
                 if i > text_start {
                     flush_html_block_text(&content[text_start..i], out);
                 }
                 out.push(Block::RawBlock("html".to_string(), tag_text.to_string()));
-                let interior = &content[i + tag_end..close_start];
-                flush_html_block_text(interior, out);
-                let close_text = &content[close_start..close_end];
-                out.push(Block::RawBlock("html".to_string(), close_text.to_string()));
-                i = close_end;
+                i += tag_end;
                 text_start = i;
                 inline_pending = false;
                 continue;
@@ -1336,6 +1359,33 @@ fn flush_html_block_tail_text(text: &str, out: &mut Vec<Block>) {
 
 fn trailing_newlines(s: &str) -> usize {
     s.bytes().rev().take_while(|&b| b == b'\n').count()
+}
+
+/// Whether the slice of `content` starting at `interior_start` (the byte
+/// just after an inline-block open tag like `<video>`) begins on its first
+/// non-blank line with a void block tag (`<source>`, `<embed>`, `<area>`,
+/// `<track>`). When true, pandoc-native abandons the matched-pair lift —
+/// the void tag emits as its own `RawBlock` and the closing `</video>`
+/// ends up inline inside the trailing paragraph rather than as a
+/// matched-pair close. Leading indentation is allowed before the void tag
+/// (pandoc still abandons even when the void tag is indented).
+fn interior_starts_with_void_block_tag(content: &str, interior_start: usize) -> bool {
+    use crate::parser::blocks::html_blocks::is_pandoc_void_block_tag_name;
+    use crate::parser::inlines::inline_html::parse_open_tag;
+
+    let bytes = content.as_bytes();
+    let mut i = interior_start;
+    while i < bytes.len() && matches!(bytes[i], b'\n' | b' ' | b'\t') {
+        i += 1;
+    }
+    if i >= bytes.len() || bytes[i] != b'<' {
+        return false;
+    }
+    let rest = &content[i..];
+    let Some(end) = parse_open_tag(rest) else {
+        return false;
+    };
+    extract_html_tag_name(&rest[..end]).is_some_and(is_pandoc_void_block_tag_name)
 }
 
 /// Extract the tag name from a complete HTML tag text (`<name ...>` or

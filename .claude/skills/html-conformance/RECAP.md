@@ -99,10 +99,16 @@ back into a session entry only if it's purely historical.
   directions** by ~15 tags. Don't merge them. The parser's
   `is_commonmark` flag gates which list runs; the projector only
   runs under Pandoc and uses `is_pandoc_block_tag_name` directly.
-- **Closing forms must be excluded from the block-start
-  recognizer.** `<button>` opens a block; `</button>` does not (it
-  goes inline). Mirrors pandoc's `htmlTag isBlockTag` which only
-  matches open tags.
+- **Closing forms of inline-block / void tags ARE block starts
+  under Pandoc.** `</video>`, `</button>`, `</embed>` standalone
+  emit as single-line `RawBlock`s in pandoc-native; the parser
+  routes them via `closes_at_open_tag: true` so the block ends on
+  the open line. `cannot_interrupt` (gated on tag-name membership
+  in the dispatcher) keeps them from breaking running paragraphs.
+  Strict-block closes (`</p>`, `</nav>`) and verbatim closes
+  (`</pre>`) still fall through to inline (separate gap, tracked).
+  pandoc's `htmlTag isBlockTag` matches BOTH directions — earlier
+  recap claims that "closing forms must be excluded" were wrong.
 - **`<script>` is in `eitherBlockOrInline` AND `blockHtmlTags`.**
   Verbatim handling fires first via `VERBATIM_TAGS`; don't add
   `script` to `PANDOC_INLINE_BLOCK_TAGS`. Likewise `<pre>`,
@@ -116,6 +122,21 @@ back into a session entry only if it's purely historical.
   context-tracked via `inline_pending`. Don't try to "merge" with
   `find_matching_close` (the smart-quote bracket scanner) — same
   name, different inputs.
+- **Matched-pair lift for `<video>...</video>` must abandon when
+  interior opens with a void block tag at column 0.** Pandoc-native
+  emits per-tag (`<video>` RB, `<source>` RB, Para[fallback, SB,
+  RawInline</video>]) — not a balanced lift. Helper
+  `interior_starts_with_void_block_tag` peeks past leading
+  newlines/whitespace; on hit, the open tag emits as a single
+  RawBlock and the closing `</video>` falls into the trailing
+  paragraph reparse as RawInline. Indentation before the void tag
+  doesn't save the lift (pandoc abandons even with 4-space indent).
+- **Inline-block open with no matched close must emit as RawBlock
+  at fresh-block.** Falling through to `inline_pending=true` causes
+  the trailing tail-text reparse to recurse on the same `<video>...`
+  bytes (parser still recognizes the open tag, projector splits it
+  again, …) → stack overflow. The same `interior_starts_with_void`
+  bail and the no-match bail share the single-tag emit path.
 - **`inline_pending` resets on consecutive newlines (≥ 2).** A
   blank line restarts pandoc's block parser; in our byte walker
   that's `\n\n`. Don't substitute "byte == whitespace" — single
@@ -177,101 +198,113 @@ back into a session entry only if it's purely historical.
 | 2 | `<span>` inline lift (INLINE_HTML_SPAN) | **Complete** (2026-05-08) |
 | 3 | Sectioning + verbatim corpus pin; `eitherBlockOrInline` lift | **Complete** — non-void (2026-05-09); void (`<embed>`/`<area>`/`<source>`/`<track>`) (2026-05-10) |
 | 4 | Comments, PIs, declarations, CDATA projection | **Complete** (2026-05-08); type-4 CM lowercase still gappy |
-| 5 | `markdown_in_html_blocks` interaction edge cases | **Mostly complete** — depth-aware nested div, Plain/Para promotion, refs inheritance, projector-level splitter all landed; outer-matched-pair-with-inner-split-conflict still gappy |
+| 5 | `markdown_in_html_blocks` interaction edge cases | **Complete** — depth-aware nested div, Plain/Para promotion, refs inheritance, projector-level splitter, outer-matched-pair-abandons-on-void-interior all landed (last gap closed 2026-05-10) |
 
 Multi-line `<div>` open-tag structural HTML_ATTRS lift landed
 (2026-05-09). Multi-line void open-tag now lifts via
 `find_multiline_open_end` + simple per-line TEXT/NEWLINE emission
+(2026-05-10). Inline-block / void closing forms (`</video>`,
+`</embed>`) also start single-line `RawBlock`s under Pandoc
 (2026-05-10).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-10 (multi-line void open-tag lift)
+## Latest session — 2026-05-10 (inline-block close lift + matched-pair abandon)
 
-**html pass count: 117 → 122** (+5 new corpus cases). **Workspace:
-0 → 0 failing.** **Total pandoc conformance: 309/309 → 314/314.**
-**New parser fixtures: 2** (paired multi-line embed open
-Pandoc/CommonMark).
+**html pass count: 122 → 126** (+4 new corpus cases). **Workspace:
+0 → 0 failing.** **Total pandoc conformance: 314/314 → 318/318.**
+**New parser fixtures: 3** (paired close-standalone Pandoc/CommonMark
++ video-source-fallback Pandoc).
 
 ### What landed
 
-The previous session's "next #1" — pandoc-native emits a single
-`RawBlock` spanning the whole multi-line open tag (`<embed\n
-src="x">` → `RawBlock "<embed\n  src=\"x\">"`); panache was
-emitting two paragraphs because the void-tag path closes the
-HTML block after line 0.
+Closed Phase 5's last gap: `<video>\n<source src="x">\nfallback\n
+</video>` projected as `[RawBlock<video>, RawBlock<source>,
+Plain[fallback], RawBlock</video>]` instead of pandoc-native's
+`[RawBlock<video>, RawBlock<source>, Para[Str fallback, SoftBreak,
+RawInline</video>]]`. Two related parser-shape gaps surfaced and
+were fixed in the same session:
 
-1. Generalized `find_multiline_div_open_end` →
-   `find_multiline_open_end(lines, start_pos, first_inner,
-   tag_name)` over arbitrary tag names. Same scan logic; tag
-   name parameterizes the prefix length and ASCII-case-insensitive
-   match. Only callers in `parse_html_block_with_wrapper`.
-2. Extended the multi-line open detection in
-   `parse_html_block_with_wrapper` to also fire for void block
-   tags (`closes_at_open_tag: true`) under `bq_depth == 0`. New
-   `emit_multiline_open_tag_simple` emits each open-tag line as
-   plain TEXT + NEWLINE — no HTML_ATTRS structural node since
-   the projector doesn't read attributes for void tags.
-3. New early-exit branch: when a void block tag has a multi-line
-   open, the HTML_BLOCK closes after the open-tag's last line
-   (mirrors the single-line void path).
-4. New unit test `test_find_multiline_open_end` covering single-
-   line returns None, multi-line returns end-line, tag-name
-   case-insensitivity, mismatch returns None, quoted-`>`
-   threading, and the no-`>` rejection.
+1. **Parser** (`html_blocks.rs::try_parse_html_block_start`):
+   accept closing forms (`</video>`, `</button>`, `</embed>`, …)
+   under Pandoc dialect for both `PANDOC_INLINE_BLOCK_TAGS` and
+   `PANDOC_VOID_BLOCK_TAGS`, routed via `closes_at_open_tag: true`
+   so the block ends on the open-tag line. `cannot_interrupt`
+   (gated on tag-name membership in the dispatcher) keeps closing
+   tags from breaking running paragraphs — `foo\n</video>` still
+   stays as `Para[foo, SoftBreak, RawInline</video>]`.
+2. **Projector** (`pandoc_ast.rs::split_html_block_by_tags`,
+   inline-block arm): new helper
+   `interior_starts_with_void_block_tag` peeks past leading
+   newlines/whitespace; when the interior of `<video>...</video>`
+   opens with a void block tag at column 0, the matched-pair lift
+   abandons and emits the open tag as a single `RawBlock`. The
+   trailing `</video>` ends up as `RawInline` inside the
+   reparsed-paragraph tail.
+3. **Projector**: same arm now also emits a single `RawBlock` for
+   inline-block opens with no matched close (e.g. `<video>\nfoo\n`)
+   and for closing tags at fresh-block positions. Without this, the
+   tail-text reparse re-recognized the same open tag and recursed
+   to a stack overflow.
 
-5 new corpus cases (0310–0314): each of `<embed>`, `<area>`,
-`<source>`, `<track>` with a 2-line open, plus a 3-line `<embed>`
-case. 2 new paired parser fixtures
-(`html_block_multiline_embed_open_{pandoc,commonmark}`) pin the
-dialect-divergent CST: Pandoc → HTML_BLOCK with HTML_BLOCK_TAG
-spanning both lines; CommonMark → PARAGRAPH with INLINE_HTML
-(`<embed>` isn't in CommonMark's BLOCK_TAGS).
-
-Strict-block tags like `<table\n  border="1">` already produce
-correct pandoc-native output via the existing depth-aware close
-path + projector byte-level splitter, so they were left
-untouched (cleanup-only, not correctness; out of scope).
+4 new corpus cases (0315–0318): `<video>\n<source>\nfallback\n
+</video>` (the original divergence); `</video>\n` standalone close;
+`<video>\nfoo\n` open-without-close; `</button>\n` standalone
+inline-block close. 3 new paired parser fixtures
+(`html_block_video_close_standalone_{pandoc,commonmark}` and
+`html_block_video_source_fallback_pandoc`); the close-standalone
+pair pins the dialect-divergent CST — Pandoc → HTML_BLOCK
+(`closes_at_open_tag`) + PARAGRAPH; CommonMark → single HTML_BLOCK
+(type 7, blank-line-terminated).
 
 ### Files in committable diff
 
-- Parser-shape: `parser/blocks/html_blocks.rs` (+131/−16).
-- Corpus: 5 new dirs under `corpus/0310..0314-…/`.
+- Parser-shape: `parser/blocks/html_blocks.rs` (+33/−14 to
+  `try_parse_html_block_start` + 2 unit-test edits).
+- Projector: `pandoc_ast.rs` (+44/−16 to inline-block arm of
+  `split_html_block_by_tags`; new `interior_starts_with_void_block_tag`
+  helper).
+- Corpus: 4 new dirs under `corpus/0315..0318-…/`.
+- Parser fixtures: 3 new under
+  `crates/panache-parser/tests/fixtures/cases/`, registered in
+  `golden_parser_cases.rs`; snapshots emitted.
 - Allowlist + report regenerated.
-- 2 new parser fixtures + snapshots, registered in
-  `golden_parser_cases.rs`.
 
-No projector, salsa, formatter, linter, LSP, or other host-side
-changes.
+No salsa, formatter, linter, LSP, or other host-side changes.
 
 ### Suggested next sub-targets, ranked
 
-1. **Strict-block multi-line open structural cleanup**
-   (`<table\n  border="1">`, `<header\n  class="x">`, etc.).
-   Output is already correct, but the CST has the open tag's
-   bytes split between HTML_BLOCK_TAG (line 0) and
+1. **Strict-block / verbatim closing-form lift**: `</p>`, `</nav>`,
+   `</pre>` standalone — pandoc-native still emits as `RawBlock`
+   but our parser leaves them as `Para[RawInline]`. Mirror this
+   session's inline-block close path under the strict-block /
+   verbatim arms. Risk: the strict-block close-as-block can
+   interrupt running paragraphs (no `cannot_interrupt`), which may
+   shift existing fixtures (`foo\n</p>` is currently
+   `Para[foo, SB, RI</p>]`; pandoc emits `Plain[foo] +
+   RawBlock</p>`). Triage hits before landing.
+2. **Strict-block multi-line open structural cleanup**
+   (`<table\n  border="1">`). Output already correct; the CST
+   still splits open-tag bytes between HTML_BLOCK_TAG (line 0) and
    HTML_BLOCK_CONTENT (later lines). Reuse
-   `find_multiline_open_end` + a parameterized emitter on the
-   non-void path so the open tag lives entirely inside
-   HTML_BLOCK_TAG. Low value (no behavior change), but tightens
-   the structural invariant. Skip if no corpus case exercises a
+   `find_multiline_open_end` + a parameterized emitter. Low value
+   (no behavior change); skip unless a corpus case exercises a
    shape that depends on the cleaner CST.
-2. **`<video>\n<source>\nfallback\n</video>` outer-wins-on-conflict**
-   (still deferred; no corpus case yet — needs a blocked.txt entry
-   first).
 3. **Audit `parse_html_attrs` and `find_matching_html_close` for
    literal-byte hazards** (still on the list from earlier sessions).
 4. **Outer-wins-on-conflict for inherited refs/footnotes** (still
    deferred — no corpus exercises it).
 
-### New trap (folded into Persistent traps)
+### New traps (folded into Persistent traps)
 
-- Multi-line void open-tag structural lift — the void-tag path
-  closes after the open-tag's last line, NOT after `start_pos +
-  1`. The `same_line_closed` short-circuit must guard on
-  `multiline_open_end.is_none()`; the multi-line void early-exit
-  is its own branch returning `end_line_idx + 1`. Folded into
-  Parser shape & losslessness.
+- Closing forms of inline-block / void tags ARE block starts under
+  Pandoc — earlier "exclude closing forms" rule was wrong. Folded
+  into Pandoc tag categorization.
+- Matched-pair lift in the projector must abandon when interior
+  starts with a void block tag at column 0, AND inline-block opens
+  with no matched close must emit as `RawBlock` (otherwise tail-text
+  reparse recurses to stack overflow). Folded into Projector tag
+  splitting.
 
 --------------------------------------------------------------------------------
 
@@ -280,6 +313,12 @@ changes.
 Newest first. One line per session: date — phase/sub-target — pass
 count delta — root cause / lever.
 
+- 2026-05-10 — Inline-block close lift + matched-pair-abandons-on-void-interior
+  (`<video>\n<source>\nfallback\n</video>`, `</video>`/`</button>`/`</embed>`
+  standalone) — html 122 → 126 — accept closing forms under Pandoc with
+  `closes_at_open_tag: true`; new `interior_starts_with_void_block_tag`
+  helper in projector; single-RawBlock emit on no-match-open / fresh-block-close
+  closes the previously-recursive tail-text reparse.
 - 2026-05-10 — Multi-line void open-tag recognition (`<embed\n
   src="x">`) — html 117 → 122 — generalized
   `find_multiline_open_end` over tag name + simple per-line
