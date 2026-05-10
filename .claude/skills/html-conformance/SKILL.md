@@ -451,20 +451,63 @@ byte-identical to `pandoc -f markdown -t native`.
 ## Session recap (`RECAP.md`)
 
 This skill keeps a rolling recap at
-`.claude/skills/html-conformance/RECAP.md`.
+`.claude/skills/html-conformance/RECAP.md`. Layout (top → bottom):
 
-- **At session start**: read `RECAP.md` first. The "Suggested next
-  sub-targets" section is the recommended starting point; the
-  "Don't redo / known traps" list keeps you from reinventing
-  failed approaches.
-- **At session end**: rewrite the **Latest session** entry with
-  phase + sub-target, html-* pass count before → after, files
-  changed, new traps. Keep it terse — judgment calls only, not a
-  rerun of the test report.
-- **If the session ends with regressions** (uncommitted partial
-  diff): the recap MUST say so explicitly and rank the next
-  sub-target. Do NOT mark the session done if any test that was
-  green at start is red at end.
+1. **Persistent traps & invariants** — cross-session knowledge.
+   Read first.
+2. **Phase progress** — terse status table. Read second.
+3. **Latest session** — detailed entry for the most recent session.
+4. **Earlier sessions (compact log)** — one-line entries, newest
+   first.
+
+### At session start
+
+Read in this order: Persistent traps → Phase progress → Latest
+session's "Suggested next sub-targets". Skim the Earlier sessions
+log only if you need to find the session that introduced a specific
+behavior; the persistent traps section already holds the still-
+relevant knowledge.
+
+### At session end (compaction discipline)
+
+The recap is a **rolling**, not append-only, document. Each session:
+
+1. **Demote the previous "Latest session" entry** to a one-line
+   summary at the TOP of the Earlier sessions log: `date —
+   phase/sub-target — pass count delta — root cause / lever`.
+   Discard the section's prose, file lists, and trap lists.
+2. **Fold any still-relevant trap from the demoted session into
+   Persistent traps**, deduplicated. A trap is still-relevant if you
+   would warn a future session about it; if it was specific to
+   that session's pivot or has been superseded, drop it. Persistent
+   traps must stay tight — favor merging into existing bullets over
+   adding new ones; aim for ≤ ~20 bullets total. Group by sub-heading
+   (Disk + tooling, Parser shape & losslessness, Pandoc tag
+   categorization, Projector tag splitting, Refs / footnotes /
+   heading-id resolution, Out of scope).
+3. **Update Phase progress** if a phase status changed.
+4. **Write the new Latest session entry** in the format used by the
+   current Latest session: pass count line, "What landed" (≤ ~10
+   bullets, no full file lists), "Files in committable diff" (≤ ~6
+   bullets at directory granularity, not per-file), "Suggested
+   next sub-targets" (ranked, ≤ 5), "New trap" (note that they're
+   folded into Persistent traps). Keep it terse — judgment calls
+   only, not a rerun of the test report.
+
+### Length budget
+
+Target: **RECAP.md ≤ 400 lines.** If your session-end edit pushes
+it past 400, take another compaction pass on the Earlier sessions
+log (collapse adjacent entries, drop dates older than the current
+phase if all session-specific traps have been folded into
+Persistent). Don't compact the current session's entry — that's
+for the next session to demote.
+
+### If the session ends with regressions
+
+(uncommitted partial diff): the recap MUST say so explicitly and
+rank the next sub-target. Do NOT mark the session done if any test
+that was green at start is red at end.
 
 ## Report-back format
 
