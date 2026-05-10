@@ -47,8 +47,16 @@ back into a session entry only if it's purely historical.
   `parse_html_tag_attributes`).
 - **Quoted attribute values can hide `<` and `>`.** Tag-bracket
   scanners must thread quote state across line boundaries; don't
-  reset per-line. `count_tag_balance`, `find_multiline_div_open_end`,
+  reset per-line. `count_tag_balance`, `find_multiline_open_end`,
   `pandoc_html_open_tag_closes` do this right.
+- **Multi-line open-tag close branches diverge by tag class.** The
+  `same_line_closed` short-circuit assumes single-line; void-tag
+  multi-line opens take a separate early-exit returning
+  `end_line_idx + 1` BEFORE the regular close-marker loop. Without
+  the explicit branch the parser would scan content lines for a
+  closing tag that doesn't exist (void tags have none) and run
+  off the document. Likewise `same_line_closed` must guard
+  `multiline_open_end.is_none()`.
 - **Incomplete open tags caused projector infinite recursion.**
   `<embed\n`, `<div\n`, `<table\n` etc. (no `>` anywhere) were
   recognized as `RawBlock` under Pandoc, but pandoc-native treats
@@ -172,63 +180,63 @@ back into a session entry only if it's purely historical.
 | 5 | `markdown_in_html_blocks` interaction edge cases | **Mostly complete** — depth-aware nested div, Plain/Para promotion, refs inheritance, projector-level splitter all landed; outer-matched-pair-with-inner-split-conflict still gappy |
 
 Multi-line `<div>` open-tag structural HTML_ATTRS lift landed
-(2026-05-09). Multi-line void open-tag still falls back to opaque
-HTML_BLOCK.
+(2026-05-09). Multi-line void open-tag now lifts via
+`find_multiline_open_end` + simple per-line TEXT/NEWLINE emission
+(2026-05-10).
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-10 (incomplete open-tag recursion fix)
+## Latest session — 2026-05-10 (multi-line void open-tag lift)
 
-**html pass count: 113 → 117** (+4 new corpus cases). **Workspace:
-0 → 0 failing.** **Total pandoc conformance: 305/305 → 309/309.**
-**New parser fixtures: 2** (paired incomplete open tag
+**html pass count: 117 → 122** (+5 new corpus cases). **Workspace:
+0 → 0 failing.** **Total pandoc conformance: 309/309 → 314/314.**
+**New parser fixtures: 2** (paired multi-line embed open
 Pandoc/CommonMark).
 
 ### What landed
 
-Triage of the previous session's "next #2" (multi-line void open
-tags) surfaced a pre-existing severe bug: incomplete HTML open
-tags (`<embed\n`, `<div\n`, `<table\n`, `<iframe\n` etc. with no
-`>` anywhere) crashed the projector with a stack overflow under
-Pandoc dialect. Pandoc-native treats them as paragraph text;
-recognizing them as `RawBlock` made the projector reparse the same
-bytes and infinite-recurse. The bug also fired for blockquoted
-inputs (`> <embed`).
+The previous session's "next #1" — pandoc-native emits a single
+`RawBlock` spanning the whole multi-line open tag (`<embed\n
+src="x">` → `RawBlock "<embed\n  src=\"x\">"`); panache was
+emitting two paragraphs because the void-tag path closes the
+HTML block after line 0.
 
-1. New `pandoc_html_open_tag_closes(lines, start_pos, bq_depth)`
-   helper in `parser/blocks/html_blocks.rs`. Scans from the open
-   tag's `<` forward for the first unquoted `>`; threads quote state
-   across line boundaries; tolerates blank lines (matching pandoc's
-   `htmlTag` behavior).
-2. Wired into `block_dispatcher.rs::detect_prepared`: under Pandoc
-   dialect, when `try_parse_html_block_start` returns `BlockTag`,
-   reject the recognition if the open tag never closes. CommonMark
-   stays liberal — its type-6 `<table\n` (no `>`) IS a valid
-   RawBlock, so the gate is dialect-specific.
-3. New unit test `test_pandoc_html_open_tag_closes` covering
-   single-line complete, multi-line complete, quoted-`>` immunity,
-   blank-line tolerance, and the no-`>` rejection cases.
+1. Generalized `find_multiline_div_open_end` →
+   `find_multiline_open_end(lines, start_pos, first_inner,
+   tag_name)` over arbitrary tag names. Same scan logic; tag
+   name parameterizes the prefix length and ASCII-case-insensitive
+   match. Only callers in `parse_html_block_with_wrapper`.
+2. Extended the multi-line open detection in
+   `parse_html_block_with_wrapper` to also fire for void block
+   tags (`closes_at_open_tag: true`) under `bq_depth == 0`. New
+   `emit_multiline_open_tag_simple` emits each open-tag line as
+   plain TEXT + NEWLINE — no HTML_ATTRS structural node since
+   the projector doesn't read attributes for void tags.
+3. New early-exit branch: when a void block tag has a multi-line
+   open, the HTML_BLOCK closes after the open-tag's last line
+   (mirrors the single-line void path).
+4. New unit test `test_find_multiline_open_end` covering single-
+   line returns None, multi-line returns end-line, tag-name
+   case-insensitivity, mismatch returns None, quoted-`>`
+   threading, and the no-`>` rejection.
 
-4 new corpus cases (0306–0309) covering void (`<embed`),
-strict-block (`<div`, `<table`), and inline-block (`<iframe`) open
-tags with no `>` — all expected to emit `Para [Str "<tagname"]` in
-pandoc-native. 2 new paired parser fixtures
-(`html_block_incomplete_open_{pandoc,commonmark}`) pin the
-dialect-divergent CST: Pandoc → 3 paragraphs; CommonMark → 1
-paragraph (`<embed`, not in BLOCK_TAGS) + 2 HTML_BLOCKs (`<div`,
-`<table` are CM type-6 starters).
+5 new corpus cases (0310–0314): each of `<embed>`, `<area>`,
+`<source>`, `<track>` with a 2-line open, plus a 3-line `<embed>`
+case. 2 new paired parser fixtures
+(`html_block_multiline_embed_open_{pandoc,commonmark}`) pin the
+dialect-divergent CST: Pandoc → HTML_BLOCK with HTML_BLOCK_TAG
+spanning both lines; CommonMark → PARAGRAPH with INLINE_HTML
+(`<embed>` isn't in CommonMark's BLOCK_TAGS).
 
-The previous session's "next #2" (multi-line void open-tag
-recognition: `<embed\n  src="x">` → single RawBlock instead of
-two Paras) is **still gappy** — it needs a parallel multi-line
-open-tag detection like `<div>` has, plus a void-tag wrapper
-emit path. Out of scope for this session.
+Strict-block tags like `<table\n  border="1">` already produce
+correct pandoc-native output via the existing depth-aware close
+path + projector byte-level splitter, so they were left
+untouched (cleanup-only, not correctness; out of scope).
 
 ### Files in committable diff
 
-- Parser-shape: `parser/blocks/html_blocks.rs` (~50 lines net),
-  `parser/block_dispatcher.rs` (~16 lines).
-- Corpus: 4 new dirs under `corpus/0306..0309-…/`.
+- Parser-shape: `parser/blocks/html_blocks.rs` (+131/−16).
+- Corpus: 5 new dirs under `corpus/0310..0314-…/`.
 - Allowlist + report regenerated.
 - 2 new parser fixtures + snapshots, registered in
   `golden_parser_cases.rs`.
@@ -238,16 +246,16 @@ changes.
 
 ### Suggested next sub-targets, ranked
 
-1. **Multi-line void open tags** (`<embed\n  src="x">`).
-   Today panache recognition rejects (good — no recursion) but the
-   structural lift is missing: pandoc emits a single RawBlock
-   spanning the multi-line tag; we emit two paragraphs. Generalize
-   `find_multiline_div_open_end` to a tag-name-parametrized
-   `find_multiline_open_end(lines, start_pos, tag_name)` and call
-   it from the void-tag branch in `try_parse_html_block_start`'s
-   call site (i.e. from `parse_html_block` like the `<div>`
-   path). Strict-block tags like `<table\n  border="1">` likely
-   want the same treatment.
+1. **Strict-block multi-line open structural cleanup**
+   (`<table\n  border="1">`, `<header\n  class="x">`, etc.).
+   Output is already correct, but the CST has the open tag's
+   bytes split between HTML_BLOCK_TAG (line 0) and
+   HTML_BLOCK_CONTENT (later lines). Reuse
+   `find_multiline_open_end` + a parameterized emitter on the
+   non-void path so the open tag lives entirely inside
+   HTML_BLOCK_TAG. Low value (no behavior change), but tightens
+   the structural invariant. Skip if no corpus case exercises a
+   shape that depends on the cleaner CST.
 2. **`<video>\n<source>\nfallback\n</video>` outer-wins-on-conflict**
    (still deferred; no corpus case yet — needs a blocked.txt entry
    first).
@@ -258,10 +266,12 @@ changes.
 
 ### New trap (folded into Persistent traps)
 
-- Pre-fix recursion mechanism: parser emits HTML_BLOCK for `<embed\n`;
-  projector's `flush_html_block_tail_text` calls `parse_pandoc_blocks`
-  which re-parses to the same HTML_BLOCK; emit_html_block recurses.
-  Persistent-traps entry covers it.
+- Multi-line void open-tag structural lift — the void-tag path
+  closes after the open-tag's last line, NOT after `start_pos +
+  1`. The `same_line_closed` short-circuit must guard on
+  `multiline_open_end.is_none()`; the multi-line void early-exit
+  is its own branch returning `end_line_idx + 1`. Folded into
+  Parser shape & losslessness.
 
 --------------------------------------------------------------------------------
 
@@ -270,6 +280,14 @@ changes.
 Newest first. One line per session: date — phase/sub-target — pass
 count delta — root cause / lever.
 
+- 2026-05-10 — Multi-line void open-tag recognition (`<embed\n
+  src="x">`) — html 117 → 122 — generalized
+  `find_multiline_open_end` over tag name + simple per-line
+  TEXT/NEWLINE emit; void early-exit returns `end_line_idx + 1`.
+- 2026-05-10 — Incomplete open-tag projector recursion fix
+  (`<embed\n` etc. with no `>`) — html 113 → 117 — new
+  `pandoc_html_open_tag_closes` gate in `block_dispatcher`; CM
+  type-6 stays liberal.
 - 2026-05-10 — Phase 3 void-element `eitherBlockOrInline` lift
   (`<embed>`, `<area>`, `<source>`, `<track>`) — html 105 → 113 —
   new `PANDOC_VOID_BLOCK_TAGS` + `closes_at_open_tag: bool`;

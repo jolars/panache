@@ -607,13 +607,31 @@ pub(crate) fn parse_html_block_with_wrapper(
         first_line
     };
 
-    // Detect a multi-line `<div>` open tag (e.g. `<div\n  id="x"\n>`).
-    // When the open `>` isn't on the first line, the open tag spans
-    // multiple lines — we tokenize each one structurally so the salsa
-    // anchor walk picks up `id` from the attribute region instead of
-    // letting it fall into raw `HTML_BLOCK_CONTENT` text.
-    let multiline_open_end = if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV && bq_depth == 0 {
-        find_multiline_div_open_end(lines, start_pos, first_inner)
+    // Detect a multi-line open tag.
+    // - `<div>` (Pandoc lift): we tokenize each line structurally so the
+    //   salsa anchor walk picks up `id` from the HTML_ATTRS region.
+    // - Void block tags (`<embed>`, `<area>`, `<source>`, `<track>`):
+    //   without this, the parser closes the block after line 0 and the
+    //   remainder of the open tag falls into following paragraphs;
+    //   pandoc-native treats the whole multi-line open tag as a single
+    //   `RawBlock`. Emission for void/non-div tags uses simple per-line
+    //   TEXT + NEWLINE (no HTML_ATTRS — the projector doesn't read attrs
+    //   from these tags).
+    let multiline_open_end = if bq_depth == 0 {
+        match (wrapper_kind, &block_type) {
+            (SyntaxKind::HTML_BLOCK_DIV, _) => {
+                find_multiline_open_end(lines, start_pos, first_inner, "div")
+            }
+            (
+                _,
+                HtmlBlockType::BlockTag {
+                    tag_name,
+                    closes_at_open_tag: true,
+                    ..
+                },
+            ) => find_multiline_open_end(lines, start_pos, first_inner, tag_name),
+            _ => None,
+        }
     } else {
         None
     };
@@ -622,7 +640,11 @@ pub(crate) fn parse_html_block_with_wrapper(
     builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
 
     if let Some(end_line_idx) = multiline_open_end {
-        emit_multiline_div_open_tag(builder, lines, start_pos, end_line_idx);
+        if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
+            emit_multiline_div_open_tag(builder, lines, start_pos, end_line_idx);
+        } else {
+            emit_multiline_open_tag_simple(builder, lines, start_pos, end_line_idx);
+        }
     } else {
         let (line_without_newline, newline_str) = strip_newline(first_inner);
         if !line_without_newline.is_empty() {
@@ -689,6 +711,20 @@ pub(crate) fn parse_html_block_with_wrapper(
             ..
         }
     );
+    // Void tags with a multi-line open close immediately after the open
+    // tag's last line. The HTML_BLOCK_TAG already covers all open-tag
+    // lines (`emit_multiline_open_tag_simple` above); pandoc-native emits
+    // a single RawBlock for the whole multi-line tag, with no following
+    // content.
+    if void_block && let Some(end_line_idx) = multiline_open_end {
+        log::trace!(
+            "HTML void block at line {} closes after multi-line open ending at line {}",
+            start_pos + 1,
+            end_line_idx + 1
+        );
+        builder.finish_node(); // HtmlBlock
+        return end_line_idx + 1;
+    }
     let same_line_closed = !blank_terminated
         && multiline_open_end.is_none()
         && (void_block
@@ -878,27 +914,32 @@ fn emit_div_open_tag_tokens(builder: &mut GreenNodeBuilder<'static>, line: &str)
     }
 }
 
-/// Detect a multi-line `<div>` open tag. Returns `Some(end_line_idx)` when
-/// the open tag's closing `>` is on a line *after* `start_pos` and within
-/// `lines`; `None` for single-line opens (handled by the existing path) or
-/// when the `>` is missing entirely.
+/// Detect a multi-line HTML open tag for `tag_name`. Returns
+/// `Some(end_line_idx)` when the open tag's closing `>` is on a line *after*
+/// `start_pos` and within `lines`; `None` for single-line opens (handled by
+/// the existing path) or when the `>` is missing entirely.
 ///
 /// Quoted attribute values (`"..."`, `'...'`) are honored so a `>` inside an
 /// attribute value doesn't terminate the open tag. Quote state carries
 /// across line boundaries.
-fn find_multiline_div_open_end(
+fn find_multiline_open_end(
     lines: &[&str],
     start_pos: usize,
     first_inner: &str,
+    tag_name: &str,
 ) -> Option<usize> {
-    // Locate the `<div` literal in `first_inner` to start scanning past it.
+    // Locate the `<tag_name` literal in `first_inner` to start scanning past
+    // it. Match is ASCII case-insensitive; the parser preserves source casing.
     let trimmed = strip_leading_spaces(first_inner);
-    if !trimmed.starts_with('<') || trimmed.len() < 4 || !trimmed[1..4].eq_ignore_ascii_case("div")
+    let prefix_len = 1 + tag_name.len();
+    if !trimmed.starts_with('<')
+        || trimmed.len() < prefix_len
+        || !trimmed[1..prefix_len].eq_ignore_ascii_case(tag_name)
     {
         return None;
     }
     let leading_indent = first_inner.len() - trimmed.len();
-    let mut i = leading_indent + 4; // past `<div`
+    let mut i = leading_indent + prefix_len; // past `<tag_name`
     let mut quote: Option<u8> = None;
 
     // Scan first line for an unquoted `>`.
@@ -1104,6 +1145,28 @@ fn emit_multiline_div_open_tag(
             }
         }
 
+        if !newline_str.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+        }
+    }
+}
+
+/// Emit a multi-line HTML open tag spanning `lines[start_pos..=end_line_idx]`
+/// for non-`<div>` tags (void tags `<embed>`/`<area>`/`<source>`/`<track>`).
+/// Each line is emitted as plain TEXT + NEWLINE; no `HTML_ATTRS` structural
+/// node is added. Pandoc's projector reads attributes only for `<div>` /
+/// `<span>` lifts, so non-div multi-line opens just need byte preservation.
+fn emit_multiline_open_tag_simple(
+    builder: &mut GreenNodeBuilder<'static>,
+    lines: &[&str],
+    start_pos: usize,
+    end_line_idx: usize,
+) {
+    for line in lines.iter().take(end_line_idx + 1).skip(start_pos) {
+        let (line_no_nl, newline_str) = strip_newline(line);
+        if !line_no_nl.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), line_no_nl);
+        }
         if !newline_str.is_empty() {
             builder.token(SyntaxKind::NEWLINE.into(), newline_str);
         }
@@ -1410,6 +1473,58 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn test_find_multiline_open_end() {
+        // Single-line opens return None (caller takes the regular path).
+        assert_eq!(
+            find_multiline_open_end(&["<div id=\"x\">"], 0, "<div id=\"x\">", "div"),
+            None
+        );
+        assert_eq!(
+            find_multiline_open_end(&["<embed src=\"x\">"], 0, "<embed src=\"x\">", "embed"),
+            None
+        );
+        // Multi-line opens return the line index of the closing `>`.
+        assert_eq!(
+            find_multiline_open_end(&["<embed", "  src=\"x\">"], 0, "<embed", "embed"),
+            Some(1)
+        );
+        assert_eq!(
+            find_multiline_open_end(
+                &["<embed", "  src=\"x\"", "  type=\"video\">"],
+                0,
+                "<embed",
+                "embed"
+            ),
+            Some(2)
+        );
+        // Tag-name mismatch returns None (case-insensitive on the tag name).
+        assert_eq!(
+            find_multiline_open_end(&["<embed", "  src=\"x\">"], 0, "<embed", "div"),
+            None
+        );
+        assert_eq!(
+            find_multiline_open_end(&["<EMBED", "  src=\"x\">"], 0, "<EMBED", "embed"),
+            Some(1)
+        );
+        // Quoted `>` does not terminate the open tag; quote state threads
+        // across line boundaries.
+        assert_eq!(
+            find_multiline_open_end(
+                &["<embed title=\"a>b", "  c\">"],
+                0,
+                "<embed title=\"a>b",
+                "embed"
+            ),
+            Some(1)
+        );
+        // No `>` anywhere returns None.
+        assert_eq!(
+            find_multiline_open_end(&["<embed", "  src=\"x\""], 0, "<embed", "embed"),
+            None
+        );
     }
 
     #[test]

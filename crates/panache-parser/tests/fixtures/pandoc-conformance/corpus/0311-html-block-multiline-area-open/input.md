@@ -1,0 +1,2 @@
+<area
+  href="x">

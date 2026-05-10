@@ -357,3 +357,10 @@
 307
 308
 309
+
+# html-block (multi-line void open tag — `<embed\n  src="x">`, `<area\n  href="x">`, `<source\n  src="x.mp3">`, `<track\n  src="t.vtt">` and three-line variants; the parser captures all open-tag lines in a single HTML_BLOCK_TAG so the projector emits one RawBlock matching pandoc-native instead of splitting the open tag across paragraphs. Generalized `find_multiline_open_end` over tag name; void path emits simple TEXT+NEWLINE per line — no HTML_ATTRS structural node is needed since the projector doesn't read attributes for void tags.)
+310
+311
+312
+313
+314

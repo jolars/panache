@@ -1,0 +1,3 @@
+[ RawBlock
+    (Format "html") "<embed\n  src=\"x\"\n  type=\"video\">"
+]
