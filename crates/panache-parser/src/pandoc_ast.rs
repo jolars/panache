@@ -1080,20 +1080,42 @@ fn html_block(node: &SyntaxNode) -> Block {
 
 /// Project an `HTML_BLOCK_DIV` node (a Pandoc-dialect-lifted
 /// `<div ...>...</div>` block) into a `Block::Div`. The CST already pins
-/// the structural shape; we read the open tag's attributes from the
-/// first `HTML_BLOCK_TAG` child and recurse into the content as
-/// markdown. Falls back to `RawBlock` only if the open-tag attribute
-/// parse fails (defensive — the parser only retags as `HTML_BLOCK_DIV`
-/// when the open tag was recognized).
+/// the structural shape (Phase 1's `HTML_ATTRS` lift) — read the open
+/// tag's attributes from the first `HTML_BLOCK_TAG` child's `HTML_ATTRS`
+/// descendant rather than byte re-tokenizing them. Inner-content + the
+/// `close_butted` Plain/Para rule still byte-walk; that's Fix #3 (lift
+/// inner blocks into structural CST children).
+///
+/// Falls back to `RawBlock` only if the inner-content extraction fails
+/// (defensive — the parser only retags as `HTML_BLOCK_DIV` when the
+/// open tag was recognized AND a matching `</div>` close was found).
 fn html_div_block(node: &SyntaxNode) -> Block {
     let mut content = node.text().to_string();
     while content.ends_with('\n') {
         content.pop();
     }
-    if let Some(div) = try_div_html_block(&content) {
-        return div;
+    if let Some((inner, close_butted)) = extract_div_inner_and_butted(&content) {
+        let attr = cst_div_open_tag_attr(node);
+        return assemble_div_block(attr, inner, close_butted);
     }
     Block::RawBlock("html".to_string(), content)
+}
+
+/// Read the `<div>` open tag's attributes from the structural CST.
+/// `HTML_BLOCK_DIV` always has an open `HTML_BLOCK_TAG` as its first
+/// `HTML_BLOCK_TAG` child; that tag's optional `HTML_ATTRS` descendant
+/// holds the byte slice the projector needs. Empty attributes (`<div>`)
+/// produce `Attr::default()` — same as the byte path's `parse_html_attrs("")`.
+fn cst_div_open_tag_attr(node: &SyntaxNode) -> Attr {
+    node.children()
+        .find(|c| c.kind() == SyntaxKind::HTML_BLOCK_TAG)
+        .and_then(|open_tag| {
+            open_tag
+                .children()
+                .find(|c| c.kind() == SyntaxKind::HTML_ATTRS)
+        })
+        .map(|attrs_node| parse_html_attrs(attrs_node.text().to_string().trim()))
+        .unwrap_or_default()
 }
 
 /// Project an `HTML_BLOCK` node into one or more `Block`s.
@@ -1543,7 +1565,21 @@ fn collect_block(node: &SyntaxNode, out: &mut Vec<Block>) {
 /// flavor) treats every `<div>` block this way, regardless of whether it
 /// has attributes. Returns `None` for any HTML block whose outer tag is not
 /// `<div>` (so other block tags keep falling through to the RawBlock path).
+///
+/// This byte-only path is for `HTML_BLOCK` callers (no structural
+/// `HTML_ATTRS` lift available). `HTML_BLOCK_DIV` callers use
+/// [`html_div_block`], which extracts attributes from the CST and
+/// shares the inner-content + close_butted helpers below.
 fn try_div_html_block(content: &str) -> Option<Block> {
+    let attr = parse_div_open_tag_attrs_from_bytes(content)?;
+    let (inner, close_butted) = extract_div_inner_and_butted(content)?;
+    Some(assemble_div_block(attr, inner, close_butted))
+}
+
+/// Byte-extract attributes from a `<div ...>` open tag at the start of
+/// `content` (skipping leading spaces/tabs). Returns `None` if the
+/// content doesn't begin with a recognizable `<div` open tag.
+fn parse_div_open_tag_attrs_from_bytes(content: &str) -> Option<Attr> {
     let bytes = content.as_bytes();
     let leading_ws = bytes
         .iter()
@@ -1562,7 +1598,35 @@ fn try_div_html_block(content: &str) -> Option<Block> {
     let close_gt_rel = head[4..].find('>')?;
     let open_attrs_raw = &head[4..4 + close_gt_rel];
     let open_attrs = open_attrs_raw.trim_matches(|c: char| c.is_whitespace() || c == '/');
-    let attr = parse_html_attrs(open_attrs);
+    Some(parse_html_attrs(open_attrs))
+}
+
+/// Locate the inner content text and `close_butted` flag for a
+/// `<div>...</div>` span by byte-scanning. Returns `None` if the content
+/// doesn't begin with `<div` or doesn't end with a matching `</div>`.
+///
+/// `close_butted = true` means the byte immediately before `</div>` is
+/// not `\n` — i.e. the close tag is on the same line as content (or the
+/// line above lacks a column-0 close), in which case the LAST inner
+/// block demotes from `Para` to `Plain` (pandoc's `markdown_in_html_blocks`
+/// rule). See [`assemble_div_block`].
+fn extract_div_inner_and_butted(content: &str) -> Option<(&str, bool)> {
+    let bytes = content.as_bytes();
+    let leading_ws = bytes
+        .iter()
+        .position(|&b| b != b' ' && b != b'\t')
+        .unwrap_or(bytes.len());
+    let head = &content[leading_ws..];
+    let head_bytes = head.as_bytes();
+    if head_bytes.len() < 4 || !head_bytes[..4].eq_ignore_ascii_case(b"<div") {
+        return None;
+    }
+    let after_div = head_bytes.get(4).copied();
+    match after_div {
+        Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'>') | Some(b'/') => {}
+        _ => return None,
+    }
+    let close_gt_rel = head[4..].find('>')?;
     let after_open_tag = leading_ws + 4 + close_gt_rel + 1;
     let trailing_ws = content.as_bytes()[after_open_tag..]
         .iter()
@@ -1584,6 +1648,13 @@ fn try_div_html_block(content: &str) -> Option<Block> {
     // separator, but the open-tag preamble guarantees `close_start > 0`.
     let close_butted = close_start == 0 || content.as_bytes()[close_start - 1] != b'\n';
     let inner = content[after_open_tag..close_start].trim_matches('\n');
+    Some((inner, close_butted))
+}
+
+/// Build a `Block::Div` from precomputed `attr` + inner text + butted
+/// flag. Reparses `inner` as Pandoc markdown and applies the
+/// last-block Para→Plain demotion when the close tag is butted.
+fn assemble_div_block(attr: Attr, inner: &str, close_butted: bool) -> Block {
     let mut blocks = parse_pandoc_blocks(inner);
     if close_butted
         && let Some(Block::Para(_)) = blocks.last()
@@ -1591,7 +1662,7 @@ fn try_div_html_block(content: &str) -> Option<Block> {
     {
         blocks.push(Block::Plain(inlines));
     }
-    Some(Block::Div(attr, blocks))
+    Block::Div(attr, blocks)
 }
 
 /// Reparse `text` as Pandoc-flavored markdown and return its top-level

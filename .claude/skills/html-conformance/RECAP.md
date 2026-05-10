@@ -243,7 +243,7 @@ how pandoc itself sub-parses cell content and can stay.
 | 3 | Sectioning + verbatim corpus pin; `eitherBlockOrInline` lift | **Conformance landed** — non-void (2026-05-09); void (`<embed>`/`<area>`/`<source>`/`<track>`) (2026-05-10). Implementation leans on projector-side `inline_pending` tracking + byte walker; CST still opaque for split/matched-pair shapes. |
 | 4 | Comments, PIs, declarations, CDATA projection | **Conformance landed** (2026-05-08); type-4 CM lowercase still gappy. CST opaque (these constructs project as RawBlock / RawInline). |
 | 5 | `markdown_in_html_blocks` interaction edge cases | **Conformance landed** — depth-aware nested div, Plain/Para promotion, refs inheritance, **projector-level splitter** (`split_html_block_by_tags` byte walker + `parse_pandoc_blocks` recursive reparse), outer-matched-pair-abandons-on-void-interior. **The structural CST lift was deferred** — Phase 5's mechanism is the projector reparsing bytes, not the parser emitting structure. |
-| 6 (new) | Lift inner HTML block content into structural CST children — `HTML_BLOCK_DIV` gets `PARAGRAPH` / `LIST` / etc. as direct children; `split_html_block_by_tags` / `flush_html_block_*` / `parse_pandoc_blocks` collapse into trivial CST walks; `PARAGRAPH→PLAIN` retag at adjacent-HTML-block boundary. | **Fix #1 landed (2026-05-10)** — `PARAGRAPH→PLAIN` retag at YesCanInterrupt for HTML BlockTag under Pandoc; +5 conformance (132 → 137 html). **Sub-target landed (2026-05-10)** — `<style>` + PI `cannot_interrupt` under Pandoc; +3 corpus (137 → 140 html). Fixes #2-#4 from AUDIT.md still pending: walk structural CST for `<div>` open-tag attrs, lift inner blocks into CST children, full `HTML_BLOCK` body structural split. |
+| 6 (new) | Lift inner HTML block content into structural CST children — `HTML_BLOCK_DIV` gets `PARAGRAPH` / `LIST` / etc. as direct children; `split_html_block_by_tags` / `flush_html_block_*` / `parse_pandoc_blocks` collapse into trivial CST walks; `PARAGRAPH→PLAIN` retag at adjacent-HTML-block boundary. | **Fix #1 landed (2026-05-10)** — `PARAGRAPH→PLAIN` retag at YesCanInterrupt for HTML BlockTag under Pandoc; +5 conformance (132 → 137 html). **`<style>` + PI sub-target landed (2026-05-10)** — `cannot_interrupt` under Pandoc; +3 corpus (137 → 140 html). **Fix #2 landed (2026-05-10)** — `html_div_block` reads open-tag attrs from `HTML_BLOCK_TAG → HTML_ATTRS` CST walk; pure projector cleanup, no conformance delta. Fixes #3-#4 from AUDIT.md still pending: lift `<div>` inner blocks into CST children, full `HTML_BLOCK` body structural split. |
 
 Multi-line `<div>` open-tag structural HTML_ATTRS lift landed
 (2026-05-09). Multi-line void open-tag now lifts via
@@ -257,84 +257,75 @@ and CAN interrupt a running paragraph (no `cannot_interrupt` gate)
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-10 (Phase 6 sub-target — `<style>` + PI cannot_interrupt under Pandoc)
+## Latest session — 2026-05-10 (Phase 6 Fix #2 — `html_div_block` walks structural CST for open-tag attrs)
 
-Extended `HtmlBlockParser::detect_prepared`'s `cannot_interrupt`
-predicate to include `HtmlBlockType::ProcessingInstruction` and
-`BlockTag`s with `tag_name == "style"` under `Dialect::Pandoc`.
-Mid-paragraph `<style>x</style>` and `<?pi?>` now stay inside the
-running paragraph as INLINE_HTML instead of splitting it; matches
-pandoc-native. `<pre>`, `<script>`, `<textarea>` keep splitting
-(they're in pandoc's `blockHtmlTags` AND `verbatimHtmlBlocks`;
-`<style>` is the lone verbatim-only outlier).
+Replaced `html_div_block`'s call to `try_div_html_block` (which
+byte-rescans `<div ATTRS>` even though Phase 1 already structured
+those bytes as `HTML_ATTRS`) with a structural CST walk:
+`HTML_BLOCK_DIV → HTML_BLOCK_TAG (open) → HTML_ATTRS`. Inner-content
++ `close_butted` byte walk extracted into shared helpers
+(`extract_div_inner_and_butted` + `assemble_div_block`); the
+byte-only `try_div_html_block` keeps using them for `HTML_BLOCK`
+callers (line 1075, 1119, 1216) that lack the structural HTML_ATTRS
+lift.
 
-Pass count: 329 → 332 total (+3), html 137 → 140 (+3). All +3 from
-new corpus pinning the now-correct shape; no previously-failing
-corpus cases were unlocked (none were targeted at this gap).
+Pass count unchanged: 332 / 332 total, html 140 / 140. Pure
+projector cleanup with no behavioral delta — exactly the expected
+shape per the AUDIT prediction.
 
 ### What landed
 
-- One-site change in `crates/panache-parser/src/parser/block_dispatcher.rs`
-  (`HtmlBlockParser::detect_prepared`): two new `or` clauses on the
-  `cannot_interrupt` predicate — PI under Pandoc, and BlockTag
-  with `tag_name.eq_ignore_ascii_case("style")` under Pandoc.
-  Comment block above it explains the verbatim-vs-`blockHtmlTags`
-  rule.
-- Corpus: 3 new cases (0330-0332) — paragraph + style, paragraph +
-  PI, paragraph + multiline style. New allowlist section
-  `# html-block (<style> and processing instructions cannot
-  interrupt …)`.
-- Parser fixtures (paired CM/Pandoc): 4 new under
-  `crates/panache-parser/tests/fixtures/cases/` (style/PI × CM/Pandoc)
-  + 4 CST snapshots. Pandoc shape: PARAGRAPH wraps everything,
-  INLINE_HTML for the tags. CommonMark shape: PARAGRAPH closes,
-  HTML_BLOCK starts.
-- Formatter golden (`html_block_paragraph_then_style`) —
-  idempotency holds; the format is `foo <style>x</style>` on a
-  single line under wrap=reflow (the formatter joins the paragraph
-  + INLINE_HTML cleanly).
+- `crates/panache-parser/src/pandoc_ast.rs` —
+  - `html_div_block` now does the structural CST walk via new
+    `cst_div_open_tag_attr` helper, then calls
+    `extract_div_inner_and_butted` + `assemble_div_block`.
+  - `try_div_html_block` reduced to a byte-attr extract +
+    delegation to the shared helpers; logic of the two paths is
+    now unified.
+  - Doc comment on `html_div_block` updated to spell out the
+    structural-CST-for-attrs invariant and that inner content is
+    Fix #3 territory.
+- Existing parser fixture
+  (`html_block_div_with_id_pandoc`) already pins both same-line
+  `<div id="…">…</div>` and multi-line `<div id="…">\n…\n</div>`
+  CST shapes including `HTML_ATTRS` — no new fixture needed.
 
 ### Suggested next sub-targets
 
-1. **Fix #2 — `html_div_block` walks structural CST for open-tag
-   attrs** (small projector cleanup, no conformance impact). Sets
-   the precedent for #3 by removing one of
-   `try_div_html_block`'s two byte walks. Pure
-   `pandoc_ast.rs` change.
-2. **Fix #3 — lift `<div>` inner blocks into structural CST
-   children** (Phase 6 proper, medium). Collapses
-   `parse_pandoc_blocks` recursive reparse, `close_butted` rule,
-   cross-boundary `RefsCtx` swap. Linter/salsa/LSP can finally see
-   structural children of a `<div>`.
-3. **Fix #4 — full HTML_BLOCK body structural split** (large;
-   defer until #3 lands). Eliminates `split_html_block_by_tags`,
-   both flush helpers, `interior_starts_with_void_block_tag`,
-   `find_matching_html_close*`, `inline_pending` flag.
-4. **Audit other "verbatim-only" cases** — confirm with pandoc-native
+1. **Fix #3 — lift `<div>` inner blocks into structural CST
+   children** (Phase 6 proper, medium). With Fix #2 landed,
+   `try_div_html_block` reduces to "byte-extract attrs + reparse
+   inner". Fix #3 lifts the inner-block reparse into the parser:
+   when the block dispatcher enters an HTML_BLOCK_DIV's body, parse
+   contents as nested markdown and emit PARAGRAPH/LIST/etc. as
+   structural children of HTML_BLOCK_DIV. The projector then walks
+   children, collapsing `parse_pandoc_blocks` recursive reparse,
+   the `close_butted` rule, and the cross-boundary `RefsCtx` swap.
+   Risk surface: formatter idempotency (`<div>` body must round-trip
+   cleanly) — pin formatter goldens before touching the projector.
+2. **Audit other "verbatim-only" cases** — confirm with pandoc-native
    that no other tag is in `verbatimHtmlBlocks` but NOT in
    `blockHtmlTags`. Source of truth:
    `pandoc/src/Text/Pandoc/Readers/HTML/TagCategories.hs`. Quick
-   probe.
+   probe; cheap insurance against another `<style>`-style outlier.
+3. **Fix #4 — full HTML_BLOCK body structural split** (large;
+   defer until #3 lands and the lift pattern is proven). Eliminates
+   `split_html_block_by_tags`, both flush helpers,
+   `interior_starts_with_void_block_tag`, `find_matching_html_close*`,
+   `inline_pending` flag.
 
 ### Files in committable diff
 
-- `crates/panache-parser/src/parser/block_dispatcher.rs` —
-  `cannot_interrupt` predicate extended; comment updated.
-- `crates/panache-parser/tests/pandoc/{allowlist,report}.txt`,
-  `docs/development/pandoc-report.json` — regenerated.
-- `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/` —
-  3 new cases (0330-0332).
-- `crates/panache-parser/tests/fixtures/cases/` + `tests/snapshots/`
-  + `tests/golden_parser_cases.rs` — 4 new paired parser fixtures +
-  snapshots.
-- `tests/fixtures/cases/html_block_paragraph_then_style/` +
-  `tests/golden_cases.rs` — formatter golden + wire-up.
-- `.claude/skills/html-conformance/RECAP.md` — this entry.
+- `crates/panache-parser/src/pandoc_ast.rs` — Fix #2 refactor.
+- `.claude/skills/html-conformance/{AUDIT,RECAP}.md` — Fix #2
+  marked landed; this Latest session entry.
 
 ### New traps
 
-Folded into Persistent traps (Pandoc tag categorization) as the
-landed-2026-05-10 status update for the `<style>` / PI rule.
+None. The Persistent traps "Refs / footnotes / heading-id resolution"
+section already covers `AttributeNode::can_cast(HTML_ATTRS)`; this
+session reuses that invariant in the projector path that previously
+byte-rescanned the same range.
 
 --------------------------------------------------------------------------------
 
@@ -343,6 +334,12 @@ landed-2026-05-10 status update for the `<style>` / PI rule.
 Newest first. One line per session: date — phase/sub-target — pass
 count delta — root cause / lever.
 
+- 2026-05-10 — Phase 6 sub-target (`<style>` + PI cannot_interrupt
+  under Pandoc) — html 137 → 140 — extended
+  `HtmlBlockParser::detect_prepared`'s `cannot_interrupt` to include
+  PI + BlockTag(`style`) under Pandoc; `<style>` is the lone verbatim
+  tag NOT in pandoc's `blockHtmlTags`. +3 from new corpus pinning
+  the now-correct shape.
 - 2026-05-10 — Phase 6 Fix #1 (PARAGRAPH→PLAIN retag at HTML
   strict/verbatim adjacency) — html 132 → 137 — new
   `Parser::close_paragraph_as_plain_if_open` wired at YesCanInterrupt
