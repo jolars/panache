@@ -768,16 +768,17 @@ pub(crate) fn parse_html_block_with_wrapper(
         && depth <= 0;
     let same_line_div_lift_safe = is_same_line_div && bq_depth == 0 && {
         let (line_without_newline, _) = strip_newline(first_inner);
-        probe_same_line_div_lift(line_without_newline)
+        probe_same_line_lift(line_without_newline, "div")
     };
 
     // Strict-block-tag Fix #4 lift (`<form>`, `<section>`, `<header>`,
     // `<nav>`, …): the body parses as fresh markdown between RawBlock
-    // emissions of the open/close tags. This session only lifts the
-    // clean multi-line shape (open tag stands alone on its line, no
-    // multi-line open, outside blockquote). Same-line / open-trailing
-    // / butted-close shapes for non-div tags fall through to the
-    // opaque-HTML_BLOCK byte walker in the projector.
+    // emissions of the open/close tags. Covers the clean multi-line
+    // shape (open tag stands alone on its line), open-trailing
+    // (`<form>foo\n…\n</form>`), butted-close (`<form>\n…\nfoo</form>`),
+    // and same-line (`<form>foo</form>`). Multi-line open and
+    // blockquote-wrapped non-div shapes still fall through to the
+    // byte-walker path.
     let strict_block_tag_name: Option<&str> = if wrapper_kind == SyntaxKind::HTML_BLOCK
         && bq_depth == 0
         && multiline_open_end.is_none()
@@ -796,20 +797,32 @@ pub(crate) fn parse_html_block_with_wrapper(
     } else {
         None
     };
-    // Strict-block lift is rejected when the open line balances the
-    // block (same-line shape) or has trailing content after `>`. The
-    // projector's byte walker handles those shapes for non-div tags.
-    let strict_block_lift = strict_block_tag_name.is_some_and(|name| {
-        depth > 0 && {
+    // Same-line `<form>foo</form>` shape: the open line already
+    // balances the block (`depth <= 0`). Lift only when the trailing
+    // bytes after the open `>` end with `</tag>` and contain exactly
+    // one close + zero nested opens.
+    let same_line_strict_lift_safe = strict_block_tag_name.is_some_and(|name| {
+        depth <= 0 && {
             let (line_no_nl, _) = strip_newline(first_inner);
-            probe_clean_open_tag_line(line_no_nl, name)
+            probe_same_line_lift(line_no_nl, name)
+        }
+    });
+    // Strict-block lift gate: accept either a clean / open-trailing
+    // open line (depth > 0, open `>` is present with quote-aware
+    // matching) or a safe same-line shape.
+    let strict_block_lift = strict_block_tag_name.is_some_and(|name| {
+        let (line_no_nl, _) = strip_newline(first_inner);
+        if depth > 0 {
+            probe_open_tag_line_has_close_gt(line_no_nl, name)
+        } else {
+            same_line_strict_lift_safe
         }
     });
 
     // Whether this block participates in the Phase 6 structural lift
     // (recursively parse body as Pandoc markdown and graft children).
     // Covers `<div>` outside blockquote context. For same-line shapes
-    // the lift is gated on `same_line_div_lift_safe` — when unsafe we
+    // the lift is gated on `same_line_*_lift_safe` — when unsafe we
     // keep the legacy single-HTML_BLOCK_TAG shape and let the
     // byte-reparse path handle projection.
     let lift_mode = (wrapper_kind == SyntaxKind::HTML_BLOCK_DIV
@@ -842,7 +855,16 @@ pub(crate) fn parse_html_block_with_wrapper(
             // heading attrs. CST bytes stay byte-equal to source — we only
             // tokenize at finer granularity for matched div opens.
             if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
-                let trailing = emit_div_open_tag_tokens(builder, line_without_newline, lift_mode);
+                let trailing =
+                    emit_open_tag_tokens(builder, line_without_newline, "div", lift_mode);
+                if !trailing.is_empty() {
+                    pre_content.push_str(trailing);
+                    pre_content.push_str(newline_str);
+                }
+            } else if let Some(name) = strict_block_tag_name
+                && strict_block_lift
+            {
+                let trailing = emit_open_tag_tokens(builder, line_without_newline, name, lift_mode);
                 if !trailing.is_empty() {
                     pre_content.push_str(trailing);
                     pre_content.push_str(newline_str);
@@ -899,16 +921,33 @@ pub(crate) fn parse_html_block_with_wrapper(
             "HTML block at line {} opens and closes on same line",
             start_pos + 1
         );
-        // Same-line `<div>foo</div>` structural lift: pre_content holds
-        // the bytes after the open `>` (including the close `</div>`
-        // and the trailing newline). Split into body + close tag, emit
-        // body via recursive parse (close is always butted → PLAIN),
-        // emit close tag as a sibling `HTML_BLOCK_TAG`.
-        if lift_mode && same_line_div_lift_safe && !pre_content.is_empty() {
+        // Same-line structural lift (div or non-div strict-block):
+        // pre_content holds the bytes after the open `>` (including
+        // the close `</tag>` and the trailing newline). Split into
+        // body + close tag, emit body via recursive parse, emit close
+        // tag as a sibling `HTML_BLOCK_TAG`.
+        let same_line_lift_tag: Option<&str> = if !lift_mode || pre_content.is_empty() {
+            None
+        } else if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV && same_line_div_lift_safe {
+            Some("div")
+        } else if same_line_strict_lift_safe {
+            strict_block_tag_name
+        } else {
+            None
+        };
+        if let Some(tag_name) = same_line_lift_tag {
             let (pre_no_nl, post_nl) = strip_newline(&pre_content);
-            if let Some((leading, close_part)) = try_split_close_line(pre_no_nl, "div") {
-                // Same-line `<div>foo</div>` is always close-butted.
-                let policy = LastParaDemote::SkipTrailingBlanks;
+            if let Some((leading, close_part)) = try_split_close_line(pre_no_nl, tag_name) {
+                // Same-line is always close-butted; div demotes the
+                // trailing Para→Plain via `SkipTrailingBlanks`.
+                // Non-div strict-block uses `OnlyIfLast` (consistent
+                // with butted-close — no trailing BLANK_LINE before
+                // the close means the trailing Para demotes).
+                let policy = if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
+                    LastParaDemote::SkipTrailingBlanks
+                } else {
+                    LastParaDemote::OnlyIfLast
+                };
                 emit_html_block_body_lifted(builder, "", &[], leading, policy, config);
                 builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
                 let mut close_line = String::with_capacity(close_part.len() + post_nl.len());
@@ -970,9 +1009,9 @@ pub(crate) fn parse_html_block_with_wrapper(
             // cases (e.g. `<inner></inner></tag>` on the close line)
             // fall back to the non-lift path. For `<div>`, non-empty
             // `leading` propagates pandoc's `markdown_in_html_blocks`
-            // Plain demotion rule. For non-div strict-block tags this
-            // session only lifts the clean shape (close on its own
-            // line), so `leading` is whitespace-only.
+            // Plain demotion rule. For non-div strict-block tags,
+            // demotion follows pandoc's `OnlyIfLast` rule (demote the
+            // trailing Para only when no blank line precedes the close).
             let close_split_tag = if lift_mode {
                 if strict_block_lift {
                     strict_block_tag_name
@@ -985,18 +1024,6 @@ pub(crate) fn parse_html_block_with_wrapper(
                 None
             };
             let close_split = close_split_tag.and_then(|name| try_split_close_line(line, name));
-
-            // Strict-block (non-div) lift rejects messy closes (anything
-            // other than `</tag>` on its own line, optionally indented):
-            // the byte-walker projector handles those shapes today.
-            let close_split = if let Some((leading, _)) = close_split
-                && strict_block_lift
-                && !leading.bytes().all(|b| matches!(b, b' ' | b'\t'))
-            {
-                None
-            } else {
-                close_split
-            };
 
             if let Some((leading, close_part)) = close_split {
                 let policy = if strict_block_lift {
@@ -1250,14 +1277,11 @@ fn graft_subtree_as(builder: &mut GreenNodeBuilder<'static>, node: &SyntaxNode, 
     builder.finish_node();
 }
 
-/// Probe whether the open-tag line of a strict-block (non-div) lift
-/// candidate is "clean": the line consists of `[indent]<tag_name[
-/// ATTRS]>` followed only by whitespace, with the open `>` properly
-/// closed (respecting quoted attribute values). Trailing content after
-/// `>` (e.g. `<form>foo`) rejects the lift — the projector's byte
-/// walker handles that shape, which would otherwise produce a
-/// `RawBlock "<form>foo"` if we emitted the whole line as the open tag.
-fn probe_clean_open_tag_line(line: &str, tag_name: &str) -> bool {
+/// Probe whether the open-tag line has a valid (quote-aware) closing
+/// `>` after the tag name. Admits trailing content after `>` (the
+/// open-trailing shape `<form>foo`) — the caller is expected to capture
+/// that trailing into the structural lift's `pre_content`.
+fn probe_open_tag_line_has_close_gt(line: &str, tag_name: &str) -> bool {
     let bytes = line.as_bytes();
     let indent_end = bytes
         .iter()
@@ -1267,6 +1291,50 @@ fn probe_clean_open_tag_line(line: &str, tag_name: &str) -> bool {
     let rest_bytes = rest.as_bytes();
     let prefix_len = 1 + tag_name.len();
     if rest_bytes.len() < prefix_len + 1
+        || rest_bytes[0] != b'<'
+        || !rest_bytes[1..prefix_len].eq_ignore_ascii_case(tag_name.as_bytes())
+    {
+        return false;
+    }
+    let after_name = &rest[prefix_len..];
+    let after_name_bytes = after_name.as_bytes();
+    let mut i = 0usize;
+    let mut quote: Option<u8> = None;
+    while i < after_name_bytes.len() {
+        match (quote, after_name_bytes[i]) {
+            (None, b'"') | (None, b'\'') => quote = Some(after_name_bytes[i]),
+            (Some(q), b2) if b2 == q => quote = None,
+            (None, b'>') => return true,
+            _ => {}
+        }
+        i += 1;
+    }
+    false
+}
+
+/// Probe whether the same-line `<tag>BODY</tag>` shape on `line` can
+/// be lifted structurally. Returns `true` only when:
+/// - The line starts with `<tag_name` (modulo leading whitespace).
+/// - The open tag's `>` exists with proper quote handling.
+/// - The bytes after the open `>` end with `</tag_name>` (case-
+///   insensitive, allowing trailing whitespace).
+/// - The trailing has exactly one `</tag_name>` close and zero
+///   `<tag_name>` opens (rejects nested same-line shapes).
+///
+/// Trailing non-whitespace content after `</tag_name>` (e.g.
+/// `<form>foo</form>extra`) rejects the lift — pandoc projects that
+/// shape as RawBlock + content + RawBlock + trailing-Para, which the
+/// byte walker handles via `split_html_block_by_tags`.
+fn probe_same_line_lift(line: &str, tag_name: &str) -> bool {
+    let bytes = line.as_bytes();
+    let indent_end = bytes
+        .iter()
+        .position(|&b| b != b' ' && b != b'\t')
+        .unwrap_or(bytes.len());
+    let rest = &line[indent_end..];
+    let rest_bytes = rest.as_bytes();
+    let prefix_len = 1 + tag_name.len();
+    if rest_bytes.len() < prefix_len
         || rest_bytes[0] != b'<'
         || !rest_bytes[1..prefix_len].eq_ignore_ascii_case(tag_name.as_bytes())
     {
@@ -1293,59 +1361,15 @@ fn probe_clean_open_tag_line(line: &str, tag_name: &str) -> bool {
         return false;
     };
     let trailing = &after_name[gt_idx + 1..];
-    trailing.bytes().all(|b| matches!(b, b' ' | b'\t'))
-}
-
-/// Probe whether the same-line `<div>BODY</div>` shape on `line` can
-/// be lifted structurally. Returns `true` only when:
-/// - The line starts with `<div` (modulo leading whitespace).
-/// - The open tag's `>` exists with proper quote handling.
-/// - The bytes after the open `>` end with `</div>` (case-insensitive,
-///   allowing trailing whitespace).
-/// - The trailing has exactly one `</div>` close and zero `<div>`
-///   opens (rejects nested same-line shapes).
-///
-/// Trailing non-whitespace content after `</div>` (e.g.
-/// `<div>foo</div>extra`) rejects the lift — pandoc projects that
-/// shape as Div + trailing Para, which the byte walker handles via
-/// `split_html_block_by_tags`.
-fn probe_same_line_div_lift(line: &str) -> bool {
-    let bytes = line.as_bytes();
-    let indent_end = bytes
-        .iter()
-        .position(|&b| b != b' ' && b != b'\t')
-        .unwrap_or(bytes.len());
-    let rest = &line[indent_end..];
-    let rest_bytes = rest.as_bytes();
-    if rest_bytes.len() < 4 || !rest_bytes[..4].eq_ignore_ascii_case(b"<div") {
-        return false;
-    }
-    let after_name = &rest[4..];
-    let after_name_bytes = after_name.as_bytes();
-    let mut i = 0usize;
-    let mut quote: Option<u8> = None;
-    let mut gt_idx: Option<usize> = None;
-    while i < after_name_bytes.len() {
-        match (quote, after_name_bytes[i]) {
-            (None, b'"') | (None, b'\'') => quote = Some(after_name_bytes[i]),
-            (Some(q), b2) if b2 == q => quote = None,
-            (None, b'>') => {
-                gt_idx = Some(i);
-                break;
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    let Some(gt_idx) = gt_idx else {
-        return false;
-    };
-    let trailing = &after_name[gt_idx + 1..];
     let trimmed = trailing.trim_end_matches([' ', '\t']);
-    if !trimmed.to_ascii_lowercase().ends_with("</div>") {
+    let close_marker = format!("</{}>", tag_name);
+    if !trimmed
+        .to_ascii_lowercase()
+        .ends_with(&close_marker.to_ascii_lowercase())
+    {
         return false;
     }
-    let (opens, closes) = count_tag_balance(trailing, "div");
+    let (opens, closes) = count_tag_balance(trailing, tag_name);
     opens == 0 && closes == 1
 }
 
@@ -1376,25 +1400,26 @@ fn try_split_close_line<'a>(line: &'a str, tag_name: &str) -> Option<(&'a str, &
     Some((&line[..close_lt], &line[close_lt..]))
 }
 
-/// Emit the open-tag line of an `HTML_BLOCK_DIV`, splitting the bytes
-/// `[ws]<div[ ws ATTRS]>[trailing]` into
-/// `WHITESPACE? + TEXT("<div") + (WHITESPACE + HTML_ATTRS{TEXT(attrs)})?
+/// Emit the open-tag line of a lift-eligible HTML block (div or non-div
+/// strict-block tag), splitting the bytes `[ws]<tag[ ws ATTRS]>[trailing]`
+/// into `WHITESPACE? + TEXT("<tag") + (WHITESPACE + HTML_ATTRS{TEXT(attrs)})?
 /// + TEXT(">") + TEXT(trailing)?`.
 ///
 /// Bytes are byte-identical to the source — this only tokenizes at finer
 /// granularity so `AttributeNode::cast(HTML_ATTRS)` can read the attribute
 /// region structurally. Falls back to a single TEXT token if the line
-/// doesn't fit the expected `<div ...>` shape (defensive — the parser
-/// only retags as `HTML_BLOCK_DIV` when this shape was matched).
+/// doesn't fit the expected `<tag ...>` shape (defensive — the parser
+/// only retags as the lift kind when this shape was matched).
 ///
 /// `lift_trailing`: when true, bytes after `>` are NOT emitted as TEXT —
 /// returned as `&str` instead so the caller can splice them into the
 /// recursive-parse input for the structural body lift. When false
 /// (legacy / non-lift path), trailing bytes are emitted as TEXT and an
 /// empty slice is returned.
-fn emit_div_open_tag_tokens<'a>(
+fn emit_open_tag_tokens<'a>(
     builder: &mut GreenNodeBuilder<'static>,
     line: &'a str,
+    tag_name: &str,
     lift_trailing: bool,
 ) -> &'a str {
     let bytes = line.as_bytes();
@@ -1404,12 +1429,16 @@ fn emit_div_open_tag_tokens<'a>(
         builder.token(SyntaxKind::WHITESPACE.into(), &line[..indent_end]);
     }
     let rest = &line[indent_end..];
-    // Match the literal `<div` prefix (ASCII case-insensitive on `div`).
-    if !rest.starts_with('<') || rest.len() < 4 || !rest[1..4].eq_ignore_ascii_case("div") {
+    // Match the literal `<tag_name` prefix (ASCII case-insensitive on the tag name).
+    let prefix_len = 1 + tag_name.len();
+    if !rest.starts_with('<')
+        || rest.len() < prefix_len
+        || !rest.as_bytes()[1..prefix_len].eq_ignore_ascii_case(tag_name.as_bytes())
+    {
         builder.token(SyntaxKind::TEXT.into(), rest);
         return "";
     }
-    let after_name = &rest[4..];
+    let after_name = &rest[prefix_len..];
     let after_name_bytes = after_name.as_bytes();
     // Find the closing `>` of the open tag, respecting quoted attribute values.
     let mut i = 0usize;
@@ -1460,8 +1489,9 @@ fn emit_div_open_tag_tokens<'a>(
     let trailing_text = &attrs_after_ws[attr_end..self_close_start.max(attr_end)];
     let after_self_close = &attrs_after_ws[self_close_start..];
 
-    // Use the original 4 source bytes (preserves source casing — losslessness).
-    builder.token(SyntaxKind::TEXT.into(), &rest[..4]);
+    // Use the original source bytes for the `<tag` prefix (preserves
+    // source casing — losslessness).
+    builder.token(SyntaxKind::TEXT.into(), &rest[..prefix_len]);
     if !leading_ws.is_empty() {
         builder.token(SyntaxKind::WHITESPACE.into(), leading_ws);
     }

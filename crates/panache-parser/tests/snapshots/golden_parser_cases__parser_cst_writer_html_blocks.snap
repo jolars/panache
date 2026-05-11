@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
-assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..839
@@ -101,15 +100,18 @@ DOCUMENT@0..839
     BLANK_LINE@242..243 "\n"
   HTML_BLOCK@243..337
     HTML_BLOCK_TAG@243..251
-      TEXT@243..250 "<table>"
+      TEXT@243..249 "<table"
+      TEXT@249..250 ">"
       NEWLINE@250..251 "\n"
     HTML_BLOCK@251..328
       HTML_BLOCK_TAG@251..256
-        TEXT@251..255 "<tr>"
+        TEXT@251..254 "<tr"
+        TEXT@254..255 ">"
         NEWLINE@255..256 "\n"
       HTML_BLOCK@256..288
         HTML_BLOCK_TAG@256..261
-          TEXT@256..260 "<td>"
+          TEXT@256..259 "<td"
+          TEXT@259..260 ">"
           NEWLINE@260..261 "\n"
         PLAIN@261..282
           TEXT@261..269 "This is "
@@ -123,7 +125,8 @@ DOCUMENT@0..839
           NEWLINE@287..288 "\n"
       HTML_BLOCK@288..322
         HTML_BLOCK_TAG@288..293
-          TEXT@288..292 "<td>"
+          TEXT@288..291 "<td"
+          TEXT@291..292 ">"
           NEWLINE@292..293 "\n"
         PLAIN@293..316
           TEXT@293..305 "And this is "
@@ -236,7 +239,8 @@ DOCUMENT@0..839
     BLANK_LINE@718..719 "\n"
   HTML_BLOCK@719..839
     HTML_BLOCK_TAG@719..724
-      TEXT@719..723 "<hr>"
+      TEXT@719..722 "<hr"
+      TEXT@722..723 ">"
       NEWLINE@723..724 "\n"
     HTML_BLOCK_CONTENT@724..839
       TEXT@724..730 "<hr />"

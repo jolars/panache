@@ -7,6 +7,11 @@ DOCUMENT@0..15
     TEXT@0..3 "foo"
     NEWLINE@3..4 "\n"
   HTML_BLOCK@4..15
-    HTML_BLOCK_TAG@4..15
-      TEXT@4..14 "<p>bar</p>"
+    HTML_BLOCK_TAG@4..7
+      TEXT@4..6 "<p"
+      TEXT@6..7 ">"
+    PLAIN@7..10
+      TEXT@7..10 "bar"
+    HTML_BLOCK_TAG@10..15
+      TEXT@10..14 "</p>"
       NEWLINE@14..15 "\n"

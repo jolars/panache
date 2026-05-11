@@ -417,3 +417,8 @@
 345
 346
 347
+
+# html-block (non-div strict-block butted-close / open-trailing / same-line shapes — `<form>\nfoo</form>`, `<form>foo\nbar\n</form>`, `<form>foo</form>` now lift to structural CST children matching pandoc's `RawBlock + Plain + RawBlock` projection. Parser extends Fix #4's clean-multi-line strict-block lift to the remaining shape variants: open-trailing captures bytes after `>` into `pre_content` via `emit_open_tag_tokens` (generalized from div's same helper); butted-close removes the leading-whitespace gate on `try_split_close_line` since `LastParaDemote::OnlyIfLast` already handles non-blank-terminated demotion; same-line reuses the existing div same-line lift path (`pre_content` splits at `</tag>`) gated on a new `same_line_strict_lift_safe` check that reuses the generalized `probe_same_line_lift(line, tag_name)`. CST gain: open tags split into `TEXT("<form") + (WHITESPACE + HTML_ATTRS{TEXT(attrs)})? + TEXT(">")` so `AttributeNode::cast(HTML_ATTRS)` finds non-div strict-block ids too. Multi-line open tags and bq-wrapped non-div shapes still fall through to opaque `HTML_BLOCK_CONTENT` + projector byte walker.)
+348
+349
+350

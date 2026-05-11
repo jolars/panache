@@ -227,8 +227,15 @@ back into a session entry only if it's purely historical.
   resolve through the outer ctx; don't generalize the swap to
   fenced divs.
 - **`AttributeNode::can_cast` accepts `HTML_ATTRS`**; the existing
-  salsa walk picks up `<div id>` / `<span id>` automatically. No
-  parallel salsa walk for HTML attrs.
+  salsa walk picks up `<div id>` / `<span id>` automatically. As of
+  2026-05-11 (Fix #4 shape-lift extension) the same walk also picks up
+  non-div strict-block tag ids (`<section id="x">`, `<form id="x">`,
+  `<p id="x">`, etc.) because the parser now emits `HTML_ATTRS` for
+  those tags too. Diverges from pandoc-native (which keeps them as
+  RawBlock without lifting attrs), but matches user intent for
+  anchor-link resolution — the linter no longer false-positives
+  `undefined-anchor` against `<section id>`. No parallel salsa walk
+  for HTML attrs.
 
 ### Out of scope / known divergences
 
@@ -354,7 +361,7 @@ and stay.
 | 3 | Sectioning + verbatim corpus pin; `eitherBlockOrInline` lift | **Conformance landed** — non-void (2026-05-09); void (`<embed>`/`<area>`/`<source>`/`<track>`) (2026-05-10). Implementation leans on projector-side `inline_pending` tracking + byte walker; CST still opaque for split/matched-pair shapes. |
 | 4 | Comments, PIs, declarations, CDATA projection | **Conformance landed** (2026-05-08); type-4 CM lowercase still gappy. CST opaque (these constructs project as RawBlock / RawInline). |
 | 5 | `markdown_in_html_blocks` interaction edge cases | **Conformance landed** — depth-aware nested div, Plain/Para promotion, refs inheritance, **projector-level splitter** (`split_html_block_by_tags` byte walker + `parse_pandoc_blocks` recursive reparse), outer-matched-pair-abandons-on-void-interior. **The structural CST lift was deferred** — Phase 5's mechanism is the projector reparsing bytes, not the parser emitting structure. |
-| 6 (new) | Lift inner HTML block content into structural CST children — `HTML_BLOCK_DIV` gets `PARAGRAPH` / `LIST` / etc. as direct children; `split_html_block_by_tags` / `flush_html_block_*` / `parse_pandoc_blocks` collapse into trivial CST walks; `PARAGRAPH→PLAIN` retag at adjacent-HTML-block boundary. | **All `<div>` shapes outside blockquotes lift structurally (2026-05-11)**: clean multi-line, trailing-on-open, butted-close, indented-close, same-line, empty / blank-only. **HTML blocks inside blockquotes project correctly via projector marker-strip (2026-05-11)**. **Fix #4 from AUDIT.md landed (2026-05-11)** for the clean shape of non-div Pandoc strict-block tags (`<form>`, `<section>`, `<header>`, `<nav>`, `<aside>`, `<article>`, `<footer>`, `<p>`, `<table>`, `<tr>`, `<td>`, …) — multi-line bodies lift into structural `PARAGRAPH`/`PLAIN`/`HEADING`/nested-`HTML_BLOCK` children; projector adds `html_block_has_structural_lift` + `emit_html_block_structural` fast path; trailing `PARAGRAPH→PLAIN` follows `LastParaDemote::OnlyIfLast`. Same-line / open-trailing / butted-close / BQ-wrapped non-div shapes still take the legacy `split_html_block_by_tags` byte-walker fallback. Pass count progression: 132 → 137 → 140 → 141 → 142 → 145 → 148 → 151 → 154 (3 new corpus cases). |
+| 6 (new) | Lift inner HTML block content into structural CST children — `HTML_BLOCK_DIV` gets `PARAGRAPH` / `LIST` / etc. as direct children; `split_html_block_by_tags` / `flush_html_block_*` / `parse_pandoc_blocks` collapse into trivial CST walks; `PARAGRAPH→PLAIN` retag at adjacent-HTML-block boundary. | **All `<div>` shapes outside blockquotes lift structurally (2026-05-11)**: clean multi-line, trailing-on-open, butted-close, indented-close, same-line, empty / blank-only. **HTML blocks inside blockquotes project correctly via projector marker-strip (2026-05-11)**. **Fix #4 (non-div strict-block body lift) clean multi-line landed (2026-05-11)** for `<form>`, `<section>`, `<header>`, `<nav>`, `<aside>`, `<article>`, `<footer>`, `<p>`, `<table>`, `<tr>`, `<td>`, …. **Fix #4 shape extension landed (2026-05-11)** for non-div butted-close (`<form>\nfoo</form>`), open-trailing (`<form>foo\n…\n</form>`), and same-line (`<form>foo</form>`). All non-bq non-div strict-block shapes outside blockquotes now lift. `HTML_ATTRS` is emitted for non-div strict-block opens too (e.g. `<section id="intro">`) — salsa picks up those ids as anchor declarations. Multi-line non-div opens and bq-wrapped non-div shapes still take the legacy `split_html_block_by_tags` byte-walker fallback. Matched-pair inline-block (`<video>`/`<iframe>`/`<button>`) still byte-walker. Pass count progression: 132 → 137 → 140 → 141 → 142 → 145 → 148 → 151 → 154 → 157 (3 new corpus cases). |
 
 Multi-line `<div>` open-tag structural HTML_ATTRS lift landed
 (2026-05-09). Multi-line void open-tag now lifts via
@@ -368,146 +375,79 @@ and CAN interrupt a running paragraph (no `cannot_interrupt` gate)
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-11 (Phase 6 / Fix #4: non-div strict-block structural body lift)
+## Latest session — 2026-05-11 (Phase 6 / Fix #4 shape extension: non-div strict-block butted-close, open-trailing, same-line)
 
-Generalized the Phase-6 `<div>` body lift to all non-div Pandoc
-strict-block tags (`PANDOC_BLOCK_TAGS` minus verbatim / inline-block /
-void / `<div>`) for the clean multi-line shape. The parser now walks
-the inner body of `<form>...</form>`, `<section>...</section>`,
-`<table>...</table>`, `<tr>...</tr>`, `<td>...</td>`, `<header>...`,
-`<nav>...`, `<p>...`, etc. as fresh Pandoc markdown via
-`parse_with_refdefs` and grafts the resulting top-level blocks
-(PARAGRAPH / PLAIN / HEADING / LIST / nested HTML_BLOCK / …) as
-direct children of the outer `HTML_BLOCK`. The projector picks up
-the lifted shape via a new `html_block_has_structural_lift` predicate
-and walks children directly — open `HTML_BLOCK_TAG` → RawBlock,
-body children → `collect_block`, close `HTML_BLOCK_TAG` → RawBlock
-— skipping the byte-walker path. Recursion is automatic: lifting
-`<table>` exposes inner `<tr>` as another lift candidate, which
-recursively lifts `<td>` etc., producing structural CST all the way
-down (verified on the `writer_html_blocks` fixture).
+Extended the same-day clean-multi-line Fix #4 lift to the three
+remaining non-div strict-block shapes outside blockquotes:
+butted-close (`<form>\nfoo</form>`), open-trailing
+(`<form>foo\n…\n</form>`), same-line (`<form>foo</form>`). All three
+now lift to structural CST (open `HTML_BLOCK_TAG` split into
+`TEXT("<form") + (HTML_ATTRS)? + TEXT(">")` + body PLAIN/PARAGRAPH +
+close `HTML_BLOCK_TAG`). Projector's existing
+`html_block_has_structural_lift` fast path picks them up unchanged.
 
-**Demotion rule** — for non-div strict-block lifts, pandoc's
-adjacency rule says "trailing Para demotes to Plain unless a blank
-line precedes the close tag". Encoded structurally via a new
-`LastParaDemote::OnlyIfLast` variant on the existing `graft_document_children`
-helper: demote the LAST top-level child only if it is a `PARAGRAPH`
-(no trailing `BLANK_LINE`). Distinct from div's
-`LastParaDemote::SkipTrailingBlanks` (used for close-butted `<div>foo</div>`
-shapes, where the demote skips trailing blanks). The third variant
-`LastParaDemote::Never` covers clean div shapes (`<div>\nfoo\n</div>`)
-and unbalanced bodies.
+**Pass count**: html 154 → 157, total 347 → 350.
 
-**Lift gate** — `strict_block_lift = wrapper_kind == HTML_BLOCK
-&& bq_depth == 0 && multiline_open_end.is_none() && block_type is
-BlockTag { is_verbatim: false, depth_aware: true, closes_at_open_tag:
-false, is_closing: false } && is_pandoc_lift_eligible_strict_block_tag(name)
-&& depth > 0 && probe_clean_open_tag_line(line, name)`. The
-`probe_clean_open_tag_line` helper accepts only `[indent]<tag[
-ATTRS]>` followed by whitespace — open-trailing shapes
-(`<form>foo`) are rejected and fall through to opaque
-`HTML_BLOCK_CONTENT`. The close-line split additionally rejects
-non-whitespace `leading` (close butted on content) for non-div
-tags, keeping butted-close shapes opaque.
+### What landed
 
-**Projector** — `emit_html_block` now checks
-`html_block_has_structural_lift` first (predicate: exactly two
-`HTML_BLOCK_TAG` children, both clean, no `HTML_BLOCK_CONTENT`). When
-true, calls `emit_html_block_structural` which walks children;
-otherwise falls through to the legacy byte path
-(`split_html_block_by_tags` etc.). `html_block_open_tag_is_clean`
-was loosened from "TEXT exactly equal to `>`" to "TEXT ending in
-`>`" so it accepts non-div's whole-line emission
-(`TEXT("<form>") + NEWLINE`) in addition to div's split-`>`
-emission. **Critical**: without the projector fast path, the byte
-walker would re-disambiguate inner heading auto-ids against a
-fresh inner `RefsCtx`, producing `heading-1` instead of `heading`
-when the outer ctx already saw the heading (same trap noted under
-"Refs / footnotes / heading-id resolution" in Persistent traps).
+- Generalized `emit_div_open_tag_tokens` → `emit_open_tag_tokens(line,
+  tag_name, lift_trailing)` (parameterize prefix length + name match).
+  Single helper now drives both `<div>` and non-div lifts.
+- Generalized `probe_same_line_div_lift` → `probe_same_line_lift(line,
+  tag_name)`.
+- New `probe_open_tag_line_has_close_gt` — admits open-trailing where
+  the old `probe_clean_open_tag_line` rejected it. The trailing bytes
+  get captured into `pre_content` for the recursive parse.
+- New `same_line_strict_lift_safe` flag; the `same_line_closed` branch
+  dispatches via a single `same_line_lift_tag: Option<&str>` so div
+  and non-div share the split-pre_content path.
+- Removed the strict-block leading-whitespace gate on `close_split` —
+  `LastParaDemote::OnlyIfLast` already handles butted-close demotion.
+- Same-line non-div uses `OnlyIfLast`; div same-line keeps
+  `SkipTrailingBlanks`.
 
-**Pass count**: html 151 → 154, total 344 → 347. Three new corpus
-cases pin Para+Plain (0345), trailing-blank-Para (0346), and
-heading-id resolution (0347) for `<section>`. Paired parser
-fixture `html_block_strict_block_inner_lift_{pandoc,commonmark}`
-exposes the dialect divergence (CM type-6 ends at blank line; Pandoc
-lifts the body). Formatter golden `html_block_strict_block_inner_lift`
-pins idempotent round-trip. The `writer_html_blocks` parser snapshot
-intentionally shifted — `<table><tr><td>...` now produces nested
-structural HTML_BLOCKs all the way down instead of one opaque
-HTML_BLOCK_CONTENT body.
+### Side effect — `HTML_ATTRS` on non-div strict-block
 
-**Payoff**: closes the second-largest projector cleanup from AUDIT.md.
-`split_html_block_by_tags` / `flush_html_block_*` /
-`find_matching_html_close*` / `inline_pending` are still callable for
-the legacy shapes (same-line, open-trailing, butted-close, bq-wrapped,
-matched-pair inline-block, multi-line open). Pruning those helpers
-needs the remaining shapes to lift too — start with butted-close /
-open-trailing for strict-block tags before reaching for inline-block
-matched-pair (`<video>`/`<iframe>`).
+`emit_open_tag_tokens` now emits structural `HTML_ATTRS` for non-div
+strict-block opens too (`<section id="intro">`, `<form id="x">`, …).
+Salsa's existing descendants walk picks up those ids as anchor
+declarations — pandoc-native does NOT (keeps as RawBlock), but matches
+user intent. No conformance regression (pandoc-native text-equality
+sees the same `RawBlock "<section id=\"intro\">"`).
 
 ### Suggested next sub-targets
 
-1. **Lift butted-close + open-trailing shapes for non-div
-   strict-block tags** (small-medium). `<form>foo\n</form>` and
-   `<form>\nfoo</form>` currently fall through to opaque
-   HTML_BLOCK_CONTENT (no lift). Lifting these closes the
-   structural gap for the remaining single-line trailing cases.
-   Same recipe as same-line div: `try_split_close_line` + open-tag
-   tokenization to capture trailing bytes as `pre_content`. Adds
-   ~50 lines.
-2. **Lift same-line non-div strict-block** (`<form>foo</form>`)
-   (small). Mirrors `probe_same_line_div_lift` for non-div; the
-   demotion is "always Plain" (close butted to content).
-3. **Parser-side structural lift inside blockquotes** (medium).
-   Still deferred — needs BLOCK_QUOTE_MARKER threading around
-   grafted children. Wait for the butted-close/same-line work
-   above to consolidate the pattern.
-4. **Matched-pair inline-block lift (`<video>`, `<iframe>`,
-   `<button>`)** (medium-large). Pandoc emits matched-pair as
-   3-way `RawBlock + Plain + RawBlock` at fresh-block; abandons
-   the matched-pair when interior opens with a void block tag at
-   column 0 (`interior_starts_with_void_block_tag`). Once this
-   lifts, the `inline_pending` flag and `interior_starts_with_void_block_tag`
-   in the projector can finally go.
-5. **Prune projector byte walkers** once all the above land:
-   `split_html_block_by_tags`, `flush_html_block_text`,
-   `flush_html_block_tail_text`, `find_matching_html_close*`,
-   `try_div_html_block` (HTML_BLOCK callers), `extract_html_tag_name`,
-   `is_raw_text_element_open`.
+1. **Matched-pair inline-block lift `<video>`/`<iframe>`/`<button>`**
+   (medium-large). The remaining big projector byte-walker user.
+   Once lifted, `inline_pending` and
+   `interior_starts_with_void_block_tag` can be pruned.
+2. **Parser-side lift inside blockquotes** (medium). `> <div>...`,
+   `> <form>...` still take projector marker-strip; parser-side lift
+   would unify the path.
+3. **Multi-line open-tag lift for non-div strict-block** (small).
+   Mirror `find_multiline_open_end` + `emit_multiline_div_open_tag`.
+4. **Prune projector byte walkers** once 1–3 land.
 
 ### Files in committable diff
 
-- `crates/panache-parser/src/parser/blocks/html_blocks.rs` —
-  `is_pandoc_lift_eligible_strict_block_tag` predicate, lift gate
-  extension, `probe_clean_open_tag_line`, generalized
-  `close_split_tag`, `LastParaDemote` enum (was `bool`), all
-  `emit_html_block_body_lifted` call sites updated.
-- `crates/panache-parser/src/pandoc_ast.rs` — `html_block_has_structural_lift`
-  + `emit_html_block_structural` fast path in `emit_html_block`;
-  `html_block_open_tag_is_clean` loosened to "TEXT ends in `>`".
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs` — gate +
+  helper generalizations (~110 ins / ~80 del).
 - `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/` —
-  three new cases `0345–0347` (Para+Plain, trailing-blank-Para,
-  heading-id-resolution).
-- `crates/panache-parser/tests/fixtures/cases/html_block_strict_block_inner_lift_{pandoc,commonmark}/`
-  + `tests/golden_parser_cases.rs` + two new snapshots — paired
-  parser fixture.
-- `tests/fixtures/cases/html_block_strict_block_inner_lift/` +
-  `tests/golden_cases.rs` — formatter golden for round-trip.
-- `crates/panache-parser/tests/snapshots/golden_parser_cases__parser_cst_writer_html_blocks.snap`
-  — intentional snapshot update reflecting the new nested
-  structural shape for `<table><tr><td>`.
-- `crates/panache-parser/tests/pandoc/allowlist.txt` — new
-  `# html-block (Fix #4 strict-block body structural lift …)`
-  section + ids 345–347.
-- Regenerated `tests/pandoc/report.txt` and
-  `docs/development/pandoc-report.json`.
+  cases 0348–0350 (form butted-close, open-trailing, same-line).
+- `crates/panache-parser/tests/fixtures/cases/html_block_strict_block_lift_shapes_{pandoc,commonmark}/`
+  + snapshots + runner — paired parser fixture; pins CM/Pandoc divergence.
+- `tests/fixtures/cases/html_block_strict_block_lift_shapes/` +
+  runner — formatter golden.
+- Three intentional CST snapshot updates (writer_html_blocks,
+  paragraph_demote_strict_pandoc, strict_block_inner_lift_pandoc):
+  open-tag split + HTML_ATTRS exposure for non-div tags.
+- Allowlist (ids 348–350 + section comment), report.txt + JSON.
 
 ### New traps
 
-Folded into Persistent traps under "Structural lift (Fix #3
-family)": the `LastParaDemote` enum's three variants for div vs
-strict-block demotion semantics, and the projector predicate's
-loosened "TEXT ends in `>`" rule.
+Folded into Persistent traps under "Refs / footnotes / heading-id
+resolution": salsa exposure of `<section id>` / `<form id>` /
+non-div strict-block ids as anchor declarations is intentional.
 
 --------------------------------------------------------------------------------
 
@@ -516,6 +456,7 @@ loosened "TEXT ends in `>`" rule.
 Newest first. One line per session: date — phase/sub-target — pass
 count delta — root cause / lever.
 
+- 2026-05-11 — Phase 6 / Fix #4 non-div strict-block clean multi-line body lift — html 151 → 154 — `is_pandoc_lift_eligible_strict_block_tag` + `html_block_has_structural_lift` projector fast path; `LastParaDemote::OnlyIfLast`; recursive `parse_with_refdefs` graft.
 - 2026-05-11 — Phase 6 empty / blank-only `<div>` structural lift — html 148 → 151 — `div_has_structural_inner` inverted to "no `HTML_BLOCK_CONTENT` children"; absence-of-`HTML_BLOCK_CONTENT` becomes the projector signal for a fully lifted body.
 - 2026-05-11 — Phase 6 bq-wrapped HTML blocks projector marker-strip — html 142 → 148 — `collect_html_block_text_skip_bq_markers` drops BLOCK_QUOTE_MARKER+WHITESPACE before byte-reparse.
 - 2026-05-11 — Phase 6 Fix #3 `<div>` shape lifts (clean multi-line, trailing-on-open, butted-close, indented-close, same-line) — html 142 → 142 — recursive `parse_with_refdefs` + `graft_subtree`; cleanness predicates; `probe_same_line_div_lift`.
