@@ -1104,7 +1104,13 @@ fn html_div_block(node: &SyntaxNode) -> Block {
         }
         return Block::Div(attr, blocks);
     }
-    let mut content = node.text().to_string();
+    // The parser-side structural lift is gated on `bq_depth == 0`; inside a
+    // blockquote the body lines still carry BLOCK_QUOTE_MARKER + WHITESPACE
+    // prefixes as structural CST tokens. The byte-reparse path below feeds
+    // its content to `parse_pandoc_blocks`, so the markers must be stripped
+    // first or the inner parse re-recognizes them as a nested blockquote.
+    // Outside a blockquote this returns the same bytes as `node.text()`.
+    let mut content = collect_html_block_text_skip_bq_markers(node);
     while content.ends_with('\n') {
         content.pop();
     }
@@ -1112,6 +1118,37 @@ fn html_div_block(node: &SyntaxNode) -> Block {
         return assemble_div_block(attr, inner, close_butted);
     }
     Block::RawBlock("html".to_string(), content)
+}
+
+/// Concatenate the node's token text, dropping every `BLOCK_QUOTE_MARKER`
+/// token (and the immediately-following `WHITESPACE` token, if any).
+/// `> <div>\n> foo\n> </div>` becomes `<div>\nfoo\n</div>` — the form the
+/// projector's byte-reparse helpers expect.
+fn collect_html_block_text_skip_bq_markers(node: &SyntaxNode) -> String {
+    let mut out = String::new();
+    let mut skip_next_ws = false;
+    walk_skip_bq_markers(node, &mut out, &mut skip_next_ws);
+    out
+}
+
+fn walk_skip_bq_markers(node: &SyntaxNode, out: &mut String, skip_next_ws: &mut bool) {
+    for child in node.children_with_tokens() {
+        match child {
+            NodeOrToken::Node(n) => walk_skip_bq_markers(&n, out, skip_next_ws),
+            NodeOrToken::Token(t) => {
+                if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {
+                    *skip_next_ws = true;
+                    continue;
+                }
+                if *skip_next_ws && t.kind() == SyntaxKind::WHITESPACE {
+                    *skip_next_ws = false;
+                    continue;
+                }
+                *skip_next_ws = false;
+                out.push_str(t.text());
+            }
+        }
+    }
 }
 
 /// True when the parser has lifted the `<div>` body into structural
@@ -1229,7 +1266,10 @@ fn cst_div_open_tag_attr(node: &SyntaxNode) -> Attr {
 /// (anywhere in the block) lifts to `Block::Div` via `try_div_html_block`,
 /// matching pandoc's `native_divs`.
 fn emit_html_block(node: &SyntaxNode, out: &mut Vec<Block>) {
-    let mut content = node.text().to_string();
+    // Strip BLOCK_QUOTE_MARKER + WHITESPACE prefix tokens so the
+    // byte-level walkers below see clean HTML — same rationale as
+    // `html_div_block`, see `collect_html_block_text_skip_bq_markers`.
+    let mut content = collect_html_block_text_skip_bq_markers(node);
     while content.ends_with('\n') {
         content.pop();
     }

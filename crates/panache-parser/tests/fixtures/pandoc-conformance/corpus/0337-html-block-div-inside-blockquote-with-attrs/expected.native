@@ -1,0 +1,8 @@
+[ BlockQuote
+    [ Div
+        ( "warn" , [ "alert" ] , [] )
+        [ Para
+            [ Str "Hello" , Space , Emph [ Str "world" ] , Str "." ]
+        ]
+    ]
+]

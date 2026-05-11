@@ -1,0 +1,6 @@
+[ BlockQuote
+    [ RawBlock (Format "html") "<video>"
+    , Plain [ Str "Inner." ]
+    , RawBlock (Format "html") "</video>"
+    ]
+]

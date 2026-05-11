@@ -1,0 +1,6 @@
+[ BlockQuote
+    [ RawBlock (Format "html") "<p>"
+    , Plain [ Str "Hello." ]
+    , RawBlock (Format "html") "</p>"
+    ]
+]

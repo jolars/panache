@@ -275,6 +275,8 @@ golden_test_cases!(
     html_block_div_butted_close_pandoc,
     html_block_div_inner_blocks_commonmark,
     html_block_div_inner_blocks_pandoc,
+    html_block_div_inside_blockquote_commonmark,
+    html_block_div_inside_blockquote_pandoc,
     html_block_div_multiline_open_pandoc,
     html_block_div_nested_commonmark,
     html_block_div_nested_pandoc,

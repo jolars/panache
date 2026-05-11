@@ -399,3 +399,11 @@
 
 # html-block (`<script type="math/tex…">` open cannot interrupt a paragraph under Pandoc — `foo\n<script type="math/tex">x</script>\nbar\n` stays as a single `Para[foo, SoftBreak, RawInline<script…>, Str x, RawInline</script>, SoftBreak, bar]` matching pandoc-native. Pandoc's `isInlineTag` SPECIAL-CASES `<script>` open with a `type` attribute whose value has the `math/tex` prefix (case-insensitive, e.g. `math/tex`, `math/tex; mode=display`) to always be inline; every other `<script>` open is a `RawBlock` start (`<pre>`, `<textarea>`, `<script>` without math/tex DO interrupt). Parser-side: `cannot_interrupt` in `HtmlBlockParser::detect_prepared` consults `is_math_tex_script_open(ctx.content)`, which parses the open tag's attributes via `parse_html_tag_attributes` and matches `type` values that start with `math/tex` (case-insensitive prefix). At fresh-block positions (`<script type="math/tex">…</script>` alone, or after a blank line) the tag still lifts to `RawBlock` per pandoc-native; only the mid-paragraph case takes the inline path.)
 335
+
+# html-block (HTML blocks inside a blockquote — `> <div>...`, `> <p>...`, `> <pre>...`, `> <video>...` etc. project with the BLOCK_QUOTE wrapping a single Div/RawBlock(s) matching pandoc-native. The parser keeps BLOCK_QUOTE_MARKER + WHITESPACE prefix tokens inside the HTML_BLOCK_CONTENT and the close HTML_BLOCK_TAG (lossless CST). The projector strips those marker pairs via `collect_html_block_text_skip_bq_markers` before feeding the bytes to `try_div_html_block` / `split_html_block_by_tags` / `flush_html_block_text` / `extract_div_inner_and_butted` / `parse_pandoc_blocks`; without the strip the inner reparse re-recognizes the `> ` prefixes as a nested blockquote (or a verbatim RawBlock includes literal `>` characters). Applied uniformly in `html_div_block` and `emit_html_block`. Handles arbitrary nesting depth (`> > <div>`); div attributes on the open tag remain accessible via the existing `cst_div_open_tag_attr` walk because the open-tag's leading marker is consumed by the outer BLOCK_QUOTE wrapper, not by HTML_BLOCK_DIV / HTML_BLOCK.)
+336
+337
+338
+339
+340
+341
