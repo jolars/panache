@@ -1,0 +1,21 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..32
+  BLOCK_QUOTE@0..32
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    HTML_BLOCK@2..32
+      HTML_BLOCK_TAG@2..10
+        TEXT@2..9 "<video>"
+        NEWLINE@9..10 "\n"
+      HTML_BLOCK_CONTENT@10..32
+        BLOCK_QUOTE_MARKER@10..11 ">"
+        WHITESPACE@11..12 " "
+        TEXT@12..20 "fallback"
+        NEWLINE@20..21 "\n"
+        BLOCK_QUOTE_MARKER@21..22 ">"
+        WHITESPACE@22..23 " "
+        TEXT@23..31 "</video>"
+        NEWLINE@31..32 "\n"

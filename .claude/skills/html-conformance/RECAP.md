@@ -343,26 +343,42 @@ and stay.
   shape** as of 2026-05-11 — same-line / open-trailing /
   butted-close fall through to opaque `HTML_BLOCK_CONTENT` and
   the projector byte walker.
-- **Parser-side structural lift is gated on `bq_depth == 0` except
-  for the Fix #5 path.** Clean multi-line `<div>` inside `>`
-  blockquote lifts via `bq_div_clean_lift` (close-line branch in
-  `parse_html_block_with_wrapper`): strip bq markers per body line,
-  recursive-parse, graft inner children with `BqPrefixState`
-  re-injecting `BLOCK_QUOTE_MARKER + WHITESPACE` at line starts.
-  Other bq shapes (butted-close, open-trailing, same-line, non-div,
-  inline-block matched-pair) still go through
+- **Parser-side structural lift inside blockquote — clean shape
+  only.** As of 2026-05-11 (Fix #6), the close-line `bq_clean_lift`
+  gate covers `<div>` (HTML_BLOCK_DIV, demote Never), non-div
+  strict-block tags (`<form>`, `<section>`, …, demote OnlyIfLast),
+  and inline-block matched-pair tags (`<video>`, `<iframe>`, …,
+  demote OnlyIfLast, abandons on void-interior). Strip bq markers
+  per body line, recursive-parse, graft inner children with
+  `BqPrefixState` re-injecting `BLOCK_QUOTE_MARKER + WHITESPACE`
+  at line starts. Non-clean bq shapes (butted-close,
+  open-trailing, same-line) still go through
   `collect_html_block_text_skip_bq_markers` + byte walker.
+  Deeper bq (`> > <div>`) works transparently via the same gate
+  (prefix capture is depth-agnostic).
 - **Bq prefix re-injection: both `NEWLINE` and the `BLANK_LINE`
   *token* (kind, not node) advance `line_idx`.** The inner parse
   puts a `BLANK_LINE` token (text `"\n"`) inside a `BLANK_LINE`
   node; treating only `NEWLINE` as a line-end mis-aligns prefixes
   for any body containing a blank line — losslessness violation
   that doesn't surface until `>` (blank) precedes a content line.
-- **`bq_div_clean_lift` gate:** HTML_BLOCK_DIV + bq_depth > 0 +
+- **`bq_clean_lift` gate:** HTML_BLOCK_DIV OR (HTML_BLOCK + tag in
+  `is_pandoc_lift_eligible_block_tag`) + bq_depth > 0 +
   single-line open + `pre_content.is_empty()` +
   `open_no_nl.trim_end…ends_with('>')` +
-  `close_no_nl.trim_start…starts_with("</")`. Anything else falls
+  `close_no_nl.trim_start…starts_with("</")` + (for inline-block)
+  not `inline_block_void_interior_abandons`. Anything else falls
   through to the opaque path.
+- **Projector `open_tag_raw_block_text` strips bq markers.** Bq-
+  wrapped close tags (`> </form>`) carry `BLOCK_QUOTE_MARKER +
+  WHITESPACE` as leading tokens inside the close `HTML_BLOCK_TAG`
+  for losslessness. Pandoc-native's `RawBlock` text is the tag
+  bytes only — the helper walks tokens skipping each
+  `BLOCK_QUOTE_MARKER` plus the immediately-following
+  `WHITESPACE`. Without this, lifted bq RawBlock emissions render
+  as `"> </form>"` instead of `"</form>"`. The HTML_ATTRS branch
+  (multi-line open canonicalization) is unaffected — those opens
+  don't have bq prefix tokens since they appear outside bq today.
 
 --------------------------------------------------------------------------------
 
@@ -375,83 +391,92 @@ and stay.
 | 3 | Sectioning + verbatim corpus pin; `eitherBlockOrInline` lift | **Conformance landed** — non-void (2026-05-09); void (`<embed>`/`<area>`/`<source>`/`<track>`) (2026-05-10). Implementation leans on projector-side `inline_pending` tracking + byte walker; CST still opaque for split/matched-pair shapes. |
 | 4 | Comments, PIs, declarations, CDATA projection | **Conformance landed** (2026-05-08); type-4 CM lowercase still gappy. CST opaque (these constructs project as RawBlock / RawInline). |
 | 5 | `markdown_in_html_blocks` interaction edge cases | **Conformance landed** — depth-aware nested div, Plain/Para promotion, refs inheritance, **projector-level splitter** (`split_html_block_by_tags` byte walker + `parse_pandoc_blocks` recursive reparse), outer-matched-pair-abandons-on-void-interior. **The structural CST lift was deferred** — Phase 5's mechanism is the projector reparsing bytes, not the parser emitting structure. |
-| 6 (new) | Lift inner HTML block content into structural CST children — `HTML_BLOCK_DIV` gets `PARAGRAPH` / `LIST` / etc. as direct children; `split_html_block_by_tags` / `flush_html_block_*` / `parse_pandoc_blocks` collapse into trivial CST walks; `PARAGRAPH→PLAIN` retag at adjacent-HTML-block boundary. | **All `<div>` shapes outside blockquotes lift structurally (2026-05-11)**: clean multi-line, trailing-on-open, butted-close, indented-close, same-line, empty / blank-only. **Fix #4 (non-div strict-block body lift) — clean multi-line + shape sweep + multi-line open landed 2026-05-11** for `<form>`, `<section>`, `<header>`, `<nav>`, `<aside>`, `<article>`, `<footer>`, `<p>`, `<table>`, `<tr>`, `<td>`, … (butted-close, open-trailing, same-line, multi-line open). **Inline-block matched-pair body lift landed (2026-05-11)** for `<video>`, `<iframe>`, `<button>`, `<audio>`, `<object>`, etc. — same shape coverage as non-div when body's first non-blank content is NOT a void block tag. **Fix #5 (bq-wrapped `<div>` clean-shape lift) landed (2026-05-11)** for the clean multi-line shape inside `>` blockquote — `BqPrefixState` re-injects per-line bq markers around the recursive parse's children so CST stays byte-equal. Other bq-wrapped shapes (butted-close / open-trailing / same-line / non-div / inline-block) still take the projector marker-strip path. Pass count progression: 132 → 137 → 140 → 141 → 142 → 145 → 148 → 151 → 154 → 157 → 159 (stable at 159 after Fix #5 — purely structural, no new corpus cases). |
+| 6 (new) | Lift inner HTML block content into structural CST children — `HTML_BLOCK_DIV` gets `PARAGRAPH` / `LIST` / etc. as direct children; `split_html_block_by_tags` / `flush_html_block_*` / `parse_pandoc_blocks` collapse into trivial CST walks; `PARAGRAPH→PLAIN` retag at adjacent-HTML-block boundary. | **All `<div>` shapes outside blockquotes lift structurally (2026-05-11)**: clean multi-line, trailing-on-open, butted-close, indented-close, same-line, empty / blank-only. **Fix #4 (non-div strict-block body lift) — clean multi-line + shape sweep + multi-line open landed 2026-05-11** for `<form>`, `<section>`, `<header>`, `<nav>`, `<aside>`, `<article>`, `<footer>`, `<p>`, `<table>`, `<tr>`, `<td>`, … (butted-close, open-trailing, same-line, multi-line open). **Inline-block matched-pair body lift landed (2026-05-11)** for `<video>`, `<iframe>`, `<button>`, `<audio>`, `<object>`, etc. — same shape coverage as non-div when body's first non-blank content is NOT a void block tag. **Fix #5 (bq-wrapped clean-shape lift) landed (2026-05-11)** for the clean multi-line shape inside `>` blockquote — `bq_clean_lift` gate covers `<div>` (Para), non-div strict-block tags (Plain via OnlyIfLast), and inline-block matched-pair (Plain, abandons on void-interior). `BqPrefixState` re-injects per-line bq markers around recursive parse's children so CST stays byte-equal; projector `open_tag_raw_block_text` strips bq markers from close-tag RawBlock emission. Deeper bq (`> > <div>`) works transparently. Other bq shapes (butted-close / open-trailing / same-line) still take the projector marker-strip path. Pass count progression: 132 → 137 → 140 → 141 → 142 → 145 → 148 → 151 → 154 → 157 → 159 (stable at 159 — purely structural, no new corpus cases). |
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-11 (Phase 6 / Fix #5 bq-wrapped `<div>` clean-shape lift)
+## Latest session — 2026-05-11 (Phase 6 / Fix #5 bq lift — generalized to non-div + inline-block + depth > 1)
 
-Lifted clean multi-line `<div>...</div>` shape inside `>`
-blockquote into structural CST children. Previously the projector's
-`html_div_block` ran `collect_html_block_text_skip_bq_markers` and
-byte-reparsed the body. Now the parser strips bq markers per body
-line, recursive-parses, and grafts inner children with per-line
-prefix tokens re-injected at line starts.
-`div_has_structural_inner` accepts the new shape (no
-`HTML_BLOCK_CONTENT`, both tags clean) so the projector picks the
-structural path automatically. Other bq-wrapped shapes still take
-the byte walker.
+Generalized the bq-wrapped clean-shape `<div>` lift from the
+previous session to also cover non-div strict-block tags
+(`<form>`, `<section>`, …) and inline-block matched-pair tags
+(`<video>`, `<iframe>`, …) inside blockquotes. Same lift gate,
+just dispatched on `wrapper_kind` + `block_type`: HTML_BLOCK_DIV
+uses `LastParaDemote::Never` (pandoc preserves Para inside Div);
+HTML_BLOCK + eligible strict-block / inline-block uses
+`LastParaDemote::OnlyIfLast` (matches pandoc's RawBlock + Plain +
+RawBlock shape). Inline-block tags also gate on
+`inline_block_void_interior_abandons` (mirrors non-bq matched-pair
+abandon rule).
+
+Also pinned depth-2 blockquote `<div>` (`> > <div>…`) — the lift
+gate is depth-agnostic so this works transparently; just added a
+paired fixture.
+
+Projector fix: `open_tag_raw_block_text` now strips
+`BLOCK_QUOTE_MARKER + WHITESPACE` prefix tokens from the close
+`HTML_BLOCK_TAG` before emitting RawBlock text — without this,
+bq-wrapped close tags rendered as `"> </form>"` instead of
+`"</form>"`.
 
 **Pass count**: html stable 159, total stable 352 (saturated
-before session). Workspace test count: 3047 → 3053 (+6 new
-fixtures). The win is architectural: bq-wrapped clean `<div>`
-bodies move from `html_div_block`'s byte-reparse branch to the
-structural walk.
+before session). Workspace test count: 3053 → 3060 (+7 new
+fixtures). The win is architectural — bq-wrapped non-div
+strict-block and inline-block matched-pair bodies move from the
+projector byte walker to the structural walk.
 
 ### What landed
 
-- `BqPrefixState` + `emit_grafted_token` + `emit_bq_prefix_tokens`:
-  per-line prefix injection during graft (`NEWLINE` AND
-  `BLANK_LINE` token advance `line_idx`).
-- `emit_html_block_body_lifted_bq`: strip bq markers, capture
-  prefixes, recursive-parse, graft with `BqPrefixState`.
-- `bq_div_clean_lift` gate at the close-line branch.
-- `graft_subtree` / `graft_subtree_as` / `graft_document_children`
-  signatures take `&mut Option<BqPrefixState>` (no-op when None).
-- Paired parser fixtures
-  `html_block_div_blockquote_nested_blocks_{pandoc,commonmark}`
-  (heading + blank + para in bq div) and
-  `html_block_video_uppercase_{pandoc,commonmark}` (regression pin).
-- Formatter golden `html_block_div_blockquote_idempotent`.
-- Existing snapshot `html_block_div_inside_blockquote_pandoc`
-  updated: opaque `HTML_BLOCK_CONTENT` → structural `PARAGRAPH`.
+- `bq_div_clean_lift` renamed to `bq_clean_lift` and generalized:
+  routes via `bq_lift_tag` resolver (HTML_BLOCK_DIV vs
+  HTML_BLOCK + lift-eligible tag) and dispatches demote policy
+  per wrapper.
+- Inline-block void-interior abandon check at the bq lift gate.
+- `open_tag_raw_block_text`: bq-prefix stripping on the close tag
+  RawBlock emission path (token-walk skipping
+  `BLOCK_QUOTE_MARKER + WHITESPACE`).
+- 3 paired parser fixtures: depth-2 (`html_block_div_blockquote_depth_2`),
+  non-div strict-block in bq (`html_block_strict_block_blockquote`),
+  inline-block matched-pair in bq (`html_block_inline_block_blockquote`).
+- Formatter golden `html_block_strict_blockquote_idempotent`.
 
 ### Suggested next sub-targets
 
-1. **Extend bq lift to other shapes** (medium). Butted-close,
-   open-trailing, same-line `<div>` inside bq; non-div
-   strict-block and inline-block matched-pair inside bq. Each needs
-   its own gate. Close-line prefix bytes belong inside the close
-   `HTML_BLOCK_TAG`, not the body.
-2. **Prune projector byte walkers** as bq lifts grow. Clean-`<div>`
-   bq case already bypasses `try_div_html_block` for the lift
-   branch; with #1 the helper plus
-   `collect_html_block_text_skip_bq_markers` can shrink, and
-   eventually `split_html_block_by_tags` matched-pair branch + 
-   `interior_starts_with_void_block_tag` go.
-3. **Deeper-nested bq (`> > <div>`).** Should work transparently
-   (the byte-slice prefix capture is depth-agnostic); add a paired
-   fixture to pin behavior.
+1. **Extend bq lift to non-clean shapes** (medium-hard).
+   Butted-close (`> foo</div>`), open-trailing (`> <div>foo`),
+   same-line (`> <div>foo</div>`) inside bq — for `<div>`,
+   non-div strict-block, and inline-block matched-pair. Each
+   shape needs different prefix-injection logic (close-line
+   leading bytes vs trailing-on-open). Current projector byte
+   walker handles these correctly but blocks pruning.
+2. **Prune projector byte walkers** once #1 lands. With all bq
+   shapes lifted, `collect_html_block_text_skip_bq_markers` and
+   `try_div_html_block` become dead code; matched-pair
+   `split_html_block_by_tags` branch and
+   `interior_starts_with_void_block_tag` can go too.
+3. **Emit `HTML_ATTRS` for non-div strict-block tags inside bq**
+   so salsa picks up `<section id>` declarations inside bq (Fix
+   #4 covers this only at `bq_depth == 0`). Small extension to
+   the open-tag tokenization in
+   `parse_html_block_with_wrapper`'s single-line branch.
 
 ### Files in committable diff
 
-- `crates/panache-parser/src/parser/blocks/html_blocks.rs`
-  (~190 net ins).
-- 2 paired parser fixtures
-  (`html_block_div_blockquote_nested_blocks`, `html_block_video_uppercase`)
-  + snapshots.
-- 1 updated parser snapshot (`html_block_div_inside_blockquote_pandoc`).
-- 1 formatter golden (`html_block_div_blockquote_idempotent`).
-- Runner registrations in
-  `crates/panache-parser/tests/golden_parser_cases.rs` and
-  `tests/golden_cases.rs`.
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs` —
+  bq_clean_lift gate generalization (~80 net ins).
+- `crates/panache-parser/src/pandoc_ast.rs` —
+  `open_tag_raw_block_text` bq-strip (~20 net ins).
+- 3 paired parser fixtures + snapshots.
+- 1 formatter golden + runner registration.
 
 ### New trap
 
-Folded into Persistent traps under "Structural lift": the inner
-parse's `BLANK_LINE` node contains a `BLANK_LINE` *token* (kind),
-not `NEWLINE`; both must advance `line_idx` or blank-line-containing
-bodies under-prefix.
+Folded into Persistent traps under "Projector tag splitting":
+`open_tag_raw_block_text` must strip `BLOCK_QUOTE_MARKER +
+WHITESPACE` prefix tokens; bq-wrapped close tags carry them as
+leading children of `HTML_BLOCK_TAG`, and the literal
+`tag.text()` includes them. Without the strip, RawBlock close
+emissions diverge from pandoc-native.
 
 --------------------------------------------------------------------------------
 
@@ -460,6 +485,7 @@ bodies under-prefix.
 Newest first. One line per session: date — phase/sub-target — pass
 count delta — root cause / lever.
 
+- 2026-05-11 — Phase 6 / Fix #5 bq-wrapped `<div>` clean-shape lift — html stable 159 (saturated) — `BqPrefixState` per-line prefix re-injection; `emit_html_block_body_lifted_bq`; `bq_div_clean_lift` gate; `BLANK_LINE` token advances line_idx alongside `NEWLINE`.
 - 2026-05-11 — Phase 6 / matched-pair inline-block body lift (`<video>`/`<iframe>`/`<button>`/…) — html stable 159 (saturated) — `is_pandoc_lift_eligible_block_tag` rename; `inline_block_void_interior_abandons` 3-shape void probe; `locate_open_tag_close_gt`.
 - 2026-05-11 — Phase 6 / Fix #4 multi-line open-tag lift for non-div strict-block tags — html 157 → 159 — `emit_multiline_open_tag_with_attrs` generalization; `open_tag_raw_block_text` canonicalizer for lifted multi-line opens.
 - 2026-05-11 — Phase 6 / Fix #4 non-div strict-block shape sweep (clean multi-line body, butted-close, open-trailing, same-line, empty `<div>`, bq-wrapped projector marker-strip, `<div>` shape lifts) — html 142 → 157 — `is_pandoc_lift_eligible_strict_block_tag`, `html_block_has_structural_lift`, `LastParaDemote::OnlyIfLast/SkipTrailingBlanks/Never`, `parse_with_refdefs` graft, `collect_html_block_text_skip_bq_markers`, generalized `emit_open_tag_tokens` + `probe_same_line_lift`.

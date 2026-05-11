@@ -1,0 +1,41 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..66
+  BLOCK_QUOTE@0..26
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    HTML_BLOCK@2..26
+      HTML_BLOCK_TAG@2..9
+        TEXT@2..8 "<form>"
+        NEWLINE@8..9 "\n"
+      PLAIN@9..16
+        BLOCK_QUOTE_MARKER@9..10 ">"
+        WHITESPACE@10..11 " "
+        TEXT@11..15 "para"
+        NEWLINE@15..16 "\n"
+      HTML_BLOCK_TAG@16..26
+        BLOCK_QUOTE_MARKER@16..17 ">"
+        WHITESPACE@17..18 " "
+        TEXT@18..25 "</form>"
+        NEWLINE@25..26 "\n"
+  BLANK_LINE@26..27
+    BLANK_LINE@26..27 "\n"
+  BLOCK_QUOTE@27..66
+    BLOCK_QUOTE_MARKER@27..28 ">"
+    WHITESPACE@28..29 " "
+    HTML_BLOCK@29..66
+      HTML_BLOCK_TAG@29..46
+        TEXT@29..45 "<section id=\"x\">"
+        NEWLINE@45..46 "\n"
+      PLAIN@46..53
+        BLOCK_QUOTE_MARKER@46..47 ">"
+        WHITESPACE@47..48 " "
+        TEXT@48..52 "body"
+        NEWLINE@52..53 "\n"
+      HTML_BLOCK_TAG@53..66
+        BLOCK_QUOTE_MARKER@53..54 ">"
+        WHITESPACE@54..55 " "
+        TEXT@55..65 "</section>"
+        NEWLINE@65..66 "\n"

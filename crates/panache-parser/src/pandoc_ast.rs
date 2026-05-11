@@ -1408,7 +1408,26 @@ fn open_tag_raw_block_text(tag: &SyntaxNode) -> String {
         result.push('>');
         return result;
     }
-    let mut text = tag.text().to_string();
+    // Blockquote-wrapped close tags (`> </form>`, `> </video>`) carry
+    // their leading `BLOCK_QUOTE_MARKER + WHITESPACE` tokens inside the
+    // close `HTML_BLOCK_TAG` for losslessness. Pandoc-native's RawBlock
+    // text is the tag bytes only — strip those prefix tokens.
+    let mut text = String::new();
+    let mut skip_next_ws = false;
+    for child in tag.children_with_tokens() {
+        if let NodeOrToken::Token(t) = child {
+            if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {
+                skip_next_ws = true;
+                continue;
+            }
+            if skip_next_ws && t.kind() == SyntaxKind::WHITESPACE {
+                skip_next_ws = false;
+                continue;
+            }
+            skip_next_ws = false;
+            text.push_str(t.text());
+        }
+    }
     while text.ends_with('\n') {
         text.pop();
     }

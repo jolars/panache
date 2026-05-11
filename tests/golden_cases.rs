@@ -241,6 +241,7 @@ golden_test_cases!(
     html_block_strict_block_inner_lift,
     html_block_strict_block_lift_shapes,
     html_block_strict_block_multiline_open,
+    html_block_strict_blockquote_idempotent,
     html_block_video_matched_pair,
     html_inline_span_idempotent,
     ignore_directives,

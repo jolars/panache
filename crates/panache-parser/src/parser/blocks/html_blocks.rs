@@ -1050,36 +1050,89 @@ pub(crate) fn parse_html_block_with_wrapper(
             log::trace!("Found HTML block closing at line {}", current_pos + 1);
             found_closing = true;
 
-            // Pandoc-dialect blockquote-wrapped `<div>` clean-shape lift:
-            // when the open and close tags stand alone on their source
-            // lines (no trailing on open, no body content on close after
-            // stripping bq markers), lift the body lines structurally so
-            // the projector walks CST children instead of byte-reparsing
-            // via `collect_html_block_text_skip_bq_markers`. Other shapes
-            // (butted-close / open-trailing / same-line inside bq) still
-            // fall through to the opaque path.
-            let bq_div_clean_lift = wrapper_kind == SyntaxKind::HTML_BLOCK_DIV
-                && bq_depth > 0
+            // Pandoc-dialect blockquote-wrapped clean-shape lift: when
+            // the open and close tags stand alone on their source lines
+            // (no trailing on open, no body content on close after
+            // stripping bq markers), lift the body lines structurally
+            // so the projector walks CST children instead of
+            // byte-reparsing via `collect_html_block_text_skip_bq_markers`.
+            //
+            // Covers `<div>` (HTML_BLOCK_DIV → Block::Div with body
+            // grafted, Para preserved), non-div strict-block tags
+            // (`<form>`, `<section>`, …) and inline-block matched-pair
+            // tags (`<video>`, `<iframe>`, …) — the latter two under
+            // HTML_BLOCK with the structural lift hitting pandoc's
+            // RawBlock + Plain + RawBlock shape via `OnlyIfLast`
+            // demotion. Inline-block additionally bails if the body
+            // starts at a fresh-block position with a void block tag
+            // (mirrors the non-bq matched-pair gate).
+            //
+            // Other bq-wrapped shapes (butted-close / open-trailing /
+            // same-line) still fall through to the opaque path.
+            let bq_lift_tag: Option<&str> = if bq_depth > 0
                 && multiline_open_end.is_none()
                 && pre_content.is_empty()
-                && {
-                    let (open_no_nl, _) = strip_newline(first_inner);
-                    open_no_nl.trim_end_matches([' ', '\t']).ends_with('>')
+            {
+                if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
+                    Some("div")
+                } else if wrapper_kind == SyntaxKind::HTML_BLOCK {
+                    match &block_type {
+                        HtmlBlockType::BlockTag {
+                            tag_name,
+                            is_verbatim: false,
+                            closed_by_blank_line: false,
+                            depth_aware: true,
+                            closes_at_open_tag: false,
+                            is_closing: false,
+                        } if is_pandoc_lift_eligible_block_tag(tag_name) => Some(tag_name.as_str()),
+                        _ => None,
+                    }
+                } else {
+                    None
                 }
-                && {
-                    let close_stripped = strip_n_blockquote_markers(line, bq_depth);
-                    let (close_no_nl, _) = strip_newline(close_stripped);
-                    close_no_nl
-                        .trim_start_matches([' ', '\t'])
-                        .starts_with("</")
-                };
+            } else {
+                None
+            };
 
-            if bq_div_clean_lift {
+            let bq_clean_lift = bq_lift_tag.is_some_and(|tag_name| {
+                let (open_no_nl, _) = strip_newline(first_inner);
+                if !open_no_nl.trim_end_matches([' ', '\t']).ends_with('>') {
+                    return false;
+                }
+                let close_stripped = strip_n_blockquote_markers(line, bq_depth);
+                let (close_no_nl, _) = strip_newline(close_stripped);
+                if !close_no_nl
+                    .trim_start_matches([' ', '\t'])
+                    .starts_with("</")
+                {
+                    return false;
+                }
+                if is_pandoc_inline_block_tag_name(tag_name)
+                    && inline_block_void_interior_abandons(
+                        first_inner,
+                        lines,
+                        start_pos,
+                        multiline_open_end,
+                        bq_depth,
+                        tag_name,
+                    )
+                {
+                    return false;
+                }
+                true
+            });
+
+            if bq_clean_lift {
+                let demote_policy = if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
+                    LastParaDemote::Never
+                } else {
+                    LastParaDemote::OnlyIfLast
+                };
                 emit_html_block_body_lifted_bq(
                     builder,
                     &content_lines,
                     bq_depth,
-                    LastParaDemote::Never,
+                    demote_policy,
                     config,
                 );
                 builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
