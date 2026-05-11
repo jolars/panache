@@ -329,6 +329,17 @@ and stay.
   reject same-line `<div>foo</div>` (one `HTML_BLOCK_TAG`, fails
   the two-tags requirement) and bq-wrapped divs (close tag has
   leading `> ` markers, not `</`).
+- **Body-lifted signal is "no `HTML_BLOCK_CONTENT` child"**
+  (2026-05-11). `div_has_structural_inner` was inverted from
+  "requires a non-(TAG/BLANK_LINE/CONTENT) body child" to "rejects
+  any node with an `HTML_BLOCK_CONTENT` child". This admits empty
+  (`<div></div>`) and blank-only (`<div>\n\n</div>`) divs into
+  the structural walk while still excluding bq-wrapped divs (those
+  carry `HTML_BLOCK_CONTENT` with marker-prefixed TEXT). Fix #4
+  generalizes this invariant: when the parser lifts non-`<div>`
+  bodies, `HTML_BLOCK_CONTENT` will only persist on still-opaque
+  blocks, and the projector's child walk can rely on its absence
+  as a "body is structural" guarantee.
 
 --------------------------------------------------------------------------------
 
@@ -341,7 +352,7 @@ and stay.
 | 3 | Sectioning + verbatim corpus pin; `eitherBlockOrInline` lift | **Conformance landed** — non-void (2026-05-09); void (`<embed>`/`<area>`/`<source>`/`<track>`) (2026-05-10). Implementation leans on projector-side `inline_pending` tracking + byte walker; CST still opaque for split/matched-pair shapes. |
 | 4 | Comments, PIs, declarations, CDATA projection | **Conformance landed** (2026-05-08); type-4 CM lowercase still gappy. CST opaque (these constructs project as RawBlock / RawInline). |
 | 5 | `markdown_in_html_blocks` interaction edge cases | **Conformance landed** — depth-aware nested div, Plain/Para promotion, refs inheritance, **projector-level splitter** (`split_html_block_by_tags` byte walker + `parse_pandoc_blocks` recursive reparse), outer-matched-pair-abandons-on-void-interior. **The structural CST lift was deferred** — Phase 5's mechanism is the projector reparsing bytes, not the parser emitting structure. |
-| 6 (new) | Lift inner HTML block content into structural CST children — `HTML_BLOCK_DIV` gets `PARAGRAPH` / `LIST` / etc. as direct children; `split_html_block_by_tags` / `flush_html_block_*` / `parse_pandoc_blocks` collapse into trivial CST walks; `PARAGRAPH→PLAIN` retag at adjacent-HTML-block boundary. | **All `<div>` shapes outside blockquotes now lift structurally (2026-05-11)**: clean multi-line `<div>...</div>` (first cut); messy shapes — trailing-on-open, butted-close, indented-close, same-line. **HTML blocks (any tag) inside blockquotes now project correctly via projector marker-strip (2026-05-11)**: `<div>`, `<p>`, `<pre>`, `<video>`, `<iframe>`, … inside `>` blockquotes get their BLOCK_QUOTE_MARKER+WHITESPACE prefix tokens stripped at the projector before byte-reparse, so the inner pandoc reparse doesn't re-recognize them as nested blockquotes. CST stays lossless (markers preserved as structural tokens); parser-side structural lift inside bq deferred (would need to thread markers around grafted children). Earlier sub-targets: PARAGRAPH→PLAIN retag at YesCanInterrupt; `<style>` / PI / `</script>` / `<script type="math/tex…">` cannot_interrupt. Pass count progression: 132 → 137 → 140 → 141 → 142 → 145 → 148. Fix #4 from AUDIT.md (full HTML_BLOCK body structural split) still pending. |
+| 6 (new) | Lift inner HTML block content into structural CST children — `HTML_BLOCK_DIV` gets `PARAGRAPH` / `LIST` / etc. as direct children; `split_html_block_by_tags` / `flush_html_block_*` / `parse_pandoc_blocks` collapse into trivial CST walks; `PARAGRAPH→PLAIN` retag at adjacent-HTML-block boundary. | **All `<div>` shapes outside blockquotes now lift structurally (2026-05-11)**: clean multi-line, trailing-on-open, butted-close, indented-close, same-line, **and empty / blank-only (2026-05-11)** — `<div></div>`, `<div>\n</div>`, `<div>\n\n</div>` all take the structural walk now that `div_has_structural_inner` only rejects nodes that carry an unlifted `HTML_BLOCK_CONTENT` body. **HTML blocks (any tag) inside blockquotes now project correctly via projector marker-strip (2026-05-11)**: BLOCK_QUOTE_MARKER+WHITESPACE prefix tokens are stripped at the projector before byte-reparse. Parser-side structural lift inside bq still deferred. Earlier sub-targets: PARAGRAPH→PLAIN retag at YesCanInterrupt; `<style>` / PI / `</script>` / `<script type="math/tex…">` cannot_interrupt. Pass count progression: 132 → 137 → 140 → 141 → 142 → 145 → 148 → 151. Fix #4 from AUDIT.md (full HTML_BLOCK body structural split) still pending. |
 
 Multi-line `<div>` open-tag structural HTML_ATTRS lift landed
 (2026-05-09). Multi-line void open-tag now lifts via
@@ -355,108 +366,80 @@ and CAN interrupt a running paragraph (no `cannot_interrupt` gate)
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-11 (Phase 6: bq-wrapped HTML blocks projector marker-strip)
+## Latest session — 2026-05-11 (Phase 6: empty / blank-only `<div>` structural lift)
 
-Closed the last shape gap for HTML blocks inside blockquotes: any
-HTML block under `> ...` markers (`<div>`, `<p>`, `<pre>`, `<video>`,
-`<iframe>`, …) now projects to the same pandoc-AST as
-`pandoc -f markdown -t native`. Previously the projector's
-byte-reparse path called `node.text()` on `HTML_BLOCK` /
-`HTML_BLOCK_DIV`, which included the BLOCK_QUOTE_MARKER + WHITESPACE
-prefix tokens that the parser keeps as structural CST tokens for
-losslessness. Feeding those bytes to the recursive parser
-re-recognized the `> ` prefixes as a nested blockquote (or, for
-verbatim `<pre>...</pre>`, kept literal `>` characters in the
-emitted RawBlock). The fix is purely projector-side; the parser-side
-structural lift (replacing the byte-reparse with CST children)
-inside `bq_depth > 0` is still deferred — it would need to thread
-markers around grafted children to keep losslessness intact.
+Trimmed the byte-reparse fallback for empty `<div></div>`,
+`<div>\n</div>`, and `<div>\n\n</div>`. The parser already emits
+clean `HTML_BLOCK_TAG + (optional BLANK_LINEs) + HTML_BLOCK_TAG`
+children for these, but `div_has_structural_inner` required at
+least one non-(TAG/BLANK_LINE/CONTENT) body child, so empties fell
+through to `extract_div_inner_and_butted` / `parse_pandoc_blocks`
+and re-derived `Div("",[],[]) []` from bytes. Output was already
+correct; the change is a small architectural cleanup.
 
-**Implementation** (all in
-`crates/panache-parser/src/pandoc_ast.rs`):
-- New `collect_html_block_text_skip_bq_markers(node)` walker plus
-  `walk_skip_bq_markers` recursive helper. Concatenates the node's
-  token text but drops every `BLOCK_QUOTE_MARKER` token AND the
-  immediately-following `WHITESPACE` token (one space). Handles
-  arbitrary nesting depth (`> > <div>`) because each line's marker
-  pairs are collapsed independently.
-- `html_div_block` switched from `node.text().to_string()` to the
-  new helper; `extract_div_inner_and_butted` + `assemble_div_block`
-  then operate on clean bytes.
-- `emit_html_block` (the opaque `HTML_BLOCK` projector) switched the
-  same way; `try_div_html_block` / `split_html_block_by_tags` /
-  `flush_html_block_text` now see clean bytes too. Inter-tag
-  Para→Plain demotion follows automatically because `Inner.` is no
-  longer wrapped in a spurious BlockQuote that hides it from
-  `flush_html_block_text`.
+**Implementation** (single-site in
+`crates/panache-parser/src/pandoc_ast.rs`): inverted the body
+predicate from "any non-(TAG/BLANK_LINE/CONTENT) child" to "no
+`HTML_BLOCK_CONTENT` children". `HTML_BLOCK_CONTENT` only appears
+on still-opaque bodies (bq-wrapped divs today; non-div HTML blocks
+until Fix #4 lands); its absence means the body is structurally
+lifted (or empty). Same-line `<div></div>` also already produces
+two clean HTML_BLOCK_TAGs and flips onto the structural walk.
 
-**Parser**: no changes. The CST shape (BLOCK_QUOTE_MARKER + WHITESPACE
-inside HTML_BLOCK_CONTENT and the close HTML_BLOCK_TAG) is unchanged
-and stays lossless. Two new paired parser fixtures
-(`html_block_div_inside_blockquote_{pandoc,commonmark}`) pin the
-shape so the projector-only fix has a stable contract.
+**Pass count**: html 148 → 151, total 341 → 344. New corpus cases
+0342/0343/0344 (same-line / newline-only / blank-only) plus paired
+parser fixture `html_block_div_empty_{pandoc,commonmark}`.
+CommonMark snapshot exposes the dialect divergence — type-6
+HTML_BLOCK with TAG + CONTENT for `<div>\n</div>` (CM closes at
+blank line, not by matching tag) vs Pandoc's HTML_BLOCK_DIV with
+clean TAG+TAG.
 
-**Pass count**: html 142 → 148, total 335 → 341. Six new corpus
-cases (336–338 div, 339–341 pre/video/p) all flipped to passing in
-one shot. No existing snapshots updated; no parser fixtures changed.
-
-**Payoff**: bq-wrapped HTML blocks now match pandoc-native at the
-public `to_pandoc_ast` API. Salsa anchor walk for `<div id>` inside
-a blockquote was already correct (HTML_ATTRS lives in the open
-HTML_BLOCK_TAG, never carries bq markers); the linter / LSP
-consumers see no change.
+**Payoff**: removes one "byte path still fires" smell. Establishes
+the invariant that *absence* of `HTML_BLOCK_CONTENT` is the signal
+for a fully lifted body — directly reusable in Fix #4 when the
+parser lifts non-`<div>` bodies.
 
 ### Suggested next sub-targets
 
 1. **Fix #4 from AUDIT.md — full HTML_BLOCK body structural split**
-   (large). Eliminates `split_html_block_by_tags`, both flush helpers,
-   `interior_starts_with_void_block_tag`,
-   `find_matching_html_close*`, `inline_pending` flag. Each lifts a
-   chunk of byte-walker compensation into a CST walk. Largest blast
-   radius remaining.
+   (medium-large). Largest remaining lever. Parser already emits
+   TAG+CONTENT+TAG for multi-line non-div HTML blocks
+   (`<form>\nbody\n</form>` etc.) but inner block tags stay as
+   TEXT inside CONTENT. Lifting non-`<div>` bodies the same way
+   `<div>` already does (recursive `parse_with_refdefs` + graft,
+   then this session's "no HTML_BLOCK_CONTENT = lifted" predicate)
+   would let `emit_html_block` walk children structurally and
+   eliminate `split_html_block_by_tags`, both flush helpers,
+   `interior_starts_with_void_block_tag`, `find_matching_html_close*`,
+   and the `inline_pending` flag. Start with strict-block tags
+   (`<form>`, `<header>`, `<footer>`, `<section>`, `<article>`,
+   `<nav>`, `<aside>`, …) with matching open/close; defer matched-
+   pair inline-block lift (`<video>`, `<iframe>`).
 2. **Parser-side structural lift for `<div>` inside blockquotes** —
-   the projector marker-strip is a stopgap. A real lift would need
-   to: (a) build inner_text from content_lines with markers stripped
-   per line, (b) recursively parse + graft, (c) re-attach markers
-   around the grafted children to stay lossless, OR keep markers in
-   sibling tokens (which makes downstream walks awkward). Defer
-   until Fix #4 lands; the bq-context decision is part of the same
-   architecture.
+   still deferred. Needs BLOCK_QUOTE_MARKER threading around
+   grafted children. Wait for Fix #4's pattern.
 3. **Multi-line `<script\n type=...>`** corpus pin — only if a real
-   case appears (the `is_math_tex_script_open` helper currently only
-   inspects single-line `ctx.content`).
-4. **Empty `<div></div>` projector trim**: relax
-   `div_has_structural_inner` to accept clean-tag-only shapes, so
-   the byte-reparse fallback isn't hit on empty divs. Cosmetic
-   (output is identical).
+   case appears.
 
 ### Files in committable diff
 
-- `crates/panache-parser/src/pandoc_ast.rs` — new
-  `collect_html_block_text_skip_bq_markers` + `walk_skip_bq_markers`
-  helpers; `html_div_block` and `emit_html_block` switched to use
-  them.
+- `crates/panache-parser/src/pandoc_ast.rs` — `div_has_structural_inner`
+  predicate inversion + comment update.
 - `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/`
-  — six new cases: `0336…0338` (div in bq, with attrs, with block
-  content); `0339…0341` (pre verbatim, video matched-pair, p strict-
-  block).
-- `crates/panache-parser/tests/fixtures/cases/html_block_div_inside_blockquote_{pandoc,commonmark}/`
+  — three new cases `0342–0344`.
+- `crates/panache-parser/tests/fixtures/cases/html_block_div_empty_{pandoc,commonmark}/`
   + `tests/golden_parser_cases.rs` + two new snapshots — paired
-  parser fixture pinning the bq+div CST shape (BLOCK_QUOTE_MARKER
-  tokens inside HTML_BLOCK_CONTENT and the close HTML_BLOCK_TAG;
-  HTML_ATTRS structurally lifted on the open tag).
+  parser fixture covering all three shapes in one input.
 - `crates/panache-parser/tests/pandoc/allowlist.txt` — new
-  `# html-block (HTML blocks inside a blockquote …)` section header
-  + ids 336–341.
-- Regenerated `crates/panache-parser/tests/pandoc/report.txt` and
+  `# html-block (empty `<div></div>` …)` section + ids 342–344.
+- Regenerated `tests/pandoc/report.txt` and
   `docs/development/pandoc-report.json`.
-- `.claude/skills/html-conformance/RECAP.md` — this session.
 
 ### New traps
 
-Folded into Persistent traps under "Projector tag splitting":
-projector marker-strip pattern for HTML blocks inside blockquotes
-(don't reintroduce `node.text()` in `html_div_block` / `emit_html_block`).
+Folded into Persistent traps under "Structural lift (Fix #3
+family)": absence of `HTML_BLOCK_CONTENT` is now the projector's
+signal for a fully lifted body.
 
 --------------------------------------------------------------------------------
 
@@ -465,9 +448,9 @@ projector marker-strip pattern for HTML blocks inside blockquotes
 Newest first. One line per session: date — phase/sub-target — pass
 count delta — root cause / lever.
 
-- 2026-05-11 — Phase 6 Fix #3 same-line `<div>foo</div>` lift — html 142 → 142 — `probe_same_line_div_lift` gates the lift; rejects nested/trailing shapes; close always butted → PLAIN.
-- 2026-05-11 — Phase 6 Fix #3 messy + first-cut `<div>` lifts (clean multi-line, trailing-on-open, butted-close, indented-close) — html 142 → 142 — recursive `parse_with_refdefs` + `graft_subtree`; cleanness predicates; `html_div_block` routed structurally.
-- 2026-05-10 → 2026-05-11 — Phase 6 cannot_interrupt (`<style>`, PI, `</script>`, `<script type=math/tex>`) + Fix #1/#2 — html 132 → 142 — PARAGRAPH→PLAIN retag at YesCanInterrupt; `is_closing` field; `is_math_tex_script_open`; pandoc `isInlineTag` (issue #10643) drives the set.
+- 2026-05-11 — Phase 6 bq-wrapped HTML blocks projector marker-strip — html 142 → 148 — `collect_html_block_text_skip_bq_markers` drops BLOCK_QUOTE_MARKER+WHITESPACE before byte-reparse.
+- 2026-05-11 — Phase 6 Fix #3 `<div>` shape lifts (clean multi-line, trailing-on-open, butted-close, indented-close, same-line) — html 142 → 142 — recursive `parse_with_refdefs` + `graft_subtree`; cleanness predicates; `probe_same_line_div_lift`.
+- 2026-05-10 → 2026-05-11 — Phase 6 cannot_interrupt (`<style>`, PI, `</script>`, `<script type=math/tex>`) + Fix #1/#2 — html 132 → 142 — PARAGRAPH→PLAIN retag at YesCanInterrupt; `is_closing` field; `is_math_tex_script_open`; pandoc `isInlineTag` (issue #10643).
 - 2026-05-10 — Strict-block/verbatim closing-form lift, multi-line void open-tag, incomplete-open recursion fix, Phase 3 void `eitherBlockOrInline` — html 105 → 132 — close-tag branches, `closes_at_open_tag`, `pandoc_html_open_tag_closes` gate, `PANDOC_VOID_BLOCK_TAGS`.
 - 2026-05-09 — Phase 3 + Phase 5 (non-void eitherBlockOrInline; HTML5 sectioning; `<DIV>` losslessness; Plain/Para; multi-line attrs; refs inheritance) — html 62 → 105 — projector `inline_pending` + parser `cannot_interrupt`; CM/Pandoc blockHtmlTags split; `build_refs_ctx_inherited`.
 - 2026-05-08 — Phases 1-5 seed (issue #263 closed) — html 0 → 62 — `HTML_BLOCK_DIV`/`INLINE_HTML_SPAN` retag, `HTML_ATTRS` tokenization, sectioning/verbatim corpus pin, depth-aware nested `<div>`.

@@ -1160,6 +1160,12 @@ fn walk_skip_bq_markers(node: &SyntaxNode, out: &mut String, skip_next_ws: &mut 
 /// butted close (`<div>\nfoo\nbar</div>`) — fall through to the byte
 /// reparse path, which is the source of truth for those cases until
 /// follow-up parser work lifts them too.
+///
+/// Presence of an `HTML_BLOCK_CONTENT` child signals an unlifted body
+/// (parser kept body lines as opaque TEXT) — bq-wrapped divs are the
+/// current example. Those still need the byte-reparse path. Empty
+/// and blank-only bodies have no `HTML_BLOCK_CONTENT` child and can
+/// be lifted structurally to `Div ("",[],[]) []`.
 fn div_has_structural_inner(node: &SyntaxNode) -> bool {
     let mut tags = node
         .children()
@@ -1179,12 +1185,9 @@ fn div_has_structural_inner(node: &SyntaxNode) -> bool {
     if !html_block_close_tag_is_clean(&close_tag) {
         return false;
     }
-    node.children().any(|c| {
-        !matches!(
-            c.kind(),
-            SyntaxKind::HTML_BLOCK_TAG | SyntaxKind::BLANK_LINE | SyntaxKind::HTML_BLOCK_CONTENT
-        )
-    })
+    !node
+        .children()
+        .any(|c| c.kind() == SyntaxKind::HTML_BLOCK_CONTENT)
 }
 
 /// True when the open `HTML_BLOCK_TAG` carries no inner content after

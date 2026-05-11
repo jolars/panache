@@ -407,3 +407,8 @@
 339
 340
 341
+
+# html-block (empty `<div></div>` / `<div>\n</div>` / `<div>\n\n</div>` projects to `Div ("",[],[]) []` matching pandoc-native. Parser already lifts the shape into clean `HTML_BLOCK_TAG` + (optional `BLANK_LINE`s) + `HTML_BLOCK_TAG` children with no `HTML_BLOCK_CONTENT`; the projector's `div_has_structural_inner` predicate was relaxed from "requires a non-(TAG/BLANK_LINE/CONTENT) body child" to "no `HTML_BLOCK_CONTENT` children", which trusts the parser-side lift even when the body is empty or blank-only. Bq-wrapped divs still carry `HTML_BLOCK_CONTENT` for the bq-prefixed body lines and continue to fall through to the byte-reparse path.)
+342
+343
+344
