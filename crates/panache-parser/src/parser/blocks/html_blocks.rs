@@ -693,40 +693,12 @@ pub(crate) fn parse_html_block_with_wrapper(
         None
     };
 
-    // Emit opening line(s)
-    builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
-
-    if let Some(end_line_idx) = multiline_open_end {
-        if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
-            emit_multiline_div_open_tag(builder, lines, start_pos, end_line_idx);
-        } else {
-            emit_multiline_open_tag_simple(builder, lines, start_pos, end_line_idx);
-        }
-    } else {
-        let (line_without_newline, newline_str) = strip_newline(first_inner);
-        if !line_without_newline.is_empty() {
-            // For HTML_BLOCK_DIV, expose the open tag's attributes
-            // structurally so `AttributeNode::cast(HTML_ATTRS)` finds them
-            // via the same descendants walk that handles fenced-div /
-            // heading attrs. CST bytes stay byte-equal to source — we only
-            // tokenize at finer granularity for matched div opens.
-            if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
-                emit_div_open_tag_tokens(builder, line_without_newline);
-            } else {
-                builder.token(SyntaxKind::TEXT.into(), line_without_newline);
-            }
-        }
-        if !newline_str.is_empty() {
-            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-        }
-    }
-
-    builder.finish_node(); // HtmlBlockTag
-
     // Set up depth-aware close tracking when the block type asks for it
     // (Pandoc dialect, balanced same-name tag matching). A `None` means
     // we fall back to the legacy "first matching close" path via
-    // `is_closing_marker`.
+    // `is_closing_marker`. Computed up front so the lift-mode gate
+    // below can decide whether the open line already balances the
+    // block (same-line `<div>...</div>`).
     let depth_aware_tag: Option<String> = match &block_type {
         HtmlBlockType::BlockTag {
             tag_name,
@@ -755,6 +727,61 @@ pub(crate) fn parse_html_block_with_wrapper(
         }
         depth = opens as i64 - closes as i64;
     }
+
+    // Whether this block participates in the Phase 6 structural lift
+    // (recursively parse body as Pandoc markdown and graft children).
+    // Covers `<div>` outside blockquote context. Disabled when the
+    // open line already balances the block (same-line `<div>foo</div>`):
+    // for those shapes the parser produces a single `HTML_BLOCK_TAG`
+    // with no separate close — the byte-reparse path in the projector
+    // still handles them.
+    let lift_mode = wrapper_kind == SyntaxKind::HTML_BLOCK_DIV
+        && bq_depth == 0
+        && !(multiline_open_end.is_none() && depth_aware_tag.is_some() && depth <= 0);
+
+    // Trailing content from the open tag (after `>`). When the lift is
+    // active and the open line is `<div ATTRS>foo\n`, this captures
+    // `"foo\n"` so it becomes the leading bytes of the recursive-parse
+    // input. Stays empty for clean opens (`<div>\n`) and for non-lift
+    // shapes (same-line / blockquote-wrapped).
+    let mut pre_content = String::new();
+
+    // Emit opening line(s)
+    builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
+
+    if let Some(end_line_idx) = multiline_open_end {
+        if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
+            emit_multiline_div_open_tag(builder, lines, start_pos, end_line_idx);
+        } else {
+            emit_multiline_open_tag_simple(builder, lines, start_pos, end_line_idx);
+        }
+    } else {
+        let (line_without_newline, newline_str) = strip_newline(first_inner);
+        if !line_without_newline.is_empty() {
+            // For HTML_BLOCK_DIV, expose the open tag's attributes
+            // structurally so `AttributeNode::cast(HTML_ATTRS)` finds them
+            // via the same descendants walk that handles fenced-div /
+            // heading attrs. CST bytes stay byte-equal to source — we only
+            // tokenize at finer granularity for matched div opens.
+            if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
+                let trailing = emit_div_open_tag_tokens(builder, line_without_newline, lift_mode);
+                if !trailing.is_empty() {
+                    pre_content.push_str(trailing);
+                    pre_content.push_str(newline_str);
+                }
+            } else {
+                builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+            }
+        }
+        // When the open tag has trailing content under lift mode, the
+        // newline belongs to that trailing line (it terminates the
+        // synthetic body line, not the open tag). Don't double-emit.
+        if pre_content.is_empty() && !newline_str.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+        }
+    }
+
+    builder.finish_node(); // HtmlBlockTag
 
     // Check if opening line also contains closing marker. Blank-line-terminated
     // blocks (CommonMark types 6 & 7) ignore inline close markers — they only
@@ -837,11 +864,40 @@ pub(crate) fn parse_html_block_with_wrapper(
             log::trace!("Found HTML block closing at line {}", current_pos + 1);
             found_closing = true;
 
-            emit_html_block_body(builder, &content_lines, bq_depth, wrapper_kind, config);
+            // Under lift mode, try to split the close line into a
+            // leading "body content" prefix and a clean `</div>...`
+            // remainder. Lift only when the close line has exactly one
+            // `</div>` and no nested `<div>` opens — depth-aware corner
+            // cases (e.g. `<inner></inner></div>` on the close line)
+            // fall back to the non-lift path. `close_butted` propagates
+            // pandoc's `markdown_in_html_blocks` Plain demotion rule:
+            // any non-newline byte immediately before `</div>` means
+            // the LAST inner block demotes Para→Plain.
+            let close_split = if lift_mode {
+                try_split_close_line(line, "div")
+            } else {
+                None
+            };
 
-            builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
-            emit_html_block_line(builder, line, bq_depth);
-            builder.finish_node();
+            if let Some((leading, close_part)) = close_split {
+                emit_html_block_body_lifted(builder, &pre_content, &content_lines, leading, config);
+                builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
+                emit_html_block_line(builder, close_part, 0);
+                builder.finish_node();
+            } else {
+                emit_html_block_body(
+                    builder,
+                    &pre_content,
+                    &content_lines,
+                    bq_depth,
+                    wrapper_kind,
+                    lift_mode,
+                    config,
+                );
+                builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
+                emit_html_block_line(builder, line, bq_depth);
+                builder.finish_node();
+            }
 
             current_pos += 1;
             break;
@@ -855,7 +911,15 @@ pub(crate) fn parse_html_block_with_wrapper(
     // If we didn't find a closing marker, emit what we collected
     if !found_closing {
         log::trace!("HTML block at line {} has no closing marker", start_pos + 1);
-        emit_html_block_body(builder, &content_lines, bq_depth, wrapper_kind, config);
+        emit_html_block_body(
+            builder,
+            &pre_content,
+            &content_lines,
+            bq_depth,
+            wrapper_kind,
+            lift_mode,
+            config,
+        );
     }
 
     builder.finish_node(); // HtmlBlock
@@ -864,74 +928,131 @@ pub(crate) fn parse_html_block_with_wrapper(
 
 /// Emit the collected inner content lines for an HTML block.
 ///
-/// For `HTML_BLOCK_DIV` under Pandoc with `bq_depth == 0`, recursively
-/// parse the inner content as Pandoc-flavored markdown and graft the
-/// resulting top-level blocks as direct children of the wrapper. This
-/// is the Phase 6 structural lift — the projector and downstream
-/// consumers (linter, salsa, LSP) can walk the structural children
-/// instead of re-tokenizing the body bytes.
+/// For `HTML_BLOCK_DIV` under Pandoc with `lift_mode == true` (single-
+/// line `<div>` open outside blockquote), recursively parse the inner
+/// content (including any open-tag trailing) as Pandoc-flavored
+/// markdown and graft the resulting top-level blocks as direct children
+/// of the wrapper. This is the Phase 6 structural lift — the projector
+/// and downstream consumers (linter, salsa, LSP) can walk the
+/// structural children instead of re-tokenizing the body bytes.
 ///
 /// All other shapes — opaque `HTML_BLOCK`, `HTML_BLOCK_DIV` inside a
-/// blockquote, or any case with no content lines — fall through to
-/// the legacy `HTML_BLOCK_CONTENT`-with-TEXT capture. Same-line
-/// `<div>foo</div>` and butted-close `<div>\nfoo</div>` produce no
-/// `content_lines` entries (the content lives inside `HTML_BLOCK_TAG`
-/// for those shapes) and so are unaffected by this lift.
+/// blockquote, multi-line open, or no content at all — fall through to
+/// the legacy `HTML_BLOCK_CONTENT`-with-TEXT capture.
 ///
 /// CST bytes remain byte-identical to source: the recursive parser is
 /// lossless on the same byte slice the legacy path would have captured
 /// as TEXT.
 fn emit_html_block_body(
     builder: &mut GreenNodeBuilder<'static>,
+    pre_content: &str,
     content_lines: &[&str],
     bq_depth: usize,
     wrapper_kind: SyntaxKind,
+    lift_mode: bool,
     config: &ParserOptions,
 ) {
-    if content_lines.is_empty() {
+    if pre_content.is_empty() && content_lines.is_empty() {
         return;
     }
-    if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV && bq_depth == 0 {
-        let inner_text: String = content_lines.concat();
-        emit_recursively_parsed_blocks(builder, &inner_text, config);
+    if lift_mode && wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
+        emit_html_block_body_lifted(builder, pre_content, content_lines, "", config);
         return;
     }
+    // Legacy path: opaque TEXT capture. `pre_content` is always empty
+    // here (lift_mode is the only path that populates it), but be
+    // defensive — if a trailing prefix snuck in, emit it as TEXT so
+    // bytes are preserved.
     builder.start_node(SyntaxKind::HTML_BLOCK_CONTENT.into());
+    if !pre_content.is_empty() {
+        builder.token(SyntaxKind::TEXT.into(), pre_content);
+    }
     for content_line in content_lines {
         emit_html_block_line(builder, content_line, bq_depth);
     }
     builder.finish_node();
 }
 
-/// Recursively parse `inner_text` as a Pandoc-flavored markdown document
-/// and graft the resulting top-level children into `builder` at the
-/// current insertion position. Inherits the outer parser's refdef
-/// labels so that reference links inside the `<div>` body can resolve
-/// against definitions declared in the surrounding document.
-fn emit_recursively_parsed_blocks(
+/// Lift the `<div>` body into structural CST children: build the inner
+/// text from `pre_content` + `content_lines` + `post_content` (in
+/// order), recursively parse it as Pandoc-flavored markdown, and graft
+/// the resulting top-level blocks into `builder`. When `post_content`
+/// is non-empty the close tag is "butted" against text, which under
+/// pandoc's `markdown_in_html_blocks` rule demotes the last block in
+/// the body Para→Plain; the graft retags the matching `PARAGRAPH` node
+/// as `PLAIN` to encode that decision structurally.
+fn emit_html_block_body_lifted(
     builder: &mut GreenNodeBuilder<'static>,
-    inner_text: &str,
+    pre_content: &str,
+    content_lines: &[&str],
+    post_content: &str,
     config: &ParserOptions,
 ) {
-    // Reuse the outer document's refdef label set so an inner reference
-    // link can resolve against a definition declared outside the
-    // `<div>`. The outer parser populated this on the very first
-    // call into `crate::parse`; subsequent recursive parses inherit
-    // it unchanged.
+    if pre_content.is_empty() && content_lines.is_empty() && post_content.is_empty() {
+        return;
+    }
+    let mut inner_text = String::with_capacity(
+        pre_content.len()
+            + content_lines.iter().map(|s| s.len()).sum::<usize>()
+            + post_content.len(),
+    );
+    inner_text.push_str(pre_content);
+    for line in content_lines {
+        inner_text.push_str(line);
+    }
+    inner_text.push_str(post_content);
+
+    let close_butted = !post_content.is_empty();
+
     let mut inner_options = config.clone();
     let refdefs = config.refdef_labels.clone().unwrap_or_default();
     inner_options.refdef_labels = Some(refdefs.clone());
-    let inner_root = crate::parser::parse_with_refdefs(inner_text, Some(inner_options), refdefs);
-    graft_document_children(builder, &inner_root);
+    let inner_root = crate::parser::parse_with_refdefs(&inner_text, Some(inner_options), refdefs);
+    graft_document_children(builder, &inner_root, close_butted);
 }
 
 /// Walk a parsed inner document's top-level children and re-emit them
 /// into `builder`. The document's wrapper node is skipped — only its
 /// children are grafted.
-fn graft_document_children(builder: &mut GreenNodeBuilder<'static>, doc: &SyntaxNode) {
-    for child in doc.children_with_tokens() {
+///
+/// When `demote_last_para` is true, the LAST top-level PARAGRAPH
+/// (skipping trailing BLANK_LINEs) is grafted as a PLAIN node instead.
+/// This encodes pandoc's `markdown_in_html_blocks` rule that the
+/// trailing paragraph inside a `<div>foo</div>`-style butted close
+/// demotes from Para to Plain.
+fn graft_document_children(
+    builder: &mut GreenNodeBuilder<'static>,
+    doc: &SyntaxNode,
+    demote_last_para: bool,
+) {
+    let children: Vec<rowan::NodeOrToken<SyntaxNode, _>> = doc.children_with_tokens().collect();
+
+    // Find the last "real block" — the last child node that isn't a
+    // BLANK_LINE. Demote it only if it's a PARAGRAPH.
+    let mut demote_idx: Option<usize> = None;
+    if demote_last_para {
+        for (i, c) in children.iter().enumerate().rev() {
+            if let rowan::NodeOrToken::Node(n) = c {
+                if n.kind() == SyntaxKind::BLANK_LINE {
+                    continue;
+                }
+                if n.kind() == SyntaxKind::PARAGRAPH {
+                    demote_idx = Some(i);
+                }
+                break;
+            }
+        }
+    }
+
+    for (i, child) in children.into_iter().enumerate() {
         match child {
-            rowan::NodeOrToken::Node(n) => graft_subtree(builder, &n),
+            rowan::NodeOrToken::Node(n) => {
+                if Some(i) == demote_idx {
+                    graft_subtree_as(builder, &n, SyntaxKind::PLAIN);
+                } else {
+                    graft_subtree(builder, &n);
+                }
+            }
             rowan::NodeOrToken::Token(t) => {
                 builder.token(t.kind().into(), t.text());
             }
@@ -943,7 +1064,14 @@ fn graft_document_children(builder: &mut GreenNodeBuilder<'static>, doc: &Syntax
 /// Token text is copied verbatim so the result is byte-identical to
 /// the input span.
 fn graft_subtree(builder: &mut GreenNodeBuilder<'static>, node: &SyntaxNode) {
-    builder.start_node(node.kind().into());
+    graft_subtree_as(builder, node, node.kind());
+}
+
+/// Like `graft_subtree` but the outer wrapper's `SyntaxKind` is
+/// overridden. Used to retag a top-level `PARAGRAPH` as `PLAIN` for
+/// the close-butted demotion rule.
+fn graft_subtree_as(builder: &mut GreenNodeBuilder<'static>, node: &SyntaxNode, kind: SyntaxKind) {
+    builder.start_node(kind.into());
     for child in node.children_with_tokens() {
         match child {
             rowan::NodeOrToken::Node(n) => graft_subtree(builder, &n),
@@ -953,6 +1081,33 @@ fn graft_subtree(builder: &mut GreenNodeBuilder<'static>, node: &SyntaxNode) {
         }
     }
     builder.finish_node();
+}
+
+/// Try to split the close line of an HTML_BLOCK_DIV body into a
+/// leading content prefix and a clean `</tag>...` remainder. Returns
+/// `Some((leading, close_part))` only when the line contains exactly
+/// one `</tag>` and no `<tag>` opens — the safe shape for the lift.
+/// Returns `None` for nested closes (e.g. `<inner></inner></div>`),
+/// for missing close tags, or for compound shapes the parser
+/// shouldn't attempt to lift in this pass.
+///
+/// `leading` may be empty (close starts at column 0) or pure
+/// whitespace (close on an indented line). Both count as "butted" per
+/// pandoc's `markdown_in_html_blocks` rule — if leading is non-empty
+/// the trailing paragraph inside the div demotes Para→Plain.
+fn try_split_close_line<'a>(line: &'a str, tag_name: &str) -> Option<(&'a str, &'a str)> {
+    let (opens, closes) = count_tag_balance(line, tag_name);
+    if opens != 0 || closes != 1 {
+        return None;
+    }
+    // Locate the close tag's opening `<` by lowercased substring search.
+    // Safe because we've already established (above) that the line has
+    // exactly one `</tag>` and no `<tag>` opens, so the first match is
+    // THE close.
+    let needle = format!("</{}", tag_name);
+    let lower = line.to_ascii_lowercase();
+    let close_lt = lower.find(&needle)?;
+    Some((&line[..close_lt], &line[close_lt..]))
 }
 
 /// Emit the open-tag line of an `HTML_BLOCK_DIV`, splitting the bytes
@@ -965,7 +1120,17 @@ fn graft_subtree(builder: &mut GreenNodeBuilder<'static>, node: &SyntaxNode) {
 /// region structurally. Falls back to a single TEXT token if the line
 /// doesn't fit the expected `<div ...>` shape (defensive — the parser
 /// only retags as `HTML_BLOCK_DIV` when this shape was matched).
-fn emit_div_open_tag_tokens(builder: &mut GreenNodeBuilder<'static>, line: &str) {
+///
+/// `lift_trailing`: when true, bytes after `>` are NOT emitted as TEXT —
+/// returned as `&str` instead so the caller can splice them into the
+/// recursive-parse input for the structural body lift. When false
+/// (legacy / non-lift path), trailing bytes are emitted as TEXT and an
+/// empty slice is returned.
+fn emit_div_open_tag_tokens<'a>(
+    builder: &mut GreenNodeBuilder<'static>,
+    line: &'a str,
+    lift_trailing: bool,
+) -> &'a str {
     let bytes = line.as_bytes();
     // Leading indent (CommonMark allows up to 3 spaces).
     let indent_end = bytes.iter().position(|&b| b != b' ').unwrap_or(bytes.len());
@@ -976,7 +1141,7 @@ fn emit_div_open_tag_tokens(builder: &mut GreenNodeBuilder<'static>, line: &str)
     // Match the literal `<div` prefix (ASCII case-insensitive on `div`).
     if !rest.starts_with('<') || rest.len() < 4 || !rest[1..4].eq_ignore_ascii_case("div") {
         builder.token(SyntaxKind::TEXT.into(), rest);
-        return;
+        return "";
     }
     let after_name = &rest[4..];
     let after_name_bytes = after_name.as_bytes();
@@ -1000,7 +1165,7 @@ fn emit_div_open_tag_tokens(builder: &mut GreenNodeBuilder<'static>, line: &str)
     let Some(tag_close) = tag_close else {
         // Open tag has no closing `>` on this line — defensive fallback.
         builder.token(SyntaxKind::TEXT.into(), rest);
-        return;
+        return "";
     };
     // Whitespace between the tag name and the attribute region.
     let attrs_inner = &after_name[..tag_close];
@@ -1047,9 +1212,15 @@ fn emit_div_open_tag_tokens(builder: &mut GreenNodeBuilder<'static>, line: &str)
     }
     builder.token(SyntaxKind::TEXT.into(), ">");
     let after_gt = &after_name[tag_close + 1..];
+    if lift_trailing {
+        // Return trailing bytes to the caller (will be spliced into the
+        // recursive-parse input for the body lift).
+        return after_gt;
+    }
     if !after_gt.is_empty() {
         builder.token(SyntaxKind::TEXT.into(), after_gt);
     }
+    ""
 }
 
 /// Detect a multi-line HTML open tag for `tag_name`. Returns
