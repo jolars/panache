@@ -894,6 +894,52 @@ pub(crate) fn parse_html_block_with_wrapper(
         )
     });
 
+    // Same-line lift inside a blockquote (`> <tag>body</tag>`). Bytes
+    // are byte-equal to the non-bq same-line shape minus the leading
+    // `> ` (which sits on the outer BLOCK_QUOTE, not inside HTML_BLOCK).
+    // The body has no inner newlines, so no bq prefix re-injection is
+    // needed when grafting — `emit_html_block_body_lifted` (passing
+    // `bq: &mut None`) is enough. Other bq shapes (butted-close,
+    // open-trailing) still fall through to the projector's byte
+    // walker — they need per-line prefix injection.
+    let same_line_bq_lift_tag: Option<&str> = if bq_depth > 0
+        && multiline_open_end.is_none()
+        && depth_aware_tag.is_some()
+        && depth <= 0
+    {
+        let (line_no_nl, _) = strip_newline(first_inner);
+        if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
+            if probe_same_line_lift(line_no_nl, "div") {
+                Some("div")
+            } else {
+                None
+            }
+        } else if wrapper_kind == SyntaxKind::HTML_BLOCK {
+            match &block_type {
+                HtmlBlockType::BlockTag {
+                    tag_name,
+                    is_verbatim: false,
+                    closed_by_blank_line: false,
+                    depth_aware: true,
+                    closes_at_open_tag: false,
+                    is_closing: false,
+                } if is_pandoc_lift_eligible_block_tag(tag_name)
+                    && probe_same_line_lift(line_no_nl, tag_name.as_str()) =>
+                {
+                    // Inline-block tags (`<video>`, `<iframe>`, …) skip
+                    // the void-interior check at same-line — the shape
+                    // has no inner block content to interfere with.
+                    Some(tag_name.as_str())
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // Whether this block participates in the Phase 6 structural lift
     // (recursively parse body as Pandoc markdown and graft children).
     // Covers `<div>` outside blockquote context. For same-line shapes
@@ -903,7 +949,8 @@ pub(crate) fn parse_html_block_with_wrapper(
     let lift_mode = (wrapper_kind == SyntaxKind::HTML_BLOCK_DIV
         && bq_depth == 0
         && (!is_same_line_div || same_line_div_lift_safe))
-        || strict_block_lift;
+        || strict_block_lift
+        || same_line_bq_lift_tag.is_some();
 
     // Trailing content from the open tag (after `>`). When the lift is
     // active and the open line is `<div ATTRS>foo\n`, this captures
@@ -952,12 +999,21 @@ pub(crate) fn parse_html_block_with_wrapper(
                 bq_strict_attr_emit_tag_name(wrapper_kind, &block_type, bq_depth)
             {
                 // Inside a blockquote we don't drive the full body lift
-                // here (that's the `bq_clean_lift` path further below),
-                // but we still tokenize the open tag's attribute region
-                // as HTML_ATTRS so `AttributeNode::cast` registers any
-                // `id` with the salsa anchor index. CST bytes stay
-                // byte-identical to source.
-                emit_open_tag_tokens(builder, line_without_newline, name, false);
+                // here for the multi-line / butted-close / open-trailing
+                // shapes (those go through the `bq_clean_lift` path or
+                // the projector byte walker). But for the same-line bq
+                // shape (`> <tag>body</tag>`) we DO lift trailing bytes
+                // into `pre_content` so the `same_line_closed` branch
+                // can graft the body and emit a separate close tag.
+                // CST bytes stay byte-identical to source either way —
+                // we only tokenize at finer granularity.
+                let lift_trailing = same_line_bq_lift_tag == Some(name);
+                let trailing =
+                    emit_open_tag_tokens(builder, line_without_newline, name, lift_trailing);
+                if lift_trailing && !trailing.is_empty() {
+                    pre_content.push_str(trailing);
+                    pre_content.push_str(newline_str);
+                }
             } else {
                 builder.token(SyntaxKind::TEXT.into(), line_without_newline);
             }
@@ -1021,6 +1077,12 @@ pub(crate) fn parse_html_block_with_wrapper(
             Some("div")
         } else if same_line_strict_lift_safe {
             strict_block_tag_name
+        } else if let Some(name) = same_line_bq_lift_tag {
+            // Bq same-line: body has no inner newlines so the standard
+            // `emit_html_block_body_lifted` (with `bq: &mut None`) is
+            // sufficient. The bq prefix `> ` lives on the outer
+            // BLOCK_QUOTE, outside the HTML_BLOCK[_DIV] span.
+            Some(name)
         } else {
             None
         };

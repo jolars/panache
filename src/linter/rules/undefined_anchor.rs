@@ -220,6 +220,22 @@ mod tests {
     }
 
     #[test]
+    fn resolves_explicit_id_on_html_strict_block_same_line_inside_blockquote() {
+        // Same-line bq lift counterpart: `> <section id="x">body</section>`
+        // routes through the parser's `same_line_bq_lift_tag` path which
+        // also tokenizes the open tag's HTML_ATTRS so the salsa anchor
+        // walk finds the id.
+        let input =
+            "> <section id=\"sec-a\">Inline body.</section>\n\nSee [the section](#sec-a).\n";
+        let diagnostics = parse_and_lint(input);
+        assert!(
+            diagnostics.is_empty(),
+            "expected no diagnostics, got {:?}",
+            diagnostics
+        );
+    }
+
+    #[test]
     fn resolves_explicit_id_on_html_inline_span_inside_paragraph() {
         let input =
             "Body text with a <span id=\"sec-a\">marker</span> inline.\n\nLink: [here](#sec-a).\n";
