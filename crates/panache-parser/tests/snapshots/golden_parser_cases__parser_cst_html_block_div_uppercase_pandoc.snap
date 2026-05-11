@@ -19,7 +19,7 @@ DOCUMENT@0..86
       TEXT@23..27 "<DiV"
       TEXT@27..28 ">"
       NEWLINE@28..29 "\n"
-    HTML_BLOCK_CONTENT@29..37
+    PARAGRAPH@29..37
       TEXT@29..36 "content"
       NEWLINE@36..37 "\n"
     HTML_BLOCK_TAG@37..44
@@ -37,7 +37,7 @@ DOCUMENT@0..86
       NEWLINE@58..59 "\n"
       TEXT@59..60 ">"
       NEWLINE@60..61 "\n"
-    HTML_BLOCK_CONTENT@61..79
+    PARAGRAPH@61..79
       TEXT@61..78 "multi-line opener"
       NEWLINE@78..79 "\n"
     HTML_BLOCK_TAG@79..86

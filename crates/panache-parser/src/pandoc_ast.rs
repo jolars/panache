@@ -1079,43 +1079,138 @@ fn html_block(node: &SyntaxNode) -> Block {
 }
 
 /// Project an `HTML_BLOCK_DIV` node (a Pandoc-dialect-lifted
-/// `<div ...>...</div>` block) into a `Block::Div`. The CST already pins
-/// the structural shape (Phase 1's `HTML_ATTRS` lift) — read the open
-/// tag's attributes from the first `HTML_BLOCK_TAG` child's `HTML_ATTRS`
-/// descendant rather than byte re-tokenizing them. Inner-content + the
-/// `close_butted` Plain/Para rule still byte-walk; that's Fix #3 (lift
-/// inner blocks into structural CST children).
+/// `<div ...>...</div>` block) into a `Block::Div`.
 ///
-/// Falls back to `RawBlock` only if the inner-content extraction fails
-/// (defensive — the parser only retags as `HTML_BLOCK_DIV` when the
-/// open tag was recognized AND a matching `</div>` close was found).
+/// Walks the structural CST: attributes come from the open
+/// `HTML_BLOCK_TAG`'s `HTML_ATTRS` descendant (Phase 1's structural
+/// lift) and inner blocks from any non-tag CST children (Phase 6's
+/// structural lift — `PARAGRAPH`, `HEADING`, nested `HTML_BLOCK_DIV`,
+/// etc., produced when the parser recursively parses the inner
+/// content of a multi-line `<div>...</div>` body).
+///
+/// Falls back to the byte-walking `extract_div_inner_and_butted` +
+/// `parse_pandoc_blocks` path for shapes the parser hasn't lifted
+/// yet: same-line `<div>foo</div>`, butted-close `<div>\nfoo</div>`,
+/// and `<div>` inside a blockquote.
 fn html_div_block(node: &SyntaxNode) -> Block {
+    let attr = cst_div_open_tag_attr(node);
+    if div_has_structural_inner(node) {
+        let mut blocks = Vec::new();
+        for child in node.children() {
+            match child.kind() {
+                SyntaxKind::HTML_BLOCK_TAG | SyntaxKind::BLANK_LINE => {}
+                _ => collect_block(&child, &mut blocks),
+            }
+        }
+        return Block::Div(attr, blocks);
+    }
     let mut content = node.text().to_string();
     while content.ends_with('\n') {
         content.pop();
     }
     if let Some((inner, close_butted)) = extract_div_inner_and_butted(&content) {
-        let attr = cst_div_open_tag_attr(node);
         return assemble_div_block(attr, inner, close_butted);
     }
     Block::RawBlock("html".to_string(), content)
 }
 
+/// True when the parser has lifted the `<div>` body into structural
+/// CST children AND both the open and close `HTML_BLOCK_TAG`s are
+/// "clean" (carry no inner content): the open tag ends with the `>`
+/// token followed only by a NEWLINE, and the close tag's first text
+/// starts with `</`. "Messy" shapes — same-line `<div>foo</div>`,
+/// trailing content on the open tag (`<div>foo\nbar\n</div>`),
+/// butted close (`<div>\nfoo\nbar</div>`) — fall through to the byte
+/// reparse path, which is the source of truth for those cases until
+/// follow-up parser work lifts them too.
+fn div_has_structural_inner(node: &SyntaxNode) -> bool {
+    let mut tags = node
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::HTML_BLOCK_TAG);
+    let Some(open_tag) = tags.next() else {
+        return false;
+    };
+    let Some(close_tag) = tags.next() else {
+        return false;
+    };
+    if tags.next().is_some() {
+        return false;
+    }
+    if !html_block_open_tag_is_clean(&open_tag) {
+        return false;
+    }
+    if !html_block_close_tag_is_clean(&close_tag) {
+        return false;
+    }
+    node.children().any(|c| {
+        !matches!(
+            c.kind(),
+            SyntaxKind::HTML_BLOCK_TAG | SyntaxKind::BLANK_LINE | SyntaxKind::HTML_BLOCK_CONTENT
+        )
+    })
+}
+
+/// True when the open `HTML_BLOCK_TAG` carries no inner content after
+/// its closing `>`: the tag's children, in order, end with the `>`
+/// TEXT followed only by zero or more NEWLINE tokens. Trailing
+/// content (e.g. `<div id="x">foo\n`) returns false.
+fn html_block_open_tag_is_clean(open_tag: &SyntaxNode) -> bool {
+    let mut seen_gt = false;
+    for child in open_tag.children_with_tokens() {
+        let NodeOrToken::Token(t) = child else {
+            // Structural HTML_ATTRS nodes are part of the open tag;
+            // ignore them — they belong before `>`.
+            continue;
+        };
+        if !seen_gt {
+            if t.kind() == SyntaxKind::TEXT && t.text() == ">" {
+                seen_gt = true;
+            }
+        } else if t.kind() != SyntaxKind::NEWLINE {
+            return false;
+        }
+    }
+    seen_gt
+}
+
+/// True when the close `HTML_BLOCK_TAG`'s first TEXT token begins with
+/// `</`. A butted-close shape (`bar</div>`) starts with content text
+/// and returns false.
+fn html_block_close_tag_is_clean(close_tag: &SyntaxNode) -> bool {
+    for child in close_tag.children_with_tokens() {
+        if let NodeOrToken::Token(t) = child
+            && t.kind() == SyntaxKind::TEXT
+        {
+            return t.text().starts_with("</");
+        }
+    }
+    false
+}
+
 /// Read the `<div>` open tag's attributes from the structural CST.
 /// `HTML_BLOCK_DIV` always has an open `HTML_BLOCK_TAG` as its first
-/// `HTML_BLOCK_TAG` child; that tag's optional `HTML_ATTRS` descendant
-/// holds the byte slice the projector needs. Empty attributes (`<div>`)
-/// produce `Attr::default()` — same as the byte path's `parse_html_attrs("")`.
+/// `HTML_BLOCK_TAG` child. The open tag may contain multiple
+/// `HTML_ATTRS` regions when the source spans multiple attribute lines
+/// (e.g. `<div\n  id="x"\n  class="y">`); join their text with spaces
+/// before parsing so attributes from every line contribute. Empty
+/// attributes (`<div>`) produce `Attr::default()`.
 fn cst_div_open_tag_attr(node: &SyntaxNode) -> Attr {
-    node.children()
+    let Some(open_tag) = node
+        .children()
         .find(|c| c.kind() == SyntaxKind::HTML_BLOCK_TAG)
-        .and_then(|open_tag| {
-            open_tag
-                .children()
-                .find(|c| c.kind() == SyntaxKind::HTML_ATTRS)
-        })
-        .map(|attrs_node| parse_html_attrs(attrs_node.text().to_string().trim()))
-        .unwrap_or_default()
+    else {
+        return Attr::default();
+    };
+    let mut parts: Vec<String> = Vec::new();
+    for child in open_tag.children() {
+        if child.kind() == SyntaxKind::HTML_ATTRS {
+            parts.push(child.text().to_string());
+        }
+    }
+    if parts.is_empty() {
+        return Attr::default();
+    }
+    parse_html_attrs(parts.join(" ").trim())
 }
 
 /// Project an `HTML_BLOCK` node into one or more `Block`s.
@@ -1547,10 +1642,19 @@ fn is_raw_text_element_open(s: &str) -> bool {
 /// (one HTML block can project as several pandoc-native blocks under
 /// `markdown_in_html_blocks`) while keeping every other kind one-block.
 fn collect_block(node: &SyntaxNode, out: &mut Vec<Block>) {
-    if matches!(
-        node.kind(),
-        SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_DIV
-    ) {
+    if node.kind() == SyntaxKind::HTML_BLOCK_DIV {
+        // `HTML_BLOCK_DIV` is the parser's explicit `<div>` retag. Route
+        // it to the structural projector (`html_div_block`), which walks
+        // the lifted CST children directly when available and only
+        // falls back to byte reparse for shapes the parser hasn't
+        // lifted yet (same-line `<div>foo</div>`, butted-close, etc.).
+        out.push(html_div_block(node));
+        return;
+    }
+    if node.kind() == SyntaxKind::HTML_BLOCK {
+        // Opaque HTML block — body bytes have no structural lift; fall
+        // through to the byte walker that scans for inline block tags
+        // and matched `<div>` pairs.
         emit_html_block(node, out);
         return;
     }

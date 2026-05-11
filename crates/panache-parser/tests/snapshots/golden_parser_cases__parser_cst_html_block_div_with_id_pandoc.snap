@@ -38,11 +38,18 @@ DOCUMENT@0..121
         TEXT@81..91 "id=\"multi\""
       TEXT@91..92 ">"
       NEWLINE@92..93 "\n"
-    HTML_BLOCK_CONTENT@93..114
-      NEWLINE@93..94 "\n"
-      TEXT@94..112 "A *multiline* div."
+    BLANK_LINE@93..94
+      BLANK_LINE@93..94 "\n"
+    PARAGRAPH@94..113
+      TEXT@94..96 "A "
+      EMPHASIS@96..107
+        EMPHASIS_MARKER@96..97 "*"
+        TEXT@97..106 "multiline"
+        EMPHASIS_MARKER@106..107 "*"
+      TEXT@107..112 " div."
       NEWLINE@112..113 "\n"
-      NEWLINE@113..114 "\n"
+    BLANK_LINE@113..114
+      BLANK_LINE@113..114 "\n"
     HTML_BLOCK_TAG@114..121
       TEXT@114..120 "</div>"
       NEWLINE@120..121 "\n"

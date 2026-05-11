@@ -1907,6 +1907,7 @@ impl BlockParser for HtmlBlockParser {
             block_type,
             ctx.blockquote_depth,
             wrapper_kind,
+            ctx.config,
         );
         new_pos - line_pos
     }

@@ -36,7 +36,7 @@ DOCUMENT@0..342
         TEXT@114..131 "class=\"container\""
       TEXT@131..132 ">"
       NEWLINE@132..133 "\n"
-    HTML_BLOCK_CONTENT@133..152
+    PARAGRAPH@133..152
       TEXT@133..151 "Content inside div"
       NEWLINE@151..152 "\n"
     HTML_BLOCK_TAG@152..159

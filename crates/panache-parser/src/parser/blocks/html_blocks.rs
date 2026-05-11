@@ -1,7 +1,8 @@
 //! HTML block parsing utilities.
 
+use crate::options::ParserOptions;
 use crate::parser::inlines::inline_html::{parse_close_tag, parse_open_tag};
-use crate::syntax::SyntaxKind;
+use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
 use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
@@ -646,6 +647,7 @@ pub(crate) fn parse_html_block_with_wrapper(
     block_type: HtmlBlockType,
     bq_depth: usize,
     wrapper_kind: SyntaxKind,
+    config: &ParserOptions,
 ) -> usize {
     // Start HTML block
     builder.start_node(wrapper_kind.into());
@@ -835,13 +837,7 @@ pub(crate) fn parse_html_block_with_wrapper(
             log::trace!("Found HTML block closing at line {}", current_pos + 1);
             found_closing = true;
 
-            if !content_lines.is_empty() {
-                builder.start_node(SyntaxKind::HTML_BLOCK_CONTENT.into());
-                for content_line in &content_lines {
-                    emit_html_block_line(builder, content_line, bq_depth);
-                }
-                builder.finish_node();
-            }
+            emit_html_block_body(builder, &content_lines, bq_depth, wrapper_kind, config);
 
             builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
             emit_html_block_line(builder, line, bq_depth);
@@ -859,17 +855,104 @@ pub(crate) fn parse_html_block_with_wrapper(
     // If we didn't find a closing marker, emit what we collected
     if !found_closing {
         log::trace!("HTML block at line {} has no closing marker", start_pos + 1);
-        if !content_lines.is_empty() {
-            builder.start_node(SyntaxKind::HTML_BLOCK_CONTENT.into());
-            for content_line in &content_lines {
-                emit_html_block_line(builder, content_line, bq_depth);
-            }
-            builder.finish_node();
-        }
+        emit_html_block_body(builder, &content_lines, bq_depth, wrapper_kind, config);
     }
 
     builder.finish_node(); // HtmlBlock
     current_pos
+}
+
+/// Emit the collected inner content lines for an HTML block.
+///
+/// For `HTML_BLOCK_DIV` under Pandoc with `bq_depth == 0`, recursively
+/// parse the inner content as Pandoc-flavored markdown and graft the
+/// resulting top-level blocks as direct children of the wrapper. This
+/// is the Phase 6 structural lift — the projector and downstream
+/// consumers (linter, salsa, LSP) can walk the structural children
+/// instead of re-tokenizing the body bytes.
+///
+/// All other shapes — opaque `HTML_BLOCK`, `HTML_BLOCK_DIV` inside a
+/// blockquote, or any case with no content lines — fall through to
+/// the legacy `HTML_BLOCK_CONTENT`-with-TEXT capture. Same-line
+/// `<div>foo</div>` and butted-close `<div>\nfoo</div>` produce no
+/// `content_lines` entries (the content lives inside `HTML_BLOCK_TAG`
+/// for those shapes) and so are unaffected by this lift.
+///
+/// CST bytes remain byte-identical to source: the recursive parser is
+/// lossless on the same byte slice the legacy path would have captured
+/// as TEXT.
+fn emit_html_block_body(
+    builder: &mut GreenNodeBuilder<'static>,
+    content_lines: &[&str],
+    bq_depth: usize,
+    wrapper_kind: SyntaxKind,
+    config: &ParserOptions,
+) {
+    if content_lines.is_empty() {
+        return;
+    }
+    if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV && bq_depth == 0 {
+        let inner_text: String = content_lines.concat();
+        emit_recursively_parsed_blocks(builder, &inner_text, config);
+        return;
+    }
+    builder.start_node(SyntaxKind::HTML_BLOCK_CONTENT.into());
+    for content_line in content_lines {
+        emit_html_block_line(builder, content_line, bq_depth);
+    }
+    builder.finish_node();
+}
+
+/// Recursively parse `inner_text` as a Pandoc-flavored markdown document
+/// and graft the resulting top-level children into `builder` at the
+/// current insertion position. Inherits the outer parser's refdef
+/// labels so that reference links inside the `<div>` body can resolve
+/// against definitions declared in the surrounding document.
+fn emit_recursively_parsed_blocks(
+    builder: &mut GreenNodeBuilder<'static>,
+    inner_text: &str,
+    config: &ParserOptions,
+) {
+    // Reuse the outer document's refdef label set so an inner reference
+    // link can resolve against a definition declared outside the
+    // `<div>`. The outer parser populated this on the very first
+    // call into `crate::parse`; subsequent recursive parses inherit
+    // it unchanged.
+    let mut inner_options = config.clone();
+    let refdefs = config.refdef_labels.clone().unwrap_or_default();
+    inner_options.refdef_labels = Some(refdefs.clone());
+    let inner_root = crate::parser::parse_with_refdefs(inner_text, Some(inner_options), refdefs);
+    graft_document_children(builder, &inner_root);
+}
+
+/// Walk a parsed inner document's top-level children and re-emit them
+/// into `builder`. The document's wrapper node is skipped — only its
+/// children are grafted.
+fn graft_document_children(builder: &mut GreenNodeBuilder<'static>, doc: &SyntaxNode) {
+    for child in doc.children_with_tokens() {
+        match child {
+            rowan::NodeOrToken::Node(n) => graft_subtree(builder, &n),
+            rowan::NodeOrToken::Token(t) => {
+                builder.token(t.kind().into(), t.text());
+            }
+        }
+    }
+}
+
+/// Recursively re-emit `node` and its descendants into `builder`.
+/// Token text is copied verbatim so the result is byte-identical to
+/// the input span.
+fn graft_subtree(builder: &mut GreenNodeBuilder<'static>, node: &SyntaxNode) {
+    builder.start_node(node.kind().into());
+    for child in node.children_with_tokens() {
+        match child {
+            rowan::NodeOrToken::Node(n) => graft_subtree(builder, &n),
+            rowan::NodeOrToken::Token(t) => {
+                builder.token(t.kind().into(), t.text());
+            }
+        }
+    }
+    builder.finish_node();
 }
 
 /// Emit the open-tag line of an `HTML_BLOCK_DIV`, splitting the bytes
@@ -1761,6 +1844,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         let block_type = try_parse_html_block_start(lines[0], false).unwrap();
+        let opts = ParserOptions::default();
         let new_pos = parse_html_block_with_wrapper(
             &mut builder,
             &lines,
@@ -1768,6 +1852,7 @@ mod tests {
             block_type,
             0,
             SyntaxKind::HTML_BLOCK,
+            &opts,
         );
 
         assert_eq!(new_pos, 1);
@@ -1780,6 +1865,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         let block_type = try_parse_html_block_start(lines[0], false).unwrap();
+        let opts = ParserOptions::default();
         let new_pos = parse_html_block_with_wrapper(
             &mut builder,
             &lines,
@@ -1787,6 +1873,7 @@ mod tests {
             block_type,
             0,
             SyntaxKind::HTML_BLOCK,
+            &opts,
         );
 
         assert_eq!(new_pos, 3);
@@ -1799,6 +1886,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         let block_type = try_parse_html_block_start(lines[0], false).unwrap();
+        let opts = ParserOptions::default();
         let new_pos = parse_html_block_with_wrapper(
             &mut builder,
             &lines,
@@ -1806,6 +1894,7 @@ mod tests {
             block_type,
             0,
             SyntaxKind::HTML_BLOCK,
+            &opts,
         );
 
         // Should consume all lines even without closing tag
@@ -1825,6 +1914,7 @@ mod tests {
 
         // is_commonmark = false → Pandoc dialect.
         let block_type = try_parse_html_block_start(lines[0], false).unwrap();
+        let opts = ParserOptions::default();
         let new_pos = parse_html_block_with_wrapper(
             &mut builder,
             &lines,
@@ -1832,6 +1922,7 @@ mod tests {
             block_type,
             0,
             SyntaxKind::HTML_BLOCK_DIV,
+            &opts,
         );
 
         // 9 lines: outer-open, blank, inner-open, blank, content, blank,
@@ -1848,6 +1939,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         let block_type = try_parse_html_block_start(lines[0], false).unwrap();
+        let opts = ParserOptions::default();
         let new_pos = parse_html_block_with_wrapper(
             &mut builder,
             &lines,
@@ -1855,6 +1947,7 @@ mod tests {
             block_type,
             0,
             SyntaxKind::HTML_BLOCK_DIV,
+            &opts,
         );
         assert_eq!(new_pos, 1);
     }
@@ -1871,6 +1964,7 @@ mod tests {
 
         // is_commonmark = true.
         let block_type = try_parse_html_block_start(lines[0], true).unwrap();
+        let opts = ParserOptions::default();
         let new_pos = parse_html_block_with_wrapper(
             &mut builder,
             &lines,
@@ -1878,6 +1972,7 @@ mod tests {
             block_type,
             0,
             SyntaxKind::HTML_BLOCK,
+            &opts,
         );
         // Three lines, closed at first `</script>` (line 2). new_pos = 3.
         assert_eq!(new_pos, 3);
@@ -1902,6 +1997,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         let block_type = try_parse_html_block_start(lines[0], false).unwrap();
+        let opts = ParserOptions::default();
         let new_pos = parse_html_block_with_wrapper(
             &mut builder,
             &lines,
@@ -1909,6 +2005,7 @@ mod tests {
             block_type,
             0,
             SyntaxKind::HTML_BLOCK_DIV,
+            &opts,
         );
 
         // 8 lines: open-line 0, open-line 1 (`  id="x"`), open-line 2
@@ -1944,6 +2041,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         let block_type = try_parse_html_block_start(lines[0], false).unwrap();
+        let opts = ParserOptions::default();
         let new_pos = parse_html_block_with_wrapper(
             &mut builder,
             &lines,
@@ -1951,6 +2049,7 @@ mod tests {
             block_type,
             0,
             SyntaxKind::HTML_BLOCK_DIV,
+            &opts,
         );
 
         // 5 lines: open-line 0, open-line 1, open-line 2 (with `>`), foo,
@@ -1980,6 +2079,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         let block_type = try_parse_html_block_start(lines[0], true).unwrap();
+        let opts = ParserOptions::default();
         let new_pos = parse_html_block_with_wrapper(
             &mut builder,
             &lines,
@@ -1987,6 +2087,7 @@ mod tests {
             block_type,
             0,
             SyntaxKind::HTML_BLOCK,
+            &opts,
         );
 
         // Block contains <div>\nfoo\n; stops at blank line (line 2).

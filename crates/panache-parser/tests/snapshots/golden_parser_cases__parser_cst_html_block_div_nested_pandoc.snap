@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
-assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..65
@@ -12,17 +11,28 @@ DOCUMENT@0..65
         TEXT@5..15 "id=\"outer\""
       TEXT@15..16 ">"
       NEWLINE@16..17 "\n"
-    HTML_BLOCK_CONTENT@17..58
-      NEWLINE@17..18 "\n"
-      TEXT@18..34 "<div id=\"inner\">"
-      NEWLINE@34..35 "\n"
-      NEWLINE@35..36 "\n"
-      TEXT@36..48 "deep content"
-      NEWLINE@48..49 "\n"
-      NEWLINE@49..50 "\n"
-      TEXT@50..56 "</div>"
-      NEWLINE@56..57 "\n"
-      NEWLINE@57..58 "\n"
+    BLANK_LINE@17..18
+      BLANK_LINE@17..18 "\n"
+    HTML_BLOCK_DIV@18..57
+      HTML_BLOCK_TAG@18..35
+        TEXT@18..22 "<div"
+        WHITESPACE@22..23 " "
+        HTML_ATTRS@23..33
+          TEXT@23..33 "id=\"inner\""
+        TEXT@33..34 ">"
+        NEWLINE@34..35 "\n"
+      BLANK_LINE@35..36
+        BLANK_LINE@35..36 "\n"
+      PARAGRAPH@36..49
+        TEXT@36..48 "deep content"
+        NEWLINE@48..49 "\n"
+      BLANK_LINE@49..50
+        BLANK_LINE@49..50 "\n"
+      HTML_BLOCK_TAG@50..57
+        TEXT@50..56 "</div>"
+        NEWLINE@56..57 "\n"
+    BLANK_LINE@57..58
+      BLANK_LINE@57..58 "\n"
     HTML_BLOCK_TAG@58..65
       TEXT@58..64 "</div>"
       NEWLINE@64..65 "\n"

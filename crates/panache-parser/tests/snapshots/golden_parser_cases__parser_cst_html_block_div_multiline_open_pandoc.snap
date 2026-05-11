@@ -17,11 +17,13 @@ DOCUMENT@0..48
       NEWLINE@29..30 "\n"
       TEXT@30..31 ">"
       NEWLINE@31..32 "\n"
-    HTML_BLOCK_CONTENT@32..41
-      NEWLINE@32..33 "\n"
+    BLANK_LINE@32..33
+      BLANK_LINE@32..33 "\n"
+    PARAGRAPH@33..40
       TEXT@33..39 "Hello."
       NEWLINE@39..40 "\n"
-      NEWLINE@40..41 "\n"
+    BLANK_LINE@40..41
+      BLANK_LINE@40..41 "\n"
     HTML_BLOCK_TAG@41..48
       TEXT@41..47 "</div>"
       NEWLINE@47..48 "\n"

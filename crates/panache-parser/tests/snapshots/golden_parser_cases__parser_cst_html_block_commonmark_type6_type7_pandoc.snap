@@ -8,7 +8,7 @@ DOCUMENT@0..91
       TEXT@0..4 "<div"
       TEXT@4..5 ">"
       NEWLINE@5..6 "\n"
-    HTML_BLOCK_CONTENT@6..10
+    PARAGRAPH@6..10
       TEXT@6..9 "foo"
       NEWLINE@9..10 "\n"
     HTML_BLOCK_TAG@10..17
@@ -50,11 +50,16 @@ DOCUMENT@0..91
       TEXT@71..75 "<div"
       TEXT@75..76 ">"
       NEWLINE@76..77 "\n"
-    HTML_BLOCK_CONTENT@77..84
-      NEWLINE@77..78 "\n"
-      TEXT@78..82 "*md*"
+    BLANK_LINE@77..78
+      BLANK_LINE@77..78 "\n"
+    PARAGRAPH@78..83
+      EMPHASIS@78..82
+        EMPHASIS_MARKER@78..79 "*"
+        TEXT@79..81 "md"
+        EMPHASIS_MARKER@81..82 "*"
       NEWLINE@82..83 "\n"
-      NEWLINE@83..84 "\n"
+    BLANK_LINE@83..84
+      BLANK_LINE@83..84 "\n"
     HTML_BLOCK_TAG@84..91
       TEXT@84..90 "</div>"
       NEWLINE@90..91 "\n"
