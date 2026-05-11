@@ -1067,13 +1067,15 @@ fn expand_tabs_to_4(line: &str) -> String {
     out
 }
 
+/// Single-block projection of an opaque `HTML_BLOCK`. Used when a non-
+/// structural caller (e.g. grid-table cell reparse via `block_from`)
+/// needs one `Block` rather than a stream. Emits a single `RawBlock`
+/// — no structural lift (the lifted shape projects as multiple blocks
+/// and is handled by `emit_html_block` via `collect_block`).
 fn html_block(node: &SyntaxNode) -> Block {
     let mut content = node.text().to_string();
     while content.ends_with('\n') {
         content.pop();
-    }
-    if let Some(div) = try_div_html_block(&content) {
-        return div;
     }
     Block::RawBlock("html".to_string(), content)
 }
@@ -1086,12 +1088,14 @@ fn html_block(node: &SyntaxNode) -> Block {
 /// lift) and inner blocks from any non-tag CST children (Phase 6's
 /// structural lift — `PARAGRAPH`, `HEADING`, nested `HTML_BLOCK_DIV`,
 /// etc., produced when the parser recursively parses the inner
-/// content of a multi-line `<div>...</div>` body).
+/// content of a `<div>...</div>` body).
 ///
-/// Falls back to the byte-walking `extract_div_inner_and_butted` +
-/// `parse_pandoc_blocks` path for shapes the parser hasn't lifted
-/// yet: same-line `<div>foo</div>`, butted-close `<div>\nfoo</div>`,
-/// and `<div>` inside a blockquote.
+/// All currently exercised `<div>` shapes lift structurally (clean
+/// multi-line, open-trailing, butted-close, indented-close, same-
+/// line, empty / blank-only, and bq-wrapped shapes). The defensive
+/// fallback below emits an empty `Div` if a future parser change
+/// somehow yields an unlifted `HTML_BLOCK_DIV` — that would be a
+/// parser bug, not something the projector should silently reparse.
 fn html_div_block(node: &SyntaxNode) -> Block {
     let attr = cst_div_open_tag_attr(node);
     if div_has_structural_inner(node) {
@@ -1104,20 +1108,11 @@ fn html_div_block(node: &SyntaxNode) -> Block {
         }
         return Block::Div(attr, blocks);
     }
-    // The parser-side structural lift is gated on `bq_depth == 0`; inside a
-    // blockquote the body lines still carry BLOCK_QUOTE_MARKER + WHITESPACE
-    // prefixes as structural CST tokens. The byte-reparse path below feeds
-    // its content to `parse_pandoc_blocks`, so the markers must be stripped
-    // first or the inner parse re-recognizes them as a nested blockquote.
-    // Outside a blockquote this returns the same bytes as `node.text()`.
-    let mut content = collect_html_block_text_skip_bq_markers(node);
-    while content.ends_with('\n') {
-        content.pop();
-    }
-    if let Some((inner, close_butted)) = extract_div_inner_and_butted(&content) {
-        return assemble_div_block(attr, inner, close_butted);
-    }
-    Block::RawBlock("html".to_string(), content)
+    debug_assert!(
+        false,
+        "HTML_BLOCK_DIV without structural inner shape — parser regression"
+    );
+    Block::Div(attr, Vec::new())
 }
 
 /// Concatenate the node's token text, dropping every `BLOCK_QUOTE_MARKER`
@@ -1268,9 +1263,9 @@ fn cst_div_open_tag_attr(node: &SyntaxNode) -> Attr {
 ///
 /// Verbatim constructs are preserved as a single `RawBlock`: comments,
 /// `<script>` / `<style>` / `<pre>` / `<textarea>`, processing
-/// instructions, declarations, and CDATA. A balanced `<div>...</div>`
-/// (anywhere in the block) lifts to `Block::Div` via `try_div_html_block`,
-/// matching pandoc's `native_divs`.
+/// instructions, declarations, and CDATA. Balanced `<div>...</div>` is
+/// handled at parse time (HTML_BLOCK_DIV lift) and routed through
+/// `html_div_block`, not the splitter.
 fn emit_html_block(node: &SyntaxNode, out: &mut Vec<Block>) {
     // Fix #4 / Phase 6 structural lift: when the parser has lifted the
     // body into structural CST children (open `HTML_BLOCK_TAG` + body
@@ -1284,15 +1279,13 @@ fn emit_html_block(node: &SyntaxNode, out: &mut Vec<Block>) {
         return;
     }
     // Strip BLOCK_QUOTE_MARKER + WHITESPACE prefix tokens so the
-    // byte-level walkers below see clean HTML — same rationale as
-    // `html_div_block`, see `collect_html_block_text_skip_bq_markers`.
+    // byte-level walkers below see clean HTML — the parser keeps bq
+    // markers as structural tokens inside HTML_BLOCK for verbatim-tag
+    // content (e.g. `> <pre>\n> code\n> </pre>`). Outside a blockquote
+    // this returns the same bytes as `node.text()`.
     let mut content = collect_html_block_text_skip_bq_markers(node);
     while content.ends_with('\n') {
         content.pop();
-    }
-    if let Some(div) = try_div_html_block(&content) {
-        out.push(div);
-        return;
     }
     let leading_ws = content
         .as_bytes()
@@ -1498,27 +1491,12 @@ fn split_html_block_by_tags(content: &str, out: &mut Vec<Block>) {
             continue;
         };
         if is_pandoc_block_tag_name(name) {
-            // `<div>` opens a balanced span that lifts to `Block::Div` (pandoc's
-            // `native_divs`). Try depth-aware lookahead for the matching close;
-            // fall back to a single RawBlock for unbalanced openers.
-            if !is_close
-                && name.eq_ignore_ascii_case("div")
-                && let Some(div_end) = find_matching_html_close(content, i, "div")
-            {
-                if i > text_start {
-                    flush_html_block_text(&content[text_start..i], out);
-                }
-                let div_chunk = &content[i..div_end];
-                if let Some(div) = try_div_html_block(div_chunk) {
-                    out.push(div);
-                } else {
-                    out.push(Block::RawBlock("html".to_string(), div_chunk.to_string()));
-                }
-                i = div_end;
-                text_start = i;
-                inline_pending = false;
-                continue;
-            }
+            // Strict block tags (incl. `<div>`) inside an opaque
+            // HTML_BLOCK split into RawBlocks per tag. Matched
+            // `<div>...</div>` is handled at parse time (HTML_BLOCK_DIV
+            // lift); we only reach the splitter for unbalanced or
+            // multi-tag content (e.g. `</section>` standalone), so
+            // emit each tag as its own RawBlock.
             if i > text_start {
                 flush_html_block_text(&content[text_start..i], out);
             }
@@ -1748,47 +1726,6 @@ fn find_matching_html_close_with_start(
     None
 }
 
-/// Depth-aware scan for the matching closing tag of `name` starting at
-/// byte position `start` (the `<` of the opening tag) in `content`.
-/// Returns the byte offset of the END (exclusive) of the matching close
-/// tag, or `None` when no balanced close exists in `content`.
-fn find_matching_html_close(content: &str, start: usize, name: &str) -> Option<usize> {
-    use crate::parser::inlines::inline_html::{parse_close_tag, parse_open_tag};
-
-    let bytes = content.as_bytes();
-    let opener_end = parse_open_tag(&content[start..])?;
-    let mut i = start + opener_end;
-    let mut depth = 1usize;
-    while i < bytes.len() {
-        if bytes[i] != b'<' {
-            i += 1;
-            continue;
-        }
-        let rest = &content[i..];
-        if let Some(end) = parse_open_tag(rest) {
-            let tag = &rest[..end];
-            if extract_html_tag_name(tag).is_some_and(|n| n.eq_ignore_ascii_case(name)) {
-                depth += 1;
-            }
-            i += end;
-            continue;
-        }
-        if let Some(end) = parse_close_tag(rest) {
-            let tag = &rest[..end];
-            if extract_html_tag_name(tag).is_some_and(|n| n.eq_ignore_ascii_case(name)) {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(i + end);
-                }
-            }
-            i += end;
-            continue;
-        }
-        i += 1;
-    }
-    None
-}
-
 /// Return true if `s` (with leading `<`) opens a raw-text HTML element where
 /// pandoc keeps the entire block verbatim — no markdown parsing inside.
 /// Lowercases the tag name for matching; matches when the tag name is
@@ -1822,130 +1759,23 @@ fn is_raw_text_element_open(s: &str) -> bool {
 /// `markdown_in_html_blocks`) while keeping every other kind one-block.
 fn collect_block(node: &SyntaxNode, out: &mut Vec<Block>) {
     if node.kind() == SyntaxKind::HTML_BLOCK_DIV {
-        // `HTML_BLOCK_DIV` is the parser's explicit `<div>` retag. Route
-        // it to the structural projector (`html_div_block`), which walks
-        // the lifted CST children directly when available and only
-        // falls back to byte reparse for shapes the parser hasn't
-        // lifted yet (same-line `<div>foo</div>`, butted-close, etc.).
+        // `HTML_BLOCK_DIV` is the parser's explicit `<div>` retag. The
+        // structural projector walks lifted CST children directly —
+        // all balanced `<div>` shapes lift at parse time.
         out.push(html_div_block(node));
         return;
     }
     if node.kind() == SyntaxKind::HTML_BLOCK {
-        // Opaque HTML block — body bytes have no structural lift; fall
-        // through to the byte walker that scans for inline block tags
-        // and matched `<div>` pairs.
+        // Opaque HTML block — comments, PI, verbatim (`<pre>`, `<style>`,
+        // `<script>`, `<textarea>`), void inline-block tags, and any
+        // strict/inline-block tag the parser couldn't lift. The byte
+        // walker splits these into per-tag RawBlocks plus interior text.
         emit_html_block(node, out);
         return;
     }
     if let Some(b) = block_from(node) {
         out.push(b);
     }
-}
-
-/// Detect a `<div ...>...</div>` HTML block and project it as
-/// `Div(attr, blocks)` with the inner content reparsed as Pandoc markdown.
-/// Pandoc's `markdown_in_html_blocks` extension (default-on under `markdown`
-/// flavor) treats every `<div>` block this way, regardless of whether it
-/// has attributes. Returns `None` for any HTML block whose outer tag is not
-/// `<div>` (so other block tags keep falling through to the RawBlock path).
-///
-/// This byte-only path is for `HTML_BLOCK` callers (no structural
-/// `HTML_ATTRS` lift available). `HTML_BLOCK_DIV` callers use
-/// [`html_div_block`], which extracts attributes from the CST and
-/// shares the inner-content + close_butted helpers below.
-fn try_div_html_block(content: &str) -> Option<Block> {
-    let attr = parse_div_open_tag_attrs_from_bytes(content)?;
-    let (inner, close_butted) = extract_div_inner_and_butted(content)?;
-    Some(assemble_div_block(attr, inner, close_butted))
-}
-
-/// Byte-extract attributes from a `<div ...>` open tag at the start of
-/// `content` (skipping leading spaces/tabs). Returns `None` if the
-/// content doesn't begin with a recognizable `<div` open tag.
-fn parse_div_open_tag_attrs_from_bytes(content: &str) -> Option<Attr> {
-    let bytes = content.as_bytes();
-    let leading_ws = bytes
-        .iter()
-        .position(|&b| b != b' ' && b != b'\t')
-        .unwrap_or(bytes.len());
-    let head = &content[leading_ws..];
-    let head_bytes = head.as_bytes();
-    if head_bytes.len() < 4 || !head_bytes[..4].eq_ignore_ascii_case(b"<div") {
-        return None;
-    }
-    let after_div = head_bytes.get(4).copied();
-    match after_div {
-        Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'>') | Some(b'/') => {}
-        _ => return None,
-    }
-    let close_gt_rel = head[4..].find('>')?;
-    let open_attrs_raw = &head[4..4 + close_gt_rel];
-    let open_attrs = open_attrs_raw.trim_matches(|c: char| c.is_whitespace() || c == '/');
-    Some(parse_html_attrs(open_attrs))
-}
-
-/// Locate the inner content text and `close_butted` flag for a
-/// `<div>...</div>` span by byte-scanning. Returns `None` if the content
-/// doesn't begin with `<div` or doesn't end with a matching `</div>`.
-///
-/// `close_butted = true` means the byte immediately before `</div>` is
-/// not `\n` — i.e. the close tag is on the same line as content (or the
-/// line above lacks a column-0 close), in which case the LAST inner
-/// block demotes from `Para` to `Plain` (pandoc's `markdown_in_html_blocks`
-/// rule). See [`assemble_div_block`].
-fn extract_div_inner_and_butted(content: &str) -> Option<(&str, bool)> {
-    let bytes = content.as_bytes();
-    let leading_ws = bytes
-        .iter()
-        .position(|&b| b != b' ' && b != b'\t')
-        .unwrap_or(bytes.len());
-    let head = &content[leading_ws..];
-    let head_bytes = head.as_bytes();
-    if head_bytes.len() < 4 || !head_bytes[..4].eq_ignore_ascii_case(b"<div") {
-        return None;
-    }
-    let after_div = head_bytes.get(4).copied();
-    match after_div {
-        Some(b' ') | Some(b'\t') | Some(b'\n') | Some(b'>') | Some(b'/') => {}
-        _ => return None,
-    }
-    let close_gt_rel = head[4..].find('>')?;
-    let after_open_tag = leading_ws + 4 + close_gt_rel + 1;
-    let trailing_ws = content.as_bytes()[after_open_tag..]
-        .iter()
-        .rev()
-        .position(|&b| b != b' ' && b != b'\t' && b != b'\n')
-        .unwrap_or(0);
-    let close_end = content.len() - trailing_ws;
-    let close_search = &content[after_open_tag..close_end];
-    if !close_search.to_ascii_lowercase().ends_with("</div>") {
-        return None;
-    }
-    let close_start = after_open_tag + close_search.len() - "</div>".len();
-    // Pandoc's Plain/Para rule for `<div>` content: the LAST block stays as
-    // `Para` only when the closing `</div>` sits on its own column-0 line
-    // (i.e. the byte immediately before `</div>` is `\n`). When the close
-    // is butted against content (`<div>foo</div>`) or sits on an indented
-    // line (`<div>foo\n   </div>`), the trailing paragraph demotes to
-    // `Plain`. Empty closing — `close_start == 0` — would mean no content
-    // separator, but the open-tag preamble guarantees `close_start > 0`.
-    let close_butted = close_start == 0 || content.as_bytes()[close_start - 1] != b'\n';
-    let inner = content[after_open_tag..close_start].trim_matches('\n');
-    Some((inner, close_butted))
-}
-
-/// Build a `Block::Div` from precomputed `attr` + inner text + butted
-/// flag. Reparses `inner` as Pandoc markdown and applies the
-/// last-block Para→Plain demotion when the close tag is butted.
-fn assemble_div_block(attr: Attr, inner: &str, close_butted: bool) -> Block {
-    let mut blocks = parse_pandoc_blocks(inner);
-    if close_butted
-        && let Some(Block::Para(_)) = blocks.last()
-        && let Some(Block::Para(inlines)) = blocks.pop()
-    {
-        blocks.push(Block::Plain(inlines));
-    }
-    Block::Div(attr, blocks)
 }
 
 /// Reparse `text` as Pandoc-flavored markdown and return its top-level
