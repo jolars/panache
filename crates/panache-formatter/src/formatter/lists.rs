@@ -946,18 +946,16 @@ impl Formatter {
                         continue;
                     }
 
-                    // These blocks are already handled by word wrapping above if they're
-                    // direct children. Only process Plain/PARAGRAPH if it comes after a BlankLine
-                    // (indicating it's a true continuation paragraph, not the first content).
-                    let has_blank_before = child
-                        .prev_sibling()
-                        .map(|prev| prev.kind() == SyntaxKind::BLANK_LINE)
-                        .unwrap_or(false);
-
-                    // Also process if we're in an ignore region (content should be preserved exactly)
+                    // The first PLAIN/PARAGRAPH after the marker is the wrap
+                    // source (already rendered above). Any other PLAIN/PARAGRAPH
+                    // child — whether a continuation after a blank line, or a
+                    // trailing paragraph after an intervening block such as
+                    // HTML_BLOCK — must still be emitted so its content is not
+                    // dropped.
+                    let is_content_node = content_node.as_ref() == Some(&child);
                     let in_ignore_region = self.directive_tracker.is_formatting_ignored();
 
-                    if has_blank_before || in_ignore_region {
+                    if !is_content_node || in_ignore_region {
                         let content_indent = list_indent.hanging_indent(total_indent);
                         // If in ignore region, just call format_node_sync which preserves content
                         // The indent parameter isn't used when in ignore mode, so we don't add it
@@ -967,7 +965,6 @@ impl Formatter {
                             self.format_list_continuation_paragraph(&child, content_indent);
                         }
                     }
-                    // Otherwise skip - already handled
                 }
                 SyntaxKind::LIST => {
                     // Check if this is an empty nested list (only has one item with no content)
