@@ -1,5 +1,5 @@
 //! Tests for LSP-side config discovery: nearest-config-wins per file and
-//! the workspace-root upper bound on the ancestor walk.
+//! the `.git`-anchored project boundary on the ancestor walk.
 
 use super::helpers::*;
 use std::fs;
@@ -14,6 +14,10 @@ async fn lsp_picks_nearest_panache_toml_per_file() {
     let server = TestLspServer::new();
     let tmp = TempDir::new().unwrap();
     let root = tmp.path();
+
+    // Mark this directory as a project root so discovery doesn't ascend
+    // into the host's filesystem.
+    fs::create_dir_all(root.join(".git")).unwrap();
 
     // Workspace-root config pins line-width = 80.
     fs::write(root.join("panache.toml"), "line-width = 80\n").unwrap();
@@ -48,19 +52,18 @@ async fn lsp_picks_nearest_panache_toml_per_file() {
     );
 }
 
-/// When the workspace has no `panache.toml`, the LSP must NOT pick up an
-/// ancestor `panache.toml` that lives above the workspace root (e.g. a stray
-/// `/tmp/panache.toml`).
+/// A `.git` directory at the workspace root makes that directory the project
+/// boundary: a stray `panache.toml` above it must not be inherited.
 #[tokio::test]
-async fn lsp_does_not_inherit_panache_toml_above_workspace_root() {
+async fn lsp_does_not_inherit_panache_toml_above_git_root() {
     let server = TestLspServer::new();
     // The outer dir simulates an unrelated `/tmp/panache.toml`.
     let outer = TempDir::new().unwrap();
     fs::write(outer.path().join("panache.toml"), "flavor = \"quarto\"\n").unwrap();
 
-    // Workspace is nested inside outer, with no panache.toml of its own.
+    // Workspace is nested inside outer and marked as its own git repo.
     let workspace = outer.path().join("ws");
-    fs::create_dir_all(&workspace).unwrap();
+    fs::create_dir_all(workspace.join(".git")).unwrap();
 
     let doc_path = workspace.join("doc.md");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
@@ -68,8 +71,8 @@ async fn lsp_does_not_inherit_panache_toml_above_workspace_root() {
     server.initialize(root_uri.as_str()).await;
 
     // If the LSP wrongly inherited the outer config, this `.md` file would be
-    // treated as Quarto and shortcode completion would fire. With the
-    // boundary in place, shortcode completion stays off.
+    // treated as Quarto and shortcode completion would fire. The `.git`
+    // boundary keeps shortcode completion off.
     let content = "{{< include _ >}}\n";
     server
         .open_document(doc_uri.as_str(), content, "markdown")
@@ -77,6 +80,6 @@ async fn lsp_does_not_inherit_panache_toml_above_workspace_root() {
     let result = server.completion(doc_uri.as_str(), 0, 13).await;
     assert!(
         result.is_none(),
-        "discovery must not ascend above workspace_root; outer panache.toml leaked in"
+        "discovery must not ascend above the .git boundary"
     );
 }

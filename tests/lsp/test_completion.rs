@@ -731,7 +731,10 @@ async fn test_shortcode_unknown_name_returns_none() {
 #[tokio::test]
 async fn test_shortcode_completion_skipped_in_plain_markdown() {
     let server = TestLspServer::new();
-    let (tmp, doc_uri) = open_quarto_doc_with_files(&server, &[("_intro.qmd", "")], "doc.md");
+    // `.git/HEAD` anchors the project boundary so config discovery doesn't
+    // leak in from an ancestor `panache.toml` on the host.
+    let (tmp, doc_uri) =
+        open_quarto_doc_with_files(&server, &[(".git/HEAD", ""), ("_intro.qmd", "")], "doc.md");
     let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
     server.initialize(root_uri.as_str()).await;
 

@@ -222,10 +222,11 @@ fn read_config(path: &Path) -> io::Result<Config> {
 
 /// Walk up from `start_dir` looking for a `panache.toml` / `.panache.toml`.
 ///
-/// If `boundary` is `Some`, the search includes the boundary directory itself
-/// but does not ascend past it — useful when the caller (e.g. the LSP) knows
-/// the project root and wants discovery to honor it instead of leaking into
-/// `/tmp` or `$HOME` ancestors.
+/// `boundary`, when set, caps the walk: the boundary directory itself is
+/// searched, but ancestors above it are not. Callers normally derive this
+/// from [`project_boundary`] so that discovery stops at the project root
+/// (the nearest `.git` ancestor) instead of leaking into unrelated
+/// directories like `/tmp` or `$HOME`.
 fn find_in_tree(start_dir: &Path, boundary: Option<&Path>) -> Option<PathBuf> {
     for dir in start_dir.ancestors() {
         for name in CANDIDATE_NAMES {
@@ -236,6 +237,21 @@ fn find_in_tree(start_dir: &Path, boundary: Option<&Path>) -> Option<PathBuf> {
         }
         if matches!(boundary, Some(b) if dir == b) {
             return None;
+        }
+    }
+    None
+}
+
+/// Find the project root by walking up from `start_dir` looking for `.git`.
+///
+/// Both regular repositories (`.git/` directory) and worktrees (`.git` file)
+/// count. Returns `None` if no `.git` ancestor exists; callers then fall
+/// back to today's unbounded walk, which is acceptable for the rare
+/// standalone-file case.
+fn project_boundary(start_dir: &Path) -> Option<PathBuf> {
+    for dir in start_dir.ancestors() {
+        if dir.join(".git").exists() {
+            return Some(dir.to_path_buf());
         }
     }
     None
@@ -265,12 +281,12 @@ pub fn load(
     start_dir: &Path,
     input_file: Option<&Path>,
     flavor_override: Option<Flavor>,
-    boundary: Option<&Path>,
 ) -> io::Result<(Config, Option<PathBuf>)> {
+    let boundary = project_boundary(start_dir);
     let (mut cfg, cfg_path) = if let Some(path) = explicit {
         let cfg = read_config(path)?;
         (cfg, Some(path.to_path_buf()))
-    } else if let Some(p) = find_in_tree(start_dir, boundary)
+    } else if let Some(p) = find_in_tree(start_dir, boundary.as_deref())
         && let Ok(cfg) = read_config(&p)
     {
         (cfg, Some(p))
@@ -556,8 +572,7 @@ mod tests {
         let qmd = tmp.path().join("doc.qmd");
         std::fs::write(&qmd, "").unwrap();
 
-        let (cfg, _) =
-            load(None, tmp.path(), Some(&qmd), Some(Flavor::Pandoc), None).expect("load");
+        let (cfg, _) = load(None, tmp.path(), Some(&qmd), Some(Flavor::Pandoc)).expect("load");
         assert_eq!(cfg.flavor, Flavor::Pandoc);
     }
 
@@ -567,7 +582,7 @@ mod tests {
         let cfg_path = tmp.path().join("panache.toml");
         std::fs::write(&cfg_path, "flavor = \"quarto\"\n").unwrap();
 
-        let (cfg, _) = load(None, tmp.path(), None, Some(Flavor::Gfm), None).expect("load");
+        let (cfg, _) = load(None, tmp.path(), None, Some(Flavor::Gfm)).expect("load");
         assert_eq!(cfg.flavor, Flavor::Gfm);
     }
 
@@ -579,7 +594,7 @@ mod tests {
         let md = tmp.path().join("doc.md");
         std::fs::write(&md, "").unwrap();
 
-        let (cfg, _) = load(None, tmp.path(), Some(&md), Some(Flavor::Gfm), None).expect("load");
+        let (cfg, _) = load(None, tmp.path(), Some(&md), Some(Flavor::Gfm)).expect("load");
         assert_eq!(cfg.flavor, Flavor::Gfm);
     }
 
@@ -594,7 +609,7 @@ mod tests {
         )
         .unwrap();
 
-        let (cfg, _) = load(None, tmp.path(), None, Some(Flavor::Pandoc), None).expect("load");
+        let (cfg, _) = load(None, tmp.path(), None, Some(Flavor::Pandoc)).expect("load");
         assert_eq!(cfg.flavor, Flavor::Pandoc);
         // The user override turns off fenced_divs even though Pandoc default would enable it.
         assert!(!cfg.extensions.fenced_divs);
@@ -616,7 +631,7 @@ mod tests {
         )
         .unwrap();
 
-        let (cfg, _) = load(None, tmp.path(), None, Some(Flavor::Pandoc), None).expect("load");
+        let (cfg, _) = load(None, tmp.path(), None, Some(Flavor::Pandoc)).expect("load");
         assert_eq!(cfg.flavor, Flavor::Pandoc);
         assert!(!cfg.extensions.fenced_divs);
     }
@@ -654,6 +669,57 @@ mod tests {
 
         let found = find_in_tree(&nested, Some(&workspace));
         assert_eq!(found.as_deref(), Some(cfg.as_path()));
+    }
+
+    #[test]
+    fn project_boundary_stops_at_git_directory() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let repo = tmp.path().join("repo");
+        let sub = repo.join("src").join("docs");
+        std::fs::create_dir_all(&sub).unwrap();
+        std::fs::create_dir_all(repo.join(".git")).unwrap();
+
+        let found = project_boundary(&sub).expect("boundary");
+        assert_eq!(found, repo);
+    }
+
+    #[test]
+    fn project_boundary_accepts_git_file_for_worktrees() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let worktree = tmp.path().join("wt");
+        std::fs::create_dir_all(&worktree).unwrap();
+        // Worktrees use a `.git` *file* (gitdir pointer), not a directory.
+        std::fs::write(worktree.join(".git"), "gitdir: /some/where\n").unwrap();
+
+        let found = project_boundary(&worktree).expect("boundary");
+        assert_eq!(found, worktree);
+    }
+
+    #[test]
+    fn project_boundary_is_none_when_no_git_ancestor() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let sub = tmp.path().join("nogit");
+        std::fs::create_dir_all(&sub).unwrap();
+        assert!(project_boundary(&sub).is_none());
+    }
+
+    #[test]
+    fn load_does_not_inherit_config_above_git_root() {
+        // A panache.toml above the .git boundary must not be picked up.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join("panache.toml"), "line-width = 7\n").unwrap();
+        let repo = tmp.path().join("repo");
+        std::fs::create_dir_all(repo.join(".git")).unwrap();
+        let doc = repo.join("doc.qmd");
+        std::fs::write(&doc, "").unwrap();
+
+        let (cfg, cfg_path) = load(None, &repo, Some(&doc), None).expect("load");
+        assert_eq!(
+            cfg_path, None,
+            "must not pick up panache.toml above .git boundary"
+        );
+        // Sanity check: defaults are used, not line-width=7 from the stray file.
+        assert_ne!(cfg.line_width, 7);
     }
 
     #[test]

@@ -20,10 +20,12 @@ Panache searches for a configuration file in the following order:
 
 For the project-config step, discovery walks up from the file being processed
 and uses the **nearest** `panache.toml` / `.panache.toml`. In a monorepo, a
-config closer to the file wins over one at the workspace root. When the LSP is
-running, the upward walk is bounded by the editor's workspace root so that
-unrelated configs above the project (e.g. `/tmp/panache.toml`) cannot leak in;
-the CLI keeps its existing unbounded behavior.
+config closer to the file wins over one at the project root. The walk stops at
+the nearest `.git` ancestor (project root) so unrelated configs above the
+project --- e.g. a stray `panache.toml` in your home directory --- are not
+inherited. The same rule applies to both the CLI and the LSP. If no `.git`
+ancestor exists (e.g. an untracked scratch file), the walk falls back to today's
+filesystem-root behavior.
 
 ## Basic Options
 
