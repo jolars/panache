@@ -1,0 +1,26 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..43
+  BLOCK_QUOTE@0..43
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    HTML_BLOCK@2..43
+      HTML_BLOCK_TAG@2..7
+        TEXT@2..6 "<div"
+        NEWLINE@6..7 "\n"
+      HTML_BLOCK_CONTENT@7..34
+        BLOCK_QUOTE_MARKER@7..8 ">"
+        WHITESPACE@8..9 " "
+        TEXT@9..26 "  id=\"x\">trailing"
+        NEWLINE@26..27 "\n"
+        BLOCK_QUOTE_MARKER@27..28 ">"
+        WHITESPACE@28..29 " "
+        TEXT@29..33 "body"
+        NEWLINE@33..34 "\n"
+      HTML_BLOCK_TAG@34..43
+        BLOCK_QUOTE_MARKER@34..35 ">"
+        WHITESPACE@35..36 " "
+        TEXT@36..42 "</div>"
+        NEWLINE@42..43 "\n"

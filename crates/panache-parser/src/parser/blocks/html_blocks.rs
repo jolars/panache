@@ -740,36 +740,32 @@ pub(crate) fn parse_html_block_with_wrapper(
     //   `RawBlock`. Emission for void tags uses simple per-line
     //   TEXT + NEWLINE (no HTML_ATTRS — the projector doesn't read attrs
     //   from void tags).
-    let multiline_open_end = if bq_depth == 0 {
-        match (wrapper_kind, &block_type) {
-            (SyntaxKind::HTML_BLOCK_DIV, _) => {
-                find_multiline_open_end(lines, start_pos, first_inner, "div")
-            }
-            (
-                _,
-                HtmlBlockType::BlockTag {
-                    tag_name,
-                    closes_at_open_tag: true,
-                    ..
-                },
-            ) => find_multiline_open_end(lines, start_pos, first_inner, tag_name),
-            (
-                _,
-                HtmlBlockType::BlockTag {
-                    tag_name,
-                    is_verbatim: false,
-                    closed_by_blank_line: false,
-                    depth_aware: true,
-                    closes_at_open_tag: false,
-                    is_closing: false,
-                },
-            ) if is_pandoc_lift_eligible_block_tag(tag_name) => {
-                find_multiline_open_end(lines, start_pos, first_inner, tag_name)
-            }
-            _ => None,
+    let multiline_open_end = match (wrapper_kind, &block_type) {
+        (SyntaxKind::HTML_BLOCK_DIV, _) => {
+            find_multiline_open_end(lines, start_pos, first_inner, "div", bq_depth)
         }
-    } else {
-        None
+        (
+            _,
+            HtmlBlockType::BlockTag {
+                tag_name,
+                closes_at_open_tag: true,
+                ..
+            },
+        ) => find_multiline_open_end(lines, start_pos, first_inner, tag_name, bq_depth),
+        (
+            _,
+            HtmlBlockType::BlockTag {
+                tag_name,
+                is_verbatim: false,
+                closed_by_blank_line: false,
+                depth_aware: true,
+                closes_at_open_tag: false,
+                is_closing: false,
+            },
+        ) if is_pandoc_lift_eligible_block_tag(tag_name) => {
+            find_multiline_open_end(lines, start_pos, first_inner, tag_name, bq_depth)
+        }
+        _ => None,
     };
 
     // Set up depth-aware close tracking when the block type asks for it
@@ -1015,13 +1011,42 @@ pub(crate) fn parse_html_block_with_wrapper(
 
     if let Some(end_line_idx) = multiline_open_end {
         if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
-            emit_multiline_open_tag_with_attrs(builder, lines, start_pos, end_line_idx, "div");
+            emit_multiline_open_tag_with_attrs(
+                builder,
+                lines,
+                start_pos,
+                end_line_idx,
+                "div",
+                bq_depth,
+            );
         } else if let Some(name) = strict_block_tag_name
             && strict_block_lift
         {
-            emit_multiline_open_tag_with_attrs(builder, lines, start_pos, end_line_idx, name);
+            emit_multiline_open_tag_with_attrs(
+                builder,
+                lines,
+                start_pos,
+                end_line_idx,
+                name,
+                bq_depth,
+            );
+        } else if let Some(name) = bq_strict_attr_emit_tag_name(wrapper_kind, &block_type, bq_depth)
+        {
+            // Multi-line open of a lift-eligible strict-block tag inside a
+            // blockquote (`> <section\n>   id=...>`). The non-bq
+            // `strict_block_tag_name` gate is `bq_depth == 0`; this branch
+            // covers the bq side so the open tag emits HTML_ATTRS regions
+            // for `AttributeNode::cast` and the projector's canonicalizer.
+            emit_multiline_open_tag_with_attrs(
+                builder,
+                lines,
+                start_pos,
+                end_line_idx,
+                name,
+                bq_depth,
+            );
         } else {
-            emit_multiline_open_tag_simple(builder, lines, start_pos, end_line_idx);
+            emit_multiline_open_tag_simple(builder, lines, start_pos, end_line_idx, bq_depth);
         }
     } else {
         let (line_without_newline, newline_str) = strip_newline(first_inner);
@@ -1223,10 +1248,16 @@ pub(crate) fn parse_html_block_with_wrapper(
             //
             // Other bq-wrapped shapes (butted-close / open-trailing /
             // same-line) still fall through to the opaque path.
-            let bq_lift_tag: Option<&str> = if bq_depth > 0
-                && multiline_open_end.is_none()
-                && pre_content.is_empty()
-            {
+            // Multi-line opens are allowed here as of 2026-05-12: the
+            // open `HTML_BLOCK_TAG` was emitted (potentially with HTML_ATTRS
+            // per attr line and per-line bq prefix tokens) by the bq-aware
+            // `emit_multiline_open_tag_with_attrs`. `pre_content` stays
+            // empty for multi-line opens (the emitter writes any trailing
+            // bytes on the last open line directly as TEXT inside
+            // HTML_BLOCK_TAG, not into `pre_content`) — so multi-line +
+            // trailing falls through to the opaque path, matching the non-
+            // bq deferral.
+            let bq_lift_tag: Option<&str> = if bq_depth > 0 && pre_content.is_empty() {
                 if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
                     Some("div")
                 } else if wrapper_kind == SyntaxKind::HTML_BLOCK {
@@ -1249,7 +1280,16 @@ pub(crate) fn parse_html_block_with_wrapper(
             };
 
             let bq_clean_lift = bq_lift_tag.is_some_and(|tag_name| {
-                let (open_no_nl, _) = strip_newline(first_inner);
+                // Open-shape: last open line must end with `>` (clean
+                // close-of-open). For single-line, that's `first_inner`
+                // (already bq-stripped); for multi-line, strip bq markers
+                // from `lines[end_line_idx]` and check the same.
+                let last_open_line: &str = match multiline_open_end {
+                    None => first_inner,
+                    Some(end) if bq_depth > 0 => strip_n_blockquote_markers(lines[end], bq_depth),
+                    Some(end) => lines[end],
+                };
+                let (open_no_nl, _) = strip_newline(last_open_line);
                 if !open_no_nl.trim_end_matches([' ', '\t']).ends_with('>') {
                     return false;
                 }
@@ -2183,9 +2223,12 @@ fn find_multiline_open_end(
     start_pos: usize,
     first_inner: &str,
     tag_name: &str,
+    bq_depth: usize,
 ) -> Option<usize> {
     // Locate the `<tag_name` literal in `first_inner` to start scanning past
     // it. Match is ASCII case-insensitive; the parser preserves source casing.
+    // `first_inner` is already bq-stripped by the caller; subsequent lines are
+    // stripped inline below via `strip_n_blockquote_markers`.
     let trimmed = strip_leading_spaces(first_inner);
     let prefix_len = 1 + tag_name.len();
     if !trimmed.starts_with('<')
@@ -2210,11 +2253,18 @@ fn find_multiline_open_end(
         i += 1;
     }
 
-    // No `>` on first line. Scan subsequent lines.
+    // No `>` on first line. Scan subsequent lines, stripping `bq_depth`
+    // blockquote markers per line so `> ` prefixes don't count toward the
+    // quote-aware scan. Mirrors `pandoc_html_open_tag_closes`.
     let mut line_idx = start_pos + 1;
     while line_idx < lines.len() {
-        let bytes = lines[line_idx].as_bytes();
-        for &b in bytes {
+        let raw = lines[line_idx];
+        let inner = if bq_depth > 0 {
+            strip_n_blockquote_markers(raw, bq_depth)
+        } else {
+            raw
+        };
+        for &b in inner.as_bytes() {
             match (quote, b) {
                 (None, b'"') | (None, b'\'') => quote = Some(b),
                 (Some(q), x) if x == q => quote = None,
@@ -2278,6 +2328,65 @@ pub(crate) fn pandoc_html_open_tag_closes(
     false
 }
 
+/// Like [`pandoc_html_open_tag_closes`] but additionally requires that
+/// the line containing the closing `>` has no non-whitespace bytes
+/// after it (i.e. the open tag is clean — no trailing on the last open
+/// line, like `<div>foo`). Used by the `HTML_BLOCK_DIV` dispatcher
+/// gate: the structural body lift (`bq_clean_lift` / non-bq lift) only
+/// fires for clean opens, so retagging an open-trailing div produces a
+/// malformed `HTML_BLOCK_DIV` whose open `HTML_BLOCK_TAG` ends in
+/// `TEXT(trailing)` — `div_has_structural_inner` would return false
+/// and `html_div_block` would `debug_assert!`.
+pub(crate) fn pandoc_html_open_tag_closes_cleanly(
+    lines: &[&str],
+    start_pos: usize,
+    bq_depth: usize,
+) -> bool {
+    if start_pos >= lines.len() {
+        return false;
+    }
+    let mut quote: Option<u8> = None;
+    for (offset, line) in lines.iter().enumerate().skip(start_pos) {
+        let inner = if bq_depth > 0 {
+            strip_n_blockquote_markers(line, bq_depth)
+        } else {
+            line
+        };
+        let bytes = inner.as_bytes();
+        let mut i = 0usize;
+        if offset == start_pos {
+            while i < bytes.len() && bytes[i] == b' ' {
+                i += 1;
+            }
+            if bytes.get(i) != Some(&b'<') {
+                return false;
+            }
+            i += 1;
+        }
+        while i < bytes.len() {
+            match (quote, bytes[i]) {
+                (None, b'"') | (None, b'\'') => quote = Some(bytes[i]),
+                (Some(q), x) if x == q => quote = None,
+                (None, b'>') => {
+                    // Verify the rest of this line is whitespace (or
+                    // newline). `bytes` is the bq-stripped inner; the
+                    // newline is still in `bytes` if `line` ended with
+                    // one, so trim trailing whitespace and check we're
+                    // at end-of-line.
+                    let tail = &bytes[i + 1..];
+                    let all_ws = tail
+                        .iter()
+                        .all(|&b| matches!(b, b' ' | b'\t' | b'\n' | b'\r'));
+                    return all_ws;
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+    }
+    false
+}
+
 /// Emit a multi-line open tag spanning `lines[start_pos..=end_line_idx]` as
 /// structural CST tokens, exposing the attribute region as `HTML_ATTRS` for
 /// `AttributeNode::cast` to find. Bytes are byte-identical to the source —
@@ -2299,14 +2408,32 @@ fn emit_multiline_open_tag_with_attrs(
     start_pos: usize,
     end_line_idx: usize,
     tag_name: &str,
+    bq_depth: usize,
 ) {
     let prefix_len = 1 + tag_name.len();
-    for (line_idx, line) in lines
+    for (line_idx, raw) in lines
         .iter()
         .enumerate()
         .take(end_line_idx + 1)
         .skip(start_pos)
     {
+        // Strip `bq_depth` blockquote markers from the source line so
+        // indent/HTML_ATTRS/TEXT splitting ignores the bq prefix bytes.
+        // Re-emit the stripped prefix as `BLOCK_QUOTE_MARKER` /
+        // `WHITESPACE` tokens — but ONLY for lines past `start_pos`.
+        // Line 0's bq prefix is consumed by the outer BLOCK_QUOTE node
+        // before this parser runs; re-emitting it here would double
+        // the bytes and break losslessness.
+        let stripped = if bq_depth > 0 {
+            strip_n_blockquote_markers(raw, bq_depth)
+        } else {
+            raw
+        };
+        let bq_prefix_len = raw.len() - stripped.len();
+        if bq_prefix_len > 0 && line_idx != start_pos {
+            emit_bq_prefix_tokens(builder, &raw[..bq_prefix_len]);
+        }
+        let line = stripped;
         let (line_no_nl, newline_str) = strip_newline(line);
 
         if line_idx == start_pos {
@@ -2421,9 +2548,26 @@ fn emit_multiline_open_tag_simple(
     lines: &[&str],
     start_pos: usize,
     end_line_idx: usize,
+    bq_depth: usize,
 ) {
-    for line in lines.iter().take(end_line_idx + 1).skip(start_pos) {
-        let (line_no_nl, newline_str) = strip_newline(line);
+    for (line_idx, raw) in lines
+        .iter()
+        .enumerate()
+        .take(end_line_idx + 1)
+        .skip(start_pos)
+    {
+        let stripped = if bq_depth > 0 {
+            strip_n_blockquote_markers(raw, bq_depth)
+        } else {
+            raw
+        };
+        let bq_prefix_len = raw.len() - stripped.len();
+        // Line 0's bq prefix is owned by the outer BLOCK_QUOTE node;
+        // re-emit prefixes only for subsequent lines.
+        if bq_prefix_len > 0 && line_idx != start_pos {
+            emit_bq_prefix_tokens(builder, &raw[..bq_prefix_len]);
+        }
+        let (line_no_nl, newline_str) = strip_newline(stripped);
         if !line_no_nl.is_empty() {
             builder.token(SyntaxKind::TEXT.into(), line_no_nl);
         }
@@ -2762,16 +2906,16 @@ mod tests {
     fn test_find_multiline_open_end() {
         // Single-line opens return None (caller takes the regular path).
         assert_eq!(
-            find_multiline_open_end(&["<div id=\"x\">"], 0, "<div id=\"x\">", "div"),
+            find_multiline_open_end(&["<div id=\"x\">"], 0, "<div id=\"x\">", "div", 0),
             None
         );
         assert_eq!(
-            find_multiline_open_end(&["<embed src=\"x\">"], 0, "<embed src=\"x\">", "embed"),
+            find_multiline_open_end(&["<embed src=\"x\">"], 0, "<embed src=\"x\">", "embed", 0),
             None
         );
         // Multi-line opens return the line index of the closing `>`.
         assert_eq!(
-            find_multiline_open_end(&["<embed", "  src=\"x\">"], 0, "<embed", "embed"),
+            find_multiline_open_end(&["<embed", "  src=\"x\">"], 0, "<embed", "embed", 0),
             Some(1)
         );
         assert_eq!(
@@ -2779,17 +2923,18 @@ mod tests {
                 &["<embed", "  src=\"x\"", "  type=\"video\">"],
                 0,
                 "<embed",
-                "embed"
+                "embed",
+                0
             ),
             Some(2)
         );
         // Tag-name mismatch returns None (case-insensitive on the tag name).
         assert_eq!(
-            find_multiline_open_end(&["<embed", "  src=\"x\">"], 0, "<embed", "div"),
+            find_multiline_open_end(&["<embed", "  src=\"x\">"], 0, "<embed", "div", 0),
             None
         );
         assert_eq!(
-            find_multiline_open_end(&["<EMBED", "  src=\"x\">"], 0, "<EMBED", "embed"),
+            find_multiline_open_end(&["<EMBED", "  src=\"x\">"], 0, "<EMBED", "embed", 0),
             Some(1)
         );
         // Quoted `>` does not terminate the open tag; quote state threads
@@ -2799,14 +2944,32 @@ mod tests {
                 &["<embed title=\"a>b", "  c\">"],
                 0,
                 "<embed title=\"a>b",
-                "embed"
+                "embed",
+                0
             ),
             Some(1)
         );
         // No `>` anywhere returns None.
         assert_eq!(
-            find_multiline_open_end(&["<embed", "  src=\"x\""], 0, "<embed", "embed"),
+            find_multiline_open_end(&["<embed", "  src=\"x\""], 0, "<embed", "embed", 0),
             None
+        );
+        // Subsequent lines inside a blockquote: bq markers stripped before
+        // scanning so `> ` prefixes don't count.
+        assert_eq!(
+            find_multiline_open_end(&["<div", ">   id=\"x\">"], 0, "<div", "div", 1),
+            Some(1)
+        );
+        // Nested bq: strips two `> ` per line.
+        assert_eq!(
+            find_multiline_open_end(
+                &["<section", "> >   id=\"x\">"],
+                0,
+                "<section",
+                "section",
+                2
+            ),
+            Some(1)
         );
     }
 

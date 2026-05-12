@@ -1,12 +1,12 @@
 Pandoc-native conformance report (pandoc 3.9.0.2)
-352 / 354 cases passing (99.4%)
-2 failing
+354 / 354 cases passing (100.0%)
+0 failing
 2 blocked-list entries
 
 === Per-section pass / fail ===
   block: 15 pass / 0 fail
   citation: 1 pass / 0 fail
-  html: 159 pass / 2 fail
+  html: 161 pass / 0 fail
   imported: 162 pass / 0 fail
   inline: 15 pass / 0 fail
 
@@ -363,6 +363,8 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 350
 351
 352
+353
+354
 
 === Passing cases grouped by section ===
 # block
@@ -545,6 +547,8 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 350
 351
 352
+353
+354
 
 # imported
 26
@@ -726,12 +730,4 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 25
 190
 191
-
-=== Failing case slugs (with rendered diff hint) ===
-# 353 (html-block-div-blockquote-multiline-open)
-  expected: [ BlockQuote [ Div ( "x" , [ ] , [ ] ) [ Para [ Str "body" ] ] ] ]
-  got:      [ BlockQuote [ RawBlock ( Format "html" ) "<div\n  id=\"x\">" , Plain [ Str "body" ] , RawBlock ( Format "html" ) "</div>" ] ]
-# 354 (html-block-section-blockquote-multiline-open)
-  expected: [ BlockQuote [ RawBlock ( Format "html" ) "<section id=\"x\">" , Plain [ Str "body" ] , RawBlock ( Format "html" ) "</section>" ] ]
-  got:      [ BlockQuote [ RawBlock ( Format "html" ) "<section\n  id=\"x\">" , Plain [ Str "body" ] , RawBlock ( Format "html" ) "</section>" ] ]
 

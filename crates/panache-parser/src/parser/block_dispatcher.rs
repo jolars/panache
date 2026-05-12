@@ -32,8 +32,8 @@ use super::blocks::headings::{
 use super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use super::blocks::html_blocks::{
     HtmlBlockType, is_pandoc_inline_block_tag_name, is_pandoc_void_block_tag_name,
-    pandoc_html_open_tag_closes, parse_html_block_with_wrapper, probe_open_tag_line_has_close_gt,
-    try_parse_html_block_start,
+    pandoc_html_open_tag_closes, pandoc_html_open_tag_closes_cleanly,
+    parse_html_block_with_wrapper, probe_open_tag_line_has_close_gt, try_parse_html_block_start,
 };
 use super::blocks::indented_code::{is_indented_code_line, parse_indented_code_block};
 use super::blocks::latex_envs::LatexEnvInfo;
@@ -1891,22 +1891,26 @@ impl BlockParser for HtmlBlockParser {
         // kind changes. CommonMark dialect keeps the opaque HTML_BLOCK
         // shape.
         //
-        // Multi-line div opens inside a blockquote (`> <div\n>   id=...>\n…`)
-        // are NOT retagged: `find_multiline_open_end` is gated on
-        // `bq_depth == 0`, so the parser cannot lift the body into structural
-        // CST children. Retagging anyway produces a malformed HTML_BLOCK_DIV
-        // whose open `HTML_BLOCK_TAG` lacks the closing `>` — `html_div_block`
-        // would `debug_assert!` (debug) or silently emit an empty `Div` (release).
-        // Keeping the wrapper as opaque `HTML_BLOCK` routes through the byte
-        // walker, which emits per-tag RawBlocks (matches the non-div multi-line-
-        // in-bq behavior; diverges from pandoc-native's structural `Div`).
+        // Retag is gated on `pandoc_html_open_tag_closes_cleanly`: the
+        // structural body lift only fires for opens whose closing `>` is
+        // followed by nothing (i.e. no trailing on the last open line),
+        // because `html_div_block`'s `div_has_structural_inner` check
+        // requires the open `HTML_BLOCK_TAG` to end with `TEXT(">")`
+        // followed only by NEWLINEs. Multi-line opens with trailing fall
+        // through to opaque `HTML_BLOCK` (parser-side `bq_clean_lift`
+        // also rejects, byte walker emits per-tag RawBlocks; diverges
+        // from pandoc-native's `Div` but no panic).
         let wrapper_kind = match &block_type {
             HtmlBlockType::BlockTag { tag_name, .. }
                 if tag_name == "div"
                     && ctx.config.dialect == crate::options::Dialect::Pandoc
                     && ctx.config.extensions.native_divs
-                    && (ctx.blockquote_depth == 0
-                        || probe_open_tag_line_has_close_gt(ctx.content, "div")) =>
+                    && (probe_open_tag_line_has_close_gt(ctx.content, "div")
+                        || pandoc_html_open_tag_closes_cleanly(
+                            lines,
+                            line_pos,
+                            ctx.blockquote_depth,
+                        )) =>
             {
                 crate::syntax::SyntaxKind::HTML_BLOCK_DIV
             }

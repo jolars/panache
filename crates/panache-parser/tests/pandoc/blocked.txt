@@ -5,21 +5,3 @@
 # exposes. Do NOT use this file to silence regressions — fix the underlying
 # cause and keep the case in the allowlist instead.
 
-# html-block: multi-line open tag inside a blockquote
-#
-# `find_multiline_open_end` is gated on `bq_depth == 0`, so a multi-line
-# HTML open tag whose `>` lands on a continuation line cannot be lifted
-# structurally when wrapped in a blockquote. The parser keeps the wrapper
-# as opaque `HTML_BLOCK` (HTML_BLOCK_DIV is also explicitly demoted at
-# the dispatcher to avoid producing a malformed lift shape), and the
-# projector emits the open tag's source bytes verbatim — preserving
-# inter-line whitespace inside the RawBlock text. Pandoc-native
-# canonicalizes the same open to a single line (`<section id="x">`); we
-# emit the literal `<section\n  id="x">`. For `<div>` the divergence is
-# structural — pandoc emits `Div ("x", …)`, we emit per-tag RawBlocks
-# because no parser-side lift fires. Properly fixing this requires
-# threading bq-marker stripping through `find_multiline_open_end` AND
-# emitting the open tag with structurally nested `BLOCK_QUOTE_MARKER`
-# tokens for losslessness. Non-trivial; defer.
-353
-354
