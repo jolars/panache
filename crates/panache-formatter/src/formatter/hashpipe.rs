@@ -217,6 +217,9 @@ pub fn split_options_from_cst_with_content(
         value: String,
         is_quoted: bool,
     ) {
+        // Dedup against inline-source keys via the normalized form, but emit
+        // the original key so user-written dotted YAML keys (e.g. knitr's
+        // `cache.extra`) are preserved verbatim.
         let normalized_key = normalize_option_name(&key);
         let rendered = if is_quoted {
             format!("\"{}\"", value)
@@ -225,8 +228,8 @@ pub fn split_options_from_cst_with_content(
         };
         insert_if_absent(
             entries,
-            normalized_key.clone(),
-            Entry::Simple((normalized_key, ChunkOptionValue::Simple(rendered))),
+            normalized_key,
+            Entry::Simple((key, ChunkOptionValue::Simple(rendered))),
         );
     }
 
@@ -399,22 +402,44 @@ fn hashpipe_flow_scalar_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
 }
 
 fn hashpipe_flow_value_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
-    if let Some(token) = flow.plain_scalar() {
+    let scalar = if let Some(token) = flow.plain_scalar() {
         let text = token.text().to_string();
         if text.contains('\n') {
             // Normalize wrapped plain scalars to a single logical line so
             // re-emission uses deterministic hashpipe wrapping.
-            return Some(fold_multiline_plain_scalar(&text));
+            fold_multiline_plain_scalar(&text)
+        } else {
+            text
         }
-        return Some(text);
+    } else if let Some(token) = flow.single_quoted_scalar() {
+        token.text().to_string()
+    } else if let Some(token) = flow.double_qouted_scalar() {
+        token.text().to_string()
+    } else {
+        return None;
+    };
+    Some(prepend_flow_tag(flow, scalar))
+}
+
+/// Prepend a YAML tag property (e.g. `!expr`) back onto a scalar value so the
+/// formatter can re-emit user-supplied tags. Quarto's `!expr` tag for knitr
+/// requires byte-for-byte preservation.
+fn prepend_flow_tag(flow: &yaml_parser::ast::Flow, scalar: String) -> String {
+    let Some(props) = flow.properties() else {
+        return scalar;
+    };
+    let Some(tag) = props.tag_property() else {
+        return scalar;
+    };
+    let tag_text = tag.syntax().text().to_string();
+    let tag_text = tag_text.trim();
+    if tag_text.is_empty() {
+        return scalar;
     }
-    if let Some(token) = flow.single_quoted_scalar() {
-        return Some(token.text().to_string());
+    if scalar.is_empty() {
+        return tag_text.to_string();
     }
-    if let Some(token) = flow.double_qouted_scalar() {
-        return Some(token.text().to_string());
-    }
-    None
+    format!("{} {}", tag_text, scalar)
 }
 
 fn fold_multiline_plain_scalar(text: &str) -> String {
@@ -677,7 +702,10 @@ pub fn format_as_hashpipe(
     for (key, value) in options {
         // Only format simple values
         if let ChunkOptionValue::Simple(v) = value {
-            let norm_key = normalize_option_name(key);
+            // Keys arrive pre-normalized from the inline-source path; the
+            // hashpipe-content path intentionally preserves the user's original
+            // form (e.g. knitr's dotted `cache.extra`), so trust them as-is.
+            let norm_key = key.clone();
             let norm_val = normalize_value(v);
 
             // Handle bare options (no value).
@@ -949,13 +977,14 @@ mod tests {
 
     #[test]
     fn test_format_as_hashpipe_simple() {
+        // Keys arrive pre-normalized at this layer.
         let options = vec![
             (
                 "echo".to_string(),
                 ChunkOptionValue::Simple("TRUE".to_string()),
             ),
             (
-                "fig.width".to_string(),
+                "fig-width".to_string(),
                 ChunkOptionValue::Simple("7".to_string()),
             ),
         ];

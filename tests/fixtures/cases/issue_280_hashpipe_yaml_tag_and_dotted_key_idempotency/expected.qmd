@@ -1,0 +1,12 @@
+```{r}
+#| label: load-obj
+#| cache: true
+#| cache-vars:
+#|   - loaded_data
+#|   - loaded_plots
+#| cache.extra: !expr file.mtime("path/to/obj-file.rds")
+
+loaded_obj <- readRDS("path/to/obj-file.rds")
+loaded_data <- loaded_obj$get_data()
+loaded_plots <- loaded_obj$get_plots()
+```

@@ -366,6 +366,7 @@ golden_test_cases!(
     issue_258_gfm_autolink,
     issue_277_list_bullet_outdent_after_blank_idempotency,
     issue_279_list_item_html_block_trailing_idempotency,
+    issue_280_hashpipe_yaml_tag_and_dotted_key_idempotency,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,
