@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.1](https://github.com/jolars/panache/compare/panache-formatter-v0.5.0...panache-formatter-v0.5.1) (2026-05-12)
+
+### Bug Fixes
+- **formatter:** don't strip `!expr` in hashpipe yaml ([`f03ca70`](https://github.com/jolars/panache/commit/f03ca702815cbafb54c0066b685ec6497ca968e4)), closes [#280](https://github.com/jolars/panache/issues/280)
+- **formatter:** don't skip `PLAIN` in second pass ([`a693f40`](https://github.com/jolars/panache/commit/a693f40488b6fa53726e70260cb66dce2853b5f9)), closes [#279](https://github.com/jolars/panache/issues/279)
+- **parser,formatter:** don't escape `[`, `]` ([`26bbb1c`](https://github.com/jolars/panache/commit/26bbb1c5bd539c85108f63e79dbe7c29d24b5222))
+
+### Dependencies
+- updated crates/panache-parser to v0.9.0
 ## [0.5.0](https://github.com/jolars/panache/compare/panache-formatter-v0.4.3...panache-formatter-v0.5.0) (2026-05-09)
 
 ### Features

@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.9.0](https://github.com/jolars/panache/compare/panache-parser-v0.8.0...panache-parser-v0.9.0) (2026-05-12)
+
+### Features
+- **parser:** handle multi-line div tag blocks ([`5f350b4`](https://github.com/jolars/panache/commit/5f350b42111bcea7636c8a7283bc1c4fbe32c40e))
+
+### Bug Fixes
+- **parser:** lift bq messy-shape HTML bodies into CST ([`e923d7c`](https://github.com/jolars/panache/commit/e923d7c4ee8ca936a5a9d34a8b9190c35a28d7c9))
+- **parser:** lift bq same-line HTML body into CST ([`1ba1b1e`](https://github.com/jolars/panache/commit/1ba1b1ea37dcdf7ecea15ecdf3ad7bb31af9ff33))
+- **parser:** expose HTML_ATTRS for non-div strict-block tags in bq ([`2bd4542`](https://github.com/jolars/panache/commit/2bd4542bb8c7144523c6ec9894584b3038670315))
+- **parser:** extend bq HTML lift to non-div and inline-block ([`8b88578`](https://github.com/jolars/panache/commit/8b8857897dd972b34aaacec47caa29477b155ed6))
+- **parser:** lift bq-wrapped clean `<div>` body into CST ([`4bc4612`](https://github.com/jolars/panache/commit/4bc4612c08347607c605971e852fd3199dc850e6))
+- **parser:** lift matched-pair inline-block HTML bodies into CST ([`f335b42`](https://github.com/jolars/panache/commit/f335b4218f39a99ba185ec27e0296ab67dc1bcad)), fix [#4](https://github.com/jolars/panache/issues/4)
+- **parser:** lift multi-line non-div strict-block HTML opens into CST ([`59a5f91`](https://github.com/jolars/panache/commit/59a5f91aa763ec29cd1ccfca03b753d8ff106fb0))
+- **parser:** lift non-div strict-block butted-close shapes into CST ([`98767ab`](https://github.com/jolars/panache/commit/98767ab92f3376e2eae79634c80bdaa4d868fecf)), fix [#4](https://github.com/jolars/panache/issues/4)
+- **parser:** lift inner strict-block HTML elements into CST ([`3f6f644`](https://github.com/jolars/panache/commit/3f6f6448cb87154f2b8cb363a747fb50cc496a95))
+- **projector:** lift empty `<div>` into structural CST walk ([`179a681`](https://github.com/jolars/panache/commit/179a681b12eedc54704d5e42826e36a0d8812ebf)), fix [#4](https://github.com/jolars/panache/issues/4)
+- **projector:** strip blockquote markers from HTML block bodies ([`47e6c38`](https://github.com/jolars/panache/commit/47e6c386527daff8dff4ca30fed708ff2c762418))
+- **parser:** lift same-line `<div>` shapes into CST ([`33b6297`](https://github.com/jolars/panache/commit/33b6297ffae9711a8459d1f0e0e60b2a2a2926c5))
+- **parser:** lift messy `<div>` shapes into CST ([`4c03405`](https://github.com/jolars/panache/commit/4c034054f52275e33903e9b3f066e7fdf175743a))
+- **parser:** lift inner `<div>` elements into CST ([`1b37801`](https://github.com/jolars/panache/commit/1b37801fc12e12dd57a239bc6a643527df640c27))
+- **parser:** mirror Pandoc's `isInlineTag` for `<script>` ([`ba9c96f`](https://github.com/jolars/panache/commit/ba9c96f39e338300dac97347ea0bb8583e813a66))
+- **parser,formatter:** don't escape `[`, `]` ([`26bbb1c`](https://github.com/jolars/panache/commit/26bbb1c5bd539c85108f63e79dbe7c29d24b5222))
+- **parser:** capture citation inside reference ([`c6685f4`](https://github.com/jolars/panache/commit/c6685f48d886d014831e83a30c71593a5692687e)), closes [#278](https://github.com/jolars/panache/issues/278)
+- **parser:** correctly merge unevenly indented lists ([`b661b61`](https://github.com/jolars/panache/commit/b661b61a50a72d302713e0fd5a50d3a1ab66e87f)), fixes [#277](https://github.com/jolars/panache/issues/277)
+- **parser:** closer cannot interrupt under pandoc ([`74d333a`](https://github.com/jolars/panache/commit/74d333a0e473cfda655a92104584afb6a1df9f17))
+- **parser:** don't let `<style>` tags interrupt under pandoc ([`b77db95`](https://github.com/jolars/panache/commit/b77db958480be7e049232860d6df10a961c980ce))
+- **parser:** fix plain/paragraph handling for html in parser ([`d7745dd`](https://github.com/jolars/panache/commit/d7745ddcb720f8464225c16397c1c3ba4c51889f))
+- **parser:** accept correct tags for Pandoc's closing-forms ([`7ab94d1`](https://github.com/jolars/panache/commit/7ab94d183cb794362acbe84f63eb6278063d8454))
+- **parser:** match Pandoc on closing forms of inline blocks ([`525cdf4`](https://github.com/jolars/panache/commit/525cdf40b22e56d2cbcfd6c6bce146a1874c453d))
+- **parser:** handle multi-line void open tag ([`05b369d`](https://github.com/jolars/panache/commit/05b369d072d2d243f59261b955c67672079561d5))
+- **parser:** handle infinite recursion in incomplete tags ([`95c95bf`](https://github.com/jolars/panache/commit/95c95bfe918d786142bc18f2290c301518fe15c9))
+- **parser:** handle Pandoc's void block tags ([`a327162`](https://github.com/jolars/panache/commit/a32716225851593bb1caa9308f24112ab18c660a))
+- **parser:** handle context-aware block/inline dispatcher ([`1b8330d`](https://github.com/jolars/panache/commit/1b8330da6017c53a83ab460af4e9ecefeedcba96))
+- **parser:** don't hardcode `<div` into CST ([`7c6515e`](https://github.com/jolars/panache/commit/7c6515e058b5df4eec014b2d1c604674d025d846))
+- **parser:** fix dialect-divergence in pandoc/commonmark ([`3a81ac2`](https://github.com/jolars/panache/commit/3a81ac245dc758d41ce0682c8bab01e52b04f54d))
 ## [0.8.0](https://github.com/jolars/panache/compare/panache-parser-v0.7.1...panache-parser-v0.8.0) (2026-05-09)
 
 ### Features
