@@ -3,8 +3,7 @@
 use super::helpers::*;
 use std::fs;
 use tempfile::TempDir;
-use tower_lsp_server::ls_types::CompletionResponse;
-use tower_lsp_server::ls_types::Uri;
+use tower_lsp_server::ls_types::{CompletionItemKind, CompletionResponse, Uri};
 
 #[tokio::test]
 async fn test_completion_without_citation_context() {
@@ -302,4 +301,188 @@ async fn test_completion_includes_only_crossrefable_chunk_labels() {
         !items.iter().any(|item| item.label == "setup"),
         "Expected non-crossrefable chunk labels to be excluded"
     );
+}
+
+// --- Path completion in `![](…)` and `[](…)` destinations ---
+
+fn open_doc_with_files(_server: &TestLspServer, files: &[(&str, &str)]) -> (TempDir, Uri) {
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    for (rel, contents) in files {
+        let abs = root.join(rel);
+        if let Some(parent) = abs.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(abs, contents).unwrap();
+    }
+    let doc_uri = Uri::from_file_path(root.join("doc.md")).expect("doc uri");
+    (temp_dir, doc_uri)
+}
+
+#[tokio::test]
+async fn test_image_path_completion_lists_image_files_only() {
+    let server = TestLspServer::new();
+    let (_tmp, doc_uri) = open_doc_with_files(
+        &server,
+        &[
+            ("images/foo.png", ""),
+            ("images/bar.jpg", ""),
+            ("images/notes.txt", ""),
+        ],
+    );
+
+    let content = "![](images/)\n";
+    server
+        .open_document(doc_uri.as_str(), content, "markdown")
+        .await;
+
+    // Cursor between `images/` and `)`: line 0, char 11.
+    let result = server.completion(doc_uri.as_str(), 0, 11).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("expected completion items");
+    };
+    let labels: Vec<String> = items.iter().map(|i| i.label.clone()).collect();
+    assert!(labels.iter().any(|l| l == "foo.png"), "labels: {labels:?}");
+    assert!(labels.iter().any(|l| l == "bar.jpg"), "labels: {labels:?}");
+    assert!(
+        !labels.iter().any(|l| l == "notes.txt"),
+        "txt files should be excluded in image context: {labels:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_image_path_completion_includes_video_files() {
+    let server = TestLspServer::new();
+    let (_tmp, doc_uri) = open_doc_with_files(
+        &server,
+        &[
+            ("media/clip.mp4", ""),
+            ("media/clip.webm", ""),
+            ("media/notes.txt", ""),
+        ],
+    );
+
+    let content = "![](media/)\n";
+    server
+        .open_document(doc_uri.as_str(), content, "markdown")
+        .await;
+
+    // Cursor between `media/` and `)`: line 0, char 10.
+    let result = server.completion(doc_uri.as_str(), 0, 10).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("expected completion items");
+    };
+    let labels: Vec<String> = items.iter().map(|i| i.label.clone()).collect();
+    assert!(labels.iter().any(|l| l == "clip.mp4"), "labels: {labels:?}");
+    assert!(
+        labels.iter().any(|l| l == "clip.webm"),
+        "labels: {labels:?}"
+    );
+    assert!(
+        !labels.iter().any(|l| l == "notes.txt"),
+        "txt files should be excluded in image context: {labels:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_image_path_completion_includes_subdirectory() {
+    let server = TestLspServer::new();
+    let (_tmp, doc_uri) = open_doc_with_files(&server, &[("images/nested/keep.png", "")]);
+
+    let content = "![](images/)\n";
+    server
+        .open_document(doc_uri.as_str(), content, "markdown")
+        .await;
+
+    let result = server.completion(doc_uri.as_str(), 0, 11).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("expected completion items");
+    };
+    let folder = items
+        .iter()
+        .find(|i| i.label == "nested/")
+        .expect("nested/ directory");
+    assert_eq!(folder.kind, Some(CompletionItemKind::FOLDER));
+}
+
+#[tokio::test]
+async fn test_image_path_completion_filters_by_typed_prefix() {
+    let server = TestLspServer::new();
+    let (_tmp, doc_uri) =
+        open_doc_with_files(&server, &[("images/foo.png", ""), ("images/bar.png", "")]);
+
+    let content = "![](images/f)\n";
+    server
+        .open_document(doc_uri.as_str(), content, "markdown")
+        .await;
+
+    // Cursor between `f` and `)`: line 0, char 12.
+    let result = server.completion(doc_uri.as_str(), 0, 12).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("expected completion items");
+    };
+    let labels: Vec<String> = items.iter().map(|i| i.label.clone()).collect();
+    assert!(labels.iter().any(|l| l == "foo.png"), "labels: {labels:?}");
+    assert!(
+        !labels.iter().any(|l| l == "bar.png"),
+        "prefix `f` must exclude bar.png: {labels:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_link_path_completion_includes_all_files() {
+    let server = TestLspServer::new();
+    let (_tmp, doc_uri) =
+        open_doc_with_files(&server, &[("docs/intro.md", ""), ("docs/notes.txt", "")]);
+
+    let content = "[see](docs/)\n";
+    server
+        .open_document(doc_uri.as_str(), content, "markdown")
+        .await;
+
+    // Cursor between `docs/` and `)`: line 0, char 11.
+    let result = server.completion(doc_uri.as_str(), 0, 11).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("expected completion items");
+    };
+    let labels: Vec<String> = items.iter().map(|i| i.label.clone()).collect();
+    assert!(labels.iter().any(|l| l == "intro.md"), "labels: {labels:?}");
+    assert!(
+        labels.iter().any(|l| l == "notes.txt"),
+        "labels: {labels:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_no_path_completion_inside_image_alt_text() {
+    let server = TestLspServer::new();
+    let (_tmp, doc_uri) = open_doc_with_files(&server, &[("images/foo.png", "")]);
+
+    let content = "![images/](images/)\n";
+    server
+        .open_document(doc_uri.as_str(), content, "markdown")
+        .await;
+
+    // Cursor inside the alt text `![images/]`, between `/` and `]`: line 0, char 9.
+    let result = server.completion(doc_uri.as_str(), 0, 9).await;
+    assert!(
+        result.is_none(),
+        "alt-text region must not trigger path completion"
+    );
+}
+
+#[tokio::test]
+async fn test_completion_capability_registers_path_trigger_characters() {
+    let server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let root_uri = Uri::from_file_path(temp_dir.path()).expect("temp dir absolute");
+    let init = server.initialize_result(root_uri.as_str()).await;
+    let triggers = init
+        .capabilities
+        .completion_provider
+        .expect("completion provider")
+        .trigger_characters
+        .expect("trigger_characters");
+    assert!(triggers.iter().any(|t| t == "/"), "triggers: {triggers:?}");
+    assert!(triggers.iter().any(|t| t == "("), "triggers: {triggers:?}");
 }

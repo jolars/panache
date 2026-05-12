@@ -1,17 +1,32 @@
 //! Handler for textDocument/completion LSP requests.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
+use crate::syntax::{AstNode, ImageLink, Link, LinkDest, SyntaxNode};
 use crate::utils::normalize_anchor_label;
 
+use super::super::conversions::offset_to_position;
 use super::super::helpers;
 use crate::metadata::inline_reference_map;
+
+/// Extensions accepted by Pandoc/Quarto image syntax `![](…)` across
+/// LaTeX, Typst, and HTML output paths. Quarto also embeds short-form
+/// video via `![](…)` for HTML output, so common video containers are
+/// included alongside still-image formats.
+const IMAGE_EXTENSIONS: &[&str] = &[
+    // Raster
+    "png", "jpg", "jpeg", "gif", "apng", "webp", "avif", "bmp", "tif", "tiff", "heic", "heif",
+    "jxl", "ico", // Vector / print
+    "svg", "pdf", "eps", "ps", // Video (Quarto/HTML)
+    "mp4", "webm", "ogv", "mov", "m4v", "mkv", "avi", "flv", "mpeg", "mpg", "3gp",
+];
+const MAX_PATH_COMPLETIONS: usize = 250;
 
 pub(crate) async fn completion(
     client: &tower_lsp_server::Client,
@@ -24,13 +39,35 @@ pub(crate) async fn completion(
     let position = params.text_document_position.position;
     let config = helpers::get_config(client, &workspace_root, uri).await;
 
-    let Some(text) = helpers::get_document_content(&document_map, &salsa_db, uri).await else {
+    // SyntaxNode is !Send, so derive everything we need from it inside a
+    // sync block and let it drop before we hit any subsequent .await.
+    let Some((text, offset, dest_ctx_opt)) = ({
+        let Some((text, root)) =
+            helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
+        else {
+            return Ok(None);
+        };
+        let Some(offset) = super::super::conversions::position_to_offset(&text, position) else {
+            return Ok(None);
+        };
+        let dest_ctx_opt = link_dest_context(&root, &text, offset);
+        Some((text, offset, dest_ctx_opt))
+    }) else {
         return Ok(None);
     };
 
-    let Some(offset) = super::super::conversions::position_to_offset(&text, position) else {
-        return Ok(None);
-    };
+    // Path-completion branch: cursor inside `[text](…)` or `![alt](…)` destination.
+    if let Some(dest_ctx) = dest_ctx_opt {
+        let doc_path = {
+            let map = document_map.lock().await;
+            map.get(&uri.to_string()).and_then(|s| s.path.clone())
+        };
+        let items = path_completion_items(&dest_ctx, doc_path.as_deref(), &text, offset).await;
+        return match items {
+            Some(items) if !items.is_empty() => Ok(Some(CompletionResponse::Array(items))),
+            _ => Ok(None),
+        };
+    }
 
     let Some(query) = citation_query_prefix(&text, offset) else {
         return Ok(None);
@@ -172,4 +209,163 @@ fn matches_query(candidate: &str, query: &str) -> bool {
 fn is_supported_crossref_completion_key(key: &str) -> bool {
     panache_parser::parser::inlines::citations::is_quarto_crossref_key(key)
         || panache_parser::parser::inlines::citations::has_bookdown_prefix(key)
+}
+
+/// Context for a cursor that sits inside an inline link or image destination.
+struct LinkDestContext {
+    is_image: bool,
+    /// Text typed inside the destination, from the start of the URL up to the cursor.
+    prefix: String,
+}
+
+fn link_dest_context(root: &SyntaxNode, text: &str, offset: usize) -> Option<LinkDestContext> {
+    let starting = helpers::find_node_at_offset(root, offset)?;
+    for ancestor in starting.ancestors() {
+        let (is_image, dest): (bool, LinkDest) = if let Some(link) = Link::cast(ancestor.clone()) {
+            (false, link.dest()?)
+        } else if let Some(image) = ImageLink::cast(ancestor.clone()) {
+            (true, image.dest()?)
+        } else {
+            continue;
+        };
+        let range = dest.syntax().text_range();
+        let start: usize = range.start().into();
+        let end: usize = range.end().into();
+        if offset < start || offset > end {
+            return None;
+        }
+        let prefix = text.get(start..offset)?.to_string();
+        // Bail if the prefix isn't plausibly part of an inline URL (e.g. cursor
+        // has crossed into the title portion `[text](url "title")`).
+        if prefix.chars().any(|c| c.is_whitespace() || c == '"') {
+            return None;
+        }
+        return Some(LinkDestContext { is_image, prefix });
+    }
+    None
+}
+
+async fn path_completion_items(
+    ctx: &LinkDestContext,
+    doc_path: Option<&Path>,
+    text: &str,
+    offset: usize,
+) -> Option<Vec<CompletionItem>> {
+    let doc_path = doc_path?;
+    let doc_dir = doc_path.parent()?.to_path_buf();
+
+    // Absolute paths, fragment-only anchors, and URLs are out of scope.
+    let first = ctx.prefix.chars().next();
+    if matches!(first, Some('/') | Some('#') | Some('<')) || ctx.prefix.contains("://") {
+        return None;
+    }
+
+    let (subdir, name_prefix) = match ctx.prefix.rsplit_once('/') {
+        Some((before, after)) => (before.to_string(), after.to_string()),
+        None => (String::new(), ctx.prefix.clone()),
+    };
+    let target_dir = doc_dir.join(&subdir);
+    let is_image = ctx.is_image;
+    let name_prefix_owned = name_prefix.clone();
+
+    let entries = tokio::task::spawn_blocking(move || {
+        read_dir_entries(&target_dir, &name_prefix_owned, is_image)
+    })
+    .await
+    .ok()?;
+
+    let name_start = offset.saturating_sub(name_prefix.len());
+    let range = Range::new(
+        offset_to_position(text, name_start),
+        offset_to_position(text, offset),
+    );
+
+    let mut items: Vec<CompletionItem> = entries
+        .into_iter()
+        .map(|entry| {
+            let new_text = if entry.is_dir {
+                format!("{}/", entry.name)
+            } else {
+                entry.name.clone()
+            };
+            CompletionItem {
+                label: new_text.clone(),
+                kind: Some(if entry.is_dir {
+                    CompletionItemKind::FOLDER
+                } else {
+                    CompletionItemKind::FILE
+                }),
+                filter_text: Some(new_text.clone()),
+                text_edit: Some(CompletionTextEdit::Edit(TextEdit { range, new_text })),
+                insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                ..Default::default()
+            }
+        })
+        .collect();
+
+    items.truncate(MAX_PATH_COMPLETIONS);
+    Some(items)
+}
+
+struct PathEntry {
+    name: String,
+    is_dir: bool,
+}
+
+fn read_dir_entries(dir: &Path, name_prefix: &str, is_image_context: bool) -> Vec<PathEntry> {
+    let Ok(read) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let prefix_lower = name_prefix.to_ascii_lowercase();
+    let include_hidden = name_prefix.starts_with('.');
+
+    let mut dirs: Vec<PathEntry> = Vec::new();
+    let mut files: Vec<PathEntry> = Vec::new();
+
+    for entry in read.flatten() {
+        let name_os = entry.file_name();
+        let Some(name) = name_os.to_str() else {
+            continue;
+        };
+        if !include_hidden && name.starts_with('.') {
+            continue;
+        }
+        if !name.to_ascii_lowercase().starts_with(&prefix_lower) {
+            continue;
+        }
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        if metadata.is_dir() {
+            dirs.push(PathEntry {
+                name: name.to_string(),
+                is_dir: true,
+            });
+        } else if metadata.is_file() {
+            if is_image_context && !has_image_extension(name) {
+                continue;
+            }
+            files.push(PathEntry {
+                name: name.to_string(),
+                is_dir: false,
+            });
+        }
+    }
+
+    let cmp = |a: &PathEntry, b: &PathEntry| {
+        a.name
+            .to_ascii_lowercase()
+            .cmp(&b.name.to_ascii_lowercase())
+    };
+    dirs.sort_by(cmp);
+    files.sort_by(cmp);
+    dirs.into_iter().chain(files).collect()
+}
+
+fn has_image_extension(name: &str) -> bool {
+    let Some(dot) = name.rfind('.') else {
+        return false;
+    };
+    let ext = name[dot + 1..].to_ascii_lowercase();
+    IMAGE_EXTENSIONS.contains(&ext.as_str())
 }

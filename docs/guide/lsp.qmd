@@ -461,7 +461,20 @@ element type).
 
 ### Auto-Completion
 
-Smart completions for Markdown syntax (implementation varies by context).
+Smart completions for Markdown syntax (implementation varies by context):
+
+- **Citations and crossrefs** inside `[@...]` --- bibliography keys, inline
+  reference IDs, Quarto/bookdown crossref labels (e.g. `fig-plot`).
+- **File paths** inside link and image destinations --- typing inside
+  `[text](...)` or `![alt](...)` suggests files and directories relative to the
+  current document. Image destinations are filtered to extensions pandoc/quarto
+  accept for `![](...)`: raster (`.png`, `.jpg`/`.jpeg`, `.gif`/`.apng`,
+  `.webp`, `.avif`, `.bmp`, `.tif`/`.tiff`, `.heic`/`.heif`, `.ico`),
+  vector/print (`.svg`, `.pdf`, `.eps`, `.ps`), and Quarto-embedded video
+  (`.mp4`, `.webm`, `.ogv`, `.mov`, `.m4v`, `.mkv`, `.avi`, `.flv`,
+  `.mpeg`/`.mpg`). Link destinations include all files. Completion auto-triggers
+  on `(` and `/`; hidden entries (`.dotfiles`) appear only when the typed prefix
+  starts with `.`.
 
 ### Symbol Renaming
 
