@@ -8,24 +8,47 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
-use crate::syntax::{AstNode, ImageLink, Link, LinkDest, SyntaxNode};
+use crate::syntax::{AstNode, ImageLink, Link, LinkDest, Shortcode, SyntaxKind, SyntaxNode};
 use crate::utils::normalize_anchor_label;
 
 use super::super::conversions::offset_to_position;
 use super::super::helpers;
+use super::shortcode_args::{shortcode_token_value_span, shortcode_tokens, token_is_named};
 use crate::metadata::inline_reference_map;
 
-/// Extensions accepted by Pandoc/Quarto image syntax `![](…)` across
-/// LaTeX, Typst, and HTML output paths. Quarto also embeds short-form
-/// video via `![](…)` for HTML output, so common video containers are
-/// included alongside still-image formats.
-const IMAGE_EXTENSIONS: &[&str] = &[
+/// Common still-image extensions accepted by Pandoc/Quarto image syntax
+/// `![](…)` across LaTeX, Typst, and HTML output paths.
+const STILL_IMAGE_EXTENSIONS: &[&str] = &[
     // Raster
     "png", "jpg", "jpeg", "gif", "apng", "webp", "avif", "bmp", "tif", "tiff", "heic", "heif",
     "jxl", "ico", // Vector / print
-    "svg", "pdf", "eps", "ps", // Video (Quarto/HTML)
+    "svg", "pdf", "eps", "ps",
+];
+
+/// Video container extensions that Quarto can embed directly via `![](…)`
+/// or `{{< video >}}`.
+const VIDEO_EXTENSIONS: &[&str] = &[
     "mp4", "webm", "ogv", "mov", "m4v", "mkv", "avi", "flv", "mpeg", "mpg", "3gp",
 ];
+
+/// Extensions accepted by `{{< include >}}` — markdown documents plus
+/// script files that the user typically pulls into code chunks.
+const INCLUDE_EXTENSIONS: &[&str] = &[
+    "qmd",
+    "md",
+    "markdown",
+    "rmd",
+    "rmarkdown",
+    "ipynb",
+    "r",
+    "py",
+    "jl",
+];
+
+/// Extensions accepted by `{{< embed >}}` — Jupyter notebooks and Quarto
+/// source documents.
+const EMBED_EXTENSIONS: &[&str] = &["ipynb", "qmd"];
+
 const MAX_PATH_COMPLETIONS: usize = 250;
 
 pub(crate) async fn completion(
@@ -41,7 +64,7 @@ pub(crate) async fn completion(
 
     // SyntaxNode is !Send, so derive everything we need from it inside a
     // sync block and let it drop before we hit any subsequent .await.
-    let Some((text, offset, dest_ctx_opt)) = ({
+    let Some((text, offset, link_ctx_opt, shortcode_ctx_opt)) = ({
         let Some((text, root)) =
             helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
         else {
@@ -50,22 +73,41 @@ pub(crate) async fn completion(
         let Some(offset) = super::super::conversions::position_to_offset(&text, position) else {
             return Ok(None);
         };
-        let dest_ctx_opt = link_dest_context(&root, &text, offset);
-        Some((text, offset, dest_ctx_opt))
+        let link_ctx_opt = link_dest_context(&root, &text, offset);
+        let shortcode_ctx_opt = if link_ctx_opt.is_none() && config.extensions.quarto_shortcodes {
+            shortcode_arg_context(&root, &text, offset)
+        } else {
+            None
+        };
+        Some((text, offset, link_ctx_opt, shortcode_ctx_opt))
     }) else {
         return Ok(None);
     };
 
-    // Path-completion branch: cursor inside `[text](…)` or `![alt](…)` destination.
-    if let Some(dest_ctx) = dest_ctx_opt {
-        let doc_path = {
+    // Path-completion branches: cursor inside `[text](…)` / `![alt](…)` destination,
+    // or inside a path-bearing Quarto shortcode argument.
+    if link_ctx_opt.is_some() || shortcode_ctx_opt.is_some() {
+        let (doc_path, ws_root) = {
             let map = document_map.lock().await;
-            map.get(&uri.to_string()).and_then(|s| s.path.clone())
+            let doc = map.get(&uri.to_string()).and_then(|s| s.path.clone());
+            let ws = workspace_root.lock().await.clone();
+            (doc, ws)
         };
-        let items = path_completion_items(&dest_ctx, doc_path.as_deref(), &text, offset).await;
-        return match items {
-            Some(items) if !items.is_empty() => Ok(Some(CompletionResponse::Array(items))),
-            _ => Ok(None),
+
+        let request = if let Some(ctx) = link_ctx_opt {
+            link_dest_path_request(&ctx, doc_path.as_deref())
+        } else if let Some(ctx) = shortcode_ctx_opt {
+            shortcode_path_request(&ctx, doc_path.as_deref(), ws_root.as_deref())
+        } else {
+            None
+        };
+
+        return match request {
+            Some(req) => match path_completion_items(req, &text, offset).await {
+                Some(items) if !items.is_empty() => Ok(Some(CompletionResponse::Array(items))),
+                _ => Ok(None),
+            },
+            None => Ok(None),
         };
     }
 
@@ -245,31 +287,204 @@ fn link_dest_context(root: &SyntaxNode, text: &str, offset: usize) -> Option<Lin
     None
 }
 
-async fn path_completion_items(
-    ctx: &LinkDestContext,
-    doc_path: Option<&Path>,
+/// Context for a cursor that sits inside the path argument of a
+/// `{{< include | embed | video | placeholder >}}` shortcode.
+struct ShortcodeArgContext {
+    kind: ShortcodeKind,
+    /// Value typed in the path argument so far (after `key=` and quote stripping).
+    prefix: String,
+}
+
+#[derive(Clone, Copy)]
+enum ShortcodeKind {
+    Include,
+    Embed,
+    Video,
+    Placeholder,
+}
+
+impl ShortcodeKind {
+    fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "include" => Some(Self::Include),
+            "embed" => Some(Self::Embed),
+            "video" => Some(Self::Video),
+            "placeholder" => Some(Self::Placeholder),
+            _ => None,
+        }
+    }
+
+    fn accepts(self, file_name: &str) -> bool {
+        let exts: &[&str] = match self {
+            Self::Include => INCLUDE_EXTENSIONS,
+            Self::Embed => EMBED_EXTENSIONS,
+            Self::Video => VIDEO_EXTENSIONS,
+            Self::Placeholder => STILL_IMAGE_EXTENSIONS,
+        };
+        has_extension(file_name, exts)
+    }
+}
+
+fn shortcode_arg_context(
+    root: &SyntaxNode,
     text: &str,
     offset: usize,
-) -> Option<Vec<CompletionItem>> {
-    let doc_path = doc_path?;
-    let doc_dir = doc_path.parent()?.to_path_buf();
+) -> Option<ShortcodeArgContext> {
+    let starting = helpers::find_node_at_offset(root, offset)?;
+    let shortcode = starting
+        .ancestors()
+        .find_map(|ancestor| Shortcode::cast(ancestor.clone()))?;
 
-    // Absolute paths, fragment-only anchors, and URLs are out of scope.
-    let first = ctx.prefix.chars().next();
-    if matches!(first, Some('/') | Some('#') | Some('<')) || ctx.prefix.contains("://") {
+    let content_node = shortcode
+        .syntax()
+        .children()
+        .find(|child| child.kind() == SyntaxKind::SHORTCODE_CONTENT)?;
+    let content_range = content_node.text_range();
+    let content_start: usize = content_range.start().into();
+    let content_end: usize = content_range.end().into();
+    if offset < content_start || offset > content_end {
+        return None;
+    }
+    let content_text = text.get(content_start..content_end)?;
+    let rel = offset - content_start;
+
+    let tokens = shortcode_tokens(content_text);
+    if tokens.is_empty() {
         return None;
     }
 
-    let (subdir, name_prefix) = match ctx.prefix.rsplit_once('/') {
-        Some((before, after)) => (before.to_string(), after.to_string()),
-        None => (String::new(), ctx.prefix.clone()),
+    // First positional token is the shortcode name. Determine the active
+    // token, treating whitespace/end-of-content as an empty next arg.
+    let name_token = tokens.first().copied()?;
+    let name_value_span = shortcode_token_value_span(content_text, name_token)?;
+    let name = content_text
+        .get(name_value_span.0..name_value_span.1)?
+        .to_string();
+    let kind = ShortcodeKind::from_name(&name)?;
+
+    // Locate the token whose range contains `rel`, if any.
+    let active_idx = tokens.iter().position(|&(s, e)| rel >= s && rel <= e);
+    let (active_token, active_idx) = match active_idx {
+        Some(0) => {
+            // Cursor sits on the shortcode name itself; don't complete the name in v1.
+            return None;
+        }
+        Some(i) => (tokens[i], i),
+        None => {
+            // Cursor is in whitespace or past the last token: start a new arg.
+            (
+                (rel.min(content_text.len()), rel.min(content_text.len())),
+                tokens.len(),
+            )
+        }
     };
-    let target_dir = doc_dir.join(&subdir);
+
+    // Skip named args (`key=value`) — v1 handles positional args only.
+    if active_idx > 0 && token_is_named(content_text, active_token) {
+        return None;
+    }
+
+    // Count positional tokens (no `=`) up to and including the active one.
+    let positional_index = tokens
+        .iter()
+        .take(active_idx)
+        .filter(|&&t| !token_is_named(content_text, t))
+        .count();
+    // Positional arg #1 (after the name at #0) is the path arg for all
+    // four supported shortcodes; bail if the cursor is on a later
+    // positional arg.
+    if positional_index != 1 {
+        return None;
+    }
+
+    // Reduce the active token to its value span (strips `key=` and surrounding quotes).
+    let value_span = if active_token.0 == active_token.1 {
+        active_token
+    } else {
+        shortcode_token_value_span(content_text, active_token)?
+    };
+    if rel < value_span.0 || rel > value_span.1 {
+        return None;
+    }
+
+    let prefix = content_text.get(value_span.0..rel)?.to_string();
+
+    // Out-of-scope prefixes: URLs and (for embed) the cell-id portion after `#`.
+    if prefix.contains("://") {
+        return None;
+    }
+    if matches!(kind, ShortcodeKind::Embed) && prefix.contains('#') {
+        return None;
+    }
+
+    Some(ShortcodeArgContext { kind, prefix })
+}
+
+/// A normalized request to enumerate filesystem entries.
+struct PathRequest {
+    /// Directory whose entries to enumerate (already absolute).
+    base_dir: PathBuf,
+    /// Path prefix relative to `base_dir` (may contain `/` separators).
+    effective_prefix: String,
+    /// Decides whether a file entry should appear in the completion list.
+    /// Directories always appear regardless.
+    accept_file: Box<dyn Fn(&str) -> bool + Send + 'static>,
+}
+
+fn link_dest_path_request(ctx: &LinkDestContext, doc_path: Option<&Path>) -> Option<PathRequest> {
+    let doc_dir = doc_path?.parent()?.to_path_buf();
+    let first = ctx.prefix.chars().next();
+    // Absolute paths, fragment-only anchors, and URLs are out of scope.
+    if matches!(first, Some('/') | Some('#') | Some('<')) || ctx.prefix.contains("://") {
+        return None;
+    }
     let is_image = ctx.is_image;
+    Some(PathRequest {
+        base_dir: doc_dir,
+        effective_prefix: ctx.prefix.clone(),
+        accept_file: Box::new(move |name| {
+            if is_image {
+                has_extension(name, STILL_IMAGE_EXTENSIONS) || has_extension(name, VIDEO_EXTENSIONS)
+            } else {
+                true
+            }
+        }),
+    })
+}
+
+fn shortcode_path_request(
+    ctx: &ShortcodeArgContext,
+    doc_path: Option<&Path>,
+    workspace_root: Option<&Path>,
+) -> Option<PathRequest> {
+    let kind = ctx.kind;
+    let (base_dir, effective_prefix) = if let Some(stripped) = ctx.prefix.strip_prefix('/') {
+        (workspace_root?.to_path_buf(), stripped.to_string())
+    } else {
+        (doc_path?.parent()?.to_path_buf(), ctx.prefix.clone())
+    };
+    Some(PathRequest {
+        base_dir,
+        effective_prefix,
+        accept_file: Box::new(move |name| kind.accepts(name)),
+    })
+}
+
+async fn path_completion_items(
+    req: PathRequest,
+    text: &str,
+    offset: usize,
+) -> Option<Vec<CompletionItem>> {
+    let (subdir, name_prefix) = match req.effective_prefix.rsplit_once('/') {
+        Some((before, after)) => (before.to_string(), after.to_string()),
+        None => (String::new(), req.effective_prefix.clone()),
+    };
+    let target_dir = req.base_dir.join(&subdir);
     let name_prefix_owned = name_prefix.clone();
+    let accept = req.accept_file;
 
     let entries = tokio::task::spawn_blocking(move || {
-        read_dir_entries(&target_dir, &name_prefix_owned, is_image)
+        read_dir_entries(&target_dir, &name_prefix_owned, accept.as_ref())
     })
     .await
     .ok()?;
@@ -312,7 +527,11 @@ struct PathEntry {
     is_dir: bool,
 }
 
-fn read_dir_entries(dir: &Path, name_prefix: &str, is_image_context: bool) -> Vec<PathEntry> {
+fn read_dir_entries(
+    dir: &Path,
+    name_prefix: &str,
+    accept_file: &(dyn Fn(&str) -> bool + Send + 'static),
+) -> Vec<PathEntry> {
     let Ok(read) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
@@ -342,7 +561,7 @@ fn read_dir_entries(dir: &Path, name_prefix: &str, is_image_context: bool) -> Ve
                 is_dir: true,
             });
         } else if metadata.is_file() {
-            if is_image_context && !has_image_extension(name) {
+            if !accept_file(name) {
                 continue;
             }
             files.push(PathEntry {
@@ -362,10 +581,10 @@ fn read_dir_entries(dir: &Path, name_prefix: &str, is_image_context: bool) -> Ve
     dirs.into_iter().chain(files).collect()
 }
 
-fn has_image_extension(name: &str) -> bool {
+fn has_extension(name: &str, allowed: &[&str]) -> bool {
     let Some(dot) = name.rfind('.') else {
         return false;
     };
     let ext = name[dot + 1..].to_ascii_lowercase();
-    IMAGE_EXTENSIONS.contains(&ext.as_str())
+    allowed.contains(&ext.as_str())
 }

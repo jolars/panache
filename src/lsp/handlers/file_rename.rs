@@ -12,6 +12,7 @@ use crate::lsp::conversions::offset_to_position;
 use crate::syntax::{AstNode, ImageLink, Link, Shortcode, SyntaxKind};
 
 use super::document_links::{extract_first_destination_token, resolve_link_target};
+use super::shortcode_args::{shortcode_token_value_span, shortcode_tokens};
 
 pub(crate) async fn will_rename_files(
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
@@ -621,68 +622,6 @@ fn extract_shortcode_path_argument_span(content: &str) -> Option<(usize, usize)>
     }
 
     None
-}
-
-fn shortcode_tokens(content: &str) -> Vec<(usize, usize)> {
-    let mut out = Vec::new();
-    let mut start = None;
-    let mut in_quotes = false;
-    let mut quote_char = '\0';
-
-    for (idx, ch) in content.char_indices() {
-        if in_quotes {
-            if ch == quote_char {
-                in_quotes = false;
-            }
-            continue;
-        }
-
-        if ch == '"' || ch == '\'' {
-            if start.is_none() {
-                start = Some(idx);
-            }
-            in_quotes = true;
-            quote_char = ch;
-            continue;
-        }
-
-        if ch.is_whitespace() {
-            if let Some(s) = start.take() {
-                out.push((s, idx));
-            }
-            continue;
-        }
-
-        if start.is_none() {
-            start = Some(idx);
-        }
-    }
-
-    if let Some(s) = start {
-        out.push((s, content.len()));
-    }
-    out
-}
-
-fn shortcode_token_value_span(content: &str, token: (usize, usize)) -> Option<(usize, usize)> {
-    let raw = content.get(token.0..token.1)?;
-    let value = if let Some(eq_idx) = raw.find('=') {
-        let after_eq = token.0 + eq_idx + 1;
-        (after_eq, token.1)
-    } else {
-        (token.0, token.1)
-    };
-
-    let start_char = content.get(value.0..value.0 + 1)?;
-    let end_char = content.get(value.1.saturating_sub(1)..value.1)?;
-    if (start_char == "\"" && end_char == "\"") || (start_char == "'" && end_char == "'") {
-        if value.1 <= value.0 + 1 {
-            return None;
-        }
-        Some((value.0 + 1, value.1 - 1))
-    } else {
-        Some(value)
-    }
 }
 
 fn candidate_edit_for_destination(

@@ -485,4 +485,294 @@ async fn test_completion_capability_registers_path_trigger_characters() {
         .expect("trigger_characters");
     assert!(triggers.iter().any(|t| t == "/"), "triggers: {triggers:?}");
     assert!(triggers.iter().any(|t| t == "("), "triggers: {triggers:?}");
+    assert!(triggers.iter().any(|t| t == "<"), "triggers: {triggers:?}");
+}
+
+// --- Path completion inside Quarto shortcodes ---
+
+fn open_quarto_doc_with_files(
+    _server: &TestLspServer,
+    files: &[(&str, &str)],
+    doc_rel: &str,
+) -> (TempDir, Uri) {
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    for (rel, contents) in files {
+        let abs = root.join(rel);
+        if let Some(parent) = abs.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(abs, contents).unwrap();
+    }
+    let doc_uri = Uri::from_file_path(root.join(doc_rel)).expect("doc uri");
+    (temp_dir, doc_uri)
+}
+
+#[tokio::test]
+async fn test_shortcode_include_completes_quarto_files() {
+    let server = TestLspServer::new();
+    let (tmp, doc_uri) = open_quarto_doc_with_files(
+        &server,
+        &[("_intro.qmd", ""), ("_setup.R", ""), ("scratch.txt", "")],
+        "doc.qmd",
+    );
+    let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
+    server.initialize(root_uri.as_str()).await;
+
+    let content = "{{< include _ >}}\n";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    // Cursor between `_` and ` `: line 0, char 13.
+    let result = server.completion(doc_uri.as_str(), 0, 13).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("expected completion items");
+    };
+    let labels: Vec<String> = items.iter().map(|i| i.label.clone()).collect();
+    assert!(
+        labels.iter().any(|l| l == "_intro.qmd"),
+        "labels: {labels:?}"
+    );
+    assert!(labels.iter().any(|l| l == "_setup.R"), "labels: {labels:?}");
+    assert!(
+        !labels.iter().any(|l| l == "scratch.txt"),
+        ".txt should be filtered out for include: {labels:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_shortcode_include_resolves_absolute_path_against_workspace_root() {
+    let server = TestLspServer::new();
+    let (tmp, doc_uri) = open_quarto_doc_with_files(
+        &server,
+        &[("chapters/_intro.qmd", ""), ("subdir/doc.qmd", "")],
+        "subdir/doc.qmd",
+    );
+    let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
+    server.initialize(root_uri.as_str()).await;
+
+    let content = "{{< include /chapters/ >}}\n";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    // Cursor between `/chapters/` and ` `: line 0, char 22.
+    let result = server.completion(doc_uri.as_str(), 0, 22).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("expected completion items");
+    };
+    let labels: Vec<String> = items.iter().map(|i| i.label.clone()).collect();
+    assert!(
+        labels.iter().any(|l| l == "_intro.qmd"),
+        "expected workspace-rooted match: {labels:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_shortcode_embed_filters_to_notebooks() {
+    let server = TestLspServer::new();
+    let (tmp, doc_uri) = open_quarto_doc_with_files(
+        &server,
+        &[("nb.ipynb", ""), ("sibling.qmd", ""), ("notes.md", "")],
+        "doc.qmd",
+    );
+    let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
+    server.initialize(root_uri.as_str()).await;
+
+    let content = "{{< embed  >}}\n";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    // Cursor between `embed ` and ` >}}`: line 0, char 11.
+    let result = server.completion(doc_uri.as_str(), 0, 11).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("expected completion items");
+    };
+    let labels: Vec<String> = items.iter().map(|i| i.label.clone()).collect();
+    assert!(labels.iter().any(|l| l == "nb.ipynb"), "labels: {labels:?}");
+    assert!(
+        labels.iter().any(|l| l == "sibling.qmd"),
+        "labels: {labels:?}"
+    );
+    assert!(
+        !labels.iter().any(|l| l == "notes.md"),
+        ".md should be filtered out for embed: {labels:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_shortcode_embed_returns_none_after_hash() {
+    let server = TestLspServer::new();
+    let (tmp, doc_uri) = open_quarto_doc_with_files(&server, &[("nb.ipynb", "")], "doc.qmd");
+    let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
+    server.initialize(root_uri.as_str()).await;
+
+    let content = "{{< embed nb.ipynb# >}}\n";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    // Cursor after `#`: line 0, char 19.
+    let result = server.completion(doc_uri.as_str(), 0, 19).await;
+    assert!(
+        result.is_none(),
+        "cell-id completion is out of scope for v1"
+    );
+}
+
+#[tokio::test]
+async fn test_shortcode_video_filters_to_video_extensions() {
+    let server = TestLspServer::new();
+    let (tmp, doc_uri) = open_quarto_doc_with_files(
+        &server,
+        &[("clip.mp4", ""), ("clip.webm", ""), ("thumb.png", "")],
+        "doc.qmd",
+    );
+    let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
+    server.initialize(root_uri.as_str()).await;
+
+    let content = "{{< video  >}}\n";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    // Cursor between `video ` and ` >}}`: line 0, char 11.
+    let result = server.completion(doc_uri.as_str(), 0, 11).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("expected completion items");
+    };
+    let labels: Vec<String> = items.iter().map(|i| i.label.clone()).collect();
+    assert!(labels.iter().any(|l| l == "clip.mp4"), "labels: {labels:?}");
+    assert!(
+        labels.iter().any(|l| l == "clip.webm"),
+        "labels: {labels:?}"
+    );
+    assert!(
+        !labels.iter().any(|l| l == "thumb.png"),
+        "images should be filtered out for video: {labels:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_shortcode_video_returns_none_for_url_prefix() {
+    let server = TestLspServer::new();
+    let (tmp, doc_uri) = open_quarto_doc_with_files(&server, &[("clip.mp4", "")], "doc.qmd");
+    let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
+    server.initialize(root_uri.as_str()).await;
+
+    let content = "{{< video https:// >}}\n";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    // Cursor after `https://`: line 0, char 18.
+    let result = server.completion(doc_uri.as_str(), 0, 18).await;
+    assert!(
+        result.is_none(),
+        "URL prefixes should not produce filesystem suggestions"
+    );
+}
+
+#[tokio::test]
+async fn test_shortcode_placeholder_filters_to_images() {
+    let server = TestLspServer::new();
+    let (tmp, doc_uri) = open_quarto_doc_with_files(
+        &server,
+        &[("pic.png", ""), ("vector.svg", ""), ("clip.mp4", "")],
+        "doc.qmd",
+    );
+    let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
+    server.initialize(root_uri.as_str()).await;
+
+    let content = "{{< placeholder  >}}\n";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    // Cursor between `placeholder ` and ` >}}`: line 0, char 17.
+    let result = server.completion(doc_uri.as_str(), 0, 17).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("expected completion items");
+    };
+    let labels: Vec<String> = items.iter().map(|i| i.label.clone()).collect();
+    assert!(labels.iter().any(|l| l == "pic.png"), "labels: {labels:?}");
+    assert!(
+        labels.iter().any(|l| l == "vector.svg"),
+        "labels: {labels:?}"
+    );
+    assert!(
+        !labels.iter().any(|l| l == "clip.mp4"),
+        "video files should be filtered out for placeholder: {labels:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_shortcode_unknown_name_returns_none() {
+    let server = TestLspServer::new();
+    let (tmp, doc_uri) = open_quarto_doc_with_files(&server, &[("a.qmd", "")], "doc.qmd");
+    let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
+    server.initialize(root_uri.as_str()).await;
+
+    let content = "{{< lipsum  >}}\n";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    // Cursor between `lipsum ` and ` >}}`: line 0, char 12.
+    let result = server.completion(doc_uri.as_str(), 0, 12).await;
+    assert!(
+        result.is_none(),
+        "unknown shortcodes should not trigger path completion"
+    );
+}
+
+#[tokio::test]
+async fn test_shortcode_completion_skipped_in_plain_markdown() {
+    let server = TestLspServer::new();
+    // Pin flavor to Pandoc explicitly via panache.toml so this test is not
+    // contaminated by any ancestor panache.toml on the host (find_in_tree
+    // walks up the directory tree from the workspace root).
+    let (tmp, doc_uri) = open_quarto_doc_with_files(
+        &server,
+        &[
+            ("panache.toml", "flavor = \"pandoc\"\n"),
+            ("_intro.qmd", ""),
+        ],
+        "doc.md",
+    );
+    let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
+    server.initialize(root_uri.as_str()).await;
+
+    let content = "{{< include _ >}}\n";
+    server
+        .open_document(doc_uri.as_str(), content, "markdown")
+        .await;
+
+    let result = server.completion(doc_uri.as_str(), 0, 13).await;
+    assert!(
+        result.is_none(),
+        "shortcode completion should be Quarto-only"
+    );
+}
+
+#[tokio::test]
+async fn test_shortcode_completion_skipped_on_named_arg() {
+    let server = TestLspServer::new();
+    let (tmp, doc_uri) = open_quarto_doc_with_files(&server, &[("nb.ipynb", "")], "doc.qmd");
+    let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
+    server.initialize(root_uri.as_str()).await;
+
+    let content = "{{< embed nb.ipynb echo=t >}}\n";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    // Cursor inside `echo=t|`: line 0, char 25 (just after the `t`).
+    let result = server.completion(doc_uri.as_str(), 0, 25).await;
+    assert!(
+        result.is_none(),
+        "named args should not trigger path completion"
+    );
 }

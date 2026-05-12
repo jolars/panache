@@ -108,7 +108,7 @@ impl LanguageServer for PanacheLsp {
                 definition_provider: Some(OneOf::Left(true)),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions {
-                    trigger_characters: Some(vec!["(".into(), "/".into()]),
+                    trigger_characters: Some(vec!["(".into(), "/".into(), "<".into()]),
                     ..Default::default()
                 }),
                 references_provider: Some(OneOf::Left(true)),
