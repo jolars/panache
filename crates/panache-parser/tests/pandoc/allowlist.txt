@@ -435,3 +435,5 @@
 355
 356
 357
+# html-block (standalone `</div>` close tag with no matched open — projects as a single RawBlock per pandoc-native, not as an empty Div. The `HTML_BLOCK_DIV` retag in `block_dispatcher.rs::HtmlBlockParser::parse_prepared` previously fired for any `tag_name == "div"` regardless of `is_closing`, because `pandoc_html_open_tag_closes` returned true for `</div>` (the line has a `>`). The retag is now gated on `is_closing: false` so close-form `</div>` keeps the opaque `HTML_BLOCK` wrapper. Symptom before fix: `panic at pandoc_ast.rs:1111` ("HTML_BLOCK_DIV without structural inner shape") on any input where `</div>` appeared without a matched block-level open — e.g. inside a list item whose paragraph already consumed the open `<div>` as `INLINE_HTML`, or a bare `</div>\n` at document start.)
+358

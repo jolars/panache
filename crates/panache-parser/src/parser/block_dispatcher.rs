@@ -1900,13 +1900,25 @@ impl BlockParser for HtmlBlockParser {
         // `html_block_open_tag_is_clean` accepts. Incomplete opens
         // (`<div\n` no `>` anywhere) keep the opaque `HTML_BLOCK` shape
         // so the projector treats them as paragraph text per pandoc-native.
+        //
+        // Standalone closing forms (`</div>` with no matched open) keep
+        // the opaque `HTML_BLOCK` shape so the projector emits a single
+        // `RawBlock "html" "</div>"` (matching pandoc-native) rather than
+        // an empty `Div` with a stale close-only structural shape — the
+        // close-form `HtmlBlockType::BlockTag` carries `is_closing: true`,
+        // and `pandoc_html_open_tag_closes` returns true for `</div>`
+        // since the line has a `>`, so without this guard the close would
+        // wrongly retag.
         let wrapper_kind = match &block_type {
-            HtmlBlockType::BlockTag { tag_name, .. }
-                if tag_name == "div"
-                    && ctx.config.dialect == crate::options::Dialect::Pandoc
-                    && ctx.config.extensions.native_divs
-                    && (probe_open_tag_line_has_close_gt(ctx.content, "div")
-                        || pandoc_html_open_tag_closes(lines, line_pos, ctx.blockquote_depth)) =>
+            HtmlBlockType::BlockTag {
+                tag_name,
+                is_closing: false,
+                ..
+            } if tag_name == "div"
+                && ctx.config.dialect == crate::options::Dialect::Pandoc
+                && ctx.config.extensions.native_divs
+                && (probe_open_tag_line_has_close_gt(ctx.content, "div")
+                    || pandoc_html_open_tag_closes(lines, line_pos, ctx.blockquote_depth)) =>
             {
                 crate::syntax::SyntaxKind::HTML_BLOCK_DIV
             }

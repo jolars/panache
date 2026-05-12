@@ -273,6 +273,8 @@ golden_test_cases!(
     html_block_dialog_inline_pandoc,
     html_block_div_butted_close_commonmark,
     html_block_div_butted_close_pandoc,
+    html_block_div_close_standalone_commonmark,
+    html_block_div_close_standalone_pandoc,
     html_block_div_empty_commonmark,
     html_block_div_empty_pandoc,
     html_block_div_inner_blocks_commonmark,
