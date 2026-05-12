@@ -325,11 +325,33 @@ fn file_count_label(count: usize, singular: &str, plural: &str) -> String {
 }
 
 fn remove_dir_if_exists(path: &Path) -> io::Result<bool> {
-    match fs::remove_dir_all(path) {
-        Ok(()) => Ok(true),
-        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(false),
-        Err(err) => Err(err),
+    let mut attempt: usize = 0;
+    loop {
+        match fs::remove_dir_all(path) {
+            Ok(()) => return Ok(true),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(false),
+            Err(err) => {
+                if !should_retry_remove(&err, attempt) {
+                    return Err(err);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(25u64 << attempt));
+                attempt += 1;
+            }
+        }
     }
+}
+
+// Windows AV / Search Indexer can briefly hold open handles on freshly-written
+// files, surfacing as PermissionDenied from `remove_dir_all`. Back off and try
+// again before giving up.
+#[cfg(windows)]
+fn should_retry_remove(err: &io::Error, attempt: usize) -> bool {
+    attempt < 5 && err.kind() == io::ErrorKind::PermissionDenied
+}
+
+#[cfg(not(windows))]
+fn should_retry_remove(_err: &io::Error, _attempt: usize) -> bool {
+    false
 }
 
 /// Walk `path` and return `(file_count, total_bytes)` for every regular file beneath it.
