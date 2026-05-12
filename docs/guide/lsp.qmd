@@ -479,15 +479,15 @@ Smart completions for Markdown syntax (implementation varies by context):
   on `(` and `/`; hidden entries (`.dotfiles`) appear only when the typed prefix
   starts with `.`.
 - **Quarto shortcode paths** --- in `.qmd` documents, typing inside the path
-  argument of `{{< include >}}`, `{{< embed >}}`, `{{< video >}}`, or
-  `{{< placeholder >}}` lists files and directories relative to the document.
+  argument of `{{{< include >}}}`, `{{{< embed >}}}`, `{{{< video >}}}`, or
+  `{{{< placeholder >}}}` lists files and directories relative to the document.
   Paths starting with `/` resolve against the LSP workspace root (Quarto's
   project-root convention). Per-shortcode extension filters: `include` accepts
   markdown/script files (`.qmd`, `.md`, `.markdown`, `.rmd`, `.rmarkdown`,
   `.ipynb`, `.R`, `.py`, `.jl`); `embed` accepts `.ipynb`/`.qmd`; `video`
   accepts the video subset; `placeholder` accepts still-image formats. Named
   args (e.g. `echo=true`) and URL prefixes (`https://...`) are skipped. Cell-id
-  completion after `{{< embed file.ipynb#... >}}` is not yet supported.
+  completion after `{{{< embed file.ipynb#... >}}}` is not yet supported.
 
 ### Symbol Renaming
 
