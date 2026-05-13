@@ -722,6 +722,139 @@ pub(crate) fn count_tag_balance(line: &str, tag_name: &str) -> (usize, usize) {
     (opens, closes)
 }
 
+/// Pandoc-dialect lift for HTML comments / processing instructions
+/// whose close marker is followed by additional bytes (same-line
+/// trailing or following lines). Pandoc-native emits a `RawBlock` for
+/// the marker bytes only, then parses the remainder as fresh blocks.
+///
+/// Returns `Some(consumed_lines)` when the split fires (caller must
+/// NOT enter the legacy emission); `None` to fall back to the legacy
+/// path (no close marker found, or no trailing content to split).
+///
+/// CST shape on success:
+/// ```text
+/// HTML_BLOCK
+///   HTML_BLOCK_TAG (open)        // line[0] up to and incl close marker
+///     TEXT  "<!-- hi -->"        // or with HTML_BLOCK_CONTENT in between
+///     ...                        // for multi-line `<!--\n…\n-->` shape
+/// <sibling blocks>               // recursive parse of trailing + lines[M+1..]
+/// ```
+fn try_parse_comment_pi_with_trailing_split(
+    builder: &mut GreenNodeBuilder<'static>,
+    lines: &[&str],
+    start_pos: usize,
+    block_type: &HtmlBlockType,
+    wrapper_kind: SyntaxKind,
+    config: &ParserOptions,
+) -> Option<usize> {
+    let marker: &str = match block_type {
+        HtmlBlockType::Comment => "-->",
+        HtmlBlockType::ProcessingInstruction => "?>",
+        _ => return None,
+    };
+
+    // Find the close marker. Scan from `start_pos` forward; the open
+    // line itself may contain it (same-line `<!-- hi --> trailing`).
+    let mut close_line_idx: Option<usize> = None;
+    let mut marker_end_in_line: usize = 0;
+    for (offset, line) in lines[start_pos..].iter().enumerate() {
+        if let Some(pos) = line.find(marker) {
+            close_line_idx = Some(start_pos + offset);
+            marker_end_in_line = pos + marker.len();
+            break;
+        }
+    }
+    let close_line_idx = close_line_idx?;
+    let close_line = lines[close_line_idx];
+    let trailing = &close_line[marker_end_in_line..];
+
+    // Only fire when there is non-whitespace content AFTER the close
+    // marker on the close line. The legacy path correctly handles
+    // the close-line-ends-at-close-marker shapes (`-->\n` followed
+    // by separate blocks); only the same-line-trailing case needs
+    // structural splitting. Trailing-whitespace-only handling
+    // (`-->   \n`) is a projector-side trim — separate concern.
+    let has_non_ws_trailing = trailing.bytes().any(|b| !b.is_ascii_whitespace());
+    if !has_non_ws_trailing {
+        return None;
+    }
+
+    builder.start_node(wrapper_kind.into());
+
+    // Emit open `HTML_BLOCK_TAG` (the opening marker line(s)) and any
+    // middle `HTML_BLOCK_CONTENT` lines between open and close. The
+    // close `HTML_BLOCK_TAG` carries only the bytes up to and
+    // including the close marker — trailing bytes go to the sibling.
+    if close_line_idx == start_pos {
+        // Same-line shape: one HTML_BLOCK_TAG containing the close
+        // marker's bytes. The newline lives on the trailing sibling.
+        builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
+        let close_part = &close_line[..marker_end_in_line];
+        if !close_part.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), close_part);
+        }
+        builder.finish_node();
+    } else {
+        // Multi-line shape: open tag covers lines[start_pos..close],
+        // middle lines go inside HTML_BLOCK_CONTENT, close tag holds
+        // only the marker bytes.
+        builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
+        let (line_no_nl, nl) = strip_newline(lines[start_pos]);
+        if !line_no_nl.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), line_no_nl);
+        }
+        if !nl.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), nl);
+        }
+        builder.finish_node();
+
+        if close_line_idx > start_pos + 1 {
+            builder.start_node(SyntaxKind::HTML_BLOCK_CONTENT.into());
+            for content_line in &lines[start_pos + 1..close_line_idx] {
+                let (cl_no_nl, cl_nl) = strip_newline(content_line);
+                if !cl_no_nl.is_empty() {
+                    builder.token(SyntaxKind::TEXT.into(), cl_no_nl);
+                }
+                if !cl_nl.is_empty() {
+                    builder.token(SyntaxKind::NEWLINE.into(), cl_nl);
+                }
+            }
+            builder.finish_node();
+        }
+
+        builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
+        let close_part = &close_line[..marker_end_in_line];
+        if !close_part.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), close_part);
+        }
+        builder.finish_node();
+    }
+
+    builder.finish_node(); // HTML_BLOCK
+
+    // Recursively parse JUST the trailing bytes on the close line
+    // and graft top-level children as siblings of the HTML_BLOCK we
+    // just closed. We do NOT consume subsequent lines here — the
+    // outer dispatcher continues from `close_line_idx + 1` and
+    // handles container-boundary lines (`:::` div closes, blockquote
+    // markers, list-marker continuations) correctly. Multi-line
+    // softbreak continuation (`<!-- --> trailing\nmore\n` →
+    // `Para [trailing, SoftBreak, more]`) is NOT modeled — the
+    // outer dispatcher sees `more` after the close line and starts
+    // a fresh paragraph. Refdefs flow through from the outer config
+    // (same pattern as `emit_html_block_body_lifted_inner`).
+    if !trailing.is_empty() {
+        let mut inner_options = config.clone();
+        let refdefs = config.refdef_labels.clone().unwrap_or_default();
+        inner_options.refdef_labels = Some(refdefs.clone());
+        let inner_root = crate::parser::parse_with_refdefs(trailing, Some(inner_options), refdefs);
+        let mut bq = None;
+        graft_document_children(builder, &inner_root, LastParaDemote::Never, &mut bq);
+    }
+
+    Some(close_line_idx + 1)
+}
+
 /// Parse an HTML block, allowing the caller to pick the wrapper SyntaxKind
 /// (`HTML_BLOCK` for opaque preservation, `HTML_BLOCK_DIV` for the
 /// Pandoc-dialect `<div>` lift). Children are emitted byte-for-byte
@@ -735,6 +868,31 @@ pub(crate) fn parse_html_block_with_wrapper(
     wrapper_kind: SyntaxKind,
     config: &ParserOptions,
 ) -> usize {
+    // Pandoc-dialect Comment / PI trailing-text split. Pandoc-native
+    // closes the RawBlock at the close marker (`-->` / `?>`) and parses
+    // any subsequent bytes (same-line trailing or following lines) as
+    // fresh blocks. The legacy path absorbs them into the HTML block
+    // wrapper, producing one oversized RawBlock. Handle the split here
+    // before entering the legacy emission so the CST encodes the
+    // sibling structure.
+    if config.dialect == crate::options::Dialect::Pandoc
+        && bq_depth == 0
+        && matches!(
+            block_type,
+            HtmlBlockType::Comment | HtmlBlockType::ProcessingInstruction
+        )
+        && let Some(consumed) = try_parse_comment_pi_with_trailing_split(
+            builder,
+            lines,
+            start_pos,
+            &block_type,
+            wrapper_kind,
+            config,
+        )
+    {
+        return consumed;
+    }
+
     // Start HTML block
     builder.start_node(wrapper_kind.into());
 

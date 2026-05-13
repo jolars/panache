@@ -1,12 +1,12 @@
 Pandoc-native conformance report (pandoc 3.9.0.2)
-385 / 385 cases passing (100.0%)
-0 failing
-0 blocked-list entries
+389 / 390 cases passing (99.7%)
+1 failing
+1 blocked-list entries
 
 === Per-section pass / fail ===
   block: 15 pass / 0 fail
   citation: 1 pass / 0 fail
-  html: 192 pass / 0 fail
+  html: 196 pass / 1 fail
   imported: 162 pass / 0 fail
   inline: 15 pass / 0 fail
 
@@ -396,6 +396,10 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 383
 384
 385
+386
+387
+388
+389
 
 === Passing cases grouped by section ===
 # block
@@ -611,6 +615,10 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 383
 384
 385
+386
+387
+388
+389
 
 # imported
 26
@@ -792,4 +800,9 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 25
 190
 191
+
+=== Failing case slugs (with rendered diff hint) ===
+# 390 (html-block-comment-trailing-softbreak)
+  expected: [ RawBlock ( Format "html" ) "<!-- hi -->" , Para [ Str "trailing" , SoftBreak , Str "more" ] ]
+  got:      [ RawBlock ( Format "html" ) "<!-- hi -->" , Para [ Str "trailing" ] , Para [ Str "more" ] ]
 

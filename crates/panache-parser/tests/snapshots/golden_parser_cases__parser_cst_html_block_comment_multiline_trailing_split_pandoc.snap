@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..24
+  HTML_BLOCK@0..14
+    HTML_BLOCK_TAG@0..5
+      TEXT@0..4 "<!--"
+      NEWLINE@4..5 "\n"
+    HTML_BLOCK_CONTENT@5..11
+      TEXT@5..10 "hello"
+      NEWLINE@10..11 "\n"
+    HTML_BLOCK_TAG@11..14
+      TEXT@11..14 "-->"
+  PARAGRAPH@14..24
+    TEXT@14..23 " trailing"
+    NEWLINE@23..24 "\n"

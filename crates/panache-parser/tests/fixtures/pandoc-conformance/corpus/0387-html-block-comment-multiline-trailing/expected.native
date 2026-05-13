@@ -1,0 +1,3 @@
+[ RawBlock (Format "html") "<!--\nhello\n-->"
+, Para [ Str "trailing" ]
+]

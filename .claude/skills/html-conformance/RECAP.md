@@ -208,6 +208,24 @@ on unlifted HTML_BLOCK_DIV.
   `parse` re-runs `populate_refdef_labels` on JUST the inner
   text, hiding outer refdefs from inner reference links. Thread
   outer config's `refdef_labels` through.
+- **Line-consumption boundary trap** (Comment / PI trailing split,
+  2026-05-13). `parse_html_block_with_wrapper`'s `lines: &[&str]`
+  is the WHOLE document, not just the current container's
+  content. Returning `lines.len()` from inside a fenced div /
+  list item / blockquote consumes container close markers
+  (`:::`, `> `, list-marker indent). Sibling-emit helpers
+  (`graft_document_children` after `builder.finish_node()`)
+  should only consume the current line; the outer dispatcher
+  resumes at `close_line + 1` to keep container boundaries
+  intact. Trade-off: multi-line softbreak continuation
+  (`<!-- --> A\nB` → `Para [A, SoftBreak, B]`) breaks because
+  the outer dispatcher starts a fresh paragraph for `B` —
+  blocked.txt entry 0390 tracks the gap.
+- **`graft_document_children` works as a sibling-emit helper**,
+  not just an inside-HTML_BLOCK helper. Call it AFTER
+  `builder.finish_node()` on HTML_BLOCK and it grafts children
+  at the parent (DOCUMENT / container) level — that is what
+  the Comment / PI trailing-split uses.
 - **`HTML_BLOCK_DIV` retag at dispatcher is two-pronged.** Retag
   fires iff `probe_open_tag_line_has_close_gt(ctx.content, "div")`
   (single-line) OR `pandoc_html_open_tag_closes(lines, line_pos,
@@ -370,63 +388,108 @@ on unlifted HTML_BLOCK_DIV.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-13 (corpus pin wave: 3-line div + span in non-paragraph inline contexts)
+## Latest session — 2026-05-13 (Comment / PI trailing-text split — sub-target #1 carry-over)
 
-Pure corpus expansion — no parser changes. Took #3 / #4 from
-previous session; probed #1 / #5 and confirmed both are
-genuinely parser-side gaps, deferred.
+Took sub-target #1 (Comment + trailing-text split). Parser-side
+fix in `parse_html_block_with_wrapper`: when the close marker
+(`-->` / `?>`) is followed by non-whitespace bytes on the close
+line under Pandoc dialect + `bq_depth == 0`, splits the close
+`HTML_BLOCK_TAG` at the marker, recursively parses just the
+trailing close-line bytes via `parse_with_refdefs`, grafts as
+sibling blocks of the closed `HTML_BLOCK`, and returns
+`close_line + 1` so the outer dispatcher continues normally.
 
-Conformance: html 187 → 192, total 380 → 385 (+5).
+Conformance: html 192 → 196 (+4), total 385 → 389 (+4); 1 case
+(0390 softbreak continuation) blocked.
 
 ### What landed
 
-- Corpus 0381 – 0385: 3-line multi-line `<div>` open in
-  list-item (extends 0378); `<span>` in footnote definition
-  (`Note [Para [Span ...]]`); `<span>` in table cell (`Cell
-  [Plain [Span ...]]`; salsa picks up `id` automatically);
-  `<span>` text inside inline code span (regression — `Code`
-  preserved verbatim); `<span>` text inside inline math
-  (regression — `Math` preserved verbatim).
-- Allowlist 381 – 385 under two new section comments.
-- No parser/formatter fixtures — no new CST structure.
+- Helper `try_parse_comment_pi_with_trailing_split` in
+  `crates/panache-parser/src/parser/blocks/html_blocks.rs`.
+  Same-line and multi-line `<!--…--> trailing` + `<?php …?> trailing`
+  now project as `RawBlock + Para [trailing]`.
+- Gated narrowly: Pandoc dialect, `bq_depth == 0`, non-whitespace
+  trailing required. Whitespace-only tails (`<!-- hi -->   \n`)
+  keep legacy opaque shape — projector-side `trim_end` deferred.
+- 4 parser goldens: same-line CM/Pandoc paired, multi-line
+  Pandoc, PI Pandoc.
+- 1 formatter golden: `html_block_comment_trailing_split`
+  pins `<!-- hello -->\ntrailing\n` round-trip + idempotency.
+- 5 corpus cases (0386-0390): same-line, multi-line,
+  PI, trailing-emphasis, trailing-softbreak. Cases 386-389
+  in allowlist; 0390 blocked (softbreak continuation across
+  HTML-block boundary not modeled).
 
 ### Files in committable diff
 
-- `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/0381…0385/`
-- `crates/panache-parser/tests/pandoc/{allowlist.txt,report.txt}`
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs`
+  (+~120 lines: new helper + early-return at function head).
+- `crates/panache-parser/tests/fixtures/cases/html_block_{comment,pi}_*_split_*/`
+  (4 new dirs) + `tests/golden_parser_cases.rs` registry edit
+  + 4 new `tests/snapshots/golden_parser_cases__parser_cst_*.snap`.
+- `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/0386…0390/`.
+- `crates/panache-parser/tests/pandoc/{allowlist.txt,blocked.txt,report.txt}`
   + `docs/development/pandoc-report.json`.
+- `tests/fixtures/cases/html_block_comment_trailing_split/` +
+  `tests/golden_cases.rs` registry edit.
 
 ### Deferred (probed, confirmed gaps)
 
-- **Comment + trailing-text split** (sub-target #1):
-  `<!-- hello --> trailing` → single `RawBlock` vs pandoc's
-  `RawBlock + Para`. Same gap for multi-line `<!--\n...\n-->
-  trailing`. Parser-side fix: close type-2 at `-->`, leave
-  trailing for normal block parsing.
-- **Bq-in-listitem stacked container** (sub-target #5):
-  `- > <div>...</div>` and multi-line variant produce wrong
-  CST (Plain with RawInline). The list-item HTML lift gate
-  doesn't combine with bq-prefix re-injection.
+- **Bq-in-listitem stacked container** (sub-target #2 carry-over).
+- **Softbreak continuation across HTML-block boundary** (0390
+  in blocked.txt): `<!-- --> trailing\nmore` → `Para [trailing,
+  SoftBreak, more]`. Current fix returns control to outer
+  dispatcher at `close_line + 1`, so `more` becomes a separate
+  Para. Modeling this requires either an "open paragraph"
+  carrying across siblings or projector-side Para fusion.
+- **Whitespace-only trailing trim** (`<!-- hi -->   \n` →
+  `RawBlock "<!-- hi -->"`). Projector-side `trim_end` on
+  RawBlock text; affects `<pre>foo</pre>   \n` and other HTML
+  blocks too — separate concern.
+- **Bq-wrapped Comment/PI trailing** (`> <!-- hi --> trailing`):
+  pandoc splits to `BlockQuote [RawBlock, Para]`; gate is
+  `bq_depth == 0` so we don't fire. Deferred.
+- **List-item Comment+trailing** (`- <!-- hi --> trailing`):
+  pandoc emits `BulletList [[RawBlock, Plain [trailing]]]`;
+  panache keeps as Plain w/ RawInline. Not a `parse_html_block_with_wrapper`
+  path under default dispatch (`cannot_interrupt` + no blank-before).
 
 ### Suggested next sub-targets
 
-1. **Comment + trailing-text split** (carry-over). Parser-
-   side truncation in `parse_html_block` type-2 close logic.
-2. **Bq-in-listitem stacked container**. Extend close-form
-   dispatcher gate to thread bq state, or graft lift over a
-   `BqPrefixState`-wrapped reparse.
-3. **Formatter non-idempotency for tab-indented list-item
-   HTML** (carry-over, out of scope).
-4. **`<span>` in autolink / image alt / heading text** —
+1. **Bq-in-listitem stacked container** (carry-over).
+2. **Bq-wrapped Comment/PI trailing split** — extend the new
+   helper to handle `bq_depth > 0` with bq-prefix re-injection
+   (`BqPrefixState`) on the trailing recursive parse.
+3. **Whitespace-only trailing trim for HTML blocks** —
+   projector-side `trim_end` on RawBlock text. Affects
+   Comment/PI/strict-block/verbatim.
+4. **Softbreak continuation** for the `<!-- --> trailing\nmore`
+   shape (0390 unblock). Likely requires projector-side fusion
+   of adjacent Para siblings sharing a comment-introducer
+   marker.
+5. **`<span>` in autolink / image alt / heading text** —
    remaining inline contexts; probe first, then pin.
-5. **`<div>\n</div>\nfoo`** (no blank line before trailing
-   paragraph). Unprobed.
 
 ### New traps
 
-None — both deferred probes are covered by existing
-persistent traps (projector-as-second-stage-parser smell;
-list-item HTML lift gate strictness).
+- **Line-consumption boundary trap.** `parse_html_block_with_wrapper`'s
+  `lines: &[&str]` is the WHOLE document, not just the current
+  container's content. Returning `lines.len()` from inside a
+  fenced div / list item / blockquote consumes the container's
+  close marker (`:::`, `> `, list-marker indent). Limit
+  consumption to `close_line + 1` and let the outer dispatcher
+  handle container boundaries. Trade-off: multi-line softbreak
+  continuation (`<!-- --> A\nB` → `Para [A, SoftBreak, B]`)
+  breaks because the outer dispatcher starts a fresh paragraph
+  for `B`. Folded into Persistent traps. (Initial fix attempted
+  `lines.len()` consumption + recursive parse of trailing +
+  lines[close+1..]; broke fenced-div context with `:::` absorbed
+  into trailing Para.)
+- **`graft_document_children` works as a sibling-emit helper**,
+  not just an inside-HTML_BLOCK helper. Call it AFTER
+  `builder.finish_node()` on HTML_BLOCK and it grafts children
+  at the parent (DOCUMENT / container) level. Useful for the
+  Comment/PI trailing split.
 
 --------------------------------------------------------------------------------
 
@@ -435,6 +498,7 @@ list-item HTML lift gate strictness).
 Newest first. One line per session: date — phase/sub-target — pass
 count delta — root cause / lever.
 
+- 2026-05-13 — Phase 6 — corpus pin wave (0381 – 0385): 3-line div in list-item + 4 `<span>`-in-inline-context variants (footnote def, table cell, code-span regression, math regression) — html 187 → 192 — pure corpus expansion, no parser changes.
 - 2026-05-13 — Phase 6 — corpus pin wave (0375 – 0380): 3 inline-span variants (in-emphasis, in-link, nested) + 3 list-item shapes (multi-line div open, tab-indent div, tab-indent pre); 6 paired parser goldens (lift CST snapshots) + 1 formatter golden — html 181 → 187 — pure corpus expansion, no parser changes; tab-indented list-item HTML found non-idempotent (formatter bug, out of scope).
 - 2026-05-13 — Phase 6 — list-item indent normalization (`strip_list_item_indent` + `LinePrefixState` re-injection; projector `walk_skip_bq_markers` line-start-WS strip) closes `<div>` Plain→Para gap and verbatim-tag (`<pre>`, `<style>`, `<script>`, `<textarea>`) RawBlock-indent gap — html 176 → 181 — `ListItemBuffer::emit_as_block` threads `content_col` from `Container::ListItem`; per-line `WHITESPACE` re-injection during graft mirrors `BqPrefixState`.
 - 2026-05-13 — Phase 6 — multi-line list-item HTML lift via close-form dispatcher gate (`- <section>...`, `- <video>...`, `- <iframe>...`, `- <span>...`) — html 171 → 176 — `BlockContext::list_item_unclosed_html_block_tag` + `ListItemBuffer::unclosed_pandoc_matched_pair_tag`; `count_tag_balance` / `is_pandoc_lift_eligible_block_tag` / new `is_pandoc_matched_pair_tag` promoted to `pub(crate)`; close-form `</tag>` dispatch suppressed when the enclosing LIST_ITEM has an unclosed matched-pair open. Indent gap for `<div>` body and verbatim content deferred to next session.

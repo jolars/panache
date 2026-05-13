@@ -482,3 +482,9 @@
 383
 384
 385
+
+# html-block (Comment / PI trailing-text split: `<!-- hi --> trailing` and `<?php foo ?> trailing` now project as `RawBlock + Para [trailing]` instead of single oversized RawBlock. Parser-side fix in `parse_html_block_with_wrapper`: when the close marker (`-->` / `?>`) is followed by non-whitespace bytes on the close line under Pandoc dialect + bq_depth==0, splits the close `HTML_BLOCK_TAG` at the marker, finishes HTML_BLOCK, and grafts trailing + subsequent lines as sibling blocks via recursive `parse_with_refdefs`. Multi-line `<!--\n…\n--> trailing` and trailing-then-softbreak `<!-- hi --> trailing\nmore` shapes share the same path. Whitespace-only trailing keeps the legacy opaque HTML_BLOCK shape — projector-side `trim_end` to drop trailing whitespace from RawBlock text is a separate concern.)
+386
+387
+388
+389

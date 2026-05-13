@@ -1,0 +1,3 @@
+[ RawBlock (Format "html") "<?php foo ?>"
+, Para [ Str "trailing" ]
+]

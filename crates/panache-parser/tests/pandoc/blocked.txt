@@ -5,3 +5,14 @@
 # exposes. Do NOT use this file to silence regressions — fix the underlying
 # cause and keep the case in the allowlist instead.
 
+# Phase 6 — Comment / PI trailing-text softbreak continuation.
+# `<!-- hi --> trailing\nmore\n` should project as `RawBlock + Para
+# [trailing, SoftBreak, more]` (one paragraph). The Comment/PI trailing
+# split (corpus 0386-0389) consumes only the close line's trailing
+# bytes and returns control to the outer dispatcher at `close_line + 1`
+# so container-boundary lines (`:::` div closes, `> ` bq markers, list-
+# marker continuations) parse correctly. Modeling softbreak continuation
+# across the HTML-block boundary requires either an "open paragraph"
+# carrying across siblings (CST shape change) or projector-side fusion
+# of adjacent Para children. Deferred.
+390

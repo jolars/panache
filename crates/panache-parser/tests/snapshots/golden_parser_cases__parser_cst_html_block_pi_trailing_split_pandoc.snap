@@ -1,0 +1,11 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..22
+  HTML_BLOCK@0..12
+    HTML_BLOCK_TAG@0..12
+      TEXT@0..12 "<?php foo ?>"
+  PARAGRAPH@12..22
+    TEXT@12..21 " trailing"
+    NEWLINE@21..22 "\n"
