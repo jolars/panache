@@ -13,7 +13,8 @@ DOCUMENT@0..33
           TEXT@10..11 ">"
           NEWLINE@11..12 "\n"
         PLAIN@12..20
-          TEXT@12..19 "  hello"
+          WHITESPACE@12..14 "  "
+          TEXT@14..19 "hello"
           NEWLINE@19..20 "\n"
         HTML_BLOCK_TAG@20..33
           WHITESPACE@20..22 "  "

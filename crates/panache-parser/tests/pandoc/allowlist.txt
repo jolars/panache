@@ -456,3 +456,10 @@
 367
 368
 369
+
+# html-block (list-item indent normalization for the HTML-block first-line structural lift — multi-line `<div>` in a list now projects as `Div [Para [body]]` matching pandoc-native instead of `Div [Plain [body]]`, and verbatim tags (`<pre>`, `<style>`, `<script>`, `<textarea>`) inside a list emit `RawBlock` text without the list-item leading indent (e.g. `<pre>\nbody\n</pre>` instead of `<pre>\n  body\n  </pre>`). `ListItemBuffer::emit_as_block` now threads the enclosing `Container::ListItem::content_col` through to `try_emit_html_block_lift`, which calls `strip_list_item_indent` to strip up to `content_col` leading-space bytes from each continuation line of the buffer text before the inner reparse. The stripped bytes are re-injected as `WHITESPACE` tokens at line starts during graft via a new `LinePrefixState` mirroring the existing `BqPrefixState` pattern, so the CST stays byte-equal to source. The projector's `walk_skip_bq_markers` (used by `collect_html_block_text_skip_bq_markers` for opaque HTML_BLOCK / verbatim-tag projection) skips a leading `WHITESPACE` token at the start of each source line when not preceded by a `BLOCK_QUOTE_MARKER` — unambiguous because the parser never emits a leading line-start `WHITESPACE` inside `HTML_BLOCK_CONTENT` outside this lift path. Inline coalescence's trim-edges rule strips the leading injected `Space` from PARAGRAPH/PLAIN content automatically, and structural `HTML_BLOCK_TAG`'s `open_tag_raw_block_text` already strips leading WS. Tested for div, pre, style, script, textarea.)
+370
+371
+372
+373
+374

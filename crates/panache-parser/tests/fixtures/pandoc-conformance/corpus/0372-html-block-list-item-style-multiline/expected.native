@@ -1,0 +1,6 @@
+[ BulletList
+    [ [ RawBlock
+          (Format "html") "<style>\nbody { color: red; }\n</style>"
+      ]
+    ]
+]

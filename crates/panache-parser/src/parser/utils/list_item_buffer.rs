@@ -174,11 +174,23 @@ impl ListItemBuffer {
     ///
     /// If `use_paragraph` is true, wraps in PARAGRAPH (loose list).
     /// If false, wraps in PLAIN (tight list).
+    ///
+    /// `content_col` is the enclosing list-item's content column (or 0
+    /// outside a list-item). The HTML-block first-line structural lift
+    /// uses it to strip the list-item leading indent from continuation
+    /// lines before reparsing the body, so `<div>` body parses as
+    /// pandoc's `Para` (matched-pair under stripped indent) instead of
+    /// `Plain` (the indented-close demotion), and so verbatim-tag
+    /// content (`<pre>`, `<style>`, etc.) projects without the leading
+    /// indent baked into the RawBlock text. The stripped bytes are
+    /// re-emitted as `WHITESPACE` tokens at line starts during graft
+    /// so the CST stays byte-equal to source.
     pub(crate) fn emit_as_block(
         &self,
         builder: &mut GreenNodeBuilder<'static>,
         use_paragraph: bool,
         config: &ParserOptions,
+        content_col: usize,
     ) {
         if self.is_empty() {
             return;
@@ -254,7 +266,7 @@ impl ListItemBuffer {
                     .segments
                     .iter()
                     .all(|s| matches!(s, ListItemContent::Text(_)))
-                && try_emit_html_block_lift(builder, &text, config)
+                && try_emit_html_block_lift(builder, &text, config, content_col)
             {
                 return;
             }
@@ -292,14 +304,23 @@ impl ListItemBuffer {
 ///
 /// The gate is strict: the inner reparse must produce exactly one
 /// top-level HTML_BLOCK or HTML_BLOCK_DIV that consumes every byte
-/// of `text`. For HTML_BLOCK_DIV, a matched open+close is required
-/// (>= 2 `HTML_BLOCK_TAG` children). This avoids lifting unclosed
-/// shapes (where the close tag would live in a separate sibling
-/// HTML_BLOCK), which would produce a structurally incomplete CST.
+/// of `text` (modulo list-item indent stripping — see `content_col`).
+/// For HTML_BLOCK_DIV, a matched open+close is required (>= 2
+/// `HTML_BLOCK_TAG` children). This avoids lifting unclosed shapes
+/// (where the close tag would live in a separate sibling HTML_BLOCK),
+/// which would produce a structurally incomplete CST.
+///
+/// When `content_col > 0`, continuation lines have up to `content_col`
+/// leading spaces stripped before the inner reparse, mirroring
+/// pandoc's list-item indent normalization. The stripped bytes are
+/// re-injected as `WHITESPACE` tokens at the start of each continuation
+/// line during graft so the result is byte-equal to the original
+/// buffer text.
 fn try_emit_html_block_lift(
     builder: &mut GreenNodeBuilder<'static>,
     text: &str,
     config: &ParserOptions,
+    content_col: usize,
 ) -> bool {
     let first_line = text.split_inclusive('\n').next().unwrap_or(text);
     let first_line_no_nl = first_line
@@ -310,8 +331,14 @@ fn try_emit_html_block_lift(
         return false;
     }
 
+    let (parse_text, prefixes) = if content_col > 0 {
+        strip_list_item_indent(text, content_col)
+    } else {
+        (text.to_string(), Vec::new())
+    };
+
     let refdefs = config.refdef_labels.clone().unwrap_or_default();
-    let inner_root = crate::parser::parse_with_refdefs(text, Some(config.clone()), refdefs);
+    let inner_root = crate::parser::parse_with_refdefs(&parse_text, Some(config.clone()), refdefs);
 
     let children: Vec<SyntaxNode> = inner_root.children().collect();
     if children.len() != 1 {
@@ -324,7 +351,7 @@ fn try_emit_html_block_lift(
     ) {
         return false;
     }
-    if child.text_range().end() != TextSize::of(text) {
+    if child.text_range().end() != TextSize::of(parse_text.as_str()) {
         return false;
     }
     if child.kind() == SyntaxKind::HTML_BLOCK_DIV {
@@ -337,21 +364,115 @@ fn try_emit_html_block_lift(
         }
     }
 
-    graft_node(builder, child);
+    let mut prefix_state = if prefixes.is_empty() {
+        None
+    } else {
+        Some(LinePrefixState {
+            prefixes,
+            line_idx: 0,
+            at_line_start: true,
+        })
+    };
+    graft_node(builder, child, &mut prefix_state);
     true
 }
 
-fn graft_node(builder: &mut GreenNodeBuilder<'static>, node: &SyntaxNode) {
+/// Per-line indent-prefix state for the list-item HTML-block lift.
+/// `prefixes[i]` is the leading-space bytes stripped from source line
+/// `i` of the buffer text before the inner reparse. During graft these
+/// are re-emitted as `WHITESPACE` tokens at the start of each line so
+/// the CST stays byte-equal to source. Mirrors the `BqPrefixState`
+/// pattern in `parser/blocks/html_blocks.rs` (which handles
+/// `BLOCK_QUOTE_MARKER` + `WHITESPACE` re-injection for bq-wrapped
+/// HTML lifts).
+struct LinePrefixState {
+    prefixes: Vec<String>,
+    line_idx: usize,
+    at_line_start: bool,
+}
+
+/// Strip up to `content_col` leading-space bytes from each continuation
+/// line of `text` (lines after the first). The first line is left
+/// untouched — its leading columns are owned by the list marker and
+/// its post-marker spaces. Returns the stripped text plus a per-line
+/// prefix vector for losslessness re-injection during graft.
+fn strip_list_item_indent(text: &str, content_col: usize) -> (String, Vec<String>) {
+    let mut stripped = String::with_capacity(text.len());
+    let mut prefixes: Vec<String> = Vec::new();
+    for (i, line) in text.split_inclusive('\n').enumerate() {
+        if i == 0 {
+            prefixes.push(String::new());
+            stripped.push_str(line);
+            continue;
+        }
+        let mut consumed = 0usize;
+        let mut col = 0usize;
+        for &b in line.as_bytes() {
+            if col >= content_col {
+                break;
+            }
+            match b {
+                b' ' => {
+                    col += 1;
+                    consumed += 1;
+                }
+                b'\t' => {
+                    let next = (col / 4 + 1) * 4;
+                    if next > content_col {
+                        break;
+                    }
+                    col = next;
+                    consumed += 1;
+                }
+                _ => break,
+            }
+        }
+        prefixes.push(line[..consumed].to_string());
+        stripped.push_str(&line[consumed..]);
+    }
+    (stripped, prefixes)
+}
+
+fn graft_node(
+    builder: &mut GreenNodeBuilder<'static>,
+    node: &SyntaxNode,
+    prefix: &mut Option<LinePrefixState>,
+) {
     builder.start_node(node.kind().into());
     for child in node.children_with_tokens() {
         match child {
-            rowan::NodeOrToken::Node(n) => graft_node(builder, &n),
+            rowan::NodeOrToken::Node(n) => graft_node(builder, &n, prefix),
             rowan::NodeOrToken::Token(t) => {
-                builder.token(t.kind().into(), t.text());
+                emit_grafted_token(builder, t.kind(), t.text(), prefix);
             }
         }
     }
     builder.finish_node();
+}
+
+fn emit_grafted_token(
+    builder: &mut GreenNodeBuilder<'static>,
+    kind: SyntaxKind,
+    text: &str,
+    prefix: &mut Option<LinePrefixState>,
+) {
+    if let Some(state) = prefix.as_mut() {
+        if state.at_line_start {
+            if let Some(p) = state.prefixes.get(state.line_idx)
+                && !p.is_empty()
+            {
+                builder.token(SyntaxKind::WHITESPACE.into(), p);
+            }
+            state.at_line_start = false;
+        }
+        builder.token(kind.into(), text);
+        if kind == SyntaxKind::NEWLINE || kind == SyntaxKind::BLANK_LINE {
+            state.line_idx += 1;
+            state.at_line_start = true;
+        }
+    } else {
+        builder.token(kind.into(), text);
+    }
 }
 
 #[cfg(test)]

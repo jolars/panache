@@ -108,9 +108,14 @@ impl<'a> Parser<'a> {
         while self.containers.depth() > keep {
             match self.containers.stack.last() {
                 // Handle ListItem with buffering
-                Some(Container::ListItem { buffer, .. }) if !buffer.is_empty() => {
+                Some(Container::ListItem {
+                    buffer,
+                    content_col,
+                    ..
+                }) if !buffer.is_empty() => {
                     // Clone buffer to avoid borrow issues
                     let buffer_clone = buffer.clone();
+                    let item_content_col = *content_col;
 
                     log::trace!(
                         "Closing ListItem with buffer (is_empty={}, segment_count={})",
@@ -148,7 +153,12 @@ impl<'a> Parser<'a> {
                     // Pop container first
                     self.containers.stack.pop();
                     // Emit buffered content as Plain or PARAGRAPH
-                    buffer_clone.emit_as_block(&mut self.builder, use_paragraph, self.config);
+                    buffer_clone.emit_as_block(
+                        &mut self.builder,
+                        use_paragraph,
+                        self.config,
+                        item_content_col,
+                    );
                     self.builder.finish_node(); // Close LIST_ITEM
                 }
                 // Handle ListItem without content
@@ -321,13 +331,23 @@ impl<'a> Parser<'a> {
     /// Emit buffered list item content if we're in a ListItem and it has content.
     /// This is used before starting block-level elements inside list items.
     fn emit_list_item_buffer_if_needed(&mut self) {
-        if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut()
+        if let Some(Container::ListItem {
+            buffer,
+            content_col,
+            ..
+        }) = self.containers.stack.last_mut()
             && !buffer.is_empty()
         {
             let buffer_clone = buffer.clone();
+            let item_content_col = *content_col;
             buffer.clear();
             let use_paragraph = buffer_clone.has_blank_lines_between_content();
-            buffer_clone.emit_as_block(&mut self.builder, use_paragraph, self.config);
+            buffer_clone.emit_as_block(
+                &mut self.builder,
+                use_paragraph,
+                self.config,
+                item_content_col,
+            );
         }
     }
 

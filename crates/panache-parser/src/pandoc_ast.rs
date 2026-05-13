@@ -1115,32 +1115,58 @@ fn html_div_block(node: &SyntaxNode) -> Block {
     Block::Div(attr, Vec::new())
 }
 
-/// Concatenate the node's token text, dropping every `BLOCK_QUOTE_MARKER`
-/// token (and the immediately-following `WHITESPACE` token, if any).
-/// `> <div>\n> foo\n> </div>` becomes `<div>\nfoo\n</div>` — the form the
-/// projector's byte-reparse helpers expect.
+/// Concatenate the node's token text, dropping prefix tokens injected
+/// by the parser for container nesting:
+/// - Every `BLOCK_QUOTE_MARKER` and the immediately-following
+///   `WHITESPACE` token (bq-wrapped HTML lift —
+///   `> <div>\n> foo\n> </div>` becomes `<div>\nfoo\n</div>`).
+/// - A leading `WHITESPACE` token at the start of each source line
+///   when it is NOT preceded by a `BLOCK_QUOTE_MARKER` on the same
+///   line (list-item content_col stripped by
+///   `parser/utils/list_item_buffer.rs::strip_list_item_indent` and
+///   re-injected as a structural `WHITESPACE` token during graft —
+///   `- <pre>\n  foo\n  </pre>` becomes `<pre>\nfoo\n</pre>` in the
+///   RawBlock text). The parser never emits a leading line-start
+///   `WHITESPACE` inside `HTML_BLOCK_CONTENT` or `HTML_BLOCK_TAG`
+///   outside this lift path — top-level indented HTML keeps the
+///   leading indent inside a single `TEXT` token — so the rule is
+///   unambiguous.
 fn collect_html_block_text_skip_bq_markers(node: &SyntaxNode) -> String {
     let mut out = String::new();
     let mut skip_next_ws = false;
-    walk_skip_bq_markers(node, &mut out, &mut skip_next_ws);
+    let mut at_line_start = true;
+    walk_skip_bq_markers(node, &mut out, &mut skip_next_ws, &mut at_line_start);
     out
 }
 
-fn walk_skip_bq_markers(node: &SyntaxNode, out: &mut String, skip_next_ws: &mut bool) {
+fn walk_skip_bq_markers(
+    node: &SyntaxNode,
+    out: &mut String,
+    skip_next_ws: &mut bool,
+    at_line_start: &mut bool,
+) {
     for child in node.children_with_tokens() {
         match child {
-            NodeOrToken::Node(n) => walk_skip_bq_markers(&n, out, skip_next_ws),
+            NodeOrToken::Node(n) => walk_skip_bq_markers(&n, out, skip_next_ws, at_line_start),
             NodeOrToken::Token(t) => {
                 if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {
                     *skip_next_ws = true;
+                    *at_line_start = false;
                     continue;
                 }
                 if *skip_next_ws && t.kind() == SyntaxKind::WHITESPACE {
                     *skip_next_ws = false;
+                    *at_line_start = false;
+                    continue;
+                }
+                if *at_line_start && t.kind() == SyntaxKind::WHITESPACE {
+                    *at_line_start = false;
                     continue;
                 }
                 *skip_next_ws = false;
+                let kind = t.kind();
                 out.push_str(t.text());
+                *at_line_start = kind == SyntaxKind::NEWLINE || kind == SyntaxKind::BLANK_LINE;
             }
         }
     }
