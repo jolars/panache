@@ -89,6 +89,25 @@ Format a Quarto, Pandoc, or R Markdown document according to Panache's formattin
    By default, explicitly-named files bypass exclude patterns: the assumption is that if you asked for a specific file, you want it processed. With --force-exclude, those patterns are honored regardless.
 
    This is primarily intended for pre-commit hooks (and similar tooling), which pass changed files explicitly but should still respect the project's exclude configuration.
+* `--line-width <N>` — Override the maximum line width for wrapping. Takes precedence over `line-width` in panache.toml and the built-in default (80). Must be a positive integer.
+* `--wrap <MODE>` — Override how paragraphs are wrapped. Takes precedence over `[format] wrap` in panache.toml. Options: `reflow` (reformat to fit line width, the default), `sentence` (wrap after each sentence), `preserve` (keep existing line breaks).
+
+  Possible values:
+  - `reflow`:
+    Reformat paragraphs to fit within line width
+  - `sentence`:
+    Wrap after each sentence
+  - `preserve`:
+    Keep existing line breaks
+
+* `--blank-lines <MODE>` — Override how blank lines are handled. Takes precedence over `[format] blank-lines` in panache.toml. Options: `collapse` (collapse multiple blank lines into one, the default), `preserve` (keep all existing blank lines).
+
+  Possible values:
+  - `collapse`:
+    Collapse multiple blank lines into one
+  - `preserve`:
+    Keep all existing blank lines
+
 
 
 

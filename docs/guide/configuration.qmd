@@ -76,6 +76,9 @@ Set the maximum line width for text wrapping:
 line-width = 80
 ```
 
+The `--line-width` flag on `panache format` overrides this setting for a single
+invocation.
+
 ### Flavor Overrides
 
 Use `flavor-overrides` to pick flavor by path pattern for Markdown-family files
@@ -211,6 +214,9 @@ wrap = "reflow"
 `preserve`
 :   Keep existing line breaks
 
+The `--wrap` flag on `panache format` overrides this setting for a single
+invocation.
+
 ### Blank Lines
 
 Control blank line handling:
@@ -225,6 +231,9 @@ blank-lines = "collapse"
 
 `preserve`
 :   Keep all existing blank lines
+
+The `--blank-lines` flag on `panache format` overrides this setting for a single
+invocation.
 
 ### Math Formatting
 

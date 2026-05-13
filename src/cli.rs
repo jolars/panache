@@ -242,6 +242,43 @@ pub enum Commands {
             configuration."
         )]
         force_exclude: bool,
+
+        /// Override the maximum line width
+        #[arg(
+            long,
+            value_name = "N",
+            value_parser = clap::value_parser!(u32).range(1..=u32::MAX as i64)
+        )]
+        #[arg(help = "Override `line-width` from panache.toml for this invocation")]
+        #[arg(
+            long_help = "Override the maximum line width for wrapping. Takes precedence over \
+            `line-width` in panache.toml and the built-in default (80). Must be a positive \
+            integer."
+        )]
+        line_width: Option<u32>,
+
+        /// Override the wrapping mode
+        #[arg(long, value_enum, value_name = "MODE")]
+        #[arg(help = "Override `[format] wrap` from panache.toml for this invocation")]
+        #[arg(
+            long_help = "Override how paragraphs are wrapped. Takes precedence over \
+            `[format] wrap` in panache.toml. Options: \
+            `reflow` (reformat to fit line width, the default), \
+            `sentence` (wrap after each sentence), \
+            `preserve` (keep existing line breaks)."
+        )]
+        wrap: Option<CliWrap>,
+
+        /// Override the blank-line handling mode
+        #[arg(long, value_enum, value_name = "MODE")]
+        #[arg(help = "Override `[format] blank-lines` from panache.toml for this invocation")]
+        #[arg(
+            long_help = "Override how blank lines are handled. Takes precedence over \
+            `[format] blank-lines` in panache.toml. Options: \
+            `collapse` (collapse multiple blank lines into one, the default), \
+            `preserve` (keep all existing blank lines)."
+        )]
+        blank_lines: Option<CliBlankLines>,
     },
     /// Parse and display the CST tree for debugging
     #[command(
@@ -466,6 +503,24 @@ pub enum ColorMode {
 pub enum MessageFormat {
     Human,
     Short,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum CliWrap {
+    /// Reformat paragraphs to fit within line width
+    Reflow,
+    /// Wrap after each sentence
+    Sentence,
+    /// Keep existing line breaks
+    Preserve,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum CliBlankLines {
+    /// Collapse multiple blank lines into one
+    Collapse,
+    /// Keep all existing blank lines
+    Preserve,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]

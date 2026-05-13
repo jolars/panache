@@ -16,9 +16,12 @@ use cache::{
     CachedLintDocument, CliCache, FormatCacheMode, FormatStoreArgs, global_cache_base_dir,
     resolve_cache_dir_for_cli,
 };
-use cli::{Cli, CliFlavor, ColorMode, Commands, DebugChecks, DebugCommands, ParseOutput};
+use cli::{
+    Cli, CliBlankLines, CliFlavor, CliWrap, ColorMode, Commands, DebugChecks, DebugCommands,
+    ParseOutput,
+};
 use diagnostic_renderer::print_diagnostics;
-use panache::config::Flavor;
+use panache::config::{BlankLines, Flavor, WrapMode};
 
 impl From<CliFlavor> for Flavor {
     fn from(value: CliFlavor) -> Self {
@@ -30,6 +33,43 @@ impl From<CliFlavor> for Flavor {
             CliFlavor::CommonMark => Flavor::CommonMark,
             CliFlavor::MultiMarkdown => Flavor::MultiMarkdown,
         }
+    }
+}
+
+impl From<CliWrap> for WrapMode {
+    fn from(value: CliWrap) -> Self {
+        match value {
+            CliWrap::Reflow => WrapMode::Reflow,
+            CliWrap::Sentence => WrapMode::Sentence,
+            CliWrap::Preserve => WrapMode::Preserve,
+        }
+    }
+}
+
+impl From<CliBlankLines> for BlankLines {
+    fn from(value: CliBlankLines) -> Self {
+        match value {
+            CliBlankLines::Collapse => BlankLines::Collapse,
+            CliBlankLines::Preserve => BlankLines::Preserve,
+        }
+    }
+}
+
+/// Apply `panache format` CLI overrides on top of a loaded config.
+fn apply_format_overrides(
+    cfg: &mut panache::Config,
+    line_width: Option<u32>,
+    wrap: Option<CliWrap>,
+    blank_lines: Option<CliBlankLines>,
+) {
+    if let Some(width) = line_width {
+        cfg.line_width = width as usize;
+    }
+    if let Some(mode) = wrap {
+        cfg.wrap = Some(WrapMode::from(mode));
+    }
+    if let Some(mode) = blank_lines {
+        cfg.blank_lines = BlankLines::from(mode);
     }
 }
 
@@ -859,6 +899,9 @@ fn main() -> io::Result<()> {
             range,
             verify,
             force_exclude,
+            line_width,
+            wrap,
+            blank_lines,
         } => {
             if verify {
                 eprintln!(
@@ -892,7 +935,7 @@ fn main() -> io::Result<()> {
             // Handle stdin case
             if files.is_empty() {
                 let start_dir = start_dir_for(cli.stdin_filename.as_deref())?;
-                let (cfg, cfg_path) = load_config_for_cli(
+                let (mut cfg, cfg_path) = load_config_for_cli(
                     cli.config.as_deref(),
                     cli.isolated,
                     cli.cache_dir.as_deref(),
@@ -900,6 +943,7 @@ fn main() -> io::Result<()> {
                     cli.stdin_filename.as_deref(),
                     cli.flavor.map(Flavor::from),
                 )?;
+                apply_format_overrides(&mut cfg, line_width, wrap, blank_lines);
 
                 if let Some(path) = &cfg_path {
                     log::debug!("Using config from: {}", path.display());
@@ -1025,6 +1069,7 @@ fn main() -> io::Result<()> {
                     Some(file_path),
                     cli.flavor.map(Flavor::from),
                 )?;
+                apply_format_overrides(&mut cfg, line_width, wrap, blank_lines);
                 if parallel {
                     cfg.external_max_parallel = 1;
                 }

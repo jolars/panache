@@ -745,3 +745,93 @@ fn test_format_dash_mixed_with_path_errors() {
             "'-' (stdin) cannot be combined with file path arguments",
         ));
 }
+
+// Long input that wraps differently at width 40 vs width 80. At 40, "wraps."
+// lands on its own line; at 80, the whole sentence fits on one line.
+const WRAP_PROBE: &str = "This is a sentence that fits on one line at width 80 but wraps.\n";
+
+#[test]
+fn test_format_line_width_flag_overrides_default() {
+    let assert = cargo_bin_cmd!("panache")
+        .args(["format", "--line-width", "40"])
+        .write_stdin(WRAP_PROBE)
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&assert.get_output().stdout).into_owned();
+    assert!(
+        stdout.lines().all(|line| line.chars().count() <= 40),
+        "expected all lines <= 40 chars, got:\n{stdout}"
+    );
+    assert!(
+        stdout.lines().count() >= 2,
+        "expected wrapping to produce >=2 lines, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn test_format_line_width_flag_overrides_config() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.md");
+    let config_file = temp_dir.path().join(".panache.toml");
+    fs::write(&test_file, WRAP_PROBE).unwrap();
+    fs::write(&config_file, "line-width = 200\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "format",
+            "--config",
+            config_file.to_str().unwrap(),
+            "--line-width",
+            "40",
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(&test_file).unwrap();
+    assert!(
+        content.lines().all(|line| line.chars().count() <= 40),
+        "--line-width CLI flag should beat config line-width=200, got:\n{content}"
+    );
+}
+
+#[test]
+fn test_format_line_width_flag_rejects_zero() {
+    cargo_bin_cmd!("panache")
+        .args(["format", "--line-width", "0"])
+        .write_stdin("# Heading\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("0"));
+}
+
+#[test]
+fn test_format_wrap_preserve_flag_keeps_existing_breaks() {
+    // Reflow at width 80 would merge these two short lines into one.
+    let input = "First short line.\nSecond short line.\n";
+    let assert = cargo_bin_cmd!("panache")
+        .args(["format", "--wrap", "preserve"])
+        .write_stdin(input)
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&assert.get_output().stdout).into_owned();
+    assert!(
+        stdout.contains("First short line.\nSecond short line."),
+        "--wrap preserve should keep both breaks, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn test_format_blank_lines_flag_accepted() {
+    // Smoke test: clap accepts both values and the run succeeds. The formatter
+    // currently treats `BlankLines::Preserve` as a no-op (it always collapses);
+    // when that gets fixed, tighten this to assert the actual behavior change.
+    for mode in ["preserve", "collapse"] {
+        cargo_bin_cmd!("panache")
+            .args(["format", "--blank-lines", mode])
+            .write_stdin("First paragraph.\n\nSecond paragraph.\n")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("First paragraph."));
+    }
+}
