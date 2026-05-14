@@ -76,8 +76,10 @@ Set the maximum line width for text wrapping:
 line-width = 80
 ```
 
-The `--line-width` flag on `panache format` overrides this setting for a single
-invocation.
+The `-o`/`--option` flag on `panache format` can override this setting for a
+single invocation, e.g. `panache format -o line-width=100`. This is an escape
+hatch for ad-hoc runs; prefer `panache.toml` so that everyone formatting the
+repository gets the same result.
 
 ### Flavor Overrides
 
@@ -213,8 +215,8 @@ wrap = "reflow"
 `preserve`
 :   Keep existing line breaks
 
-The `--wrap` flag on `panache format` overrides this setting for a single
-invocation.
+The `-o wrap=<MODE>` flag on `panache format` can override this setting for a
+single invocation, e.g. `panache format -o wrap=sentence`.
 
 ### Math Formatting
 

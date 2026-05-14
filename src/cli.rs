@@ -243,31 +243,23 @@ pub enum Commands {
         )]
         force_exclude: bool,
 
-        /// Override the maximum line width
+        /// Override individual config options (repeatable)
+        #[arg(short = 'o', long = "option", value_name = "KEY=VALUE")]
         #[arg(
-            long,
-            value_name = "N",
-            value_parser = clap::value_parser!(u32).range(1..=u32::MAX as i64)
+            help = "Override an individual config option for this invocation (e.g. -o line-width=100)"
         )]
-        #[arg(help = "Override `line-width` from panache.toml for this invocation")]
         #[arg(
-            long_help = "Override the maximum line width for wrapping. Takes precedence over \
-            `line-width` in panache.toml and the built-in default (80). Must be a positive \
-            integer."
+            long_help = "Override an individual config option for this invocation, using the \
+            kebab-case key names from panache.toml. May be repeated. Takes precedence over \
+            both panache.toml and the built-in defaults. \
+            \n\nSupported keys: \
+            `line-width` (positive integer) and \
+            `wrap` (one of: reflow, sentence, preserve). \
+            \n\nExample: --option line-width=100 -o wrap=sentence. \
+            \n\nNote: this is an escape hatch for ad-hoc invocations. Prefer panache.toml so \
+            that everyone formatting the repository gets the same result."
         )]
-        line_width: Option<u32>,
-
-        /// Override the wrapping mode
-        #[arg(long, value_enum, value_name = "MODE")]
-        #[arg(help = "Override `[format] wrap` from panache.toml for this invocation")]
-        #[arg(
-            long_help = "Override how paragraphs are wrapped. Takes precedence over \
-            `[format] wrap` in panache.toml. Options: \
-            `reflow` (reformat to fit line width, the default), \
-            `sentence` (wrap after each sentence), \
-            `preserve` (keep existing line breaks)."
-        )]
-        wrap: Option<CliWrap>,
+        option: Vec<String>,
     },
     /// Parse and display the CST tree for debugging
     #[command(
@@ -492,16 +484,6 @@ pub enum ColorMode {
 pub enum MessageFormat {
     Human,
     Short,
-}
-
-#[derive(Clone, Copy, Debug, ValueEnum)]
-pub enum CliWrap {
-    /// Reformat paragraphs to fit within line width
-    Reflow,
-    /// Wrap after each sentence
-    Sentence,
-    /// Keep existing line breaks
-    Preserve,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]

@@ -16,7 +16,7 @@ use cache::{
     CachedLintDocument, CliCache, FormatCacheMode, FormatStoreArgs, global_cache_base_dir,
     resolve_cache_dir_for_cli,
 };
-use cli::{Cli, CliFlavor, CliWrap, ColorMode, Commands, DebugChecks, DebugCommands, ParseOutput};
+use cli::{Cli, CliFlavor, ColorMode, Commands, DebugChecks, DebugCommands, ParseOutput};
 use diagnostic_renderer::print_diagnostics;
 use panache::config::{Flavor, WrapMode};
 
@@ -33,28 +33,47 @@ impl From<CliFlavor> for Flavor {
     }
 }
 
-impl From<CliWrap> for WrapMode {
-    fn from(value: CliWrap) -> Self {
-        match value {
-            CliWrap::Reflow => WrapMode::Reflow,
-            CliWrap::Sentence => WrapMode::Sentence,
-            CliWrap::Preserve => WrapMode::Preserve,
+/// Apply `panache format -o key=value` overrides on top of a loaded config.
+fn apply_format_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Result<(), String> {
+    for raw in overrides {
+        let (key, value) = raw
+            .split_once('=')
+            .ok_or_else(|| format!("invalid --option `{raw}`: expected key=value"))?;
+        let key = key.trim();
+        let value = value.trim();
+        match key {
+            "line-width" => {
+                let n: usize = value.parse().map_err(|_| {
+                    format!("invalid value for `line-width`: `{value}` (expected positive integer)")
+                })?;
+                if n == 0 {
+                    return Err(
+                        "invalid value for `line-width`: 0 (expected positive integer)".into(),
+                    );
+                }
+                cfg.line_width = n;
+            }
+            "wrap" => {
+                let mode = match value {
+                    "reflow" => WrapMode::Reflow,
+                    "sentence" => WrapMode::Sentence,
+                    "preserve" => WrapMode::Preserve,
+                    other => {
+                        return Err(format!(
+                            "invalid value for `wrap`: `{other}` (expected one of: reflow, sentence, preserve)"
+                        ));
+                    }
+                };
+                cfg.wrap = Some(mode);
+            }
+            other => {
+                return Err(format!(
+                    "unknown config key in --option: `{other}` (supported: line-width, wrap)"
+                ));
+            }
         }
     }
-}
-
-/// Apply `panache format` CLI overrides on top of a loaded config.
-fn apply_format_overrides(
-    cfg: &mut panache::Config,
-    line_width: Option<u32>,
-    wrap: Option<CliWrap>,
-) {
-    if let Some(width) = line_width {
-        cfg.line_width = width as usize;
-    }
-    if let Some(mode) = wrap {
-        cfg.wrap = Some(WrapMode::from(mode));
-    }
+    Ok(())
 }
 
 /// Supported file extensions for formatting
@@ -883,8 +902,7 @@ fn main() -> io::Result<()> {
             range,
             verify,
             force_exclude,
-            line_width,
-            wrap,
+            option,
         } => {
             if verify {
                 eprintln!(
@@ -926,7 +944,10 @@ fn main() -> io::Result<()> {
                     cli.stdin_filename.as_deref(),
                     cli.flavor.map(Flavor::from),
                 )?;
-                apply_format_overrides(&mut cfg, line_width, wrap);
+                if let Err(err) = apply_format_overrides(&mut cfg, &option) {
+                    eprintln!("Error: {err}");
+                    std::process::exit(2);
+                }
 
                 if let Some(path) = &cfg_path {
                     log::debug!("Using config from: {}", path.display());
@@ -1052,7 +1073,10 @@ fn main() -> io::Result<()> {
                     Some(file_path),
                     cli.flavor.map(Flavor::from),
                 )?;
-                apply_format_overrides(&mut cfg, line_width, wrap);
+                if let Err(err) = apply_format_overrides(&mut cfg, &option) {
+                    eprintln!("Error: {err}");
+                    std::process::exit(2);
+                }
                 if parallel {
                     cfg.external_max_parallel = 1;
                 }

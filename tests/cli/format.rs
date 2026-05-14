@@ -751,9 +751,9 @@ fn test_format_dash_mixed_with_path_errors() {
 const WRAP_PROBE: &str = "This is a sentence that fits on one line at width 80 but wraps.\n";
 
 #[test]
-fn test_format_line_width_flag_overrides_default() {
+fn test_format_option_line_width_overrides_default() {
     let assert = cargo_bin_cmd!("panache")
-        .args(["format", "--line-width", "40"])
+        .args(["format", "-o", "line-width=40"])
         .write_stdin(WRAP_PROBE)
         .assert()
         .success();
@@ -769,7 +769,7 @@ fn test_format_line_width_flag_overrides_default() {
 }
 
 #[test]
-fn test_format_line_width_flag_overrides_config() {
+fn test_format_option_line_width_overrides_config() {
     let temp_dir = TempDir::new().unwrap();
     let test_file = temp_dir.path().join("test.md");
     let config_file = temp_dir.path().join(".panache.toml");
@@ -781,8 +781,8 @@ fn test_format_line_width_flag_overrides_config() {
             "format",
             "--config",
             config_file.to_str().unwrap(),
-            "--line-width",
-            "40",
+            "-o",
+            "line-width=40",
             test_file.to_str().unwrap(),
         ])
         .assert()
@@ -791,32 +791,66 @@ fn test_format_line_width_flag_overrides_config() {
     let content = fs::read_to_string(&test_file).unwrap();
     assert!(
         content.lines().all(|line| line.chars().count() <= 40),
-        "--line-width CLI flag should beat config line-width=200, got:\n{content}"
+        "-o line-width=40 should beat config line-width=200, got:\n{content}"
     );
 }
 
 #[test]
-fn test_format_line_width_flag_rejects_zero() {
+fn test_format_option_line_width_rejects_zero() {
     cargo_bin_cmd!("panache")
-        .args(["format", "--line-width", "0"])
+        .args(["format", "-o", "line-width=0"])
         .write_stdin("# Heading\n")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("0"));
+        .stderr(predicate::str::contains("line-width"));
 }
 
 #[test]
-fn test_format_wrap_preserve_flag_keeps_existing_breaks() {
-    // Reflow at width 80 would merge these two short lines into one.
+fn test_format_option_wrap_preserve_keeps_existing_breaks() {
     let input = "First short line.\nSecond short line.\n";
     let assert = cargo_bin_cmd!("panache")
-        .args(["format", "--wrap", "preserve"])
+        .args(["format", "-o", "wrap=preserve"])
         .write_stdin(input)
         .assert()
         .success();
     let stdout = String::from_utf8_lossy(&assert.get_output().stdout).into_owned();
     assert!(
         stdout.contains("First short line.\nSecond short line."),
-        "--wrap preserve should keep both breaks, got:\n{stdout}"
+        "-o wrap=preserve should keep both breaks, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn test_format_option_rejects_unknown_key() {
+    cargo_bin_cmd!("panache")
+        .args(["format", "-o", "not-a-real-key=42"])
+        .write_stdin("# Heading\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not-a-real-key"));
+}
+
+#[test]
+fn test_format_option_rejects_missing_equals() {
+    cargo_bin_cmd!("panache")
+        .args(["format", "-o", "line-width"])
+        .write_stdin("# Heading\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("key=value"));
+}
+
+#[test]
+fn test_format_option_repeatable() {
+    let input = "First short line.\nSecond short line.\n";
+    let assert = cargo_bin_cmd!("panache")
+        .args(["format", "-o", "line-width=40", "-o", "wrap=preserve"])
+        .write_stdin(input)
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&assert.get_output().stdout).into_owned();
+    assert!(
+        stdout.contains("First short line.\nSecond short line."),
+        "wrap=preserve should still preserve breaks even with line-width=40, got:\n{stdout}"
     );
 }
