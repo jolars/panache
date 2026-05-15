@@ -99,15 +99,47 @@ pub fn log_missing_formatter_commands(missing: &HashSet<String>) {
     log::info!("{}", message);
 }
 
+/// Substitute the supported placeholders inside a single arg string.
+///
+/// - `{}`     → `brace_value` (file path in file mode, virtual stdin filename
+///   in stdin mode).
+/// - `{lang}` → the literal language string from the code fence.
+/// - `{ext}`  → the file extension corresponding to the language via
+///   [`temp_file_extension_for_language`]. Unknown languages fall back to
+///   `txt`.
+fn substitute_placeholders(arg: &str, brace_value: &str, language: &str) -> String {
+    arg.replace("{lang}", language)
+        .replace("{ext}", temp_file_extension_for_language(language))
+        .replace("{}", brace_value)
+}
+
 /// Resolve stdin argument placeholders against a language-aware virtual filename.
 ///
 /// Some tools (for example Prettier) need a file path hint while still reading
-/// from stdin. We support `{}` as a placeholder in stdin args for this purpose.
+/// from stdin. Supports `{}` (virtual stdin filename), `{lang}`, and `{ext}`.
 pub fn resolve_stdin_args(args: &[String], language: &str) -> Vec<String> {
     let virtual_filename = virtual_filename_for_language(language);
     args.iter()
-        .map(|arg| arg.replace("{}", &virtual_filename))
+        .map(|arg| substitute_placeholders(arg, &virtual_filename, language))
         .collect()
+}
+
+/// Resolve file-mode argument placeholders against a real temp file path.
+///
+/// Supports `{}` (file path), `{lang}`, and `{ext}`. Preserves the documented
+/// behavior that, when no `{}` placeholder is present, the file path is
+/// appended at the end of the resolved args. `{lang}`/`{ext}` are substituted
+/// in either case.
+pub fn resolve_file_args(args: &[String], language: &str, file_path: &str) -> Vec<String> {
+    let has_brace = args.iter().any(|arg| arg.contains("{}"));
+    let mut resolved: Vec<String> = args
+        .iter()
+        .map(|arg| substitute_placeholders(arg, file_path, language))
+        .collect();
+    if !has_brace {
+        resolved.push(file_path.to_string());
+    }
+    resolved
 }
 
 pub fn log_formatter_invocation(
@@ -214,6 +246,36 @@ pub(crate) fn temp_file_extension_for_language(language: &str) -> &'static str {
         "svelte" => "svelte",
         "graphql" | "gql" => "graphql",
         "r" => "r",
+        "python" | "py" => "py",
+        "rust" | "rs" => "rs",
+        "go" => "go",
+        "bash" | "sh" | "zsh" => "sh",
+        "c" => "c",
+        "cpp" | "c++" | "cxx" => "cpp",
+        "csharp" | "c-sharp" | "cs" => "cs",
+        "java" => "java",
+        "kotlin" | "kt" => "kt",
+        "ruby" | "rb" => "rb",
+        "swift" => "swift",
+        "php" => "php",
+        "lua" => "lua",
+        "perl" | "pl" => "pl",
+        "elixir" | "ex" => "exs",
+        "haskell" | "hs" => "hs",
+        "scala" => "scala",
+        "julia" | "jl" => "jl",
+        "ocaml" | "ml" => "ml",
+        "clojure" | "clj" => "clj",
+        "dart" => "dart",
+        "zig" => "zig",
+        "nix" => "nix",
+        "toml" => "toml",
+        "xml" => "xml",
+        "sql" => "sql",
+        "tex" | "latex" => "tex",
+        "bibtex" | "bib" => "bib",
+        "dockerfile" => "dockerfile",
+        "makefile" => "makefile",
         _ => "txt",
     }
 }
@@ -233,8 +295,8 @@ fn missing_formatter_warning_message(missing: &HashSet<String>) -> Option<String
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::{
-        find_missing_formatter_commands, missing_formatter_warning_message, resolve_stdin_args,
-        temp_file_extension_for_language,
+        find_missing_formatter_commands, missing_formatter_warning_message, resolve_file_args,
+        resolve_stdin_args, substitute_placeholders, temp_file_extension_for_language,
     };
     use crate::config::FormatterConfig;
     use std::collections::{HashMap, HashSet};
@@ -322,5 +384,109 @@ mod tests {
         assert_eq!(temp_file_extension_for_language("r"), "r");
         assert_eq!(temp_file_extension_for_language("TypeScript"), "ts");
         assert_eq!(temp_file_extension_for_language("unknownlang"), "txt");
+
+        // Expanded mappings.
+        assert_eq!(temp_file_extension_for_language("python"), "py");
+        assert_eq!(temp_file_extension_for_language("py"), "py");
+        assert_eq!(temp_file_extension_for_language("Rust"), "rs");
+        assert_eq!(temp_file_extension_for_language("bash"), "sh");
+        assert_eq!(temp_file_extension_for_language("zsh"), "sh");
+        assert_eq!(temp_file_extension_for_language("c++"), "cpp");
+        assert_eq!(temp_file_extension_for_language("c_sharp"), "cs");
+        assert_eq!(temp_file_extension_for_language("elixir"), "exs");
+        assert_eq!(temp_file_extension_for_language("go"), "go");
+        assert_eq!(temp_file_extension_for_language("LaTeX"), "tex");
+    }
+
+    #[test]
+    fn substitute_placeholders_handles_lang() {
+        let out = substitute_placeholders("--parser={lang}", "ignored", "python");
+        assert_eq!(out, "--parser=python");
+    }
+
+    #[test]
+    fn substitute_placeholders_handles_ext() {
+        let out = substitute_placeholders("snippet.{ext}", "ignored", "rust");
+        assert_eq!(out, "snippet.rs");
+    }
+
+    #[test]
+    fn substitute_placeholders_handles_brace() {
+        let out = substitute_placeholders("--path={}", "/tmp/foo.py", "python");
+        assert_eq!(out, "--path=/tmp/foo.py");
+    }
+
+    #[test]
+    fn substitute_placeholders_combines_all_three() {
+        let out = substitute_placeholders(
+            "--lang={lang} --file=stdin.{ext} --path={}",
+            "/tmp/x",
+            "python",
+        );
+        assert_eq!(out, "--lang=python --file=stdin.py --path=/tmp/x");
+    }
+
+    #[test]
+    fn resolve_stdin_args_substitutes_lang_and_ext() {
+        let args = vec![
+            "fmt".to_string(),
+            "--stdin".to_string(),
+            "snippet.{ext}".to_string(),
+            "--lang={lang}".to_string(),
+        ];
+        let resolved = resolve_stdin_args(&args, "python");
+        assert_eq!(
+            resolved,
+            vec![
+                "fmt".to_string(),
+                "--stdin".to_string(),
+                "snippet.py".to_string(),
+                "--lang=python".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn resolve_file_args_substitutes_brace_in_place() {
+        let args = vec!["format".to_string(), "{}".to_string()];
+        let resolved = resolve_file_args(&args, "python", "/tmp/x.py");
+        assert_eq!(
+            resolved,
+            vec!["format".to_string(), "/tmp/x.py".to_string()]
+        );
+    }
+
+    #[test]
+    fn resolve_file_args_appends_path_when_brace_missing() {
+        let args = vec!["format".to_string(), "--lang={lang}".to_string()];
+        let resolved = resolve_file_args(&args, "rust", "/tmp/x.rs");
+        assert_eq!(
+            resolved,
+            vec![
+                "format".to_string(),
+                "--lang=rust".to_string(),
+                "/tmp/x.rs".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn resolve_file_args_substitutes_lang_and_ext_with_brace() {
+        let args = vec![
+            "fmt".to_string(),
+            "--lang={lang}".to_string(),
+            "--ext={ext}".to_string(),
+            "{}".to_string(),
+        ];
+        let resolved = resolve_file_args(&args, "python", "/tmp/x.py");
+        assert_eq!(
+            resolved,
+            vec![
+                "fmt".to_string(),
+                "--lang=python".to_string(),
+                "--ext=py".to_string(),
+                "/tmp/x.py".to_string(),
+            ]
+        );
     }
 }

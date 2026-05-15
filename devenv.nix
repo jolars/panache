@@ -38,6 +38,8 @@
     pkgs.go
     pkgs.vsce
     pkgs.maturin
+    pkgs.dprint
+    pkgs.dprint-plugins.dprint-plugin-toml
     (pkgs.rWrapper.override {
       packages = with pkgs.rPackages; [
         knitr

@@ -871,6 +871,39 @@ stdin = false
 The `{}` placeholder controls where the file path is inserted. If omitted, it's
 appended at the end.
 
+### Placeholders
+
+Formatter `args` support the following placeholders, substituted per code block
+before the formatter is invoked:
+
+`{}`
+:   The temp file path (in file mode) or a language-aware virtual stdin filename
+    like `stdin.py` (in stdin mode). If omitted in file mode, the path is
+    appended at the end of the args.
+
+`{lang}`
+:   The literal language string from the code fence, e.g. `python`,
+    `javascript`, `bash`. Useful when the external tool takes a language name as
+    a parameter (e.g. Prettier's `--parser`).
+
+`{ext}`
+:   The conventional file extension for the language, e.g. `py`, `js`, `sh`.
+    Panache maintains a built-in language --- extension table covering the
+    common languages; unknown languages fall back to `txt`.
+
+This makes it practical to delegate every code block to a monolithic formatter
+that dispatches by extension internally, e.g. `dprint`:
+
+```toml
+[formatters.python]
+cmd = "dprint"
+args = ["fmt", "--stdin", "snippet.{ext}"]
+
+[formatters.rust]
+cmd = "dprint"
+args = ["fmt", "--stdin", "snippet.{ext}"]
+```
+
 ### Untagged Code Blocks
 
 To register a formatter that runs on fenced code blocks with **no language tag**

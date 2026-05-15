@@ -14,7 +14,7 @@ pub use crate::external_formatters_common::FormatterError;
 use crate::external_formatters_common::{
     FormatterIoMode, find_missing_formatter_commands, log_formatter_invocation,
     log_formatter_nonzero_exit, log_formatter_spawn_failed, log_formatter_success,
-    log_formatter_timeout, log_missing_formatter_commands, resolve_stdin_args,
+    log_formatter_timeout, log_missing_formatter_commands, resolve_file_args, resolve_stdin_args,
     temp_file_extension_for_language,
 };
 use panache_formatter::{ExternalCodeBlock, FormattedCodeMap};
@@ -146,18 +146,7 @@ fn format_with_file(
     // Write code to temp file
     fs::write(&temp_path, code).map_err(FormatterError::IoError)?;
 
-    // Build args with temp file path (replace {} placeholder or append)
-    let args: Vec<String> = if config.args.iter().any(|arg| arg.contains("{}")) {
-        config
-            .args
-            .iter()
-            .map(|arg| arg.replace("{}", temp_path.to_str().unwrap()))
-            .collect()
-    } else {
-        let mut args = config.args.clone();
-        args.push(temp_path.to_str().unwrap().to_string());
-        args
-    };
+    let args = resolve_file_args(&config.args, language, temp_path.to_str().unwrap());
 
     log_formatter_invocation(&config.cmd, language, FormatterIoMode::File, &args);
     log::trace!(

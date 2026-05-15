@@ -79,6 +79,48 @@ hello world
 }
 
 #[test]
+fn formatter_args_substitute_lang_placeholder() {
+    // `sed s/{lang}/REPL/g` should rewrite the language literal in the code
+    // body, proving the {lang} placeholder is substituted at dispatch time.
+    if which::which("sed").is_err() {
+        println!("Skipping sed test - sed not installed");
+        return;
+    }
+
+    let mut formatters = HashMap::new();
+    formatters.insert(
+        "python".to_string(),
+        vec![panache::config::FormatterConfig {
+            cmd: "sed".to_string(),
+            args: vec!["s/{lang}/REPL/g".to_string()],
+            enabled: true,
+            stdin: true,
+        }],
+    );
+
+    let config = Config {
+        flavor: Flavor::Quarto,
+        extensions: Extensions::for_flavor(Flavor::Quarto),
+        formatters,
+        ..Default::default()
+    };
+
+    let input = r#"
+```python
+print("python rocks")
+```
+"#
+    .trim_start();
+
+    let output = format(input, Some(config), None);
+
+    assert!(
+        output.contains("REPL rocks"),
+        "expected `python` literal in body to be rewritten to `REPL` by `s/{{lang}}/REPL/g`; got:\n{output}"
+    );
+}
+
+#[test]
 fn untagged_code_block_with_empty_string_formatter_key() {
     // `[formatters.""]` matches only truly untagged blocks, never ```plain.
     let mut formatters = HashMap::new();
