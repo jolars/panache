@@ -59,7 +59,6 @@ preserve it verbatim and, at worst, rewrite it into something the renderer no
 longer accepts.
 
 ::: {.column-page}
-
   | Tool              | CommonMark | GFM   | Pandoc | Quarto | R Markdown | MultiMarkdown | MDX |
   | ----------------- | :--------- | :---- | :----- | :----- | :--------- | :------------ | :-- |
   | Panache           | ●          | ●     | ●      | ●      | ●          | ●             | ○   |
@@ -73,7 +72,6 @@ longer accepts.
   | rumdl             | ●          | ●     | ○      | ◐[^12] | ◐[^12]     | ○             | ○   |
 
   : Markdown dialect coverage across the tools.
-
 :::
 
 [^6]: markdownlint (the Ruby `mdl` gem) targets generic Markdown style rather
