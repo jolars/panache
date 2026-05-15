@@ -2350,6 +2350,7 @@ impl Formatter {
                     0
                 };
 
+                let mut prev_was_blank = false;
                 for (idx, child) in content_children[start..end].iter().enumerate() {
                     if child.kind() == SyntaxKind::BLANK_LINE {
                         if idx < leading_blank_lines
@@ -2360,8 +2361,16 @@ impl Formatter {
                         {
                             continue;
                         }
-                        self.output.push('\n');
-                    } else if child.kind() == SyntaxKind::CODE_BLOCK && indent > 0 {
+                        // Collapse runs of blank lines to a single separator,
+                        // matching how blank lines are normalised at the document level.
+                        if !prev_was_blank {
+                            self.output.push('\n');
+                            prev_was_blank = true;
+                        }
+                        continue;
+                    }
+                    prev_was_blank = false;
+                    if child.kind() == SyntaxKind::CODE_BLOCK && indent > 0 {
                         self.format_indented_code_block(child, indent);
                         if let Some(next) = content_children[start..end].get(idx + 1)
                             && ((next.kind() == SyntaxKind::PARAGRAPH
