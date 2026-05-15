@@ -1194,16 +1194,20 @@ fn div_has_structural_inner(node: &SyntaxNode) -> bool {
     let Some(open_tag) = tags.next() else {
         return false;
     };
-    let Some(close_tag) = tags.next() else {
-        return false;
-    };
+    // Close tag is optional: pandoc emits an implicit close at EOF
+    // for an unclosed `<div>` (warning: "Div ... unclosed ... closing
+    // implicitly"). The body lift still produces structural children
+    // (or none, for empty `<div>`), which we project as `Block::Div`.
+    let close_tag = tags.next();
     if tags.next().is_some() {
         return false;
     }
     if !html_block_open_tag_is_clean(&open_tag) {
         return false;
     }
-    if !html_block_close_tag_is_clean(&close_tag) {
+    if let Some(close_tag) = close_tag.as_ref()
+        && !html_block_close_tag_is_clean(close_tag)
+    {
         return false;
     }
     !node

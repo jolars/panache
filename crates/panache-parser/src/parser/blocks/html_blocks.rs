@@ -1386,7 +1386,14 @@ pub(crate) fn parse_html_block_with_wrapper(
         };
         if let Some(tag_name) = same_line_lift_tag {
             let (pre_no_nl, post_nl) = strip_newline(&pre_content);
-            if let Some((leading, close_part)) = try_split_close_line(pre_no_nl, tag_name) {
+            // Depth-aware split: handles `<tag>foo</tag>bar` (single
+            // close, trailing text), `<tag>foo</tag></tag>` (matched
+            // close + unmatched trailing close → sibling RawBlock),
+            // and `<tag><tag>x</tag></tag>bar` (nested same-tag,
+            // recursive body parse).
+            if let Some((leading, close_part)) =
+                try_split_close_line_depth_aware(pre_no_nl, tag_name)
+            {
                 // `close_part` starts with `</tag` and contains the close
                 // marker followed by any same-line trailing text. Split
                 // off the close marker bytes (`</tag>`) so the close
@@ -1648,15 +1655,19 @@ pub(crate) fn parse_html_block_with_wrapper(
             }
 
             // Under lift mode, try to split the close line into a
-            // leading "body content" prefix and a clean `</tag>...`
-            // remainder. Lift only when the close line has exactly one
-            // `</tag>` and no nested `<tag>` opens — depth-aware corner
-            // cases (e.g. `<inner></inner></tag>` on the close line)
-            // fall back to the non-lift path. For `<div>`, non-empty
-            // `leading` propagates pandoc's `markdown_in_html_blocks`
-            // Plain demotion rule. For non-div strict-block tags,
-            // demotion follows pandoc's `OnlyIfLast` rule (demote the
-            // trailing Para only when no blank line precedes the close).
+            // leading "body content" prefix and the close-marker
+            // remainder using depth-aware matching. Walks at depth 1
+            // (we're inside the open tag) so nested same-tag opens
+            // (e.g. `<inner></inner></tag>` style with a nested div)
+            // are absorbed into the body and parsed recursively, and
+            // multi-close shapes (`foo</div></div>` on the close line)
+            // peel off the matched-pair close — the unmatched
+            // trailing close projects as a sibling `RawBlock` per
+            // pandoc-native. For `<div>`, non-empty `leading`
+            // propagates pandoc's `markdown_in_html_blocks` Plain
+            // demotion rule. For non-div strict-block tags, demotion
+            // follows pandoc's `OnlyIfLast` rule (demote the trailing
+            // Para only when no blank line precedes the close).
             let close_split_tag = if lift_mode {
                 if strict_block_lift {
                     strict_block_tag_name
@@ -1668,7 +1679,9 @@ pub(crate) fn parse_html_block_with_wrapper(
             } else {
                 None
             };
-            let close_split = close_split_tag.and_then(|name| try_split_close_line(line, name));
+            let (close_no_nl, close_post_nl) = strip_newline(line);
+            let close_split = close_split_tag
+                .and_then(|name| try_split_close_line_depth_aware(close_no_nl, name));
 
             if let Some((leading, close_part)) = close_split {
                 // Close-line leading that is whitespace-only is close-tag
@@ -1689,6 +1702,18 @@ pub(crate) fn parse_html_block_with_wrapper(
                 } else {
                     LastParaDemote::Never
                 };
+                // Split close_part into close-marker bytes (`</tag>`)
+                // and trailing bytes (e.g. an extra `</div>` for the
+                // double-close case, or `bar` for trailing text after
+                // a normal close). Trailing bytes are recursively
+                // parsed and grafted as siblings of the HTML_BLOCK_DIV
+                // wrapper.
+                let close_tag_name = close_split_tag.expect("close_split_tag present");
+                let close_marker_end =
+                    split_close_marker_end(close_part, close_tag_name).unwrap_or(close_part.len());
+                let close_marker = &close_part[..close_marker_end];
+                let close_trailing = &close_part[close_marker_end..];
+
                 emit_html_block_body_lifted(
                     builder,
                     &pre_content,
@@ -1701,8 +1726,37 @@ pub(crate) fn parse_html_block_with_wrapper(
                 if leading_is_ws_only {
                     builder.token(SyntaxKind::WHITESPACE.into(), leading);
                 }
-                emit_html_block_line(builder, close_part, 0);
-                builder.finish_node();
+                if close_trailing.is_empty() {
+                    let mut close_line =
+                        String::with_capacity(close_marker.len() + close_post_nl.len());
+                    close_line.push_str(close_marker);
+                    close_line.push_str(close_post_nl);
+                    emit_html_block_line(builder, &close_line, 0);
+                    builder.finish_node();
+                } else {
+                    // Close tag holds only the close-marker bytes;
+                    // trailing + newline graft as siblings.
+                    builder.token(SyntaxKind::TEXT.into(), close_marker);
+                    builder.finish_node(); // HTML_BLOCK_TAG
+                    builder.finish_node(); // HtmlBlock
+
+                    let mut trailing_text =
+                        String::with_capacity(close_trailing.len() + close_post_nl.len());
+                    trailing_text.push_str(close_trailing);
+                    trailing_text.push_str(close_post_nl);
+                    let mut inner_options = config.clone();
+                    let refdefs = config.refdef_labels.clone().unwrap_or_default();
+                    inner_options.refdef_labels = Some(refdefs.clone());
+                    let inner_root = crate::parser::parse_with_refdefs(
+                        &trailing_text,
+                        Some(inner_options),
+                        refdefs,
+                    );
+                    let mut bq = None;
+                    graft_document_children(builder, &inner_root, LastParaDemote::Never, &mut bq);
+                    current_pos += 1;
+                    return current_pos;
+                }
             } else {
                 emit_html_block_body(
                     builder,
@@ -2279,15 +2333,17 @@ pub(crate) fn probe_open_tag_line_has_close_gt(line: &str, tag_name: &str) -> bo
 /// be lifted structurally. Returns `true` only when:
 /// - The line starts with `<tag_name` (modulo leading whitespace).
 /// - The open tag's `>` exists with proper quote handling.
-/// - The bytes after the open `>` end with `</tag_name>` (case-
-///   insensitive, allowing trailing whitespace).
-/// - The trailing has exactly one `</tag_name>` close and zero
-///   `<tag_name>` opens (rejects nested same-line shapes).
+/// - The bytes after the open `>` contain a depth-zero matched
+///   `</tag_name>` close (depth-aware: nested `<tag>` opens
+///   increment depth; matching is case-insensitive, quote-aware).
 ///
-/// Trailing non-whitespace content after `</tag_name>` (e.g.
-/// `<form>foo</form>extra`) rejects the lift — pandoc projects that
-/// shape as RawBlock + content + RawBlock + trailing-Para, which the
-/// byte walker handles via `split_html_block_by_tags`.
+/// Trailing bytes after the matched close are accepted and grafted
+/// as a sibling block by the caller. Examples:
+/// - `<div>foo</div>bar` → body=`foo`, trailing=`bar`.
+/// - `<div>foo</div></div>` → body=`foo`, trailing=`</div>` (which
+///   recursively parses to a `RawBlock`).
+/// - `<div><div>x</div></div>bar` → body=`<div>x</div>` (nested div
+///   parsed recursively), trailing=`bar`.
 fn probe_same_line_lift(line: &str, tag_name: &str) -> bool {
     let bytes = line.as_bytes();
     let indent_end = bytes
@@ -2324,21 +2380,93 @@ fn probe_same_line_lift(line: &str, tag_name: &str) -> bool {
         return false;
     };
     let trailing = &after_name[gt_idx + 1..];
-    // Body must contain the close marker; bytes after the close are
-    // accepted as same-line trailing text and grafted as a sibling
-    // block by the caller (e.g. `<div>foo</div>bar` →
-    // `Div [Plain[foo]] + Para [bar]`). Reject nested same-tag opens
-    // and require exactly one close — multiple closes are a malformed
-    // shape that should fall back to the opaque path.
-    let close_marker = format!("</{}>", tag_name);
-    if !trailing
-        .to_ascii_lowercase()
-        .contains(&close_marker.to_ascii_lowercase())
-    {
-        return false;
+    // Depth-aware: walk `trailing` (we begin inside the open tag at
+    // depth 1). Return true iff a matched `</tag>` exists where depth
+    // returns to 0. Self-closing `<tag/>` opens don't bump depth.
+    matched_close_offset(trailing, tag_name).is_some()
+}
+
+/// Walk `trailing` (the bytes after an open `<tag ...>`'s closing `>`)
+/// looking for the depth-zero matched `</tag>` close. Counts `<tag>`
+/// opens and `</tag>` closes case-insensitively, quote-aware. Depth
+/// starts at 1 (we begin inside the open tag). Self-closing opens
+/// (`<tag/>`) do not increment depth.
+///
+/// Returns `Some((close_start, close_end))` where:
+/// - `close_start` is the byte offset of `<` in the matched `</tag>`.
+/// - `close_end` is one past the matched `>`.
+///
+/// Returns `None` when no matched close is present (unclosed tag,
+/// depth never returns to 0).
+fn matched_close_offset(trailing: &str, tag_name: &str) -> Option<(usize, usize)> {
+    let bytes = trailing.as_bytes();
+    let lower_line = trailing.to_ascii_lowercase();
+    let lower_bytes = lower_line.as_bytes();
+    let tag_lower = tag_name.to_ascii_lowercase();
+    let tag_bytes = tag_lower.as_bytes();
+
+    let mut depth: i32 = 1;
+    let mut i = 0usize;
+
+    while i < bytes.len() {
+        if bytes[i] != b'<' {
+            i += 1;
+            continue;
+        }
+        let after = i + 1;
+        let is_close = after < bytes.len() && bytes[after] == b'/';
+        let name_start = if is_close { after + 1 } else { after };
+        let matched = name_start + tag_bytes.len() <= bytes.len()
+            && &lower_bytes[name_start..name_start + tag_bytes.len()] == tag_bytes;
+        let after_name = name_start + tag_bytes.len();
+        let is_boundary = matched
+            && matches!(
+                bytes.get(after_name).copied(),
+                Some(b' ' | b'\t' | b'\n' | b'\r' | b'>' | b'/') | None
+            );
+
+        // Scan forward to this tag bracket's `>`, respecting quoted
+        // attribute values; track self-closing form (`/>`).
+        let mut j = if matched { after_name } else { after };
+        let mut quote: Option<u8> = None;
+        let mut self_close = false;
+        let mut found_gt = false;
+        while j < bytes.len() {
+            let b = bytes[j];
+            match (quote, b) {
+                (Some(q), x) if x == q => quote = None,
+                (None, b'"') | (None, b'\'') => quote = Some(b),
+                (None, b'>') => {
+                    found_gt = true;
+                    if j > i + 1 && bytes[j - 1] == b'/' {
+                        self_close = true;
+                    }
+                    break;
+                }
+                _ => {}
+            }
+            j += 1;
+        }
+
+        if matched && is_boundary {
+            if is_close {
+                depth -= 1;
+                if depth == 0 && found_gt {
+                    return Some((i, j + 1));
+                }
+            } else if !self_close {
+                depth += 1;
+            }
+        }
+
+        if found_gt {
+            i = j + 1;
+        } else {
+            // Unterminated `<...` — give up.
+            break;
+        }
     }
-    let (opens, closes) = count_tag_balance(trailing, tag_name);
-    opens == 0 && closes == 1
+    None
 }
 
 /// Locate the byte offset of the first `>` after a `</tag` prefix at
@@ -2397,6 +2525,27 @@ fn try_split_close_line<'a>(line: &'a str, tag_name: &str) -> Option<(&'a str, &
     let lower = line.to_ascii_lowercase();
     let close_lt = lower.find(&needle)?;
     Some((&line[..close_lt], &line[close_lt..]))
+}
+
+/// Depth-aware variant of `try_split_close_line` used by the same-line
+/// lift path. Walks `line` starting at depth 1 (we begin inside the
+/// open `<tag>`) and splits at the byte position where the matched
+/// `</tag>` close brings depth to 0. Returns `Some((body,
+/// close_part))` where `body` is the bytes before the matched-close
+/// start and `close_part` is the bytes from the matched close onward.
+///
+/// Unlike `try_split_close_line` this accepts nested same-tag opens
+/// and multiple closes: for `<div><div>x</div></div>bar` it returns
+/// body=`<div>x</div>` (a nested div the body lift parses
+/// recursively) and close_part=`</div>bar`. For `<div>foo</div></div>`
+/// it returns body=`foo`, close_part=`</div></div>` — the unmatched
+/// trailing close projects as a sibling `RawBlock` per pandoc-native.
+fn try_split_close_line_depth_aware<'a>(
+    line: &'a str,
+    tag_name: &str,
+) -> Option<(&'a str, &'a str)> {
+    let (close_start, _close_end) = matched_close_offset(line, tag_name)?;
+    Some((&line[..close_start], &line[close_start..]))
 }
 
 /// Emit the open-tag line of a lift-eligible HTML block (div or non-div

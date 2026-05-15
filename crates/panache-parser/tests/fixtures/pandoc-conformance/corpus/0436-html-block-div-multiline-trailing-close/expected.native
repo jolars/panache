@@ -1,0 +1,3 @@
+[ Div ( "" , [] , [] ) [ Plain [ Str "foo" ] ]
+, RawBlock (Format "html") "</div>"
+]

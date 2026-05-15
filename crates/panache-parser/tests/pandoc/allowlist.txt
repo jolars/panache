@@ -543,3 +543,13 @@
 427
 428
 429
+
+# html-block (Depth-aware same-line and multi-line close-line lift. `probe_same_line_lift` and the same-line lift body now walk the post-`>` bytes depth-aware via `matched_close_offset`, accepting nested same-tag opens and unmatched trailing closes alongside the existing single-close shape. `<div>foo</div></div>` lifts to `Div [Plain[foo]] + RawBlock`; `<div><div>x</div></div>bar` lifts to `Div [Div [Plain[x]]] + Para[bar]` (nested div is recursively parsed). The multi-line close-line path (`<div>\nfoo</div></div>`, `<div>\nfoo\n</div>bar`) was widened to use the same depth-aware split + `split_close_marker_end` + trailing graft pattern that the same-line path already had. Unclosed `<div>` (`<div>`, `<div>\nfoo`, `<div>foo<bar>baz`) now projects as `Div [...]` per pandoc-native (warning: implicit close at EOF) — `div_has_structural_inner` accepts a missing close tag when the open tag is clean and the body has structural children with no `HTML_BLOCK_CONTENT`. All seven shapes previously panicked at the projector's `debug_assert!("HTML_BLOCK_DIV without structural inner shape")`.)
+430
+431
+432
+433
+434
+435
+436
+437
