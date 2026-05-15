@@ -1,0 +1,54 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..90
+  FENCED_DIV@0..90
+    DIV_FENCE_OPEN@0..19
+      TEXT@0..3 ":::"
+      WHITESPACE@3..4 " "
+      DIV_INFO@4..18
+        TEXT@4..18 "{.column-page}"
+      NEWLINE@18..19 "\n"
+    PIPE_TABLE@19..86
+      TABLE_HEADER@19..35
+        WHITESPACE@19..21 "  "
+        TEXT@21..22 "|"
+        WHITESPACE@22..23 " "
+        TABLE_CELL@23..24
+          TEXT@23..24 "a"
+        WHITESPACE@24..27 "   "
+        TEXT@27..28 "|"
+        WHITESPACE@28..29 " "
+        TABLE_CELL@29..30
+          TEXT@29..30 "b"
+        WHITESPACE@30..33 "   "
+        TEXT@33..34 "|"
+        NEWLINE@34..35 "\n"
+      TABLE_SEPARATOR@35..51
+        TEXT@35..50 "  | --- | --- |"
+        NEWLINE@50..51 "\n"
+      TABLE_ROW@51..67
+        WHITESPACE@51..53 "  "
+        TEXT@53..54 "|"
+        WHITESPACE@54..55 " "
+        TABLE_CELL@55..56
+          TEXT@55..56 "1"
+        WHITESPACE@56..59 "   "
+        TEXT@59..60 "|"
+        WHITESPACE@60..61 " "
+        TABLE_CELL@61..62
+          TEXT@61..62 "2"
+        WHITESPACE@62..65 "   "
+        TEXT@65..66 "|"
+        NEWLINE@66..67 "\n"
+      BLANK_LINE@67..68
+        BLANK_LINE@67..68 "\n"
+      TABLE_CAPTION@68..86
+        WHITESPACE@68..70 "  "
+        TABLE_CAPTION_PREFIX@70..72 ": "
+        TEXT@72..85 "Caption text."
+        NEWLINE@85..86 "\n"
+    DIV_FENCE_CLOSE@86..90
+      TEXT@86..89 ":::"
+      NEWLINE@89..90 "\n"

@@ -226,8 +226,13 @@ pub(crate) fn is_caption_followed_by_table(lines: &[&str], caption_pos: usize) -
 
     let mut pos = caption_pos + 1;
 
-    // Skip continuation lines of caption (non-blank lines)
-    while pos < lines.len() && !lines[pos].trim().is_empty() {
+    // Skip continuation lines of caption (non-blank lines).
+    // Stop at fenced-div fences (`:::`) — those close the enclosing div and
+    // must not be folded into the caption.
+    while pos < lines.len()
+        && !lines[pos].trim().is_empty()
+        && !line_is_fenced_div_fence(lines[pos])
+    {
         // If we hit a table separator, we found a table
         if try_parse_table_separator(lines[pos]).is_some() {
             return true;
@@ -278,7 +283,10 @@ fn caption_range_starting_at(lines: &[&str], start: usize) -> Option<(usize, usi
         return None;
     }
     let mut end = start + 1;
-    while end < lines.len() && !lines[end].trim().is_empty() {
+    while end < lines.len()
+        && !lines[end].trim().is_empty()
+        && !line_is_fenced_div_fence(lines[end])
+    {
         end += 1;
     }
     Some((start, end))
@@ -316,8 +324,8 @@ fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<(usiz
             scan_pos -= 1;
             let line = lines[scan_pos];
 
-            // If we hit a blank line, we've gone too far
-            if line.trim().is_empty() {
+            // If we hit a blank line or fenced-div fence, we've gone too far
+            if line.trim().is_empty() || line_is_fenced_div_fence(line) {
                 return None;
             }
 
@@ -395,9 +403,12 @@ fn find_caption_after_table(lines: &[&str], table_end: usize) -> Option<(usize, 
     // Check if this line is a caption
     if is_table_caption_start(lines[pos]) {
         let caption_start = pos;
-        // Find end of caption (continues until blank line)
+        // Find end of caption (continues until blank line or fenced-div fence)
         let mut caption_end = caption_start + 1;
-        while caption_end < lines.len() && !lines[caption_end].trim().is_empty() {
+        while caption_end < lines.len()
+            && !lines[caption_end].trim().is_empty()
+            && !line_is_fenced_div_fence(lines[caption_end])
+        {
             caption_end += 1;
         }
         Some((caption_start, caption_end))
