@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.10.0](https://github.com/jolars/panache/compare/panache-parser-v0.9.0...panache-parser-v0.10.0) (2026-05-17)
+
+### Features
+- **linter:** add `heading-eaten-attrs` + `heading-strip-comments-residue` ([`966135d`](https://github.com/jolars/panache/commit/966135da659ecf8be64127c34dd26649941d958f)), closes [#288](https://github.com/jolars/panache/issues/288)
+
+### Bug Fixes
+- **parser:** let blockquotes close lists properly ([`88ca2c2`](https://github.com/jolars/panache/commit/88ca2c22bb7eecee8383282a4488b764009c00cd)), closes [#292](https://github.com/jolars/panache/issues/292)
+- **parser:** treat footnote refs inside footnote-def bodies as text ([`1f37425`](https://github.com/jolars/panache/commit/1f37425d4d4007594ad43b54b05837e72702499e)), ref [#290](https://github.com/jolars/panache/issues/290)
+- **parser:** lift bq + multi-line `<div>` open + same-line close ([`259241a`](https://github.com/jolars/panache/commit/259241a95794ec18165a53c4290a98d629a4b415))
+- **parser:** lift multi-line `<div>` open + same-line close ([`61e1df1`](https://github.com/jolars/panache/commit/61e1df126ff0e1c6462ed420d874c8fad688acff))
+- **parser:** widen `<div>` lift for depth-aware and unclosed shapes ([`c7e4830`](https://github.com/jolars/panache/commit/c7e483040224f355235d325e57147e13f468cddc))
+- **parser:** handle `:`-captions directly before `:::` ([`2f6a3ca`](https://github.com/jolars/panache/commit/2f6a3ca8c1c239101eddf409342e8dc6659d1fd6))
+- **parser:** lift same-line HTML block with trailing text ([`add805e`](https://github.com/jolars/panache/commit/add805e75b3845291cfe3a53df342ee68cd2a20c))
+- **parser:** lift list-item Comment/PI trailing-text split ([`50b4b45`](https://github.com/jolars/panache/commit/50b4b45db76bbab613322fb8fb71e8ae3ceefa66))
+- **parser:** demote indented isInlineTag to RawInline ([`c0cf92b`](https://github.com/jolars/panache/commit/c0cf92bb36876c433bd72968457453f15d77b5be))
+- **projector:** strip RawBlock first-line indent ([`926096e`](https://github.com/jolars/panache/commit/926096e9e7e1ce23b0c4de5b2de07ab125d1d1b3))
+- **parser:** bq-wrapped HTML comment/PI trailing split ([`af26bdd`](https://github.com/jolars/panache/commit/af26bdd9fa741d403da1596aa68b5651c4f8ddad))
+- **parser:** split Pandoc HTML comment / PI trailing-text ([`3171eae`](https://github.com/jolars/panache/commit/3171eae255db17ce1cc0ae5e106b9d6f6689393a))
+- **parser:** strip list-item indent for HTML-block lift ([`f19ec57`](https://github.com/jolars/panache/commit/f19ec57d3c074308d4160164c32fda0550e45116))
+- **parser:** lift multi-line HTML blocks as list-item ([`faf5c85`](https://github.com/jolars/panache/commit/faf5c851d82f56022e9b8ce19683fffb17c0cb79))
+- **parser:** lift same-line HTML block as sole list-item content ([`cb0a2c1`](https://github.com/jolars/panache/commit/cb0a2c1bc707b49a837ce20202eb6b4b59b6b76f))
+- **parser:** route indented HTML close-tag bytes ([`82bc43d`](https://github.com/jolars/panache/commit/82bc43d54d10ac743c42a797c5f988229ff1af56))
+- **parser:** keep HTML_BLOCK on standalone </div> close form ([`fe1cd9c`](https://github.com/jolars/panache/commit/fe1cd9c7bc4728bf1549da3037b15abe087d0fe6))
+- **parser:** lift mutliline html tags with trailing bytes ([`ea463f3`](https://github.com/jolars/panache/commit/ea463f34fc935746a825ec8119433c37e96496cf))
+- **parser:** structurally lift multi-line HTML opens ([`5d65a02`](https://github.com/jolars/panache/commit/5d65a02d996b350dd4b36b8eeb744228e828a5e0))
+- **parser:** avoid HTML_BLOCK_DIV panic on multi-line div ([`5613174`](https://github.com/jolars/panache/commit/561317490a03a2ef439e51481273397515d6c179))
 ## [0.9.0](https://github.com/jolars/panache/compare/panache-parser-v0.8.0...panache-parser-v0.9.0) (2026-05-12)
 
 ### Features

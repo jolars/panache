@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/jolars/panache/compare/panache-formatter-v0.5.1...panache-formatter-v0.6.0) (2026-05-17)
+
+### Features
+- **formatter:** trim trailing blanklines in fenced divs ([`6d2fe6c`](https://github.com/jolars/panache/commit/6d2fe6c55643fcffac29cfa3cda7b96198b71a7b))
+- **formatter:** add `""` as configurable external formatter ([`31c0bcb`](https://github.com/jolars/panache/commit/31c0bcb7c1b8d3434bcef78444a6a6ec356c79ad)), closes [#287](https://github.com/jolars/panache/issues/287)
+
+### Bug Fixes
+- **formatter:** reflow `BRACKETED_SPAN` content ([`0aac341`](https://github.com/jolars/panache/commit/0aac3414f34136b92b834c55a01effca9a0f0784)), closes [#291](https://github.com/jolars/panache/issues/291)
+- **formatter:** collapse blank lines inside fenced divs ([`eb52b1e`](https://github.com/jolars/panache/commit/eb52b1ead93b6bf24a4b44f12a055f09a4d0ba56)), fixes [#286](https://github.com/jolars/panache/issues/286)
+- **parser:** lift list-item Comment/PI trailing-text split ([`50b4b45`](https://github.com/jolars/panache/commit/50b4b45db76bbab613322fb8fb71e8ae3ceefa66))
+- **parser:** lift same-line HTML block as sole list-item content ([`cb0a2c1`](https://github.com/jolars/panache/commit/cb0a2c1bc707b49a837ce20202eb6b4b59b6b76f))
+
+### Dependencies
+- updated crates/panache-parser to v0.10.0
 ## [0.5.1](https://github.com/jolars/panache/compare/panache-formatter-v0.5.0...panache-formatter-v0.5.1) (2026-05-12)
 
 ### Bug Fixes
