@@ -191,6 +191,7 @@ impl ListItemBuffer {
         use_paragraph: bool,
         config: &ParserOptions,
         content_col: usize,
+        suppress_footnote_refs: bool,
     ) {
         if self.is_empty() {
             return;
@@ -241,7 +242,12 @@ impl ListItemBuffer {
                         SyntaxKind::PLAIN
                     };
                     builder.start_node(block_kind.into());
-                    inline_emission::emit_inlines(builder, after_first, config);
+                    inline_emission::emit_inlines(
+                        builder,
+                        after_first,
+                        config,
+                        suppress_footnote_refs,
+                    );
                     builder.finish_node();
                     return;
                 }
@@ -282,9 +288,9 @@ impl ListItemBuffer {
 
         let paragraph_buffer = self.to_paragraph_buffer();
         if !paragraph_buffer.is_empty() {
-            paragraph_buffer.emit_with_inlines(builder, config);
+            paragraph_buffer.emit_with_inlines(builder, config, suppress_footnote_refs);
         } else if !text.is_empty() {
-            inline_emission::emit_inlines(builder, &text, config);
+            inline_emission::emit_inlines(builder, &text, config, suppress_footnote_refs);
         }
 
         builder.finish_node(); // Close PLAIN or PARAGRAPH

@@ -244,6 +244,7 @@ golden_test_cases!(
     footnote_continuation_idempotency_reflow,
     footnote_def_paragraph,
     footnote_definition_list,
+    footnote_ref_in_footnote_def_is_text,
     headings,
     hr_as_list_item_content_commonmark,
     hr_as_list_item_content_pandoc,

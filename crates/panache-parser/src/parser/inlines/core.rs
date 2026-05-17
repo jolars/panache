@@ -72,10 +72,15 @@ use super::superscript::{emit_superscript, try_parse_superscript};
 /// * `text` - The inline text to parse
 /// * `config` - Configuration for extensions and formatting
 /// * `builder` - The CST builder to emit nodes to
+/// * `suppress_footnote_refs` - When `true`, `[^id]` bytes are emitted as
+///   literal TEXT instead of `FOOTNOTE_REFERENCE`. Set by block parsers when
+///   the inline content lives inside a reference-style footnote definition
+///   body, where pandoc silently drops nested footnote references.
 pub fn parse_inline_text_recursive(
     builder: &mut GreenNodeBuilder,
     text: &str,
     config: &ParserOptions,
+    suppress_footnote_refs: bool,
 ) {
     log::trace!(
         "Recursive inline parsing: {:?} ({} bytes)",
@@ -101,6 +106,7 @@ pub fn parse_inline_text_recursive(
         &plans.brackets,
         &plans.constructs,
         false,
+        suppress_footnote_refs,
         &mask,
     );
 
@@ -126,6 +132,7 @@ pub fn parse_inline_text(
     text: &str,
     config: &ParserOptions,
     suppress_inner_links: bool,
+    suppress_footnote_refs: bool,
 ) {
     log::trace!(
         "Parsing inline text (nested in link): {:?} ({} bytes)",
@@ -150,6 +157,7 @@ pub fn parse_inline_text(
         &plans.brackets,
         &plans.constructs,
         suppress_inner_links,
+        suppress_footnote_refs,
         &mask,
     );
 }
@@ -326,6 +334,7 @@ fn parse_inline_range_impl(
     bracket_plan: &BracketPlan,
     construct_plan: &ConstructPlan,
     suppress_inner_links: bool,
+    suppress_footnote_refs: bool,
     mask: &[bool; 256],
 ) {
     log::trace!(
@@ -374,7 +383,7 @@ fn parse_inline_range_impl(
                             builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                         }
                         log::trace!("IR: matched inline footnote at pos {}", pos);
-                        emit_inline_footnote(builder, content, config);
+                        emit_inline_footnote(builder, content, config, suppress_footnote_refs);
                         pos += len;
                         text_start = pos;
                         continue;
@@ -390,14 +399,21 @@ fn parse_inline_range_impl(
                             builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                         }
                         log::trace!("IR: matched native span at pos {}", pos);
-                        emit_native_span(builder, &text[pos..pos + len], content, config);
+                        emit_native_span(
+                            builder,
+                            &text[pos..pos + len],
+                            content,
+                            config,
+                            suppress_footnote_refs,
+                        );
                         pos += len;
                         text_start = pos;
                         continue;
                     }
                 }
                 ConstructDispo::FootnoteReference { end: dispo_end } => {
-                    if dispo_end <= end
+                    if !suppress_footnote_refs
+                        && dispo_end <= end
                         && let Some((len, id)) = try_parse_footnote_reference(&text[pos..])
                         && pos + len == dispo_end
                     {
@@ -460,7 +476,13 @@ fn parse_inline_range_impl(
                             builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                         }
                         log::trace!("IR: matched bracketed span at pos {}", pos);
-                        emit_bracketed_span(builder, &content, &attrs, config);
+                        emit_bracketed_span(
+                            builder,
+                            &content,
+                            &attrs,
+                            config,
+                            suppress_footnote_refs,
+                        );
                         pos += len;
                         text_start = pos;
                         continue;
@@ -531,6 +553,7 @@ fn parse_inline_range_impl(
                             dest,
                             attributes,
                             config,
+                            suppress_footnote_refs,
                         );
                         pos += len;
                         text_start = pos;
@@ -556,6 +579,7 @@ fn parse_inline_range_impl(
                         dest,
                         attributes,
                         config,
+                        suppress_footnote_refs,
                     );
                     pos += len;
                     text_start = pos;
@@ -579,7 +603,14 @@ fn parse_inline_range_impl(
                 pos,
                 ref_end
             );
-            emit_unresolved_reference(builder, is_image, inner_text, label_suffix, config);
+            emit_unresolved_reference(
+                builder,
+                is_image,
+                inner_text,
+                label_suffix,
+                config,
+                suppress_footnote_refs,
+            );
             pos = *ref_end;
             text_start = pos;
             continue;
@@ -616,6 +647,7 @@ fn parse_inline_range_impl(
                             dest,
                             attributes,
                             config,
+                            suppress_footnote_refs,
                         );
                         pos += len;
                         text_start = pos;
@@ -631,7 +663,14 @@ fn parse_inline_range_impl(
                             builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                         }
                         log::trace!("IR: matched reference image at pos {}", pos);
-                        emit_reference_image(builder, alt_text, &reference, is_shortcut, config);
+                        emit_reference_image(
+                            builder,
+                            alt_text,
+                            &reference,
+                            is_shortcut,
+                            config,
+                            suppress_footnote_refs,
+                        );
                         pos += len;
                         text_start = pos;
                         continue;
@@ -654,6 +693,7 @@ fn parse_inline_range_impl(
                             dest,
                             attributes,
                             config,
+                            suppress_footnote_refs,
                         );
                         pos += len;
                         text_start = pos;
@@ -674,7 +714,14 @@ fn parse_inline_range_impl(
                             builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                         }
                         log::trace!("IR: matched reference link at pos {}", pos);
-                        emit_reference_link(builder, link_text, &reference, is_shortcut, config);
+                        emit_reference_link(
+                            builder,
+                            link_text,
+                            &reference,
+                            is_shortcut,
+                            config,
+                            suppress_footnote_refs,
+                        );
                         pos += len;
                         text_start = pos;
                         continue;
@@ -948,7 +995,7 @@ fn parse_inline_range_impl(
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
             log::trace!("Matched inline footnote at pos {}", pos);
-            emit_inline_footnote(builder, content, config);
+            emit_inline_footnote(builder, content, config, suppress_footnote_refs);
             pos += len;
             text_start = pos;
             continue;
@@ -963,7 +1010,7 @@ fn parse_inline_range_impl(
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
             log::trace!("Matched superscript at pos {}", pos);
-            emit_superscript(builder, content, config);
+            emit_superscript(builder, content, config, suppress_footnote_refs);
             pos += len;
             text_start = pos;
             continue;
@@ -1006,7 +1053,7 @@ fn parse_inline_range_impl(
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
             log::trace!("Matched strikeout at pos {}", pos);
-            emit_strikeout(builder, content, config);
+            emit_strikeout(builder, content, config, suppress_footnote_refs);
             pos += len;
             text_start = pos;
             continue;
@@ -1022,7 +1069,7 @@ fn parse_inline_range_impl(
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
             log::trace!("Matched subscript at pos {}", pos);
-            emit_subscript(builder, content, config);
+            emit_subscript(builder, content, config, suppress_footnote_refs);
             pos += len;
             text_start = pos;
             continue;
@@ -1037,7 +1084,7 @@ fn parse_inline_range_impl(
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
             log::trace!("Matched mark at pos {}", pos);
-            emit_mark(builder, content, config);
+            emit_mark(builder, content, config, suppress_footnote_refs);
             pos += len;
             text_start = pos;
             continue;
@@ -1200,7 +1247,13 @@ fn parse_inline_range_impl(
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
             log::trace!("Matched native span at pos {}", pos);
-            emit_native_span(builder, &text[pos..pos + len], content, config);
+            emit_native_span(
+                builder,
+                &text[pos..pos + len],
+                content,
+                config,
+                suppress_footnote_refs,
+            );
             pos += len;
             text_start = pos;
             continue;
@@ -1233,6 +1286,7 @@ fn parse_inline_range_impl(
         if byte == b'['
             && config.dialect == Dialect::CommonMark
             && config.extensions.footnotes
+            && !suppress_footnote_refs
             && let Some((len, id)) = try_parse_footnote_reference(&text[pos..])
         {
             if pos > text_start {
@@ -1273,7 +1327,13 @@ fn parse_inline_range_impl(
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
             log::trace!("Matched bracketed span at pos {}", pos);
-            emit_bracketed_span(builder, &text_content, &attrs, config);
+            emit_bracketed_span(
+                builder,
+                &text_content,
+                &attrs,
+                config,
+                suppress_footnote_refs,
+            );
             pos += len;
             text_start = pos;
             continue;
@@ -1372,6 +1432,7 @@ fn parse_inline_range_impl(
                         bracket_plan,
                         construct_plan,
                         suppress_inner_links,
+                        suppress_footnote_refs,
                         mask,
                     );
                     builder.token(marker_kind.into(), &text[partner..partner + partner_len]);
@@ -1517,7 +1578,7 @@ mod tests {
         let config = ParserOptions::default();
         let mut builder = GreenNodeBuilder::new();
 
-        parse_inline_text_recursive(&mut builder, text, &config);
+        parse_inline_text_recursive(&mut builder, text, &config, false);
 
         let green: GreenNode = builder.finish();
         let node = SyntaxNode::new_root(green);
@@ -1538,7 +1599,7 @@ mod tests {
 
         // Wrap in a PARAGRAPH node (inline content needs a parent)
         builder.start_node(SyntaxKind::PARAGRAPH.into());
-        parse_inline_text_recursive(&mut builder, text, &config);
+        parse_inline_text_recursive(&mut builder, text, &config, false);
         builder.finish_node();
 
         let green: GreenNode = builder.finish();
@@ -1568,7 +1629,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         builder.start_node(SyntaxKind::DOCUMENT.into());
-        parse_inline_text_recursive(&mut builder, text, &config);
+        parse_inline_text_recursive(&mut builder, text, &config, false);
         builder.finish_node();
 
         let green: GreenNode = builder.finish();
@@ -1619,7 +1680,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         builder.start_node(SyntaxKind::DOCUMENT.into());
-        parse_inline_text_recursive(&mut builder, text, &config);
+        parse_inline_text_recursive(&mut builder, text, &config, false);
         builder.finish_node();
 
         let green: GreenNode = builder.finish();
@@ -1671,7 +1732,7 @@ mod tests {
         builder.start_node(SyntaxKind::DOCUMENT.into()); // Need a root node
 
         // Parse the whole text
-        parse_inline_text_recursive(&mut builder, text, &config);
+        parse_inline_text_recursive(&mut builder, text, &config, false);
 
         builder.finish_node(); // Finish ROOT
         let green: GreenNode = builder.finish();
@@ -1728,6 +1789,7 @@ mod tests {
             &mut builder,
             "Second Link [link_text](https://link.com)",
             &config,
+            false,
         );
         builder.finish_node();
         let green = builder.finish();
@@ -1767,7 +1829,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         builder.start_node(SyntaxKind::DOCUMENT.into());
-        parse_inline_text_recursive(&mut builder, text, &config);
+        parse_inline_text_recursive(&mut builder, text, &config, false);
         builder.finish_node();
 
         let green: GreenNode = builder.finish();
@@ -1782,7 +1844,7 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         builder.start_node(SyntaxKind::PARAGRAPH.into());
-        parse_inline_text_recursive(&mut builder, text, &config);
+        parse_inline_text_recursive(&mut builder, text, &config, false);
         builder.finish_node();
 
         let green: GreenNode = builder.finish();
@@ -1808,7 +1870,7 @@ fn test_two_with_nested_one_and_triple_closer() {
     let mut builder = GreenNodeBuilder::new();
 
     builder.start_node(SyntaxKind::PARAGRAPH.into());
-    parse_inline_text_recursive(&mut builder, text, &config);
+    parse_inline_text_recursive(&mut builder, text, &config, false);
     builder.finish_node();
 
     let green: GreenNode = builder.finish();
@@ -1844,7 +1906,7 @@ fn test_emphasis_with_trailing_space_before_closer() {
     let mut builder = GreenNodeBuilder::new();
 
     builder.start_node(SyntaxKind::PARAGRAPH.into());
-    parse_inline_text_recursive(&mut builder, text, &config);
+    parse_inline_text_recursive(&mut builder, text, &config, false);
     builder.finish_node();
 
     let green: GreenNode = builder.finish();
@@ -1869,7 +1931,7 @@ fn test_triple_emphasis_all_strong_nested() {
     let mut builder = GreenNodeBuilder::new();
 
     builder.start_node(SyntaxKind::DOCUMENT.into());
-    parse_inline_text_recursive(&mut builder, text, &config);
+    parse_inline_text_recursive(&mut builder, text, &config, false);
     builder.finish_node();
 
     let green: GreenNode = builder.finish();
@@ -1918,7 +1980,7 @@ fn test_triple_emphasis_all_emph_nested() {
     let mut builder = GreenNodeBuilder::new();
 
     builder.start_node(SyntaxKind::DOCUMENT.into());
-    parse_inline_text_recursive(&mut builder, text, &config);
+    parse_inline_text_recursive(&mut builder, text, &config, false);
     builder.finish_node();
 
     let green: GreenNode = builder.finish();
@@ -1966,7 +2028,7 @@ fn test_parse_emphasis_multiline() {
     let mut builder = GreenNodeBuilder::new();
 
     builder.start_node(SyntaxKind::PARAGRAPH.into());
-    parse_inline_text_recursive(&mut builder, text, &config);
+    parse_inline_text_recursive(&mut builder, text, &config, false);
     builder.finish_node();
 
     let green: GreenNode = builder.finish();
@@ -1994,7 +2056,7 @@ fn test_parse_strong_multiline() {
     let mut builder = GreenNodeBuilder::new();
 
     builder.start_node(SyntaxKind::PARAGRAPH.into());
-    parse_inline_text_recursive(&mut builder, text, &config);
+    parse_inline_text_recursive(&mut builder, text, &config, false);
     builder.finish_node();
 
     let green: GreenNode = builder.finish();
@@ -2022,7 +2084,7 @@ fn test_parse_triple_emphasis_multiline() {
     let mut builder = GreenNodeBuilder::new();
 
     builder.start_node(SyntaxKind::PARAGRAPH.into());
-    parse_inline_text_recursive(&mut builder, text, &config);
+    parse_inline_text_recursive(&mut builder, text, &config, false);
     builder.finish_node();
 
     let green: GreenNode = builder.finish();

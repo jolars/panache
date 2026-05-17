@@ -68,7 +68,12 @@ pub fn try_parse_strikeout(text: &str) -> Option<(usize, &str)> {
 }
 
 /// Emit a strikeout node with its content
-pub fn emit_strikeout(builder: &mut GreenNodeBuilder, inner_text: &str, config: &ParserOptions) {
+pub fn emit_strikeout(
+    builder: &mut GreenNodeBuilder,
+    inner_text: &str,
+    config: &ParserOptions,
+    suppress_footnote_refs: bool,
+) {
     builder.start_node(SyntaxKind::STRIKEOUT.into());
 
     // Opening marker
@@ -77,7 +82,7 @@ pub fn emit_strikeout(builder: &mut GreenNodeBuilder, inner_text: &str, config: 
     builder.finish_node();
 
     // Parse inner content recursively for nested inline elements
-    parse_inline_text(builder, inner_text, config, false);
+    parse_inline_text(builder, inner_text, config, false, suppress_footnote_refs);
 
     // Closing marker
     builder.start_node(SyntaxKind::STRIKEOUT_MARKER.into());

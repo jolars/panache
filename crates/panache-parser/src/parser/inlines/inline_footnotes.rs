@@ -57,10 +57,17 @@ pub(crate) fn try_parse_inline_footnote(text: &str) -> Option<(usize, &str)> {
 }
 
 /// Emit an inline footnote node to the builder.
+///
+/// `suppress_footnote_refs` cascades through to the recursive inline parse:
+/// if the caller is already inside a footnote-definition body (where pandoc
+/// silently drops nested refs), inline footnotes nested in that body also
+/// drop their inner refs. At the top level the flag is `false` and `[^id]`
+/// inside `^[...]` resolves normally per pandoc-native.
 pub(crate) fn emit_inline_footnote(
     builder: &mut GreenNodeBuilder,
     content: &str,
     config: &ParserOptions,
+    suppress_footnote_refs: bool,
 ) {
     builder.start_node(SyntaxKind::INLINE_FOOTNOTE.into());
 
@@ -68,7 +75,7 @@ pub(crate) fn emit_inline_footnote(
     builder.token(SyntaxKind::INLINE_FOOTNOTE_START.into(), "^[");
 
     // Parse the content recursively for nested inline elements
-    parse_inline_text(builder, content, config, false);
+    parse_inline_text(builder, content, config, false, suppress_footnote_refs);
 
     // Closing marker
     builder.token(SyntaxKind::INLINE_FOOTNOTE_END.into(), "]");

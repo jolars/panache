@@ -56,14 +56,19 @@ pub fn try_parse_mark(text: &str) -> Option<(usize, &str)> {
 }
 
 /// Emit a mark node with its content.
-pub fn emit_mark(builder: &mut GreenNodeBuilder, inner_text: &str, config: &ParserOptions) {
+pub fn emit_mark(
+    builder: &mut GreenNodeBuilder,
+    inner_text: &str,
+    config: &ParserOptions,
+    suppress_footnote_refs: bool,
+) {
     builder.start_node(SyntaxKind::MARK.into());
 
     builder.start_node(SyntaxKind::MARK_MARKER.into());
     builder.token(SyntaxKind::MARK_MARKER.into(), "==");
     builder.finish_node();
 
-    parse_inline_text(builder, inner_text, config, false);
+    parse_inline_text(builder, inner_text, config, false, suppress_footnote_refs);
 
     builder.start_node(SyntaxKind::MARK_MARKER.into());
     builder.token(SyntaxKind::MARK_MARKER.into(), "==");

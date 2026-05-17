@@ -103,7 +103,12 @@ fn contains_unescaped_whitespace(content: &str) -> bool {
 }
 
 /// Emit a subscript node with its content
-pub fn emit_subscript(builder: &mut GreenNodeBuilder, inner_text: &str, config: &ParserOptions) {
+pub fn emit_subscript(
+    builder: &mut GreenNodeBuilder,
+    inner_text: &str,
+    config: &ParserOptions,
+    suppress_footnote_refs: bool,
+) {
     builder.start_node(SyntaxKind::SUBSCRIPT.into());
 
     // Opening marker
@@ -112,7 +117,7 @@ pub fn emit_subscript(builder: &mut GreenNodeBuilder, inner_text: &str, config: 
     builder.finish_node();
 
     // Parse inner content recursively for nested inline elements
-    parse_inline_text(builder, inner_text, config, false);
+    parse_inline_text(builder, inner_text, config, false, suppress_footnote_refs);
 
     // Closing marker
     builder.start_node(SyntaxKind::SUBSCRIPT_MARKER.into());

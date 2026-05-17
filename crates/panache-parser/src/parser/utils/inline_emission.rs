@@ -21,15 +21,24 @@ use rowan::GreenNodeBuilder;
 /// * `builder` - The GreenNodeBuilder to emit nodes into
 /// * `text` - The text content to parse for inline elements
 /// * `config` - Configuration controlling which extensions are enabled
+/// * `suppress_footnote_refs` - When `true`, `[^id]` bytes are emitted as
+///   literal TEXT instead of `FOOTNOTE_REFERENCE`. Block parsers set this
+///   when the inline content lives inside a reference-style footnote
+///   definition body, mirroring pandoc's silent drop of nested refs.
 ///
 /// # Example
 /// ```ignore
 /// // In a block parser (e.g., headings):
 /// builder.start_node(SyntaxKind::HEADING_CONTENT.into());
-/// emit_inlines(builder, heading_text, config);
+/// emit_inlines(builder, heading_text, config, false);
 /// builder.finish_node();
 /// ```
-pub fn emit_inlines(builder: &mut GreenNodeBuilder, text: &str, config: &ParserOptions) {
+pub fn emit_inlines(
+    builder: &mut GreenNodeBuilder,
+    text: &str,
+    config: &ParserOptions,
+    suppress_footnote_refs: bool,
+) {
     log::trace!(
         "emit_inlines: {:?} ({} bytes)",
         &text[..text.len().min(40)],
@@ -37,7 +46,7 @@ pub fn emit_inlines(builder: &mut GreenNodeBuilder, text: &str, config: &ParserO
     );
 
     // Call the recursive inline parser
-    core::parse_inline_text_recursive(builder, text, config);
+    core::parse_inline_text_recursive(builder, text, config, suppress_footnote_refs);
 }
 
 #[cfg(test)]
@@ -66,7 +75,7 @@ mod tests {
             // Build using emit_inlines
             let mut builder_new = GreenNodeBuilder::new();
             builder_new.start_node(SyntaxKind::HEADING_CONTENT.into());
-            emit_inlines(&mut builder_new, text, &config);
+            emit_inlines(&mut builder_new, text, &config, false);
             builder_new.finish_node();
             let green_new = builder_new.finish();
             let tree_new = SyntaxNode::new_root(green_new);
@@ -87,7 +96,7 @@ mod tests {
         let config = ParserOptions::default();
         let mut builder = GreenNodeBuilder::new();
         builder.start_node(SyntaxKind::HEADING_CONTENT.into());
-        emit_inlines(&mut builder, "", &config);
+        emit_inlines(&mut builder, "", &config, false);
         builder.finish_node();
         let green = builder.finish();
         let tree = SyntaxNode::new_root(green);
@@ -105,7 +114,7 @@ mod tests {
 
         let mut builder = GreenNodeBuilder::new();
         builder.start_node(SyntaxKind::HEADING_CONTENT.into());
-        emit_inlines(&mut builder, text, &config);
+        emit_inlines(&mut builder, text, &config, false);
         builder.finish_node();
         let green = builder.finish();
         let tree = SyntaxNode::new_root(green);

@@ -150,6 +150,7 @@ impl<'a> Parser<'a> {
                         buffer_clone.has_blank_lines_between_content()
                     );
 
+                    let suppress_footnote_refs = self.in_footnote_definition();
                     // Pop container first
                     self.containers.stack.pop();
                     // Emit buffered content as Plain or PARAGRAPH
@@ -158,6 +159,7 @@ impl<'a> Parser<'a> {
                         use_paragraph,
                         self.config,
                         item_content_col,
+                        suppress_footnote_refs,
                     );
                     self.builder.finish_node(); // Close LIST_ITEM
                 }
@@ -177,12 +179,17 @@ impl<'a> Parser<'a> {
                     // Clone buffer to avoid borrow issues
                     let buffer_clone = buffer.clone();
                     let checkpoint = *start_checkpoint;
+                    let suppress_footnote_refs = self.in_footnote_definition();
                     // Pop container first
                     self.containers.stack.pop();
                     // Retroactively wrap as PARAGRAPH and emit buffered content
                     self.builder
                         .start_node_at(checkpoint, SyntaxKind::PARAGRAPH.into());
-                    buffer_clone.emit_with_inlines(&mut self.builder, self.config);
+                    buffer_clone.emit_with_inlines(
+                        &mut self.builder,
+                        self.config,
+                        suppress_footnote_refs,
+                    );
                     self.builder.finish_node();
                 }
                 // Handle Paragraph without content
@@ -203,7 +210,13 @@ impl<'a> Parser<'a> {
                     ..
                 }) if !plain_buffer.is_empty() => {
                     let text = plain_buffer.get_accumulated_text();
-                    emit_definition_plain_or_heading(&mut self.builder, &text, self.config);
+                    let suppress_footnote_refs = self.in_footnote_definition();
+                    emit_definition_plain_or_heading(
+                        &mut self.builder,
+                        &text,
+                        self.config,
+                        suppress_footnote_refs,
+                    );
 
                     // Mark PLAIN as closed and clear buffer
                     if let Some(Container::Definition {
@@ -260,7 +273,13 @@ impl<'a> Parser<'a> {
             && !plain_buffer.is_empty()
         {
             let text = plain_buffer.get_accumulated_text();
-            emit_definition_plain_or_heading(&mut self.builder, &text, self.config);
+            let suppress_footnote_refs = self.in_footnote_definition();
+            emit_definition_plain_or_heading(
+                &mut self.builder,
+                &text,
+                self.config,
+                suppress_footnote_refs,
+            );
         }
 
         // Mark PLAIN as closed and clear buffer
@@ -342,11 +361,13 @@ impl<'a> Parser<'a> {
             let item_content_col = *content_col;
             buffer.clear();
             let use_paragraph = buffer_clone.has_blank_lines_between_content();
+            let suppress_footnote_refs = self.in_footnote_definition();
             buffer_clone.emit_as_block(
                 &mut self.builder,
                 use_paragraph,
                 self.config,
                 item_content_col,
+                suppress_footnote_refs,
             );
         }
     }
@@ -673,11 +694,12 @@ impl<'a> Parser<'a> {
         };
         let buffer_clone = buffer.clone();
         let checkpoint = *start_checkpoint;
+        let suppress_footnote_refs = self.in_footnote_definition();
         self.containers.stack.pop();
         self.builder
             .start_node_at(checkpoint, SyntaxKind::PLAIN.into());
         if !buffer_clone.is_empty() {
-            buffer_clone.emit_with_inlines(&mut self.builder, self.config);
+            buffer_clone.emit_with_inlines(&mut self.builder, self.config, suppress_footnote_refs);
         }
         self.builder.finish_node();
     }
@@ -3234,6 +3256,20 @@ impl<'a> Parser<'a> {
             .iter()
             .any(|c| matches!(c, Container::FencedDiv { .. }))
     }
+
+    /// Whether the active container stack has any `FootnoteDefinition`
+    /// ancestor. Used to drive `suppress_footnote_refs` when flushing
+    /// buffered inline content: pandoc silently drops nested `[^id]`
+    /// references inside a reference-style footnote definition body, and
+    /// the suppression cascades through every container nested under it
+    /// (blockquotes, lists, bracketed spans, emphasis, inline footnotes,
+    /// etc.).
+    fn in_footnote_definition(&self) -> bool {
+        self.containers
+            .stack
+            .iter()
+            .any(|c| matches!(c, Container::FootnoteDefinition { .. }))
+    }
 }
 
 /// Emit buffered Definition content as either Heading-then-Plain (when the
@@ -3246,6 +3282,7 @@ fn emit_definition_plain_or_heading(
     builder: &mut GreenNodeBuilder<'static>,
     text: &str,
     config: &ParserOptions,
+    suppress_footnote_refs: bool,
 ) {
     let line_without_newline = text
         .strip_suffix("\r\n")
@@ -3269,14 +3306,14 @@ fn emit_definition_plain_or_heading(
             let heading_bytes = &text[..first_nl + 1];
             emit_atx_heading(builder, heading_bytes, level, config);
             builder.start_node(SyntaxKind::PLAIN.into());
-            inline_emission::emit_inlines(builder, after_first, config);
+            inline_emission::emit_inlines(builder, after_first, config, suppress_footnote_refs);
             builder.finish_node();
             return;
         }
     }
 
     builder.start_node(SyntaxKind::PLAIN.into());
-    inline_emission::emit_inlines(builder, text, config);
+    inline_emission::emit_inlines(builder, text, config, suppress_footnote_refs);
     builder.finish_node();
 }
 

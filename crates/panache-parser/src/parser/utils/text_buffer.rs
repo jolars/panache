@@ -235,10 +235,16 @@ impl ParagraphBuffer {
     }
 
     /// Emit the buffered content with inline parsing, interspersing markers at correct positions.
+    ///
+    /// `suppress_footnote_refs` cascades down into the inline parser. Block
+    /// callers compute it from the container stack so paragraphs flushed
+    /// from inside a `FOOTNOTE_DEFINITION` body silently drop `[^id]` refs
+    /// (pandoc-native behavior).
     pub(crate) fn emit_with_inlines(
         &self,
         builder: &mut GreenNodeBuilder<'static>,
         config: &ParserOptions,
+        suppress_footnote_refs: bool,
     ) {
         let text = self.get_text_for_parsing();
         if text.is_empty() && self.segments.is_empty() {
@@ -249,10 +255,16 @@ impl ParagraphBuffer {
 
         if marker_positions.is_empty() {
             // No markers - simple case, just emit inlines
-            inline_emission::emit_inlines(builder, &text, config);
+            inline_emission::emit_inlines(builder, &text, config, suppress_footnote_refs);
         } else {
             // Complex case: emit inlines with markers interspersed
-            self.emit_with_markers(builder, &text, &marker_positions, config);
+            self.emit_with_markers(
+                builder,
+                &text,
+                &marker_positions,
+                config,
+                suppress_footnote_refs,
+            );
         }
     }
 
@@ -266,11 +278,12 @@ impl ParagraphBuffer {
         text: &str,
         marker_positions: &[(usize, usize, bool)],
         config: &ParserOptions,
+        suppress_footnote_refs: bool,
     ) {
         // Parse inlines once into a temporary tree.
         let mut temp_builder = GreenNodeBuilder::new();
         temp_builder.start_node(SyntaxKind::HEADING_CONTENT.into());
-        inline_emission::emit_inlines(&mut temp_builder, text, config);
+        inline_emission::emit_inlines(&mut temp_builder, text, config, suppress_footnote_refs);
         temp_builder.finish_node();
         let inline_root = SyntaxNode::new_root(temp_builder.finish());
 

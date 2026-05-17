@@ -25,7 +25,7 @@ pub(in crate::parser) fn parse_figure(
 
     // Parse inline content (IMAGE_LINK) directly
     if !text_without_newline.is_empty() {
-        emit_inlines(builder, text_without_newline, config);
+        emit_inlines(builder, text_without_newline, config, false);
     }
 
     if !newline_str.is_empty() {

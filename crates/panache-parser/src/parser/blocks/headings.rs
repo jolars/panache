@@ -210,7 +210,7 @@ pub(crate) fn emit_setext_heading_body(
     // Emit heading content with inline parsing
     builder.start_node(SyntaxKind::HEADING_CONTENT.into());
     if !text_content.is_empty() {
-        inline_emission::emit_inlines(builder, text_content, config);
+        inline_emission::emit_inlines(builder, text_content, config, false);
     }
     builder.finish_node();
 
@@ -376,7 +376,7 @@ pub(crate) fn emit_atx_heading(
     // Heading content node
     builder.start_node(SyntaxKind::HEADING_CONTENT.into());
     if !text_content.is_empty() {
-        inline_emission::emit_inlines(builder, text_content, config);
+        inline_emission::emit_inlines(builder, text_content, config, false);
     }
     builder.finish_node();
 

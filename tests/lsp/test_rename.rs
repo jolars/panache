@@ -625,8 +625,11 @@ async fn test_rename_heading_reference_updates_shortcut_and_hash_links() {
 #[tokio::test]
 async fn test_rename_footnote_updates_references_and_definition_id() {
     let server = TestLspServer::new();
+    // Blank line after the footnote def is required so `Another[^1].` is a
+    // sibling paragraph rather than a lazy-continuation line of the def body
+    // (pandoc-native: `[^1]` inside a footnote-def body is literal text).
     let content =
-        "Simple footnote[^1] in text.\n\n[^1]: This is a simple footnote.\nAnother[^1].\n";
+        "Simple footnote[^1] in text.\n\n[^1]: This is a simple footnote.\n\nAnother[^1].\n";
     server
         .open_document("file:///test.md", content, "markdown")
         .await;
@@ -646,5 +649,5 @@ async fn test_rename_footnote_updates_references_and_definition_id() {
     );
     assert!(edits.iter().any(|e| e.range.start.line == 0));
     assert!(edits.iter().any(|e| e.range.start.line == 2));
-    assert!(edits.iter().any(|e| e.range.start.line == 3));
+    assert!(edits.iter().any(|e| e.range.start.line == 4));
 }

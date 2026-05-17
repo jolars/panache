@@ -442,7 +442,7 @@ fn emit_caption_line_text(
         let trailing_ws = &text[trimmed_len..];
 
         if !before_attrs.is_empty() {
-            inline_emission::emit_inlines(builder, before_attrs, config);
+            inline_emission::emit_inlines(builder, before_attrs, config, false);
         }
         if !space.is_empty() {
             builder.token(SyntaxKind::WHITESPACE.into(), space);
@@ -460,7 +460,7 @@ fn emit_caption_line_text(
     }
 
     if !text.is_empty() {
-        inline_emission::emit_inlines(builder, text, config);
+        inline_emission::emit_inlines(builder, text, config, false);
     }
     if !newline_str.is_empty() {
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
@@ -542,7 +542,7 @@ fn emit_table_cell(
 
     // Parse inline content within the cell
     if !cell_text.is_empty() {
-        inline_emission::emit_inlines(builder, cell_text, config);
+        inline_emission::emit_inlines(builder, cell_text, config, false);
     }
 
     builder.finish_node(); // TABLE_CELL

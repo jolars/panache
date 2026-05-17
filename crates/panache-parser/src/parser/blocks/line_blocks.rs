@@ -48,7 +48,7 @@ pub fn parse_line_block(
             let (content_without_newline, newline_str) = strip_newline(content);
 
             if !content_without_newline.is_empty() {
-                inline_emission::emit_inlines(builder, content_without_newline, config);
+                inline_emission::emit_inlines(builder, content_without_newline, config, false);
             }
 
             if !newline_str.is_empty() {
@@ -71,7 +71,7 @@ pub fn parse_line_block(
                     let (line_without_newline, newline_str) = strip_newline(next_line);
 
                     if !line_without_newline.is_empty() {
-                        inline_emission::emit_inlines(builder, line_without_newline, config);
+                        inline_emission::emit_inlines(builder, line_without_newline, config, false);
                     }
 
                     if !newline_str.is_empty() {

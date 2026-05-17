@@ -94,6 +94,7 @@ pub(crate) fn emit_bracketed_span(
     content: &str,
     attributes: &str,
     config: &ParserOptions,
+    suppress_footnote_refs: bool,
 ) {
     builder.start_node(SyntaxKind::BRACKETED_SPAN.into());
 
@@ -102,7 +103,7 @@ pub(crate) fn emit_bracketed_span(
 
     // Content (with recursive inline parsing)
     builder.start_node(SyntaxKind::SPAN_CONTENT.into());
-    parse_inline_text(builder, content, config, false);
+    parse_inline_text(builder, content, config, false, suppress_footnote_refs);
     builder.finish_node(); // SpanContent
 
     // Closing bracket

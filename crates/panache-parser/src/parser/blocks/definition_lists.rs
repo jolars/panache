@@ -66,7 +66,7 @@ pub(crate) fn emit_term(
     let trimmed_text = text.trim_end();
 
     if !trimmed_text.is_empty() {
-        inline_emission::emit_inlines(builder, trimmed_text, config);
+        inline_emission::emit_inlines(builder, trimmed_text, config, false);
     }
 
     if !newline_str.is_empty() {

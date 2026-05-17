@@ -344,6 +344,7 @@ pub fn emit_inline_image(
     dest: &str,
     raw_attributes: Option<&str>,
     config: &ParserOptions,
+    suppress_footnote_refs: bool,
 ) {
     builder.start_node(SyntaxKind::IMAGE_LINK.into());
 
@@ -356,7 +357,7 @@ pub fn emit_inline_image(
     builder.start_node(SyntaxKind::IMAGE_ALT.into());
     // Use the standalone parse_inline_text function for recursive parsing
     // Note: nested contexts don't resolve references
-    parse_inline_text(builder, alt_text, config, false);
+    parse_inline_text(builder, alt_text, config, false, suppress_footnote_refs);
     builder.finish_node();
 
     // Closing ]
@@ -815,6 +816,7 @@ pub fn emit_inline_link(
     dest: &str,
     raw_attributes: Option<&str>,
     config: &ParserOptions,
+    suppress_footnote_refs: bool,
 ) {
     builder.start_node(SyntaxKind::LINK.into());
 
@@ -829,7 +831,7 @@ pub fn emit_inline_link(
     // still recognised. CommonMark relies on outer-level process_brackets
     // to prevent nested links, but the flag is harmless under CM.
     builder.start_node(SyntaxKind::LINK_TEXT.into());
-    parse_inline_text(builder, link_text, config, true);
+    parse_inline_text(builder, link_text, config, true, suppress_footnote_refs);
     builder.finish_node();
 
     // Closing ]
@@ -1004,6 +1006,7 @@ pub fn emit_reference_link(
     label: &str,
     is_shortcut: bool,
     config: &ParserOptions,
+    suppress_footnote_refs: bool,
 ) {
     builder.start_node(SyntaxKind::LINK.into());
 
@@ -1017,7 +1020,7 @@ pub fn emit_reference_link(
     // recognition during the recursion. Images, emphasis, code, etc. are
     // still recognised.
     builder.start_node(SyntaxKind::LINK_TEXT.into());
-    parse_inline_text(builder, link_text, config, true);
+    parse_inline_text(builder, link_text, config, true, suppress_footnote_refs);
     builder.finish_node();
 
     // Closing ] and reference label
@@ -1129,6 +1132,7 @@ pub fn emit_reference_image(
     label: &str,
     is_shortcut: bool,
     config: &ParserOptions,
+    suppress_footnote_refs: bool,
 ) {
     builder.start_node(SyntaxKind::IMAGE_LINK.into());
 
@@ -1139,7 +1143,7 @@ pub fn emit_reference_image(
 
     // Alt text (recursively parse inline elements)
     builder.start_node(SyntaxKind::IMAGE_ALT.into());
-    parse_inline_text(builder, alt_text, config, false);
+    parse_inline_text(builder, alt_text, config, false, suppress_footnote_refs);
     builder.finish_node();
 
     // Closing ] and reference label
@@ -1177,6 +1181,7 @@ pub fn emit_unresolved_reference(
     text_content: &str,
     label_suffix: Option<&str>,
     config: &ParserOptions,
+    suppress_footnote_refs: bool,
 ) {
     builder.start_node(SyntaxKind::UNRESOLVED_REFERENCE.into());
 
@@ -1185,14 +1190,14 @@ pub fn emit_unresolved_reference(
         builder.token(SyntaxKind::IMAGE_LINK_START.into(), "![");
         builder.finish_node();
         builder.start_node(SyntaxKind::IMAGE_ALT.into());
-        parse_inline_text(builder, text_content, config, false);
+        parse_inline_text(builder, text_content, config, false, suppress_footnote_refs);
         builder.finish_node();
     } else {
         builder.start_node(SyntaxKind::LINK_START.into());
         builder.token(SyntaxKind::LINK_START.into(), "[");
         builder.finish_node();
         builder.start_node(SyntaxKind::LINK_TEXT.into());
-        parse_inline_text(builder, text_content, config, true);
+        parse_inline_text(builder, text_content, config, true, suppress_footnote_refs);
         builder.finish_node();
     }
 

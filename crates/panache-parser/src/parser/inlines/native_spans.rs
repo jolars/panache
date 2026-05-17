@@ -132,6 +132,7 @@ pub(crate) fn emit_native_span(
     raw: &str,
     content: &str,
     config: &ParserOptions,
+    suppress_footnote_refs: bool,
 ) {
     let close_tag = "</span>";
     let open_tag_end = raw.len().saturating_sub(content.len() + close_tag.len());
@@ -141,7 +142,7 @@ pub(crate) fn emit_native_span(
         builder.start_node(SyntaxKind::INLINE_HTML_SPAN.into());
         emit_span_open_tag_tokens(builder, open_tag);
         builder.start_node(SyntaxKind::SPAN_CONTENT.into());
-        parse_inline_text(builder, content, config, false);
+        parse_inline_text(builder, content, config, false, suppress_footnote_refs);
         builder.finish_node();
         builder.token(SyntaxKind::SPAN_BRACKET_CLOSE.into(), close_tag);
         builder.finish_node();
@@ -165,7 +166,7 @@ pub(crate) fn emit_native_span(
     }
     builder.token(SyntaxKind::SPAN_BRACKET_OPEN.into(), ">");
     builder.start_node(SyntaxKind::SPAN_CONTENT.into());
-    parse_inline_text(builder, content, config, false);
+    parse_inline_text(builder, content, config, false, suppress_footnote_refs);
     builder.finish_node();
     builder.token(SyntaxKind::SPAN_BRACKET_CLOSE.into(), close_tag);
     builder.finish_node();

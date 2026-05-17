@@ -606,6 +606,91 @@ mod footnote_tests {
         assert_eq!(footnotes.len(), 1);
         assert!(footnotes[0].contains("[link](http://example.com)"));
     }
+
+    /// Pandoc silently treats `[^id]` inside a reference-style footnote
+    /// definition body as literal text (no `Note` is emitted, the would-be
+    /// reference is just a `Str`). Match that — the inner `[^b]` must NOT
+    /// produce a `FOOTNOTE_REFERENCE` CST node.
+    #[test]
+    fn footnote_ref_inside_footnote_definition_body_is_text() {
+        let input = "Outer[^a].\n\n[^a]: Body with [^b] ref.\n\n[^b]: B.\n";
+        let tree = parse_inline(input);
+
+        let footnote_defs: Vec<_> = tree
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::FOOTNOTE_DEFINITION)
+            .collect();
+        assert_eq!(footnote_defs.len(), 2, "expected two footnote definitions");
+
+        let inner_refs_in_a_body: Vec<_> = footnote_defs[0]
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
+            .collect();
+        assert!(
+            inner_refs_in_a_body.is_empty(),
+            "expected zero FOOTNOTE_REFERENCE inside [^a] def body, got {}",
+            inner_refs_in_a_body.len()
+        );
+
+        // The outer `[^a]` in the document paragraph still resolves normally.
+        let outer_refs: Vec<_> = tree
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
+            .collect();
+        assert_eq!(
+            outer_refs.len(),
+            1,
+            "expected exactly one FOOTNOTE_REFERENCE outside any def body"
+        );
+    }
+
+    /// Suppression cascades transitively through inline wrappers nested
+    /// inside the def body — strong, emphasis, strikeout, links — none
+    /// should resolve `[^b]` inside them. Pandoc-native verified.
+    #[test]
+    fn footnote_ref_suppression_cascades_through_inline_wrappers() {
+        let input = "Outer[^a].\n\n[^a]: Body with **bold [^b]** and ~~strike [^b]~~ and [link [^b]](u).\n\n[^b]: B.\n";
+        let tree = parse_inline(input);
+
+        // Only the outer `[^a]` should be a FOOTNOTE_REFERENCE; all `[^b]`
+        // references inside the def body's inline wrappers fall through to
+        // TEXT.
+        let all_refs: Vec<_> = tree
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
+            .collect();
+        assert_eq!(
+            all_refs.len(),
+            1,
+            "expected exactly one FOOTNOTE_REFERENCE in the whole doc; got {}",
+            all_refs.len()
+        );
+    }
+
+    /// Counter-regression: at the top level (NOT inside a footnote-def body),
+    /// `[^id]` inside an `^[...]` inline footnote DOES resolve to a real
+    /// FOOTNOTE_REFERENCE — pandoc allows it.
+    #[test]
+    fn footnote_ref_inside_inline_footnote_at_top_level_still_resolves() {
+        let input = "Outer^[inline with [^b] ref].\n\n[^b]: B.\n";
+        let tree = parse_inline(input);
+
+        let inline_fn: Vec<_> = tree
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::INLINE_FOOTNOTE)
+            .collect();
+        assert_eq!(inline_fn.len(), 1, "expected one INLINE_FOOTNOTE");
+
+        let refs_in_inline_fn: Vec<_> = inline_fn[0]
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
+            .collect();
+        assert_eq!(
+            refs_in_inline_fn.len(),
+            1,
+            "expected `[^b]` inside top-level `^[...]` to still emit FOOTNOTE_REFERENCE"
+        );
+    }
 }
 
 #[cfg(test)]
