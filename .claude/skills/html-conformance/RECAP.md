@@ -421,6 +421,40 @@ on unlifted HTML_BLOCK_DIV.
   silently disappears. The `_` fallback at the end of the loop
   just calls `format_node_sync` with content_node — it does
   NOT emit the marker.
+
+### Bq-in-listitem first-line dispatch (option (a) landed 2026-05-18)
+
+- **`lists::add_list_item` returns `ListItemFinish`.** When the
+  list-item line is `- > <content>`, the bq branch of
+  `finish_list_item_with_optional_nested` opens an inner
+  `BLOCK_QUOTE` then returns `ListItemFinish::BqDispatch{content}`
+  carrying the post-`> ` content. All `add_list_item` call sites
+  + `start_nested_list` must capture the result and feed it to
+  `Parser::dispatch_bq_after_list_item(finish)`. The helper calls
+  `parse_inner_content(&content, Some(&content))` and decrements
+  `self.pos` by 1 to absorb the caller's mandatory `lines_consumed
+  += 1` (parse_inner_content advances pos by N; outer adds 1; net
+  N is the target). Discarding the result silently loses line 0
+  content — there is no eager-paragraph fallback inside the
+  function anymore.
+- **HTML-block dispatcher uses raw `lines[line_pos]`, not stripped
+  content.** When `parse_inner_content` is invoked from the bq-in-
+  listitem dispatch helper, the HTML-block dispatcher's
+  `pandoc_html_open_tag_closes` still reads raw
+  `lines[line_pos]` and strips `bq_depth` markers via
+  `strip_n_blockquote_markers`. The list-marker prefix bytes
+  (`- ` etc.) are NOT stripped, so the gate fails for
+  bq-in-listitem first line. `parse_inner_content` falls back to
+  paragraph; 0452/0453 stay broken in the same family. Headings,
+  HRs, fenced-code-fail, etc. dispatch correctly because their
+  parsers use `ctx.content` (already stripped before the helper
+  is invoked). Fix shape (deferred): thread `list_content_col` from
+  `ctx.list_indent_info` through `pandoc_html_open_tag_closes`,
+  `parse_html_block_with_wrapper`, `find_multiline_open_end`,
+  `count_tag_balance`, and the bq body-lift paths
+  (`emit_html_block_body_lifted_bq*`). Watch losslessness — line-
+  start `WHITESPACE` for list indent needs the same re-injection
+  treatment as `BqPrefixState` / `LinePrefixState`.
 - **`find_content_node` skips PLAIN/PARAGRAPH trailing a leading
   `HTML_BLOCK`/`HTML_BLOCK_DIV`.** Without the guard, the
   formatter picks the trailing PLAIN (from the comment/PI
@@ -447,68 +481,75 @@ on unlifted HTML_BLOCK_DIV.
 | 3 | Sectioning + verbatim corpus pin; `eitherBlockOrInline` lift | **Conformance landed** — non-void (2026-05-09); void (`<embed>`/`<area>`/`<source>`/`<track>`) (2026-05-10). Implementation leans on projector-side `inline_pending` tracking + byte walker; CST still opaque for split/matched-pair shapes. |
 | 4 | Comments, PIs, declarations, CDATA projection | **Conformance landed** (2026-05-08); type-4 CM lowercase still gappy. CST opaque (these constructs project as RawBlock / RawInline). |
 | 5 | `markdown_in_html_blocks` interaction edge cases | **Conformance landed** — depth-aware nested div, Plain/Para promotion, refs inheritance, **projector-level splitter** (`split_html_block_by_tags` byte walker + `parse_pandoc_blocks` recursive reparse), outer-matched-pair-abandons-on-void-interior. **The structural CST lift was deferred** — Phase 5's mechanism is the projector reparsing bytes, not the parser emitting structure. |
-| 6 (new) | Lift inner HTML block content into structural CST children — `HTML_BLOCK_DIV` / `HTML_BLOCK` get `PARAGRAPH` / `LIST` / etc. as direct children; projector byte walkers become vestigial; `PARAGRAPH→PLAIN` retag at adjacent-HTML-block boundary. | **All non-bq + bq shapes lifted for `<div>` and non-div Pandoc strict-block tags.** Shapes covered: clean multi-line, open-trailing, butted-close, indented-close, same-line, same-line + trailing-text-after-close, empty / blank-only, multi-line open (clean and trailing), depth-aware nested same-tag (`<div><div>x</div></div>` and trailing variants), multi-close trailing (`<div>foo</div></div>` and variants — projects as `Div + RawBlock` per pandoc-native), unclosed `<div>` (projects as `Div [...]` with implicit close), multi-line open + matched close in `pre_content` (single-close, nested, trailing-close, trailing-text — `<div\n  id="x">foo</div>` / `<div\n  id="x">foo</div></div>` / `<div\n  id="x"><div>x</div></div>` / `<div\n  id="x">foo</div>bar` and strict-block `<form\n  id="x">foo</form>`, **at top level and inside a blockquote** via `bq_multiline_close_lift_tag`). Inline-block matched-pair abandons when body begins with a void block tag (Plain via OnlyIfLast). Bq via four discriminator gates (`bq_clean_lift`, `same_line_bq_lift_tag`, `bq_messy_lift_tag`, `bq_multiline_close_lift_tag`). Dispatcher's `HTML_BLOCK_DIV` retag gate uses `pandoc_html_open_tag_closes` AND requires `is_closing: false`. Same-line / multi-line close-line lift paths use depth-aware split (`matched_close_offset` + `try_split_close_line_depth_aware`) + `split_close_marker_end` + trailing graft. `div_has_structural_inner` accepts unclosed div (1 HTML_BLOCK_TAG + structural body, no close). List items: same-line / fully-contained lift via `ListItemBuffer::emit_as_block` reparse + graft (formatter `format_list_item` HTML_BLOCK arm); multi-line lift via close-form dispatcher gate (`BlockContext::list_item_unclosed_html_block_tag` + `ListItemBuffer::unclosed_pandoc_matched_pair_tag`); indent normalization via `strip_list_item_indent` + `LinePrefixState` re-injection (projector `walk_skip_bq_markers` line-start-WS strip). List-item Comment/PI trailing-text via 2-child `try_emit_html_block_lift` branch + formatter `find_content_node` PLAIN-after-HTML_BLOCK guard. Inline-block matched-pair multi-line-open + same-line close (`<video\n  src="x">body</video>` / `<iframe\n  ...>...</iframe>` and bq variants) works transparently via the existing parser-side structural lift (open `HTML_BLOCK_TAG` + PLAIN body + close `HTML_BLOCK_TAG`, no HTML_BLOCK_DIV retag), pinned by 0448-0451. **Pass count history: 105 → 257** (current). **Known gap: bq-in-listitem first-line HTML block** (`- > <div>...` shapes — corpus 0452, 0453 blocked). Open shape gaps tracked in latest session's "Suggested next sub-targets". |
+| 6 (new) | Lift inner HTML block content into structural CST children — `HTML_BLOCK_DIV` / `HTML_BLOCK` get `PARAGRAPH` / `LIST` / etc. as direct children; projector byte walkers become vestigial; `PARAGRAPH→PLAIN` retag at adjacent-HTML-block boundary. | **All non-bq + bq shapes lifted for `<div>` and non-div Pandoc strict-block tags.** Shapes covered: clean multi-line, open-trailing, butted-close, indented-close, same-line, same-line + trailing-text-after-close, empty / blank-only, multi-line open (clean and trailing), depth-aware nested same-tag (`<div><div>x</div></div>` and trailing variants), multi-close trailing (`<div>foo</div></div>` and variants — projects as `Div + RawBlock` per pandoc-native), unclosed `<div>` (projects as `Div [...]` with implicit close), multi-line open + matched close in `pre_content` (single-close, nested, trailing-close, trailing-text — `<div\n  id="x">foo</div>` / `<div\n  id="x">foo</div></div>` / `<div\n  id="x"><div>x</div></div>` / `<div\n  id="x">foo</div>bar` and strict-block `<form\n  id="x">foo</form>`, **at top level and inside a blockquote** via `bq_multiline_close_lift_tag`). Inline-block matched-pair abandons when body begins with a void block tag (Plain via OnlyIfLast). Bq via four discriminator gates (`bq_clean_lift`, `same_line_bq_lift_tag`, `bq_messy_lift_tag`, `bq_multiline_close_lift_tag`). Dispatcher's `HTML_BLOCK_DIV` retag gate uses `pandoc_html_open_tag_closes` AND requires `is_closing: false`. Same-line / multi-line close-line lift paths use depth-aware split (`matched_close_offset` + `try_split_close_line_depth_aware`) + `split_close_marker_end` + trailing graft. `div_has_structural_inner` accepts unclosed div (1 HTML_BLOCK_TAG + structural body, no close). List items: same-line / fully-contained lift via `ListItemBuffer::emit_as_block` reparse + graft (formatter `format_list_item` HTML_BLOCK arm); multi-line lift via close-form dispatcher gate (`BlockContext::list_item_unclosed_html_block_tag` + `ListItemBuffer::unclosed_pandoc_matched_pair_tag`); indent normalization via `strip_list_item_indent` + `LinePrefixState` re-injection (projector `walk_skip_bq_markers` line-start-WS strip). List-item Comment/PI trailing-text via 2-child `try_emit_html_block_lift` branch + formatter `find_content_node` PLAIN-after-HTML_BLOCK guard. Inline-block matched-pair multi-line-open + same-line close (`<video\n  src="x">body</video>` / `<iframe\n  ...>...</iframe>` and bq variants) works transparently via the existing parser-side structural lift (open `HTML_BLOCK_TAG` + PLAIN body + close `HTML_BLOCK_TAG`, no HTML_BLOCK_DIV retag), pinned by 0448-0451. **Bq-in-listitem first-line dispatch landed 2026-05-18** via `ListItemFinish::BqDispatch` + `Parser::dispatch_bq_after_list_item` helper — fixes headings/HRs/etc. on `- > # heading` etc. (pinned by corpus 0454/0455 in `block` section). **Pass count history: 105 → 257** (current). **Known gap: bq-in-listitem first-line HTML block** (`- > <div>...` shapes — corpus 0452, 0453 blocked because the html-block dispatcher's `pandoc_html_open_tag_closes` walks raw `lines[line_pos]` without list-marker stripping; see Persistent traps for fix shape). |
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-05-17 (Inline-block multi-line pin + bq-in-listitem diagnosis)
+## Latest session — 2026-05-18 (bq-in-listitem dispatch — option (a) lands)
 
-Two targets touched, **no parser/projector code changes**:
+Conformance: html 257 → 257 (no change), block 15 → 17 (+2), total
+450 → 452. Workspace 0 → 0 failures.
 
-1. **Negative-space pin** (prior target #3): pinned `<video\n
-   src="x">body</video>` / `<iframe\n …>` and bq variants. These
-   already project correctly via the parser-side structural lift
-   (open `HTML_BLOCK_TAG` + PLAIN body + close `HTML_BLOCK_TAG`,
-   no `HTML_BLOCK_DIV` retag — inline-block matched-pair stays
-   opaque). +4 cases (0448-0451).
-2. **Bq-in-listitem stacked container diagnosis** (prior target #1):
-   root-cause is `lists.rs:1499` —
-   `finish_list_item_with_optional_nested` eagerly starts a
-   paragraph for line 0's bq-internal content instead of
-   dispatching it. The bq dispatcher handles later lines correctly
-   (`- > hello\n  > <div>...` works), but line 0 of bq-in-listitem
-   stays as `Paragraph[INLINE_HTML]`. Added 0452 (single-line
-   `- > <div>foo</div>`) + 0453 (multi-line) to `blocked.txt`
-   with diagnosis.
+### What landed
 
-Conformance: html 253 → 257 (+4), total 446 → 450 (+4); 3 blocked
-(0390 + 0452-0453). Workspace: 0 → 0 failures.
+- New `lists::ListItemFinish` enum (`Done` / `BqDispatch{content:
+  String}`) returned by `add_list_item`, `start_nested_list`, and
+  `finish_list_item_with_optional_nested`. Bq branch now hands the
+  post-`> ` content to the caller instead of eagerly creating a
+  paragraph.
+- New `Parser::dispatch_bq_after_list_item(finish)` helper —
+  invokes `parse_inner_content(&content, Some(&content))` then
+  decrements `self.pos` by 1 to absorb the caller's mandatory
+  `lines_consumed += 1`. All 5 `add_list_item` sites + the
+  `start_nested_list` site in `core.rs` capture the return + call
+  the helper. `handle_list_open_effect` stays void.
+- Fixes heading / HR / fenced-code-fail / ref-def / etc. dispatch
+  on bq-in-listitem first line (`- > # heading`, `- > ---`, …) to
+  match pandoc-native. 0452/0453 (HTML block) stay failing — see
+  new trap.
+- 0453 shape changed (`Para[<div>, foo, </div>]` → `Plain[<div>,
+  foo] + RawBlock</div>`) — still wrong vs pandoc's `Div[Para[foo]]`
+  but the close-form `</div>` is now recognized as a block
+  boundary by the dispatcher.
+- 2 new parser-crate fixtures + insta snapshots
+  (`blockquote_list_item_first_line_{heading,hr}_pandoc`).
+- 2 new corpus cases 0454, 0455 (block section, since the fix is
+  parser-dispatch not HTML-specific).
 
 ### Files in committable diff
 
+- `crates/panache-parser/src/parser/blocks/lists.rs`,
+  `crates/panache-parser/src/parser/core.rs`.
+- `crates/panache-parser/tests/fixtures/cases/` (2 new dirs +
+  snapshots); `golden_parser_cases.rs` (2 entries).
 - `crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/`
-  — 6 new case directories (0448-0453).
-- `crates/panache-parser/tests/pandoc/{allowlist.txt,blocked.txt,
-  report.txt}` + `docs/development/pandoc-report.json`.
+  (0454, 0455) + `tests/pandoc/{allowlist.txt,report.txt}` +
+  `docs/development/pandoc-report.json`.
 
 ### Suggested next sub-targets
 
-1. **Bq-in-listitem stacked container** (0452, 0453). Bug at
-   `lists.rs::finish_list_item_with_optional_nested` line 1499
-   (eager paragraph). Two fix paths: **(a)** make
-   `lists.rs` return a "bq-with-content" signal up to
-   `handle_list_open_effect`, which then calls
-   `self.parse_inner_content(content)`; needs `lines_consumed`
-   plumbing (return `bool` "I already advanced pos" so caller
-   skips the `+= 1`); fixes headings/fenced-code/etc. on
-   bq-in-listitem first line too. **(b)** thread
-   `first_line_prefix_offset: usize` through
-   `parse_html_block_with_wrapper` to skip list-marker bytes on
-   line 0 (HTML-specific). Watch losslessness — the html block
-   parser emits TEXT tokens from `lines[start_pos]` byte slices;
-   `self.lines` modification breaks tree-text-equals-input.
-2. **Softbreak continuation** (0390). Requires Para fusion across
-   the HTML-block boundary; conflicts with the deliberate
-   `close_line + 1` return to keep container boundaries intact
-   (see blocked.txt).
+1. **HTML-block dispatcher list-marker awareness** — unblocks 0452 +
+   0453. `pandoc_html_open_tag_closes`
+   (`crates/panache-parser/src/parser/blocks/html_blocks.rs:2883`)
+   strips `bq_depth` markers from `lines[start_pos..]` but doesn't
+   skip list-marker prefix bytes. Fix shape: thread
+   `list_content_col` from `ctx.list_indent_info` through
+   `pandoc_html_open_tag_closes`, `parse_html_block_with_wrapper`,
+   `find_multiline_open_end`, `count_tag_balance`, and the bq
+   body-lift paths (`emit_html_block_body_lifted_bq*`). Strip list-
+   marker bytes from line 0 (and `content_col`-wide indent from
+   later lines) BEFORE the bq strip. Losslessness: line-start
+   `WHITESPACE` for list indent needs `LinePrefixState`-style
+   re-injection.
+2. **Softbreak continuation** (0390) — unchanged. Conflicts with
+   `close_line + 1` boundary preservation.
 3. **`<aside>` with `markdown="1"`** — Phase 5 spillover; needs
-   the `markdown_attribute` extension default first.
+   `markdown_attribute` extension default first.
 
-### New traps
+### New trap
 
-None — the bq-in-listitem first-line diagnosis lives in
-`blocked.txt` and the next-target section above; no Persistent
-traps expansion needed.
+Folded into Persistent traps ("Bq-in-listitem first-line dispatch"
+subsection).
 
 --------------------------------------------------------------------------------
 
@@ -517,6 +558,7 @@ traps expansion needed.
 Newest first. One line per session: date — phase/sub-target — pass
 count delta — root cause / lever.
 
+- 2026-05-17 — Negative-space pin (`<video\n…>body</video>`, `<iframe\n…>` and bq variants) + bq-in-listitem first-line diagnosis (0452/0453) — html 253 → 257 — already-correct parser-side structural lift pinned; eager-paragraph at `finish_list_item_with_optional_nested` line 1499 identified as the root cause.
 - 2026-05-15 — Phase 6 — bq + multi-line + same-line close lift (`> <div\n>   id="x">foo</div>` and depth-aware variants) — html 248 → 253 — new gate `bq_multiline_close_lift_tag` in `parse_html_block_with_wrapper` joins `lift_mode`/`lift_trailing`; close-line lift gate widens to `bq_depth == 0 || bq_multiline_close_lift_tag.is_some()`; body and close inherit bq prefix from open's last line via `emit_multiline_open_tag_with_attrs`.
 - 2026-05-15 — Phase 6 — multi-line open + same-line close lift on `pre_content` (`<div\n  id="x">foo</div>` and depth-aware variants — non-bq only) — html 243 → 248 — new branch BEFORE legacy `same_line_closed`, gated on `multiline_open_end.is_some() && depth <= 0 && lift_mode && bq_depth == 0 && !pre_content.is_empty()`; same depth-aware split + `split_close_marker_end` + `graft_document_children` pattern; consumes `end_line_idx + 1` lines.
 - 2026-05-15 — Phase 6 — depth-aware same-line + multi-line close-line lift; unclosed `<div>` projects as `Div [...]` — html 235 → 243 — `matched_close_offset` helper; `probe_same_line_lift` switched to depth-aware; `try_split_close_line_depth_aware` mirror + same-line/multi-line lift body switch; multi-line close-line path widened to depth-aware split + `split_close_marker_end` + trailing graft; `div_has_structural_inner` accepts missing close tag.

@@ -377,6 +377,30 @@ impl<'a> Parser<'a> {
     /// not buffered text. The list-item open path normally pushes the
     /// post-marker text into the item's buffer; this helper detects an opening
     /// fence in that buffered first line and converts it into a CODE_BLOCK
+    /// When `add_list_item` opens an inner BLOCK_QUOTE on the same line as
+    /// the list marker (`- > <content>`), it returns the post-`> ` content
+    /// instead of stuffing it into a paragraph; we re-dispatch that content
+    /// through the block parser so block-level constructs (HTML blocks,
+    /// ATX headings, fenced code, …) on the first line of a bq-in-listitem
+    /// are recognized properly.
+    ///
+    /// `parse_inner_content` advances `self.pos` by N (1 for same-line
+    /// content, more for multi-line blocks). The outer dispatcher flow
+    /// always follows the list dispatch with `self.pos += 1` (`lines_consumed`
+    /// for the list-marker line), so we pre-decrement by 1 here to make the
+    /// net advancement equal N rather than N + 1. Callers can then ignore
+    /// the return.
+    fn dispatch_bq_after_list_item(&mut self, result: super::blocks::lists::ListItemFinish) {
+        let super::blocks::lists::ListItemFinish::BqDispatch { content } = result else {
+            return;
+        };
+        let pos_before = self.pos;
+        self.parse_inner_content(&content, Some(&content));
+        if self.pos > pos_before {
+            self.pos -= 1;
+        }
+    }
+
     /// inside the LIST_ITEM, consuming subsequent lines until the closing
     /// fence (or end of document under CommonMark dialect, per §4.5).
     ///
@@ -1001,30 +1025,32 @@ impl<'a> Parser<'a> {
                             .token(SyntaxKind::WHITESPACE.into(), indent_str);
                     }
 
-                    if let Some(nested_marker) = prepared.nested_marker {
+                    let finish = if let Some(nested_marker) = prepared.nested_marker {
                         lists::add_list_item_with_nested_empty_list(
                             &mut self.containers,
                             &mut self.builder,
                             &list_item,
                             nested_marker,
                         );
+                        lists::ListItemFinish::Done
                     } else {
                         lists::add_list_item(
                             &mut self.containers,
                             &mut self.builder,
                             &list_item,
                             self.config,
-                        );
-                    }
+                        )
+                    };
                     self.maybe_open_fenced_code_in_new_list_item();
                     self.maybe_open_indented_code_in_new_list_item();
+                    self.dispatch_bq_after_list_item(finish);
                     return;
                 }
             }
 
             self.emit_list_item_buffer_if_needed();
 
-            start_nested_list(
+            let finish = start_nested_list(
                 &mut self.containers,
                 &mut self.builder,
                 &prepared.marker,
@@ -1034,6 +1060,7 @@ impl<'a> Parser<'a> {
             );
             self.maybe_open_fenced_code_in_new_list_item();
             self.maybe_open_indented_code_in_new_list_item();
+            self.dispatch_bq_after_list_item(finish);
             return;
         }
 
@@ -1052,23 +1079,25 @@ impl<'a> Parser<'a> {
                     .token(SyntaxKind::WHITESPACE.into(), indent_str);
             }
 
-            if let Some(nested_marker) = prepared.nested_marker {
+            let finish = if let Some(nested_marker) = prepared.nested_marker {
                 lists::add_list_item_with_nested_empty_list(
                     &mut self.containers,
                     &mut self.builder,
                     &list_item,
                     nested_marker,
                 );
+                lists::ListItemFinish::Done
             } else {
                 lists::add_list_item(
                     &mut self.containers,
                     &mut self.builder,
                     &list_item,
                     self.config,
-                );
-            }
+                )
+            };
             self.maybe_open_fenced_code_in_new_list_item();
             self.maybe_open_indented_code_in_new_list_item();
+            self.dispatch_bq_after_list_item(finish);
             return;
         }
 
@@ -1093,23 +1122,25 @@ impl<'a> Parser<'a> {
             has_blank_between_items: false,
         });
 
-        if let Some(nested_marker) = prepared.nested_marker {
+        let finish = if let Some(nested_marker) = prepared.nested_marker {
             lists::add_list_item_with_nested_empty_list(
                 &mut self.containers,
                 &mut self.builder,
                 &list_item,
                 nested_marker,
             );
+            lists::ListItemFinish::Done
         } else {
             lists::add_list_item(
                 &mut self.containers,
                 &mut self.builder,
                 &list_item,
                 self.config,
-            );
-        }
+            )
+        };
         self.maybe_open_fenced_code_in_new_list_item();
         self.maybe_open_indented_code_in_new_list_item();
+        self.dispatch_bq_after_list_item(finish);
     }
 
     fn handle_definition_list_effect(
@@ -1305,7 +1336,7 @@ impl<'a> Parser<'a> {
                             virtual_marker_space: marker_match.virtual_marker_space,
                         };
 
-                        if let Some(nested_marker) = is_content_nested_bullet_marker(
+                        let finish = if let Some(nested_marker) = is_content_nested_bullet_marker(
                             content_line,
                             marker_match.marker_len,
                             marker_match.spaces_after_bytes,
@@ -1316,14 +1347,16 @@ impl<'a> Parser<'a> {
                                 &list_item,
                                 nested_marker,
                             );
+                            lists::ListItemFinish::Done
                         } else {
                             lists::add_list_item(
                                 &mut self.containers,
                                 &mut self.builder,
                                 &list_item,
                                 self.config,
-                            );
-                        }
+                            )
+                        };
+                        self.dispatch_bq_after_list_item(finish);
                     } else if let Some(fence) = code_blocks::try_parse_fence_open(content_slice) {
                         self.containers.push(Container::Definition {
                             content_col,
@@ -2185,12 +2218,13 @@ impl<'a> Parser<'a> {
                                 indent_bytes,
                                 virtual_marker_space: marker_match.virtual_marker_space,
                             };
-                            lists::add_list_item(
+                            let finish = lists::add_list_item(
                                 &mut self.containers,
                                 &mut self.builder,
                                 &list_item,
                                 self.config,
                             );
+                            self.dispatch_bq_after_list_item(finish);
                         }
                         self.pos += 1;
                         return true;
@@ -2331,7 +2365,7 @@ impl<'a> Parser<'a> {
                         indent_bytes: inner_indent_bytes,
                         virtual_marker_space: marker_match.virtual_marker_space,
                     };
-                    lists::add_list_item(
+                    let finish = lists::add_list_item(
                         &mut self.containers,
                         &mut self.builder,
                         &list_item,
@@ -2339,6 +2373,7 @@ impl<'a> Parser<'a> {
                     );
                     self.maybe_open_fenced_code_in_new_list_item();
                     self.maybe_open_indented_code_in_new_list_item();
+                    self.dispatch_bq_after_list_item(finish);
                     self.pos += 1;
                     return true;
                 }
@@ -2522,12 +2557,13 @@ impl<'a> Parser<'a> {
                             indent_bytes,
                             virtual_marker_space: marker_match.virtual_marker_space,
                         };
-                        lists::add_list_item(
+                        let finish = lists::add_list_item(
                             &mut self.containers,
                             &mut self.builder,
                             &list_item,
                             self.config,
                         );
+                        self.dispatch_bq_after_list_item(finish);
                     }
                     self.pos += 1;
                     return true;

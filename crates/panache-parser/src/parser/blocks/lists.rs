@@ -8,6 +8,20 @@ use crate::parser::utils::container_stack::{
 use crate::parser::utils::helpers::{strip_newline, trim_end_newlines};
 use crate::parser::utils::list_item_buffer::ListItemBuffer;
 
+/// Signal returned by `add_list_item` / `finish_list_item_with_optional_nested`
+/// so the caller can decide how to handle leftover first-line content.
+///
+/// `BqDispatch` fires when the list item opens an inner BLOCK_QUOTE on the same
+/// line (`- > <content>`) and the post-`> ` content is non-empty and not itself
+/// a list marker. The caller is responsible for dispatching `content` through
+/// the block parser (typically `Parser::parse_inner_content`) so block-level
+/// constructs like HTML blocks or headings are recognized rather than wrapped
+/// in a stray paragraph.
+pub(in crate::parser) enum ListItemFinish {
+    Done,
+    BqDispatch { content: String },
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ListMarker {
     Bullet(char),
@@ -1487,7 +1501,7 @@ pub(in crate::parser) fn start_nested_list(
     item: &ListItemEmissionInput<'_>,
     indent_to_emit: Option<&str>,
     config: &ParserOptions,
-) {
+) -> ListItemFinish {
     // Emit the indent if needed
     if let Some(indent_str) = indent_to_emit {
         builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
@@ -1510,7 +1524,7 @@ pub(in crate::parser) fn start_nested_list(
         text_to_buffer,
         item.virtual_marker_space,
         config,
-    );
+    )
 }
 
 /// Checks if the content after a list marker is exactly another bullet marker.
@@ -1614,7 +1628,7 @@ pub(in crate::parser) fn add_list_item(
     builder: &mut GreenNodeBuilder<'static>,
     item: &ListItemEmissionInput<'_>,
     config: &ParserOptions,
-) {
+) -> ListItemFinish {
     let (content_col, text_to_buffer) = emit_list_item(builder, item);
 
     log::trace!(
@@ -1630,7 +1644,7 @@ pub(in crate::parser) fn add_list_item(
         text_to_buffer,
         item.virtual_marker_space,
         config,
-    );
+    )
 }
 
 /// Finish a list item by either buffering its content or, when the buffered
@@ -1644,7 +1658,7 @@ fn finish_list_item_with_optional_nested(
     text_to_buffer: String,
     virtual_marker_space: bool,
     config: &ParserOptions,
-) {
+) -> ListItemFinish {
     // A line whose content is a thematic break (e.g. `* * *`) takes precedence
     // over being parsed as a sequence of nested list markers. Both dialects
     // agree: `- * * *` is a list item containing a thematic break, not a
@@ -1697,7 +1711,10 @@ fn finish_list_item_with_optional_nested(
                 virtual_marker_space: inner_match.virtual_marker_space,
             };
             let (inner_content_col, inner_text_to_buffer) = emit_list_item(builder, &inner_item);
-            finish_list_item_with_optional_nested(
+            // Recursive call is for nested same-line markers (`- - foo`);
+            // the inner content doesn't begin with `>` so no BqDispatch can
+            // propagate up. Discard the result.
+            let _ = finish_list_item_with_optional_nested(
                 containers,
                 builder,
                 inner_content_col,
@@ -1705,7 +1722,7 @@ fn finish_list_item_with_optional_nested(
                 inner_match.virtual_marker_space,
                 config,
             );
-            return;
+            return ListItemFinish::Done;
         }
     }
 
@@ -1777,7 +1794,9 @@ fn finish_list_item_with_optional_nested(
                 };
                 let (inner_content_col, inner_text_to_buffer) =
                     emit_list_item(builder, &inner_item);
-                finish_list_item_with_optional_nested(
+                // Same as above: inner content doesn't start with `>` so no
+                // BqDispatch can propagate.
+                let _ = finish_list_item_with_optional_nested(
                     containers,
                     builder,
                     inner_content_col,
@@ -1785,21 +1804,22 @@ fn finish_list_item_with_optional_nested(
                     inner_match.virtual_marker_space,
                     config,
                 );
-                return;
+                return ListItemFinish::Done;
             }
         }
 
-        // If there is content after `> `, start a paragraph and buffer
-        // the first line; subsequent lines flow in via the parser's main
-        // loop (lazy continuation handles the no-marker continuation
-        // line in cases like #292).
+        // If there is content after `> `, hand it back to the caller so the
+        // parser's block dispatcher can recognize block-level constructs
+        // (HTML blocks, ATX headings, fenced code, …) instead of wrapping
+        // the first line in a stray paragraph. Subsequent lines continue
+        // via the parser's main loop (lazy continuation handles the
+        // no-marker continuation line in cases like #292).
         if !trimmed.is_empty() {
-            crate::parser::blocks::paragraphs::start_paragraph_if_needed(containers, builder);
-            crate::parser::blocks::paragraphs::append_paragraph_line(
-                containers, builder, remaining, config,
-            );
+            return ListItemFinish::BqDispatch {
+                content: remaining.to_string(),
+            };
         }
-        return;
+        return ListItemFinish::Done;
     }
 
     let marker_only = text_to_buffer.trim().is_empty();
@@ -1813,4 +1833,5 @@ fn finish_list_item_with_optional_nested(
         marker_only,
         virtual_marker_space,
     });
+    ListItemFinish::Done
 }
