@@ -1,12 +1,12 @@
 Pandoc-native conformance report (pandoc 3.9.0.2)
-452 / 455 cases passing (99.3%)
-3 failing
+454 / 455 cases passing (99.8%)
+1 failing
 3 blocked-list entries
 
 === Per-section pass / fail ===
   block: 17 pass / 0 fail
   citation: 1 pass / 0 fail
-  html: 257 pass / 3 fail
+  html: 259 pass / 1 fail
   imported: 162 pass / 0 fail
   inline: 15 pass / 0 fail
 
@@ -461,6 +461,8 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 449
 450
 451
+452
+453
 454
 455
 
@@ -745,6 +747,8 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 449
 450
 451
+452
+453
 
 # imported
 26
@@ -931,10 +935,4 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 # 390 (html-block-comment-trailing-softbreak)
   expected: [ RawBlock ( Format "html" ) "<!-- hi -->" , Para [ Str "trailing" , SoftBreak , Str "more" ] ]
   got:      [ RawBlock ( Format "html" ) "<!-- hi -->" , Para [ Str "trailing" ] , Para [ Str "more" ] ]
-# 452 (html-block-div-blockquote-list-item-single-line)
-  expected: [ BulletList [ [ BlockQuote [ Div ( "" , [ ] , [ ] ) [ Plain [ Str "foo" ] ] ] ] ] ]
-  got:      [ BulletList [ [ BlockQuote [ Para [ RawInline ( Format "html" ) "<div>" , Str "foo" , RawInline ( Format "html" ) "</div>" ] ] ] ] ]
-# 453 (html-block-div-blockquote-list-item-multi-line)
-  expected: [ BulletList [ [ BlockQuote [ Div ( "" , [ ] , [ ] ) [ Para [ Str "hello" ] ] ] ] ] ]
-  got:      [ BulletList [ [ BlockQuote [ Plain [ RawInline ( Format "html" ) "<div>" , SoftBreak , Str "hello" ] , RawBlock ( Format "html" ) "</div>" ] ] ] ]
 

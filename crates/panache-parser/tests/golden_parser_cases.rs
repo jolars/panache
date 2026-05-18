@@ -167,6 +167,8 @@ golden_test_cases!(
     blockquote_list_blockquote,
     blockquote_list_item_first_line_heading_pandoc,
     blockquote_list_item_first_line_hr_pandoc,
+    blockquote_list_item_first_line_html_div_multiline_pandoc,
+    blockquote_list_item_first_line_html_div_pandoc,
     blockquote_list_lazy_continuation_no_marker,
     blockquote_list_no_marker_closes_commonmark,
     blockquote_list_no_marker_continues_pandoc,

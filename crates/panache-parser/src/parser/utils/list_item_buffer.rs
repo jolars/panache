@@ -4,6 +4,9 @@
 //! allowing us to determine tight vs loose lists and parse inline elements correctly.
 
 use crate::options::{Dialect, ParserOptions};
+use crate::parser::blocks::container_prefix::{
+    ContainerPrefixLine, ContainerPrefixState, emit_container_prefix_tokens,
+};
 use crate::parser::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
 use crate::parser::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use crate::parser::blocks::html_blocks::{
@@ -403,15 +406,11 @@ fn try_emit_html_block_lift(
         }
     }
 
-    let mut prefix_state = if prefixes.is_empty() {
-        None
-    } else {
-        Some(LinePrefixState {
-            prefixes,
-            line_idx: 0,
-            at_line_start: true,
-        })
-    };
+    let prefix_lines: Vec<ContainerPrefixLine> = prefixes
+        .into_iter()
+        .map(ContainerPrefixLine::list_only)
+        .collect();
+    let mut prefix_state = ContainerPrefixState::new(prefix_lines);
     if multi_child_trailing {
         graft_node(builder, first, &mut prefix_state);
         let trailing_kind = if use_paragraph {
@@ -429,7 +428,7 @@ fn try_emit_html_block_lift(
 fn graft_node_retag_root(
     builder: &mut GreenNodeBuilder<'static>,
     node: &SyntaxNode,
-    prefix: &mut Option<LinePrefixState>,
+    prefix: &mut Option<ContainerPrefixState>,
     new_kind: SyntaxKind,
 ) {
     builder.start_node(new_kind.into());
@@ -442,20 +441,6 @@ fn graft_node_retag_root(
         }
     }
     builder.finish_node();
-}
-
-/// Per-line indent-prefix state for the list-item HTML-block lift.
-/// `prefixes[i]` is the leading-space bytes stripped from source line
-/// `i` of the buffer text before the inner reparse. During graft these
-/// are re-emitted as `WHITESPACE` tokens at the start of each line so
-/// the CST stays byte-equal to source. Mirrors the `BqPrefixState`
-/// pattern in `parser/blocks/html_blocks.rs` (which handles
-/// `BLOCK_QUOTE_MARKER` + `WHITESPACE` re-injection for bq-wrapped
-/// HTML lifts).
-struct LinePrefixState {
-    prefixes: Vec<String>,
-    line_idx: usize,
-    at_line_start: bool,
 }
 
 /// Strip up to `content_col` leading-space bytes from each continuation
@@ -503,7 +488,7 @@ fn strip_list_item_indent(text: &str, content_col: usize) -> (String, Vec<String
 fn graft_node(
     builder: &mut GreenNodeBuilder<'static>,
     node: &SyntaxNode,
-    prefix: &mut Option<LinePrefixState>,
+    prefix: &mut Option<ContainerPrefixState>,
 ) {
     builder.start_node(node.kind().into());
     for child in node.children_with_tokens() {
@@ -521,14 +506,12 @@ fn emit_grafted_token(
     builder: &mut GreenNodeBuilder<'static>,
     kind: SyntaxKind,
     text: &str,
-    prefix: &mut Option<LinePrefixState>,
+    prefix: &mut Option<ContainerPrefixState>,
 ) {
     if let Some(state) = prefix.as_mut() {
         if state.at_line_start {
-            if let Some(p) = state.prefixes.get(state.line_idx)
-                && !p.is_empty()
-            {
-                builder.token(SyntaxKind::WHITESPACE.into(), p);
+            if let Some(line_prefix) = state.prefixes.get(state.line_idx) {
+                emit_container_prefix_tokens(builder, line_prefix);
             }
             state.at_line_start = false;
         }

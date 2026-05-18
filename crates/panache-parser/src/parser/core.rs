@@ -80,6 +80,16 @@ pub struct Parser<'a> {
     /// The first line after a metadata block is treated as if it has a blank line before it,
     /// matching Pandoc's behavior of allowing headings etc. directly after frontmatter.
     after_metadata_block: bool,
+    /// True while `dispatch_bq_after_list_item` is routing the post-marker
+    /// content of a `- > <block>` shape through `parse_inner_content`. In
+    /// that path the LIST_MARKER + WHITESPACE bytes for `lines[self.pos]`
+    /// have just been emitted upstream by `add_list_item`, so the helper
+    /// must skip them when computing the dispatch line's inner content.
+    /// Toggled false outside that helper — most dispatch paths fire on
+    /// continuation lines where the list-indent bytes are inner content,
+    /// not upstream-emitted prefix. Threaded into `BlockContext` via
+    /// `list_marker_consumed_on_line_0`.
+    dispatch_list_marker_consumed: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -94,6 +104,7 @@ impl<'a> Parser<'a> {
             config,
             block_registry: BlockParserRegistry::new(),
             after_metadata_block: false,
+            dispatch_list_marker_consumed: false,
         }
     }
 
@@ -420,7 +431,13 @@ impl<'a> Parser<'a> {
             return 0;
         };
         let pos_before = self.pos;
+        // Tell parse_inner_content that the LIST_MARKER + WHITESPACE bytes
+        // for `lines[self.pos]`'s first list-content-col columns have
+        // already been emitted upstream by `add_list_item`, so any
+        // emission helper that walks raw `lines[..]` must skip them.
+        self.dispatch_list_marker_consumed = true;
         let dispatch = self.parse_inner_content(&content, Some(&content));
+        self.dispatch_list_marker_consumed = false;
         self.pos = pos_before;
         match dispatch {
             LineDispatch::Consumed(n) => n.saturating_sub(1),
@@ -1697,6 +1714,7 @@ impl<'a> Parser<'a> {
                 config: self.config,
                 content_indent: 0,
                 indent_to_emit: None,
+                list_marker_consumed_on_line_0: self.dispatch_list_marker_consumed,
                 list_indent_info: None,
                 in_list: lists::in_list(&self.containers),
                 in_marker_only_list_item: matches!(
@@ -2725,6 +2743,7 @@ impl<'a> Parser<'a> {
                             &self.containers,
                             leading_indent(stripped_content).0,
                         ),
+                        list_marker_consumed_on_line_0: self.dispatch_list_marker_consumed,
                     },
                     &self.lines,
                     self.pos,
@@ -2900,6 +2919,7 @@ impl<'a> Parser<'a> {
                 &self.containers,
                 leading_indent(content).0,
             ),
+            list_marker_consumed_on_line_0: self.dispatch_list_marker_consumed,
         };
 
         // We'll update these two fields shortly (after they are computed), but we can still

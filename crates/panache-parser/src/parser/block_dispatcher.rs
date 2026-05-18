@@ -150,6 +150,19 @@ pub(crate) struct BlockContext<'a> {
     /// candidates {i,v,x,I,V,X} against an open alpha list in a single
     /// classification pass under Pandoc dialect.
     pub open_alpha_hint: super::blocks::lists::OpenListHint,
+
+    /// True iff the dispatch is for the LIST-MARKER line — i.e. the
+    /// LIST_MARKER + WHITESPACE bytes have just been emitted upstream
+    /// and `lines[line_pos]`'s first `list_content_col` columns are
+    /// "consumed" from the emission's perspective. Set true by
+    /// `parse_inner_content` (which is invoked right after
+    /// `add_list_item` emits the marker), false by normal continuation-
+    /// line dispatch (where the indent bytes belong to inner content).
+    ///
+    /// Consumed by `super::blocks::container_prefix::ContainerPrefix`'s
+    /// emission-safe line-0 strip — see
+    /// `ContainerPrefix::strip_line_0_for_emission`.
+    pub list_marker_consumed_on_line_0: bool,
 }
 
 /// Result of detecting whether a block can be parsed.
@@ -1845,7 +1858,11 @@ impl BlockParser for HtmlBlockParser {
         // so the validation is gated on Pandoc dialect and BlockTag types.
         if !is_commonmark
             && matches!(block_type, HtmlBlockType::BlockTag { .. })
-            && !pandoc_html_open_tag_closes(lines, line_pos, ctx.blockquote_depth)
+            && !pandoc_html_open_tag_closes(
+                lines,
+                line_pos,
+                super::blocks::container_prefix::ContainerPrefix::from_ctx(ctx),
+            )
         {
             return None;
         }
@@ -1982,7 +1999,11 @@ impl BlockParser for HtmlBlockParser {
                 && ctx.config.dialect == crate::options::Dialect::Pandoc
                 && ctx.config.extensions.native_divs
                 && (probe_open_tag_line_has_close_gt(ctx.content, "div")
-                    || pandoc_html_open_tag_closes(lines, line_pos, ctx.blockquote_depth)) =>
+                    || pandoc_html_open_tag_closes(
+                        lines,
+                        line_pos,
+                        super::blocks::container_prefix::ContainerPrefix::from_ctx(ctx),
+                    )) =>
             {
                 crate::syntax::SyntaxKind::HTML_BLOCK_DIV
             }
@@ -1994,7 +2015,7 @@ impl BlockParser for HtmlBlockParser {
             lines,
             line_pos,
             block_type,
-            ctx.blockquote_depth,
+            super::blocks::container_prefix::ContainerPrefix::from_ctx(ctx),
             wrapper_kind,
             ctx.config,
         );

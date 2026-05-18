@@ -400,6 +400,7 @@ fn dispatcher_blockquote_detection() {
         paragraph_open: false,
         next_line: None,
         open_alpha_hint: crate::parser::blocks::lists::OpenListHint::None,
+        list_marker_consumed_on_line_0: false,
     };
 
     let result = registry.detect_prepared(&ctx, &[line], 0);
@@ -436,6 +437,7 @@ fn dispatcher_blockquote_requires_blank_before() {
         paragraph_open: false,
         next_line: None,
         open_alpha_hint: crate::parser::blocks::lists::OpenListHint::None,
+        list_marker_consumed_on_line_0: false,
     };
 
     let result = registry.detect_prepared(&ctx, &[line], 0);
@@ -478,6 +480,7 @@ fn dispatcher_blockquote_payload_basic() {
         paragraph_open: false,
         next_line: None,
         open_alpha_hint: crate::parser::blocks::lists::OpenListHint::None,
+        list_marker_consumed_on_line_0: false,
     };
 
     let result = registry.detect_prepared(&ctx, &[line], 0).unwrap();
@@ -517,6 +520,7 @@ fn dispatcher_blockquote_payload_nested_requires_blank() {
         paragraph_open: false,
         next_line: None,
         open_alpha_hint: crate::parser::blocks::lists::OpenListHint::None,
+        list_marker_consumed_on_line_0: false,
     };
 
     let result = registry.detect_prepared(&ctx, &lines, 1).unwrap();
@@ -555,6 +559,7 @@ fn dispatcher_blockquote_ignored_inside_blockquote() {
         paragraph_open: false,
         next_line: None,
         open_alpha_hint: crate::parser::blocks::lists::OpenListHint::None,
+        list_marker_consumed_on_line_0: false,
     };
 
     let result = registry.detect_prepared(&ctx, &[line], 0);
@@ -588,6 +593,7 @@ fn dispatcher_blockquote_payload_nested_with_blank() {
         paragraph_open: false,
         next_line: None,
         open_alpha_hint: crate::parser::blocks::lists::OpenListHint::None,
+        list_marker_consumed_on_line_0: false,
     };
 
     let result = registry.detect_prepared(&ctx, &lines, 2).unwrap();
@@ -626,6 +632,7 @@ fn dispatcher_blockquote_payload_nested_after_blank_line() {
         paragraph_open: false,
         next_line: None,
         open_alpha_hint: crate::parser::blocks::lists::OpenListHint::None,
+        list_marker_consumed_on_line_0: false,
     };
 
     let result = registry.detect_prepared(&ctx, &lines, 2).unwrap();

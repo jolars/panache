@@ -7,6 +7,8 @@
 pub mod blockquotes;
 #[path = "blocks/code_blocks.rs"]
 pub mod code_blocks; // Public for formatter access to InfoString and CodeBlockType
+#[path = "blocks/container_prefix.rs"]
+pub(crate) mod container_prefix;
 #[path = "blocks/definition_lists.rs"]
 pub mod definition_lists;
 #[path = "blocks/fenced_divs.rs"]

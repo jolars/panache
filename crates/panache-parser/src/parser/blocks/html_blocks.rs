@@ -6,6 +6,9 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
 use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
+use super::container_prefix::{
+    ContainerPrefix, ContainerPrefixLine, ContainerPrefixState, emit_container_prefix_tokens,
+};
 use crate::parser::utils::helpers::{strip_leading_spaces, strip_newline};
 
 /// HTML block-level tags as defined by CommonMark spec.
@@ -888,10 +891,11 @@ pub(crate) fn parse_html_block_with_wrapper(
     lines: &[&str],
     start_pos: usize,
     block_type: HtmlBlockType,
-    bq_depth: usize,
+    prefix: ContainerPrefix,
     wrapper_kind: SyntaxKind,
     config: &ParserOptions,
 ) -> usize {
+    let bq_depth = prefix.bq_depth;
     // Pandoc-dialect Comment / PI trailing-text split. Pandoc-native
     // closes the RawBlock at the close marker (`-->` / `?>`) and parses
     // any subsequent bytes (same-line trailing or following lines) as
@@ -923,14 +927,13 @@ pub(crate) fn parse_html_block_with_wrapper(
     let first_line = lines[start_pos];
     let blank_terminated = ends_at_blank_line(&block_type);
 
-    // The block dispatcher has already emitted BLOCK_QUOTE_MARKER + WHITESPACE
-    // tokens for the first line's blockquote prefix; emit only the inner
-    // content as TEXT to keep the CST byte-equal to the source.
-    let first_inner = if bq_depth > 0 {
-        strip_n_blockquote_markers(first_line, bq_depth)
-    } else {
-        first_line
-    };
+    // The block dispatcher has already emitted the bq prefix tokens for
+    // the first line; emit only the inner content as TEXT to keep the
+    // CST byte-equal to the source. List-marker bytes are stripped only
+    // when this dispatch fires on a list-marker line — for
+    // continuation-line dispatches (the much more common case) the
+    // leading indent is inner content, not upstream-emitted prefix.
+    let first_inner = prefix.strip_line_0_for_emission(first_line);
 
     // Detect a multi-line open tag.
     // - `<div>` (Pandoc lift): we tokenize each line structurally so the
@@ -947,7 +950,7 @@ pub(crate) fn parse_html_block_with_wrapper(
     //   from void tags).
     let multiline_open_end = match (wrapper_kind, &block_type) {
         (SyntaxKind::HTML_BLOCK_DIV, _) => {
-            find_multiline_open_end(lines, start_pos, first_inner, "div", bq_depth)
+            find_multiline_open_end(lines, start_pos, first_inner, "div", prefix)
         }
         (
             _,
@@ -956,7 +959,7 @@ pub(crate) fn parse_html_block_with_wrapper(
                 closes_at_open_tag: true,
                 ..
             },
-        ) => find_multiline_open_end(lines, start_pos, first_inner, tag_name, bq_depth),
+        ) => find_multiline_open_end(lines, start_pos, first_inner, tag_name, prefix),
         (
             _,
             HtmlBlockType::BlockTag {
@@ -968,7 +971,7 @@ pub(crate) fn parse_html_block_with_wrapper(
                 is_closing: false,
             },
         ) if is_pandoc_lift_eligible_block_tag(tag_name) => {
-            find_multiline_open_end(lines, start_pos, first_inner, tag_name, bq_depth)
+            find_multiline_open_end(lines, start_pos, first_inner, tag_name, prefix)
         }
         _ => None,
     };
@@ -996,11 +999,7 @@ pub(crate) fn parse_html_block_with_wrapper(
         let mut opens = 0usize;
         let mut closes = 0usize;
         for line in &lines[start_pos..=last_open_line] {
-            let inner = if bq_depth > 0 {
-                strip_n_blockquote_markers(line, bq_depth)
-            } else {
-                line
-            };
+            let inner = prefix.strip(line);
             let (o, c) = count_tag_balance(inner, tag_name);
             opens += o;
             closes += c;
@@ -1685,14 +1684,16 @@ pub(crate) fn parse_html_block_with_wrapper(
                 // from `lines[end_line_idx]` and check the same.
                 let last_open_line: &str = match multiline_open_end {
                     None => first_inner,
-                    Some(end) if bq_depth > 0 => strip_n_blockquote_markers(lines[end], bq_depth),
+                    Some(end) if prefix.bq_depth > 0 || prefix.list_content_col > 0 => {
+                        prefix.strip(lines[end])
+                    }
                     Some(end) => lines[end],
                 };
                 let (open_no_nl, _) = strip_newline(last_open_line);
                 if !open_no_nl.trim_end_matches([' ', '\t']).ends_with('>') {
                     return false;
                 }
-                let close_stripped = strip_n_blockquote_markers(line, bq_depth);
+                let close_stripped = prefix.strip(line);
                 let (close_no_nl, _) = strip_newline(close_stripped);
                 if !close_no_nl
                     .trim_start_matches([' ', '\t'])
@@ -1724,7 +1725,7 @@ pub(crate) fn parse_html_block_with_wrapper(
                 emit_html_block_body_lifted_bq(
                     builder,
                     &content_lines,
-                    bq_depth,
+                    prefix,
                     demote_policy,
                     config,
                 );
@@ -1746,7 +1747,7 @@ pub(crate) fn parse_html_block_with_wrapper(
             // close-butted-ness (Plain when leading non-empty, Para
             // otherwise); non-div uses OnlyIfLast either way.
             if let Some(tag_name) = bq_messy_lift_tag {
-                let close_stripped = strip_n_blockquote_markers(line, bq_depth);
+                let close_stripped = prefix.strip(line);
                 let close_prefix_len = line.len() - close_stripped.len();
                 let close_prefix = &line[..close_prefix_len];
                 if let Some((leading, close_part)) = try_split_close_line(close_stripped, tag_name)
@@ -1766,7 +1767,7 @@ pub(crate) fn parse_html_block_with_wrapper(
                         &content_lines,
                         leading,
                         close_prefix,
-                        bq_depth,
+                        prefix,
                         policy,
                         config,
                     );
@@ -2044,23 +2045,21 @@ fn emit_html_block_body_lifted(
 fn emit_html_block_body_lifted_bq(
     builder: &mut GreenNodeBuilder<'static>,
     content_lines: &[&str],
-    bq_depth: usize,
+    prefix: ContainerPrefix,
     demote_policy: LastParaDemote,
     config: &ParserOptions,
 ) {
-    let mut prefixes: Vec<String> = Vec::with_capacity(content_lines.len());
+    let mut prefix_lines: Vec<ContainerPrefixLine> = Vec::with_capacity(content_lines.len());
     let mut stripped_lines: Vec<&str> = Vec::with_capacity(content_lines.len());
     for cl in content_lines {
-        let stripped = strip_n_blockquote_markers(cl, bq_depth);
-        let prefix_len = cl.len() - stripped.len();
-        prefixes.push(cl[..prefix_len].to_string());
-        stripped_lines.push(stripped);
+        let (li, bq, inner) = prefix.split(cl);
+        prefix_lines.push(ContainerPrefixLine {
+            list_indent: li.to_string(),
+            bq_prefix: bq.to_string(),
+        });
+        stripped_lines.push(inner);
     }
-    let mut bq = Some(BqPrefixState {
-        prefixes,
-        line_idx: 0,
-        at_line_start: true,
-    });
+    let mut state = ContainerPrefixState::new(prefix_lines);
     emit_html_block_body_lifted_inner(
         builder,
         "",
@@ -2068,7 +2067,7 @@ fn emit_html_block_body_lifted_bq(
         "",
         demote_policy,
         config,
-        &mut bq,
+        &mut state,
     )
 }
 
@@ -2092,29 +2091,31 @@ fn emit_html_block_body_lifted_bq_messy(
     content_lines: &[&str],
     leading: &str,
     close_line_prefix: &str,
-    bq_depth: usize,
+    prefix: ContainerPrefix,
     demote_policy: LastParaDemote,
     config: &ParserOptions,
 ) {
-    let mut prefixes: Vec<String> = Vec::new();
+    let mut prefix_lines: Vec<ContainerPrefixLine> = Vec::new();
     if !pre_content.is_empty() {
-        prefixes.push(String::new());
+        prefix_lines.push(ContainerPrefixLine::default());
     }
     let mut stripped_lines: Vec<&str> = Vec::with_capacity(content_lines.len());
     for cl in content_lines {
-        let stripped = strip_n_blockquote_markers(cl, bq_depth);
-        let prefix_len = cl.len() - stripped.len();
-        prefixes.push(cl[..prefix_len].to_string());
-        stripped_lines.push(stripped);
+        let (li, bq, inner) = prefix.split(cl);
+        prefix_lines.push(ContainerPrefixLine {
+            list_indent: li.to_string(),
+            bq_prefix: bq.to_string(),
+        });
+        stripped_lines.push(inner);
     }
     if !leading.is_empty() {
-        prefixes.push(close_line_prefix.to_string());
+        // The close line carries its own captured prefix bytes; treat
+        // them as bq-prefix only (no list-indent split applied) to keep
+        // the legacy bq-only re-injection behavior for messy-shape
+        // close-line lifts.
+        prefix_lines.push(ContainerPrefixLine::bq_only(close_line_prefix.to_string()));
     }
-    let mut bq = Some(BqPrefixState {
-        prefixes,
-        line_idx: 0,
-        at_line_start: true,
-    });
+    let mut state = ContainerPrefixState::new(prefix_lines);
     emit_html_block_body_lifted_inner(
         builder,
         pre_content,
@@ -2122,7 +2123,7 @@ fn emit_html_block_body_lifted_bq_messy(
         leading,
         demote_policy,
         config,
-        &mut bq,
+        &mut state,
     )
 }
 
@@ -2133,7 +2134,7 @@ fn emit_html_block_body_lifted_inner(
     post_content: &str,
     demote_policy: LastParaDemote,
     config: &ParserOptions,
-    bq: &mut Option<BqPrefixState>,
+    bq: &mut Option<ContainerPrefixState>,
 ) {
     if pre_content.is_empty() && content_lines.is_empty() && post_content.is_empty() {
         return;
@@ -2156,22 +2157,6 @@ fn emit_html_block_body_lifted_inner(
     graft_document_children(builder, &inner_root, demote_policy, bq);
 }
 
-/// Per-line blockquote-prefix injection state used by the graft helpers
-/// when the lifted body originated inside a `> …` blockquote: the
-/// recursive parse was fed the bq-stripped text, so the prefix bytes
-/// (`BLOCK_QUOTE_MARKER` + `WHITESPACE`) must be re-emitted at the
-/// start of each source line to keep the CST byte-equal to the source.
-///
-/// `prefixes[i]` is the literal prefix bytes for source line `i` of the
-/// body (e.g. `"> "`, `">  "`, or `">"`). `line_idx` is the index of
-/// the next prefix to emit; `at_line_start` flips to `true` after every
-/// `NEWLINE` so the next token triggers prefix emission.
-struct BqPrefixState {
-    prefixes: Vec<String>,
-    line_idx: usize,
-    at_line_start: bool,
-}
-
 /// Walk a parsed inner document's top-level children and re-emit them
 /// into `builder`. The document's wrapper node is skipped — only its
 /// children are grafted.
@@ -2179,14 +2164,16 @@ struct BqPrefixState {
 /// `demote_policy` controls whether a trailing `PARAGRAPH` is retagged
 /// as `PLAIN` — see [`LastParaDemote`].
 ///
-/// `bq` is `Some` when grafting a body that lived inside a blockquote
-/// — token emission then injects `BLOCK_QUOTE_MARKER + WHITESPACE`
-/// prefix tokens at line starts. See [`BqPrefixState`].
+/// `bq` is `Some` when grafting a body that lived inside an outer
+/// container (blockquote, list-item, or both) — token emission then
+/// injects the captured per-line prefix tokens at line starts so the
+/// CST stays byte-equal to source. See
+/// [`super::container_prefix::ContainerPrefixState`].
 fn graft_document_children(
     builder: &mut GreenNodeBuilder<'static>,
     doc: &SyntaxNode,
     demote_policy: LastParaDemote,
-    bq: &mut Option<BqPrefixState>,
+    bq: &mut Option<ContainerPrefixState>,
 ) {
     let children: Vec<rowan::NodeOrToken<SyntaxNode, _>> = doc.children_with_tokens().collect();
 
@@ -2241,7 +2228,7 @@ fn graft_document_children(
 fn graft_subtree(
     builder: &mut GreenNodeBuilder<'static>,
     node: &SyntaxNode,
-    bq: &mut Option<BqPrefixState>,
+    bq: &mut Option<ContainerPrefixState>,
 ) {
     graft_subtree_as(builder, node, node.kind(), bq);
 }
@@ -2253,7 +2240,7 @@ fn graft_subtree_as(
     builder: &mut GreenNodeBuilder<'static>,
     node: &SyntaxNode,
     kind: SyntaxKind,
-    bq: &mut Option<BqPrefixState>,
+    bq: &mut Option<ContainerPrefixState>,
 ) {
     builder.start_node(kind.into());
     for child in node.children_with_tokens() {
@@ -2274,12 +2261,12 @@ fn emit_grafted_token(
     builder: &mut GreenNodeBuilder<'static>,
     kind: SyntaxKind,
     text: &str,
-    bq: &mut Option<BqPrefixState>,
+    bq: &mut Option<ContainerPrefixState>,
 ) {
     if let Some(state) = bq.as_mut() {
         if state.at_line_start {
-            if let Some(prefix) = state.prefixes.get(state.line_idx) {
-                emit_bq_prefix_tokens(builder, prefix);
+            if let Some(line_prefix) = state.prefixes.get(state.line_idx) {
+                emit_container_prefix_tokens(builder, line_prefix);
             }
             state.at_line_start = false;
         }
@@ -2814,7 +2801,7 @@ fn find_multiline_open_end(
     start_pos: usize,
     first_inner: &str,
     tag_name: &str,
-    bq_depth: usize,
+    prefix: ContainerPrefix,
 ) -> Option<usize> {
     // Locate the `<tag_name` literal in `first_inner` to start scanning past
     // it. Match is ASCII case-insensitive; the parser preserves source casing.
@@ -2850,11 +2837,7 @@ fn find_multiline_open_end(
     let mut line_idx = start_pos + 1;
     while line_idx < lines.len() {
         let raw = lines[line_idx];
-        let inner = if bq_depth > 0 {
-            strip_n_blockquote_markers(raw, bq_depth)
-        } else {
-            raw
-        };
+        let inner = prefix.strip(raw);
         for &b in inner.as_bytes() {
             match (quote, b) {
                 (None, b'"') | (None, b'\'') => quote = Some(b),
@@ -2883,18 +2866,14 @@ fn find_multiline_open_end(
 pub(crate) fn pandoc_html_open_tag_closes(
     lines: &[&str],
     start_pos: usize,
-    bq_depth: usize,
+    prefix: ContainerPrefix,
 ) -> bool {
     if start_pos >= lines.len() {
         return false;
     }
     let mut quote: Option<u8> = None;
     for (offset, line) in lines.iter().enumerate().skip(start_pos) {
-        let inner = if bq_depth > 0 {
-            strip_n_blockquote_markers(line, bq_depth)
-        } else {
-            line
-        };
+        let inner = prefix.strip(line);
         let bytes = inner.as_bytes();
         let mut i = 0usize;
         if offset == start_pos {
@@ -3452,16 +3431,34 @@ mod tests {
     fn test_find_multiline_open_end() {
         // Single-line opens return None (caller takes the regular path).
         assert_eq!(
-            find_multiline_open_end(&["<div id=\"x\">"], 0, "<div id=\"x\">", "div", 0),
+            find_multiline_open_end(
+                &["<div id=\"x\">"],
+                0,
+                "<div id=\"x\">",
+                "div",
+                ContainerPrefix::default()
+            ),
             None
         );
         assert_eq!(
-            find_multiline_open_end(&["<embed src=\"x\">"], 0, "<embed src=\"x\">", "embed", 0),
+            find_multiline_open_end(
+                &["<embed src=\"x\">"],
+                0,
+                "<embed src=\"x\">",
+                "embed",
+                ContainerPrefix::default()
+            ),
             None
         );
         // Multi-line opens return the line index of the closing `>`.
         assert_eq!(
-            find_multiline_open_end(&["<embed", "  src=\"x\">"], 0, "<embed", "embed", 0),
+            find_multiline_open_end(
+                &["<embed", "  src=\"x\">"],
+                0,
+                "<embed",
+                "embed",
+                ContainerPrefix::default()
+            ),
             Some(1)
         );
         assert_eq!(
@@ -3470,17 +3467,29 @@ mod tests {
                 0,
                 "<embed",
                 "embed",
-                0
+                ContainerPrefix::default()
             ),
             Some(2)
         );
         // Tag-name mismatch returns None (case-insensitive on the tag name).
         assert_eq!(
-            find_multiline_open_end(&["<embed", "  src=\"x\">"], 0, "<embed", "div", 0),
+            find_multiline_open_end(
+                &["<embed", "  src=\"x\">"],
+                0,
+                "<embed",
+                "div",
+                ContainerPrefix::default()
+            ),
             None
         );
         assert_eq!(
-            find_multiline_open_end(&["<EMBED", "  src=\"x\">"], 0, "<EMBED", "embed", 0),
+            find_multiline_open_end(
+                &["<EMBED", "  src=\"x\">"],
+                0,
+                "<EMBED",
+                "embed",
+                ContainerPrefix::default()
+            ),
             Some(1)
         );
         // Quoted `>` does not terminate the open tag; quote state threads
@@ -3491,19 +3500,31 @@ mod tests {
                 0,
                 "<embed title=\"a>b",
                 "embed",
-                0
+                ContainerPrefix::default()
             ),
             Some(1)
         );
         // No `>` anywhere returns None.
         assert_eq!(
-            find_multiline_open_end(&["<embed", "  src=\"x\""], 0, "<embed", "embed", 0),
+            find_multiline_open_end(
+                &["<embed", "  src=\"x\""],
+                0,
+                "<embed",
+                "embed",
+                ContainerPrefix::default()
+            ),
             None
         );
         // Subsequent lines inside a blockquote: bq markers stripped before
         // scanning so `> ` prefixes don't count.
         assert_eq!(
-            find_multiline_open_end(&["<div", ">   id=\"x\">"], 0, "<div", "div", 1),
+            find_multiline_open_end(
+                &["<div", ">   id=\"x\">"],
+                0,
+                "<div",
+                "div",
+                ContainerPrefix::bq_only(1)
+            ),
             Some(1)
         );
         // Nested bq: strips two `> ` per line.
@@ -3513,7 +3534,7 @@ mod tests {
                 0,
                 "<section",
                 "section",
-                2
+                ContainerPrefix::bq_only(2)
             ),
             Some(1)
         );
@@ -3522,39 +3543,55 @@ mod tests {
     #[test]
     fn test_pandoc_html_open_tag_closes() {
         // Single-line complete: scanner finds `>` on the first line.
-        assert!(pandoc_html_open_tag_closes(&["<div>"], 0, 0));
-        assert!(pandoc_html_open_tag_closes(&["<embed src=\"x\">"], 0, 0));
+        assert!(pandoc_html_open_tag_closes(
+            &["<div>"],
+            0,
+            ContainerPrefix::default()
+        ));
+        assert!(pandoc_html_open_tag_closes(
+            &["<embed src=\"x\">"],
+            0,
+            ContainerPrefix::default()
+        ));
         // Multi-line complete: scanner finds `>` on a later line.
         assert!(pandoc_html_open_tag_closes(
             &["<div", "  id=\"x\">", "body", "</div>"],
             0,
-            0
+            ContainerPrefix::default()
         ));
         assert!(pandoc_html_open_tag_closes(
             &["<embed", "  src=\"x.png\" alt=\"y\">"],
             0,
-            0
+            ContainerPrefix::default()
         ));
         // Quoted `>` does not close: scanner threads quote state.
         assert!(!pandoc_html_open_tag_closes(
             &["<div title=\"a>b", "  c\""],
             0,
-            0
+            ContainerPrefix::default()
         ));
         assert!(pandoc_html_open_tag_closes(
             &["<div title=\"a>b", "  c\">"],
             0,
-            0
+            ContainerPrefix::default()
         ));
         // Incomplete: no `>` anywhere — pandoc treats as paragraph text.
-        assert!(!pandoc_html_open_tag_closes(&["<embed"], 0, 0));
-        assert!(!pandoc_html_open_tag_closes(&["<div", "foo", "bar"], 0, 0));
+        assert!(!pandoc_html_open_tag_closes(
+            &["<embed"],
+            0,
+            ContainerPrefix::default()
+        ));
+        assert!(!pandoc_html_open_tag_closes(
+            &["<div", "foo", "bar"],
+            0,
+            ContainerPrefix::default()
+        ));
         // Pandoc tolerates blank lines mid-open-tag (its `htmlTag` reads
         // across them); the scan continues until EOF or `>`.
         assert!(pandoc_html_open_tag_closes(
             &["<div", "", "id=\"x\">"],
             0,
-            0
+            ContainerPrefix::default()
         ));
     }
 
@@ -3681,7 +3718,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            0,
+            ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
             &opts,
         );
@@ -3702,7 +3739,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            0,
+            ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
             &opts,
         );
@@ -3723,7 +3760,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            0,
+            ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
             &opts,
         );
@@ -3751,7 +3788,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            0,
+            ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
             &opts,
         );
@@ -3776,7 +3813,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            0,
+            ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
             &opts,
         );
@@ -3801,7 +3838,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            0,
+            ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
             &opts,
         );
@@ -3834,7 +3871,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            0,
+            ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
             &opts,
         );
@@ -3878,7 +3915,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            0,
+            ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
             &opts,
         );
@@ -3916,7 +3953,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            0,
+            ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
             &opts,
         );
