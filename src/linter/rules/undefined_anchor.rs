@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::{AttributeNode, Link, SyntaxNode};
+use crate::syntax::{AttributeNode, Citation, Link, SyntaxNode};
 use crate::utils::implicit_heading_ids;
 use rowan::ast::AstNode;
 use std::collections::HashSet;
@@ -106,6 +106,17 @@ fn extend_anchors(anchors: &mut HashSet<String>, tree: &SyntaxNode, config: &Con
                 continue;
             }
             anchors.insert(entry.id);
+        }
+    }
+
+    if config.extensions.citations {
+        for citation in tree.descendants().filter_map(Citation::cast) {
+            for key in citation.key_texts() {
+                if key.is_empty() {
+                    continue;
+                }
+                anchors.insert(format!("ref-{key}"));
+            }
         }
     }
 }
@@ -324,6 +335,40 @@ mod tests {
     fn ignores_inline_link_without_hash() {
         let input = "See [there](https://example.com).\n";
         assert!(parse_and_lint(input).is_empty());
+    }
+
+    #[test]
+    fn resolves_ref_anchor_for_in_document_citation() {
+        // Pandoc renders bibliography entries with id="ref-<citekey>"; per the
+        // pandoc maintainer this is the canonical way to override a citation's
+        // link text. See https://github.com/jgm/pandoc/issues/11657.
+        let input = "See @laws1 [@laws1].\n\nLater: [my label](#ref-laws1).\n";
+        let diagnostics = parse_and_lint(input);
+        assert!(
+            diagnostics.is_empty(),
+            "expected no diagnostics, got {:?}",
+            diagnostics
+        );
+    }
+
+    #[test]
+    fn reports_ref_anchor_when_no_matching_citation() {
+        let input = "Just text. See [label](#ref-laws1).\n";
+        let diagnostics = parse_and_lint(input);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "undefined-anchor");
+        assert!(diagnostics[0].message.contains("#ref-laws1"));
+    }
+
+    #[test]
+    fn ref_anchor_ignored_when_citations_extension_disabled() {
+        let input = "See @laws1.\n\n[label](#ref-laws1).\n";
+        let mut config = Config::default();
+        config.extensions.citations = false;
+        let diagnostics = parse_and_lint_with_config(input, config);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "undefined-anchor");
+        assert!(diagnostics[0].message.contains("#ref-laws1"));
     }
 
     #[test]

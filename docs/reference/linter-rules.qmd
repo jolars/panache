@@ -297,6 +297,11 @@ Description
     renderer rewrites cross-chapter anchors. Quarto books render each chapter to a
     separate HTML page and are not scanned cross-chapter.
 
+    When the `citations` extension is enabled, links of the form
+    `[text](#ref-citekey)` are recognized as overriding a citation's link text
+    (Pandoc renders bibliography entries with `id="ref-<citekey>"`), so they resolve
+    as long as `@citekey` appears somewhere in the document.
+
     Anchors declared via raw HTML `<a id="x">` / `<a name="x">` are not currently
     inspected, so links to them may be flagged as undefined. `<div id="x">` blocks
     are recognized.

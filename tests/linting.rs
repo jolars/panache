@@ -159,6 +159,27 @@ fn test_undefined_anchor() {
 }
 
 #[test]
+fn test_citation_ref_anchor() {
+    // Pandoc renders bibliography entries with id="ref-<citekey>"; links of
+    // the shape [text](#ref-citekey) override the citation's display text.
+    // See https://github.com/jolars/panache/discussions/289 and
+    // https://github.com/jgm/pandoc/issues/11657.
+    let diagnostics = lint_file("citation_ref_anchor.md");
+    let anchors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "undefined-anchor")
+        .collect();
+
+    assert_eq!(
+        anchors.len(),
+        1,
+        "ref-<citekey> anchors should resolve for cited keys, got {:?}",
+        anchors
+    );
+    assert!(anchors[0].message.contains("#ref-missing"));
+}
+
+#[test]
 fn test_missing_reference_targets() {
     let diagnostics = lint_file("missing_references.md");
     let missing_ref: Vec<_> = diagnostics
