@@ -459,50 +459,34 @@ intentionally excluded.
       and `LinePrefixState` collapsed into a unified `ContainerPrefixState` for
       graft re-injection. Unblocked pandoc-conformance 0452/0453 (`- > <div>...`
       single- and multi-line); html 257 → 259, total 452 → 454.
-- [ ] Follow-up to the `ContainerPrefix` work: remove the dual `ctx.content` /
-      raw-`&self.lines, line_pos` redundancy in the `BlockParser` trait. The
-      strip vocabulary is now uniform, but the trait still passes both views. A
-      pre-stripped lines view (or computing `first_inner` once at the
-      dispatcher) would let helpers stop re-stripping and remove the
-      `list_marker_consumed_on_line_0` line-0 special case.
-      - **Partial**: trait signature swapped to take
-        `lines: &StrippedLines<'_,     '_>`
-        (`parser/blocks/container_prefix.rs`). The raw `(&[&str], usize)` tuple
-        is gone from `detect_prepared` / `parse_prepared`; parser bodies still
-        access `lines.raw()` / `lines.pos()` via in-fn shims. A
-        `BlockPrefixInfo` struct landed (definition only --- no plumbing yet) to
-        host the eventual `count_blockquote_markers` /
-        `parse_blockquote_marker_info` cache.
-      - **Unblocked**: `ContainerPrefix` is now a stack-walked
-        `SmallVec<[StripOp; 8]>` (`ListAdvance` / `BlockQuoteMarker` /
-        `ContentIndent`) built by `from_stack(stack, list_marker_consumed)` from
-        the live container stack. Strip order matches the stack-walk order, so
-        cases like `[Definition, List, ListItem, BlockQuote]` produce the
-        correct `content_indent → list_advance → bq` cascade instead of the
-        previous fixed order. A `debug_assert!` in `parse_inner_content` proves
-        `lines.first() == ctx.content` on every dispatch across the full test
-        suite. SmallVec inlines ≤8 ops (deeper than any realistic input) and
-        heap-spills for pathological nesting; no silent-drop cap.
-      - **Remaining sub-tasks**:
-        1. Plumb `BlockPrefixInfo` once at dispatcher entry; replace the
-           redundant `parse_blockquote_marker_info` / `next_line` bq-strip
-           recomputations at `core.rs:2815`, `2842`, `2886`.
-        2. Migrate the 21 `BlockParser` impls to read `lines.first()` instead of
-           `ctx.content`; replace the
-           `let line_pos = lines.pos(); let            lines = lines.raw();`
-           shim with direct `StrippedLines` accessors. Delete
-           `BlockContext.content` and
-           `BlockContext.list_marker_consumed_on_line_0` (the flag now lives
-           only inside `ContainerPrefix`). Drop the debug_assert.
-        3. Add a `footnote_with_blockquote` parser golden fixture covering the
-           bq-inside-footnote case that motivated the strip-order fix.
-      - **Polish (optional)**: delete the `from_ctx` shim once the three
-        parser-body callers in `block_dispatcher.rs` can build prefixes via
-        `from_stack` (requires threading `&[Container]` or a pre-built recipe
-        through `BlockContext`). The `dispatch_list_marker_consumed` toggle in
-        `parse_line`'s shifted-bq paths is a side-band signal that could be
-        replaced by a `StripOp::ListAdvanceConditional` variant so the prefix
-        self-encodes the semantic.
+- [x] Follow-up to the `ContainerPrefix` work: remove the dual `ctx.content` /
+      raw-`&self.lines, line_pos` redundancy in the `BlockParser` trait.
+      Completed across three landed refactors: stack-walked `ContainerPrefix`
+      (`SmallVec<[StripOp; 8]>` recipe of `ListAdvance` / `BlockQuoteMarker` /
+      `ContentIndent` ops); migration of all 21 `BlockParser` impls to read the
+      dispatch line via `lines.first()`; deletion of `BlockContext.content` and
+      `BlockContext.list_marker_consumed_on_line_0` (the latter routed directly
+      from `self.dispatch_list_marker_consumed` into
+      `ContainerPrefix::from_stack`); deletion of the unused `BlockPrefixInfo`
+      cache; and addition of the `footnote_with_blockquote` parser golden case
+      locking in the bq-in-footnote strip-order semantics. A drive-by bug fell
+      out: `shifted_blockquote_from_list` was sourcing `list_content_col` from
+      `paragraphs::current_content_col` (which folds in the `FootnoteDefinition`
+      content_col), double-counting the footnote indent for
+      `[FootnoteDef, BlockQuote, Paragraph]` stacks and leaving
+      continuation-line `>` bytes stranded as raw TEXT inside the paragraph.
+      Source `list_content_col` from `ListItem` only and gate the probe on
+      either `list_content_col > 0` or `current_blockquote_depth() > 0` so
+      paragraph-continuation lines starting with `>` inside footnotes
+      (angle-link variants) are not misclassified.
+      - **Optional polish (deferred)**: delete the `from_ctx` shim by threading
+        `&[Container]` or a pre-built prefix through `BlockContext` (4 callers
+        remain: `parse_line` top-level dispatch, the in-flight bq-detect
+        emission path, and two `ContinuationPolicy` helpers). The
+        `dispatch_list_marker_consumed` toggle in `parse_line`'s shifted-bq
+        paths is a side-band signal that could be replaced by a
+        `StripOp::ListAdvanceConditional` variant so the prefix self-encodes the
+        semantic.
 - [ ] Audit other multi-line-lookahead block parsers for the same misfire class.
       Concrete finding from the `ContainerPrefix` audit: fenced code in
       list-item + bq breaks losslessness (CST text doesn't match input) for the
