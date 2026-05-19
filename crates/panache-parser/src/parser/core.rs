@@ -1560,8 +1560,35 @@ impl<'a> Parser<'a> {
         &self,
         line: &'b str,
     ) -> Option<(usize, &'b str, &'b str, &'b str)> {
-        let list_content_col = paragraphs::current_content_col(&self.containers);
+        // Only the innermost `ListItem`'s content_col counts here — content
+        // containers (footnotes/definitions) are accounted for separately by
+        // `content_container_indent_to_strip`. Mixing them via
+        // `paragraphs::current_content_col` (which returns the innermost
+        // ListItem-or-FootnoteDef content_col) double-counts the footnote
+        // indent for stacks like `[FootnoteDef, BlockQuote, Paragraph]`,
+        // pushing `marker_col` past the actual `>` column and stranding
+        // continuation-line markers as paragraph text.
+        let list_content_col = self
+            .containers
+            .stack
+            .iter()
+            .rev()
+            .find_map(|c| match c {
+                Container::ListItem { content_col, .. } => Some(*content_col),
+                _ => None,
+            })
+            .unwrap_or(0);
         let content_container_indent = self.content_container_indent_to_strip();
+        // Don't probe for a "new" blockquote inside a footnote/definition that
+        // has no list and no open blockquote — paragraph continuation lines
+        // there can legitimately start with `>` (e.g. an angle-link variant
+        // `>url>`), and `parse_inner_content` already gates real bq opens
+        // via `blank_before_blockquote`. Only fire here when there's an
+        // open `BlockQuote` (so we're continuing an existing quote) or a
+        // `ListItem` providing the column offset.
+        if list_content_col == 0 && self.current_blockquote_depth() == 0 {
+            return None;
+        }
         let marker_col = list_content_col.saturating_add(content_container_indent);
         if marker_col == 0 {
             return None;

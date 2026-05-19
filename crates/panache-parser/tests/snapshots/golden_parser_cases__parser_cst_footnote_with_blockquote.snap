@@ -1,0 +1,34 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..100
+  FOOTNOTE_DEFINITION@0..100
+    FOOTNOTE_LABEL_START@0..2 "[^"
+    FOOTNOTE_LABEL_ID@2..3 "a"
+    FOOTNOTE_LABEL_END@3..4 "]"
+    FOOTNOTE_LABEL_COLON@4..5 ":"
+    WHITESPACE@5..6 " "
+    PARAGRAPH@6..18
+      TEXT@6..17 "First line."
+      NEWLINE@17..18 "\n"
+    BLANK_LINE@18..19
+      BLANK_LINE@18..19 "\n"
+    BLOCK_QUOTE@19..79
+      WHITESPACE@19..23 "    "
+      BLOCK_QUOTE_MARKER@23..24 ">"
+      WHITESPACE@24..25 " "
+      PARAGRAPH@25..79
+        TEXT@25..53 "A quote inside the fo ..."
+        NEWLINE@53..54 "\n"
+        WHITESPACE@54..58 "    "
+        BLOCK_QUOTE_MARKER@58..59 ">"
+        WHITESPACE@59..60 " "
+        TEXT@60..78 "Second quote line."
+        NEWLINE@78..79 "\n"
+    BLANK_LINE@79..80
+      BLANK_LINE@79..80 "\n"
+    PARAGRAPH@80..100
+      TEXT@80..99 "    Tail paragraph."
+      NEWLINE@99..100 "\n"
