@@ -25,5 +25,8 @@ tests/fixtures/bibtex_samples/bibtex_crlf.bib -text
 # CST fixtures (parser-internal) should use LF endings
 tests/fixtures/bibtex_samples/*.cst eol=lf
 
+# Generated schema must use LF — test compares against bytes produced with `\n`
+panache.schema.json eol=lf
+
 # Other test cases can use LF (the default for most projects)
 # Individual test cases can override if needed
