@@ -25,50 +25,145 @@
 //!   (matching the legacy `BqPrefixState` byte-walker).
 
 use rowan::GreenNodeBuilder;
+use smallvec::SmallVec;
 
 use crate::syntax::SyntaxKind;
 
 use super::super::block_dispatcher::BlockContext;
+use super::super::utils::container_stack::{Container, byte_index_at_column, leading_indent};
 use super::blockquotes::strip_n_blockquote_markers;
+
+/// A single strip operation applied during the dispatcher's
+/// container-stack walk. Ops are applied in order; each consumes some
+/// leading bytes of the line and the next op operates on what remains.
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum StripOp {
+    /// Advance N columns (tab-aware). Mirrors the legacy `list_content_col`
+    /// strip. On line 0, applied only when the marker line is the
+    /// upstream-emitted dispatch line (see
+    /// [`ContainerPrefix::strip_line_0_for_emission`]).
+    ListAdvance(u32),
+    /// Strip one `>` marker (up to 3 leading spaces allowed per CommonMark).
+    BlockQuoteMarker,
+    /// Advance N columns when leading indent ≥ N; otherwise lazy-strip
+    /// whatever leading whitespace exists. Mirrors the footnote/definition
+    /// `content_indent` strip in `parse_inner_content`.
+    ContentIndent(u32),
+}
+
+/// Inline capacity for the strip-op sequence. Container stacks are
+/// typically ≤ 4 deep; sizes up to this stay stack-allocated. Deeper
+/// nesting (legal but rare, e.g. 18-level blockquote chains) spills
+/// to the heap automatically via `SmallVec`.
+const INLINE_STRIP_OPS: usize = 8;
 
 /// Outer-container prefix on every line at the dispatcher level.
 ///
-/// `list_content_col` is the column at which list-item content begins
-/// (0 when not inside a list). On the list-marker line this consumes
-/// the marker bytes; on continuation lines it consumes leading indent
-/// (spaces or tabs). `bq_depth` is the blockquote nesting (0 when not
-/// inside a blockquote).
-#[derive(Copy, Clone, Default, Debug)]
+/// Captured as an ordered sequence of strip ops produced by walking
+/// the container stack from bottom (outermost) to top (innermost).
+/// Each container contributes one op (with `List` and most non-strip
+/// containers skipped); the order matches the stack-walk order, so
+/// nested cases like [Definition, List, ListItem, BlockQuote] produce
+/// the correct content_indent → list_advance → bq cascade.
+///
+/// Only the innermost ListItem *per section* contributes a `ListAdvance`
+/// op (matching `paragraphs::current_content_col`'s single-value
+/// semantics for adjacent nested lists). FootnoteDefinition and
+/// Definition each push one `ContentIndent`. BlockQuote pushes one
+/// `BlockQuoteMarker`.
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ContainerPrefix {
-    pub list_content_col: usize,
-    pub bq_depth: usize,
+    ops: SmallVec<[StripOp; INLINE_STRIP_OPS]>,
     /// True iff the line at dispatch position (`lines[start_pos]`) is
     /// the LIST-MARKER line — i.e. the LIST_MARKER + WHITESPACE tokens
-    /// for the first `list_content_col` columns have just been emitted
-    /// upstream and must be skipped by the helper. False (default) when
-    /// the dispatch fires on a continuation line: those leading-indent
-    /// bytes are NOT upstream-emitted and must be preserved inside the
-    /// block's content for losslessness.
+    /// for the innermost list item's `content_col` columns have just
+    /// been emitted upstream and must be skipped by the helper. False
+    /// (default) when the dispatch fires on a continuation line: those
+    /// leading-indent bytes are NOT upstream-emitted and must be
+    /// preserved inside the block's content for losslessness.
     ///
-    /// Affects only the line-0 strip semantics in emission helpers.
-    /// Lookahead helpers (`pandoc_html_open_tag_closes`,
-    /// `find_multiline_open_end`) always strip list_content_col on all
-    /// lines — they're pure byte scans, not emission.
+    /// Affects only the line-0 strip semantics. Lookahead helpers and
+    /// the continuation-line strip always apply every op.
     pub list_marker_consumed_on_line_0: bool,
 }
 
 impl ContainerPrefix {
-    /// Build from a `BlockContext`. List-content column is pulled from
-    /// `list_indent_info`; bq depth from the ctx; the line-0 marker
-    /// flag from `list_marker_consumed_on_line_0`.
-    pub fn from_ctx(ctx: &BlockContext) -> Self {
+    /// Build a strip recipe by walking the container stack from bottom
+    /// (outermost) to top (innermost).
+    ///
+    /// Each strip-contributing container pushes one op in stack order:
+    /// `BlockQuote` → `BlockQuoteMarker`, `FootnoteDefinition` /
+    /// `Definition` → `ContentIndent(content_col)`. Nested `ListItem`s
+    /// are collapsed *per section* — for each run of adjacent
+    /// `ListItem`s with no intervening strip-contributing container,
+    /// only the innermost contributes a `ListAdvance`. This matches
+    /// today's `paragraphs::current_content_col` semantics for nested
+    /// same-section lists (inner.content_col is cumulative) while still
+    /// applying outer-section list strips before an intervening
+    /// blockquote or content-indent container.
+    pub fn from_stack(stack: &[Container], list_marker_consumed_on_line_0: bool) -> Self {
+        let mut ops: SmallVec<[StripOp; INLINE_STRIP_OPS]> = SmallVec::new();
+        let mut pending_list_advance: Option<u32> = None;
+        for c in stack {
+            match c {
+                Container::BlockQuote { .. } => {
+                    if let Some(la) = pending_list_advance.take() {
+                        ops.push(StripOp::ListAdvance(la));
+                    }
+                    ops.push(StripOp::BlockQuoteMarker);
+                }
+                Container::FootnoteDefinition { content_col, .. }
+                | Container::Definition { content_col, .. } => {
+                    if let Some(la) = pending_list_advance.take() {
+                        ops.push(StripOp::ListAdvance(la));
+                    }
+                    ops.push(StripOp::ContentIndent(*content_col as u32));
+                }
+                Container::ListItem { content_col, .. } => {
+                    // Keep only the innermost ListItem within this section
+                    // (overwrites any previous pending value).
+                    pending_list_advance = Some(*content_col as u32);
+                }
+                _ => {}
+            }
+        }
+        if let Some(la) = pending_list_advance {
+            ops.push(StripOp::ListAdvance(la));
+        }
         Self {
-            list_content_col: ctx
-                .list_indent_info
-                .as_ref()
-                .map(|i| i.content_col)
-                .unwrap_or(0),
-            bq_depth: ctx.blockquote_depth,
+            ops,
+            list_marker_consumed_on_line_0,
+        }
+    }
+
+    /// Build from a `BlockContext`. Equivalent to a stack with at most
+    /// one ListAdvance + one BlockQuote run + one ContentIndent, in
+    /// the order `[ListAdvance?, BlockQuote*, ContentIndent?]`. Use
+    /// this only when the caller doesn't have stack access; it is
+    /// correct for the common container shapes but may diverge from
+    /// [`Self::from_stack`] for exotic orderings (Definition above
+    /// List, FootnoteDef interleaved with BlockQuote, etc.).
+    pub fn from_ctx(ctx: &BlockContext) -> Self {
+        let list_content_col = ctx
+            .list_indent_info
+            .as_ref()
+            .map(|i| i.content_col)
+            .unwrap_or(0);
+        let bq_depth = ctx.blockquote_depth;
+        let content_indent = ctx.content_indent;
+
+        let mut ops: SmallVec<[StripOp; INLINE_STRIP_OPS]> = SmallVec::new();
+        if list_content_col > 0 {
+            ops.push(StripOp::ListAdvance(list_content_col as u32));
+        }
+        for _ in 0..bq_depth {
+            ops.push(StripOp::BlockQuoteMarker);
+        }
+        if content_indent > 0 {
+            ops.push(StripOp::ContentIndent(content_indent as u32));
+        }
+        Self {
+            ops,
             list_marker_consumed_on_line_0: ctx.list_marker_consumed_on_line_0,
         }
     }
@@ -76,53 +171,204 @@ impl ContainerPrefix {
     /// Bq-only convenience for callers that don't have a `BlockContext`.
     #[allow(dead_code)]
     pub fn bq_only(bq_depth: usize) -> Self {
+        let mut ops: SmallVec<[StripOp; INLINE_STRIP_OPS]> = SmallVec::new();
+        for _ in 0..bq_depth {
+            ops.push(StripOp::BlockQuoteMarker);
+        }
         Self {
-            list_content_col: 0,
-            bq_depth,
+            ops,
             list_marker_consumed_on_line_0: false,
         }
     }
 
-    /// Strip list cols then bq markers, returning the inner content.
-    /// Unconditional list strip — use this for multi-line lookahead and
-    /// for continuation-line emission inside a known bq-with-list
-    /// context. For line-0 emission, prefer
-    /// [`Self::strip_line_0_for_emission`] which respects the
-    /// upstream-emitted contract.
-    pub fn strip<'a>(&self, line: &'a str) -> &'a str {
-        let after_list = advance_columns(line, self.list_content_col);
-        strip_n_blockquote_markers(after_list, self.bq_depth)
+    fn ops(&self) -> &[StripOp] {
+        &self.ops
     }
 
-    /// Strip semantics for the dispatch line (line 0) of an emission
-    /// helper. Strips list_content_col bytes only when
-    /// `list_marker_consumed_on_line_0` is true (upstream emitted the
-    /// LIST_MARKER + WHITESPACE for this line); otherwise the leading
-    /// indent stays in the inner content because it was NOT upstream-
-    /// emitted (continuation-line dispatch). Bq markers are always
-    /// stripped on line 0 (always upstream-emitted by the BLOCK_QUOTE
-    /// container code path).
+    /// Total number of `BlockQuoteMarker` ops. Kept as a back-compat
+    /// accessor for callers that previously read `prefix.bq_depth`.
+    pub fn bq_depth(&self) -> usize {
+        self.ops()
+            .iter()
+            .filter(|op| matches!(op, StripOp::BlockQuoteMarker))
+            .count()
+    }
+
+    /// Innermost (last) `ListAdvance` op's column count, or 0 when
+    /// the prefix contains no list-advance op. Kept as a back-compat
+    /// accessor for callers that previously read
+    /// `prefix.list_content_col`.
+    pub fn list_content_col(&self) -> usize {
+        self.ops()
+            .iter()
+            .rev()
+            .find_map(|op| match op {
+                StripOp::ListAdvance(n) => Some(*n as usize),
+                _ => None,
+            })
+            .unwrap_or(0)
+    }
+
+    /// Sum of `ContentIndent` ops' column counts. Kept as a back-compat
+    /// accessor for callers that previously read `prefix.content_indent`.
+    #[allow(dead_code)]
+    pub fn content_indent(&self) -> usize {
+        self.ops()
+            .iter()
+            .map(|op| match op {
+                StripOp::ContentIndent(n) => *n as usize,
+                _ => 0,
+            })
+            .sum()
+    }
+
+    /// Build a `ContainerPrefix` directly from a sequence of strip ops.
+    /// Intended for tests; production code should use
+    /// [`Self::from_stack`] or [`Self::from_ctx`].
+    #[cfg(test)]
+    pub fn from_ops(ops_slice: &[StripOp], list_marker_consumed_on_line_0: bool) -> Self {
+        Self {
+            ops: SmallVec::from_slice(ops_slice),
+            list_marker_consumed_on_line_0,
+        }
+    }
+
+    /// Strip every op in order. Used for continuation lines (lines 1+)
+    /// in multi-line lookahead and for callers that need the full
+    /// strip regardless of the line-0 marker flag.
+    pub fn strip<'a>(&self, line: &'a str) -> &'a str {
+        let mut s = line;
+        for op in self.ops() {
+            s = apply_op(s, *op);
+        }
+        s
+    }
+
+    /// Strip semantics for the dispatch line (line 0). Identical to
+    /// [`Self::strip`] except that the *innermost* (last)
+    /// `ListAdvance` op is skipped when
+    /// `list_marker_consumed_on_line_0` is false — that's the
+    /// "continuation-line dispatch where the leading indent belongs to
+    /// inner content" case.
     pub fn strip_line_0_for_emission<'a>(&self, line: &'a str) -> &'a str {
-        let after_list = if self.list_marker_consumed_on_line_0 {
-            advance_columns(line, self.list_content_col)
-        } else {
-            line
-        };
-        strip_n_blockquote_markers(after_list, self.bq_depth)
+        self.strip_line_0_with_indent_emit(line).0
+    }
+
+    /// Like [`Self::strip_line_0_for_emission`] but also returns the
+    /// bytes consumed by the *last* `ContentIndent` op (for re-emission
+    /// as WHITESPACE when a nested BlockQuote opens inside a
+    /// footnote/definition).
+    #[allow(dead_code)]
+    pub fn strip_line_0_with_indent_emit<'a>(&self, line: &'a str) -> (&'a str, Option<&'a str>) {
+        let last_list_idx = self
+            .ops()
+            .iter()
+            .rposition(|op| matches!(op, StripOp::ListAdvance(_)));
+        let mut s = line;
+        let mut emit: Option<&'a str> = None;
+        for (i, op) in self.ops().iter().enumerate() {
+            match op {
+                StripOp::ListAdvance(n) => {
+                    if Some(i) == last_list_idx && !self.list_marker_consumed_on_line_0 {
+                        // Preserve list-indent on the dispatch line
+                        // when the marker wasn't upstream-emitted.
+                    } else {
+                        s = advance_columns(s, *n as usize);
+                    }
+                }
+                StripOp::BlockQuoteMarker => {
+                    s = strip_n_blockquote_markers(s, 1);
+                }
+                StripOp::ContentIndent(n) => {
+                    let (next, e) = strip_content_indent(s, *n as usize);
+                    s = next;
+                    if e.is_some() {
+                        emit = e;
+                    }
+                }
+            }
+        }
+        (s, emit)
     }
 
     /// Split a line into `(list_indent, bq_prefix, inner)` — the bytes
-    /// consumed by the list-col advance, the bytes consumed by the bq
-    /// marker strip, and the remaining inner content. Used by graft
+    /// consumed by the FIRST `ListAdvance` op, the bytes consumed by
+    /// all `BlockQuoteMarker` ops between the list advance and the
+    /// next non-bq op, and the remaining inner content. Used by graft
     /// helpers that need to capture the consumed prefix bytes for
     /// re-injection.
+    ///
+    /// Note: this split mirrors the legacy `(list_indent, bq_prefix,
+    /// inner)` shape and does NOT account for `ContentIndent` ops
+    /// (graft helpers operate on outer-container prefixes only).
     #[allow(dead_code)]
     pub fn split<'a>(&self, line: &'a str) -> (&'a str, &'a str, &'a str) {
-        let after_list = advance_columns(line, self.list_content_col);
-        let list_len = line.len() - after_list.len();
-        let inner = strip_n_blockquote_markers(after_list, self.bq_depth);
-        let bq_len = after_list.len() - inner.len();
-        (&line[..list_len], &line[list_len..list_len + bq_len], inner)
+        let mut s = line;
+        let mut list_consumed = 0usize;
+        let mut bq_consumed = 0usize;
+        let mut phase = 0; // 0 = looking for list, 1 = consuming bqs, 2 = done
+        for op in self.ops() {
+            match op {
+                StripOp::ListAdvance(n) if phase == 0 => {
+                    let after = advance_columns(s, *n as usize);
+                    list_consumed = s.len() - after.len();
+                    s = after;
+                    phase = 1;
+                }
+                StripOp::BlockQuoteMarker if phase <= 1 => {
+                    let after = strip_n_blockquote_markers(s, 1);
+                    bq_consumed += s.len() - after.len();
+                    s = after;
+                    phase = 1;
+                }
+                _ => {
+                    phase = 2;
+                    break;
+                }
+            }
+        }
+        let _ = phase;
+        (
+            &line[..list_consumed],
+            &line[list_consumed..list_consumed + bq_consumed],
+            s,
+        )
+    }
+}
+
+fn apply_op(line: &str, op: StripOp) -> &str {
+    match op {
+        StripOp::ListAdvance(n) => advance_columns(line, n as usize),
+        StripOp::BlockQuoteMarker => strip_n_blockquote_markers(line, 1),
+        StripOp::ContentIndent(n) => strip_content_indent(line, n as usize).0,
+    }
+}
+
+/// Strip up to `content_indent` columns of leading whitespace from
+/// `line`, returning the stripped slice and the consumed bytes (or
+/// `None` when nothing was stripped).
+///
+/// Mirrors the strip done by `parse_inner_content` in `core.rs` for
+/// footnote/definition base-indent: when the line's leading indent
+/// reaches `content_indent`, strip exactly `content_indent` columns;
+/// otherwise (lazy continuation) strip whatever leading whitespace
+/// exists.
+pub(crate) fn strip_content_indent(line: &str, content_indent: usize) -> (&str, Option<&str>) {
+    if content_indent == 0 {
+        return (line, None);
+    }
+    let (indent_cols, _) = leading_indent(line);
+    if indent_cols >= content_indent {
+        let idx = byte_index_at_column(line, content_indent);
+        (&line[idx..], Some(&line[..idx]))
+    } else {
+        let trimmed_start = line.trim_start();
+        let ws_len = line.len() - trimmed_start.len();
+        if ws_len > 0 {
+            (trimmed_start, Some(&line[..ws_len]))
+        } else {
+            (line, None)
+        }
     }
 }
 
@@ -138,8 +384,11 @@ impl ContainerPrefix {
 /// Three accessors, with deliberately different strip semantics:
 ///
 /// * [`Self::first`] — emission-safe line-0 strip via
-///   [`ContainerPrefix::strip_line_0_for_emission`]. Matches the byte
-///   boundary of the legacy `BlockContext::content` exactly.
+///   [`ContainerPrefix::strip_line_0_for_emission`]. For common stack
+///   shapes (no nested footnote-inside-list-inside-definition) this
+///   matches the byte boundary of `BlockContext::content` exactly;
+///   parsers that need a guaranteed match should keep reading
+///   `ctx.content` directly.
 /// * [`Self::get`] — line `i` from `base`; emission-safe for `i == 0`,
 ///   unconditional [`ContainerPrefix::strip`] for `i > 0`. Mirrors what
 ///   parsers used to hand-roll with `prefix.strip(lines[line_pos + i])`.
@@ -165,7 +414,7 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
     }
 
     /// Line 0 with emission-safe strip semantics (matches the legacy
-    /// `ctx.content` byte boundary).
+    /// `ctx.content` byte boundary for the common container stacks).
     pub fn first(&self) -> &'a str {
         self.prefix.strip_line_0_for_emission(self.raw[self.base])
     }
@@ -357,53 +606,36 @@ mod tests {
     #[test]
     fn strip_list_marker_line() {
         // `- > <div>` with content_col=2: advance past `- `, then strip `>`.
-        let p = ContainerPrefix {
-            list_content_col: 2,
-            bq_depth: 1,
-            ..Default::default()
-        };
+        let p =
+            ContainerPrefix::from_ops(&[StripOp::ListAdvance(2), StripOp::BlockQuoteMarker], false);
         assert_eq!(p.strip("- > <div>"), "<div>");
     }
 
     #[test]
     fn strip_list_continuation_line() {
         // `  > hello` with content_col=2: advance past `  `, then strip `>`.
-        let p = ContainerPrefix {
-            list_content_col: 2,
-            bq_depth: 1,
-            ..Default::default()
-        };
+        let p =
+            ContainerPrefix::from_ops(&[StripOp::ListAdvance(2), StripOp::BlockQuoteMarker], false);
         assert_eq!(p.strip("  > hello"), "hello");
     }
 
     #[test]
     fn strip_tab_indent_rounds_to_four() {
-        let p = ContainerPrefix {
-            list_content_col: 4,
-            bq_depth: 0,
-            ..Default::default()
-        };
+        let p = ContainerPrefix::from_ops(&[StripOp::ListAdvance(4)], false);
         assert_eq!(p.strip("\tfoo"), "foo");
     }
 
     #[test]
     fn strip_short_line_yields_empty() {
-        let p = ContainerPrefix {
-            list_content_col: 4,
-            bq_depth: 0,
-            ..Default::default()
-        };
+        let p = ContainerPrefix::from_ops(&[StripOp::ListAdvance(4)], false);
         assert_eq!(p.strip(""), "");
         assert_eq!(p.strip("\n"), "");
     }
 
     #[test]
     fn stripped_lines_first_matches_strip_line_0_for_emission() {
-        let prefix = ContainerPrefix {
-            list_content_col: 2,
-            bq_depth: 1,
-            list_marker_consumed_on_line_0: true,
-        };
+        let prefix =
+            ContainerPrefix::from_ops(&[StripOp::ListAdvance(2), StripOp::BlockQuoteMarker], true);
         let raw = ["- > <div>", "  > foo"];
         let lines = StrippedLines::new(&raw, 0, &prefix);
         assert_eq!(lines.first(), "<div>");
@@ -412,14 +644,10 @@ mod tests {
 
     #[test]
     fn stripped_lines_first_skips_list_col_only_when_marker_consumed() {
-        // bq_depth=0 isolates the list-col strip difference — the bq
+        // bq absent isolates the list-col strip difference — the bq
         // marker stripper otherwise consumes up to 3 leading spaces by
         // itself, masking the divergence.
-        let prefix_continuation = ContainerPrefix {
-            list_content_col: 2,
-            bq_depth: 0,
-            list_marker_consumed_on_line_0: false,
-        };
+        let prefix_continuation = ContainerPrefix::from_ops(&[StripOp::ListAdvance(2)], false);
         let raw = ["  continuation"];
         let lines = StrippedLines::new(&raw, 0, &prefix_continuation);
         // marker_consumed=false → list-indent preserved on line 0.
@@ -427,10 +655,7 @@ mod tests {
         // first_unconditional always advances past the list cols.
         assert_eq!(lines.first_unconditional(), "continuation");
 
-        let prefix_marker = ContainerPrefix {
-            list_marker_consumed_on_line_0: true,
-            ..prefix_continuation
-        };
+        let prefix_marker = ContainerPrefix::from_ops(&[StripOp::ListAdvance(2)], true);
         let lines = StrippedLines::new(&raw, 0, &prefix_marker);
         // marker_consumed=true → list-indent skipped on line 0.
         assert_eq!(lines.first(), "continuation");
@@ -438,11 +663,7 @@ mod tests {
 
     #[test]
     fn stripped_lines_get_uses_unconditional_strip_after_line_0() {
-        let prefix = ContainerPrefix {
-            list_content_col: 2,
-            bq_depth: 0,
-            list_marker_consumed_on_line_0: false,
-        };
+        let prefix = ContainerPrefix::from_ops(&[StripOp::ListAdvance(2)], false);
         let raw = ["  foo", "  bar", "  baz"];
         let lines = StrippedLines::new(&raw, 0, &prefix);
         // Line 0: emission-safe → list-indent preserved.
@@ -454,11 +675,8 @@ mod tests {
 
     #[test]
     fn stripped_lines_raw_access_is_unstripped() {
-        let prefix = ContainerPrefix {
-            list_content_col: 2,
-            bq_depth: 1,
-            list_marker_consumed_on_line_0: true,
-        };
+        let prefix =
+            ContainerPrefix::from_ops(&[StripOp::ListAdvance(2), StripOp::BlockQuoteMarker], true);
         let raw = ["- > foo", "  > bar"];
         let lines = StrippedLines::new(&raw, 0, &prefix);
         assert_eq!(lines.raw_at(0), "- > foo");
@@ -469,11 +687,7 @@ mod tests {
 
     #[test]
     fn stripped_lines_respects_base_offset() {
-        let prefix = ContainerPrefix {
-            list_content_col: 0,
-            bq_depth: 0,
-            list_marker_consumed_on_line_0: false,
-        };
+        let prefix = ContainerPrefix::default();
         let raw = ["pre", "first", "second"];
         let lines = StrippedLines::new(&raw, 1, &prefix);
         assert_eq!(lines.first(), "first");
@@ -484,12 +698,130 @@ mod tests {
     }
 
     #[test]
+    fn strip_content_indent_only() {
+        // Inside a footnote definition (content_indent=4), the line's
+        // leading 4 cols belong to the footnote container and are stripped.
+        let p = ContainerPrefix::from_ops(&[StripOp::ContentIndent(4)], false);
+        assert_eq!(p.strip("    continuation"), "continuation");
+        // Same via `strip_line_0_for_emission` (always strips content_indent).
+        assert_eq!(
+            p.strip_line_0_for_emission("    continuation"),
+            "continuation"
+        );
+    }
+
+    #[test]
+    fn strip_content_indent_inside_blockquote() {
+        // Footnote inside a blockquote ([BlockQuote, FootnoteDef]):
+        // bq strips first, then content_indent.
+        let p = ContainerPrefix::from_ops(
+            &[StripOp::BlockQuoteMarker, StripOp::ContentIndent(4)],
+            false,
+        );
+        // `>     continuation` → strip `> ` → `    continuation` → strip 4 cols → `continuation`.
+        assert_eq!(p.strip(">     continuation"), "continuation");
+    }
+
+    #[test]
+    fn strip_blockquote_inside_content_indent() {
+        // Blockquote opened *inside* a footnote ([FootnoteDef, BlockQuote]):
+        // content_indent strips first, then bq.
+        let p = ContainerPrefix::from_ops(
+            &[StripOp::ContentIndent(4), StripOp::BlockQuoteMarker],
+            false,
+        );
+        // `    >quoted` → strip 4 cols → `>quoted` → strip bq → `quoted`.
+        assert_eq!(p.strip("    >quoted"), "quoted");
+    }
+
+    #[test]
+    fn strip_definition_above_list_above_bq() {
+        // Stack [Definition(4), List, ListItem(2), BlockQuote] for a line
+        // shaped like `    - > a` (Definition indent + list marker + bq).
+        let p = ContainerPrefix::from_ops(
+            &[
+                StripOp::ContentIndent(4),
+                StripOp::ListAdvance(2),
+                StripOp::BlockQuoteMarker,
+            ],
+            false,
+        );
+        assert_eq!(p.strip("    - > a"), "a");
+    }
+
+    #[test]
+    fn strip_content_indent_lazy_continuation() {
+        // Less indent than `content_indent` requires: legacy strip
+        // consumes whatever leading whitespace exists and reports it via
+        // `indent_to_emit`.
+        let p = ContainerPrefix::from_ops(&[StripOp::ContentIndent(4)], false);
+        let (stripped, emit) = p.strip_line_0_with_indent_emit("  short");
+        assert_eq!(stripped, "short");
+        assert_eq!(emit, Some("  "));
+    }
+
+    #[test]
+    fn strip_content_indent_with_list_marker_consumed() {
+        // List-marker line with content_indent set (footnote in a list
+        // item): list cols stripped, then content_indent.
+        let p =
+            ContainerPrefix::from_ops(&[StripOp::ListAdvance(2), StripOp::ContentIndent(4)], true);
+        // Line: `- ` (list marker, 2 cols) + `    footnote text` (content_indent).
+        assert_eq!(
+            p.strip_line_0_for_emission("-     footnote text"),
+            "footnote text"
+        );
+    }
+
+    #[test]
+    fn strip_content_indent_zero_is_passthrough() {
+        let p = ContainerPrefix::default();
+        assert_eq!(p.strip("no indent here"), "no indent here");
+        let (stripped, emit) = p.strip_line_0_with_indent_emit("no indent here");
+        assert_eq!(stripped, "no indent here");
+        assert_eq!(emit, None);
+    }
+
+    #[test]
+    fn from_stack_picks_only_innermost_list_item() {
+        // Nested lists: only the innermost ListItem contributes a
+        // ListAdvance, matching `paragraphs::current_content_col`.
+        // For `- - foo`, inner.content_col=4 is absolute.
+        use crate::parser::blocks::lists::ListMarker;
+        use crate::parser::utils::list_item_buffer::ListItemBuffer;
+        let stack = vec![
+            Container::List {
+                marker: ListMarker::Bullet('-'),
+                base_indent_cols: 0,
+                has_blank_between_items: false,
+            },
+            Container::ListItem {
+                content_col: 2,
+                buffer: ListItemBuffer::new(),
+                marker_only: false,
+                virtual_marker_space: false,
+            },
+            Container::List {
+                marker: ListMarker::Bullet('-'),
+                base_indent_cols: 2,
+                has_blank_between_items: false,
+            },
+            Container::ListItem {
+                content_col: 4,
+                buffer: ListItemBuffer::new(),
+                marker_only: false,
+                virtual_marker_space: false,
+            },
+        ];
+        let p = ContainerPrefix::from_stack(&stack, false);
+        // Only the innermost (content_col=4) is applied.
+        assert_eq!(p.strip("- - foo"), "foo");
+    }
+
+    #[test]
     fn split_captures_consumed_bytes() {
-        let p = ContainerPrefix {
-            list_content_col: 2,
-            bq_depth: 1,
-            ..Default::default()
-        };
+        let p =
+            ContainerPrefix::from_ops(&[StripOp::ListAdvance(2), StripOp::BlockQuoteMarker], false);
         let (li, bq, inner) = p.split("  > hello");
         assert_eq!(li, "  ");
         assert_eq!(bq, "> ");

@@ -19,6 +19,7 @@ serde = { version = "1.0.228", features = ["derive"], optional = true }
 serde_json = "1.0"
 yaml_parser = "0.3.0"
 log = { version = "0.4.28", features = ["release_max_level_debug"] }
+smallvec = "1"
 unicode-width = "0.2"
 
 [features]

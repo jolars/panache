@@ -921,6 +921,7 @@ dependencies = [
  "rowan",
  "serde",
  "serde_json",
+ "smallvec",
  "toml",
  "unicode-width",
  "yaml_parser",

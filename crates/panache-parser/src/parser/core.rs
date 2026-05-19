@@ -8,7 +8,7 @@ use super::block_dispatcher::{
 };
 use super::blocks::blockquotes;
 use super::blocks::code_blocks;
-use super::blocks::container_prefix::{ContainerPrefix, StrippedLines};
+use super::blocks::container_prefix::{ContainerPrefix, StrippedLines, strip_content_indent};
 use super::blocks::definition_lists;
 use super::blocks::fenced_divs;
 use super::blocks::headings::{
@@ -2088,9 +2088,25 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            // Now parse the inner content
+            // Now parse the inner content. When the bq was a "shifted" one
+            // (detected at the list content column inside a list), the
+            // bq marker emission above absorbed the outer list-indent
+            // bytes (the cols BEFORE the `>`). If the innermost ListItem
+            // in the stack sits *below* the BlockQuote we just opened
+            // (i.e. there's no inner LI above the BQ), its content_col
+            // IS the outer list-indent that was upstream-emitted, so
+            // line 0's ListAdvance must be applied — toggle the flag.
+            // When an inner LI sits *above* the BQ on the stack, the
+            // innermost LA represents inner list-indent that wasn't
+            // emitted by the bq marker, so leave the flag false.
             // Pass inner_content as line_to_append since markers are already stripped
-            return self.parse_inner_content(inner_content, Some(inner_content));
+            let prev_flag = self.dispatch_list_marker_consumed;
+            if used_shifted_bq && !self.innermost_li_above_bq() {
+                self.dispatch_list_marker_consumed = true;
+            }
+            let dispatch = self.parse_inner_content(inner_content, Some(inner_content));
+            self.dispatch_list_marker_consumed = prev_flag;
+            return dispatch;
         } else if bq_depth < current_bq_depth {
             // Need to close some blockquotes, but first check for lazy continuation
             // Lazy continuation: line with fewer (or zero) > markers continues
@@ -2542,7 +2558,18 @@ impl<'a> Parser<'a> {
             } else {
                 Some(inner_content)
             };
-            return self.parse_inner_content(inner_content, line_to_append);
+            // See the "new-depth shifted-bq" path above for the rationale.
+            // Only set the flag when the innermost LI sits below the BQ
+            // on the stack — its cols are then the ones the bq marker
+            // emission absorbed; otherwise the innermost LA represents
+            // inner-list indent that wasn't upstream-emitted.
+            let prev_flag = self.dispatch_list_marker_consumed;
+            if used_shifted_bq && !self.innermost_li_above_bq() {
+                self.dispatch_list_marker_consumed = true;
+            }
+            let dispatch = self.parse_inner_content(inner_content, line_to_append);
+            self.dispatch_list_marker_consumed = prev_flag;
+            return dispatch;
         }
 
         // No blockquote markers - parse as regular content
@@ -2647,6 +2674,23 @@ impl<'a> Parser<'a> {
             .sum()
     }
 
+    /// Walk the container stack from top (innermost) toward bottom and
+    /// return `true` iff a `ListItem` is encountered before a
+    /// `BlockQuote`. Used by the shifted-bq dispatch in `parse_line` to
+    /// decide whether the innermost `ListAdvance` op corresponds to
+    /// outer-list-indent already absorbed by the bq marker emission,
+    /// or to inner-list-indent that is still part of the line's content.
+    fn innermost_li_above_bq(&self) -> bool {
+        for c in self.containers.stack.iter().rev() {
+            match c {
+                Container::ListItem { .. } => return true,
+                Container::BlockQuote { .. } => return false,
+                _ => continue,
+            }
+        }
+        false
+    }
+
     /// Parse content inside blockquotes (or at top level).
     ///
     /// `content` - The content to parse (may have indent/markers stripped)
@@ -2661,26 +2705,11 @@ impl<'a> Parser<'a> {
             content.trim_end()
         );
         // Calculate how much indentation should be stripped for content containers
-        // (definitions, footnotes) FIRST, so we can check for block markers correctly
+        // (definitions, footnotes) FIRST, so we can check for block markers correctly.
+        // Shared helper mirrors `ContainerPrefix::strip` (post-bq path) so the
+        // dispatcher's `StrippedLines::first()` and `ctx.content` agree.
         let content_indent = self.content_container_indent_to_strip();
-        let (stripped_content, indent_to_emit) = if content_indent > 0 {
-            let (indent_cols, _) = leading_indent(content);
-            if indent_cols >= content_indent {
-                let idx = byte_index_at_column(content, content_indent);
-                (&content[idx..], Some(&content[..idx]))
-            } else {
-                // Line has less indent than required - preserve leading whitespace
-                let trimmed_start = content.trim_start();
-                let ws_len = content.len() - trimmed_start.len();
-                if ws_len > 0 {
-                    (trimmed_start, Some(&content[..ws_len]))
-                } else {
-                    (content, None)
-                }
-            }
-        } else {
-            (content, None)
-        };
+        let (stripped_content, indent_to_emit) = strip_content_indent(content, content_indent);
 
         if self.config.extensions.alerts
             && self.current_blockquote_depth() > 0
@@ -2930,6 +2959,30 @@ impl<'a> Parser<'a> {
         // use this ctx shape to avoid rebuilding repeated context objects.
         let mut dispatcher_ctx = dispatcher_ctx;
 
+        // Build a stack-aware prefix once; reused across the
+        // dispatcher's multiple detect_prepared calls below.
+        let dispatcher_prefix = ContainerPrefix::from_stack(
+            &self.containers.stack,
+            dispatcher_ctx.list_marker_consumed_on_line_0,
+        );
+
+        // Invariant during the `ctx.content` → `lines.first()` migration:
+        // the pre-stripped `ctx.content` and the lazy `StrippedLines::first()`
+        // computed from the stack-aware prefix must produce byte-identical
+        // slices. Trips early in debug builds if the strip vocabulary diverges
+        // from `parse_inner_content`'s own strip.
+        // Invariant: the pre-stripped `ctx.content` and the lazy
+        // `StrippedLines::first()` computed from the stack-aware prefix
+        // produce byte-identical slices. Trips early in debug builds if
+        // the strip vocabulary in `ContainerPrefix::from_stack` diverges
+        // from `parse_inner_content`'s strip cascade — the chief risk of
+        // the migration away from `ctx.content`.
+        debug_assert_eq!(
+            StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix).first(),
+            dispatcher_ctx.content,
+            "lines.first() must match ctx.content for the dispatch line",
+        );
+
         // Setext heading folded over a list item's buffered first-line text.
         // Must run before block detection so that an HR-shaped underline like
         // `---` doesn't get claimed by the thematic-break parser.
@@ -2940,8 +2993,7 @@ impl<'a> Parser<'a> {
         // Initial detection (before blank/doc-start are computed). Note: this can
         // match reference definitions, but footnotes are handled explicitly later.
         let dispatcher_match = {
-            let prefix = ContainerPrefix::from_ctx(&dispatcher_ctx);
-            let stripped = StrippedLines::new(&self.lines, self.pos, &prefix);
+            let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix);
             self.block_registry
                 .detect_prepared(&dispatcher_ctx, &stripped)
         };
@@ -2991,8 +3043,7 @@ impl<'a> Parser<'a> {
         let dispatcher_match =
             if dispatcher_ctx.has_blank_before || dispatcher_ctx.at_document_start {
                 // Recompute now that blank/doc-start conditions are known.
-                let prefix = ContainerPrefix::from_ctx(&dispatcher_ctx);
-                let stripped = StrippedLines::new(&self.lines, self.pos, &prefix);
+                let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix);
                 self.block_registry
                     .detect_prepared(&dispatcher_ctx, &stripped)
             } else {
@@ -3040,8 +3091,7 @@ impl<'a> Parser<'a> {
                 }
 
                 let lines_consumed = {
-                    let prefix = ContainerPrefix::from_ctx(&dispatcher_ctx);
-                    let stripped = StrippedLines::new(&self.lines, self.pos, &prefix);
+                    let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix);
                     self.block_registry.parse_prepared(
                         block_match,
                         &dispatcher_ctx,
@@ -3261,8 +3311,7 @@ impl<'a> Parser<'a> {
                 }
 
                 let lines_consumed = {
-                    let prefix = ContainerPrefix::from_ctx(&dispatcher_ctx);
-                    let stripped = StrippedLines::new(&self.lines, self.pos, &prefix);
+                    let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix);
                     self.block_registry.parse_prepared(
                         block_match,
                         &dispatcher_ctx,

@@ -1885,7 +1885,7 @@ impl BlockParser for HtmlBlockParser {
             && !pandoc_html_open_tag_closes(
                 lines,
                 line_pos,
-                super::blocks::container_prefix::ContainerPrefix::from_ctx(ctx),
+                &super::blocks::container_prefix::ContainerPrefix::from_ctx(ctx),
             )
         {
             return None;
@@ -2027,7 +2027,7 @@ impl BlockParser for HtmlBlockParser {
                     || pandoc_html_open_tag_closes(
                         lines,
                         line_pos,
-                        super::blocks::container_prefix::ContainerPrefix::from_ctx(ctx),
+                        &super::blocks::container_prefix::ContainerPrefix::from_ctx(ctx),
                     )) =>
             {
                 crate::syntax::SyntaxKind::HTML_BLOCK_DIV
@@ -2040,7 +2040,7 @@ impl BlockParser for HtmlBlockParser {
             lines,
             line_pos,
             block_type,
-            super::blocks::container_prefix::ContainerPrefix::from_ctx(ctx),
+            &super::blocks::container_prefix::ContainerPrefix::from_ctx(ctx),
             wrapper_kind,
             ctx.config,
         );

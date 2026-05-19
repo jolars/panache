@@ -891,11 +891,11 @@ pub(crate) fn parse_html_block_with_wrapper(
     lines: &[&str],
     start_pos: usize,
     block_type: HtmlBlockType,
-    prefix: ContainerPrefix,
+    prefix: &ContainerPrefix,
     wrapper_kind: SyntaxKind,
     config: &ParserOptions,
 ) -> usize {
-    let bq_depth = prefix.bq_depth;
+    let bq_depth = prefix.bq_depth();
     // Pandoc-dialect Comment / PI trailing-text split. Pandoc-native
     // closes the RawBlock at the close marker (`-->` / `?>`) and parses
     // any subsequent bytes (same-line trailing or following lines) as
@@ -1684,7 +1684,7 @@ pub(crate) fn parse_html_block_with_wrapper(
                 // from `lines[end_line_idx]` and check the same.
                 let last_open_line: &str = match multiline_open_end {
                     None => first_inner,
-                    Some(end) if prefix.bq_depth > 0 || prefix.list_content_col > 0 => {
+                    Some(end) if prefix.bq_depth() > 0 || prefix.list_content_col() > 0 => {
                         prefix.strip(lines[end])
                     }
                     Some(end) => lines[end],
@@ -2045,7 +2045,7 @@ fn emit_html_block_body_lifted(
 fn emit_html_block_body_lifted_bq(
     builder: &mut GreenNodeBuilder<'static>,
     content_lines: &[&str],
-    prefix: ContainerPrefix,
+    prefix: &ContainerPrefix,
     demote_policy: LastParaDemote,
     config: &ParserOptions,
 ) {
@@ -2091,7 +2091,7 @@ fn emit_html_block_body_lifted_bq_messy(
     content_lines: &[&str],
     leading: &str,
     close_line_prefix: &str,
-    prefix: ContainerPrefix,
+    prefix: &ContainerPrefix,
     demote_policy: LastParaDemote,
     config: &ParserOptions,
 ) {
@@ -2801,7 +2801,7 @@ fn find_multiline_open_end(
     start_pos: usize,
     first_inner: &str,
     tag_name: &str,
-    prefix: ContainerPrefix,
+    prefix: &ContainerPrefix,
 ) -> Option<usize> {
     // Locate the `<tag_name` literal in `first_inner` to start scanning past
     // it. Match is ASCII case-insensitive; the parser preserves source casing.
@@ -2866,7 +2866,7 @@ fn find_multiline_open_end(
 pub(crate) fn pandoc_html_open_tag_closes(
     lines: &[&str],
     start_pos: usize,
-    prefix: ContainerPrefix,
+    prefix: &ContainerPrefix,
 ) -> bool {
     if start_pos >= lines.len() {
         return false;
@@ -3436,7 +3436,7 @@ mod tests {
                 0,
                 "<div id=\"x\">",
                 "div",
-                ContainerPrefix::default()
+                &ContainerPrefix::default()
             ),
             None
         );
@@ -3446,7 +3446,7 @@ mod tests {
                 0,
                 "<embed src=\"x\">",
                 "embed",
-                ContainerPrefix::default()
+                &ContainerPrefix::default()
             ),
             None
         );
@@ -3457,7 +3457,7 @@ mod tests {
                 0,
                 "<embed",
                 "embed",
-                ContainerPrefix::default()
+                &ContainerPrefix::default()
             ),
             Some(1)
         );
@@ -3467,7 +3467,7 @@ mod tests {
                 0,
                 "<embed",
                 "embed",
-                ContainerPrefix::default()
+                &ContainerPrefix::default()
             ),
             Some(2)
         );
@@ -3478,7 +3478,7 @@ mod tests {
                 0,
                 "<embed",
                 "div",
-                ContainerPrefix::default()
+                &ContainerPrefix::default()
             ),
             None
         );
@@ -3488,7 +3488,7 @@ mod tests {
                 0,
                 "<EMBED",
                 "embed",
-                ContainerPrefix::default()
+                &ContainerPrefix::default()
             ),
             Some(1)
         );
@@ -3500,7 +3500,7 @@ mod tests {
                 0,
                 "<embed title=\"a>b",
                 "embed",
-                ContainerPrefix::default()
+                &ContainerPrefix::default()
             ),
             Some(1)
         );
@@ -3511,7 +3511,7 @@ mod tests {
                 0,
                 "<embed",
                 "embed",
-                ContainerPrefix::default()
+                &ContainerPrefix::default()
             ),
             None
         );
@@ -3523,7 +3523,7 @@ mod tests {
                 0,
                 "<div",
                 "div",
-                ContainerPrefix::bq_only(1)
+                &ContainerPrefix::bq_only(1)
             ),
             Some(1)
         );
@@ -3534,7 +3534,7 @@ mod tests {
                 0,
                 "<section",
                 "section",
-                ContainerPrefix::bq_only(2)
+                &ContainerPrefix::bq_only(2)
             ),
             Some(1)
         );
@@ -3546,52 +3546,52 @@ mod tests {
         assert!(pandoc_html_open_tag_closes(
             &["<div>"],
             0,
-            ContainerPrefix::default()
+            &ContainerPrefix::default()
         ));
         assert!(pandoc_html_open_tag_closes(
             &["<embed src=\"x\">"],
             0,
-            ContainerPrefix::default()
+            &ContainerPrefix::default()
         ));
         // Multi-line complete: scanner finds `>` on a later line.
         assert!(pandoc_html_open_tag_closes(
             &["<div", "  id=\"x\">", "body", "</div>"],
             0,
-            ContainerPrefix::default()
+            &ContainerPrefix::default()
         ));
         assert!(pandoc_html_open_tag_closes(
             &["<embed", "  src=\"x.png\" alt=\"y\">"],
             0,
-            ContainerPrefix::default()
+            &ContainerPrefix::default()
         ));
         // Quoted `>` does not close: scanner threads quote state.
         assert!(!pandoc_html_open_tag_closes(
             &["<div title=\"a>b", "  c\""],
             0,
-            ContainerPrefix::default()
+            &ContainerPrefix::default()
         ));
         assert!(pandoc_html_open_tag_closes(
             &["<div title=\"a>b", "  c\">"],
             0,
-            ContainerPrefix::default()
+            &ContainerPrefix::default()
         ));
         // Incomplete: no `>` anywhere — pandoc treats as paragraph text.
         assert!(!pandoc_html_open_tag_closes(
             &["<embed"],
             0,
-            ContainerPrefix::default()
+            &ContainerPrefix::default()
         ));
         assert!(!pandoc_html_open_tag_closes(
             &["<div", "foo", "bar"],
             0,
-            ContainerPrefix::default()
+            &ContainerPrefix::default()
         ));
         // Pandoc tolerates blank lines mid-open-tag (its `htmlTag` reads
         // across them); the scan continues until EOF or `>`.
         assert!(pandoc_html_open_tag_closes(
             &["<div", "", "id=\"x\">"],
             0,
-            ContainerPrefix::default()
+            &ContainerPrefix::default()
         ));
     }
 
@@ -3718,7 +3718,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            ContainerPrefix::default(),
+            &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
             &opts,
         );
@@ -3739,7 +3739,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            ContainerPrefix::default(),
+            &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
             &opts,
         );
@@ -3760,7 +3760,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            ContainerPrefix::default(),
+            &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
             &opts,
         );
@@ -3788,7 +3788,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            ContainerPrefix::default(),
+            &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
             &opts,
         );
@@ -3813,7 +3813,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            ContainerPrefix::default(),
+            &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
             &opts,
         );
@@ -3838,7 +3838,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            ContainerPrefix::default(),
+            &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
             &opts,
         );
@@ -3871,7 +3871,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            ContainerPrefix::default(),
+            &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
             &opts,
         );
@@ -3915,7 +3915,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            ContainerPrefix::default(),
+            &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
             &opts,
         );
@@ -3953,7 +3953,7 @@ mod tests {
             &lines,
             0,
             block_type,
-            ContainerPrefix::default(),
+            &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
             &opts,
         );
