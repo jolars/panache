@@ -5,7 +5,37 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
+use super::container_prefix::{ContainerPrefix, StripOp, advance_columns};
 use crate::parser::utils::container_stack::byte_index_at_column;
+
+/// Strip up to `list_content_col` columns of leading whitespace,
+/// stopping at the first non-whitespace byte (newlines stop the scan
+/// rather than being consumed — important on blank lines inside a
+/// fenced code block). Mirrors the legacy
+/// `byte_index_at_column`-based strip used by the formatter.
+fn strip_list_indent(line: &str, list_content_col: usize) -> &str {
+    if list_content_col == 0 {
+        return line;
+    }
+    let idx = byte_index_at_column(line, list_content_col);
+    &line[idx..]
+}
+
+/// Returns `true` iff the outermost active container in `prefix` is a
+/// blockquote (i.e. `prefix.ops()` starts with `BlockQuoteMarker`
+/// before any `ListAdvance`). Used to pick the bq-vs-list strip order
+/// on content/lookahead lines.
+pub(crate) fn bq_outer_of_list(prefix: &ContainerPrefix) -> bool {
+    for op in prefix.ops() {
+        match op {
+            StripOp::BlockQuoteMarker => return true,
+            StripOp::ListAdvance(_) => return false,
+            StripOp::ContentIndent(_) => {}
+        }
+    }
+    false
+}
+
 use crate::parser::utils::helpers::{
     strip_leading_spaces, strip_newline, trim_end_spaces_tabs, trim_start_spaces_tabs,
 };
@@ -489,56 +519,124 @@ pub(crate) fn try_parse_fence_open(content: &str) -> Option<FenceInfo> {
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn prepare_fence_open_line<'a>(
     builder: &mut GreenNodeBuilder<'static>,
     source_line: &'a str,
     first_line_override: Option<&'a str>,
     bq_depth: usize,
-    base_indent: usize,
+    list_content_col: usize,
+    list_marker_consumed_on_line_0: bool,
+    bq_outer: bool,
+    content_indent: usize,
 ) -> (&'a str, &'a str) {
-    let first_line = first_line_override.unwrap_or(source_line);
-
-    // Only strip blockquote markers for the *surrounding* blockquote depth.
-    // Anything beyond that (e.g. a literal `>` inside the code block) must be preserved.
-    let first_inner = if bq_depth > 0 && first_line_override.is_none() {
-        strip_n_blockquote_markers(first_line, bq_depth)
-    } else {
-        if bq_depth > 0 && first_line_override.is_some() && source_line != first_line {
+    // Strip the active container prefix on line 0 in container-stack
+    // order. Bq markers are always upstream-emitted by the blockquote
+    // dispatch and silently consumed here. The list_content_col indent
+    // is upstream-emitted only on a marker-line dispatch
+    // (`list_marker_consumed_on_line_0=true`); on continuation-line
+    // dispatch it must be emitted here as WHITESPACE. Adjacent
+    // WHITESPACE emissions are coalesced into one token for
+    // byte-range-equivalent CST stability.
+    if let Some(first_line) = first_line_override {
+        if bq_depth > 0 && source_line != first_line {
             let stripped = strip_n_blockquote_markers(source_line, bq_depth);
             let prefix_len = source_line.len().saturating_sub(stripped.len());
             if prefix_len > 0 {
                 emit_blockquote_prefix_tokens(builder, &source_line[..prefix_len]);
             }
         }
-        first_line
-    };
-
-    // For lossless parsing: emit the base indent before stripping it
-    let first_base_indent = if first_line_override.is_some() {
-        0
-    } else {
-        base_indent
-    };
-    let first_base_indent_bytes = byte_index_at_column(first_inner, first_base_indent);
-    let first_stripped = if first_base_indent > 0 && first_inner.len() >= first_base_indent_bytes {
-        let indent_str = &first_inner[..first_base_indent_bytes];
-        if !indent_str.is_empty() {
-            builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+        let first_trimmed = strip_leading_spaces(first_line);
+        let leading_ws_len = first_line.len().saturating_sub(first_trimmed.len());
+        if leading_ws_len > 0 {
+            builder.token(SyntaxKind::WHITESPACE.into(), &first_line[..leading_ws_len]);
         }
-        &first_inner[first_base_indent_bytes..]
-    } else {
-        first_inner
+        return (first_trimmed, first_line);
+    }
+
+    let mut s: &'a str = source_line;
+    let mut pending_ws_start: Option<usize> = None;
+    let suppress_list = list_marker_consumed_on_line_0;
+
+    let flush_ws = |builder: &mut GreenNodeBuilder<'static>,
+                    pending: &mut Option<usize>,
+                    current_offset: usize| {
+        if let Some(start) = *pending
+            && current_offset > start
+        {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &source_line[start..current_offset],
+            );
+        }
+        *pending = None;
     };
 
-    let first_trimmed = strip_leading_spaces(first_stripped);
-    let leading_ws_len = first_stripped.len().saturating_sub(first_trimmed.len());
-    if leading_ws_len > 0 {
-        builder.token(
-            SyntaxKind::WHITESPACE.into(),
-            &first_stripped[..leading_ws_len],
-        );
+    let do_strip_list = |s: &mut &'a str, pending: &mut Option<usize>| {
+        if list_content_col == 0 {
+            return;
+        }
+        // On a marker-line dispatch (`suppress_list=true`), the list
+        // marker bytes have already been emitted upstream and may not
+        // be whitespace (e.g. `- > ```` has a leading `-`). Use
+        // `advance_columns` which counts columns through any char.
+        // On continuation lines, the leading bytes ARE whitespace
+        // (the list-content-indent) so use the whitespace-only
+        // `strip_list_indent` to stop at non-whitespace.
+        let stripped = if suppress_list {
+            advance_columns(s, list_content_col)
+        } else {
+            strip_list_indent(s, list_content_col)
+        };
+        let consumed = s.len() - stripped.len();
+        if consumed > 0 {
+            let start = source_line.len() - s.len();
+            if !suppress_list && pending.is_none() {
+                *pending = Some(start);
+            }
+            *s = stripped;
+        }
+    };
+
+    let do_strip_bq =
+        |builder: &mut GreenNodeBuilder<'static>, s: &mut &'a str, pending: &mut Option<usize>| {
+            if bq_depth == 0 {
+                return;
+            }
+            let current_offset = source_line.len() - s.len();
+            flush_ws(builder, pending, current_offset);
+            *s = strip_n_blockquote_markers(s, bq_depth);
+        };
+
+    if bq_outer {
+        do_strip_bq(builder, &mut s, &mut pending_ws_start);
+        do_strip_list(&mut s, &mut pending_ws_start);
+    } else {
+        do_strip_list(&mut s, &mut pending_ws_start);
+        do_strip_bq(builder, &mut s, &mut pending_ws_start);
     }
-    (first_trimmed, first_inner)
+
+    // content_indent (footnote/definition) — always emit as WHITESPACE.
+    if content_indent > 0 {
+        let indent_bytes = byte_index_at_column(s, content_indent);
+        if s.len() >= indent_bytes && indent_bytes > 0 {
+            let start = source_line.len() - s.len();
+            if pending_ws_start.is_none() {
+                pending_ws_start = Some(start);
+            }
+            s = &s[indent_bytes..];
+        }
+    }
+
+    let final_offset = source_line.len() - s.len();
+    flush_ws(builder, &mut pending_ws_start, final_offset);
+
+    let first_trimmed = strip_leading_spaces(s);
+    let leading_ws_len = s.len().saturating_sub(first_trimmed.len());
+    if leading_ws_len > 0 {
+        builder.token(SyntaxKind::WHITESPACE.into(), &s[..leading_ws_len]);
+    }
+    (first_trimmed, s)
 }
 
 fn emit_blockquote_prefix_tokens(builder: &mut GreenNodeBuilder<'static>, prefix: &str) {
@@ -556,43 +654,120 @@ fn emit_content_line_prefixes<'a>(
     builder: &mut GreenNodeBuilder<'static>,
     content_line: &'a str,
     bq_depth: usize,
-    base_indent: usize,
+    list_content_col: usize,
+    bq_outer: bool,
+    content_indent: usize,
 ) -> &'a str {
-    let after_blockquote = if bq_depth > 0 {
-        let stripped = strip_n_blockquote_markers(content_line, bq_depth);
-        let prefix_len = content_line.len().saturating_sub(stripped.len());
-        if prefix_len > 0 {
-            emit_blockquote_prefix_tokens(builder, &content_line[..prefix_len]);
+    // Strip and emit content-line (1+) prefixes in container-stack
+    // order:
+    //   bq_outer=true  → bq markers → list_content_col → content_indent
+    //   bq_outer=false → list_content_col → bq markers → content_indent
+    // Bq markers emit granular tokens (BLOCK_QUOTE_MARKER + WHITESPACE);
+    // list_content_col and content_indent emit WHITESPACE. Adjacent
+    // WHITESPACE emissions are coalesced into one token for
+    // byte-range-equivalent CST stability.
+    let mut s = content_line;
+    let mut pending_ws_start: Option<usize> = None;
+
+    let flush_ws = |builder: &mut GreenNodeBuilder<'static>,
+                    pending: &mut Option<usize>,
+                    current_offset: usize| {
+        if let Some(start) = *pending
+            && current_offset > start
+        {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &content_line[start..current_offset],
+            );
+            *pending = None;
         }
-        stripped
-    } else {
-        content_line
     };
 
-    let base_indent_bytes = byte_index_at_column(after_blockquote, base_indent);
-    if base_indent > 0 && after_blockquote.len() >= base_indent_bytes {
-        let indent_str = &after_blockquote[..base_indent_bytes];
-        if !indent_str.is_empty() {
-            builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+    let strip_and_remember_list =
+        |s: &mut &'a str, pending: &mut Option<usize>, list_content_col: usize| {
+            if list_content_col == 0 {
+                return;
+            }
+            let stripped = strip_list_indent(s, list_content_col);
+            let consumed = s.len() - stripped.len();
+            if consumed > 0 {
+                let start = content_line.len() - s.len();
+                if pending.is_none() {
+                    *pending = Some(start);
+                }
+                *s = stripped;
+            }
+        };
+
+    let strip_and_emit_bq = |builder: &mut GreenNodeBuilder<'static>,
+                             s: &mut &'a str,
+                             pending: &mut Option<usize>,
+                             bq_depth: usize| {
+        if bq_depth == 0 {
+            return;
         }
-        &after_blockquote[base_indent_bytes..]
+        let current_offset = content_line.len() - s.len();
+        flush_ws(builder, pending, current_offset);
+        let stripped = strip_n_blockquote_markers(s, bq_depth);
+        let prefix_len = s.len() - stripped.len();
+        if prefix_len > 0 {
+            emit_blockquote_prefix_tokens(builder, &s[..prefix_len]);
+        }
+        *s = stripped;
+    };
+
+    if bq_outer {
+        strip_and_emit_bq(builder, &mut s, &mut pending_ws_start, bq_depth);
+        strip_and_remember_list(&mut s, &mut pending_ws_start, list_content_col);
     } else {
-        after_blockquote
+        strip_and_remember_list(&mut s, &mut pending_ws_start, list_content_col);
+        strip_and_emit_bq(builder, &mut s, &mut pending_ws_start, bq_depth);
     }
+
+    if content_indent > 0 {
+        let indent_bytes = byte_index_at_column(s, content_indent);
+        if s.len() >= indent_bytes && indent_bytes > 0 {
+            let start = content_line.len() - s.len();
+            if pending_ws_start.is_none() {
+                pending_ws_start = Some(start);
+            }
+            s = &s[indent_bytes..];
+        }
+    }
+
+    let final_offset = content_line.len() - s.len();
+    flush_ws(builder, &mut pending_ws_start, final_offset);
+    s
 }
 
-fn strip_content_line_prefixes(content_line: &str, bq_depth: usize, base_indent: usize) -> &str {
-    let after_blockquote = if bq_depth > 0 {
-        strip_n_blockquote_markers(content_line, bq_depth)
+fn strip_content_line_prefixes(
+    content_line: &str,
+    bq_depth: usize,
+    list_content_col: usize,
+    bq_outer: bool,
+    content_indent: usize,
+) -> &str {
+    let after_bq_and_list = if bq_outer {
+        let after_bq = if bq_depth > 0 {
+            strip_n_blockquote_markers(content_line, bq_depth)
+        } else {
+            content_line
+        };
+        strip_list_indent(after_bq, list_content_col)
     } else {
-        content_line
+        let after_list = strip_list_indent(content_line, list_content_col);
+        if bq_depth > 0 {
+            strip_n_blockquote_markers(after_list, bq_depth)
+        } else {
+            after_list
+        }
     };
 
-    let base_indent_bytes = byte_index_at_column(after_blockquote, base_indent);
-    if base_indent > 0 && after_blockquote.len() >= base_indent_bytes {
-        &after_blockquote[base_indent_bytes..]
+    let indent_bytes = byte_index_at_column(after_bq_and_list, content_indent);
+    if content_indent > 0 && after_bq_and_list.len() >= indent_bytes {
+        &after_bq_and_list[indent_bytes..]
     } else {
-        after_blockquote
+        after_bq_and_list
     }
 }
 
@@ -600,13 +775,20 @@ pub(crate) fn compute_hashpipe_preamble_line_count(
     content_lines: &[&str],
     prefix: &str,
     bq_depth: usize,
-    base_indent: usize,
+    list_content_col: usize,
+    bq_outer: bool,
+    content_indent: usize,
 ) -> usize {
     let mut line_idx = 0usize;
 
     while line_idx < content_lines.len() {
-        let preview_after_indent =
-            strip_content_line_prefixes(content_lines[line_idx], bq_depth, base_indent);
+        let preview_after_indent = strip_content_line_prefixes(
+            content_lines[line_idx],
+            bq_depth,
+            list_content_col,
+            bq_outer,
+            content_indent,
+        );
         let (preview_without_newline, _) = strip_newline(preview_after_indent);
         if !is_hashpipe_option_line(preview_without_newline, prefix)
             && !is_hashpipe_continuation_line(preview_without_newline, prefix)
@@ -1074,14 +1256,21 @@ fn emit_code_info_node(builder: &mut GreenNodeBuilder<'static>, info_string: &st
 /// Returns the new position after the code block.
 /// Parse a fenced code block, consuming lines from the parser.
 /// Returns the new position after the code block.
-/// base_indent accounts for container indentation (e.g., footnotes) that should be stripped.
+/// list_content_col + content_indent account for container indentation
+/// (list-item indent + footnote/definition base indent) that should be
+/// stripped from each line. `bq_outer` flips the bq-vs-list strip
+/// order to match the container stack.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn parse_fenced_code_block(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
     start_pos: usize,
     fence: FenceInfo,
     bq_depth: usize,
-    base_indent: usize,
+    list_content_col: usize,
+    list_marker_consumed_on_line_0: bool,
+    bq_outer: bool,
+    content_indent: usize,
     first_line_override: Option<&str>,
 ) -> usize {
     // Start code block
@@ -1093,7 +1282,10 @@ pub(crate) fn parse_fenced_code_block(
         lines[start_pos],
         first_line_override,
         bq_depth,
-        base_indent,
+        list_content_col,
+        list_marker_consumed_on_line_0,
+        bq_outer,
+        content_indent,
     );
 
     builder.start_node(SyntaxKind::CODE_FENCE_OPEN.into());
@@ -1130,37 +1322,52 @@ pub(crate) fn parse_fenced_code_block(
     while current_pos < lines.len() {
         let line = lines[current_pos];
 
-        // Count blockquote markers to detect leaving the surrounding blockquote.
-        let (line_bq_depth, _) = count_blockquote_markers(line);
+        // Strip container prefix in stack order so the closing-fence
+        // probe sees the post-prefix content.
+        let after_bq_and_list = if bq_outer {
+            let after_bq = if bq_depth > 0 {
+                strip_n_blockquote_markers(line, bq_depth)
+            } else {
+                line
+            };
+            strip_list_indent(after_bq, list_content_col)
+        } else {
+            let after_list = strip_list_indent(line, list_content_col);
+            if bq_depth > 0 {
+                strip_n_blockquote_markers(after_list, bq_depth)
+            } else {
+                after_list
+            }
+        };
 
-        // If blockquote depth decreases, code block ends (we've left the blockquote)
+        // Count blockquote markers on the *post-list-stripped*-or-raw
+        // line to detect leaving the surrounding blockquote. For
+        // bq_outer=true we already stripped bq markers, so probe the
+        // raw line; for bq_outer=false we stripped list indent first,
+        // so probe the post-list slice.
+        let probe = if bq_outer {
+            line
+        } else {
+            strip_list_indent(line, list_content_col)
+        };
+        let (line_bq_depth, _) = count_blockquote_markers(probe);
         if line_bq_depth < bq_depth {
             break;
         }
 
-        // Strip exactly the surrounding blockquote depth; preserve any additional `>` literally.
-        let inner = if bq_depth > 0 {
-            strip_n_blockquote_markers(line, bq_depth)
+        let indent_bytes = byte_index_at_column(after_bq_and_list, content_indent);
+        let inner_stripped = if content_indent > 0 && after_bq_and_list.len() >= indent_bytes {
+            &after_bq_and_list[indent_bytes..]
         } else {
-            line
+            after_bq_and_list
         };
 
-        // Strip base indent (footnote context) from content lines for fence detection
-        let base_indent_bytes = byte_index_at_column(inner, base_indent);
-        let inner_stripped = if base_indent > 0 && inner.len() >= base_indent_bytes {
-            &inner[base_indent_bytes..]
-        } else {
-            inner
-        };
-
-        // Check for closing fence
         if is_closing_fence(inner_stripped, &fence) {
             found_closing = true;
             current_pos += 1;
             break;
         }
 
-        // Store the original line for lossless parsing.
         content_lines.push(line);
         current_pos += 1;
     }
@@ -1175,15 +1382,27 @@ pub(crate) fn parse_fenced_code_block(
 
         let mut line_idx = 0usize;
         if let Some(prefix) = hashpipe_prefix {
-            let prepared_hashpipe_lines =
-                compute_hashpipe_preamble_line_count(&content_lines, prefix, bq_depth, base_indent);
+            let prepared_hashpipe_lines = compute_hashpipe_preamble_line_count(
+                &content_lines,
+                prefix,
+                bq_depth,
+                list_content_col,
+                bq_outer,
+                content_indent,
+            );
             if prepared_hashpipe_lines > 0 {
                 builder.start_node(SyntaxKind::HASHPIPE_YAML_PREAMBLE.into());
                 builder.start_node(SyntaxKind::HASHPIPE_YAML_CONTENT.into());
                 while line_idx < prepared_hashpipe_lines {
                     let content_line = content_lines[line_idx];
-                    let after_indent =
-                        emit_content_line_prefixes(builder, content_line, bq_depth, base_indent);
+                    let after_indent = emit_content_line_prefixes(
+                        builder,
+                        content_line,
+                        bq_depth,
+                        list_content_col,
+                        bq_outer,
+                        content_indent,
+                    );
                     let (line_without_newline, newline_str) = strip_newline(after_indent);
                     if !emit_hashpipe_option_line(builder, line_without_newline, prefix) {
                         let _ =
@@ -1200,8 +1419,14 @@ pub(crate) fn parse_fenced_code_block(
         }
 
         for content_line in content_lines.iter().skip(line_idx) {
-            let after_indent =
-                emit_content_line_prefixes(builder, content_line, bq_depth, base_indent);
+            let after_indent = emit_content_line_prefixes(
+                builder,
+                content_line,
+                bq_depth,
+                list_content_col,
+                bq_outer,
+                content_indent,
+            );
             let (line_without_newline, newline_str) = strip_newline(after_indent);
 
             if !line_without_newline.is_empty() {
@@ -1218,33 +1443,15 @@ pub(crate) fn parse_fenced_code_block(
     // Closing fence (if found)
     if found_closing {
         let closing_line = lines[current_pos - 1];
-        let closing_after_blockquote = if bq_depth > 0 {
-            let stripped = strip_n_blockquote_markers(closing_line, bq_depth);
-            let prefix_len = closing_line.len().saturating_sub(stripped.len());
-            if prefix_len > 0 {
-                emit_blockquote_prefix_tokens(builder, &closing_line[..prefix_len]);
-            }
-            stripped
-        } else {
-            closing_line
-        };
 
-        // Emit base indent for lossless parsing
-        let base_indent_bytes = byte_index_at_column(closing_after_blockquote, base_indent);
-        if base_indent > 0 && closing_after_blockquote.len() >= base_indent_bytes {
-            let indent_str = &closing_after_blockquote[..base_indent_bytes];
-            if !indent_str.is_empty() {
-                builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
-            }
-        }
-
-        // Strip base indent to get fence
-        let closing_stripped =
-            if base_indent > 0 && closing_after_blockquote.len() >= base_indent_bytes {
-                &closing_after_blockquote[base_indent_bytes..]
-            } else {
-                closing_after_blockquote
-            };
+        let closing_stripped = emit_content_line_prefixes(
+            builder,
+            closing_line,
+            bq_depth,
+            list_content_col,
+            bq_outer,
+            content_indent,
+        );
         let (closing_without_newline, newline_str) = strip_newline(closing_stripped);
         let closing_trimmed_start = strip_leading_spaces(closing_without_newline);
         let leading_ws_len = closing_without_newline.len() - closing_trimmed_start.len();
@@ -1280,13 +1487,17 @@ pub(crate) fn parse_fenced_code_block(
 }
 
 /// Parse a GFM math fence (``` math ... ```) as DISPLAY_MATH while preserving bytes.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn parse_fenced_math_block(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
     start_pos: usize,
     fence: FenceInfo,
     bq_depth: usize,
-    base_indent: usize,
+    list_content_col: usize,
+    list_marker_consumed_on_line_0: bool,
+    bq_outer: bool,
+    content_indent: usize,
     first_line_override: Option<&str>,
 ) -> usize {
     builder.start_node(SyntaxKind::DISPLAY_MATH.into());
@@ -1296,7 +1507,10 @@ pub(crate) fn parse_fenced_math_block(
         lines[start_pos],
         first_line_override,
         bq_depth,
-        base_indent,
+        list_content_col,
+        list_marker_consumed_on_line_0,
+        bq_outer,
+        content_indent,
     );
     let (opening_without_newline, opening_newline) = strip_newline(first_trimmed);
     builder.token(
@@ -1313,21 +1527,38 @@ pub(crate) fn parse_fenced_math_block(
 
     while current_pos < lines.len() {
         let line = lines[current_pos];
-        let (line_bq_depth, _) = count_blockquote_markers(line);
+
+        let after_bq_and_list = if bq_outer {
+            let after_bq = if bq_depth > 0 {
+                strip_n_blockquote_markers(line, bq_depth)
+            } else {
+                line
+            };
+            strip_list_indent(after_bq, list_content_col)
+        } else {
+            let after_list = strip_list_indent(line, list_content_col);
+            if bq_depth > 0 {
+                strip_n_blockquote_markers(after_list, bq_depth)
+            } else {
+                after_list
+            }
+        };
+
+        let probe = if bq_outer {
+            line
+        } else {
+            strip_list_indent(line, list_content_col)
+        };
+        let (line_bq_depth, _) = count_blockquote_markers(probe);
         if line_bq_depth < bq_depth {
             break;
         }
 
-        let inner = if bq_depth > 0 {
-            strip_n_blockquote_markers(line, bq_depth)
+        let indent_bytes = byte_index_at_column(after_bq_and_list, content_indent);
+        let inner_stripped = if content_indent > 0 && after_bq_and_list.len() >= indent_bytes {
+            &after_bq_and_list[indent_bytes..]
         } else {
-            line
-        };
-        let base_indent_bytes = byte_index_at_column(inner, base_indent);
-        let inner_stripped = if base_indent > 0 && inner.len() >= base_indent_bytes {
-            &inner[base_indent_bytes..]
-        } else {
-            inner
+            after_bq_and_list
         };
 
         if is_closing_fence(inner_stripped, &fence) {
@@ -1343,8 +1574,14 @@ pub(crate) fn parse_fenced_math_block(
     if !content_lines.is_empty() {
         let mut content = String::new();
         for content_line in content_lines {
-            let after_indent =
-                emit_content_line_prefixes(builder, content_line, bq_depth, base_indent);
+            let after_indent = emit_content_line_prefixes(
+                builder,
+                content_line,
+                bq_depth,
+                list_content_col,
+                bq_outer,
+                content_indent,
+            );
             let (line_without_newline, newline_str) = strip_newline(after_indent);
             content.push_str(line_without_newline);
             content.push_str(newline_str);
@@ -1354,31 +1591,15 @@ pub(crate) fn parse_fenced_math_block(
 
     if found_closing {
         let closing_line = lines[current_pos - 1];
-        let closing_after_blockquote = if bq_depth > 0 {
-            let stripped = strip_n_blockquote_markers(closing_line, bq_depth);
-            let prefix_len = closing_line.len().saturating_sub(stripped.len());
-            if prefix_len > 0 {
-                emit_blockquote_prefix_tokens(builder, &closing_line[..prefix_len]);
-            }
-            stripped
-        } else {
-            closing_line
-        };
 
-        let base_indent_bytes = byte_index_at_column(closing_after_blockquote, base_indent);
-        if base_indent > 0 && closing_after_blockquote.len() >= base_indent_bytes {
-            let indent_str = &closing_after_blockquote[..base_indent_bytes];
-            if !indent_str.is_empty() {
-                builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
-            }
-        }
-
-        let closing_stripped =
-            if base_indent > 0 && closing_after_blockquote.len() >= base_indent_bytes {
-                &closing_after_blockquote[base_indent_bytes..]
-            } else {
-                closing_after_blockquote
-            };
+        let closing_stripped = emit_content_line_prefixes(
+            builder,
+            closing_line,
+            bq_depth,
+            list_content_col,
+            bq_outer,
+            content_indent,
+        );
         let (closing_without_newline, newline_str) = strip_newline(closing_stripped);
         let closing_trimmed_start = strip_leading_spaces(closing_without_newline);
         let leading_ws_len = closing_without_newline.len() - closing_trimmed_start.len();
@@ -1921,21 +2142,21 @@ mod tests {
             "#|   spanning lines\n",
             "a <- 1\n",
         ];
-        let count = compute_hashpipe_preamble_line_count(&content_lines, "#|", 0, 0);
+        let count = compute_hashpipe_preamble_line_count(&content_lines, "#|", 0, 0, false, 0);
         assert_eq!(count, 3);
     }
 
     #[test]
     fn test_compute_hashpipe_preamble_line_count_stops_at_non_option() {
         let content_lines = vec!["#| label: fig-plot\n", "plot(1:10)\n", "#| echo: false\n"];
-        let count = compute_hashpipe_preamble_line_count(&content_lines, "#|", 0, 0);
+        let count = compute_hashpipe_preamble_line_count(&content_lines, "#|", 0, 0, false, 0);
         assert_eq!(count, 1);
     }
 
     #[test]
     fn test_compute_hashpipe_preamble_line_count_stops_at_standalone_prefix() {
         let content_lines = vec!["#| label: fig-plot\n", "#|\n", "plot(1:10)\n"];
-        let count = compute_hashpipe_preamble_line_count(&content_lines, "#|", 0, 0);
+        let count = compute_hashpipe_preamble_line_count(&content_lines, "#|", 0, 0, false, 0);
         assert_eq!(count, 1);
     }
 }

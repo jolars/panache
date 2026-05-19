@@ -189,7 +189,7 @@ impl ContainerPrefix {
         }
     }
 
-    fn ops(&self) -> &[StripOp] {
+    pub fn ops(&self) -> &[StripOp] {
         &self.ops
     }
 
@@ -481,7 +481,7 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
 /// (mirrors `strip_list_item_indent`'s tab handling). Newlines / CR
 /// short-circuit to the empty string — the line ended before the target
 /// was reached.
-fn advance_columns(line: &str, target: usize) -> &str {
+pub(in crate::parser::blocks) fn advance_columns(line: &str, target: usize) -> &str {
     if target == 0 {
         return line;
     }

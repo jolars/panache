@@ -18,7 +18,7 @@ use super::blocks::blockquotes::{
     strip_n_blockquote_markers,
 };
 use super::blocks::code_blocks::{
-    CodeBlockType, FenceInfo, InfoString, is_closing_fence, is_gfm_math_fence,
+    CodeBlockType, FenceInfo, InfoString, bq_outer_of_list, is_closing_fence, is_gfm_math_fence,
     parse_fenced_code_block, parse_fenced_math_block, try_parse_fence_open,
 };
 use super::blocks::container_prefix::StrippedLines;
@@ -1716,6 +1716,8 @@ impl BlockParser for FencedCodeBlockParser {
     ) -> usize {
         let content = lines.first();
         let line_pos = lines.pos();
+        let list_marker_consumed_on_line_0 = lines.prefix().list_marker_consumed_on_line_0;
+        let bq_outer = bq_outer_of_list(lines.prefix());
         let lines = lines.raw();
         let list_indent_stripped = ctx.list_indent_info.map(|i| i.content_col).unwrap_or(0);
 
@@ -1731,9 +1733,6 @@ impl BlockParser for FencedCodeBlockParser {
             try_parse_fence_open(content_to_check).expect("Fence should exist")
         };
 
-        // Calculate total indent: base content indent + list indent
-        let total_indent = ctx.content_indent + list_indent_stripped;
-
         let new_pos = if ctx.config.extensions.tex_math_gfm && is_gfm_math_fence(&fence) {
             parse_fenced_math_block(
                 builder,
@@ -1741,7 +1740,10 @@ impl BlockParser for FencedCodeBlockParser {
                 line_pos,
                 fence,
                 ctx.blockquote_depth,
-                total_indent,
+                list_indent_stripped,
+                list_marker_consumed_on_line_0,
+                bq_outer,
+                ctx.content_indent,
                 None,
             )
         } else {
@@ -1751,7 +1753,10 @@ impl BlockParser for FencedCodeBlockParser {
                 line_pos,
                 fence,
                 ctx.blockquote_depth,
-                total_indent,
+                list_indent_stripped,
+                list_marker_consumed_on_line_0,
+                bq_outer,
+                ctx.content_indent,
                 None,
             )
         };

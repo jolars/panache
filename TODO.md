@@ -487,13 +487,35 @@ intentionally excluded.
         paths is a side-band signal that could be replaced by a
         `StripOp::ListAdvanceConditional` variant so the prefix self-encodes the
         semantic.
-- [ ] Audit other multi-line-lookahead block parsers for the same misfire class.
-      Concrete finding from the `ContainerPrefix` audit: fenced code in
-      list-item + bq breaks losslessness (CST text doesn't match input) for the
-      canonical input shape with a backtick fence inside `- >` continuation
-      lines. Pre-existing, not a regression from the `ContainerPrefix` work.
-      Tables (`tables.rs`), line blocks (`line_blocks.rs`), and definition lists
-      (`definition_lists.rs`) walk raw `lines` and weren't exhaustively probed.
+- [~] Audit other multi-line-lookahead block parsers for the same misfire class.
+  Audit complete; partial fix landed for fenced code; tables, line blocks, and
+  definition lists remain as known audit findings.
+  - **Fenced code** --- fixed. `parse_fenced_code_block` /
+    `parse_fenced_math_block` now take
+    `(list_content_col,         list_marker_consumed_on_line_0, bq_outer, content_indent)`
+    and apply the strip in container-stack order. The line-0 marker case uses
+    `advance_columns` (so the non-whitespace list-marker bytes get skipped past
+    silently) and the continuation case uses `byte_index_at_column` (so blank
+    lines aren't eaten). Adjacent WHITESPACE emissions are coalesced for
+    byte-range- equivalent CST stability. Locked in by parser golden case
+    `fenced_code_in_list_blockquote`.
+  - **Definition lists** --- audit finding (not yet fixed). For input
+    `- > Term\n  > : Definition\n`, the parser invents 4 prefix bytes (`>` +
+    `:`) inside the emitted `DEFINITION` node, breaking losslessness (+4 bytes).
+    Fixture `definition_list_in_list_blockquote/input.md` preserved; gated out
+    of `golden_test_cases!` until the fix lands.
+  - **Pipe tables** --- audit finding (not yet fixed). Multi-line lookahead in
+    `tables.rs` (separator detection, multi-line cells, caption scans) walks raw
+    `lines` so a `- > | a | b |` shape falls back to paragraph emission
+    (structural detection misses the table; losslessness is preserved). Fixture
+    `pipe_table_in_list_blockquote/input.md` preserved; gated out of
+    `golden_test_cases!` until the fix lands.
+  - **Line blocks** --- audit finding (not yet fixed). `parse_line_block` walks
+    raw `lines[pos..]` and fails to recognize
+    `- > | First         line\n  >   continued` as a line block; structural
+    detection misses, losslessness preserved. Fixture
+    `line_block_in_list_blockquote/input.md` preserved; gated out of
+    `golden_test_cases!` until the fix lands.
 - [ ] Stop letting `pandoc_ast.rs` drift into a second-stage parser. Load-
       bearing byte-walkers (`split_html_block_by_tags`, `parse_pandoc_blocks`
       and the refs/heading-id reparse helpers) re-tokenize source the CST should

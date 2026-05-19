@@ -495,6 +495,9 @@ impl<'a> Parser<'a> {
             fence,
             bq_depth,
             content_col,
+            true,
+            bq_depth > 0,
+            0,
             Some(&text_owned),
         );
         Some(new_pos.saturating_sub(self.pos).saturating_sub(1))
@@ -1437,6 +1440,9 @@ impl<'a> Parser<'a> {
                                 self.pos,
                                 fence,
                                 bq_depth,
+                                0,
+                                false,
+                                bq_depth > 0,
                                 content_col,
                                 Some(&fence_line),
                             )
@@ -1447,6 +1453,9 @@ impl<'a> Parser<'a> {
                                 self.pos,
                                 fence,
                                 bq_depth,
+                                0,
+                                false,
+                                bq_depth > 0,
                                 content_col,
                                 Some(&fence_line),
                             )

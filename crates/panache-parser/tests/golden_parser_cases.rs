@@ -197,6 +197,10 @@ golden_test_cases!(
     citation_prefix_paren_escape_278,
     definition_list,
     definition_list_blockquote_continuation,
+    // definition_list_in_list_blockquote — audit finding from
+    // TODO.md "Audit other multi-line-lookahead block parsers";
+    // currently breaks losslessness (+4 bytes). Fixture preserved for
+    // the eventual fix; gated out of the macro to keep CI green.
     definition_list_inner_list_no_blank,
     definition_list_nesting,
     definition_list_pandoc_bare_leading_list,
@@ -238,6 +242,7 @@ golden_test_cases!(
     blockquote_paragraph_tilde_continuation_pandoc,
     blockquote_marker_does_not_interrupt_paragraph_pandoc,
     fenced_code,
+    fenced_code_in_list_blockquote,
     fenced_code_quarto,
     fenced_code_unclosed_commonmark,
     fenced_code_unclosed_pandoc,
@@ -423,6 +428,10 @@ golden_test_cases!(
     latex_environment,
     lazy_continuation_deep,
     leading_blanklines,
+    // line_block_in_list_blockquote — audit finding from TODO.md;
+    // currently falls back to paragraph emission (losslessness OK,
+    // structural detection misses the line block). Fixture preserved
+    // for the eventual detection-via-stripped-line fix.
     line_blocks,
     line_ending_crlf,
     line_ending_lf,
@@ -509,6 +518,10 @@ golden_test_cases!(
     paragraphs,
     pipe_table,
     pipe_table_caption_attribute,
+    // pipe_table_in_list_blockquote — audit finding from TODO.md;
+    // currently falls back to paragraph emission (losslessness OK,
+    // structural detection misses the pipe table). Fixture preserved
+    // for the eventual detection-via-stripped-line fix.
     pipe_table_unicode,
     plain_continuation_edge_cases,
     quarto_code_blocks,
