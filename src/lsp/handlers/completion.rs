@@ -225,8 +225,14 @@ pub(crate) async fn completion(
 }
 
 fn citation_query_prefix(text: &str, offset: usize) -> Option<String> {
-    let start = offset.saturating_sub(8);
-    let snippet = &text[start..offset];
+    // Look back a small fixed window for an `@`. Floor the window start down to
+    // a char boundary so multi-byte text (e.g. CJK) right before the cursor
+    // doesn't make us slice inside a character and panic (#298).
+    let mut start = offset.saturating_sub(8);
+    while start > 0 && !text.is_char_boundary(start) {
+        start -= 1;
+    }
+    let snippet = text.get(start..offset)?;
     let at = snippet.rfind('@')?;
     let query = &snippet[at + 1..];
     if query
@@ -587,4 +593,45 @@ fn has_extension(name: &str, allowed: &[&str]) -> bool {
     };
     let ext = name[dot + 1..].to_ascii_lowercase();
     allowed.contains(&ext.as_str())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn citation_query_prefix_basic_ascii() {
+        // Cursor at end of "see @smith".
+        assert_eq!(
+            citation_query_prefix("see @smith", "see @smith".len()),
+            Some("smith".to_string())
+        );
+    }
+
+    #[test]
+    fn citation_query_prefix_no_at_sign() {
+        assert_eq!(citation_query_prefix("see smith", "see smith".len()), None);
+    }
+
+    #[test]
+    fn citation_query_prefix_does_not_panic_inside_multibyte() {
+        // Regression for #298: the look-back window start (`offset - 8`) must
+        // not slice inside a multi-byte UTF-8 character. Here the cursor sits
+        // at the end of three 3-byte CJK chars (9 bytes), so `offset - 8`
+        // lands at byte 1, inside the first `あ` (bytes 0..3), and the old
+        // `&text[start..offset]` panicked.
+        let text = "あああ";
+        assert_eq!(citation_query_prefix(text, text.len()), None);
+    }
+
+    #[test]
+    fn citation_query_prefix_finds_query_after_multibyte() {
+        // `offset - 8` lands inside the first `あ`; flooring to a char boundary
+        // keeps the `@fig` query reachable instead of crashing or losing it.
+        let text = "ああ@fig";
+        assert_eq!(
+            citation_query_prefix(text, text.len()),
+            Some("fig".to_string())
+        );
+    }
 }
