@@ -487,66 +487,93 @@ intentionally excluded.
         paths is a side-band signal that could be replaced by a
         `StripOp::ListAdvanceConditional` variant so the prefix self-encodes the
         semantic.
-- [~] Audit other multi-line-lookahead block parsers for the same misfire class.
-  Audit complete; partial fixes landed for fenced code, definition lists, and
-  line blocks; pipe tables remain as the last known audit finding.
-  - **Fenced code** --- fixed. `parse_fenced_code_block` /
-    `parse_fenced_math_block` now take
-    `(list_content_col,         list_marker_consumed_on_line_0, bq_outer, content_indent)`
-    and apply the strip in container-stack order. The line-0 marker case uses
-    `advance_columns` (so the non-whitespace list-marker bytes get skipped past
-    silently) and the continuation case uses `byte_index_at_column` (so blank
-    lines aren't eaten). Adjacent WHITESPACE emissions are coalesced for
-    byte-range- equivalent CST stability. Locked in by parser golden case
-    `fenced_code_in_list_blockquote`.
-  - **Definition lists** --- fixed. The marker-line branch of
-    `handle_definition_list_effect` was slicing the **raw** `self.lines[pos]`
-    using `content_start_bytes` computed against the **container-stripped**
-    `content` argument from `StrippedLines`, so the post-marker view still
-    carried the outer `>` prefix and `count_blockquote_markers` fabricated a
-    phantom inner blockquote (+4 bytes). The fix slices `content` directly for
-    `content_slice` / `content_line` (and for the fence-open `fence_line` in the
-    same branch, proactively). Locked in by parser golden case
-    `definition_list_in_list_blockquote`. Pandoc-native reads this as
-    `BulletList → BlockQuote → DefinitionList`; our CST keeps Term as a
-    PARAGRAPH outside the DEFINITION_LIST (same status quo as before; only the
-    +4 losslessness break was in scope here).
-  - **Pipe tables** --- audit finding (not yet fixed). Multi-line lookahead in
-    `tables.rs` (separator detection, multi-line cells, caption scans) walks raw
-    `lines` so a `- > | a | b |` shape falls back to paragraph emission
-    (structural detection misses the table; losslessness is preserved). Fixture
-    `pipe_table_in_list_blockquote/input.md` preserved; gated out of
-    `golden_test_cases!` until the fix lands.
-  - **Line blocks** --- fixed. `parse_line_block` now takes
-    `(bq_depth, list_content_col, list_marker_consumed_on_line_0, bq_outer, content_indent)`
-    mirroring fenced code, with a `silent_strip_container_prefix` peek for
-    continuation/next-marker detection and an `emit_open_line_prefixes` helper
-    on the dispatch line (a near-clone of `prepare_fence_open_line` minus the
-    final leading-space strip, since `LINE_BLOCK_MARKER` swallows any leading
-    spaces before `|`). The dispatcher (`LineBlockParser::parse_prepared`)
-    threads container geometry from `lines.prefix()` / `ctx`; the over-strict
-    raw-line guard in `detect_prepared` was also removed. Helpers
-    `strip_list_indent` / `emit_blockquote_prefix_tokens` /
-    `emit_content_line_prefixes` were promoted to `pub(crate)` in
-    `code_blocks.rs`. Formatter LINE_BLOCK walker updated to skip leading
-    WS/BQ_MARKER prefix tokens before emitting the marker line, since the parser
-    now emits those prefix tokens inside LINE_BLOCK_LINE. Locked in by parser
-    golden case `line_block_in_list_blockquote`. Pandoc-native reads this as
-    `BulletList → BlockQuote → LineBlock`. (Formatter round-trip for the nested
-    case is still imperfect because the BLOCK_QUOTE walker doesn't re-emit `>`
-    for continuation lines under a LIST_ITEM --- pre-existing, unrelated to this
-    fix; no test exercises that round-trip.)
-  - **Follow-up (after pipe tables land)**: evaluate extracting the per-line
-    container-stripping pattern into a shared `StrippedLineWindow` (or similar)
-    that any forward-scanning block parser can iterate. The threaded-params
-    approach (fenced code:
-    `list_content_col, list_marker_consumed_on_line_0, bq_outer, content_indent`)
-    and the "slice the stripped view" approach (definition lists) are both
-    ad-hoc patches for the same root: long-lookahead parsers re-derive the
-    container prefix on each line because the `StrippedLines` view only covers
-    `lines.first()`. Three concrete call sites is enough signal to design
-    against; don't pull the abstraction forward before the remaining two
-    findings are fixed.
+- [x] Audit other multi-line-lookahead block parsers for the same misfire class.
+      Audit complete; all four findings fixed (fenced code, definition lists,
+      line blocks, pipe tables).
+      - **Fenced code** --- fixed. `parse_fenced_code_block` /
+        `parse_fenced_math_block` now take
+        `(list_content_col,         list_marker_consumed_on_line_0, bq_outer, content_indent)`
+        and apply the strip in container-stack order. The line-0 marker case
+        uses `advance_columns` (so the non-whitespace list-marker bytes get
+        skipped past silently) and the continuation case uses
+        `byte_index_at_column` (so blank lines aren't eaten). Adjacent
+        WHITESPACE emissions are coalesced for byte-range- equivalent CST
+        stability. Locked in by parser golden case
+        `fenced_code_in_list_blockquote`.
+      - **Definition lists** --- fixed. The marker-line branch of
+        `handle_definition_list_effect` was slicing the **raw**
+        `self.lines[pos]` using `content_start_bytes` computed against the
+        **container-stripped** `content` argument from `StrippedLines`, so the
+        post-marker view still carried the outer `>` prefix and
+        `count_blockquote_markers` fabricated a phantom inner blockquote (+4
+        bytes). The fix slices `content` directly for `content_slice` /
+        `content_line` (and for the fence-open `fence_line` in the same branch,
+        proactively). Locked in by parser golden case
+        `definition_list_in_list_blockquote`. Pandoc-native reads this as
+        `BulletList → BlockQuote → DefinitionList`; our CST keeps Term as a
+        PARAGRAPH outside the DEFINITION_LIST (same status quo as before; only
+        the +4 losslessness break was in scope here).
+      - **Pipe tables** --- fixed. `try_parse_pipe_table` now takes
+        `(prefix: &ContainerPrefix, dispatch_line)` and builds a no-alloc
+        container-stripped line view (`strip_line_0_for_emission` on the
+        dispatch line, full `strip` elsewhere) that every detection scan
+        (separator/cell shape, end-of-table, caption helpers) runs against, so a
+        `- > | a | b |` shape is recognized instead of falling back to paragraph
+        emission. Emission re-emits the per-continuation-line `>` prefix as
+        `WHITESPACE`/`BLOCK_QUOTE_MARKER` tokens inside each `TABLE_SEPARATOR` /
+        `TABLE_ROW` node (via `emit_content_line_prefixes`), parsing cells from
+        the stripped tail; the `TABLE_HEADER` on the dispatch line emits no
+        prefix (the core consumed it). With an empty prefix (non-nested tables)
+        every strip is a no-op, so existing output stays byte-identical. The
+        dispatcher threads `lines.prefix()` + `line_pos`; grid/multiline/simple
+        parsers are unchanged (still fall back losslessly under list+bq nesting
+        --- no fixtures exercise those nested cases, and fixing them
+        speculatively was out of scope). Locked in by parser golden case
+        `pipe_table_in_list_blockquote`. Pandoc-native reads this as
+        `BulletList → BlockQuote → Table`, which our
+        `LIST → LIST_ITEM → BLOCK_QUOTE → PIPE_TABLE` shape matches. (Formatter
+        round-trip for the nested case is still imperfect, as with the
+        line-block sibling: the separator-cell alignment scan trims the `>`
+        prefix into a junk cell. Pre-existing class of issue, out of scope here;
+        no test exercises that round-trip.)
+      - **Line blocks** --- fixed. `parse_line_block` now takes
+        `(bq_depth, list_content_col, list_marker_consumed_on_line_0, bq_outer, content_indent)`
+        mirroring fenced code, with a `silent_strip_container_prefix` peek for
+        continuation/next-marker detection and an `emit_open_line_prefixes`
+        helper on the dispatch line (a near-clone of `prepare_fence_open_line`
+        minus the final leading-space strip, since `LINE_BLOCK_MARKER` swallows
+        any leading spaces before `|`). The dispatcher
+        (`LineBlockParser::parse_prepared`) threads container geometry from
+        `lines.prefix()` / `ctx`; the over-strict raw-line guard in
+        `detect_prepared` was also removed. Helpers `strip_list_indent` /
+        `emit_blockquote_prefix_tokens` / `emit_content_line_prefixes` were
+        promoted to `pub(crate)` in `code_blocks.rs`. Formatter LINE_BLOCK
+        walker updated to skip leading WS/BQ_MARKER prefix tokens before
+        emitting the marker line, since the parser now emits those prefix tokens
+        inside LINE_BLOCK_LINE. Locked in by parser golden case
+        `line_block_in_list_blockquote`. Pandoc-native reads this as
+        `BulletList → BlockQuote → LineBlock`. (Formatter round-trip for the
+        nested case is still imperfect because the BLOCK_QUOTE walker doesn't
+        re-emit `>` for continuation lines under a LIST_ITEM --- pre-existing,
+        unrelated to this fix; no test exercises that round-trip.)
+      - **Follow-up (deferred, standalone task)**: extract the per-line
+        container-stripping pattern into a shared `StrippedLineWindow` (or
+        similar) that any forward-scanning block parser can iterate. With all
+        four findings fixed, the pattern is now re-derived three different ways:
+        fenced code / line blocks thread a 5-scalar geometry tuple and call
+        `emit_content_line_prefixes` per line; definition lists slice the
+        stripped view directly; pipe tables build a materialized stripped
+        `Vec<&str>` and reuse `emit_content_line_prefixes`. All three are ad-hoc
+        patches for the same root: long-lookahead parsers re-derive the
+        container prefix on each line because the `StrippedLines` view only
+        covers `lines.first()`. Recommend a window owning
+        `(raw, base, &ContainerPrefix)` exposing peek-strip (`strip_at(i)`),
+        emission (`emit_prefix_at(builder, i) -> tail`), and iteration, so every
+        parser strips and emits prefixes uniformly. `StrippedLines`
+        (`container_prefix.rs`) is the natural seed; the window adds the
+        emit-into-builder method that currently only lives in `code_blocks.rs`.
+        Must be byte-equivalence verified against all four
+        `*_in_list_blockquote` golden snapshots.
 - [ ] Stop letting `pandoc_ast.rs` drift into a second-stage parser. Load-
       bearing byte-walkers (`split_html_block_by_tags`, `parse_pandoc_blocks`
       and the refs/heading-id reparse helpers) re-tokenize source the CST should

@@ -512,10 +512,7 @@ golden_test_cases!(
     paragraphs,
     pipe_table,
     pipe_table_caption_attribute,
-    // pipe_table_in_list_blockquote — audit finding from TODO.md;
-    // currently falls back to paragraph emission (losslessness OK,
-    // structural detection misses the pipe table). Fixture preserved
-    // for the eventual detection-via-stripped-line fix.
+    pipe_table_in_list_blockquote,
     pipe_table_unicode,
     plain_continuation_edge_cases,
     quarto_code_blocks,

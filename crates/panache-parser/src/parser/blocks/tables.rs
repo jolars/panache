@@ -9,6 +9,9 @@ use crate::parser::utils::attributes::try_parse_trailing_attributes_with_pos;
 use crate::parser::utils::helpers::{emit_line_tokens, strip_newline};
 use crate::parser::utils::inline_emission;
 
+use super::code_blocks::{bq_outer_of_list, emit_content_line_prefixes};
+use super::container_prefix::ContainerPrefix;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Alignment {
     Left,
@@ -961,11 +964,32 @@ fn parse_pipe_table_row(line: &str) -> Vec<String> {
 /// Preserves losslessness by emitting exact byte representation while parsing cell content inline.
 fn emit_pipe_table_row(
     builder: &mut GreenNodeBuilder<'static>,
-    line: &str,
+    raw_line: &str,
     row_kind: SyntaxKind,
     config: &ParserOptions,
+    prefix: &ContainerPrefix,
+    emit_prefix: bool,
 ) {
     builder.start_node(row_kind.into());
+
+    // On continuation lines (separator/data rows under a list+blockquote
+    // container) the leading `  > ` prefix is not consumed by the core;
+    // emit it as WHITESPACE/BLOCK_QUOTE_MARKER tokens here and parse the
+    // cells from the stripped tail. On the dispatch line the core already
+    // emitted the prefix, so we only strip it from our view. With an empty
+    // prefix (non-nested tables) both branches are no-ops returning `raw_line`.
+    let line = if emit_prefix {
+        emit_content_line_prefixes(
+            builder,
+            raw_line,
+            prefix.bq_depth(),
+            prefix.list_content_col(),
+            bq_outer_of_list(prefix),
+            prefix.content_indent(),
+        )
+    } else {
+        prefix.strip_line_0_for_emission(raw_line)
+    };
 
     let (line_without_newline, newline_str) = strip_newline(line);
     let trimmed = line_without_newline.trim();
@@ -1102,17 +1126,37 @@ pub(crate) fn try_parse_pipe_table(
     start_pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
     config: &ParserOptions,
+    prefix: &ContainerPrefix,
+    dispatch_line: usize,
 ) -> Option<usize> {
     if start_pos + 1 >= lines.len() {
         return None;
     }
 
+    // Detection scans run against a container-prefix-stripped view, so a
+    // table nested in `list → blockquote` (e.g. `- > | a | b |`) has its
+    // `  > ` prefix removed before the separator/cell shape checks. Each
+    // entry is a no-alloc tail slice of the matching raw line; with an
+    // empty prefix `stripped == lines`. The dispatch line uses the
+    // emission-safe line-0 strip (its prefix was consumed by the core);
+    // every other line gets the full continuation strip. Emission still
+    // reads raw `lines` so the prefix bytes can be re-emitted as tokens.
+    let stripped: Vec<&str> = (0..lines.len())
+        .map(|i| {
+            if i == dispatch_line {
+                prefix.strip_line_0_for_emission(lines[i])
+            } else {
+                prefix.strip(lines[i])
+            }
+        })
+        .collect();
+
     // Check if this line is a caption followed by a table
     // If so, the actual table starts after the caption and blank line
-    let (actual_start, caption_before) = if is_caption_followed_by_table(lines, start_pos) {
-        let (cap_start, cap_end) = caption_range_starting_at(lines, start_pos)?;
+    let (actual_start, caption_before) = if is_caption_followed_by_table(&stripped, start_pos) {
+        let (cap_start, cap_end) = caption_range_starting_at(&stripped, start_pos)?;
         let mut pos = cap_end;
-        while pos < lines.len() && lines[pos].trim().is_empty() {
+        while pos < stripped.len() && stripped[pos].trim().is_empty() {
             pos += 1;
         }
         (pos, Some((cap_start, cap_end)))
@@ -1125,17 +1169,15 @@ pub(crate) fn try_parse_pipe_table(
     }
 
     // First line should have pipes (potential header)
-    let header_line = lines[actual_start];
-    if !header_line.contains('|') {
+    if !stripped[actual_start].contains('|') {
         return None;
     }
 
     // Second line should be separator
-    let separator_line = lines[actual_start + 1];
-    let alignments = try_parse_pipe_separator(separator_line)?;
+    let alignments = try_parse_pipe_separator(stripped[actual_start + 1])?;
 
     // Parse header cells
-    let header_cells = parse_pipe_table_row(header_line);
+    let header_cells = parse_pipe_table_row(stripped[actual_start]);
 
     // Number of columns should match (approximately - be lenient)
     if header_cells.len() != alignments.len() && !header_cells.is_empty() {
@@ -1147,8 +1189,8 @@ pub(crate) fn try_parse_pipe_table(
 
     // Find table end (first blank line or end of input)
     let mut end_pos = actual_start + 2;
-    while end_pos < lines.len() {
-        let line = lines[end_pos];
+    while end_pos < stripped.len() {
+        let line = stripped[end_pos];
         if line.trim().is_empty() {
             break;
         }
@@ -1165,13 +1207,14 @@ pub(crate) fn try_parse_pipe_table(
     }
 
     // Check for caption before table (only if we didn't already detect it)
-    let caption_before = caption_before.or_else(|| find_caption_before_table(lines, actual_start));
+    let caption_before =
+        caption_before.or_else(|| find_caption_before_table(&stripped, actual_start));
 
     // Check for caption after table
     let caption_after = if caption_before.is_some() {
         None
     } else {
-        find_caption_after_table(lines, end_pos)
+        find_caption_after_table(&stripped, end_pos)
     };
 
     // Build the pipe table
@@ -1192,17 +1235,52 @@ pub(crate) fn try_parse_pipe_table(
         }
     }
 
-    // Emit header row with inline-parsed cells
-    emit_pipe_table_row(builder, header_line, SyntaxKind::TABLE_HEADER, config);
+    // Emit header row with inline-parsed cells. On the dispatch line the
+    // core already emitted the container prefix; only when the header is a
+    // continuation line (e.g. it follows a caption-before line) do we emit
+    // the prefix here.
+    emit_pipe_table_row(
+        builder,
+        lines[actual_start],
+        SyntaxKind::TABLE_HEADER,
+        config,
+        prefix,
+        actual_start != dispatch_line,
+    );
 
-    // Emit separator
+    // Emit separator, re-emitting any continuation-line container prefix
+    // (`  > `) as WHITESPACE/BLOCK_QUOTE_MARKER tokens before the row text.
     builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-    emit_line_tokens(builder, separator_line);
+    let separator_tail = if actual_start + 1 != dispatch_line {
+        emit_content_line_prefixes(
+            builder,
+            lines[actual_start + 1],
+            prefix.bq_depth(),
+            prefix.list_content_col(),
+            bq_outer_of_list(prefix),
+            prefix.content_indent(),
+        )
+    } else {
+        prefix.strip_line_0_for_emission(lines[actual_start + 1])
+    };
+    emit_line_tokens(builder, separator_tail);
     builder.finish_node();
 
-    // Emit data rows with inline-parsed cells
-    for line in lines.iter().take(end_pos).skip(actual_start + 2) {
-        emit_pipe_table_row(builder, line, SyntaxKind::TABLE_ROW, config);
+    // Emit data rows with inline-parsed cells (always continuation lines)
+    for (idx, line) in lines
+        .iter()
+        .enumerate()
+        .take(end_pos)
+        .skip(actual_start + 2)
+    {
+        emit_pipe_table_row(
+            builder,
+            line,
+            SyntaxKind::TABLE_ROW,
+            config,
+            prefix,
+            idx != dispatch_line,
+        );
     }
 
     // Emit caption after if present
@@ -1480,7 +1558,14 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_pipe_table(&input, 1, &mut builder, &ParserOptions::default());
+        let result = try_parse_pipe_table(
+            &input,
+            1,
+            &mut builder,
+            &ParserOptions::default(),
+            &ContainerPrefix::default(),
+            1,
+        );
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 4); // header + sep + 2 rows
@@ -1498,7 +1583,14 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_pipe_table(&input, 1, &mut builder, &ParserOptions::default());
+        let result = try_parse_pipe_table(
+            &input,
+            1,
+            &mut builder,
+            &ParserOptions::default(),
+            &ContainerPrefix::default(),
+            1,
+        );
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 4);
@@ -1517,7 +1609,14 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_pipe_table(&input, 1, &mut builder, &ParserOptions::default());
+        let result = try_parse_pipe_table(
+            &input,
+            1,
+            &mut builder,
+            &ParserOptions::default(),
+            &ContainerPrefix::default(),
+            1,
+        );
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 5); // header + sep + row + blank + caption
@@ -1536,7 +1635,14 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_pipe_table(&input, 0, &mut builder, &ParserOptions::default());
+        let result = try_parse_pipe_table(
+            &input,
+            0,
+            &mut builder,
+            &ParserOptions::default(),
+            &ContainerPrefix::default(),
+            0,
+        );
 
         assert!(result.is_some());
         // caption(2) + blank(1) + header + sep + row

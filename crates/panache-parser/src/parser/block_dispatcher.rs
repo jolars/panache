@@ -1192,6 +1192,7 @@ impl BlockParser for TableParser {
         lines: &StrippedLines<'_, '_>,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         let line_pos = lines.pos();
+        let prefix = lines.prefix();
         let lines = lines.raw();
         if !ctx.has_blank_before && !ctx.at_document_start {
             return None;
@@ -1251,7 +1252,8 @@ impl BlockParser for TableParser {
             }
 
             if ctx.config.extensions.pipe_tables
-                && try_parse_pipe_table(lines, table_pos, &mut tmp, ctx.config).is_some()
+                && try_parse_pipe_table(lines, table_pos, &mut tmp, ctx.config, prefix, line_pos)
+                    .is_some()
             {
                 return Some((
                     detection,
@@ -1298,7 +1300,8 @@ impl BlockParser for TableParser {
         }
 
         if ctx.config.extensions.pipe_tables
-            && try_parse_pipe_table(lines, line_pos, &mut tmp, ctx.config).is_some()
+            && try_parse_pipe_table(lines, line_pos, &mut tmp, ctx.config, prefix, line_pos)
+                .is_some()
         {
             return Some((
                 BlockDetectionResult::Yes,
@@ -1333,6 +1336,7 @@ impl BlockParser for TableParser {
         payload: Option<&dyn Any>,
     ) -> usize {
         let line_pos = lines.pos();
+        let prefix = lines.prefix();
         let lines = lines.raw();
         let prepared = payload.and_then(|p| p.downcast_ref::<TablePrepared>().copied());
         let caption_before_table =
@@ -1371,7 +1375,7 @@ impl BlockParser for TableParser {
                 }
                 TableKind::Pipe => {
                     if ctx.config.extensions.pipe_tables {
-                        try_parse_pipe_table(lines, pos, builder, ctx.config)
+                        try_parse_pipe_table(lines, pos, builder, ctx.config, prefix, line_pos)
                     } else {
                         None
                     }
