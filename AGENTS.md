@@ -436,9 +436,9 @@ change genuinely spans the whole workspace.
 
 **Body** (when warranted):
 
-- Keep it short and to the point. A few short paragraphs at most; often a single
-  sentence is enough. If the subject says it all, skip the body entirely.
-- Explain the *why* and the user-visible effect --- the diff already shows the
+- Keep it short and to the point. One paragraph or a single sentence is enough.
+  If the subject says it all, skip the body entirely.
+- Explain the *why* and the user-visible effect---the diff already shows the
   *what*.
 - Reference the failure mode or pandoc-native shape being fixed when it isn't
   obvious from the subject.
