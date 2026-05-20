@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.48.0](https://github.com/jolars/panache/compare/v2.47.0...v2.48.0) (2026-05-20)
+
+### Features
+- **config:** add `anchor_dir` and `GlobMatcher` ([`4410951`](https://github.com/jolars/panache/commit/44109510e12c1e603d7340cdeb907756e977c2fc))
+- **config:** discover `.config/panache.toml` ([`0d9a44f`](https://github.com/jolars/panache/commit/0d9a44ffe8bcbeba8e6bf4985948d255dea483c0)), closes [#294](https://github.com/jolars/panache/issues/294)
+- add JSON schema for configuration ([`5ae80bf`](https://github.com/jolars/panache/commit/5ae80bf1ebb75c2e41b2cf8115f301406af10816)), closes [#295](https://github.com/jolars/panache/issues/295)
+- **editors:** toggle symbol publication via settings ([`fdf5a94`](https://github.com/jolars/panache/commit/fdf5a941dec8d51e6e1e9eafa4f9d34d3af1bff6)), closes [#297](https://github.com/jolars/panache/issues/297)
+
+### Bug Fixes
+- **ci:** pin linux-gnu binaries to a glibc 2.17 floor ([`a1dfa9e`](https://github.com/jolars/panache/commit/a1dfa9e8bb933d9286be32381c6869604fd70921)), fixes [#300](https://github.com/jolars/panache/issues/300)
+- **cli:** anchor exclude/include at the config's directory ([`24b948d`](https://github.com/jolars/panache/commit/24b948dda03ddcbe3a951d02a999694deabb78e2))
+- **config:** anchor flavor-overrides at the unified project dir ([`38f1a21`](https://github.com/jolars/panache/commit/38f1a21d194ddec0daff5925b98c576d810e14e9))
+- **lsp:** floor citation completion window to char boundary ([`8b79812`](https://github.com/jolars/panache/commit/8b798128ec654354f14ed136a74517424db728f5)), fixes [#298](https://github.com/jolars/panache/issues/298)
+- **parser:** strip list+bq prefix on line-block lookahead ([`280c6c1`](https://github.com/jolars/panache/commit/280c6c1774ab2b226c0018fcdc96bb03b4449643))
+- **parser:** use stripped content in def-list emit ([`a8ba276`](https://github.com/jolars/panache/commit/a8ba276990a2f73951017869c9846f6ed74299be))
+- **parser:** strip list+bq prefix on fenced-code lookahead ([`bc0efc3`](https://github.com/jolars/panache/commit/bc0efc35168cd2b70bf54a50841e598fc37b6b1c))
+- **linter:** resolve `#ref-<citekey>` anchors for cited keys ([`a0c0afd`](https://github.com/jolars/panache/commit/a0c0afd637fcb64d7c79ed430d7d42044e01af76)), closes [#296](https://github.com/jolars/panache/issues/296)
+- **parser:** dispatch bq-in-listitem first-line HTML blocks ([`bc32e49`](https://github.com/jolars/panache/commit/bc32e492b9ea09f6ffe37b3aa23ba330ed632a5c))
+- **parser:** dispatch bq-in-listitem first-line content ([`c1c0db5`](https://github.com/jolars/panache/commit/c1c0db50358dc02ae1ec6efe6f000e99eea89e35))
+- **parser:** emit `BLOCK_QUOTE_MARKER` for bq continuations in footnotes ([`f24b787`](https://github.com/jolars/panache/commit/f24b787f28e4cff6307f739daf400cadfe8cf0af))
+- interpret a-j alphabetical list as one list ([`bed78dd`](https://github.com/jolars/panache/commit/bed78dd0b42bd9dde99c60a2cc08be31b0f99507))
+
+### Dependencies
+- updated crates/panache-formatter to v0.6.1
+- updated crates/panache-parser to v0.11.0
 ## [2.47.0](https://github.com/jolars/panache/compare/v2.46.0...v2.47.0) (2026-05-17)
 
 ### Features

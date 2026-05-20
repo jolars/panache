@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0](https://github.com/jolars/panache/compare/panache-parser-v0.10.0...panache-parser-v0.11.0) (2026-05-20)
+
+### Features
+- add JSON schema for configuration ([`5ae80bf`](https://github.com/jolars/panache/commit/5ae80bf1ebb75c2e41b2cf8115f301406af10816)), closes [#295](https://github.com/jolars/panache/issues/295)
+
+### Bug Fixes
+- **parser:** strip list+bq prefix on line-block lookahead ([`280c6c1`](https://github.com/jolars/panache/commit/280c6c1774ab2b226c0018fcdc96bb03b4449643))
+- **parser:** use stripped content in def-list emit ([`a8ba276`](https://github.com/jolars/panache/commit/a8ba276990a2f73951017869c9846f6ed74299be))
+- **parser:** strip list+bq prefix on fenced-code lookahead ([`bc0efc3`](https://github.com/jolars/panache/commit/bc0efc35168cd2b70bf54a50841e598fc37b6b1c))
+- **parser:** emit `BLOCK_QUOTE_MARKER` for bq continuations in footnotes ([`f24b787`](https://github.com/jolars/panache/commit/f24b787f28e4cff6307f739daf400cadfe8cf0af))
+- **parser:** dispatch bq-in-listitem first-line HTML blocks ([`bc32e49`](https://github.com/jolars/panache/commit/bc32e492b9ea09f6ffe37b3aa23ba330ed632a5c))
+- **parser:** dispatch bq-in-listitem first-line content ([`c1c0db5`](https://github.com/jolars/panache/commit/c1c0db50358dc02ae1ec6efe6f000e99eea89e35))
+- interpret a-j alphabetical list as one list ([`bed78dd`](https://github.com/jolars/panache/commit/bed78dd0b42bd9dde99c60a2cc08be31b0f99507))
 ## [0.10.0](https://github.com/jolars/panache/compare/panache-parser-v0.9.0...panache-parser-v0.10.0) (2026-05-17)
 
 ### Features

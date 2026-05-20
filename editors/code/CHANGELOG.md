@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.41.0](https://github.com/jolars/panache/compare/panache-code-v2.40.0...panache-code-v2.41.0) (2026-05-20)
+
+### Features
+- **editors:** toggle symbol publication via settings ([`fdf5a94`](https://github.com/jolars/panache/commit/fdf5a941dec8d51e6e1e9eafa4f9d34d3af1bff6)), closes [#297](https://github.com/jolars/panache/issues/297)
+
+### Dependencies
+- updated panache to v2.48.0
 ## [2.40.0](https://github.com/jolars/panache/compare/panache-code-v2.39.0...panache-code-v2.40.0) (2026-05-17)
 
 ### Dependencies

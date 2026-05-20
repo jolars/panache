@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/jolars/panache/compare/panache-formatter-v0.6.0...panache-formatter-v0.6.1) (2026-05-20)
+
+### Bug Fixes
+- **parser:** strip list+bq prefix on line-block lookahead ([`280c6c1`](https://github.com/jolars/panache/commit/280c6c1774ab2b226c0018fcdc96bb03b4449643))
+
+### Dependencies
+- updated crates/panache-parser to v0.11.0
 ## [0.6.0](https://github.com/jolars/panache/compare/panache-formatter-v0.5.1...panache-formatter-v0.6.0) (2026-05-17)
 
 ### Features
