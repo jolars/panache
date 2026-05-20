@@ -125,7 +125,7 @@ fn schema_accepts_every_fixture_panache_toml() {
         };
         let errors: Vec<String> = validator
             .iter_errors(&json)
-            .map(|e| format!("    {} at {}", e, e.instance_path))
+            .map(|e| format!("    {} at {}", e, e.instance_path()))
             .collect();
         if !errors.is_empty() {
             failures.push(format!("{}:\n{}", toml_path.display(), errors.join("\n")));

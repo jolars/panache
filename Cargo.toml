@@ -91,7 +91,7 @@ insta = { version = "1.47.2", features = ["json"] }
 tokio = { version = "1", features = ["macros", "rt"] }
 assert_cmd = "2.0"
 predicates = "3.0"
-jsonschema = { version = "0.36", default-features = false }
+jsonschema = { version = "0.46", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rayon = "1.10.0"
