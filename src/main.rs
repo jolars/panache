@@ -119,8 +119,8 @@ fn init_lsp_debug_log() -> io::Result<PathBuf> {
 }
 
 struct PathFilters {
-    exclude: ignore::gitignore::Gitignore,
-    include: ignore::gitignore::Gitignore,
+    exclude: panache::config::GlobMatcher,
+    include: panache::config::GlobMatcher,
 }
 
 fn effective_exclude_patterns(cfg: &panache::Config) -> Vec<String> {
@@ -145,23 +145,13 @@ fn effective_include_patterns(cfg: &panache::Config) -> Vec<String> {
     patterns
 }
 
-fn build_path_filters(root: &Path, cfg: &panache::Config) -> io::Result<PathFilters> {
-    let mut exclude_builder = ignore::gitignore::GitignoreBuilder::new(root);
-    for pattern in effective_exclude_patterns(cfg) {
-        exclude_builder
-            .add_line(None, &pattern)
-            .map_err(io::Error::other)?;
-    }
-    let exclude = exclude_builder.build().map_err(io::Error::other)?;
-
-    let mut include_builder = ignore::gitignore::GitignoreBuilder::new(root);
-    for pattern in effective_include_patterns(cfg) {
-        include_builder
-            .add_line(None, &pattern)
-            .map_err(io::Error::other)?;
-    }
-    let include = include_builder.build().map_err(io::Error::other)?;
-
+fn build_path_filters(cfg: &panache::Config) -> io::Result<PathFilters> {
+    // Anchoring is applied by computing config-dir-relative paths in
+    // `expand_paths`; the matchers themselves are anchor-agnostic.
+    let exclude = panache::config::GlobMatcher::build(&effective_exclude_patterns(cfg))
+        .map_err(io::Error::other)?;
+    let include = panache::config::GlobMatcher::build(&effective_include_patterns(cfg))
+        .map_err(io::Error::other)?;
     Ok(PathFilters { exclude, include })
 }
 
@@ -188,20 +178,16 @@ fn expand_paths(
     use ignore::WalkBuilder;
 
     let mut files = Vec::new();
-    // One matcher anchored at the config's directory (the unified rule).
-    let filters = build_path_filters(anchor, cfg)?;
+    // One matcher set; paths are matched config-dir-relative (the unified rule).
+    let filters = build_path_filters(cfg)?;
 
     for path in paths {
         if path.is_file() {
             let rel_path = relative_path_from_root(path, anchor)
                 .or_else(|| path.file_name().map(PathBuf::from))
                 .unwrap_or_else(|| path.to_path_buf());
-            if force_exclude
-                && filters
-                    .exclude
-                    .matched_path_or_any_parents(&rel_path, false)
-                    .is_ignore()
-            {
+            let rel = rel_path.to_string_lossy().replace('\\', "/");
+            if force_exclude && filters.exclude.is_match(&rel) {
                 continue;
             }
             if accept_any_extension {
@@ -232,19 +218,16 @@ fn expand_paths(
             for entry in walker {
                 let entry = entry.map_err(io::Error::other)?;
                 let entry_path = entry.path();
-                let rel_path = relative_path_from_root(entry_path, anchor)
-                    .unwrap_or_else(|| entry_path.to_path_buf());
                 if entry_path.is_dir() {
                     continue;
                 }
-                if filters
-                    .exclude
-                    .matched_path_or_any_parents(&rel_path, false)
-                    .is_ignore()
-                {
+                let rel_path = relative_path_from_root(entry_path, anchor)
+                    .unwrap_or_else(|| entry_path.to_path_buf());
+                let rel = rel_path.to_string_lossy().replace('\\', "/");
+                if filters.exclude.is_match(&rel) {
                     continue;
                 }
-                if !filters.include.matched(&rel_path, false).is_ignore() {
+                if !filters.include.is_match(&rel) {
                     continue;
                 }
                 if entry_path.is_file() {
