@@ -167,6 +167,38 @@ exclude = ["tests/"]
 }
 
 #[test]
+fn test_format_directory_respects_exclude_in_dot_config() {
+    // A `.config/panache.toml` must behave like a top-level config: its exclude
+    // globs anchor at the project root, so `tests/` excludes `tests/snapshot.md`
+    // without needing a `../` prefix.
+    let temp_dir = TempDir::new().unwrap();
+    let config_dir = temp_dir.path().join(".config");
+    fs::create_dir_all(&config_dir).unwrap();
+    let config = config_dir.join("panache.toml");
+    let included = temp_dir.path().join("doc.qmd");
+    let excluded_dir = temp_dir.path().join("tests");
+    let excluded = excluded_dir.join("snapshot.md");
+    fs::create_dir_all(&excluded_dir).unwrap();
+    fs::write(
+        &config,
+        r#"
+exclude = ["tests/"]
+"#,
+    )
+    .unwrap();
+    fs::write(&included, "# Included\n\nParagraph.\n").unwrap();
+    fs::write(&excluded, "# Excluded\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["format", temp_dir.path().to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("1 file left unchanged"))
+        .stdout(predicate::str::contains("snapshot.md").not());
+}
+
+#[test]
 fn test_format_directory_reports_only_changed_files_and_summary() {
     let temp_dir = TempDir::new().unwrap();
     let changed = temp_dir.path().join("changed.qmd");

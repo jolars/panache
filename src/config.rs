@@ -276,6 +276,14 @@ fn find_in_tree(start_dir: &Path, boundary: Option<&Path>) -> Option<PathBuf> {
                 return Some(p);
             }
         }
+        // The dot-config convention: `<dir>/.config/panache.toml`. Checked
+        // *after* the bare names so a top-level `panache.toml` wins within the
+        // same directory; the per-directory ascent still makes the nearest
+        // config win across directories.
+        let nested = dir.join(".config").join("panache.toml");
+        if nested.is_file() {
+            return Some(nested);
+        }
         if matches!(boundary, Some(b) if dir == b) {
             return None;
         }
@@ -710,6 +718,73 @@ mod tests {
 
         let found = find_in_tree(&nested, Some(&workspace));
         assert_eq!(found.as_deref(), Some(cfg.as_path()));
+    }
+
+    #[test]
+    fn find_in_tree_discovers_dot_config_panache_toml() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let workspace = tmp.path().join("ws");
+        let nested = workspace.join("docs");
+        std::fs::create_dir_all(&nested).unwrap();
+        let cfg_dir = workspace.join(".config");
+        std::fs::create_dir_all(&cfg_dir).unwrap();
+        let cfg = cfg_dir.join("panache.toml");
+        std::fs::write(&cfg, "").unwrap();
+
+        let found = find_in_tree(&nested, Some(&workspace));
+        assert_eq!(found.as_deref(), Some(cfg.as_path()));
+    }
+
+    #[test]
+    fn find_in_tree_prefers_bare_config_over_dot_config() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let workspace = tmp.path().join("ws");
+        std::fs::create_dir_all(workspace.join(".config")).unwrap();
+        let bare = workspace.join("panache.toml");
+        std::fs::write(&bare, "").unwrap();
+        std::fs::write(workspace.join(".config").join("panache.toml"), "").unwrap();
+
+        let found = find_in_tree(&workspace, Some(&workspace));
+        assert_eq!(
+            found.as_deref(),
+            Some(bare.as_path()),
+            "a bare panache.toml must win over .config/panache.toml in the same dir"
+        );
+    }
+
+    #[test]
+    fn find_in_tree_prefers_nearest_dot_config_over_ancestor() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let workspace = tmp.path().join("ws");
+        let sub = workspace.join("sub");
+        std::fs::create_dir_all(sub.join(".config")).unwrap();
+        std::fs::write(workspace.join("panache.toml"), "").unwrap();
+        let near = sub.join(".config").join("panache.toml");
+        std::fs::write(&near, "").unwrap();
+
+        let found = find_in_tree(&sub, Some(&workspace));
+        assert_eq!(
+            found.as_deref(),
+            Some(near.as_path()),
+            "a nearer .config/panache.toml must win over an ancestor's panache.toml"
+        );
+    }
+
+    #[test]
+    fn find_in_tree_dot_config_above_boundary_not_inherited() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let cfg_dir = tmp.path().join(".config");
+        std::fs::create_dir_all(&cfg_dir).unwrap();
+        std::fs::write(cfg_dir.join("panache.toml"), "").unwrap();
+        let workspace = tmp.path().join("workspace");
+        let nested = workspace.join("sub");
+        std::fs::create_dir_all(&nested).unwrap();
+
+        let found = find_in_tree(&nested, Some(&workspace));
+        assert!(
+            found.is_none(),
+            "boundary must prevent ascent to a .config above workspace, got {found:?}"
+        );
     }
 
     #[test]
