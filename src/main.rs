@@ -510,7 +510,9 @@ fn load_config_for_cli(
     flavor_override: Option<Flavor>,
 ) -> io::Result<(panache::Config, Option<PathBuf>)> {
     let mut loaded = if !isolated {
-        panache::config::load(config_path, start_dir, input_path, flavor_override)?
+        let (cfg, source) =
+            panache::config::load(config_path, start_dir, input_path, flavor_override)?;
+        (cfg, source.path().map(Path::to_path_buf))
     } else {
         let mut cfg = panache::Config::default();
         let isolated_flavor = flavor_override.or_else(|| {

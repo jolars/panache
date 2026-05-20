@@ -325,37 +325,66 @@ fn xdg_config_path() -> Option<PathBuf> {
     None
 }
 
+/// Which configuration source [`load`] resolved, carrying its path.
+///
+/// The directory of the carried path is where relative globs declared in that
+/// config anchor (see [`anchor_dir`]) — except for [`ConfigSource::Global`],
+/// the XDG user config, which has no project location and therefore no anchor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConfigSource {
+    /// Loaded from an explicit `--config <path>`.
+    Explicit(PathBuf),
+    /// Discovered by walking up the directory tree from the input.
+    Discovered(PathBuf),
+    /// The global `~/.config/panache/config.toml` (XDG user config).
+    Global(PathBuf),
+    /// No config file found; built-in defaults are in use.
+    None,
+}
+
+impl ConfigSource {
+    /// Path of the resolved config file, if any.
+    pub fn path(&self) -> Option<&Path> {
+        match self {
+            ConfigSource::Explicit(p) | ConfigSource::Discovered(p) | ConfigSource::Global(p) => {
+                Some(p)
+            }
+            ConfigSource::None => None,
+        }
+    }
+}
+
 pub fn load(
     explicit: Option<&Path>,
     start_dir: &Path,
     input_file: Option<&Path>,
     flavor_override: Option<Flavor>,
-) -> io::Result<(Config, Option<PathBuf>)> {
+) -> io::Result<(Config, ConfigSource)> {
     let boundary = project_boundary(start_dir);
-    let (mut cfg, cfg_path) = if let Some(path) = explicit {
+    let (mut cfg, source) = if let Some(path) = explicit {
         let cfg = read_config(path)?;
-        (cfg, Some(path.to_path_buf()))
+        (cfg, ConfigSource::Explicit(path.to_path_buf()))
     } else if let Some(p) = find_in_tree(start_dir, boundary.as_deref())
         && let Ok(cfg) = read_config(&p)
     {
-        (cfg, Some(p))
+        (cfg, ConfigSource::Discovered(p))
     } else if let Some(p) = xdg_config_path()
         && let Ok(cfg) = read_config(&p)
     {
-        (cfg, Some(p))
+        (cfg, ConfigSource::Global(p))
     } else {
         log::debug!("No config file found, using defaults");
-        (Config::default(), None)
+        (Config::default(), ConfigSource::None)
     };
 
-    let resolved_flavor =
-        flavor_override.or_else(|| detect_flavor(input_file, cfg_path.as_deref(), &cfg));
+    let cfg_path = source.path();
+    let resolved_flavor = flavor_override.or_else(|| detect_flavor(input_file, cfg_path, &cfg));
 
     if let Some(flavor) = resolved_flavor {
-        apply_flavor(&mut cfg, flavor, cfg_path.as_deref());
+        apply_flavor(&mut cfg, flavor, cfg_path);
     }
 
-    Ok((cfg, cfg_path))
+    Ok((cfg, source))
 }
 
 fn apply_flavor(cfg: &mut Config, flavor: Flavor, cfg_path: Option<&Path>) {
@@ -829,9 +858,10 @@ mod tests {
         let doc = repo.join("doc.qmd");
         std::fs::write(&doc, "").unwrap();
 
-        let (cfg, cfg_path) = load(None, &repo, Some(&doc), None).expect("load");
+        let (cfg, source) = load(None, &repo, Some(&doc), None).expect("load");
         assert_eq!(
-            cfg_path, None,
+            source,
+            ConfigSource::None,
             "must not pick up panache.toml above .git boundary"
         );
         // Sanity check: defaults are used, not line-width=7 from the stray file.

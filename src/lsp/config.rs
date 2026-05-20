@@ -30,8 +30,8 @@ pub(crate) async fn load_config(
             .map(Path::to_path_buf)
             .unwrap_or_else(|| root.clone());
         match crate::config::load(None, &start_dir, input_file.as_deref(), None) {
-            Ok((config, path)) => {
-                if let Some(p) = path {
+            Ok((config, source)) => {
+                if let Some(p) = source.path() {
                     client
                         .log_message(
                             MessageType::INFO,
