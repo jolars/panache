@@ -44,10 +44,13 @@ In sentence mode, Panache applies conservative no-break rules for common
 abbreviations (for example `i.e.` and `e.g.`), so these do not trigger sentence
 splits by themselves.
 
-When document metadata provides `lang` (as in Quarto and Pandoc frontmatter),
-Panache uses it to choose sentence-boundary behavior. Currently, English rules
-are applied as the default fallback when language-specific rules are not
-available.
+The abbreviation list follows the document language. When metadata provides
+`lang` (as in Quarto and Pandoc frontmatter), Panache selects a built-in profile
+for it; profiles ship for English, Czech, German, Spanish, and French, and
+unknown languages fall back to English. You can also set a project-wide fallback
+language and extend the list with your own tokens --- see [Sentence-Wrapping
+Abbreviations](configuration.qmd#no-break-abbreviations) in the configuration
+guide.
 
 Input
 

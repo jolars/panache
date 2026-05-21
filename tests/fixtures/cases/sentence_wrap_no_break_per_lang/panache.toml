@@ -1,0 +1,7 @@
+[format]
+wrap = "sentence"
+
+[format.no-break-abbreviations]
+default = ["zkr."]
+cs = ["např."]
+de = ["bzw."]

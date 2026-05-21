@@ -38,6 +38,19 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
         crate::config::BlankLines::Preserve => panache_formatter::BlankLines::Preserve,
         crate::config::BlankLines::Collapse => panache_formatter::BlankLines::Collapse,
     };
+    // Collapse the user-facing flat/per-language shapes into a single
+    // language-keyed map; the formatter normalizes the entries at resolution
+    // time. Keys are lowercased so they match the resolved language code.
+    let no_break_abbreviations = match &config.no_break_abbreviations {
+        None => std::collections::BTreeMap::new(),
+        Some(crate::config::NoBreakAbbreviations::Flat(list)) => {
+            std::collections::BTreeMap::from([("default".to_string(), list.clone())])
+        }
+        Some(crate::config::NoBreakAbbreviations::PerLanguage(by_lang)) => by_lang
+            .iter()
+            .map(|(key, list)| (key.to_lowercase(), list.clone()))
+            .collect(),
+    };
     let formatter_extensions = panache_formatter::config::FormatterExtensions {
         // Keep shared extension behavior aligned with parser-facing extensions.
         blank_before_header: config.extensions.blank_before_header,
@@ -79,6 +92,8 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
         tab_width: config.tab_width,
         wrap,
         blank_lines,
+        lang: config.lang.clone(),
+        no_break_abbreviations,
         formatters,
         external_max_parallel: config.external_max_parallel,
         parser: config.parser,

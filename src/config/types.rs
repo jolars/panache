@@ -239,6 +239,55 @@ pub enum TabStopMode {
     Preserve,
 }
 
+/// User-supplied no-break abbreviations for sentence wrapping.
+///
+/// Accepts either a flat list applied to every document, or a table keyed by
+/// primary language subtag with a `default` bucket:
+///
+/// ```toml
+/// # flat
+/// no-break-abbreviations = ["např.", "tzv."]
+///
+/// # per-language
+/// [format.no-break-abbreviations]
+/// default = ["etc."]
+/// cs = ["např."]
+/// ```
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum NoBreakAbbreviations {
+    /// A single list merged into every document's profile.
+    Flat(Vec<String>),
+    /// Per-language buckets keyed by primary subtag (`cs`, `de`, ...), plus an
+    /// optional `default` bucket applied to every document.
+    PerLanguage(std::collections::BTreeMap<String, Vec<String>>),
+}
+
+impl JsonSchema for NoBreakAbbreviations {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "NoBreakAbbreviations".into()
+    }
+
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        // serde `untagged` accepts two shapes; schemars can't derive this, so
+        // describe both by hand (see `.claude/rules/config.md`):
+        //   no-break-abbreviations = ["etc."]              (flat list)
+        //   [format.no-break-abbreviations] de = ["bzw."]  (per-language table)
+        schemars::json_schema!({
+            "anyOf": [
+                { "type": "array", "items": { "type": "string" } },
+                {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                    }
+                }
+            ]
+        })
+    }
+}
+
 /// Formatting style configuration.
 /// Groups all style-related settings together.
 #[derive(Debug, Clone, Deserialize, JsonSchema, PartialEq)]
@@ -259,6 +308,12 @@ pub struct StyleConfig {
     pub tab_width: usize,
     /// Use panache-native greedy wrapping instead of textwrap.
     pub built_in_greedy_wrap: bool,
+    /// Extra abbreviations whose trailing period must not end a sentence (used
+    /// by `wrap = "sentence"`). Merged with the built-in per-language profile.
+    pub no_break_abbreviations: Option<NoBreakAbbreviations>,
+    /// Fallback document language for sentence wrapping when the document has no
+    /// YAML `lang:`. A code such as `de` or `pt-BR`.
+    pub lang: Option<String>,
 }
 
 impl Default for StyleConfig {
@@ -271,6 +326,8 @@ impl Default for StyleConfig {
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
             built_in_greedy_wrap: true,
+            no_break_abbreviations: None,
+            lang: None,
         }
     }
 }
@@ -682,6 +739,8 @@ impl RawConfig {
                 tab_stops: self.tab_stops,
                 tab_width: self.tab_width,
                 built_in_greedy_wrap: true,
+                no_break_abbreviations: None,
+                lang: None,
             }
         };
 
@@ -709,6 +768,8 @@ impl RawConfig {
                 .unwrap_or_else(default_external_max_parallel),
             parser: resolved_pandoc_compat,
             built_in_greedy_wrap: style.built_in_greedy_wrap,
+            no_break_abbreviations: style.no_break_abbreviations,
+            lang: style.lang,
             exclude: self.exclude,
             extend_exclude: self.extend_exclude,
             include: self.include,
@@ -926,6 +987,10 @@ pub struct Config {
     /// Optional cache directory override.
     pub cache_dir: Option<String>,
     pub built_in_greedy_wrap: bool,
+    /// Extra no-break abbreviations for sentence wrapping (see [`StyleConfig`]).
+    pub no_break_abbreviations: Option<NoBreakAbbreviations>,
+    /// Fallback document language for sentence wrapping.
+    pub lang: Option<String>,
     pub exclude: Option<Vec<String>>,
     pub extend_exclude: Vec<String>,
     pub include: Option<Vec<String>>,
@@ -978,6 +1043,8 @@ impl Default for Config {
             lint: LintConfig::default(),
             cache_dir: None,
             built_in_greedy_wrap: true,
+            no_break_abbreviations: None,
+            lang: None,
             exclude: None,
             extend_exclude: Vec::new(),
             include: None,

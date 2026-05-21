@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::formatter::sentence_wrap::{
-    SentenceBoundaryClass, SentenceLanguage, SentenceSegment, is_sentence_boundary_segment,
-    resolve_sentence_language,
+    ResolvedProfile, SentenceBoundaryClass, SentenceLanguage, SentenceSegment,
+    is_sentence_boundary_segment, resolve_profile,
 };
 use crate::formatter::smart::normalize_smart_punctuation;
 use crate::syntax::{SyntaxKind, SyntaxNode};
@@ -407,7 +407,7 @@ struct StreamingCoreSink<'a> {
     pending_piece: Option<SentenceSegment>,
     strip_standalone_blockquote_markers: bool,
     merge_initialism_year: bool,
-    sentence_language: SentenceLanguage,
+    profile: ResolvedProfile<'a>,
     avoid_unsafe_line_start: bool,
     avoid_blockquote_line_start: bool,
 }
@@ -418,7 +418,7 @@ impl<'a> StreamingCoreSink<'a> {
         sentence_mode: bool,
         strip_standalone_blockquote_markers: bool,
         merge_initialism_year: bool,
-        sentence_language: SentenceLanguage,
+        profile: ResolvedProfile<'a>,
         avoid_unsafe_line_start: bool,
         avoid_blockquote_line_start: bool,
     ) -> Self {
@@ -434,7 +434,7 @@ impl<'a> StreamingCoreSink<'a> {
             pending_piece: None,
             strip_standalone_blockquote_markers,
             merge_initialism_year,
-            sentence_language,
+            profile,
             avoid_unsafe_line_start,
             avoid_blockquote_line_start,
         }
@@ -480,7 +480,7 @@ impl<'a> StreamingCoreSink<'a> {
         self.prev_ws_after = segment.has_whitespace_after;
 
         if self.sentence_mode
-            && is_sentence_boundary_segment(&segment, next_segment, is_last, self.sentence_language)
+            && is_sentence_boundary_segment(&segment, next_segment, is_last, self.profile)
         {
             self.out.push(std::mem::take(&mut self.line));
             self.line_width = 0;
@@ -561,7 +561,7 @@ pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> 
         false,
         false,
         false,
-        SentenceLanguage::English,
+        ResolvedProfile::builtin_only(SentenceLanguage::English),
         false,
         false,
     );
@@ -723,7 +723,7 @@ impl<'a> TraversalBuilder<'a> {
         line_widths: &'a [usize],
         sentence_mode: bool,
         strip_standalone_blockquote_markers: bool,
-        sentence_language: SentenceLanguage,
+        profile: ResolvedProfile<'a>,
         avoid_unsafe_line_start: bool,
         avoid_blockquote_line_start: bool,
     ) -> Self {
@@ -733,7 +733,7 @@ impl<'a> TraversalBuilder<'a> {
                 sentence_mode,
                 strip_standalone_blockquote_markers,
                 true,
-                sentence_language,
+                profile,
                 avoid_unsafe_line_start,
                 avoid_blockquote_line_start,
             ),
@@ -1288,12 +1288,13 @@ pub(super) fn wrapped_lines_for_node(
     } else {
         &[1]
     };
-    let sentence_language = resolve_sentence_language(node);
+    let mut extra_abbreviations = Vec::new();
+    let profile = resolve_profile(node, config, &mut extra_abbreviations);
     let mut builder = TraversalBuilder::new(
         line_widths,
         sentence_mode,
         options.strip_standalone_blockquote_markers,
-        sentence_language,
+        profile,
         options.avoid_unsafe_line_start,
         options.avoid_blockquote_line_start,
     );

@@ -285,6 +285,44 @@ wrap = "reflow"
 The `-o wrap=<MODE>` flag on `panache format` can override this setting for a
 single invocation, e.g. `panache format -o wrap=sentence`.
 
+### Sentence-Wrapping Abbreviations {#no-break-abbreviations}
+
+In `sentence` mode, Panache must decide whether a trailing period ends a
+sentence or merely an abbreviation (`etc.`, `e.g.`). It picks a built-in
+abbreviation list from the document's language, read from the YAML `lang:`
+metadata (the same field Quarto and Pandoc use). Built-in profiles ship for
+English (`en`), Czech (`cs`), German (`de`), Spanish (`es`), and French (`fr`);
+unknown languages fall back to English. Region subtags fold to their primary
+subtag, so `de-AT` uses the German profile.
+
+When the document has no `lang:`, set a fallback for the project:
+
+```toml
+[format]
+wrap = "sentence"
+lang = "de"
+```
+
+To extend the built-in list with your own tokens, add `no-break-abbreviations`.
+A flat list applies to every document and is merged with the built-in profile:
+
+```toml
+[format]
+wrap = "sentence"
+no-break-abbreviations = ["př.", "čís."]
+```
+
+For multilingual projects, use a table keyed by language code (the primary
+subtag). The `default` bucket applies to every document, and the bucket matching
+the document's language is added on top:
+
+```toml
+[format.no-break-abbreviations]
+default = ["etc."]
+cs = ["např.", "tzv."]
+de = ["bzw.", "usw."]
+```
+
 ### Math Formatting
 
 Configure how math delimiters are formatted:

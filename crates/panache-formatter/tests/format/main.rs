@@ -18,6 +18,7 @@ mod links;
 mod lists_unordered;
 mod math;
 mod nbsp;
+mod no_break_abbreviations;
 mod paragraphs;
 mod preserve_wrap;
 mod quotes;

@@ -27,6 +27,7 @@ pub use types::FormatterValue;
 pub use types::LineEnding;
 pub use types::LintConfig;
 pub use types::MathDelimiterStyle;
+pub use types::NoBreakAbbreviations;
 pub use types::TabStopMode;
 pub use types::WrapMode;
 

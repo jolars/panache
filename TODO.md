@@ -179,6 +179,12 @@ support.
 
 - [x] Add support for comments to disable formatting on specific lines or blocks
       (e.g., `<!-- something-->`)
+- [x] Language-aware sentence-wrap abbreviations (#307): select the no-break
+      list from the document `lang:` (English, Czech, German, Spanish, French
+      built-ins; primary-subtag fallback; `[format] lang` fallback) and let
+      users extend it via `[format] no-break-abbreviations` (flat list or
+      per-language table, merged with the built-ins). Spanish/French built-in
+      lists are conservative starters --- extend as false splits surface.
 
 ### External formatter presets backlog (conform.nvim parity)
 

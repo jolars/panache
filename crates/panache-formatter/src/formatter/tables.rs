@@ -1,8 +1,6 @@
 use crate::config::{Config, WrapMode};
 use crate::formatter::inline::format_inline_node;
-use crate::formatter::sentence_wrap::{
-    SentenceLanguage, resolve_sentence_language, split_sentence_text,
-};
+use crate::formatter::sentence_wrap::{ResolvedProfile, resolve_profile, split_sentence_text};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::collections::HashMap;
@@ -103,14 +101,14 @@ fn wrap_words_with_widths(words: &[&str], first_width: usize, rest_width: usize)
     out
 }
 
-fn split_sentences(text: &str, language: SentenceLanguage) -> Vec<String> {
-    split_sentence_text(text, language)
+fn split_sentences(text: &str, profile: ResolvedProfile<'_>) -> Vec<String> {
+    split_sentence_text(text, profile)
 }
 
 fn format_table_caption_with_language(
     caption_text: &str,
     config: &Config,
-    sentence_language: SentenceLanguage,
+    profile: ResolvedProfile<'_>,
 ) -> String {
     const CAPTION_PREFIX: &str = ": ";
     const CAPTION_HANGING_INDENT: &str = "  ";
@@ -161,7 +159,7 @@ fn format_table_caption_with_language(
         }
         WrapMode::Sentence => {
             let normalized = collapse_ascii_whitespace(body);
-            let lines = split_sentences(&normalized, sentence_language);
+            let lines = split_sentences(&normalized, profile);
             if lines.is_empty() {
                 ":".to_string()
             } else {
@@ -180,8 +178,9 @@ fn format_table_caption_with_language(
 }
 
 fn format_table_caption(caption_text: &str, config: &Config, node: &SyntaxNode) -> String {
-    let language = resolve_sentence_language(node);
-    format_table_caption_with_language(caption_text, config, language)
+    let mut extra_abbreviations = Vec::new();
+    let profile = resolve_profile(node, config, &mut extra_abbreviations);
+    format_table_caption_with_language(caption_text, config, profile)
 }
 
 fn extract_table_caption_content(caption_node: &SyntaxNode) -> String {
@@ -573,7 +572,7 @@ fn grid_separator_widths(separator_text: &str) -> Vec<usize> {
 fn format_spanning_grid_table_raw(
     raw_table: &str,
     config: &Config,
-    sentence_language: SentenceLanguage,
+    profile: ResolvedProfile<'_>,
 ) -> String {
     let mut lines: Vec<&str> = raw_table.lines().collect();
     while lines.last().is_some_and(|l| l.trim().is_empty()) {
@@ -771,7 +770,7 @@ fn format_spanning_grid_table_raw(
     }
 
     if let Some(caption) = caption {
-        let caption = format_table_caption_with_language(&caption, config, sentence_language);
+        let caption = format_table_caption_with_language(&caption, config, profile);
         out.push('\n');
         out.push_str(&caption);
         out.push('\n');
@@ -926,12 +925,13 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
 /// Format a grid table with consistent alignment and padding
 pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
     let raw_table = node.text().to_string();
-    let sentence_language = resolve_sentence_language(node);
+    let mut extra_abbreviations = Vec::new();
+    let profile = resolve_profile(node, config, &mut extra_abbreviations);
     if raw_table
         .lines()
         .any(|line| line.trim_start().starts_with('|') && line.contains('+'))
     {
-        return format_spanning_grid_table_raw(&raw_table, config, sentence_language);
+        return format_spanning_grid_table_raw(&raw_table, config, profile);
     }
 
     let table_data = extract_grid_table_data(node, config);

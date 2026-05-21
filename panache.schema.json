@@ -175,6 +175,25 @@
         }
       ]
     },
+    "NoBreakAbbreviations": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        }
+      ]
+    },
     "PandocCompat": {
       "description": "Compatibility target for ambiguous Pandoc behavior.",
       "enum": [
@@ -202,6 +221,14 @@
           "description": "Use panache-native greedy wrapping instead of textwrap.",
           "type": "boolean"
         },
+        "lang": {
+          "default": null,
+          "description": "Fallback document language for sentence wrapping when the document has no\nYAML `lang:`. A code such as `de` or `pt-BR`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "math-delimiter-style": {
           "$ref": "#/$defs/MathDelimiterStyle",
           "description": "Math delimiter style preference"
@@ -212,6 +239,17 @@
           "format": "uint",
           "minimum": 0,
           "type": "integer"
+        },
+        "no-break-abbreviations": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NoBreakAbbreviations"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Extra abbreviations whose trailing period must not end a sentence (used\nby `wrap = \"sentence\"`). Merged with the built-in per-language profile."
         },
         "tab-stops": {
           "$ref": "#/$defs/TabStopMode",

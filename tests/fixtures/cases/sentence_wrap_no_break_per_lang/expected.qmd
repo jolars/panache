@@ -1,0 +1,7 @@
+---
+lang: cs
+---
+
+Mám zkr. a např. a bzw.
+v jedné větě.
+Konec.

@@ -1,0 +1,5 @@
+---
+lang: cs
+---
+
+Použij např. a atd. v textu. Potom konec.

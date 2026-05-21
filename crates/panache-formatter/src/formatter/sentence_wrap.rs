@@ -1,8 +1,13 @@
+use crate::config::Config;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 #[derive(Clone, Copy)]
 pub(super) enum SentenceLanguage {
     English,
+    Czech,
+    German,
+    Spanish,
+    French,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,10 +58,74 @@ const ENGLISH_PROFILE: LanguageProfile = LanguageProfile {
     ],
 };
 
+const CZECH_PROFILE: LanguageProfile = LanguageProfile {
+    no_break_abbreviations: &[
+        "např.", "tzv.", "tj.", "atd.", "apod.", "resp.", "mj.", "aj.",
+    ],
+    contextual_abbreviations: &[],
+    meridiem_abbreviations: &[],
+    sentence_starters: &[],
+};
+
+const GERMAN_PROFILE: LanguageProfile = LanguageProfile {
+    no_break_abbreviations: &["bzw.", "usw.", "vgl.", "ggf."],
+    contextual_abbreviations: &[],
+    meridiem_abbreviations: &[],
+    sentence_starters: &[],
+};
+
+// Conservative starter list; review/extend the contents as real usage surfaces
+// false splits. Entries must be lowercase (candidates are lowercased before the
+// comparison).
+const SPANISH_PROFILE: LanguageProfile = LanguageProfile {
+    no_break_abbreviations: &[
+        "etc.", "p.ej.", "ej.", "vs.", "cf.", "núm.", "pág.", "págs.", "art.", "cap.", "fig.",
+    ],
+    contextual_abbreviations: &[],
+    meridiem_abbreviations: &[],
+    sentence_starters: &[],
+};
+
+// Conservative starter list; review/extend as above.
+const FRENCH_PROFILE: LanguageProfile = LanguageProfile {
+    no_break_abbreviations: &[
+        "etc.", "cf.", "p.ex.", "ex.", "réf.", "fig.", "chap.", "éd.", "vol.",
+    ],
+    contextual_abbreviations: &[],
+    meridiem_abbreviations: &[],
+    sentence_starters: &[],
+};
+
 impl SentenceLanguage {
     fn profile(self) -> &'static LanguageProfile {
         match self {
             SentenceLanguage::English => &ENGLISH_PROFILE,
+            SentenceLanguage::Czech => &CZECH_PROFILE,
+            SentenceLanguage::German => &GERMAN_PROFILE,
+            SentenceLanguage::Spanish => &SPANISH_PROFILE,
+            SentenceLanguage::French => &FRENCH_PROFILE,
+        }
+    }
+}
+
+/// A built-in language profile plus any user-supplied no-break abbreviations
+/// resolved for the current document. It holds two references, so it is `Copy`
+/// and threads through the wrapper exactly like the former `SentenceLanguage`.
+#[derive(Clone, Copy)]
+pub(super) struct ResolvedProfile<'a> {
+    builtin: &'static LanguageProfile,
+    /// User additions, already candidate-normalized (see
+    /// [`normalize_abbreviation_candidate`]).
+    extra_no_break: &'a [String],
+}
+
+impl ResolvedProfile<'static> {
+    /// Built-in profile only, no user additions. Used by tests and by callers
+    /// that never enter sentence mode (where the profile is never consulted).
+    pub(super) fn builtin_only(language: SentenceLanguage) -> Self {
+        Self {
+            builtin: language.profile(),
+            extra_no_break: &[],
         }
     }
 }
@@ -69,12 +138,23 @@ fn normalize_abbreviation_candidate(word: &str) -> String {
     let trimmed = trim_sentence_closing_punctuation(word)
         .trim_start_matches(['"', '\'', '(', '[', '{', '`'])
         .trim_end_matches([',', ';', ':']);
-    trimmed.to_ascii_lowercase()
+    trimmed.to_lowercase()
 }
 
-fn is_no_break_abbreviation(word: &str, profile: &LanguageProfile) -> bool {
+fn is_no_break_abbreviation(word: &str, profile: ResolvedProfile<'_>) -> bool {
     let candidate = normalize_abbreviation_candidate(word);
-    if profile.no_break_abbreviations.contains(&candidate.as_str()) {
+    if profile
+        .builtin
+        .no_break_abbreviations
+        .contains(&candidate.as_str())
+    {
+        return true;
+    }
+    if profile
+        .extra_no_break
+        .iter()
+        .any(|entry| entry == &candidate)
+    {
         return true;
     }
     candidate.ends_with('.') && candidate.matches('.').count() >= 2 && {
@@ -130,13 +210,14 @@ fn rule_ellipsis_no_break(ctx: &BoundaryContext<'_>) -> BoundaryDecision {
 
 fn rule_contextual_abbreviation_break(
     ctx: &BoundaryContext<'_>,
-    profile: &LanguageProfile,
+    profile: ResolvedProfile<'_>,
 ) -> BoundaryDecision {
     let trimmed = trim_sentence_closing_punctuation(ctx.current_word);
     let Some(last_char) = trimmed.chars().last() else {
         return BoundaryDecision::NoBreak;
     };
-    if last_char == '.' && is_contextual_sentence_boundary(trimmed, ctx.next_word, profile) {
+    if last_char == '.' && is_contextual_sentence_boundary(trimmed, ctx.next_word, profile.builtin)
+    {
         return BoundaryDecision::Break;
     }
     BoundaryDecision::Undecided
@@ -144,7 +225,7 @@ fn rule_contextual_abbreviation_break(
 
 fn rule_abbreviation_no_break(
     ctx: &BoundaryContext<'_>,
-    profile: &LanguageProfile,
+    profile: ResolvedProfile<'_>,
 ) -> BoundaryDecision {
     let trimmed = trim_sentence_closing_punctuation(ctx.current_word);
     let Some(last_char) = trimmed.chars().last() else {
@@ -172,9 +253,8 @@ pub(super) fn decide_sentence_boundary(
     next_word: Option<&str>,
     has_whitespace_after: bool,
     is_last: bool,
-    language: SentenceLanguage,
+    profile: ResolvedProfile<'_>,
 ) -> BoundaryDecision {
-    let profile = language.profile();
     let ctx = BoundaryContext {
         current_word: word,
         next_word,
@@ -202,10 +282,10 @@ pub(super) fn is_sentence_boundary_text(
     next_word: Option<&str>,
     has_whitespace_after: bool,
     is_last: bool,
-    language: SentenceLanguage,
+    profile: ResolvedProfile<'_>,
 ) -> bool {
     matches!(
-        decide_sentence_boundary(word, next_word, has_whitespace_after, is_last, language),
+        decide_sentence_boundary(word, next_word, has_whitespace_after, is_last, profile),
         BoundaryDecision::Break
     )
 }
@@ -214,7 +294,7 @@ pub(super) fn is_sentence_boundary_segment(
     segment: &SentenceSegment,
     next_segment: Option<&SentenceSegment>,
     is_last: bool,
-    language: SentenceLanguage,
+    profile: ResolvedProfile<'_>,
 ) -> bool {
     if segment.boundary_class == SentenceBoundaryClass::NonBoundary {
         return false;
@@ -224,13 +304,13 @@ pub(super) fn is_sentence_boundary_segment(
         next_segment.map(|next| next.text.as_str()),
         segment.has_whitespace_after,
         is_last,
-        language,
+        profile,
     )
 }
 
 pub(super) fn split_sentence_segments(
     segments: &[SentenceSegment],
-    language: SentenceLanguage,
+    profile: ResolvedProfile<'_>,
 ) -> Vec<String> {
     if segments.is_empty() {
         return Vec::new();
@@ -255,7 +335,7 @@ pub(super) fn split_sentence_segments(
 
         let is_last = idx + 1 == segments.len();
         let next = segments.get(idx + 1);
-        if is_sentence_boundary_segment(segment, next, is_last, language) {
+        if is_sentence_boundary_segment(segment, next, is_last, profile) {
             lines.push(std::mem::take(&mut current));
         }
     }
@@ -266,7 +346,7 @@ pub(super) fn split_sentence_segments(
     lines
 }
 
-pub(super) fn split_sentence_text(text: &str, language: SentenceLanguage) -> Vec<String> {
+pub(super) fn split_sentence_text(text: &str, profile: ResolvedProfile<'_>) -> Vec<String> {
     let words: Vec<&str> = text.split_ascii_whitespace().collect();
     if words.is_empty() {
         return Vec::new();
@@ -280,7 +360,7 @@ pub(super) fn split_sentence_text(text: &str, language: SentenceLanguage) -> Vec
             boundary_class: SentenceBoundaryClass::Normal,
         })
         .collect();
-    split_sentence_segments(&segments, language)
+    split_sentence_segments(&segments, profile)
 }
 
 fn extract_lang_from_yaml_text(yaml_text: &str) -> Option<String> {
@@ -310,9 +390,8 @@ fn extract_lang_from_yaml_text(yaml_text: &str) -> Option<String> {
     None
 }
 
-pub(super) fn resolve_sentence_language(node: &SyntaxNode) -> SentenceLanguage {
-    let lang = node
-        .ancestors()
+fn extract_document_lang(node: &SyntaxNode) -> Option<String> {
+    node.ancestors()
         .find(|ancestor| ancestor.kind() == SyntaxKind::DOCUMENT)
         .and_then(|document| {
             document
@@ -320,20 +399,77 @@ pub(super) fn resolve_sentence_language(node: &SyntaxNode) -> SentenceLanguage {
                 .find(|child| child.kind() == SyntaxKind::YAML_METADATA)
         })
         .and_then(|yaml| extract_lang_from_yaml_text(&yaml.text().to_string()))
-        .map(|lang| lang.to_ascii_lowercase());
+}
 
-    if let Some(lang) = lang
-        && (lang == "en" || lang.starts_with("en-"))
-    {
-        return SentenceLanguage::English;
+/// Resolve the active document language as a normalized (lowercased) string.
+/// Precedence: the document's YAML `lang:` over the `config_lang` fallback. The
+/// region subtag is preserved; callers fold it with [`primary_subtag`].
+pub(super) fn resolve_lang_string(node: &SyntaxNode, config_lang: Option<&str>) -> Option<String> {
+    extract_document_lang(node)
+        .or_else(|| config_lang.map(str::to_string))
+        .map(|lang| lang.to_lowercase())
+}
+
+/// Primary language subtag, e.g. `en-gb` -> `en`, `pt_br` -> `pt`.
+fn primary_subtag(lang: &str) -> &str {
+    lang.split(['-', '_']).next().unwrap_or(lang)
+}
+
+fn sentence_language_for(lang: Option<&str>) -> SentenceLanguage {
+    match lang.map(primary_subtag) {
+        Some("cs") => SentenceLanguage::Czech,
+        Some("de") => SentenceLanguage::German,
+        Some("es") => SentenceLanguage::Spanish,
+        Some("fr") => SentenceLanguage::French,
+        // "en", unknown languages, and absent metadata fall back to English.
+        _ => SentenceLanguage::English,
     }
-    SentenceLanguage::English
+}
+
+/// Resolve the built-in profile plus any user-configured no-break abbreviations
+/// for `node`'s document language. `scratch` owns the normalized user entries
+/// for the lifetime of the returned profile. Built once per node-wrap; this
+/// could be hoisted to once-per-document if profiling ever warrants it.
+pub(super) fn resolve_profile<'a>(
+    node: &SyntaxNode,
+    config: &Config,
+    scratch: &'a mut Vec<String>,
+) -> ResolvedProfile<'a> {
+    let lang = resolve_lang_string(node, config.lang.as_deref());
+    let language = sentence_language_for(lang.as_deref());
+
+    scratch.clear();
+    if let Some(entries) = config.no_break_abbreviations.get("default") {
+        scratch.extend(
+            entries
+                .iter()
+                .map(|entry| normalize_abbreviation_candidate(entry)),
+        );
+    }
+    if let Some(code) = lang.as_deref().map(primary_subtag)
+        && let Some(entries) = config.no_break_abbreviations.get(code)
+    {
+        scratch.extend(
+            entries
+                .iter()
+                .map(|entry| normalize_abbreviation_candidate(entry)),
+        );
+    }
+
+    ResolvedProfile {
+        builtin: language.profile(),
+        extra_no_break: scratch.as_slice(),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::parser::parse;
+
+    fn english() -> ResolvedProfile<'static> {
+        ResolvedProfile::builtin_only(SentenceLanguage::English)
+    }
 
     #[test]
     fn abbreviation_periods_are_not_sentence_boundaries() {
@@ -342,37 +478,31 @@ mod tests {
             Some("Next"),
             true,
             false,
-            SentenceLanguage::English
+            english()
         ));
         assert!(!is_sentence_boundary_text(
             "i.e.",
             Some("Next"),
             true,
             false,
-            SentenceLanguage::English
+            english()
         ));
         assert!(!is_sentence_boundary_text(
             "`etc.`",
             Some("Next"),
             true,
             false,
-            SentenceLanguage::English
+            english()
         ));
         assert!(is_sentence_boundary_text(
             "complete.",
             Some("Next"),
             true,
             false,
-            SentenceLanguage::English
+            english()
         ));
         assert_eq!(
-            decide_sentence_boundary(
-                "complete.",
-                Some("Next"),
-                true,
-                false,
-                SentenceLanguage::English
-            ),
+            decide_sentence_boundary("complete.", Some("Next"), true, false, english()),
             BoundaryDecision::Break
         );
     }
@@ -380,7 +510,7 @@ mod tests {
     #[test]
     fn boundary_decision_reports_no_break_for_abbreviation() {
         assert_eq!(
-            decide_sentence_boundary("e.g.", Some("Next"), true, false, SentenceLanguage::English),
+            decide_sentence_boundary("e.g.", Some("Next"), true, false, english()),
             BoundaryDecision::NoBreak
         );
     }
@@ -392,35 +522,145 @@ mod tests {
             Some("at"),
             false,
             false,
-            SentenceLanguage::English
+            english()
         ));
         assert!(is_sentence_boundary_text(
             "co.",
             Some("They"),
             true,
             false,
-            SentenceLanguage::English
+            english()
         ));
         assert!(!is_sentence_boundary_text(
             "U.S.",
             Some("Government"),
             false,
             false,
-            SentenceLanguage::English
+            english()
         ));
         assert!(is_sentence_boundary_text(
             "U.S.",
             Some("How"),
             true,
             false,
-            SentenceLanguage::English
+            english()
         ));
         assert!(!is_sentence_boundary_text(
             "p.m.",
             Some("traveler"),
             false,
             false,
-            SentenceLanguage::English
+            english()
+        ));
+    }
+
+    #[test]
+    fn german_builtin_abbreviation_no_break() {
+        let de = ResolvedProfile::builtin_only(SentenceLanguage::German);
+        assert!(!is_sentence_boundary_text(
+            "bzw.",
+            Some("Next"),
+            true,
+            false,
+            de
+        ));
+        // The English profile doesn't know `bzw.`, so there it ends a sentence.
+        assert!(is_sentence_boundary_text(
+            "bzw.",
+            Some("Next"),
+            true,
+            false,
+            english()
+        ));
+    }
+
+    #[test]
+    fn czech_builtin_abbreviation_no_break_is_case_insensitive() {
+        let cs = ResolvedProfile::builtin_only(SentenceLanguage::Czech);
+        assert!(!is_sentence_boundary_text(
+            "např.",
+            Some("Next"),
+            true,
+            false,
+            cs
+        ));
+        // Mixed case exercises the `to_lowercase()` normalization path.
+        assert!(!is_sentence_boundary_text(
+            "Např.",
+            Some("Next"),
+            true,
+            false,
+            cs
+        ));
+        assert!(!is_sentence_boundary_text(
+            "atd.",
+            Some("Next"),
+            true,
+            false,
+            cs
+        ));
+    }
+
+    #[test]
+    fn spanish_non_ascii_abbreviation_matches_via_list() {
+        let es = ResolvedProfile::builtin_only(SentenceLanguage::Spanish);
+        // `núm.` is single-period and non-ASCII, so the multi-period heuristic
+        // does not apply; it matches only because it is in the Spanish list.
+        assert!(!is_sentence_boundary_text(
+            "núm.",
+            Some("Next"),
+            true,
+            false,
+            es
+        ));
+        assert!(is_sentence_boundary_text(
+            "núm.",
+            Some("Next"),
+            true,
+            false,
+            english()
+        ));
+        // A bogus non-list, non-ASCII multi-period token still breaks: the
+        // heuristic stays ASCII-only.
+        assert!(is_sentence_boundary_text(
+            "ñ.ñ.",
+            Some("Next"),
+            true,
+            false,
+            english()
+        ));
+    }
+
+    #[test]
+    fn user_extra_abbreviations_merge_with_builtin() {
+        let extras = vec!["zzz.".to_string()];
+        let profile = ResolvedProfile {
+            builtin: SentenceLanguage::English.profile(),
+            extra_no_break: &extras,
+        };
+        // The user-supplied entry suppresses the break...
+        assert!(!is_sentence_boundary_text(
+            "zzz.",
+            Some("Next"),
+            true,
+            false,
+            profile
+        ));
+        // ...the built-in English entry still suppresses...
+        assert!(!is_sentence_boundary_text(
+            "e.g.",
+            Some("Next"),
+            true,
+            false,
+            profile
+        ));
+        // ...and an ordinary word still ends the sentence.
+        assert!(is_sentence_boundary_text(
+            "done.",
+            Some("Next"),
+            true,
+            false,
+            profile
         ));
     }
 
@@ -431,7 +671,19 @@ mod tests {
     }
 
     #[test]
-    fn resolves_sentence_language_from_document_metadata() {
+    fn region_subtag_selects_primary_language_profile() {
+        assert!(matches!(
+            sentence_language_for(Some("de-at")),
+            SentenceLanguage::German
+        ));
+        assert!(matches!(
+            sentence_language_for(Some("en-gb")),
+            SentenceLanguage::English
+        ));
+    }
+
+    #[test]
+    fn resolves_lang_string_from_document_metadata() {
         let input = "---\nlang: sv\ntitle: Test\n---\n\nA sentence.";
         let tree = parse(input, None);
         let paragraph = tree
@@ -439,8 +691,36 @@ mod tests {
             .find(|node| node.kind() == SyntaxKind::PARAGRAPH)
             .expect("paragraph node");
 
-        let lang = resolve_sentence_language(&paragraph);
-        assert!(matches!(lang, SentenceLanguage::English));
+        assert_eq!(resolve_lang_string(&paragraph, None).as_deref(), Some("sv"));
+        // Swedish has no built-in profile yet, so it falls back to English.
+        assert!(matches!(
+            sentence_language_for(Some("sv")),
+            SentenceLanguage::English
+        ));
+    }
+
+    #[test]
+    fn config_lang_used_as_fallback_when_no_frontmatter() {
+        let tree = parse("A sentence.", None);
+        let paragraph = tree
+            .descendants()
+            .find(|node| node.kind() == SyntaxKind::PARAGRAPH)
+            .expect("paragraph node");
+        assert_eq!(
+            resolve_lang_string(&paragraph, Some("de")).as_deref(),
+            Some("de")
+        );
+
+        // Frontmatter wins over the config fallback.
+        let tree = parse("---\nlang: cs\n---\n\nText.", None);
+        let paragraph = tree
+            .descendants()
+            .find(|node| node.kind() == SyntaxKind::PARAGRAPH)
+            .expect("paragraph node");
+        assert_eq!(
+            resolve_lang_string(&paragraph, Some("de")).as_deref(),
+            Some("cs")
+        );
     }
 
     #[test]
@@ -457,13 +737,13 @@ mod tests {
                 boundary_class: SentenceBoundaryClass::Normal,
             },
         ];
-        let lines = split_sentence_segments(&segments, SentenceLanguage::English);
+        let lines = split_sentence_segments(&segments, english());
         assert_eq!(lines, vec!["`???` also"]);
     }
 
     #[test]
     fn split_sentence_text_uses_normal_segment_defaults() {
-        let lines = split_sentence_text("Alpha. Beta.", SentenceLanguage::English);
+        let lines = split_sentence_text("Alpha. Beta.", english());
         assert_eq!(lines, vec!["Alpha.", "Beta."]);
     }
 }

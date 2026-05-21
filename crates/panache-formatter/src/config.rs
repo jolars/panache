@@ -128,6 +128,14 @@ pub struct Config {
     pub tab_width: usize,
     pub wrap: Option<WrapMode>,
     pub blank_lines: BlankLines,
+    /// Document-language fallback used by sentence wrapping when the document
+    /// has no YAML `lang:`. Normalized lowercase code (e.g. `de`, `pt-br`).
+    pub lang: Option<String>,
+    /// User-supplied no-break abbreviations for sentence wrapping, keyed by
+    /// language code (or the literal `"default"` bucket applied to every
+    /// document). Values are raw abbreviation strings; they are
+    /// candidate-normalized at resolution time.
+    pub no_break_abbreviations: std::collections::BTreeMap<String, Vec<String>>,
     /// Language → Formatter(s) mapping (supports multiple formatters per language)
     pub formatters: HashMap<String, Vec<FormatterConfig>>,
     /// Max parallel external tool invocations (formatters/linters) per document.
@@ -151,6 +159,8 @@ impl Default for Config {
             tab_width: 4,
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
+            lang: None,
+            no_break_abbreviations: std::collections::BTreeMap::new(),
             formatters: HashMap::new(), // Opt-in: empty by default
             external_max_parallel: default_external_max_parallel(),
             parser: PandocCompat::default(),
