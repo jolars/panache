@@ -189,6 +189,52 @@ impl ContainerPrefix {
         }
     }
 
+    /// Build a prefix that reproduces an explicit set of container scalars
+    /// — the inverse of the [`Self::bq_depth`] / [`Self::list_content_col`]
+    /// / [`Self::content_indent`] accessors and [`bq_outer_of_list`]. Used
+    /// by the marker-line fenced-code dispatch paths in `core.rs`, which
+    /// compute these scalars by hand from a mid-transition container state
+    /// (a `ListItem`/`Definition` just pushed, the marker bytes just
+    /// emitted) rather than from a settled stack the other constructors
+    /// read.
+    ///
+    /// `bq_outer` is honored only when both a blockquote run and a list
+    /// advance are present (it picks which leads); with at most one of the
+    /// two, the op order is forced and `bq_outer_of_list` reconstructs it
+    /// faithfully. The content indent is always last, matching
+    /// [`emit_content_line_prefixes`]'s emission order.
+    pub fn from_scalars(
+        bq_depth: usize,
+        list_content_col: usize,
+        bq_outer: bool,
+        content_indent: usize,
+        list_marker_consumed_on_line_0: bool,
+    ) -> Self {
+        let mut ops: SmallVec<[StripOp; INLINE_STRIP_OPS]> = SmallVec::new();
+        if bq_outer {
+            for _ in 0..bq_depth {
+                ops.push(StripOp::BlockQuoteMarker);
+            }
+            if list_content_col > 0 {
+                ops.push(StripOp::ListAdvance(list_content_col as u32));
+            }
+        } else {
+            if list_content_col > 0 {
+                ops.push(StripOp::ListAdvance(list_content_col as u32));
+            }
+            for _ in 0..bq_depth {
+                ops.push(StripOp::BlockQuoteMarker);
+            }
+        }
+        if content_indent > 0 {
+            ops.push(StripOp::ContentIndent(content_indent as u32));
+        }
+        Self {
+            ops,
+            list_marker_consumed_on_line_0,
+        }
+    }
+
     pub fn ops(&self) -> &[StripOp] {
         &self.ops
     }
@@ -845,6 +891,31 @@ mod tests {
         assert_eq!(p.strip(">> foo"), "> foo");
         assert_eq!(p.strip("> "), "");
         assert_eq!(p.strip("plain"), "plain");
+    }
+
+    #[test]
+    fn from_scalars_round_trips_marker_line_caller_combos() {
+        // Each case mirrors a `core.rs` marker-line fenced-code caller,
+        // which passes `bq_outer = bq_depth > 0`.
+        let check = |bq: usize, lcc: usize, ci: usize, lmc0: bool| {
+            let bq_outer = bq > 0;
+            let p = ContainerPrefix::from_scalars(bq, lcc, bq_outer, ci, lmc0);
+            assert_eq!(p.bq_depth(), bq, "bq_depth");
+            assert_eq!(p.list_content_col(), lcc, "list_content_col");
+            assert_eq!(p.content_indent(), ci, "content_indent");
+            assert_eq!(bq_outer_of_list(&p), bq_outer, "bq_outer_of_list");
+            assert_eq!(
+                p.list_marker_consumed_on_line_0, lmc0,
+                "list_marker_consumed_on_line_0"
+            );
+        };
+
+        // core.rs:491 (list-item-first-line): lcc>0, ci=0, lmc0=true.
+        check(0, 4, 0, true);
+        check(1, 4, 0, true);
+        // core.rs:1443/1456 (definition-marker): lcc=0, ci>0, lmc0=false.
+        check(0, 0, 4, false);
+        check(2, 0, 4, false);
     }
 
     #[test]

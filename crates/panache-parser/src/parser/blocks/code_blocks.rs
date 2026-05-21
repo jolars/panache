@@ -5,7 +5,7 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
-use super::container_prefix::advance_columns;
+use super::container_prefix::{StrippedLines, advance_columns};
 use crate::parser::utils::container_stack::byte_index_at_column;
 
 // Container-prefix primitives live in `container_prefix.rs` (the lower
@@ -13,7 +13,7 @@ use crate::parser::utils::container_stack::byte_index_at_column;
 // this module, `tables.rs`, `line_blocks.rs`, and `block_dispatcher.rs`
 // keep their `code_blocks::…` import paths working.
 pub(crate) use super::container_prefix::{
-    bq_outer_of_list, emit_blockquote_prefix_tokens, emit_content_line_prefixes, strip_list_indent,
+    bq_outer_of_list, emit_blockquote_prefix_tokens, strip_list_indent,
 };
 
 use crate::parser::utils::helpers::{
@@ -1132,26 +1132,29 @@ fn emit_code_info_node(builder: &mut GreenNodeBuilder<'static>, info_string: &st
 }
 
 /// Parse a fenced code block, consuming lines from the parser.
-/// Returns the new position after the code block.
 /// Parse a fenced code block, consuming lines from the parser.
 /// Returns the new position after the code block.
-/// list_content_col + content_indent account for container indentation
-/// (list-item indent + footnote/definition base indent) that should be
-/// stripped from each line. `bq_outer` flips the bq-vs-list strip
-/// order to match the container stack.
-#[allow(clippy::too_many_arguments)]
+///
+/// All container geometry (blockquote depth, list-item indent,
+/// footnote/definition base indent, and the bq-vs-list strip order) is
+/// derived from `window.prefix()`; detection scans and the open-fence
+/// emitter read those derived scalars, and content/closing-fence lines
+/// re-emit their container prefix via [`StrippedLines::emit_prefix_at`].
 pub(crate) fn parse_fenced_code_block(
     builder: &mut GreenNodeBuilder<'static>,
-    lines: &[&str],
-    start_pos: usize,
+    window: &StrippedLines<'_, '_>,
     fence: FenceInfo,
-    bq_depth: usize,
-    list_content_col: usize,
-    list_marker_consumed_on_line_0: bool,
-    bq_outer: bool,
-    content_indent: usize,
     first_line_override: Option<&str>,
 ) -> usize {
+    let lines = window.raw();
+    let start_pos = window.pos();
+    let prefix = window.prefix();
+    let bq_depth = prefix.bq_depth();
+    let list_content_col = prefix.list_content_col();
+    let list_marker_consumed_on_line_0 = prefix.list_marker_consumed_on_line_0;
+    let bq_outer = bq_outer_of_list(prefix);
+    let content_indent = prefix.content_indent();
+
     // Start code block
     builder.start_node(SyntaxKind::CODE_BLOCK.into());
 
@@ -1201,29 +1204,11 @@ pub(crate) fn parse_fenced_code_block(
     while current_pos < lines.len() {
         let line = lines[current_pos];
 
-        // Strip container prefix in stack order so the closing-fence
-        // probe sees the post-prefix content.
-        let after_bq_and_list = if bq_outer {
-            let after_bq = if bq_depth > 0 {
-                strip_n_blockquote_markers(line, bq_depth)
-            } else {
-                line
-            };
-            strip_list_indent(after_bq, list_content_col)
-        } else {
-            let after_list = strip_list_indent(line, list_content_col);
-            if bq_depth > 0 {
-                strip_n_blockquote_markers(after_list, bq_depth)
-            } else {
-                after_list
-            }
-        };
-
-        // Count blockquote markers on the *post-list-stripped*-or-raw
-        // line to detect leaving the surrounding blockquote. For
-        // bq_outer=true we already stripped bq markers, so probe the
-        // raw line; for bq_outer=false we stripped list indent first,
-        // so probe the post-list slice.
+        // Count blockquote markers to detect leaving the surrounding
+        // blockquote. For bq_outer=true probe the raw line (bq markers
+        // lead); for bq_outer=false strip the list indent first, then
+        // probe the post-list slice. This forward-scan termination has no
+        // `StrippedLines` equivalent, so it stays inline.
         let probe = if bq_outer {
             line
         } else {
@@ -1234,12 +1219,12 @@ pub(crate) fn parse_fenced_code_block(
             break;
         }
 
-        let indent_bytes = byte_index_at_column(after_bq_and_list, content_indent);
-        let inner_stripped = if content_indent > 0 && after_bq_and_list.len() >= indent_bytes {
-            &after_bq_and_list[indent_bytes..]
-        } else {
-            after_bq_and_list
-        };
+        // Detection only (emits nothing): the same 2-bucket container
+        // strip the emission path applies via `emit_content_line_prefixes`
+        // / `emit_prefix_at`, kept here rather than `strip_at` (a per-op
+        // walk) to stay byte-identical in interleaved nesting.
+        let inner_stripped =
+            strip_content_line_prefixes(line, bq_depth, list_content_col, bq_outer, content_indent);
 
         if is_closing_fence(inner_stripped, &fence) {
             found_closing = true;
@@ -1273,15 +1258,7 @@ pub(crate) fn parse_fenced_code_block(
                 builder.start_node(SyntaxKind::HASHPIPE_YAML_PREAMBLE.into());
                 builder.start_node(SyntaxKind::HASHPIPE_YAML_CONTENT.into());
                 while line_idx < prepared_hashpipe_lines {
-                    let content_line = content_lines[line_idx];
-                    let after_indent = emit_content_line_prefixes(
-                        builder,
-                        content_line,
-                        bq_depth,
-                        list_content_col,
-                        bq_outer,
-                        content_indent,
-                    );
+                    let after_indent = window.emit_prefix_at(builder, start_pos + 1 + line_idx);
                     let (line_without_newline, newline_str) = strip_newline(after_indent);
                     if !emit_hashpipe_option_line(builder, line_without_newline, prefix) {
                         let _ =
@@ -1297,15 +1274,8 @@ pub(crate) fn parse_fenced_code_block(
             }
         }
 
-        for content_line in content_lines.iter().skip(line_idx) {
-            let after_indent = emit_content_line_prefixes(
-                builder,
-                content_line,
-                bq_depth,
-                list_content_col,
-                bq_outer,
-                content_indent,
-            );
+        for k in line_idx..content_lines.len() {
+            let after_indent = window.emit_prefix_at(builder, start_pos + 1 + k);
             let (line_without_newline, newline_str) = strip_newline(after_indent);
 
             if !line_without_newline.is_empty() {
@@ -1321,16 +1291,7 @@ pub(crate) fn parse_fenced_code_block(
 
     // Closing fence (if found)
     if found_closing {
-        let closing_line = lines[current_pos - 1];
-
-        let closing_stripped = emit_content_line_prefixes(
-            builder,
-            closing_line,
-            bq_depth,
-            list_content_col,
-            bq_outer,
-            content_indent,
-        );
+        let closing_stripped = window.emit_prefix_at(builder, current_pos - 1);
         let (closing_without_newline, newline_str) = strip_newline(closing_stripped);
         let closing_trimmed_start = strip_leading_spaces(closing_without_newline);
         let leading_ws_len = closing_without_newline.len() - closing_trimmed_start.len();
@@ -1366,19 +1327,24 @@ pub(crate) fn parse_fenced_code_block(
 }
 
 /// Parse a GFM math fence (``` math ... ```) as DISPLAY_MATH while preserving bytes.
-#[allow(clippy::too_many_arguments)]
+///
+/// Container geometry is derived from `window.prefix()`, mirroring
+/// [`parse_fenced_code_block`].
 pub(crate) fn parse_fenced_math_block(
     builder: &mut GreenNodeBuilder<'static>,
-    lines: &[&str],
-    start_pos: usize,
+    window: &StrippedLines<'_, '_>,
     fence: FenceInfo,
-    bq_depth: usize,
-    list_content_col: usize,
-    list_marker_consumed_on_line_0: bool,
-    bq_outer: bool,
-    content_indent: usize,
     first_line_override: Option<&str>,
 ) -> usize {
+    let lines = window.raw();
+    let start_pos = window.pos();
+    let prefix = window.prefix();
+    let bq_depth = prefix.bq_depth();
+    let list_content_col = prefix.list_content_col();
+    let list_marker_consumed_on_line_0 = prefix.list_marker_consumed_on_line_0;
+    let bq_outer = bq_outer_of_list(prefix);
+    let content_indent = prefix.content_indent();
+
     builder.start_node(SyntaxKind::DISPLAY_MATH.into());
 
     let (first_trimmed, _first_inner) = prepare_fence_open_line(
@@ -1407,22 +1373,8 @@ pub(crate) fn parse_fenced_math_block(
     while current_pos < lines.len() {
         let line = lines[current_pos];
 
-        let after_bq_and_list = if bq_outer {
-            let after_bq = if bq_depth > 0 {
-                strip_n_blockquote_markers(line, bq_depth)
-            } else {
-                line
-            };
-            strip_list_indent(after_bq, list_content_col)
-        } else {
-            let after_list = strip_list_indent(line, list_content_col);
-            if bq_depth > 0 {
-                strip_n_blockquote_markers(after_list, bq_depth)
-            } else {
-                after_list
-            }
-        };
-
+        // Forward-scan termination on blockquote depth — stays inline (no
+        // `StrippedLines` equivalent), mirroring `parse_fenced_code_block`.
         let probe = if bq_outer {
             line
         } else {
@@ -1433,12 +1385,9 @@ pub(crate) fn parse_fenced_math_block(
             break;
         }
 
-        let indent_bytes = byte_index_at_column(after_bq_and_list, content_indent);
-        let inner_stripped = if content_indent > 0 && after_bq_and_list.len() >= indent_bytes {
-            &after_bq_and_list[indent_bytes..]
-        } else {
-            after_bq_and_list
-        };
+        // Detection only (emits nothing): same 2-bucket strip as emission.
+        let inner_stripped =
+            strip_content_line_prefixes(line, bq_depth, list_content_col, bq_outer, content_indent);
 
         if is_closing_fence(inner_stripped, &fence) {
             found_closing = true;
@@ -1452,15 +1401,8 @@ pub(crate) fn parse_fenced_math_block(
 
     if !content_lines.is_empty() {
         let mut content = String::new();
-        for content_line in content_lines {
-            let after_indent = emit_content_line_prefixes(
-                builder,
-                content_line,
-                bq_depth,
-                list_content_col,
-                bq_outer,
-                content_indent,
-            );
+        for k in 0..content_lines.len() {
+            let after_indent = window.emit_prefix_at(builder, start_pos + 1 + k);
             let (line_without_newline, newline_str) = strip_newline(after_indent);
             content.push_str(line_without_newline);
             content.push_str(newline_str);
@@ -1469,16 +1411,7 @@ pub(crate) fn parse_fenced_math_block(
     }
 
     if found_closing {
-        let closing_line = lines[current_pos - 1];
-
-        let closing_stripped = emit_content_line_prefixes(
-            builder,
-            closing_line,
-            bq_depth,
-            list_content_col,
-            bq_outer,
-            content_indent,
-        );
+        let closing_stripped = window.emit_prefix_at(builder, current_pos - 1);
         let (closing_without_newline, newline_str) = strip_newline(closing_stripped);
         let closing_trimmed_start = strip_leading_spaces(closing_without_newline);
         let leading_ws_len = closing_without_newline.len() - closing_trimmed_start.len();

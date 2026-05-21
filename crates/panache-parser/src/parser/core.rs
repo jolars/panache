@@ -488,16 +488,15 @@ impl<'a> Parser<'a> {
         if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
             buffer.clear();
         }
+        // Marker-line dispatch: the list marker + indent were emitted
+        // upstream (`list_marker_consumed_on_line_0 = true`); blockquotes,
+        // if any, are outer of the list.
+        let prefix = ContainerPrefix::from_scalars(bq_depth, content_col, bq_depth > 0, 0, true);
+        let window = StrippedLines::new(&self.lines, self.pos, &prefix);
         let new_pos = code_blocks::parse_fenced_code_block(
             &mut self.builder,
-            &self.lines,
-            self.pos,
+            &window,
             fence,
-            bq_depth,
-            content_col,
-            true,
-            bq_depth > 0,
-            0,
             Some(&text_owned),
         );
         Some(new_pos.saturating_sub(self.pos).saturating_sub(1))
@@ -1437,32 +1436,31 @@ impl<'a> Parser<'a> {
                                 .token(SyntaxKind::WHITESPACE.into(), indent_str);
                         }
                         let fence_line = content[content_start..].to_string();
+                        // Definition-marker dispatch: no list advance here
+                        // (`list_content_col = 0`); the definition's base
+                        // indent is the content indent; bq, if any, is outer.
+                        let prefix = ContainerPrefix::from_scalars(
+                            bq_depth,
+                            0,
+                            bq_depth > 0,
+                            content_col,
+                            false,
+                        );
+                        let window = StrippedLines::new(&self.lines, self.pos, &prefix);
                         let new_pos = if self.config.extensions.tex_math_gfm
                             && code_blocks::is_gfm_math_fence(&fence)
                         {
                             code_blocks::parse_fenced_math_block(
                                 &mut self.builder,
-                                &self.lines,
-                                self.pos,
+                                &window,
                                 fence,
-                                bq_depth,
-                                0,
-                                false,
-                                bq_depth > 0,
-                                content_col,
                                 Some(&fence_line),
                             )
                         } else {
                             code_blocks::parse_fenced_code_block(
                                 &mut self.builder,
-                                &self.lines,
-                                self.pos,
+                                &window,
                                 fence,
-                                bq_depth,
-                                0,
-                                false,
-                                bq_depth > 0,
-                                content_col,
                                 Some(&fence_line),
                             )
                         };

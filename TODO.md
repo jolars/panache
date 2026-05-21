@@ -557,9 +557,9 @@ intentionally excluded.
         re-emit `>` for continuation lines under a LIST_ITEM --- pre-existing,
         unrelated to this fix; no test exercises that round-trip.)
       - **Follow-up (window extraction) --- done for pipe tables, line blocks,
-        grid tables, and simple tables.** The per-line container-stripping
-        pattern is now consolidated onto the `StrippedLines` window
-        (`container_prefix.rs`). The prefix emitters
+        grid tables, simple tables, and fenced code / math.** The per-line
+        container-stripping pattern is now consolidated onto the `StrippedLines`
+        window (`container_prefix.rs`). The prefix emitters
         (`emit_content_line_prefixes`, `emit_blockquote_prefix_tokens`,
         `strip_list_indent`, `bq_outer_of_list`) were relocated from
         `code_blocks.rs` down into `container_prefix.rs` (the lower layer that
@@ -597,21 +597,38 @@ intentionally excluded.
           parser golden cases `grid_table_in_list_blockquote` /
           `simple_table_in_list_blockquote` (`GRID_TABLE` / `SIMPLE_TABLE`, not
           `PARAGRAPH`).
-        - **Remaining (deferred, standalone task)**: migrate fenced code / math
-          (`parse_fenced_code_block` / `parse_fenced_math_block` in
-          `code_blocks.rs`) onto the window. Kept separate because it carries
-          structural snapshot-drift risk the table/line-block migrations did
-          not: (1) the closing-fence detection loop runs
-          `count_blockquote_markers(probe)` with a `line_bq_depth < bq_depth`
-          break --- a forward-scan *termination* condition the window's
-          `strip_at` can't express (would need a new `bq_survivors_at(i)` method
-          or stay inline); (2) the open-fence emitter `prepare_fence_open_line`
-          (with `first_line_override`) has no window equivalent and must stay
-          bespoke. Recommend partial migration --- emission-loop
-          `emit_content_line_prefixes` → `emit_prefix_at`, detection
-          `inner_stripped` → `strip_at`, keep the bq-break inline, leave
-          `prepare_fence_open_line` / `strip_content_line_prefixes` untouched
-          --- gated hard on every fenced-code snapshot.
+        - **Fenced code + math --- done.** `parse_fenced_code_block` /
+          `parse_fenced_math_block` now take a `&StrippedLines` window and
+          derive every container scalar (`bq_depth`, `list_content_col`,
+          `bq_outer`, `content_indent`, `list_marker_consumed_on_line_0`) from
+          `window.prefix()`; content + closing-fence lines re-emit their prefix
+          via `emit_prefix_at(start_pos + 1 + k)` (the contiguous-row index
+          trick avoids touching `content_lines: Vec<&str>`, so the hashpipe
+          preamble preview stays untouched). For the block dispatcher the prefix
+          comes from `from_stack`, whose derived scalars equal the old
+          `ctx`-sourced ones *by construction* (`ctx.content_indent` is itself
+          `content_container_indent_to_strip()` = the sum of footnote/definition
+          `content_col`s, which `from_stack` encodes as `ContentIndent` ops).
+          The three marker-line callers in `core.rs` (list-item-first-line at
+          \~491, definition-marker at \~1443/1456) pass hand-computed scalars
+          (`bq_outer = bq_depth > 0`, special
+          `list_content_col`/`content_indent`, `first_line_override`) that don't
+          come from a settled stack, so they build a window from a new
+          `ContainerPrefix::from_scalars(...)` constructor that reproduces those
+          scalars (and `bq_outer_of_list`) exactly. **Deliberate deviation**
+          from the earlier sketch: detection stays on the 2-bucket
+          `strip_content_line_prefixes` helper, *not* `strip_at` --- `strip_at`
+          is a per-op walk that diverges from the emission's 2-bucket order in
+          interleaved `list→bq→list` nesting, and detection emits no tokens so
+          the swap had no CST benefit and nonzero byte-drift risk. The
+          `line_bq_depth < bq_depth` bq-break and `prepare_fence_open_line` stay
+          inline/bespoke (no window equivalent). All six pre-existing fenced
+          snapshots plus `definition_list` /
+          `list_item_fenced_code_first_line_*` stay byte-identical; locked in by
+          new parser golden cases `fenced_math_in_list_blockquote`
+          (`DISPLAY_MATH` under `list →           blockquote`) and
+          `fenced_code_in_definition` (definition-marker fence,
+          `content_indent > 0`).
         - **Remaining (deferred, deeper than the window)**: multiline tables
           (`try_parse_multiline_table`) under `list → blockquote` nesting. The
           window is necessary but *not sufficient* here: a multiline table
