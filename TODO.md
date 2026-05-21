@@ -490,72 +490,18 @@ intentionally excluded.
 - [x] Audit other multi-line-lookahead block parsers for the same misfire class.
       Audit complete; all four findings fixed (fenced code, definition lists,
       line blocks, pipe tables).
-      - **Fenced code** --- fixed. `parse_fenced_code_block` /
-        `parse_fenced_math_block` now take
-        `(list_content_col,         list_marker_consumed_on_line_0, bq_outer, content_indent)`
-        and apply the strip in container-stack order. The line-0 marker case
-        uses `advance_columns` (so the non-whitespace list-marker bytes get
-        skipped past silently) and the continuation case uses
-        `byte_index_at_column` (so blank lines aren't eaten). Adjacent
-        WHITESPACE emissions are coalesced for byte-range- equivalent CST
-        stability. Locked in by parser golden case
-        `fenced_code_in_list_blockquote`.
-      - **Definition lists** --- fixed. The marker-line branch of
-        `handle_definition_list_effect` was slicing the **raw**
-        `self.lines[pos]` using `content_start_bytes` computed against the
-        **container-stripped** `content` argument from `StrippedLines`, so the
-        post-marker view still carried the outer `>` prefix and
-        `count_blockquote_markers` fabricated a phantom inner blockquote (+4
-        bytes). The fix slices `content` directly for `content_slice` /
-        `content_line` (and for the fence-open `fence_line` in the same branch,
-        proactively). Locked in by parser golden case
-        `definition_list_in_list_blockquote`. Pandoc-native reads this as
-        `BulletList → BlockQuote → DefinitionList`; our CST keeps Term as a
-        PARAGRAPH outside the DEFINITION_LIST (same status quo as before; only
-        the +4 losslessness break was in scope here).
-      - **Pipe tables** --- fixed. `try_parse_pipe_table` now takes
-        `(prefix: &ContainerPrefix, dispatch_line)` and builds a no-alloc
-        container-stripped line view (`strip_line_0_for_emission` on the
-        dispatch line, full `strip` elsewhere) that every detection scan
-        (separator/cell shape, end-of-table, caption helpers) runs against, so a
-        `- > | a | b |` shape is recognized instead of falling back to paragraph
-        emission. Emission re-emits the per-continuation-line `>` prefix as
-        `WHITESPACE`/`BLOCK_QUOTE_MARKER` tokens inside each `TABLE_SEPARATOR` /
-        `TABLE_ROW` node (via `emit_content_line_prefixes`), parsing cells from
-        the stripped tail; the `TABLE_HEADER` on the dispatch line emits no
-        prefix (the core consumed it). With an empty prefix (non-nested tables)
-        every strip is a no-op, so existing output stays byte-identical. The
-        dispatcher threads `lines.prefix()` + `line_pos`. (Grid + simple tables
-        were later migrated onto the same window --- see the follow-up below;
-        multiline remains deferred because the container fragments it before
-        dispatch.) Locked in by parser golden case
-        `pipe_table_in_list_blockquote`. Pandoc-native reads this as
-        `BulletList → BlockQuote → Table`, which our
-        `LIST → LIST_ITEM → BLOCK_QUOTE → PIPE_TABLE` shape matches. (Formatter
-        round-trip for the nested case is still imperfect, as with the
-        line-block sibling: the separator-cell alignment scan trims the `>`
-        prefix into a junk cell. Pre-existing class of issue, out of scope here;
-        no test exercises that round-trip.)
-      - **Line blocks** --- fixed. `parse_line_block` now takes
-        `(bq_depth, list_content_col, list_marker_consumed_on_line_0, bq_outer, content_indent)`
-        mirroring fenced code, with a `silent_strip_container_prefix` peek for
-        continuation/next-marker detection and an `emit_open_line_prefixes`
-        helper on the dispatch line (a near-clone of `prepare_fence_open_line`
-        minus the final leading-space strip, since `LINE_BLOCK_MARKER` swallows
-        any leading spaces before `|`). The dispatcher
-        (`LineBlockParser::parse_prepared`) threads container geometry from
-        `lines.prefix()` / `ctx`; the over-strict raw-line guard in
-        `detect_prepared` was also removed. Helpers `strip_list_indent` /
-        `emit_blockquote_prefix_tokens` / `emit_content_line_prefixes` were
-        promoted to `pub(crate)` in `code_blocks.rs`. Formatter LINE_BLOCK
-        walker updated to skip leading WS/BQ_MARKER prefix tokens before
-        emitting the marker line, since the parser now emits those prefix tokens
-        inside LINE_BLOCK_LINE. Locked in by parser golden case
-        `line_block_in_list_blockquote`. Pandoc-native reads this as
-        `BulletList → BlockQuote → LineBlock`. (Formatter round-trip for the
-        nested case is still imperfect because the BLOCK_QUOTE walker doesn't
-        re-emit `>` for continuation lines under a LIST_ITEM --- pre-existing,
-        unrelated to this fix; no test exercises that round-trip.)
+      - **The four findings** --- each was a forward scanner whose raw-line scan
+        tripped over the continuation `>` prefix under `list → blockquote`
+        nesting (fenced code/math, definition lists, pipe tables, line blocks).
+        All fixed and locked in by `*_in_list_blockquote` parser golden cases
+        (`fenced_code`, `definition_list`, `pipe_table`, `line_block`);
+        pandoc-native reads each as `BulletList → BlockQuote → <block>`. Pipe
+        tables, line blocks, and fenced code/math were subsequently folded into
+        the shared window (see the follow-up below); definition lists stay
+        scalar-threaded. (Formatter round-trip for the nested pipe-table /
+        line-block cases is still imperfect --- the BLOCK_QUOTE walker doesn't
+        re-emit `>` for continuation lines under a LIST_ITEM; pre-existing, no
+        test exercises it.) Implementation detail lives in git history.
       - **Follow-up (window extraction) --- COMPLETE.** Every multi-line-
         lookahead block parser (pipe / grid / simple / multiline tables, line
         blocks, fenced code / math) now scans + emits through the
