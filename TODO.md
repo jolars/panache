@@ -525,10 +525,10 @@ intentionally excluded.
         the stripped tail; the `TABLE_HEADER` on the dispatch line emits no
         prefix (the core consumed it). With an empty prefix (non-nested tables)
         every strip is a no-op, so existing output stays byte-identical. The
-        dispatcher threads `lines.prefix()` + `line_pos`; grid/multiline/simple
-        parsers are unchanged (still fall back losslessly under list+bq nesting
-        --- no fixtures exercise those nested cases, and fixing them
-        speculatively was out of scope). Locked in by parser golden case
+        dispatcher threads `lines.prefix()` + `line_pos`. (Grid + simple tables
+        were later migrated onto the same window --- see the follow-up below;
+        multiline remains deferred because the container fragments it before
+        dispatch.) Locked in by parser golden case
         `pipe_table_in_list_blockquote`. Pandoc-native reads this as
         `BulletList → BlockQuote → Table`, which our
         `LIST → LIST_ITEM → BLOCK_QUOTE → PIPE_TABLE` shape matches. (Formatter
@@ -556,10 +556,11 @@ intentionally excluded.
         nested case is still imperfect because the BLOCK_QUOTE walker doesn't
         re-emit `>` for continuation lines under a LIST_ITEM --- pre-existing,
         unrelated to this fix; no test exercises that round-trip.)
-      - **Follow-up (window extraction) --- done for pipe tables + line
-        blocks.** The per-line container-stripping pattern is now consolidated
-        onto the `StrippedLines` window (`container_prefix.rs`). The prefix
-        emitters (`emit_content_line_prefixes`, `emit_blockquote_prefix_tokens`,
+      - **Follow-up (window extraction) --- done for pipe tables, line blocks,
+        grid tables, and simple tables.** The per-line container-stripping
+        pattern is now consolidated onto the `StrippedLines` window
+        (`container_prefix.rs`). The prefix emitters
+        (`emit_content_line_prefixes`, `emit_blockquote_prefix_tokens`,
         `strip_list_indent`, `bq_outer_of_list`) were relocated from
         `code_blocks.rs` down into `container_prefix.rs` (the lower layer that
         hosts `StrippedLines`) and re-exported, so the window can own the emit
@@ -576,6 +577,26 @@ intentionally excluded.
         and line-block snapshots are byte-identical. Definition lists are out of
         scope (single-line consumer of a pre-stripped view, not a forward
         scanner).
+        - **Grid + simple tables --- done.** Verified (not assumed) that both
+          misfired identically to pipe tables under `list → blockquote` nesting:
+          their forward scans ran against raw `lines` still carrying `>` on
+          continuation rows, so detection failed and they fell back to a
+          `PARAGRAPH` (lossless but structurally wrong).
+          `try_parse_simple_table` / `try_parse_grid_table` now take a
+          `&StrippedLines` window: detection scans run on `window.strip_all()`,
+          emission routes each line through a new
+          `StrippedLines::emit_or_dispatch_tail(builder, i)` helper
+          (`dispatch_tail` on the dispatch line, `emit_prefix_at` on
+          continuation lines). `emit_table_row` / `emit_grid_table_row` take the
+          window + absolute index/indices; grid's row accumulator switched from
+          `Vec<&str>` to `Vec<usize>` (absolute indices) so each physical line
+          of a multi-line row re-emits its prefix. Captions + internal blank
+          lines still read raw `lines` (nested-caption is the untested corner,
+          same as pipe tables). Empty prefix ⇒ every strip is a no-op, so all
+          pre-existing grid/simple snapshots stay byte-identical. Locked in by
+          parser golden cases `grid_table_in_list_blockquote` /
+          `simple_table_in_list_blockquote` (`GRID_TABLE` / `SIMPLE_TABLE`, not
+          `PARAGRAPH`).
         - **Remaining (deferred, standalone task)**: migrate fenced code / math
           (`parse_fenced_code_block` / `parse_fenced_math_block` in
           `code_blocks.rs`) onto the window. Kept separate because it carries
@@ -591,6 +612,20 @@ intentionally excluded.
           `inner_stripped` → `strip_at`, keep the bq-break inline, leave
           `prepare_fence_open_line` / `strip_content_line_prefixes` untouched
           --- gated hard on every fenced-code snapshot.
+        - **Remaining (deferred, deeper than the window)**: multiline tables
+          (`try_parse_multiline_table`) under `list → blockquote` nesting. The
+          window is necessary but *not sufficient* here: a multiline table
+          requires internal blank rows, and to stay inside the blockquote those
+          must be `>`-only lines --- but a `>`-only "blank" line makes the
+          **blockquote's** block parser split the content into two separate
+          `PARAGRAPH`s *before* the table dispatcher ever sees a contiguous
+          slice (verified: `BLOCK_QUOTE → PARAGRAPH, BLANK_LINE, PARAGRAPH`).
+          That's container-level blank-line block segmentation, a layer above
+          the table dispatcher. Grid/simple have no internal blank lines so they
+          arrive contiguous and the window alone fixes them; multiline needs a
+          deeper change to how `>`-prefixed blank lines terminate block
+          accumulation inside containers (and only then a window migration of
+          the parser itself). Out of scope for the window work.
 - [ ] Stop letting `pandoc_ast.rs` drift into a second-stage parser. Load-
       bearing byte-walkers (`split_html_block_by_tags`, `parse_pandoc_blocks`
       and the refs/heading-id reparse helpers) re-tokenize source the CST should

@@ -557,6 +557,24 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
             .strip_line_0_for_emission(self.raw[self.dispatch])
     }
 
+    /// Emission tail for the line at ABSOLUTE index `i`, picking the right
+    /// strategy by position: the dispatch line emits no prefix tokens (the
+    /// core consumed them) via [`Self::dispatch_tail`]; every other line
+    /// re-emits its container prefix as tokens via [`Self::emit_prefix_at`].
+    /// Consolidates the `if i == dispatch { … } else { … }` idiom repeated
+    /// across the table emitters.
+    pub fn emit_or_dispatch_tail(
+        &self,
+        builder: &mut GreenNodeBuilder<'static>,
+        i: usize,
+    ) -> &'a str {
+        if i == self.dispatch {
+            self.dispatch_tail()
+        } else {
+            self.emit_prefix_at(builder, i)
+        }
+    }
+
     /// Iterate `(absolute_index, raw_line, peek_stripped)` from `base` to
     /// the end of the buffer. `peek_stripped` follows the same
     /// dispatch-aware rule as [`Self::strip_at`].

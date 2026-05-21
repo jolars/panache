@@ -601,28 +601,36 @@ fn determine_alignments(columns: &mut [Column], separator_line: &str, header_lin
 /// Try to parse a simple table starting at the given position.
 /// Returns the number of lines consumed if successful.
 pub(crate) fn try_parse_simple_table(
-    lines: &[&str],
-    start_pos: usize,
+    window: &StrippedLines<'_, '_>,
     builder: &mut GreenNodeBuilder<'static>,
     config: &ParserOptions,
 ) -> Option<usize> {
+    let lines = window.raw();
+    let start_pos = window.pos();
     log::trace!("try_parse_simple_table at line {}", start_pos + 1);
 
     if start_pos >= lines.len() {
         return None;
     }
 
+    // Detection scans run against the container-prefix-stripped view so a
+    // table nested in `list → blockquote` (e.g. `- >  a   b`) has its `  > `
+    // prefix removed before the separator/column-shape checks. With an empty
+    // prefix `stripped == lines`. Emission re-emits the prefix bytes as
+    // tokens via the window; captions/blank lines still read raw `lines`.
+    let stripped = window.strip_all();
+
     // Look for a separator line
-    let separator_pos = find_separator_line(lines, start_pos)?;
+    let separator_pos = find_separator_line(&stripped, start_pos)?;
     log::trace!("  found separator at line {}", separator_pos + 1);
 
-    let separator_line = lines[separator_pos];
+    let separator_line = stripped[separator_pos];
     let mut columns = try_parse_table_separator(separator_line)?;
 
     // Determine if there's a header (separator not at start)
     let has_header = separator_pos > start_pos;
     let header_line = if has_header {
-        Some(lines[separator_pos - 1])
+        Some(stripped[separator_pos - 1])
     } else {
         None
     };
@@ -631,7 +639,7 @@ pub(crate) fn try_parse_simple_table(
     determine_alignments(&mut columns, separator_line, header_line);
 
     // Find table end (blank line or end of input)
-    let end_pos = find_table_end(lines, separator_pos + 1);
+    let end_pos = find_table_end(&stripped, separator_pos + 1);
 
     // Must have at least one data row (or it's just a separator)
     let data_rows = end_pos - separator_pos - 1;
@@ -641,13 +649,13 @@ pub(crate) fn try_parse_simple_table(
     }
 
     // Check for caption before table
-    let caption_before = find_caption_before_table(lines, start_pos);
+    let caption_before = find_caption_before_table(&stripped, start_pos);
 
     // Check for caption after table
     let caption_after = if caption_before.is_some() {
         None
     } else {
-        find_caption_after_table(lines, end_pos)
+        find_caption_after_table(&stripped, end_pos)
     };
 
     // Build the table
@@ -669,25 +677,37 @@ pub(crate) fn try_parse_simple_table(
         }
     }
 
-    // Emit header if present
+    // Emit header if present. On the dispatch line the core already emitted
+    // the container prefix; only continuation rows re-emit it (via the window
+    // inside `emit_table_row`).
     if has_header {
         emit_table_row(
             builder,
-            lines[separator_pos - 1],
+            window,
+            separator_pos - 1,
             &columns,
             SyntaxKind::TABLE_HEADER,
             config,
         );
     }
 
-    // Emit separator
+    // Emit separator, re-emitting any continuation-line container prefix
+    // (`  > `) as WHITESPACE/BLOCK_QUOTE_MARKER tokens before the row text.
     builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-    emit_line_tokens(builder, separator_line);
+    let separator_tail = window.emit_or_dispatch_tail(builder, separator_pos);
+    emit_line_tokens(builder, separator_tail);
     builder.finish_node();
 
-    // Emit data rows
-    for line in lines.iter().take(end_pos).skip(separator_pos + 1) {
-        emit_table_row(builder, line, &columns, SyntaxKind::TABLE_ROW, config);
+    // Emit data rows (always continuation lines)
+    for idx in (separator_pos + 1)..end_pos {
+        emit_table_row(
+            builder,
+            window,
+            idx,
+            &columns,
+            SyntaxKind::TABLE_ROW,
+            config,
+        );
     }
 
     // Emit caption after if present
@@ -769,12 +789,19 @@ fn find_table_end(lines: &[&str], start_pos: usize) -> usize {
 /// Uses column boundaries from the separator line to extract cells.
 fn emit_table_row(
     builder: &mut GreenNodeBuilder<'static>,
-    line: &str,
+    window: &StrippedLines<'_, '_>,
+    abs_idx: usize,
     columns: &[Column],
     row_kind: SyntaxKind,
     config: &ParserOptions,
 ) {
     builder.start_node(row_kind.into());
+
+    // On continuation lines the leading `  > ` prefix is re-emitted as
+    // WHITESPACE/BLOCK_QUOTE_MARKER tokens inside the row node and the
+    // stripped tail returned; the dispatch line just strips its (already
+    // core-emitted) prefix. Empty prefix ⇒ the raw line.
+    let line = window.emit_or_dispatch_tail(builder, abs_idx);
 
     let (line_without_newline, newline_str) = strip_newline(line);
 
@@ -1308,7 +1335,9 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 0, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_simple_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 4); // header + sep + 2 rows
@@ -1324,7 +1353,9 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 0, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_simple_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 3); // sep + 2 rows
@@ -1396,7 +1427,9 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 0, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_simple_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         // Should consume: header + sep + 2 rows + blank + caption
@@ -1416,7 +1449,9 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 2, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 2, &prefix);
+        let result = try_parse_simple_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         // Should consume: caption + blank + header + sep + 2 rows
@@ -1435,7 +1470,9 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 0, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_simple_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 5); // header + sep + row + blank + caption
@@ -1454,7 +1491,9 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 0, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_simple_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         // Should consume through end of multi-line caption
@@ -1472,7 +1511,9 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 0, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_simple_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 4);
@@ -1764,49 +1805,43 @@ fn extract_grid_cells_from_line(line: &str, _columns: &[GridColumn]) -> Vec<Stri
     cells
 }
 
-/// Extract cell contents from multiple grid table row lines (for multi-line cells).
-/// Concatenates cell contents across lines with newlines, then trims.
-fn extract_grid_cells_multiline(lines: &[&str], columns: &[GridColumn]) -> Vec<String> {
-    if lines.is_empty() {
-        return vec![String::new(); columns.len()];
-    }
-
-    extract_grid_cells_from_line(lines[0], columns)
-}
-
 /// Emit a grid table row with inline-parsed cells.
 /// Handles multi-line rows by emitting first line with TABLE_CELL nodes,
 /// then continuation lines as raw TEXT for losslessness.
 fn emit_grid_table_row(
     builder: &mut GreenNodeBuilder<'static>,
-    lines: &[&str],
+    window: &StrippedLines<'_, '_>,
+    indices: &[usize],
     columns: &[GridColumn],
     row_kind: SyntaxKind,
     config: &ParserOptions,
 ) {
-    if lines.is_empty() {
+    if indices.is_empty() {
         return;
     }
 
-    // Extract cell contents from the first line.
-    let cell_contents = extract_grid_cells_multiline(lines, columns);
-
     builder.start_node(row_kind.into());
 
-    // Emit first line with TABLE_CELL nodes
+    // Emit first line with TABLE_CELL nodes. The continuation-line container
+    // prefix (`  > `) is re-emitted as WHITESPACE/BLOCK_QUOTE_MARKER tokens
+    // inside the row node before the cell text; the returned tail is the
+    // prefix-stripped line we slice cells from (empty prefix ⇒ raw line).
     // Grid table rows look like: "| Cell 1 | Cell 2 | Cell 3 |"
-    let first_line = lines[0];
+    let first_line = window.emit_or_dispatch_tail(builder, indices[0]);
+    let cell_contents = extract_grid_cells_from_line(first_line, columns);
     let (line_without_newline, newline_str) = strip_newline(first_line);
     let trimmed = line_without_newline.trim();
     let expected_pipe_count = columns.len().saturating_add(1);
     let actual_pipe_count = trimmed.chars().filter(|&c| c == '|').count();
 
     // Rows that don't contain all expected column separators (spanning-style rows)
-    // must be emitted verbatim for losslessness.
+    // must be emitted verbatim for losslessness. The first line's prefix was
+    // already consumed above; emit its tail and each continuation tail.
     if actual_pipe_count != expected_pipe_count {
         emit_line_tokens(builder, first_line);
-        for line in lines.iter().skip(1) {
-            emit_line_tokens(builder, line);
+        for &idx in &indices[1..] {
+            let tail = window.emit_or_dispatch_tail(builder, idx);
+            emit_line_tokens(builder, tail);
         }
         builder.finish_node();
         return;
@@ -1884,9 +1919,11 @@ fn emit_grid_table_row(
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
 
-    // Emit continuation lines as TEXT for losslessness
-    for line in lines.iter().skip(1) {
-        emit_line_tokens(builder, line);
+    // Emit continuation lines as TEXT for losslessness, re-emitting each
+    // line's container prefix first.
+    for &idx in &indices[1..] {
+        let tail = window.emit_or_dispatch_tail(builder, idx);
+        emit_line_tokens(builder, tail);
     }
 
     builder.finish_node();
@@ -1895,21 +1932,29 @@ fn emit_grid_table_row(
 /// Try to parse a grid table starting at the given position.
 /// Returns the number of lines consumed if successful.
 pub(crate) fn try_parse_grid_table(
-    lines: &[&str],
-    start_pos: usize,
+    window: &StrippedLines<'_, '_>,
     builder: &mut GreenNodeBuilder<'static>,
     config: &ParserOptions,
 ) -> Option<usize> {
+    let lines = window.raw();
+    let start_pos = window.pos();
     if start_pos >= lines.len() {
         return None;
     }
 
+    // Detection scans run against the container-prefix-stripped view so a
+    // grid table nested in `list → blockquote` (e.g. `- > +---+---+`) has its
+    // `  > ` prefix removed before the separator/content-row shape checks.
+    // With an empty prefix `stripped == lines`. Emission re-emits the prefix
+    // bytes as tokens via the window; captions/blank lines read raw `lines`.
+    let stripped = window.strip_all();
+
     // Check if this line is a caption followed by a table
     // If so, the actual table starts after the caption and blank line
-    let (actual_start, caption_before) = if is_caption_followed_by_table(lines, start_pos) {
-        let (cap_start, cap_end) = caption_range_starting_at(lines, start_pos)?;
+    let (actual_start, caption_before) = if is_caption_followed_by_table(&stripped, start_pos) {
+        let (cap_start, cap_end) = caption_range_starting_at(&stripped, start_pos)?;
         let mut pos = cap_end;
-        while pos < lines.len() && lines[pos].trim().is_empty() {
+        while pos < stripped.len() && stripped[pos].trim().is_empty() {
             pos += 1;
         }
         (pos, Some((cap_start, cap_end)))
@@ -1922,7 +1967,7 @@ pub(crate) fn try_parse_grid_table(
     }
 
     // First line must be a grid separator
-    let first_line = lines[actual_start];
+    let first_line = stripped[actual_start];
     let _columns = try_parse_grid_separator(first_line)?;
 
     // Track table structure
@@ -1932,7 +1977,7 @@ pub(crate) fn try_parse_grid_table(
 
     // Scan table lines
     while end_pos < lines.len() {
-        let line = lines[end_pos];
+        let line = stripped[end_pos];
 
         // Check for blank line (table ends)
         if line.trim().is_empty() {
@@ -1974,13 +2019,14 @@ pub(crate) fn try_parse_grid_table(
     // But we'll be lenient and accept tables ending with content rows
 
     // Check for caption before table (only if we didn't already detected it)
-    let caption_before = caption_before.or_else(|| find_caption_before_table(lines, actual_start));
+    let caption_before =
+        caption_before.or_else(|| find_caption_before_table(&stripped, actual_start));
 
     // Check for caption after table
     let caption_after = if caption_before.is_some() {
         None
     } else {
-        find_caption_after_table(lines, end_pos)
+        find_caption_after_table(&stripped, end_pos)
     };
 
     // Build the grid table
@@ -2004,31 +2050,37 @@ pub(crate) fn try_parse_grid_table(
     // Track whether we've passed the header separator
     let mut past_header_sep = false;
     let mut in_footer_section = false;
-    let mut current_row_lines: Vec<&str> = Vec::new();
+    // Accumulate ABSOLUTE indices of the lines making up a multi-line row, so
+    // each line's container prefix can be re-emitted via the window.
+    let mut current_row_indices: Vec<usize> = Vec::new();
     let mut current_row_kind = SyntaxKind::TABLE_HEADER;
 
     // Emit table rows - accumulate multi-line cells
-    for line in lines.iter().take(end_pos).skip(actual_start) {
+    for (idx, &line) in stripped.iter().enumerate().take(end_pos).skip(actual_start) {
         if let Some(sep_cols) = try_parse_grid_separator(line) {
             // Separator line - emit any accumulated row first
-            if !current_row_lines.is_empty() {
+            if !current_row_indices.is_empty() {
                 emit_grid_table_row(
                     builder,
-                    &current_row_lines,
+                    window,
+                    &current_row_indices,
                     &sep_cols,
                     current_row_kind,
                     config,
                 );
-                current_row_lines.clear();
+                current_row_indices.clear();
             }
 
             let is_header_sep = sep_cols.iter().any(|c| c.is_header_separator);
 
+            // Re-emit any continuation-line container prefix (`  > `) as
+            // WHITESPACE/BLOCK_QUOTE_MARKER tokens before the separator text.
             if is_header_sep {
                 if !past_header_sep {
                     // This is the header/body separator
                     builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-                    emit_line_tokens(builder, line);
+                    let tail = window.emit_or_dispatch_tail(builder, idx);
+                    emit_line_tokens(builder, tail);
                     builder.finish_node();
                     past_header_sep = true;
                 } else {
@@ -2037,13 +2089,15 @@ pub(crate) fn try_parse_grid_table(
                         in_footer_section = true;
                     }
                     builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-                    emit_line_tokens(builder, line);
+                    let tail = window.emit_or_dispatch_tail(builder, idx);
+                    emit_line_tokens(builder, tail);
                     builder.finish_node();
                 }
             } else {
                 // Regular separator (row boundary)
                 builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-                emit_line_tokens(builder, line);
+                let tail = window.emit_or_dispatch_tail(builder, idx);
+                emit_line_tokens(builder, tail);
                 builder.finish_node();
             }
         } else if is_grid_content_row(line) {
@@ -2056,17 +2110,18 @@ pub(crate) fn try_parse_grid_table(
                 SyntaxKind::TABLE_ROW
             };
 
-            current_row_lines.push(line);
+            current_row_indices.push(idx);
         }
     }
 
     // Emit any remaining accumulated row
-    if !current_row_lines.is_empty() {
+    if !current_row_indices.is_empty() {
         // Use first separator's columns for cell boundaries
-        if let Some(sep_cols) = try_parse_grid_separator(lines[actual_start]) {
+        if let Some(sep_cols) = try_parse_grid_separator(stripped[actual_start]) {
             emit_grid_table_row(
                 builder,
-                &current_row_lines,
+                window,
+                &current_row_indices,
                 &sep_cols,
                 current_row_kind,
                 config,
@@ -2105,6 +2160,7 @@ pub(crate) fn try_parse_grid_table(
 
 #[cfg(test)]
 mod grid_table_tests {
+    use super::super::container_prefix::ContainerPrefix;
     use super::*;
 
     #[test]
@@ -2147,7 +2203,9 @@ mod grid_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 0, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_grid_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 5);
@@ -2169,7 +2227,9 @@ mod grid_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 0, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_grid_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 9);
@@ -2191,7 +2251,9 @@ mod grid_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 0, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_grid_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 9);
@@ -2209,7 +2271,9 @@ mod grid_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 0, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_grid_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 5);
@@ -2229,7 +2293,9 @@ mod grid_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 2, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 2, &prefix);
+        let result = try_parse_grid_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         // Should include caption + blank + table
@@ -2250,7 +2316,9 @@ mod grid_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 0, &mut builder, &ParserOptions::default());
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_grid_table(&window, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         // table + blank + caption
