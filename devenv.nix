@@ -73,6 +73,14 @@
     typescript = {
       enable = true;
     };
+
+    python = {
+      enable = true;
+
+      package = pkgs.python3.withPackages (ps: [
+        ps.markdown
+      ]);
+    };
   };
 
   git-hooks = {
