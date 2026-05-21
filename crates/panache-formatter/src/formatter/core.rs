@@ -2,6 +2,7 @@ use crate::config::{Config, WrapMode};
 use crate::directives::{DirectiveTracker, extract_directive_from_node};
 use crate::syntax::{BlockQuote, DefinitionItem, DisplayMath, FencedDiv, SyntaxKind, SyntaxNode};
 use panache_parser::parser::blocks::headings::{try_parse_atx_heading, try_parse_setext_heading};
+use panache_parser::parser::blocks::horizontal_rules::try_parse_horizontal_rule;
 use panache_parser::parser::utils::attributes::parse_attribute_content;
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
@@ -510,6 +511,60 @@ impl Formatter {
     }
 
     // The large format_node_sync method - keeping it here for now, can extract later
+    /// Smart punctuation turns `—`→`---` and `–`→`--`. When a paragraph's
+    /// whole content normalizes to dashes, the emitted line re-parses as a
+    /// thematic break (or setext underline) — a semantic + idempotency break
+    /// (one pandoc itself shares). When that happens, re-emit the paragraph
+    /// with smart off so the lossless unicode dash is preserved. The smart-off
+    /// rendering is adopted only when it actually clears the marker, so a
+    /// paragraph that genuinely contains a `***`/`___`/`- - -` line (not
+    /// produced by smart) is left untouched.
+    fn guard_dash_block_marker(&mut self, start: usize, node: &SyntaxNode, indent: usize) {
+        if !self.config.formatter_extensions.smart
+            || !Self::produces_dash_block_marker(&self.output[start..])
+        {
+            return;
+        }
+
+        let original = self.output[start..].to_string();
+        self.output.truncate(start);
+
+        let mut cfg = self.config.clone();
+        cfg.formatter_extensions.smart = false;
+        let saved = std::mem::replace(&mut self.config, cfg);
+        // Re-dispatch the same node: with smart off the guard short-circuits,
+        // so this cannot recurse. A dash-only paragraph carries no inline
+        // directives, so re-running the dispatcher preamble is a no-op.
+        self.format_node_sync(node, indent);
+        self.config = saved;
+
+        if Self::produces_dash_block_marker(&self.output[start..]) {
+            self.output.truncate(start);
+            self.output.push_str(&original);
+        }
+    }
+
+    /// True if `text` has a line that re-parses as a dash thematic break or a
+    /// dash setext-h2 underline. Smart punctuation only ever emits `-` dashes,
+    /// so those are the only block markers it can manufacture.
+    fn produces_dash_block_marker(text: &str) -> bool {
+        let lines: Vec<&str> = text.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if try_parse_horizontal_rule(line).is_some() {
+                return true;
+            }
+            // Setext h2: a `-`-only line directly under a non-blank line.
+            if i > 0 && trimmed.chars().all(|c| c == '-') && !lines[i - 1].trim().is_empty() {
+                return true;
+            }
+        }
+        false
+    }
+
     pub(super) fn format_node_sync(&mut self, node: &SyntaxNode, indent: usize) {
         // Check if formatting is ignored - if so, preserve content exactly
         // Exception: Always process DOCUMENT, COMMENT, and HTML_BLOCK / HTML_BLOCK_DIV nodes (may contain directives)
@@ -671,7 +726,20 @@ impl Formatter {
                                             self.output.push(' ');
                                         }
                                     } else {
-                                        self.output.push_str(t.text());
+                                        // Bare heading text bypassed smart
+                                        // normalization (unlike paragraphs and
+                                        // list-nested headings), so `# —` stayed
+                                        // while a `—` paragraph became `---`.
+                                        // The `#` prefix means a heading can
+                                        // never collide with a thematic break.
+                                        self.output.push_str(
+                                            normalize_smart_punctuation(
+                                                t.text(),
+                                                self.config.formatter_extensions.smart,
+                                                self.config.formatter_extensions.smart_quotes,
+                                            )
+                                            .as_ref(),
+                                        );
                                     }
                                 }
                                 NodeOrToken::Node(n) => {
@@ -1380,6 +1448,7 @@ impl Formatter {
             }
 
             SyntaxKind::PARAGRAPH => {
+                let para_start = self.output.len();
                 let text = node.text().to_string();
                 log::trace!("Formatting paragraph, text length: {}", text.len());
                 let paragraph_indent = " ".repeat(indent);
@@ -1554,6 +1623,8 @@ impl Formatter {
                 if !self.output.ends_with('\n') {
                     self.output.push('\n');
                 }
+
+                self.guard_dash_block_marker(para_start, node, indent);
             }
 
             SyntaxKind::FIGURE => {

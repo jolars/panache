@@ -759,7 +759,10 @@ mark = false
 :   Normalize smart/curly punctuation in formatter output (quotes/apostrophes
     and en/em dashes, plus ellipsis) to Markdown forms (`'`, `"`, `--`, `---`,
     `...`). Defaults: enabled for `pandoc`, `quarto`, `rmarkdown`; disabled for
-    `gfm`, `commonmark`, `multimarkdown`.
+    `gfm`, `commonmark`, `multimarkdown`. A dash that would land alone on a line
+    (e.g. a paragraph that is just `---`) is left as the Unicode character
+    instead, since `---`/`--` there would re-parse as a thematic break or setext
+    underline.
 
 `smart-quotes`
 :   Normalize smart/curly quotes and apostrophes only (`'`, `"`). Unlike
