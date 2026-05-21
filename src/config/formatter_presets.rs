@@ -96,6 +96,27 @@ const PRESETS: &[FormatterPresetMetadata] = &[
         supported_languages: &["sh", "bash", "shell"],
     },
     FormatterPresetMetadata {
+        name: "biome",
+        url: "https://biomejs.dev/",
+        description: "Formatter for JavaScript, TypeScript, JSON, and CSS.",
+        cmd: "biome",
+        args: &["format", "--stdin-file-path", "{}"],
+        stdin: true,
+        supported_languages: &[
+            "javascript",
+            "js",
+            "typescript",
+            "ts",
+            "jsx",
+            "tsx",
+            "json",
+            "jsonc",
+            "css",
+            "graphql",
+            "gql",
+        ],
+    },
+    FormatterPresetMetadata {
         name: "black",
         url: "https://github.com/psf/black",
         description: "Opinionated Python formatter.",
@@ -291,6 +312,15 @@ const PRESETS: &[FormatterPresetMetadata] = &[
         supported_languages: &["hurl"],
     },
     FormatterPresetMetadata {
+        name: "isort",
+        url: "https://pycqa.github.io/isort/",
+        description: "Sorts and formats Python imports.",
+        cmd: "isort",
+        args: &["-"],
+        stdin: true,
+        supported_languages: &["python", "py"],
+    },
+    FormatterPresetMetadata {
         name: "jsonnetfmt",
         url: "https://github.com/google/go-jsonnet",
         description: "Format Jsonnet files.",
@@ -429,6 +459,15 @@ const PRESETS: &[FormatterPresetMetadata] = &[
         supported_languages: &["ruby", "rb"],
     },
     FormatterPresetMetadata {
+        name: "rustfmt",
+        url: "https://github.com/rust-lang/rustfmt",
+        description: "Official formatter for Rust code.",
+        cmd: "rustfmt",
+        args: &[],
+        stdin: true,
+        supported_languages: &["rust", "rs"],
+    },
+    FormatterPresetMetadata {
         name: "shfmt",
         url: "https://github.com/mvdan/sh",
         description: "Shell script formatter.",
@@ -454,6 +493,15 @@ const PRESETS: &[FormatterPresetMetadata] = &[
         args: &["-e", "styler::style_file('{}')"],
         stdin: false,
         supported_languages: &["r"],
+    },
+    FormatterPresetMetadata {
+        name: "stylua",
+        url: "https://github.com/JohnnyMorganz/StyLua",
+        description: "Opinionated Lua code formatter.",
+        cmd: "stylua",
+        args: &["-"],
+        stdin: true,
+        supported_languages: &["lua"],
     },
     FormatterPresetMetadata {
         name: "taplo",
@@ -570,6 +618,7 @@ pub fn formatter_preset_names() -> &'static [&'static str] {
         "bean-format",
         "bibtex-tidy",
         "beautysh",
+        "biome",
         "black",
         "bpfmt",
         "bsfmt",
@@ -590,6 +639,7 @@ pub fn formatter_preset_names() -> &'static [&'static str] {
         "gofmt",
         "gofumpt",
         "hurlfmt",
+        "isort",
         "jsonnetfmt",
         "ktfmt",
         "leptosfmt",
@@ -603,9 +653,11 @@ pub fn formatter_preset_names() -> &'static [&'static str] {
         "rubyfmt",
         "ruff",
         "rufo",
+        "rustfmt",
         "shfmt",
         "sqlfmt",
         "styler",
+        "stylua",
         "tclfmt",
         "taplo",
         "tex-fmt",
@@ -620,6 +672,7 @@ pub fn formatter_preset_names() -> &'static [&'static str] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn clang_format_is_available_for_rcpp_language() {
@@ -627,6 +680,54 @@ mod tests {
         assert!(
             presets.iter().any(|preset| preset.name == "clang-format"),
             "Expected clang-format preset to support Rcpp"
+        );
+    }
+
+    #[test]
+    fn biome_is_available_for_web_languages() {
+        for language in ["javascript", "typescript", "json", "css"] {
+            let presets = formatter_presets_for_language(language);
+            assert!(
+                presets.iter().any(|preset| preset.name == "biome"),
+                "Expected biome preset to support {language}"
+            );
+        }
+    }
+
+    #[test]
+    fn rustfmt_is_available_for_rust() {
+        let presets = formatter_presets_for_language("rust");
+        assert!(
+            presets.iter().any(|preset| preset.name == "rustfmt"),
+            "Expected rustfmt preset to support rust"
+        );
+    }
+
+    #[test]
+    fn isort_is_available_for_python() {
+        let presets = formatter_presets_for_language("python");
+        assert!(
+            presets.iter().any(|preset| preset.name == "isort"),
+            "Expected isort preset to support python"
+        );
+    }
+
+    #[test]
+    fn stylua_is_available_for_lua() {
+        let presets = formatter_presets_for_language("lua");
+        assert!(
+            presets.iter().any(|preset| preset.name == "stylua"),
+            "Expected stylua preset to support lua"
+        );
+    }
+
+    #[test]
+    fn preset_names_list_matches_metadata() {
+        let metadata_names: HashSet<&str> = PRESETS.iter().map(|preset| preset.name).collect();
+        let listed_names: HashSet<&str> = formatter_preset_names().iter().copied().collect();
+        assert_eq!(
+            metadata_names, listed_names,
+            "PRESETS and formatter_preset_names() must list the same presets"
         );
     }
 }

@@ -207,7 +207,7 @@ intentionally excluded.
 - [ ] `bicep`
 - [ ] `biome-check`
 - [ ] `biome-organize-imports`
-- [ ] `biome`
+- [x] `biome`
 - [ ] `blade-formatter`
 - [ ] `blue`
 - [x] `bpfmt`
@@ -287,7 +287,7 @@ intentionally excluded.
 - [ ] `indent`
 - [ ] `injected`
 - [ ] `inko`
-- [ ] `isort`
+- [x] `isort`
 - [ ] `janet-format`
 - [ ] `joker`
 - [ ] `jq`
@@ -374,7 +374,7 @@ intentionally excluded.
 - [x] `rufo`
 - [ ] `rumdl`
 - [ ] `runic`
-- [ ] `rustfmt`
+- [x] `rustfmt`
 - [ ] `rustywind`
 - [ ] `scalafmt`
 - [ ] `shellcheck`
@@ -393,7 +393,7 @@ intentionally excluded.
 - [ ] `standardrb`
 - [ ] `stylelint`
 - [ ] `stylish-haskell`
-- [ ] `stylua`
+- [x] `stylua`
 - [ ] `superhtml`
 - [ ] `swift`
 - [ ] `swift_format`

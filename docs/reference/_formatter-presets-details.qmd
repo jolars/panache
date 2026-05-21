@@ -151,6 +151,25 @@ Command
 Type
 :   Stdin
 
+## `biome`
+
+Formatter for JavaScript, TypeScript, JSON, and CSS.
+
+Homepage
+:   <https://biomejs.dev/>
+
+Supported Languages
+:   `javascript`, `js`, `typescript`, `ts`, `jsx`, `tsx`, `json`, `jsonc`, `css`, `graphql`, `gql`
+
+Command
+:   `biome`
+
+`args`
+:   `[format, --stdin-file-path, {}]`
+
+Type
+:   Stdin
+
 ## `black`
 
 Opinionated Python formatter.
@@ -531,6 +550,25 @@ Command
 Type
 :   Stdin
 
+## `isort`
+
+Sorts and formats Python imports.
+
+Homepage
+:   <https://pycqa.github.io/isort/>
+
+Supported Languages
+:   `python`, `py`
+
+Command
+:   `isort`
+
+`args`
+:   `[-]`
+
+Type
+:   Stdin
+
 ## `jsonnetfmt`
 
 Format Jsonnet files.
@@ -778,6 +816,25 @@ Command
 Type
 :   Stdin
 
+## `rustfmt`
+
+Official formatter for Rust code.
+
+Homepage
+:   <https://github.com/rust-lang/rustfmt>
+
+Supported Languages
+:   `rust`, `rs`
+
+Command
+:   `rustfmt`
+
+`args`
+:   `[]`
+
+Type
+:   Stdin
+
 ## `shfmt`
 
 Shell script formatter.
@@ -834,6 +891,25 @@ Command
 
 Type
 :   File-based
+
+## `stylua`
+
+Opinionated Lua code formatter.
+
+Homepage
+:   <https://github.com/JohnnyMorganz/StyLua>
+
+Supported Languages
+:   `lua`
+
+Command
+:   `stylua`
+
+`args`
+:   `[-]`
+
+Type
+:   Stdin
 
 ## `taplo`
 
