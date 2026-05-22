@@ -927,13 +927,13 @@ fn parse_inline_range_impl(
                 );
 
                 // Check for raw inline
-                if let Some((ref attrs, _)) = attributes
+                if let Some((ref attrs, raw_attr)) = attributes
                     && config.extensions.raw_attribute
                     && let Some(format) = is_raw_inline(attrs)
                 {
                     use super::raw_inline::emit_raw_inline;
                     log::trace!("Matched raw inline span at pos {}: format={}", pos, format);
-                    emit_raw_inline(builder, content, backtick_count, format);
+                    emit_raw_inline(builder, content, backtick_count, raw_attr);
                 } else if !config.extensions.inline_code_attributes && attributes.is_some() {
                     let code_span_len = backtick_count * 2 + content.len();
                     emit_code_span(builder, content, backtick_count, None);

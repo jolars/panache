@@ -1,0 +1,36 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..83
+  PARAGRAPH@0..83
+    TEXT@0..18 "Inline raw spans: "
+    RAW_INLINE@18..38
+      RAW_INLINE_MARKER@18..19 "`"
+      RAW_INLINE_CONTENT@19..30 "<a>html</a>"
+      RAW_INLINE_MARKER@30..31 "`"
+      ATTRIBUTE@31..38
+        TEXT@31..32 "{"
+        ATTR_CLASS@32..37 "=html"
+        TEXT@37..38 "}"
+    TEXT@38..40 ", "
+    RAW_INLINE@40..56
+      RAW_INLINE_MARKER@40..41 "`"
+      RAW_INLINE_CONTENT@41..47 "\\LaTeX"
+      RAW_INLINE_MARKER@47..48 "`"
+      ATTRIBUTE@48..56
+        TEXT@48..49 "{"
+        ATTR_CLASS@49..55 "=latex"
+        TEXT@55..56 "}"
+    TEXT@56..61 ", and"
+    NEWLINE@61..62 "\n"
+    RAW_INLINE@62..81
+      RAW_INLINE_MARKER@62..63 "`"
+      RAW_INLINE_CONTENT@63..70 "<w:br/>"
+      RAW_INLINE_MARKER@70..71 "`"
+      ATTRIBUTE@71..81
+        TEXT@71..72 "{"
+        ATTR_CLASS@72..80 "=openxml"
+        TEXT@80..81 "}"
+    TEXT@81..82 "."
+    NEWLINE@82..83 "\n"

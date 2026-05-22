@@ -9,7 +9,7 @@
 //!
 //! This is enabled by the raw_attribute extension.
 
-use crate::parser::utils::attributes::AttributeBlock;
+use crate::parser::utils::attributes::{AttributeBlock, emit_attribute_node};
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -35,11 +35,16 @@ pub fn is_raw_inline(attributes: &AttributeBlock) -> Option<&str> {
 }
 
 /// Emit a raw inline span node to the builder.
+///
+/// `attr_raw` is the raw `{=format}` source slice (braces included). It is
+/// structured into `ATTR_*` children via [`emit_attribute_node`] so the node
+/// wraps the original bytes losslessly instead of synthesizing them — any
+/// interior whitespace (`{ =html }`) round-trips byte-for-byte.
 pub fn emit_raw_inline(
     builder: &mut GreenNodeBuilder,
     content: &str,
     backtick_count: usize,
-    format: &str,
+    attr_raw: &str,
 ) {
     builder.start_node(SyntaxKind::RAW_INLINE.into());
 
@@ -58,10 +63,8 @@ pub fn emit_raw_inline(
         &"`".repeat(backtick_count),
     );
 
-    // Format attribute: {=format}
-    builder.start_node(SyntaxKind::ATTRIBUTE.into());
-    builder.token(SyntaxKind::TEXT.into(), &format!("{{={}}}", format));
-    builder.finish_node();
+    // Format attribute `{=format}`, structured over the raw source bytes.
+    emit_attribute_node(builder, attr_raw);
 
     builder.finish_node();
 }
@@ -149,5 +152,36 @@ mod tests {
             key_values: vec![],
         };
         assert_eq!(is_raw_inline(&attrs), None);
+    }
+
+    /// The `{=format}` attribute is now structured over the raw source bytes
+    /// (an `ATTR_CLASS` token wrapping `=format`) rather than synthesized, so
+    /// the `RAW_INLINE` node round-trips byte-for-byte and exposes structure.
+    #[test]
+    fn raw_inline_attribute_is_structured_and_lossless() {
+        let input = "`<a>`{=html}\n";
+        let tree = crate::parse(input, None);
+        assert_eq!(tree.text().to_string(), input);
+
+        let attr = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::ATTRIBUTE)
+            .expect("ATTRIBUTE node under RAW_INLINE");
+        assert_eq!(attr.text().to_string(), "{=html}");
+        let class = attr
+            .children_with_tokens()
+            .find(|el| el.kind() == SyntaxKind::ATTR_CLASS)
+            .and_then(|el| el.into_token())
+            .expect("ATTR_CLASS token");
+        assert_eq!(class.text(), "=html");
+    }
+
+    /// Interior whitespace inside the braces is preserved verbatim — the old
+    /// synthesizing emitter collapsed `{ =html }` to `{=html}`.
+    #[test]
+    fn raw_inline_attribute_preserves_interior_whitespace() {
+        let input = "`<a>`{ =html }\n";
+        let tree = crate::parse(input, None);
+        assert_eq!(tree.text().to_string(), input);
     }
 }
