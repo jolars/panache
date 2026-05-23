@@ -19,6 +19,14 @@ linters on code blocks.
 
 ## Installation
 
+### Homebrew
+
+Panache is available from Homebrew on macOS and Linux:
+
+```bash
+brew install panache
+```
+
 ### From crates.io
 
 If you have Rust installed, the easiest way is likely to install from
