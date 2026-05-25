@@ -1,0 +1,7 @@
+# Regression for #314-322: simple-table detection inside a list item scans
+# the whole line buffer via `strip_all()`, advancing `list_content_col`
+# columns through every line — including the later code block whose content
+# starts with a multibyte char (`├`). `advance_columns` must not slice inside
+# a multibyte char. RMarkdown flavor enables `simple_tables`, which triggers
+# the scan.
+flavor = "rmarkdown"

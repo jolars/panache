@@ -767,26 +767,26 @@ pub(in crate::parser::blocks) fn advance_columns(line: &str, target: usize) -> &
     if target == 0 {
         return line;
     }
-    let bytes = line.as_bytes();
+    // Walk whole UTF-8 characters, not bytes: each char counts as one
+    // column, so the returned slice always starts on a char boundary.
+    // (A byte-indexed walk treated every continuation byte of a
+    // multibyte char as its own column and could slice mid-char — #314.)
     let mut col = 0usize;
-    let mut i = 0usize;
-    while i < bytes.len() {
+    for (i, ch) in line.char_indices() {
         if col >= target {
             return &line[i..];
         }
-        match bytes[i] {
-            b'\n' | b'\r' => return "",
-            b'\t' => {
+        match ch {
+            '\n' | '\r' => return "",
+            '\t' => {
                 let next = (col / 4 + 1) * 4;
                 if next > target {
                     return &line[i..];
                 }
                 col = next;
-                i += 1;
             }
             _ => {
                 col += 1;
-                i += 1;
             }
         }
     }
@@ -945,6 +945,24 @@ mod tests {
         let p = ContainerPrefix::from_ops(&[StripOp::ListAdvance(4)], false);
         assert_eq!(p.strip(""), "");
         assert_eq!(p.strip("\n"), "");
+    }
+
+    #[test]
+    fn advance_columns_lands_on_char_boundary_for_multibyte() {
+        // Regression for #314-322: `advance_columns` counted columns
+        // per-byte, so advancing past N columns could slice inside a
+        // multibyte char (e.g. box-drawing `├`, accented `é`, CJK,
+        // emoji) and panic. Each char must count as one column.
+        assert_eq!(advance_columns("├── x", 2), "─ x");
+        assert_eq!(advance_columns("éxy", 1), "xy");
+        assert_eq!(advance_columns("黑x", 1), "x");
+        assert_eq!(advance_columns("😄.", 1), ".");
+        // Advancing past the whole multibyte run yields empty.
+        assert_eq!(advance_columns("├──", 5), "");
+        // ASCII behaviour is unchanged (one column per char).
+        assert_eq!(advance_columns("  > hello", 2), "> hello");
+        // Tabs still round up to the next 4-column stop.
+        assert_eq!(advance_columns("\tfoo", 4), "foo");
     }
 
     #[test]
