@@ -1,0 +1,38 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..95
+  FENCED_DIV@0..95
+    DIV_FENCE_OPEN@0..17
+      TEXT@0..3 ":::"
+      WHITESPACE@3..4 " "
+      DIV_INFO@4..16
+        TEXT@4..5 "{"
+        ATTR_KEY_VALUE@5..15
+          ATTR_KEY@5..9 "lang"
+          TEXT@9..10 "="
+          ATTR_VALUE@10..15 "en-US"
+        TEXT@15..16 "}"
+      NEWLINE@16..17 "\n"
+    BLOCK_QUOTE@17..71
+      BLOCK_QUOTE_MARKER@17..18 ">"
+      WHITESPACE@18..19 " "
+      PARAGRAPH@19..71
+        TEXT@19..43 "first paragraph line one"
+        NEWLINE@43..44 "\n"
+        BLOCK_QUOTE_MARKER@44..45 ">"
+        WHITESPACE@45..46 " "
+        TEXT@46..70 "first paragraph line two"
+        NEWLINE@70..71 "\n"
+    BLANK_LINE@71..72
+      BLANK_LINE@71..72 "\n"
+    BLOCK_QUOTE@72..91
+      BLOCK_QUOTE_MARKER@72..73 ">"
+      WHITESPACE@73..74 " "
+      PARAGRAPH@74..91
+        TEXT@74..90 "second paragraph"
+        NEWLINE@90..91 "\n"
+    DIV_FENCE_CLOSE@91..95
+      TEXT@91..94 ":::"
+      NEWLINE@94..95 "\n"

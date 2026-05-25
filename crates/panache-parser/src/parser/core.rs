@@ -1825,7 +1825,11 @@ impl<'a> Parser<'a> {
             && is_blank_line(inner_content)
             && (current_bq_depth > 0
                 || !self.config.extensions.blank_before_blockquote
-                || blockquotes::can_start_blockquote(self.pos, &self.lines));
+                || blockquotes::can_start_blockquote(
+                    self.pos,
+                    &self.lines,
+                    self.config.extensions.fenced_divs,
+                ));
         let is_blank = is_blank_line(line) || inner_blank_in_blockquote;
 
         if is_blank {
@@ -1988,7 +1992,13 @@ impl<'a> Parser<'a> {
                 && !blockquote_payload
                     .as_ref()
                     .map(|payload| payload.can_start)
-                    .unwrap_or_else(|| blockquotes::can_start_blockquote(self.pos, &self.lines))
+                    .unwrap_or_else(|| {
+                        blockquotes::can_start_blockquote(
+                            self.pos,
+                            &self.lines,
+                            self.config.extensions.fenced_divs,
+                        )
+                    })
             {
                 // Can't start blockquote without blank line - treat as paragraph
                 // Flush any pending list-item inline buffer first so this line
@@ -2166,7 +2176,14 @@ impl<'a> Parser<'a> {
                 let interrupts_via_hr = is_commonmark && try_parse_horizontal_rule(line).is_some();
                 let interrupts_via_fence =
                     is_commonmark && code_blocks::try_parse_fence_open(line).is_some();
-                if !interrupts_via_hr && !interrupts_via_fence {
+                // A fenced-div closing fence terminates the blockquote rather
+                // than being swallowed as lazy paragraph text — but only while
+                // we're actually inside an open div. At the top level a lone
+                // `:::` is just text, which is what pandoc does (issue #310).
+                let interrupts_via_div_close = self.config.extensions.fenced_divs
+                    && self.in_fenced_div()
+                    && fenced_divs::is_div_closing_fence(line);
+                if !interrupts_via_hr && !interrupts_via_fence && !interrupts_via_div_close {
                     if bq_depth > 0 {
                         // Buffer the explicit `>` markers we have into the
                         // paragraph (it's at the deeper blockquote level, so
@@ -2867,7 +2884,11 @@ impl<'a> Parser<'a> {
                 if in_footnote_definition
                     && self.config.extensions.blank_before_blockquote
                     && current_bq_depth == 0
-                    && !blockquotes::can_start_blockquote(self.pos, &self.lines)
+                    && !blockquotes::can_start_blockquote(
+                        self.pos,
+                        &self.lines,
+                        self.config.extensions.fenced_divs,
+                    )
                 {
                     // Respect blank_before_blockquote even when `>` appears only
                     // after stripping content-container indentation (e.g. footnotes).

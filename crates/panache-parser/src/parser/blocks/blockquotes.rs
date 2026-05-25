@@ -13,13 +13,29 @@ pub(crate) use crate::parser::utils::marker_utils::{
 
 /// Check if we need a blank line before starting a new blockquote.
 /// Returns true if a blockquote can start here.
-pub(in crate::parser) fn can_start_blockquote(pos: usize, lines: &[&str]) -> bool {
+///
+/// `fenced_divs_enabled` lets the first child of a fenced div start a
+/// blockquote without a preceding blank line: Pandoc treats the line right
+/// after a `::: {...}` opener like the start of the document, so a flush
+/// blockquote there is still a blockquote (see issue #310).
+pub(in crate::parser) fn can_start_blockquote(
+    pos: usize,
+    lines: &[&str],
+    fenced_divs_enabled: bool,
+) -> bool {
     // At start of document, no blank line needed
     if pos == 0 {
         return true;
     }
     // After a blank line, can start blockquote
-    if pos > 0 && crate::parser::utils::helpers::is_blank_line(lines[pos - 1]) {
+    if crate::parser::utils::helpers::is_blank_line(lines[pos - 1]) {
+        return true;
+    }
+    // First child of a fenced div: the opener line is not blank, but Pandoc
+    // treats the start of a div like the start of the document.
+    if fenced_divs_enabled
+        && crate::parser::blocks::fenced_divs::try_parse_div_fence_open(lines[pos - 1]).is_some()
+    {
         return true;
     }
     // If we're already in a blockquote, nested blockquotes need blank line too

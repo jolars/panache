@@ -592,6 +592,7 @@ golden_test_cases!(
     issue_224_simple_table_short_header_losslessness,
     issue_235_gfm_bare_uri_in_link_text,
     issue_249_indented_paragraph_line_atx_shape,
+    issue_310_blockquote_flush_fenced_div_pandoc,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,
