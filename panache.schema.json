@@ -295,7 +295,8 @@
       "enum": [
         "preserve",
         "reflow",
-        "sentence"
+        "sentence",
+        "semantic"
       ],
       "type": "string"
     }

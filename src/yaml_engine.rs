@@ -26,7 +26,7 @@ pub(crate) fn format_yaml_with_config(input: &str, config: &Config) -> Result<St
 fn prose_wrap_for_config(config: &Config) -> pretty_yaml::config::ProseWrap {
     match config.wrap {
         Some(WrapMode::Preserve) => pretty_yaml::config::ProseWrap::Preserve,
-        Some(WrapMode::Reflow) | Some(WrapMode::Sentence) | None => {
+        Some(WrapMode::Reflow) | Some(WrapMode::Sentence) | Some(WrapMode::Semantic) | None => {
             pretty_yaml::config::ProseWrap::Always
         }
     }

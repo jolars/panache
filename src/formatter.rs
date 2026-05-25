@@ -33,6 +33,7 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
         crate::config::WrapMode::Preserve => panache_formatter::WrapMode::Preserve,
         crate::config::WrapMode::Reflow => panache_formatter::WrapMode::Reflow,
         crate::config::WrapMode::Sentence => panache_formatter::WrapMode::Sentence,
+        crate::config::WrapMode::Semantic => panache_formatter::WrapMode::Semantic,
     });
     let blank_lines = match config.blank_lines {
         crate::config::BlankLines::Preserve => panache_formatter::BlankLines::Preserve,

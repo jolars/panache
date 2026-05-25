@@ -248,8 +248,12 @@ impl Formatter {
                     self.output.push('\n');
                 }
             }
-            WrapMode::Sentence => {
-                let lines = self.sentence_lines_for_paragraph(node);
+            WrapMode::Sentence | WrapMode::Semantic => {
+                let lines = if matches!(wrap_mode, WrapMode::Semantic) {
+                    self.semantic_lines_for_paragraph(node)
+                } else {
+                    self.sentence_lines_for_paragraph(node)
+                };
                 for line in lines {
                     self.output.push_str(&" ".repeat(indent));
                     self.output.push_str(&line);
@@ -769,8 +773,7 @@ impl Formatter {
         let in_blockquote = BlockQuote::contains_node(node) && !content_starts_with_blockquote;
         let line_widths = [available_width];
         let lines = match wrap_mode {
-            WrapMode::Preserve => Vec::new(),
-            WrapMode::Sentence => Vec::new(),
+            WrapMode::Preserve | WrapMode::Sentence | WrapMode::Semantic => Vec::new(),
             WrapMode::Reflow => wrap_source
                 .map(|source| {
                     inline_layout::wrapped_lines_for_node(
@@ -817,19 +820,26 @@ impl Formatter {
             _ => None,
         };
         let sentence_lines: Option<Vec<String>> = match wrap_mode {
-            WrapMode::Sentence => Some(
-                wrap_source
-                    .map(|source| {
-                        inline_layout::wrapped_lines_for_node(
-                            &self.config,
-                            source,
-                            &[],
-                            &|n| self.format_inline_node(n),
-                            WrapStrategy::ListSentence { in_blockquote },
-                        )
-                    })
-                    .unwrap_or_default(),
-            ),
+            WrapMode::Sentence | WrapMode::Semantic => {
+                let strategy = if matches!(wrap_mode, WrapMode::Semantic) {
+                    WrapStrategy::ListSemantic { in_blockquote }
+                } else {
+                    WrapStrategy::ListSentence { in_blockquote }
+                };
+                Some(
+                    wrap_source
+                        .map(|source| {
+                            inline_layout::wrapped_lines_for_node(
+                                &self.config,
+                                source,
+                                &[],
+                                &|n| self.format_inline_node(n),
+                                strategy,
+                            )
+                        })
+                        .unwrap_or_default(),
+                )
+            }
             _ => None,
         };
 

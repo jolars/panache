@@ -277,7 +277,11 @@ wrap = "reflow"
 :   Reformat paragraphs to fit within line width (default)
 
 `sentence`
-:   Wrap after each sentence.
+:   Wrap after each sentence, reflowing away existing breaks.
+
+`semantic`
+:   Keep existing line breaks *and* add a break after each sentence ([semantic
+    line breaks](https://sembr.org/)). Ignores line width.
 
 `preserve`
 :   Keep existing line breaks
@@ -287,13 +291,13 @@ single invocation, e.g. `panache format -o wrap=sentence`.
 
 ### Sentence-Wrapping Abbreviations {#no-break-abbreviations}
 
-In `sentence` mode, Panache must decide whether a trailing period ends a
-sentence or merely an abbreviation (`etc.`, `e.g.`). It picks a built-in
-abbreviation list from the document's language, read from the YAML `lang:`
-metadata (the same field Quarto and Pandoc use). Built-in profiles ship for
-English (`en`), Czech (`cs`), German (`de`), Spanish (`es`), and French (`fr`);
-unknown languages fall back to English. Region subtags fold to their primary
-subtag, so `de-AT` uses the German profile.
+In `sentence` and `semantic` modes, Panache must decide whether a trailing
+period ends a sentence or merely an abbreviation (`etc.`, `e.g.`). It picks a
+built-in abbreviation list from the document's language, read from the YAML
+`lang:` metadata (the same field Quarto and Pandoc use). Built-in profiles ship
+for English (`en`), Czech (`cs`), German (`de`), Spanish (`es`), and French
+(`fr`); unknown languages fall back to English. Region subtags fold to their
+primary subtag, so `de-AT` uses the German profile.
 
 When the document has no `lang:`, set a fallback for the project:
 

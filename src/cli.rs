@@ -254,7 +254,7 @@ pub enum Commands {
             both panache.toml and the built-in defaults. \
             \n\nSupported keys: \
             `line-width` (positive integer) and \
-            `wrap` (one of: reflow, sentence, preserve). \
+            `wrap` (one of: reflow, sentence, semantic, preserve). \
             \n\nExample: --option line-width=100 -o wrap=sentence. \
             \n\nNote: this is an escape hatch for ad-hoc invocations. Prefer panache.toml so \
             that everyone formatting the repository gets the same result."

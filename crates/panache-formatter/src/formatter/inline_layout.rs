@@ -213,8 +213,10 @@ pub(super) enum NodeWrapMode {
 pub(super) enum WrapStrategy {
     ParagraphReflow,
     ParagraphSentence,
+    ParagraphSemantic,
     ListReflow { in_blockquote: bool },
     ListSentence { in_blockquote: bool },
+    ListSemantic { in_blockquote: bool },
 }
 
 #[derive(Clone, Copy)]
@@ -225,6 +227,10 @@ pub(super) struct NodeWrapOptions<'a> {
     pub strip_standalone_blockquote_markers: bool,
     pub avoid_unsafe_line_start: bool,
     pub avoid_blockquote_line_start: bool,
+    /// Force a line break at every existing soft break (`NEWLINE`) in addition
+    /// to the breaks `mode` produces. Set by the `Semantic` wrap mode, which
+    /// layers sembr break-preservation on top of the sentence-break path.
+    pub preserve_newlines: bool,
 }
 
 impl<'a> NodeWrapOptions<'a> {
@@ -236,6 +242,7 @@ impl<'a> NodeWrapOptions<'a> {
             strip_standalone_blockquote_markers: false,
             avoid_unsafe_line_start: false,
             avoid_blockquote_line_start: false,
+            preserve_newlines: false,
         }
     }
 
@@ -247,6 +254,15 @@ impl<'a> NodeWrapOptions<'a> {
             strip_standalone_blockquote_markers: false,
             avoid_unsafe_line_start: false,
             avoid_blockquote_line_start: false,
+            preserve_newlines: false,
+        }
+    }
+
+    /// Sentence-break path plus soft-break preservation (the `Semantic` mode).
+    pub(super) fn semantic() -> Self {
+        Self {
+            preserve_newlines: true,
+            ..Self::sentence()
         }
     }
 }
@@ -263,6 +279,7 @@ impl WrapStrategy {
                 ..NodeWrapOptions::reflow(widths)
             },
             Self::ParagraphSentence => NodeWrapOptions::sentence(),
+            Self::ParagraphSemantic => NodeWrapOptions::semantic(),
             Self::ListReflow { in_blockquote } => NodeWrapOptions {
                 strip_standalone_blockquote_markers: in_blockquote,
                 avoid_unsafe_line_start: true,
@@ -274,6 +291,12 @@ impl WrapStrategy {
                 avoid_unsafe_line_start: true,
                 avoid_blockquote_line_start: avoid_blockquote_start,
                 ..NodeWrapOptions::sentence()
+            },
+            Self::ListSemantic { in_blockquote } => NodeWrapOptions {
+                strip_standalone_blockquote_markers: in_blockquote,
+                avoid_unsafe_line_start: true,
+                avoid_blockquote_line_start: avoid_blockquote_start,
+                ..NodeWrapOptions::semantic()
             },
         }
     }
@@ -703,6 +726,7 @@ struct TraversalBuilder<'a> {
     current_piece_boundary_class: SentenceBoundaryClass,
     pending_space: bool,
     skip_next_leading_whitespace: bool,
+    preserve_newlines: bool,
 }
 
 impl<'a> TraversalBuilder<'a> {
@@ -713,6 +737,7 @@ impl<'a> TraversalBuilder<'a> {
         profile: ResolvedProfile<'a>,
         avoid_unsafe_line_start: bool,
         avoid_blockquote_line_start: bool,
+        preserve_newlines: bool,
     ) -> Self {
         Self {
             sink: StreamingCoreSink::new(
@@ -728,6 +753,7 @@ impl<'a> TraversalBuilder<'a> {
             current_piece_boundary_class: SentenceBoundaryClass::Normal,
             pending_space: false,
             skip_next_leading_whitespace: false,
+            preserve_newlines,
         }
     }
 
@@ -756,6 +782,22 @@ impl<'a> TraversalBuilder<'a> {
 
     fn set_pending_space(&mut self, value: bool) {
         self.pending_space = value;
+    }
+
+    fn preserve_newlines(&self) -> bool {
+        self.preserve_newlines
+    }
+
+    /// Force a line break at an existing soft break (`NEWLINE`). Used by
+    /// `Semantic` wrap mode so authored breaks survive alongside the
+    /// sentence-boundary breaks. A trailing soft break (no following content)
+    /// is a no-op, so it never emits a dangling empty line.
+    fn push_soft_break(&mut self) {
+        self.flush_current(false);
+        if self.sink.has_content_or_pending() {
+            self.sink.force_line_break();
+        }
+        self.pending_space = false;
     }
 
     fn skip_next_leading_whitespace(&self) -> bool {
@@ -855,7 +897,11 @@ fn process_node_recursive(
                     if in_inline_footnote && sink.is_at_inline_footnote_open() {
                         continue;
                     }
-                    sink.set_pending_space(true);
+                    if sink.preserve_newlines() && t.kind() == SyntaxKind::NEWLINE {
+                        sink.push_soft_break();
+                    } else {
+                        sink.set_pending_space(true);
+                    }
                 }
                 SyntaxKind::INLINE_FOOTNOTE_START | SyntaxKind::INLINE_FOOTNOTE_END => {
                     skip_marker_whitespace = false;
@@ -1263,6 +1309,21 @@ pub(super) fn sentence_lines_for_paragraph(
     )
 }
 
+pub(super) fn semantic_lines_for_paragraph(
+    _config: &Config,
+    node: &SyntaxNode,
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+) -> Vec<String> {
+    log::trace!("semantic_lines_for_paragraph called");
+    wrapped_lines_for_node(
+        _config,
+        node,
+        &[],
+        format_inline_fn,
+        WrapStrategy::ParagraphSemantic,
+    )
+}
+
 pub(super) fn wrapped_lines_for_node(
     config: &Config,
     node: &SyntaxNode,
@@ -1286,6 +1347,7 @@ pub(super) fn wrapped_lines_for_node(
         profile,
         options.avoid_unsafe_line_start,
         options.avoid_blockquote_line_start,
+        options.preserve_newlines,
     );
     process_node_recursive(
         config,

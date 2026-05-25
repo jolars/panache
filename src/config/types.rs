@@ -1113,6 +1113,7 @@ pub enum WrapMode {
     Preserve,
     Reflow,
     Sentence,
+    Semantic,
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema, PartialEq)]

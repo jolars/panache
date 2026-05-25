@@ -21,6 +21,7 @@ fn parse_wrap_mode(value: &str) -> Option<WrapMode> {
         "preserve" => Some(WrapMode::Preserve),
         "reflow" => Some(WrapMode::Reflow),
         "sentence" => Some(WrapMode::Sentence),
+        "semantic" => Some(WrapMode::Semantic),
         _ => None,
     }
 }

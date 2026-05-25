@@ -157,7 +157,9 @@ fn format_table_caption_with_language(
                 out
             }
         }
-        WrapMode::Sentence => {
+        // A caption is collapsed to a single logical line, so there are no soft
+        // breaks for `Semantic` to preserve — it degenerates to `Sentence`.
+        WrapMode::Sentence | WrapMode::Semantic => {
             let normalized = collapse_ascii_whitespace(body);
             let lines = split_sentences(&normalized, profile);
             if lines.is_empty() {

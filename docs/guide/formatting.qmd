@@ -26,12 +26,12 @@ runs^[This is precisely what Pandoc's writer also does.]
 
 ### Paragraphs
 
-Panache supports three modes of text wrapping for paragraphs, which are
+Panache supports four modes of text wrapping for paragraphs, which are
 controlled via the [configuration](configuration.qmd) file:
 
 ```toml
 [format]
-wrap = "reflow" # or "preserve" or "sentence"
+wrap = "reflow" # or "preserve", "sentence", or "semantic"
 ```
 
 If `wrap` is set to `reflow`, Panache will reformat paragraphs to fit within the
@@ -40,9 +40,19 @@ number of columns specified by the `line-width` configuration option (default
 not reflow paragraphs. If `wrap` is set to `sentence`, Panache will break lines
 at sentence boundaries, ensuring that each sentence starts on a new line.
 
-In sentence mode, Panache applies conservative no-break rules for common
-abbreviations (for example `i.e.` and `e.g.`), so these do not trigger sentence
-splits by themselves.
+If `wrap` is set to `semantic`, Panache enforces [semantic line
+breaks](https://sembr.org/): it keeps the line breaks you already placed (for
+example after a comma or clause) *and* adds a break at every sentence boundary
+you missed. Unlike `sentence`, it never reflows away an existing break, and like
+`sentence` it ignores `line-width` --- a long sentence with no internal break is
+left on a single line. This makes it the non-destructive companion to
+`sentence`: use `sentence` to normalize an arbitrarily-wrapped document into
+one-sentence-per-line, and `semantic` to augment a document you are already
+hand-breaking.
+
+In `sentence` and `semantic` modes, Panache applies conservative no-break rules
+for common abbreviations (for example `i.e.` and `e.g.`), so these do not
+trigger sentence splits by themselves.
 
 The abbreviation list follows the document language. When metadata provides
 `lang` (as in Quarto and Pandoc frontmatter), Panache selects a built-in profile
@@ -71,6 +81,27 @@ Output (`"sentence"`)
     First sentence with a [link text](https://example.com) and inline math $a + b = c$.
     Second sentence; third sentence!
     ```
+
+For `semantic`, consider input where the author has already broken a line after
+a clause:
+
+Input
+
+:   ```markdown
+    A longstanding problem asks: whether the bound is tight. It is,
+    as the appendix shows.
+    ```
+
+Output (`"semantic"`)
+
+:   ```markdown
+    A longstanding problem asks: whether the bound is tight.
+    It is,
+    as the appendix shows.
+    ```
+
+The break after `It is,` is preserved (the author put it there), while a new
+break is added after `tight.` (a sentence boundary).
 
 ### Hard Line Breaks
 

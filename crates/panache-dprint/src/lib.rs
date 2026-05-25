@@ -75,11 +75,12 @@ fn parse_wrap(value: &str, diagnostics: &mut Vec<ConfigurationDiagnostic>) -> Op
         "preserve" => Some(WrapMode::Preserve),
         "reflow" => Some(WrapMode::Reflow),
         "sentence" => Some(WrapMode::Sentence),
+        "semantic" => Some(WrapMode::Semantic),
         other => {
             diagnostics.push(ConfigurationDiagnostic {
                 property_name: "wrap".to_string(),
                 message: format!(
-                    "Unknown wrap mode '{other}'. Expected one of: preserve, reflow, sentence."
+                    "Unknown wrap mode '{other}'. Expected one of: preserve, reflow, sentence, semantic."
                 ),
             });
             Some(WrapMode::Reflow)

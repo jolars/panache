@@ -23,6 +23,7 @@ mod paragraphs;
 mod preserve_wrap;
 mod quotes;
 mod raw_inline;
+mod semantic_wrap;
 mod smart;
 mod spans;
 mod strikeout;

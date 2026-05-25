@@ -47,6 +47,9 @@ pub enum WrapMode {
     Preserve,
     Reflow,
     Sentence,
+    /// Preserve existing soft line breaks AND add breaks at sentence
+    /// boundaries (semantic line breaks; see <https://sembr.org/>).
+    Semantic,
 }
 
 #[derive(Debug, Clone, PartialEq)]

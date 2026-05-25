@@ -57,10 +57,11 @@ fn apply_format_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Re
                 let mode = match value {
                     "reflow" => WrapMode::Reflow,
                     "sentence" => WrapMode::Sentence,
+                    "semantic" => WrapMode::Semantic,
                     "preserve" => WrapMode::Preserve,
                     other => {
                         return Err(format!(
-                            "invalid value for `wrap`: `{other}` (expected one of: reflow, sentence, preserve)"
+                            "invalid value for `wrap`: `{other}` (expected one of: reflow, sentence, semantic, preserve)"
                         ));
                     }
                 };

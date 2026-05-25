@@ -136,6 +136,12 @@ impl Formatter {
         })
     }
 
+    pub(super) fn semantic_lines_for_paragraph(&self, node: &SyntaxNode) -> Vec<String> {
+        inline_layout::semantic_lines_for_paragraph(&self.config, node, &|n| {
+            self.format_inline_node(n)
+        })
+    }
+
     // Delegate to headings module
     pub(super) fn format_heading(&self, node: &SyntaxNode) -> String {
         headings::format_heading(node, &self.config)
@@ -252,7 +258,9 @@ impl Formatter {
         let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
         let width = self.config.line_width.saturating_sub(indent);
         match wrap_mode {
-            WrapMode::Preserve => vec![text.to_string()],
+            // `Semantic` joins `Preserve` here: this string-only fallback has no
+            // CST to find sentence boundaries, and `Semantic` ignores width.
+            WrapMode::Preserve | WrapMode::Semantic => vec![text.to_string()],
             WrapMode::Reflow | WrapMode::Sentence => {
                 inline_layout::wrap_text_first_fit(text, width)
             }
@@ -825,6 +833,7 @@ impl Formatter {
                                     self.wrapped_lines_for_paragraph_with_widths(child, &widths)
                                 }
                                 WrapMode::Sentence => self.sentence_lines_for_paragraph(child),
+                                WrapMode::Semantic => self.semantic_lines_for_paragraph(child),
                             };
 
                             if !lines.is_empty() {
@@ -884,8 +893,12 @@ impl Formatter {
                                         self.output.push('\n');
                                     }
                                 }
-                                WrapMode::Sentence => {
-                                    let lines = self.sentence_lines_for_paragraph(child);
+                                WrapMode::Sentence | WrapMode::Semantic => {
+                                    let lines = if matches!(wrap_mode, WrapMode::Semantic) {
+                                        self.semantic_lines_for_paragraph(child)
+                                    } else {
+                                        self.sentence_lines_for_paragraph(child)
+                                    };
                                     for line in lines {
                                         self.output.push_str(&" ".repeat(child_indent));
                                         self.output.push_str(line.trim_start_matches([' ', '\t']));
@@ -1150,8 +1163,12 @@ impl Formatter {
                                     self.output.push('\n');
                                 }
                             }
-                            WrapMode::Sentence => {
-                                let lines = self.sentence_lines_for_paragraph(child);
+                            WrapMode::Sentence | WrapMode::Semantic => {
+                                let lines = if matches!(wrap_mode, WrapMode::Semantic) {
+                                    self.semantic_lines_for_paragraph(child)
+                                } else {
+                                    self.sentence_lines_for_paragraph(child)
+                                };
                                 for line in lines {
                                     self.output.push_str(&content_prefix);
                                     self.output.push_str(&line);
@@ -1195,10 +1212,13 @@ impl Formatter {
                                                 self.output.push('\n');
                                             }
                                         }
-                                        WrapMode::Sentence => {
-                                            for line in
+                                        WrapMode::Sentence | WrapMode::Semantic => {
+                                            let lines = if matches!(wrap_mode, WrapMode::Semantic) {
+                                                self.semantic_lines_for_paragraph(&alert_child)
+                                            } else {
                                                 self.sentence_lines_for_paragraph(&alert_child)
-                                            {
+                                            };
+                                            for line in lines {
                                                 self.output.push_str(&content_prefix);
                                                 self.output.push_str(&line);
                                                 self.output.push('\n');
@@ -1520,9 +1540,14 @@ impl Formatter {
                             self.output.push_str(line);
                         }
                     }
-                    WrapMode::Sentence => {
-                        log::trace!("Wrapping paragraph by sentence");
-                        let lines = self.sentence_lines_for_paragraph(node);
+                    WrapMode::Sentence | WrapMode::Semantic => {
+                        let lines = if matches!(wrap_mode, WrapMode::Semantic) {
+                            log::trace!("Wrapping paragraph by semantic line breaks");
+                            self.semantic_lines_for_paragraph(node)
+                        } else {
+                            log::trace!("Wrapping paragraph by sentence");
+                            self.sentence_lines_for_paragraph(node)
+                        };
 
                         for (i, line) in lines.iter().enumerate() {
                             if i > 0 {
@@ -1635,14 +1660,17 @@ impl Formatter {
                             self.output.push('\n');
                         }
                     }
-                    WrapMode::Sentence => {
-                        log::trace!("Wrapping Plain block by sentence");
+                    WrapMode::Sentence | WrapMode::Semantic => {
                         let in_definition = self.output.ends_with(":   ");
                         let preserve_ambiguous_definition_emphasis =
                             in_definition && text.contains(r"\|*") && text.contains(".*");
                         let lines = if preserve_ambiguous_definition_emphasis {
                             text.lines().map(ToString::to_string).collect()
+                        } else if matches!(wrap_mode, WrapMode::Semantic) {
+                            log::trace!("Wrapping Plain block by semantic line breaks");
+                            self.semantic_lines_for_paragraph(node)
                         } else {
+                            log::trace!("Wrapping Plain block by sentence");
                             self.sentence_lines_for_paragraph(node)
                         };
 
@@ -1984,6 +2012,9 @@ impl Formatter {
                                                 ),
                                             WrapMode::Sentence => {
                                                 self.sentence_lines_for_paragraph(n)
+                                            }
+                                            WrapMode::Semantic => {
+                                                self.semantic_lines_for_paragraph(n)
                                             }
                                         };
 
