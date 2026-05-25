@@ -8,6 +8,14 @@ description: >
 
 ## Installation
 
+### Homebrew
+
+Install `panache` from Homebrew on macOS or Linux:
+
+```bash
+brew install panache
+```
+
 ### From crates.io
 
 Install `panache` with Cargo:

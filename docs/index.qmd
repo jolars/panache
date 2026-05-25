@@ -54,7 +54,13 @@ and in CI, with consistent behavior across all environments.
 
 ## Quick Start
 
-Install with Cargo:
+Install with Homebrew on macOS or Linux:
+
+```bash
+brew install panache
+```
+
+Or install with Cargo:
 
 ```bash
 cargo install panache
