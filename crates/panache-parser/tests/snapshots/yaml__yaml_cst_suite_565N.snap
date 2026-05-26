@@ -1,0 +1,40 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 283
+expression: snapshot
+---
+case_id: 565N
+input: "canonical: !!binary \"\\\n R0lGODlhDAAMAIQAAP//9/X17unp5WZmZgAAAOfn515eXvPz7Y6OjuDg4J+fn5\\\n OTk6enp56enmlpaWNjY6Ojo4SEhP/++f/++f/++f/++f/++f/++f/++f/++f/+\\\n +f/++f/++f/++f/++f/++SH+Dk1hZGUgd2l0aCBHSU1QACwAAAAADAAMAAAFLC\\\n AgjoEwnuNAFOhpEMTRiggcz4BNJHrv/zCFcLiwMWYNG84BwwEeECcgggoBADs=\"\ngeneric: !!binary |\n R0lGODlhDAAMAIQAAP//9/X17unp5WZmZgAAAOfn515eXvPz7Y6OjuDg4J+fn5\n OTk6enp56enmlpaWNjY6Ojo4SEhP/++f/++f/++f/++f/++f/++f/++f/++f/+\n +f/++f/++f/++f/++f/++SH+Dk1hZGUgd2l0aCBHSU1QACwAAAAADAAMAAAFLC\n AgjoEwnuNAFOhpEMTRiggcz4BNJHrv/zCFcLiwMWYNG84BwwEeECcgggoBADs=\ndescription:\n The binary value above is a tiny arrow encoded as a gif image.\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..636
+  YAML_METADATA_CONTENT@0..636
+    YAML_STREAM@0..636
+      YAML_DOCUMENT@0..636
+        YAML_BLOCK_MAP@0..636
+          YAML_BLOCK_MAP_ENTRY@0..283
+            YAML_BLOCK_MAP_KEY@0..10
+              YAML_SCALAR@0..9 "canonical"
+              YAML_COLON@9..10 ":"
+            YAML_BLOCK_MAP_VALUE@10..283
+              WHITESPACE@10..11 " "
+              YAML_SCALAR@11..282 "!!binary \"\\\n R0lGODlh ..."
+              NEWLINE@282..283 "\n"
+          YAML_BLOCK_MAP_ENTRY@283..559
+            YAML_BLOCK_MAP_KEY@283..291
+              YAML_SCALAR@283..290 "generic"
+              YAML_COLON@290..291 ":"
+            YAML_BLOCK_MAP_VALUE@291..559
+              WHITESPACE@291..292 " "
+              YAML_SCALAR@292..558 "!!binary |\n R0lGODlhD ..."
+              NEWLINE@558..559 "\n"
+          YAML_BLOCK_MAP_ENTRY@559..636
+            YAML_BLOCK_MAP_KEY@559..571
+              YAML_SCALAR@559..570 "description"
+              YAML_COLON@570..571 ":"
+            YAML_BLOCK_MAP_VALUE@571..636
+              NEWLINE@571..572 "\n"
+              WHITESPACE@572..573 " "
+              YAML_SCALAR@573..635 "The binary value abov ..."
+              NEWLINE@635..636 "\n"

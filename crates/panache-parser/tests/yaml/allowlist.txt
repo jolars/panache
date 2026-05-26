@@ -500,3 +500,8 @@ XW4D
 # map keyed by the collection (4FJ6: nested `[[b,c]]: d` and `[ a, [...]]: 23`).
 SBG9
 4FJ6
+# Tagged multi-line double-quoted scalar with §7.5 escaped line breaks
+# (`!!binary "\<NL> base64\<NL> …"`): a line ending in an unescaped backslash
+# escapes the break, so it joins with no folded space. fold_quoted_inner is now
+# escaped-break-aware and the tag-decompose value path enables it for `"` bodies.
+565N

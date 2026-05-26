@@ -540,12 +540,6 @@
       "tree": true
     },
     {
-      "case_id": "565N",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "57H4",
       "diagnostic_codes": [
         "YAML_PARSE_UNEXPECTED_DEDENT"
@@ -747,6 +741,7 @@
     "4ZYM",
     "52DL",
     "54T7",
+    "565N",
     "58MP",
     "5BVJ",
     "5C5M",
@@ -952,8 +947,8 @@
   "summary": {
     "error_contract_ok_count": 53,
     "fails_needs_error_path_count": 25,
-    "fails_needs_feature_count": 26,
-    "passes_now_count": 229,
+    "fails_needs_feature_count": 25,
+    "passes_now_count": 230,
     "total_cases": 352
   }
 }

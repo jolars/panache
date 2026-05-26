@@ -636,12 +636,12 @@ fn quoted_val_event_multi_line(raw: &str) -> String {
     let trimmed = raw.trim_start_matches([' ', '\t', '\n']);
     if trimmed.starts_with('\'') {
         let inner_with_breaks = strip_quoted_wrapper(trimmed, '\'');
-        let folded = fold_quoted_inner(&inner_with_breaks);
+        let folded = fold_quoted_inner(&inner_with_breaks, false);
         let decoded = folded.replace("''", "'");
         format!("=VAL '{}", escape_for_event(&decoded))
     } else {
         let inner_with_breaks = strip_quoted_wrapper(trimmed, '"');
-        let folded = fold_quoted_inner(&inner_with_breaks);
+        let folded = fold_quoted_inner(&inner_with_breaks, true);
         let decoded = decode_double_quoted_inner(&folded);
         format!("=VAL \"{}", escape_for_event(&decoded))
     }
@@ -688,7 +688,13 @@ fn strip_quoted_wrapper(text: &str, quote: char) -> String {
 /// - A single line break (no blank between) folds to a single space.
 /// - Trailing whitespace of the final line is stripped (matching
 ///   yaml-test-suite event expectations for multi-line quoted scalars).
-fn fold_quoted_inner(inner: &str) -> String {
+///
+/// `escaped_breaks` enables YAML §7.5 double-quoted escaped line breaks: a
+/// continuation line whose predecessor ends in an unescaped (odd-count)
+/// backslash joins directly with no folded space, and the escaping backslash
+/// is dropped. Pass `false` for single-quoted and plain scalars, where a
+/// trailing backslash is literal content.
+fn fold_quoted_inner(inner: &str, escaped_breaks: bool) -> String {
     let mut out = String::new();
     let mut blanks = 0usize;
     let mut have_first = false;
@@ -705,6 +711,15 @@ fn fold_quoted_inner(inner: &str) -> String {
         }
         let trimmed_end = out.trim_end_matches([' ', '\t']);
         out.truncate(trimmed_end.len());
+        if escaped_breaks && blanks == 0 && have_first && ends_with_odd_backslashes(&out) {
+            // The preceding line ends in an unescaped backslash: the line
+            // break is escaped, so the continuation joins with no folded
+            // space and the escaping backslash is consumed.
+            out.pop();
+            out.push_str(stripped);
+            blanks = 0;
+            continue;
+        }
         if !have_first {
             // No content yet, so prepend nothing — first-line leading
             // whitespace is preserved later by the `idx == 0` branch only.
@@ -739,6 +754,12 @@ fn fold_quoted_inner(inner: &str) -> String {
     // No trailing blank run: the final line's trailing whitespace before the
     // closing quote is content (yaml-test-suite 7A4E) and is preserved as-is.
     out
+}
+
+/// Whether `s` ends with an odd-length run of `\` characters, i.e. the final
+/// backslash is unescaped. Used to detect double-quoted escaped line breaks.
+fn ends_with_odd_backslashes(s: &str) -> bool {
+    s.chars().rev().take_while(|&c| c == '\\').count() % 2 == 1
 }
 
 /// Inner-only variant of [`decode_double_quoted`]: the input has no
@@ -2666,7 +2687,7 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
         let long_tag = key_long_tag.or(body_tag);
         let folded;
         let body_for_event: &str = if body.contains('\n') {
-            folded = fold_quoted_inner(body);
+            folded = fold_quoted_inner(body, false);
             &folded
         } else {
             body
@@ -2924,7 +2945,13 @@ fn project_block_map_entry_value(
             let long_tag = value_long_tag.or(body_tag);
             let folded;
             let body_for_event: &str = if body.contains('\n') {
-                folded = fold_quoted_inner(body);
+                // A tag/anchor can precede a multi-line double-quoted value
+                // (`!!binary "\\\n …"`, 565N), so the quoted branch above is
+                // skipped. Enable §7.5 escaped line breaks when the decomposed
+                // body is itself double-quoted; the later `decode_double_quoted`
+                // in `scalar_event` strips the quotes and remaining escapes.
+                let escaped_breaks = body.trim_start().starts_with('"');
+                folded = fold_quoted_inner(body, escaped_breaks);
                 &folded
             } else {
                 body
