@@ -260,6 +260,13 @@
       "event_parity": false
     },
     {
+      "case_id": "H7TQ",
+      "diagnostic_codes": [
+        "YAML_PARSE_MALFORMED_YAML_DIRECTIVE"
+      ],
+      "event_parity": false
+    },
+    {
       "case_id": "HRE5",
       "diagnostic_codes": [
         "YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE"
@@ -333,6 +340,13 @@
       "case_id": "S4GJ",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "SF5V",
+      "diagnostic_codes": [
+        "YAML_PARSE_DUPLICATE_YAML_DIRECTIVE"
       ],
       "event_parity": false
     },
@@ -422,12 +436,6 @@
       "tree": true
     },
     {
-      "case_id": "H7TQ",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "JKF3",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -453,12 +461,6 @@
     },
     {
       "case_id": "S98Z",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "SF5V",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -935,8 +937,8 @@
     "ZWK4"
   ],
   "summary": {
-    "error_contract_ok_count": 53,
-    "fails_needs_error_path_count": 25,
+    "error_contract_ok_count": 55,
+    "fails_needs_error_path_count": 23,
     "fails_needs_feature_count": 23,
     "passes_now_count": 232,
     "total_cases": 352

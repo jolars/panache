@@ -146,7 +146,7 @@ use super::scanner::{Scanner, Token, TokenKind};
 /// shape.
 pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
     let tokens = collect_tokens(input);
-    if let Some(diag) = check_directives(&tokens) {
+    if let Some(diag) = check_directives(input, &tokens) {
         return Some(diag);
     }
     let tree = parse_v2(input);
@@ -194,7 +194,7 @@ fn collect_tokens(input: &str) -> Vec<Token> {
 
 /// Cluster F — directive ordering and lone-directive checks.
 ///
-/// Surfaces two failures, both driven off scanner-emitted `Directive`
+/// Surfaces four failures, all driven off scanner-emitted `Directive`
 /// tokens:
 /// - `PARSE_DIRECTIVE_AFTER_CONTENT` when a directive appears after
 ///   non-trivia, non-`...` content. YAML 1.2 requires a `...`
@@ -202,6 +202,11 @@ fn collect_tokens(input: &str) -> Vec<Token> {
 /// - `PARSE_DIRECTIVE_WITHOUT_DOCUMENT_START` when any directive is
 ///   present but no `---` marker exists in the stream. A directive
 ///   without `---` has no document to attach to.
+/// - `PARSE_DUPLICATE_YAML_DIRECTIVE` when two `%YAML` directives
+///   precede the same document (§6.8.1 — at most one per document).
+/// - `PARSE_MALFORMED_YAML_DIRECTIVE` when a `%YAML` directive carries
+///   anything beyond its single version argument (a trailing comment
+///   is still allowed), e.g. `%YAML 1.2 foo`.
 ///
 /// The streaming scanner emits `Directive` only when a `%`-prefixed
 /// line is in a directive position (stream start, or after `...`).
@@ -210,9 +215,10 @@ fn collect_tokens(input: &str) -> Vec<Token> {
 /// emitted as directives — so this check inherits the scanner's
 /// spec-correct view.
 ///
-/// Covers fixtures EB22, RHX7, 9MMA, B63P.
-fn check_directives(tokens: &[Token]) -> Option<YamlDiagnostic> {
+/// Covers fixtures EB22, RHX7, 9MMA, B63P, SF5V, H7TQ.
+fn check_directives(input: &str, tokens: &[Token]) -> Option<YamlDiagnostic> {
     let mut seen_content = false;
+    let mut yaml_directive_in_scope = false;
     for tok in tokens {
         match tok.kind {
             TokenKind::Directive if seen_content => {
@@ -222,11 +228,35 @@ fn check_directives(tokens: &[Token]) -> Option<YamlDiagnostic> {
                     "directive requires document end before subsequent directives",
                 ));
             }
-            TokenKind::Directive
-            | TokenKind::Trivia(_)
-            | TokenKind::StreamStart
-            | TokenKind::StreamEnd => {}
-            TokenKind::DocumentEnd => seen_content = false,
+            TokenKind::Directive => {
+                let text = &input[tok.start.index..tok.end.index];
+                if directive_name(text) == "YAML" {
+                    if yaml_directive_in_scope {
+                        return Some(diag_at_token(
+                            tok,
+                            diagnostic_codes::PARSE_DUPLICATE_YAML_DIRECTIVE,
+                            "a document may carry at most one %YAML directive",
+                        ));
+                    }
+                    yaml_directive_in_scope = true;
+                    if yaml_directive_has_trailing_content(text) {
+                        return Some(diag_at_token(
+                            tok,
+                            diagnostic_codes::PARSE_MALFORMED_YAML_DIRECTIVE,
+                            "%YAML directive takes a single version argument",
+                        ));
+                    }
+                }
+            }
+            TokenKind::Trivia(_) | TokenKind::StreamStart | TokenKind::StreamEnd => {}
+            TokenKind::DocumentStart => {
+                seen_content = true;
+                yaml_directive_in_scope = false;
+            }
+            TokenKind::DocumentEnd => {
+                seen_content = false;
+                yaml_directive_in_scope = false;
+            }
             _ => seen_content = true,
         }
     }
@@ -242,6 +272,26 @@ fn check_directives(tokens: &[Token]) -> Option<YamlDiagnostic> {
     }
 
     None
+}
+
+/// The directive name — the run of non-whitespace characters following
+/// the leading `%`. `%YAML 1.2` → `"YAML"`, `%TAG ! …` → `"TAG"`.
+fn directive_name(text: &str) -> &str {
+    text.strip_prefix('%')
+        .unwrap_or(text)
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+}
+
+/// True when a `%YAML` directive carries content beyond its single
+/// version argument. A trailing comment (`# …`) is permitted; any other
+/// token is invalid (spec §6.8.1), e.g. the `foo` in `%YAML 1.2 foo`.
+fn yaml_directive_has_trailing_content(text: &str) -> bool {
+    let mut fields = text.strip_prefix('%').unwrap_or(text).split_whitespace();
+    let _name = fields.next();
+    let _version = fields.next();
+    matches!(fields.next(), Some(field) if !field.starts_with('#'))
 }
 
 fn diag_at_token(tok: &Token, code: &'static str, message: &'static str) -> YamlDiagnostic {
@@ -1567,6 +1617,47 @@ mod tests {
     fn directive_then_doc_then_directive_with_separator_passes() {
         // Two-document stream with proper `...` separator between
         // them must NOT trigger PARSE_DIRECTIVE_AFTER_CONTENT.
+        let input = "%YAML 1.2\n---\nfoo: 1\n...\n%YAML 1.2\n---\nbar: 2\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn duplicate_yaml_directive_sf5v() {
+        // SF5V: two `%YAML` directives precede the same `---` — a document
+        // may carry at most one YAML directive (spec §6.8.1).
+        let input = "%YAML 1.2\n%YAML 1.2\n---\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_DUPLICATE_YAML_DIRECTIVE);
+    }
+
+    #[test]
+    fn malformed_yaml_directive_trailing_content_h7tq() {
+        // H7TQ: `%YAML 1.2 foo` — the YAML directive takes a single version
+        // argument; `foo` is invalid trailing content.
+        let input = "%YAML 1.2 foo\n---\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_MALFORMED_YAML_DIRECTIVE);
+    }
+
+    #[test]
+    fn yaml_directive_with_trailing_comment_passes() {
+        // A trailing comment after the version is allowed.
+        let input = "%YAML 1.2 # comment\n---\nfoo: bar\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn yaml_then_tag_directive_passes() {
+        // One `%YAML` plus one `%TAG` is well-formed; the duplicate check is
+        // scoped to `%YAML` only.
+        let input = "%YAML 1.2\n%TAG ! tag:example.com,2000:app/\n---\nfoo: bar\n";
+        assert!(run(input).is_none());
+    }
+
+    #[test]
+    fn yaml_directives_across_documents_pass() {
+        // A second `%YAML` after a `...` belongs to a new document — not a
+        // duplicate.
         let input = "%YAML 1.2\n---\nfoo: 1\n...\n%YAML 1.2\n---\nbar: 2\n";
         assert!(run(input).is_none());
     }

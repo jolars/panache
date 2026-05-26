@@ -516,3 +516,12 @@ SBG9
 # emits no BlockSequenceStart, so parser_v2 now synthesizes the
 # YAML_BLOCK_SEQUENCE inside the open KEY (mirroring the VALUE side).
 6PBE
+# Error-contract: two `%YAML` directives precede the same document
+# (`%YAML 1.2\n%YAML 1.2\n---`) — at most one is allowed (§6.8.1).
+# check_directives now tracks a per-document `%YAML` scope and rejects with
+# YAML_PARSE_DUPLICATE_YAML_DIRECTIVE.
+SF5V
+# Error-contract: a `%YAML` directive with content beyond its single version
+# argument (`%YAML 1.2 foo`) — rejected with YAML_PARSE_MALFORMED_YAML_DIRECTIVE.
+# A trailing comment after the version stays valid.
+H7TQ

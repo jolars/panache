@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 250
+expression: snapshot
+---
+case_id: SF5V
+input: "%YAML 1.2\n%YAML 1.2\n---\n"
+has_error_contract: true
+parsed_mapping_tree: false
+diagnostics: [YAML_PARSE_DUPLICATE_YAML_DIRECTIVE:a document may carry at most one %YAML directive@10..19]
