@@ -1,5 +1,53 @@
 # Changelog
 
+## [2.49.0](https://github.com/jolars/panache/compare/v2.48.0...v2.49.0) (2026-05-26)
+
+The largest change in this release is likely a new wrap mode, `semantic`, which
+is a hybrid between `sentence` and `preserve` modes based on [Semantic Line
+Breaks](https://sembr.org/). You configure it by setting
+
+```toml
+[format]
+wrap = "semantic"
+```
+
+in the config. It will break lines at sentence boundaries, like the `sentence`
+mode, but also preserve existing break points. In the future, I expect to tailor
+some lint rules to the mode according to the sembr spec, but for now it is just
+a new wrap mode. Thanks to @BoltonBailey for the suggestion
+([#313](https://github.com/jolars/panache/issues/313)).
+
+This release also comes with support for a new extension, `four-space-rule`,
+which is a standard Pandoc extension (off by default) that enforces a four-space
+indent for continuation lines. This helps Panache play nicely with systems based
+on [Python-Markdown](https://python-markdown.github.io/), where this rule is
+enforced. Thanks to @DamonBayer for the suggestion in
+[#308](https://github.com/jolars/panache/issues/308).
+
+Finally, there are a number of smaller bug fixes and improvements to the parser
+and formatter, as well as new presets for external formatters (`ormolu`,
+`biome`, `csharpier`, `mix`, `rustfmt`, `isort`, `runic`, and `stylua`).
+
+### Features
+- **formatter:** add `semantic` wrap mode ([`41f7025`](https://github.com/jolars/panache/commit/41f70254abd7ccbbcfb36cff833c14ed7b81e6f8)), closes [#313](https://github.com/jolars/panache/issues/313)
+- **extensions:** support `four-space-rule` extension ([`77768ba`](https://github.com/jolars/panache/commit/77768bab3daec6dbae3a8d1d629add0d4b0700c8)), closes [#308](https://github.com/jolars/panache/issues/308)
+- **formatter:** add presets for csharpier, mix, ormulu, runic ([`d6da0e0`](https://github.com/jolars/panache/commit/d6da0e03ecc9bed396f463148a08db34608dc0dd))
+- **formatter:** add presets for biome, isort, rustfmt, stylua ([`f477d46`](https://github.com/jolars/panache/commit/f477d466193803dbd424e527996eca88dcba560a))
+- **formatter:** add language-aware and configurable abbrevations ([`ca9b514`](https://github.com/jolars/panache/commit/ca9b5146914cd21141bc6036d48f3e1732085154)), closes [#307](https://github.com/jolars/panache/issues/307)
+
+### Bug Fixes
+- **parser:** parse blockquotes flush against div fences ([`faf7ad1`](https://github.com/jolars/panache/commit/faf7ad12544f1d3e175edbd73d1fae1d017a0395)), closes [#310](https://github.com/jolars/panache/issues/310) and [#309](https://github.com/jolars/panache/issues/309)
+- **formatter:** normalize smart dashes in headings, guard rule ([`82c9a31`](https://github.com/jolars/panache/commit/82c9a310fc3f88be88b68101e45bcbaa2f7b425c))
+- **parser:** parse multiline tables in list+blockquote ([`74896c6`](https://github.com/jolars/panache/commit/74896c623cb23edfb5ce5b5d5b5170665141d922))
+- **parser:** recognize nested grid/simple tables ([`feb5693`](https://github.com/jolars/panache/commit/feb5693501dde57596663dd90da28bc872cac1be))
+- **parser:** detect pipe tables in list+blockquote ([`75a3157`](https://github.com/jolars/panache/commit/75a3157cda831b70a99c74588455abc0d902d3fa))
+- **formatter:** keep code spans and autolinks literal under smart ([`7114c5d`](https://github.com/jolars/panache/commit/7114c5d69b600fc39b746b27b606ed838f5110dd))
+- **parser:** walk chars in `advance_columns` ([`c0f983b`](https://github.com/jolars/panache/commit/c0f983ba30bfb899605b5b0ca1b2acff9d2df915)), closes [#314](https://github.com/jolars/panache/issues/314), [#315](https://github.com/jolars/panache/issues/315), [#316](https://github.com/jolars/panache/issues/316), [#317](https://github.com/jolars/panache/issues/317), [#318](https://github.com/jolars/panache/issues/318), [#319](https://github.com/jolars/panache/issues/319), [#320](https://github.com/jolars/panache/issues/320), [#321](https://github.com/jolars/panache/issues/321), and [#322](https://github.com/jolars/panache/issues/322)
+- **parser:** enable reference links in GFM defaults ([`581ebfb`](https://github.com/jolars/panache/commit/581ebfb5c493ec62db00d61a8661f602c9d3b300))
+
+### Dependencies
+- updated crates/panache-formatter to v0.7.0
+- updated crates/panache-parser to v0.12.0
 ## [2.48.0](https://github.com/jolars/panache/compare/v2.47.0...v2.48.0) (2026-05-20)
 
 ### Features

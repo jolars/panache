@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/jolars/panache/compare/panache-formatter-v0.6.1...panache-formatter-v0.7.0) (2026-05-26)
+
+### Features
+- **formatter:** add `semantic` wrap mode ([`41f7025`](https://github.com/jolars/panache/commit/41f70254abd7ccbbcfb36cff833c14ed7b81e6f8)), closes [#313](https://github.com/jolars/panache/issues/313)
+- **extensions:** support `four-space-rule` extension ([`77768ba`](https://github.com/jolars/panache/commit/77768bab3daec6dbae3a8d1d629add0d4b0700c8)), closes [#308](https://github.com/jolars/panache/issues/308)
+- **formatter:** add language-aware and configurable abbrevations ([`ca9b514`](https://github.com/jolars/panache/commit/ca9b5146914cd21141bc6036d48f3e1732085154)), closes [#307](https://github.com/jolars/panache/issues/307)
+
+### Bug Fixes
+- **formatter:** keep code spans and autolinks literal under smart ([`7114c5d`](https://github.com/jolars/panache/commit/7114c5d69b600fc39b746b27b606ed838f5110dd))
+- **formatter:** normalize smart dashes in headings, guard rule ([`82c9a31`](https://github.com/jolars/panache/commit/82c9a310fc3f88be88b68101e45bcbaa2f7b425c))
+
+### Dependencies
+- updated crates/panache-parser to v0.12.0
 ## [0.6.1](https://github.com/jolars/panache/compare/panache-formatter-v0.6.0...panache-formatter-v0.6.1) (2026-05-20)
 
 ### Bug Fixes

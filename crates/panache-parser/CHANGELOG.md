@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.0](https://github.com/jolars/panache/compare/panache-parser-v0.11.0...panache-parser-v0.12.0) (2026-05-26)
+
+### Features
+- **extensions:** support `four-space-rule` extension ([`77768ba`](https://github.com/jolars/panache/commit/77768bab3daec6dbae3a8d1d629add0d4b0700c8)), closes [#308](https://github.com/jolars/panache/issues/308)
+
+### Bug Fixes
+- **parser:** walk chars in `advance_columns` ([`c0f983b`](https://github.com/jolars/panache/commit/c0f983ba30bfb899605b5b0ca1b2acff9d2df915)), closes [#314](https://github.com/jolars/panache/issues/314), [#315](https://github.com/jolars/panache/issues/315), [#316](https://github.com/jolars/panache/issues/316), [#317](https://github.com/jolars/panache/issues/317), [#318](https://github.com/jolars/panache/issues/318), [#319](https://github.com/jolars/panache/issues/319), [#320](https://github.com/jolars/panache/issues/320), [#321](https://github.com/jolars/panache/issues/321), and [#322](https://github.com/jolars/panache/issues/322)
+- **parser:** parse blockquotes flush against div fences ([`faf7ad1`](https://github.com/jolars/panache/commit/faf7ad12544f1d3e175edbd73d1fae1d017a0395)), closes [#310](https://github.com/jolars/panache/issues/310) and [#309](https://github.com/jolars/panache/issues/309)
+- **formatter:** normalize smart dashes in headings, guard rule ([`82c9a31`](https://github.com/jolars/panache/commit/82c9a310fc3f88be88b68101e45bcbaa2f7b425c))
+- **parser:** enable reference links in GFM defaults ([`581ebfb`](https://github.com/jolars/panache/commit/581ebfb5c493ec62db00d61a8661f602c9d3b300))
+- **parser:** parse multiline tables in list+blockquote ([`74896c6`](https://github.com/jolars/panache/commit/74896c623cb23edfb5ce5b5d5b5170665141d922))
+- **parser:** recognize nested grid/simple tables ([`feb5693`](https://github.com/jolars/panache/commit/feb5693501dde57596663dd90da28bc872cac1be))
+- **parser:** detect pipe tables in list+blockquote ([`75a3157`](https://github.com/jolars/panache/commit/75a3157cda831b70a99c74588455abc0d902d3fa))
 ## [0.11.0](https://github.com/jolars/panache/compare/panache-parser-v0.10.0...panache-parser-v0.11.0) (2026-05-20)
 
 ### Features
