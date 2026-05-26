@@ -475,3 +475,8 @@ BU8L
 # where the fused `!!map\n  key` scalar precedes a nested map with an empty
 # first key; the sequence-item path now reuses the shared splice helper.
 6JWB
+# Verbatim tags `!<URI>` on a block-map key and value (`!<tag:yaml.org,2002:str>
+# foo :` / `!<!bar> baz`): split_leading_tag now spans `!<…>` to its closing `>`
+# (the URI carries commas/colons) and resolve_long_tag passes the inner URI
+# through verbatim, bypassing handle resolution per YAML 1.2 §6.8.1.
+7FWL

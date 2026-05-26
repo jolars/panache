@@ -54,6 +54,13 @@ fn collect_tag_handles(doc: &SyntaxNode) -> TagHandles {
 /// map. Handles are checked first (so a `%TAG !` directive can override the
 /// primary handle); we fall back to the built-in handling for unknown handles.
 fn resolve_long_tag(tag: &str, handles: &TagHandles) -> Option<String> {
+    // Verbatim tag `!<URI>` (YAML 1.2 §6.8.1): the URI between the angle
+    // brackets is used as-is, bypassing handle resolution. Local verbatim
+    // tags keep their leading `!` (`!<!bar>` → `<!bar>`). Checked before the
+    // handle loop so a registered `!` primary handle can't claim it.
+    if let Some(inner) = tag.strip_prefix("!<").and_then(|t| t.strip_suffix('>')) {
+        return Some(format!("<{}>", percent_decode_tag(inner)));
+    }
     let mut best: Option<(&str, &String)> = None;
     for (h, p) in handles {
         if tag.starts_with(h)
@@ -485,6 +492,14 @@ fn flow_scalar_event(text: &str, handles: &TagHandles) -> String {
 /// end of input; otherwise `text` is returned as-is.
 fn split_leading_tag(text: &str) -> Option<(&str, &str)> {
     let rest = text.strip_prefix('!')?;
+    // Verbatim tag `!<URI>`: the URI runs to the closing `>` and may contain
+    // characters (`,`, `:`) that otherwise terminate a shorthand. Span the
+    // whole `!<…>` so the URI isn't truncated at the first comma/colon.
+    if let Some(uri) = rest.strip_prefix('<') {
+        let close = uri.find('>')?;
+        // `!` + `<` + URI + `>`
+        return Some(text.split_at(2 + close + 1));
+    }
     let mut i = 0usize;
     let mut bangs = 0usize;
     for (idx, ch) in rest.char_indices() {

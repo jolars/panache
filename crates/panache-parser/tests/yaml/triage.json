@@ -590,12 +590,6 @@
       "tree": true
     },
     {
-      "case_id": "7FWL",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "9KAX",
       "diagnostic_codes": [
         "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START"
@@ -821,6 +815,7 @@
     "7A4E",
     "7BMT",
     "7BUB",
+    "7FWL",
     "7T8X",
     "7TMG",
     "7W2P",
@@ -987,8 +982,8 @@
   "summary": {
     "error_contract_ok_count": 53,
     "fails_needs_error_path_count": 25,
-    "fails_needs_feature_count": 33,
-    "passes_now_count": 222,
+    "fails_needs_feature_count": 32,
+    "passes_now_count": 223,
     "total_cases": 352
   }
 }
