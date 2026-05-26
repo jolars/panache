@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.0](https://github.com/jolars/panache/compare/dprint-plugin-panache-v0.1.0...dprint-plugin-panache-v0.2.0) (2026-05-26)
+
+### Features
+- **formatter:** add `semantic` wrap mode ([`41f7025`](https://github.com/jolars/panache/commit/41f70254abd7ccbbcfb36cff833c14ed7b81e6f8)), closes [#313](https://github.com/jolars/panache/issues/313)
 ## [0.1.0](https://github.com/jolars/panache/compare/dprint-plugin-panache-v0.0.1...dprint-plugin-panache-v0.1.0) (2026-05-07)
 
 ### Features
