@@ -511,3 +511,8 @@ SBG9
 # now project via the CST walker (structural flow-collection keys) and
 # flow_kv_split accepts the adjacent colon after a quoted key.
 9MMW
+# Zero-indented block sequence as an explicit-key (`?`) mapping key
+# (`?\n- a\n- b\n:\n…`): like an indentless sequence in a VALUE, the scanner
+# emits no BlockSequenceStart, so parser_v2 now synthesizes the
+# YAML_BLOCK_SEQUENCE inside the open KEY (mirroring the VALUE side).
+6PBE

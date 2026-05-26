@@ -248,12 +248,26 @@ pub fn parse_v2(input: &str) -> SyntaxNode {
                 // is otherwise empty; a `-` after scalar content in the
                 // value is a structural error left unwrapped for the
                 // validator to reject.
-                if last_significant == Some(TokenKind::Value)
+                let indentless_value = last_significant == Some(TokenKind::Value)
                     && matches!(
                         block_stack.last(),
                         Some(BlockFrame::BlockMap { in_value: true, .. })
-                    )
-                {
+                    );
+                // The mirror case: a `-` landing directly after the `?`
+                // explicit-key indicator opens an indentless sequence as
+                // the KEY's content (6PBE). The scanner likewise pushes no
+                // indent level, so synthesize the `YAML_BLOCK_SEQUENCE`
+                // inside the open KEY. `close_indentless_sequences` later
+                // pops it when the entry's `:` (`Value`) arrives.
+                let indentless_key = last_significant == Some(TokenKind::Key)
+                    && matches!(
+                        block_stack.last(),
+                        Some(BlockFrame::BlockMap {
+                            entry_open: true,
+                            in_value: false,
+                        })
+                    );
+                if indentless_value || indentless_key {
                     builder.start_node(SyntaxKind::YAML_BLOCK_SEQUENCE.into());
                     block_stack.push(BlockFrame::BlockSequence {
                         item_open: false,
@@ -996,6 +1010,36 @@ mod tests {
                 .is_some_and(|t| t.kind() == SyntaxKind::YAML_KEY)
         });
         assert!(has_question, "`?` should live inside YAML_BLOCK_MAP_KEY");
+        assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn explicit_key_indentless_sequence_wraps_inside_key() {
+        // `?\n- a\n- b\n:\n- c\n- d\n` (6PBE) — the explicit `?` key's
+        // content is a zero-indented block sequence. As with an indentless
+        // sequence in a VALUE, the scanner pushes no indent level and emits
+        // no BlockSequenceStart, so the builder must synthesize a
+        // YAML_BLOCK_SEQUENCE inside the KEY (mirroring the VALUE side)
+        // rather than leaving the `- a` / `- b` entries flat.
+        let input = "?\n- a\n- b\n:\n- c\n- d\n";
+        let tree = parse_v2(input);
+        let doc = first_document(&tree);
+        let map = block_map_under(&doc).expect("YAML_BLOCK_MAP child");
+        let entries = block_map_entries(&map);
+        assert_eq!(entries.len(), 1);
+        let key = entry_key(&entries[0]);
+        assert!(
+            key.children()
+                .any(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE),
+            "explicit-key block sequence should be wrapped in YAML_BLOCK_SEQUENCE inside KEY",
+        );
+        let value = entry_value(&entries[0]);
+        assert!(
+            value
+                .children()
+                .any(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE),
+            "value-side block sequence should remain wrapped",
+        );
         assert_eq!(tree.text().to_string(), input);
     }
 

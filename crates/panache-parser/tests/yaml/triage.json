@@ -572,12 +572,6 @@
       "tree": false
     },
     {
-      "case_id": "6PBE",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "9KAX",
       "diagnostic_codes": [
         "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START"
@@ -757,6 +751,7 @@
     "6JWB",
     "6KGN",
     "6LVF",
+    "6PBE",
     "6SLA",
     "6VJK",
     "6WLZ",
@@ -942,8 +937,8 @@
   "summary": {
     "error_contract_ok_count": 53,
     "fails_needs_error_path_count": 25,
-    "fails_needs_feature_count": 24,
-    "passes_now_count": 231,
+    "fails_needs_feature_count": 23,
+    "passes_now_count": 232,
     "total_cases": 352
   }
 }
