@@ -570,12 +570,6 @@
       "tree": false
     },
     {
-      "case_id": "AB8U",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "C4HZ",
       "diagnostic_codes": [
         "YAML_PARSE_UNEXPECTED_DEDENT"
@@ -744,6 +738,7 @@
     "A2M4",
     "A6F9",
     "A984",
+    "AB8U",
     "AVM7",
     "AZ63",
     "AZW3",
@@ -890,8 +885,8 @@
   "summary": {
     "error_contract_ok_count": 65,
     "fails_needs_error_path_count": 13,
-    "fails_needs_feature_count": 14,
-    "passes_now_count": 241,
+    "fails_needs_feature_count": 13,
+    "passes_now_count": 242,
     "total_cases": 352
   }
 }

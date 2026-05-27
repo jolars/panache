@@ -446,6 +446,18 @@ impl<'a> Scanner<'a> {
         self.allow_simple_key = false;
         let start = self.cursor;
         let min_indent = self.indent + 1;
+        // Bridge for absent anchor/alias/tag tokenization: a plain scalar
+        // that begins with `&`/`*`/`!` is an emulation placeholder for an
+        // anchor, alias, or tag. Keep a following block-indicator line
+        // (`-`/`?`) separate so the projection can attach the placeholder
+        // to the collection that follows (e.g. 3R3P `&sequence\n- a`,
+        // J7PZ `--- !!omap\n- ...`). Genuine plain scalars instead fold
+        // such lines per libyaml (AB8U). Remove this guard once the
+        // scanner emits real anchor/alias/tag tokens.
+        let placeholder = matches!(
+            self.input[start.index..].chars().next(),
+            Some('&' | '*' | '!')
+        );
         loop {
             let chunk_start = self.cursor.index;
             self.consume_plain_chunk();
@@ -465,7 +477,7 @@ impl<'a> Scanner<'a> {
                     break;
                 }
                 Some('\n' | '\r') => {
-                    if !self.try_consume_plain_line_break(min_indent) {
+                    if !self.try_consume_plain_line_break(min_indent, placeholder) {
                         self.cursor = saved;
                         break;
                     }
@@ -529,7 +541,7 @@ impl<'a> Scanner<'a> {
     /// false (without modifying the cursor) if the scalar must
     /// terminate at the line break. The caller is responsible for
     /// rewinding to a saved cursor in that case.
-    fn try_consume_plain_line_break(&mut self, min_indent: i32) -> bool {
+    fn try_consume_plain_line_break(&mut self, min_indent: i32, placeholder: bool) -> bool {
         let saved = self.cursor;
         self.consume_one_line_break();
         loop {
@@ -564,12 +576,21 @@ impl<'a> Scanner<'a> {
                             self.cursor = saved;
                             return false;
                         }
-                        // A block indicator (`-`/`?`/`:` followed by
-                        // EOL or whitespace) at the head of the next
-                        // line aborts the plain scalar — those would
-                        // otherwise be (mis)consumed as part of the
-                        // chunk by the inner loop on the next pass.
-                        if matches!(self.peek_char(), Some('-' | '?' | ':'))
+                        // A value indicator (`:` followed by EOL or
+                        // whitespace) at the head of the next line always
+                        // aborts the plain scalar: `consume_plain_chunk`
+                        // refuses to consume it, which would otherwise
+                        // leave the cursor stranded past the line break
+                        // with an empty chunk. `-`/`?` only abort for
+                        // anchor/tag/alias placeholders (see `placeholder`
+                        // above); for genuine plain scalars they fold in
+                        // as content per libyaml (yaml-test-suite AB8U).
+                        let aborts = if placeholder {
+                            matches!(self.peek_char(), Some('-' | '?' | ':'))
+                        } else {
+                            self.peek_char() == Some(':')
+                        };
+                        if aborts
                             && matches!(self.peek_at(1), None | Some(' ' | '\t' | '\n' | '\r'))
                         {
                             self.cursor = saved;
@@ -2763,6 +2784,33 @@ mod tests {
             .filter(|&&k| k == TokenKind::BlockEntry)
             .count();
         assert!(block_entry_count >= 1, "got {kinds:?}");
+    }
+
+    #[test]
+    fn more_indented_dash_line_folds_into_plain_scalar() {
+        // yaml-test-suite AB8U: `- single multiline\n - sequence entry\n`.
+        // The second line's `-` sits at column 1, deeper than the
+        // sequence indent (0), so per libyaml it folds into the plain
+        // scalar rather than opening a nested sequence. Expect a single
+        // BlockEntry and a single plain scalar spanning both lines.
+        let input = "- single multiline\n - sequence entry\n";
+        let tokens = collect_tokens(input);
+        let kinds = meaningful_kinds(&tokens);
+        let block_entry_count = kinds
+            .iter()
+            .filter(|&&k| k == TokenKind::BlockEntry)
+            .count();
+        assert_eq!(block_entry_count, 1, "got {kinds:?}");
+        let plain_scalars: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.kind, TokenKind::Scalar(ScalarStyle::Plain)))
+            .collect();
+        assert_eq!(plain_scalars.len(), 1, "got {tokens:?}");
+        let value = plain_scalars[0];
+        assert_eq!(
+            &input[value.start.index..value.end.index],
+            "single multiline\n - sequence entry",
+        );
     }
 
     #[test]

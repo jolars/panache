@@ -606,3 +606,7 @@ S98Z
 SU5Z
 # CVW2: `#` right after a flow `,` separator (`[ a, b, c,#invalid ]`).
 CVW2
+# Multi-line plain scalar: a more-indented `- ` continuation line folds into
+# the scalar instead of opening a nested sequence (libyaml rule; only `:`
+# value indicators abort a plain-scalar continuation, not `-`/`?`).
+AB8U
