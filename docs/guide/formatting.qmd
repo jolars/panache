@@ -663,6 +663,14 @@ Output
       -------------------------------------------------------------
     ```
 
+Body cell text is **reflowed** to fit the existing column width and any blank
+padding lines inside a cell are dropped, following the global `wrap` setting:
+under `reflow` (the default) a cell whose lines could pack more tightly is
+re-wrapped within its column, while `preserve` keeps the existing line breaks
+untouched. As with grid tables, column widths themselves are **never** resized,
+since Pandoc derives relative output widths from them. The header row is left
+as-is, because its layout determines each column's alignment.
+
 ### Table Captions
 
 Table captions are normalized to be on a separate line **below** the table,

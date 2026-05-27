@@ -1,5 +1,6 @@
 use crate::config::{Config, WrapMode};
 use crate::formatter::inline::format_inline_node;
+use crate::formatter::inline_layout::wrap_text_first_fit;
 use crate::formatter::sentence_wrap::{ResolvedProfile, resolve_profile, split_sentence_text};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
@@ -107,6 +108,49 @@ fn wrap_words_with_widths(words: &[&str], first_width: usize, rest_width: usize)
         out.push(current);
     }
 
+    out
+}
+
+/// Reflow a multi-line table cell's lines to fit a fixed column width.
+///
+/// Column widths in grid/multiline tables are load-bearing (pandoc maps them to
+/// relative output widths), so we never resize the column -- we only re-pack the
+/// cell's text to use the existing width more tightly. Leading/trailing blank
+/// lines are dropped (pandoc discards them); runs of blank lines split the cell
+/// into paragraphs (an internal blank line in a grid cell is a paragraph break),
+/// each reflowed independently and rejoined with a single blank line. Multiline
+/// table cells never contain internal blanks, so this reduces to one paragraph.
+fn reflow_cell_lines(lines: &[String], width: usize) -> Vec<String> {
+    // Group consecutive non-blank lines into paragraphs, dropping blank runs.
+    let mut paragraphs: Vec<Vec<&str>> = Vec::new();
+    let mut current: Vec<&str> = Vec::new();
+    for line in lines {
+        if line.trim().is_empty() {
+            if !current.is_empty() {
+                paragraphs.push(std::mem::take(&mut current));
+            }
+        } else {
+            current.push(line.trim());
+        }
+    }
+    if !current.is_empty() {
+        paragraphs.push(current);
+    }
+
+    let mut out = Vec::new();
+    for paragraph in paragraphs {
+        if !out.is_empty() {
+            // Preserve the paragraph break between reflowed paragraphs.
+            out.push(String::new());
+        }
+        let joined = paragraph.join(" ");
+        if width == 0 {
+            // Degenerate column: keep the text rather than wrapping to nothing.
+            out.push(joined);
+        } else {
+            out.extend(wrap_text_first_fit(&joined, width));
+        }
+    }
     out
 }
 
@@ -1916,12 +1960,36 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
         return node.text().to_string();
     }
 
-    let table_data = extract_multiline_table_data(node, config);
+    let mut table_data = extract_multiline_table_data(node, config);
     let mut output = String::new();
 
     // Early return if no rows or no column info
     if table_data.rows.is_empty() || table_data.column_positions.is_empty() {
         return node.text().to_string();
+    }
+
+    // Reflow each body cell to its (fixed) column width unless wrapping is
+    // disabled. Column widths are preserved; we only re-pack the cell text to
+    // use the existing width more tightly and drop blank padding lines.
+    //
+    // The header row is intentionally left untouched: column alignment is
+    // detected from the header's text geometry, and packing a header so it
+    // fills the column would erase its leading pad and flip a centered column to
+    // left on the next pass (breaking idempotency). Headers are short anyway.
+    let wrap_mode = config.wrap.clone().unwrap_or(WrapMode::Reflow);
+    if wrap_mode != WrapMode::Preserve {
+        let col_widths: Vec<usize> = table_data
+            .column_positions
+            .iter()
+            .map(|(start, end)| end.saturating_sub(*start))
+            .collect();
+        let body_start = usize::from(table_data.has_header);
+        for row in table_data.rows.iter_mut().skip(body_start) {
+            for (col_idx, cell) in row.iter_mut().enumerate() {
+                let width = col_widths.get(col_idx).copied().unwrap_or(0);
+                *cell = reflow_cell_lines(cell, width);
+            }
+        }
     }
 
     let base_offset = table_data
