@@ -5,19 +5,19 @@ were to tune 20 different hyperparameter configurations; note that each entry in
 the table is a unique ID referring to a possible configuration of multiple
 hyperparameters to tune.
 
-  +-----+---------+---------+
-  |     | $s = 3$ | $s = 2$ |
-  +-----+---------+---------+
-  | $i$ | $m_{i}$ | $r_{i}$ |
-  +=====+=========+=========+
-  | 0   | 8       | 1       |
-  +-----+---------+---------+
-  | 1   | 4       | 2       |
-  +-----+---------+---------+
++-----+---------+---------+
+|     | $s = 3$ | $s = 2$ |
++-----+---------+---------+
+| $i$ | $m_{i}$ | $r_{i}$ |
++=====+=========+=========+
+| 0   | 8       | 1       |
++-----+---------+---------+
+| 1   | 4       | 2       |
++-----+---------+---------+
 
-  : Hyperband schedule with the number of configurations, $m_{i}$, and
-    resources, $r_{i}$, for each bracket, $s$, and stage, $i$, when $\eta = 2$,
-    $r{_{min}} = 1$ and $r{_{max}} = 8$. {#tbl-hyperband}
+: Hyperband schedule with the number of configurations, $m_{i}$, and
+  resources, $r_{i}$, for each bracket, $s$, and stage, $i$, when $\eta = 2$,
+  $r{_{min}} = 1$ and $r{_{max}} = 8$. {#tbl-hyperband}
 
   |         | $s = 3$          | $s = 2$             |
   | ------- | ---------------- | ------------------- |

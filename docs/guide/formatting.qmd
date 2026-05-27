@@ -538,8 +538,10 @@ Output
 ## Tables
 
 Panache supports all Pandoc table types and normalizes alignment and spacing
-while preserving content and attributes. Formatted table blocks are indented by
-two spaces.
+while preserving content and attributes. Pipe, simple, and multiline table
+blocks are indented by two spaces. Grid tables are left at the margin (column
+0): Pandoc only recognizes a grid table when its `+---+` border starts at column
+0, so an indented border would be parsed as a paragraph instead.
 
 ### Pipe Tables
 
@@ -569,7 +571,9 @@ Output
 
 ### Grid Tables
 
-Grid tables are normalized to have consistent spacing and alignment.
+Grid tables are normalized to have consistent spacing and alignment. They are
+kept at column 0 rather than indented, since Pandoc does not recognize an
+indented grid border.
 
 Input
 
@@ -584,11 +588,11 @@ Input
 Output
 
 :   ```markdown
-      +-----+----------------+
-      | Var | Description    |
-      +=====+================+
-      | `A` | Example value. |
-      +-----+----------------+
+    +-----+----------------+
+    | Var | Description    |
+    +=====+================+
+    | `A` | Example value. |
+    +-----+----------------+
     ```
 
 ### Simple Tables

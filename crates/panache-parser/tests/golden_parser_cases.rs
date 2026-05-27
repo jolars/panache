@@ -432,6 +432,7 @@ golden_test_cases!(
     inline_math,
     grid_table,
     grid_table_in_list_blockquote,
+    grid_table_indented_is_paragraph,
     grid_table_nordics,
     grid_table_planets,
     latex_environment,

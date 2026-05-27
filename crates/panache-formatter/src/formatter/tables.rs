@@ -6,25 +6,34 @@ use rowan::NodeOrToken;
 use std::collections::HashMap;
 use unicode_width::UnicodeWidthStr;
 
-const TABLE_BLOCK_INDENT: &str = "  ";
+/// Default indent (in spaces) for table types that still self-indent at the top
+/// level (pipe, simple, multiline). Grid tables instead honor the container
+/// indent threaded from the dispatcher so a top-level grid sits at column 0 --
+/// pandoc rejects an indented `+---+` border. See `format_grid_table`.
+const TABLE_BLOCK_INDENT: usize = 2;
 
-fn indent_table_block(block: &str) -> String {
+fn indent_table_block(block: &str, indent: usize) -> String {
+    if indent == 0 {
+        return block.to_string();
+    }
+    let prefix = " ".repeat(indent);
+
     let already_indented = block
         .lines()
         .filter(|line| !line.is_empty())
-        .all(|line| line.starts_with(TABLE_BLOCK_INDENT));
+        .all(|line| line.starts_with(&prefix));
     if already_indented {
         return block.to_string();
     }
 
-    let mut output = String::with_capacity(block.len() + 32);
+    let mut output = String::with_capacity(block.len() + indent + 32);
     let mut line_start = 0;
 
     for (idx, ch) in block.char_indices() {
         if ch == '\n' {
             let line = &block[line_start..idx];
             if !line.is_empty() {
-                output.push_str(TABLE_BLOCK_INDENT);
+                output.push_str(&prefix);
             }
             output.push_str(line);
             output.push('\n');
@@ -35,7 +44,7 @@ fn indent_table_block(block: &str) -> String {
     if line_start < block.len() {
         let line = &block[line_start..];
         if !line.is_empty() {
-            output.push_str(TABLE_BLOCK_INDENT);
+            output.push_str(&prefix);
         }
         output.push_str(line);
     }
@@ -126,10 +135,7 @@ fn format_table_caption_with_language(
     }
 
     let wrap_mode = config.wrap.clone().unwrap_or(WrapMode::Reflow);
-    let available_width = config
-        .line_width
-        .saturating_sub(TABLE_BLOCK_INDENT.len())
-        .max(1);
+    let available_width = config.line_width.saturating_sub(TABLE_BLOCK_INDENT).max(1);
 
     match wrap_mode {
         WrapMode::Preserve => format!(": {body}"),
@@ -497,7 +503,7 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config) -> String {
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    indent_table_block(&output)
+    indent_table_block(&output, TABLE_BLOCK_INDENT)
 }
 
 // Grid Table Formatting
@@ -575,6 +581,7 @@ fn format_spanning_grid_table_raw(
     raw_table: &str,
     config: &Config,
     profile: ResolvedProfile<'_>,
+    indent: usize,
 ) -> String {
     let mut lines: Vec<&str> = raw_table.lines().collect();
     while lines.last().is_some_and(|l| l.trim().is_empty()) {
@@ -777,7 +784,7 @@ fn format_spanning_grid_table_raw(
         out.push_str(&caption);
         out.push('\n');
     }
-    indent_table_block(&out)
+    indent_table_block(&out, indent)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -925,7 +932,7 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
 }
 
 /// Format a grid table with consistent alignment and padding
-pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
+pub fn format_grid_table(node: &SyntaxNode, config: &Config, indent: usize) -> String {
     let raw_table = node.text().to_string();
     let mut extra_abbreviations = Vec::new();
     let profile = resolve_profile(node, config, &mut extra_abbreviations);
@@ -933,7 +940,7 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
         .lines()
         .any(|line| line.trim_start().starts_with('|') && line.contains('+'))
     {
-        return format_spanning_grid_table_raw(&raw_table, config, profile);
+        return format_spanning_grid_table_raw(&raw_table, config, profile, indent);
     }
 
     let table_data = extract_grid_table_data(node, config);
@@ -1082,7 +1089,9 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    indent_table_block(&output)
+    // Grid tables honor the threaded container indent (0 at the top level) so
+    // the `+---+` border sits at column 0 -- pandoc rejects an indented border.
+    indent_table_block(&output, indent)
 }
 
 // Simple Table Formatting
@@ -1629,7 +1638,7 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    indent_table_block(&output)
+    indent_table_block(&output, TABLE_BLOCK_INDENT)
 }
 
 /// Extract column information from multiline table separator line
@@ -2060,5 +2069,5 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    indent_table_block(&output)
+    indent_table_block(&output, TABLE_BLOCK_INDENT)
 }

@@ -165,7 +165,7 @@ fn test_pipe_table_without_edge_pipes() {
 #[test]
 fn test_basic_grid_table() {
     let input = "+-------+--------+\n| Left  | Right  |\n+=======+========+\n| A     | B      |\n+-------+--------+\n| C     | D      |\n+-------+--------+";
-    let expected = "  +------+-------+\n  | Left | Right |\n  +======+=======+\n  | A    | B     |\n  +------+-------+\n  | C    | D     |\n  +------+-------+\n";
+    let expected = "+------+-------+\n| Left | Right |\n+======+=======+\n| A    | B     |\n+------+-------+\n| C    | D     |\n+------+-------+\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -174,7 +174,7 @@ fn test_basic_grid_table() {
 #[test]
 fn test_grid_table_with_alignments() {
     let input = "+:------+-------:+:------:+\n| Left  | Right  | Center |\n+=======+========+========+\n| A     | B      | C      |\n+-------+--------+--------+";
-    let expected = "  +------+-------+--------+\n  | Left | Right | Center |\n  +:=====+======:+:======:+\n  | A    |     B |   C    |\n  +------+-------+--------+\n";
+    let expected = "+------+-------+--------+\n| Left | Right | Center |\n+:=====+======:+:======:+\n| A    |     B |   C    |\n+------+-------+--------+\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -183,7 +183,7 @@ fn test_grid_table_with_alignments() {
 #[test]
 fn test_grid_table_uneven_widths() {
     let input = "+-------+------------------------+\n| Short | Very long content here |\n+=======+========================+\n| X     | Y                      |\n+-------+------------------------+";
-    let expected = "  +-------+------------------------+\n  | Short | Very long content here |\n  +=======+========================+\n  | X     | Y                      |\n  +-------+------------------------+\n";
+    let expected = "+-------+------------------------+\n| Short | Very long content here |\n+=======+========================+\n| X     | Y                      |\n+-------+------------------------+\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -192,7 +192,7 @@ fn test_grid_table_uneven_widths() {
 #[test]
 fn test_grid_table_with_inline_elements() {
     let input = "+------------+----------+\n| *emphasis* | `code`   |\n+============+==========+\n| X          | Y        |\n+------------+----------+";
-    let expected = "  +------------+--------+\n  | *emphasis* | `code` |\n  +============+========+\n  | X          | Y      |\n  +------------+--------+\n";
+    let expected = "+------------+--------+\n| *emphasis* | `code` |\n+============+========+\n| X          | Y      |\n+------------+--------+\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -252,7 +252,7 @@ fn test_grid_table_with_spanning_style_rows_stays_idempotent() {
 #[test]
 fn test_grid_table_with_spanning_style_caption_before_normalizes_after() {
     let input = ": My caption\n\n+-------------+-------+----------+\n|             | min   | -89.2 °C |\n| Temperature +-------+----------+\n| 1961-1990   | mean  | 14 °C    |\n|             +-------+----------+\n|             | min   | 56.7 °C  |\n+-------------+-------+----------+\n";
-    let expected = "  +-------------+-------+----------+\n  |             | min   | -89.2 °C |\n  | Temperature +-------+----------+\n  |  1961-1990  | mean  | 14 °C    |\n  |             +-------+----------+\n  |             | min   | 56.7 °C  |\n  +-------------+-------+----------+\n\n  : My caption\n";
+    let expected = "+-------------+-------+----------+\n|             | min   | -89.2 °C |\n| Temperature +-------+----------+\n|  1961-1990  | mean  | 14 °C    |\n|             +-------+----------+\n|             | min   | 56.7 °C  |\n+-------------+-------+----------+\n\n: My caption\n";
     let result = format(input, None, None);
     assert_eq!(result, expected);
 }
@@ -260,8 +260,7 @@ fn test_grid_table_with_spanning_style_caption_before_normalizes_after() {
 #[test]
 fn test_grid_table_with_caption_after() {
     let input = "+-----+-----+\n| A   | B   |\n+=====+=====+\n| C   | D   |\n+-----+-----+\n\nTable: Caption text";
-    let expected =
-        "  +---+---+\n  | A | B |\n  +===+===+\n  | C | D |\n  +---+---+\n\n  : Caption text\n";
+    let expected = "+---+---+\n| A | B |\n+===+===+\n| C | D |\n+---+---+\n\n: Caption text\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -284,7 +283,7 @@ fn test_grid_table_planets_regression_case() {
 #[test]
 fn test_grid_table_multiline_header_and_footer_sections() {
     let input = "+---------+--------+\n| Name    | Value  |\n|         | (2020) |\n+:=======:+:======:+\n| Denmark | 5.8    |\n+---------+--------+\n+=========+========+\n| Total   | 5.8    |\n+=========+========+";
-    let expected = "  +---------+--------+\n  |  Name   | Value  |\n  |         | (2020) |\n  +:=======:+:======:+\n  | Denmark |  5.8   |\n  +=========+========+\n  |  Total  |  5.8   |\n  +=========+========+\n";
+    let expected = "+---------+--------+\n|  Name   | Value  |\n|         | (2020) |\n+:=======:+:======:+\n| Denmark |  5.8   |\n+=========+========+\n|  Total  |  5.8   |\n+=========+========+\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -293,7 +292,7 @@ fn test_grid_table_multiline_header_and_footer_sections() {
 #[test]
 fn test_grid_table_empty_cells() {
     let input = "+-----+-----+\n| A   |     |\n+=====+=====+\n|     | D   |\n+-----+-----+";
-    let expected = "  +---+---+\n  | A |   |\n  +===+===+\n  |   | D |\n  +---+---+\n";
+    let expected = "+---+---+\n| A |   |\n+===+===+\n|   | D |\n+---+---+\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -302,7 +301,7 @@ fn test_grid_table_empty_cells() {
 #[test]
 fn test_grid_table_single_column() {
     let input = "+--------+\n| Header |\n+========+\n| Cell   |\n+--------+";
-    let expected = "  +--------+\n  | Header |\n  +========+\n  | Cell   |\n  +--------+\n";
+    let expected = "+--------+\n| Header |\n+========+\n| Cell   |\n+--------+\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -311,7 +310,7 @@ fn test_grid_table_single_column() {
 #[test]
 fn test_grid_table_multiple_rows() {
     let input = "+---+---+\n| A | B |\n+===+===+\n| 1 | 2 |\n+---+---+\n| 3 | 4 |\n+---+---+\n| 5 | 6 |\n+---+---+";
-    let expected = "  +---+---+\n  | A | B |\n  +===+===+\n  | 1 | 2 |\n  +---+---+\n  | 3 | 4 |\n  +---+---+\n  | 5 | 6 |\n  +---+---+\n";
+    let expected = "+---+---+\n| A | B |\n+===+===+\n| 1 | 2 |\n+---+---+\n| 3 | 4 |\n+---+---+\n| 5 | 6 |\n+---+---+\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -320,7 +319,7 @@ fn test_grid_table_multiple_rows() {
 #[test]
 fn test_grid_table_right_alignment() {
     let input = "+--------+\n| Number |\n+========+\n| 12     |\n+--------+\n| 345    |\n+--------+\n| 6      |\n+--------+";
-    let expected = "  +--------+\n  | Number |\n  +========+\n  | 12     |\n  +--------+\n  | 345    |\n  +--------+\n  | 6      |\n  +--------+\n";
+    let expected = "+--------+\n| Number |\n+========+\n| 12     |\n+--------+\n| 345    |\n+--------+\n| 6      |\n+--------+\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -330,10 +329,27 @@ fn test_grid_table_right_alignment() {
 fn test_grid_table_center_alignment() {
     let input =
         "+--------+\n| Center |\n+========+\n| X      |\n+--------+\n| YYY    |\n+--------+";
-    let expected = "  +--------+\n  | Center |\n  +========+\n  | X      |\n  +--------+\n  | YYY    |\n  +--------+\n";
+    let expected =
+        "+--------+\n| Center |\n+========+\n| X      |\n+--------+\n| YYY    |\n+--------+\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_grid_table_in_list_item_keeps_container_indent() {
+    // Top-level grid tables sit at column 0, but a grid nested in a list item
+    // must keep the container indent so it still parses as a table (pandoc
+    // strips the list prefix before recognizing the `+---+` border). The
+    // formatter threads the container indent instead of a hardcoded one.
+    let input = "- An item:\n\n  +---+---+\n  | a | b |\n  +===+===+\n  | 1 | 2 |\n  +===+===+\n";
+    let first = format(input, None, None);
+    let second = format(&first, None, None);
+    assert_eq!(first, second, "list-nested grid table must be idempotent");
+    assert!(
+        first.contains("\n  +---+---+"),
+        "grid border must keep the list container indent, got:\n{first}"
+    );
 }
 
 #[test]

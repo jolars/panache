@@ -1646,8 +1646,11 @@ fn try_parse_grid_separator(line: &str) -> Option<Vec<GridColumn>> {
     let trimmed = line.trim_start();
     let leading_spaces = line.len() - trimmed.len();
 
-    // Must have leading spaces <= 3 to not be a code block
-    if leading_spaces > 3 {
+    // A grid border must begin at column 0 of its container content. Detection
+    // runs on the container-prefix-stripped line (see `try_parse_grid_table`),
+    // so any remaining leading whitespace means the border is indented relative
+    // to its container -- pandoc parses that as a paragraph, not a grid table.
+    if leading_spaces > 0 {
         return None;
     }
 
@@ -2171,6 +2174,14 @@ mod grid_table_tests {
         assert!(try_parse_grid_separator("+:---:+").is_some()); // center aligned
         assert!(try_parse_grid_separator("not a separator").is_none());
         assert!(try_parse_grid_separator("|---|---|").is_none()); // pipe table sep
+
+        // A grid border must sit at column 0 of its container content; an
+        // indented border is not a grid table (matches pandoc, which parses
+        // an indented `+---+` as a paragraph). Detection runs on the
+        // container-stripped line, so any remaining leading space disqualifies.
+        assert!(try_parse_grid_separator(" +---+---+").is_none());
+        assert!(try_parse_grid_separator("  +---+---+").is_none());
+        assert!(try_parse_grid_separator("   +===+===+").is_none());
     }
 
     #[test]

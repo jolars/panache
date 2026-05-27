@@ -2139,7 +2139,7 @@ impl Formatter {
                     return;
                 }
                 // Format grid table with proper alignment and borders
-                let formatted = tables::format_grid_table(node, &self.config);
+                let formatted = tables::format_grid_table(node, &self.config, indent);
                 self.output.push_str(&formatted);
             }
 
