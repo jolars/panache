@@ -79,7 +79,7 @@ jobs:
         uses: actions/deploy-pages@v5
 
       - name: Submit sitemap to IndexNow
-        uses: bojieyang/indexnow-action@v2
+        uses: bojieyang/indexnow-action@v3
         with:
           sitemap-location: https://panache.bz/sitemap.xml
           key: d8f6b1cafaee4cbc8aec36e0b9b5bb01
