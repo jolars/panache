@@ -599,6 +599,33 @@ Output
     +--------+----------------+
     ```
 
+Plain-prose cell text is **reflowed** to fill the existing column width and any
+blank padding lines inside a cell are dropped, following the global `wrap`
+setting (on under the default `reflow`; `preserve` leaves cell line breaks
+untouched). Column widths are not resized, so reflowing only re-packs a cell's
+text within its column. Cells that carry block content (lists, headings,
+blockquotes, code) or an explicit hard line break (a trailing `\`) are kept
+verbatim so their structure is never collapsed into a paragraph:
+
+Input
+
+:   ```markdown
+    +--------------------+
+    | Lorem ipsum        |
+    | dolor sit          |
+    |                    |
+    +--------------------+
+    ```
+
+Output
+
+:   ```markdown
+    +--------------------+
+    | Lorem ipsum dolor  |
+    | sit                |
+    +--------------------+
+    ```
+
 ### Simple Tables
 
 We normalize simple tables so that cell contents align with the alignment

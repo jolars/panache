@@ -154,6 +154,164 @@ fn reflow_cell_lines(lines: &[String], width: usize) -> Vec<String> {
     out
 }
 
+/// Whether a grid cell's content is plain prose that can be safely reflowed.
+///
+/// Grid cells can hold arbitrary block content (lists, code, blockquotes,
+/// headings) and hard line breaks (a trailing `\`). Reflowing those as plain
+/// text would corrupt them, so we only reflow cells whose every non-blank line
+/// is ordinary inline text. Block-bearing cells are kept verbatim (their
+/// leading/trailing blank padding is still trimmed in `reflow_or_trim_grid_cell`).
+fn grid_cell_is_reflowable(lines: &[String]) -> bool {
+    let mut has_content = false;
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        has_content = true;
+        // A trailing backslash is a pandoc hard line break -- keep the geometry.
+        if trimmed.ends_with('\\') {
+            return false;
+        }
+        if grid_cell_line_is_block_marker(trimmed) {
+            return false;
+        }
+    }
+    has_content
+}
+
+/// Detect a leading block-level marker that must not be reflowed into a
+/// paragraph: a list bullet/number, blockquote, ATX heading, code fence, or a
+/// nested pipe/grid line. `trimmed` must already be whitespace-trimmed.
+fn grid_cell_line_is_block_marker(trimmed: &str) -> bool {
+    let first = trimmed.split_whitespace().next().unwrap_or("");
+
+    // Bullet list: "-", "*", or "+" followed by content.
+    if matches!(first, "-" | "*" | "+") && trimmed.len() > first.len() {
+        return true;
+    }
+    // Ordered list: digits then '.' or ')' (e.g. "1.", "2)") followed by content.
+    if is_ordered_list_marker(first) && trimmed.len() > first.len() {
+        return true;
+    }
+
+    trimmed.starts_with('>')
+        || trimmed.starts_with('#')
+        || trimmed.starts_with("```")
+        || trimmed.starts_with("~~~")
+        || trimmed.starts_with('|')
+        || trimmed.starts_with('+')
+}
+
+/// Whether `token` is an ordered-list marker like `1.` or `2)`.
+fn is_ordered_list_marker(token: &str) -> bool {
+    let bytes = token.as_bytes();
+    let Some((last, digits)) = bytes.split_last() else {
+        return false;
+    };
+    !digits.is_empty() && digits.iter().all(u8::is_ascii_digit) && matches!(last, b'.' | b')')
+}
+
+/// Reflow a single grid cell (its lines across one row group) to `width`, or --
+/// when the content carries block structure -- keep it verbatim after dropping
+/// leading/trailing blank lines. Column widths are load-bearing, so `width` is a
+/// fixed target, never a resize.
+fn reflow_or_trim_grid_cell(lines: &[String], width: usize) -> Vec<String> {
+    if width > 0 && grid_cell_is_reflowable(lines) {
+        // `reflow_cell_lines` already drops leading/trailing/internal blank runs.
+        reflow_cell_lines(lines, width)
+    } else {
+        let first = lines.iter().position(|l| !l.trim().is_empty());
+        let last = lines.iter().rposition(|l| !l.trim().is_empty());
+        match (first, last) {
+            (Some(f), Some(l)) => lines[f..=l].to_vec(),
+            _ => Vec::new(),
+        }
+    }
+}
+
+/// Re-pack grid table cells within each row group: drop blank padding lines and
+/// reflow plain-prose cells to their fixed column width.
+///
+/// The line-per-row grid model stores each physical `| ... |` line as its own
+/// logical row, so a multi-line cell is spread across several rows sharing one
+/// `row_groups` id. Here we regroup those physical lines into per-column cells,
+/// reflow/trim each cell, then redistribute the result back into physical lines.
+/// Column widths are never resized (pandoc maps grid widths to relative output
+/// widths); cells with block content or hard line breaks stay verbatim.
+fn reflow_grid_table_cells(table_data: &mut GridTableData) {
+    let num_cols = table_data
+        .column_widths
+        .len()
+        .max(table_data.rows.iter().map(Vec::len).max().unwrap_or(0));
+    if num_cols == 0 {
+        return;
+    }
+
+    // Reflow to the width the renderer will actually use for each column: the
+    // widest existing content line, floored at the load-bearing source width.
+    // Using the bare source width would wrap a cell whose content already
+    // exceeds it (the renderer expands such a column instead of shrinking it),
+    // and would not be idempotent. The widest line always reproduces at its own
+    // width, so this target is stable across passes.
+    let content_widths = calculate_grid_column_widths(&table_data.rows);
+    let targets: Vec<usize> = (0..num_cols)
+        .map(|col| {
+            content_widths
+                .get(col)
+                .copied()
+                .unwrap_or(0)
+                .max(table_data.column_widths.get(col).copied().unwrap_or(0))
+        })
+        .collect();
+
+    let mut new_rows: Vec<Vec<String>> = Vec::new();
+    let mut new_sections: Vec<GridRowSection> = Vec::new();
+    let mut new_groups: Vec<usize> = Vec::new();
+
+    let mut start = 0;
+    while start < table_data.rows.len() {
+        let group = table_data.row_groups.get(start).copied();
+        let section = table_data
+            .row_sections
+            .get(start)
+            .copied()
+            .unwrap_or(GridRowSection::Body);
+        let mut end = start;
+        while end < table_data.rows.len() && table_data.row_groups.get(end).copied() == group {
+            end += 1;
+        }
+
+        // Reflow/trim each column across the group's physical lines.
+        let mut cols: Vec<Vec<String>> = Vec::with_capacity(num_cols);
+        for (col, &target) in targets.iter().enumerate() {
+            let lines: Vec<String> = (start..end)
+                .map(|r| table_data.rows[r].get(col).cloned().unwrap_or_default())
+                .collect();
+            cols.push(reflow_or_trim_grid_cell(&lines, target));
+        }
+
+        // Redistribute the per-column lines back into physical rows; keep at
+        // least one line so an all-empty group still renders a row.
+        let line_count = cols.iter().map(Vec::len).max().unwrap_or(0).max(1);
+        let group_id = group.unwrap_or(0);
+        for line_idx in 0..line_count {
+            let row: Vec<String> = (0..num_cols)
+                .map(|col| cols[col].get(line_idx).cloned().unwrap_or_default())
+                .collect();
+            new_rows.push(row);
+            new_sections.push(section);
+            new_groups.push(group_id);
+        }
+
+        start = end;
+    }
+
+    table_data.rows = new_rows;
+    table_data.row_sections = new_sections;
+    table_data.row_groups = new_groups;
+}
+
 fn split_sentences(text: &str, profile: ResolvedProfile<'_>) -> Vec<String> {
     split_sentence_text(text, profile)
 }
@@ -1006,12 +1164,21 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config, indent: usize) -> S
         return format_spanning_grid_table_raw(&raw_table, config, profile, indent);
     }
 
-    let table_data = extract_grid_table_data(node, config);
+    let mut table_data = extract_grid_table_data(node, config);
     let mut output = String::new();
 
     // Early return if no rows
     if table_data.rows.is_empty() {
         return node.text().to_string();
+    }
+
+    // Reflow plain-prose body cells to their fixed column width and drop blank
+    // padding lines, unless wrapping is disabled. Column widths are preserved
+    // (pandoc maps them to relative output widths); cells carrying block content
+    // or hard line breaks stay verbatim. See `reflow_grid_table_cells`.
+    let wrap_mode = config.wrap.clone().unwrap_or(WrapMode::Reflow);
+    if wrap_mode != WrapMode::Preserve {
+        reflow_grid_table_cells(&mut table_data);
     }
 
     // Use the source separator widths as a floor: grid column widths are
@@ -2165,4 +2332,62 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
         output.push('\n');
     }
     indent_table_block(&output, TABLE_BLOCK_INDENT)
+}
+
+#[cfg(test)]
+mod grid_reflow_tests {
+    use super::*;
+
+    fn lines(text: &str) -> Vec<String> {
+        text.lines().map(str::to_string).collect()
+    }
+
+    #[test]
+    fn ordered_list_marker_distinguishes_numbers_from_markers() {
+        assert!(is_ordered_list_marker("1."));
+        assert!(is_ordered_list_marker("2)"));
+        assert!(is_ordered_list_marker("42."));
+        assert!(!is_ordered_list_marker("1,234"));
+        assert!(!is_ordered_list_marker("v2.0"));
+        assert!(!is_ordered_list_marker("1"));
+        assert!(!is_ordered_list_marker("."));
+    }
+
+    #[test]
+    fn plain_prose_cells_are_reflowable() {
+        assert!(grid_cell_is_reflowable(&lines("Lorem ipsum\ndolor sit")));
+        assert!(grid_cell_is_reflowable(&lines(
+            "A fairly long\ndescription"
+        )));
+    }
+
+    #[test]
+    fn block_and_hard_break_cells_are_not_reflowable() {
+        assert!(!grid_cell_is_reflowable(&lines("- item one\n- item two")));
+        assert!(!grid_cell_is_reflowable(&lines("1. first\n2. second")));
+        assert!(!grid_cell_is_reflowable(&lines("> quote")));
+        assert!(!grid_cell_is_reflowable(&lines("# heading")));
+        assert!(!grid_cell_is_reflowable(&lines("```\ncode\n```")));
+        // Trailing backslash is a pandoc hard line break.
+        assert!(!grid_cell_is_reflowable(&lines("Population\\\n(in 2018)")));
+    }
+
+    #[test]
+    fn empty_or_blank_only_cells_are_not_reflowable() {
+        assert!(!grid_cell_is_reflowable(&[]));
+        assert!(!grid_cell_is_reflowable(&lines("\n   \n")));
+    }
+
+    #[test]
+    fn reflow_packs_prose_and_drops_trailing_blank() {
+        // "Lorem ipsum dolor sit" packed into width 18.
+        let out = reflow_or_trim_grid_cell(&lines("Lorem ipsum\ndolor sit\n"), 18);
+        assert_eq!(out, vec!["Lorem ipsum dolor", "sit"]);
+    }
+
+    #[test]
+    fn trim_only_keeps_block_content_but_drops_blank_edges() {
+        let out = reflow_or_trim_grid_cell(&lines("\n- item one\n- item two\n"), 18);
+        assert_eq!(out, vec!["- item one", "- item two"]);
+    }
 }
