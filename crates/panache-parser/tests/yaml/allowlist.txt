@@ -839,7 +839,12 @@ GT5M
 # losslessly and project events matching `test.event`; grouped by
 # parent theme.
 # 2G84 literal-modifiers — block scalar `|`/`>` headers with chomp
-# and indent indicators. /02 = `--- |1-`, /03 = `--- |10`.
+# and indent indicators. /02 = `--- |1-`, /03 = `--- |1+` parse cleanly;
+# /00 = `--- |0` (zero indent indicator) and /01 = `--- |10` (multi-digit
+# run) are error contracts caught by `check_block_scalar_header` — the
+# indent indicator must be a single digit in range 1-9 per §8.1.1.1.
+2G84/00
+2G84/01
 2G84/02
 2G84/03
 # 3RLN leading-tabs-in-double-quoted — double-quoted scalars whose
@@ -870,8 +875,13 @@ DE56/04
 DE56/05
 # DK95 tabs-that-look-like-indentation — block map/sequence values
 # whose continuation line uses a tab where space-indent would be
-# expected.
+# expected. /01 = `foo: "bar\n\tbaz"` (tab in the required-indentation
+# slot of a multi-line double-quoted continuation) is an error contract
+# caught by `check_quoted_scalar_continuation`'s §6.1 guard; the guard
+# only fires when leading spaces do not already exceed `parent_indent`
+# so 4ZYM (`  \tlines` after enough space-indent) stays content-only.
 DK95/00
+DK95/01
 DK95/02
 DK95/03
 DK95/05

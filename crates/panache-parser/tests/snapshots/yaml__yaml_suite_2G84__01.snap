@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 279
+expression: snapshot
+---
+case_id: 2G84/01
+input: "--- |10\n"
+has_error_contract: true
+parsed_mapping_tree: false
+diagnostics: [YAML_PARSE_INVALID_KEY_TOKEN:block scalar indent indicator must be a single digit in range 1-9@5..7]

@@ -1020,6 +1020,23 @@ fn check_quoted_scalar_continuation(
                 offset += 1;
                 continue;
             }
+            // §6.1 — a tab in the *required-indentation slot* of a
+            // multi-line quoted scalar continuation is illegal (DK95/01).
+            // Spaces past `parent_indent` provide the required indentation;
+            // any tab after enough leading spaces is content (4ZYM), not
+            // indentation, and must not be flagged.
+            let leading_spaces = line_text_in_src.bytes().take_while(|b| *b == b' ').count();
+            if leading_spaces <= parent_indent
+                && line_text_in_src.as_bytes().get(leading_spaces) == Some(&b'\t')
+            {
+                let tab_byte = line_start_in_src + leading_spaces;
+                return Some(diag_at_range(
+                    tab_byte,
+                    tab_byte + 1,
+                    diagnostic_codes::PARSE_UNEXPECTED_INDENT,
+                    "tab character used as indentation is not allowed in YAML",
+                ));
+            }
             let first_non_ws_col = leading_ws;
             let first_non_ws_byte = line_start_in_src + leading_ws;
             if first_non_ws_col <= parent_indent {
@@ -1457,7 +1474,9 @@ fn check_tab_as_indent(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
 /// `|` (folded / literal block scalar). After the indicator and any
 /// chomping (`+` / `-`) or explicit-indent (digit) characters, the
 /// header line must end at end-of-line or with a properly-spaced
-/// comment. Two malformed shapes:
+/// comment. Malformed shapes:
+/// - 2G84/00: indent indicator `0` (must be `1-9`, e.g. `|0`).
+/// - 2G84/01: multi-digit indent indicator (e.g. `|10`).
 /// - S4GJ: non-comment content on the header line (e.g. `> first line`).
 /// - X4QW: `#` immediately after the indicator with no whitespace
 ///   separator (e.g. `>#comment`).
@@ -1474,11 +1493,51 @@ fn check_block_scalar_header(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
         let header_end = text.find('\n').unwrap_or(text.len());
         let header = &text[..header_end];
         let bytes = header.as_bytes();
-        // Skip indicator + chomping/indent characters.
+        // Skip indicator + chomping/indent characters, tracking digit run for §8.1.1.1
+        // (indent indicator must be a single digit in `1-9`).
         let mut i = 1usize;
+        let mut digit_start: Option<usize> = None;
+        let mut digit_end: usize = i;
+        let mut digit_count: usize = 0;
+        let mut zero_digit: Option<usize> = None;
         while i < bytes.len() && (bytes[i] == b'+' || bytes[i] == b'-' || bytes[i].is_ascii_digit())
         {
+            if bytes[i].is_ascii_digit() {
+                if digit_start.is_none() {
+                    digit_start = Some(i);
+                }
+                digit_end = i + 1;
+                digit_count += 1;
+                if bytes[i] == b'0' && zero_digit.is_none() {
+                    zero_digit = Some(i);
+                }
+            }
             i += 1;
+        }
+        if digit_count > 0 {
+            let scalar_start: usize = token.text_range().start().into();
+            // `|0`: zero as the indent indicator is invalid (range `[1-9]`).
+            if let Some(zero_off) = zero_digit
+                && digit_count == 1
+            {
+                return Some(diag_at_range(
+                    scalar_start + zero_off,
+                    scalar_start + zero_off + 1,
+                    diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
+                    "block scalar indent indicator must be in range 1-9",
+                ));
+            }
+            // `|10`: multi-digit run is never a valid indent indicator.
+            if digit_count > 1
+                && let Some(start_off) = digit_start
+            {
+                return Some(diag_at_range(
+                    scalar_start + start_off,
+                    scalar_start + digit_end,
+                    diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
+                    "block scalar indent indicator must be a single digit in range 1-9",
+                ));
+            }
         }
         let rest = &header[i..];
         if rest.is_empty() {
