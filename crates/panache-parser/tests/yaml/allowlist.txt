@@ -698,3 +698,14 @@ N782
 # so the continuation column is compared against the block sequence's
 # parent indent.
 JKF3
+# Complex key: a flow collection (`{...}` or `[...]`) used as a
+# block-mapping key on a single line (e.g. `{ first: Sammy, last: Sosa }:`
+# followed by a nested block-map value). The scanner now registers the
+# flow-collection start as a simple-key candidate at the outer flow
+# level so a subsequent `:` on the same line splices `Key` (and
+# `BlockMappingStart` at level 0) before the flow start. The projector
+# walks `YAML_FLOW_SEQUENCE`/`YAML_FLOW_MAP` nested directly inside a
+# `YAML_FLOW_MAP_KEY` as a structural collection rather than slurped
+# scalar text — this also tightens SBG9 (`{[d, e]: f}`), LX3P
+# (`[flow]: block`), UDR7 (`{ sky: blue, ... }`), and ZF4X.
+Q9WF

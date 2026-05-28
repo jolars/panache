@@ -272,12 +272,19 @@ impl<'a> Scanner<'a> {
     }
 
     fn fetch_flow_collection_start(&mut self, kind: TokenKind) {
+        // Register the flow collection as a simple-key candidate at the
+        // current (outer) flow level. A subsequent `:` on the same line
+        // (e.g. `{x: y}: value`, `[a, b]: value`, `{[a,b]: c}`) splices
+        // a Key marker before the flow start — and a BlockMappingStart
+        // earlier when entering block context from level 0.
+        self.save_simple_key();
         let start = self.cursor;
         self.advance();
         let end = self.cursor;
         self.flow_level += 1;
-        // Reserve a simple-key slot for this flow nest. Step 6 wires
-        // candidate registration; for now the slot stays None.
+        // New nest: a flow scalar can immediately register as the
+        // inner level's simple-key candidate (e.g. `a` in `{a: b}`).
+        self.allow_simple_key = true;
         self.simple_keys.push(None);
         self.tokens.push_back(Token { kind, start, end });
     }

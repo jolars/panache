@@ -31,17 +31,17 @@ DOCUMENT@0..23
                 YAML_SCALAR@9..10 "]"
           YAML_SCALAR@10..11 ","
           WHITESPACE@11..12 " "
-          YAML_FLOW_SEQUENCE@12..18
-            YAML_SCALAR@12..13 "["
-            YAML_FLOW_SEQUENCE_ITEM@13..14
-              YAML_SCALAR@13..14 "d"
-            YAML_SCALAR@14..15 ","
-            WHITESPACE@15..16 " "
-            YAML_FLOW_SEQUENCE_ITEM@16..17
-              YAML_SCALAR@16..17 "e"
-            YAML_SCALAR@17..18 "]"
-          YAML_FLOW_MAP_ENTRY@18..21
-            YAML_FLOW_MAP_KEY@18..19
+          YAML_FLOW_MAP_ENTRY@12..21
+            YAML_FLOW_MAP_KEY@12..19
+              YAML_FLOW_SEQUENCE@12..18
+                YAML_SCALAR@12..13 "["
+                YAML_FLOW_SEQUENCE_ITEM@13..14
+                  YAML_SCALAR@13..14 "d"
+                YAML_SCALAR@14..15 ","
+                WHITESPACE@15..16 " "
+                YAML_FLOW_SEQUENCE_ITEM@16..17
+                  YAML_SCALAR@16..17 "e"
+                YAML_SCALAR@17..18 "]"
               YAML_COLON@18..19 ":"
             YAML_FLOW_MAP_VALUE@19..21
               WHITESPACE@19..20 " "

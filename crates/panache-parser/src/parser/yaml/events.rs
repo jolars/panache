@@ -1660,6 +1660,28 @@ fn project_flow_map_entry(
         .filter_map(|el| el.into_token())
         .any(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_KEY));
 
+    // A flow collection (`[...]` / `{...}`) nested directly inside the
+    // KEY wrapper is a complex key (SBG9 `{[d, e]: f}`) and must project
+    // structurally (`+SEQ [] ... -SEQ`) rather than as slurped scalar
+    // text. With the scanner registering flow-collection-start as a
+    // simple-key candidate, the resulting CST places the collection
+    // node directly under `YAML_FLOW_MAP_KEY` instead of leaving it as
+    // an orphan sibling.
+    let key_collection = key_node.children().find(|n| {
+        matches!(
+            n.kind(),
+            SyntaxKind::YAML_FLOW_SEQUENCE | SyntaxKind::YAML_FLOW_MAP
+        )
+    });
+    if let Some(collection) = key_collection {
+        if let Some(ext) = external_key {
+            flush_pending_orphan(ext, handles, out);
+        }
+        project_flow_collection_node(&collection, handles, out);
+        project_flow_map_value(&value_node, handles, out);
+        return;
+    }
+
     // Include WHITESPACE / NEWLINE so v2's separately-emitted `?`
     // (`YAML_KEY`) and key scalar (`YAML_SCALAR`) keep the original
     // trivia between them, letting `strip_explicit_key_indicator`

@@ -600,12 +600,6 @@
       "tree": false
     },
     {
-      "case_id": "Q9WF",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "SKE5",
       "diagnostic_codes": [
         "YAML_PARSE_UNEXPECTED_DEDENT"
@@ -825,6 +819,7 @@
     "Q5MG",
     "Q88A",
     "Q8AD",
+    "Q9WF",
     "QF4Y",
     "QT73",
     "R4YG",
@@ -877,8 +872,8 @@
   "summary": {
     "error_contract_ok_count": 71,
     "fails_needs_error_path_count": 7,
-    "fails_needs_feature_count": 11,
-    "passes_now_count": 244,
+    "fails_needs_feature_count": 10,
+    "passes_now_count": 245,
     "total_cases": 352
   }
 }
