@@ -801,3 +801,13 @@ EHF6
 # SU74: anchor + alias as a block-map key (`&b *alias : value2`).
 SR86
 SU74
+# Cluster N — invalid character in tag. YAML 1.2 §5.6: `ns-tag-char`
+# excludes `!` and the c-flow-indicators `,`, `[`, `]`, `{`, `}`. The
+# streaming scanner keeps these characters inside the tag token in
+# block context for losslessness; the validator now rejects the
+# resulting tag at the first offending byte. Verbatim form `!<uri>`
+# stays untouched because its body is `ns-uri-char+`.
+# LHL4: tag with `{}` in suffix (`!invalid{}tag scalar`).
+# U99R: tag with `,` in suffix (`- !!str, xxx`).
+LHL4
+U99R

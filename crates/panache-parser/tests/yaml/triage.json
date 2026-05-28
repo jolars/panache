@@ -337,6 +337,13 @@
       "event_parity": false
     },
     {
+      "case_id": "LHL4",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_TAG_CHARACTER"
+      ],
+      "event_parity": false
+    },
+    {
       "case_id": "N4JP",
       "diagnostic_codes": [
         "YAML_PARSE_UNEXPECTED_DEDENT"
@@ -449,6 +456,13 @@
       "event_parity": false
     },
     {
+      "case_id": "U99R",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_TAG_CHARACTER"
+      ],
+      "event_parity": false
+    },
+    {
       "case_id": "W9L4",
       "diagnostic_codes": [
         "YAML_PARSE_UNEXPECTED_INDENT"
@@ -518,12 +532,6 @@
       "tree": true
     },
     {
-      "case_id": "LHL4",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "QLJ7",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -531,12 +539,6 @@
     },
     {
       "case_id": "SY6V",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "U99R",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -801,8 +803,8 @@
     "ZWK4"
   ],
   "summary": {
-    "error_contract_ok_count": 71,
-    "fails_needs_error_path_count": 7,
+    "error_contract_ok_count": 73,
+    "fails_needs_error_path_count": 5,
     "fails_needs_feature_count": 0,
     "passes_now_count": 255,
     "total_cases": 352

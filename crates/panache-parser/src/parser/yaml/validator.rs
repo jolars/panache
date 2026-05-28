@@ -206,6 +206,9 @@ pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
     if let Some(diag) = check_anchor_decorates_alias(&tree) {
         return Some(diag);
     }
+    if let Some(diag) = check_invalid_tag_chars(&tree) {
+        return Some(diag);
+    }
     None
 }
 
@@ -1993,6 +1996,46 @@ fn check_comment_not_preceded_by_space(tree: &SyntaxNode, input: &str) -> Option
 /// (the spec-illegal node).
 ///
 /// Covers fixtures SR86 (`key2: &b *a`) and SU74 (`&b *alias : value`).
+/// Cluster N — invalid character in tag.
+///
+/// YAML 1.2 §5.6 defines `ns-tag-char` as `ns-uri-char` minus `!` and
+/// minus the flow indicators `,`, `[`, `]`, `{`, `}`. The scanner consumes
+/// any non-whitespace char into the tag suffix (libyaml/PyYAML-style relaxed
+/// name class) and only excludes flow indicators when already inside a flow
+/// context. That keeps block-context tokens like `!invalid{}tag` or `!!str,`
+/// in one piece for round-tripping, but the spec rejects them. Surface a
+/// diagnostic at the first offending byte so cases like LHL4 and U99R end up
+/// in the `error_contract_ok` bucket.
+///
+/// Verbatim form (`!<uri>`) is excluded: its body is `ns-uri-char+`, which
+/// legitimately allows `,`, `[`, `]`.
+fn check_invalid_tag_chars(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    for tok in tree
+        .descendants_with_tokens()
+        .filter_map(|c| c.into_token())
+    {
+        if tok.kind() != SyntaxKind::YAML_TAG {
+            continue;
+        }
+        let text = tok.text();
+        if text.starts_with("!<") {
+            continue;
+        }
+        for (offset, ch) in text.char_indices() {
+            if matches!(ch, ',' | '{' | '}') {
+                let start: usize = tok.text_range().start().into();
+                return Some(diag_at_range(
+                    start + offset,
+                    start + offset + ch.len_utf8(),
+                    diagnostic_codes::PARSE_INVALID_TAG_CHARACTER,
+                    "invalid character in tag",
+                ));
+            }
+        }
+    }
+    None
+}
+
 fn check_anchor_decorates_alias(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
     for container in tree.descendants().filter(|n| {
         matches!(
@@ -2960,6 +3003,40 @@ mod tests {
         // Contract guard: a bare alias (no preceding anchor sibling) is
         // valid.
         let input = "key1: &a value\nkey2: *a\n";
+        assert!(run(input).is_none(), "got {:?}", run(input));
+    }
+
+    #[test]
+    fn invalid_tag_braces_lhl4() {
+        // LHL4: tag suffix carries `{}` which are c-flow-indicators,
+        // forbidden from ns-tag-char.
+        let input = "---\n!invalid{}tag scalar\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_INVALID_TAG_CHARACTER);
+    }
+
+    #[test]
+    fn invalid_tag_comma_u99r() {
+        // U99R: `!!str,` — comma is a c-flow-indicator and not a
+        // valid ns-tag-char.
+        let input = "- !!str, xxx\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_INVALID_TAG_CHARACTER);
+    }
+
+    #[test]
+    fn valid_tag_passes() {
+        // Contract guard: tags from the well-formed allowlist must not
+        // trip the invalid-char check.
+        let input = "key: !!str value\n";
+        assert!(run(input).is_none(), "got {:?}", run(input));
+    }
+
+    #[test]
+    fn verbatim_tag_with_uri_chars_passes() {
+        // Contract guard: verbatim form `!<uri>` allows any ns-uri-char
+        // in the URI body, including `,` and `[`.
+        let input = "key: !<tag:example.com,2011:foo[bar]> value\n";
         assert!(run(input).is_none(), "got {:?}", run(input));
     }
 }
