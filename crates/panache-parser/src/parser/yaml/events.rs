@@ -421,9 +421,15 @@ fn scalar_document_value(doc: &SyntaxNode, handles: &TagHandles) -> Option<Strin
             quoted.replacen("=VAL ", &format!("=VAL {long} "), 1)
         } else {
             // Plain scalar: fold multi-line continuations the same way the
-            // untagged path does so `!!str\nd\ne` projects as `:d e`.
+            // untagged path does so `!!str\nd\ne` projects as `:d e`. The
+            // folded text may still carry a leading anchor token
+            // (`&a1\nscalar1`, 9KAX) since `fold_plain_document_lines`
+            // keeps YAML_ANCHOR tokens — peel it off so the event renders
+            // as `=VAL &anchor <tag> :body` rather than burying `&anchor`
+            // in the scalar body.
             let folded = fold_plain_document_lines(doc);
-            format!("=VAL {long} :{}", escape_block_scalar_text(folded.trim()))
+            let (anchor, _, body) = decompose_scalar(folded.trim_start(), handles);
+            scalar_event(anchor, Some(&long), &escape_block_scalar_text(body))
         }
     } else if is_multi_line_quoted {
         quoted_val_event_multi_line(&multi_line_text)
@@ -2429,13 +2435,13 @@ fn seq_open_event(seq_node: &SyntaxNode, handles: &TagHandles) -> String {
         absorb_anchor_or_tag(tok, handles, &mut anchor, &mut long_tag);
     }
     let mut event = String::from("+SEQ");
-    if let Some(t) = long_tag {
-        event.push(' ');
-        event.push_str(&t);
-    }
     if let Some(a) = anchor {
         event.push_str(" &");
         event.push_str(&a);
+    }
+    if let Some(t) = long_tag {
+        event.push(' ');
+        event.push_str(&t);
     }
     event
 }
@@ -2656,16 +2662,7 @@ fn map_open_event_for_block_map(map_node: &SyntaxNode, handles: &TagHandles) -> 
         }
         absorb_anchor_or_tag(tok, handles, &mut anchor, &mut long_tag);
     }
-    let mut event = String::from("+MAP");
-    if let Some(t) = long_tag {
-        event.push(' ');
-        event.push_str(&t);
-    }
-    if let Some(a) = anchor {
-        event.push_str(" &");
-        event.push_str(&a);
-    }
-    event
+    map_open_event_from_props(anchor.as_deref(), long_tag.as_deref())
 }
 
 fn decompose_scalar<'a>(

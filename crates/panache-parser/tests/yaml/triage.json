@@ -540,14 +540,7 @@
       "tree": true
     }
   ],
-  "fails_needs_feature": [
-    {
-      "case_id": "9KAX",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    }
-  ],
+  "fails_needs_feature": [],
   "passes_now": [
     "229Q",
     "26DV",
@@ -641,6 +634,7 @@
     "9DXL",
     "9FMG",
     "9J7A",
+    "9KAX",
     "9MMW",
     "9SA2",
     "9SHH",
@@ -807,8 +801,8 @@
   "summary": {
     "error_contract_ok_count": 69,
     "fails_needs_error_path_count": 9,
-    "fails_needs_feature_count": 1,
-    "passes_now_count": 254,
+    "fails_needs_feature_count": 0,
+    "passes_now_count": 255,
     "total_cases": 352
   }
 }

@@ -773,3 +773,16 @@ UGM3
 57H4
 C4HZ
 EHF6
+# 9KAX: doc-level scalars and block-maps decorated with `&anchor`
+# and `!!str`/`!!map` in either order, across multiple lines.
+# Exposed two projection gaps:
+#   - `scalar_document_value`'s tagged-plain branch never peeled an
+#     anchor token off the folded body, so `&a1\n!!str\nscalar1`
+#     projected `=VAL <tag> :&a1 scalar1` instead of
+#     `=VAL &a1 <tag> :scalar1`. Now decomposes the folded text and
+#     routes through `scalar_event`.
+#   - `+MAP`/`+SEQ` open events emitted tag before anchor; the
+#     yaml-test-suite canonical order is anchor first. Aligned
+#     `map_open_event_for_block_map` and `seq_open_event` with
+#     `map_open_event_from_props`.
+9KAX
