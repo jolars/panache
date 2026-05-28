@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 250
+expression: snapshot
+---
+case_id: GDY7
+input: "key: value\nthis is #not a: key\n"
+has_error_contract: true
+parsed_mapping_tree: false
+diagnostics: [YAML_PARSE_UNEXPECTED_DEDENT:comment cannot appear inside a multi-line plain scalar@11..18]

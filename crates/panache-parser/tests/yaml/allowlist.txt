@@ -618,3 +618,25 @@ AB8U
 # YAML_PARSE_INVALID_PLAIN_SCALAR_IN_FLOW.
 YJV2
 G5U8
+# Error-contract: a line at the block-sequence's own indent that is not a
+# new `- item` is rejected as stray content. The parser already surfaces
+# YAML_PARSE_INVALID_KEY_TOKEN ("stray content following a block sequence
+# item at its indent level") for these.
+# BD7L: a mapping key (`invalid: x`) after `- item1 / - item2`.
+BD7L
+# TD5N: a bare scalar (`invalid`) after `- item1 / - item2`.
+TD5N
+# GT5M: an anchor line (`&node`) between block-sequence items. The
+# scanner doesn't yet dispatch anchors but `&node` at sequence-indent is
+# stray content either way; the existing diagnostic catches it.
+GT5M
+# Error-contract: a second mapping key indented deeper than the first in
+# the same block map (`k1: v1\n k2: v2`). An implicit key cannot span
+# lines (§7.4.2.4); the parser surfaces YAML_PARSE_INVALID_KEY_TOKEN
+# ("implicit key cannot span lines").
+EW3V
+# Error-contract: a `#` mid-line inside a multi-line plain scalar
+# (`this is #not a: key`). A comment cannot appear inside a plain scalar
+# (§6.6); the parser surfaces YAML_PARSE_UNEXPECTED_DEDENT ("comment
+# cannot appear inside a multi-line plain scalar").
+GDY7
