@@ -992,8 +992,11 @@ fn check_multiline_quoted_indent(tree: &SyntaxNode, input: &str) -> Option<YamlD
 ///   each — symptom of a dedent or over-indent that broke the parent
 ///   collection.
 /// - Multiple `YAML_SCALAR` token children inside a single
-///   `YAML_BLOCK_MAP_VALUE` (8XDJ, BF9H): a comment line split a
-///   multi-line plain scalar into two pieces.
+///   `YAML_BLOCK_MAP_VALUE` (8XDJ, BF9H) or directly under a
+///   `YAML_DOCUMENT` (BS4K): a comment line split a multi-line plain
+///   scalar into two pieces. Top-level scalars carry the same
+///   "comment-inside-plain-scalar" failure mode as value-level ones;
+///   the only difference is the absence of an enclosing block-map.
 fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
     if let Some(diag) = check_tab_as_indent(tree) {
         return Some(diag);
@@ -1004,7 +1007,9 @@ fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
     for node in tree.descendants().filter(|n| {
         matches!(
             n.kind(),
-            SyntaxKind::YAML_BLOCK_MAP_VALUE | SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
+            SyntaxKind::YAML_BLOCK_MAP_VALUE
+                | SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
+                | SyntaxKind::YAML_DOCUMENT
         )
     }) {
         let mut struct_count = 0usize;
@@ -1028,7 +1033,15 @@ fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
                 }
             }
         }
-        if struct_count > 1 {
+        // The struct_count > 1 and scalar-after-structural checks below
+        // are about block-collection siblings being split by indent
+        // anomalies — they do not apply to YAML_DOCUMENT, which can
+        // legitimately hold multiple block collections under a
+        // doc-start marker before a doc-end one in error-recovery
+        // shapes. The scalar_count > 1 check that follows applies
+        // uniformly to all included node kinds.
+        let is_doc = node.kind() == SyntaxKind::YAML_DOCUMENT;
+        if !is_doc && struct_count > 1 {
             let n = last_struct.expect("struct_count > 1 implies last_struct set");
             return Some(diag_at_range(
                 n.text_range().start().into(),
@@ -1056,6 +1069,19 @@ fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
             ));
         }
         if scalar_count > 1 {
+            // At YAML_DOCUMENT scope, the v2 scanner currently folds
+            // `%YAML` / `%TAG` directives into plain scalars, so a bare
+            // "two scalars at doc root" shape isn't reliable evidence of
+            // the comment-splits-scalar bug — it commonly fires on
+            // well-formed directive-prefixed documents instead. Require
+            // a YAML_COMMENT token between two scalars to fire, which is
+            // BS4K's actual failure mode. The existing BLOCK_MAP_VALUE /
+            // BLOCK_SEQUENCE_ITEM scopes keep the simpler scalar-count
+            // contract because those parents cannot legitimately hold
+            // two sibling scalars without a comment under any shape.
+            if is_doc && !has_comment_between_scalars(&node) {
+                continue;
+            }
             let scalars: Vec<_> = node
                 .children_with_tokens()
                 .filter_map(|c| c.into_token())
@@ -1064,16 +1090,15 @@ fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
             let last_scalar = scalars
                 .last()
                 .expect("scalar_count > 1 implies at least one scalar child");
-            let (code, message) = if node.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE {
-                (
+            let (code, message) = match node.kind() {
+                SyntaxKind::YAML_BLOCK_MAP_VALUE | SyntaxKind::YAML_DOCUMENT => (
                     diagnostic_codes::PARSE_UNEXPECTED_DEDENT,
                     "comment cannot appear inside a multi-line plain scalar",
-                )
-            } else {
-                (
+                ),
+                _ => (
                     diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
                     "stray content following a block sequence item at its indent level",
-                )
+                ),
             };
             return Some(diag_at_range(
                 last_scalar.text_range().start().into(),
@@ -1084,6 +1109,50 @@ fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
         }
     }
     None
+}
+
+/// True when at least one `YAML_COMMENT` token appears between two
+/// `YAML_SCALAR` token children of `node` (with only trivia in
+/// between). Distinguishes BS4K's "comment splits a multi-line plain
+/// scalar" shape from a multi-scalar artifact caused by the v2
+/// scanner folding `%YAML` / `%TAG` directives as plain scalars
+/// (5TYM, well-formed directive-prefixed documents).
+///
+/// A `YAML_DOCUMENT_START` between the two scalars resets the state:
+/// the next scalar is content of a fresh document section, not a
+/// continuation of the previous one. A leading `%` on a scalar marks
+/// a folded directive and is also ignored.
+fn has_comment_between_scalars(node: &SyntaxNode) -> bool {
+    let mut saw_scalar = false;
+    let mut saw_comment_since_scalar = false;
+    for child in node.children_with_tokens() {
+        let NodeOrToken::Token(t) = &child else {
+            continue;
+        };
+        match t.kind() {
+            SyntaxKind::YAML_SCALAR => {
+                if t.text().starts_with('%') {
+                    continue;
+                }
+                if saw_scalar && saw_comment_since_scalar {
+                    return true;
+                }
+                saw_scalar = true;
+                saw_comment_since_scalar = false;
+            }
+            SyntaxKind::YAML_COMMENT => {
+                if saw_scalar {
+                    saw_comment_since_scalar = true;
+                }
+            }
+            SyntaxKind::YAML_DOCUMENT_START | SyntaxKind::YAML_DOCUMENT_END => {
+                saw_scalar = false;
+                saw_comment_since_scalar = false;
+            }
+            _ => {}
+        }
+    }
+    false
 }
 
 /// Returns the first `YAML_SCALAR` token child of `block_map_value`
@@ -2423,6 +2492,30 @@ mod tests {
         let input = "---\nplain: a\n       b # end of scalar\n       c\n";
         let diag = run(input).expect("expected diagnostic");
         assert_eq!(diag.code, diagnostic_codes::PARSE_UNEXPECTED_DEDENT);
+    }
+
+    #[test]
+    fn doc_level_comment_in_multiline_plain_bs4k() {
+        // BS4K: a comment splits a multi-line plain scalar that sits
+        // at the document root (no enclosing block map / sequence).
+        let input = "word1  # comment\nword2\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::PARSE_UNEXPECTED_DEDENT);
+    }
+
+    #[test]
+    fn doc_level_single_multiline_plain_passes() {
+        // Plain scalar that legitimately spans multiple lines at the
+        // document root (no intervening comment).
+        let input = "word1\nword2\n";
+        assert!(run(input).is_none(), "got {:?}", run(input));
+    }
+
+    #[test]
+    fn multi_document_each_with_single_scalar_passes() {
+        // Two distinct documents, each containing a single scalar.
+        let input = "---\nfoo\n---\nbar\n";
+        assert!(run(input).is_none(), "got {:?}", run(input));
     }
 
     #[test]

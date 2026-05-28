@@ -176,6 +176,13 @@
       "event_parity": false
     },
     {
+      "case_id": "BS4K",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_DEDENT"
+      ],
+      "event_parity": false
+    },
+    {
       "case_id": "C2SP",
       "diagnostic_codes": [
         "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END"
@@ -479,12 +486,6 @@
     },
     {
       "case_id": "9HCY",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "BS4K",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -871,8 +872,8 @@
     "ZWK4"
   ],
   "summary": {
-    "error_contract_ok_count": 67,
-    "fails_needs_error_path_count": 11,
+    "error_contract_ok_count": 68,
+    "fails_needs_error_path_count": 10,
     "fails_needs_feature_count": 11,
     "passes_now_count": 244,
     "total_cases": 352

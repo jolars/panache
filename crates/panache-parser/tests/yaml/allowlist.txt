@@ -28,6 +28,10 @@ T833
 8XDJ
 9CWY
 BF9H
+# BS4K: comment splits a multi-line plain scalar at the document root
+# (no enclosing block-map). Extension of the 8XDJ/BF9H value-level
+# rule into YAML_DOCUMENT scope.
+BS4K
 C2SP
 CML9
 D49Q

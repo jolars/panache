@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 331
+expression: snapshot
+---
+case_id: BS4K
+input: "word1  # comment\nword2\n"
+diagnostics:
+YAML_PARSE_UNEXPECTED_DEDENT:comment cannot appear inside a multi-line plain scalar@17..22
+cst:
