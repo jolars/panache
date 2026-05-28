@@ -640,3 +640,20 @@ EW3V
 # (§6.6); the parser surfaces YAML_PARSE_UNEXPECTED_DEDENT ("comment
 # cannot appear inside a multi-line plain scalar").
 GDY7
+# Error-contract: bare content following a closed quoted scalar on the
+# same line (`key: "quoted" trailing content`). A flow-quoted scalar
+# terminates at its closing quote; subsequent non-trivia on the same
+# line is invalid. The existing multi-line plain-scalar guard rejects
+# the document via YAML_PARSE_UNEXPECTED_DEDENT — wording is approximate
+# but the rejection is correct.
+Q4CL
+# Error-contract: a tag-shorthand prefix (`!prefix!A`) on the same line
+# as a `---` document-start marker. Tag dispatch isn't implemented in
+# the scanner yet, so the prefix is surfaced as trailing content after
+# the marker; the parser rejects via
+# YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START. The fixture's spec
+# error (a `!prefix!` shorthand defined only in the first document) is
+# a different motivation, but both converge on rejection — keeping the
+# case in the harness will flag any future regression where tag dispatch
+# silently accepts the shape.
+QLJ7
