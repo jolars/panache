@@ -344,6 +344,13 @@
       "event_parity": false
     },
     {
+      "case_id": "H7J7",
+      "diagnostic_codes": [
+        "YAML_PARSE_NODE_PROPERTY_UNDERINDENTED"
+      ],
+      "event_parity": false
+    },
+    {
       "case_id": "H7TQ",
       "diagnostic_codes": [
         "YAML_PARSE_MALFORMED_YAML_DIRECTIVE"
@@ -646,12 +653,6 @@
     }
   ],
   "fails_needs_error_path": [
-    {
-      "case_id": "H7J7",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
     {
       "case_id": "QLJ7",
       "diagnostic_codes": [],
@@ -971,8 +972,8 @@
     "ZWK4"
   ],
   "summary": {
-    "error_contract_ok_count": 92,
-    "fails_needs_error_path_count": 2,
+    "error_contract_ok_count": 93,
+    "fails_needs_error_path_count": 1,
     "fails_needs_feature_count": 0,
     "passes_now_count": 308,
     "total_cases": 402

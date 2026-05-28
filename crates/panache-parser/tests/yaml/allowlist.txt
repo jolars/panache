@@ -43,13 +43,12 @@ HU3P
 CTN5
 CXX2
 EB22
-# H7J7 (`key: &x\n!!map\n  a: b`): the prior diagnostic was a spurious
-# `comment cannot appear inside a multi-line plain scalar`, raised
-# because the placeholder bridge fused `&x` and `!!map` into one plain
-# scalar. With anchor dispatch in place the tree parses cleanly; the
-# real error contract (anchor+tag attached to indent-broken value) needs
-# the Phase 6 lex-level error pass to be re-allowlisted.
-# H7J7
+# H7J7 (`key: &x\n!!map\n  a: b`): node property (the `!!map` tag) on a
+# continuation line of a block-map value sits at the parent key's column,
+# violating spec §8.2.2 which requires continuation indent > key column.
+# `check_node_property_underindented` rejects it as
+# PARSE_NODE_PROPERTY_UNDERINDENTED.
+H7J7
 HRE5
 JY7Z
 N4JP

@@ -212,6 +212,9 @@ pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
     if let Some(diag) = check_anchor_without_target(&tree) {
         return Some(diag);
     }
+    if let Some(diag) = check_node_property_underindented(&tree, input) {
+        return Some(diag);
+    }
     if let Some(diag) = check_invalid_tag_chars(&tree) {
         return Some(diag);
     }
@@ -2363,6 +2366,63 @@ fn check_anchor_without_target(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
                     _ => {}
                 },
                 NodeOrToken::Node(_) => saw_value = true,
+            }
+        }
+    }
+    None
+}
+
+/// Cluster Q — anchor/tag property on a continuation line inside a
+/// block-map value, but indented at or below the parent key's column.
+/// YAML 1.2 §8.2.2: a block-map value that ends its first line with a
+/// node property (e.g. `key: &x\n…`) must continue on subsequent lines
+/// at a column strictly greater than the parent key column. A `!!map`
+/// or further `&x` token at the parent key column belongs to the
+/// surrounding map, not to the empty value being decorated, so the
+/// document is malformed.
+///
+/// Covers H7J7 (`key: &x\n!!map\n  a: b`): the parser folds the
+/// dedented tag into the value alongside the nested map. The check
+/// fires once we cross a `NEWLINE` inside `YAML_BLOCK_MAP_VALUE` and
+/// see a property token whose column is ≤ the parent key column.
+fn check_node_property_underindented(tree: &SyntaxNode, input: &str) -> Option<YamlDiagnostic> {
+    for entry in tree
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+    {
+        let Some(key_col) = entry
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)
+            .map(|k| column_of(input, k.text_range().start().into()))
+        else {
+            continue;
+        };
+        let Some(value) = entry
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
+        else {
+            continue;
+        };
+        let mut on_continuation = false;
+        for child in value.children_with_tokens() {
+            let NodeOrToken::Token(tok) = child else {
+                continue;
+            };
+            match tok.kind() {
+                SyntaxKind::NEWLINE => on_continuation = true,
+                SyntaxKind::WHITESPACE | SyntaxKind::YAML_COMMENT => {}
+                SyntaxKind::YAML_TAG | SyntaxKind::YAML_ANCHOR if on_continuation => {
+                    let col = column_of(input, tok.text_range().start().into());
+                    if col <= key_col {
+                        return Some(diag_at_range(
+                            tok.text_range().start().into(),
+                            tok.text_range().end().into(),
+                            diagnostic_codes::PARSE_NODE_PROPERTY_UNDERINDENTED,
+                            "node property must be indented more than the parent key",
+                        ));
+                    }
+                }
+                _ => {}
             }
         }
     }
