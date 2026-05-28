@@ -750,3 +750,14 @@ CN3R
 # containing an embedded alias item. Unlocked by the flow-context
 # anchor propagation + alias-aware `flow_scalar_event` paths.
 X38W
+# SKE5: indentless block sequence as map value, with a `&anchor`
+# decoration on its own line between the `:` and the first `-`.
+# The anchor sits inside the value scope (column > parent mapping
+# indent), so parser_v2 now treats anchors/tags/aliases as
+# transparent when deciding whether to synthesize the
+# YAML_BLOCK_SEQUENCE wrapper, and gates the wrap on the
+# decoration column > BlockEntry column. Event projection's
+# `absorb_preceding_anchor_and_tag` picks up the sibling anchor and
+# emits `+SEQ &anchor`. G9HC (anchor at column 0, parent indent)
+# stays rejected by the column gate.
+SKE5

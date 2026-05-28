@@ -47,21 +47,43 @@ pub fn parse_v2(input: &str) -> SyntaxNode {
     // sub-wrapper is still open and waiting to be closed (by the next
     // `Key` / `BlockEntry` peer or by `BlockEnd`).
     let mut block_stack: Vec<BlockFrame> = Vec::new();
-    // Kind of the last non-trivia, non-stream-marker token emitted.
-    // An indentless block sequence is only valid when its `-` directly
-    // follows the map entry's `:` (the value is otherwise empty), so the
-    // `BlockEntry` handler consults this to tell RLU9 (`foo:\n- 42`,
-    // value is purely the sequence) apart from G9HC (`seq:\n&anchor\n-
-    // a`, value already holds a scalar — an error the validator must
-    // still catch on the unwrapped shape).
+    // Kind of the last non-trivia, non-stream-marker, non-decoration
+    // token emitted. An indentless block sequence is only valid when
+    // its `-` directly follows the map entry's `:` (the value is
+    // otherwise empty), so the `BlockEntry` handler consults this to
+    // tell RLU9 (`foo:\n- 42`, value is purely the sequence) apart from
+    // G9HC (`seq:\n&anchor\n- a` with the anchor at column 0 — an
+    // error the validator must still catch on the unwrapped shape).
+    // Anchor / Tag / Alias tokens are *decorations* of the next node
+    // and don't fill the empty-value slot; they're skipped here so a
+    // value-leading decoration still permits an indentless sequence
+    // (SKE5: `seq:\n &anchor\n- a`).
     let mut prev_significant: Option<TokenKind> = None;
+    // Smallest column among Anchor/Tag/Alias decorations seen since the
+    // last value-filling token. The indentless detector uses this to
+    // distinguish SKE5 (decoration indented past parent → wrap) from
+    // G9HC (decoration at parent indent → leave unwrapped for the
+    // validator). `None` when no decoration is pending.
+    let mut decoration_col_floor: Option<usize> = None;
     while let Some(tok) = scanner.next_token() {
         let last_significant = prev_significant;
+        let decorations_so_far = decoration_col_floor;
+        let is_decoration = matches!(
+            tok.kind,
+            TokenKind::Anchor | TokenKind::Tag | TokenKind::Alias
+        );
         if !matches!(
             tok.kind,
             TokenKind::Trivia(_) | TokenKind::StreamStart | TokenKind::StreamEnd
         ) {
-            prev_significant = Some(tok.kind);
+            if is_decoration {
+                decoration_col_floor = Some(
+                    decoration_col_floor.map_or(tok.start.column, |c| c.min(tok.start.column)),
+                );
+            } else {
+                prev_significant = Some(tok.kind);
+                decoration_col_floor = None;
+            }
         }
         match tok.kind {
             TokenKind::StreamStart | TokenKind::StreamEnd => continue,
@@ -264,11 +286,19 @@ pub fn parse_v2(input: &str) -> SyntaxNode {
                 // is otherwise empty; a `-` after scalar content in the
                 // value is a structural error left unwrapped for the
                 // validator to reject.
+                // Decorations between `:` and `-` are allowed only when
+                // they sit inside the value scope — strictly indented
+                // past the indentless `-`. Otherwise the anchor is at
+                // the parent mapping's level (G9HC) and the sequence
+                // shouldn't wrap.
+                let decorations_inside_value =
+                    decorations_so_far.is_none_or(|c| c > tok.start.column);
                 let indentless_value = last_significant == Some(TokenKind::Value)
                     && matches!(
                         block_stack.last(),
                         Some(BlockFrame::BlockMap { in_value: true, .. })
-                    );
+                    )
+                    && decorations_inside_value;
                 // The mirror case: a `-` landing directly after the `?`
                 // explicit-key indicator opens an indentless sequence as
                 // the KEY's content (6PBE). The scanner likewise pushes no
@@ -282,7 +312,8 @@ pub fn parse_v2(input: &str) -> SyntaxNode {
                             entry_open: true,
                             in_value: false,
                         })
-                    );
+                    )
+                    && decorations_inside_value;
                 if indentless_value || indentless_key {
                     builder.start_node(SyntaxKind::YAML_BLOCK_SEQUENCE.into());
                     block_stack.push(BlockFrame::BlockSequence {

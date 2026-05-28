@@ -574,14 +574,6 @@
       "tree": false
     },
     {
-      "case_id": "SKE5",
-      "diagnostic_codes": [
-        "YAML_PARSE_UNEXPECTED_DEDENT"
-      ],
-      "event_parity": false,
-      "tree": false
-    },
-    {
       "case_id": "UGM3",
       "diagnostic_codes": [
         "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START"
@@ -806,6 +798,7 @@
     "S7BG",
     "S9E8",
     "SBG9",
+    "SKE5",
     "SSW6",
     "SYW4",
     "T26H",
@@ -844,8 +837,8 @@
   "summary": {
     "error_contract_ok_count": 69,
     "fails_needs_error_path_count": 9,
-    "fails_needs_feature_count": 6,
-    "passes_now_count": 249,
+    "fails_needs_feature_count": 5,
+    "passes_now_count": 250,
     "total_cases": 352
   }
 }
