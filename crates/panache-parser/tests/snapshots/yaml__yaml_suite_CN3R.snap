@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 250
+expression: snapshot
+---
+case_id: CN3R
+input: "&flowseq [\n a: b,\n &c c: d,\n { &e e: f },\n &g { g: h }\n]\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

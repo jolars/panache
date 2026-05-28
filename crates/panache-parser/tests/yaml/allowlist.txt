@@ -723,3 +723,30 @@ Q9WF
 # YAML_ALIAS with the same name. Unlocked by Phase 1 of the scanner
 # anchor/alias dispatch work.
 2SXE
+# Anchors and aliases in flow contexts and on complex/structural keys.
+# The event projector now (a) propagates a `&anchor` sitting in the KEY
+# wrapper before a flow-collection-as-key onto the `+SEQ [] &anchor` /
+# `+MAP {} &anchor` open event, (b) propagates an item-level `&anchor`
+# preceding a nested flow collection in a `YAML_FLOW_SEQUENCE_ITEM`
+# onto its open event, (c) carries a doc-level `&anchor` on a
+# doc-direct flow seq/map (`&flowseq [...]`) by preferring children()
+# over descendants() in `project_document`, (d) routes plain-text flow
+# seq items through `flow_scalar_event` so node properties survive
+# (`[&item a, b]`), (e) includes `YAML_ANCHOR`/`YAML_ALIAS` in the
+# flow-map key text and the flow-seq item text so the key/value
+# scalar projection sees them, and (f) emits `=ALI *name` for any
+# scalar whose body begins with `*` (aliases never appear as plain
+# scalars per the YAML 1.2 character set).
+6BFJ
+# CN3R: doc-direct flow sequence with a doc-level `&flowseq` anchor
+# whose items mix bare kv pairs, anchored kv pairs (`&c c: d`), and
+# nested flow maps with both anchored keys (`{ &e e: f }`) and
+# anchors on the nested map itself (`&g { g: h }`). Unlocked by the
+# anchor-propagation paths above.
+CN3R
+# X38W: flow map whose first key is a flow sequence with its own
+# `&a` anchor, whose value is a bare alias (`*b`), and whose second
+# key is itself an alias (`*a`) with a flow-sequence value
+# containing an embedded alias item. Unlocked by the flow-context
+# anchor propagation + alias-aware `flow_scalar_event` paths.
+X38W

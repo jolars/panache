@@ -300,6 +300,27 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
                 out.push("=VAL :".to_string());
             }
         }
+    } else if let Some(flow_collection) = doc.children().find(|n| {
+        matches!(
+            n.kind(),
+            SyntaxKind::YAML_FLOW_MAP | SyntaxKind::YAML_FLOW_SEQUENCE
+        )
+    }) {
+        // A doc-direct flow collection may be preceded by a doc-level
+        // anchor token (`&flowseq [ ... ]`, CN3R). Carry the anchor
+        // onto the open event so `+SEQ [] &flowseq` matches the
+        // expected projection. Looking at `descendants()` (the prior
+        // implementation) is wrong here because it surfaces the
+        // first nested flow_map encountered in document order — for a
+        // `&flowseq [ ... { e: f } ... ]` shape that collapses the
+        // whole document into a bare flow-map projection.
+        let anchor = anchor_preceding_node(doc, &flow_collection);
+        project_flow_collection_node_with_anchor(
+            &flow_collection,
+            anchor.as_deref(),
+            &handles,
+            out,
+        );
     } else if let Some(flow_map) = doc
         .descendants()
         .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
@@ -508,6 +529,12 @@ fn flow_scalar_event(text: &str, handles: &TagHandles) -> String {
         }
         return quoted_val_event(trimmed);
     }
+    // Alias indicator (`*name`). YAML plain scalars cannot begin with `*`,
+    // so a leading `*` is always an alias reference. The trimmed body
+    // (`*name`) is the alias's serialized form.
+    if trimmed.starts_with('*') {
+        return format!("=ALI {trimmed}");
+    }
     let (anchor, long_tag, body) = decompose_scalar(trimmed, handles);
     if anchor.is_some() || long_tag.is_some() {
         return scalar_event(anchor, long_tag.as_deref(), body);
@@ -635,7 +662,11 @@ fn project_flow_seq_item(item: &str, handles: &TagHandles, out: &mut Vec<String>
             out.push(quoted_val_event(trimmed));
         }
     } else {
-        out.push(plain_val_event(&fold_plain_scalar(item)));
+        // Route through `flow_scalar_event` so node properties on a
+        // flow-seq item (`[&item a, b, c]`, 6BFJ) project as
+        // `=VAL &item :a` and alias items (`[*b]`, X38W) project as
+        // `=ALI *b`.
+        out.push(flow_scalar_event(&fold_plain_scalar(item), handles));
     }
 }
 
@@ -1705,7 +1736,11 @@ fn project_flow_map_entry(
         if let Some(ext) = external_key {
             flush_pending_orphan(ext, handles, out);
         }
-        project_flow_collection_node(&collection, handles, out);
+        // Pick up an anchor sitting in the KEY wrapper before the
+        // collection (`{ &a [a, &b b]: *b }`, X38W) so the structural
+        // projection carries `&a` on the open event.
+        let anchor = anchor_preceding_node(&key_node, &collection);
+        project_flow_collection_node_with_anchor(&collection, anchor.as_deref(), handles, out);
         project_flow_map_value(&value_node, handles, out);
         return;
     }
@@ -1715,6 +1750,10 @@ fn project_flow_map_entry(
     // trivia between them, letting `strip_explicit_key_indicator`
     // recognize the `?<sp>` pattern. v1 emitted both as a single
     // `YAML_KEY` token so the join was already a no-op there.
+    // Include `YAML_ANCHOR`/`YAML_ALIAS` so node properties on a flow
+    // map key (`{ &c c: d }`, CN3R) and an alias-as-key (`{ *a: v }`,
+    // X38W) survive into the key text — `flow_scalar_event` then
+    // peels the leading `&anchor` or projects the `*alias`.
     let mut raw_key = key_node
         .descendants_with_tokens()
         .filter_map(|el| el.into_token())
@@ -1723,6 +1762,8 @@ fn project_flow_map_entry(
                 tok.kind(),
                 SyntaxKind::YAML_SCALAR
                     | SyntaxKind::YAML_KEY
+                    | SyntaxKind::YAML_ANCHOR
+                    | SyntaxKind::YAML_ALIAS
                     | SyntaxKind::WHITESPACE
                     | SyntaxKind::NEWLINE
             )
@@ -1849,19 +1890,65 @@ fn project_flow_map_value(value_node: &SyntaxNode, handles: &TagHandles, out: &m
 /// flow-sequence single-pair-map projection so a collection sitting in
 /// key position is projected structurally, not slurped as scalar text.
 fn project_flow_collection_node(node: &SyntaxNode, handles: &TagHandles, out: &mut Vec<String>) {
+    project_flow_collection_node_with_anchor(node, None, handles, out);
+}
+
+/// Variant of [`project_flow_collection_node`] that propagates a
+/// caller-extracted anchor (e.g. `&a [a, &b b]`) into the collection's
+/// open event (`+SEQ [] &a`, `+MAP {} &a`). The anchor name is passed
+/// without its leading `&`.
+fn project_flow_collection_node_with_anchor(
+    node: &SyntaxNode,
+    anchor: Option<&str>,
+    handles: &TagHandles,
+    out: &mut Vec<String>,
+) {
     match node.kind() {
         SyntaxKind::YAML_FLOW_SEQUENCE => {
-            out.push("+SEQ []".to_string());
+            out.push(match anchor {
+                Some(a) => format!("+SEQ [] &{a}"),
+                None => "+SEQ []".to_string(),
+            });
             project_flow_sequence_items_cst(node, handles, out);
             out.push("-SEQ".to_string());
         }
         SyntaxKind::YAML_FLOW_MAP => {
-            out.push("+MAP {}".to_string());
+            out.push(match anchor {
+                Some(a) => format!("+MAP {{}} &{a}"),
+                None => "+MAP {}".to_string(),
+            });
             project_flow_map_entries(node, handles, out);
             out.push("-MAP".to_string());
         }
         _ => {}
     }
+}
+
+/// Walk `container`'s children-with-tokens from the start; return the
+/// anchor name (sans `&`) of any `YAML_ANCHOR` token that sits before
+/// `target` (and is not separated from it by a non-trivia token). Used
+/// to splice a key/value anchor onto a structural projection of a
+/// flow collection (`&a [...]`, `&a { ... }`).
+fn anchor_preceding_node(container: &SyntaxNode, target: &SyntaxNode) -> Option<String> {
+    let mut anchor: Option<String> = None;
+    for el in container.children_with_tokens() {
+        match el {
+            rowan::NodeOrToken::Token(tok) => match tok.kind() {
+                SyntaxKind::YAML_ANCHOR => {
+                    anchor = tok.text().strip_prefix('&').map(|s| s.to_string());
+                }
+                SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::YAML_COMMENT => {}
+                _ => anchor = None,
+            },
+            rowan::NodeOrToken::Node(node) => {
+                if node == *target {
+                    return anchor;
+                }
+                anchor = None;
+            }
+        }
+    }
+    None
 }
 
 /// Project the value side of a flow-sequence single-pair map item:
@@ -1949,18 +2036,18 @@ fn project_flow_sequence_items_cst(
             .children()
             .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
         {
-            out.push("+SEQ []".to_string());
-            project_flow_sequence_items_cst(&nested_seq, handles, out);
-            out.push("-SEQ".to_string());
+            // Propagate an item-level anchor (`[ &g [...] ]`, CN3R-shape)
+            // onto the nested collection's open event.
+            let anchor = anchor_preceding_node(&item, &nested_seq);
+            project_flow_collection_node_with_anchor(&nested_seq, anchor.as_deref(), handles, out);
             continue;
         }
         if let Some(nested_map) = item
             .children()
             .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
         {
-            out.push("+MAP {}".to_string());
-            project_flow_map_entries(&nested_map, handles, out);
-            out.push("-MAP".to_string());
+            let anchor = anchor_preceding_node(&item, &nested_map);
+            project_flow_collection_node_with_anchor(&nested_map, anchor.as_deref(), handles, out);
             continue;
         }
         // Build the item text from scalar/key/colon tokens plus
@@ -1972,6 +2059,10 @@ fn project_flow_sequence_items_cst(
         // `project_flow_seq_item` recognize the kv pattern.
         // `YAML_COMMENT` tokens stay excluded so leading/trailing
         // comments inside multi-line items don't leak into the value.
+        // Include `YAML_ANCHOR`/`YAML_ALIAS` so node properties on a
+        // plain item (`[&item a, b]`, 6BFJ) and bare aliases (`[*b]`,
+        // X38W) survive into the item text — `flow_scalar_event`
+        // (called from `project_flow_seq_item`) then peels them.
         let item_text: String = item
             .descendants_with_tokens()
             .filter_map(|el| el.into_token())
@@ -1981,6 +2072,8 @@ fn project_flow_sequence_items_cst(
                     SyntaxKind::YAML_SCALAR
                         | SyntaxKind::YAML_KEY
                         | SyntaxKind::YAML_COLON
+                        | SyntaxKind::YAML_ANCHOR
+                        | SyntaxKind::YAML_ALIAS
                         | SyntaxKind::WHITESPACE
                         | SyntaxKind::NEWLINE
                 )
@@ -2681,21 +2774,18 @@ fn project_block_map_key_collection(
                 out.push("-SEQ".to_string());
                 return true;
             }
-            SyntaxKind::YAML_FLOW_SEQUENCE => {
-                out.push("+SEQ []".to_string());
-                project_flow_sequence_items_cst(&child, handles, out);
-                out.push("-SEQ".to_string());
+            SyntaxKind::YAML_FLOW_SEQUENCE | SyntaxKind::YAML_FLOW_MAP => {
+                // A flow collection in key position may carry an anchor
+                // sitting as a sibling token inside the KEY wrapper
+                // (`&key [a, b]: value`, 6BFJ). Surface it on the open
+                // event so the projection matches `+SEQ [] &key …`.
+                let anchor = anchor_preceding_node(key_node, &child);
+                project_flow_collection_node_with_anchor(&child, anchor.as_deref(), handles, out);
                 return true;
             }
             SyntaxKind::YAML_BLOCK_MAP => {
                 out.push("+MAP".to_string());
                 project_block_map_entries(&child, handles, out);
-                out.push("-MAP".to_string());
-                return true;
-            }
-            SyntaxKind::YAML_FLOW_MAP => {
-                out.push("+MAP {}".to_string());
-                project_flow_map_entries(&child, handles, out);
                 out.push("-MAP".to_string());
                 return true;
             }

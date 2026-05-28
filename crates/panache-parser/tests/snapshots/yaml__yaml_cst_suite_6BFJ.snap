@@ -1,0 +1,44 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 283
+expression: snapshot
+---
+case_id: 6BFJ
+input: "---\n&mapping\n&key [ &item a, b, c ]: value\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..43
+  YAML_METADATA_CONTENT@0..43
+    YAML_STREAM@0..43
+      YAML_DOCUMENT@0..43
+        YAML_DOCUMENT_START@0..3 "---"
+        NEWLINE@3..4 "\n"
+        YAML_ANCHOR@4..12 "&mapping"
+        NEWLINE@12..13 "\n"
+        YAML_BLOCK_MAP@13..43
+          YAML_BLOCK_MAP_ENTRY@13..43
+            YAML_BLOCK_MAP_KEY@13..36
+              YAML_ANCHOR@13..17 "&key"
+              WHITESPACE@17..18 " "
+              YAML_FLOW_SEQUENCE@18..35
+                YAML_SCALAR@18..19 "["
+                WHITESPACE@19..20 " "
+                YAML_FLOW_SEQUENCE_ITEM@20..27
+                  YAML_ANCHOR@20..25 "&item"
+                  WHITESPACE@25..26 " "
+                  YAML_SCALAR@26..27 "a"
+                YAML_SCALAR@27..28 ","
+                WHITESPACE@28..29 " "
+                YAML_FLOW_SEQUENCE_ITEM@29..30
+                  YAML_SCALAR@29..30 "b"
+                YAML_SCALAR@30..31 ","
+                WHITESPACE@31..32 " "
+                YAML_FLOW_SEQUENCE_ITEM@32..34
+                  YAML_SCALAR@32..34 "c "
+                YAML_SCALAR@34..35 "]"
+              YAML_COLON@35..36 ":"
+            YAML_BLOCK_MAP_VALUE@36..43
+              WHITESPACE@36..37 " "
+              YAML_SCALAR@37..42 "value"
+              NEWLINE@42..43 "\n"

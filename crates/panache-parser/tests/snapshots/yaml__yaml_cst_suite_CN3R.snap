@@ -1,0 +1,72 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 283
+expression: snapshot
+---
+case_id: CN3R
+input: "&flowseq [\n a: b,\n &c c: d,\n { &e e: f },\n &g { g: h }\n]\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..57
+  YAML_METADATA_CONTENT@0..57
+    YAML_STREAM@0..57
+      YAML_DOCUMENT@0..57
+        YAML_ANCHOR@0..8 "&flowseq"
+        WHITESPACE@8..9 " "
+        YAML_FLOW_SEQUENCE@9..56
+          YAML_SCALAR@9..10 "["
+          NEWLINE@10..11 "\n"
+          WHITESPACE@11..12 " "
+          YAML_FLOW_SEQUENCE_ITEM@12..16
+            YAML_SCALAR@12..13 "a"
+            YAML_COLON@13..14 ":"
+            WHITESPACE@14..15 " "
+            YAML_SCALAR@15..16 "b"
+          YAML_SCALAR@16..17 ","
+          NEWLINE@17..18 "\n"
+          WHITESPACE@18..19 " "
+          YAML_FLOW_SEQUENCE_ITEM@19..26
+            YAML_ANCHOR@19..21 "&c"
+            WHITESPACE@21..22 " "
+            YAML_SCALAR@22..23 "c"
+            YAML_COLON@23..24 ":"
+            WHITESPACE@24..25 " "
+            YAML_SCALAR@25..26 "d"
+          YAML_SCALAR@26..27 ","
+          NEWLINE@27..28 "\n"
+          WHITESPACE@28..29 " "
+          YAML_FLOW_SEQUENCE_ITEM@29..40
+            YAML_FLOW_MAP@29..40
+              YAML_SCALAR@29..30 "{"
+              WHITESPACE@30..31 " "
+              YAML_FLOW_MAP_ENTRY@31..39
+                YAML_FLOW_MAP_KEY@31..36
+                  YAML_ANCHOR@31..33 "&e"
+                  WHITESPACE@33..34 " "
+                  YAML_SCALAR@34..35 "e"
+                  YAML_COLON@35..36 ":"
+                YAML_FLOW_MAP_VALUE@36..39
+                  WHITESPACE@36..37 " "
+                  YAML_SCALAR@37..39 "f "
+              YAML_SCALAR@39..40 "}"
+          YAML_SCALAR@40..41 ","
+          NEWLINE@41..42 "\n"
+          WHITESPACE@42..43 " "
+          YAML_FLOW_SEQUENCE_ITEM@43..55
+            YAML_ANCHOR@43..45 "&g"
+            WHITESPACE@45..46 " "
+            YAML_FLOW_MAP@46..54
+              YAML_SCALAR@46..47 "{"
+              WHITESPACE@47..48 " "
+              YAML_FLOW_MAP_ENTRY@48..53
+                YAML_FLOW_MAP_KEY@48..50
+                  YAML_SCALAR@48..49 "g"
+                  YAML_COLON@49..50 ":"
+                YAML_FLOW_MAP_VALUE@50..53
+                  WHITESPACE@50..51 " "
+                  YAML_SCALAR@51..53 "h "
+              YAML_SCALAR@53..54 "}"
+            NEWLINE@54..55 "\n"
+          YAML_SCALAR@55..56 "]"
+        NEWLINE@56..57 "\n"
