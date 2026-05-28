@@ -832,3 +832,91 @@ SY6V
 # GT5M: `- item1\n&node\n- item2` — `&node` lands inside item1 after
 # its value scalar with no node behind it.
 GT5M
+# --- yaml-test-suite numbered subcases ---
+# These live under hashed parents that don't carry a top-level
+# `in.yaml`; the harness now recurses into hashed parents so each
+# `<ID>/<NN>` is its own case. The subcases below already parse
+# losslessly and project events matching `test.event`; grouped by
+# parent theme.
+# 2G84 literal-modifiers — block scalar `|`/`>` headers with chomp
+# and indent indicators. /02 = `--- |1-`, /03 = `--- |10`.
+2G84/02
+2G84/03
+# 3RLN leading-tabs-in-double-quoted — double-quoted scalars whose
+# continuation lines begin with a `\t` escape after fold/indent.
+3RLN/00
+3RLN/01
+3RLN/02
+3RLN/03
+3RLN/04
+3RLN/05
+# 4MUZ flow-mapping-colon-on-line-after-key — `{"foo"\n: "bar"}`
+# style where the `:` for a flow-map entry appears on the next line.
+4MUZ/00
+4MUZ/01
+4MUZ/02
+# 96NN leading-tab-content-in-literals — block literal scalars whose
+# content lines begin with a tab inside the literal body.
+96NN/00
+96NN/01
+# 9MQT scalar-doc-with-in-content — bare-document quoted scalars that
+# contain a `...` or `---` sequence inside the scalar body.
+9MQT/00
+# DE56 trailing-tabs-in-double-quoted — double-quoted scalar whose
+# folded line ends in a tab before the join.
+DE56/00
+DE56/01
+DE56/04
+DE56/05
+# DK95 tabs-that-look-like-indentation — block map/sequence values
+# whose continuation line uses a tab where space-indent would be
+# expected.
+DK95/00
+DK95/02
+DK95/03
+DK95/05
+DK95/07
+DK95/08
+# HM87 scalars-in-flow-start-with-syntax-char — flow-seq/map plain
+# scalars beginning with `:` or other syntax chars (`[:x]`).
+HM87/00
+HM87/01
+# JEF9 trailing-whitespace-in-streams — block-scalar chomp `|+`
+# followed by trailing blank lines forming the keep-trailing newlines.
+JEF9/00
+# KH5V inline-tabs-in-double-quoted — `\t` and literal tab inline in
+# double-quoted scalars (no fold/continuation).
+KH5V/00
+KH5V/01
+KH5V/02
+# L24T trailing-line-of-spaces — block literal scalar whose final
+# content line is whitespace-only.
+L24T/00
+L24T/01
+# M2N8 question-mark-edge-cases — `- ? : x` style explicit-key entries
+# in nested block-sequence/map context.
+M2N8/00
+M2N8/01
+# MUS6 directive-variants — `%YAML 1.1` / `%YAML 1.2` directives with
+# extra spacing or comments before `---`.
+MUS6/02
+MUS6/03
+MUS6/04
+MUS6/05
+MUS6/06
+# SM9W single-character-streams — minimal valid streams of one byte
+# (`-` for empty seq, similar).
+SM9W/00
+SM9W/01
+# UKK6 syntax-character-edge-cases — block-seq entries whose plain
+# scalar is just `:` or another syntax marker.
+UKK6/00
+UKK6/01
+UKK6/02
+# VJP3 flow-collections-over-many-lines — flow map split across
+# multiple continuation lines (`k: {\n k\n :\n v\n }`).
+VJP3/01
+# Y79Y tabs-in-various-contexts — tabs inside flow collections and
+# block-sequence continuation lines.
+Y79Y/002
+Y79Y/010

@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: VJP3/01
+input: "k: {\n k\n :\n v\n }\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

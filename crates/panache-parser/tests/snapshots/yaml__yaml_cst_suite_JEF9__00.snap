@@ -1,0 +1,18 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: JEF9/00
+input: "- |+\n\n\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..7
+  YAML_METADATA_CONTENT@0..7
+    YAML_STREAM@0..7
+      YAML_DOCUMENT@0..7
+        YAML_BLOCK_SEQUENCE@0..7
+          YAML_BLOCK_SEQUENCE_ITEM@0..7
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_SCALAR@2..7 "|+\n\n\n"

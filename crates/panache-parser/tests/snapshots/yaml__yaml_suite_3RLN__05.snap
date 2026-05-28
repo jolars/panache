@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: 3RLN/05
+input: "\"6 leading\n    \t  tab\"\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

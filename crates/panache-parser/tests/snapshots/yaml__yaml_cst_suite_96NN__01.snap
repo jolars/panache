@@ -1,0 +1,21 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: 96NN/01
+input: "foo: |-\n \tbar"
+diagnostics:
+
+cst:
+DOCUMENT@0..13
+  YAML_METADATA_CONTENT@0..13
+    YAML_STREAM@0..13
+      YAML_DOCUMENT@0..13
+        YAML_BLOCK_MAP@0..13
+          YAML_BLOCK_MAP_ENTRY@0..13
+            YAML_BLOCK_MAP_KEY@0..4
+              YAML_SCALAR@0..3 "foo"
+              YAML_COLON@3..4 ":"
+            YAML_BLOCK_MAP_VALUE@4..13
+              WHITESPACE@4..5 " "
+              YAML_SCALAR@5..13 "|-\n \tbar"

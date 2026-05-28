@@ -60,22 +60,51 @@ fn allowlisted_case_paths() -> Vec<(String, PathBuf)> {
 
 fn all_case_paths() -> Vec<(String, PathBuf)> {
     let root = fixture_root();
-    let mut entries: Vec<(String, PathBuf)> = fs::read_dir(&root)
-        .unwrap_or_else(|e| panic!("failed to read {}: {e}", root.display()))
-        .filter_map(|entry| {
-            let entry = entry.unwrap_or_else(|e| panic!("failed to read dir entry: {e}"));
-            let path = entry.path();
-            if !path.is_dir() {
-                return None;
+    let mut entries: Vec<(String, PathBuf)> = Vec::new();
+    for entry in
+        fs::read_dir(&root).unwrap_or_else(|e| panic!("failed to read {}: {e}", root.display()))
+    {
+        let entry = entry.unwrap_or_else(|e| panic!("failed to read dir entry: {e}"));
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .expect("valid UTF-8 case id")
+            .to_string();
+        if path.join("in.yaml").exists() {
+            entries.push((name, path));
+            continue;
+        }
+        // No in.yaml at top level. The yaml-test-suite layout uses two kinds
+        // of non-leaf directories: 4-char hashed parents that hold numbered
+        // subcases (e.g. `2G84/00/in.yaml`), and `name/` / `tags/` index
+        // directories built from symlinks back to the hashed parents.
+        // Recurse only into the hashed parents to avoid double-counting.
+        let is_hashed_parent = name.len() == 4
+            && name
+                .chars()
+                .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit());
+        if !is_hashed_parent {
+            continue;
+        }
+        for sub in
+            fs::read_dir(&path).unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()))
+        {
+            let sub = sub.unwrap_or_else(|e| panic!("failed to read dir entry: {e}"));
+            let sub_path = sub.path();
+            if !sub_path.is_dir() || !sub_path.join("in.yaml").exists() {
+                continue;
             }
-            let case_id = path
+            let sub_name = sub_path
                 .file_name()
                 .and_then(|s| s.to_str())
-                .expect("valid UTF-8 case id")
-                .to_string();
-            Some((case_id, path))
-        })
-        .collect();
+                .expect("valid UTF-8 subcase name");
+            entries.push((format!("{name}/{sub_name}"), sub_path));
+        }
+    }
     entries.sort_by(|a, b| a.0.cmp(&b.0));
     entries
 }

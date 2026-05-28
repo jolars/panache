@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: MUS6/03
+input: "%YAML \t 1.1\n---\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

@@ -169,6 +169,13 @@
       "event_parity": false
     },
     {
+      "case_id": "9MQT/01",
+      "diagnostic_codes": [
+        "YAML_LEX_UNTERMINATED_QUOTED_SCALAR"
+      ],
+      "event_parity": false
+    },
+    {
       "case_id": "B63P",
       "diagnostic_codes": [
         "YAML_PARSE_DIRECTIVE_WITHOUT_DOCUMENT_START"
@@ -247,6 +254,13 @@
     },
     {
       "case_id": "DK4H",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "DK95/06",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_KEY_TOKEN"
       ],
@@ -354,6 +368,13 @@
       "case_id": "LHL4",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_TAG_CHARACTER"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "MUS6/01",
+      "diagnostic_codes": [
+        "YAML_PARSE_DIRECTIVE_AFTER_CONTENT"
       ],
       "event_parity": false
     },
@@ -484,6 +505,13 @@
       "event_parity": false
     },
     {
+      "case_id": "VJP3/00",
+      "diagnostic_codes": [
+        "YAML_LEX_WRONG_INDENTED_FLOW"
+      ],
+      "event_parity": false
+    },
+    {
       "case_id": "W9L4",
       "diagnostic_codes": [
         "YAML_PARSE_UNEXPECTED_INDENT"
@@ -535,7 +563,31 @@
   ],
   "fails_needs_error_path": [
     {
+      "case_id": "2G84/00",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "2G84/01",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "DK95/01",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
       "case_id": "H7J7",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "MUS6/00",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -545,15 +597,104 @@
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
+    },
+    {
+      "case_id": "Y79Y/000",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "Y79Y/003",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "Y79Y/004",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "Y79Y/005",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "Y79Y/006",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "Y79Y/007",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "Y79Y/008",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "Y79Y/009",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
     }
   ],
-  "fails_needs_feature": [],
+  "fails_needs_feature": [
+    {
+      "case_id": "DE56/02",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "DE56/03",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "DK95/04",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "JEF9/01",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "JEF9/02",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "Y79Y/001",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    }
+  ],
   "passes_now": [
     "229Q",
     "26DV",
     "27NA",
     "2AUY",
     "2EBW",
+    "2G84/02",
+    "2G84/03",
     "2JQS",
     "2LFX",
     "2SXE",
@@ -565,11 +706,20 @@
     "3GZX",
     "3MYT",
     "3R3P",
+    "3RLN/00",
+    "3RLN/01",
+    "3RLN/02",
+    "3RLN/03",
+    "3RLN/04",
+    "3RLN/05",
     "3UYS",
     "4ABK",
     "4CQQ",
     "4FJ6",
     "4GC6",
+    "4MUZ/00",
+    "4MUZ/01",
+    "4MUZ/02",
     "4Q9F",
     "4QFQ",
     "4RWC",
@@ -636,6 +786,8 @@
     "93JH",
     "93WF",
     "96L6",
+    "96NN/00",
+    "96NN/01",
     "98YD",
     "9BXH",
     "9DXL",
@@ -643,6 +795,7 @@
     "9J7A",
     "9KAX",
     "9MMW",
+    "9MQT/00",
     "9SA2",
     "9SHH",
     "9TFX",
@@ -672,9 +825,19 @@
     "D9TU",
     "DBG4",
     "DC7X",
+    "DE56/00",
+    "DE56/01",
+    "DE56/04",
+    "DE56/05",
     "DFF7",
     "DHP8",
     "DK3J",
+    "DK95/00",
+    "DK95/02",
+    "DK95/03",
+    "DK95/05",
+    "DK95/07",
+    "DK95/08",
     "DWX9",
     "E76Z",
     "EHF6",
@@ -696,6 +859,8 @@
     "GH63",
     "H2RW",
     "H3Z8",
+    "HM87/00",
+    "HM87/01",
     "HMK4",
     "HMQ5",
     "HS5T",
@@ -705,6 +870,7 @@
     "J7PZ",
     "J7VC",
     "J9HZ",
+    "JEF9/00",
     "JHB9",
     "JQ4R",
     "JR7V",
@@ -715,9 +881,14 @@
     "K527",
     "K54U",
     "K858",
+    "KH5V/00",
+    "KH5V/01",
+    "KH5V/02",
     "KK5P",
     "KMK3",
     "KSS4",
+    "L24T/00",
+    "L24T/01",
     "L383",
     "L94M",
     "L9U5",
@@ -726,6 +897,8 @@
     "LQZ7",
     "LX3P",
     "M29M",
+    "M2N8/00",
+    "M2N8/01",
     "M5C3",
     "M5DY",
     "M6YH",
@@ -733,6 +906,11 @@
     "M7NX",
     "M9B4",
     "MJS9",
+    "MUS6/02",
+    "MUS6/03",
+    "MUS6/04",
+    "MUS6/05",
+    "MUS6/06",
     "MXS3",
     "MYW6",
     "MZX3",
@@ -769,6 +947,8 @@
     "S9E8",
     "SBG9",
     "SKE5",
+    "SM9W/00",
+    "SM9W/01",
     "SSW6",
     "SYW4",
     "T26H",
@@ -783,10 +963,14 @@
     "UDM2",
     "UDR7",
     "UGM3",
+    "UKK6/00",
+    "UKK6/01",
+    "UKK6/02",
     "UT92",
     "UV7Q",
     "V55R",
     "V9D5",
+    "VJP3/01",
     "W42U",
     "W4TN",
     "W5VH",
@@ -797,6 +981,8 @@
     "XV9V",
     "XW4D",
     "Y2GN",
+    "Y79Y/002",
+    "Y79Y/010",
     "YD5X",
     "Z67P",
     "Z9M4",
@@ -806,10 +992,10 @@
     "ZWK4"
   ],
   "summary": {
-    "error_contract_ok_count": 76,
-    "fails_needs_error_path_count": 2,
-    "fails_needs_feature_count": 0,
-    "passes_now_count": 255,
-    "total_cases": 352
+    "error_contract_ok_count": 80,
+    "fails_needs_error_path_count": 14,
+    "fails_needs_feature_count": 6,
+    "passes_now_count": 302,
+    "total_cases": 402
   }
 }

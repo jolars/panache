@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: KH5V/02
+input: "\"3 inline\ttab\"\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

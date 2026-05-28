@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: L24T/01
+input: "foo: |\n  x\n   "
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

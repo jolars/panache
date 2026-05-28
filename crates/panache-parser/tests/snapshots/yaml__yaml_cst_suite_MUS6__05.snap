@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: MUS6/05
+input: "%YAM 1.1\n---\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..13
+  YAML_METADATA_CONTENT@0..13
+    YAML_STREAM@0..13
+      YAML_DOCUMENT@0..13
+        YAML_SCALAR@0..8 "%YAM 1.1"
+        NEWLINE@8..9 "\n"
+        YAML_DOCUMENT_START@9..12 "---"
+        NEWLINE@12..13 "\n"
