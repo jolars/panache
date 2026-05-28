@@ -782,8 +782,7 @@ fn fold_quoted_inner(inner: &str, escaped_breaks: bool) -> String {
             blanks += 1;
             continue;
         }
-        let trimmed_end = out.trim_end_matches([' ', '\t']);
-        out.truncate(trimmed_end.len());
+        trim_trailing_ws_respecting_escape(&mut out, escaped_breaks);
         if escaped_breaks && blanks == 0 && have_first && ends_with_odd_backslashes(&out) {
             // The preceding line ends in an unescaped backslash: the line
             // break is escaped, so the continuation joins with no folded
@@ -814,8 +813,7 @@ fn fold_quoted_inner(inner: &str, escaped_breaks: bool) -> String {
         // to a space, a run of `n` breaks collapses to `n - 1` newlines. When
         // every line is empty/whitespace-only the content is empty and this is
         // the scalar's only contribution (yaml-test-suite NAT4).
-        let trimmed = out.trim_end_matches([' ', '\t']);
-        out.truncate(trimmed.len());
+        trim_trailing_ws_respecting_escape(&mut out, escaped_breaks);
         if blanks == 1 {
             out.push(' ');
         } else {
@@ -827,6 +825,42 @@ fn fold_quoted_inner(inner: &str, escaped_breaks: bool) -> String {
     // No trailing blank run: the final line's trailing whitespace before the
     // closing quote is content (yaml-test-suite 7A4E) and is preserved as-is.
     out
+}
+
+/// Strip trailing space/tab chars from a double-quoted folding buffer,
+/// preserving the first whitespace char of a `\<ws>` escape sequence.
+///
+/// YAML 1.2 §5.7 includes escapes `\<TAB>` (literal tab) and `\<SPACE>`
+/// (literal space) — the whitespace after the backslash is the escape's
+/// argument and must survive the trailing-whitespace strip that fold rules
+/// apply on continuation. Without this, inputs like `"x\<TAB> \n y"`
+/// (DE56/02) lose the tab and the trailing `\` is mis-detected as a
+/// line-continuation marker, collapsing the value to `xy`.
+///
+/// For single-quoted / plain scalars (`escaped_breaks == false`), `\` is
+/// literal content and the function degrades to a plain whitespace strip.
+fn trim_trailing_ws_respecting_escape(out: &mut String, escaped_breaks: bool) {
+    let bytes = out.as_bytes();
+    let mut end = bytes.len();
+    while end > 0 && (bytes[end - 1] == b' ' || bytes[end - 1] == b'\t') {
+        end -= 1;
+    }
+    if !escaped_breaks || end == bytes.len() || end == 0 || bytes[end - 1] != b'\\' {
+        out.truncate(end);
+        return;
+    }
+    let mut bs_start = end - 1;
+    while bs_start > 0 && bytes[bs_start - 1] == b'\\' {
+        bs_start -= 1;
+    }
+    let bs_count = end - bs_start;
+    if bs_count % 2 == 1 {
+        // Unescaped `\` — the next byte (a space or tab) is the escape's
+        // argument; keep it and trim anything past it.
+        out.truncate(end + 1);
+    } else {
+        out.truncate(end);
+    }
 }
 
 /// Whether `s` ends with an odd-length run of `\` characters, i.e. the final
@@ -1329,13 +1363,20 @@ fn fold_block_scalar_raw(
     // column of the parent block (block-map-entry or block-sequence-item)
     // that contains the block-scalar; nested map/seq values pick up
     // the right anchor (e.g. `- aaa: |2` → parent col 2 + 2 → 4).
+    //
+    // §6.1: indentation only counts as spaces. A tab (or other non-space
+    // char) past the leading spaces is content, so a line like ` \t`
+    // counts as non-empty with leading-space count 1 (Y79Y/001).
+    // If every line is space-only, fall back to the max leading-space
+    // count among all lines per §8.1.1.1 paragraph 2 (JEF9/01-02).
+    let leading_spaces = |l: &str| l.chars().take_while(|c| *c == ' ').count();
     let content_indent = match explicit_indent {
         Some(m) => parent_indent + m,
         None => lines
             .iter()
-            .find(|l| !l.trim().is_empty())
-            .map(|l| l.chars().take_while(|c| *c == ' ').count())
-            .unwrap_or(0),
+            .find(|l| l.chars().any(|c| c != ' '))
+            .map(|l| leading_spaces(l))
+            .unwrap_or_else(|| lines.iter().map(|l| leading_spaces(l)).max().unwrap_or(0)),
     };
 
     // Truncate at the first non-empty line whose indentation drops below the
@@ -1416,10 +1457,14 @@ fn fold_block_scalar_raw(
             // Keep chomping preserves the line break after the last
             // content line plus one line break per trailing empty line.
             // "Empty" is checked on the stripped text (so a raw `  `
-            // line stripped to ` ` is content, not empty). Falling back
-            // on `raw_trailing_newlines` for content-free bodies keeps
-            // bare-blank-keep cases (`|+\n\n\n`) producing the right
-            // count without a spurious extra newline.
+            // line stripped to ` ` is content, not empty).
+            //
+            // When there are no content lines (`seen_content == false`),
+            // each whitespace-only body line still contributes one `\n`
+            // (JEF9/02 produces `\n` even with no trailing source newline,
+            // because the line break after the header is implicit). Fall
+            // back to `raw_trailing_newlines` only when no body line was
+            // captured at all (`|+\n` with no body source).
             let body_trailing_empty = stripped
                 .iter()
                 .rev()
@@ -1427,6 +1472,8 @@ fn fold_block_scalar_raw(
                 .count();
             let count = if seen_content {
                 body_trailing_empty + 1
+            } else if !stripped.is_empty() {
+                body_trailing_empty
             } else {
                 raw_trailing_newlines
             };

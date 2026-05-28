@@ -1,0 +1,15 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: DE56/03
+input: "\"4 trailing\\\t  \n    tab\"\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..25
+  YAML_METADATA_CONTENT@0..25
+    YAML_STREAM@0..25
+      YAML_DOCUMENT@0..25
+        YAML_SCALAR@0..24 "\"4 trailing\\\t  \n    tab\""
+        NEWLINE@24..25 "\n"

@@ -649,42 +649,12 @@
   ],
   "fails_needs_feature": [
     {
-      "case_id": "DE56/02",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "DE56/03",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "DK95/04",
       "diagnostic_codes": [
         "YAML_PARSE_UNEXPECTED_INDENT"
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "JEF9/01",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "JEF9/02",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "Y79Y/001",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     }
   ],
   "passes_now": [
@@ -827,6 +797,8 @@
     "DC7X",
     "DE56/00",
     "DE56/01",
+    "DE56/02",
+    "DE56/03",
     "DE56/04",
     "DE56/05",
     "DFF7",
@@ -871,6 +843,8 @@
     "J7VC",
     "J9HZ",
     "JEF9/00",
+    "JEF9/01",
+    "JEF9/02",
     "JHB9",
     "JQ4R",
     "JR7V",
@@ -981,6 +955,7 @@
     "XV9V",
     "XW4D",
     "Y2GN",
+    "Y79Y/001",
     "Y79Y/002",
     "Y79Y/010",
     "YD5X",
@@ -994,8 +969,8 @@
   "summary": {
     "error_contract_ok_count": 80,
     "fails_needs_error_path_count": 14,
-    "fails_needs_feature_count": 6,
-    "passes_now_count": 302,
+    "fails_needs_feature_count": 1,
+    "passes_now_count": 307,
     "total_cases": 402
   }
 }

@@ -920,3 +920,21 @@ VJP3/01
 # block-sequence continuation lines.
 Y79Y/002
 Y79Y/010
+# DE56/02-03 trailing-tab-via-escape-in-double-quoted — `\<TAB>` is
+# the YAML escape for a tab character (§5.7); the fold's
+# trailing-whitespace strip now preserves the escape argument before
+# applying line folding and the line-continuation `\<newline>` test.
+DE56/02
+DE56/03
+# JEF9/01-02 keep-chomp-with-whitespace-only-body — `|+` block scalar
+# whose only body line is whitespace; content indent now falls back
+# to the max leading-space count when no line has past-indent content,
+# and Keep chomp emits one `\n` per whitespace-only line even when
+# the source has no terminating newline.
+JEF9/01
+JEF9/02
+# Y79Y/001 tab-after-indent-in-literal — literal block scalar value
+# whose content line is ` \t`; the leading space is indent, the tab
+# is content, and content-indent detection now treats tabs past
+# leading spaces as content rather than whitespace.
+Y79Y/001
