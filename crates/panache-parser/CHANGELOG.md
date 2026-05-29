@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.13.0](https://github.com/jolars/panache/compare/panache-parser-v0.12.0...panache-parser-v0.13.0) (2026-05-29)
+
+### Features
+- **parser:** reject yaml node property under parent key indent ([`db371fd`](https://github.com/jolars/panache/commit/db371fd97830263f0410cfb59a0e9a9f4898319e))
+- **parser:** reject yaml %YAML directive with malformed version ([`557b116`](https://github.com/jolars/panache/commit/557b1162f41d450280af35aa89cd488aedbd6b00))
+- **parser:** reject invalid yaml block-scalar indent + tab-in-quoted ([`e577390`](https://github.com/jolars/panache/commit/e577390270b8c784e64ad67d0a3f8a4456034ebe))
+- **parser:** detect tab-in-indent-slot in yaml `check_tab_as_indent` ([`8b2ece9`](https://github.com/jolars/panache/commit/8b2ece90325a4a860b5c9bd7c20b784c5bc6d690))
+- **parser:** reject yaml anchor in invalid positions ([`c8b8d6d`](https://github.com/jolars/panache/commit/c8b8d6d311c3c7a5f5d9fa3f1d04089aaa1226ed))
+- **parser:** reject yaml tag with c-flow-indicator char ([`d83dca9`](https://github.com/jolars/panache/commit/d83dca99f7379a08462a5cfe2cacf54551687183))
+- **parser:** reject yaml anchor decorating alias node ([`53289ca`](https://github.com/jolars/panache/commit/53289cac2dcb7efb8bbe2260463e5a39dd8c9cdb))
+- **parser:** dispatch yaml `!tag` tokens in scanner ([`378a380`](https://github.com/jolars/panache/commit/378a3803889ccf11920416b68a40e17ddc62707f))
+- **parser:** wrap indentless yaml seq when anchor decorates value ([`a7ca3c1`](https://github.com/jolars/panache/commit/a7ca3c1902eb58db57fc7fb7905d8586f51cc515))
+- **parser:** propagate yaml anchors and aliases through flow projection ([`5874f78`](https://github.com/jolars/panache/commit/5874f785cc7c40534c25c3add630ec45dbc9d03e))
+- **parser:** dispatch yaml `&anchor` / `*alias` in scanner ([`3959305`](https://github.com/jolars/panache/commit/39593053eecff1fa9bc293f0e2e3aaa27cb1aa53))
+- **parser:** support flow collections as complex yaml keys ([`f1799d2`](https://github.com/jolars/panache/commit/f1799d23a15f850931b756b265ba7a574cf83e92))
+- **parser:** reject yaml doc markers in flow and seq-item quoted dedent ([`8eddfdc`](https://github.com/jolars/panache/commit/8eddfdc40446c1902ab59e2b0ef3d8f8e5f20471))
+- **parser:** reject doc-level comment-split plain scalar (BS4K) ([`641313a`](https://github.com/jolars/panache/commit/641313a60ec92844163567b87b2a7c4f3f7b8857))
+
+### Bug Fixes
+- add `inline-images` to gfm flavor ([`8ade630`](https://github.com/jolars/panache/commit/8ade63092ef9dc58bab04d37a2f9fa44a7256d0f))
+- **parser:** preserve `\<ws>` escape arg and tab-as-content in yaml fold ([`c99c6a5`](https://github.com/jolars/panache/commit/c99c6a509ded4420b1bdb01030aaf7f87ca3f25c))
+- **parser:** emit yaml anchor before tag in event projection ([`26c0b5f`](https://github.com/jolars/panache/commit/26c0b5fc98feccef606f28ee49aade9f3a90375a))
+- **parser:** allow column-0 block scalar body at doc root ([`a0f358c`](https://github.com/jolars/panache/commit/a0f358c47a3635d050adbdc96810e8fccab1c37d))
+- **parser:** reject YAML comment not preceded by space ([`a6125c3`](https://github.com/jolars/panache/commit/a6125c361b0b86ebac4a4bc76237f59aee9cc1ca))
+- keep grid tables at column 0 to match pandoc ([`73016e3`](https://github.com/jolars/panache/commit/73016e3acabdfff0b0c800e8c557ea51a63456b4))
+- **parser:** reject unterminated and over-indented YAML scalars ([`23f855e`](https://github.com/jolars/panache/commit/23f855ebfa2b14c1a908d031aef464cdc0bb155a))
 ## [0.12.0](https://github.com/jolars/panache/compare/panache-parser-v0.11.0...panache-parser-v0.12.0) (2026-05-26)
 
 ### Features

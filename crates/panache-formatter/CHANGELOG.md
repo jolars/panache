@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0](https://github.com/jolars/panache/compare/panache-formatter-v0.7.0...panache-formatter-v0.8.0) (2026-05-29)
+
+### Features
+- **formatter:** reflow grid table cells ([`721b110`](https://github.com/jolars/panache/commit/721b1104b609ac9401e0bc8c9faa6dbfb925eaf7)), closes [#323](https://github.com/jolars/panache/issues/323)
+- **formatter:** reflow multiline table cells ([`5682db7`](https://github.com/jolars/panache/commit/5682db7e2389f862c90655c55bd2ab1c0cc08248)), ref [#323](https://github.com/jolars/panache/issues/323)
+
+### Bug Fixes
+- **parser:** don't swallow space after inline code in emph ([`adf92fa`](https://github.com/jolars/panache/commit/adf92fae91d50c4a9cc82cc10128c8f1232e858b)), closes [#332](https://github.com/jolars/panache/issues/332)
+- **formatter:** preserve grid table column widths ([`c4d011b`](https://github.com/jolars/panache/commit/c4d011b4a2b1ca1ab7c2ddc9728f8d3f04724f77))
+- keep grid tables at column 0 to match pandoc ([`73016e3`](https://github.com/jolars/panache/commit/73016e3acabdfff0b0c800e8c557ea51a63456b4))
+
+### Dependencies
+- updated crates/panache-parser to v0.13.0
 ## [0.7.0](https://github.com/jolars/panache/compare/panache-formatter-v0.6.1...panache-formatter-v0.7.0) (2026-05-26)
 
 ### Features
