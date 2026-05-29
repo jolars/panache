@@ -98,16 +98,16 @@
       "id": "residual_splice_26dv",
       "file": "crates/panache-parser/src/parser/yaml/events.rs",
       "anchor_line": 3117,
-      "summary": "26DV / BU8L / 6JWB residual-splice path inside project_block_map_entry_value: when a value_node has a nested YAML_BLOCK_MAP and the leading YAML_SCALAR carries fused node properties + residual text, peel the properties (via extract_leading_node_properties) and splice the residual as the first entry's key (which the parser left empty).",
-      "classification": "PARSER_GAP",
-      "ownership_target": "scanner.rs",
-      "rationale": "The scanner fuses sequences like `&node3\\n  *alias1` and `key0:\\n  &anchor inner` into a single YAML_SCALAR token, then parser_v2 puts that scalar before (not inside) the nested YAML_BLOCK_MAP, leaving the first entry with an empty key. Fixing the scanner to emit YAML_ANCHOR / YAML_ALIAS as separate tokens (or break the scalar at the newline boundary when the next line introduces a nested map) eliminates the fusion. Companion fix in parser_v2 may be needed so the leading properties land inside the YAML_BLOCK_MAP rather than as siblings.",
-      "predicted_regressions_if_ablated": ["26DV", "BU8L", "6JWB"],
+      "summary": "26DV / BU8L / 6JWB residual-splice path inside project_block_map_entry_value (and a parallel path inside project_block_sequence_items): when a value/item had a nested YAML_BLOCK_MAP and the leading YAML_SCALAR carried fused node properties + residual text, peel the properties and splice the residual as the first entry's empty key.",
+      "classification": "RESOLVED",
+      "resolution": "Dead code at audit time on both splice paths (block-map-value and block-sequence-item). CST probes for all three seed cases show the scanner already emits YAML_ANCHOR / YAML_ALIAS / YAML_TAG as dedicated tokens, and the nested YAML_BLOCK_MAP's first entry has a real (non-empty) key, so the splice condition (`!residual.is_empty() && first_entry_empty`) never fires. Ablated both branches under `if false`, ran the full yaml suite (17/17 pass), then deleted the branches and the now-unused `project_spliced_nested_map` helper. `extract_leading_node_properties` still has one caller (`map_open_event_for_value`) that discards `residual` — its return type can be simplified as a follow-up.",
+      "ownership_target": null,
+      "predicted_regressions_if_ablated": [],
       "seed_case_ids_in_comments": ["26DV", "BU8L", "6JWB"],
       "depends_on": [],
-      "blocks": ["decompose_scalar"],
-      "fix_size_estimate": "M",
-      "test_strategy": "Scanner unit tests for the three seed inputs verifying YAML_ANCHOR / YAML_ALIAS emission; CST snapshots for each; projection parity for the three seed cases."
+      "blocks": [],
+      "fix_size_estimate": "S",
+      "test_strategy": "n/a — removed."
     },
     {
       "id": "extract_tagged_block_scalar",
@@ -192,7 +192,6 @@
     }
   ],
   "sequencing": [
-    "residual_splice_26dv",
     "extract_tagged_block_scalar",
     "absorb_anchor_or_tag_text_fallback",
     "decompose_scalar",

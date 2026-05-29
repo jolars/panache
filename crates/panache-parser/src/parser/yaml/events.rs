@@ -2356,20 +2356,6 @@ fn project_block_sequence_items(
             .children()
             .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
         {
-            // `- !!map\n  key: …` (6JWB): the scanner fuses the item's node
-            // properties and the first key into one YAML_SCALAR before the
-            // nested map, whose first entry then has an empty key. Hoist the
-            // properties onto the `+MAP` and splice the residual first key in.
-            let (anchor, long_tag, residual) = extract_leading_node_properties(&item, handles);
-            let first_entry_empty = nested_map
-                .children()
-                .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
-                .as_ref()
-                .is_some_and(block_map_entry_key_is_empty);
-            if !residual.is_empty() && first_entry_empty {
-                project_spliced_nested_map(&nested_map, anchor, long_tag, &residual, handles, out);
-                continue;
-            }
             out.push(map_open_event_for_block_map(&nested_map, handles));
             project_block_map_entries(&nested_map, handles, out);
             out.push("-MAP".to_string());
@@ -3028,22 +3014,6 @@ fn project_block_map_entry_value(
         .children()
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
     {
-        // 26DV: a value scalar like `&node3 \n  *alias1 ` lands as a
-        // single YAML_SCALAR before the nested YAML_BLOCK_MAP. Strip the
-        // node properties (anchor and/or tag, BU8L), then splice any
-        // residual text (e.g. `*alias1`, or the fused first key `a`) in
-        // as the first entry's key when that entry has an empty key
-        // (the v2 builder shape for an indented implicit map).
-        let (anchor, long_tag, residual) = extract_leading_node_properties(value_node, handles);
-        let first_entry_empty = nested_map
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
-            .as_ref()
-            .is_some_and(block_map_entry_key_is_empty);
-        if !residual.is_empty() && first_entry_empty {
-            project_spliced_nested_map(&nested_map, anchor, long_tag, &residual, handles, out);
-            return;
-        }
         out.push(map_open_event_for_value(value_node, handles));
         project_block_map_entries(&nested_map, handles, out);
         out.push("-MAP".to_string());
@@ -3229,48 +3199,6 @@ fn project_block_map_entry_value(
             out.push(scalar_event(anchor, long_tag.as_deref(), body_for_event));
         }
     }
-}
-
-/// Emit a nested YAML_BLOCK_MAP whose hoisted node properties (`anchor` /
-/// `long_tag`) and fused first key (`residual`) were peeled off the preceding
-/// scalar by [`extract_leading_node_properties`]. The map's first entry has an
-/// empty key (just the boundary `:`); `residual` *is* that key. Shared by the
-/// block-map-value path (BU8L) and the block-sequence-item path (6JWB).
-fn project_spliced_nested_map(
-    nested_map: &SyntaxNode,
-    anchor: Option<String>,
-    long_tag: Option<String>,
-    residual: &str,
-    handles: &TagHandles,
-    out: &mut Vec<String>,
-) {
-    out.push(map_open_event_from_props(
-        anchor.as_deref(),
-        long_tag.as_deref(),
-    ));
-    if residual.starts_with('*') {
-        out.push(format!("=ALI {residual}"));
-    } else {
-        let (anchor, body_tag, body) = decompose_scalar(residual, handles);
-        out.push(scalar_event(anchor, body_tag.as_deref(), body));
-    }
-    let mut entries = nested_map
-        .children()
-        .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY);
-    if let Some(first_entry) = entries.next() {
-        if let Some(value_node) = first_entry
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
-        {
-            project_block_map_entry_value(&value_node, handles, out);
-        } else {
-            out.push("=VAL :".to_string());
-        }
-    }
-    for entry in entries {
-        project_block_map_entry(&entry, handles, out);
-    }
-    out.push("-MAP".to_string());
 }
 
 /// Reconstruct a YAML_BLOCK_MAP_VALUE's scalar text with line breaks intact
