@@ -284,16 +284,6 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
                 out.push("+MAP {}".to_string());
                 out.append(&mut flow_values);
                 out.push("-MAP".to_string());
-            } else if let Some(flow_seq) = doc
-                .descendants()
-                .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
-                && let Some(items) = simple_flow_sequence_items(&flow_seq.text().to_string())
-            {
-                out.push("+SEQ []".to_string());
-                for item in items {
-                    project_flow_seq_item(&item, &handles, out);
-                }
-                out.push("-SEQ".to_string());
             } else if let Some(scalar) = scalar_document_value(doc, &handles) {
                 out.push(scalar);
             } else {
@@ -1035,63 +1025,6 @@ fn long_tag_builtin(tag: &str) -> Option<String> {
         return Some(format!("<!{rest}>"));
     }
     None
-}
-
-fn simple_flow_sequence_items(text: &str) -> Option<Vec<String>> {
-    let trimmed = text.trim();
-    let inner = trimmed.strip_prefix('[')?.strip_suffix(']')?;
-    let inner = inner.trim();
-    if inner.is_empty() {
-        return Some(Vec::new());
-    }
-
-    let mut items = Vec::new();
-    let mut start = 0usize;
-    let mut in_single = false;
-    let mut in_double = false;
-    let mut escaped_double = false;
-
-    for (idx, ch) in inner.char_indices() {
-        if in_double {
-            if escaped_double {
-                escaped_double = false;
-                continue;
-            }
-            match ch {
-                '\\' => escaped_double = true,
-                '"' => in_double = false,
-                _ => {}
-            }
-            continue;
-        }
-
-        if in_single {
-            if ch == '\'' {
-                in_single = false;
-            }
-            continue;
-        }
-
-        match ch {
-            '\'' => in_single = true,
-            '"' => in_double = true,
-            ',' => {
-                let item = inner[start..idx].trim();
-                if item.is_empty() {
-                    return None;
-                }
-                items.push(item.to_string());
-                start = idx + 1;
-            }
-            _ => {}
-        }
-    }
-
-    let last = inner[start..].trim();
-    if !last.is_empty() {
-        items.push(last.to_string());
-    }
-    Some(items)
 }
 
 fn escape_block_scalar_text(text: &str) -> String {
@@ -2889,16 +2822,7 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
     // v1 wouldn't reach this strip because its v1-shape `YAML_KEY`
     // token carried only the implicit key body.
     let key_trimmed = strip_explicit_key_indicator(key_text.trim());
-    if key_trimmed.starts_with('[')
-        && key_trimmed.ends_with(']')
-        && let Some(items) = simple_flow_sequence_items(key_trimmed)
-    {
-        out.push("+SEQ []".to_string());
-        for item in items {
-            project_flow_seq_item(&item, handles, out);
-        }
-        out.push("-SEQ".to_string());
-    } else if key_trimmed.starts_with('*') {
+    if key_trimmed.starts_with('*') {
         out.push(format!("=ALI {key_trimmed}"));
     } else if key_tag.is_none()
         && let Some((indicator, body)) = extract_block_scalar_body(&key_node)
@@ -3035,15 +2959,7 @@ fn project_block_map_entry_value(
         .collect::<Vec<_>>()
         .join("");
 
-    if value_tag.is_none()
-        && let Some(items) = simple_flow_sequence_items(&value_text)
-    {
-        out.push("+SEQ []".to_string());
-        for item in items {
-            project_flow_seq_item(&item, handles, out);
-        }
-        out.push("-SEQ".to_string());
-    } else if value_text.trim().is_empty() {
+    if value_text.trim().is_empty() {
         if let Some(tag) = value_tag
             && let Some(long) = resolve_long_tag(&tag, handles)
         {

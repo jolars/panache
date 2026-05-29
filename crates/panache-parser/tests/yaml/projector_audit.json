@@ -35,16 +35,16 @@
       "id": "simple_flow_sequence_items",
       "file": "crates/panache-parser/src/parser/yaml/events.rs",
       "anchor_line": 1040,
-      "summary": "Comma-split a `[...]` flow-sequence text into items with quote-nesting tracking. Called from project_block_map_entry_value at l.3249 as a text fallback when value_node has no YAML_FLOW_SEQUENCE child.",
-      "classification": "CST_FIDELITY_BUG",
-      "ownership_target": "parser_v2.rs",
-      "rationale": "Likely dead code after the structured YAML_FLOW_SEQUENCE branch at l.3163 took precedence. The text fallback's comment at l.3158-3162 explicitly notes the structured path is needed because the text fallback below strips colons during value_text assembly. If the structured path covers all flow-seq-inside-block-map shapes, this helper is removable; if any shape still falls through, parser_v2 needs to ensure flow-seq lands as a YAML_FLOW_SEQUENCE child consistently.",
+      "summary": "Comma-split a `[...]` flow-sequence text into items with quote-nesting tracking. Three callers: doc-level descendant-search fallback, explicit-key flow-seq projection, and project_block_map_entry_value text fallback.",
+      "classification": "RESOLVED",
+      "resolution": "Dead at all three call sites. Ablated by making the function return None, full yaml suite stayed green (17/17). The structured flow-collection paths (`project_flow_collection_node`, `project_flow_collection_node_with_anchor`) cover every allowlisted case. Helper and all three call sites removed.",
+      "ownership_target": null,
       "predicted_regressions_if_ablated": [],
       "seed_case_ids_in_comments": [],
-      "depends_on": ["flow_kv_split"],
+      "depends_on": [],
       "blocks": [],
       "fix_size_estimate": "S",
-      "test_strategy": "Ablate (return None unconditionally), run yaml_allowlist_projected_event_parity. Empty regression set confirms dead-code; any regression points at the parser_v2 shape gap to close."
+      "test_strategy": "n/a — removed."
     },
     {
       "id": "fold_block_scalar_raw",
@@ -194,7 +194,6 @@
   "sequencing": [
     "decompose_scalar",
     "flow_kv_split",
-    "simple_flow_sequence_items",
     "find_block_scalar_kv_split",
     "fold_block_scalar_raw"
   ],
