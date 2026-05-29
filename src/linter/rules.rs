@@ -14,6 +14,7 @@ pub mod heading_eaten_attrs;
 pub mod heading_hierarchy;
 pub mod heading_strip_comments_residue;
 pub mod html_entities;
+pub mod link_text_is_url;
 pub mod missing_chunk_labels;
 pub mod stray_fenced_div_markers;
 pub mod undefined_anchor;

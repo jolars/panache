@@ -167,6 +167,9 @@ fn default_registry(config: &Config) -> RuleRegistry {
     if config.lint.is_rule_enabled("html-entities") {
         registry.register(Box::new(rules::html_entities::HtmlEntitiesRule));
     }
+    if config.lint.is_rule_enabled("link-text-is-url") {
+        registry.register(Box::new(rules::link_text_is_url::LinkTextIsUrlRule));
+    }
     if ext.fenced_divs && config.lint.is_rule_enabled("stray-fenced-div-markers") {
         registry.register(Box::new(
             rules::stray_fenced_div_markers::StrayFencedDivMarkersRule,

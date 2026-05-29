@@ -654,6 +654,60 @@ warning[html-entities]: HTML entity '&numero' is missing a trailing ';'
   = help: write '&numero;' to encode the character
 ```
 
+### `link-text-is-url` {#link-text-is-url}
+
+Detects inline links whose visible text is identical to the destination URL
+(e.g. `[https://example.com/](https://example.com/)`) --- typically an artifact
+of HTML→Markdown conversion --- and offers to rewrite them as an autolink.
+
+Severity
+:   Warning
+
+Auto-fix
+:   Yes (replaces the bracket form with `<url>`)
+
+Diagnostic codes
+:   [`link-text-is-url`](#link-text-is-url)
+
+Description
+
+:   The rule fires only when **all** of the following hold:
+
+    - the link is inline (`[text](url)`), not reference-style;
+    - the link text is plain --- no nested emphasis, code, or other inline
+      structure;
+    - the rendered link text is byte-identical to the destination URL, including
+      any trailing slash;
+    - the link has no title;
+    - the URL passes the dialect's autolink validator (CommonMark §6.4 schemes /
+      email shape; the Pandoc dialect is laxer).
+
+    The byte-exact text-vs-URL check is intentional: changing `[A](B)` to `<A>`
+    rewrites where the link points. The rule never silently changes a destination,
+    so cases like `[https://example.net/](https://example.net)` (text and URL differ
+    by a trailing slash) are skipped even though they look "almost" duplicated. Use
+    the LSP code action to convert those manually if intended.
+
+**Example violation:**
+
+```markdown
+See [https://example.com/](https://example.com/) for details.
+```
+
+**Diagnostic:**
+
+```
+warning[link-text-is-url]: Link text is identical to the URL; an autolink is shorter and clearer.
+ --> document.md:1:5
+  = help: rewrite as `<https://example.com/>`
+```
+
+**Auto-fix output:**
+
+```markdown
+See <https://example.com/> for details.
+```
+
 ### `adjacent-footnote-refs` {#adjacent-footnote-refs}
 
 Detects footnote references placed back-to-back (`[^a][^b]`) where the rendered

@@ -98,6 +98,33 @@ fn test_duplicate_footnotes() {
 }
 
 #[test]
+fn test_link_text_is_url() {
+    let diagnostics = lint_file("link_text_is_url.md");
+    let hits: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "link-text-is-url")
+        .collect();
+
+    // The fixture has six bracket-shape candidates, but only the first should fire:
+    // - line 5 (plain match)               → fires
+    // - line 9 (trailing-slash mismatch)   → skip (destination changes)
+    // - line 13 (scheme-less /docs/intro)  → skip (autolink validator rejects)
+    // - line 17 (title present)            → skip
+    // - line 21 (formatted text)           → skip
+    // - line 25 (reference-style link)     → skip (out of scope)
+    assert_eq!(
+        hits.len(),
+        1,
+        "expected only the plain match to fire, got: {:?}",
+        hits.iter().map(|d| &d.message).collect::<Vec<_>>()
+    );
+    assert_eq!(hits[0].location.line, 5);
+    let fix = hits[0].fix.as_ref().expect("autofix");
+    assert_eq!(fix.edits.len(), 1);
+    assert_eq!(fix.edits[0].replacement, "<https://example.com/>");
+}
+
+#[test]
 fn test_no_duplicates() {
     let diagnostics = lint_file("no_duplicates.md");
     let dup: Vec<_> = diagnostics
