@@ -113,16 +113,16 @@
       "id": "extract_tagged_block_scalar",
       "file": "crates/panache-parser/src/parser/yaml/events.rs",
       "anchor_line": 1141,
-      "summary": "Detect a block-map value shaped `<node-properties> <block-scalar>` (e.g. `folded: !foo >1\\n value`, M5C3 / Z67P). The comment states explicitly: \"The scanner embeds the node properties *inside* the leading YAML_SCALAR token rather than a separate YAML_TAG, so extract_block_scalar_body sees a header line of `!foo >1` that doesn't parse as an indicator and bails.\"",
-      "classification": "PARSER_GAP",
-      "ownership_target": "scanner.rs",
-      "rationale": "Tag/anchor dispatch landed in the scanner per SKILL.md, but block-scalar headers preceded by `!tag` or `&anchor` still get fused into the scalar token. The scanner should emit YAML_TAG/YAML_ANCHOR before the YAML_SCALAR carrying the block-scalar header line, mirroring its handling of non-block-scalar shapes.",
-      "predicted_regressions_if_ablated": ["M5C3", "Z67P"],
+      "summary": "Fallback that re-reads a fused `<node-properties> <block-scalar>` value (e.g. `folded: !foo >1\\n value`, M5C3 / Z67P) when the bare block-scalar detector misses it because the tag is embedded in the scalar token.",
+      "classification": "RESOLVED",
+      "resolution": "Dead code at audit time. CST probes for M5C3 and Z67P show the scanner now emits `YAML_TAG` as a dedicated sibling token of the block-scalar `YAML_SCALAR`, so `extract_block_scalar_body` (the primary path) already handles them — it walks the YAML_TAG sibling and splices it into the prefix. Ablation under `if false` left the full yaml suite green (17/17). Helper and call site removed; `fold_block_scalar_raw` doc-comment trimmed to drop the stale [`extract_tagged_block_scalar`] reference.",
+      "ownership_target": null,
+      "predicted_regressions_if_ablated": [],
       "seed_case_ids_in_comments": ["M5C3", "Z67P"],
       "depends_on": [],
-      "blocks": ["decompose_scalar"],
-      "fix_size_estimate": "M",
-      "test_strategy": "Scanner unit tests for `!foo >1\\n value` and `!!binary |\\n  ...`; CST snapshots; projection parity for M5C3 and Z67P."
+      "blocks": [],
+      "fix_size_estimate": "S",
+      "test_strategy": "n/a — removed."
     },
     {
       "id": "absorb_anchor_or_tag_text_fallback",
@@ -192,7 +192,6 @@
     }
   ],
   "sequencing": [
-    "extract_tagged_block_scalar",
     "absorb_anchor_or_tag_text_fallback",
     "decompose_scalar",
     "flow_kv_split",

@@ -1129,64 +1129,6 @@ fn extract_block_scalar_body(value_node: &SyntaxNode) -> Option<(char, String)> 
     fold_block_scalar_tokens(&tokens, block_scalar_parent_indent(value_node))
 }
 
-/// Detect a block-map value shaped `<node-properties> <block-scalar>`, where a
-/// leading anchor and/or tag precede a literal (`|`) or folded (`>`) block
-/// scalar (e.g. `folded: !foo >1\n value`, M5C3/Z67P). The scanner embeds the
-/// node properties *inside* the leading `YAML_SCALAR` token rather than a
-/// separate `YAML_TAG`, so [`extract_block_scalar_body`] sees a header line of
-/// `!foo >1` that doesn't parse as an indicator and bails. Here we reconstruct
-/// the value text with newlines, peel the leading `&anchor` / tag (either
-/// order), and fold the remainder as a block scalar. Returns
-/// `(anchor, long_tag, indicator, folded_body)` when the shape matches.
-fn extract_tagged_block_scalar(
-    value_node: &SyntaxNode,
-    handles: &TagHandles,
-) -> Option<(Option<String>, Option<String>, char, String)> {
-    let full = collect_value_scalar_text_with_newlines(value_node);
-    let mut rest = full.trim_start();
-
-    // Peel a leading anchor and/or tag in either order. Bail unless at least
-    // one property is present — a bare block scalar is handled upstream by
-    // `extract_block_scalar_body`, and a plain scalar must not be re-read here.
-    let mut anchor: Option<String> = None;
-    let mut long_tag: Option<String> = None;
-    loop {
-        if anchor.is_none()
-            && let Some(after) = rest.strip_prefix('&')
-        {
-            let end = after.find(char::is_whitespace).unwrap_or(after.len());
-            anchor = Some(after[..end].to_string());
-            rest = after[end..].trim_start();
-            continue;
-        }
-        if long_tag.is_none()
-            && let Some((tag, tail)) = split_leading_tag(rest)
-            && let Some(long) = resolve_long_tag(tag, handles)
-        {
-            long_tag = Some(long);
-            rest = tail.trim_start();
-            continue;
-        }
-        break;
-    }
-    if anchor.is_none() && long_tag.is_none() {
-        return None;
-    }
-
-    // The block-scalar source begins at the indicator; the header line runs to
-    // the first newline, the body follows it.
-    let (header_part, body_raw) = match rest.split_once('\n') {
-        Some((header, body)) => (header, body),
-        None => (rest, ""),
-    };
-    let (indicator, body) = fold_block_scalar_raw(
-        header_part,
-        body_raw,
-        block_scalar_parent_indent(value_node),
-    )?;
-    Some((anchor, long_tag, indicator, body))
-}
-
 /// Compute the column of the start-of-line for the parent scope of a
 /// block-scalar value, used to anchor explicit indent indicators per
 /// YAML 1.2 §8.1.1.1: when a block-scalar header carries an indentation
@@ -1340,11 +1282,8 @@ fn fold_block_scalar_tokens(
 }
 
 /// Fold a block scalar from its header line (`|`, `>2-`, …) and the raw body
-/// source that follows the header's trailing newline. Shared by the
-/// token-walking [`fold_block_scalar_tokens`] and the tagged-value path
-/// ([`extract_tagged_block_scalar`]), which strips a leading anchor/tag off the
-/// embedded scalar token before reaching the indicator. `parent_indent`
-/// anchors explicit indent indicators per YAML 1.2 §8.1.1.1.
+/// source that follows the header's trailing newline. `parent_indent` anchors
+/// explicit indent indicators per YAML 1.2 §8.1.1.1.
 fn fold_block_scalar_raw(
     header_part: &str,
     raw: &str,
@@ -3075,26 +3014,6 @@ fn project_block_map_entry_value(
             && let Some(long) = resolve_long_tag(&tag, handles)
         {
             prefix.push_str(&long);
-            prefix.push(' ');
-        }
-        let escaped = escape_block_scalar_text(&body);
-        out.push(format!("=VAL {prefix}{indicator}{escaped}"));
-        return;
-    }
-
-    // Block scalar preceded by node properties (`!foo >1\n value`): the tag /
-    // anchor live inside the scalar token, so the bare detector above misses
-    // it. Re-read with the leading properties peeled off and emit them in
-    // canonical `&anchor <tag> <indicator>body` order.
-    if let Some((anchor, long_tag, indicator, body)) =
-        extract_tagged_block_scalar(value_node, handles)
-    {
-        let mut prefix = String::new();
-        if let Some(a) = anchor {
-            prefix.push_str(&format!("&{a} "));
-        }
-        if let Some(t) = long_tag {
-            prefix.push_str(&t);
             prefix.push(' ');
         }
         let escaped = escape_block_scalar_text(&body);
