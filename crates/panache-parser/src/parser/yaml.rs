@@ -329,9 +329,10 @@ mod tests {
 
     #[test]
     fn parse_yaml_report_detects_directive_after_content() {
-        // EB22-shape: a comment terminates the plain scalar, leaving
-        // `%YAML 1.2` at column 0 in directive position after content.
-        let report = parse_yaml_report("---\nscalar1 # comment\n%YAML 1.2\n---\nscalar2\n");
+        // Tag-shape: tag dispatch terminates the scalar before `%TAG`
+        // hits column 0, so the directive lands in its real position
+        // after content.
+        let report = parse_yaml_report("!foo \"bar\"\n%TAG !x! tag:example.com,2014:\n---\n");
         assert!(report.tree.is_none());
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
