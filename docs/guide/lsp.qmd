@@ -72,6 +72,7 @@ Code actions
     - Auto-fix lint issues (e.g., heading hierarchy corrections)
     - Convert list styles (loose ↔ compact)
     - Convert footnote styles (inline ↔ reference)
+    - Convert link styles (inline ↔ reference)
 
 Hover information
 
@@ -410,6 +411,13 @@ Convert list styles
 
 Convert footnote styles
 :   Toggle between inline `^[text]` and reference `[^id]` footnotes
+
+Convert link styles
+:   Toggle a single link between inline `[text](url)` and reference
+    `[text][label]` form. When converting to reference style, an existing
+    definition with the same URL and title is reused; otherwise a new definition
+    is appended (label slugged from the link text). When converting back, the
+    definition is deleted only if the converted link was its last use.
 
 Trigger code actions:
 
