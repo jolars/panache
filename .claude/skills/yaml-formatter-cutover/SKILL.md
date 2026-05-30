@@ -14,8 +14,8 @@ Use this skill when:
 - Maintaining the cross-validation harness that compares formatter
   output to `pretty_yaml` on the corpus.
 - Extending the style spec with a newly-discovered rule (rare —
-  see [`plan.md`](plan.md) for the 12-rule spec and the process for
-  adding a 13th).
+  see [`plan.md`](plan.md) for the 13-rule spec and the process for
+  adding a 14th).
 - Preparing or executing the joint cutover that retires `yaml_parser` and
   `pretty_yaml` for plain metadata YAML in one commit.
 - Extending the same pipeline to hashpipe YAML after the plain cutover lands.
@@ -48,7 +48,7 @@ work progresses.
   is NOT wired into the live formatting pipeline. It exists as a parallel
   implementation cross-validated against pretty_yaml output. See
   [`yaml-formatter`](../../rules/yaml-formatter.md) for the invariants.
-- **Rule-based deterministic style.** The 12-rule spec in [`plan.md`](plan.md)
+- **Rule-based deterministic style.** The 13-rule spec in [`plan.md`](plan.md)
   (eventually `STYLE.md` in the formatter module) is the source of truth.
   pretty_yaml is a cross-validation reference because it implements the
   same rules — not a divergence target. If `format_in_tree(x) != pretty_yaml(x)`,
@@ -77,10 +77,11 @@ Phased path:
 
 1. **Shadow formatter (Phase 1).** Build
    `crates/panache-formatter/src/formatter/yaml/` consuming the in-tree
-   parser's CST. No host wiring. Tests run `format_in_tree(text) ≈
-   pretty_yaml(text)` over a corpus.
-2. **Joint cutover (Phase 2).** When parity holds minus declared
-   divergences, swap `src/syntax/yaml.rs` to use the in-tree parser AND
+   parser's CST. No host wiring. Tests assert
+   `format_in_tree(text) == pretty_yaml(text)` over a corpus, plus
+   idempotency.
+2. **Joint cutover (Phase 2).** When cross-validation passes across
+   the corpus, swap `src/syntax/yaml.rs` to use the in-tree parser AND
    replace `yaml_engine.rs::format_text` with the in-tree formatter in
    one commit. Both `yaml_parser` and `pretty_yaml` come out together.
 3. **Hashpipe extension (Phase 3).** Wire the same parser+formatter
@@ -93,7 +94,7 @@ Phased path:
 - `crates/panache-formatter/src/formatter/yaml/` — in-tree YAML formatter
   modules (created in Phase 1).
 - `crates/panache-formatter/src/formatter/yaml/STYLE.md` — canonical
-  style spec (12 rules), moved from `plan.md` once the module exists.
+  style spec (13 rules), moved from `plan.md` once the module exists.
 - `crates/panache-formatter/tests/yaml_cross_validation.rs` — Phase 1
   cross-validation harness. Walks a corpus, asserts
   `format_in_tree == pretty_yaml` and idempotency
@@ -116,20 +117,23 @@ Phased path:
    "what landed" annotations. Don't start Phase 2 work before Phase 1
    parity holds; don't start Phase 3 before Phase 2 has cut over.
 
-2. **Add or extend divergence cases first when in doubt.** If a parity
-   failure could plausibly be intentional, add the case to
-   `yaml_divergences/` with a written rationale before fixing the
-   formatter to match pretty_yaml. The divergence list is load-bearing.
+2. **Diagnose cross-validation failures in order.** If
+   `format_in_tree(x) != pretty_yaml(x)`: first suspect the in-tree
+   formatter, then the in-tree parser CST shape, then pretty_yaml. Do
+   not enumerate the case as a divergence — fix the bug. The only
+   route to a legitimate output change is a deliberate spec extension
+   (a 14th rule with rationale and fixture), per
+   [`yaml-formatter`](../../rules/yaml-formatter.md).
 
-3. **Drive parser fixes through formatter symptoms.** A formatter
-   parity failure often surfaces a parser CST shape gap (mis-attached
-   trivia, wrong indent grouping). Verify against the in-tree parser
-   CST shape before reaching for a formatter workaround — see
-   [`formatter`](../../rules/formatter.md) rule on idempotency
-   divergence root-causing.
+3. **Drive parser fixes through formatter symptoms.** A
+   cross-validation failure often surfaces a parser CST shape gap
+   (mis-attached trivia, wrong indent grouping). Verify against the
+   in-tree parser CST shape before reaching for a formatter
+   workaround — see [`formatter`](../../rules/formatter.md) rule on
+   idempotency root-causing.
 
 4. **Validate**:
-   - `cargo test -p panache-formatter --test yaml_shadow_parity`
+   - `cargo test -p panache-formatter --test yaml_cross_validation`
    - `cargo test -p panache-parser --test yaml` (no regression in parser parity)
    - `cargo test` (workspace)
    - `cargo clippy --workspace --all-targets -- -D warnings`
@@ -140,12 +144,12 @@ Phased path:
 
 ## Dos and don'ts
 
-- **Do** add a divergence case with rationale before adapting the
-  formatter to match pretty_yaml on a debatable choice.
+- **Do** treat the style spec as the source of truth and pretty_yaml
+  as a cross-validation reference, not a divergence target.
 - **Do** keep formatter modules in `crates/panache-formatter/`; the
   parser stays policy-free.
 - **Do** treat idempotency as a first-class invariant, asserted in the
-  parity harness, not just verified ad-hoc.
+  cross-validation harness, not just verified ad-hoc.
 - **Don't** wire the in-tree formatter into the live pipeline before
   Phase 2. The shadow invariant is what keeps the cutover honest.
 - **Don't** add ad-hoc YAML output paths elsewhere (e.g. a

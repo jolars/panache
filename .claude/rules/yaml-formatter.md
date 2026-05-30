@@ -10,10 +10,10 @@ paths:
 
 This rule applies to the staged in-tree YAML formatter rollout. See
 [`yaml-formatter-cutover`](../skills/yaml-formatter-cutover/SKILL.md)
-for the phased plan and the canonical 12-rule style spec; this rule
+for the phased plan and the canonical 13-rule style spec; this rule
 encodes the load-bearing invariants.
 
-- **The style spec is the source of truth.** The 12-rule spec in
+- **The style spec is the source of truth.** The 13-rule spec in
   `plan.md` (eventually `crates/panache-formatter/src/formatter/yaml/STYLE.md`)
   defines what the formatter emits. pretty_yaml is used as a
   cross-validation reference because it implements the same rules,
@@ -31,8 +31,8 @@ encodes the load-bearing invariants.
   either (a) a bug in the in-tree formatter, (b) a parser CST shape
   bug in `panache-parser`, or (c) a bug in pretty_yaml. Diagnose in
   that order. Fix it; don't enumerate it.
-- **Adding a 13th rule is a deliberate act.** If Phase 1 surfaces an
-  edge case the 12 rules don't cover, the resolution is a new rule
+- **Adding a 14th rule is a deliberate act.** If Phase 1 surfaces an
+  edge case the 13 rules don't cover, the resolution is a new rule
   in STYLE.md (with a one-line rationale and a fixture) — not a
   special-case branch in the formatter. New rules need explicit
   decision: does pretty_yaml's behavior become the spec, or do we

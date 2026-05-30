@@ -63,8 +63,8 @@ gives the cutover a downstream consumer and a real parity bar.
 The in-tree YAML formatter follows these rules. They are deterministic
 (same input → same output) and small enough to fit in one table.
 Cross-validated against pretty_yaml 0.6.0 and Prettier 3.6.2 on a
-15-case battery of representative frontmatter — both agree with all 12
-rules; rule 6's bracket placement is the one point where they differ
+15-case battery of representative frontmatter — both agree on rules
+1-12; rule 6's bracket placement is the one point where they differ
 and the rule pins pretty_yaml's choice.
 
 This spec lives here during the planning phase. After Phase 1.1
@@ -97,6 +97,10 @@ formatter docs.
     `key: null` or `key: ""`.
 12. **Key order:** preserved. Frontmatter is content the user wrote;
     reordering would surprise.
+13. **Trailing document newline:** always exactly one `\n` at EOF.
+    Missing trailing newline → add one; multiple trailing newlines
+    → collapse to one. Not cross-validated against pretty_yaml or
+    Prettier yet; needed in Phase 1.3 corpus harness.
 
 Rules 4, 9, and 12 are "preserve" rules: they don't add a new
 behavior, they explicitly decline to canonicalize a
@@ -131,11 +135,9 @@ breakage. The in-tree parser will likely reject this input outright,
 making the wrap question moot. If we ever silently accept it, the
 formatter must avoid wrapping at that boundary.
 
-Open style decisions deferred until Phase 1 surfaces real cases:
-
-- **Trailing document newline** (single `\n` at EOF). Both tools
-  emit one; need to verify the in-tree parser preserves
-  losslessly so the formatter has a deterministic input signal.
+No further style decisions are open at the spec level. Phase 1 may
+still surface edge cases that need a 14th rule, but the process for
+that is documented in [`yaml-formatter`](../../rules/yaml-formatter.md).
 
 ## Phase 1 — Shadow in-tree formatter (plain metadata)
 
@@ -274,8 +276,8 @@ Add cases under
 
 ### Exit criteria for Phase 3
 
-- Hashpipe and plain metadata share one formatter path with one
-  divergence list.
+- Hashpipe and plain metadata share one formatter path governed by
+  the same style spec.
 - All host hashpipe golden cases green; pretty_yaml-specific
   workarounds in `crates/panache-formatter/src/formatter/hashpipe.rs`
   removed.
@@ -294,6 +296,8 @@ Add cases under
   but the formatter may force it (rule 4 requires distinguishing
   `|` / `>` / `'…'` / `"…"` styles per-scalar). Decide before Phase
   1.1 lands whether to do this preemptively or reactively.
-- **Trailing document newline.** Single `\n` at EOF is the universal
-  convention; verify in-tree parser preserves it losslessly so the
-  formatter can emit deterministically.
+- **Lossless parser preservation of trailing newline.** Rule 13 pins
+  the formatter output (always one `\n` at EOF) but the in-tree
+  parser must round-trip the trailing newline byte-for-byte (zero,
+  one, or many) so the formatter has a deterministic input signal.
+  Verify in Phase 1.1.
