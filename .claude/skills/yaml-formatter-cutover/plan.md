@@ -106,14 +106,33 @@ Rule 3 is the only spec rule with semantic-content awareness. The
 escape-required test is decidable from the scalar's bytes alone (no
 context dependence), so it remains rule-based.
 
+**Plain-scalar wrapping is a config option, not a spec rule.** It is
+controlled by Panache's `wrap` setting, which `yaml_engine.rs` maps
+onto pretty_yaml's `ProseWrap`:
+
+- `wrap: preserve` → `ProseWrap::Preserve` — nothing wraps.
+- `wrap: reflow` (default) / `sentence` / `semantic` →
+  `ProseWrap::Always` — plain scalars wrap with +2 indent continuation
+  lines; quoted (`"…"`, `'…'`) and block (`>`, `|`) styles never wrap
+  regardless of mode.
+
+The in-tree formatter inherits this mapping at cutover. The
+spec-adjacent invariant worth pinning: **only plain scalars are ever
+wrapped; quoted and block styles are preserved verbatim regardless of
+wrap mode**. Wrapping a quoted scalar would change escape behavior
+(double-quoted) or require backslash handling not present in single-
+quoted; wrapping a block scalar would change `>` folding or `|`
+literal semantics.
+
+Edge case worth knowing about: a plain scalar containing
+`key: value`-shaped text (colon followed by space, mid-content) is
+already ambiguous to strict YAML parsers; wrapping it surfaces the
+breakage. The in-tree parser will likely reject this input outright,
+making the wrap question moot. If we ever silently accept it, the
+formatter must avoid wrapping at that boundary.
+
 Open style decisions deferred until Phase 1 surfaces real cases:
 
-- **Plain-scalar wrapping** at line-width overflow. Prettier's
-  `proseWrap: always` will wrap a long plain scalar; pretty_yaml's
-  default leaves it alone. YAML plain-scalar semantics depend on
-  indentation context, so wrapping is fragile. Default position:
-  never wrap plain scalars; if users want wrapping they should use
-  block scalars (`>` for folded or `\|` for literal).
 - **Trailing document newline** (single `\n` at EOF). Both tools
   emit one; need to verify the in-tree parser preserves
   losslessly so the formatter has a deterministic input signal.
@@ -275,8 +294,6 @@ Add cases under
   but the formatter may force it (rule 4 requires distinguishing
   `|` / `>` / `'…'` / `"…"` styles per-scalar). Decide before Phase
   1.1 lands whether to do this preemptively or reactively.
-- **Plain-scalar wrapping policy.** See style spec — current
-  position is "never". Confirm before Phase 1.1.
 - **Trailing document newline.** Single `\n` at EOF is the universal
   convention; verify in-tree parser preserves it losslessly so the
   formatter can emit deterministically.
