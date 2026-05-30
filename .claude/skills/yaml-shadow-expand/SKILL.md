@@ -1,10 +1,10 @@
 ---
 name: yaml-shadow-expand
-description: Guard Panache's YAML shadow parser coverage and pick up residual
-  cutover work (multi-line scalar projection unification, upstream fixture
-  refreshes, eventual live-parser replacement) when it ripens. Includes the
-  triage/allowlist nibbling workflow for when new fixtures or regressions
-  surface candidate cases.
+description: Guard Panache's YAML shadow parser coverage — yaml-test-suite
+  parity, allowlist nibbling, triage regen, and parser-side cluster fixes.
+  Sibling to yaml-formatter-cutover (which owns the in-tree formatter
+  rollout and joint cutover); invoke this one when the work is
+  parser-coverage or test-suite triage.
 ---
 
 Use this skill when:
@@ -13,9 +13,12 @@ Use this skill when:
   `error_contract_ok` and you need to investigate the regression.
 - `scripts/update-yaml-test-suite-fixtures.sh` brought in new upstream cases
   that need triaging.
-- You're picking up the eventual `yaml_parser` live-path cutover.
 - A fresh `fails_needs_feature` or `fails_needs_error_path` entry appears in
   `triage.json` and you want to pick it up.
+
+For the formatter cutover (joint retirement of `yaml_parser` + `pretty_yaml`)
+or hashpipe extension, use
+[`yaml-formatter-cutover`](../yaml-formatter-cutover/SKILL.md) instead.
 
 **Current state (as of last triage regen):** every fixture is in a terminal
 bucket and allowlisted (`passes_now`: 308, `error_contract_ok`: 94,

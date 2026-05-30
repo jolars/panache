@@ -631,6 +631,30 @@ intentionally excluded.
       hashpipe-prefixed YAML.
 - [x] Add pinned yaml-test-suite fixtures under `tests/fixtures/yaml-test-suite`
       with an update script (`scripts/update-yaml-test-suite-fixtures.sh`).
+- [ ] Unify `quoted_val_event` / `quoted_val_event_multi_line` in
+      `parser/yaml/events.rs` onto the auto-detecting
+      `cooking::cook_single_quoted` / `cook_double_quoted` entries; audit the
+      \~20 call sites for input whitespace state so the trim semantics stay
+      correct.
+- [ ] Stage the in-tree YAML formatter cutover per
+      `.claude/skills/yaml-formatter-cutover/plan.md` (sibling to
+      `yaml-shadow-expand`). Joint cutover retires `yaml_parser` and
+      `pretty_yaml` in one commit.
+      - [ ] Phase 1 --- Build a shadow in-tree YAML formatter at
+            `crates/panache-formatter/src/formatter/yaml/`, parity-checked
+            against `pretty_yaml` minus an enumerated divergence list, with
+            idempotency asserted per case.
+      - [ ] Phase 2 --- Joint cutover: swap `src/syntax/yaml.rs` to the in-tree
+            parser and `yaml_engine.rs` to the in-tree formatter in one commit;
+            drop `yaml_parser` and `pretty_yaml` deps.
+      - [ ] Phase 3 --- Extend the same parser+formatter pipeline to hashpipe
+            YAML via `normalize_hashpipe_input`; retire pretty_yaml-specific
+            workarounds in `formatter/hashpipe.rs`.
+- [ ] Promote YAML scalar style into the CST as typed `SyntaxKind` variants
+      (`YAML_PLAIN_SCALAR` / `YAML_*_QUOTED_SCALAR` / `YAML_LITERAL_SCALAR` /
+      `YAML_FOLDED_SCALAR`) and add a `Scalar` AST wrapper. Likely forced by the
+      formatter cutover (Phase 1); decide preemptive vs reactive in `plan.md`
+      open questions.
 
 ## Parser - Coverage
 
