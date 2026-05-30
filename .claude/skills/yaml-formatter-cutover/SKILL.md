@@ -1,18 +1,21 @@
 ---
 name: yaml-formatter-cutover
-description: Drive the staged in-tree YAML formatter rollout — shadow parity
-  against pretty_yaml, divergence enumeration, joint parser+formatter cutover,
-  then hashpipe extension. Sibling to yaml-shadow-expand (parser-coverage);
-  invoke when the work is formatter-side or the joint cutover gate.
+description: Drive the staged in-tree YAML formatter rollout — implement
+  the rule-based style spec, cross-validate against pretty_yaml, joint
+  parser+formatter cutover, then hashpipe extension. Sibling to
+  yaml-shadow-expand (parser-coverage); invoke when the work is formatter-side
+  or the joint cutover gate.
 ---
 
 Use this skill when:
 
 - Building, extending, or testing the in-tree YAML formatter under
   `crates/panache-formatter/src/formatter/yaml/`.
-- Maintaining the shadow parity harness against `pretty_yaml`.
-- Adding to or revising the divergence list (cases where the in-tree
-  formatter intentionally differs from pretty_yaml).
+- Maintaining the cross-validation harness that compares formatter
+  output to `pretty_yaml` on the corpus.
+- Extending the style spec with a newly-discovered rule (rare —
+  see [`plan.md`](plan.md) for the 12-rule spec and the process for
+  adding a 13th).
 - Preparing or executing the joint cutover that retires `yaml_parser` and
   `pretty_yaml` for plain metadata YAML in one commit.
 - Extending the same pipeline to hashpipe YAML after the plain cutover lands.
@@ -43,11 +46,14 @@ work progresses.
   and [`formatter`](../../rules/formatter.md) rules.
 - **Shadow-first.** Until the joint cutover lands, the in-tree formatter
   is NOT wired into the live formatting pipeline. It exists as a parallel
-  implementation tested against pretty_yaml output. See
+  implementation cross-validated against pretty_yaml output. See
   [`yaml-formatter`](../../rules/yaml-formatter.md) for the invariants.
-- **Parity bar is pretty_yaml minus an enumerated divergence list.** Don't
-  burn cycles matching pretty_yaml quirks we'd rather drop. New
-  divergences need a written rationale.
+- **Rule-based deterministic style.** The 12-rule spec in [`plan.md`](plan.md)
+  (eventually `STYLE.md` in the formatter module) is the source of truth.
+  pretty_yaml is a cross-validation reference because it implements the
+  same rules — not a divergence target. If `format_in_tree(x) != pretty_yaml(x)`,
+  it's a bug in the in-tree formatter, the in-tree parser CST shape, or
+  pretty_yaml, in that diagnostic order.
 - **Plain metadata first, hashpipe last.** Hashpipe inherits the plain
   engine via `normalize_hashpipe_input`. Doing hashpipe first means doing
   the plain work anyway plus locking in hashpipe-specific behavior before
@@ -86,16 +92,16 @@ Phased path:
 
 - `crates/panache-formatter/src/formatter/yaml/` — in-tree YAML formatter
   modules (created in Phase 1).
-- `crates/panache-formatter/src/formatter/yaml/divergences.md` —
-  enumerated list of intentional divergences from pretty_yaml, each with
-  rationale and locking fixture reference.
-- `crates/panache-formatter/tests/yaml_shadow_parity.rs` — Phase 1
-  parity harness. Walks a corpus, asserts
-  `format_in_tree ≈ pretty_yaml` modulo divergences, plus idempotency
-  (`format(format(x)) == format(x)`).
-- `crates/panache-formatter/tests/fixtures/yaml_divergences/` —
-  divergence cases with `input.yaml`, `expected_in_tree.yaml`,
-  `expected_pretty_yaml.yaml`, `rationale.md`.
+- `crates/panache-formatter/src/formatter/yaml/STYLE.md` — canonical
+  style spec (12 rules), moved from `plan.md` once the module exists.
+- `crates/panache-formatter/tests/yaml_cross_validation.rs` — Phase 1
+  cross-validation harness. Walks a corpus, asserts
+  `format_in_tree == pretty_yaml` and idempotency
+  (`format(format(x)) == format(x)`). Disagreements are bugs to fix,
+  not divergences to enumerate.
+- `crates/panache-formatter/tests/fixtures/yaml_corpus/` — corpus of
+  representative frontmatter cases (real `.qmd`/`.Rmd` frontmatter
+  plus hand-picked stressors for flow overflow, comments, anchors).
 - `tests/fixtures/cases/*/` — host-level golden cases (existing
   pattern). New cases that specifically exercise YAML formatting come
   here; the host config schema lives at this level.
