@@ -75,6 +75,12 @@ pub fn parse_directive(comment_text: &str) -> Option<Directive> {
         return None;
     }
 
+    // Reject comments where the opening `<!--` and closing `-->` markers
+    // overlap or abut (e.g. `<!--->`); the inner slice would otherwise panic.
+    if content.len() < 7 {
+        return None;
+    }
+
     // Extract content between <!-- and -->
     let inner = content[4..content.len() - 3].trim();
 
@@ -242,6 +248,15 @@ mod tests {
         assert_eq!(parse_directive("<!-- regular comment -->"), None);
         assert_eq!(parse_directive("<!-- panache-something -->"), None);
         assert_eq!(parse_directive("not a comment"), None);
+    }
+
+    #[test]
+    fn test_parse_directive_overlapping_markers() {
+        // Comments where the opening `<!--` and closing `-->` markers overlap
+        // (or abut) must not panic when slicing the inner content.
+        assert_eq!(parse_directive("<!--->"), None);
+        assert_eq!(parse_directive("<!-->"), None);
+        assert_eq!(parse_directive("<!---->"), None);
     }
 
     #[test]
