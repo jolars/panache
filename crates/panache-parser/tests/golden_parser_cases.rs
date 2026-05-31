@@ -598,7 +598,6 @@ golden_test_cases!(
     issue_249_indented_paragraph_line_atx_shape,
     issue_310_blockquote_flush_fenced_div_pandoc,
     issue_314_advance_columns_multibyte,
-    issue_336_gfm_bold_colon_bare_uri,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

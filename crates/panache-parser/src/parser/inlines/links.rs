@@ -553,13 +553,6 @@ pub fn try_parse_bare_uri(text: &str) -> Option<(usize, &str)> {
         return None;
     }
 
-    // Only emit a bare-URI link if the scheme is one pandoc would
-    // recognize. Without this guard prose like `**Note:**` or `TODO:foo`
-    // gets rewritten into a bogus `Note:**`-as-URL link (see #336).
-    if !super::uri_schemes::is_known_scheme(&text[..scheme_end]) {
-        return None;
-    }
-
     let mut end = scheme_end + 1;
     let bytes = text.as_bytes();
     while end < text.len() {
@@ -1376,23 +1369,6 @@ mod tests {
         let input = r"a:\]";
         let result = try_parse_bare_uri(input);
         assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_parse_bare_uri_rejects_unknown_scheme() {
-        // #336: scheme must be on pandoc's allowlist. Prose words
-        // ending in `:` (`Note:`, `TODO:`, `a:`) are not autolinks.
-        assert_eq!(try_parse_bare_uri("Note:**"), None);
-        assert_eq!(try_parse_bare_uri("TODO:foo"), None);
-        assert_eq!(try_parse_bare_uri("a:/"), None);
-    }
-
-    #[test]
-    fn test_parse_bare_uri_accepts_known_schemes() {
-        let r = try_parse_bare_uri("http://example.com");
-        assert_eq!(r, Some((18, "http://example.com")));
-        let r = try_parse_bare_uri("mailto:foo@bar.com");
-        assert_eq!(r, Some((18, "mailto:foo@bar.com")));
     }
 
     #[test]

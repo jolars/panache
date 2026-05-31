@@ -48,8 +48,6 @@ pub mod strikeout;
 pub mod subscript;
 #[path = "inlines/superscript.rs"]
 pub mod superscript;
-#[path = "inlines/uri_schemes.rs"]
-pub mod uri_schemes;
 
 #[cfg(test)]
 #[path = "inlines/tests.rs"]
