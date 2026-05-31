@@ -9,7 +9,7 @@ Thanks for your interest in contributing to Panache.
 3. Run the full validation command before and after changes:
 
 ```bash
-cargo check && cargo test && cargo clippy --all-targets --all-features -- -D warnings && cargo fmt -- --check
+cargo check --workspace && cargo test --workspace && cargo clippy --workspace --all-targets --all-features -- -D warnings && cargo fmt -- --check
 ```
 
 ## Development Workflow
