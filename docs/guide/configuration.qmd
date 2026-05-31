@@ -629,7 +629,8 @@ autolinks = true
 :   Automatic links `<http://example.com>` (default: enabled)
 
 `autolink-bare-uris`
-:   Bare URLs become links (default: disabled, non-default extension)
+:   Bare URLs with a recognized URI scheme (e.g. `https:`, `mailto:`)
+    become links (default: disabled, non-default extension)
 
 #### Images
 
