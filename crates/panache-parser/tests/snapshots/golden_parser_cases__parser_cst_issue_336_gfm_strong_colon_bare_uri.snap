@@ -1,0 +1,11 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..10
+  PARAGRAPH@0..10
+    STRONG@0..9
+      STRONG_MARKER@0..2 "**"
+      TEXT@2..7 "Note:"
+      STRONG_MARKER@7..9 "**"
+    NEWLINE@9..10 "\n"

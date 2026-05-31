@@ -39,3 +39,23 @@ fn autolink_bare_uri_uppercase() {
     let output = format_with_bare_uris(input);
     similar_asserts::assert_eq!(output, "[HTTPS://GOOGLE.COM](HTTPS://GOOGLE.COM),\n");
 }
+
+#[test]
+fn autolink_bare_uri_less_common_schemes() {
+    similar_asserts::assert_eq!(
+        format_with_bare_uris("ssh://host\n"),
+        "[ssh://host](ssh://host)\n"
+    );
+    similar_asserts::assert_eq!(
+        format_with_bare_uris("mongodb://localhost/db\n"),
+        "[mongodb://localhost/db](mongodb://localhost/db)\n"
+    );
+}
+
+#[test]
+fn strong_ending_in_colon_is_not_autolinked() {
+    let input = "**Note:**\n";
+    let output = format_with_bare_uris(input);
+    similar_asserts::assert_eq!(output, "**Note:**\n");
+    similar_asserts::assert_eq!(format_with_bare_uris(&output), output);
+}

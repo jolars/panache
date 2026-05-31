@@ -531,6 +531,20 @@ pub fn emit_autolink(builder: &mut GreenNodeBuilder, _text: &str, url: &str) {
     builder.finish_node();
 }
 
+// Recognized URI schemes for pandoc's `autolink_bare_uris` extension.
+// Generated at build time by `build.rs`
+// from the vendored IANA registry plus pandoc's nonstandard additions,
+// as a sorted `const BARE_URI_SCHEMES: &[&str]`.
+// A `scheme:` prefix outside this set stays literal.
+include!(concat!(env!("OUT_DIR"), "/uri_schemes.rs"));
+
+/// Returns `true` if `scheme` (matched case-insensitively) is a recognized URI scheme.
+/// See [`BARE_URI_SCHEMES`].
+fn is_known_bare_uri_scheme(scheme: &str) -> bool {
+    let lower = scheme.to_ascii_lowercase();
+    BARE_URI_SCHEMES.binary_search(&lower.as_str()).is_ok()
+}
+
 pub fn try_parse_bare_uri(text: &str) -> Option<(usize, &str)> {
     let mut chars = text.char_indices();
     let (_, first) = chars.next()?;
@@ -550,6 +564,10 @@ pub fn try_parse_bare_uri(text: &str) -> Option<(usize, &str)> {
     }
     let scheme_end = scheme_end?;
     if scheme_end == 0 {
+        return None;
+    }
+
+    if !is_known_bare_uri_scheme(&text[..scheme_end]) {
         return None;
     }
 
@@ -1369,6 +1387,47 @@ mod tests {
         let input = r"a:\]";
         let result = try_parse_bare_uri(input);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_bare_uri_rejects_unknown_scheme() {
+        assert_eq!(try_parse_bare_uri("Note:**"), None);
+        assert_eq!(try_parse_bare_uri("Note:foo"), None);
+        assert_eq!(try_parse_bare_uri("foo:bar"), None);
+    }
+
+    #[test]
+    fn test_parse_bare_uri_accepts_known_schemes() {
+        assert_eq!(
+            try_parse_bare_uri("http://example.com"),
+            Some((18, "http://example.com"))
+        );
+        assert_eq!(
+            try_parse_bare_uri("HTTPS://EXAMPLE.COM"),
+            Some((19, "HTTPS://EXAMPLE.COM"))
+        );
+        assert_eq!(
+            try_parse_bare_uri("mailto:a@b.com"),
+            Some((14, "mailto:a@b.com"))
+        );
+        assert_eq!(try_parse_bare_uri("doi:10.1/x"), Some((10, "doi:10.1/x")));
+    }
+
+    #[test]
+    fn bare_uri_scheme_table_is_well_formed() {
+        assert!(
+            BARE_URI_SCHEMES.len() > 300,
+            "only {} schemes",
+            BARE_URI_SCHEMES.len()
+        );
+        assert!(BARE_URI_SCHEMES.windows(2).all(|w| w[0] < w[1]));
+        for known in ["http", "https", "mailto", "ftp", "mongodb", "shttp"] {
+            assert!(is_known_bare_uri_scheme(known), "missing scheme {known}");
+        }
+        for extra in ["doi", "gemini", "isbn", "pmid"] {
+            assert!(is_known_bare_uri_scheme(extra), "missing scheme {extra}");
+        }
+        assert!(!is_known_bare_uri_scheme("note"));
     }
 
     #[test]

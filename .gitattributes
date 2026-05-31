@@ -28,5 +28,9 @@ tests/fixtures/bibtex_samples/*.cst eol=lf
 # Generated schema must use LF — test compares against bytes produced with `\n`
 panache.schema.json eol=lf
 
+# Vendored IANA URI scheme registry — kept byte-for-byte as fetched (CRLF) so
+# scripts/update-uri-schemes.sh reproduces it exactly with no processing.
+crates/panache-parser/src/parser/inlines/uri-schemes.csv -text linguist-vendored
+
 # Other test cases can use LF (the default for most projects)
 # Individual test cases can override if needed
