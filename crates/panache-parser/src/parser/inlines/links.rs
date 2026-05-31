@@ -531,6 +531,292 @@ pub fn emit_autolink(builder: &mut GreenNodeBuilder, _text: &str, url: &str) {
     builder.finish_node();
 }
 
+/// Recognized URI schemes for pandoc's `autolink_bare_uris` extension.
+/// A `scheme:` prefix outside this set stays literal.
+///
+/// Mirrors pandoc's `schemes` set verbatim;
+/// resync if it changes:
+/// <https://github.com/jgm/pandoc/blob/main/src/Text/Pandoc/URI.hs>
+///
+/// Sorted so membership can use `binary_search`.
+const BARE_URI_SCHEMES: &[&str] = &[
+    "aaa",
+    "aaas",
+    "about",
+    "acap",
+    "acct",
+    "acr",
+    "adiumxtra",
+    "afp",
+    "afs",
+    "aim",
+    "appdata",
+    "apt",
+    "attachment",
+    "aw",
+    "barion",
+    "beshare",
+    "bitcoin",
+    "blob",
+    "bolo",
+    "browserext",
+    "callto",
+    "cap",
+    "chrome",
+    "chrome-extension",
+    "cid",
+    "coap",
+    "coaps",
+    "com-eventbrite-attendee",
+    "content",
+    "crid",
+    "cvs",
+    "data",
+    "dav",
+    "dict",
+    "dis",
+    "dlna-playcontainer",
+    "dlna-playsingle",
+    "dns",
+    "dntp",
+    "doi",
+    "dtn",
+    "dvb",
+    "ed2k",
+    "example",
+    "facetime",
+    "fax",
+    "feed",
+    "feedready",
+    "file",
+    "filesystem",
+    "finger",
+    "fish",
+    "ftp",
+    "gemini",
+    "geo",
+    "gg",
+    "git",
+    "gizmoproject",
+    "go",
+    "gopher",
+    "graph",
+    "gtalk",
+    "h323",
+    "ham",
+    "hcp",
+    "http",
+    "https",
+    "hxxp",
+    "hxxps",
+    "hydrazone",
+    "iax",
+    "icap",
+    "icon",
+    "im",
+    "imap",
+    "info",
+    "iotdisco",
+    "ipn",
+    "ipp",
+    "ipps",
+    "irc",
+    "irc6",
+    "ircs",
+    "iris",
+    "iris.beep",
+    "iris.lwz",
+    "iris.xpc",
+    "iris.xpcs",
+    "isbn",
+    "isostore",
+    "itms",
+    "jabber",
+    "jar",
+    "javascript",
+    "jms",
+    "keyparc",
+    "lastfm",
+    "ldap",
+    "ldaps",
+    "lvlt",
+    "magnet",
+    "mailserver",
+    "mailto",
+    "maps",
+    "market",
+    "message",
+    "mid",
+    "mms",
+    "modem",
+    "mongodb",
+    "moz",
+    "ms-access",
+    "ms-browser-extension",
+    "ms-drive-to",
+    "ms-enrollment",
+    "ms-excel",
+    "ms-gamebarservices",
+    "ms-getoffice",
+    "ms-help",
+    "ms-infopath",
+    "ms-media-stream-id",
+    "ms-officeapp",
+    "ms-powerpoint",
+    "ms-project",
+    "ms-publisher",
+    "ms-search-repair",
+    "ms-secondary-screen-controller",
+    "ms-secondary-screen-setup",
+    "ms-settings",
+    "ms-settings-airplanemode",
+    "ms-settings-bluetooth",
+    "ms-settings-camera",
+    "ms-settings-cellular",
+    "ms-settings-cloudstorage",
+    "ms-settings-connectabledevices",
+    "ms-settings-displays-topology",
+    "ms-settings-emailandaccounts",
+    "ms-settings-language",
+    "ms-settings-location",
+    "ms-settings-lock",
+    "ms-settings-nfctransactions",
+    "ms-settings-notifications",
+    "ms-settings-power",
+    "ms-settings-privacy",
+    "ms-settings-proximity",
+    "ms-settings-screenrotation",
+    "ms-settings-wifi",
+    "ms-settings-workplace",
+    "ms-spd",
+    "ms-sttoverlay",
+    "ms-transit-to",
+    "ms-virtualtouchpad",
+    "ms-visio",
+    "ms-walk-to",
+    "ms-whiteboard",
+    "ms-whiteboard-cmd",
+    "ms-word",
+    "msnim",
+    "msrp",
+    "msrps",
+    "mtqp",
+    "mumble",
+    "mupdate",
+    "mvn",
+    "news",
+    "nfs",
+    "ni",
+    "nih",
+    "nntp",
+    "notes",
+    "ocf",
+    "oid",
+    "onenote",
+    "onenote-cmd",
+    "opaquelocktoken",
+    "pack",
+    "palm",
+    "paparazzi",
+    "pkcs11",
+    "platform",
+    "pmid",
+    "pop",
+    "pres",
+    "prospero",
+    "proxy",
+    "psyc",
+    "pwid",
+    "qb",
+    "query",
+    "redis",
+    "rediss",
+    "reload",
+    "res",
+    "resource",
+    "rmi",
+    "rsync",
+    "rtmfp",
+    "rtmp",
+    "rtsp",
+    "rtsps",
+    "rtspu",
+    "secondlife",
+    "service",
+    "session",
+    "sftp",
+    "sgn",
+    "shttp",
+    "sieve",
+    "sip",
+    "sips",
+    "skype",
+    "smb",
+    "sms",
+    "smtp",
+    "snews",
+    "snmp",
+    "soap.beep",
+    "soap.beeps",
+    "soldat",
+    "spotify",
+    "ssh",
+    "steam",
+    "stun",
+    "stuns",
+    "submit",
+    "svn",
+    "tag",
+    "teamspeak",
+    "tel",
+    "teliaeid",
+    "telnet",
+    "tftp",
+    "things",
+    "thismessage",
+    "tip",
+    "tn3270",
+    "tool",
+    "turn",
+    "turns",
+    "tv",
+    "udp",
+    "unreal",
+    "urn",
+    "ut2004",
+    "v-event",
+    "vemmi",
+    "ventrilo",
+    "videotex",
+    "view-source",
+    "vnc",
+    "wais",
+    "webcal",
+    "wpid",
+    "ws",
+    "wss",
+    "wtai",
+    "wyciwyg",
+    "xcon",
+    "xcon-userid",
+    "xfire",
+    "xmlrpc.beep",
+    "xmlrpc.beeps",
+    "xmpp",
+    "xri",
+    "ymsgr",
+    "z39.50",
+    "z39.50r",
+    "z39.50s",
+];
+
+/// Returns `true` if `scheme` (matched case-insensitively) is a recognized
+/// bare-URI scheme. See [`BARE_URI_SCHEMES`].
+fn is_known_bare_uri_scheme(scheme: &str) -> bool {
+    let lower = scheme.to_ascii_lowercase();
+    BARE_URI_SCHEMES.binary_search(&lower.as_str()).is_ok()
+}
+
 pub fn try_parse_bare_uri(text: &str) -> Option<(usize, &str)> {
     let mut chars = text.char_indices();
     let (_, first) = chars.next()?;
@@ -550,6 +836,12 @@ pub fn try_parse_bare_uri(text: &str) -> Option<(usize, &str)> {
     }
     let scheme_end = scheme_end?;
     if scheme_end == 0 {
+        return None;
+    }
+
+    // Only recognized URI schemes start a bare-URI autolink; everything else
+    // (e.g. `Note:` in `**Note:**`) stays literal, matching pandoc.
+    if !is_known_bare_uri_scheme(&text[..scheme_end]) {
         return None;
     }
 
@@ -1369,6 +1661,35 @@ mod tests {
         let input = r"a:\]";
         let result = try_parse_bare_uri(input);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_bare_uri_rejects_unknown_scheme() {
+        assert_eq!(try_parse_bare_uri("Note:**"), None);
+        assert_eq!(try_parse_bare_uri("Note:foo"), None);
+        assert_eq!(try_parse_bare_uri("foo:bar"), None);
+    }
+
+    #[test]
+    fn test_parse_bare_uri_accepts_known_schemes() {
+        assert_eq!(
+            try_parse_bare_uri("http://example.com"),
+            Some((18, "http://example.com"))
+        );
+        assert_eq!(
+            try_parse_bare_uri("HTTPS://EXAMPLE.COM"),
+            Some((19, "HTTPS://EXAMPLE.COM"))
+        );
+        assert_eq!(
+            try_parse_bare_uri("mailto:a@b.com"),
+            Some((14, "mailto:a@b.com"))
+        );
+        assert_eq!(try_parse_bare_uri("doi:10.1/x"), Some((10, "doi:10.1/x")));
+    }
+
+    #[test]
+    fn bare_uri_schemes_table_is_sorted() {
+        assert!(BARE_URI_SCHEMES.windows(2).all(|w| w[0] < w[1]));
     }
 
     #[test]
