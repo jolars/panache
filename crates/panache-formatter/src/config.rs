@@ -104,20 +104,28 @@ impl FormatterExtensions {
 
     pub fn merge_with_flavor(overrides: HashMap<String, bool>, flavor: Flavor) -> Self {
         let mut base = Self::for_flavor(flavor);
+        base.apply_overrides(overrides);
+        base
+    }
+
+    /// Apply `overrides` on top of an already-resolved `FormatterExtensions`.
+    /// Unknown keys are silently ignored. Use this when layering individual
+    /// extension overrides on top of a config that has already merged flavor
+    /// defaults + file-based overrides (e.g. CLI `-o extensions.<name>=<bool>`).
+    pub fn apply_overrides(&mut self, overrides: HashMap<String, bool>) {
         for (key, value) in overrides {
             match key.replace('_', "-").to_ascii_lowercase().as_str() {
-                "blank-before-header" => base.blank_before_header = value,
-                "bookdown-references" => base.bookdown_references = value,
-                "east-asian-line-breaks" => base.east_asian_line_breaks = value,
-                "escaped-line-breaks" => base.escaped_line_breaks = value,
-                "gfm-auto-identifiers" => base.gfm_auto_identifiers = value,
-                "quarto-crossrefs" => base.quarto_crossrefs = value,
-                "smart" => base.smart = value,
-                "smart-quotes" => base.smart_quotes = value,
+                "blank-before-header" => self.blank_before_header = value,
+                "bookdown-references" => self.bookdown_references = value,
+                "east-asian-line-breaks" => self.east_asian_line_breaks = value,
+                "escaped-line-breaks" => self.escaped_line_breaks = value,
+                "gfm-auto-identifiers" => self.gfm_auto_identifiers = value,
+                "quarto-crossrefs" => self.quarto_crossrefs = value,
+                "smart" => self.smart = value,
+                "smart-quotes" => self.smart_quotes = value,
                 _ => {}
             }
         }
-        base
     }
 }
 

@@ -253,9 +253,12 @@ pub enum Commands {
             kebab-case key names from panache.toml. May be repeated. Takes precedence over \
             both panache.toml and the built-in defaults. \
             \n\nSupported keys: \
-            `line-width` (positive integer) and \
-            `wrap` (one of: reflow, sentence, semantic, preserve). \
-            \n\nExample: --option line-width=100 -o wrap=sentence. \
+            `line-width` (positive integer); \
+            `wrap` (one of: reflow, sentence, semantic, preserve); and \
+            `extensions.<name>=<bool>` to toggle any extension (booleans accept \
+            true/false/1/0/yes/no/on/off). \
+            \n\nExample: --option line-width=100 -o wrap=sentence \
+            -o extensions.east-asian-line-breaks=true. \
             \n\nNote: this is an escape hatch for ad-hoc invocations. Prefer panache.toml so \
             that everyone formatting the repository gets the same result."
         )]

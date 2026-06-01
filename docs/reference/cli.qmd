@@ -91,9 +91,9 @@ Format a Quarto, Pandoc, or R Markdown document according to Panache's formattin
    This is primarily intended for pre-commit hooks (and similar tooling), which pass changed files explicitly but should still respect the project's exclude configuration.
 * `-o`, `--option <KEY=VALUE>` — Override an individual config option for this invocation, using the kebab-case key names from panache.toml. May be repeated. Takes precedence over both panache.toml and the built-in defaults. 
 
-   Supported keys: `line-width` (positive integer) and `wrap` (one of: reflow, sentence, semantic, preserve). 
+   Supported keys: `line-width` (positive integer); `wrap` (one of: reflow, sentence, semantic, preserve); and `extensions.<name>=<bool>` to toggle any extension (booleans accept true/false/1/0/yes/no/on/off). 
 
-   Example: --option line-width=100 -o wrap=sentence. 
+   Example: --option line-width=100 -o wrap=sentence -o extensions.east-asian-line-breaks=true. 
 
    Note: this is an escape hatch for ad-hoc invocations. Prefer panache.toml so that everyone formatting the repository gets the same result.
 

@@ -35,6 +35,8 @@ impl From<CliFlavor> for Flavor {
 
 /// Apply `panache format -o key=value` overrides on top of a loaded config.
 fn apply_format_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Result<(), String> {
+    let mut extension_overrides: std::collections::HashMap<String, bool> =
+        std::collections::HashMap::new();
     for raw in overrides {
         let (key, value) = raw
             .split_once('=')
@@ -67,12 +69,35 @@ fn apply_format_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Re
                 };
                 cfg.wrap = Some(mode);
             }
+            ext_key if ext_key.starts_with("extensions.") => {
+                let name = ext_key["extensions.".len()..].trim();
+                if name.is_empty() {
+                    return Err(format!(
+                        "invalid --option `{raw}`: missing extension name after `extensions.`"
+                    ));
+                }
+                let bool_value = match value.to_ascii_lowercase().as_str() {
+                    "true" | "1" | "yes" | "on" => true,
+                    "false" | "0" | "no" | "off" => false,
+                    _ => {
+                        return Err(format!(
+                            "invalid value for `{ext_key}`: `{value}` (expected boolean: true/false)"
+                        ));
+                    }
+                };
+                extension_overrides.insert(name.to_string(), bool_value);
+            }
             other => {
                 return Err(format!(
-                    "unknown config key in --option: `{other}` (supported: line-width, wrap)"
+                    "unknown config key in --option: `{other}` (supported: line-width, wrap, extensions.<name>)"
                 ));
             }
         }
+    }
+    if !extension_overrides.is_empty() {
+        cfg.extensions.apply_overrides(extension_overrides.clone());
+        cfg.formatter_extensions
+            .apply_overrides(extension_overrides);
     }
     Ok(())
 }
@@ -2329,5 +2354,64 @@ mod tests {
             Some(OsStr::new("xterm-256color")),
             true,
         ));
+    }
+
+    mod format_overrides {
+        use crate::apply_format_overrides;
+
+        fn cfg() -> panache::Config {
+            panache::Config::default()
+        }
+
+        #[test]
+        fn extensions_dot_key_toggles_extension() {
+            let mut c = cfg();
+            assert!(!c.extensions.east_asian_line_breaks);
+            assert!(!c.formatter_extensions.east_asian_line_breaks);
+            apply_format_overrides(
+                &mut c,
+                &["extensions.east-asian-line-breaks=true".to_string()],
+            )
+            .unwrap();
+            assert!(c.extensions.east_asian_line_breaks);
+            assert!(c.formatter_extensions.east_asian_line_breaks);
+        }
+
+        #[test]
+        fn extensions_dot_key_accepts_snake_case_alias() {
+            let mut c = cfg();
+            apply_format_overrides(
+                &mut c,
+                &["extensions.east_asian_line_breaks=true".to_string()],
+            )
+            .unwrap();
+            assert!(c.extensions.east_asian_line_breaks);
+        }
+
+        #[test]
+        fn extensions_dot_key_rejects_non_boolean_value() {
+            let mut c = cfg();
+            let err = apply_format_overrides(
+                &mut c,
+                &["extensions.east-asian-line-breaks=maybe".to_string()],
+            )
+            .unwrap_err();
+            assert!(err.contains("expected boolean"), "{err}");
+        }
+
+        #[test]
+        fn extensions_dot_key_requires_name() {
+            let mut c = cfg();
+            let err =
+                apply_format_overrides(&mut c, &["extensions.=true".to_string()]).unwrap_err();
+            assert!(err.contains("missing extension name"), "{err}");
+        }
+
+        #[test]
+        fn unknown_top_level_key_still_errors() {
+            let mut c = cfg();
+            let err = apply_format_overrides(&mut c, &["nope=1".to_string()]).unwrap_err();
+            assert!(err.contains("unknown config key"), "{err}");
+        }
     }
 }

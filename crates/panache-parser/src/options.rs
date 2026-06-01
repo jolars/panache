@@ -594,6 +594,15 @@ impl Extensions {
         Self::merge_overrides(defaults, user_overrides)
     }
 
+    /// Apply `user_overrides` on top of an already-resolved `Extensions`.
+    /// Unknown keys are silently ignored (mirrors the panache.toml loader).
+    /// Use this when overriding individual extensions on top of a config that
+    /// has already merged flavor defaults + file-based overrides (e.g. CLI
+    /// `-o extensions.<name>=<bool>`).
+    pub fn apply_overrides(&mut self, user_overrides: HashMap<String, bool>) {
+        *self = Self::merge_overrides(self.clone(), user_overrides);
+    }
+
     fn merge_overrides(mut base: Extensions, user_overrides: HashMap<String, bool>) -> Self {
         for (key, value) in user_overrides {
             let normalized_key = key.replace('_', "-");
