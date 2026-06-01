@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, Dialect};
 use crate::formatter::sentence_wrap::{
     ResolvedProfile, SentenceBoundaryClass, SentenceLanguage, SentenceSegment,
     is_sentence_boundary_segment, resolve_profile,
@@ -269,8 +269,14 @@ impl<'a> NodeWrapOptions<'a> {
 
 impl WrapStrategy {
     fn options<'a>(self, config: &Config, widths: &'a [usize]) -> NodeWrapOptions<'a> {
+        // A `+`/`-`/`*` (or ordered marker) reflowed to column 1 becomes a list
+        // marker when the parser lets a list interrupt a paragraph. Pandoc only
+        // allows that under `lists_without_preceding_blankline`; the CommonMark
+        // dialect always does, so guard the line-break there too or reflow stops
+        // being idempotent.
         let avoid_unsafe_in_paragraph_reflow =
-            config.parser_extensions.lists_without_preceding_blankline;
+            config.parser_extensions.lists_without_preceding_blankline
+                || config.dialect() == Dialect::CommonMark;
         let avoid_blockquote_start = !config.parser_extensions.blank_before_blockquote;
         match self {
             Self::ParagraphReflow => NodeWrapOptions {
@@ -1448,5 +1454,21 @@ mod tests {
         let options_enabled = WrapStrategy::ParagraphReflow.options(&config_enabled, &[80]);
         assert!(options_enabled.avoid_unsafe_line_start);
         assert!(options_enabled.avoid_blockquote_line_start);
+    }
+
+    #[test]
+    fn paragraph_reflow_unsafe_start_guard_enabled_for_commonmark_dialect() {
+        // CommonMark/gfm let a list interrupt a paragraph without a blank line,
+        // so the guard must fire even though `lists_without_preceding_blankline`
+        // is off by default.
+        let flavor = crate::config::Flavor::Gfm;
+        let config = crate::config::Config {
+            flavor,
+            parser_extensions: crate::config::ParserExtensions::for_flavor(flavor),
+            ..crate::config::Config::default()
+        };
+        assert!(!config.parser_extensions.lists_without_preceding_blankline);
+        let options = WrapStrategy::ParagraphReflow.options(&config, &[80]);
+        assert!(options.avoid_unsafe_line_start);
     }
 }

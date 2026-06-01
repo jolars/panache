@@ -172,10 +172,15 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Markdown dialect implied by the configured flavor.
+    pub fn dialect(&self) -> Dialect {
+        Dialect::for_flavor(self.flavor)
+    }
+
     pub fn parser_options(&self) -> ParserOptions {
         ParserOptions {
             flavor: self.flavor,
-            dialect: Dialect::for_flavor(self.flavor),
+            dialect: self.dialect(),
             extensions: self.parser_extensions.clone(),
             pandoc_compat: self.parser,
             refdef_labels: None,
