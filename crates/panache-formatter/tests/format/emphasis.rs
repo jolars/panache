@@ -28,4 +28,5 @@ fn strong_with_code_span_in_middle_is_unchanged() {
     let input = "**text `code` word**\n";
     let output = format(input, None, None);
     similar_asserts::assert_eq!(output, "**text `code` word**\n");
+    similar_asserts::assert_eq!(format(&output, None, None), output);
 }
