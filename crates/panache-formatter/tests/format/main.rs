@@ -3,6 +3,7 @@ mod bullet_standardization;
 mod code_chunks;
 mod comments;
 mod definition_lists;
+mod emphasis;
 mod fenced_divs;
 mod frontmatter;
 mod header_attributes;
