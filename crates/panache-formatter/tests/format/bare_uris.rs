@@ -59,3 +59,22 @@ fn strong_ending_in_colon_is_not_autolinked() {
     similar_asserts::assert_eq!(output, "**Note:**\n");
     similar_asserts::assert_eq!(format_with_bare_uris(&output), output);
 }
+
+// A `word:` with no recognized scheme and no `//` is not a bare URI, so it must
+// not swallow the emphasis close (regression: `*note:* text` became
+// `*[note:\*](note:*)* text`).
+#[test]
+fn emphasis_ending_in_colon_is_not_autolinked() {
+    let input = "*note:* text\n";
+    let output = format_with_bare_uris(input);
+    similar_asserts::assert_eq!(output, "*note:* text\n");
+    similar_asserts::assert_eq!(format_with_bare_uris(&output), output);
+}
+
+// Guard: a real scheme still autolinks under the bare-URI extension.
+#[test]
+fn real_bare_url_still_autolinks() {
+    let input = "https://example.com\n";
+    let output = format_with_bare_uris(input);
+    similar_asserts::assert_eq!(output, "[https://example.com](https://example.com)\n");
+}
