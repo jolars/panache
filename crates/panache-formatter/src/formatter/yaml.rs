@@ -13,37 +13,39 @@
 //! `crates/panache-formatter/tests/yaml_cross_validation.rs`. See
 //! `.claude/skills/yaml-formatter-cutover/SKILL.md` for scope.
 //!
-//! Phase 1.10 status: cross-validation harness live; rules 1
+//! Phase 1.11 status: cross-validation harness live; rules 1
 //! (canonical 2-space indent driven by entry/item nesting depth),
 //! 2 (sequence items indent +2 from parent key — carried by rule 1's
-//! depth math, no separate code), 5 (canonical flow spacing for
-//! single-line, comment-free `YAML_FLOW_SEQUENCE` / `YAML_FLOW_MAP`
-//! subtrees), 6 (overflow wrap: when a flow container's
-//! single-line form pushes its enclosing line past `line_width`,
-//! rewrite each item onto its own line at the parent entry/item's
-//! content column + 2, with trailing comma and a standalone
-//! closing bracket; opening bracket stays on the key line),
-//! 7 (collapse blank-line runs; strip leading blanks entirely),
-//! 8 (one space before inline `#` comments), 10 (strip trailing
-//! whitespace per line), and 13 (exactly one trailing `\n` at EOF)
-//! implemented in [`document`]. Token bodies outside flow containers
-//! are otherwise emitted verbatim — quote-style restyling (rule 3)
-//! is the remaining behavior-changing rule. Corpus covers
-//! trivially-canonical inputs, trailing-newline + trailing-WS shape
-//! rules, rule-1 indent stressors (4-space and 8-space collapse,
-//! sequence-in-mapping, sequence-of-mappings), rule-2 parent-column
-//! sequences (top-level, nested, sequence-of-mappings), rule-5
-//! flow-spacing cases (no-comma-space, extra-inner-space, pathological
-//! no-spaces, nested seq-of-maps, nested maps, flow-in-block-seq,
-//! empty containers), rule-6 overflow-wrap cases (depths 0/1/2,
-//! block-sequence parent shifts items +4, sequence-of-maps keeps
-//! nested flow canonical, just-at-80 boundary), rule-7 blank-line
-//! cases, and rule-8 inline-comment cases. Block scalar (`|`/`>`)
-//! interior lines are left verbatim — rule 1 needs a real
-//! block-scalar renderer to canonicalize them. Multi-line flow
-//! input (containing `\n` between brackets) is still rejected by the
-//! in-tree parser, so the "multi-line input is sticky" behavior
-//! pretty_yaml shows is parked until the parser supports it.
+//! depth math, no separate code), 3 (prefer double-quoted over
+//! single-quoted unless the de-escaped content has `\`, `'`, `"`, or
+//! a control char that would require backslash-escaping in
+//! double-quoted form; plain stays plain; double stays double),
+//! 5 (canonical flow spacing for single-line, comment-free
+//! `YAML_FLOW_SEQUENCE` / `YAML_FLOW_MAP` subtrees), 6 (overflow wrap:
+//! when a flow container's single-line form pushes its enclosing line
+//! past `line_width`, rewrite each item onto its own line at the
+//! parent entry/item's content column + 2, with trailing comma and a
+//! standalone closing bracket; opening bracket stays on the key
+//! line), 7 (collapse blank-line runs; strip leading blanks
+//! entirely), 8 (one space before inline `#` comments), 10 (strip
+//! trailing whitespace per line), and 13 (exactly one trailing `\n`
+//! at EOF) implemented in [`document`]. All behavior-changing rules
+//! are now live; the remaining rules (4 block-scalar style,
+//! 9 comment positions, 11 empty scalars, 12 key order) are preserve
+//! rules with no code. Corpus covers trivially-canonical inputs,
+//! trailing-newline + trailing-WS shape rules, rule-1 indent
+//! stressors, rule-2 parent-column sequences, rule-3 quote-style
+//! cases (single→double when safe; single kept for `\` / `'` / `"`
+//! content; conversion on keys + flow items), rule-5 flow-spacing
+//! cases, rule-6 overflow-wrap cases (depths 0/1/2, block-sequence
+//! parent shifts items +4, sequence-of-maps keeps nested flow
+//! canonical, just-at-80 boundary), rule-7 blank-line cases, and
+//! rule-8 inline-comment cases. Block scalar (`|`/`>`) interior
+//! lines are left verbatim — rule 1 needs a real block-scalar
+//! renderer to canonicalize them. Multi-line flow input (containing
+//! `\n` between brackets) is still rejected by the in-tree parser,
+//! so the "multi-line input is sticky" behavior pretty_yaml shows is
+//! parked until the parser supports it.
 
 #[path = "yaml/block_map.rs"]
 mod block_map;
@@ -295,6 +297,66 @@ mod tests {
         let input = "k: [{a: 1, b: 2}, {c: 3, d: 4}, {e: 5, f: 6}, {g: 7, h: 8}, {i: 9, j: 10}, {k: 11, l: 12}]\n";
         let expected = "k: [\n  { a: 1, b: 2 },\n  { c: 3, d: 4 },\n  { e: 5, f: 6 },\n  { g: 7, h: 8 },\n  { i: 9, j: 10 },\n  { k: 11, l: 12 },\n]\n";
         assert_eq!(format_yaml(input, &opts), expected);
+    }
+
+    #[test]
+    fn rule_3_single_to_double_when_safe() {
+        // Rule 3: single-quoted scalars whose de-escaped content has none
+        // of `\`, `'`, `"`, or control chars convert to double-quoted.
+        // Plain stays plain; double-quoted stays double-quoted.
+        let opts = YamlFormatOptions::default();
+        assert_eq!(format_yaml("k: 'hello'\n", &opts), "k: \"hello\"\n");
+        assert_eq!(
+            format_yaml("k: 'hello world'\n", &opts),
+            "k: \"hello world\"\n"
+        );
+        // Content that would force quoting if plain (has `:`, `-`, `[`...)
+        // still converts single → double — the conversion only cares
+        // about double-form escape needs, not plain-form ambiguity.
+        assert_eq!(format_yaml("k: 'foo: bar'\n", &opts), "k: \"foo: bar\"\n");
+        assert_eq!(format_yaml("k: '-value'\n", &opts), "k: \"-value\"\n");
+        assert_eq!(format_yaml("k: '[1,2,3]'\n", &opts), "k: \"[1,2,3]\"\n");
+        // Type-ambiguous strings stay quoted (single → double); the
+        // quote preserves the string semantics that distinguish `true`
+        // the bool from `"true"` the string.
+        assert_eq!(format_yaml("k: 'true'\n", &opts), "k: \"true\"\n");
+        assert_eq!(format_yaml("k: '42'\n", &opts), "k: \"42\"\n");
+        // Empty single becomes empty double.
+        assert_eq!(format_yaml("k: ''\n", &opts), "k: \"\"\n");
+        // Plain stays plain; double stays double.
+        assert_eq!(format_yaml("k: hello\n", &opts), "k: hello\n");
+        assert_eq!(format_yaml("k: \"hello\"\n", &opts), "k: \"hello\"\n");
+    }
+
+    #[test]
+    fn rule_3_single_kept_when_escape_needed() {
+        // Single is preserved when the de-escaped content has `\`, `'`,
+        // or `"` — i.e., anything where double would require backslash
+        // escaping or change escape character usage.
+        let opts = YamlFormatOptions::default();
+        assert_eq!(
+            format_yaml("k: 'C:\\Users\\test'\n", &opts),
+            "k: 'C:\\Users\\test'\n"
+        );
+        assert_eq!(
+            format_yaml("k: 'he said \"hi\"'\n", &opts),
+            "k: 'he said \"hi\"'\n"
+        );
+        // Doubled apostrophe (de-escapes to `'`) keeps single.
+        assert_eq!(format_yaml("k: 'don''t'\n", &opts), "k: 'don''t'\n");
+    }
+
+    #[test]
+    fn rule_3_applies_to_keys_and_flow_items() {
+        // Single → double conversion fires on quoted KEYS and on quoted
+        // scalars inside flow containers (which themselves carry through
+        // rule 5's canonical spacing).
+        let opts = YamlFormatOptions::default();
+        assert_eq!(format_yaml("'hello': world\n", &opts), "\"hello\": world\n");
+        assert_eq!(
+            format_yaml("tags: ['foo', 'bar', baz]\n", &opts),
+            "tags: [\"foo\", \"bar\", baz]\n"
+        );
     }
 
     #[test]

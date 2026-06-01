@@ -23,11 +23,15 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
   containers in reverse byte order, replace overflowing single-line
   forms with canonical multi-line — items at parent_content_column + 2,
   closing bracket at parent_content_column; multi-line input is parked
-  on the in-tree parser landing multi-line flow). Remaining: rules 3
-  (quote style), 4 (block scalar style — preserve, no code), 9 (comment
+  on the in-tree parser landing multi-line flow); 1.11 rule 3 (convert
+  single-quoted scalars to double-quoted when the de-escaped content
+  has none of `\`, `'`, `"`, or ASCII control chars; plain stays plain;
+  double stays double). All behavior-changing rules now live. Remaining:
+  rule 4 (block scalar style — preserve, no code), 9 (comment
   positions — preserve, no code), 11 (empty scalars — preserve, no
-  code), 12 (key order — preserve, no code). Active work: rule 3 (the
-  one remaining behavior-changing rule).
+  code), 12 (key order — preserve, no code). Phase 1 exit gated on
+  broadening the corpus (real frontmatter extracts) and the parser-side
+  enablement of multi-line flow input.
 - **Phase 2 (joint cutover):** not started, blocked on Phase 1.
 - **Phase 3 (hashpipe extension):** not started, blocked on Phase 2.
 
@@ -35,6 +39,37 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
 
 _(Update as phases complete. Earliest entries on top.)_
 
+- **Phase 1.11 — rule 3 (quote-style preference).** Added
+  `try_convert_single_to_double` to
+  `crates/panache-formatter/src/formatter/yaml/document.rs::emit_token`.
+  Strategy: for any token whose text starts and ends with `'` (length
+  ≥ 2), strip outer quotes and de-escape (`''` → `'`), then check the
+  content for any of `\`, `'`, `"`, or ASCII control char (< 0x20 or
+  0x7F). If found, emit verbatim (keep single). Else emit `"<content>"`
+  (convert to double). Brackets/commas inside flow containers are also
+  `YAML_SCALAR` tokens but their text never starts with `'`, so the
+  prefix check filters them out. Plain and double-quoted scalars pass
+  through unchanged — never up-quote plain to double or down-quote
+  double to single, matching pretty_yaml's "preserve user choice except
+  for the one safe direction" behavior. Conservative on control chars:
+  pretty_yaml escapes literal `\t` / `\n` into double-quoted form when
+  converting, but we keep single in those cases (frontmatter rarely has
+  literal control characters in quoted scalars; the escape logic adds
+  complexity for little real-world benefit). Eleven new corpus cases
+  under `tests/fixtures/yaml_corpus/quotes/`:
+  `single_to_double_simple`, `single_to_double_with_space`,
+  `single_to_double_with_colon`, `single_keeps_with_backslash`,
+  `single_keeps_with_apostrophe`, `single_keeps_with_doublequote`,
+  `double_stays_double`, `plain_stays_plain`,
+  `empty_single_becomes_double`, `single_key_converts`,
+  `flow_singles_convert`, `seq_singles_convert`. Three new unit tests in
+  `yaml.rs` covering the single→double conversion paths, the
+  conservative-keep paths, and key/flow-context coverage. STYLE.md
+  rule 3 amended with the operational rule (the spec's preference
+  order doesn't strip quotes from plain or down-quote double; it's
+  applied at the single→double conversion boundary) and the
+  control-char carve-out. yaml.rs and document.rs status blocks bumped
+  to 1.11. No live-pipeline changes.
 - **Phase 1.10 — rule 6 (overflow wrap).** Added `apply_flow_wrap` to
   `crates/panache-formatter/src/formatter/yaml/document.rs::render`,
   inserted between rule 1 (indent canonicalization) and rule 10

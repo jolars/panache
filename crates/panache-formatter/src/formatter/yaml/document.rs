@@ -6,19 +6,22 @@
 //! [`block_sequence`](super::block_sequence),
 //! [`flow`](super::flow), [`scalar`](super::scalar)).
 //!
-//! Phase 1.10 status: seven rules across the render pipeline. The CST
+//! Phase 1.11 status: eight rules across the render pipeline. The CST
 //! walk that builds `raw` is recursive (descends into nodes, emits
 //! tokens): it applies rule 8 (collapse whitespace before an inline
 //! `YAML_COMMENT` to one space — needs CST kind to distinguish `#` in
-//! quoted scalars from comment indicators) and rule 5 (canonical flow
-//! spacing — takes over emission for single-line, comment-free
-//! `YAML_FLOW_SEQUENCE` / `YAML_FLOW_MAP` subtrees, producing
-//! `[a, b, c]` and `{ k: v, ... }`). After that, rule 1 (canonical
-//! 2-space indent) runs against per-CST-line depths precomputed from
-//! `root.text()` so it stays robust to rule 8's byte shifts; then
-//! rule 6 (overflow wrap: re-parse the post-indent buffer, walk
-//! top-level flow containers in reverse byte order, replace overflowing
-//! single-line forms with canonical multi-line — items at
+//! quoted scalars from comment indicators), rule 3 (convert
+//! single-quoted scalar tokens to double-quoted when the de-escaped
+//! content has no `\`, `'`, `"`, or control char — keep single
+//! otherwise), and rule 5 (canonical flow spacing — takes over
+//! emission for single-line, comment-free `YAML_FLOW_SEQUENCE` /
+//! `YAML_FLOW_MAP` subtrees, producing `[a, b, c]` and
+//! `{ k: v, ... }`). After that, rule 1 (canonical 2-space indent)
+//! runs against per-CST-line depths precomputed from `root.text()` so
+//! it stays robust to rule 8's byte shifts; then rule 6 (overflow
+//! wrap: re-parse the post-indent buffer, walk top-level flow
+//! containers in reverse byte order, replace overflowing single-line
+//! forms with canonical multi-line — items at
 //! `parent_content_column + 2`, closing bracket at
 //! `parent_content_column`); then rule 10 (strip trailing whitespace
 //! per line), rule 7 (collapse blank-line runs), and rule 13 (exactly
@@ -95,9 +98,40 @@ fn emit_node(out: &mut String, node: &SyntaxNode) {
 fn emit_token(out: &mut String, t: &SyntaxToken) {
     if t.kind() == SyntaxKind::WHITESPACE && is_ws_before_inline_comment(t) {
         out.push(' ');
+    } else if let Some(converted) = try_convert_single_to_double(t.text()) {
+        out.push_str(&converted);
     } else {
         out.push_str(t.text());
     }
+}
+
+/// STYLE.md rule 3: prefer double-quoted over single-quoted when the
+/// content has nothing that would need backslash-escaping in
+/// double-quoted form. Returns `Some(double_quoted)` if `text` is a
+/// single-quoted scalar whose de-escaped content has no `\`, `'`, `"`,
+/// or ASCII control char (0x00–0x1F or 0x7F); otherwise `None` (caller
+/// emits verbatim). Keeping single-quoted when content has `'` is
+/// conservative — double would handle bare `'` fine, but pretty_yaml
+/// preserves the user's choice in that case and we match.
+/// Control-char escaping in double-quoted form (TAB → `\t`,
+/// LF → `\n` with continuation indent, etc.) is non-trivial and not
+/// yet implemented; we keep single in those cases. Brackets/commas
+/// inside flow containers are also `YAML_SCALAR` tokens but their
+/// text never starts with `'`, so the prefix check filters them out
+/// safely.
+fn try_convert_single_to_double(text: &str) -> Option<String> {
+    if text.len() < 2 || !text.starts_with('\'') || !text.ends_with('\'') {
+        return None;
+    }
+    let inner = &text[1..text.len() - 1];
+    let content = inner.replace("''", "'");
+    if content.chars().any(|c| {
+        let cp = c as u32;
+        c == '\\' || c == '\'' || c == '"' || cp < 0x20 || cp == 0x7F
+    }) {
+        return None;
+    }
+    Some(format!("\"{content}\""))
 }
 
 /// True if `t` is a `WHITESPACE` token whose forward run of contiguous

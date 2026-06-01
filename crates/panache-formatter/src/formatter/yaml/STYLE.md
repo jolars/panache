@@ -31,7 +31,19 @@ the load-bearing invariants.
    never `- foo` at parent column).
 3. **Quote style preference:** plain → double-quoted → single-quoted only when
    content contains characters that would need backslash-escaping in
-   double-quoted form (e.g. `'C:\Users\test'`).
+   double-quoted form (e.g. `'C:\Users\test'`). Operationally, the formatter
+   never adds or removes quoting from a scalar the user wrote plain or
+   double-quoted --- those carry semantic intent (`true` the bool vs `"true"`
+   the string). Single-quoted scalars are converted to double-quoted UNLESS the
+   de-escaped content contains any of `\`, `'`, `"`, or an ASCII control
+   character (0x00--0x1F or 0x7F). The control-char guard is conservative:
+   pretty_yaml additionally generates `\t` / `\n` / etc. escapes when converting
+   single → double, but the in-tree formatter keeps those as single-quoted
+   instead --- frontmatter rarely has literal tabs or newlines in quoted
+   scalars, and adding escape generation buys little. Single is preserved when
+   content has `'` because that's the one case where converting (`'don''t'` →
+   `"don't"`) would change the user's explicit choice of escape character
+   without simplifying anything; pretty_yaml does the same.
 4. **Block scalar style** (literal `|` vs folded `>`): preserved from input.
    They carry different YAML semantics and are not interchangeable.
 5. **Flow spacing:** `{ key: value }` with one space inside braces; `[a, b, c]`
