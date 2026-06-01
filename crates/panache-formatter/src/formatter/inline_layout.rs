@@ -1292,22 +1292,17 @@ fn process_node_recursive(
 }
 
 pub(super) fn wrapped_lines_for_paragraph(
-    _config: &Config,
+    config: &Config,
     node: &SyntaxNode,
     width: usize,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
-    if is_fence_like_triplet_paragraph(node) {
-        return node
-            .text()
-            .to_string()
-            .lines()
-            .map(ToString::to_string)
-            .collect();
+    if should_preserve_paragraph_layout(config, node) {
+        return preserved_paragraph_lines(node);
     }
     log::trace!("wrapped_lines_for_paragraph called with width={}", width);
     let out_lines = wrapped_lines_for_node(
-        _config,
+        config,
         node,
         &[width],
         format_inline_fn,
@@ -1318,22 +1313,17 @@ pub(super) fn wrapped_lines_for_paragraph(
 }
 
 pub(super) fn wrapped_lines_for_paragraph_with_widths(
-    _config: &Config,
+    config: &Config,
     node: &SyntaxNode,
     widths: &[usize],
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
-    if is_fence_like_triplet_paragraph(node) {
-        return node
-            .text()
-            .to_string()
-            .lines()
-            .map(ToString::to_string)
-            .collect();
+    if should_preserve_paragraph_layout(config, node) {
+        return preserved_paragraph_lines(node);
     }
     log::trace!("wrapped_lines_for_paragraph_with_widths called");
     let out_lines = wrapped_lines_for_node(
-        _config,
+        config,
         node,
         widths,
         format_inline_fn,
@@ -1344,13 +1334,16 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
 }
 
 pub(super) fn sentence_lines_for_paragraph(
-    _config: &Config,
+    config: &Config,
     node: &SyntaxNode,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
+    if should_preserve_paragraph_layout(config, node) {
+        return preserved_paragraph_lines(node);
+    }
     log::trace!("sentence_lines_for_paragraph called");
     wrapped_lines_for_node(
-        _config,
+        config,
         node,
         &[],
         format_inline_fn,
@@ -1359,18 +1352,33 @@ pub(super) fn sentence_lines_for_paragraph(
 }
 
 pub(super) fn semantic_lines_for_paragraph(
-    _config: &Config,
+    config: &Config,
     node: &SyntaxNode,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
+    if should_preserve_paragraph_layout(config, node) {
+        return preserved_paragraph_lines(node);
+    }
     log::trace!("semantic_lines_for_paragraph called");
     wrapped_lines_for_node(
-        _config,
+        config,
         node,
         &[],
         format_inline_fn,
         WrapStrategy::ParagraphSemantic,
     )
+}
+
+fn preserved_paragraph_lines(node: &SyntaxNode) -> Vec<String> {
+    node.text()
+        .to_string()
+        .lines()
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn should_preserve_paragraph_layout(config: &Config, node: &SyntaxNode) -> bool {
+    is_fence_like_triplet_paragraph(node) || paragraph_has_swept_fence_shape(config, node)
 }
 
 pub(super) fn wrapped_lines_for_node(
@@ -1427,6 +1435,80 @@ fn is_fence_like_triplet_paragraph(node: &SyntaxNode) -> bool {
 
     let is_fence = |line: &str| line.len() >= 3 && line.chars().all(|c| c == ':');
     is_fence(first) && is_fence(last) && !middle.is_empty()
+}
+
+/// True when a paragraph contains a continuation line that begins with a
+/// fence-shape `:::` run. Issue #340: when the user forgets the blank line
+/// between content and a fenced div opener, pandoc parses the whole thing
+/// as one paragraph; reflowing it collapses the `:::` lines into prose and
+/// destroys the visual signal of the missing blank line. Preserving source
+/// linebreaks keeps the user's intent legible. (The lint rule
+/// `stray-fenced-div-markers` flags the same shape diagnostically.)
+fn paragraph_has_swept_fence_shape(config: &Config, node: &SyntaxNode) -> bool {
+    if !config.parser_extensions.fenced_divs {
+        return false;
+    }
+    if node.kind() != SyntaxKind::PARAGRAPH {
+        return false;
+    }
+
+    // Cheap reject: skip the allocation+scan unless an immediate TEXT child
+    // already contains `:::`. `:::` runs at the start of a continuation line
+    // sit in direct TEXT children of the PARAGRAPH (never nested inside an
+    // inline element), so this scan is sufficient.
+    let has_triple_colon = node
+        .children_with_tokens()
+        .filter_map(|c| c.into_token())
+        .any(|t| t.kind() == SyntaxKind::TEXT && t.text().contains(":::"));
+    if !has_triple_colon {
+        return false;
+    }
+
+    let text = node.text().to_string();
+    let mut had_content = false;
+    for line in text.split('\n') {
+        let line = line.trim_end_matches('\r');
+        let leading = line.bytes().take_while(|b| *b == b' ').count();
+        if leading <= 3 {
+            let after_ws = &line[leading..];
+            if had_content && after_ws.starts_with(":::") && looks_like_div_fence_line(after_ws) {
+                return true;
+            }
+        }
+        if line.bytes().any(|b| !b.is_ascii_whitespace()) {
+            had_content = true;
+        }
+    }
+    false
+}
+
+/// Minimal recognizer for pandoc fenced div opener / closer shapes; intended
+/// only for the heuristic above. Mirrors the parser's `try_parse_div_fence_open`
+/// + `is_div_closing_fence` for the line shapes that count as a fence.
+fn looks_like_div_fence_line(content: &str) -> bool {
+    let colon_count = content.bytes().take_while(|b| *b == b':').count();
+    if colon_count < 3 {
+        return false;
+    }
+    let after = content[colon_count..].trim();
+    if after.is_empty() {
+        return true;
+    }
+    if let Some(rest) = after.strip_prefix('{') {
+        return rest.contains('}');
+    }
+    let word_end = after
+        .find(|c: char| c.is_whitespace() || c == ':')
+        .unwrap_or(after.len());
+    let (first, rest) = after.split_at(word_end);
+    if first.is_empty() {
+        return false;
+    }
+    let trailing = rest.trim();
+    if trailing.is_empty() {
+        return true;
+    }
+    trailing.chars().all(|c| c == ':') && trailing.len() >= 3
 }
 
 #[cfg(test)]

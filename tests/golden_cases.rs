@@ -209,6 +209,7 @@ golden_test_cases!(
     fenced_div_list_idempotency_setup,
     fenced_div_close_grid_table,
     fenced_div_trim_blank_lines,
+    fenced_div_missing_blank_line_340,
     bracketed_span_footnote_reflow_291,
     footnote_continuation_idempotency,
     footnote_continuation_idempotency_reflow,

@@ -61,7 +61,10 @@ A
 
 This is not a fenced div either:
 
-B ::: declare A :::
+B
+::: declare
+A
+:::
 
 Here is a fenced div:
 

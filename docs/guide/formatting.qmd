@@ -828,6 +828,35 @@ Output
     :::
     ```
 
+### Fence-shape lines pulled into a paragraph
+
+If a line that looks like a fenced div opener or closer (`::: foo`, `:::`, etc.)
+directly follows non-blank content with no separating blank line, pandoc parses
+it as paragraph text rather than a fence. Reflowing such a paragraph would
+collapse the structural-looking lines into ordinary prose and hide the cause.
+Panache instead preserves the source line breaks for that paragraph so the
+missing blank line stays visible. The
+[`stray-fenced-div-markers`](../reference/linter-rules.qmd#stray-fenced-div-markers)
+lint rule flags the same shape diagnostically.
+
+Input
+
+:   ```markdown
+    []{#hmm}
+    ::: {lang=zh-TW}
+    bla
+    :::
+    ```
+
+Output
+
+:   ```markdown
+    []{#hmm}
+    ::: {lang=zh-TW}
+    bla
+    :::
+    ```
+
 ## Footnotes
 
 ### Reference Footnotes
