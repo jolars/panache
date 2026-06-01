@@ -49,6 +49,32 @@ fn test_pipe_table_idempotency() {
     assert_eq!(first_format, second_format);
 }
 
+// An escaped pipe `\|` inside a table-cell code span is a literal pipe, not a
+// column delimiter. The cell must stay one intact code span and the table must
+// keep its original column count (regression: the row was re-split on `|`,
+// producing a phantom 3rd column and rewriting `\|` to `\ |`).
+#[test]
+fn test_pipe_table_escaped_pipe_in_code_span() {
+    let input = "| cmd | run |\n| --- | --- |\n| go | `curl x \\| sh` |";
+    let expected =
+        "  | cmd | run            |\n  | --- | -------------- |\n  | go  | `curl x \\| sh` |\n";
+
+    let result = format(input, None, None);
+    assert_eq!(result, expected);
+    assert_eq!(format(&result, None, None), result);
+}
+
+// Guard: a genuine 3-column table (unescaped pipes) still formats as 3 columns.
+#[test]
+fn test_pipe_table_genuine_three_columns() {
+    let input = "| a | b | c |\n| --- | --- | --- |\n| 1 | 2 | 3 |";
+    let expected = "  | a   | b   | c   |\n  | --- | --- | --- |\n  | 1   | 2   | 3   |\n";
+
+    let result = format(input, None, None);
+    assert_eq!(result, expected);
+    assert_eq!(format(&result, None, None), result);
+}
+
 #[test]
 fn test_pipe_table_with_caption_after() {
     let input = "| A | B |\n|---|---|\n| C | D |\n\n: Caption text";

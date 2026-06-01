@@ -547,8 +547,17 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                 alignments = extract_alignments(&separator_text);
             }
             SyntaxKind::TABLE_HEADER | SyntaxKind::TABLE_ROW => {
-                let row_content = format_cell_content(&child, config);
-                let cells = split_row(&row_content);
+                // Prefer the structured TABLE_CELL nodes: the parser already
+                // resolved cell boundaries with escape awareness, so an escaped
+                // `\|` stays inside its cell. Re-rendering the row and splitting
+                // on `|` (as `split_row` does) is escape-blind: it re-tokenizes
+                // the `\|` as a delimiter and invents a phantom column.
+                let cells = extract_row_cells(&child, config);
+                let cells = if cells.is_empty() {
+                    split_row(&format_cell_content(&child, config))
+                } else {
+                    cells
+                };
                 rows.push(cells);
             }
             _ => {}
