@@ -854,6 +854,13 @@ The fence count on the opener and closer don't match.
 [contact Ms. Nebbercracker]{lang=en-US}:::
 ```
 
+```markdown
+[]{#hmm}
+::: {lang=zh-TW}
+bla
+:::
+```
+
 **Diagnostic:**
 
 ```
@@ -862,6 +869,18 @@ warning[stray-fenced-div-markers]: '::::' appears as text, not as a fenced div m
   = help: Pandoc only treats ':::' as a fenced div marker when it starts a line
           on its own (optionally followed by a class or attributes). Add a
           newline before it, or wrap it in backticks if it's intentional text
+```
+
+When a `:::` run sits at the start of a line and the rest of the line forms a
+valid fence shape (opener or closer), but a preceding non-blank line pulls it
+into a paragraph, the diagnostic is sharpened to name the actual failure mode:
+
+```
+warning[stray-fenced-div-markers]: ':::' looks like a fenced div marker, but
+the preceding line pulls it into a paragraph
+ --> document.qmd:2:1
+  = help: Insert a blank line above this line so Pandoc parses it as a fenced
+          div instead of paragraph text
 ```
 
 ## YAML diagnostics

@@ -34,23 +34,42 @@ impl Rule for StrayFencedDivMarkersRule {
                 }
                 let text = token.text();
                 let token_start: u32 = token.text_range().start().into();
+                let para_start: usize = node.text_range().start().into();
                 for (run_start, run_end) in find_colon_runs(text) {
                     let abs_start = token_start + run_start as u32;
                     let abs_end = token_start + run_end as u32;
                     let range = TextRange::new(abs_start.into(), abs_end.into());
                     let location = Location::from_range(range, input);
                     let marker = &text[run_start..run_end];
-                    let diag = Diagnostic::warning(
-                        location,
-                        "stray-fenced-div-markers",
-                        format!("'{marker}' appears as text, not as a fenced div marker"),
-                    )
-                    .with_note(
-                        DiagnosticNoteKind::Help,
-                        "Pandoc only treats ':::' as a fenced div marker when it starts a line \
-                         on its own (optionally followed by a class or attributes). Add a \
-                         newline before it, or wrap it in backticks if it's intentional text",
-                    );
+
+                    let diag = if is_swept_fence_shape(input, para_start, abs_start as usize) {
+                        Diagnostic::warning(
+                            location,
+                            "stray-fenced-div-markers",
+                            format!(
+                                "'{marker}' looks like a fenced div marker, but the preceding \
+                                 line pulls it into a paragraph"
+                            ),
+                        )
+                        .with_note(
+                            DiagnosticNoteKind::Help,
+                            "Insert a blank line above this line so Pandoc parses it as a \
+                             fenced div instead of paragraph text",
+                        )
+                    } else {
+                        Diagnostic::warning(
+                            location,
+                            "stray-fenced-div-markers",
+                            format!("'{marker}' appears as text, not as a fenced div marker"),
+                        )
+                        .with_note(
+                            DiagnosticNoteKind::Help,
+                            "Pandoc only treats ':::' as a fenced div marker when it starts a \
+                             line on its own (optionally followed by a class or attributes). \
+                             Add a newline before it, or wrap it in backticks if it's \
+                             intentional text",
+                        )
+                    };
                     diagnostics.push(diag);
                 }
             }
@@ -58,6 +77,72 @@ impl Rule for StrayFencedDivMarkersRule {
 
         diagnostics
     }
+}
+
+/// True when a `:::` run sits at the start of its source line (after up to
+/// three leading spaces), the rest of the line forms a valid fence opener or
+/// closer shape, and the enclosing paragraph already has non-whitespace
+/// content before the line. Together those mean the user almost certainly
+/// intended a fenced div block but a missing blank line above is pulling it
+/// into the preceding paragraph (cf. issue #340).
+fn is_swept_fence_shape(input: &str, para_start: usize, run_start: usize) -> bool {
+    let bytes = input.as_bytes();
+    if run_start > bytes.len() {
+        return false;
+    }
+
+    let line_start = input[..run_start].rfind('\n').map_or(0, |i| i + 1);
+    let line_end = input[run_start..]
+        .find('\n')
+        .map_or(bytes.len(), |i| run_start + i);
+    let line = &input[line_start..line_end];
+
+    let leading_spaces = line.bytes().take_while(|b| *b == b' ').count();
+    if leading_spaces > 3 || line_start + leading_spaces != run_start {
+        return false;
+    }
+
+    if !input[para_start..line_start]
+        .chars()
+        .any(|c| !c.is_whitespace())
+    {
+        return false;
+    }
+
+    looks_like_div_fence(&line[leading_spaces..])
+}
+
+/// Minimal version of the parser's fence-shape recognizer: accepts both
+/// opener (`::: {.cls}` / `::: classname` / `::::: {#id} :::::`) and closer
+/// (`:::` / `::::`) shapes. Inlined here to avoid widening
+/// `panache-parser`'s public API for a lint-only check.
+fn looks_like_div_fence(content: &str) -> bool {
+    let colon_count = content.bytes().take_while(|b| *b == b':').count();
+    if colon_count < 3 {
+        return false;
+    }
+    let after = content[colon_count..].trim();
+
+    if after.is_empty() {
+        return true;
+    }
+
+    if let Some(rest) = after.strip_prefix('{') {
+        return rest.contains('}');
+    }
+
+    let word_end = after
+        .find(|c: char| c.is_whitespace() || c == ':')
+        .unwrap_or(after.len());
+    let (first, rest) = after.split_at(word_end);
+    if first.is_empty() {
+        return false;
+    }
+    let trailing = rest.trim();
+    if trailing.is_empty() {
+        return true;
+    }
+    trailing.chars().all(|c| c == ':') && trailing.len() >= 3
 }
 
 /// Non-overlapping byte offsets of every run of three or more `:` characters
@@ -203,5 +288,68 @@ mod tests {
         let input = "p\r\n\r\n:::\r\n\r\nmore\r\n";
         let diagnostics = parse_and_lint(input);
         assert_eq!(diagnostics.len(), 1);
+    }
+
+    #[test]
+    fn upgrades_message_for_opener_swept_into_paragraph() {
+        // Issue #340: `[]{#hmm}` immediately followed by `::: {lang=zh-TW}`
+        // with no blank line. Both ::: lines fall into the same paragraph;
+        // the diagnostic should call this out specifically rather than the
+        // generic "appears as text" message.
+        let input = "[]{#hmm}\n::: {lang=zh-TW}\nbla\n:::\n";
+        let diagnostics = parse_and_lint(input);
+        assert_eq!(diagnostics.len(), 2);
+
+        assert_eq!(diagnostics[0].location.line, 2);
+        assert!(diagnostics[0].message.contains("looks like a fenced div"));
+        assert!(diagnostics[0].message.contains("preceding line pulls it"));
+        assert!(
+            diagnostics[0]
+                .notes
+                .iter()
+                .any(|n| n.message.contains("Insert a blank line"))
+        );
+
+        assert_eq!(diagnostics[1].location.line, 4);
+        assert!(diagnostics[1].message.contains("looks like a fenced div"));
+    }
+
+    #[test]
+    fn upgrades_message_for_plain_text_then_fence_shape() {
+        let input = "hello world\n::: warning\n";
+        let diagnostics = parse_and_lint(input);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].location.line, 2);
+        assert!(diagnostics[0].message.contains("looks like a fenced div"));
+    }
+
+    #[test]
+    fn lone_triple_colon_paragraph_keeps_generic_message() {
+        // No preceding paragraph content means this isn't the swept-in shape;
+        // the generic "appears as text" message is still appropriate.
+        let input = "Hello.\n\n:::\n\nGoodbye.\n";
+        let diagnostics = parse_and_lint(input);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0].message.contains("appears as text"));
+    }
+
+    #[test]
+    fn mid_line_colons_keep_generic_message() {
+        // `:::` mid-line isn't a fence-shape line, so don't upgrade.
+        let input = "Use ::: to start a div.\n";
+        let diagnostics = parse_and_lint(input);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0].message.contains("appears as text"));
+    }
+
+    #[test]
+    fn non_fence_shape_after_colons_keeps_generic_message() {
+        // Multi-word junk after `:::` isn't a valid fence opener; even though
+        // the run starts the line and has paragraph content above, the line
+        // isn't a fence shape, so don't upgrade.
+        let input = "para\n::: not a fence shape with words\n";
+        let diagnostics = parse_and_lint(input);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0].message.contains("appears as text"));
     }
 }
