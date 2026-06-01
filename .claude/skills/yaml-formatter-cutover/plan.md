@@ -18,12 +18,16 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
   refactored to precompute per-line depths so rule 8's byte shifts
   don't invalidate rule 1's offset lookup); 1.9 rule 5 (canonical flow
   spacing; token walk refactored to recursive node walk so flow
-  containers can take over emission for their subtrees). Remaining:
-  rules 3 (quote style), 4 (block scalar style — preserve, no code),
-  6 (flow wrap on overflow), 9 (comment positions — preserve, no
-  code), 11 (empty scalars — preserve, no code), 12 (key order —
-  preserve, no code). Active work: rules 3, 6 (the two remaining
-  behavior-changing rules).
+  containers can take over emission for their subtrees); 1.10 rule 6
+  (overflow wrap: re-parse the post-indent buffer, walk top-level flow
+  containers in reverse byte order, replace overflowing single-line
+  forms with canonical multi-line — items at parent_content_column + 2,
+  closing bracket at parent_content_column; multi-line input is parked
+  on the in-tree parser landing multi-line flow). Remaining: rules 3
+  (quote style), 4 (block scalar style — preserve, no code), 9 (comment
+  positions — preserve, no code), 11 (empty scalars — preserve, no
+  code), 12 (key order — preserve, no code). Active work: rule 3 (the
+  one remaining behavior-changing rule).
 - **Phase 2 (joint cutover):** not started, blocked on Phase 1.
 - **Phase 3 (hashpipe extension):** not started, blocked on Phase 2.
 
@@ -31,6 +35,42 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
 
 _(Update as phases complete. Earliest entries on top.)_
 
+- **Phase 1.10 — rule 6 (overflow wrap).** Added `apply_flow_wrap` to
+  `crates/panache-formatter/src/formatter/yaml/document.rs::render`,
+  inserted between rule 1 (indent canonicalization) and rule 10
+  (trailing-WS strip). Strategy: re-parse the post-rule-1 buffer with
+  the in-tree YAML parser, walk top-level (`!has_flow_ancestor`)
+  `YAML_FLOW_SEQUENCE` / `YAML_FLOW_MAP` nodes in reverse byte order,
+  and replace any whose canonical single-line form + the container's
+  containing-line context exceeds `opts.line_width`. Wrap layout
+  follows pretty_yaml: opening bracket stays on the key line; each
+  item indented at `parent_content_column + 2`; trailing comma after
+  every item; closing bracket on its own line at
+  `parent_content_column`. `parent_content_column` =
+  `2 * (entry/item depth − 1)` for a flow in a block-map value, and
+  the same +2 for a flow in a block-sequence item — the `- ` prefix
+  shifts the content column right by two. Nested flow containers
+  inside a wrapped item stay in their canonical rule-5 single-line
+  form (matches pretty_yaml's seq-of-maps output). The wrap threshold
+  is strict `>`: lines exactly at `line_width` (default 80) stay
+  single-line; lines at `line_width + 1` wrap. Re-parsing on rule 6
+  is bounded by the in-tree parser's known limitation: multi-line
+  flow containers (a flow with `\n` between brackets) currently fail
+  to parse, so `format_yaml` already passed the input through
+  verbatim before `render` was reached — the "multi-line input is
+  sticky" behavior pretty_yaml shows is parked on parser support for
+  those inputs. Idempotency holds because run 2 of a wrapped output
+  hits the multi-line-flow parser-rejection path and passes through
+  verbatim. Seven new corpus cases under
+  `tests/fixtures/yaml_corpus/flow_wrap/`: `overflow_depth_0`,
+  `overflow_depth_1`, `overflow_depth_2`, `overflow_in_block_seq`,
+  `overflow_map`, `overflow_seq_of_maps`, `exactly_80_no_wrap`. Four
+  new unit tests in `yaml.rs` (depth-0 wrap with at-80 / over-80
+  boundary, depth-1 wrap alignment, block-sequence parent +4 shift,
+  nested flow stays canonical). STYLE.md rule 6 amended with the
+  wrap-decision formula, the parent-content-column math, the nested
+  flow rule, and the multi-line-input deferral. yaml.rs status block
+  bumped to 1.10. No live-pipeline changes.
 - **Phase 1.9 — rule 5 (canonical flow spacing) + recursive walker.**
   Refactored the token walk into a recursive node walk
   (`walk_with_normalization` → `emit_node` → `emit_token`) so flow

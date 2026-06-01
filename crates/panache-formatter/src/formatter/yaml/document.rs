@@ -6,9 +6,9 @@
 //! [`block_sequence`](super::block_sequence),
 //! [`flow`](super::flow), [`scalar`](super::scalar)).
 //!
-//! Phase 1.9 status: six rules across the render pipeline. The CST walk
-//! that builds `raw` is recursive (descends into nodes, emits tokens):
-//! it applies rule 8 (collapse whitespace before an inline
+//! Phase 1.10 status: seven rules across the render pipeline. The CST
+//! walk that builds `raw` is recursive (descends into nodes, emits
+//! tokens): it applies rule 8 (collapse whitespace before an inline
 //! `YAML_COMMENT` to one space — needs CST kind to distinguish `#` in
 //! quoted scalars from comment indicators) and rule 5 (canonical flow
 //! spacing — takes over emission for single-line, comment-free
@@ -16,13 +16,19 @@
 //! `[a, b, c]` and `{ k: v, ... }`). After that, rule 1 (canonical
 //! 2-space indent) runs against per-CST-line depths precomputed from
 //! `root.text()` so it stays robust to rule 8's byte shifts; then
-//! rule 10 (strip trailing whitespace per line), rule 7 (collapse
-//! blank-line runs), and rule 13 (exactly one `\n` at EOF) run as
-//! line-level post-passes. Multi-line flow containers and flow
-//! containers with embedded comments are emitted verbatim (rule 6 will
-//! own multi-line flow wrap). Block-scalar (`|`/`>`) interior lines
-//! are still preserved verbatim — rule 1 needs a real block-scalar
-//! renderer to canonicalize their indent.
+//! rule 6 (overflow wrap: re-parse the post-indent buffer, walk
+//! top-level flow containers in reverse byte order, replace overflowing
+//! single-line forms with canonical multi-line — items at
+//! `parent_content_column + 2`, closing bracket at
+//! `parent_content_column`); then rule 10 (strip trailing whitespace
+//! per line), rule 7 (collapse blank-line runs), and rule 13 (exactly
+//! one `\n` at EOF) run as line-level post-passes. Flow containers
+//! whose CST text already contains `\n` (multi-line input the parser
+//! rejected today) never reach `render` — `format_yaml` falls back to
+//! verbatim passthrough on parse error. Flow containers with embedded
+//! comments stay verbatim; block-scalar (`|`/`>`) interior lines are
+//! preserved verbatim — rule 1 needs a real block-scalar renderer to
+//! canonicalize their indent.
 
 use panache_parser::SyntaxNode;
 use panache_parser::syntax::{SyntaxKind, SyntaxToken};
@@ -34,11 +40,12 @@ use super::options::YamlFormatOptions;
 /// the `DOCUMENT` node returned by
 /// [`panache_parser::parser::yaml::parse_yaml_tree`], but any CST node
 /// works for the walk — we descend into it recursively.
-pub(super) fn render(root: &SyntaxNode, _opts: &YamlFormatOptions) -> String {
+pub(super) fn render(root: &SyntaxNode, opts: &YamlFormatOptions) -> String {
     let depths = precompute_line_depths(root);
     let raw = walk_with_normalization(root);
     let indented = apply_canonical_indents(&raw, &depths);
-    let stripped = strip_trailing_whitespace_per_line(indented);
+    let wrapped = apply_flow_wrap(indented, opts);
+    let stripped = strip_trailing_whitespace_per_line(wrapped);
     let collapsed = collapse_blank_line_runs(stripped);
     normalize_trailing_newline(collapsed)
 }
@@ -380,4 +387,181 @@ fn normalize_trailing_newline(mut buf: String) -> String {
     buf.truncate(trimmed_len);
     buf.push('\n');
     buf
+}
+
+/// STYLE.md rule 6: when a flow container's canonical single-line form
+/// would push its enclosing line past `opts.line_width`, rewrite the
+/// container to canonical multi-line. Each item lands on its own line
+/// indented at the parent entry/item's content column + 2; a trailing
+/// comma follows the final item; the closing `]`/`}` sits on its own
+/// line at the parent's content column. The opening bracket stays on
+/// the key line — that's the one point of disagreement with Prettier
+/// (we follow pretty_yaml).
+///
+/// Implementation: re-parse the post-indent buffer to find flow
+/// containers in their canonical-single-line form (rule 5 emitted them
+/// there), then walk top-level (no flow ancestor) containers in reverse
+/// byte order, rewriting overflowing ones in place. Multi-line input
+/// can't appear here today — the in-tree parser rejects multi-line flow
+/// containers, so `format_yaml` already passed the original input
+/// through verbatim before `render` ever ran. The "multi-line input is
+/// sticky" behavior pretty_yaml shows lands when the parser learns to
+/// accept those inputs.
+fn apply_flow_wrap(buf: String, opts: &YamlFormatOptions) -> String {
+    let Some(tree) = panache_parser::parser::yaml::parse_yaml_tree(&buf) else {
+        return buf;
+    };
+
+    let mut targets: Vec<SyntaxNode> = tree
+        .descendants()
+        .filter(|n| {
+            matches!(
+                n.kind(),
+                SyntaxKind::YAML_FLOW_SEQUENCE | SyntaxKind::YAML_FLOW_MAP
+            )
+        })
+        .filter(|n| !has_flow_ancestor(n))
+        .collect();
+    targets.sort_by_key(|n| n.text_range().start());
+
+    let mut out = buf;
+    for container in targets.into_iter().rev() {
+        let start = usize::from(container.text_range().start());
+        let end = usize::from(container.text_range().end());
+        let col = column_of_offset(&out, start);
+        let single = canonical_single_line_flow(&container);
+        let tail_chars = out[end..].split('\n').next().unwrap_or("").chars().count();
+        let line_len = col + single.chars().count() + tail_chars;
+        if line_len <= opts.line_width {
+            continue;
+        }
+        let wrapped = canonical_wrapped_flow(&container);
+        out.replace_range(start..end, &wrapped);
+    }
+    out
+}
+
+fn has_flow_ancestor(node: &SyntaxNode) -> bool {
+    let mut p = node.parent();
+    while let Some(n) = p {
+        if matches!(
+            n.kind(),
+            SyntaxKind::YAML_FLOW_SEQUENCE | SyntaxKind::YAML_FLOW_MAP
+        ) {
+            return true;
+        }
+        p = n.parent();
+    }
+    false
+}
+
+fn column_of_offset(text: &str, offset: usize) -> usize {
+    let prefix = &text[..offset];
+    let last_nl = prefix.rfind('\n').map(|p| p + 1).unwrap_or(0);
+    prefix[last_nl..].chars().count()
+}
+
+fn canonical_single_line_flow(node: &SyntaxNode) -> String {
+    let mut out = String::new();
+    match node.kind() {
+        SyntaxKind::YAML_FLOW_SEQUENCE => emit_flow_sequence(&mut out, node),
+        SyntaxKind::YAML_FLOW_MAP => emit_flow_map(&mut out, node),
+        _ => out.push_str(&node.text().to_string()),
+    }
+    out
+}
+
+/// Canonical multi-line form for a flow container that overflows its
+/// line. Items go one-per-line at the parent's content column + 2, with
+/// a trailing comma; the closing bracket sits at the parent's content
+/// column. The parent's content column is computed from the CST: it's
+/// `2 * (block_entry_item_depth − 1)` for a flow in a block-map value,
+/// and `2 * (block_entry_item_depth − 1) + 2` for a flow inside a block
+/// sequence item (the `- ` prefix shifts the content column right by
+/// two). Nested flow containers inside the wrapped items stay in
+/// canonical single-line form — rule 6 only wraps the outermost
+/// overflowing container in a single pass.
+fn canonical_wrapped_flow(node: &SyntaxNode) -> String {
+    let (open, close) = match node.kind() {
+        SyntaxKind::YAML_FLOW_SEQUENCE => ('[', ']'),
+        SyntaxKind::YAML_FLOW_MAP => ('{', '}'),
+        _ => return node.text().to_string(),
+    };
+
+    let content_col = parent_content_col(node);
+    let item_indent = " ".repeat(content_col + 2);
+    let close_indent = " ".repeat(content_col);
+
+    let mut out = String::new();
+    out.push(open);
+
+    let item_kind = match node.kind() {
+        SyntaxKind::YAML_FLOW_SEQUENCE => SyntaxKind::YAML_FLOW_SEQUENCE_ITEM,
+        SyntaxKind::YAML_FLOW_MAP => SyntaxKind::YAML_FLOW_MAP_ENTRY,
+        _ => unreachable!(),
+    };
+    let items: Vec<_> = node.children().filter(|c| c.kind() == item_kind).collect();
+    if items.is_empty() {
+        out.push(close);
+        return out;
+    }
+
+    out.push('\n');
+    for item in &items {
+        out.push_str(&item_indent);
+        let rendered = match item.kind() {
+            SyntaxKind::YAML_FLOW_SEQUENCE_ITEM => {
+                let mut buf = String::new();
+                emit_node(&mut buf, item);
+                buf.trim().to_string()
+            }
+            SyntaxKind::YAML_FLOW_MAP_ENTRY => {
+                let mut buf = String::new();
+                emit_flow_map_entry(&mut buf, item);
+                buf
+            }
+            _ => unreachable!(),
+        };
+        out.push_str(&rendered);
+        out.push(',');
+        out.push('\n');
+    }
+    out.push_str(&close_indent);
+    out.push(close);
+    out
+}
+
+/// Compute the "content column" of the entry/item that immediately
+/// contains this flow node — where its `]`/`}` should sit on wrap. For
+/// a flow in a block-map value, that's the line indent of the key
+/// (canonical `2 * (depth − 1)`). For a flow in a block-sequence item,
+/// the `- ` prefix shifts content right by two, so add another 2.
+fn parent_content_col(node: &SyntaxNode) -> usize {
+    let mut depth = 0usize;
+    let mut in_block_seq_item = false;
+    let mut found_first_block_anchor = false;
+    let mut parent = node.parent();
+    while let Some(p) = parent {
+        match p.kind() {
+            SyntaxKind::YAML_BLOCK_MAP_ENTRY => {
+                depth += 1;
+                found_first_block_anchor = true;
+            }
+            SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM => {
+                depth += 1;
+                if !found_first_block_anchor {
+                    in_block_seq_item = true;
+                    found_first_block_anchor = true;
+                }
+            }
+            _ => {}
+        }
+        parent = p.parent();
+    }
+    let canonical = 2 * depth.saturating_sub(1);
+    if in_block_seq_item {
+        canonical + 2
+    } else {
+        canonical
+    }
 }

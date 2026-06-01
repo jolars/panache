@@ -46,7 +46,19 @@ the load-bearing invariants.
 6. **Flow wrap on line-width overflow:** each item on its own line, trailing
    comma, **opening bracket stays on the key line**
    (`keywords: [\n  first,\n  ...\n]`). This is the one point of disagreement
-   between pretty_yaml and Prettier --- we follow pretty_yaml.
+   between pretty_yaml and Prettier --- we follow pretty_yaml. Wrap fires when
+   the canonical single-line form would push the line strictly past
+   `line_width`; lines exactly at `line_width` stay single-line. Items indent at
+   `parent_content_column + 2`; the closing bracket aligns at
+   `parent_content_column`. For a flow in a block-map value, the parent content
+   column is `2 * (entry/item depth − 1)`; for a flow in a block sequence item,
+   the `-` prefix shifts the content column right by two. Nested flow containers
+   inside a wrapped item stay in their canonical single-line form (rule 5)
+   unless they themselves overflow on the wrapped line. Multi-line flow input (a
+   flow container with `\n` between its brackets) currently passes through
+   verbatim because the in-tree parser rejects it; the "multi-line input is
+   sticky" behavior pretty_yaml shows lands when the parser learns to accept
+   those inputs.
 7. **Blank lines:** runs of multiple interior blank lines collapse to one max.
    Leading blank lines (before the first content line) are stripped entirely ---
    mirrors rule 13's no-trailing-blanks invariant; preamble whitespace at the
