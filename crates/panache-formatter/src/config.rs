@@ -71,6 +71,7 @@ pub enum BlankLines {
 pub struct FormatterExtensions {
     pub blank_before_header: bool,
     pub bookdown_references: bool,
+    pub east_asian_line_breaks: bool,
     pub escaped_line_breaks: bool,
     pub gfm_auto_identifiers: bool,
     pub quarto_crossrefs: bool,
@@ -92,6 +93,7 @@ impl FormatterExtensions {
         Self {
             blank_before_header: parser_defaults.blank_before_header,
             bookdown_references: parser_defaults.bookdown_references,
+            east_asian_line_breaks: parser_defaults.east_asian_line_breaks,
             escaped_line_breaks: parser_defaults.escaped_line_breaks,
             gfm_auto_identifiers: parser_defaults.gfm_auto_identifiers,
             quarto_crossrefs: parser_defaults.quarto_crossrefs,
@@ -106,6 +108,7 @@ impl FormatterExtensions {
             match key.replace('_', "-").to_ascii_lowercase().as_str() {
                 "blank-before-header" => base.blank_before_header = value,
                 "bookdown-references" => base.bookdown_references = value,
+                "east-asian-line-breaks" => base.east_asian_line_breaks = value,
                 "escaped-line-breaks" => base.escaped_line_breaks = value,
                 "gfm-auto-identifiers" => base.gfm_auto_identifiers = value,
                 "quarto-crossrefs" => base.quarto_crossrefs = value,

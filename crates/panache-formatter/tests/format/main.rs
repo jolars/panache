@@ -3,6 +3,7 @@ mod bullet_standardization;
 mod code_chunks;
 mod comments;
 mod definition_lists;
+mod east_asian_line_breaks;
 mod emphasis;
 mod fenced_divs;
 mod frontmatter;

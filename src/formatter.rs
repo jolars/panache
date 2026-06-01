@@ -56,6 +56,7 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
         // Keep shared extension behavior aligned with parser-facing extensions.
         blank_before_header: config.extensions.blank_before_header,
         bookdown_references: config.extensions.bookdown_references,
+        east_asian_line_breaks: config.extensions.east_asian_line_breaks,
         escaped_line_breaks: config.extensions.escaped_line_breaks,
         gfm_auto_identifiers: config.extensions.gfm_auto_identifiers,
         quarto_crossrefs: config.extensions.quarto_crossrefs,

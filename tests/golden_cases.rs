@@ -177,6 +177,7 @@ golden_test_cases!(
     crlf_line_endings,
     crlf_raw_blocks,
     crlf_yaml_metadata,
+    east_asian_line_breaks,
     citations,
     citation_prefix_paren_escape_idempotency_278,
     definition_list,

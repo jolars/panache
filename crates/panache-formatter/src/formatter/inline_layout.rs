@@ -8,7 +8,7 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::borrow::Cow;
 use std::fmt::Write;
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Escape special characters in text to prevent ambiguous parsing.
 ///
@@ -729,6 +729,17 @@ struct TraversalBuilder<'a> {
     current_piece: Option<String>,
     current_piece_boundary_class: SentenceBoundaryClass,
     pending_space: bool,
+    /// `Some(c)` when the prior pending space came from a soft break
+    /// (`NEWLINE`) under `east_asian_line_breaks`: suppresses the
+    /// space iff the next piece's first char and `c` are both East
+    /// Asian wide (width 2). `c` is the last char emitted before the
+    /// break — checking it here mirrors pandoc's filter while the
+    /// extension is otherwise transparent to the rest of the pipeline.
+    pending_soft_break_ea_prev: Option<char>,
+    /// Last character handed to the underlying sink. Updated by
+    /// every piece-emitting path so the EA-break check above has
+    /// fresh state when a `NEWLINE` arrives.
+    last_emitted_char: Option<char>,
     skip_next_leading_whitespace: bool,
     preserve_newlines: bool,
 }
@@ -756,6 +767,8 @@ impl<'a> TraversalBuilder<'a> {
             current_piece: None,
             current_piece_boundary_class: SentenceBoundaryClass::Normal,
             pending_space: false,
+            pending_soft_break_ea_prev: None,
+            last_emitted_char: None,
             skip_next_leading_whitespace: false,
             preserve_newlines,
         }
@@ -766,6 +779,13 @@ impl<'a> TraversalBuilder<'a> {
     }
 
     fn push_piece_with_boundary(&mut self, text: &str, boundary_class: SentenceBoundaryClass) {
+        if let Some(prev) = self.pending_soft_break_ea_prev.take()
+            && let Some(next) = text.chars().next()
+            && UnicodeWidthChar::width(prev) == Some(2)
+            && UnicodeWidthChar::width(next) == Some(2)
+        {
+            self.pending_space = false;
+        }
         if self.pending_space {
             self.flush_current(true);
             self.current_piece = Some(text.to_string());
@@ -778,6 +798,19 @@ impl<'a> TraversalBuilder<'a> {
             self.current_piece = Some(text.to_string());
             self.current_piece_boundary_class = boundary_class;
         }
+        if let Some(last) = text.chars().last() {
+            self.last_emitted_char = Some(last);
+        }
+    }
+
+    /// Mark the next pending space as an East-Asian-aware soft break:
+    /// if the next pushed piece's first char and the last char emitted
+    /// before this break are both width-2 (wide / fullwidth), suppress
+    /// the space; otherwise behave like a normal pending space. Called
+    /// only when the `east_asian_line_breaks` extension is on.
+    fn set_pending_soft_break_ea(&mut self) {
+        self.pending_space = true;
+        self.pending_soft_break_ea_prev = self.last_emitted_char;
     }
 
     fn pending_space(&self) -> bool {
@@ -802,6 +835,8 @@ impl<'a> TraversalBuilder<'a> {
             self.sink.force_line_break();
         }
         self.pending_space = false;
+        self.pending_soft_break_ea_prev = None;
+        self.last_emitted_char = None;
     }
 
     fn skip_next_leading_whitespace(&self) -> bool {
@@ -840,6 +875,10 @@ impl<'a> TraversalBuilder<'a> {
                 self.sink.force_line_break();
             }
         }
+        if let Some(last) = text.chars().last() {
+            self.last_emitted_char = Some(last);
+        }
+        self.pending_soft_break_ea_prev = None;
     }
 
     fn push_verbatim_block(&mut self, text: &str) {
@@ -861,6 +900,8 @@ impl<'a> TraversalBuilder<'a> {
             self.sink.emit_piece(marker.to_string(), false);
         }
         self.sink.force_line_break();
+        self.last_emitted_char = None;
+        self.pending_soft_break_ea_prev = None;
     }
 }
 
@@ -903,6 +944,10 @@ fn process_node_recursive(
                     }
                     if sink.preserve_newlines() && t.kind() == SyntaxKind::NEWLINE {
                         sink.push_soft_break();
+                    } else if t.kind() == SyntaxKind::NEWLINE
+                        && config.formatter_extensions.east_asian_line_breaks
+                    {
+                        sink.set_pending_soft_break_ea();
                     } else {
                         sink.set_pending_space(true);
                     }

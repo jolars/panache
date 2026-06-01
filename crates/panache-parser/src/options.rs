@@ -237,6 +237,9 @@ pub struct Extensions {
     /// [NON-DEFAULT] Newline = <br>
     #[cfg_attr(feature = "serde", serde(alias = "hard_line_breaks"))]
     pub hard_line_breaks: bool,
+    /// [NON-DEFAULT] Ignore soft breaks between two East Asian wide characters
+    #[cfg_attr(feature = "serde", serde(alias = "east_asian_line_breaks"))]
+    pub east_asian_line_breaks: bool,
     /// [NON-DEFAULT] MultiMarkdown style heading identifiers [my-id]
     pub mmd_header_identifiers: bool,
     /// [NON-DEFAULT] MultiMarkdown key=value attributes on reference defs
@@ -301,6 +304,7 @@ impl Extensions {
             four_space_rule: false,
             gfm_auto_identifiers: false,
             grid_tables: false,
+            east_asian_line_breaks: false,
             hard_line_breaks: false,
             header_attributes: false,
             implicit_figures: false,
@@ -450,6 +454,7 @@ impl Extensions {
             // Non-default
             alerts: false,
             autolink_bare_uris: false,
+            east_asian_line_breaks: false,
             emoji: false,
             four_space_rule: false,
             hard_line_breaks: false,
@@ -654,6 +659,7 @@ impl Extensions {
                 "escaped-line-breaks" => base.escaped_line_breaks = value,
                 "autolink-bare-uris" => base.autolink_bare_uris = value,
                 "hard-line-breaks" => base.hard_line_breaks = value,
+                "east-asian-line-breaks" => base.east_asian_line_breaks = value,
                 "mmd-header-identifiers" => base.mmd_header_identifiers = value,
                 "mmd-link-attributes" => base.mmd_link_attributes = value,
                 "alerts" => base.alerts = value,
