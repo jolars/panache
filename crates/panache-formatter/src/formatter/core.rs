@@ -2124,7 +2124,7 @@ impl Formatter {
 
             SyntaxKind::PIPE_TABLE => {
                 // Format pipe table with proper alignment
-                let formatted = tables::format_pipe_table(node, &self.config);
+                let formatted = tables::format_pipe_table(node, &self.config, indent);
                 self.output.push_str(&formatted);
             }
 

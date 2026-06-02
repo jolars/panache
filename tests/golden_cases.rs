@@ -328,6 +328,7 @@ golden_test_cases!(
     paragraph_plain_mixed,
     paragraph_wrapping,
     paragraphs,
+    nested_pipe_table_indent,
     pipe_table,
     pipe_table_unicode,
     plain_continuation_edge_cases,
