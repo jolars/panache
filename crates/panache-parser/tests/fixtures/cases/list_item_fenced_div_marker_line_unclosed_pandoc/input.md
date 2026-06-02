@@ -1,0 +1,2 @@
+- ::: note
+  body without close

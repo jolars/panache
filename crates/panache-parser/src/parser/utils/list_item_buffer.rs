@@ -279,6 +279,23 @@ impl ListItemBuffer {
             {
                 return;
             }
+
+            // Structural block lift for marker-line tables and fenced divs.
+            // Pandoc recognizes `- | a | b |\n  | - | - |` and `- ::: note\n
+            // ...\n  :::` as nested Table / Div; without lifting, the buffer
+            // would emit them as PLAIN with raw `|` / `:` text. Mirrors the
+            // HTML lift above: strip list-item indent from continuation
+            // lines, reparse via the block dispatcher, accept a single root
+            // node whose kind is in the allowlist and that consumes the
+            // whole buffer.
+            if self
+                .segments
+                .iter()
+                .all(|s| matches!(s, ListItemContent::Text(_)))
+                && try_emit_table_or_div_lift(builder, &text, config, content_col)
+            {
+                return;
+            }
         }
 
         let block_kind = if use_paragraph {
@@ -422,6 +439,63 @@ fn try_emit_html_block_lift(
     } else {
         graft_node(builder, first, &mut prefix_state);
     }
+    true
+}
+
+/// Structural lift for pipe tables, grid tables, and fenced divs whose
+/// opener sits on the list-item marker line (or on the first non-blank
+/// continuation line of a buffered list item). Returns `true` when the
+/// buffered text was emitted as a single LIST_ITEM-child block. The
+/// strict single-root + total-end-coverage gate makes "lift failed"
+/// indistinguishable from "buffer is not actually a table/div" — the
+/// caller falls through to its PLAIN/PARAGRAPH wrapper.
+fn try_emit_table_or_div_lift(
+    builder: &mut GreenNodeBuilder<'static>,
+    text: &str,
+    config: &ParserOptions,
+    content_col: usize,
+) -> bool {
+    let first_line = text.split_inclusive('\n').next().unwrap_or(text);
+    let first_line_no_nl = first_line
+        .strip_suffix("\r\n")
+        .or_else(|| first_line.strip_suffix('\n'))
+        .unwrap_or(first_line);
+    let trimmed = first_line_no_nl.trim_start();
+    let first_byte = trimmed.as_bytes().first().copied();
+    if !matches!(first_byte, Some(b'|') | Some(b'+') | Some(b':')) {
+        return false;
+    }
+
+    let (parse_text, prefixes) = if content_col > 0 {
+        strip_list_item_indent(text, content_col)
+    } else {
+        (text.to_string(), Vec::new())
+    };
+
+    let refdefs = config.refdef_labels.clone().unwrap_or_default();
+    let inner_root = crate::parser::parse_with_refdefs(&parse_text, Some(config.clone()), refdefs);
+
+    let children: Vec<SyntaxNode> = inner_root.children().collect();
+    if children.len() != 1 {
+        return false;
+    }
+    let first = &children[0];
+    if !matches!(
+        first.kind(),
+        SyntaxKind::PIPE_TABLE | SyntaxKind::GRID_TABLE | SyntaxKind::FENCED_DIV
+    ) {
+        return false;
+    }
+    if first.text_range().end() != TextSize::of(parse_text.as_str()) {
+        return false;
+    }
+
+    let prefix_lines: Vec<ContainerPrefixLine> = prefixes
+        .into_iter()
+        .map(ContainerPrefixLine::list_only)
+        .collect();
+    let mut prefix_state = ContainerPrefixState::new(prefix_lines);
+    graft_node(builder, first, &mut prefix_state);
     true
 }
 
