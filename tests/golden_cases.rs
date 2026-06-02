@@ -250,6 +250,7 @@ golden_test_cases!(
     html_block,
     html_block_commonmark_type6_type7,
     html_block_comment_trailing_split,
+    html_block_details_blockquote_child,
     html_block_div_blockquote_idempotent,
     html_block_div_blockquote_messy_idempotent,
     html_block_div_blockquote_multiline_open_idempotent,
