@@ -651,6 +651,13 @@ autolinks = true
 `shortcut-reference-links`
 :   Shortcut reference links `[ref]` (default: enabled)
 
+`spaced-reference-links`
+:   Allow whitespace --- spaces, tabs, or a single newline --- between the two
+    bracket pairs of a reference link or image: `[foo] [bar]`, `![alt] [bar]`,
+    `[foo] []`. Without the extension, `[foo] [bar]` parses as a shortcut
+    `[foo]` followed by literal text. Also applies to reference images (default:
+    disabled, non-default extension).
+
 `link-attributes`
 :   Attributes on links `[text](url){.class}` (default: enabled)
 

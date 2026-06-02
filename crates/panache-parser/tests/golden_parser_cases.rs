@@ -554,6 +554,7 @@ golden_test_cases!(
     reference_images,
     reference_link_code_span_precedence,
     reference_links,
+    spaced_reference_links,
     unresolved_collapsed_reference_pandoc,
     unresolved_full_reference_pandoc,
     unresolved_image_reference_pandoc,

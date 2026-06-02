@@ -933,7 +933,7 @@ for initial implementation.
       (non-default)
 - [ ] Extension: `sourcepos` - Include source position info (non-default)
 - [ ] Extension: `space_in_atx_header` - Allow no space after `#` (non-default)
-- [ ] Extension: `spaced_reference_links` - Allow space in `[ref] [def]`
+- [x] Extension: `spaced_reference_links` - Allow space in `[ref] [def]`
       (non-default)
 
 ### Won't Implement

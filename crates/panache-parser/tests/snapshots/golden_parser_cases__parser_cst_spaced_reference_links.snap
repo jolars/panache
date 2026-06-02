@@ -1,0 +1,131 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..264
+  PARAGRAPH@0..27
+    TEXT@0..14 "Single space: "
+    LINK@14..25
+      LINK_START@14..15
+        LINK_START@14..15 "["
+      LINK_TEXT@15..18
+        TEXT@15..18 "foo"
+      TEXT@18..19 "]"
+      WHITESPACE@19..20 " "
+      TEXT@20..21 "["
+      LINK_REF@21..24
+        TEXT@21..24 "bar"
+      TEXT@24..25 "]"
+    TEXT@25..26 "."
+    NEWLINE@26..27 "\n"
+  BLANK_LINE@27..28
+    BLANK_LINE@27..28 "\n"
+  PARAGRAPH@28..60
+    TEXT@28..45 "Multiple spaces: "
+    LINK@45..58
+      LINK_START@45..46
+        LINK_START@45..46 "["
+      LINK_TEXT@46..49
+        TEXT@46..49 "foo"
+      TEXT@49..50 "]"
+      WHITESPACE@50..53 "   "
+      TEXT@53..54 "["
+      LINK_REF@54..57
+        TEXT@54..57 "bar"
+      TEXT@57..58 "]"
+    TEXT@58..59 "."
+    NEWLINE@59..60 "\n"
+  BLANK_LINE@60..61
+    BLANK_LINE@60..61 "\n"
+  PARAGRAPH@61..87
+    TEXT@61..74 "Tab between: "
+    LINK@74..85
+      LINK_START@74..75
+        LINK_START@74..75 "["
+      LINK_TEXT@75..78
+        TEXT@75..78 "foo"
+      TEXT@78..79 "]"
+      WHITESPACE@79..80 "\t"
+      TEXT@80..81 "["
+      LINK_REF@81..84
+        TEXT@81..84 "bar"
+      TEXT@84..85 "]"
+    TEXT@85..86 "."
+    NEWLINE@86..87 "\n"
+  BLANK_LINE@87..88
+    BLANK_LINE@87..88 "\n"
+  PARAGRAPH@88..123
+    TEXT@88..99 "Soft break:"
+    NEWLINE@99..100 "\n"
+    LINK@100..111
+      LINK_START@100..101
+        LINK_START@100..101 "["
+      LINK_TEXT@101..104
+        TEXT@101..104 "foo"
+      TEXT@104..105 "]"
+      NEWLINE@105..106 "\n"
+      TEXT@106..107 "["
+      LINK_REF@107..110
+        TEXT@107..110 "bar"
+      TEXT@110..111 "]"
+    TEXT@111..122 " continues."
+    NEWLINE@122..123 "\n"
+  BLANK_LINE@123..124
+    BLANK_LINE@123..124 "\n"
+  PARAGRAPH@124..153
+    TEXT@124..131 "Image: "
+    IMAGE_LINK@131..143
+      IMAGE_LINK_START@131..133
+        IMAGE_LINK_START@131..133 "!["
+      IMAGE_ALT@133..136
+        TEXT@133..136 "alt"
+      TEXT@136..137 "]"
+      WHITESPACE@137..138 " "
+      TEXT@138..139 "["
+      LINK_REF@139..142
+        TEXT@139..142 "bar"
+      TEXT@142..143 "]"
+    TEXT@143..152 " caption."
+    NEWLINE@152..153 "\n"
+  BLANK_LINE@153..154
+    BLANK_LINE@153..154 "\n"
+  PARAGRAPH@154..209
+    TEXT@154..187 "Implicit not affected ..."
+    LINK@187..195
+      LINK_START@187..188
+        LINK_START@187..188 "["
+      LINK_TEXT@188..191
+        TEXT@188..191 "foo"
+      TEXT@191..192 "]"
+      WHITESPACE@192..193 " "
+      TEXT@193..194 "["
+      LINK_REF@194..194
+      TEXT@194..195 "]"
+    TEXT@195..208 " keeps shape."
+    NEWLINE@208..209 "\n"
+  BLANK_LINE@209..210
+    BLANK_LINE@209..210 "\n"
+  REFERENCE_DEFINITION@210..237
+    LINK@210..215
+      LINK_START@210..211
+        LINK_START@210..211 "["
+      LINK_TEXT@211..214
+        TEXT@211..214 "bar"
+      TEXT@214..215 "]"
+    TEXT@215..216 ":"
+    WHITESPACE@216..217 " "
+    REFERENCE_URL@217..236
+      TEXT@217..236 "https://example.com"
+    NEWLINE@236..237 "\n"
+  REFERENCE_DEFINITION@237..264
+    LINK@237..242
+      LINK_START@237..238
+        LINK_START@237..238 "["
+      LINK_TEXT@238..241
+        TEXT@238..241 "foo"
+      TEXT@241..242 "]"
+    TEXT@242..243 ":"
+    WHITESPACE@243..244 " "
+    REFERENCE_URL@244..263
+      TEXT@244..263 "https://example.org"
+    NEWLINE@263..264 "\n"

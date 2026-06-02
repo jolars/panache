@@ -256,6 +256,9 @@ pub struct Extensions {
     /// [NON-DEFAULT] Pandoc wikilinks with title before pipe: `[[title|url]]`
     #[cfg_attr(feature = "serde", serde(alias = "wikilinks_title_before_pipe"))]
     pub wikilinks_title_before_pipe: bool,
+    /// [NON-DEFAULT] Allow whitespace between reference link brackets: `[foo] [bar]`
+    #[cfg_attr(feature = "serde", serde(alias = "spaced_reference_links"))]
+    pub spaced_reference_links: bool,
 
     // ===== Quarto-specific extensions =====
     /// Quarto callout blocks (.callout-note, etc.)
@@ -353,6 +356,7 @@ impl Extensions {
             tex_math_single_backslash: false,
             wikilinks_title_after_pipe: false,
             wikilinks_title_before_pipe: false,
+            spaced_reference_links: false,
             yaml_metadata_block: false,
         }
     }
@@ -480,6 +484,9 @@ impl Extensions {
             // Wikilinks (opt-in, no flavor default)
             wikilinks_title_after_pipe: false,
             wikilinks_title_before_pipe: false,
+
+            // Spaced reference links (opt-in)
+            spaced_reference_links: false,
         }
     }
 
@@ -728,6 +735,7 @@ known_extensions! {
     "bookdown-equation-references" => bookdown_equation_references,
     "wikilinks-title-after-pipe" => wikilinks_title_after_pipe,
     "wikilinks-title-before-pipe" => wikilinks_title_before_pipe,
+    "spaced-reference-links" => spaced_reference_links,
 }
 
 #[cfg(test)]

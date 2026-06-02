@@ -669,8 +669,12 @@ fn parse_inline_range_impl(
                         continue;
                     }
                     if config.extensions.reference_links
-                        && let Some((len, alt_text, reference, is_shortcut)) =
-                            try_parse_reference_image(&text[pos..], allow_shortcut)
+                        && let Some((len, alt_text, reference, gap, is_shortcut)) =
+                            try_parse_reference_image(
+                                &text[pos..],
+                                allow_shortcut,
+                                config.extensions.spaced_reference_links,
+                            )
                         && pos + len == dispo_suffix_end
                         && pos + len <= end
                     {
@@ -682,6 +686,7 @@ fn parse_inline_range_impl(
                             builder,
                             alt_text,
                             &reference,
+                            gap,
                             is_shortcut,
                             config,
                             suppress_footnote_refs,
@@ -715,11 +720,12 @@ fn parse_inline_range_impl(
                         continue;
                     }
                     if config.extensions.reference_links
-                        && let Some((len, link_text, reference, is_shortcut)) =
+                        && let Some((len, link_text, reference, gap, is_shortcut)) =
                             try_parse_reference_link(
                                 &text[pos..],
                                 allow_shortcut,
                                 config.extensions.inline_links,
+                                config.extensions.spaced_reference_links,
                                 ctx,
                             )
                         && pos + len == dispo_suffix_end
@@ -733,6 +739,7 @@ fn parse_inline_range_impl(
                             builder,
                             link_text,
                             &reference,
+                            gap,
                             is_shortcut,
                             config,
                             suppress_footnote_refs,

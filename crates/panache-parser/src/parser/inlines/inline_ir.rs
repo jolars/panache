@@ -1080,7 +1080,8 @@ fn try_pandoc_bracket_link_extent(
             return Some(len);
         }
         if exts.reference_links
-            && let Some((len, _, _, _)) = try_parse_reference_image(&text[pos..], allow_shortcut)
+            && let Some((len, _, _, _, _)) =
+                try_parse_reference_image(&text[pos..], allow_shortcut, exts.spaced_reference_links)
             && pos + len <= end
         {
             return Some(len);
@@ -1099,8 +1100,13 @@ fn try_pandoc_bracket_link_extent(
         return Some(len);
     }
     if exts.reference_links
-        && let Some((len, _, _, _)) =
-            try_parse_reference_link(&text[pos..], allow_shortcut, exts.inline_links, ctx)
+        && let Some((len, _, _, _, _)) = try_parse_reference_link(
+            &text[pos..],
+            allow_shortcut,
+            exts.inline_links,
+            exts.spaced_reference_links,
+            ctx,
+        )
         && pos + len <= end
     {
         return Some(len);
@@ -1903,6 +1909,7 @@ pub fn process_brackets(
     text: &str,
     refdefs: Option<&RefdefMap>,
     dialect: crate::options::Dialect,
+    allow_spaced: bool,
 ) {
     let empty: HashSet<String> = HashSet::new();
     let labels: &HashSet<String> = match refdefs {
@@ -1973,7 +1980,7 @@ pub fn process_brackets(
         }
 
         // 2. Full reference link: `[text][label]`.
-        let full_ref_suffix = try_full_reference_suffix(text, after_close);
+        let full_ref_suffix = try_full_reference_suffix(text, after_close, allow_spaced);
         if let Some((suffix_end, label_raw)) = &full_ref_suffix {
             let label_norm = normalize_label(label_raw);
             if label_resolves(&label_norm) {
@@ -2005,8 +2012,9 @@ pub fn process_brackets(
         // 3. Collapsed `[]`.
         let link_text = &text[text_start..text_end];
         let link_text_norm = normalize_label(link_text);
-        let is_collapsed = is_collapsed_marker(text, after_close);
-        let collapsed_suffix_end = after_close + 2;
+        let (is_collapsed, collapsed_suffix_end) =
+            collapsed_marker_span(text, after_close, allow_spaced)
+                .map_or((false, after_close + 2), |end| (true, end));
 
         if is_collapsed && label_resolves(&link_text_norm) {
             if !is_image && is_commonmark {
@@ -2293,13 +2301,22 @@ fn parse_link_title(text: &str, start: usize) -> Option<(String, usize)> {
 
 /// Try to parse `[label]` after a `]`. Returns `(suffix_end, label_raw)`.
 /// For the collapsed form `[]`, returns `None` here (handled separately
-/// by `is_collapsed_marker`).
-fn try_full_reference_suffix(text: &str, pos: usize) -> Option<(usize, String)> {
+/// by `collapsed_marker_span`).
+fn try_full_reference_suffix(
+    text: &str,
+    pos: usize,
+    allow_spaced: bool,
+) -> Option<(usize, String)> {
     let bytes = text.as_bytes();
-    if pos >= bytes.len() || bytes[pos] != b'[' {
+    let bracket_pos = if allow_spaced {
+        skip_spaced_ref_gap(bytes, pos)
+    } else {
+        pos
+    };
+    if bracket_pos >= bytes.len() || bytes[bracket_pos] != b'[' {
         return None;
     }
-    let label_start = pos + 1;
+    let label_start = bracket_pos + 1;
     let mut p = label_start;
     let mut escape_next = false;
     while p < bytes.len() {
@@ -2331,8 +2348,41 @@ fn try_full_reference_suffix(text: &str, pos: usize) -> Option<(usize, String)> 
     Some((p + 1, label))
 }
 
-fn is_collapsed_marker(text: &str, pos: usize) -> bool {
-    text.as_bytes().get(pos) == Some(&b'[') && text.as_bytes().get(pos + 1) == Some(&b']')
+/// True when `text[pos..]` opens with the collapsed `[]` marker. Under
+/// `spaced_reference_links`, whitespace before the `[]` is permitted; the
+/// returned `Some(end)` reports the byte position past the closing `]`.
+fn collapsed_marker_span(text: &str, pos: usize, allow_spaced: bool) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let bracket_pos = if allow_spaced {
+        skip_spaced_ref_gap(bytes, pos)
+    } else {
+        pos
+    };
+    if bytes.get(bracket_pos) == Some(&b'[') && bytes.get(bracket_pos + 1) == Some(&b']') {
+        Some(bracket_pos + 2)
+    } else {
+        None
+    }
+}
+
+/// Skip the whitespace gap permitted by `spaced_reference_links` between a
+/// closing `]` and the next opening `[`/`[]`: spaces, tabs, and at most one LF.
+/// Block parsing already guarantees a blank line cannot appear inside a single
+/// inline-parse range, so a single newline is the upper bound.
+fn skip_spaced_ref_gap(bytes: &[u8], pos: usize) -> usize {
+    let mut p = pos;
+    let mut saw_newline = false;
+    while p < bytes.len() {
+        match bytes[p] {
+            b' ' | b'\t' => p += 1,
+            b'\n' if !saw_newline => {
+                saw_newline = true;
+                p += 1;
+            }
+            _ => break,
+        }
+    }
+    p
 }
 
 // ============================================================================
@@ -2580,6 +2630,7 @@ pub fn build_full_plans(
         text,
         config.refdef_labels.as_ref(),
         config.dialect,
+        config.extensions.spaced_reference_links,
     );
 
     // Scoped emphasis pass per resolved bracket pair, innermost first.
@@ -2999,7 +3050,7 @@ mod tests {
     fn brackets_resolve_inline_link() {
         let opts = cm_opts();
         let mut ir = build_ir("[foo](/url)", 0, 11, &opts);
-        process_brackets(&mut ir, "[foo](/url)", None, opts.dialect);
+        process_brackets(&mut ir, "[foo](/url)", None, opts.dialect, false);
         let open = ir
             .iter()
             .find(|e| matches!(e, IrEvent::OpenBracket { start: 0, .. }))
@@ -3019,7 +3070,7 @@ mod tests {
         let text = "[foo]";
         let map = refdefs(["foo"]);
         let mut ir = build_ir(text, 0, text.len(), &opts);
-        process_brackets(&mut ir, text, Some(&map), opts.dialect);
+        process_brackets(&mut ir, text, Some(&map), opts.dialect, false);
         let open = ir
             .iter()
             .find(|e| matches!(e, IrEvent::OpenBracket { start: 0, .. }))
@@ -3040,7 +3091,7 @@ mod tests {
         let opts = cm_opts();
         let text = "[bar* baz]";
         let mut ir = build_ir(text, 0, text.len(), &opts);
-        process_brackets(&mut ir, text, None, opts.dialect);
+        process_brackets(&mut ir, text, None, opts.dialect, false);
         let open = ir
             .iter()
             .find(|e| matches!(e, IrEvent::OpenBracket { start: 0, .. }))

@@ -908,8 +908,9 @@ pub fn try_parse_reference_link(
     text: &str,
     allow_shortcut: bool,
     inline_link_attempted: bool,
+    allow_spaced: bool,
     ctx: LinkScanContext,
-) -> Option<(usize, &str, String, bool)> {
+) -> Option<(usize, &str, String, &str, bool)> {
     if !text.starts_with('[') {
         return None;
     }
@@ -969,10 +970,34 @@ pub fn try_parse_reference_link(
         return None;
     }
 
+    // Pandoc `spaced_reference_links`: allow whitespace (space, tab, and a
+    // single LF — block parsing already enforces blank-line boundaries) between
+    // the link-text `]` and the label `[`. Without the extension, gap stays
+    // empty and the next byte must be `[` directly.
+    let gap_end = if allow_spaced {
+        let bytes = text.as_bytes();
+        let mut p = after_bracket;
+        let mut saw_newline = false;
+        while p < bytes.len() {
+            match bytes[p] {
+                b' ' | b'\t' => p += 1,
+                b'\n' if !saw_newline => {
+                    saw_newline = true;
+                    p += 1;
+                }
+                _ => break,
+            }
+        }
+        p
+    } else {
+        after_bracket
+    };
+    let gap = &text[after_bracket..gap_end];
+
     // Check for explicit reference [text][label] or implicit [text][]
-    if after_bracket < text.len() && text[after_bracket..].starts_with('[') {
+    if gap_end < text.len() && text[gap_end..].starts_with('[') {
         // Find the closing ] for the label
-        let label_start = after_bracket + 1;
+        let label_start = gap_end + 1;
         let mut label_end = None;
 
         for (i, ch) in text[label_start..].char_indices() {
@@ -989,23 +1014,25 @@ pub fn try_parse_reference_link(
         let label_end = label_end?;
         let label = &text[label_start..label_end];
 
-        // Total length includes both bracket pairs
+        // Total length includes both bracket pairs (and any gap between them)
         let total_len = label_end + 1;
 
         // Implicit reference: empty label means emit [text][]
         if label.is_empty() {
-            return Some((total_len, link_text, String::new(), false));
+            return Some((total_len, link_text, String::new(), gap, false));
         }
 
         // Explicit reference: use the provided label
-        Some((total_len, link_text, label.to_string(), false))
+        Some((total_len, link_text, label.to_string(), gap, false))
     } else if allow_shortcut {
         // Shortcut reference: [text] with no second bracket pair
-        // The text is both the display text and the label
+        // The text is both the display text and the label. Any whitespace we
+        // tentatively consumed for the spaced-form lookahead belongs to the
+        // surrounding text, so we report the shortcut at its strict length.
         if link_text.is_empty() {
             return None;
         }
-        Some((after_bracket, link_text, link_text.to_string(), true))
+        Some((after_bracket, link_text, link_text.to_string(), "", true))
     } else {
         // No second bracket pair and shortcut not allowed - not a reference link
         None
@@ -1014,10 +1041,13 @@ pub fn try_parse_reference_link(
 
 /// Emit a reference link node to the builder.
 /// Preserves the original reference syntax (explicit [text][ref], implicit [text][], or shortcut [text]).
+/// `gap` carries any whitespace consumed between the link-text `]` and the
+/// label `[` under `spaced_reference_links`; empty otherwise.
 pub fn emit_reference_link(
     builder: &mut GreenNodeBuilder,
     link_text: &str,
     label: &str,
+    gap: &str,
     is_shortcut: bool,
     config: &ParserOptions,
     suppress_footnote_refs: bool,
@@ -1042,6 +1072,7 @@ pub fn emit_reference_link(
 
     if !is_shortcut {
         // Explicit or implicit reference: [text][label] or [text][]
+        emit_reference_link_gap(builder, gap);
         builder.token(SyntaxKind::TEXT.into(), "[");
         builder.start_node(SyntaxKind::LINK_REF.into());
         // For implicit references, label is empty and we emit [text][]
@@ -1057,12 +1088,50 @@ pub fn emit_reference_link(
     builder.finish_node();
 }
 
+/// Emit the whitespace gap between `]` and `[` of a spaced reference link,
+/// preserving exact bytes by splitting into WHITESPACE / NEWLINE tokens.
+fn emit_reference_link_gap(builder: &mut GreenNodeBuilder, gap: &str) {
+    if gap.is_empty() {
+        return;
+    }
+    let bytes = gap.as_bytes();
+    let mut start = 0;
+    while start < bytes.len() {
+        match bytes[start] {
+            b'\r' => {
+                let end = if start + 1 < bytes.len() && bytes[start + 1] == b'\n' {
+                    start + 2
+                } else {
+                    start + 1
+                };
+                builder.token(SyntaxKind::NEWLINE.into(), &gap[start..end]);
+                start = end;
+            }
+            b'\n' => {
+                builder.token(SyntaxKind::NEWLINE.into(), &gap[start..start + 1]);
+                start += 1;
+            }
+            _ => {
+                let mut end = start + 1;
+                while end < bytes.len() && !matches!(bytes[end], b'\r' | b'\n') {
+                    end += 1;
+                }
+                builder.token(SyntaxKind::WHITESPACE.into(), &gap[start..end]);
+                start = end;
+            }
+        }
+    }
+}
+
 /// Try to parse a reference-style image: `![alt][ref]`, `![alt][]`, or `![alt]`
-/// Returns (total_len, alt_text, label, is_shortcut) if successful.
+/// Returns (total_len, alt_text, label, gap, is_shortcut) if successful. `gap`
+/// is the whitespace between `]` and `[` consumed under
+/// `spaced_reference_links`; empty otherwise (and always empty for shortcuts).
 pub fn try_parse_reference_image(
     text: &str,
     allow_shortcut: bool,
-) -> Option<(usize, &str, String, bool)> {
+    allow_spaced: bool,
+) -> Option<(usize, &str, String, &str, bool)> {
     let bytes = text.as_bytes();
     if bytes.len() < 4 || bytes[0] != b'!' || bytes[1] != b'[' {
         return None;
@@ -1088,9 +1157,31 @@ pub fn try_parse_reference_image(
     }
 
     let alt_text = &text[alt_start..pos - 1];
+    let after_alt_close = pos;
+
+    // Pandoc `spaced_reference_links` applies to reference images too: allow
+    // whitespace (space, tab, single LF) between `]` and `[`.
+    if allow_spaced {
+        let mut saw_newline = false;
+        while pos < bytes.len() {
+            match bytes[pos] {
+                b' ' | b'\t' => pos += 1,
+                b'\n' if !saw_newline => {
+                    saw_newline = true;
+                    pos += 1;
+                }
+                _ => break,
+            }
+        }
+    }
+    let gap = &text[after_alt_close..pos];
 
     // Now check for the label part
     if pos >= bytes.len() {
+        if allow_shortcut && gap.is_empty() {
+            let label = alt_text.to_string();
+            return Some((pos, alt_text, label, "", true));
+        }
         return None;
     }
 
@@ -1120,30 +1211,31 @@ pub fn try_parse_reference_image(
             label_text.to_string() // Preserve original case
         };
 
-        return Some((pos, alt_text, label, false));
+        return Some((pos, alt_text, label, gap, false));
     }
 
-    // Shortcut reference: `![alt]` (only if enabled)
-    // BUT not if followed by (url) - that's an inline image
+    // Shortcut reference: `![alt]` (only if enabled). Any whitespace we
+    // tentatively consumed past the alt-text `]` belongs to surrounding text.
     if allow_shortcut {
         // Check if next char is ( - if so, not a reference
-        if pos < bytes.len() && bytes[pos] == b'(' {
+        if bytes[after_alt_close] == b'(' {
             return None;
         }
 
-        // For shortcut references, use alt text as label for equality check
         let label = alt_text.to_string();
-        return Some((pos, alt_text, label, true));
+        return Some((after_alt_close, alt_text, label, "", true));
     }
 
     None
 }
 
-/// Emit a reference image node with registry lookup.
+/// Emit a reference image node with registry lookup. `gap` carries whitespace
+/// consumed between `]` and `[` under `spaced_reference_links`; empty otherwise.
 pub fn emit_reference_image(
     builder: &mut GreenNodeBuilder,
     alt_text: &str,
     label: &str,
+    gap: &str,
     is_shortcut: bool,
     config: &ParserOptions,
     suppress_footnote_refs: bool,
@@ -1165,6 +1257,7 @@ pub fn emit_reference_image(
 
     if !is_shortcut {
         // Explicit or implicit reference: ![alt][label] or ![alt][]
+        emit_reference_link_gap(builder, gap);
         builder.token(SyntaxKind::TEXT.into(), "[");
         builder.start_node(SyntaxKind::LINK_REF.into());
         // For implicit references, emit empty label (label == alt means implicit from parser)
@@ -1550,45 +1643,52 @@ mod tests {
     #[test]
     fn test_parse_reference_link_explicit() {
         let input = "[link text][label]";
-        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
-        assert_eq!(result, Some((18, "link text", "label".to_string(), false)));
+        let result =
+            try_parse_reference_link(input, false, true, false, LinkScanContext::default());
+        assert_eq!(
+            result,
+            Some((18, "link text", "label".to_string(), "", false))
+        );
     }
 
     #[test]
     fn test_parse_reference_link_implicit() {
         let input = "[link text][]";
-        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
-        assert_eq!(result, Some((13, "link text", String::new(), false)));
+        let result =
+            try_parse_reference_link(input, false, true, false, LinkScanContext::default());
+        assert_eq!(result, Some((13, "link text", String::new(), "", false)));
     }
 
     #[test]
     fn test_parse_reference_link_explicit_same_label_as_text() {
         let input = "[stack][stack]";
-        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
-        assert_eq!(result, Some((14, "stack", "stack".to_string(), false)));
+        let result =
+            try_parse_reference_link(input, false, true, false, LinkScanContext::default());
+        assert_eq!(result, Some((14, "stack", "stack".to_string(), "", false)));
     }
 
     #[test]
     fn test_parse_reference_link_shortcut() {
         let input = "[link text] rest";
-        let result = try_parse_reference_link(input, true, true, LinkScanContext::default());
+        let result = try_parse_reference_link(input, true, true, false, LinkScanContext::default());
         assert_eq!(
             result,
-            Some((11, "link text", "link text".to_string(), true))
+            Some((11, "link text", "link text".to_string(), "", true))
         );
     }
 
     #[test]
     fn test_parse_reference_link_shortcut_rejects_empty_label() {
         let input = "[] rest";
-        let result = try_parse_reference_link(input, true, true, LinkScanContext::default());
+        let result = try_parse_reference_link(input, true, true, false, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_reference_link_shortcut_disabled() {
         let input = "[link text] rest";
-        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
+        let result =
+            try_parse_reference_link(input, false, true, false, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
@@ -1597,7 +1697,8 @@ mod tests {
         // With shortcut disabled, `[text](url)` is rejected so the inline
         // link form upstream gets exclusive ownership.
         let input = "[text](url)";
-        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
+        let result =
+            try_parse_reference_link(input, false, true, false, LinkScanContext::default());
         assert_eq!(result, None);
     }
 
@@ -1608,56 +1709,102 @@ mod tests {
         // link first; if that returns None, we should still see `[text]`
         // as a shortcut and leave `(url)` to be parsed as following text).
         let input = "[text](url)";
-        let result = try_parse_reference_link(input, true, true, LinkScanContext::default());
-        assert_eq!(result, Some((6, "text", "text".to_string(), true)));
+        let result = try_parse_reference_link(input, true, true, false, LinkScanContext::default());
+        assert_eq!(result, Some((6, "text", "text".to_string(), "", true)));
     }
 
     #[test]
     fn test_parse_reference_link_with_nested_brackets() {
         let input = "[outer [inner] text][ref]";
-        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
+        let result =
+            try_parse_reference_link(input, false, true, false, LinkScanContext::default());
         assert_eq!(
             result,
-            Some((25, "outer [inner] text", "ref".to_string(), false))
+            Some((25, "outer [inner] text", "ref".to_string(), "", false))
         );
     }
 
     #[test]
     fn test_parse_reference_link_label_no_newline() {
         let input = "[text][label\nmore]";
-        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
+        let result =
+            try_parse_reference_link(input, false, true, false, LinkScanContext::default());
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_reference_link_spaced_disabled() {
+        // Without `spaced_reference_links`, a space between brackets blocks the
+        // explicit form; shortcut takes over so `[foo]` matches at length 5.
+        let input = "[foo] [bar]";
+        let result = try_parse_reference_link(input, true, true, false, LinkScanContext::default());
+        assert_eq!(result, Some((5, "foo", "foo".to_string(), "", true)));
+    }
+
+    #[test]
+    fn test_parse_reference_link_spaced_single_space() {
+        let input = "[foo] [bar]";
+        let result = try_parse_reference_link(input, true, true, true, LinkScanContext::default());
+        assert_eq!(result, Some((11, "foo", "bar".to_string(), " ", false)));
+    }
+
+    #[test]
+    fn test_parse_reference_link_spaced_multiple_spaces_and_tab() {
+        let input = "[foo]  \t[bar]";
+        let result = try_parse_reference_link(input, true, true, true, LinkScanContext::default());
+        assert_eq!(result, Some((13, "foo", "bar".to_string(), "  \t", false)));
+    }
+
+    #[test]
+    fn test_parse_reference_link_spaced_newline() {
+        let input = "[foo]\n[bar]";
+        let result = try_parse_reference_link(input, true, true, true, LinkScanContext::default());
+        assert_eq!(result, Some((11, "foo", "bar".to_string(), "\n", false)));
+    }
+
+    #[test]
+    fn test_parse_reference_link_spaced_implicit() {
+        // Pandoc: with the extension, `[foo] []` resolves to implicit `[foo][]`.
+        let input = "[foo] []";
+        let result = try_parse_reference_link(input, true, true, true, LinkScanContext::default());
+        assert_eq!(result, Some((8, "foo", String::new(), " ", false)));
     }
 
     // Reference image tests
     #[test]
     fn test_parse_reference_image_explicit() {
         let input = "![alt text][label]";
-        let result = try_parse_reference_image(input, false);
-        assert_eq!(result, Some((18, "alt text", "label".to_string(), false)));
+        let result = try_parse_reference_image(input, false, false);
+        assert_eq!(
+            result,
+            Some((18, "alt text", "label".to_string(), "", false))
+        );
     }
 
     #[test]
     fn test_parse_reference_image_implicit() {
         let input = "![alt text][]";
-        let result = try_parse_reference_image(input, false);
+        let result = try_parse_reference_image(input, false, false);
         assert_eq!(
             result,
-            Some((13, "alt text", "alt text".to_string(), false))
+            Some((13, "alt text", "alt text".to_string(), "", false))
         );
     }
 
     #[test]
     fn test_parse_reference_image_shortcut() {
         let input = "![alt text] rest";
-        let result = try_parse_reference_image(input, true);
-        assert_eq!(result, Some((11, "alt text", "alt text".to_string(), true)));
+        let result = try_parse_reference_image(input, true, false);
+        assert_eq!(
+            result,
+            Some((11, "alt text", "alt text".to_string(), "", true))
+        );
     }
 
     #[test]
     fn test_parse_reference_image_shortcut_disabled() {
         let input = "![alt text] rest";
-        let result = try_parse_reference_image(input, false);
+        let result = try_parse_reference_image(input, false, false);
         assert_eq!(result, None);
     }
 
@@ -1665,25 +1812,33 @@ mod tests {
     fn test_parse_reference_image_not_inline() {
         // Should not match inline images with (url)
         let input = "![alt](url)";
-        let result = try_parse_reference_image(input, true);
+        let result = try_parse_reference_image(input, true, false);
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_reference_image_with_nested_brackets() {
         let input = "![alt [nested] text][ref]";
-        let result = try_parse_reference_image(input, false);
+        let result = try_parse_reference_image(input, false, false);
         assert_eq!(
             result,
-            Some((25, "alt [nested] text", "ref".to_string(), false))
+            Some((25, "alt [nested] text", "ref".to_string(), "", false))
         );
+    }
+
+    #[test]
+    fn test_parse_reference_image_spaced() {
+        let input = "![alt] [ref]";
+        let result = try_parse_reference_image(input, true, true);
+        assert_eq!(result, Some((12, "alt", "ref".to_string(), " ", false)));
     }
 
     #[test]
     fn test_reference_link_label_with_crlf() {
         // Reference link labels should not span lines with CRLF
         let input = "[foo\r\nbar]";
-        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
+        let result =
+            try_parse_reference_link(input, false, true, false, LinkScanContext::default());
 
         // Should fail to parse because label contains line break
         assert_eq!(
@@ -1696,7 +1851,8 @@ mod tests {
     fn test_reference_link_label_with_lf() {
         // Reference link labels should not span lines with LF either
         let input = "[foo\nbar]";
-        let result = try_parse_reference_link(input, false, true, LinkScanContext::default());
+        let result =
+            try_parse_reference_link(input, false, true, false, LinkScanContext::default());
 
         // Should fail to parse because label contains line break
         assert_eq!(
