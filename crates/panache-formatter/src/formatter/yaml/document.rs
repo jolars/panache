@@ -96,7 +96,9 @@ fn emit_node(out: &mut String, node: &SyntaxNode) {
 }
 
 fn emit_token(out: &mut String, t: &SyntaxToken) {
-    if t.kind() == SyntaxKind::WHITESPACE && is_ws_before_inline_comment(t) {
+    if t.kind() == SyntaxKind::WHITESPACE
+        && (is_ws_before_inline_comment(t) || is_ws_after_block_structural(t))
+    {
         out.push(' ');
     } else if let Some(converted) = try_convert_single_to_double(t.text()) {
         out.push_str(&converted);
@@ -132,6 +134,31 @@ fn try_convert_single_to_double(text: &str) -> Option<String> {
         return None;
     }
     Some(format!("\"{content}\""))
+}
+
+/// STYLE.md rule 14: a `WHITESPACE` token sitting immediately between
+/// a block structural indicator (`YAML_COLON` after a block-map key,
+/// `YAML_BLOCK_SEQ_ENTRY` after a block-sequence `-`) and its inline
+/// content collapses to a single space. Same-line content only — a
+/// trailing-WS-then-NEWLINE shape (`key:    \n  value`) is left to
+/// rule 10 to strip; the value's own indent line is governed by
+/// rule 1. Flow containers handle their `:` / `,` spacing through
+/// the canonical-emission path (`emit_flow_map_entry`), so this
+/// rule only matters for block-level structural runs.
+fn is_ws_after_block_structural(t: &SyntaxToken) -> bool {
+    let Some(prev) = t.prev_token() else {
+        return false;
+    };
+    if !matches!(
+        prev.kind(),
+        SyntaxKind::YAML_COLON | SyntaxKind::YAML_BLOCK_SEQ_ENTRY
+    ) {
+        return false;
+    }
+    match t.next_token() {
+        Some(next) => next.kind() != SyntaxKind::NEWLINE,
+        None => false,
+    }
 }
 
 /// True if `t` is a `WHITESPACE` token whose forward run of contiguous

@@ -28,10 +28,14 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
   has none of `\`, `'`, `"`, or ASCII control chars; plain stays plain;
   double stays double); 1.12 preserve-rule lockdown (rules 4 block-scalar
   style, 9 comment positions, 11 empty scalars, 12 key order — no
-  formatter code, locked in by corpus + unit tests against pretty_yaml).
-  All thirteen rules now have corpus + unit coverage. Phase 1 exit gated
-  on broadening the corpus (real frontmatter extracts) and the
-  parser-side enablement of multi-line flow input.
+  formatter code, locked in by corpus + unit tests against pretty_yaml);
+  1.13 real-frontmatter harvest (six representative cases from
+  `tests/fixtures/cases/` + `docs/`) which surfaced a spec gap →
+  added rule 14 (collapse multi-space runs between block structural
+  indicators `:` / `-` and inline content to one space; trailing-only
+  runs deferred to rule 10). The spec is now 14 rules with corpus +
+  unit coverage. Phase 1 exit gated on the parser-side enablement of
+  multi-line flow input (parked here, on the parser side).
 - **Phase 2 (joint cutover):** not started, blocked on Phase 1.
 - **Phase 3 (hashpipe extension):** not started, blocked on Phase 2.
 
@@ -39,6 +43,48 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
 
 _(Update as phases complete. Earliest entries on top.)_
 
+- **Phase 1.13 — real-frontmatter harvest + rule 14
+  (block-structural spacing).** Pulled six representative frontmatter
+  blocks into `tests/fixtures/yaml_corpus/real/`:
+  `quarto_frontmatter_keywords` (title/author/date/keywords sequence
+  from `tests/fixtures/cases/yaml_metadata/`),
+  `whitespace_normalization` (the `echo:    false` / `-  a` /
+  `-     b` stressor from `yaml_metadata_normalization/`),
+  `non_ascii_scalar` (`smörgås` from `umlauts/`),
+  `quarto_landing_page` (the full `docs/index.qmd` frontmatter —
+  folded scalars, nested `open-graph` / `twitter-card` / `format`
+  sub-maps), `folded_description_performance` (folded `description: >`
+  + `engine: knitr` from `docs/guide/performance.qmd`), and
+  `folded_description_short` (short folded description from
+  `docs/guide/formatting.qmd`). Skipped single-line `title: x` cases
+  (already covered by `mappings/simple_mapping`) and the
+  `yaml_metadata_opening_blank_not_metadata` case (already covered
+  by `blank_lines/leading_blank_run`). The `whitespace_normalization`
+  case immediately surfaced a spec gap pretty_yaml normalizes but
+  rules 1, 5, and 8 didn't reach: runs of whitespace between block
+  structural indicators (`:` after a key, `-` after a sequence
+  marker) and their inline value. Resolution: a 14th rule, added per
+  the `yaml-formatter` rule on deliberate spec extensions.
+
+  Rule 14 implementation: a `WHITESPACE` token whose `prev_token()`
+  is `YAML_COLON` or `YAML_BLOCK_SEQ_ENTRY` and whose `next_token()`
+  is not `NEWLINE` collapses to a single space. Composed into
+  `emit_token` via an OR with rule 8's
+  `is_ws_before_inline_comment` — both want the same output for the
+  shared `key:    # comment` shape, so no precedence conflict. Three
+  new corpus cases under `tests/fixtures/yaml_corpus/structural_spacing/`
+  (`multiple_spaces_after_colon`, `multiple_spaces_after_dash`,
+  `tab_after_colon`) plus the harvested `real/whitespace_normalization`
+  case lock the behavior. Two new unit tests in `yaml.rs`
+  (`rule_14_collapses_run_after_colon`,
+  `rule_14_collapses_run_after_dash`) cover the trailing-WS carve-out
+  (`key:   \n  inner: v` keeps the trailing WS untouched for rule 10
+  to strip) and the bare-`-` case (`-   \n  - foo` keeps the dash
+  alone, not `- ` + nothing). STYLE.md amended: header notes rules
+  1–12 + 14 share a 15-case cross-validation battery with Prettier,
+  rule 13 + 14 were cross-validated against pretty_yaml later in the
+  corpus harness rollout. yaml.rs module doc-comment bumped to 1.13.
+  No live-pipeline changes.
 - **Phase 1.12 — preserve-rule lockdown (rules 4, 9, 11, 12).** No
   formatter code; locks in the four spec rules that explicitly decline
   to canonicalize a semantically-meaningful user choice by giving each

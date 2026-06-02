@@ -4,10 +4,12 @@ Canonical reference for the deterministic style rules that govern the in-tree
 YAML formatter under `crates/panache-formatter/src/formatter/yaml/`.
 
 These rules are deterministic (same input → same output) and small enough to fit
-in one table. They were cross-validated against pretty_yaml 0.6.0 and Prettier
-3.6.2 on a 15-case battery of representative frontmatter --- both agree on rules
-1--12; rule 6's bracket placement is the one point where they differ, and the
-rule pins pretty_yaml's choice.
+in one table. Rules 1--12 + 14 were cross-validated against pretty_yaml 0.6.0
+and Prettier 3.6.2 on a 15-case battery of representative frontmatter --- both
+agree on the spec; rule 6's bracket placement is the one point where they
+differ, and the rule pins pretty_yaml's choice. Rule 13 (trailing newline) and
+rule 14 (block-structural spacing) were cross-validated against pretty_yaml
+later, during the Phase 1 corpus harness rollout.
 
 pretty_yaml is the cross-validation reference because it implements the same
 rules. It is not the source of truth: this document is. If the formatter
@@ -101,6 +103,16 @@ the load-bearing invariants.
     Whitespace-only inputs (e.g. `"   "`) are out of scope for rule 13 alone ---
     pretty_yaml canonicalizes those more aggressively, and the divergence
     resolves once the trailing-whitespace rule (#10) lands.
+14. **Block-structural spacing.** A whitespace run sitting between a block
+    structural indicator (`:` after a block-map key, `-` after a block-sequence
+    item marker) and inline content on the same line collapses to exactly one
+    space. `key:    value` → `key: value`; `-    item` → `- item`. Trailing-only
+    whitespace (`key:   \n  value`) is left to rule 10 to strip; the value's own
+    indent line is governed by rule 1. Flow containers normalize `:` / `,`
+    spacing through the canonical-emission path (rule 5), so this rule only
+    governs block-level structural runs. Added in Phase 1.13 after the real-
+    frontmatter harvest surfaced inputs (e.g. `echo:    false`) that rules 1, 5,
+    and 8 didn't reach.
 
 ## Notes
 

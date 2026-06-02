@@ -1,0 +1,8 @@
+title: "Performance"
+description: >
+  This page presents performance benchmarks for Panache, comparing its formatting
+  and linting speed against popular alternatives like Prettier, Pandoc, rumdl,
+  mdformat, mado, markdownlint, and markdownlint-cli2 on real Quarto and Markdown
+  documents. The benchmarks highlight Panache's efficiency and suitability for
+  on-save formatting and fast repository-wide checks.
+engine: knitr

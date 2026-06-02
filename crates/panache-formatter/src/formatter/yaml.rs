@@ -2,7 +2,7 @@
 //!
 //! Consumes the in-tree parser CST
 //! ([`panache_parser::parser::yaml::parse_yaml_tree`]) and emits
-//! deterministically-styled YAML text per the 13 style rules in
+//! deterministically-styled YAML text per the 14 style rules in
 //! `STYLE.md` (next to this file) — the canonical spec, relocated
 //! from `.claude/skills/yaml-formatter-cutover/plan.md` in Phase 1.2.
 //!
@@ -13,7 +13,7 @@
 //! `crates/panache-formatter/tests/yaml_cross_validation.rs`. See
 //! `.claude/skills/yaml-formatter-cutover/SKILL.md` for scope.
 //!
-//! Phase 1.12 status: cross-validation harness live; rules 1
+//! Phase 1.13 status: cross-validation harness live; rules 1
 //! (canonical 2-space indent driven by entry/item nesting depth),
 //! 2 (sequence items indent +2 from parent key — carried by rule 1's
 //! depth math, no separate code), 3 (prefer double-quoted over
@@ -28,9 +28,13 @@
 //! standalone closing bracket; opening bracket stays on the key
 //! line), 7 (collapse blank-line runs; strip leading blanks
 //! entirely), 8 (one space before inline `#` comments), 10 (strip
-//! trailing whitespace per line), and 13 (exactly one trailing `\n`
-//! at EOF) implemented in [`document`]. All behavior-changing rules
-//! are live; preserve rules 4 (block-scalar style), 9 (comment
+//! trailing whitespace per line), 13 (exactly one trailing `\n` at
+//! EOF), and 14 (collapse runs of whitespace between block
+//! structural indicators — `:` after a block-map key, `-` after a
+//! block-sequence marker — and inline content on the same line to a
+//! single space; trailing-only runs are left for rule 10)
+//! implemented in [`document`]. All behavior-changing rules are
+//! live; preserve rules 4 (block-scalar style), 9 (comment
 //! positions), 11 (empty scalars), and 12 (key order) are locked in
 //! by corpus + unit tests with no formatter code (they cross-validate
 //! against pretty_yaml because both implementations leave these
@@ -45,13 +49,18 @@
 //! inline-comment cases, rule-4 literal/folded + chomping indicator
 //! cases, rule-9 between-keys / between-seq-items / trailing-comment
 //! cases, rule-11 empty-scalar cases (bare, multiple, with inline
-//! comment, in sequence), and rule-12 key-order cases (reverse-alpha,
-//! deep nesting). Block scalar (`|`/`>`) interior lines are left
-//! verbatim — rule 1 needs a real block-scalar renderer to
-//! canonicalize them. Multi-line flow input (containing `\n` between
-//! brackets) is still rejected by the in-tree parser, so the
-//! "multi-line input is sticky" behavior pretty_yaml shows is parked
-//! until the parser supports it.
+//! comment, in sequence), rule-12 key-order cases (reverse-alpha,
+//! deep nesting), rule-14 cases (multi-space after `:` / `-`, tab
+//! after `:`), and six harvested real-frontmatter cases
+//! (`real/quarto_frontmatter_keywords`, `whitespace_normalization`,
+//! `non_ascii_scalar`, `quarto_landing_page`,
+//! `folded_description_performance`, `folded_description_short`).
+//! Block scalar (`|`/`>`) interior lines are left verbatim — rule 1
+//! needs a real block-scalar renderer to canonicalize them.
+//! Multi-line flow input (containing `\n` between brackets) is still
+//! rejected by the in-tree parser, so the "multi-line input is
+//! sticky" behavior pretty_yaml shows is parked until the parser
+//! supports it.
 
 #[path = "yaml/block_map.rs"]
 mod block_map;
@@ -420,6 +429,37 @@ mod tests {
         let deep =
             "root:\n  z: 1\n  a: 2\n  m: 3\nnested:\n  outer:\n    second: 2\n    first: 1\n";
         assert_eq!(format_yaml(deep, &opts), deep);
+    }
+
+    #[test]
+    fn rule_14_collapses_run_after_colon() {
+        // Rule 14: whitespace between `:` (block-map structural indicator)
+        // and inline value collapses to one space.
+        let opts = YamlFormatOptions::default();
+        assert_eq!(format_yaml("k:    v\n", &opts), "k: v\n");
+        assert_eq!(format_yaml("k:\tv\n", &opts), "k: v\n");
+        assert_eq!(format_yaml("k:   v # c\n", &opts), "k: v # c\n");
+        // No content after `:` on the same line — left for rule 10 to strip.
+        assert_eq!(
+            format_yaml("k:   \n  inner: v\n", &opts),
+            "k:\n  inner: v\n"
+        );
+    }
+
+    #[test]
+    fn rule_14_collapses_run_after_dash() {
+        // Rule 14: whitespace between `-` (block-sequence indicator) and
+        // inline item collapses to one space.
+        let opts = YamlFormatOptions::default();
+        assert_eq!(
+            format_yaml("items:\n  -    foo\n  -      bar\n", &opts),
+            "items:\n  - foo\n  - bar\n"
+        );
+        // Bare `-` with only trailing whitespace stays empty (rule 10 strips).
+        assert_eq!(
+            format_yaml("items:\n  -   \n  - foo\n", &opts),
+            "items:\n  -\n  - foo\n"
+        );
     }
 
     #[test]
