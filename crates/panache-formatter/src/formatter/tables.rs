@@ -714,10 +714,6 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config, indent: usize) -> S
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    // Honor the threaded container indent so a nested pipe table aligns to its
-    // container's content column (e.g. an ordered list whose content starts at
-    // column 3). At the top level the dispatcher passes indent 0; keep the
-    // house-style two-space indent there.
     let block_indent = if indent == 0 {
         TABLE_BLOCK_INDENT
     } else {
