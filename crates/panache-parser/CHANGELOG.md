@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.14.0](https://github.com/jolars/panache/compare/panache-parser-v0.13.0...panache-parser-v0.14.0) (2026-06-02)
+
+### Features
+- **config:** abort on unknown extensions, add exts to schema ([`397e1e5`](https://github.com/jolars/panache/commit/397e1e58a83e42a1decfb7692114099702fe681d))
+- **cli:** allow `-o extensions.<name>=<bool>` overrides ([`2df73ab`](https://github.com/jolars/panache/commit/2df73ab3153b1f4e009a930536f3f590d1a0ef37))
+- **formatter:** add `east_asian_line_breaks` extension ([`4f28716`](https://github.com/jolars/panache/commit/4f2871673d2ba4d00142032d066386db151179e9)), in [#339](https://github.com/jolars/panache/issues/339), closes [#339](https://github.com/jolars/panache/issues/339)
+
+### Bug Fixes
+- **parser:** reject deeply-indented empty bullets as nested lists ([`15691ff`](https://github.com/jolars/panache/commit/15691ffdc2c2ad6c1180dbee12f540607f01f602)), ref [#341](https://github.com/jolars/panache/issues/341)
+- **parser:** restrict bare-URI autolinks to known schemes (#337) ([`930db45`](https://github.com/jolars/panache/commit/930db45b8f7bf71f08e3bdb4f036e5a6928936d9)), closes [#336](https://github.com/jolars/panache/issues/336)
+- **parser:** keep `.class`/`#id` on executable fence info ([`4c8f396`](https://github.com/jolars/panache/commit/4c8f39682b6de5c887f0727a39b0f18b264ec762)), fixes [#334](https://github.com/jolars/panache/issues/334)
 ## [0.13.0](https://github.com/jolars/panache/compare/panache-parser-v0.12.0...panache-parser-v0.13.0) (2026-05-29)
 
 ### Features

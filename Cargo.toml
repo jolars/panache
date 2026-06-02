@@ -7,7 +7,7 @@ authors = ["Johan Larsson <johan@jolars.co>"]
 
 [package]
 name = "panache"
-version = "2.50.0"
+version = "2.51.0"
 edition.workspace = true
 readme = "README.md"
 description = "An LSP, formatter, and linter for Markdown, Quarto, and R Markdown"
@@ -47,8 +47,8 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [dependencies]
-panache-formatter = { path = "crates/panache-formatter", version = "0.8.0" }
-panache-parser = { path = "crates/panache-parser", version = "0.13.0", features = [
+panache-formatter = { path = "crates/panache-formatter", version = "0.9.0" }
+panache-parser = { path = "crates/panache-parser", version = "0.14.0", features = [
     "serde",
     "schema",
 ] }

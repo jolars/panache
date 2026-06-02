@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.9.0](https://github.com/jolars/panache/compare/panache-formatter-v0.8.0...panache-formatter-v0.9.0) (2026-06-02)
+
+### Features
+- **config:** abort on unknown extensions, add exts to schema ([`397e1e5`](https://github.com/jolars/panache/commit/397e1e58a83e42a1decfb7692114099702fe681d))
+- **cli:** allow `-o extensions.<name>=<bool>` overrides ([`2df73ab`](https://github.com/jolars/panache/commit/2df73ab3153b1f4e009a930536f3f590d1a0ef37))
+- **formatter:** add `east_asian_line_breaks` extension ([`4f28716`](https://github.com/jolars/panache/commit/4f2871673d2ba4d00142032d066386db151179e9)), in [#339](https://github.com/jolars/panache/issues/339), closes [#339](https://github.com/jolars/panache/issues/339)
+
+### Bug Fixes
+- **formatter:** preserve layout when paragraph swallows a fence shape ([`6458e96`](https://github.com/jolars/panache/commit/6458e96a5e276232866d12225300a61e6e46a8af)), closes [#340](https://github.com/jolars/panache/issues/340)
+- **formatter:** keep list marker off reflowed line start ([`68bc1fc`](https://github.com/jolars/panache/commit/68bc1fc8cb43e2e3eea72d7363d8b35c5dad055d))
+- **formatter:** keep escaped pipe in table-cell code span ([`0b94ca2`](https://github.com/jolars/panache/commit/0b94ca2537f8b51ddd285468c144c09620b0ecfd))
+- **parser:** restrict bare-URI autolinks to known schemes (#337) ([`930db45`](https://github.com/jolars/panache/commit/930db45b8f7bf71f08e3bdb4f036e5a6928936d9)), closes [#336](https://github.com/jolars/panache/issues/336)
+- **formatter:** fix panic when formatting `<!--->` ([`b580bb9`](https://github.com/jolars/panache/commit/b580bb9cfa9345787c106a6d3522be2a515fb451))
+- **parser:** keep `.class`/`#id` on executable fence info ([`4c8f396`](https://github.com/jolars/panache/commit/4c8f39682b6de5c887f0727a39b0f18b264ec762)), fixes [#334](https://github.com/jolars/panache/issues/334)
+
+### Dependencies
+- updated crates/panache-parser to v0.14.0
 ## [0.8.0](https://github.com/jolars/panache/compare/panache-formatter-v0.7.0...panache-formatter-v0.8.0) (2026-05-29)
 
 ### Features
