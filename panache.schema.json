@@ -411,6 +411,8 @@
                 "tex-math-double-backslash",
                 "tex-math-gfm",
                 "tex-math-single-backslash",
+                "wikilinks-title-after-pipe",
+                "wikilinks-title-before-pipe",
                 "yaml-metadata-block"
               ]
             },
@@ -502,6 +504,8 @@
           "tex-math-double-backslash",
           "tex-math-gfm",
           "tex-math-single-backslash",
+          "wikilinks-title-after-pipe",
+          "wikilinks-title-before-pipe",
           "yaml-metadata-block"
         ]
       },

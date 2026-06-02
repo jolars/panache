@@ -48,6 +48,8 @@ pub mod strikeout;
 pub mod subscript;
 #[path = "inlines/superscript.rs"]
 pub mod superscript;
+#[path = "inlines/wikilinks.rs"]
+pub mod wikilinks;
 
 #[cfg(test)]
 #[path = "inlines/tests.rs"]

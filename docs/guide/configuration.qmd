@@ -666,6 +666,27 @@ autolinks = true
 :   Bare URLs with a recognized URI scheme (e.g. `https:`, `mailto:`) become
     links (default: disabled, non-default extension)
 
+#### Wikilinks
+
+```toml
+[extensions]
+wikilinks-title-after-pipe = true
+wikilinks-title-before-pipe = false
+```
+
+`wikilinks-title-after-pipe`
+:   Wikilink syntax `[[url]]` and `[[url|title]]` --- URL first, optional title
+    after the pipe. Image variant `![[url]]` / `![[url|title]]` is also
+    recognized. Single-line shape, non-greedy on the first `]]`, empty bodies
+    (`[[]]`) are treated as literal text. Title content is *not* recursively
+    parsed for inline markup, mirroring pandoc behavior (default: disabled, no
+    flavor default).
+
+`wikilinks-title-before-pipe`
+:   Same as above but with title before the pipe: `[[title|url]]`. The two
+    extensions are mutually exclusive in intent; if both are enabled,
+    `wikilinks-title-after-pipe` takes precedence (matches pandoc).
+
 #### Images
 
 ```toml

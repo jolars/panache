@@ -1,0 +1,104 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..263
+  PARAGRAPH@0..36
+    TEXT@0..25 "Multi-pipe (first win ..."
+    WIKI_LINK@25..34
+      WIKI_LINK_OPEN@25..27 "[["
+      WIKI_LINK_URL@27..28
+        TEXT@27..28 "a"
+      WIKI_LINK_PIPE@28..29 "|"
+      WIKI_LINK_TITLE@29..32
+        TEXT@29..32 "b|c"
+      WIKI_LINK_CLOSE@32..34 "]]"
+    TEXT@34..35 "."
+    NEWLINE@35..36 "\n"
+  BLANK_LINE@36..37
+    BLANK_LINE@36..37 "\n"
+  PARAGRAPH@37..66
+    TEXT@37..60 "Empty body is literal: "
+    UNRESOLVED_REFERENCE@60..64
+      LINK_START@60..61
+        LINK_START@60..61 "["
+      LINK_TEXT@61..63
+        TEXT@61..63 "[]"
+      TEXT@63..64 "]"
+    TEXT@64..65 "."
+    NEWLINE@65..66 "\n"
+  BLANK_LINE@66..67
+    BLANK_LINE@66..67 "\n"
+  PARAGRAPH@67..90
+    TEXT@67..89 "Newline inside aborts:"
+    NEWLINE@89..90 "\n"
+  BLANK_LINE@90..91
+    BLANK_LINE@90..91 "\n"
+  PARAGRAPH@91..99
+    UNRESOLVED_REFERENCE@91..98
+      LINK_START@91..92
+        LINK_START@91..92 "["
+      LINK_TEXT@92..97
+        UNRESOLVED_REFERENCE@92..97
+          LINK_START@92..93
+            LINK_START@92..93 "["
+          LINK_TEXT@93..96
+            TEXT@93..94 "a"
+            NEWLINE@94..95 "\n"
+            TEXT@95..96 "b"
+          TEXT@96..97 "]"
+      TEXT@97..98 "]"
+    NEWLINE@98..99 "\n"
+  BLANK_LINE@99..100
+    BLANK_LINE@99..100 "\n"
+  PARAGRAPH@100..153
+    TEXT@100..143 "Non-greedy close leav ..."
+    WIKI_LINK@143..148
+      WIKI_LINK_OPEN@143..145 "[["
+      WIKI_LINK_URL@145..146
+        TEXT@145..146 "a"
+      WIKI_LINK_CLOSE@146..148 "]]"
+    TEXT@148..152 "b]]."
+    NEWLINE@152..153 "\n"
+  BLANK_LINE@153..154
+    BLANK_LINE@153..154 "\n"
+  PARAGRAPH@154..191
+    TEXT@154..174 "Adjacent wikilinks: "
+    WIKI_LINK@174..181
+      WIKI_LINK_OPEN@174..176 "[["
+      WIKI_LINK_URL@176..179
+        TEXT@176..179 "one"
+      WIKI_LINK_CLOSE@179..181 "]]"
+    TEXT@181..182 " "
+    WIKI_LINK@182..189
+      WIKI_LINK_OPEN@182..184 "[["
+      WIKI_LINK_URL@184..187
+        TEXT@184..187 "two"
+      WIKI_LINK_CLOSE@187..189 "]]"
+    TEXT@189..190 "."
+    NEWLINE@190..191 "\n"
+  BLANK_LINE@191..192
+    BLANK_LINE@191..192 "\n"
+  PARAGRAPH@192..263
+    TEXT@192..216 "Mixed with regular link "
+    LINK@216..227
+      LINK_START@216..217
+        LINK_START@216..217 "["
+      LINK_TEXT@217..221
+        TEXT@217..221 "text"
+      LINK_TEXT_END@221..222 "]"
+      LINK_DEST_START@222..223 "("
+      LINK_DEST@223..226
+        TEXT@223..226 "url"
+      LINK_DEST_END@226..227 ")"
+    TEXT@227..248 " on the same line as "
+    WIKI_LINK@248..261
+      WIKI_LINK_OPEN@248..250 "[["
+      WIKI_LINK_URL@250..254
+        TEXT@250..254 "wiki"
+      WIKI_LINK_PIPE@254..255 "|"
+      WIKI_LINK_TITLE@255..259
+        TEXT@255..259 "link"
+      WIKI_LINK_CLOSE@259..261 "]]"
+    TEXT@261..262 "."
+    NEWLINE@262..263 "\n"

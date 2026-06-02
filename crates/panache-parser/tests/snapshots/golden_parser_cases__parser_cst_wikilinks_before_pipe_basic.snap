@@ -1,0 +1,45 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..97
+  PARAGRAPH@0..24
+    WIKI_LINK@0..23
+      WIKI_LINK_OPEN@0..2 "[["
+      WIKI_LINK_URL@2..21
+        TEXT@2..21 "https://example.org"
+      WIKI_LINK_CLOSE@21..23 "]]"
+    NEWLINE@23..24 "\n"
+  BLANK_LINE@24..25
+    BLANK_LINE@24..25 "\n"
+  PARAGRAPH@25..55
+    WIKI_LINK@25..54
+      WIKI_LINK_OPEN@25..27 "[["
+      WIKI_LINK_TITLE@27..32
+        TEXT@27..32 "title"
+      WIKI_LINK_PIPE@32..33 "|"
+      WIKI_LINK_URL@33..52
+        TEXT@33..52 "https://example.org"
+      WIKI_LINK_CLOSE@52..54 "]]"
+    NEWLINE@54..55 "\n"
+  BLANK_LINE@55..56
+    BLANK_LINE@55..56 "\n"
+  PARAGRAPH@56..73
+    WIKI_LINK@56..72
+      WIKI_LINK_OPEN@56..58 "[["
+      WIKI_LINK_URL@58..70
+        TEXT@58..70 "Name of page"
+      WIKI_LINK_CLOSE@70..72 "]]"
+    NEWLINE@72..73 "\n"
+  BLANK_LINE@73..74
+    BLANK_LINE@73..74 "\n"
+  PARAGRAPH@74..97
+    WIKI_LINK@74..96
+      WIKI_LINK_OPEN@74..76 "[["
+      WIKI_LINK_TITLE@76..81
+        TEXT@76..81 "Title"
+      WIKI_LINK_PIPE@81..82 "|"
+      WIKI_LINK_URL@82..94
+        TEXT@82..94 "Name of page"
+      WIKI_LINK_CLOSE@94..96 "]]"
+    NEWLINE@96..97 "\n"

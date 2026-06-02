@@ -1,0 +1,41 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..85
+  PARAGRAPH@0..15
+    IMAGE_WIKI_LINK@0..14
+      WIKI_LINK_OPEN@0..3 "![["
+      WIKI_LINK_URL@3..12
+        TEXT@3..12 "image.png"
+      WIKI_LINK_CLOSE@12..14 "]]"
+    NEWLINE@14..15 "\n"
+  BLANK_LINE@15..16
+    BLANK_LINE@15..16 "\n"
+  PARAGRAPH@16..39
+    IMAGE_WIKI_LINK@16..38
+      WIKI_LINK_OPEN@16..19 "![["
+      WIKI_LINK_URL@19..28
+        TEXT@19..28 "image.png"
+      WIKI_LINK_PIPE@28..29 "|"
+      WIKI_LINK_TITLE@29..36
+        TEXT@29..36 "caption"
+      WIKI_LINK_CLOSE@36..38 "]]"
+    NEWLINE@38..39 "\n"
+  BLANK_LINE@39..40
+    BLANK_LINE@39..40 "\n"
+  PARAGRAPH@40..85
+    TEXT@40..47 "Mixed: "
+    WIKI_LINK@47..55
+      WIKI_LINK_OPEN@47..49 "[["
+      WIKI_LINK_URL@49..53
+        TEXT@49..53 "page"
+      WIKI_LINK_CLOSE@53..55 "]]"
+    TEXT@55..60 " and "
+    IMAGE_WIKI_LINK@60..74
+      WIKI_LINK_OPEN@60..63 "![["
+      WIKI_LINK_URL@63..72
+        TEXT@63..72 "image.png"
+      WIKI_LINK_CLOSE@72..74 "]]"
+    TEXT@74..84 " together."
+    NEWLINE@84..85 "\n"

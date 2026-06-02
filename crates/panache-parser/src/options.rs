@@ -250,6 +250,12 @@ pub struct Extensions {
     pub emoji: bool,
     /// [NON-DEFAULT] Highlighted ==text==
     pub mark: bool,
+    /// [NON-DEFAULT] Pandoc wikilinks with title after pipe: `[[url|title]]`
+    #[cfg_attr(feature = "serde", serde(alias = "wikilinks_title_after_pipe"))]
+    pub wikilinks_title_after_pipe: bool,
+    /// [NON-DEFAULT] Pandoc wikilinks with title before pipe: `[[title|url]]`
+    #[cfg_attr(feature = "serde", serde(alias = "wikilinks_title_before_pipe"))]
+    pub wikilinks_title_before_pipe: bool,
 
     // ===== Quarto-specific extensions =====
     /// Quarto callout blocks (.callout-note, etc.)
@@ -345,6 +351,8 @@ impl Extensions {
             tex_math_double_backslash: false,
             tex_math_gfm: false,
             tex_math_single_backslash: false,
+            wikilinks_title_after_pipe: false,
+            wikilinks_title_before_pipe: false,
             yaml_metadata_block: false,
         }
     }
@@ -468,6 +476,10 @@ impl Extensions {
             quarto_callouts: false,
             quarto_crossrefs: false,
             quarto_shortcodes: false,
+
+            // Wikilinks (opt-in, no flavor default)
+            wikilinks_title_after_pipe: false,
+            wikilinks_title_before_pipe: false,
         }
     }
 
@@ -714,6 +726,8 @@ known_extensions! {
     "quarto-shortcodes" => quarto_shortcodes,
     "bookdown-references" => bookdown_references,
     "bookdown-equation-references" => bookdown_equation_references,
+    "wikilinks-title-after-pipe" => wikilinks_title_after_pipe,
+    "wikilinks-title-before-pipe" => wikilinks_title_before_pipe,
 }
 
 #[cfg(test)]

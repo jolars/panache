@@ -75,6 +75,15 @@ pub enum SyntaxKind {
     REFERENCE_URL,        // url part
     REFERENCE_TITLE,      // "title" part
 
+    // Wikilinks (Pandoc `wikilinks_title_{after,before}_pipe` extensions)
+    WIKI_LINK,       // [[url]] or [[url|title]]
+    IMAGE_WIKI_LINK, // ![[url]] or ![[url|title]]
+    WIKI_LINK_OPEN,  // [[ or ![[
+    WIKI_LINK_URL,   // URL slot (raw TEXT child, no inline parsing)
+    WIKI_LINK_PIPE,  // | separator
+    WIKI_LINK_TITLE, // title slot (raw TEXT child, no inline parsing)
+    WIKI_LINK_CLOSE, // ]]
+
     // Math
     INLINE_MATH_MARKER,  // $
     DISPLAY_MATH_MARKER, // $$

@@ -1,0 +1,53 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..80
+  PARAGRAPH@0..42
+    TEXT@0..41 "Extension off — the ..."
+    NEWLINE@41..42 "\n"
+  BLANK_LINE@42..43
+    BLANK_LINE@42..43 "\n"
+  PARAGRAPH@43..61
+    UNRESOLVED_REFERENCE@43..60
+      LINK_START@43..44
+        LINK_START@43..44 "["
+      LINK_TEXT@44..59
+        UNRESOLVED_REFERENCE@44..59
+          LINK_START@44..45
+            LINK_START@44..45 "["
+          LINK_TEXT@45..58
+            TEXT@45..58 "just brackets"
+          TEXT@58..59 "]"
+      TEXT@59..60 "]"
+    NEWLINE@60..61 "\n"
+  BLANK_LINE@61..62
+    BLANK_LINE@61..62 "\n"
+  PARAGRAPH@62..70
+    UNRESOLVED_REFERENCE@62..69
+      LINK_START@62..63
+        LINK_START@62..63 "["
+      LINK_TEXT@63..68
+        UNRESOLVED_REFERENCE@63..68
+          LINK_START@63..64
+            LINK_START@63..64 "["
+          LINK_TEXT@64..67
+            TEXT@64..67 "a|b"
+          TEXT@67..68 "]"
+      TEXT@68..69 "]"
+    NEWLINE@69..70 "\n"
+  BLANK_LINE@70..71
+    BLANK_LINE@70..71 "\n"
+  PARAGRAPH@71..80
+    UNRESOLVED_REFERENCE@71..79
+      IMAGE_LINK_START@71..73
+        IMAGE_LINK_START@71..73 "!["
+      IMAGE_ALT@73..78
+        UNRESOLVED_REFERENCE@73..78
+          LINK_START@73..74
+            LINK_START@73..74 "["
+          LINK_TEXT@74..77
+            TEXT@74..77 "img"
+          TEXT@77..78 "]"
+      TEXT@78..79 "]"
+    NEWLINE@79..80 "\n"

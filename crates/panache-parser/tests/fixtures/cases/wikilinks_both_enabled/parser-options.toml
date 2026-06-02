@@ -1,0 +1,5 @@
+flavor = "pandoc"
+
+[extensions]
+wikilinks-title-after-pipe = true
+wikilinks-title-before-pipe = true

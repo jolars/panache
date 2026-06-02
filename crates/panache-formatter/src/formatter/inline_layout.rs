@@ -1179,6 +1179,10 @@ fn process_node_recursive(
                     let text = format_inline_fn(&n);
                     sink.push_piece_with_boundary(&text, SentenceBoundaryClass::NonBoundary);
                 }
+                SyntaxKind::WIKI_LINK | SyntaxKind::IMAGE_WIKI_LINK => {
+                    skip_marker_whitespace = false;
+                    sink.push_piece(&n.text().to_string());
+                }
                 SyntaxKind::BRACKETED_SPAN => {
                     skip_marker_whitespace = false;
                     sink.push_piece("[");

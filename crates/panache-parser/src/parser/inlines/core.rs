@@ -488,6 +488,21 @@ fn parse_inline_range_impl(
                         continue;
                     }
                 }
+                ConstructDispo::WikiLink { end: dispo_end } => {
+                    if dispo_end <= end
+                        && let Some(span) = super::wikilinks::try_parse_wikilink(text, pos, config)
+                        && span.end == dispo_end
+                    {
+                        if pos > text_start {
+                            builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                        }
+                        log::trace!("IR: matched wikilink at pos {}", pos);
+                        super::wikilinks::emit_wikilink(builder, text, span, config);
+                        pos = span.end;
+                        text_start = pos;
+                        continue;
+                    }
+                }
             }
         }
 

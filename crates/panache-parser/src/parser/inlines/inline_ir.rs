@@ -261,6 +261,14 @@ pub enum ConstructKind {
     /// walk via the IR's `ConstructPlan`. The dispatcher's legacy
     /// `[text]{attrs}` branch is gated to CommonMark dialect only.
     BracketedSpan,
+    /// Pandoc wikilink `[[url]]` / `[[url|title]]` / `![[url]]` /
+    /// `![[url|title]]`. Recognised in `build_ir` when either
+    /// `wikilinks_title_after_pipe` or `wikilinks_title_before_pipe` is
+    /// enabled. Dialect-agnostic (pandoc accepts the extension on both
+    /// `markdown+` and `commonmark+`). The emission walk dispatches via
+    /// the IR's `ConstructPlan`; the `is_image` variant is recovered by
+    /// peeking the leading byte of the source range.
+    WikiLink,
 }
 
 /// One matched fragment within a [`IrEvent::DelimRun`].
@@ -661,6 +669,28 @@ pub(super) fn build_ir_into(
                 kind: ConstructKind::BracketedSpan,
             });
             pos += len;
+            text_run_start = pos;
+            continue;
+        }
+
+        // Wikilinks `[[url]]`, `[[url|title]]`, `![[url]]`,
+        // `![[url|title]]`. Recognised on either pipe-order extension
+        // and on both dialects (pandoc accepts the extension under both
+        // `markdown+` and `commonmark+`). Must precede the `![` and `[`
+        // bracket scans below so the wikilink shape wins over an
+        // image-bracket or link-bracket open.
+        if (b == b'[' || b == b'!')
+            && super::wikilinks::any_enabled(config)
+            && let Some(span) = super::wikilinks::try_parse_wikilink(text, pos, config)
+            && span.end <= end
+        {
+            flush_text!();
+            events.push(IrEvent::Construct {
+                start: span.start,
+                end: span.end,
+                kind: ConstructKind::WikiLink,
+            });
+            pos = span.end;
             text_run_start = pos;
             continue;
         }
@@ -2380,6 +2410,10 @@ pub enum ConstructDispo {
     /// `[content]{attrs}` — emit via `emit_bracketed_span` after
     /// slicing the inner content and attribute string.
     BracketedSpan { end: usize },
+    /// `[[url]]` / `[[url|title]]` (or image variant `![[...]]`) —
+    /// emit via `emit_wikilink` after re-locating the pipe within the
+    /// source range.
+    WikiLink { end: usize },
 }
 
 /// A byte-keyed view of the IR's standalone Pandoc constructs that the
@@ -2430,6 +2464,9 @@ pub fn build_construct_plan(events: &[IrEvent]) -> ConstructPlan {
                 }
                 ConstructKind::BracketedSpan => {
                     by_pos.insert(*start, ConstructDispo::BracketedSpan { end: *end });
+                }
+                ConstructKind::WikiLink => {
+                    by_pos.insert(*start, ConstructDispo::WikiLink { end: *end });
                 }
                 _ => {}
             }

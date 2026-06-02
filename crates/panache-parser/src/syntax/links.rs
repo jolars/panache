@@ -415,6 +415,57 @@ impl UnresolvedReference {
     }
 }
 
+/// A Pandoc wikilink: `[[url]]`, `[[url|title]]`, `![[url]]`,
+/// `![[url|title]]`. Both `WIKI_LINK` and `IMAGE_WIKI_LINK` cast to this
+/// wrapper; discriminate with [`WikiLink::is_image`]. The URL and (when
+/// present) title are flat raw-text spans — wikilink children are not
+/// recursively parsed for inline markup, matching pandoc behavior.
+pub struct WikiLink(SyntaxNode);
+
+impl AstNode for WikiLink {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        matches!(kind, SyntaxKind::WIKI_LINK | SyntaxKind::IMAGE_WIKI_LINK)
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self(syntax))
+        } else {
+            None
+        }
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl WikiLink {
+    /// `true` if this is an image wikilink (`![[...]]`), `false` for a
+    /// regular wikilink (`[[...]]`).
+    pub fn is_image(&self) -> bool {
+        self.0.kind() == SyntaxKind::IMAGE_WIKI_LINK
+    }
+
+    /// The URL slot text. Always present in a well-formed wikilink.
+    pub fn url(&self) -> Option<String> {
+        self.0
+            .children()
+            .find(|n| n.kind() == SyntaxKind::WIKI_LINK_URL)
+            .map(|n| n.text().to_string())
+    }
+
+    /// The title slot text. `None` for the pipe-less `[[url]]` form.
+    pub fn title(&self) -> Option<String> {
+        self.0
+            .children()
+            .find(|n| n.kind() == SyntaxKind::WIKI_LINK_TITLE)
+            .map(|n| n.text().to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{AstNode, ImageLink, UnresolvedReference};
