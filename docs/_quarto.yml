@@ -3,6 +3,8 @@ project:
   pre-render: filters/pre-render.lua
   preview:
     port: 4200
+  post-render:
+    - scripts/fix-sitemap.sh
 
 website:
   title: "Panache"
@@ -142,6 +144,7 @@ format:
       light: cosmo
       dark: [cosmo, theme-dark.scss]
     html-math-method: katex
+    canonical-url: true
     pagetitle: "{{< meta title >}}"
     code-copy: true
     include-in-header: _includes/social-extra.html
