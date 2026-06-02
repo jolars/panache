@@ -83,6 +83,11 @@ fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
                     ranges.push(range);
                 }
             }
+            SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_DIV => {
+                if let Some(range) = extract_html_block_range(&node, content) {
+                    ranges.push(range);
+                }
+            }
             _ => {}
         }
     }
@@ -153,6 +158,27 @@ fn extract_fenced_div_range(fenced_div: &FencedDiv, content: &str) -> Option<Fol
     let end_pos = offset_to_position(content, end_offset.saturating_sub(1));
 
     // Only fold if div spans multiple lines
+    if start_pos.line < end_pos.line {
+        Some(FoldingRange {
+            start_line: start_pos.line,
+            start_character: None,
+            end_line: end_pos.line,
+            end_character: None,
+            kind: Some(FoldingRangeKind::Region),
+            collapsed_text: None,
+        })
+    } else {
+        None
+    }
+}
+
+fn extract_html_block_range(node: &SyntaxNode, content: &str) -> Option<FoldingRange> {
+    let start_offset: usize = node.text_range().start().into();
+    let end_offset: usize = node.text_range().end().into();
+
+    let start_pos = offset_to_position(content, start_offset);
+    let end_pos = offset_to_position(content, end_offset.saturating_sub(1));
+
     if start_pos.line < end_pos.line {
         Some(FoldingRange {
             start_line: start_pos.line,
@@ -337,6 +363,78 @@ More content.
         assert!(
             ranges.is_empty(),
             "Single heading with no content should have no folds"
+        );
+    }
+
+    #[test]
+    fn test_html_block_folding() {
+        let content = r#"<details><summary>Summary</summary>
+
+This is the hidden content.
+
+</details>
+
+Trailing paragraph.
+"#;
+        let config = crate::config::Config::default();
+        let tree = crate::parser::parse(content, Some(config));
+        let ranges = build_folding_ranges(&tree, content);
+
+        assert!(
+            !ranges.is_empty(),
+            "Multi-line HTML block should have a fold"
+        );
+    }
+
+    #[test]
+    fn test_html_comment_folding() {
+        let content = r#"<!-- editor: a comment
+spanning multiple lines
+for clarity -->
+
+Body paragraph.
+"#;
+        let config = crate::config::Config::default();
+        let tree = crate::parser::parse(content, Some(config));
+        let ranges = build_folding_ranges(&tree, content);
+
+        assert!(
+            !ranges.is_empty(),
+            "Multi-line HTML comment should have a fold"
+        );
+    }
+
+    #[test]
+    fn test_html_block_div_folding() {
+        // Pandoc dialect lifts <div>…</div> to HTML_BLOCK_DIV.
+        let content = r#"<div class="callout">
+First line.
+Second line.
+</div>
+
+Outside.
+"#;
+        let config = crate::config::Config::default();
+        let tree = crate::parser::parse(content, Some(config));
+        let ranges = build_folding_ranges(&tree, content);
+
+        assert!(
+            !ranges.is_empty(),
+            "Multi-line HTML_BLOCK_DIV should have a fold"
+        );
+    }
+
+    #[test]
+    fn test_inline_html_no_fold() {
+        // Single-line raw HTML in a paragraph must not produce a fold.
+        let content = "Hello <span>world</span>.\n";
+        let config = crate::config::Config::default();
+        let tree = crate::parser::parse(content, Some(config));
+        let ranges = build_folding_ranges(&tree, content);
+
+        assert!(
+            ranges.is_empty(),
+            "Inline HTML inside a single-line paragraph should not fold"
         );
     }
 

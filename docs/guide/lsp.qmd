@@ -455,6 +455,10 @@ Code blocks
 Fenced divs
 :   Fold `::: {.class}` content
 
+HTML blocks
+:   Fold multi-line HTML blocks (e.g. `<details>`, `<script>`, `<!-- … -->`,
+    `<div>`)
+
 YAML frontmatter
 :   Fold `---` delimited metadata
 
