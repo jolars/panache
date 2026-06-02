@@ -125,6 +125,44 @@ fn test_link_text_is_url() {
 }
 
 #[test]
+fn test_empty_list_item() {
+    let diagnostics = lint_file("empty_list_item.md");
+    let hits: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "empty-list-item")
+        .collect();
+
+    // Expect six hits:
+    //   1. bare `-` between two bullets (line 6)
+    //   2. bare `1.` opening the ordered list (line 11)
+    //   3. bare `3.` at the end of the ordered list (line 13)
+    //   4. bare `-` that became a Setext H2 underline (line 18)
+    //   5. marker followed by only trailing whitespace (line 28)
+    //   6 ... nothing else; the H1 (===) case and the clean lists below stay quiet.
+    let lines: Vec<usize> = hits.iter().map(|d| d.location.line).collect();
+    assert_eq!(
+        hits.len(),
+        5,
+        "unexpected hit count, lines: {:?}, messages: {:?}",
+        lines,
+        hits.iter().map(|d| &d.message).collect::<Vec<_>>(),
+    );
+    assert_eq!(lines, vec![6, 11, 13, 18, 28]);
+
+    let setext_hit = hits.iter().find(|d| d.location.line == 18).unwrap();
+    assert!(
+        setext_hit.message.contains("Setext"),
+        "line 18 should mention the Setext consequence, got {:?}",
+        setext_hit.message,
+    );
+
+    assert!(
+        hits.iter().all(|d| d.fix.is_none()),
+        "empty-list-item should not ship an autofix",
+    );
+}
+
+#[test]
 fn test_no_duplicates() {
     let diagnostics = lint_file("no_duplicates.md");
     let dup: Vec<_> = diagnostics

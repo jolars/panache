@@ -102,6 +102,9 @@ fn default_registry(config: &Config) -> RuleRegistry {
     if config.lint.is_rule_enabled("heading-hierarchy") {
         registry.register(Box::new(rules::heading_hierarchy::HeadingHierarchyRule));
     }
+    if config.lint.is_rule_enabled("empty-list-item") {
+        registry.register(Box::new(rules::empty_list_item::EmptyListItemRule));
+    }
     if ext.header_attributes && config.lint.is_rule_enabled("heading-eaten-attrs") {
         registry.register(Box::new(rules::heading_eaten_attrs::HeadingEatenAttrsRule));
     }

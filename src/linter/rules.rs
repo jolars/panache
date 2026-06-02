@@ -8,6 +8,7 @@ pub mod citation_keys;
 pub mod crossref_as_link_target;
 pub mod duplicate_references;
 pub mod emoji_aliases;
+pub mod empty_list_item;
 pub mod figure_crossref_captions;
 pub mod footnote_ref_in_footnote_def;
 pub mod heading_eaten_attrs;

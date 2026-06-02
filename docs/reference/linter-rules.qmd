@@ -100,6 +100,57 @@ warning[heading-hierarchy]: Heading level skipped from h1 to h3; expected h2
 
 **Auto-fix:** Changes `### Subsection` to `## Subsection`.
 
+### `empty-list-item` {#empty-list-item}
+
+Detects list items whose content is empty --- a bare marker with nothing after
+it.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Diagnostic codes
+:   [`empty-list-item`](#empty-list-item)
+
+Description
+
+:   An empty list item is almost always a placeholder the author forgot to fill
+    in. The rule fires in two situations:
+
+    1. A `LIST_ITEM` produced by the parser has no inline content (e.g. a bare
+       `-` line between two non-empty bullets, or `1.` with nothing after the
+       period).
+    2. A bare `-` on the line below a list item gets interpreted as a Setext H2
+       underline, silently merging the item with the previous line as a heading.
+       (`=` underlines are not flagged because they don't share the
+       bullet-marker shape.)
+
+    Both cases are valid Markdown, but they tend to surprise readers.
+
+**Example violation:**
+
+```markdown
+- Item one
+-
+- Item three
+```
+
+**Diagnostic:**
+
+```
+warning[empty-list-item]: List item has no content
+ --> document.md:2:1
+  |
+2 | -
+  | ^
+```
+
+**Resolution:** Fill in the missing content, or delete the marker. No auto-fix
+is provided because the right choice (placeholder vs. removal) is an
+author-intent decision.
+
 ### `heading-eaten-attrs` {#heading-eaten-attrs}
 
 Detects HTML comments that cause pandoc to silently drop a heading's `{...}`
