@@ -51,8 +51,7 @@ pub enum FormatterValue {
 /// append-args = ["-i", "2"]  # Adds args to end: ["format", "{}", "-i", "2"]
 /// ```
 #[derive(Debug, Clone, Deserialize, JsonSchema, PartialEq, Default)]
-#[serde(default)]
-#[serde(rename_all = "kebab-case")]
+#[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
 pub struct FormatterDefinition {
     /// Reference to a built-in preset (e.g., "air", "black") - OLD FORMAT ONLY
     /// In new format, presets are referenced directly in [formatters] mapping
@@ -291,8 +290,7 @@ impl JsonSchema for NoBreakAbbreviations {
 /// Formatting style configuration.
 /// Groups all style-related settings together.
 #[derive(Debug, Clone, Deserialize, JsonSchema, PartialEq)]
-#[serde(default)]
-#[serde(rename_all = "kebab-case")]
+#[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
 pub struct StyleConfig {
     /// Text wrapping mode
     pub wrap: Option<WrapMode>,
@@ -314,6 +312,13 @@ pub struct StyleConfig {
     /// Fallback document language for sentence wrapping when the document has no
     /// YAML `lang:`. A code such as `de` or `pt-BR`.
     pub lang: Option<String>,
+    /// DEPRECATED no-op table. Kept so `[format.code-blocks]` /
+    /// `[style.code-blocks]` configs from older releases keep parsing under
+    /// `deny_unknown_fields`; `check_deprecated_code_block_style_options`
+    /// surfaces the warning. Schema hides it.
+    #[serde(skip_serializing)]
+    #[schemars(skip)]
+    pub code_blocks: Option<toml::Value>,
 }
 
 impl Default for StyleConfig {
@@ -328,6 +333,7 @@ impl Default for StyleConfig {
             built_in_greedy_wrap: true,
             no_break_abbreviations: None,
             lang: None,
+            code_blocks: None,
         }
     }
 }
@@ -453,7 +459,7 @@ impl<'de> Deserialize<'de> for LintConfig {
 
 /// Internal deserialization struct that allows for optional fields
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 struct RawConfig {
     #[serde(default)]
     flavor: Flavor,
@@ -475,6 +481,15 @@ struct RawConfig {
     // DEPRECATED: [style] section (kept for backwards compatibility)
     #[serde(default)]
     style: Option<StyleConfig>,
+
+    // DEPRECATED no-op table. Kept so top-level `[code-blocks]` configs from
+    // older releases keep parsing under `deny_unknown_fields`;
+    // `check_deprecated_code_block_style_options` surfaces the warning. Schema
+    // hides it.
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
+    #[allow(dead_code)]
+    code_blocks: Option<toml::Value>,
 
     // DEPRECATED: Old top-level style fields (kept for backwards compatibility)
     #[serde(default)]
@@ -741,6 +756,7 @@ impl RawConfig {
                 built_in_greedy_wrap: true,
                 no_break_abbreviations: None,
                 lang: None,
+                code_blocks: None,
             }
         };
 

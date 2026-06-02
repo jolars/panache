@@ -1026,6 +1026,47 @@ mod tests {
     }
 
     #[test]
+    fn unknown_top_level_key_is_rejected() {
+        // Typo of `line-width` — we used to silently drop it.
+        let toml = "lin-width = 100\n";
+        let err = parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("typo'd top-level key must error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("lin-width") && msg.contains("unknown field"),
+            "error must name the offending key: {msg}"
+        );
+    }
+
+    #[test]
+    fn unknown_key_inside_format_section_is_rejected() {
+        let toml = "[format]\nwrapp = \"reflow\"\n";
+        let err = parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("typo'd [format] key must error");
+        assert!(
+            err.to_string().contains("wrapp"),
+            "error must name the offending key: {err}"
+        );
+    }
+
+    #[test]
+    fn deprecated_code_blocks_table_still_parses() {
+        // `[code-blocks]` is a no-op since the feature was removed, but older
+        // configs still in the wild use it — the deprecation warning must keep
+        // firing without `deny_unknown_fields` hard-failing the load.
+        let toml = "flavor = \"pandoc\"\n[code-blocks]\nattribute-style = \"explicit\"\n";
+        parse_config_str(toml, Path::new("panache.toml"))
+            .expect("deprecated [code-blocks] table must still parse");
+    }
+
+    #[test]
+    fn deprecated_format_code_blocks_subtable_still_parses() {
+        let toml = "[format.code-blocks]\nattribute-style = \"explicit\"\n";
+        parse_config_str(toml, Path::new("panache.toml"))
+            .expect("deprecated [format.code-blocks] subtable must still parse");
+    }
+
+    #[test]
     fn find_in_tree_prefers_nearest_config() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let workspace = tmp.path().join("ws");

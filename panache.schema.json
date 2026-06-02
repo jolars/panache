@@ -42,6 +42,7 @@
       "type": "string"
     },
     "FormatterDefinition": {
+      "additionalProperties": false,
       "description": "NEW: Named formatter definition (formatters.NAME sections in new format)\nOLD: Language-specific formatter config (formatters.LANG sections in old format)\n\nIn new format, if the definition name matches a built-in preset, unspecified fields\nwill inherit from that preset. This allows partial overrides like:\n\n```toml\n[formatters.air]\nargs = [\"format\", \"--custom\"]  # Overrides args, inherits cmd/stdin from built-in \"air\"\n```\n\nAdditionally, you can modify arguments incrementally using `prepend-args` and `append-args`:\n\n```toml\n[formatters.air]\nappend-args = [\"-i\", \"2\"]  # Adds args to end: [\"format\", \"{}\", \"-i\", \"2\"]\n```",
       "properties": {
         "append-args": {
@@ -210,6 +211,7 @@
       "type": "string"
     },
     "StyleConfig": {
+      "additionalProperties": false,
       "description": "Formatting style configuration.\nGroups all style-related settings together.",
       "properties": {
         "blank-lines": {
@@ -303,6 +305,7 @@
   },
   "$id": "https://panache.bz/panache.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Schema for panache.toml. Generated from the host Config types; do not hand-edit — run `UPDATE_EXPECTED=1 cargo test config_schema` instead.",
   "properties": {
     "blank-lines": {

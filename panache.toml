@@ -13,8 +13,6 @@ extend-exclude = [
   ".agents/**/*",
 ]
 
-cache = false
-
 [formatters]
 r = "air"
 toml = "taplo"

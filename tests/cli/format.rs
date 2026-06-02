@@ -86,7 +86,7 @@ fn test_format_with_config() {
     let config_file = temp_dir.path().join(".panache.toml");
 
     fs::write(&test_file, "# Heading\n\nThis is a very long line that will be wrapped at 60 characters instead of 80.").unwrap();
-    fs::write(&config_file, "line_width = 60").unwrap();
+    fs::write(&config_file, "line-width = 60").unwrap();
 
     cargo_bin_cmd!("panache")
         .args([

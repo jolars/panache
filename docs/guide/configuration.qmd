@@ -38,6 +38,32 @@ parent directory (the project root), so a pattern like `vendor/**` matches
 `vendor/` next to `.config/`, with no `../` prefix needed (see [Path matching
 base](#file-selection-directory-traversal)).
 
+## Validation
+
+Panache validates every config it loads. Unknown keys are a hard error rather
+than a silent drop, so a typo like `lin-width = 100` or `[forrmat]` fails the
+run with a message that names the offending key and lists the accepted ones:
+
+```
+Error: invalid config /path/panache.toml: TOML parse error at line 1, column 1
+  |
+1 | lin-width = 100
+  | ^^^^^^^^^
+unknown field `lin-width`, expected one of `flavor`, `extensions`,
+`line-ending`, `line-width`, `pandoc-compat`, `format`, ...
+```
+
+Keys that were valid in older releases and have since been deprecated still
+parse, but Panache prints a warning. The current crop is:
+
+- snake_case names under `[extensions]` (e.g. `quarto_crossrefs` → use
+  `quarto-crossrefs`)
+- snake_case fields under `[formatters.*]` (e.g. `prepend_args` →
+  `prepend-args`)
+- the top-level / `[format]` / `[style]` `code-blocks` table (now a no-op)
+- the top-level / `[format]` / `[style]` `blank-lines` key (now a no-op)
+- the top-level `[style]` section itself (use `[format]`)
+
 ## Editor Support {#editor-support}
 
 Panache publishes a [JSON Schema](https://json-schema.org/) for `panache.toml`

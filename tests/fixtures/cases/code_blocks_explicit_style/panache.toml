@@ -1,4 +1,1 @@
 flavor = "pandoc"
-
-[code-blocks]
-attribute-style = "explicit"
