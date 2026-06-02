@@ -1,0 +1,55 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..75
+  LIST@0..75
+    LIST_ITEM@0..75
+      LIST_MARKER@0..1 "-"
+      WHITESPACE@1..2 " "
+      PLAIN@2..14
+        TEXT@2..13 "text before"
+        NEWLINE@13..14 "\n"
+      BLANK_LINE@14..15
+        BLANK_LINE@14..15 "\n"
+      GRID_TABLE@15..75
+        TABLE_SEPARATOR@15..27
+          TEXT@15..26 "  +---+---+"
+          NEWLINE@26..27 "\n"
+        TABLE_HEADER@27..39
+          WHITESPACE@27..29 "  "
+          TEXT@29..30 "|"
+          WHITESPACE@30..31 " "
+          TABLE_CELL@31..32
+            TEXT@31..32 "a"
+          WHITESPACE@32..33 " "
+          TEXT@33..34 "|"
+          WHITESPACE@34..35 " "
+          TABLE_CELL@35..36
+            TEXT@35..36 "b"
+          WHITESPACE@36..37 " "
+          TEXT@37..38 "|"
+          NEWLINE@38..39 "\n"
+        TABLE_SEPARATOR@39..51
+          WHITESPACE@39..41 "  "
+          TEXT@41..50 "+===+===+"
+          NEWLINE@50..51 "\n"
+        TABLE_ROW@51..63
+          WHITESPACE@51..53 "  "
+          TEXT@53..54 "|"
+          WHITESPACE@54..55 " "
+          TABLE_CELL@55..56
+            TEXT@55..56 "1"
+          WHITESPACE@56..57 " "
+          TEXT@57..58 "|"
+          WHITESPACE@58..59 " "
+          TABLE_CELL@59..60
+            TEXT@59..60 "2"
+          WHITESPACE@60..61 " "
+          TEXT@61..62 "|"
+          NEWLINE@62..63 "\n"
+        TABLE_SEPARATOR@63..75
+          WHITESPACE@63..65 "  "
+          TEXT@65..74 "+---+---+"
+          NEWLINE@74..75 "\n"

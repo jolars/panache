@@ -1950,7 +1950,20 @@ pub(crate) fn try_parse_grid_table(
     // `  > ` prefix removed before the separator/content-row shape checks.
     // With an empty prefix `stripped == lines`. Emission re-emits the prefix
     // bytes as tokens via the window; captions/blank lines read raw `lines`.
-    let stripped = window.strip_all();
+    //
+    // `strip_all` keeps the dispatch line's list-indent (via
+    // `strip_line_0_for_emission`) so emission re-injects those bytes
+    // correctly. For grid-border *detection*, the strict column-0 check in
+    // `try_parse_grid_separator` would then reject a border that's actually
+    // sitting at column 0 of the list-item's inner content — so force the
+    // dispatch line to its fully-stripped view here. Emission still goes
+    // through `window.emit_or_dispatch_tail`, which preserves the indent
+    // bytes.
+    let mut stripped = window.strip_all();
+    let dispatch_pos = window.dispatch_pos();
+    if dispatch_pos < stripped.len() {
+        stripped[dispatch_pos] = window.prefix().strip(lines[dispatch_pos]);
+    }
 
     // Check if this line is a caption followed by a table
     // If so, the actual table starts after the caption and blank line
