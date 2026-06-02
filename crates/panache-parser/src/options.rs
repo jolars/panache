@@ -605,85 +605,115 @@ impl Extensions {
 
     fn merge_overrides(mut base: Extensions, user_overrides: HashMap<String, bool>) -> Self {
         for (key, value) in user_overrides {
-            let normalized_key = key.replace('_', "-");
-            match normalized_key.as_str() {
-                "blank-before-header" => base.blank_before_header = value,
-                "header-attributes" => base.header_attributes = value,
-                "auto-identifiers" => base.auto_identifiers = value,
-                "gfm-auto-identifiers" => base.gfm_auto_identifiers = value,
-                "implicit-header-references" => base.implicit_header_references = value,
-                "blank-before-blockquote" => base.blank_before_blockquote = value,
-                "fancy-lists" => base.fancy_lists = value,
-                "startnum" => base.startnum = value,
-                "example-lists" => base.example_lists = value,
-                "task-lists" => base.task_lists = value,
-                "definition-lists" => base.definition_lists = value,
-                "lists-without-preceding-blankline" => {
-                    base.lists_without_preceding_blankline = value
-                }
-                "four-space-rule" => base.four_space_rule = value,
-                "backtick-code-blocks" => base.backtick_code_blocks = value,
-                "fenced-code-blocks" => base.fenced_code_blocks = value,
-                "fenced-code-attributes" => base.fenced_code_attributes = value,
-                "executable-code" => base.executable_code = value,
-                "rmarkdown-inline-code" => base.rmarkdown_inline_code = value,
-                "quarto-inline-code" => base.quarto_inline_code = value,
-                "inline-code-attributes" => base.inline_code_attributes = value,
-                "simple-tables" => base.simple_tables = value,
-                "multiline-tables" => base.multiline_tables = value,
-                "grid-tables" => base.grid_tables = value,
-                "pipe-tables" => base.pipe_tables = value,
-                "table-captions" => base.table_captions = value,
-                "fenced-divs" => base.fenced_divs = value,
-                "native-divs" => base.native_divs = value,
-                "line-blocks" => base.line_blocks = value,
-                "intraword-underscores" => base.intraword_underscores = value,
-                "strikeout" => base.strikeout = value,
-                "superscript" => base.superscript = value,
-                "subscript" => base.subscript = value,
-                "inline-links" => base.inline_links = value,
-                "reference-links" => base.reference_links = value,
-                "shortcut-reference-links" => base.shortcut_reference_links = value,
-                "link-attributes" => base.link_attributes = value,
-                "autolinks" => base.autolinks = value,
-                "inline-images" => base.inline_images = value,
-                "implicit-figures" => base.implicit_figures = value,
-                "tex-math-dollars" => base.tex_math_dollars = value,
-                "tex-math-gfm" => base.tex_math_gfm = value,
-                "tex-math-single-backslash" => base.tex_math_single_backslash = value,
-                "tex-math-double-backslash" => base.tex_math_double_backslash = value,
-                "inline-footnotes" => base.inline_footnotes = value,
-                "footnotes" => base.footnotes = value,
-                "citations" => base.citations = value,
-                "bracketed-spans" => base.bracketed_spans = value,
-                "native-spans" => base.native_spans = value,
-                "yaml-metadata-block" => base.yaml_metadata_block = value,
-                "pandoc-title-block" => base.pandoc_title_block = value,
-                "mmd-title-block" => base.mmd_title_block = value,
-                "raw-html" => base.raw_html = value,
-                "markdown-in-html-blocks" => base.markdown_in_html_blocks = value,
-                "raw-tex" => base.raw_tex = value,
-                "raw-attribute" => base.raw_attribute = value,
-                "all-symbols-escapable" => base.all_symbols_escapable = value,
-                "escaped-line-breaks" => base.escaped_line_breaks = value,
-                "autolink-bare-uris" => base.autolink_bare_uris = value,
-                "hard-line-breaks" => base.hard_line_breaks = value,
-                "east-asian-line-breaks" => base.east_asian_line_breaks = value,
-                "mmd-header-identifiers" => base.mmd_header_identifiers = value,
-                "mmd-link-attributes" => base.mmd_link_attributes = value,
-                "alerts" => base.alerts = value,
-                "emoji" => base.emoji = value,
-                "mark" => base.mark = value,
-                "quarto-callouts" => base.quarto_callouts = value,
-                "quarto-crossrefs" => base.quarto_crossrefs = value,
-                "quarto-shortcodes" => base.quarto_shortcodes = value,
-                "bookdown-references" => base.bookdown_references = value,
-                "bookdown-equation-references" => base.bookdown_equation_references = value,
-                _ => {}
-            }
+            base.set_by_name(&key, value);
         }
         base
     }
+}
+
+/// Define the canonical mapping between kebab-case extension names (as users
+/// write them in `[extensions]`) and the corresponding `Extensions` fields.
+/// Drives both the runtime setter and the public name list, so adding an
+/// extension means editing exactly one table.
+macro_rules! known_extensions {
+    ( $( $kebab:literal => $field:ident ),* $(,)? ) => {
+        impl Extensions {
+            /// Canonical kebab-case names accepted in `[extensions]`. Used by
+            /// the config loader's typo check and by the JSON Schema
+            /// generator. Snake_case is also accepted at runtime via
+            /// normalization in [`Extensions::set_by_name`].
+            pub const KNOWN_NAMES: &'static [&'static str] = &[ $($kebab),* ];
+
+            /// True if `name` (in either kebab- or snake-case) is a known
+            /// extension key.
+            pub fn is_known_name(name: &str) -> bool {
+                let normalized = name.replace('_', "-");
+                Self::KNOWN_NAMES.iter().any(|k| *k == normalized)
+            }
+
+            /// Set the named extension on `self`, returning `true` if `name`
+            /// matched a known field. Kebab- and snake-case are accepted.
+            fn set_by_name(&mut self, name: &str, value: bool) -> bool {
+                match name.replace('_', "-").as_str() {
+                    $( $kebab => { self.$field = value; true } )*
+                    _ => false,
+                }
+            }
+        }
+    };
+}
+
+known_extensions! {
+    "blank-before-header" => blank_before_header,
+    "header-attributes" => header_attributes,
+    "auto-identifiers" => auto_identifiers,
+    "gfm-auto-identifiers" => gfm_auto_identifiers,
+    "implicit-header-references" => implicit_header_references,
+    "blank-before-blockquote" => blank_before_blockquote,
+    "fancy-lists" => fancy_lists,
+    "startnum" => startnum,
+    "example-lists" => example_lists,
+    "task-lists" => task_lists,
+    "definition-lists" => definition_lists,
+    "lists-without-preceding-blankline" => lists_without_preceding_blankline,
+    "four-space-rule" => four_space_rule,
+    "backtick-code-blocks" => backtick_code_blocks,
+    "fenced-code-blocks" => fenced_code_blocks,
+    "fenced-code-attributes" => fenced_code_attributes,
+    "executable-code" => executable_code,
+    "rmarkdown-inline-code" => rmarkdown_inline_code,
+    "quarto-inline-code" => quarto_inline_code,
+    "inline-code-attributes" => inline_code_attributes,
+    "simple-tables" => simple_tables,
+    "multiline-tables" => multiline_tables,
+    "grid-tables" => grid_tables,
+    "pipe-tables" => pipe_tables,
+    "table-captions" => table_captions,
+    "fenced-divs" => fenced_divs,
+    "native-divs" => native_divs,
+    "line-blocks" => line_blocks,
+    "intraword-underscores" => intraword_underscores,
+    "strikeout" => strikeout,
+    "superscript" => superscript,
+    "subscript" => subscript,
+    "inline-links" => inline_links,
+    "reference-links" => reference_links,
+    "shortcut-reference-links" => shortcut_reference_links,
+    "link-attributes" => link_attributes,
+    "autolinks" => autolinks,
+    "inline-images" => inline_images,
+    "implicit-figures" => implicit_figures,
+    "tex-math-dollars" => tex_math_dollars,
+    "tex-math-gfm" => tex_math_gfm,
+    "tex-math-single-backslash" => tex_math_single_backslash,
+    "tex-math-double-backslash" => tex_math_double_backslash,
+    "inline-footnotes" => inline_footnotes,
+    "footnotes" => footnotes,
+    "citations" => citations,
+    "bracketed-spans" => bracketed_spans,
+    "native-spans" => native_spans,
+    "yaml-metadata-block" => yaml_metadata_block,
+    "pandoc-title-block" => pandoc_title_block,
+    "mmd-title-block" => mmd_title_block,
+    "raw-html" => raw_html,
+    "markdown-in-html-blocks" => markdown_in_html_blocks,
+    "raw-tex" => raw_tex,
+    "raw-attribute" => raw_attribute,
+    "all-symbols-escapable" => all_symbols_escapable,
+    "escaped-line-breaks" => escaped_line_breaks,
+    "autolink-bare-uris" => autolink_bare_uris,
+    "hard-line-breaks" => hard_line_breaks,
+    "east-asian-line-breaks" => east_asian_line_breaks,
+    "mmd-header-identifiers" => mmd_header_identifiers,
+    "mmd-link-attributes" => mmd_link_attributes,
+    "alerts" => alerts,
+    "emoji" => emoji,
+    "mark" => mark,
+    "quarto-callouts" => quarto_callouts,
+    "quarto-crossrefs" => quarto_crossrefs,
+    "quarto-shortcodes" => quarto_shortcodes,
+    "bookdown-references" => bookdown_references,
+    "bookdown-equation-references" => bookdown_equation_references,
 }
 
 #[cfg(test)]

@@ -53,6 +53,14 @@ unknown field `lin-width`, expected one of `flavor`, `extensions`,
 `line-ending`, `line-width`, `pandoc-compat`, `format`, ...
 ```
 
+Extension names are validated against the canonical set, including inside
+per-flavor subtables, and the error suggests the closest valid name:
+
+```
+Error: invalid config /path/panache.toml: unknown extension
+`quato-crossrefs` in [extensions]; did you mean `quarto-crossrefs`?
+```
+
 Keys that were valid in older releases and have since been deprecated still
 parse, but Panache prints a warning. The current crop is:
 

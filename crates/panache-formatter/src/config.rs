@@ -114,19 +114,47 @@ impl FormatterExtensions {
     /// defaults + file-based overrides (e.g. CLI `-o extensions.<name>=<bool>`).
     pub fn apply_overrides(&mut self, overrides: HashMap<String, bool>) {
         for (key, value) in overrides {
-            match key.replace('_', "-").to_ascii_lowercase().as_str() {
-                "blank-before-header" => self.blank_before_header = value,
-                "bookdown-references" => self.bookdown_references = value,
-                "east-asian-line-breaks" => self.east_asian_line_breaks = value,
-                "escaped-line-breaks" => self.escaped_line_breaks = value,
-                "gfm-auto-identifiers" => self.gfm_auto_identifiers = value,
-                "quarto-crossrefs" => self.quarto_crossrefs = value,
-                "smart" => self.smart = value,
-                "smart-quotes" => self.smart_quotes = value,
-                _ => {}
-            }
+            self.set_by_name(&key, value);
         }
     }
+}
+
+/// See [`known_extensions!`](panache_parser::Extensions) for the parser-side
+/// twin. The formatter extension surface is a small subset; the macro keeps
+/// the runtime setter, the public name list, and the JSON Schema generator in
+/// lockstep.
+macro_rules! known_formatter_extensions {
+    ( $( $kebab:literal => $field:ident ),* $(,)? ) => {
+        impl FormatterExtensions {
+            /// Canonical kebab-case names accepted in `[extensions]` that
+            /// affect formatter behavior (a subset of the parser names).
+            pub const KNOWN_NAMES: &'static [&'static str] = &[ $($kebab),* ];
+
+            /// True if `name` matches a known formatter extension.
+            pub fn is_known_name(name: &str) -> bool {
+                let normalized = name.replace('_', "-").to_ascii_lowercase();
+                Self::KNOWN_NAMES.iter().any(|k| *k == normalized)
+            }
+
+            fn set_by_name(&mut self, name: &str, value: bool) -> bool {
+                match name.replace('_', "-").to_ascii_lowercase().as_str() {
+                    $( $kebab => { self.$field = value; true } )*
+                    _ => false,
+                }
+            }
+        }
+    };
+}
+
+known_formatter_extensions! {
+    "blank-before-header" => blank_before_header,
+    "bookdown-references" => bookdown_references,
+    "east-asian-line-breaks" => east_asian_line_breaks,
+    "escaped-line-breaks" => escaped_line_breaks,
+    "gfm-auto-identifiers" => gfm_auto_identifiers,
+    "quarto-crossrefs" => quarto_crossrefs,
+    "smart" => smart,
+    "smart-quotes" => smart_quotes,
 }
 
 #[derive(Debug, Clone)]

@@ -249,6 +249,13 @@ fn parse_config_str(s: &str, path: &Path) -> io::Result<Config> {
     check_deprecated_code_block_style_options(s, path);
     check_deprecated_blank_lines(s, path);
 
+    if let Err(msg) = validate_extension_names(s) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("invalid config {}: {msg}", path.display()),
+        ));
+    }
+
     let config: Config = toml::from_str(s).map_err(|e| {
         io::Error::new(
             io::ErrorKind::InvalidData,
@@ -257,6 +264,133 @@ fn parse_config_str(s: &str, path: &Path) -> io::Result<Config> {
     })?;
 
     Ok(config)
+}
+
+/// True if `name` is a known extension at either the parser or formatter
+/// layer (since users write both under a single `[extensions]` table).
+fn is_known_extension_name(name: &str) -> bool {
+    Extensions::is_known_name(name) || FormatterExtensions::is_known_name(name)
+}
+
+/// All extension names users may legally write, sorted and de-duplicated.
+/// Cached as a `Vec` so callers can `binary_search` and so the JSON Schema
+/// generator can emit the list deterministically.
+fn all_known_extension_names() -> Vec<&'static str> {
+    let mut names: Vec<&'static str> = Extensions::KNOWN_NAMES
+        .iter()
+        .chain(FormatterExtensions::KNOWN_NAMES.iter())
+        .copied()
+        .collect();
+    names.sort_unstable();
+    names.dedup();
+    names
+}
+
+/// All flavor names users may use as `[extensions.<flavor>]` subtable keys.
+const KNOWN_FLAVOR_KEYS: &[&str] = &[
+    "pandoc",
+    "quarto",
+    "rmarkdown",
+    "r-markdown",
+    "gfm",
+    "commonmark",
+    "common-mark",
+    "multimarkdown",
+    "multi-markdown",
+];
+
+/// Suggest the closest valid name from `candidates` for an unknown `input`
+/// using a small edit-distance budget. Returns `None` when nothing close
+/// enough is found.
+fn closest_match<'a>(input: &str, candidates: &[&'a str]) -> Option<&'a str> {
+    fn edit_distance(a: &str, b: &str) -> usize {
+        let (a, b) = (a.as_bytes(), b.as_bytes());
+        let mut prev: Vec<usize> = (0..=b.len()).collect();
+        let mut curr = vec![0; b.len() + 1];
+        for (i, &ai) in a.iter().enumerate() {
+            curr[0] = i + 1;
+            for (j, &bj) in b.iter().enumerate() {
+                let cost = if ai == bj { 0 } else { 1 };
+                curr[j + 1] = (prev[j + 1] + 1).min(curr[j] + 1).min(prev[j] + cost);
+            }
+            std::mem::swap(&mut prev, &mut curr);
+        }
+        prev[b.len()]
+    }
+
+    let normalized = input.replace('_', "-");
+    let budget = 3.min(normalized.len() / 3 + 1);
+    candidates
+        .iter()
+        .map(|c| (*c, edit_distance(&normalized, c)))
+        .filter(|(_, d)| *d <= budget)
+        .min_by_key(|(_, d)| *d)
+        .map(|(c, _)| c)
+}
+
+/// Walk the raw TOML `[extensions]` table and reject unknown extension
+/// names (both at the top level and inside per-flavor subtables) and unknown
+/// per-flavor subtable keys. Returns the user-facing error text on failure.
+fn validate_extension_names(s: &str) -> Result<(), String> {
+    let Ok(value) = toml::from_str::<toml::Value>(s) else {
+        // Real TOML parse error — serde will surface it.
+        return Ok(());
+    };
+
+    let Some(ext_table) = value
+        .as_table()
+        .and_then(|t| t.get("extensions"))
+        .and_then(|v| v.as_table())
+    else {
+        return Ok(());
+    };
+
+    let known_exts = all_known_extension_names();
+
+    for (key, val) in ext_table {
+        match val {
+            toml::Value::Boolean(_) => {
+                if !is_known_extension_name(key) {
+                    return Err(unknown_extension_error(key, &known_exts, None));
+                }
+            }
+            toml::Value::Table(flavor_table) => {
+                if parse_flavor_key(key).is_none() {
+                    return Err(unknown_flavor_subtable_error(key));
+                }
+                for sub_key in flavor_table.keys() {
+                    if !is_known_extension_name(sub_key) {
+                        return Err(unknown_extension_error(sub_key, &known_exts, Some(key)));
+                    }
+                }
+            }
+            _ => {
+                // Wrong-shape entries are non-fatal: `resolve_extensions_for_flavor`
+                // still emits a warning and skips them, matching legacy behavior.
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn unknown_extension_error(name: &str, known: &[&str], in_flavor: Option<&str>) -> String {
+    let mut msg = match in_flavor {
+        Some(f) => format!("unknown extension `{name}` in [extensions.{f}]"),
+        None => format!("unknown extension `{name}` in [extensions]"),
+    };
+    if let Some(suggestion) = closest_match(name, known) {
+        msg.push_str(&format!("; did you mean `{suggestion}`?"));
+    }
+    msg
+}
+
+fn unknown_flavor_subtable_error(name: &str) -> String {
+    let mut msg = format!("unknown flavor subtable [extensions.{name}]");
+    if let Some(suggestion) = closest_match(name, KNOWN_FLAVOR_KEYS) {
+        msg.push_str(&format!("; did you mean `[extensions.{suggestion}]`?"));
+    }
+    msg
 }
 
 fn read_config(path: &Path) -> io::Result<Config> {
@@ -1064,6 +1198,70 @@ mod tests {
         let toml = "[format.code-blocks]\nattribute-style = \"explicit\"\n";
         parse_config_str(toml, Path::new("panache.toml"))
             .expect("deprecated [format.code-blocks] subtable must still parse");
+    }
+
+    #[test]
+    fn unknown_extension_name_is_rejected() {
+        let toml = "[extensions]\nquato-crossrefs = true\n";
+        let err = parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("typo'd extension must error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("quato-crossrefs"),
+            "error must name the typo: {msg}"
+        );
+        assert!(
+            msg.contains("quarto-crossrefs"),
+            "error must suggest the closest match: {msg}"
+        );
+    }
+
+    #[test]
+    fn unknown_extension_inside_flavor_subtable_is_rejected() {
+        let toml = "[extensions.pandoc]\nnot-a-real-flag = true\n";
+        let err = parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("typo inside [extensions.pandoc] must error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("not-a-real-flag") && msg.contains("[extensions.pandoc]"),
+            "error must surface the offending key and table: {msg}"
+        );
+    }
+
+    #[test]
+    fn unknown_flavor_subtable_is_rejected() {
+        let toml = "[extensions.qarto]\nfenced-divs = true\n";
+        let err = parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("typo'd flavor subtable must error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("qarto") && msg.contains("quarto"),
+            "error must name typo and suggest the closest flavor: {msg}"
+        );
+    }
+
+    #[test]
+    fn known_extension_under_flavor_subtable_still_parses() {
+        let toml = "[extensions.pandoc]\nfenced-divs = false\n";
+        parse_config_str(toml, Path::new("panache.toml"))
+            .expect("valid per-flavor extension override must parse");
+    }
+
+    #[test]
+    fn snake_case_extension_name_still_parses() {
+        // Existing back-compat: snake_case names normalize to kebab-case.
+        let toml = "[extensions]\nquarto_crossrefs = true\n";
+        parse_config_str(toml, Path::new("panache.toml"))
+            .expect("snake_case extension alias must still parse");
+    }
+
+    #[test]
+    fn formatter_only_extension_name_is_accepted() {
+        // `smart-quotes` lives only on `FormatterExtensions`, not `Extensions`.
+        // The union validator must accept it.
+        let toml = "[extensions]\nsmart-quotes = true\n";
+        parse_config_str(toml, Path::new("panache.toml"))
+            .expect("formatter-only extension must parse");
     }
 
     #[test]
