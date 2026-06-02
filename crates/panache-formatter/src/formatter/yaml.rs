@@ -305,6 +305,23 @@ mod tests {
     }
 
     #[test]
+    fn rule_6_wrap_round_trips_multiline_input() {
+        // Multi-line flow input (the parser now accepts the closing-`]`
+        // at parent indent that rule 6 emits) must round-trip through
+        // the formatter unchanged — items keep their canonical indent
+        // and the closing bracket stays at parent_content_col.
+        let opts = YamlFormatOptions::default();
+        let input = "k: [\n  itm00,\n  itm01,\n  itm02,\n  itm03,\n  itm04,\n  itm05,\n  itm06,\n  itm07,\n  itm08,\n  itm09,\n  itm10x,\n]\n";
+        let formatted = format_yaml(input, &opts);
+        assert_eq!(
+            formatted, input,
+            "multi-line flow input should be sticky\n got: {formatted:?}\nwant: {input:?}",
+        );
+        let pass2 = format_yaml(&formatted, &opts);
+        assert_eq!(pass2, formatted, "idempotency");
+    }
+
+    #[test]
     fn rule_6_wrap_preserves_nested_flow_canonical() {
         // When the outer wraps, inner flow items that fit stay in their
         // canonical single-line form (rule 5). pretty_yaml does the same.

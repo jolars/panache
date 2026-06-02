@@ -2047,6 +2047,15 @@ fn check_block_collection_after_value_scalar(tree: &SyntaxNode) -> Option<YamlDi
 /// inside the flow node's byte range starts at a column strictly
 /// greater than the column of the enclosing `YAML_BLOCK_MAP`.
 ///
+/// Carve-out: a line whose first non-whitespace byte is the flow's
+/// matching closing indicator (`]` for `YAML_FLOW_SEQUENCE`, `}` for
+/// `YAML_FLOW_MAP`) may sit at or below the threshold. pretty_yaml,
+/// libyaml, and pandoc all accept the closing bracket at the parent
+/// block-map's indent when a flow wraps across lines — see the
+/// `parser` rule on treating pandoc as the behavioral reference. The
+/// stricter spec wording would reject these but no mainstream parser
+/// does.
+///
 /// Top-level flow collections (no block-map ancestor) are exempt —
 /// v1 only sets `flow_requires_indent` when the flow opens inside a
 /// raw block-mapping value.
@@ -2064,6 +2073,11 @@ fn check_flow_continuation_indent(tree: &SyntaxNode, input: &str) -> Option<Yaml
         let threshold = column_of(input, block_map_start);
         let flow_start: usize = flow.text_range().start().into();
         let flow_end: usize = flow.text_range().end().into();
+        let closer = match flow.kind() {
+            SyntaxKind::YAML_FLOW_SEQUENCE => b']',
+            SyntaxKind::YAML_FLOW_MAP => b'}',
+            _ => unreachable!(),
+        };
         let bytes = input.as_bytes();
         let mut i = flow_start;
         while i < flow_end {
@@ -2083,6 +2097,11 @@ fn check_flow_continuation_indent(tree: &SyntaxNode, input: &str) -> Option<Yaml
             }
             // Blank-only continuation lines do not impose indent.
             if j >= flow_end || bytes[j] == b'\n' {
+                i = j;
+                continue;
+            }
+            // Closing-indicator line is exempt from the strict-indent rule.
+            if bytes[j] == closer {
                 i = j;
                 continue;
             }
@@ -3559,5 +3578,49 @@ mod tests {
         // resolution.
         let input = "--- !<tag:example.com,2025:foo> bar\n";
         assert!(run(input).is_none(), "got {:?}", run(input));
+    }
+
+    #[test]
+    fn flow_continuation_accepts_closing_bracket_at_parent_indent_depth0() {
+        // pretty_yaml, libyaml, and pandoc all accept the closing flow
+        // indicator on its own line at the parent block-map's indent
+        // column when wrapping a flow across lines. YAML 1.2 §7.1 is
+        // stricter, but matching real-world parsers is the behavioral
+        // bar (cf. `parser` rule on pandoc as reference).
+        let input = "a: [\n  1,\n  2,\n  3,\n]\n";
+        assert!(run(input).is_none(), "got {:?}", run(input));
+    }
+
+    #[test]
+    fn flow_continuation_accepts_closing_bracket_at_parent_indent_depth1() {
+        // Same shape, one nesting level deeper. Closing `]` sits at the
+        // inner block-map's indent (col 2), threshold = 2.
+        let input = "outer:\n  inner: [\n    a,\n    b,\n  ]\n";
+        assert!(run(input).is_none(), "got {:?}", run(input));
+    }
+
+    #[test]
+    fn flow_continuation_accepts_closing_brace_at_parent_indent() {
+        // Flow map equivalent of the depth-0 wrap shape.
+        let input = "a: {\n  k1: v1,\n  k2: v2,\n}\n";
+        assert!(run(input).is_none(), "got {:?}", run(input));
+    }
+
+    #[test]
+    fn flow_continuation_rejects_content_line_at_parent_indent_9c9n() {
+        // 9C9N: `flow: [a,\nb,\nc]` — content lines at col 0 still get
+        // rejected. Only the closing-indicator line is exempt.
+        let input = "---\nflow: [a,\nb,\nc]\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::LEX_WRONG_INDENTED_FLOW);
+    }
+
+    #[test]
+    fn flow_continuation_rejects_comment_line_at_parent_indent_cml9() {
+        // CML9: comment at col 0 inside a flow opened at deeper indent.
+        // Comments are not the closer ⇒ still rejected.
+        let input = "key: [ word1\n#  xxx\n  word2 ]\n";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(diag.code, diagnostic_codes::LEX_WRONG_INDENTED_FLOW);
     }
 }

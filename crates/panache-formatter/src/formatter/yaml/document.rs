@@ -6,7 +6,7 @@
 //! [`block_sequence`](super::block_sequence),
 //! [`flow`](super::flow), [`scalar`](super::scalar)).
 //!
-//! Phase 1.11 status: eight rules across the render pipeline. The CST
+//! Phase 1.14 status: eight rules across the render pipeline. The CST
 //! walk that builds `raw` is recursive (descends into nodes, emits
 //! tokens): it applies rule 8 (collapse whitespace before an inline
 //! `YAML_COMMENT` to one space — needs CST kind to distinguish `#` in
@@ -17,21 +17,23 @@
 //! emission for single-line, comment-free `YAML_FLOW_SEQUENCE` /
 //! `YAML_FLOW_MAP` subtrees, producing `[a, b, c]` and
 //! `{ k: v, ... }`). After that, rule 1 (canonical 2-space indent)
-//! runs against per-CST-line depths precomputed from `root.text()` so
-//! it stays robust to rule 8's byte shifts; then rule 6 (overflow
+//! runs against per-CST-line depths precomputed from `root.text()`,
+//! returning `None` for lines inside multi-line flow continuations so
+//! rule 6's wrap indent survives across passes; then rule 6 (overflow
 //! wrap: re-parse the post-indent buffer, walk top-level flow
 //! containers in reverse byte order, replace overflowing single-line
 //! forms with canonical multi-line — items at
 //! `parent_content_column + 2`, closing bracket at
 //! `parent_content_column`); then rule 10 (strip trailing whitespace
 //! per line), rule 7 (collapse blank-line runs), and rule 13 (exactly
-//! one `\n` at EOF) run as line-level post-passes. Flow containers
-//! whose CST text already contains `\n` (multi-line input the parser
-//! rejected today) never reach `render` — `format_yaml` falls back to
-//! verbatim passthrough on parse error. Flow containers with embedded
-//! comments stay verbatim; block-scalar (`|`/`>`) interior lines are
-//! preserved verbatim — rule 1 needs a real block-scalar renderer to
-//! canonicalize their indent.
+//! one `\n` at EOF) run as line-level post-passes. Multi-line flow
+//! input now round-trips (parser accepts the closing-`]`/`}` at the
+//! parent block-map's indent; rule 6 leaves already-wrapped containers
+//! in place when they fit, or rewraps via `replace_range` when the
+//! canonical single-line form would overflow). Flow containers with
+//! embedded comments stay verbatim; block-scalar (`|`/`>`) interior
+//! lines are preserved verbatim — rule 1 needs a real block-scalar
+//! renderer to canonicalize their indent.
 
 use panache_parser::SyntaxNode;
 use panache_parser::syntax::{SyntaxKind, SyntaxToken};
@@ -378,6 +380,30 @@ fn canonical_indent_depth(root: &SyntaxNode, offset: usize) -> Option<usize> {
         }
     }
 
+    // Multi-line flow continuation: rule 6 owns the indent for wrapped
+    // flow content. If `offset` lands on a continuation line of an
+    // enclosing `YAML_FLOW_SEQUENCE` / `YAML_FLOW_MAP` (its text spans
+    // a newline between the flow's start and this offset), preserve the
+    // existing indent — rule 1's block-context depth formula doesn't
+    // apply inside a wrapped flow.
+    let mut probe = token.parent();
+    while let Some(n) = probe {
+        if matches!(
+            n.kind(),
+            SyntaxKind::YAML_FLOW_SEQUENCE | SyntaxKind::YAML_FLOW_MAP
+        ) {
+            let flow_start = usize::from(n.text_range().start());
+            if flow_start < offset {
+                let span = n.text().to_string();
+                let before_offset_in_flow = &span[..offset - flow_start];
+                if before_offset_in_flow.contains('\n') {
+                    return None;
+                }
+            }
+        }
+        probe = n.parent();
+    }
+
     let mut entry_item_ancestors = 0usize;
     let mut node = token.parent();
     while let Some(n) = node {
@@ -460,14 +486,17 @@ fn normalize_trailing_newline(mut buf: String) -> String {
 /// (we follow pretty_yaml).
 ///
 /// Implementation: re-parse the post-indent buffer to find flow
-/// containers in their canonical-single-line form (rule 5 emitted them
-/// there), then walk top-level (no flow ancestor) containers in reverse
-/// byte order, rewriting overflowing ones in place. Multi-line input
-/// can't appear here today — the in-tree parser rejects multi-line flow
-/// containers, so `format_yaml` already passed the original input
-/// through verbatim before `render` ever ran. The "multi-line input is
-/// sticky" behavior pretty_yaml shows lands when the parser learns to
-/// accept those inputs.
+/// containers. Single-line containers reach here in their canonical
+/// rule-5 form; already-multi-line containers (either pass-2 input or
+/// pre-wrapped user input) have their wrap indent preserved by rule 1
+/// (`canonical_indent_depth` returns `None` inside multi-line flow).
+/// Walk top-level (no flow ancestor) containers in reverse byte order
+/// and `replace_range` overflowing ones with the canonical wrap shape.
+/// Already-wrapped containers whose canonical single-line form fits
+/// stay multi-line (matches pretty_yaml's "sticky multi-line" behavior);
+/// already-wrapped containers that still overflow are rewritten via
+/// `replace_range`, which canonicalizes any non-spec indent on the way
+/// through.
 fn apply_flow_wrap(buf: String, opts: &YamlFormatOptions) -> String {
     let Some(tree) = panache_parser::parser::yaml::parse_yaml_tree(&buf) else {
         return buf;

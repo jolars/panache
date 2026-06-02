@@ -22,20 +22,27 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
   (overflow wrap: re-parse the post-indent buffer, walk top-level flow
   containers in reverse byte order, replace overflowing single-line
   forms with canonical multi-line — items at parent_content_column + 2,
-  closing bracket at parent_content_column; multi-line input is parked
-  on the in-tree parser landing multi-line flow); 1.11 rule 3 (convert
-  single-quoted scalars to double-quoted when the de-escaped content
-  has none of `\`, `'`, `"`, or ASCII control chars; plain stays plain;
-  double stays double); 1.12 preserve-rule lockdown (rules 4 block-scalar
-  style, 9 comment positions, 11 empty scalars, 12 key order — no
-  formatter code, locked in by corpus + unit tests against pretty_yaml);
-  1.13 real-frontmatter harvest (six representative cases from
-  `tests/fixtures/cases/` + `docs/`) which surfaced a spec gap →
-  added rule 14 (collapse multi-space runs between block structural
-  indicators `:` / `-` and inline content to one space; trailing-only
-  runs deferred to rule 10). The spec is now 14 rules with corpus +
-  unit coverage. Phase 1 exit gated on the parser-side enablement of
-  multi-line flow input (parked here, on the parser side).
+  closing bracket at parent_content_column; multi-line input was
+  parked on the parser side, now unblocked by 1.14); 1.11 rule 3
+  (convert single-quoted scalars to double-quoted when the de-escaped
+  content has none of `\`, `'`, `"`, or ASCII control chars; plain
+  stays plain; double stays double); 1.12 preserve-rule lockdown
+  (rules 4 block-scalar style, 9 comment positions, 11 empty scalars,
+  12 key order — no formatter code, locked in by corpus + unit tests
+  against pretty_yaml); 1.13 real-frontmatter harvest (six
+  representative cases from `tests/fixtures/cases/` + `docs/`) which
+  surfaced a spec gap → added rule 14 (collapse multi-space runs
+  between block structural indicators `:` / `-` and inline content to
+  one space; trailing-only runs deferred to rule 10); 1.14 multi-line
+  flow round-trip (parser-side: relax
+  `check_flow_continuation_indent` to exempt the line whose first
+  non-WS byte is the flow's matching closing indicator — matches
+  libyaml/pandoc/yq; formatter-side:
+  `canonical_indent_depth` returns None on continuation lines of a
+  multi-line flow ancestor so rule 1 preserves rule 6's wrap
+  indentation across passes). The spec is now 14 rules with corpus +
+  unit coverage. Phase 1 ready for exit gate review (all corpus cases
+  parity-pass and round-trip).
 - **Phase 2 (joint cutover):** not started, blocked on Phase 1.
 - **Phase 3 (hashpipe extension):** not started, blocked on Phase 2.
 
@@ -43,6 +50,49 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
 
 _(Update as phases complete. Earliest entries on top.)_
 
+- **Phase 1.14 — multi-line flow round-trip (parser + formatter).**
+  Two coupled changes that unblock the "multi-line flow input is
+  sticky" behavior parked in Phase 1.10. Parser-side: relaxed
+  `check_flow_continuation_indent` in
+  `crates/panache-parser/src/parser/yaml/validator.rs` so that a
+  continuation line whose first non-whitespace byte is the flow's
+  matching closing indicator (`]` for `YAML_FLOW_SEQUENCE`, `}` for
+  `YAML_FLOW_MAP`) is exempt from the strict `col > threshold` rule.
+  YAML 1.2 §7.1 reads the spec stricter than mainstream parsers — but
+  pretty_yaml, libyaml (via pandoc), and yaml.v3 (via yq) all emit
+  and accept the closing bracket on its own line at the parent
+  block-map's indent column, and the `parser` rule names pandoc as
+  the behavioral reference. Verified via probes (pandoc `-t native`
+  + yq) on depth-0 closing-`]`, depth-0 closing-`}`, and depth-1
+  nested cases. Five new unit tests in
+  `parser/yaml/validator.rs::tests` cover accept (depth-0 seq /
+  depth-1 seq / depth-0 map) and reject (CML9 comment line at parent
+  indent, 9C9N content lines at parent indent) directions; the three
+  existing yaml-test-suite snapshots (CML9, 9C9N, VJP3/00) still
+  carry their `LEX_WRONG_INDENTED_FLOW` diagnostics because the
+  carve-out only spares the closing indicator, not content/comment
+  lines at the threshold. Triage regen produced no bucket changes
+  (308 passes_now / 94 error_contract_ok unchanged).
+
+  Formatter-side: rule 1's
+  `canonical_indent_depth` returns `None` when the offset lands on a
+  continuation line of an enclosing multi-line `YAML_FLOW_SEQUENCE` /
+  `YAML_FLOW_MAP` (the ancestor flow's text contains a `\n` between
+  its start and the offset). Without this carve-out, rule 1 would
+  re-indent multi-line flow content as if it were block-map keys at
+  depth 0 (column 0), destroying the wrap that rule 6 produced and
+  breaking idempotency on every `flow_wrap/*.yaml` corpus case once
+  the parser stopped rejecting their pass-1 outputs. Three new
+  corpus cases under
+  `tests/fixtures/yaml_corpus/flow_wrap/`
+  (`sticky_multiline_depth_0`, `sticky_multiline_depth_1`,
+  `sticky_multiline_map`) feed pre-wrapped pretty_yaml output back
+  through the harness — they must parity-match pretty_yaml and
+  round-trip unchanged. One new unit test in
+  `formatter/yaml.rs::tests::rule_6_wrap_round_trips_multiline_input`
+  pins the depth-0 seq case at the API level. STYLE.md unchanged
+  (the spec already documented rule 6's wrap shape; this fixes
+  implementation). No live-pipeline changes — still shadow.
 - **Phase 1.13 — real-frontmatter harvest + rule 14
   (block-structural spacing).** Pulled six representative frontmatter
   blocks into `tests/fixtures/yaml_corpus/real/`:
