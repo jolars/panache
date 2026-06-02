@@ -20,72 +20,72 @@ Benchmarks are run on real Quarto documents to measure realistic performance.
 Document: `small.qmd` (756 bytes, 48 lines)\
 Iterations: 1000
 
-  | Metric        | Avg time     |
-  | ------------- | -----------: |
-  | Full pipeline |      0.09 ms |
-  | Parse only    |      0.05 ms |
-  | Format only   |      0.04 ms |
-  | Throughput    | 7798.64 KB/s |
+| Metric        | Avg time     |
+| ------------- | -----------: |
+| Full pipeline |      0.09 ms |
+| Parse only    |      0.05 ms |
+| Format only   |      0.04 ms |
+| Throughput    | 7798.64 KB/s |
 
 ### Medium (Quarto tutorial)
 
 Document: `medium_quarto.qmd` (8893 bytes, 146 lines)\
 Iterations: 100
 
-  | Metric        | Avg time      |
-  | ------------- | ------------: |
-  | Full pipeline |       0.62 ms |
-  | Parse only    |       0.25 ms |
-  | Format only   |       0.29 ms |
-  | Throughput    | 13941.04 KB/s |
+| Metric        | Avg time      |
+| ------------- | ------------: |
+| Full pipeline |       0.62 ms |
+| Parse only    |       0.25 ms |
+| Format only   |       0.29 ms |
+| Throughput    | 13941.04 KB/s |
 
 ### Tables (table-heavy)
 
 Document: `tables.qmd` (18833 bytes, 636 lines)\
 Iterations: 50
 
-  | Metric        | Avg time      |
-  | ------------- | ------------: |
-  | Full pipeline |       1.43 ms |
-  | Parse only    |       0.70 ms |
-  | Format only   |       0.60 ms |
-  | Throughput    | 12893.36 KB/s |
+| Metric        | Avg time      |
+| ------------- | ------------: |
+| Full pipeline |       1.43 ms |
+| Parse only    |       0.70 ms |
+| Format only   |       0.60 ms |
+| Throughput    | 12893.36 KB/s |
 
 ### Math (computation-heavy)
 
 Document: `math.qmd` (28562 bytes, 664 lines)\
 Iterations: 50
 
-  | Metric        | Avg time      |
-  | ------------- | ------------: |
-  | Full pipeline |       1.46 ms |
-  | Parse only    |       0.60 ms |
-  | Format only   |       0.70 ms |
-  | Throughput    | 19156.73 KB/s |
+| Metric        | Avg time      |
+| ------------- | ------------: |
+| Full pipeline |       1.46 ms |
+| Parse only    |       0.60 ms |
+| Format only   |       0.70 ms |
+| Throughput    | 19156.73 KB/s |
 
 ### Large (comprehensive)
 
 Document: `large_authoring.qmd` (29858 bytes, 592 lines)\
 Iterations: 20
 
-  | Metric        | Avg time      |
-  | ------------- | ------------: |
-  | Full pipeline |       1.30 ms |
-  | Parse only    |       0.65 ms |
-  | Format only   |       0.56 ms |
-  | Throughput    | 22405.26 KB/s |
+| Metric        | Avg time      |
+| ------------- | ------------: |
+| Full pipeline |       1.30 ms |
+| Parse only    |       0.65 ms |
+| Format only   |       0.56 ms |
+| Throughput    | 22405.26 KB/s |
 
 ### Pandoc MANUAL (stress)
 
 Document: `pandoc_manual.md` (299536 bytes, 8036 lines)\
 Iterations: 3
 
-  | Metric        | Avg time      |
-  | ------------- | ------------: |
-  | Full pipeline |      20.05 ms |
-  | Parse only    |       9.99 ms |
-  | Format only   |      10.23 ms |
-  | Throughput    | 14589.79 KB/s |
+| Metric        | Avg time      |
+| ------------- | ------------: |
+| Full pipeline |      20.05 ms |
+| Parse only    |       9.99 ms |
+| Format only   |      10.23 ms |
+| Throughput    | 14589.79 KB/s |
 
 ## Reproducing
 

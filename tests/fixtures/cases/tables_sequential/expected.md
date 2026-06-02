@@ -1,13 +1,13 @@
-  |      | Developer | User        |
-  | ---- | --------- | ----------- |
-  | One  | `expr()`  | `enexpr()`  |
-  | Many | `exprs()` | `enexprs()` |
+|      | Developer | User        |
+| ---- | --------- | ----------- |
+| One  | `expr()`  | `enexpr()`  |
+| Many | `exprs()` | `enexprs()` |
 
-  : (\#tab:quoting-rlang) rlang quasiquoting functions
+: (\#tab:quoting-rlang) rlang quasiquoting functions
 
-  |      | Developer | User                         |
-  | ---- | --------- | ---------------------------- |
-  | One  | `quote()` | `substitute()`               |
-  | Many | `alist()` | `as.list(substitute(...()))` |
+|      | Developer | User                         |
+| ---- | --------- | ---------------------------- |
+| One  | `quote()` | `substitute()`               |
+| Many | `alist()` | `as.list(substitute(...()))` |
 
-  : (\#tab:quoting-base) base R quoting functions
+: (\#tab:quoting-base) base R quoting functions

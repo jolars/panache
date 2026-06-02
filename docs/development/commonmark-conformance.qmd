@@ -21,14 +21,14 @@ from the spec.
 
 ## Harness layout
 
-  | Path                                                            | Purpose                                                         |
-  | --------------------------------------------------------------- | --------------------------------------------------------------- |
-  | `crates/panache-parser/tests/fixtures/commonmark-spec/spec.txt` | Vendored CommonMark spec.                                       |
-  | `crates/panache-parser/tests/commonmark.rs`                     | Test runner (`commonmark_allowlist`, `commonmark_full_report`). |
-  | `crates/panache-parser/tests/commonmark/spec_parser.rs`         | Parses spec.txt into example records.                           |
-  | `crates/panache-parser/tests/commonmark/html_renderer.rs`       | Test-only CST → HTML renderer (not a public API).               |
-  | `crates/panache-parser/tests/commonmark/allowlist.txt`          | Example numbers currently passing. CI fails on regression.      |
-  | `crates/panache-parser/tests/commonmark/blocked.txt`            | Examples we deliberately do not target yet, with reasons.       |
+| Path                                                            | Purpose                                                         |
+| --------------------------------------------------------------- | --------------------------------------------------------------- |
+| `crates/panache-parser/tests/fixtures/commonmark-spec/spec.txt` | Vendored CommonMark spec.                                       |
+| `crates/panache-parser/tests/commonmark.rs`                     | Test runner (`commonmark_allowlist`, `commonmark_full_report`). |
+| `crates/panache-parser/tests/commonmark/spec_parser.rs`         | Parses spec.txt into example records.                           |
+| `crates/panache-parser/tests/commonmark/html_renderer.rs`       | Test-only CST → HTML renderer (not a public API).               |
+| `crates/panache-parser/tests/commonmark/allowlist.txt`          | Example numbers currently passing. CI fails on regression.      |
+| `crates/panache-parser/tests/commonmark/blocked.txt`            | Examples we deliberately do not target yet, with reasons.       |
 
 The renderer mirrors the byte-equality comparison commonmark-hs uses: the output
 is normalized via `<li>\n` → `<li>` and `\n</li>` → `</li>` before comparison.

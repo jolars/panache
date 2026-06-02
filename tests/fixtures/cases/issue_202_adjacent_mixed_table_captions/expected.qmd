@@ -19,13 +19,13 @@ hyperparameters to tune.
   resources, $r_{i}$, for each bracket, $s$, and stage, $i$, when $\eta = 2$,
   $r{_{min}} = 1$ and $r{_{max}} = 8$. {#tbl-hyperband}
 
-  |         | $s = 3$          | $s = 2$             |
-  | ------- | ---------------- | ------------------- |
-  | $i = 0$ | $\{1, 2, 3, 4\}$ | $\{9, 10, 11, 12\}$ |
-  | $i = 1$ | $\{1, 2\}$       | $\{9, 14\}$         |
+|         | $s = 3$          | $s = 2$             |
+| ------- | ---------------- | ------------------- |
+| $i = 0$ | $\{1, 2, 3, 4\}$ | $\{9, 10, 11, 12\}$ |
+| $i = 1$ | $\{1, 2\}$       | $\{9, 14\}$         |
 
-  : Hyperparameter configurations in each stage and bracket from the schedule in
-    @tbl-hyperband. Entries are unique identifiers for tested hyperparameter
-    configurations (HPCs). $HPC^*_s$ is the optimal hyperparameter configuration
-    in bracket $s$ and $HPC^*$ is the optimal hyperparameter configuration
-    across all brackets. {#tbl-hyperband-eg}
+: Hyperparameter configurations in each stage and bracket from the schedule in
+  @tbl-hyperband. Entries are unique identifiers for tested hyperparameter
+  configurations (HPCs). $HPC^*_s$ is the optimal hyperparameter configuration
+  in bracket $s$ and $HPC^*$ is the optimal hyperparameter configuration
+  across all brackets. {#tbl-hyperband-eg}
