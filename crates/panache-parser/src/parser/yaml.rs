@@ -31,8 +31,8 @@ pub use model::{
     YamlParseReport, diagnostic_codes,
 };
 pub use parser::{
-    ShadowParserReport, parse_shadow, parse_stream, parse_yaml_report, parse_yaml_tree,
-    shadow_parser_check,
+    ShadowParserReport, parse_shadow, parse_stream, parse_stream_with_prefix, parse_yaml_report,
+    parse_yaml_tree, shadow_parser_check, validate_yaml_with_prefix,
 };
 pub(crate) use scanner::ScalarStyle;
 pub use scanner::{ShadowScannerReport, shadow_scanner_check};

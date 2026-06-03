@@ -37,7 +37,8 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
 use super::model::{
-    ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlInputKind, YamlParseReport,
+    ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
+    YamlParseReport,
 };
 use super::scanner::{Scanner, TokenKind, TriviaKind};
 
@@ -99,6 +100,34 @@ fn strip_hashpipe_prefix(line: &str) -> &str {
     line
 }
 
+/// Strip a per-line `prefix` (marker plus at most one following space)
+/// from every line, joining with `\n`. The stripped baseline a
+/// prefix-aware parse is validated against (see
+/// [`validate_yaml_with_prefix`]).
+fn strip_line_prefix(input: &str, prefix: &str) -> String {
+    input
+        .lines()
+        .map(|line| match line.strip_prefix(prefix) {
+            Some(rest) => rest.strip_prefix(' ').unwrap_or(rest),
+            None => line,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Structural validation for embedded (prefixed) YAML. Strips the
+/// per-line `prefix` to the plain-YAML baseline and runs the standard
+/// [`super::validator::validate_yaml`] pass. The verdict matches the
+/// stripped baseline; diagnostic offsets refer to the stripped text
+/// (host-offset remapping is a later concern). An empty `prefix` is
+/// plain validation.
+pub fn validate_yaml_with_prefix(input: &str, prefix: &str) -> Option<YamlDiagnostic> {
+    if prefix.is_empty() {
+        return super::validator::validate_yaml(input);
+    }
+    super::validator::validate_yaml(&strip_line_prefix(input, prefix))
+}
+
 /// Parse prototype YAML tree structure from input
 pub fn parse_yaml_tree(input: &str) -> Option<SyntaxNode> {
     parse_yaml_report(input).tree
@@ -133,9 +162,26 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
 /// `SyntaxNode` — the scanner is permissive and the builder preserves
 /// bytes regardless of well-formedness.
 pub fn parse_stream(input: &str) -> SyntaxNode {
+    parse_stream_inner(input, None)
+}
+
+/// Like [`parse_stream`], but treats `prefix` (e.g. hashpipe `"#|"`) as
+/// an embedded-YAML per-line marker: the scanner excludes it from
+/// column/indent accounting and the builder peels it into
+/// `YAML_LINE_PREFIX` leaves, so the resulting CST's token ranges are
+/// host ranges directly (prefix bytes included as trivia, no offset
+/// remapping). An empty `prefix` behaves like [`parse_stream`].
+pub fn parse_stream_with_prefix(input: &str, prefix: &str) -> SyntaxNode {
+    parse_stream_inner(input, (!prefix.is_empty()).then_some(prefix))
+}
+
+fn parse_stream_inner(input: &str, line_prefix: Option<&str>) -> SyntaxNode {
     let mut builder = GreenNodeBuilder::new();
     builder.start_node(SyntaxKind::YAML_STREAM.into());
-    let mut scanner = Scanner::new(input);
+    let mut scanner = match line_prefix {
+        Some(prefix) => Scanner::with_prefix(input, prefix),
+        None => Scanner::new(input),
+    };
     let mut doc_open = false;
     // True when the open YAML_DOCUMENT has only seen directives + trivia
     // (no body content yet, no `---`). YAML 1.2 says directives belong to
@@ -521,7 +567,7 @@ pub fn parse_stream(input: &str) -> SyntaxNode {
                 // (and, later, hashpipe line prefixes) as real structure.
                 ensure_doc_open(&mut builder, &mut doc_open);
                 doc_only_has_directives = false;
-                emit_scalar_node(&mut builder, text);
+                emit_scalar_node(&mut builder, text, line_prefix);
             }
             _ => {
                 // Any other non-trivia content (Anchor, Tag, Alias, ...)
@@ -770,41 +816,72 @@ fn close_block_containers(builder: &mut GreenNodeBuilder<'_>, stack: &mut Vec<Bl
 /// fragmentation is what lets the formatter/LSP treat a scalar as real
 /// structure and is the seam a later step uses to interleave hashpipe
 /// line-prefix leaves (see the yaml-formatter cutover plan, step 2).
-fn emit_scalar_node(builder: &mut GreenNodeBuilder<'static>, text: &str) {
+fn emit_scalar_node(
+    builder: &mut GreenNodeBuilder<'static>,
+    text: &str,
+    line_prefix: Option<&str>,
+) {
     builder.start_node(SyntaxKind::YAML_SCALAR.into());
-    emit_scalar_fragments(builder, text);
+    emit_scalar_fragments(builder, text, line_prefix);
     builder.finish_node();
 }
 
-/// Split a scalar's source `text` into alternating `YAML_SCALAR_TEXT`
-/// content leaves and `NEWLINE` line-break leaves. Empty content runs are
-/// skipped (rowan rejects zero-width tokens), so a leading, trailing, or
-/// consecutive line break emits only the `NEWLINE` leaf. `\n`, `\r\n`,
-/// and lone `\r` are each emitted as a single `NEWLINE` leaf.
-fn emit_scalar_fragments(builder: &mut GreenNodeBuilder<'static>, text: &str) {
+/// Split a scalar's source `text` into per-physical-line leaves:
+/// `YAML_SCALAR_TEXT` content interleaved with `NEWLINE` line breaks
+/// (`\n`, `\r\n`, and lone `\r` each one `NEWLINE` leaf). When
+/// `line_prefix` is set, an embedded prefix at the start of each
+/// *continuation* line (the marker plus at most one trailing space,
+/// mirroring the scanner) is peeled into a leading `YAML_LINE_PREFIX`
+/// leaf. The first line never carries an embedded prefix — its line-start
+/// prefix was emitted as a separate `Trivia(LinePrefix)` token by the
+/// scanner before the scalar began. Empty content runs are skipped
+/// (rowan rejects zero-width tokens). The concatenation of all leaves
+/// equals `text` exactly, so the node stays byte-lossless.
+fn emit_scalar_fragments(
+    builder: &mut GreenNodeBuilder<'static>,
+    text: &str,
+    line_prefix: Option<&str>,
+) {
     let bytes = text.as_bytes();
     let mut i = 0;
-    let mut content_start = 0;
+    let mut line_index = 0usize;
     while i < bytes.len() {
-        let nl_len = match bytes[i] {
-            b'\n' => 1,
-            b'\r' if bytes.get(i + 1) == Some(&b'\n') => 2,
-            b'\r' => 1,
-            _ => {
-                i += 1;
-                continue;
-            }
-        };
+        // Peel an embedded line prefix on continuation lines only.
+        if line_index > 0
+            && let Some(prefix) = line_prefix
+            && let Some(len) = prefix_match_len(&text[i..], prefix)
+        {
+            builder.token(SyntaxKind::YAML_LINE_PREFIX.into(), &text[i..i + len]);
+            i += len;
+        }
+        // Content up to the next line break.
+        let content_start = i;
+        while i < bytes.len() && !matches!(bytes[i], b'\n' | b'\r') {
+            i += 1;
+        }
         if content_start < i {
             builder.token(SyntaxKind::YAML_SCALAR_TEXT.into(), &text[content_start..i]);
         }
-        builder.token(SyntaxKind::NEWLINE.into(), &text[i..i + nl_len]);
-        i += nl_len;
-        content_start = i;
+        // Line break (if any).
+        if i < bytes.len() {
+            let nl_len = if bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n') {
+                2
+            } else {
+                1
+            };
+            builder.token(SyntaxKind::NEWLINE.into(), &text[i..i + nl_len]);
+            i += nl_len;
+            line_index += 1;
+        }
     }
-    if content_start < bytes.len() {
-        builder.token(SyntaxKind::YAML_SCALAR_TEXT.into(), &text[content_start..]);
-    }
+}
+
+/// Match an embedded line prefix at the start of `s`: the `marker` plus
+/// at most one following space (mirroring `strip_hashpipe_prefix` and the
+/// scanner's `prefix_byte_len_at`). Returns the matched byte length.
+fn prefix_match_len(s: &str, marker: &str) -> Option<usize> {
+    let after = s.strip_prefix(marker)?;
+    Some(marker.len() + usize::from(after.starts_with(' ')))
 }
 
 fn map_token_to_syntax_kind(kind: TokenKind) -> SyntaxKind {
@@ -812,6 +889,7 @@ fn map_token_to_syntax_kind(kind: TokenKind) -> SyntaxKind {
         TokenKind::Trivia(TriviaKind::Whitespace) => SyntaxKind::WHITESPACE,
         TokenKind::Trivia(TriviaKind::Newline) => SyntaxKind::NEWLINE,
         TokenKind::Trivia(TriviaKind::Comment) => SyntaxKind::YAML_COMMENT,
+        TokenKind::Trivia(TriviaKind::LinePrefix) => SyntaxKind::YAML_LINE_PREFIX,
         TokenKind::DocumentStart => SyntaxKind::YAML_DOCUMENT_START,
         TokenKind::DocumentEnd => SyntaxKind::YAML_DOCUMENT_END,
         TokenKind::Directive => SyntaxKind::YAML_DIRECTIVE,

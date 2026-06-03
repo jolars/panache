@@ -27,6 +27,7 @@ pub enum SyntaxKind {
     YAML_FLOW_INDICATOR, // YAML flow structural punctuation ([ ] { } ,)
     YAML_DIRECTIVE,      // YAML directive line (%YAML, %TAG)
     YAML_COMMENT,        // YAML inline comment token
+    YAML_LINE_PREFIX,    // Embedded-YAML per-line prefix trivia (hashpipe `#|`)
     YAML_DOCUMENT_START, // YAML document start marker (---) in shadow parser
     YAML_DOCUMENT_END,   // YAML document end marker (...) in shadow parser
 

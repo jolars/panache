@@ -59,6 +59,10 @@ pub(crate) enum TriviaKind {
     Whitespace,
     Newline,
     Comment,
+    /// Embedded-YAML per-line prefix (e.g. hashpipe `#|`). Carried as
+    /// trivia so the host bytes stay in the tree (`YAML_LINE_PREFIX`)
+    /// while being excluded from column/indent accounting.
+    LinePrefix,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -121,6 +125,14 @@ pub(crate) struct Scanner<'a> {
     allow_simple_key: bool,
     diagnostics: Vec<YamlDiagnostic>,
     stream_end_emitted: bool,
+    /// Optional embedded-YAML line prefix (e.g. hashpipe `#|`). When set,
+    /// the scanner recognizes the marker (plus at most one trailing
+    /// space, mirroring `strip_hashpipe_prefix`) at each physical line
+    /// start, consumes it as `Trivia(LinePrefix)` (or leaves it embedded
+    /// inside a multi-line scalar span for the builder to peel), and
+    /// resets the column so the prefix is excluded from indent/column
+    /// accounting. `None` for plain (frontmatter) YAML.
+    line_prefix: Option<Box<str>>,
 }
 
 impl<'a> Scanner<'a> {
@@ -139,6 +151,7 @@ impl<'a> Scanner<'a> {
             allow_simple_key: true,
             diagnostics: Vec::new(),
             stream_end_emitted: false,
+            line_prefix: None,
         };
         let mark = scanner.cursor;
         scanner.tokens.push_back(Token {
@@ -147,6 +160,70 @@ impl<'a> Scanner<'a> {
             end: mark,
         });
         scanner
+    }
+
+    /// Construct a prefix-aware scanner. `prefix` is the embedded-YAML
+    /// per-line marker (e.g. `"#|"`); an empty marker behaves like
+    /// [`Self::new`]. See [`Self::line_prefix`].
+    pub(crate) fn with_prefix(input: &'a str, prefix: &str) -> Self {
+        let mut scanner = Self::new(input);
+        if !prefix.is_empty() {
+            scanner.line_prefix = Some(Box::from(prefix));
+        }
+        scanner
+    }
+
+    /// Match the configured line prefix at byte `offset` (a physical line
+    /// start). Returns the matched length in bytes — the marker plus at
+    /// most one following space, mirroring `strip_hashpipe_prefix` — or
+    /// `None` when no prefix is configured or the bytes don't match.
+    fn prefix_byte_len_at(&self, offset: usize) -> Option<usize> {
+        let marker = self.line_prefix.as_deref()?;
+        let after = self.input.get(offset..)?.strip_prefix(marker)?;
+        let mut len = marker.len();
+        if after.starts_with(' ') {
+            len += 1;
+        }
+        Some(len)
+    }
+
+    /// At a physical line start, consume the configured line prefix (if
+    /// it matches) as a `Trivia(LinePrefix)` token and reset the column
+    /// so the prefix is excluded from indent/column accounting. Returns
+    /// `true` if a prefix was consumed. No-op (returns `false`) when no
+    /// prefix is configured.
+    fn consume_line_prefix_token(&mut self) -> bool {
+        let Some(len) = self.prefix_byte_len_at(self.cursor.index) else {
+            return false;
+        };
+        let start = self.cursor;
+        let target = self.cursor.index + len;
+        while self.cursor.index < target {
+            self.advance();
+        }
+        self.cursor.column = 0;
+        let end = self.cursor;
+        self.tokens.push_back(Token {
+            kind: TokenKind::Trivia(TriviaKind::LinePrefix),
+            start,
+            end,
+        });
+        true
+    }
+
+    /// Within a multi-line scalar, skip the configured line prefix at the
+    /// current line start without emitting a token: the prefix bytes stay
+    /// inside the scalar's span (the builder peels them into
+    /// `YAML_LINE_PREFIX` leaves) while the column is reset so they don't
+    /// count as scalar indentation.
+    fn skip_embedded_line_prefix(&mut self) {
+        if let Some(len) = self.prefix_byte_len_at(self.cursor.index) {
+            let target = self.cursor.index + len;
+            while self.cursor.index < target {
+                self.advance();
+            }
+            self.cursor.column = 0;
+        }
     }
 
     pub(crate) fn next_token(&mut self) -> Option<Token> {
@@ -559,6 +636,10 @@ impl<'a> Scanner<'a> {
     fn try_consume_plain_line_break(&mut self, min_indent: i32, placeholder: bool) -> bool {
         let saved = self.cursor;
         self.consume_one_line_break();
+        // Skip this continuation line's embedded prefix so the column
+        // check below measures post-prefix indentation and the `#` of a
+        // `#|` prefix isn't mistaken for a comment that ends the scalar.
+        self.skip_embedded_line_prefix();
         loop {
             while matches!(self.peek_char(), Some(' ' | '\t')) {
                 self.advance();
@@ -570,6 +651,7 @@ impl<'a> Scanner<'a> {
                 }
                 Some('\n' | '\r') => {
                     self.consume_one_line_break();
+                    self.skip_embedded_line_prefix();
                     continue;
                 }
                 Some('#') => {
@@ -669,6 +751,19 @@ impl<'a> Scanner<'a> {
                 && (self.check_document_indicator(b"---") || self.check_document_indicator(b"..."))
             {
                 break;
+            }
+            // A line break inside the scalar: consume it, then skip the
+            // continuation line's embedded prefix so its bytes stay in
+            // the scalar span (peeled by the builder) while the column-0
+            // document-marker check above lands on the post-prefix
+            // content.
+            if matches!(c, '\n' | '\r') {
+                self.advance();
+                if c == '\r' && self.peek_char() == Some('\n') {
+                    self.advance();
+                }
+                self.skip_embedded_line_prefix();
+                continue;
             }
             self.advance();
         }
@@ -891,11 +986,16 @@ impl<'a> Scanner<'a> {
         loop {
             let line_start = self.cursor.index;
             let bytes = self.input.as_bytes();
-            let mut probe = line_start;
+            // Skip an embedded line prefix (e.g. hashpipe `#|`) before
+            // measuring indentation: the prefix bytes stay part of the
+            // scalar content (consumed below, peeled by the builder) but
+            // must not count toward the block-scalar indent.
+            let content_start = line_start + self.prefix_byte_len_at(line_start).unwrap_or(0);
+            let mut probe = content_start;
             while bytes.get(probe) == Some(&b' ') {
                 probe += 1;
             }
-            let leading_spaces = probe - line_start;
+            let leading_spaces = probe - content_start;
             match bytes.get(probe) {
                 None => break,
                 Some(b'\n' | b'\r') => {
@@ -948,7 +1048,12 @@ impl<'a> Scanner<'a> {
         let bytes = self.input.as_bytes();
         let mut i = self.cursor.index;
         while i < bytes.len() {
-            let line_start = i;
+            // Skip an embedded line prefix (e.g. hashpipe `#|`) so the
+            // detected indent is measured from the post-prefix content
+            // column, matching the prefix-excluded accounting the rest of
+            // the scanner uses.
+            let line_start = i + self.prefix_byte_len_at(i).unwrap_or(0);
+            i = line_start;
             while bytes.get(i) == Some(&b' ') {
                 i += 1;
             }
@@ -1298,6 +1403,12 @@ impl<'a> Scanner<'a> {
     /// one `Trivia` token per run. Stops at the first meaningful char
     /// or EOF.
     fn scan_trivia(&mut self) {
+        // First-line bootstrap: the very first line has no preceding
+        // newline, so consume its embedded prefix here. Subsequent lines
+        // are handled by `scan_newline`.
+        if self.cursor.index == 0 {
+            self.consume_line_prefix_token();
+        }
         while !self.at_eof() {
             match self.peek_char() {
                 Some(' ' | '\t') => self.scan_whitespace_run(),
@@ -1348,6 +1459,11 @@ impl<'a> Scanner<'a> {
             start,
             end,
         });
+        // Consume this new line's embedded prefix (if any) as a
+        // `LinePrefix` trivia token before the trivia loop sees the `#`
+        // and mistakes it for a comment. Resets the column so the
+        // prefix is excluded from indent accounting.
+        self.consume_line_prefix_token();
     }
 
     fn scan_comment(&mut self) {

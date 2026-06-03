@@ -91,6 +91,52 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
 
 _(Update as phases complete. Earliest entries on top.)_
 
+- **Phase 2c step 2 — prefix-aware scanner + builder.** Landed as two
+  parser-crate commits. (1) `refactor(parser): fragment multi-line YAML
+  scalars at line breaks` — `emit_scalar_node` now splits a multi-line
+  scalar into per-line `YAML_SCALAR_TEXT` leaves interleaved with
+  `NEWLINE` (the seam the `#|` prefix interleaves into); node text range
+  unchanged so the parse stays byte-lossless and yaml-test-suite event
+  parity holds. Surfaced three event-projection consumers that had
+  assumed the single-embedded-newline leaf: the block-map-value and
+  block-sequence-item `value_text` assemblies dropped `NEWLINE` (folding
+  `e\n  f` → `e  f` instead of `e f`, A984/UV7Q — fixed by keeping
+  `NEWLINE`), and `collect_scalar_source`/`fold_plain_document_lines`
+  carried a now-stale `%`-line filter that dropped a `%YAML 1.2`
+  plain-scalar continuation (XLQ9 — removed; real directives are
+  `YAML_DIRECTIVE`, already excluded by kind). The formatter's
+  `canonical_indent_depth` (`formatter/yaml/document.rs`) was repointed to
+  read the parent `YAML_SCALAR` node (multi-line check, start offset,
+  `|`/`>` probe) instead of a single leaf — fixed 4 host hashpipe goldens
+  (issue_172/201, nested-list-indent, code_blocks_executable). 297
+  yaml-test-suite CST snapshots re-blessed (pure scalar-leaf splitting).
+  (2) `feat(parser): prefix-aware YAML scanner and builder` — new
+  `parse_stream_with_prefix` / `validate_yaml_with_prefix`. The scanner
+  carries a `line_prefix` (`Box<str>`) and recognizes the marker (+ ≤1
+  trailing space, mirroring `strip_hashpipe_prefix`) at each physical line
+  start: in the main fetch loop it is consumed as a `Trivia(LinePrefix)`
+  token (`YAML_LINE_PREFIX`) inside `scan_newline` (+ a first-line
+  bootstrap in `scan_trivia`) **before** the `#` reaches `scan_comment`,
+  resetting `cursor.column` so all ~15 column sites are prefix-excluded
+  for free. The raw-byte forward scanners
+  (`auto_detect_block_scalar_indent`, the block-scalar content loop) skip
+  the marker via `prefix_byte_len_at`; the plain
+  (`try_consume_plain_line_break`) and quoted (`fetch_flow_scalar`)
+  multi-line continuation paths call `skip_embedded_line_prefix` (advance
+  past the marker, reset column, leave bytes embedded). `emit_scalar_node`
+  peels the embedded continuation marker into a `YAML_LINE_PREFIX` leaf.
+  Result is the directive's "no offsets" shape: the YAML CST token ranges
+  are host ranges directly (verified on a block scalar — `YAML_SCALAR@12..62`
+  over raw `#|`-prefixed bytes, blank `#|` line peeled as a 2-byte
+  `YAML_LINE_PREFIX`). New `yaml_prefix_parity.rs` harness asserts
+  losslessness, structural parity vs. the prefix-stripped baseline
+  (projected events; the projector already skips `YAML_LINE_PREFIX`), and
+  validator agreement across block scalars, quoted/plain multi-line
+  continuation, flow, blank `#|`, dotted keys, and tags; the empty-prefix
+  path is pinned identical to the plain parse (frontmatter callers
+  unaffected). Full workspace `cargo test`, clippy `-D warnings`, fmt
+  clean. Remaining 2c: steps 3 (cook over prefixed scalars), 4 (host
+  embedding), 5 (consumer rewire + drop offset layer).
 - **Phase 2c step 1 — `YAML_SCALAR` promoted from token to node.** The
   enabling CST reshape for hashpipe embedding (and the long-term shape the
   formatter/LSP want). A scalar value is now a `YAML_SCALAR` **node**
@@ -862,13 +908,16 @@ Staged (each landable independently; the offset layer dies last):
   flow punctuation/directives got `YAML_FLOW_INDICATOR`/`YAML_DIRECTIVE`.
   This is the wrapper that lets `#|` prefixes (and per-line content) live
   as clean child tokens. Single-leaf for now (no fragmentation).
-- **Step 2 — prefix-aware scanner + builder.** Add `line_prefix` to the
-  scanner for prefix-excluded column/indent accounting (the riskiest spot
-  is `auto_detect_block_scalar_indent`); add
-  `parse_stream_with_prefix` / `validate_yaml_with_prefix`; teach
-  `emit_scalar_node` to fragment multi-line scalars at line breaks and
-  peel a `YAML_LINE_PREFIX` leaf off each continuation line. Land
-  parser-crate-first, parity-tested against the current normalizer.
+- **Step 2 — prefix-aware scanner + builder — DONE** (see "what landed").
+  Added `line_prefix` to the scanner for prefix-excluded column/indent
+  accounting (`auto_detect_block_scalar_indent` + the block-scalar content
+  loop skip the marker via `prefix_byte_len_at`; the plain/quoted
+  continuation paths use `skip_embedded_line_prefix`); added
+  `parse_stream_with_prefix` / `validate_yaml_with_prefix`; `emit_scalar_node`
+  fragments multi-line scalars at line breaks (landed as its own commit
+  first) and peels a `YAML_LINE_PREFIX` leaf off each continuation line.
+  Parity-tested against the `normalize_hashpipe_input` baseline in
+  `yaml_prefix_parity.rs`.
 - **Step 3 — cook/value over prefixed scalars.** `.value()` walks the
   `YAML_SCALAR_TEXT` leaves, skipping prefix/newline leaves (cheap, since
   they're discrete tokens now — no string-stripping).
