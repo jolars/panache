@@ -466,8 +466,22 @@ impl YamlScalar {
     /// scalars folded per YAML 1.2. Block scalars (`|`/`>`) are returned raw
     /// (their cooking needs parent indent context).
     pub fn value(&self) -> String {
-        let raw = self.raw();
-        cook(detect_style(&raw).to_cook_style(), &raw)
+        let source = self.prefix_stripped_source();
+        cook(detect_style(&source).to_cook_style(), &source)
+    }
+
+    /// The scalar's content leaves concatenated, dropping any embedded
+    /// per-line prefix trivia (`YAML_LINE_PREFIX`, e.g. hashpipe `#|`). This
+    /// is the cooking input: prefixes are host framing, not scalar content,
+    /// so they must not fold into the value. For plain (frontmatter) scalars,
+    /// which carry no prefix leaves, this equals [`raw`](Self::raw).
+    fn prefix_stripped_source(&self) -> String {
+        self.0
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|t| t.kind() != SyntaxKind::YAML_LINE_PREFIX)
+            .map(|t| t.text().to_string())
+            .collect()
     }
 
     pub fn text_range(&self) -> TextRange {
@@ -520,6 +534,30 @@ mod tests {
             .unwrap();
         assert_eq!(scalar.raw(), "'it''s'");
         assert_eq!(scalar.style(), YamlScalarStyle::SingleQuoted);
+    }
+
+    #[test]
+    fn value_skips_embedded_line_prefix() {
+        use crate::parser::yaml::parse_stream_with_prefix;
+
+        // Double-quoted multi-line scalar inside hashpipe-prefixed YAML: the
+        // `#|` continuation prefix is carried as a `YAML_LINE_PREFIX` leaf for
+        // losslessness, but it must not bleed into the cooked value.
+        let tree = parse_stream_with_prefix("#| key: \"foo\n#|   bar\"\n", "#|");
+        let scalar = first_document(&tree)
+            .and_then(|d| d.block_map())
+            .and_then(|m| m.value_of("key"))
+            .and_then(|v| v.as_scalar())
+            .expect("scalar value");
+        let value = scalar.value();
+        assert!(!value.contains("#|"), "prefix leaked into value: {value:?}");
+        assert_eq!(value, "foo bar");
+        // raw() stays byte-exact (lossless contract): the prefix leaf is kept.
+        assert!(
+            scalar.raw().contains("#|"),
+            "raw() must retain the prefix leaf: {:?}",
+            scalar.raw()
+        );
     }
 
     #[test]
