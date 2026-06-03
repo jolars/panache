@@ -7,16 +7,14 @@ input: "escaped slash: \"a\\/b\"\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..22
-  YAML_METADATA_CONTENT@0..22
-    YAML_STREAM@0..22
-      YAML_DOCUMENT@0..22
-        YAML_BLOCK_MAP@0..22
-          YAML_BLOCK_MAP_ENTRY@0..22
-            YAML_BLOCK_MAP_KEY@0..14
-              YAML_SCALAR@0..13 "escaped slash"
-              YAML_COLON@13..14 ":"
-            YAML_BLOCK_MAP_VALUE@14..22
-              WHITESPACE@14..15 " "
-              YAML_SCALAR@15..21 "\"a\\/b\""
-              NEWLINE@21..22 "\n"
+YAML_STREAM@0..22
+  YAML_DOCUMENT@0..22
+    YAML_BLOCK_MAP@0..22
+      YAML_BLOCK_MAP_ENTRY@0..22
+        YAML_BLOCK_MAP_KEY@0..14
+          YAML_SCALAR@0..13 "escaped slash"
+          YAML_COLON@13..14 ":"
+        YAML_BLOCK_MAP_VALUE@14..22
+          WHITESPACE@14..15 " "
+          YAML_SCALAR@15..21 "\"a\\/b\""
+          NEWLINE@21..22 "\n"

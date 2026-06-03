@@ -467,11 +467,13 @@ pub fn collect_parsed_yaml_regions(tree: &SyntaxNode) -> Vec<ParsedYamlRegion> {
         .collect()
 }
 
-/// Locate the embedded YAML_STREAM subtree under the frontmatter's
+/// Locate the embedded YAML subtree under the frontmatter's
 /// YAML_METADATA_CONTENT node, if the host parser embedded one (valid
-/// frontmatter). Returns `None` for malformed frontmatter, where the
-/// content node holds opaque line tokens and the standalone re-parse
-/// surfaces the diagnostic.
+/// frontmatter). The content node plays the stream container role for the
+/// singleton-stream embedding, so we return it directly when it actually
+/// carries a YAML_DOCUMENT child. Returns `None` for malformed frontmatter,
+/// where the content node holds opaque line tokens and the standalone
+/// re-parse surfaces the diagnostic.
 fn embedded_frontmatter_stream(tree: &SyntaxNode) -> Option<SyntaxNode> {
     let metadata = tree
         .descendants()
@@ -481,7 +483,8 @@ fn embedded_frontmatter_stream(tree: &SyntaxNode) -> Option<SyntaxNode> {
         .find(|child| child.kind() == SyntaxKind::YAML_METADATA_CONTENT)?;
     content_node
         .children()
-        .find(|child| child.kind() == SyntaxKind::YAML_STREAM)
+        .any(|child| child.kind() == SyntaxKind::YAML_DOCUMENT)
+        .then_some(content_node)
 }
 
 /// Parse a YAML region's content with the in-tree parser, returning the CST on

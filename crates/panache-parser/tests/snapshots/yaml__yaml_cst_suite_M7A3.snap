@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 283
 expression: snapshot
 ---
 case_id: M7A3
@@ -8,18 +7,16 @@ input: "Bare\ndocument\n...\n# No document\n...\n|\n%!PS-Adobe-2.0 # Not the fir
 diagnostics:
 
 cst:
-DOCUMENT@0..74
-  YAML_METADATA_CONTENT@0..74
-    YAML_STREAM@0..74
-      YAML_DOCUMENT@0..17
-        YAML_SCALAR@0..13 "Bare\ndocument"
-        NEWLINE@13..14 "\n"
-        YAML_DOCUMENT_END@14..17 "..."
-      NEWLINE@17..18 "\n"
-      YAML_COMMENT@18..31 "# No document"
-      NEWLINE@31..32 "\n"
-      YAML_DOCUMENT@32..35
-        YAML_DOCUMENT_END@32..35 "..."
-      NEWLINE@35..36 "\n"
-      YAML_DOCUMENT@36..74
-        YAML_SCALAR@36..74 "|\n%!PS-Adobe-2.0 # No ..."
+YAML_STREAM@0..74
+  YAML_DOCUMENT@0..17
+    YAML_SCALAR@0..13 "Bare\ndocument"
+    NEWLINE@13..14 "\n"
+    YAML_DOCUMENT_END@14..17 "..."
+  NEWLINE@17..18 "\n"
+  YAML_COMMENT@18..31 "# No document"
+  NEWLINE@31..32 "\n"
+  YAML_DOCUMENT@32..35
+    YAML_DOCUMENT_END@32..35 "..."
+  NEWLINE@35..36 "\n"
+  YAML_DOCUMENT@36..74
+    YAML_SCALAR@36..74 "|\n%!PS-Adobe-2.0 # No ..."

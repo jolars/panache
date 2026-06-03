@@ -7,52 +7,50 @@ input: "sequence: !!seq\n- entry\n- !!seq\n - nested\nmapping: !!map\n foo: bar\
 diagnostics:
 
 cst:
-DOCUMENT@0..67
-  YAML_METADATA_CONTENT@0..67
-    YAML_STREAM@0..67
-      YAML_DOCUMENT@0..67
-        YAML_BLOCK_MAP@0..67
-          YAML_BLOCK_MAP_ENTRY@0..42
-            YAML_BLOCK_MAP_KEY@0..9
-              YAML_SCALAR@0..8 "sequence"
-              YAML_COLON@8..9 ":"
-            YAML_BLOCK_MAP_VALUE@9..42
-              WHITESPACE@9..10 " "
-              YAML_TAG@10..15 "!!seq"
-              NEWLINE@15..16 "\n"
-              YAML_BLOCK_SEQUENCE@16..42
-                YAML_BLOCK_SEQUENCE_ITEM@16..24
-                  YAML_BLOCK_SEQ_ENTRY@16..17 "-"
-                  WHITESPACE@17..18 " "
-                  YAML_SCALAR@18..23 "entry"
-                  NEWLINE@23..24 "\n"
-                YAML_BLOCK_SEQUENCE_ITEM@24..42
-                  YAML_BLOCK_SEQ_ENTRY@24..25 "-"
-                  WHITESPACE@25..26 " "
-                  YAML_TAG@26..31 "!!seq"
-                  NEWLINE@31..32 "\n"
-                  WHITESPACE@32..33 " "
-                  YAML_BLOCK_SEQUENCE@33..42
-                    YAML_BLOCK_SEQUENCE_ITEM@33..42
-                      YAML_BLOCK_SEQ_ENTRY@33..34 "-"
-                      WHITESPACE@34..35 " "
-                      YAML_SCALAR@35..41 "nested"
-                      NEWLINE@41..42 "\n"
-          YAML_BLOCK_MAP_ENTRY@42..67
-            YAML_BLOCK_MAP_KEY@42..50
-              YAML_SCALAR@42..49 "mapping"
-              YAML_COLON@49..50 ":"
-            YAML_BLOCK_MAP_VALUE@50..67
-              WHITESPACE@50..51 " "
-              YAML_TAG@51..56 "!!map"
-              NEWLINE@56..57 "\n"
-              WHITESPACE@57..58 " "
-              YAML_BLOCK_MAP@58..67
-                YAML_BLOCK_MAP_ENTRY@58..67
-                  YAML_BLOCK_MAP_KEY@58..62
-                    YAML_SCALAR@58..61 "foo"
-                    YAML_COLON@61..62 ":"
-                  YAML_BLOCK_MAP_VALUE@62..67
-                    WHITESPACE@62..63 " "
-                    YAML_SCALAR@63..66 "bar"
-                    NEWLINE@66..67 "\n"
+YAML_STREAM@0..67
+  YAML_DOCUMENT@0..67
+    YAML_BLOCK_MAP@0..67
+      YAML_BLOCK_MAP_ENTRY@0..42
+        YAML_BLOCK_MAP_KEY@0..9
+          YAML_SCALAR@0..8 "sequence"
+          YAML_COLON@8..9 ":"
+        YAML_BLOCK_MAP_VALUE@9..42
+          WHITESPACE@9..10 " "
+          YAML_TAG@10..15 "!!seq"
+          NEWLINE@15..16 "\n"
+          YAML_BLOCK_SEQUENCE@16..42
+            YAML_BLOCK_SEQUENCE_ITEM@16..24
+              YAML_BLOCK_SEQ_ENTRY@16..17 "-"
+              WHITESPACE@17..18 " "
+              YAML_SCALAR@18..23 "entry"
+              NEWLINE@23..24 "\n"
+            YAML_BLOCK_SEQUENCE_ITEM@24..42
+              YAML_BLOCK_SEQ_ENTRY@24..25 "-"
+              WHITESPACE@25..26 " "
+              YAML_TAG@26..31 "!!seq"
+              NEWLINE@31..32 "\n"
+              WHITESPACE@32..33 " "
+              YAML_BLOCK_SEQUENCE@33..42
+                YAML_BLOCK_SEQUENCE_ITEM@33..42
+                  YAML_BLOCK_SEQ_ENTRY@33..34 "-"
+                  WHITESPACE@34..35 " "
+                  YAML_SCALAR@35..41 "nested"
+                  NEWLINE@41..42 "\n"
+      YAML_BLOCK_MAP_ENTRY@42..67
+        YAML_BLOCK_MAP_KEY@42..50
+          YAML_SCALAR@42..49 "mapping"
+          YAML_COLON@49..50 ":"
+        YAML_BLOCK_MAP_VALUE@50..67
+          WHITESPACE@50..51 " "
+          YAML_TAG@51..56 "!!map"
+          NEWLINE@56..57 "\n"
+          WHITESPACE@57..58 " "
+          YAML_BLOCK_MAP@58..67
+            YAML_BLOCK_MAP_ENTRY@58..67
+              YAML_BLOCK_MAP_KEY@58..62
+                YAML_SCALAR@58..61 "foo"
+                YAML_COLON@61..62 ":"
+              YAML_BLOCK_MAP_VALUE@62..67
+                WHITESPACE@62..63 " "
+                YAML_SCALAR@63..66 "bar"
+                NEWLINE@66..67 "\n"

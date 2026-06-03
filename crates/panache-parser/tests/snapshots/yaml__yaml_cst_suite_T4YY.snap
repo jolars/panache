@@ -7,11 +7,9 @@ input: "---\n' 1st non-empty\n\n 2nd non-empty \n 3rd non-empty '\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..54
-  YAML_METADATA_CONTENT@0..54
-    YAML_STREAM@0..54
-      YAML_DOCUMENT@0..54
-        YAML_DOCUMENT_START@0..3 "---"
-        NEWLINE@3..4 "\n"
-        YAML_SCALAR@4..53 "' 1st non-empty\n\n 2nd ..."
-        NEWLINE@53..54 "\n"
+YAML_STREAM@0..54
+  YAML_DOCUMENT@0..54
+    YAML_DOCUMENT_START@0..3 "---"
+    NEWLINE@3..4 "\n"
+    YAML_SCALAR@4..53 "' 1st non-empty\n\n 2nd ..."
+    NEWLINE@53..54 "\n"

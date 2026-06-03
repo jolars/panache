@@ -7,10 +7,8 @@ input: "--- |\n literal\n \ttext\n\n\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..24
-  YAML_METADATA_CONTENT@0..24
-    YAML_STREAM@0..24
-      YAML_DOCUMENT@0..24
-        YAML_DOCUMENT_START@0..3 "---"
-        WHITESPACE@3..4 " "
-        YAML_SCALAR@4..24 "|\n literal\n \ttext\n\n\n"
+YAML_STREAM@0..24
+  YAML_DOCUMENT@0..24
+    YAML_DOCUMENT_START@0..3 "---"
+    WHITESPACE@3..4 " "
+    YAML_SCALAR@4..24 "|\n literal\n \ttext\n\n\n"

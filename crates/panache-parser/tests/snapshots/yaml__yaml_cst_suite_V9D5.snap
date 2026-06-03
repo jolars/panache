@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 283
 expression: snapshot
 ---
 case_id: V9D5
@@ -8,50 +7,48 @@ input: "- sun: yellow\n- ? earth: blue\n  : moon: white\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..46
-  YAML_METADATA_CONTENT@0..46
-    YAML_STREAM@0..46
-      YAML_DOCUMENT@0..46
-        YAML_BLOCK_SEQUENCE@0..46
-          YAML_BLOCK_SEQUENCE_ITEM@0..14
-            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
-            WHITESPACE@1..2 " "
-            YAML_BLOCK_MAP@2..14
-              YAML_BLOCK_MAP_ENTRY@2..14
-                YAML_BLOCK_MAP_KEY@2..6
-                  YAML_SCALAR@2..5 "sun"
-                  YAML_COLON@5..6 ":"
-                YAML_BLOCK_MAP_VALUE@6..14
-                  WHITESPACE@6..7 " "
-                  YAML_SCALAR@7..13 "yellow"
-                  NEWLINE@13..14 "\n"
-          YAML_BLOCK_SEQUENCE_ITEM@14..46
-            YAML_BLOCK_SEQ_ENTRY@14..15 "-"
-            WHITESPACE@15..16 " "
-            YAML_BLOCK_MAP@16..46
-              YAML_BLOCK_MAP_ENTRY@16..46
-                YAML_BLOCK_MAP_KEY@16..33
-                  YAML_KEY@16..17 "?"
-                  WHITESPACE@17..18 " "
-                  YAML_BLOCK_MAP@18..32
-                    YAML_BLOCK_MAP_ENTRY@18..32
-                      YAML_BLOCK_MAP_KEY@18..24
-                        YAML_SCALAR@18..23 "earth"
-                        YAML_COLON@23..24 ":"
-                      YAML_BLOCK_MAP_VALUE@24..32
-                        WHITESPACE@24..25 " "
-                        YAML_SCALAR@25..29 "blue"
-                        NEWLINE@29..30 "\n"
-                        WHITESPACE@30..32 "  "
-                  YAML_COLON@32..33 ":"
-                YAML_BLOCK_MAP_VALUE@33..46
-                  WHITESPACE@33..34 " "
-                  YAML_BLOCK_MAP@34..46
-                    YAML_BLOCK_MAP_ENTRY@34..46
-                      YAML_BLOCK_MAP_KEY@34..39
-                        YAML_SCALAR@34..38 "moon"
-                        YAML_COLON@38..39 ":"
-                      YAML_BLOCK_MAP_VALUE@39..46
-                        WHITESPACE@39..40 " "
-                        YAML_SCALAR@40..45 "white"
-                        NEWLINE@45..46 "\n"
+YAML_STREAM@0..46
+  YAML_DOCUMENT@0..46
+    YAML_BLOCK_SEQUENCE@0..46
+      YAML_BLOCK_SEQUENCE_ITEM@0..14
+        YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+        WHITESPACE@1..2 " "
+        YAML_BLOCK_MAP@2..14
+          YAML_BLOCK_MAP_ENTRY@2..14
+            YAML_BLOCK_MAP_KEY@2..6
+              YAML_SCALAR@2..5 "sun"
+              YAML_COLON@5..6 ":"
+            YAML_BLOCK_MAP_VALUE@6..14
+              WHITESPACE@6..7 " "
+              YAML_SCALAR@7..13 "yellow"
+              NEWLINE@13..14 "\n"
+      YAML_BLOCK_SEQUENCE_ITEM@14..46
+        YAML_BLOCK_SEQ_ENTRY@14..15 "-"
+        WHITESPACE@15..16 " "
+        YAML_BLOCK_MAP@16..46
+          YAML_BLOCK_MAP_ENTRY@16..46
+            YAML_BLOCK_MAP_KEY@16..33
+              YAML_KEY@16..17 "?"
+              WHITESPACE@17..18 " "
+              YAML_BLOCK_MAP@18..32
+                YAML_BLOCK_MAP_ENTRY@18..32
+                  YAML_BLOCK_MAP_KEY@18..24
+                    YAML_SCALAR@18..23 "earth"
+                    YAML_COLON@23..24 ":"
+                  YAML_BLOCK_MAP_VALUE@24..32
+                    WHITESPACE@24..25 " "
+                    YAML_SCALAR@25..29 "blue"
+                    NEWLINE@29..30 "\n"
+                    WHITESPACE@30..32 "  "
+              YAML_COLON@32..33 ":"
+            YAML_BLOCK_MAP_VALUE@33..46
+              WHITESPACE@33..34 " "
+              YAML_BLOCK_MAP@34..46
+                YAML_BLOCK_MAP_ENTRY@34..46
+                  YAML_BLOCK_MAP_KEY@34..39
+                    YAML_SCALAR@34..38 "moon"
+                    YAML_COLON@38..39 ":"
+                  YAML_BLOCK_MAP_VALUE@39..46
+                    WHITESPACE@39..40 " "
+                    YAML_SCALAR@40..45 "white"
+                    NEWLINE@45..46 "\n"

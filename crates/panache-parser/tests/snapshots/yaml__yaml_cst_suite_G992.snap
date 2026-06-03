@@ -7,8 +7,6 @@ input: ">\n folded\n text\n\n\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..18
-  YAML_METADATA_CONTENT@0..18
-    YAML_STREAM@0..18
-      YAML_DOCUMENT@0..18
-        YAML_SCALAR@0..18 ">\n folded\n text\n\n\n"
+YAML_STREAM@0..18
+  YAML_DOCUMENT@0..18
+    YAML_SCALAR@0..18 ">\n folded\n text\n\n\n"

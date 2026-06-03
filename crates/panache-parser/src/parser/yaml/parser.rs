@@ -3,12 +3,14 @@
 //! Two layers live in this module:
 //!
 //! 1. **Orchestrator** — [`parse_shadow`], [`parse_yaml_tree`], and
-//!    [`parse_yaml_report`]. These wrap [`parse_stream`] in the
-//!    `DOCUMENT > YAML_METADATA_CONTENT > YAML_STREAM` envelope
-//!    expected by the host CST, run the structural
-//!    [`super::validator::validate_yaml`] pass, and surface
-//!    diagnostics. Shadow-mode (`parse_shadow`) keeps a probe path the
-//!    integration harness can flip on for prototype reporting.
+//!    [`parse_yaml_report`]. These drive [`parse_stream`] for a pure-YAML
+//!    parse rooted at `YAML_STREAM`, run the structural
+//!    [`super::validator::validate_yaml`] pass, and surface diagnostics.
+//!    Host envelope wrappers (`DOCUMENT`, `YAML_METADATA_CONTENT`,
+//!    `HASHPIPE_YAML_CONTENT`) are added by the host parser at embedding
+//!    sites and are not concerns of the standalone YAML parse path.
+//!    Shadow-mode (`parse_shadow`) keeps a probe path the integration
+//!    harness can flip on for prototype reporting.
 //!
 //! 2. **Streaming parser** — [`parse_stream`] drives
 //!    [`super::scanner::Scanner`] and emits the rowan green tree. Each
@@ -31,7 +33,6 @@
 
 #![allow(dead_code)]
 
-use crate::parser::utils::tree_copy::copy_green_node;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
@@ -122,16 +123,8 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
         };
     }
 
-    let stream = parse_stream(input);
-    let stream_green = stream.green().into_owned();
-    let mut builder = GreenNodeBuilder::new();
-    builder.start_node(SyntaxKind::DOCUMENT.into());
-    builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
-    copy_green_node(&mut builder, &stream_green);
-    builder.finish_node(); // YAML_METADATA_CONTENT
-    builder.finish_node(); // DOCUMENT
     YamlParseReport {
-        tree: Some(SyntaxNode::new_root(builder.finish())),
+        tree: Some(parse_stream(input)),
         diagnostics: Vec::new(),
     }
 }

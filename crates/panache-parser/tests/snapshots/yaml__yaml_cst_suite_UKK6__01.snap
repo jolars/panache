@@ -7,14 +7,12 @@ input: "::\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..3
-  YAML_METADATA_CONTENT@0..3
-    YAML_STREAM@0..3
-      YAML_DOCUMENT@0..3
-        YAML_BLOCK_MAP@0..3
-          YAML_BLOCK_MAP_ENTRY@0..3
-            YAML_BLOCK_MAP_KEY@0..2
-              YAML_SCALAR@0..1 ":"
-              YAML_COLON@1..2 ":"
-            YAML_BLOCK_MAP_VALUE@2..3
-              NEWLINE@2..3 "\n"
+YAML_STREAM@0..3
+  YAML_DOCUMENT@0..3
+    YAML_BLOCK_MAP@0..3
+      YAML_BLOCK_MAP_ENTRY@0..3
+        YAML_BLOCK_MAP_KEY@0..2
+          YAML_SCALAR@0..1 ":"
+          YAML_COLON@1..2 ":"
+        YAML_BLOCK_MAP_VALUE@2..3
+          NEWLINE@2..3 "\n"

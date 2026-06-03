@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 283
 expression: snapshot
 ---
 case_id: X38W
@@ -8,53 +7,51 @@ input: "{ &a [a, &b b]: *b, *a : [c, *b, d]}\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..37
-  YAML_METADATA_CONTENT@0..37
-    YAML_STREAM@0..37
-      YAML_DOCUMENT@0..37
-        YAML_FLOW_MAP@0..36
-          YAML_SCALAR@0..1 "{"
-          WHITESPACE@1..2 " "
-          YAML_FLOW_MAP_ENTRY@2..18
-            YAML_FLOW_MAP_KEY@2..15
-              YAML_ANCHOR@2..4 "&a"
-              WHITESPACE@4..5 " "
-              YAML_FLOW_SEQUENCE@5..14
-                YAML_SCALAR@5..6 "["
-                YAML_FLOW_SEQUENCE_ITEM@6..7
-                  YAML_SCALAR@6..7 "a"
-                YAML_SCALAR@7..8 ","
-                WHITESPACE@8..9 " "
-                YAML_FLOW_SEQUENCE_ITEM@9..13
-                  YAML_ANCHOR@9..11 "&b"
-                  WHITESPACE@11..12 " "
-                  YAML_SCALAR@12..13 "b"
-                YAML_SCALAR@13..14 "]"
-              YAML_COLON@14..15 ":"
-            YAML_FLOW_MAP_VALUE@15..18
-              WHITESPACE@15..16 " "
-              YAML_ALIAS@16..18 "*b"
-          YAML_SCALAR@18..19 ","
-          WHITESPACE@19..20 " "
-          YAML_FLOW_MAP_ENTRY@20..35
-            YAML_FLOW_MAP_KEY@20..24
-              YAML_ALIAS@20..22 "*a"
-              WHITESPACE@22..23 " "
-              YAML_COLON@23..24 ":"
-            YAML_FLOW_MAP_VALUE@24..35
-              WHITESPACE@24..25 " "
-              YAML_FLOW_SEQUENCE@25..35
-                YAML_SCALAR@25..26 "["
-                YAML_FLOW_SEQUENCE_ITEM@26..27
-                  YAML_SCALAR@26..27 "c"
-                YAML_SCALAR@27..28 ","
-                WHITESPACE@28..29 " "
-                YAML_FLOW_SEQUENCE_ITEM@29..31
-                  YAML_ALIAS@29..31 "*b"
-                YAML_SCALAR@31..32 ","
-                WHITESPACE@32..33 " "
-                YAML_FLOW_SEQUENCE_ITEM@33..34
-                  YAML_SCALAR@33..34 "d"
-                YAML_SCALAR@34..35 "]"
-          YAML_SCALAR@35..36 "}"
-        NEWLINE@36..37 "\n"
+YAML_STREAM@0..37
+  YAML_DOCUMENT@0..37
+    YAML_FLOW_MAP@0..36
+      YAML_SCALAR@0..1 "{"
+      WHITESPACE@1..2 " "
+      YAML_FLOW_MAP_ENTRY@2..18
+        YAML_FLOW_MAP_KEY@2..15
+          YAML_ANCHOR@2..4 "&a"
+          WHITESPACE@4..5 " "
+          YAML_FLOW_SEQUENCE@5..14
+            YAML_SCALAR@5..6 "["
+            YAML_FLOW_SEQUENCE_ITEM@6..7
+              YAML_SCALAR@6..7 "a"
+            YAML_SCALAR@7..8 ","
+            WHITESPACE@8..9 " "
+            YAML_FLOW_SEQUENCE_ITEM@9..13
+              YAML_ANCHOR@9..11 "&b"
+              WHITESPACE@11..12 " "
+              YAML_SCALAR@12..13 "b"
+            YAML_SCALAR@13..14 "]"
+          YAML_COLON@14..15 ":"
+        YAML_FLOW_MAP_VALUE@15..18
+          WHITESPACE@15..16 " "
+          YAML_ALIAS@16..18 "*b"
+      YAML_SCALAR@18..19 ","
+      WHITESPACE@19..20 " "
+      YAML_FLOW_MAP_ENTRY@20..35
+        YAML_FLOW_MAP_KEY@20..24
+          YAML_ALIAS@20..22 "*a"
+          WHITESPACE@22..23 " "
+          YAML_COLON@23..24 ":"
+        YAML_FLOW_MAP_VALUE@24..35
+          WHITESPACE@24..25 " "
+          YAML_FLOW_SEQUENCE@25..35
+            YAML_SCALAR@25..26 "["
+            YAML_FLOW_SEQUENCE_ITEM@26..27
+              YAML_SCALAR@26..27 "c"
+            YAML_SCALAR@27..28 ","
+            WHITESPACE@28..29 " "
+            YAML_FLOW_SEQUENCE_ITEM@29..31
+              YAML_ALIAS@29..31 "*b"
+            YAML_SCALAR@31..32 ","
+            WHITESPACE@32..33 " "
+            YAML_FLOW_SEQUENCE_ITEM@33..34
+              YAML_SCALAR@33..34 "d"
+            YAML_SCALAR@34..35 "]"
+      YAML_SCALAR@35..36 "}"
+    NEWLINE@36..37 "\n"

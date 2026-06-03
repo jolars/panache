@@ -51,7 +51,7 @@ mod tests {
     #[test]
     fn builds_basic_rowan_tree_for_multiline_mapping() {
         let tree = parse_yaml_tree("title: My Title\nauthor: Me\n").expect("tree");
-        assert_eq!(tree.kind(), SyntaxKind::DOCUMENT);
+        assert_eq!(tree.kind(), SyntaxKind::YAML_STREAM);
         assert_eq!(tree.text().to_string(), "title: My Title\nauthor: Me\n");
 
         let mapping = tree

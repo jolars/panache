@@ -7,10 +7,8 @@ input: "--- >\n  Mark McGwire's\n  year was crippled\n  by a knee injury.\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..63
-  YAML_METADATA_CONTENT@0..63
-    YAML_STREAM@0..63
-      YAML_DOCUMENT@0..63
-        YAML_DOCUMENT_START@0..3 "---"
-        WHITESPACE@3..4 " "
-        YAML_SCALAR@4..63 ">\n  Mark McGwire's\n   ..."
+YAML_STREAM@0..63
+  YAML_DOCUMENT@0..63
+    YAML_DOCUMENT_START@0..3 "---"
+    WHITESPACE@3..4 " "
+    YAML_SCALAR@4..63 ">\n  Mark McGwire's\n   ..."

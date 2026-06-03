@@ -7,23 +7,21 @@ input: "foo: |\n \t\nbar: 1\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..17
-  YAML_METADATA_CONTENT@0..17
-    YAML_STREAM@0..17
-      YAML_DOCUMENT@0..17
-        YAML_BLOCK_MAP@0..17
-          YAML_BLOCK_MAP_ENTRY@0..10
-            YAML_BLOCK_MAP_KEY@0..4
-              YAML_SCALAR@0..3 "foo"
-              YAML_COLON@3..4 ":"
-            YAML_BLOCK_MAP_VALUE@4..10
-              WHITESPACE@4..5 " "
-              YAML_SCALAR@5..10 "|\n \t\n"
-          YAML_BLOCK_MAP_ENTRY@10..17
-            YAML_BLOCK_MAP_KEY@10..14
-              YAML_SCALAR@10..13 "bar"
-              YAML_COLON@13..14 ":"
-            YAML_BLOCK_MAP_VALUE@14..17
-              WHITESPACE@14..15 " "
-              YAML_SCALAR@15..16 "1"
-              NEWLINE@16..17 "\n"
+YAML_STREAM@0..17
+  YAML_DOCUMENT@0..17
+    YAML_BLOCK_MAP@0..17
+      YAML_BLOCK_MAP_ENTRY@0..10
+        YAML_BLOCK_MAP_KEY@0..4
+          YAML_SCALAR@0..3 "foo"
+          YAML_COLON@3..4 ":"
+        YAML_BLOCK_MAP_VALUE@4..10
+          WHITESPACE@4..5 " "
+          YAML_SCALAR@5..10 "|\n \t\n"
+      YAML_BLOCK_MAP_ENTRY@10..17
+        YAML_BLOCK_MAP_KEY@10..14
+          YAML_SCALAR@10..13 "bar"
+          YAML_COLON@13..14 ":"
+        YAML_BLOCK_MAP_VALUE@14..17
+          WHITESPACE@14..15 " "
+          YAML_SCALAR@15..16 "1"
+          NEWLINE@16..17 "\n"

@@ -9,10 +9,14 @@
 //!
 //! Two CST facts shape the API:
 //!
-//! - The parser wraps every parse in a
-//!   `DOCUMENT > YAML_METADATA_CONTENT > YAML_STREAM > YAML_DOCUMENT` envelope.
-//!   [`parse_yaml_document`] centralizes the descent so no consumer
-//!   re-implements it.
+//! - YAML parses produce one or more `YAML_DOCUMENT` children under a
+//!   *stream-equivalent* container. Standalone parses
+//!   ([`crate::parser::yaml::parse_yaml_tree`]) root the tree at
+//!   `YAML_STREAM`; embedded parses nest the documents directly under
+//!   the host wrapper (`YAML_METADATA_CONTENT` for frontmatter,
+//!   `HASHPIPE_YAML_CONTENT` for hashpipe), which plays the stream
+//!   role for its singleton-stream embedding. [`parse_yaml_document`]
+//!   centralizes the descent so no consumer re-implements it.
 //! - `YAML_BLOCK_MAP_KEY` includes the trailing `:` (`YAML_COLON`) token, so
 //!   [`YamlBlockMapKey::scalar`] reads the `YAML_SCALAR` token child rather
 //!   than the node text.
@@ -27,9 +31,11 @@ use super::ast::{AstChildren, AstNode, support};
 use super::{PanacheLanguage, SyntaxKind, SyntaxNode, SyntaxToken};
 use crate::parser::yaml::{ScalarStyle, cook, parse_yaml_tree};
 
-/// Parse `input` and return the first YAML document, descending the host
-/// `DOCUMENT > YAML_METADATA_CONTENT > YAML_STREAM` envelope. Returns `None`
-/// when the input fails the structural validator (no tree) or has no document.
+/// Parse `input` and return the first YAML document. Descends through any
+/// stream-equivalent container ([`is_stream_equivalent`]) so it works against
+/// standalone parses (rooted at `YAML_STREAM`) and host embeddings alike.
+/// Returns `None` when the input fails the structural validator (no tree)
+/// or has no document.
 pub fn parse_yaml_document(input: &str) -> Option<YamlDocument> {
     first_document(&parse_yaml_tree(input)?)
 }
@@ -41,15 +47,31 @@ pub fn parse_yaml_documents(input: &str) -> Vec<YamlDocument> {
     let Some(tree) = parse_yaml_tree(input) else {
         return Vec::new();
     };
-    tree.descendants()
-        .find(|n| n.kind() == SyntaxKind::YAML_STREAM)
+    stream_container(&tree)
         .map(|stream| stream.children().filter_map(YamlDocument::cast).collect())
         .unwrap_or_default()
 }
 
+/// True for any node that plays the YAML stream container role: the spec
+/// `YAML_STREAM` for standalone parses, and the host embedding wrappers
+/// (`YAML_METADATA_CONTENT`, `HASHPIPE_YAML_CONTENT`) for the singleton-stream
+/// embeddings the host parser produces. Each wraps zero or more
+/// `YAML_DOCUMENT` children.
+pub(crate) fn is_stream_equivalent(kind: SyntaxKind) -> bool {
+    matches!(
+        kind,
+        SyntaxKind::YAML_STREAM
+            | SyntaxKind::YAML_METADATA_CONTENT
+            | SyntaxKind::HASHPIPE_YAML_CONTENT
+    )
+}
+
+fn stream_container(tree: &SyntaxNode) -> Option<SyntaxNode> {
+    tree.descendants().find(|n| is_stream_equivalent(n.kind()))
+}
+
 fn first_document(tree: &SyntaxNode) -> Option<YamlDocument> {
-    tree.descendants()
-        .find(|n| n.kind() == SyntaxKind::YAML_STREAM)?
+    stream_container(tree)?
         .children()
         .find_map(YamlDocument::cast)
 }

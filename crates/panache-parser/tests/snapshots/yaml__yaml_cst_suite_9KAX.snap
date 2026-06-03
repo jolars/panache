@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 283
 expression: snapshot
 ---
 case_id: 9KAX
@@ -8,120 +7,118 @@ input: "---\n&a1\n!!str\nscalar1\n---\n!!str\n&a2\nscalar2\n---\n&a3\n!!str scal
 diagnostics:
 
 cst:
-DOCUMENT@0..219
-  YAML_METADATA_CONTENT@0..219
-    YAML_STREAM@0..219
-      YAML_DOCUMENT@0..22
-        YAML_DOCUMENT_START@0..3 "---"
-        NEWLINE@3..4 "\n"
-        YAML_ANCHOR@4..7 "&a1"
-        NEWLINE@7..8 "\n"
-        YAML_TAG@8..13 "!!str"
-        NEWLINE@13..14 "\n"
-        YAML_SCALAR@14..21 "scalar1"
-        NEWLINE@21..22 "\n"
-      YAML_DOCUMENT@22..44
-        YAML_DOCUMENT_START@22..25 "---"
-        NEWLINE@25..26 "\n"
-        YAML_TAG@26..31 "!!str"
-        NEWLINE@31..32 "\n"
-        YAML_ANCHOR@32..35 "&a2"
-        NEWLINE@35..36 "\n"
-        YAML_SCALAR@36..43 "scalar2"
-        NEWLINE@43..44 "\n"
-      YAML_DOCUMENT@44..66
-        YAML_DOCUMENT_START@44..47 "---"
-        NEWLINE@47..48 "\n"
-        YAML_ANCHOR@48..51 "&a3"
-        NEWLINE@51..52 "\n"
-        YAML_TAG@52..57 "!!str"
-        WHITESPACE@57..58 " "
-        YAML_SCALAR@58..65 "scalar3"
-        NEWLINE@65..66 "\n"
-      YAML_DOCUMENT@66..103
-        YAML_DOCUMENT_START@66..69 "---"
-        NEWLINE@69..70 "\n"
-        YAML_ANCHOR@70..73 "&a4"
-        WHITESPACE@73..74 " "
-        YAML_TAG@74..79 "!!map"
-        NEWLINE@79..80 "\n"
-        YAML_BLOCK_MAP@80..103
-          YAML_BLOCK_MAP_ENTRY@80..103
-            YAML_BLOCK_MAP_KEY@80..95
-              YAML_ANCHOR@80..83 "&a5"
-              WHITESPACE@83..84 " "
-              YAML_TAG@84..89 "!!str"
-              WHITESPACE@89..90 " "
-              YAML_SCALAR@90..94 "key5"
-              YAML_COLON@94..95 ":"
-            YAML_BLOCK_MAP_VALUE@95..103
-              WHITESPACE@95..96 " "
-              YAML_SCALAR@96..102 "value4"
-              NEWLINE@102..103 "\n"
-      YAML_DOCUMENT@103..128
-        YAML_DOCUMENT_START@103..106 "---"
-        NEWLINE@106..107 "\n"
-        YAML_BLOCK_MAP@107..128
-          YAML_BLOCK_MAP_ENTRY@107..113
-            YAML_BLOCK_MAP_KEY@107..110
-              YAML_SCALAR@107..109 "a6"
-              YAML_COLON@109..110 ":"
-            YAML_BLOCK_MAP_VALUE@110..113
-              WHITESPACE@110..111 " "
-              YAML_SCALAR@111..112 "1"
-              NEWLINE@112..113 "\n"
-          YAML_BLOCK_MAP_ENTRY@113..128
-            YAML_BLOCK_MAP_KEY@113..125
-              YAML_ANCHOR@113..121 "&anchor6"
-              WHITESPACE@121..122 " "
-              YAML_SCALAR@122..124 "b6"
-              YAML_COLON@124..125 ":"
-            YAML_BLOCK_MAP_VALUE@125..128
-              WHITESPACE@125..126 " "
-              YAML_SCALAR@126..127 "2"
-              NEWLINE@127..128 "\n"
-      YAML_DOCUMENT@128..161
-        YAML_DOCUMENT_START@128..131 "---"
-        NEWLINE@131..132 "\n"
-        YAML_TAG@132..137 "!!map"
-        NEWLINE@137..138 "\n"
-        YAML_BLOCK_MAP@138..161
-          YAML_BLOCK_MAP_ENTRY@138..161
-            YAML_BLOCK_MAP_KEY@138..153
-              YAML_ANCHOR@138..141 "&a8"
-              WHITESPACE@141..142 " "
-              YAML_TAG@142..147 "!!str"
-              WHITESPACE@147..148 " "
-              YAML_SCALAR@148..152 "key8"
-              YAML_COLON@152..153 ":"
-            YAML_BLOCK_MAP_VALUE@153..161
-              WHITESPACE@153..154 " "
-              YAML_SCALAR@154..160 "value7"
-              NEWLINE@160..161 "\n"
-      YAML_DOCUMENT@161..196
-        YAML_DOCUMENT_START@161..164 "---"
-        NEWLINE@164..165 "\n"
-        YAML_TAG@165..170 "!!map"
-        NEWLINE@170..171 "\n"
-        YAML_BLOCK_MAP@171..196
-          YAML_BLOCK_MAP_ENTRY@171..196
-            YAML_BLOCK_MAP_KEY@171..188
-              YAML_TAG@171..176 "!!str"
-              WHITESPACE@176..177 " "
-              YAML_ANCHOR@177..181 "&a10"
-              WHITESPACE@181..182 " "
-              YAML_SCALAR@182..187 "key10"
-              YAML_COLON@187..188 ":"
-            YAML_BLOCK_MAP_VALUE@188..196
-              WHITESPACE@188..189 " "
-              YAML_SCALAR@189..195 "value9"
-              NEWLINE@195..196 "\n"
-      YAML_DOCUMENT@196..219
-        YAML_DOCUMENT_START@196..199 "---"
-        NEWLINE@199..200 "\n"
-        YAML_TAG@200..205 "!!str"
-        WHITESPACE@205..206 " "
-        YAML_ANCHOR@206..210 "&a11"
-        NEWLINE@210..211 "\n"
-        YAML_SCALAR@211..218 "value11"
-        NEWLINE@218..219 "\n"
+YAML_STREAM@0..219
+  YAML_DOCUMENT@0..22
+    YAML_DOCUMENT_START@0..3 "---"
+    NEWLINE@3..4 "\n"
+    YAML_ANCHOR@4..7 "&a1"
+    NEWLINE@7..8 "\n"
+    YAML_TAG@8..13 "!!str"
+    NEWLINE@13..14 "\n"
+    YAML_SCALAR@14..21 "scalar1"
+    NEWLINE@21..22 "\n"
+  YAML_DOCUMENT@22..44
+    YAML_DOCUMENT_START@22..25 "---"
+    NEWLINE@25..26 "\n"
+    YAML_TAG@26..31 "!!str"
+    NEWLINE@31..32 "\n"
+    YAML_ANCHOR@32..35 "&a2"
+    NEWLINE@35..36 "\n"
+    YAML_SCALAR@36..43 "scalar2"
+    NEWLINE@43..44 "\n"
+  YAML_DOCUMENT@44..66
+    YAML_DOCUMENT_START@44..47 "---"
+    NEWLINE@47..48 "\n"
+    YAML_ANCHOR@48..51 "&a3"
+    NEWLINE@51..52 "\n"
+    YAML_TAG@52..57 "!!str"
+    WHITESPACE@57..58 " "
+    YAML_SCALAR@58..65 "scalar3"
+    NEWLINE@65..66 "\n"
+  YAML_DOCUMENT@66..103
+    YAML_DOCUMENT_START@66..69 "---"
+    NEWLINE@69..70 "\n"
+    YAML_ANCHOR@70..73 "&a4"
+    WHITESPACE@73..74 " "
+    YAML_TAG@74..79 "!!map"
+    NEWLINE@79..80 "\n"
+    YAML_BLOCK_MAP@80..103
+      YAML_BLOCK_MAP_ENTRY@80..103
+        YAML_BLOCK_MAP_KEY@80..95
+          YAML_ANCHOR@80..83 "&a5"
+          WHITESPACE@83..84 " "
+          YAML_TAG@84..89 "!!str"
+          WHITESPACE@89..90 " "
+          YAML_SCALAR@90..94 "key5"
+          YAML_COLON@94..95 ":"
+        YAML_BLOCK_MAP_VALUE@95..103
+          WHITESPACE@95..96 " "
+          YAML_SCALAR@96..102 "value4"
+          NEWLINE@102..103 "\n"
+  YAML_DOCUMENT@103..128
+    YAML_DOCUMENT_START@103..106 "---"
+    NEWLINE@106..107 "\n"
+    YAML_BLOCK_MAP@107..128
+      YAML_BLOCK_MAP_ENTRY@107..113
+        YAML_BLOCK_MAP_KEY@107..110
+          YAML_SCALAR@107..109 "a6"
+          YAML_COLON@109..110 ":"
+        YAML_BLOCK_MAP_VALUE@110..113
+          WHITESPACE@110..111 " "
+          YAML_SCALAR@111..112 "1"
+          NEWLINE@112..113 "\n"
+      YAML_BLOCK_MAP_ENTRY@113..128
+        YAML_BLOCK_MAP_KEY@113..125
+          YAML_ANCHOR@113..121 "&anchor6"
+          WHITESPACE@121..122 " "
+          YAML_SCALAR@122..124 "b6"
+          YAML_COLON@124..125 ":"
+        YAML_BLOCK_MAP_VALUE@125..128
+          WHITESPACE@125..126 " "
+          YAML_SCALAR@126..127 "2"
+          NEWLINE@127..128 "\n"
+  YAML_DOCUMENT@128..161
+    YAML_DOCUMENT_START@128..131 "---"
+    NEWLINE@131..132 "\n"
+    YAML_TAG@132..137 "!!map"
+    NEWLINE@137..138 "\n"
+    YAML_BLOCK_MAP@138..161
+      YAML_BLOCK_MAP_ENTRY@138..161
+        YAML_BLOCK_MAP_KEY@138..153
+          YAML_ANCHOR@138..141 "&a8"
+          WHITESPACE@141..142 " "
+          YAML_TAG@142..147 "!!str"
+          WHITESPACE@147..148 " "
+          YAML_SCALAR@148..152 "key8"
+          YAML_COLON@152..153 ":"
+        YAML_BLOCK_MAP_VALUE@153..161
+          WHITESPACE@153..154 " "
+          YAML_SCALAR@154..160 "value7"
+          NEWLINE@160..161 "\n"
+  YAML_DOCUMENT@161..196
+    YAML_DOCUMENT_START@161..164 "---"
+    NEWLINE@164..165 "\n"
+    YAML_TAG@165..170 "!!map"
+    NEWLINE@170..171 "\n"
+    YAML_BLOCK_MAP@171..196
+      YAML_BLOCK_MAP_ENTRY@171..196
+        YAML_BLOCK_MAP_KEY@171..188
+          YAML_TAG@171..176 "!!str"
+          WHITESPACE@176..177 " "
+          YAML_ANCHOR@177..181 "&a10"
+          WHITESPACE@181..182 " "
+          YAML_SCALAR@182..187 "key10"
+          YAML_COLON@187..188 ":"
+        YAML_BLOCK_MAP_VALUE@188..196
+          WHITESPACE@188..189 " "
+          YAML_SCALAR@189..195 "value9"
+          NEWLINE@195..196 "\n"
+  YAML_DOCUMENT@196..219
+    YAML_DOCUMENT_START@196..199 "---"
+    NEWLINE@199..200 "\n"
+    YAML_TAG@200..205 "!!str"
+    WHITESPACE@205..206 " "
+    YAML_ANCHOR@206..210 "&a11"
+    NEWLINE@210..211 "\n"
+    YAML_SCALAR@211..218 "value11"
+    NEWLINE@218..219 "\n"

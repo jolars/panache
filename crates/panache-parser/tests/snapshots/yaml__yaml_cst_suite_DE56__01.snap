@@ -7,9 +7,7 @@ input: "\"2 trailing\\t  \n    tab\"\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..25
-  YAML_METADATA_CONTENT@0..25
-    YAML_STREAM@0..25
-      YAML_DOCUMENT@0..25
-        YAML_SCALAR@0..24 "\"2 trailing\\t  \n    tab\""
-        NEWLINE@24..25 "\n"
+YAML_STREAM@0..25
+  YAML_DOCUMENT@0..25
+    YAML_SCALAR@0..24 "\"2 trailing\\t  \n    tab\""
+    NEWLINE@24..25 "\n"

@@ -7,25 +7,23 @@ input: "- ? : x\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..8
-  YAML_METADATA_CONTENT@0..8
-    YAML_STREAM@0..8
-      YAML_DOCUMENT@0..8
-        YAML_BLOCK_SEQUENCE@0..8
-          YAML_BLOCK_SEQUENCE_ITEM@0..8
-            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
-            WHITESPACE@1..2 " "
-            YAML_BLOCK_MAP@2..8
-              YAML_BLOCK_MAP_ENTRY@2..8
-                YAML_BLOCK_MAP_KEY@2..8
-                  YAML_KEY@2..3 "?"
-                  WHITESPACE@3..4 " "
-                  YAML_BLOCK_MAP@4..8
-                    YAML_BLOCK_MAP_ENTRY@4..8
-                      YAML_BLOCK_MAP_KEY@4..5
-                        YAML_COLON@4..5 ":"
-                      YAML_BLOCK_MAP_VALUE@5..8
-                        WHITESPACE@5..6 " "
-                        YAML_SCALAR@6..7 "x"
-                        NEWLINE@7..8 "\n"
-                YAML_BLOCK_MAP_VALUE@8..8
+YAML_STREAM@0..8
+  YAML_DOCUMENT@0..8
+    YAML_BLOCK_SEQUENCE@0..8
+      YAML_BLOCK_SEQUENCE_ITEM@0..8
+        YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+        WHITESPACE@1..2 " "
+        YAML_BLOCK_MAP@2..8
+          YAML_BLOCK_MAP_ENTRY@2..8
+            YAML_BLOCK_MAP_KEY@2..8
+              YAML_KEY@2..3 "?"
+              WHITESPACE@3..4 " "
+              YAML_BLOCK_MAP@4..8
+                YAML_BLOCK_MAP_ENTRY@4..8
+                  YAML_BLOCK_MAP_KEY@4..5
+                    YAML_COLON@4..5 ":"
+                  YAML_BLOCK_MAP_VALUE@5..8
+                    WHITESPACE@5..6 " "
+                    YAML_SCALAR@6..7 "x"
+                    NEWLINE@7..8 "\n"
+            YAML_BLOCK_MAP_VALUE@8..8

@@ -7,17 +7,15 @@ input: "%TAG !! tag:example.com,2000:app/\n---\n!!int 1 - 3 # Interval, not inte
 diagnostics:
 
 cst:
-DOCUMENT@0..74
-  YAML_METADATA_CONTENT@0..74
-    YAML_STREAM@0..74
-      YAML_DOCUMENT@0..74
-        YAML_SCALAR@0..33 "%TAG !! tag:example.c ..."
-        NEWLINE@33..34 "\n"
-        YAML_DOCUMENT_START@34..37 "---"
-        NEWLINE@37..38 "\n"
-        YAML_TAG@38..43 "!!int"
-        WHITESPACE@43..44 " "
-        YAML_SCALAR@44..49 "1 - 3"
-        WHITESPACE@49..50 " "
-        YAML_COMMENT@50..73 "# Interval, not integer"
-        NEWLINE@73..74 "\n"
+YAML_STREAM@0..74
+  YAML_DOCUMENT@0..74
+    YAML_SCALAR@0..33 "%TAG !! tag:example.c ..."
+    NEWLINE@33..34 "\n"
+    YAML_DOCUMENT_START@34..37 "---"
+    NEWLINE@37..38 "\n"
+    YAML_TAG@38..43 "!!int"
+    WHITESPACE@43..44 " "
+    YAML_SCALAR@44..49 "1 - 3"
+    WHITESPACE@49..50 " "
+    YAML_COMMENT@50..73 "# Interval, not integer"
+    NEWLINE@73..74 "\n"

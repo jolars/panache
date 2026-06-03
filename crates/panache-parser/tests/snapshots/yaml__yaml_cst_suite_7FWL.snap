@@ -7,21 +7,19 @@ input: "!<tag:yaml.org,2002:str> foo :\n  !<!bar> baz\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..45
-  YAML_METADATA_CONTENT@0..45
-    YAML_STREAM@0..45
-      YAML_DOCUMENT@0..45
-        YAML_BLOCK_MAP@0..45
-          YAML_BLOCK_MAP_ENTRY@0..45
-            YAML_BLOCK_MAP_KEY@0..30
-              YAML_TAG@0..24 "!<tag:yaml.org,2002:str>"
-              WHITESPACE@24..25 " "
-              YAML_SCALAR@25..29 "foo "
-              YAML_COLON@29..30 ":"
-            YAML_BLOCK_MAP_VALUE@30..45
-              NEWLINE@30..31 "\n"
-              WHITESPACE@31..33 "  "
-              YAML_TAG@33..40 "!<!bar>"
-              WHITESPACE@40..41 " "
-              YAML_SCALAR@41..44 "baz"
-              NEWLINE@44..45 "\n"
+YAML_STREAM@0..45
+  YAML_DOCUMENT@0..45
+    YAML_BLOCK_MAP@0..45
+      YAML_BLOCK_MAP_ENTRY@0..45
+        YAML_BLOCK_MAP_KEY@0..30
+          YAML_TAG@0..24 "!<tag:yaml.org,2002:str>"
+          WHITESPACE@24..25 " "
+          YAML_SCALAR@25..29 "foo "
+          YAML_COLON@29..30 ":"
+        YAML_BLOCK_MAP_VALUE@30..45
+          NEWLINE@30..31 "\n"
+          WHITESPACE@31..33 "  "
+          YAML_TAG@33..40 "!<!bar>"
+          WHITESPACE@40..41 " "
+          YAML_SCALAR@41..44 "baz"
+          NEWLINE@44..45 "\n"

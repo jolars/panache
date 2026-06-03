@@ -7,26 +7,24 @@ input: "literal: |2\n  value\nfolded:\n   !foo\n  >1\n value\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..48
-  YAML_METADATA_CONTENT@0..48
-    YAML_STREAM@0..48
-      YAML_DOCUMENT@0..48
-        YAML_BLOCK_MAP@0..48
-          YAML_BLOCK_MAP_ENTRY@0..20
-            YAML_BLOCK_MAP_KEY@0..8
-              YAML_SCALAR@0..7 "literal"
-              YAML_COLON@7..8 ":"
-            YAML_BLOCK_MAP_VALUE@8..20
-              WHITESPACE@8..9 " "
-              YAML_SCALAR@9..20 "|2\n  value\n"
-          YAML_BLOCK_MAP_ENTRY@20..48
-            YAML_BLOCK_MAP_KEY@20..27
-              YAML_SCALAR@20..26 "folded"
-              YAML_COLON@26..27 ":"
-            YAML_BLOCK_MAP_VALUE@27..48
-              NEWLINE@27..28 "\n"
-              WHITESPACE@28..31 "   "
-              YAML_TAG@31..35 "!foo"
-              NEWLINE@35..36 "\n"
-              WHITESPACE@36..38 "  "
-              YAML_SCALAR@38..48 ">1\n value\n"
+YAML_STREAM@0..48
+  YAML_DOCUMENT@0..48
+    YAML_BLOCK_MAP@0..48
+      YAML_BLOCK_MAP_ENTRY@0..20
+        YAML_BLOCK_MAP_KEY@0..8
+          YAML_SCALAR@0..7 "literal"
+          YAML_COLON@7..8 ":"
+        YAML_BLOCK_MAP_VALUE@8..20
+          WHITESPACE@8..9 " "
+          YAML_SCALAR@9..20 "|2\n  value\n"
+      YAML_BLOCK_MAP_ENTRY@20..48
+        YAML_BLOCK_MAP_KEY@20..27
+          YAML_SCALAR@20..26 "folded"
+          YAML_COLON@26..27 ":"
+        YAML_BLOCK_MAP_VALUE@27..48
+          NEWLINE@27..28 "\n"
+          WHITESPACE@28..31 "   "
+          YAML_TAG@31..35 "!foo"
+          NEWLINE@35..36 "\n"
+          WHITESPACE@36..38 "  "
+          YAML_SCALAR@38..48 ">1\n value\n"

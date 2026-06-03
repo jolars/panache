@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 283
 expression: snapshot
 ---
 case_id: 3GZX
@@ -8,44 +7,42 @@ input: "First occurrence: &anchor Foo\nSecond occurrence: *anchor\nOverride anch
 diagnostics:
 
 cst:
-DOCUMENT@0..108
-  YAML_METADATA_CONTENT@0..108
-    YAML_STREAM@0..108
-      YAML_DOCUMENT@0..108
-        YAML_BLOCK_MAP@0..108
-          YAML_BLOCK_MAP_ENTRY@0..30
-            YAML_BLOCK_MAP_KEY@0..17
-              YAML_SCALAR@0..16 "First occurrence"
-              YAML_COLON@16..17 ":"
-            YAML_BLOCK_MAP_VALUE@17..30
-              WHITESPACE@17..18 " "
-              YAML_ANCHOR@18..25 "&anchor"
-              WHITESPACE@25..26 " "
-              YAML_SCALAR@26..29 "Foo"
-              NEWLINE@29..30 "\n"
-          YAML_BLOCK_MAP_ENTRY@30..57
-            YAML_BLOCK_MAP_KEY@30..48
-              YAML_SCALAR@30..47 "Second occurrence"
-              YAML_COLON@47..48 ":"
-            YAML_BLOCK_MAP_VALUE@48..57
-              WHITESPACE@48..49 " "
-              YAML_ALIAS@49..56 "*anchor"
-              NEWLINE@56..57 "\n"
-          YAML_BLOCK_MAP_ENTRY@57..86
-            YAML_BLOCK_MAP_KEY@57..73
-              YAML_SCALAR@57..72 "Override anchor"
-              YAML_COLON@72..73 ":"
-            YAML_BLOCK_MAP_VALUE@73..86
-              WHITESPACE@73..74 " "
-              YAML_ANCHOR@74..81 "&anchor"
-              WHITESPACE@81..82 " "
-              YAML_SCALAR@82..85 "Bar"
-              NEWLINE@85..86 "\n"
-          YAML_BLOCK_MAP_ENTRY@86..108
-            YAML_BLOCK_MAP_KEY@86..99
-              YAML_SCALAR@86..98 "Reuse anchor"
-              YAML_COLON@98..99 ":"
-            YAML_BLOCK_MAP_VALUE@99..108
-              WHITESPACE@99..100 " "
-              YAML_ALIAS@100..107 "*anchor"
-              NEWLINE@107..108 "\n"
+YAML_STREAM@0..108
+  YAML_DOCUMENT@0..108
+    YAML_BLOCK_MAP@0..108
+      YAML_BLOCK_MAP_ENTRY@0..30
+        YAML_BLOCK_MAP_KEY@0..17
+          YAML_SCALAR@0..16 "First occurrence"
+          YAML_COLON@16..17 ":"
+        YAML_BLOCK_MAP_VALUE@17..30
+          WHITESPACE@17..18 " "
+          YAML_ANCHOR@18..25 "&anchor"
+          WHITESPACE@25..26 " "
+          YAML_SCALAR@26..29 "Foo"
+          NEWLINE@29..30 "\n"
+      YAML_BLOCK_MAP_ENTRY@30..57
+        YAML_BLOCK_MAP_KEY@30..48
+          YAML_SCALAR@30..47 "Second occurrence"
+          YAML_COLON@47..48 ":"
+        YAML_BLOCK_MAP_VALUE@48..57
+          WHITESPACE@48..49 " "
+          YAML_ALIAS@49..56 "*anchor"
+          NEWLINE@56..57 "\n"
+      YAML_BLOCK_MAP_ENTRY@57..86
+        YAML_BLOCK_MAP_KEY@57..73
+          YAML_SCALAR@57..72 "Override anchor"
+          YAML_COLON@72..73 ":"
+        YAML_BLOCK_MAP_VALUE@73..86
+          WHITESPACE@73..74 " "
+          YAML_ANCHOR@74..81 "&anchor"
+          WHITESPACE@81..82 " "
+          YAML_SCALAR@82..85 "Bar"
+          NEWLINE@85..86 "\n"
+      YAML_BLOCK_MAP_ENTRY@86..108
+        YAML_BLOCK_MAP_KEY@86..99
+          YAML_SCALAR@86..98 "Reuse anchor"
+          YAML_COLON@98..99 ":"
+        YAML_BLOCK_MAP_VALUE@99..108
+          WHITESPACE@99..100 " "
+          YAML_ALIAS@100..107 "*anchor"
+          NEWLINE@107..108 "\n"
