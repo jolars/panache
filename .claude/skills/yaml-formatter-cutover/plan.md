@@ -79,15 +79,48 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
   stack — hashpipe *value extraction* migrated to the in-tree wrappers
   in 2b, and hashpipe *option-body formatting* has gone through
   `yaml_engine::format_yaml_with_config` (the in-tree formatter) since
-  2a. Remaining: dedicated hashpipe corpus fixtures
-  (`tests/fixtures/yaml_corpus/hashpipe/`), removing stale
-  `pretty_yaml`-era comments/workarounds in `hashpipe.rs`, and folding
-  hashpipe into the 2c CST embedding (the preamble content node).
+  2a. **3.2 DONE** (see "what landed"): dedicated hashpipe corpus
+  fixtures landed under `tests/fixtures/yaml_corpus/hashpipe/`, the lone
+  stale `pretty_yaml`-era comment in `hashpipe.rs` de-staled, and the
+  host `issue_*_hashpipe_*` goldens audited (no `pretty_yaml` quirks
+  remain — they were reconciled to in-tree output when 2a went live).
+  Remaining: folding hashpipe into the 2c CST embedding (the preamble
+  content node) — deferred **with 2c**, not part of Phase 3 proper.
 
 ## What landed since drafting
 
 _(Update as phases complete. Earliest entries on top.)_
 
+- **Phase 3.2 — hashpipe corpus + finishing.** Closes the 2c-independent
+  half of Phase 3. (1) Added a dedicated hashpipe corpus under
+  `crates/panache-formatter/tests/fixtures/yaml_corpus/hashpipe/` —
+  five plain-YAML payload cases mirroring the shapes the host
+  `issue_*_hashpipe_*` fixtures emit after `#|` stripping:
+  `fig_subcap_block_sequence` (quoted captions in a block sequence,
+  issue #172/#181), `dotted_key` (`cache.extra:` + a `cache-vars` block
+  sequence, issue #280), `yaml_tag_value` (`!expr` tag, issue #280),
+  `blank_line_between_keys` (interior single blank, issue #190), and
+  `continuation_lines` (multi-line plain scalar, issue #189). The
+  cross-validation harness (`yaml_cross_validation.rs`) auto-discovers
+  them recursively — no harness change — and all five passed
+  `format_yaml == pretty_yaml` parity **and** idempotency on the first
+  run (no parser/formatter fix or 14th rule needed; tag + dotted key
+  verified to round-trip end-to-end through the live formatter). (2)
+  De-staled the only `pretty_yaml`-era comment left in
+  `crates/panache-formatter/src/formatter/hashpipe.rs` (the print-width
+  note above the `line_width.saturating_sub(prefix.len() + 1)` math) to
+  reference the in-tree formatter; `grep pretty_yaml hashpipe.rs` is now
+  empty. The width subtraction itself and the issue-#172 block-value
+  preservation notes are load-bearing and untouched. (3) Audited the
+  host hashpipe goldens — all nine registered cases green and reflecting
+  in-tree output; `issue_194_idempotency_lsj_tbl_cap`'s trailing-space
+  strip is the intentional rule-10 trade, not a `pretty_yaml` quirk; no
+  fixture edits. **Note:** the on-disk
+  `issue_179_hashpipe_one_space_list_idempotency` case is **not**
+  registered in `tests/golden_cases.rs` (pre-existing wiring gap,
+  unrelated to the cutover) — flagged, not fixed. Remaining Phase 3 work
+  (nest the hashpipe preamble's YAML structure into the host CST) folds
+  into the still-outstanding Phase 2c. STYLE.md unchanged (no new rule).
 - **Phase 2b — `yaml_parser` retirement via in-tree typed AST
   wrappers.** Built `crates/panache-parser/src/syntax/yaml_ast.rs`: a
   typed wrapper layer over the in-tree YAML CST in the house

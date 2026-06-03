@@ -1,0 +1,5 @@
+cache: true
+cache.extra: file.mtime
+cache-vars:
+  - loaded_data
+  - loaded_plots

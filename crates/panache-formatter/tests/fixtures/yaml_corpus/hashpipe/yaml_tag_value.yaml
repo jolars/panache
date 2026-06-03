@@ -1,0 +1,1 @@
+cache-extra: !expr file.mtime("path/to/obj-file.rds")
