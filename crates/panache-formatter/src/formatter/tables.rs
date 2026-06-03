@@ -1,4 +1,4 @@
-use crate::config::{Config, WrapMode};
+use crate::config::{Config, TableIndentStyle, WrapMode};
 use crate::formatter::inline::format_inline_node;
 use crate::formatter::inline_layout::wrap_text_first_fit;
 use crate::formatter::sentence_wrap::{ResolvedProfile, resolve_profile, split_sentence_text};
@@ -10,7 +10,9 @@ use unicode_width::UnicodeWidthStr;
 /// Default indent (in spaces) for table types that self-indent at the top level
 /// (pipe, simple, multiline). Grid tables instead honor the container indent
 /// threaded from the dispatcher so a top-level grid sits at column 0 -- pandoc
-/// rejects an indented `+---+` border. See `format_grid_table`.
+/// rejects an indented `+---+` border. See `format_grid_table`. Pipe tables
+/// also drop the self-indent when `table-indent = "pandoc"`; see
+/// `format_pipe_table`.
 const TABLE_BLOCK_INDENT: usize = 2;
 
 fn indent_table_block(block: &str, indent: usize) -> String {
@@ -714,10 +716,12 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config, indent: usize) -> S
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    let block_indent = if indent == 0 {
-        TABLE_BLOCK_INDENT
-    } else {
-        indent
+    // A top-level pipe table self-indents two columns under the unified style;
+    // under the pandoc style it stays flush (`indent == 0`) like pandoc's pipe
+    // writers. Nested tables always honor the container indent threaded in.
+    let block_indent = match config.table_indent {
+        TableIndentStyle::Unified if indent == 0 => TABLE_BLOCK_INDENT,
+        _ => indent,
     };
     indent_table_block(&output, block_indent)
 }

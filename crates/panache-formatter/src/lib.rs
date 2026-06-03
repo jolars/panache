@@ -13,6 +13,7 @@ pub use config::LineEnding;
 pub use config::MathDelimiterStyle;
 pub use config::ParserOptions;
 pub use config::TabStopMode;
+pub use config::TableIndentStyle;
 pub use config::WrapMode;
 pub use formatter::ExternalCodeBlock;
 pub use formatter::FormattedCodeMap;

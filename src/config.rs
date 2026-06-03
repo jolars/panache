@@ -29,6 +29,7 @@ pub use types::LintConfig;
 pub use types::MathDelimiterStyle;
 pub use types::NoBreakAbbreviations;
 pub use types::TabStopMode;
+pub use types::TableIndentStyle;
 pub use types::WrapMode;
 
 // Globset forms (the engine `GlobMatcher` is built on): `**/<dir>/**` excludes
@@ -1179,6 +1180,31 @@ mod tests {
             .expect_err("typo'd [format] key must error");
         assert!(
             err.to_string().contains("wrapp"),
+            "error must name the offending key: {err}"
+        );
+    }
+
+    #[test]
+    fn table_indent_defaults_to_unified() {
+        let cfg = parse_config_str("", Path::new("panache.toml")).expect("empty config parses");
+        assert_eq!(cfg.table_indent, TableIndentStyle::Unified);
+    }
+
+    #[test]
+    fn table_indent_pandoc_parses_from_format_section() {
+        let toml = "[format]\ntable-indent = \"pandoc\"\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("table-indent = pandoc must parse");
+        assert_eq!(cfg.table_indent, TableIndentStyle::Pandoc);
+    }
+
+    #[test]
+    fn unknown_table_indent_value_is_rejected() {
+        let toml = "[format]\ntable-indent = \"flush\"\n";
+        let err = parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("unknown table-indent value must error");
+        assert!(
+            err.to_string().contains("table-indent"),
             "error must name the offending key: {err}"
         );
     }

@@ -294,6 +294,7 @@ Formatting style preferences are organized under the `[format]` section:
 wrap = "reflow"
 math-delimiter-style = "preserve"
 math-indent = 0
+table-indent = "unified"
 tab-stops = "normalize"
 tab-width = 4
 ```
@@ -384,6 +385,28 @@ Math delimiter styles:
 
 The `math-indent` field specifies indentation (in spaces) for display math
 blocks. Default is 0.
+
+### Table Indentation
+
+Control how tables are indented at the top level of a document:
+
+```toml
+[format]
+table-indent = "unified"
+```
+
+`unified`
+:   Indent pipe, simple, and multiline tables by two columns (default)
+
+`pandoc`
+:   Keep pipe tables flush at column 0, as Pandoc's pipe-table writers do; simple
+    and multiline tables stay indented two columns
+
+This setting affects only top-level tables. A table nested inside a list item or
+other container still honors the container's content indentation.
+
+The `-o table-indent=<STYLE>` flag on `panache format` can override this setting
+for a single invocation, e.g. `panache format -o table-indent=pandoc`.
 
 ### Tab Stops
 
