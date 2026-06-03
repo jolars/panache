@@ -448,10 +448,12 @@ fn scalar_document_value(doc: &SyntaxNode, handles: &TagHandles) -> Option<Strin
 
 /// Collect a node's scalar source bytes — concatenate every
 /// `YAML_SCALAR` / `YAML_ANCHOR` / `YAML_ALIAS` / `NEWLINE` descendant
-/// token in order, skipping any line whose first non-whitespace byte is
-/// `%` (a directive token left over from the document prologue). The
-/// result is the raw multi-line text the [`super::cooking`] helpers
-/// expect when folding a multi-line quoted scalar — usable at the
+/// token in order. Real directive lines are emitted as `YAML_DIRECTIVE`
+/// tokens and so are already excluded by the kind filter; a scalar
+/// fragment that merely *looks* like a directive (e.g. a `%YAML 1.2`
+/// continuation line of a plain scalar, XLQ9) is genuine content and
+/// kept. The result is the raw multi-line text the [`super::cooking`]
+/// helpers expect when folding a multi-line quoted scalar — usable at the
 /// document level or scoped to a single `YAML_BLOCK_MAP_VALUE`.
 fn collect_scalar_source(node: &SyntaxNode) -> String {
     node.descendants_with_tokens()
@@ -465,7 +467,6 @@ fn collect_scalar_source(node: &SyntaxNode) -> String {
                     | SyntaxKind::NEWLINE
             )
         })
-        .filter(|tok| !tok.text().trim_start().starts_with('%'))
         .map(|tok| tok.text().to_string())
         .collect()
 }
@@ -475,10 +476,12 @@ fn plain_val_event(text: &str) -> String {
 }
 
 /// Fold the YAML-1.2 plain-scalar body of a top-level scalar `YAML_DOCUMENT`
-/// into its canonical value: walk `YAML_SCALAR` and `NEWLINE` tokens in order
-/// (skipping directive lines), then apply plain-scalar folding —
-/// non-empty-line breaks fold to a single space, runs of `n` empty lines fold
-/// to `n` line feeds. Leading/trailing empty lines are stripped.
+/// into its canonical value: walk `YAML_SCALAR` and `NEWLINE` tokens in order,
+/// then apply plain-scalar folding — non-empty-line breaks fold to a single
+/// space, runs of `n` empty lines fold to `n` line feeds. Leading/trailing
+/// empty lines are stripped. Real directives are `YAML_DIRECTIVE` tokens
+/// (excluded by the kind filter); a `%`-leading plain-scalar continuation
+/// line (XLQ9) is content and is kept.
 fn fold_plain_document_lines(doc: &SyntaxNode) -> String {
     let raw: String = doc
         .descendants_with_tokens()
@@ -493,7 +496,6 @@ fn fold_plain_document_lines(doc: &SyntaxNode) -> String {
                     | SyntaxKind::NEWLINE
             )
         })
-        .filter(|tok| !tok.text().trim_start().starts_with('%'))
         .map(|tok| tok.text().to_string())
         .collect();
 
@@ -1880,8 +1882,10 @@ fn project_block_sequence_items(
             .map(|tok| tok.text().to_string());
         // Include WHITESPACE so `&anchor body` joins as `&anchor body`,
         // letting `decompose_scalar` find the whitespace terminator on
-        // the anchor name. See `project_block_map_entry_value` for the
-        // matching rationale at value position.
+        // the anchor name, and NEWLINE so a multi-line plain item folds
+        // its line breaks (`x\n  \tx` → `x x`, UV7Q) instead of
+        // concatenating the continuation indentation. See
+        // `project_block_map_entry_value` for the matching rationale.
         let scalar_text = item
             .descendants_with_tokens()
             .filter_map(|el| el.into_token())
@@ -1892,6 +1896,7 @@ fn project_block_sequence_items(
                         | SyntaxKind::YAML_ANCHOR
                         | SyntaxKind::YAML_ALIAS
                         | SyntaxKind::WHITESPACE
+                        | SyntaxKind::NEWLINE
                 )
             })
             .map(|tok| tok.text().to_string())
@@ -2578,9 +2583,11 @@ fn project_block_map_entry_value(
     // Include WHITESPACE between scalar-ish tokens so a value like
     // `&anchor body` joins as `&anchor body` (not `&anchorbody`),
     // letting `decompose_scalar` find the whitespace terminator on the
-    // anchor name. The scanner emits multi-line plain scalars as one
-    // YAML_SCALAR token, so the WS we pick up here is only the inter-
-    // property indentation that yaml-test-suite trims anyway.
+    // anchor name. NEWLINE must be kept too: the scanner splits a
+    // multi-line plain scalar into per-line `YAML_SCALAR_TEXT` leaves
+    // interleaved with `NEWLINE` leaves, and the downstream plain fold
+    // needs those breaks to collapse `e\n  f` to `e f` (A984) rather than
+    // concatenating the continuation indentation into `e  f`.
     let value_text = value_node
         .descendants_with_tokens()
         .filter_map(|el| el.into_token())
@@ -2591,6 +2598,7 @@ fn project_block_map_entry_value(
                     | SyntaxKind::YAML_ANCHOR
                     | SyntaxKind::YAML_ALIAS
                     | SyntaxKind::WHITESPACE
+                    | SyntaxKind::NEWLINE
             )
         })
         .map(|tok| tok.text().to_string())

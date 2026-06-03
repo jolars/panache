@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 312
 expression: snapshot
 ---
 case_id: NP9H
@@ -11,5 +10,13 @@ cst:
 YAML_STREAM@0..63
   YAML_DOCUMENT@0..63
     YAML_SCALAR@0..62
-      YAML_SCALAR_TEXT@0..62 "\"folded \nto a space,\t ..."
+      YAML_SCALAR_TEXT@0..8 "\"folded "
+      NEWLINE@8..9 "\n"
+      YAML_SCALAR_TEXT@9..21 "to a space,\t"
+      NEWLINE@21..22 "\n"
+      YAML_SCALAR_TEXT@22..23 " "
+      NEWLINE@23..24 "\n"
+      YAML_SCALAR_TEXT@24..45 "to a line feed, or \t\\"
+      NEWLINE@45..46 "\n"
+      YAML_SCALAR_TEXT@46..62 " \\ \tnon-content\""
     NEWLINE@62..63 "\n"

@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 312
 expression: snapshot
 ---
 case_id: 6VJK
@@ -11,4 +10,17 @@ cst:
 YAML_STREAM@0..120
   YAML_DOCUMENT@0..120
     YAML_SCALAR@0..120
-      YAML_SCALAR_TEXT@0..120 ">\n Sammy Sosa complet ..."
+      YAML_SCALAR_TEXT@0..1 ">"
+      NEWLINE@1..2 "\n"
+      YAML_SCALAR_TEXT@2..31 " Sammy Sosa completed ..."
+      NEWLINE@31..32 "\n"
+      YAML_SCALAR_TEXT@32..62 " fine season with gre ..."
+      NEWLINE@62..63 "\n"
+      NEWLINE@63..64 "\n"
+      YAML_SCALAR_TEXT@64..79 "   63 Home Runs"
+      NEWLINE@79..80 "\n"
+      YAML_SCALAR_TEXT@80..104 "   0.288 Batting Average"
+      NEWLINE@104..105 "\n"
+      NEWLINE@105..106 "\n"
+      YAML_SCALAR_TEXT@106..119 " What a year!"
+      NEWLINE@119..120 "\n"

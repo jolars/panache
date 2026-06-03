@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 312
 expression: snapshot
 ---
 case_id: 5WE3
@@ -26,7 +25,10 @@ YAML_STREAM@0..94
           YAML_KEY@29..30 "?"
           WHITESPACE@30..31 " "
           YAML_SCALAR@31..45
-            YAML_SCALAR_TEXT@31..45 "|\n  block key\n"
+            YAML_SCALAR_TEXT@31..32 "|"
+            NEWLINE@32..33 "\n"
+            YAML_SCALAR_TEXT@33..44 "  block key"
+            NEWLINE@44..45 "\n"
           YAML_COLON@45..46 ":"
         YAML_BLOCK_MAP_VALUE@46..94
           WHITESPACE@46..47 " "

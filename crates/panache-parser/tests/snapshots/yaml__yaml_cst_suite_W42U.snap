@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 312
 expression: snapshot
 ---
 case_id: W42U
@@ -20,7 +19,10 @@ YAML_STREAM@0..92
         YAML_BLOCK_SEQ_ENTRY@10..11 "-"
         WHITESPACE@11..12 " "
         YAML_SCALAR@12..26
-          YAML_SCALAR_TEXT@12..26 "|\n block node\n"
+          YAML_SCALAR_TEXT@12..13 "|"
+          NEWLINE@13..14 "\n"
+          YAML_SCALAR_TEXT@14..25 " block node"
+          NEWLINE@25..26 "\n"
       YAML_BLOCK_SEQUENCE_ITEM@26..63
         YAML_BLOCK_SEQ_ENTRY@26..27 "-"
         WHITESPACE@27..28 " "

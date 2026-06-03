@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 312
 expression: snapshot
 ---
 case_id: RZP5
@@ -19,7 +18,9 @@ YAML_STREAM@0..157
         YAML_BLOCK_MAP_VALUE@2..28
           WHITESPACE@2..3 " "
           YAML_SCALAR@3..20
-            YAML_SCALAR_TEXT@3..20 "\"double\n  quotes\""
+            YAML_SCALAR_TEXT@3..10 "\"double"
+            NEWLINE@10..11 "\n"
+            YAML_SCALAR_TEXT@11..20 "  quotes\""
           WHITESPACE@20..21 " "
           YAML_COMMENT@21..27 "# lala"
           NEWLINE@27..28 "\n"
@@ -31,7 +32,9 @@ YAML_STREAM@0..157
         YAML_BLOCK_MAP_VALUE@30..52
           WHITESPACE@30..31 " "
           YAML_SCALAR@31..43
-            YAML_SCALAR_TEXT@31..43 "plain\n value"
+            YAML_SCALAR_TEXT@31..36 "plain"
+            NEWLINE@36..37 "\n"
+            YAML_SCALAR_TEXT@37..43 " value"
           WHITESPACE@43..45 "  "
           YAML_COMMENT@45..51 "# lala"
           NEWLINE@51..52 "\n"
@@ -113,4 +116,7 @@ YAML_STREAM@0..157
         YAML_BLOCK_MAP_VALUE@139..157
           WHITESPACE@139..140 " "
           YAML_SCALAR@140..157
-            YAML_SCALAR_TEXT@140..157 "> # lala\n  abcde\n"
+            YAML_SCALAR_TEXT@140..148 "> # lala"
+            NEWLINE@148..149 "\n"
+            YAML_SCALAR_TEXT@149..156 "  abcde"
+            NEWLINE@156..157 "\n"

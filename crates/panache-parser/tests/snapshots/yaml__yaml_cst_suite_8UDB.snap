@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 312
 expression: snapshot
 ---
 case_id: 8UDB
@@ -15,17 +14,23 @@ YAML_STREAM@0..89
       NEWLINE@1..2 "\n"
       YAML_FLOW_SEQUENCE_ITEM@2..18
         YAML_SCALAR@2..18
-          YAML_SCALAR_TEXT@2..18 "\"double\n quoted\""
+          YAML_SCALAR_TEXT@2..9 "\"double"
+          NEWLINE@9..10 "\n"
+          YAML_SCALAR_TEXT@10..18 " quoted\""
       YAML_FLOW_INDICATOR@18..19 ","
       WHITESPACE@19..20 " "
       YAML_FLOW_SEQUENCE_ITEM@20..46
         YAML_SCALAR@20..46
-          YAML_SCALAR_TEXT@20..46 "'single\n           qu ..."
+          YAML_SCALAR_TEXT@20..27 "'single"
+          NEWLINE@27..28 "\n"
+          YAML_SCALAR_TEXT@28..46 "           quoted'"
       YAML_FLOW_INDICATOR@46..47 ","
       NEWLINE@47..48 "\n"
       YAML_FLOW_SEQUENCE_ITEM@48..59
         YAML_SCALAR@48..59
-          YAML_SCALAR_TEXT@48..59 "plain\n text"
+          YAML_SCALAR_TEXT@48..53 "plain"
+          NEWLINE@53..54 "\n"
+          YAML_SCALAR_TEXT@54..59 " text"
       YAML_FLOW_INDICATOR@59..60 ","
       WHITESPACE@60..61 " "
       YAML_FLOW_SEQUENCE_ITEM@61..71

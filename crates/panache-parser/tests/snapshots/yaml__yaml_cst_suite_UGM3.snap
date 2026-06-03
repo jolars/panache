@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 312
 expression: snapshot
 ---
 case_id: UGM3
@@ -85,7 +84,12 @@ YAML_STREAM@0..644
                     YAML_BLOCK_MAP_VALUE@156..218
                       WHITESPACE@156..157 " "
                       YAML_SCALAR@157..210
-                        YAML_SCALAR_TEXT@157..210 "|\n            458 Wal ..."
+                        YAML_SCALAR_TEXT@157..158 "|"
+                        NEWLINE@158..159 "\n"
+                        YAML_SCALAR_TEXT@159..186 "            458 Walkm ..."
+                        NEWLINE@186..187 "\n"
+                        YAML_SCALAR_TEXT@187..209 "            Suite #292"
+                        NEWLINE@209..210 "\n"
                       WHITESPACE@210..218 "        "
                   YAML_BLOCK_MAP_ENTRY@218..246
                     YAML_BLOCK_MAP_KEY@218..227
@@ -261,5 +265,9 @@ YAML_STREAM@0..644
           NEWLINE@562..563 "\n"
           WHITESPACE@563..567 "    "
           YAML_SCALAR@567..643
-            YAML_SCALAR_TEXT@567..643 "Late afternoon is bes ..."
+            YAML_SCALAR_TEXT@567..590 "Late afternoon is best."
+            NEWLINE@590..591 "\n"
+            YAML_SCALAR_TEXT@591..618 "    Backup contact is ..."
+            NEWLINE@618..619 "\n"
+            YAML_SCALAR_TEXT@619..643 "    Billsmer @ 338-4338."
           NEWLINE@643..644 "\n"

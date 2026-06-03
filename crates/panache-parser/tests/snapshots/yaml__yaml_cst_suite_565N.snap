@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 312
 expression: snapshot
 ---
 case_id: 565N
@@ -21,7 +20,15 @@ YAML_STREAM@0..636
           YAML_TAG@11..19 "!!binary"
           WHITESPACE@19..20 " "
           YAML_SCALAR@20..282
-            YAML_SCALAR_TEXT@20..282 "\"\\\n R0lGODlhDAAMAIQAA ..."
+            YAML_SCALAR_TEXT@20..22 "\"\\"
+            NEWLINE@22..23 "\n"
+            YAML_SCALAR_TEXT@23..87 " R0lGODlhDAAMAIQAAP// ..."
+            NEWLINE@87..88 "\n"
+            YAML_SCALAR_TEXT@88..152 " OTk6enp56enmlpaWNjY6 ..."
+            NEWLINE@152..153 "\n"
+            YAML_SCALAR_TEXT@153..217 " +f/++f/++f/++f/++f/+ ..."
+            NEWLINE@217..218 "\n"
+            YAML_SCALAR_TEXT@218..282 " AgjoEwnuNAFOhpEMTRig ..."
           NEWLINE@282..283 "\n"
       YAML_BLOCK_MAP_ENTRY@283..559
         YAML_BLOCK_MAP_KEY@283..291
@@ -33,7 +40,16 @@ YAML_STREAM@0..636
           YAML_TAG@292..300 "!!binary"
           WHITESPACE@300..301 " "
           YAML_SCALAR@301..559
-            YAML_SCALAR_TEXT@301..559 "|\n R0lGODlhDAAMAIQAAP ..."
+            YAML_SCALAR_TEXT@301..302 "|"
+            NEWLINE@302..303 "\n"
+            YAML_SCALAR_TEXT@303..366 " R0lGODlhDAAMAIQAAP// ..."
+            NEWLINE@366..367 "\n"
+            YAML_SCALAR_TEXT@367..430 " OTk6enp56enmlpaWNjY6 ..."
+            NEWLINE@430..431 "\n"
+            YAML_SCALAR_TEXT@431..494 " +f/++f/++f/++f/++f/+ ..."
+            NEWLINE@494..495 "\n"
+            YAML_SCALAR_TEXT@495..558 " AgjoEwnuNAFOhpEMTRig ..."
+            NEWLINE@558..559 "\n"
       YAML_BLOCK_MAP_ENTRY@559..636
         YAML_BLOCK_MAP_KEY@559..571
           YAML_SCALAR@559..570

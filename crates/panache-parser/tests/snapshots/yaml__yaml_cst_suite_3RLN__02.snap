@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 312
 expression: snapshot
 ---
 case_id: 3RLN/02
@@ -11,5 +10,7 @@ cst:
 YAML_STREAM@0..21
   YAML_DOCUMENT@0..21
     YAML_SCALAR@0..20
-      YAML_SCALAR_TEXT@0..20 "\"3 leading\n    \ttab\""
+      YAML_SCALAR_TEXT@0..10 "\"3 leading"
+      NEWLINE@10..11 "\n"
+      YAML_SCALAR_TEXT@11..20 "    \ttab\""
     NEWLINE@20..21 "\n"

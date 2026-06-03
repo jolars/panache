@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 312
 expression: snapshot
 ---
 case_id: 4CQQ
@@ -20,7 +19,9 @@ YAML_STREAM@0..93
           NEWLINE@6..7 "\n"
           WHITESPACE@7..9 "  "
           YAML_SCALAR@9..49
-            YAML_SCALAR_TEXT@9..49 "This unquoted scalar\n ..."
+            YAML_SCALAR_TEXT@9..29 "This unquoted scalar"
+            NEWLINE@29..30 "\n"
+            YAML_SCALAR_TEXT@30..49 "  spans many lines."
           NEWLINE@49..50 "\n"
           NEWLINE@50..51 "\n"
       YAML_BLOCK_MAP_ENTRY@51..93
@@ -31,5 +32,7 @@ YAML_STREAM@0..93
         YAML_BLOCK_MAP_VALUE@58..93
           WHITESPACE@58..59 " "
           YAML_SCALAR@59..92
-            YAML_SCALAR_TEXT@59..92 "\"So does this\n  quote ..."
+            YAML_SCALAR_TEXT@59..72 "\"So does this"
+            NEWLINE@72..73 "\n"
+            YAML_SCALAR_TEXT@73..92 "  quoted scalar.\\n\""
           NEWLINE@92..93 "\n"

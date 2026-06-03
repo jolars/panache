@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 312
 expression: snapshot
 ---
 case_id: 4ZYM
@@ -19,7 +18,9 @@ YAML_STREAM@0..70
         YAML_BLOCK_MAP_VALUE@6..20
           WHITESPACE@6..7 " "
           YAML_SCALAR@7..19
-            YAML_SCALAR_TEXT@7..19 "text\n  lines"
+            YAML_SCALAR_TEXT@7..11 "text"
+            NEWLINE@11..12 "\n"
+            YAML_SCALAR_TEXT@12..19 "  lines"
           NEWLINE@19..20 "\n"
       YAML_BLOCK_MAP_ENTRY@20..44
         YAML_BLOCK_MAP_KEY@20..27
@@ -29,7 +30,9 @@ YAML_STREAM@0..70
         YAML_BLOCK_MAP_VALUE@27..44
           WHITESPACE@27..28 " "
           YAML_SCALAR@28..43
-            YAML_SCALAR_TEXT@28..43 "\"text\n  \tlines\""
+            YAML_SCALAR_TEXT@28..33 "\"text"
+            NEWLINE@33..34 "\n"
+            YAML_SCALAR_TEXT@34..43 "  \tlines\""
           NEWLINE@43..44 "\n"
       YAML_BLOCK_MAP_ENTRY@44..70
         YAML_BLOCK_MAP_KEY@44..50
@@ -39,4 +42,9 @@ YAML_STREAM@0..70
         YAML_BLOCK_MAP_VALUE@50..70
           WHITESPACE@50..51 " "
           YAML_SCALAR@51..70
-            YAML_SCALAR_TEXT@51..70 "|\n  text\n   \tlines\n"
+            YAML_SCALAR_TEXT@51..52 "|"
+            NEWLINE@52..53 "\n"
+            YAML_SCALAR_TEXT@53..59 "  text"
+            NEWLINE@59..60 "\n"
+            YAML_SCALAR_TEXT@60..69 "   \tlines"
+            NEWLINE@69..70 "\n"

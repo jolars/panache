@@ -375,36 +375,47 @@ fn canonical_indent_depth(root: &SyntaxNode, offset: usize) -> Option<usize> {
         TokenAtOffset::None => return Some(0),
     };
 
-    if token.kind() == SyntaxKind::YAML_SCALAR_TEXT && token.text().contains('\n') {
-        // Multi-line scalar continuation: block scalars (`|`/`>`) bake
-        // their interior indent into the single `YAML_SCALAR_TEXT` leaf —
-        // proper canonicalization needs a real block-scalar renderer, so
-        // preserve verbatim. Plain / single- / double-quoted multi-line
-        // scalars have their continuation lines canonicalized to the
-        // parent value's content column (depth * 2 spaces — one level
-        // deeper than rule 1's default formula, matching pretty_yaml's
-        // output for multi-line values). The first line of the scalar
-        // doesn't hit this carve-out: when the scalar is a value, the
-        // line's first non-WS byte is the key (offset < scalar_start);
-        // when the scalar opens the line, offset == scalar_start.
-        let scalar_start = usize::from(token.text_range().start());
-        if offset > scalar_start {
-            let text = token.text();
-            if text.starts_with('|') || text.starts_with('>') {
-                return None;
-            }
-            let mut entry_item_ancestors = 0usize;
-            let mut node = token.parent();
-            while let Some(n) = node {
-                if matches!(
-                    n.kind(),
-                    SyntaxKind::YAML_BLOCK_MAP_ENTRY | SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
-                ) {
-                    entry_item_ancestors += 1;
+    if token.kind() == SyntaxKind::YAML_SCALAR_TEXT
+        && let Some(scalar) = token
+            .parent()
+            .filter(|p| p.kind() == SyntaxKind::YAML_SCALAR)
+    {
+        // Multi-line scalar continuation. The scanner splits a multi-line
+        // scalar into per-line `YAML_SCALAR_TEXT` fragments interleaved
+        // with `NEWLINE`, so the multi-line check, the scalar's start
+        // offset, and the `|`/`>` block-indicator probe all read the
+        // parent `YAML_SCALAR` node (not the individual fragment leaf).
+        // Block scalars (`|`/`>`) bake their interior indent into the
+        // source — proper canonicalization needs a real block-scalar
+        // renderer, so preserve verbatim. Plain / single- / double-quoted
+        // multi-line scalars have their continuation lines canonicalized
+        // to the parent value's content column (depth * 2 spaces — one
+        // level deeper than rule 1's default formula, matching
+        // pretty_yaml's output for multi-line values). The first line of
+        // the scalar doesn't hit this carve-out: when the scalar is a
+        // value, the line's first non-WS byte is the key
+        // (offset < scalar_start); when the scalar opens the line,
+        // offset == scalar_start.
+        let scalar_text = scalar.text().to_string();
+        if scalar_text.contains('\n') {
+            let scalar_start = usize::from(scalar.text_range().start());
+            if offset > scalar_start {
+                if scalar_text.starts_with('|') || scalar_text.starts_with('>') {
+                    return None;
                 }
-                node = n.parent();
+                let mut entry_item_ancestors = 0usize;
+                let mut node = scalar.parent();
+                while let Some(n) = node {
+                    if matches!(
+                        n.kind(),
+                        SyntaxKind::YAML_BLOCK_MAP_ENTRY | SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
+                    ) {
+                        entry_item_ancestors += 1;
+                    }
+                    node = n.parent();
+                }
+                return Some(entry_item_ancestors);
             }
-            return Some(entry_item_ancestors);
         }
     }
 

@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 312
 expression: snapshot
 ---
 case_id: RZT7
@@ -42,7 +41,9 @@ YAML_STREAM@0..411
           NEWLINE@50..51 "\n"
           WHITESPACE@51..53 "  "
           YAML_SCALAR@53..96
-            YAML_SCALAR_TEXT@53..96 "This is an error mess ..."
+            YAML_SCALAR_TEXT@53..77 "This is an error message"
+            NEWLINE@77..78 "\n"
+            YAML_SCALAR_TEXT@78..96 "  for the log file"
           NEWLINE@96..97 "\n"
   YAML_DOCUMENT@97..188
     YAML_DOCUMENT_START@97..100 "---"
@@ -77,7 +78,9 @@ YAML_STREAM@0..411
           NEWLINE@147..148 "\n"
           WHITESPACE@148..150 "  "
           YAML_SCALAR@150..187
-            YAML_SCALAR_TEXT@150..187 "A slightly different  ..."
+            YAML_SCALAR_TEXT@150..176 "A slightly different  ..."
+            NEWLINE@176..177 "\n"
+            YAML_SCALAR_TEXT@177..187 "  message."
           NEWLINE@187..188 "\n"
   YAML_DOCUMENT@188..411
     YAML_DOCUMENT_START@188..191 "---"
@@ -157,7 +160,10 @@ YAML_STREAM@0..411
                   YAML_BLOCK_MAP_VALUE@313..348
                     WHITESPACE@313..314 " "
                     YAML_SCALAR@314..346
-                      YAML_SCALAR_TEXT@314..346 "|\n      x = MoreObjec ..."
+                      YAML_SCALAR_TEXT@314..315 "|"
+                      NEWLINE@315..316 "\n"
+                      YAML_SCALAR_TEXT@316..345 "      x = MoreObject( ..."
+                      NEWLINE@345..346 "\n"
                     WHITESPACE@346..348 "  "
             YAML_BLOCK_SEQUENCE_ITEM@348..411
               YAML_BLOCK_SEQ_ENTRY@348..349 "-"
@@ -193,4 +199,7 @@ YAML_STREAM@0..411
                   YAML_BLOCK_MAP_VALUE@391..411
                     WHITESPACE@391..392 " "
                     YAML_SCALAR@392..411
-                      YAML_SCALAR_TEXT@392..411 "|-\n      foo = bar\n"
+                      YAML_SCALAR_TEXT@392..394 "|-"
+                      NEWLINE@394..395 "\n"
+                      YAML_SCALAR_TEXT@395..410 "      foo = bar"
+                      NEWLINE@410..411 "\n"

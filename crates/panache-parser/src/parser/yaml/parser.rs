@@ -762,18 +762,49 @@ fn close_block_containers(builder: &mut GreenNodeBuilder<'_>, stack: &mut Vec<Bl
     }
 }
 
-/// Emit a scalar token's bytes as a `YAML_SCALAR` node wrapping a single
-/// `YAML_SCALAR_TEXT` content leaf (the leaf carries the full scalar
-/// source, including any embedded line breaks for multi-line scalars).
-/// The node text equals `text` exactly, so this is byte-lossless. The
-/// node wrapper is what lets the formatter/LSP treat a scalar as real
+/// Emit a scalar token's bytes as a `YAML_SCALAR` node whose leaves are
+/// the per-physical-line content fragments (`YAML_SCALAR_TEXT`)
+/// interleaved with `NEWLINE` leaves for the line breaks. Concatenating
+/// the leaves reproduces `text` exactly, so this is byte-lossless and the
+/// node's text range is unchanged. The node wrapper plus per-line
+/// fragmentation is what lets the formatter/LSP treat a scalar as real
 /// structure and is the seam a later step uses to interleave hashpipe
-/// line-prefix leaves (which is also where per-line fragmentation will
-/// land — see the yaml-formatter cutover plan, step 2).
+/// line-prefix leaves (see the yaml-formatter cutover plan, step 2).
 fn emit_scalar_node(builder: &mut GreenNodeBuilder<'static>, text: &str) {
     builder.start_node(SyntaxKind::YAML_SCALAR.into());
-    builder.token(SyntaxKind::YAML_SCALAR_TEXT.into(), text);
+    emit_scalar_fragments(builder, text);
     builder.finish_node();
+}
+
+/// Split a scalar's source `text` into alternating `YAML_SCALAR_TEXT`
+/// content leaves and `NEWLINE` line-break leaves. Empty content runs are
+/// skipped (rowan rejects zero-width tokens), so a leading, trailing, or
+/// consecutive line break emits only the `NEWLINE` leaf. `\n`, `\r\n`,
+/// and lone `\r` are each emitted as a single `NEWLINE` leaf.
+fn emit_scalar_fragments(builder: &mut GreenNodeBuilder<'static>, text: &str) {
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    let mut content_start = 0;
+    while i < bytes.len() {
+        let nl_len = match bytes[i] {
+            b'\n' => 1,
+            b'\r' if bytes.get(i + 1) == Some(&b'\n') => 2,
+            b'\r' => 1,
+            _ => {
+                i += 1;
+                continue;
+            }
+        };
+        if content_start < i {
+            builder.token(SyntaxKind::YAML_SCALAR_TEXT.into(), &text[content_start..i]);
+        }
+        builder.token(SyntaxKind::NEWLINE.into(), &text[i..i + nl_len]);
+        i += nl_len;
+        content_start = i;
+    }
+    if content_start < bytes.len() {
+        builder.token(SyntaxKind::YAML_SCALAR_TEXT.into(), &text[content_start..]);
+    }
 }
 
 fn map_token_to_syntax_kind(kind: TokenKind) -> SyntaxKind {
