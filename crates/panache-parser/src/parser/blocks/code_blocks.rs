@@ -1,14 +1,15 @@
 //! Fenced code block parsing utilities.
 
+use crate::parser::diagnostics::{Diagnostics, SyntaxError, SyntaxErrorSource};
 use crate::parser::utils::chunk_options::hashpipe_comment_prefix;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
+use rowan::{GreenNodeBuilder, TextRange};
 
 use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
 use super::container_prefix::{StrippedLines, advance_columns};
 use crate::parser::utils::container_stack::byte_index_at_column;
 use crate::parser::utils::tree_copy::copy_green_children;
-use crate::parser::yaml::{parse_stream_with_prefix, validate_yaml_with_prefix};
+use crate::parser::yaml::{locate_yaml_diagnostic, parse_stream_with_prefix};
 
 // Container-prefix primitives live in `container_prefix.rs` (the lower
 // layer that hosts `StrippedLines`); re-export so existing call sites in
@@ -1046,6 +1047,7 @@ pub(crate) fn parse_fenced_code_block(
     window: &StrippedLines<'_, '_>,
     fence: FenceInfo,
     first_line_override: Option<&str>,
+    diags: &Diagnostics,
 ) -> usize {
     let lines = window.raw();
     let start_pos = window.pos();
@@ -1175,19 +1177,27 @@ pub(crate) fn parse_fenced_code_block(
                     content_indent,
                 );
 
-                if validate_yaml_with_prefix(&content, marker).is_none() {
-                    // Splice the prefix-aware YAML subtree: token ranges are
-                    // host ranges directly, the composite prefix peeled into
-                    // `YAML_LINE_PREFIX` trivia. Mirrors the frontmatter
-                    // `emit_yaml_block` validate→splice→fallback pattern.
-                    let stream = parse_stream_with_prefix(&content, marker)
-                        .green()
-                        .into_owned();
-                    copy_green_children(builder, &stream);
-                } else {
-                    // Malformed hashpipe YAML: fall back to opaque line
-                    // tokens (container prefix + TEXT + NEWLINE), preserving
-                    // the bytes without imposing a structure that didn't parse.
+                if let Some((diag, start_off, end_off)) = locate_yaml_diagnostic(&content, marker) {
+                    // Malformed hashpipe YAML: record the syntax error at its
+                    // host position — the parser already computed the verdict,
+                    // so it surfaces the diagnostic here instead of discarding
+                    // it (the linter would otherwise re-parse to recover it).
+                    // `content` is `content_lines[..n]` concatenated and those
+                    // lines are subslices of the host input, so the preamble's
+                    // host start is their pointer offset from line 0.
+                    let host_start =
+                        content_lines[0].as_ptr() as usize - lines[0].as_ptr() as usize;
+                    diags.push(SyntaxError {
+                        range: TextRange::new(
+                            ((host_start + start_off) as u32).into(),
+                            ((host_start + end_off) as u32).into(),
+                        ),
+                        message: diag.message.to_string(),
+                        source: SyntaxErrorSource::Yaml,
+                    });
+                    // Fall back to opaque line tokens (container prefix + TEXT +
+                    // NEWLINE), preserving the bytes without imposing a
+                    // structure that didn't parse.
                     while line_idx < prepared_hashpipe_lines {
                         let after_indent = window.emit_prefix_at(builder, start_pos + 1 + line_idx);
                         let (line_without_newline, newline_str) = strip_newline(after_indent);
@@ -1199,6 +1209,15 @@ pub(crate) fn parse_fenced_code_block(
                         }
                         line_idx += 1;
                     }
+                } else {
+                    // Valid: splice the prefix-aware YAML subtree. Token ranges
+                    // are host ranges directly, the composite prefix peeled into
+                    // `YAML_LINE_PREFIX` trivia. Mirrors the frontmatter
+                    // `emit_yaml_block` validate→splice→fallback pattern.
+                    let stream = parse_stream_with_prefix(&content, marker)
+                        .green()
+                        .into_owned();
+                    copy_green_children(builder, &stream);
                 }
                 // Whether spliced or fallback, the preamble lines are consumed.
                 line_idx = prepared_hashpipe_lines;

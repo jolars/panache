@@ -10,6 +10,7 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::{GreenNode, GreenToken, NodeOrToken};
 
 pub mod blocks;
+pub mod diagnostics;
 pub mod inlines;
 pub mod utils;
 pub mod yaml;
@@ -19,6 +20,7 @@ mod core;
 
 // Re-export main parser
 pub use core::Parser;
+pub use diagnostics::{Diagnostics, SyntaxError, SyntaxErrorSource};
 
 /// Parses a Quarto document string into a syntax tree.
 ///
@@ -44,9 +46,22 @@ pub use core::Parser;
 /// * `input` - The Quarto document content to parse
 /// * `config` - Optional configuration. If None, uses default config.
 pub fn parse(input: &str, config: Option<ParserOptions>) -> SyntaxNode {
+    parse_with_errors(input, config).0
+}
+
+/// Like [`parse`], but also returns the syntax errors the parser found in
+/// embedded sublanguages (currently malformed frontmatter / hashpipe YAML).
+///
+/// The errors carry host-aligned ranges, so consumers (the linter) can turn
+/// them straight into diagnostics without re-parsing the region or remapping
+/// offsets. For pure Markdown the error list is empty.
+pub fn parse_with_errors(
+    input: &str,
+    config: Option<ParserOptions>,
+) -> (SyntaxNode, Vec<SyntaxError>) {
     let mut config = config.unwrap_or_default();
     populate_refdef_labels(input, &mut config);
-    Parser::new(input, &config).parse()
+    Parser::new(input, &config).parse_with_errors()
 }
 
 /// Parse with a caller-supplied refdef set.
@@ -63,9 +78,20 @@ pub fn parse_with_refdefs(
     options: Option<ParserOptions>,
     refdefs: RefdefMap,
 ) -> SyntaxNode {
+    parse_with_refdefs_and_errors(input, options, refdefs).0
+}
+
+/// Like [`parse_with_refdefs`], but also returns embedded-sublanguage syntax
+/// errors (see [`parse_with_errors`]). Used by the salsa parse query, which
+/// caches the tree and the errors together from a single parse.
+pub fn parse_with_refdefs_and_errors(
+    input: &str,
+    options: Option<ParserOptions>,
+    refdefs: RefdefMap,
+) -> (SyntaxNode, Vec<SyntaxError>) {
     let mut options = options.unwrap_or_default();
     options.refdef_labels = Some(refdefs);
-    Parser::new(input, &options).parse()
+    Parser::new(input, &options).parse_with_errors()
 }
 
 /// Pre-compute the document-level reference link label set.
@@ -391,6 +417,44 @@ mod tests {
         out.push_str(insert);
         out.push_str(&text[old.1..]);
         out
+    }
+
+    fn quarto_options() -> crate::options::ParserOptions {
+        crate::options::ParserOptions {
+            flavor: crate::options::Flavor::Quarto,
+            extensions: crate::options::Extensions::for_flavor(crate::options::Flavor::Quarto),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn parse_with_errors_reports_malformed_hashpipe_yaml() {
+        let input = "```{r}\n#| echo: [\n1 + 1\n```\n";
+        let (_tree, errors) = parse_with_errors(input, Some(quarto_options()));
+        assert_eq!(errors.len(), 1, "expected one yaml error, got {errors:?}");
+        assert_eq!(errors[0].source, SyntaxErrorSource::Yaml);
+        let start: usize = errors[0].range.start().into();
+        assert_eq!(start, input.find('[').unwrap());
+    }
+
+    #[test]
+    fn parse_with_errors_reports_malformed_frontmatter_yaml() {
+        let input = "---\ntitle: [\n---\n";
+        let (_tree, errors) = parse_with_errors(input, None);
+        assert_eq!(errors.len(), 1, "expected one yaml error, got {errors:?}");
+        assert_eq!(errors[0].source, SyntaxErrorSource::Yaml);
+        let start: usize = errors[0].range.start().into();
+        assert_eq!(start, input.find('[').unwrap());
+    }
+
+    #[test]
+    fn parse_with_errors_empty_for_valid_document() {
+        let input = "---\ntitle: ok\n---\n\n```{r}\n#| echo: false\n1\n```\n";
+        let (_tree, errors) = parse_with_errors(input, Some(quarto_options()));
+        assert!(
+            errors.is_empty(),
+            "valid document should have no errors: {errors:?}"
+        );
     }
 
     #[test]

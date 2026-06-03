@@ -13,6 +13,8 @@ use crate::options::ParserOptions;
 use rowan::GreenNodeBuilder;
 use std::any::Any;
 
+use super::diagnostics::Diagnostics;
+
 use super::blocks::blockquotes::{
     can_start_blockquote, count_blockquote_markers, emit_one_blockquote_marker,
     strip_n_blockquote_markers,
@@ -95,6 +97,11 @@ pub(crate) struct BlockContext<'a> {
 
     /// Parser configuration
     pub config: &'a ParserOptions,
+
+    /// Sink for embedded-sublanguage syntax errors (malformed YAML). An owned
+    /// `Rc`-backed clone, so it threads here without borrowing `self` (which
+    /// would clash with the `&mut GreenNodeBuilder` held during emission).
+    pub diags: Diagnostics,
 
     // NOTE: we intentionally do not store `&ContainerStack` here to avoid
     // long-lived borrows of `self` in the main parser loop.
@@ -477,7 +484,8 @@ impl BlockParser for YamlMetadataParser {
         let line_pos = lines.pos();
         let lines = lines.raw();
         if let Some(prepared) = payload.and_then(|p| p.downcast_ref::<YamlMetadataPrepared>())
-            && let Some(new_pos) = emit_yaml_block(lines, line_pos, prepared.closing_pos, builder)
+            && let Some(new_pos) =
+                emit_yaml_block(lines, line_pos, prepared.closing_pos, builder, &ctx.diags)
         {
             return new_pos - line_pos;
         }
@@ -486,7 +494,7 @@ impl BlockParser for YamlMetadataParser {
             .and_then(|p| p.downcast_ref::<YamlMetadataPrepared>())
             .map(|p| p.at_document_start)
             .unwrap_or(ctx.at_document_start);
-        try_parse_yaml_block(lines, line_pos, builder, at_document_start)
+        try_parse_yaml_block(lines, line_pos, builder, at_document_start, &ctx.diags)
             .map(|new_pos| new_pos - line_pos)
             .unwrap_or(1)
     }
@@ -1845,7 +1853,7 @@ impl BlockParser for FencedCodeBlockParser {
         let new_pos = if ctx.config.extensions.tex_math_gfm && is_gfm_math_fence(&fence) {
             parse_fenced_math_block(builder, lines, fence, None)
         } else {
-            parse_fenced_code_block(builder, lines, fence, None)
+            parse_fenced_code_block(builder, lines, fence, None, &ctx.diags)
         };
 
         new_pos - line_pos

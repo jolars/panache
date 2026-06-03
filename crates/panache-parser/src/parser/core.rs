@@ -20,6 +20,7 @@ use super::blocks::line_blocks;
 use super::blocks::lists;
 use super::blocks::paragraphs;
 use super::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
+use super::diagnostics::{Diagnostics, SyntaxError};
 use super::utils::container_stack;
 use super::utils::helpers::{is_blank_line, split_lines_inclusive, strip_newline};
 use super::utils::inline_emission;
@@ -91,6 +92,10 @@ pub struct Parser<'a> {
     /// not upstream-emitted prefix. Threaded into `BlockContext` via
     /// `list_marker_consumed_on_line_0`.
     dispatch_list_marker_consumed: bool,
+    /// Syntax errors found in embedded sublanguages (malformed frontmatter /
+    /// hashpipe YAML). Threaded to the validation sites via `BlockContext`;
+    /// drained by [`Parser::parse_with_errors`]. Empty for pure Markdown.
+    diagnostics: Diagnostics,
 }
 
 impl<'a> Parser<'a> {
@@ -106,13 +111,21 @@ impl<'a> Parser<'a> {
             block_registry: BlockParserRegistry::new(),
             after_metadata_block: false,
             dispatch_list_marker_consumed: false,
+            diagnostics: Diagnostics::new(),
         }
     }
 
-    pub fn parse(mut self) -> SyntaxNode {
-        self.parse_document_stack();
+    pub fn parse(self) -> SyntaxNode {
+        self.parse_with_errors().0
+    }
 
-        SyntaxNode::new_root(self.builder.finish())
+    /// Parse, returning the CST plus any embedded-sublanguage syntax errors
+    /// (host-ranged) collected during the single pass.
+    pub fn parse_with_errors(mut self) -> (SyntaxNode, Vec<SyntaxError>) {
+        self.parse_document_stack();
+        let node = SyntaxNode::new_root(self.builder.finish());
+        let errors = self.diagnostics.take();
+        (node, errors)
     }
 
     /// Close enclosing list items (and their containing list) whose
@@ -498,6 +511,7 @@ impl<'a> Parser<'a> {
             &window,
             fence,
             Some(&text_owned),
+            &self.diagnostics,
         );
         Some(new_pos.saturating_sub(self.pos).saturating_sub(1))
     }
@@ -1466,6 +1480,7 @@ impl<'a> Parser<'a> {
                                 &window,
                                 fence,
                                 Some(&fence_line),
+                                &self.diagnostics,
                             )
                         };
                         extras = new_pos.saturating_sub(self.pos).saturating_sub(1);
@@ -1756,6 +1771,7 @@ impl<'a> Parser<'a> {
                 in_fenced_div: self.in_fenced_div(),
                 blockquote_depth: current_bq_depth,
                 config: self.config,
+                diags: self.diagnostics.clone(),
                 content_indent: 0,
                 indent_to_emit: None,
                 list_indent_info: None,
@@ -2814,6 +2830,7 @@ impl<'a> Parser<'a> {
                         in_fenced_div: self.in_fenced_div(),
                         blockquote_depth: self.current_blockquote_depth(),
                         config: self.config,
+                        diags: self.diagnostics.clone(),
                         content_indent,
                         indent_to_emit: None,
                         list_indent_info: None,
@@ -2997,6 +3014,7 @@ impl<'a> Parser<'a> {
             in_fenced_div: self.in_fenced_div(),
             blockquote_depth: current_bq_depth,
             config: self.config,
+            diags: self.diagnostics.clone(),
             content_indent,
             indent_to_emit,
             list_indent_info,

@@ -128,6 +128,65 @@ pub fn validate_yaml_with_prefix(input: &str, prefix: &str) -> Option<YamlDiagno
     super::validator::validate_yaml(&strip_line_prefix(input, prefix))
 }
 
+/// Strip the per-line `prefix` exactly as [`strip_line_prefix`] does, but also
+/// record — for every byte of the stripped output, plus a trailing EOF entry —
+/// the byte offset it came from within `input`. Building the text and the map in
+/// lockstep guarantees they cannot drift, so a diagnostic offset (in stripped
+/// coordinates) can be located back in the original prefixed region. `prefix`
+/// must be non-empty (empty-prefix validation never strips).
+fn strip_line_prefix_with_offsets(input: &str, prefix: &str) -> (String, Vec<usize>) {
+    let mut stripped = String::new();
+    let mut offsets = Vec::new();
+    let base = input.as_ptr() as usize;
+    for (line_idx, line) in input.lines().enumerate() {
+        // `line` is a subslice of `input`; recover its byte offset.
+        let line_off = line.as_ptr() as usize - base;
+        if line_idx > 0 {
+            // The join `\n` maps to the original line break preceding this line.
+            offsets.push(line_off.saturating_sub(1));
+            stripped.push('\n');
+        }
+        let (payload, payload_off) = match line.strip_prefix(prefix) {
+            Some(rest) => {
+                let after = rest.strip_prefix(' ').unwrap_or(rest);
+                (after, line.len() - after.len())
+            }
+            None => (line, 0),
+        };
+        offsets.extend((0..payload.len()).map(|i| line_off + payload_off + i));
+        stripped.push_str(payload);
+    }
+    offsets.push(input.len());
+    (stripped, offsets)
+}
+
+/// Locate a structural YAML diagnostic in `input` (raw, possibly `prefix`-marked),
+/// returning the diagnostic plus the byte range **within `input`** it covers
+/// (start, end). An empty `prefix` is plain YAML with identity offsets. Returns
+/// `None` when `input` is valid — the verdict matches
+/// [`validate_yaml_with_prefix`]. The host parser adds the region's document
+/// start to emit a host-ranged `SyntaxError` for malformed embedded YAML.
+pub fn locate_yaml_diagnostic(input: &str, prefix: &str) -> Option<(YamlDiagnostic, usize, usize)> {
+    if prefix.is_empty() {
+        let diag = super::validator::validate_yaml(input)?;
+        let start = diag.byte_start.min(input.len());
+        let end = diag.byte_end.min(input.len()).max(start);
+        return Some((diag, start, end));
+    }
+    // Validate cheaply first (no offset table) — the common, valid path returns
+    // here with the same verdict as `validate_yaml_with_prefix`. Only build the
+    // lockstep offset map when there's actually a diagnostic to locate.
+    let diag = super::validator::validate_yaml(&strip_line_prefix(input, prefix))?;
+    let (_stripped, offsets) = strip_line_prefix_with_offsets(input, prefix);
+    let start = offsets.get(diag.byte_start).copied().unwrap_or(input.len());
+    let end = offsets
+        .get(diag.byte_end)
+        .copied()
+        .unwrap_or(input.len())
+        .max(start);
+    Some((diag, start, end))
+}
+
 /// Parse prototype YAML tree structure from input
 pub fn parse_yaml_tree(input: &str) -> Option<SyntaxNode> {
     parse_yaml_report(input).tree
@@ -958,6 +1017,61 @@ pub fn shadow_parser_check(input: &str) -> ShadowParserReport {
 mod tests {
     use super::*;
     use crate::syntax::SyntaxKind;
+
+    #[test]
+    fn strip_with_offsets_matches_strip_line_prefix() {
+        for input in [
+            "#| a: 1\n",
+            "#| a: 1\n#|   b\n",
+            "  #| x: 1\n",
+            "#| a\r\n#| b\r\n",
+            "#| a",
+        ] {
+            let (text, offsets) = strip_line_prefix_with_offsets(input, "#|");
+            assert_eq!(text, strip_line_prefix(input, "#|"), "text for {input:?}");
+            assert_eq!(offsets.len(), text.len() + 1, "offset count for {input:?}");
+            assert!(
+                offsets.iter().all(|&o| o <= input.len()),
+                "offsets in bounds for {input:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn locate_maps_hashpipe_error_to_region_offset() {
+        let input = "#| echo: [\n";
+        let (_diag, start, _end) = locate_yaml_diagnostic(input, "#|").expect("diagnostic");
+        assert_eq!(start, input.find('[').unwrap());
+    }
+
+    #[test]
+    fn locate_maps_composite_marker_error() {
+        // List-indented cell: the marker includes the container indent.
+        let input = "   #| echo: [\n";
+        let (_diag, start, _end) = locate_yaml_diagnostic(input, "   #|").expect("diagnostic");
+        assert_eq!(start, input.find('[').unwrap());
+    }
+
+    #[test]
+    fn locate_maps_crlf_region_error() {
+        let input = "#| ok: 1\r\n#| echo: [\r\n";
+        let (_diag, start, _end) = locate_yaml_diagnostic(input, "#|").expect("diagnostic");
+        assert_eq!(start, input.find('[').unwrap());
+    }
+
+    #[test]
+    fn locate_frontmatter_uses_identity_offsets() {
+        let input = "title: [\n";
+        let (diag, start, _end) = locate_yaml_diagnostic(input, "").expect("diagnostic");
+        assert_eq!(start, diag.byte_start);
+        assert_eq!(start, input.find('[').unwrap());
+    }
+
+    #[test]
+    fn locate_returns_none_for_valid_yaml() {
+        assert!(locate_yaml_diagnostic("#| echo: false\n", "#|").is_none());
+        assert!(locate_yaml_diagnostic("title: ok\n", "").is_none());
+    }
 
     #[test]
     fn returns_byte_lossless_cst_for_empty_input() {

@@ -1,10 +1,11 @@
 //! YAML metadata block parsing utilities.
 
+use crate::parser::diagnostics::{Diagnostics, SyntaxError, SyntaxErrorSource};
 use crate::parser::utils::helpers::{emit_line_tokens, strip_newline};
 use crate::parser::utils::tree_copy::copy_green_children;
-use crate::parser::yaml::{parse_stream, validate_yaml};
+use crate::parser::yaml::{locate_yaml_diagnostic, parse_stream};
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
+use rowan::{GreenNodeBuilder, TextRange};
 
 /// Try to parse a YAML metadata block starting at the given position.
 /// Returns the new position after the block if successful, None otherwise.
@@ -18,9 +19,10 @@ pub(crate) fn try_parse_yaml_block(
     pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
     at_document_start: bool,
+    diags: &Diagnostics,
 ) -> Option<usize> {
     let closing_pos = find_yaml_block_closing_pos(lines, pos, at_document_start)?;
-    emit_yaml_block(lines, pos, closing_pos, builder)
+    emit_yaml_block(lines, pos, closing_pos, builder, diags)
 }
 
 pub(crate) fn find_yaml_block_closing_pos(
@@ -75,6 +77,7 @@ pub(crate) fn emit_yaml_block(
     pos: usize,
     closing_pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
+    diags: &Diagnostics,
 ) -> Option<usize> {
     if pos >= lines.len() || closing_pos <= pos || closing_pos >= lines.len() {
         return None;
@@ -112,13 +115,27 @@ pub(crate) fn emit_yaml_block(
     // `find_yaml_block_closing_pos` guarantees a single document by
     // stopping at the first internal `---` / `...`). Splice the stream's
     // children in directly to avoid the redundant wrapper.
-    if validate_yaml(&content).is_none() {
-        let stream_green = parse_stream(&content).green().into_owned();
-        copy_green_children(builder, &stream_green);
-    } else {
+    if let Some((diag, start_off, end_off)) = locate_yaml_diagnostic(&content, "") {
+        // Malformed frontmatter YAML: record the syntax error at its host
+        // position (the parser already has the verdict), then fall back to the
+        // opaque line-token shape. `content` begins at `lines[pos + 1]`, a
+        // subslice of the host input, so its host start is the pointer offset
+        // from line 0; offsets are identity (no per-line prefix).
+        let host_start = lines[pos + 1].as_ptr() as usize - lines[0].as_ptr() as usize;
+        diags.push(SyntaxError {
+            range: TextRange::new(
+                ((host_start + start_off) as u32).into(),
+                ((host_start + end_off) as u32).into(),
+            ),
+            message: diag.message.to_string(),
+            source: SyntaxErrorSource::Yaml,
+        });
         for content_line in lines.iter().take(closing_pos).skip(pos + 1) {
             emit_line_tokens(builder, content_line);
         }
+    } else {
+        let stream_green = parse_stream(&content).green().into_owned();
+        copy_green_children(builder, &stream_green);
     }
     builder.finish_node(); // YAML_METADATA_CONTENT
 
@@ -301,7 +318,7 @@ mod tests {
     fn test_yaml_block_at_start() {
         let lines = vec!["---", "title: Test", "---", "Content"];
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_yaml_block(&lines, 0, &mut builder, true);
+        let result = try_parse_yaml_block(&lines, 0, &mut builder, true, &Diagnostics::default());
         assert_eq!(result, Some(3));
     }
 
@@ -309,7 +326,7 @@ mod tests {
     fn test_yaml_block_not_at_start() {
         let lines = vec!["Paragraph", "", "---", "title: Test", "---", "Content"];
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_yaml_block(&lines, 2, &mut builder, false);
+        let result = try_parse_yaml_block(&lines, 2, &mut builder, false, &Diagnostics::default());
         assert_eq!(result, Some(5));
     }
 
@@ -317,7 +334,7 @@ mod tests {
     fn test_horizontal_rule_not_yaml() {
         let lines = vec!["---", "", "Content"];
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_yaml_block(&lines, 0, &mut builder, true);
+        let result = try_parse_yaml_block(&lines, 0, &mut builder, true, &Diagnostics::default());
         assert_eq!(result, None); // Followed by blank line, so not YAML
     }
 
@@ -325,7 +342,7 @@ mod tests {
     fn test_yaml_with_dots_closer() {
         let lines = vec!["---", "title: Test", "...", "Content"];
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_yaml_block(&lines, 0, &mut builder, true);
+        let result = try_parse_yaml_block(&lines, 0, &mut builder, true, &Diagnostics::default());
         assert_eq!(result, Some(3));
     }
 
@@ -333,7 +350,7 @@ mod tests {
     fn test_yaml_without_closing_delimiter_is_not_yaml_block() {
         let lines = vec!["---", "title: Test", "Content"];
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_yaml_block(&lines, 0, &mut builder, true);
+        let result = try_parse_yaml_block(&lines, 0, &mut builder, true, &Diagnostics::default());
         assert_eq!(result, None);
     }
 

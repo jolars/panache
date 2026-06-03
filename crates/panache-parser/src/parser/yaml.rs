@@ -31,12 +31,12 @@ pub use model::{
     YamlParseReport, diagnostic_codes,
 };
 pub use parser::{
-    ShadowParserReport, parse_shadow, parse_stream, parse_stream_with_prefix, parse_yaml_report,
-    parse_yaml_tree, shadow_parser_check, validate_yaml_with_prefix,
+    ShadowParserReport, locate_yaml_diagnostic, parse_shadow, parse_stream,
+    parse_stream_with_prefix, parse_yaml_report, parse_yaml_tree, shadow_parser_check,
+    validate_yaml_with_prefix,
 };
 pub(crate) use scanner::ScalarStyle;
 pub use scanner::{ShadowScannerReport, shadow_scanner_check};
-pub(crate) use validator::validate_yaml;
 
 #[doc(hidden)]
 pub fn validate_yaml_for_test(input: &str) -> Option<YamlDiagnostic> {
