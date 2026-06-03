@@ -918,22 +918,47 @@ Staged (each landable independently; the offset layer dies last):
   first) and peels a `YAML_LINE_PREFIX` leaf off each continuation line.
   Parity-tested against the `normalize_hashpipe_input` baseline in
   `yaml_prefix_parity.rs`.
-- **Step 3 — cook/value over prefixed scalars.** `.value()` walks the
-  `YAML_SCALAR_TEXT` leaves, skipping prefix/newline leaves (cheap, since
-  they're discrete tokens now — no string-stripping).
-- **Step 4 — host embedding.** Rewire `parse_fenced_code_block`
-  (`blocks/code_blocks.rs`) to splice a prefix-aware `parse_stream`
-  subtree into `HASHPIPE_YAML_CONTENT` (mirroring the frontmatter
-  validate→splice→fallback pattern); keep
-  `compute_hashpipe_preamble_line_count` for region detection; retire the
-  `HASHPIPE_PREFIX` token + `emit_hashpipe_option_line/continuation`
-  (keep the shared `CHUNK_OPTION*` kinds — still used by inline fence
-  options).
-- **Step 5 — consumer rewire + drop offset layer.** Repoint
+- **Step 3 — cook/value over prefixed scalars — DONE.**
+  `YamlScalar::value()` cooks a prefix-stripped reassembly of the content
+  leaves (skipping `YAML_LINE_PREFIX`); `raw()` stays byte-exact for
+  losslessness. Test: `value_skips_embedded_line_prefix` in `yaml_ast.rs`.
+- **Step 4 — host embedding — DONE.** `parse_fenced_code_block`
+  (`blocks/code_blocks.rs`) now validates (`validate_yaml_with_prefix`)
+  then splices a `parse_stream_with_prefix` subtree into
+  `HASHPIPE_YAML_CONTENT` (validate→splice→opaque-fallback, mirroring
+  `emit_yaml_block`); `compute_hashpipe_preamble_line_count` still does
+  region detection; the `HASHPIPE_PREFIX` token + `emit_hashpipe_option_line/
+  continuation` are retired (shared `CHUNK_OPTION*` kinds kept for inline
+  fence options).
+  - **No scanner/builder generalization was needed** (the planned closure
+    over a "host per-line recipe"). Within a preamble the container prefix
+    is uniform per line, so a *composite* marker — container prefix + `#|`,
+    computed by `hashpipe_composite_marker` — matches via length-agnostic
+    `strip_prefix` and splices nested (list-/blockquote-indented) cells
+    through the *same* path as top-level, peeling the whole prefix into one
+    opaque `YAML_LINE_PREFIX` leaf. Verified end-to-end: parser golden
+    `quarto_hashpipe_list_item` (4-space list-nested cell) + parity case
+    `composite_prefix_matches_stripped_baseline`.
+  - **Forced consumer rewire (was assumed Step 5):** `CodeBlock`'s
+    `hashpipe_chunk_option_entries` and `ChunkOptionEntry` read `CHUNK_OPTION`
+    *structurally*, so the splice broke them. `ChunkOptionEntry` is now
+    decoupled from the `CHUNK_OPTION` node (eager key/value/ranges +
+    `declaration_range`) and hashpipe options are read from the embedded
+    YAML block map. Linter consumers (`figure_crossref_captions`,
+    `duplicate_references`, `chunk_label_spaces`) only use the decoupled
+    views, so no linter changes were needed.
+  - **html-entities exclusion not needed:** the rule only flags `TEXT`
+    tokens and already excludes `CODE_BLOCK`/`CODE_CONTENT` ancestors;
+    hashpipe YAML is `YAML_SCALAR_TEXT` under `CODE_CONTENT`.
+  - **Semantic note for Step 5/downstream:** hashpipe option `value` is now
+    the *cooked* scalar (quotes stripped, multi-line folded) and
+    `value_range` for a quoted scalar spans the quotes.
+- **Step 5 — consumer rewire + drop offset layer — OUTSTANDING.** Repoint
   `formatter/hashpipe.rs` and `syntax/yaml.rs`
   (`collect_hashpipe_regions` / `extract_hashpipe_region`) to read the
   embedded subtree; delete `hashpipe_normalizer.rs` and the
-  `yaml_to_host_offsets` machinery.
+  `yaml_to_host_offsets` machinery. (These still read region `.text()`,
+  which the byte-lossless splice preserves, so they keep working today.)
 
 **Consumer audit.** Linter rules, LSP, salsa indexers, pandoc-ast
 projector — anything that walks `YAML_METADATA_CONTENT`/
