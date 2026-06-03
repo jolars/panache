@@ -1,4 +1,4 @@
-use crate::config::{Config, WrapMode};
+use crate::config::{Config, Flavor, WrapMode};
 use crate::formatter::inline::format_inline_node;
 use crate::formatter::inline_layout::wrap_text_first_fit;
 use crate::formatter::sentence_wrap::{ResolvedProfile, resolve_profile, split_sentence_text};
@@ -714,7 +714,11 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config, indent: usize) -> S
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    let block_indent = if indent == 0 {
+    // GFM and CommonMark keep top-level tables flush at column zero; those
+    // flavors do not self-indent pipe tables.  Pandoc/Quarto/RMarkdown use a
+    // two-space indent so the table is rendered as a block element.
+    let self_indents = !matches!(config.flavor, Flavor::Gfm | Flavor::CommonMark);
+    let block_indent = if indent == 0 && self_indents {
         TABLE_BLOCK_INDENT
     } else {
         indent
