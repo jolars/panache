@@ -113,6 +113,57 @@ fn prefix_aware_validation_agrees_with_baseline() {
     }
 }
 
+/// A *composite* prefix — a container prefix (list indent, blockquote
+/// marker) prepended to `#|` — parses identically to the top-level case.
+/// Within a hashpipe preamble the container prefix is uniform per line, and
+/// the prefix machinery matches the marker via length-agnostic `strip_prefix`
+/// and resets the column, so a longer marker needs no scanner/builder change.
+/// This is what lets the host (step 4b) splice list- and blockquote-nested
+/// hashpipe cells through the same prefix-aware path as top-level cells, with
+/// the whole prefix peeled into one opaque `YAML_LINE_PREFIX` leaf.
+#[test]
+fn composite_prefix_matches_stripped_baseline() {
+    // (label, composite marker, prefixed input, expected stripped baseline)
+    let cases: &[(&str, &str, &str, &str)] = &[
+        (
+            "list_indent_single_line_map",
+            "   #|",
+            "   #| echo: true\n   #| warning: false\n",
+            "echo: true\nwarning: false\n",
+        ),
+        (
+            "list_indent_quoted_multiline",
+            "   #|",
+            "   #| fig-cap: 'Comparing ROC\n   #|   trained on a task.'\n",
+            "fig-cap: 'Comparing ROC\n  trained on a task.'\n",
+        ),
+        (
+            "blockquote_single_line_map",
+            "> #|",
+            "> #| echo: true\n> #| warning: false\n",
+            "echo: true\nwarning: false\n",
+        ),
+    ];
+    for (label, marker, input, baseline) in cases {
+        let tree = parse_stream_with_prefix(input, marker);
+        assert_eq!(
+            tree.text().to_string(),
+            *input,
+            "losslessness failed for `{label}`",
+        );
+        let plain = parse_stream(baseline);
+        assert_eq!(
+            project_events_from_tree(&tree),
+            project_events_from_tree(&plain),
+            "structural parity failed for `{label}`",
+        );
+        assert!(
+            validate_yaml_with_prefix(input, marker).is_none(),
+            "expected `{label}` to validate",
+        );
+    }
+}
+
 /// The empty-prefix path must behave exactly like the plain parse so the
 /// frontmatter (no-prefix) callers are unaffected.
 #[test]

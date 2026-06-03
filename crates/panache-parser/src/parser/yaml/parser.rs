@@ -171,6 +171,14 @@ pub fn parse_stream(input: &str) -> SyntaxNode {
 /// `YAML_LINE_PREFIX` leaves, so the resulting CST's token ranges are
 /// host ranges directly (prefix bytes included as trivia, no offset
 /// remapping). An empty `prefix` behaves like [`parse_stream`].
+///
+/// `prefix` may be a *composite* marker — a container prefix prepended to
+/// `#|` (e.g. `"   #|"` for a list-indented cell, `"> #|"` for a blockquoted
+/// one). Within a hashpipe preamble the container prefix is uniform per line,
+/// so matching the whole composite marker via `strip_prefix` parses a nested
+/// cell identically to a top-level one, peeling the entire prefix into one
+/// `YAML_LINE_PREFIX` leaf. The host computes this marker (see
+/// `parse_fenced_code_block`).
 pub fn parse_stream_with_prefix(input: &str, prefix: &str) -> SyntaxNode {
     parse_stream_inner(input, (!prefix.is_empty()).then_some(prefix))
 }
