@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: AZ63
@@ -12,7 +13,8 @@ YAML_STREAM@0..21
     YAML_BLOCK_MAP@0..21
       YAML_BLOCK_MAP_ENTRY@0..13
         YAML_BLOCK_MAP_KEY@0..4
-          YAML_SCALAR@0..3 "one"
+          YAML_SCALAR@0..3
+            YAML_SCALAR_TEXT@0..3 "one"
           YAML_COLON@3..4 ":"
         YAML_BLOCK_MAP_VALUE@4..13
           NEWLINE@4..5 "\n"
@@ -20,18 +22,22 @@ YAML_STREAM@0..21
             YAML_BLOCK_SEQUENCE_ITEM@5..9
               YAML_BLOCK_SEQ_ENTRY@5..6 "-"
               WHITESPACE@6..7 " "
-              YAML_SCALAR@7..8 "2"
+              YAML_SCALAR@7..8
+                YAML_SCALAR_TEXT@7..8 "2"
               NEWLINE@8..9 "\n"
             YAML_BLOCK_SEQUENCE_ITEM@9..13
               YAML_BLOCK_SEQ_ENTRY@9..10 "-"
               WHITESPACE@10..11 " "
-              YAML_SCALAR@11..12 "3"
+              YAML_SCALAR@11..12
+                YAML_SCALAR_TEXT@11..12 "3"
               NEWLINE@12..13 "\n"
       YAML_BLOCK_MAP_ENTRY@13..21
         YAML_BLOCK_MAP_KEY@13..18
-          YAML_SCALAR@13..17 "four"
+          YAML_SCALAR@13..17
+            YAML_SCALAR_TEXT@13..17 "four"
           YAML_COLON@17..18 ":"
         YAML_BLOCK_MAP_VALUE@18..21
           WHITESPACE@18..19 " "
-          YAML_SCALAR@19..20 "5"
+          YAML_SCALAR@19..20
+            YAML_SCALAR_TEXT@19..20 "5"
           NEWLINE@20..21 "\n"

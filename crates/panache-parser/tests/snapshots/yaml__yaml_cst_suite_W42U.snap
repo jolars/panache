@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: W42U
@@ -18,7 +19,8 @@ YAML_STREAM@0..92
       YAML_BLOCK_SEQUENCE_ITEM@10..26
         YAML_BLOCK_SEQ_ENTRY@10..11 "-"
         WHITESPACE@11..12 " "
-        YAML_SCALAR@12..26 "|\n block node\n"
+        YAML_SCALAR@12..26
+          YAML_SCALAR_TEXT@12..26 "|\n block node\n"
       YAML_BLOCK_SEQUENCE_ITEM@26..63
         YAML_BLOCK_SEQ_ENTRY@26..27 "-"
         WHITESPACE@27..28 " "
@@ -26,7 +28,8 @@ YAML_STREAM@0..92
           YAML_BLOCK_SEQUENCE_ITEM@28..46
             YAML_BLOCK_SEQ_ENTRY@28..29 "-"
             WHITESPACE@29..30 " "
-            YAML_SCALAR@30..33 "one"
+            YAML_SCALAR@30..33
+              YAML_SCALAR_TEXT@30..33 "one"
             WHITESPACE@33..34 " "
             YAML_COMMENT@34..43 "# Compact"
             NEWLINE@43..44 "\n"
@@ -34,7 +37,8 @@ YAML_STREAM@0..92
           YAML_BLOCK_SEQUENCE_ITEM@46..63
             YAML_BLOCK_SEQ_ENTRY@46..47 "-"
             WHITESPACE@47..48 " "
-            YAML_SCALAR@48..51 "two"
+            YAML_SCALAR@48..51
+              YAML_SCALAR_TEXT@48..51 "two"
             WHITESPACE@51..52 " "
             YAML_COMMENT@52..62 "# sequence"
             NEWLINE@62..63 "\n"
@@ -44,11 +48,13 @@ YAML_STREAM@0..92
         YAML_BLOCK_MAP@65..92
           YAML_BLOCK_MAP_ENTRY@65..92
             YAML_BLOCK_MAP_KEY@65..69
-              YAML_SCALAR@65..68 "one"
+              YAML_SCALAR@65..68
+                YAML_SCALAR_TEXT@65..68 "one"
               YAML_COLON@68..69 ":"
             YAML_BLOCK_MAP_VALUE@69..92
               WHITESPACE@69..70 " "
-              YAML_SCALAR@70..73 "two"
+              YAML_SCALAR@70..73
+                YAML_SCALAR_TEXT@70..73 "two"
               WHITESPACE@73..74 " "
               YAML_COMMENT@74..91 "# Compact mapping"
               NEWLINE@91..92 "\n"

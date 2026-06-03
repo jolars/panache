@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: FBC9
@@ -12,33 +13,41 @@ YAML_STREAM@0..148
     YAML_BLOCK_MAP@0..148
       YAML_BLOCK_MAP_ENTRY@0..90
         YAML_BLOCK_MAP_KEY@0..5
-          YAML_SCALAR@0..4 "safe"
+          YAML_SCALAR@0..4
+            YAML_SCALAR_TEXT@0..4 "safe"
           YAML_COLON@4..5 ":"
         YAML_BLOCK_MAP_VALUE@5..90
           WHITESPACE@5..6 " "
-          YAML_SCALAR@6..89 "a!\"#$%&'()*+,-./09:;< ..."
+          YAML_SCALAR@6..89
+            YAML_SCALAR_TEXT@6..89 "a!\"#$%&'()*+,-./09:;< ..."
           NEWLINE@89..90 "\n"
       YAML_BLOCK_MAP_ENTRY@90..115
         YAML_BLOCK_MAP_KEY@90..109
-          YAML_SCALAR@90..108 "safe question mark"
+          YAML_SCALAR@90..108
+            YAML_SCALAR_TEXT@90..108 "safe question mark"
           YAML_COLON@108..109 ":"
         YAML_BLOCK_MAP_VALUE@109..115
           WHITESPACE@109..110 " "
-          YAML_SCALAR@110..114 "?foo"
+          YAML_SCALAR@110..114
+            YAML_SCALAR_TEXT@110..114 "?foo"
           NEWLINE@114..115 "\n"
       YAML_BLOCK_MAP_ENTRY@115..132
         YAML_BLOCK_MAP_KEY@115..126
-          YAML_SCALAR@115..125 "safe colon"
+          YAML_SCALAR@115..125
+            YAML_SCALAR_TEXT@115..125 "safe colon"
           YAML_COLON@125..126 ":"
         YAML_BLOCK_MAP_VALUE@126..132
           WHITESPACE@126..127 " "
-          YAML_SCALAR@127..131 ":foo"
+          YAML_SCALAR@127..131
+            YAML_SCALAR_TEXT@127..131 ":foo"
           NEWLINE@131..132 "\n"
       YAML_BLOCK_MAP_ENTRY@132..148
         YAML_BLOCK_MAP_KEY@132..142
-          YAML_SCALAR@132..141 "safe dash"
+          YAML_SCALAR@132..141
+            YAML_SCALAR_TEXT@132..141 "safe dash"
           YAML_COLON@141..142 ":"
         YAML_BLOCK_MAP_VALUE@142..148
           WHITESPACE@142..143 " "
-          YAML_SCALAR@143..147 "-foo"
+          YAML_SCALAR@143..147
+            YAML_SCALAR_TEXT@143..147 "-foo"
           NEWLINE@147..148 "\n"

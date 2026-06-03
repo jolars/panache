@@ -35,7 +35,7 @@ fn collect_tag_handles(doc: &SyntaxNode) -> TagHandles {
         .descendants_with_tokens()
         .filter_map(|el| el.into_token())
     {
-        if tok.kind() != SyntaxKind::YAML_SCALAR {
+        if tok.kind() != SyntaxKind::YAML_DIRECTIVE {
             continue;
         }
         let line = tok.text().trim_start();
@@ -184,15 +184,20 @@ fn block_map_entry_key_is_empty(entry: &SyntaxNode) -> bool {
     else {
         return false;
     };
+    // The key text lives in a `YAML_SCALAR` node child or, for the
+    // explicit `?`/tag shapes, a `YAML_KEY`/`YAML_TAG` token — all before
+    // the trailing `:`.
     !key_node
         .children_with_tokens()
-        .filter_map(|el| el.into_token())
-        .take_while(|tok| tok.kind() != SyntaxKind::YAML_COLON)
-        .any(|tok| {
-            matches!(
-                tok.kind(),
-                SyntaxKind::YAML_KEY | SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_TAG
-            ) && !tok.text().trim().is_empty()
+        .take_while(|el| el.as_token().map(|t| t.kind()) != Some(SyntaxKind::YAML_COLON))
+        .any(|el| match el {
+            rowan::NodeOrToken::Node(n) => {
+                n.kind() == SyntaxKind::YAML_SCALAR && !n.text().to_string().trim().is_empty()
+            }
+            rowan::NodeOrToken::Token(t) => {
+                matches!(t.kind(), SyntaxKind::YAML_KEY | SyntaxKind::YAML_TAG)
+                    && !t.text().trim().is_empty()
+            }
         })
 }
 
@@ -366,7 +371,7 @@ fn scalar_document_value(doc: &SyntaxNode, handles: &TagHandles) -> Option<Strin
         .filter(|tok| {
             matches!(
                 tok.kind(),
-                SyntaxKind::YAML_SCALAR
+                SyntaxKind::YAML_SCALAR_TEXT
                     | SyntaxKind::YAML_ANCHOR
                     | SyntaxKind::YAML_ALIAS
                     | SyntaxKind::WHITESPACE
@@ -454,7 +459,7 @@ fn collect_scalar_source(node: &SyntaxNode) -> String {
         .filter(|tok| {
             matches!(
                 tok.kind(),
-                SyntaxKind::YAML_SCALAR
+                SyntaxKind::YAML_SCALAR_TEXT
                     | SyntaxKind::YAML_ANCHOR
                     | SyntaxKind::YAML_ALIAS
                     | SyntaxKind::NEWLINE
@@ -481,7 +486,7 @@ fn fold_plain_document_lines(doc: &SyntaxNode) -> String {
         .filter(|tok| {
             matches!(
                 tok.kind(),
-                SyntaxKind::YAML_SCALAR
+                SyntaxKind::YAML_SCALAR_TEXT
                     | SyntaxKind::YAML_ANCHOR
                     | SyntaxKind::YAML_ALIAS
                     | SyntaxKind::WHITESPACE
@@ -771,7 +776,7 @@ fn extract_block_scalar_body(value_node: &SyntaxNode) -> Option<(char, String)> 
         .filter(|tok| {
             matches!(
                 tok.kind(),
-                SyntaxKind::YAML_SCALAR
+                SyntaxKind::YAML_SCALAR_TEXT
                     | SyntaxKind::NEWLINE
                     | SyntaxKind::WHITESPACE
                     | SyntaxKind::YAML_COMMENT,
@@ -831,7 +836,7 @@ fn extract_scalar_doc_block_body(doc: &SyntaxNode) -> Option<(char, String)> {
         }
         match tok.kind() {
             SyntaxKind::YAML_DOCUMENT_END => break,
-            SyntaxKind::YAML_SCALAR
+            SyntaxKind::YAML_SCALAR_TEXT
             | SyntaxKind::NEWLINE
             | SyntaxKind::WHITESPACE
             | SyntaxKind::YAML_COMMENT => tokens.push(tok),
@@ -860,7 +865,7 @@ fn extract_top_level_block_body(doc: &SyntaxNode) -> Option<(char, String)> {
         .filter(|tok| {
             matches!(
                 tok.kind(),
-                SyntaxKind::YAML_SCALAR
+                SyntaxKind::YAML_SCALAR_TEXT
                     | SyntaxKind::NEWLINE
                     | SyntaxKind::WHITESPACE
                     | SyntaxKind::YAML_COMMENT,
@@ -872,7 +877,7 @@ fn extract_top_level_block_body(doc: &SyntaxNode) -> Option<(char, String)> {
     // (header + newline + body) as a single token. Detect the header by
     // inspecting up to the first newline.
     let first = tokens.iter().find(|tok| {
-        if tok.kind() != SyntaxKind::YAML_SCALAR {
+        if tok.kind() != SyntaxKind::YAML_SCALAR_TEXT {
             return false;
         }
         let header_part = tok.text().split('\n').next().unwrap_or("");
@@ -892,7 +897,7 @@ fn fold_block_scalar_tokens(
     // as a single YAML_SCALAR token. Detect either shape by inspecting
     // the chars before the first `\n` of the candidate token.
     let header_idx = tokens.iter().position(|t| {
-        if t.kind() != SyntaxKind::YAML_SCALAR {
+        if t.kind() != SyntaxKind::YAML_SCALAR_TEXT {
             return false;
         }
         let header_part = t.text().split('\n').next().unwrap_or("");
@@ -1222,29 +1227,29 @@ fn project_flow_map_entries(flow_map: &SyntaxNode, handles: &TagHandles, out: &m
                         pending.push_str(tok.text());
                     }
                 }
-                SyntaxKind::YAML_SCALAR => {
-                    let text = tok.text();
-                    match text {
-                        "{" | "}" => {}
-                        "," => {
-                            if pending_has_content {
-                                flush_pending_orphan(&pending, handles, out);
-                                pending.clear();
-                                pending_has_content = false;
-                            }
-                        }
-                        _ => {
-                            pending.push_str(text);
-                            pending_has_content = true;
+                SyntaxKind::YAML_FLOW_INDICATOR => match tok.text() {
+                    "{" | "}" => {}
+                    "," => {
+                        if pending_has_content {
+                            flush_pending_orphan(&pending, handles, out);
+                            pending.clear();
+                            pending_has_content = false;
                         }
                     }
-                }
+                    _ => {}
+                },
                 SyntaxKind::YAML_KEY => {
                     pending.push_str(tok.text());
                     pending_has_content = true;
                 }
                 _ => {}
             },
+            // An orphan scalar (not wrapped in a `YAML_FLOW_MAP_ENTRY`)
+            // accumulates into `pending` as the next entry's key.
+            rowan::NodeOrToken::Node(node) if node.kind() == SyntaxKind::YAML_SCALAR => {
+                pending.push_str(&node.text().to_string());
+                pending_has_content = true;
+            }
             rowan::NodeOrToken::Node(node) if node.kind() == SyntaxKind::YAML_FLOW_MAP_ENTRY => {
                 if let Some(key_collection) = pending_key_collection.take() {
                     // The orphan collection is this entry's key; the
@@ -1346,7 +1351,12 @@ fn project_flow_map_entry(
     let key_has_content = key_node
         .descendants_with_tokens()
         .filter_map(|el| el.into_token())
-        .any(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_KEY));
+        .any(|tok| {
+            matches!(
+                tok.kind(),
+                SyntaxKind::YAML_SCALAR_TEXT | SyntaxKind::YAML_KEY
+            )
+        });
 
     // A flow collection (`[...]` / `{...}`) nested directly inside the
     // KEY wrapper is a complex key (SBG9 `{[d, e]: f}`) and must project
@@ -1389,7 +1399,7 @@ fn project_flow_map_entry(
         .filter(|tok| {
             matches!(
                 tok.kind(),
-                SyntaxKind::YAML_SCALAR
+                SyntaxKind::YAML_SCALAR_TEXT
                     | SyntaxKind::YAML_KEY
                     | SyntaxKind::YAML_ANCHOR
                     | SyntaxKind::YAML_ALIAS
@@ -1460,7 +1470,7 @@ fn project_flow_map_entry(
             .filter(|tok| {
                 matches!(
                     tok.kind(),
-                    SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_ANCHOR | SyntaxKind::YAML_ALIAS
+                    SyntaxKind::YAML_SCALAR_TEXT | SyntaxKind::YAML_ANCHOR | SyntaxKind::YAML_ALIAS
                 )
             })
             .map(|tok| tok.text().to_string())
@@ -1529,7 +1539,7 @@ fn project_flow_map_value(value_node: &SyntaxNode, handles: &TagHandles, out: &m
         .filter(|tok| {
             matches!(
                 tok.kind(),
-                SyntaxKind::YAML_SCALAR
+                SyntaxKind::YAML_SCALAR_TEXT
                     | SyntaxKind::YAML_ANCHOR
                     | SyntaxKind::YAML_ALIAS
                     | SyntaxKind::YAML_COLON
@@ -1654,10 +1664,7 @@ fn project_flow_seq_item_pair_value(
                 }
                 if matches!(
                     tok.kind(),
-                    SyntaxKind::YAML_SCALAR
-                        | SyntaxKind::YAML_KEY
-                        | SyntaxKind::WHITESPACE
-                        | SyntaxKind::NEWLINE
+                    SyntaxKind::YAML_KEY | SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE
                 ) {
                     value_text.push_str(tok.text());
                 }
@@ -1671,6 +1678,12 @@ fn project_flow_seq_item_pair_value(
             {
                 project_flow_collection_node(&node, handles, out);
                 return;
+            }
+            // The value scalar after the colon is a `YAML_SCALAR` node.
+            rowan::NodeOrToken::Node(node)
+                if seen_colon && node.kind() == SyntaxKind::YAML_SCALAR =>
+            {
+                value_text.push_str(&node.text().to_string());
             }
             _ => {}
         }
@@ -1750,7 +1763,7 @@ fn project_flow_sequence_items_cst(
             .filter(|tok| {
                 matches!(
                     tok.kind(),
-                    SyntaxKind::YAML_SCALAR
+                    SyntaxKind::YAML_SCALAR_TEXT
                         | SyntaxKind::YAML_KEY
                         | SyntaxKind::YAML_COLON
                         | SyntaxKind::YAML_ANCHOR
@@ -1875,7 +1888,7 @@ fn project_block_sequence_items(
             .filter(|tok| {
                 matches!(
                     tok.kind(),
-                    SyntaxKind::YAML_SCALAR
+                    SyntaxKind::YAML_SCALAR_TEXT
                         | SyntaxKind::YAML_ANCHOR
                         | SyntaxKind::YAML_ALIAS
                         | SyntaxKind::WHITESPACE
@@ -2068,6 +2081,44 @@ fn extract_leading_node_properties(
         {
             break;
         }
+        // The fused node-property + first-key scalar is a `YAML_SCALAR`
+        // node; peel anchor/tag out of its text and keep the residual.
+        if let Some(scalar) = child
+            .as_node()
+            .filter(|n| n.kind() == SyntaxKind::YAML_SCALAR)
+        {
+            let scalar_text = scalar.text().to_string();
+            let mut rest = scalar_text.trim();
+            loop {
+                if anchor.is_none()
+                    && let Some(after) = rest.strip_prefix('&')
+                {
+                    let end = after
+                        .find(|c: char| c.is_whitespace() || matches!(c, ',' | '}' | ']'))
+                        .unwrap_or(after.len());
+                    anchor = Some(after[..end].to_string());
+                    rest = after[end..].trim_start();
+                    continue;
+                }
+                if long_tag.is_none()
+                    && let Some((tag, tail)) = split_leading_tag(rest)
+                    && let Some(long) = resolve_long_tag(tag, handles)
+                {
+                    long_tag = Some(long);
+                    rest = tail.trim_start();
+                    continue;
+                }
+                break;
+            }
+            let extra = rest.trim();
+            if !extra.is_empty() {
+                if !residual.is_empty() {
+                    residual.push(' ');
+                }
+                residual.push_str(extra);
+            }
+            continue;
+        }
         let Some(tok) = child.as_token() else {
             continue;
         };
@@ -2082,39 +2133,6 @@ fn extract_leading_node_properties(
                     && let Some(long) = resolve_long_tag(tok.text(), handles)
                 {
                     long_tag = Some(long);
-                }
-            }
-            SyntaxKind::YAML_SCALAR => {
-                let mut rest = tok.text().trim();
-                // Peel a leading `&anchor` and/or tag shorthand, in either
-                // order, that haven't already been captured.
-                loop {
-                    if anchor.is_none()
-                        && let Some(after) = rest.strip_prefix('&')
-                    {
-                        let end = after
-                            .find(|c: char| c.is_whitespace() || matches!(c, ',' | '}' | ']'))
-                            .unwrap_or(after.len());
-                        anchor = Some(after[..end].to_string());
-                        rest = after[end..].trim_start();
-                        continue;
-                    }
-                    if long_tag.is_none()
-                        && let Some((tag, tail)) = split_leading_tag(rest)
-                        && let Some(long) = resolve_long_tag(tag, handles)
-                    {
-                        long_tag = Some(long);
-                        rest = tail.trim_start();
-                        continue;
-                    }
-                    break;
-                }
-                let extra = rest.trim();
-                if !extra.is_empty() {
-                    if !residual.is_empty() {
-                        residual.push(' ');
-                    }
-                    residual.push_str(extra);
                 }
             }
             _ => {}
@@ -2135,23 +2153,26 @@ fn map_open_event_for_block_map(map_node: &SyntaxNode, handles: &TagHandles) -> 
     // first (v2 emission), then the MAP's inner-prefix tokens (v1).
     absorb_preceding_anchor_and_tag(map_node, handles, &mut anchor, &mut long_tag);
     for child in map_node.children_with_tokens() {
-        if let Some(node) = child.as_node()
-            && node.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY
-        {
-            break;
+        if let Some(node) = child.as_node() {
+            if node.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY {
+                break;
+            }
+            // A `? `-prefixed scalar (now a `YAML_SCALAR` node) is the
+            // first key of the map; stop scanning header tokens there so
+            // we don't pick up entry-level data as document-level
+            // node properties.
+            if node.kind() == SyntaxKind::YAML_SCALAR {
+                let text = node.text().to_string();
+                let trimmed = text.trim();
+                if trimmed.starts_with("? ") || trimmed == "?" {
+                    break;
+                }
+            }
+            continue;
         }
         let Some(tok) = child.as_token() else {
             continue;
         };
-        if tok.kind() == SyntaxKind::YAML_SCALAR {
-            let trimmed = tok.text().trim();
-            // A `? `-prefixed scalar is the first key of the map; stop
-            // scanning header tokens at that point so we don't pick up
-            // entry-level data as document-level node properties.
-            if trimmed.starts_with("? ") || trimmed == "?" {
-                break;
-            }
-        }
         absorb_anchor_or_tag(tok, handles, &mut anchor, &mut long_tag);
     }
     map_open_event_from_props(anchor.as_deref(), long_tag.as_deref())
@@ -2223,12 +2244,15 @@ fn project_block_map_entries(map_node: &SyntaxNode, handles: &TagHandles, out: &
     let mut idx = 0;
     while idx < children.len() {
         match &children[idx] {
-            rowan::NodeOrToken::Token(tok)
-                if tok.kind() == SyntaxKind::YAML_SCALAR
-                    && (tok.text().trim_start().starts_with("? ")
-                        || tok.text().trim_start() == "?") =>
+            rowan::NodeOrToken::Node(scalar)
+                if scalar.kind() == SyntaxKind::YAML_SCALAR && {
+                    let t = scalar.text().to_string();
+                    let ts = t.trim_start();
+                    ts.starts_with("? ") || ts == "?"
+                } =>
             {
-                let body = tok.text().trim_start().trim_start_matches('?').trim();
+                let scalar_text = scalar.text().to_string();
+                let body = scalar_text.trim_start().trim_start_matches('?').trim();
                 if body.is_empty() {
                     out.push("=VAL :".to_string());
                 } else {
@@ -2256,24 +2280,32 @@ fn project_block_map_entries(map_node: &SyntaxNode, handles: &TagHandles, out: &
                             let mut value_text = String::new();
                             let mut value_end = peek + 1;
                             while value_end < children.len() {
-                                if let rowan::NodeOrToken::Token(vt) = &children[value_end] {
-                                    if vt.kind() == SyntaxKind::NEWLINE {
-                                        break;
+                                match &children[value_end] {
+                                    rowan::NodeOrToken::Token(vt) => {
+                                        if vt.kind() == SyntaxKind::NEWLINE {
+                                            break;
+                                        }
+                                        if vt.kind() == SyntaxKind::YAML_TAG && value_tag.is_none()
+                                        {
+                                            value_tag = Some(vt.text().to_string());
+                                        } else if matches!(
+                                            vt.kind(),
+                                            SyntaxKind::YAML_ANCHOR
+                                                | SyntaxKind::YAML_ALIAS
+                                                | SyntaxKind::WHITESPACE
+                                        ) {
+                                            value_text.push_str(vt.text());
+                                        }
+                                        value_end += 1;
                                     }
-                                    if vt.kind() == SyntaxKind::YAML_TAG && value_tag.is_none() {
-                                        value_tag = Some(vt.text().to_string());
-                                    } else if matches!(
-                                        vt.kind(),
-                                        SyntaxKind::YAML_SCALAR
-                                            | SyntaxKind::YAML_ANCHOR
-                                            | SyntaxKind::YAML_ALIAS
-                                            | SyntaxKind::WHITESPACE
-                                    ) {
-                                        value_text.push_str(vt.text());
+                                    // The value scalar is a `YAML_SCALAR` node.
+                                    rowan::NodeOrToken::Node(vn)
+                                        if vn.kind() == SyntaxKind::YAML_SCALAR =>
+                                    {
+                                        value_text.push_str(&vn.text().to_string());
+                                        value_end += 1;
                                     }
-                                    value_end += 1;
-                                } else {
-                                    break;
+                                    _ => break,
                                 }
                             }
                             let trimmed = value_text.trim();
@@ -2398,20 +2430,26 @@ fn project_block_map_entry(entry: &SyntaxNode, handles: &TagHandles, out: &mut V
     // (`: value` — KEY wrapper holds only the colon).
     let key_text = key_node
         .children_with_tokens()
-        .filter_map(|el| el.into_token())
-        .take_while(|tok| tok.kind() != SyntaxKind::YAML_COLON)
-        .filter(|tok| {
-            matches!(
-                tok.kind(),
-                SyntaxKind::YAML_KEY
-                    | SyntaxKind::YAML_SCALAR
-                    | SyntaxKind::YAML_ANCHOR
-                    | SyntaxKind::YAML_ALIAS
-                    | SyntaxKind::WHITESPACE
-                    | SyntaxKind::NEWLINE
-            )
+        .take_while(|el| el.as_token().map(|t| t.kind()) != Some(SyntaxKind::YAML_COLON))
+        .filter_map(|el| match el {
+            // The key scalar is a `YAML_SCALAR` node.
+            rowan::NodeOrToken::Node(n) if n.kind() == SyntaxKind::YAML_SCALAR => {
+                Some(n.text().to_string())
+            }
+            rowan::NodeOrToken::Token(t)
+                if matches!(
+                    t.kind(),
+                    SyntaxKind::YAML_KEY
+                        | SyntaxKind::YAML_ANCHOR
+                        | SyntaxKind::YAML_ALIAS
+                        | SyntaxKind::WHITESPACE
+                        | SyntaxKind::NEWLINE
+                ) =>
+            {
+                Some(t.text().to_string())
+            }
+            _ => None,
         })
-        .map(|tok| tok.text().to_string())
         .collect::<Vec<_>>()
         .join("");
     let key_text = key_text.trim_end().to_string();
@@ -2549,7 +2587,7 @@ fn project_block_map_entry_value(
         .filter(|tok| {
             matches!(
                 tok.kind(),
-                SyntaxKind::YAML_SCALAR
+                SyntaxKind::YAML_SCALAR_TEXT
                     | SyntaxKind::YAML_ANCHOR
                     | SyntaxKind::YAML_ALIAS
                     | SyntaxKind::WHITESPACE

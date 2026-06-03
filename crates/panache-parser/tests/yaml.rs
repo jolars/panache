@@ -638,10 +638,9 @@ fn yaml_nested_map_lossless() {
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)
         .expect("outer key");
     let key_text = outer_key
-        .children_with_tokens()
-        .filter_map(|el| el.into_token())
-        .find(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
-        .expect("key token")
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_SCALAR)
+        .expect("key scalar")
         .text()
         .to_string();
     assert_eq!(key_text, "foo");

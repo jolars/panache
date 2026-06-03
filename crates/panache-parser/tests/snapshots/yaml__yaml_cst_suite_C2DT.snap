@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: C2DT
@@ -10,30 +11,35 @@ cst:
 YAML_STREAM@0..50
   YAML_DOCUMENT@0..50
     YAML_FLOW_MAP@0..49
-      YAML_SCALAR@0..1 "{"
+      YAML_FLOW_INDICATOR@0..1 "{"
       NEWLINE@1..2 "\n"
       YAML_FLOW_MAP_ENTRY@2..18
         YAML_FLOW_MAP_KEY@2..13
-          YAML_SCALAR@2..12 "\"adjacent\""
+          YAML_SCALAR@2..12
+            YAML_SCALAR_TEXT@2..12 "\"adjacent\""
           YAML_COLON@12..13 ":"
         YAML_FLOW_MAP_VALUE@13..18
-          YAML_SCALAR@13..18 "value"
-      YAML_SCALAR@18..19 ","
+          YAML_SCALAR@13..18
+            YAML_SCALAR_TEXT@13..18 "value"
+      YAML_FLOW_INDICATOR@18..19 ","
       NEWLINE@19..20 "\n"
       YAML_FLOW_MAP_ENTRY@20..37
         YAML_FLOW_MAP_KEY@20..31
-          YAML_SCALAR@20..30 "\"readable\""
+          YAML_SCALAR@20..30
+            YAML_SCALAR_TEXT@20..30 "\"readable\""
           YAML_COLON@30..31 ":"
         YAML_FLOW_MAP_VALUE@31..37
           WHITESPACE@31..32 " "
-          YAML_SCALAR@32..37 "value"
-      YAML_SCALAR@37..38 ","
+          YAML_SCALAR@32..37
+            YAML_SCALAR_TEXT@32..37 "value"
+      YAML_FLOW_INDICATOR@37..38 ","
       NEWLINE@38..39 "\n"
       YAML_FLOW_MAP_ENTRY@39..48
         YAML_FLOW_MAP_KEY@39..47
-          YAML_SCALAR@39..46 "\"empty\""
+          YAML_SCALAR@39..46
+            YAML_SCALAR_TEXT@39..46 "\"empty\""
           YAML_COLON@46..47 ":"
         YAML_FLOW_MAP_VALUE@47..48
           NEWLINE@47..48 "\n"
-      YAML_SCALAR@48..49 "}"
+      YAML_FLOW_INDICATOR@48..49 "}"
     NEWLINE@49..50 "\n"

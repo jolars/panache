@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 26DV
@@ -12,7 +13,8 @@ YAML_STREAM@0..193
     YAML_BLOCK_MAP@0..193
       YAML_BLOCK_MAP_ENTRY@0..37
         YAML_BLOCK_MAP_KEY@0..8
-          YAML_SCALAR@0..6 "\"top1\""
+          YAML_SCALAR@0..6
+            YAML_SCALAR_TEXT@0..6 "\"top1\""
           WHITESPACE@6..7 " "
           YAML_COLON@7..8 ":"
         YAML_BLOCK_MAP_VALUE@8..37
@@ -22,18 +24,21 @@ YAML_STREAM@0..193
           YAML_BLOCK_MAP@12..37
             YAML_BLOCK_MAP_ENTRY@12..37
               YAML_BLOCK_MAP_KEY@12..20
-                YAML_SCALAR@12..18 "\"key1\""
+                YAML_SCALAR@12..18
+                  YAML_SCALAR_TEXT@12..18 "\"key1\""
                 WHITESPACE@18..19 " "
                 YAML_COLON@19..20 ":"
               YAML_BLOCK_MAP_VALUE@20..37
                 WHITESPACE@20..21 " "
                 YAML_ANCHOR@21..28 "&alias1"
                 WHITESPACE@28..29 " "
-                YAML_SCALAR@29..36 "scalar1"
+                YAML_SCALAR@29..36
+                  YAML_SCALAR_TEXT@29..36 "scalar1"
                 NEWLINE@36..37 "\n"
       YAML_BLOCK_MAP_ENTRY@37..74
         YAML_BLOCK_MAP_KEY@37..45
-          YAML_SCALAR@37..43 "'top2'"
+          YAML_SCALAR@37..43
+            YAML_SCALAR_TEXT@37..43 "'top2'"
           WHITESPACE@43..44 " "
           YAML_COLON@44..45 ":"
         YAML_BLOCK_MAP_VALUE@45..74
@@ -43,18 +48,21 @@ YAML_STREAM@0..193
           YAML_BLOCK_MAP@49..74
             YAML_BLOCK_MAP_ENTRY@49..74
               YAML_BLOCK_MAP_KEY@49..57
-                YAML_SCALAR@49..55 "'key2'"
+                YAML_SCALAR@49..55
+                  YAML_SCALAR_TEXT@49..55 "'key2'"
                 WHITESPACE@55..56 " "
                 YAML_COLON@56..57 ":"
               YAML_BLOCK_MAP_VALUE@57..74
                 WHITESPACE@57..58 " "
                 YAML_ANCHOR@58..65 "&alias2"
                 WHITESPACE@65..66 " "
-                YAML_SCALAR@66..73 "scalar2"
+                YAML_SCALAR@66..73
+                  YAML_SCALAR_TEXT@66..73 "scalar2"
                 NEWLINE@73..74 "\n"
       YAML_BLOCK_MAP_ENTRY@74..108
         YAML_BLOCK_MAP_KEY@74..79
-          YAML_SCALAR@74..78 "top3"
+          YAML_SCALAR@74..78
+            YAML_SCALAR_TEXT@74..78 "top3"
           YAML_COLON@78..79 ":"
         YAML_BLOCK_MAP_VALUE@79..108
           WHITESPACE@79..80 " "
@@ -70,11 +78,13 @@ YAML_STREAM@0..193
                 YAML_COLON@98..99 ":"
               YAML_BLOCK_MAP_VALUE@99..108
                 WHITESPACE@99..100 " "
-                YAML_SCALAR@100..107 "scalar3"
+                YAML_SCALAR@100..107
+                  YAML_SCALAR_TEXT@100..107 "scalar3"
                 NEWLINE@107..108 "\n"
       YAML_BLOCK_MAP_ENTRY@108..135
         YAML_BLOCK_MAP_KEY@108..113
-          YAML_SCALAR@108..112 "top4"
+          YAML_SCALAR@108..112
+            YAML_SCALAR_TEXT@108..112 "top4"
           YAML_COLON@112..113 ":"
         YAML_BLOCK_MAP_VALUE@113..135
           WHITESPACE@113..114 " "
@@ -88,21 +98,25 @@ YAML_STREAM@0..193
                 YAML_COLON@125..126 ":"
               YAML_BLOCK_MAP_VALUE@126..135
                 WHITESPACE@126..127 " "
-                YAML_SCALAR@127..134 "scalar4"
+                YAML_SCALAR@127..134
+                  YAML_SCALAR_TEXT@127..134 "scalar4"
                 NEWLINE@134..135 "\n"
       YAML_BLOCK_MAP_ENTRY@135..158
         YAML_BLOCK_MAP_KEY@135..143
-          YAML_SCALAR@135..142 "top5   "
+          YAML_SCALAR@135..142
+            YAML_SCALAR_TEXT@135..142 "top5   "
           YAML_COLON@142..143 ":"
         YAML_BLOCK_MAP_VALUE@143..158
           WHITESPACE@143..147 "    "
           NEWLINE@147..148 "\n"
           WHITESPACE@148..150 "  "
-          YAML_SCALAR@150..157 "scalar5"
+          YAML_SCALAR@150..157
+            YAML_SCALAR_TEXT@150..157 "scalar5"
           NEWLINE@157..158 "\n"
       YAML_BLOCK_MAP_ENTRY@158..193
         YAML_BLOCK_MAP_KEY@158..163
-          YAML_SCALAR@158..162 "top6"
+          YAML_SCALAR@158..162
+            YAML_SCALAR_TEXT@158..162 "top6"
           YAML_COLON@162..163 ":"
         YAML_BLOCK_MAP_VALUE@163..193
           WHITESPACE@163..164 " "
@@ -113,10 +127,12 @@ YAML_STREAM@0..193
               YAML_BLOCK_MAP_KEY@167..184
                 YAML_ANCHOR@167..175 "&anchor6"
                 WHITESPACE@175..176 " "
-                YAML_SCALAR@176..182 "'key6'"
+                YAML_SCALAR@176..182
+                  YAML_SCALAR_TEXT@176..182 "'key6'"
                 WHITESPACE@182..183 " "
                 YAML_COLON@183..184 ":"
               YAML_BLOCK_MAP_VALUE@184..193
                 WHITESPACE@184..185 " "
-                YAML_SCALAR@185..192 "scalar6"
+                YAML_SCALAR@185..192
+                  YAML_SCALAR_TEXT@185..192 "scalar6"
                 NEWLINE@192..193 "\n"

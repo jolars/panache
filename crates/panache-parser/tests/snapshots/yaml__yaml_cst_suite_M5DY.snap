@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: M5DY
@@ -18,13 +19,15 @@ YAML_STREAM@0..142
             YAML_BLOCK_SEQUENCE_ITEM@2..21
               YAML_BLOCK_SEQ_ENTRY@2..3 "-"
               WHITESPACE@3..4 " "
-              YAML_SCALAR@4..18 "Detroit Tigers"
+              YAML_SCALAR@4..18
+                YAML_SCALAR_TEXT@4..18 "Detroit Tigers"
               NEWLINE@18..19 "\n"
               WHITESPACE@19..21 "  "
             YAML_BLOCK_SEQUENCE_ITEM@21..36
               YAML_BLOCK_SEQ_ENTRY@21..22 "-"
               WHITESPACE@22..23 " "
-              YAML_SCALAR@23..35 "Chicago cubs"
+              YAML_SCALAR@23..35
+                YAML_SCALAR_TEXT@23..35 "Chicago cubs"
               NEWLINE@35..36 "\n"
           YAML_COLON@36..37 ":"
         YAML_BLOCK_MAP_VALUE@37..54
@@ -34,7 +37,8 @@ YAML_STREAM@0..142
             YAML_BLOCK_SEQUENCE_ITEM@40..54
               YAML_BLOCK_SEQ_ENTRY@40..41 "-"
               WHITESPACE@41..42 " "
-              YAML_SCALAR@42..52 "2001-07-23"
+              YAML_SCALAR@42..52
+                YAML_SCALAR_TEXT@42..52 "2001-07-23"
               NEWLINE@52..53 "\n"
               NEWLINE@53..54 "\n"
       YAML_BLOCK_MAP_ENTRY@54..142
@@ -42,33 +46,38 @@ YAML_STREAM@0..142
           YAML_KEY@54..55 "?"
           WHITESPACE@55..56 " "
           YAML_FLOW_SEQUENCE@56..96
-            YAML_SCALAR@56..57 "["
+            YAML_FLOW_INDICATOR@56..57 "["
             WHITESPACE@57..58 " "
             YAML_FLOW_SEQUENCE_ITEM@58..74
-              YAML_SCALAR@58..74 "New York Yankees"
-            YAML_SCALAR@74..75 ","
+              YAML_SCALAR@58..74
+                YAML_SCALAR_TEXT@58..74 "New York Yankees"
+            YAML_FLOW_INDICATOR@74..75 ","
             NEWLINE@75..76 "\n"
             WHITESPACE@76..80 "    "
             YAML_FLOW_SEQUENCE_ITEM@80..95
-              YAML_SCALAR@80..95 "Atlanta Braves "
-            YAML_SCALAR@95..96 "]"
+              YAML_SCALAR@80..95
+                YAML_SCALAR_TEXT@80..95 "Atlanta Braves "
+            YAML_FLOW_INDICATOR@95..96 "]"
           NEWLINE@96..97 "\n"
           YAML_COLON@97..98 ":"
         YAML_BLOCK_MAP_VALUE@98..142
           WHITESPACE@98..99 " "
           YAML_FLOW_SEQUENCE@99..141
-            YAML_SCALAR@99..100 "["
+            YAML_FLOW_INDICATOR@99..100 "["
             WHITESPACE@100..101 " "
             YAML_FLOW_SEQUENCE_ITEM@101..111
-              YAML_SCALAR@101..111 "2001-07-02"
-            YAML_SCALAR@111..112 ","
+              YAML_SCALAR@101..111
+                YAML_SCALAR_TEXT@101..111 "2001-07-02"
+            YAML_FLOW_INDICATOR@111..112 ","
             WHITESPACE@112..113 " "
             YAML_FLOW_SEQUENCE_ITEM@113..123
-              YAML_SCALAR@113..123 "2001-08-12"
-            YAML_SCALAR@123..124 ","
+              YAML_SCALAR@113..123
+                YAML_SCALAR_TEXT@113..123 "2001-08-12"
+            YAML_FLOW_INDICATOR@123..124 ","
             NEWLINE@124..125 "\n"
             WHITESPACE@125..129 "    "
             YAML_FLOW_SEQUENCE_ITEM@129..140
-              YAML_SCALAR@129..140 "2001-08-14 "
-            YAML_SCALAR@140..141 "]"
+              YAML_SCALAR@129..140
+                YAML_SCALAR_TEXT@129..140 "2001-08-14 "
+            YAML_FLOW_INDICATOR@140..141 "]"
           NEWLINE@141..142 "\n"

@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 35KP
@@ -18,12 +19,14 @@ YAML_STREAM@0..52
         YAML_BLOCK_MAP_KEY@10..15
           YAML_KEY@10..11 "?"
           WHITESPACE@11..12 " "
-          YAML_SCALAR@12..13 "a"
+          YAML_SCALAR@12..13
+            YAML_SCALAR_TEXT@12..13 "a"
           NEWLINE@13..14 "\n"
           YAML_COLON@14..15 ":"
         YAML_BLOCK_MAP_VALUE@15..18
           WHITESPACE@15..16 " "
-          YAML_SCALAR@16..17 "b"
+          YAML_SCALAR@16..17
+            YAML_SCALAR_TEXT@16..17 "b"
           NEWLINE@17..18 "\n"
   YAML_DOCUMENT@18..38
     YAML_DOCUMENT_START@18..21 "---"
@@ -36,12 +39,14 @@ YAML_STREAM@0..52
         WHITESPACE@29..30 " "
         YAML_TAG@30..35 "!!str"
         WHITESPACE@35..36 " "
-        YAML_SCALAR@36..37 "c"
+        YAML_SCALAR@36..37
+          YAML_SCALAR_TEXT@36..37 "c"
         NEWLINE@37..38 "\n"
   YAML_DOCUMENT@38..52
     YAML_DOCUMENT_START@38..41 "---"
     WHITESPACE@41..42 " "
     YAML_TAG@42..47 "!!str"
     NEWLINE@47..48 "\n"
-    YAML_SCALAR@48..51 "d\ne"
+    YAML_SCALAR@48..51
+      YAML_SCALAR_TEXT@48..51 "d\ne"
     NEWLINE@51..52 "\n"

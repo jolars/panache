@@ -354,10 +354,10 @@ fn hashpipe_map_entry_value_text(normalized_yaml: &str, entry: &YamlBlockMapEntr
             }
             YamlScalarStyle::Plain if scalar.raw().contains('\n') => {
                 // Normalize wrapped plain scalars to a single logical line.
-                let folded = fold_multiline_plain_scalar(scalar.raw());
+                let folded = fold_multiline_plain_scalar(&scalar.raw());
                 prepend_tag(value.tag(), folded)
             }
-            _ => prepend_tag(value.tag(), scalar.raw().to_string()),
+            _ => prepend_tag(value.tag(), scalar.raw()),
         },
         // Flow container: slice its range and trim (single logical line).
         Some(YamlNode::FlowSequence(n)) => slice_trim(normalized_yaml, n.syntax()),

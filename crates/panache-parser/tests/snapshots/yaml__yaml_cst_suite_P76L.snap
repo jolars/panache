@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: P76L
@@ -9,13 +10,14 @@ diagnostics:
 cst:
 YAML_STREAM@0..74
   YAML_DOCUMENT@0..74
-    YAML_SCALAR@0..33 "%TAG !! tag:example.c ..."
+    YAML_DIRECTIVE@0..33 "%TAG !! tag:example.c ..."
     NEWLINE@33..34 "\n"
     YAML_DOCUMENT_START@34..37 "---"
     NEWLINE@37..38 "\n"
     YAML_TAG@38..43 "!!int"
     WHITESPACE@43..44 " "
-    YAML_SCALAR@44..49 "1 - 3"
+    YAML_SCALAR@44..49
+      YAML_SCALAR_TEXT@44..49 "1 - 3"
     WHITESPACE@49..50 " "
     YAML_COMMENT@50..73 "# Interval, not integer"
     NEWLINE@73..74 "\n"

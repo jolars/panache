@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..62
@@ -11,19 +12,23 @@ DOCUMENT@0..62
         YAML_BLOCK_MAP@4..34
           YAML_BLOCK_MAP_ENTRY@4..17
             YAML_BLOCK_MAP_KEY@4..11
-              YAML_SCALAR@4..10 "author"
+              YAML_SCALAR@4..10
+                YAML_SCALAR_TEXT@4..10 "author"
               YAML_COLON@10..11 ":"
             YAML_BLOCK_MAP_VALUE@11..17
               WHITESPACE@11..12 " "
-              YAML_SCALAR@12..16 "Test"
+              YAML_SCALAR@12..16
+                YAML_SCALAR_TEXT@12..16 "Test"
               NEWLINE@16..17 "\n"
           YAML_BLOCK_MAP_ENTRY@17..34
             YAML_BLOCK_MAP_KEY@17..23
-              YAML_SCALAR@17..22 "title"
+              YAML_SCALAR@17..22
+                YAML_SCALAR_TEXT@17..22 "title"
               YAML_COLON@22..23 ":"
             YAML_BLOCK_MAP_VALUE@23..34
               WHITESPACE@23..24 " "
-              YAML_SCALAR@24..33 "smörgås"
+              YAML_SCALAR@24..33
+                YAML_SCALAR_TEXT@24..33 "smörgås"
               NEWLINE@33..34 "\n"
     YAML_METADATA_DELIM@34..37 "---"
     NEWLINE@37..38 "\n"

@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 2EBW
@@ -12,41 +13,51 @@ YAML_STREAM@0..127
     YAML_BLOCK_MAP@0..127
       YAML_BLOCK_MAP_ENTRY@0..46
         YAML_BLOCK_MAP_KEY@0..40
-          YAML_SCALAR@0..39 "a!\"#$%&'()*+,-./09:;< ..."
+          YAML_SCALAR@0..39
+            YAML_SCALAR_TEXT@0..39 "a!\"#$%&'()*+,-./09:;< ..."
           YAML_COLON@39..40 ":"
         YAML_BLOCK_MAP_VALUE@40..46
           WHITESPACE@40..41 " "
-          YAML_SCALAR@41..45 "safe"
+          YAML_SCALAR@41..45
+            YAML_SCALAR_TEXT@41..45 "safe"
           NEWLINE@45..46 "\n"
       YAML_BLOCK_MAP_ENTRY@46..71
         YAML_BLOCK_MAP_KEY@46..51
-          YAML_SCALAR@46..50 "?foo"
+          YAML_SCALAR@46..50
+            YAML_SCALAR_TEXT@46..50 "?foo"
           YAML_COLON@50..51 ":"
         YAML_BLOCK_MAP_VALUE@51..71
           WHITESPACE@51..52 " "
-          YAML_SCALAR@52..70 "safe question mark"
+          YAML_SCALAR@52..70
+            YAML_SCALAR_TEXT@52..70 "safe question mark"
           NEWLINE@70..71 "\n"
       YAML_BLOCK_MAP_ENTRY@71..88
         YAML_BLOCK_MAP_KEY@71..76
-          YAML_SCALAR@71..75 ":foo"
+          YAML_SCALAR@71..75
+            YAML_SCALAR_TEXT@71..75 ":foo"
           YAML_COLON@75..76 ":"
         YAML_BLOCK_MAP_VALUE@76..88
           WHITESPACE@76..77 " "
-          YAML_SCALAR@77..87 "safe colon"
+          YAML_SCALAR@77..87
+            YAML_SCALAR_TEXT@77..87 "safe colon"
           NEWLINE@87..88 "\n"
       YAML_BLOCK_MAP_ENTRY@88..104
         YAML_BLOCK_MAP_KEY@88..93
-          YAML_SCALAR@88..92 "-foo"
+          YAML_SCALAR@88..92
+            YAML_SCALAR_TEXT@88..92 "-foo"
           YAML_COLON@92..93 ":"
         YAML_BLOCK_MAP_VALUE@93..104
           WHITESPACE@93..94 " "
-          YAML_SCALAR@94..103 "safe dash"
+          YAML_SCALAR@94..103
+            YAML_SCALAR_TEXT@94..103 "safe dash"
           NEWLINE@103..104 "\n"
       YAML_BLOCK_MAP_ENTRY@104..127
         YAML_BLOCK_MAP_KEY@104..116
-          YAML_SCALAR@104..115 "this is#not"
+          YAML_SCALAR@104..115
+            YAML_SCALAR_TEXT@104..115 "this is#not"
           YAML_COLON@115..116 ":"
         YAML_BLOCK_MAP_VALUE@116..127
           WHITESPACE@116..117 " "
-          YAML_SCALAR@117..126 "a comment"
+          YAML_SCALAR@117..126
+            YAML_SCALAR_TEXT@117..126 "a comment"
           NEWLINE@126..127 "\n"

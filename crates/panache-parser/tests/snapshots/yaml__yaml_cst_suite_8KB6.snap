@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 8KB6
@@ -16,35 +17,41 @@ YAML_STREAM@0..51
         YAML_BLOCK_SEQ_ENTRY@4..5 "-"
         WHITESPACE@5..6 " "
         YAML_FLOW_MAP@6..26
-          YAML_SCALAR@6..7 "{"
+          YAML_FLOW_INDICATOR@6..7 "{"
           WHITESPACE@7..8 " "
-          YAML_SCALAR@8..19 "single line"
-          YAML_SCALAR@19..20 ","
+          YAML_SCALAR@8..19
+            YAML_SCALAR_TEXT@8..19 "single line"
+          YAML_FLOW_INDICATOR@19..20 ","
           WHITESPACE@20..21 " "
           YAML_FLOW_MAP_ENTRY@21..25
             YAML_FLOW_MAP_KEY@21..23
-              YAML_SCALAR@21..22 "a"
+              YAML_SCALAR@21..22
+                YAML_SCALAR_TEXT@21..22 "a"
               YAML_COLON@22..23 ":"
             YAML_FLOW_MAP_VALUE@23..25
               WHITESPACE@23..24 " "
-              YAML_SCALAR@24..25 "b"
-          YAML_SCALAR@25..26 "}"
+              YAML_SCALAR@24..25
+                YAML_SCALAR_TEXT@24..25 "b"
+          YAML_FLOW_INDICATOR@25..26 "}"
         NEWLINE@26..27 "\n"
       YAML_BLOCK_SEQUENCE_ITEM@27..51
         YAML_BLOCK_SEQ_ENTRY@27..28 "-"
         WHITESPACE@28..29 " "
         YAML_FLOW_MAP@29..50
-          YAML_SCALAR@29..30 "{"
+          YAML_FLOW_INDICATOR@29..30 "{"
           WHITESPACE@30..31 " "
-          YAML_SCALAR@31..43 "multi\n  line"
-          YAML_SCALAR@43..44 ","
+          YAML_SCALAR@31..43
+            YAML_SCALAR_TEXT@31..43 "multi\n  line"
+          YAML_FLOW_INDICATOR@43..44 ","
           WHITESPACE@44..45 " "
           YAML_FLOW_MAP_ENTRY@45..49
             YAML_FLOW_MAP_KEY@45..47
-              YAML_SCALAR@45..46 "a"
+              YAML_SCALAR@45..46
+                YAML_SCALAR_TEXT@45..46 "a"
               YAML_COLON@46..47 ":"
             YAML_FLOW_MAP_VALUE@47..49
               WHITESPACE@47..48 " "
-              YAML_SCALAR@48..49 "b"
-          YAML_SCALAR@49..50 "}"
+              YAML_SCALAR@48..49
+                YAML_SCALAR_TEXT@48..49 "b"
+          YAML_FLOW_INDICATOR@49..50 "}"
         NEWLINE@50..51 "\n"

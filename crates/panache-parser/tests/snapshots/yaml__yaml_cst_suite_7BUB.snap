@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 7BUB
@@ -14,7 +15,8 @@ YAML_STREAM@0..127
     YAML_BLOCK_MAP@4..127
       YAML_BLOCK_MAP_ENTRY@4..74
         YAML_BLOCK_MAP_KEY@4..7
-          YAML_SCALAR@4..6 "hr"
+          YAML_SCALAR@4..6
+            YAML_SCALAR_TEXT@4..6 "hr"
           YAML_COLON@6..7 ":"
         YAML_BLOCK_MAP_VALUE@7..74
           NEWLINE@7..8 "\n"
@@ -23,7 +25,8 @@ YAML_STREAM@0..127
             YAML_BLOCK_SEQUENCE_ITEM@10..57
               YAML_BLOCK_SEQ_ENTRY@10..11 "-"
               WHITESPACE@11..12 " "
-              YAML_SCALAR@12..24 "Mark McGwire"
+              YAML_SCALAR@12..24
+                YAML_SCALAR_TEXT@12..24 "Mark McGwire"
               NEWLINE@24..25 "\n"
               WHITESPACE@25..27 "  "
               YAML_COMMENT@27..54 "# Following node labe ..."
@@ -34,11 +37,13 @@ YAML_STREAM@0..127
               WHITESPACE@58..59 " "
               YAML_ANCHOR@59..62 "&SS"
               WHITESPACE@62..63 " "
-              YAML_SCALAR@63..73 "Sammy Sosa"
+              YAML_SCALAR@63..73
+                YAML_SCALAR_TEXT@63..73 "Sammy Sosa"
               NEWLINE@73..74 "\n"
       YAML_BLOCK_MAP_ENTRY@74..127
         YAML_BLOCK_MAP_KEY@74..78
-          YAML_SCALAR@74..77 "rbi"
+          YAML_SCALAR@74..77
+            YAML_SCALAR_TEXT@74..77 "rbi"
           YAML_COLON@77..78 ":"
         YAML_BLOCK_MAP_VALUE@78..127
           NEWLINE@78..79 "\n"
@@ -55,5 +60,6 @@ YAML_STREAM@0..127
             YAML_BLOCK_SEQUENCE_ITEM@113..127
               YAML_BLOCK_SEQ_ENTRY@113..114 "-"
               WHITESPACE@114..115 " "
-              YAML_SCALAR@115..126 "Ken Griffey"
+              YAML_SCALAR@115..126
+                YAML_SCALAR_TEXT@115..126 "Ken Griffey"
               NEWLINE@126..127 "\n"

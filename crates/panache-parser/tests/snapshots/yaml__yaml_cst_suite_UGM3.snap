@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: UGM3
@@ -16,23 +17,28 @@ YAML_STREAM@0..644
     YAML_BLOCK_MAP@39..644
       YAML_BLOCK_MAP_ENTRY@39..54
         YAML_BLOCK_MAP_KEY@39..47
-          YAML_SCALAR@39..46 "invoice"
+          YAML_SCALAR@39..46
+            YAML_SCALAR_TEXT@39..46 "invoice"
           YAML_COLON@46..47 ":"
         YAML_BLOCK_MAP_VALUE@47..54
           WHITESPACE@47..48 " "
-          YAML_SCALAR@48..53 "34843"
+          YAML_SCALAR@48..53
+            YAML_SCALAR_TEXT@48..53 "34843"
           NEWLINE@53..54 "\n"
       YAML_BLOCK_MAP_ENTRY@54..74
         YAML_BLOCK_MAP_KEY@54..62
-          YAML_SCALAR@54..61 "date   "
+          YAML_SCALAR@54..61
+            YAML_SCALAR_TEXT@54..61 "date   "
           YAML_COLON@61..62 ":"
         YAML_BLOCK_MAP_VALUE@62..74
           WHITESPACE@62..63 " "
-          YAML_SCALAR@63..73 "2001-01-23"
+          YAML_SCALAR@63..73
+            YAML_SCALAR_TEXT@63..73 "2001-01-23"
           NEWLINE@73..74 "\n"
       YAML_BLOCK_MAP_ENTRY@74..283
         YAML_BLOCK_MAP_KEY@74..82
-          YAML_SCALAR@74..81 "bill-to"
+          YAML_SCALAR@74..81
+            YAML_SCALAR_TEXT@74..81 "bill-to"
           YAML_COLON@81..82 ":"
         YAML_BLOCK_MAP_VALUE@82..283
           WHITESPACE@82..83 " "
@@ -42,25 +48,30 @@ YAML_STREAM@0..644
           YAML_BLOCK_MAP@94..283
             YAML_BLOCK_MAP_ENTRY@94..113
               YAML_BLOCK_MAP_KEY@94..102
-                YAML_SCALAR@94..101 "given  "
+                YAML_SCALAR@94..101
+                  YAML_SCALAR_TEXT@94..101 "given  "
                 YAML_COLON@101..102 ":"
               YAML_BLOCK_MAP_VALUE@102..113
                 WHITESPACE@102..103 " "
-                YAML_SCALAR@103..108 "Chris"
+                YAML_SCALAR@103..108
+                  YAML_SCALAR_TEXT@103..108 "Chris"
                 NEWLINE@108..109 "\n"
                 WHITESPACE@109..113 "    "
             YAML_BLOCK_MAP_ENTRY@113..133
               YAML_BLOCK_MAP_KEY@113..121
-                YAML_SCALAR@113..120 "family "
+                YAML_SCALAR@113..120
+                  YAML_SCALAR_TEXT@113..120 "family "
                 YAML_COLON@120..121 ":"
               YAML_BLOCK_MAP_VALUE@121..133
                 WHITESPACE@121..122 " "
-                YAML_SCALAR@122..128 "Dumars"
+                YAML_SCALAR@122..128
+                  YAML_SCALAR_TEXT@122..128 "Dumars"
                 NEWLINE@128..129 "\n"
                 WHITESPACE@129..133 "    "
             YAML_BLOCK_MAP_ENTRY@133..283
               YAML_BLOCK_MAP_KEY@133..141
-                YAML_SCALAR@133..140 "address"
+                YAML_SCALAR@133..140
+                  YAML_SCALAR_TEXT@133..140 "address"
                 YAML_COLON@140..141 ":"
               YAML_BLOCK_MAP_VALUE@141..283
                 NEWLINE@141..142 "\n"
@@ -68,41 +79,50 @@ YAML_STREAM@0..644
                 YAML_BLOCK_MAP@150..283
                   YAML_BLOCK_MAP_ENTRY@150..218
                     YAML_BLOCK_MAP_KEY@150..156
-                      YAML_SCALAR@150..155 "lines"
+                      YAML_SCALAR@150..155
+                        YAML_SCALAR_TEXT@150..155 "lines"
                       YAML_COLON@155..156 ":"
                     YAML_BLOCK_MAP_VALUE@156..218
                       WHITESPACE@156..157 " "
-                      YAML_SCALAR@157..210 "|\n            458 Wal ..."
+                      YAML_SCALAR@157..210
+                        YAML_SCALAR_TEXT@157..210 "|\n            458 Wal ..."
                       WHITESPACE@210..218 "        "
                   YAML_BLOCK_MAP_ENTRY@218..246
                     YAML_BLOCK_MAP_KEY@218..227
-                      YAML_SCALAR@218..226 "city    "
+                      YAML_SCALAR@218..226
+                        YAML_SCALAR_TEXT@218..226 "city    "
                       YAML_COLON@226..227 ":"
                     YAML_BLOCK_MAP_VALUE@227..246
                       WHITESPACE@227..228 " "
-                      YAML_SCALAR@228..237 "Royal Oak"
+                      YAML_SCALAR@228..237
+                        YAML_SCALAR_TEXT@228..237 "Royal Oak"
                       NEWLINE@237..238 "\n"
                       WHITESPACE@238..246 "        "
                   YAML_BLOCK_MAP_ENTRY@246..267
                     YAML_BLOCK_MAP_KEY@246..255
-                      YAML_SCALAR@246..254 "state   "
+                      YAML_SCALAR@246..254
+                        YAML_SCALAR_TEXT@246..254 "state   "
                       YAML_COLON@254..255 ":"
                     YAML_BLOCK_MAP_VALUE@255..267
                       WHITESPACE@255..256 " "
-                      YAML_SCALAR@256..258 "MI"
+                      YAML_SCALAR@256..258
+                        YAML_SCALAR_TEXT@256..258 "MI"
                       NEWLINE@258..259 "\n"
                       WHITESPACE@259..267 "        "
                   YAML_BLOCK_MAP_ENTRY@267..283
                     YAML_BLOCK_MAP_KEY@267..276
-                      YAML_SCALAR@267..275 "postal  "
+                      YAML_SCALAR@267..275
+                        YAML_SCALAR_TEXT@267..275 "postal  "
                       YAML_COLON@275..276 ":"
                     YAML_BLOCK_MAP_VALUE@276..283
                       WHITESPACE@276..277 " "
-                      YAML_SCALAR@277..282 "48046"
+                      YAML_SCALAR@277..282
+                        YAML_SCALAR_TEXT@277..282 "48046"
                       NEWLINE@282..283 "\n"
       YAML_BLOCK_MAP_ENTRY@283..299
         YAML_BLOCK_MAP_KEY@283..291
-          YAML_SCALAR@283..290 "ship-to"
+          YAML_SCALAR@283..290
+            YAML_SCALAR_TEXT@283..290 "ship-to"
           YAML_COLON@290..291 ":"
         YAML_BLOCK_MAP_VALUE@291..299
           WHITESPACE@291..292 " "
@@ -110,7 +130,8 @@ YAML_STREAM@0..644
           NEWLINE@298..299 "\n"
       YAML_BLOCK_MAP_ENTRY@299..524
         YAML_BLOCK_MAP_KEY@299..307
-          YAML_SCALAR@299..306 "product"
+          YAML_SCALAR@299..306
+            YAML_SCALAR_TEXT@299..306 "product"
           YAML_COLON@306..307 ":"
         YAML_BLOCK_MAP_VALUE@307..524
           NEWLINE@307..308 "\n"
@@ -122,38 +143,46 @@ YAML_STREAM@0..644
               YAML_BLOCK_MAP@314..419
                 YAML_BLOCK_MAP_ENTRY@314..341
                   YAML_BLOCK_MAP_KEY@314..327
-                    YAML_SCALAR@314..326 "sku         "
+                    YAML_SCALAR@314..326
+                      YAML_SCALAR_TEXT@314..326 "sku         "
                     YAML_COLON@326..327 ":"
                   YAML_BLOCK_MAP_VALUE@327..341
                     WHITESPACE@327..328 " "
-                    YAML_SCALAR@328..334 "BL394D"
+                    YAML_SCALAR@328..334
+                      YAML_SCALAR_TEXT@328..334 "BL394D"
                     NEWLINE@334..335 "\n"
                     WHITESPACE@335..341 "      "
                 YAML_BLOCK_MAP_ENTRY@341..363
                   YAML_BLOCK_MAP_KEY@341..354
-                    YAML_SCALAR@341..353 "quantity    "
+                    YAML_SCALAR@341..353
+                      YAML_SCALAR_TEXT@341..353 "quantity    "
                     YAML_COLON@353..354 ":"
                   YAML_BLOCK_MAP_VALUE@354..363
                     WHITESPACE@354..355 " "
-                    YAML_SCALAR@355..356 "4"
+                    YAML_SCALAR@355..356
+                      YAML_SCALAR_TEXT@355..356 "4"
                     NEWLINE@356..357 "\n"
                     WHITESPACE@357..363 "      "
                 YAML_BLOCK_MAP_ENTRY@363..394
                   YAML_BLOCK_MAP_KEY@363..376
-                    YAML_SCALAR@363..375 "description "
+                    YAML_SCALAR@363..375
+                      YAML_SCALAR_TEXT@363..375 "description "
                     YAML_COLON@375..376 ":"
                   YAML_BLOCK_MAP_VALUE@376..394
                     WHITESPACE@376..377 " "
-                    YAML_SCALAR@377..387 "Basketball"
+                    YAML_SCALAR@377..387
+                      YAML_SCALAR_TEXT@377..387 "Basketball"
                     NEWLINE@387..388 "\n"
                     WHITESPACE@388..394 "      "
                 YAML_BLOCK_MAP_ENTRY@394..419
                   YAML_BLOCK_MAP_KEY@394..407
-                    YAML_SCALAR@394..406 "price       "
+                    YAML_SCALAR@394..406
+                      YAML_SCALAR_TEXT@394..406 "price       "
                     YAML_COLON@406..407 ":"
                   YAML_BLOCK_MAP_VALUE@407..419
                     WHITESPACE@407..408 " "
-                    YAML_SCALAR@408..414 "450.00"
+                    YAML_SCALAR@408..414
+                      YAML_SCALAR_TEXT@408..414 "450.00"
                     NEWLINE@414..415 "\n"
                     WHITESPACE@415..419 "    "
             YAML_BLOCK_SEQUENCE_ITEM@419..524
@@ -162,61 +191,75 @@ YAML_STREAM@0..644
               YAML_BLOCK_MAP@421..524
                 YAML_BLOCK_MAP_ENTRY@421..449
                   YAML_BLOCK_MAP_KEY@421..434
-                    YAML_SCALAR@421..433 "sku         "
+                    YAML_SCALAR@421..433
+                      YAML_SCALAR_TEXT@421..433 "sku         "
                     YAML_COLON@433..434 ":"
                   YAML_BLOCK_MAP_VALUE@434..449
                     WHITESPACE@434..435 " "
-                    YAML_SCALAR@435..442 "BL4438H"
+                    YAML_SCALAR@435..442
+                      YAML_SCALAR_TEXT@435..442 "BL4438H"
                     NEWLINE@442..443 "\n"
                     WHITESPACE@443..449 "      "
                 YAML_BLOCK_MAP_ENTRY@449..471
                   YAML_BLOCK_MAP_KEY@449..462
-                    YAML_SCALAR@449..461 "quantity    "
+                    YAML_SCALAR@449..461
+                      YAML_SCALAR_TEXT@449..461 "quantity    "
                     YAML_COLON@461..462 ":"
                   YAML_BLOCK_MAP_VALUE@462..471
                     WHITESPACE@462..463 " "
-                    YAML_SCALAR@463..464 "1"
+                    YAML_SCALAR@463..464
+                      YAML_SCALAR_TEXT@463..464 "1"
                     NEWLINE@464..465 "\n"
                     WHITESPACE@465..471 "      "
                 YAML_BLOCK_MAP_ENTRY@471..502
                   YAML_BLOCK_MAP_KEY@471..484
-                    YAML_SCALAR@471..483 "description "
+                    YAML_SCALAR@471..483
+                      YAML_SCALAR_TEXT@471..483 "description "
                     YAML_COLON@483..484 ":"
                   YAML_BLOCK_MAP_VALUE@484..502
                     WHITESPACE@484..485 " "
-                    YAML_SCALAR@485..495 "Super Hoop"
+                    YAML_SCALAR@485..495
+                      YAML_SCALAR_TEXT@485..495 "Super Hoop"
                     NEWLINE@495..496 "\n"
                     WHITESPACE@496..502 "      "
                 YAML_BLOCK_MAP_ENTRY@502..524
                   YAML_BLOCK_MAP_KEY@502..515
-                    YAML_SCALAR@502..514 "price       "
+                    YAML_SCALAR@502..514
+                      YAML_SCALAR_TEXT@502..514 "price       "
                     YAML_COLON@514..515 ":"
                   YAML_BLOCK_MAP_VALUE@515..524
                     WHITESPACE@515..516 " "
-                    YAML_SCALAR@516..523 "2392.00"
+                    YAML_SCALAR@516..523
+                      YAML_SCALAR_TEXT@516..523 "2392.00"
                     NEWLINE@523..524 "\n"
       YAML_BLOCK_MAP_ENTRY@524..538
         YAML_BLOCK_MAP_KEY@524..530
-          YAML_SCALAR@524..529 "tax  "
+          YAML_SCALAR@524..529
+            YAML_SCALAR_TEXT@524..529 "tax  "
           YAML_COLON@529..530 ":"
         YAML_BLOCK_MAP_VALUE@530..538
           WHITESPACE@530..531 " "
-          YAML_SCALAR@531..537 "251.42"
+          YAML_SCALAR@531..537
+            YAML_SCALAR_TEXT@531..537 "251.42"
           NEWLINE@537..538 "\n"
       YAML_BLOCK_MAP_ENTRY@538..553
         YAML_BLOCK_MAP_KEY@538..544
-          YAML_SCALAR@538..543 "total"
+          YAML_SCALAR@538..543
+            YAML_SCALAR_TEXT@538..543 "total"
           YAML_COLON@543..544 ":"
         YAML_BLOCK_MAP_VALUE@544..553
           WHITESPACE@544..545 " "
-          YAML_SCALAR@545..552 "4443.52"
+          YAML_SCALAR@545..552
+            YAML_SCALAR_TEXT@545..552 "4443.52"
           NEWLINE@552..553 "\n"
       YAML_BLOCK_MAP_ENTRY@553..644
         YAML_BLOCK_MAP_KEY@553..562
-          YAML_SCALAR@553..561 "comments"
+          YAML_SCALAR@553..561
+            YAML_SCALAR_TEXT@553..561 "comments"
           YAML_COLON@561..562 ":"
         YAML_BLOCK_MAP_VALUE@562..644
           NEWLINE@562..563 "\n"
           WHITESPACE@563..567 "    "
-          YAML_SCALAR@567..643 "Late afternoon is bes ..."
+          YAML_SCALAR@567..643
+            YAML_SCALAR_TEXT@567..643 "Late afternoon is bes ..."
           NEWLINE@643..644 "\n"

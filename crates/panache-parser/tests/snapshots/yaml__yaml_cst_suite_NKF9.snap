@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: NKF9
@@ -14,43 +15,49 @@ YAML_STREAM@0..120
     YAML_BLOCK_MAP@4..27
       YAML_BLOCK_MAP_ENTRY@4..15
         YAML_BLOCK_MAP_KEY@4..8
-          YAML_SCALAR@4..7 "key"
+          YAML_SCALAR@4..7
+            YAML_SCALAR_TEXT@4..7 "key"
           YAML_COLON@7..8 ":"
         YAML_BLOCK_MAP_VALUE@8..15
           WHITESPACE@8..9 " "
-          YAML_SCALAR@9..14 "value"
+          YAML_SCALAR@9..14
+            YAML_SCALAR_TEXT@9..14 "value"
           NEWLINE@14..15 "\n"
       YAML_BLOCK_MAP_ENTRY@15..27
         YAML_BLOCK_MAP_KEY@15..16
           YAML_COLON@15..16 ":"
         YAML_BLOCK_MAP_VALUE@16..27
           WHITESPACE@16..17 " "
-          YAML_SCALAR@17..26 "empty key"
+          YAML_SCALAR@17..26
+            YAML_SCALAR_TEXT@17..26 "empty key"
           NEWLINE@26..27 "\n"
   YAML_DOCUMENT@27..60
     YAML_DOCUMENT_START@27..30 "---"
     NEWLINE@30..31 "\n"
     YAML_FLOW_MAP@31..59
-      YAML_SCALAR@31..32 "{"
+      YAML_FLOW_INDICATOR@31..32 "{"
       NEWLINE@32..33 "\n"
       WHITESPACE@33..34 " "
       YAML_FLOW_MAP_ENTRY@34..44
         YAML_FLOW_MAP_KEY@34..38
-          YAML_SCALAR@34..37 "key"
+          YAML_SCALAR@34..37
+            YAML_SCALAR_TEXT@34..37 "key"
           YAML_COLON@37..38 ":"
         YAML_FLOW_MAP_VALUE@38..44
           WHITESPACE@38..39 " "
-          YAML_SCALAR@39..44 "value"
-      YAML_SCALAR@44..45 ","
+          YAML_SCALAR@39..44
+            YAML_SCALAR_TEXT@39..44 "value"
+      YAML_FLOW_INDICATOR@44..45 ","
       WHITESPACE@45..46 " "
       YAML_FLOW_MAP_ENTRY@46..58
         YAML_FLOW_MAP_KEY@46..47
           YAML_COLON@46..47 ":"
         YAML_FLOW_MAP_VALUE@47..58
           WHITESPACE@47..48 " "
-          YAML_SCALAR@48..57 "empty key"
+          YAML_SCALAR@48..57
+            YAML_SCALAR_TEXT@48..57 "empty key"
           NEWLINE@57..58 "\n"
-      YAML_SCALAR@58..59 "}"
+      YAML_FLOW_INDICATOR@58..59 "}"
     NEWLINE@59..60 "\n"
   YAML_DOCUMENT@60..88
     YAML_DOCUMENT_START@60..63 "---"
@@ -69,12 +76,12 @@ YAML_STREAM@0..120
     YAML_COMMENT@92..113 "# empty key and value"
     NEWLINE@113..114 "\n"
     YAML_FLOW_MAP@114..119
-      YAML_SCALAR@114..115 "{"
+      YAML_FLOW_INDICATOR@114..115 "{"
       WHITESPACE@115..116 " "
       YAML_FLOW_MAP_ENTRY@116..118
         YAML_FLOW_MAP_KEY@116..117
           YAML_COLON@116..117 ":"
         YAML_FLOW_MAP_VALUE@117..118
           WHITESPACE@117..118 " "
-      YAML_SCALAR@118..119 "}"
+      YAML_FLOW_INDICATOR@118..119 "}"
     NEWLINE@119..120 "\n"

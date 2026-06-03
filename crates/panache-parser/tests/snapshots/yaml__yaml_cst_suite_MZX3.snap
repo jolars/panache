@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: MZX3
@@ -13,24 +14,29 @@ YAML_STREAM@0..70
       YAML_BLOCK_SEQUENCE_ITEM@0..8
         YAML_BLOCK_SEQ_ENTRY@0..1 "-"
         WHITESPACE@1..2 " "
-        YAML_SCALAR@2..7 "plain"
+        YAML_SCALAR@2..7
+          YAML_SCALAR_TEXT@2..7 "plain"
         NEWLINE@7..8 "\n"
       YAML_BLOCK_SEQUENCE_ITEM@8..26
         YAML_BLOCK_SEQ_ENTRY@8..9 "-"
         WHITESPACE@9..10 " "
-        YAML_SCALAR@10..25 "\"double quoted\""
+        YAML_SCALAR@10..25
+          YAML_SCALAR_TEXT@10..25 "\"double quoted\""
         NEWLINE@25..26 "\n"
       YAML_BLOCK_SEQUENCE_ITEM@26..44
         YAML_BLOCK_SEQ_ENTRY@26..27 "-"
         WHITESPACE@27..28 " "
-        YAML_SCALAR@28..43 "'single quoted'"
+        YAML_SCALAR@28..43
+          YAML_SCALAR_TEXT@28..43 "'single quoted'"
         NEWLINE@43..44 "\n"
       YAML_BLOCK_SEQUENCE_ITEM@44..56
         YAML_BLOCK_SEQ_ENTRY@44..45 "-"
         WHITESPACE@45..46 " "
-        YAML_SCALAR@46..56 ">\n  block\n"
+        YAML_SCALAR@46..56
+          YAML_SCALAR_TEXT@46..56 ">\n  block\n"
       YAML_BLOCK_SEQUENCE_ITEM@56..70
         YAML_BLOCK_SEQ_ENTRY@56..57 "-"
         WHITESPACE@57..58 " "
-        YAML_SCALAR@58..69 "plain again"
+        YAML_SCALAR@58..69
+          YAML_SCALAR_TEXT@58..69 "plain again"
         NEWLINE@69..70 "\n"

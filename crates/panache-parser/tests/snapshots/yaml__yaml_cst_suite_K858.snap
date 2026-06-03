@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: K858
@@ -12,22 +13,28 @@ YAML_STREAM@0..30
     YAML_BLOCK_MAP@0..30
       YAML_BLOCK_MAP_ENTRY@0..11
         YAML_BLOCK_MAP_KEY@0..6
-          YAML_SCALAR@0..5 "strip"
+          YAML_SCALAR@0..5
+            YAML_SCALAR_TEXT@0..5 "strip"
           YAML_COLON@5..6 ":"
         YAML_BLOCK_MAP_VALUE@6..11
           WHITESPACE@6..7 " "
-          YAML_SCALAR@7..11 ">-\n\n"
+          YAML_SCALAR@7..11
+            YAML_SCALAR_TEXT@7..11 ">-\n\n"
       YAML_BLOCK_MAP_ENTRY@11..20
         YAML_BLOCK_MAP_KEY@11..16
-          YAML_SCALAR@11..15 "clip"
+          YAML_SCALAR@11..15
+            YAML_SCALAR_TEXT@11..15 "clip"
           YAML_COLON@15..16 ":"
         YAML_BLOCK_MAP_VALUE@16..20
           WHITESPACE@16..17 " "
-          YAML_SCALAR@17..20 ">\n\n"
+          YAML_SCALAR@17..20
+            YAML_SCALAR_TEXT@17..20 ">\n\n"
       YAML_BLOCK_MAP_ENTRY@20..30
         YAML_BLOCK_MAP_KEY@20..25
-          YAML_SCALAR@20..24 "keep"
+          YAML_SCALAR@20..24
+            YAML_SCALAR_TEXT@20..24 "keep"
           YAML_COLON@24..25 ":"
         YAML_BLOCK_MAP_VALUE@25..30
           WHITESPACE@25..26 " "
-          YAML_SCALAR@26..30 "|+\n\n"
+          YAML_SCALAR@26..30
+            YAML_SCALAR_TEXT@26..30 "|+\n\n"

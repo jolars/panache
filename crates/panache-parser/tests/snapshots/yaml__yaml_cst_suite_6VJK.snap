@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 6VJK
@@ -9,4 +10,5 @@ diagnostics:
 cst:
 YAML_STREAM@0..120
   YAML_DOCUMENT@0..120
-    YAML_SCALAR@0..120 ">\n Sammy Sosa complet ..."
+    YAML_SCALAR@0..120
+      YAML_SCALAR_TEXT@0..120 ">\n Sammy Sosa complet ..."

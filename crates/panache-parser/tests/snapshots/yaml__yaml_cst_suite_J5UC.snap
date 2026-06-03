@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: J5UC
@@ -12,25 +13,31 @@ YAML_STREAM@0..30
     YAML_BLOCK_MAP@0..30
       YAML_BLOCK_MAP_ENTRY@0..10
         YAML_BLOCK_MAP_KEY@0..4
-          YAML_SCALAR@0..3 "foo"
+          YAML_SCALAR@0..3
+            YAML_SCALAR_TEXT@0..3 "foo"
           YAML_COLON@3..4 ":"
         YAML_BLOCK_MAP_VALUE@4..10
           WHITESPACE@4..5 " "
-          YAML_SCALAR@5..9 "blue"
+          YAML_SCALAR@5..9
+            YAML_SCALAR_TEXT@5..9 "blue"
           NEWLINE@9..10 "\n"
       YAML_BLOCK_MAP_ENTRY@10..20
         YAML_BLOCK_MAP_KEY@10..14
-          YAML_SCALAR@10..13 "bar"
+          YAML_SCALAR@10..13
+            YAML_SCALAR_TEXT@10..13 "bar"
           YAML_COLON@13..14 ":"
         YAML_BLOCK_MAP_VALUE@14..20
           WHITESPACE@14..15 " "
-          YAML_SCALAR@15..19 "arrr"
+          YAML_SCALAR@15..19
+            YAML_SCALAR_TEXT@15..19 "arrr"
           NEWLINE@19..20 "\n"
       YAML_BLOCK_MAP_ENTRY@20..30
         YAML_BLOCK_MAP_KEY@20..24
-          YAML_SCALAR@20..23 "baz"
+          YAML_SCALAR@20..23
+            YAML_SCALAR_TEXT@20..23 "baz"
           YAML_COLON@23..24 ":"
         YAML_BLOCK_MAP_VALUE@24..30
           WHITESPACE@24..25 " "
-          YAML_SCALAR@25..29 "jazz"
+          YAML_SCALAR@25..29
+            YAML_SCALAR_TEXT@25..29 "jazz"
           NEWLINE@29..30 "\n"

@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 5TYM
@@ -9,7 +10,7 @@ diagnostics:
 cst:
 YAML_STREAM@0..101
   YAML_DOCUMENT@0..54
-    YAML_SCALAR@0..13 "%TAG !m! !my-"
+    YAML_DIRECTIVE@0..13 "%TAG !m! !my-"
     NEWLINE@13..14 "\n"
     YAML_DOCUMENT_START@14..17 "---"
     WHITESPACE@17..18 " "
@@ -17,12 +18,13 @@ YAML_STREAM@0..101
     NEWLINE@29..30 "\n"
     YAML_TAG@30..38 "!m!light"
     WHITESPACE@38..39 " "
-    YAML_SCALAR@39..50 "fluorescent"
+    YAML_SCALAR@39..50
+      YAML_SCALAR_TEXT@39..50 "fluorescent"
     NEWLINE@50..51 "\n"
     YAML_DOCUMENT_END@51..54 "..."
   NEWLINE@54..55 "\n"
   YAML_DOCUMENT@55..101
-    YAML_SCALAR@55..68 "%TAG !m! !my-"
+    YAML_DIRECTIVE@55..68 "%TAG !m! !my-"
     NEWLINE@68..69 "\n"
     YAML_DOCUMENT_START@69..72 "---"
     WHITESPACE@72..73 " "
@@ -30,5 +32,6 @@ YAML_STREAM@0..101
     NEWLINE@85..86 "\n"
     YAML_TAG@86..94 "!m!light"
     WHITESPACE@94..95 " "
-    YAML_SCALAR@95..100 "green"
+    YAML_SCALAR@95..100
+      YAML_SCALAR_TEXT@95..100 "green"
     NEWLINE@100..101 "\n"

@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: J7PZ
@@ -34,11 +35,13 @@ YAML_STREAM@0..318
         YAML_BLOCK_MAP@267..284
           YAML_BLOCK_MAP_ENTRY@267..284
             YAML_BLOCK_MAP_KEY@267..280
-              YAML_SCALAR@267..279 "Mark McGwire"
+              YAML_SCALAR@267..279
+                YAML_SCALAR_TEXT@267..279 "Mark McGwire"
               YAML_COLON@279..280 ":"
             YAML_BLOCK_MAP_VALUE@280..284
               WHITESPACE@280..281 " "
-              YAML_SCALAR@281..283 "65"
+              YAML_SCALAR@281..283
+                YAML_SCALAR_TEXT@281..283 "65"
               NEWLINE@283..284 "\n"
       YAML_BLOCK_SEQUENCE_ITEM@284..301
         YAML_BLOCK_SEQ_ENTRY@284..285 "-"
@@ -46,11 +49,13 @@ YAML_STREAM@0..318
         YAML_BLOCK_MAP@286..301
           YAML_BLOCK_MAP_ENTRY@286..301
             YAML_BLOCK_MAP_KEY@286..297
-              YAML_SCALAR@286..296 "Sammy Sosa"
+              YAML_SCALAR@286..296
+                YAML_SCALAR_TEXT@286..296 "Sammy Sosa"
               YAML_COLON@296..297 ":"
             YAML_BLOCK_MAP_VALUE@297..301
               WHITESPACE@297..298 " "
-              YAML_SCALAR@298..300 "63"
+              YAML_SCALAR@298..300
+                YAML_SCALAR_TEXT@298..300 "63"
               NEWLINE@300..301 "\n"
       YAML_BLOCK_SEQUENCE_ITEM@301..318
         YAML_BLOCK_SEQ_ENTRY@301..302 "-"
@@ -58,9 +63,11 @@ YAML_STREAM@0..318
         YAML_BLOCK_MAP@303..318
           YAML_BLOCK_MAP_ENTRY@303..318
             YAML_BLOCK_MAP_KEY@303..314
-              YAML_SCALAR@303..313 "Ken Griffy"
+              YAML_SCALAR@303..313
+                YAML_SCALAR_TEXT@303..313 "Ken Griffy"
               YAML_COLON@313..314 ":"
             YAML_BLOCK_MAP_VALUE@314..318
               WHITESPACE@314..315 " "
-              YAML_SCALAR@315..317 "58"
+              YAML_SCALAR@315..317
+                YAML_SCALAR_TEXT@315..317 "58"
               NEWLINE@317..318 "\n"

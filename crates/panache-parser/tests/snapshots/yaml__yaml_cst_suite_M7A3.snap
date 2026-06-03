@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: M7A3
@@ -9,7 +10,8 @@ diagnostics:
 cst:
 YAML_STREAM@0..74
   YAML_DOCUMENT@0..17
-    YAML_SCALAR@0..13 "Bare\ndocument"
+    YAML_SCALAR@0..13
+      YAML_SCALAR_TEXT@0..13 "Bare\ndocument"
     NEWLINE@13..14 "\n"
     YAML_DOCUMENT_END@14..17 "..."
   NEWLINE@17..18 "\n"
@@ -19,4 +21,5 @@ YAML_STREAM@0..74
     YAML_DOCUMENT_END@32..35 "..."
   NEWLINE@35..36 "\n"
   YAML_DOCUMENT@36..74
-    YAML_SCALAR@36..74 "|\n%!PS-Adobe-2.0 # No ..."
+    YAML_SCALAR@36..74
+      YAML_SCALAR_TEXT@36..74 "|\n%!PS-Adobe-2.0 # No ..."

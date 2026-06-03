@@ -135,7 +135,7 @@
 
 use std::collections::HashSet;
 
-use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
+use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
 use super::model::{YamlDiagnostic, diagnostic_codes};
@@ -787,7 +787,7 @@ fn check_flow_node_commas(flow: &SyntaxNode) -> Option<YamlDiagnostic> {
             }
             NodeOrToken::Token(t) => match t.kind() {
                 SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::YAML_COMMENT => {}
-                SyntaxKind::YAML_SCALAR if t.text() == "," => {
+                SyntaxKind::YAML_FLOW_INDICATOR if t.text() == "," => {
                     if !seen_item_since_separator {
                         return Some(diag_at_range(
                             t.text_range().start().into(),
@@ -799,7 +799,7 @@ fn check_flow_node_commas(flow: &SyntaxNode) -> Option<YamlDiagnostic> {
                     seen_item_since_separator = false;
                 }
                 // Structural opener/closer brackets — neutral.
-                SyntaxKind::YAML_SCALAR if matches!(t.text(), "[" | "]" | "{" | "}") => {}
+                SyntaxKind::YAML_FLOW_INDICATOR if matches!(t.text(), "[" | "]" | "{" | "}") => {}
                 // Any other token — bare scalar (implicit-null map
                 // entry like `single line` in `{ single line, a: b }`,
                 // or a plain-value entry in `{ http://foo.com, … }`),
@@ -837,7 +837,7 @@ fn check_unterminated_flow(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
         };
         let has_close = flow.children_with_tokens().any(|c| {
             c.as_token()
-                .is_some_and(|t| t.kind() == SyntaxKind::YAML_SCALAR && t.text() == close)
+                .is_some_and(|t| t.kind() == SyntaxKind::YAML_FLOW_INDICATOR && t.text() == close)
         });
         if !has_close {
             let (code, message) = if flow.kind() == SyntaxKind::YAML_FLOW_SEQUENCE {
@@ -923,12 +923,9 @@ fn check_flow_lone_dash(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
                 | SyntaxKind::YAML_FLOW_MAP_VALUE
         )
     }) {
-        let lone_dash = holder.children_with_tokens().find_map(|c| match c {
-            NodeOrToken::Token(t) if t.kind() == SyntaxKind::YAML_SCALAR && t.text() == "-" => {
-                Some(t)
-            }
-            _ => None,
-        });
+        let lone_dash = holder
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_SCALAR && n.text() == "-");
         if let Some(dash) = lone_dash {
             return Some(diag_at_range(
                 dash.text_range().start().into(),
@@ -959,9 +956,6 @@ fn check_flow_seq_item_multiline_key(item: &SyntaxNode) -> Option<YamlDiagnostic
         match &child {
             NodeOrToken::Token(t) => match t.kind() {
                 SyntaxKind::NEWLINE => saw_newline_before_colon = true,
-                SyntaxKind::YAML_SCALAR if t.text().contains('\n') => {
-                    saw_newline_before_colon = true;
-                }
                 SyntaxKind::YAML_COLON => {
                     if saw_newline_before_colon {
                         return Some(diag_at_range(
@@ -975,6 +969,13 @@ fn check_flow_seq_item_multiline_key(item: &SyntaxNode) -> Option<YamlDiagnostic
                 }
                 _ => {}
             },
+            // A multi-line implicit key is a `YAML_SCALAR` node spanning a
+            // newline (the break lives among the scalar's leaves).
+            NodeOrToken::Node(n)
+                if n.kind() == SyntaxKind::YAML_SCALAR && n.text().to_string().contains('\n') =>
+            {
+                saw_newline_before_colon = true;
+            }
             NodeOrToken::Node(_) => {}
         }
     }
@@ -994,9 +995,10 @@ fn check_flow_seq_item_multiline_key(item: &SyntaxNode) -> Option<YamlDiagnostic
 fn check_flow_map_value_extra_colon(value: &SyntaxNode) -> Option<YamlDiagnostic> {
     let mut saw_scalar = false;
     for child in value.children_with_tokens() {
-        if let NodeOrToken::Token(t) = &child {
-            match t.kind() {
-                SyntaxKind::YAML_SCALAR => saw_scalar = true,
+        match &child {
+            // The value scalar is a `YAML_SCALAR` node child.
+            NodeOrToken::Node(n) if n.kind() == SyntaxKind::YAML_SCALAR => saw_scalar = true,
+            NodeOrToken::Token(t) => match t.kind() {
                 SyntaxKind::YAML_COLON if saw_scalar => {
                     return Some(diag_at_range(
                         t.text_range().start().into(),
@@ -1006,7 +1008,8 @@ fn check_flow_map_value_extra_colon(value: &SyntaxNode) -> Option<YamlDiagnostic
                     ));
                 }
                 _ => {}
-            }
+            },
+            _ => {}
         }
     }
     None
@@ -1076,14 +1079,11 @@ fn check_quoted_scalar_continuation(
     input: &str,
     parent_indent: usize,
 ) -> Option<YamlDiagnostic> {
-    for child in container.children_with_tokens() {
-        let NodeOrToken::Token(t) = child else {
-            continue;
-        };
-        if t.kind() != SyntaxKind::YAML_SCALAR {
+    for child in container.children() {
+        if child.kind() != SyntaxKind::YAML_SCALAR {
             continue;
         }
-        let text = t.text();
+        let text = child.text().to_string();
         if !text.contains('\n') {
             continue;
         }
@@ -1091,7 +1091,7 @@ fn check_quoted_scalar_continuation(
         if !starts_quoted {
             continue;
         }
-        let scalar_start: usize = t.text_range().start().into();
+        let scalar_start: usize = child.text_range().start().into();
         let bytes = text.as_bytes();
         let mut offset = 0usize;
         while offset < bytes.len() {
@@ -1195,13 +1195,11 @@ fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
                     ) {
                         struct_count += 1;
                         last_struct = Some(n.clone());
-                    }
-                }
-                NodeOrToken::Token(t) => {
-                    if t.kind() == SyntaxKind::YAML_SCALAR {
+                    } else if n.kind() == SyntaxKind::YAML_SCALAR {
                         scalar_count += 1;
                     }
                 }
+                NodeOrToken::Token(_) => {}
             }
         }
         // The struct_count > 1 and scalar-after-structural checks below
@@ -1254,9 +1252,8 @@ fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
                 continue;
             }
             let scalars: Vec<_> = node
-                .children_with_tokens()
-                .filter_map(|c| c.into_token())
-                .filter(|t| t.kind() == SyntaxKind::YAML_SCALAR)
+                .children()
+                .filter(|n| n.kind() == SyntaxKind::YAML_SCALAR)
                 .collect();
             let last_scalar = scalars
                 .last()
@@ -1297,12 +1294,11 @@ fn has_comment_between_scalars(node: &SyntaxNode) -> bool {
     let mut saw_scalar = false;
     let mut saw_comment_since_scalar = false;
     for child in node.children_with_tokens() {
-        let NodeOrToken::Token(t) = &child else {
-            continue;
-        };
-        match t.kind() {
-            SyntaxKind::YAML_SCALAR => {
-                if t.text().starts_with('%') {
+        match &child {
+            // A scalar is a `YAML_SCALAR` node; a leading `%` marks a
+            // folded directive-shaped scalar that doesn't count.
+            NodeOrToken::Node(n) if n.kind() == SyntaxKind::YAML_SCALAR => {
+                if n.text().to_string().starts_with('%') {
                     continue;
                 }
                 if saw_scalar && saw_comment_since_scalar {
@@ -1311,15 +1307,18 @@ fn has_comment_between_scalars(node: &SyntaxNode) -> bool {
                 saw_scalar = true;
                 saw_comment_since_scalar = false;
             }
-            SyntaxKind::YAML_COMMENT => {
-                if saw_scalar {
-                    saw_comment_since_scalar = true;
+            NodeOrToken::Token(t) => match t.kind() {
+                SyntaxKind::YAML_COMMENT => {
+                    if saw_scalar {
+                        saw_comment_since_scalar = true;
+                    }
                 }
-            }
-            SyntaxKind::YAML_DOCUMENT_START | SyntaxKind::YAML_DOCUMENT_END => {
-                saw_scalar = false;
-                saw_comment_since_scalar = false;
-            }
+                SyntaxKind::YAML_DOCUMENT_START | SyntaxKind::YAML_DOCUMENT_END => {
+                    saw_scalar = false;
+                    saw_comment_since_scalar = false;
+                }
+                _ => {}
+            },
             _ => {}
         }
     }
@@ -1331,23 +1330,16 @@ fn has_comment_between_scalars(node: &SyntaxNode) -> bool {
 /// (`YAML_BLOCK_MAP` / `YAML_BLOCK_SEQUENCE`). Returns `None` if no
 /// scalar follows a collection — preserves the compact-mapping shape
 /// `a: <scalar>: <value>` where the scalar precedes the inner map.
-fn scalar_after_structural_in_block_map_value(value: &SyntaxNode) -> Option<SyntaxToken> {
+fn scalar_after_structural_in_block_map_value(value: &SyntaxNode) -> Option<SyntaxNode> {
     let mut saw_struct = false;
-    for child in value.children_with_tokens() {
-        match &child {
-            NodeOrToken::Node(n) => {
-                if matches!(
-                    n.kind(),
-                    SyntaxKind::YAML_BLOCK_MAP | SyntaxKind::YAML_BLOCK_SEQUENCE
-                ) {
-                    saw_struct = true;
-                }
-            }
-            NodeOrToken::Token(t) => {
-                if t.kind() == SyntaxKind::YAML_SCALAR && saw_struct {
-                    return Some(t.clone());
-                }
-            }
+    for child in value.children() {
+        if matches!(
+            child.kind(),
+            SyntaxKind::YAML_BLOCK_MAP | SyntaxKind::YAML_BLOCK_SEQUENCE
+        ) {
+            saw_struct = true;
+        } else if child.kind() == SyntaxKind::YAML_SCALAR && saw_struct {
+            return Some(child);
         }
     }
     None
@@ -1494,9 +1486,12 @@ fn check_tab_as_indent(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
             let prev_kind = i
                 .checked_sub(1)
                 .and_then(|j| children.get(j))
-                .and_then(|c| match c {
-                    NodeOrToken::Token(pt) => Some((pt.kind(), pt.text().to_string())),
-                    _ => None,
+                .map(|c| match c {
+                    NodeOrToken::Token(pt) => (pt.kind(), pt.text().to_string()),
+                    // A block scalar is now a `YAML_SCALAR` node; surface its
+                    // kind+text so the block-scalar-trailing-newline case
+                    // below still matches.
+                    NodeOrToken::Node(pn) => (pn.kind(), pn.text().to_string()),
                 });
             let next = children.get(i + 1);
             let next_is_newline = matches!(
@@ -1578,11 +1573,10 @@ fn check_tab_as_indent(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
 ///   separator (e.g. `>#comment`).
 fn check_block_scalar_header(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
     for token in tree
-        .descendants_with_tokens()
-        .filter_map(|el| el.into_token())
-        .filter(|t| t.kind() == SyntaxKind::YAML_SCALAR)
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_SCALAR)
     {
-        let text = token.text();
+        let text = token.text().to_string();
         if !text.starts_with('>') && !text.starts_with('|') {
             continue;
         }
@@ -1693,11 +1687,10 @@ fn check_block_scalar_header(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
 /// Covers fixtures 5LLU, S98Z, W9L4.
 fn check_block_scalar_leading_indent(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
     for token in tree
-        .descendants_with_tokens()
-        .filter_map(|el| el.into_token())
-        .filter(|t| t.kind() == SyntaxKind::YAML_SCALAR)
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_SCALAR)
     {
-        let text = token.text();
+        let text = token.text().to_string();
         if !text.starts_with('>') && !text.starts_with('|') {
             continue;
         }
@@ -1798,15 +1791,12 @@ fn check_doc_level_bare_scalar_then_colon_map(tree: &SyntaxNode) -> Option<YamlD
         .filter(|n| n.kind() == SyntaxKind::YAML_DOCUMENT)
     {
         let mut has_doc_start = false;
-        let mut last_bare_scalar: Option<SyntaxToken> = None;
+        let mut last_bare_scalar: Option<SyntaxNode> = None;
         for child in doc.children_with_tokens() {
             match &child {
                 NodeOrToken::Token(t) => match t.kind() {
                     SyntaxKind::YAML_DOCUMENT_START => {
                         has_doc_start = true;
-                    }
-                    SyntaxKind::YAML_SCALAR => {
-                        last_bare_scalar = Some(t.clone());
                     }
                     // Node properties (`&anchor`, `*alias`) are not
                     // bare scalars; they attach to the following content
@@ -1817,6 +1807,9 @@ fn check_doc_level_bare_scalar_then_colon_map(tree: &SyntaxNode) -> Option<YamlD
                         last_bare_scalar = None;
                     }
                 },
+                NodeOrToken::Node(n) if n.kind() == SyntaxKind::YAML_SCALAR => {
+                    last_bare_scalar = Some(n.clone());
+                }
                 NodeOrToken::Node(n) => {
                     if n.kind() == SyntaxKind::YAML_BLOCK_MAP
                         && let Some(scalar) = last_bare_scalar.take()
@@ -1866,11 +1859,10 @@ fn check_value_level_scalar_then_colon_map(tree: &SyntaxNode) -> Option<YamlDiag
         .descendants()
         .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
     {
-        let mut last_scalar: Option<SyntaxToken> = None;
+        let mut last_scalar: Option<SyntaxNode> = None;
         for child in value.children_with_tokens() {
             match &child {
                 NodeOrToken::Token(t) => match t.kind() {
-                    SyntaxKind::YAML_SCALAR => last_scalar = Some(t.clone()),
                     // Node properties (`&anchor`, `*alias`) are not
                     // bare scalars; they attach to the following content
                     // and must not reset or claim the slot.
@@ -1878,13 +1870,16 @@ fn check_value_level_scalar_then_colon_map(tree: &SyntaxNode) -> Option<YamlDiag
                     SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::YAML_COMMENT => {}
                     _ => last_scalar = None,
                 },
+                NodeOrToken::Node(n) if n.kind() == SyntaxKind::YAML_SCALAR => {
+                    last_scalar = Some(n.clone());
+                }
                 NodeOrToken::Node(n) => {
                     if n.kind() == SyntaxKind::YAML_BLOCK_MAP
                         && let Some(scalar) = last_scalar.take()
                         && first_entry_has_colon_only_key(n)
-                        && scalar_is_content_implicit_key(scalar.text())
+                        && scalar_is_content_implicit_key(&scalar.text().to_string())
                     {
-                        let message = if scalar.text().contains('\n') {
+                        let message = if scalar.text().to_string().contains('\n') {
                             "implicit key cannot span lines"
                         } else {
                             "mapping values are not allowed in this context"
@@ -1988,15 +1983,11 @@ fn check_block_collection_after_value_scalar(tree: &SyntaxNode) -> Option<YamlDi
         .descendants()
         .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
     {
-        let mut last_scalar: Option<SyntaxToken> = None;
+        let mut last_scalar: Option<SyntaxNode> = None;
         let mut saw_newline_after_scalar = false;
         for child in value.children_with_tokens() {
             match &child {
                 NodeOrToken::Token(t) => match t.kind() {
-                    SyntaxKind::YAML_SCALAR => {
-                        last_scalar = Some(t.clone());
-                        saw_newline_after_scalar = false;
-                    }
                     SyntaxKind::NEWLINE => {
                         if last_scalar.is_some() {
                             saw_newline_after_scalar = true;
@@ -2008,6 +1999,10 @@ fn check_block_collection_after_value_scalar(tree: &SyntaxNode) -> Option<YamlDi
                         saw_newline_after_scalar = false;
                     }
                 },
+                NodeOrToken::Node(n) if n.kind() == SyntaxKind::YAML_SCALAR => {
+                    last_scalar = Some(n.clone());
+                    saw_newline_after_scalar = false;
+                }
                 NodeOrToken::Node(n) => {
                     if saw_newline_after_scalar
                         && matches!(
@@ -2015,7 +2010,7 @@ fn check_block_collection_after_value_scalar(tree: &SyntaxNode) -> Option<YamlDi
                             SyntaxKind::YAML_BLOCK_MAP | SyntaxKind::YAML_BLOCK_SEQUENCE
                         )
                         && let Some(scalar) = last_scalar.as_ref()
-                        && scalar_is_content_implicit_key(scalar.text())
+                        && scalar_is_content_implicit_key(&scalar.text().to_string())
                     {
                         return Some(diag_at_range(
                             n.text_range().start().into(),
@@ -2154,16 +2149,16 @@ fn check_flow_doc_markers(tree: &SyntaxNode, input: &str) -> Option<YamlDiagnost
             SyntaxKind::YAML_FLOW_SEQUENCE | SyntaxKind::YAML_FLOW_MAP
         )
     }) {
-        for scalar in flow.descendants_with_tokens().filter_map(|c| match c {
-            NodeOrToken::Token(t) if t.kind() == SyntaxKind::YAML_SCALAR => Some(t),
-            _ => None,
-        }) {
+        for scalar in flow
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::YAML_SCALAR)
+        {
             let start: usize = scalar.text_range().start().into();
             let at_line_start = start == 0 || bytes.get(start - 1) == Some(&b'\n');
             if !at_line_start {
                 continue;
             }
-            let text = scalar.text();
+            let text = scalar.text().to_string();
             let head = text.as_bytes();
             // Only plain scalars (no quote/block-style prefix) can carry
             // the marker shape; quoted text starting with `---`/`...` is
@@ -2200,15 +2195,14 @@ fn check_flow_doc_markers(tree: &SyntaxNode, input: &str) -> Option<YamlDiagnost
 /// `invalid_double_quote_escape_offset` contract.
 fn check_invalid_dq_escapes(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
     for token in tree
-        .descendants_with_tokens()
-        .filter_map(|el| el.into_token())
-        .filter(|t| t.kind() == SyntaxKind::YAML_SCALAR)
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_SCALAR)
     {
-        let text = token.text();
+        let text = token.text().to_string();
         if !text.starts_with('"') {
             continue;
         }
-        if let Some(rel_idx) = invalid_dq_escape_offset(text) {
+        if let Some(rel_idx) = invalid_dq_escape_offset(&text) {
             let scalar_start: usize = token.text_range().start().into();
             return Some(diag_at_range(
                 scalar_start + rel_idx,
@@ -2450,7 +2444,7 @@ fn check_anchor_without_target(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
                             "anchor has no target node",
                         ));
                     }
-                    SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_ALIAS => saw_value = true,
+                    SyntaxKind::YAML_ALIAS => saw_value = true,
                     _ => {}
                 },
                 NodeOrToken::Node(_) => saw_value = true,

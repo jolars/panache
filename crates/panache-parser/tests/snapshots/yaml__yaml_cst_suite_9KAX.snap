@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 9KAX
@@ -15,7 +16,8 @@ YAML_STREAM@0..219
     NEWLINE@7..8 "\n"
     YAML_TAG@8..13 "!!str"
     NEWLINE@13..14 "\n"
-    YAML_SCALAR@14..21 "scalar1"
+    YAML_SCALAR@14..21
+      YAML_SCALAR_TEXT@14..21 "scalar1"
     NEWLINE@21..22 "\n"
   YAML_DOCUMENT@22..44
     YAML_DOCUMENT_START@22..25 "---"
@@ -24,7 +26,8 @@ YAML_STREAM@0..219
     NEWLINE@31..32 "\n"
     YAML_ANCHOR@32..35 "&a2"
     NEWLINE@35..36 "\n"
-    YAML_SCALAR@36..43 "scalar2"
+    YAML_SCALAR@36..43
+      YAML_SCALAR_TEXT@36..43 "scalar2"
     NEWLINE@43..44 "\n"
   YAML_DOCUMENT@44..66
     YAML_DOCUMENT_START@44..47 "---"
@@ -33,7 +36,8 @@ YAML_STREAM@0..219
     NEWLINE@51..52 "\n"
     YAML_TAG@52..57 "!!str"
     WHITESPACE@57..58 " "
-    YAML_SCALAR@58..65 "scalar3"
+    YAML_SCALAR@58..65
+      YAML_SCALAR_TEXT@58..65 "scalar3"
     NEWLINE@65..66 "\n"
   YAML_DOCUMENT@66..103
     YAML_DOCUMENT_START@66..69 "---"
@@ -49,11 +53,13 @@ YAML_STREAM@0..219
           WHITESPACE@83..84 " "
           YAML_TAG@84..89 "!!str"
           WHITESPACE@89..90 " "
-          YAML_SCALAR@90..94 "key5"
+          YAML_SCALAR@90..94
+            YAML_SCALAR_TEXT@90..94 "key5"
           YAML_COLON@94..95 ":"
         YAML_BLOCK_MAP_VALUE@95..103
           WHITESPACE@95..96 " "
-          YAML_SCALAR@96..102 "value4"
+          YAML_SCALAR@96..102
+            YAML_SCALAR_TEXT@96..102 "value4"
           NEWLINE@102..103 "\n"
   YAML_DOCUMENT@103..128
     YAML_DOCUMENT_START@103..106 "---"
@@ -61,21 +67,25 @@ YAML_STREAM@0..219
     YAML_BLOCK_MAP@107..128
       YAML_BLOCK_MAP_ENTRY@107..113
         YAML_BLOCK_MAP_KEY@107..110
-          YAML_SCALAR@107..109 "a6"
+          YAML_SCALAR@107..109
+            YAML_SCALAR_TEXT@107..109 "a6"
           YAML_COLON@109..110 ":"
         YAML_BLOCK_MAP_VALUE@110..113
           WHITESPACE@110..111 " "
-          YAML_SCALAR@111..112 "1"
+          YAML_SCALAR@111..112
+            YAML_SCALAR_TEXT@111..112 "1"
           NEWLINE@112..113 "\n"
       YAML_BLOCK_MAP_ENTRY@113..128
         YAML_BLOCK_MAP_KEY@113..125
           YAML_ANCHOR@113..121 "&anchor6"
           WHITESPACE@121..122 " "
-          YAML_SCALAR@122..124 "b6"
+          YAML_SCALAR@122..124
+            YAML_SCALAR_TEXT@122..124 "b6"
           YAML_COLON@124..125 ":"
         YAML_BLOCK_MAP_VALUE@125..128
           WHITESPACE@125..126 " "
-          YAML_SCALAR@126..127 "2"
+          YAML_SCALAR@126..127
+            YAML_SCALAR_TEXT@126..127 "2"
           NEWLINE@127..128 "\n"
   YAML_DOCUMENT@128..161
     YAML_DOCUMENT_START@128..131 "---"
@@ -89,11 +99,13 @@ YAML_STREAM@0..219
           WHITESPACE@141..142 " "
           YAML_TAG@142..147 "!!str"
           WHITESPACE@147..148 " "
-          YAML_SCALAR@148..152 "key8"
+          YAML_SCALAR@148..152
+            YAML_SCALAR_TEXT@148..152 "key8"
           YAML_COLON@152..153 ":"
         YAML_BLOCK_MAP_VALUE@153..161
           WHITESPACE@153..154 " "
-          YAML_SCALAR@154..160 "value7"
+          YAML_SCALAR@154..160
+            YAML_SCALAR_TEXT@154..160 "value7"
           NEWLINE@160..161 "\n"
   YAML_DOCUMENT@161..196
     YAML_DOCUMENT_START@161..164 "---"
@@ -107,11 +119,13 @@ YAML_STREAM@0..219
           WHITESPACE@176..177 " "
           YAML_ANCHOR@177..181 "&a10"
           WHITESPACE@181..182 " "
-          YAML_SCALAR@182..187 "key10"
+          YAML_SCALAR@182..187
+            YAML_SCALAR_TEXT@182..187 "key10"
           YAML_COLON@187..188 ":"
         YAML_BLOCK_MAP_VALUE@188..196
           WHITESPACE@188..189 " "
-          YAML_SCALAR@189..195 "value9"
+          YAML_SCALAR@189..195
+            YAML_SCALAR_TEXT@189..195 "value9"
           NEWLINE@195..196 "\n"
   YAML_DOCUMENT@196..219
     YAML_DOCUMENT_START@196..199 "---"
@@ -120,5 +134,6 @@ YAML_STREAM@0..219
     WHITESPACE@205..206 " "
     YAML_ANCHOR@206..210 "&a11"
     NEWLINE@210..211 "\n"
-    YAML_SCALAR@211..218 "value11"
+    YAML_SCALAR@211..218
+      YAML_SCALAR_TEXT@211..218 "value11"
     NEWLINE@218..219 "\n"

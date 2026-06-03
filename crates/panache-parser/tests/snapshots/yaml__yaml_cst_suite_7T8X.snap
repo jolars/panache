@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 7T8X
@@ -9,6 +10,7 @@ diagnostics:
 cst:
 YAML_STREAM@0..88
   YAML_DOCUMENT@0..88
-    YAML_SCALAR@0..78 ">\n\n folded\n line\n\n ne ..."
+    YAML_SCALAR@0..78
+      YAML_SCALAR_TEXT@0..78 ">\n\n folded\n line\n\n ne ..."
     YAML_COMMENT@78..87 "# Comment"
     NEWLINE@87..88 "\n"

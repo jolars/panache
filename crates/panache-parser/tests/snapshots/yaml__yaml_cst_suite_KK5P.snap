@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: KK5P
@@ -12,7 +13,8 @@ YAML_STREAM@0..124
     YAML_BLOCK_MAP@0..124
       YAML_BLOCK_MAP_ENTRY@0..18
         YAML_BLOCK_MAP_KEY@0..9
-          YAML_SCALAR@0..8 "complex1"
+          YAML_SCALAR@0..8
+            YAML_SCALAR_TEXT@0..8 "complex1"
           YAML_COLON@8..9 ":"
         YAML_BLOCK_MAP_VALUE@9..18
           NEWLINE@9..10 "\n"
@@ -26,12 +28,14 @@ YAML_STREAM@0..124
                   YAML_BLOCK_SEQUENCE_ITEM@14..18
                     YAML_BLOCK_SEQ_ENTRY@14..15 "-"
                     WHITESPACE@15..16 " "
-                    YAML_SCALAR@16..17 "a"
+                    YAML_SCALAR@16..17
+                      YAML_SCALAR_TEXT@16..17 "a"
                     NEWLINE@17..18 "\n"
               YAML_BLOCK_MAP_VALUE@18..18
       YAML_BLOCK_MAP_ENTRY@18..42
         YAML_BLOCK_MAP_KEY@18..27
-          YAML_SCALAR@18..26 "complex2"
+          YAML_SCALAR@18..26
+            YAML_SCALAR_TEXT@18..26 "complex2"
           YAML_COLON@26..27 ":"
         YAML_BLOCK_MAP_VALUE@27..42
           NEWLINE@27..28 "\n"
@@ -45,17 +49,20 @@ YAML_STREAM@0..124
                   YAML_BLOCK_SEQUENCE_ITEM@32..38
                     YAML_BLOCK_SEQ_ENTRY@32..33 "-"
                     WHITESPACE@33..34 " "
-                    YAML_SCALAR@34..35 "a"
+                    YAML_SCALAR@34..35
+                      YAML_SCALAR_TEXT@34..35 "a"
                     NEWLINE@35..36 "\n"
                     WHITESPACE@36..38 "  "
                 YAML_COLON@38..39 ":"
               YAML_BLOCK_MAP_VALUE@39..42
                 WHITESPACE@39..40 " "
-                YAML_SCALAR@40..41 "b"
+                YAML_SCALAR@40..41
+                  YAML_SCALAR_TEXT@40..41 "b"
                 NEWLINE@41..42 "\n"
       YAML_BLOCK_MAP_ENTRY@42..72
         YAML_BLOCK_MAP_KEY@42..51
-          YAML_SCALAR@42..50 "complex3"
+          YAML_SCALAR@42..50
+            YAML_SCALAR_TEXT@42..50 "complex3"
           YAML_COLON@50..51 ":"
         YAML_BLOCK_MAP_VALUE@51..72
           NEWLINE@51..52 "\n"
@@ -69,16 +76,19 @@ YAML_STREAM@0..124
                   YAML_BLOCK_SEQUENCE_ITEM@56..62
                     YAML_BLOCK_SEQ_ENTRY@56..57 "-"
                     WHITESPACE@57..58 " "
-                    YAML_SCALAR@58..59 "a"
+                    YAML_SCALAR@58..59
+                      YAML_SCALAR_TEXT@58..59 "a"
                     NEWLINE@59..60 "\n"
                     WHITESPACE@60..62 "  "
                 YAML_COLON@62..63 ":"
               YAML_BLOCK_MAP_VALUE@63..72
                 WHITESPACE@63..64 " "
-                YAML_SCALAR@64..72 ">\n    b\n"
+                YAML_SCALAR@64..72
+                  YAML_SCALAR_TEXT@64..72 ">\n    b\n"
       YAML_BLOCK_MAP_ENTRY@72..98
         YAML_BLOCK_MAP_KEY@72..81
-          YAML_SCALAR@72..80 "complex4"
+          YAML_SCALAR@72..80
+            YAML_SCALAR_TEXT@72..80 "complex4"
           YAML_COLON@80..81 ":"
         YAML_BLOCK_MAP_VALUE@81..98
           NEWLINE@81..82 "\n"
@@ -88,14 +98,16 @@ YAML_STREAM@0..124
               YAML_BLOCK_MAP_KEY@84..97
                 YAML_KEY@84..85 "?"
                 WHITESPACE@85..86 " "
-                YAML_SCALAR@86..94 ">\n    a\n"
+                YAML_SCALAR@86..94
+                  YAML_SCALAR_TEXT@86..94 ">\n    a\n"
                 WHITESPACE@94..96 "  "
                 YAML_COLON@96..97 ":"
               YAML_BLOCK_MAP_VALUE@97..98
                 NEWLINE@97..98 "\n"
       YAML_BLOCK_MAP_ENTRY@98..124
         YAML_BLOCK_MAP_KEY@98..107
-          YAML_SCALAR@98..106 "complex5"
+          YAML_SCALAR@98..106
+            YAML_SCALAR_TEXT@98..106 "complex5"
           YAML_COLON@106..107 ":"
         YAML_BLOCK_MAP_VALUE@107..124
           NEWLINE@107..108 "\n"
@@ -109,7 +121,8 @@ YAML_STREAM@0..124
                   YAML_BLOCK_SEQUENCE_ITEM@112..118
                     YAML_BLOCK_SEQ_ENTRY@112..113 "-"
                     WHITESPACE@113..114 " "
-                    YAML_SCALAR@114..115 "a"
+                    YAML_SCALAR@114..115
+                      YAML_SCALAR_TEXT@114..115 "a"
                     NEWLINE@115..116 "\n"
                     WHITESPACE@116..118 "  "
                 YAML_COLON@118..119 ":"
@@ -119,5 +132,6 @@ YAML_STREAM@0..124
                   YAML_BLOCK_SEQUENCE_ITEM@120..124
                     YAML_BLOCK_SEQ_ENTRY@120..121 "-"
                     WHITESPACE@121..122 " "
-                    YAML_SCALAR@122..123 "b"
+                    YAML_SCALAR@122..123
+                      YAML_SCALAR_TEXT@122..123 "b"
                     NEWLINE@123..124 "\n"

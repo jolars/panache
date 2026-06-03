@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 7ZZ5
@@ -14,7 +15,8 @@ YAML_STREAM@0..58
     YAML_BLOCK_MAP@4..58
       YAML_BLOCK_MAP_ENTRY@4..40
         YAML_BLOCK_MAP_KEY@4..21
-          YAML_SCALAR@4..20 "nested sequences"
+          YAML_SCALAR@4..20
+            YAML_SCALAR_TEXT@4..20 "nested sequences"
           YAML_COLON@20..21 ":"
         YAML_BLOCK_MAP_VALUE@21..40
           NEWLINE@21..22 "\n"
@@ -31,8 +33,8 @@ YAML_STREAM@0..58
                       YAML_BLOCK_SEQ_ENTRY@26..27 "-"
                       WHITESPACE@27..28 " "
                       YAML_FLOW_SEQUENCE@28..30
-                        YAML_SCALAR@28..29 "["
-                        YAML_SCALAR@29..30 "]"
+                        YAML_FLOW_INDICATOR@28..29 "["
+                        YAML_FLOW_INDICATOR@29..30 "]"
                       NEWLINE@30..31 "\n"
             YAML_BLOCK_SEQUENCE_ITEM@31..40
               YAML_BLOCK_SEQ_ENTRY@31..32 "-"
@@ -46,26 +48,28 @@ YAML_STREAM@0..58
                       YAML_BLOCK_SEQ_ENTRY@35..36 "-"
                       WHITESPACE@36..37 " "
                       YAML_FLOW_MAP@37..39
-                        YAML_SCALAR@37..38 "{"
-                        YAML_SCALAR@38..39 "}"
+                        YAML_FLOW_INDICATOR@37..38 "{"
+                        YAML_FLOW_INDICATOR@38..39 "}"
                       NEWLINE@39..40 "\n"
       YAML_BLOCK_MAP_ENTRY@40..49
         YAML_BLOCK_MAP_KEY@40..45
-          YAML_SCALAR@40..44 "key1"
+          YAML_SCALAR@40..44
+            YAML_SCALAR_TEXT@40..44 "key1"
           YAML_COLON@44..45 ":"
         YAML_BLOCK_MAP_VALUE@45..49
           WHITESPACE@45..46 " "
           YAML_FLOW_SEQUENCE@46..48
-            YAML_SCALAR@46..47 "["
-            YAML_SCALAR@47..48 "]"
+            YAML_FLOW_INDICATOR@46..47 "["
+            YAML_FLOW_INDICATOR@47..48 "]"
           NEWLINE@48..49 "\n"
       YAML_BLOCK_MAP_ENTRY@49..58
         YAML_BLOCK_MAP_KEY@49..54
-          YAML_SCALAR@49..53 "key2"
+          YAML_SCALAR@49..53
+            YAML_SCALAR_TEXT@49..53 "key2"
           YAML_COLON@53..54 ":"
         YAML_BLOCK_MAP_VALUE@54..58
           WHITESPACE@54..55 " "
           YAML_FLOW_MAP@55..57
-            YAML_SCALAR@55..56 "{"
-            YAML_SCALAR@56..57 "}"
+            YAML_FLOW_INDICATOR@55..56 "{"
+            YAML_FLOW_INDICATOR@56..57 "}"
           NEWLINE@57..58 "\n"

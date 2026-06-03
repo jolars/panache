@@ -18,12 +18,13 @@
 //!   role for its singleton-stream embedding. [`parse_yaml_document`]
 //!   centralizes the descent so no consumer re-implements it.
 //! - `YAML_BLOCK_MAP_KEY` includes the trailing `:` (`YAML_COLON`) token, so
-//!   [`YamlBlockMapKey::scalar`] reads the `YAML_SCALAR` token child rather
-//!   than the node text.
+//!   [`YamlBlockMapKey::scalar`] reads the `YAML_SCALAR` node child rather
+//!   than the whole-key text.
 //!
-//! Scalar style is not a CST kind — every style emits `YAML_SCALAR` — so
-//! [`YamlScalar`] detects the style from the leading byte and cooks via the
-//! shared [`crate::parser::yaml::cook`] primitives.
+//! Scalar style is not a CST kind — every style is a `YAML_SCALAR` node
+//! (wrapping `YAML_SCALAR_TEXT` content) — so [`YamlScalar`] detects the
+//! style from the leading byte and cooks via the shared
+//! [`crate::parser::yaml::cook`] primitives.
 
 use rowan::TextRange;
 
@@ -89,7 +90,7 @@ pub enum YamlNode {
 
 /// Resolve the single content node held by a value / item / document wrapper.
 /// Container children take precedence; a bare scalar value resolves to the
-/// first `YAML_SCALAR` token (anchors/tags/aliases are skipped). Returns `None`
+/// first `YAML_SCALAR` node (anchors/tags/aliases are skipped). Returns `None`
 /// for an empty value.
 fn node_child(parent: &SyntaxNode) -> Option<YamlNode> {
     for child in parent.children() {
@@ -108,14 +109,14 @@ fn node_child(parent: &SyntaxNode) -> Option<YamlNode> {
     scalar_token(parent).map(YamlNode::Scalar)
 }
 
-/// First direct `YAML_SCALAR` token child of `parent`, wrapped. Note flow
-/// containers emit their `[`/`]`/`{`/`}`/`,` as `YAML_SCALAR` tokens too, but
-/// those live inside the flow node, not as direct children of a value/key.
+/// First direct `YAML_SCALAR` node child of `parent`, wrapped. A scalar is a
+/// node whose leaves are the per-line `YAML_SCALAR_TEXT` fragments (and any
+/// `NEWLINE` between them); flow punctuation is `YAML_FLOW_INDICATOR`, so it
+/// never matches here.
 fn scalar_token(parent: &SyntaxNode) -> Option<YamlScalar> {
     parent
-        .children_with_tokens()
-        .filter_map(|el| el.into_token())
-        .find(|t| t.kind() == SyntaxKind::YAML_SCALAR)
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_SCALAR)
         .and_then(YamlScalar::cast)
 }
 
@@ -285,13 +286,13 @@ impl YamlBlockMapEntry {
 }
 
 ast_node!(
-    /// The key side of a block-map entry. Holds the `YAML_SCALAR` token AND the
+    /// The key side of a block-map entry. Holds the `YAML_SCALAR` node AND the
     /// trailing `YAML_COLON` token.
     YamlBlockMapKey, YAML_BLOCK_MAP_KEY
 );
 
 impl YamlBlockMapKey {
-    /// The key's scalar token (excluding the `:` colon).
+    /// The key's scalar node (excluding the `:` colon).
     pub fn scalar(&self) -> Option<YamlScalar> {
         scalar_token(&self.0)
     }
@@ -408,7 +409,7 @@ impl YamlFlowMapValue {
 }
 
 /// The lexical style of a scalar, detected from its raw source. (The CST does
-/// not record style as a distinct kind — every style is a `YAML_SCALAR` token.)
+/// not record style as a distinct kind — every style is a `YAML_SCALAR` node.)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum YamlScalarStyle {
     Plain,
@@ -440,23 +441,25 @@ fn detect_style(raw: &str) -> YamlScalarStyle {
     }
 }
 
-/// A scalar token. Unlike the node wrappers, this wraps a `SyntaxToken`
-/// (`YAML_SCALAR` is a token, not a node), so it is not an [`AstNode`].
+/// A scalar value node. Its leaves are the per-physical-line content fragments
+/// (`YAML_SCALAR_TEXT`) interleaved with `NEWLINE` (and, for embedded hashpipe,
+/// line-prefix) tokens; [`raw`](Self::raw) reassembles them.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct YamlScalar(SyntaxToken);
+pub struct YamlScalar(SyntaxNode);
 
 impl YamlScalar {
-    pub fn cast(token: SyntaxToken) -> Option<Self> {
-        (token.kind() == SyntaxKind::YAML_SCALAR).then_some(Self(token))
+    pub fn cast(node: SyntaxNode) -> Option<Self> {
+        (node.kind() == SyntaxKind::YAML_SCALAR).then_some(Self(node))
     }
 
-    /// The raw source bytes of the scalar, including any quotes / block header.
-    pub fn raw(&self) -> &str {
-        self.0.text()
+    /// The raw source bytes of the scalar (all leaves concatenated), including
+    /// any quotes / block header and embedded line breaks.
+    pub fn raw(&self) -> String {
+        self.0.text().to_string()
     }
 
     pub fn style(&self) -> YamlScalarStyle {
-        detect_style(self.raw())
+        detect_style(&self.raw())
     }
 
     /// The cooked logical string: quotes stripped, escapes decoded, multi-line
@@ -464,14 +467,14 @@ impl YamlScalar {
     /// (their cooking needs parent indent context).
     pub fn value(&self) -> String {
         let raw = self.raw();
-        cook(detect_style(raw).to_cook_style(), raw)
+        cook(detect_style(&raw).to_cook_style(), &raw)
     }
 
     pub fn text_range(&self) -> TextRange {
         self.0.text_range()
     }
 
-    pub fn syntax(&self) -> &SyntaxToken {
+    pub fn syntax(&self) -> &SyntaxNode {
         &self.0
     }
 }

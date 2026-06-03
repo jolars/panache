@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: DE56/01
@@ -9,5 +10,6 @@ diagnostics:
 cst:
 YAML_STREAM@0..25
   YAML_DOCUMENT@0..25
-    YAML_SCALAR@0..24 "\"2 trailing\\t  \n    tab\""
+    YAML_SCALAR@0..24
+      YAML_SCALAR_TEXT@0..24 "\"2 trailing\\t  \n    tab\""
     NEWLINE@24..25 "\n"

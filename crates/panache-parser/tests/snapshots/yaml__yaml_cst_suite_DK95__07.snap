@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: DK95/07
@@ -9,7 +10,7 @@ diagnostics:
 cst:
 YAML_STREAM@0..16
   YAML_DOCUMENT@0..16
-    YAML_SCALAR@0..9 "%YAML 1.2"
+    YAML_DIRECTIVE@0..9 "%YAML 1.2"
     NEWLINE@9..10 "\n"
     WHITESPACE@10..11 "\t"
     NEWLINE@11..12 "\n"

@@ -23,7 +23,9 @@ pub enum SyntaxKind {
     YAML_TAG,            // YAML explicit tag token (e.g. !!str)
     YAML_ANCHOR,         // YAML anchor token (e.g. &name)
     YAML_ALIAS,          // YAML alias token (e.g. *name)
-    YAML_SCALAR,         // YAML scalar value token
+    YAML_SCALAR_TEXT,    // YAML scalar content fragment (one physical line of a scalar)
+    YAML_FLOW_INDICATOR, // YAML flow structural punctuation ([ ] { } ,)
+    YAML_DIRECTIVE,      // YAML directive line (%YAML, %TAG)
     YAML_COMMENT,        // YAML inline comment token
     YAML_DOCUMENT_START, // YAML document start marker (---) in shadow parser
     YAML_DOCUMENT_END,   // YAML document end marker (...) in shadow parser
@@ -164,6 +166,7 @@ pub enum SyntaxKind {
     YAML_METADATA_CONTENT,    // Content lines inside YAML metadata block
     YAML_STREAM, // Shadow parser only: YAML 1.2 stream wrapper (zero or more YAML_DOCUMENT children + trivia)
     YAML_DOCUMENT, // Shadow parser only: a single YAML document (markers + body)
+    YAML_SCALAR, // YAML scalar value node (wraps YAML_SCALAR_TEXT content + NEWLINE/prefix leaves)
     YAML_BLOCK_MAP, // YAML block mapping container (prototype shadow parser)
     YAML_BLOCK_MAP_ENTRY, // YAML block mapping entry (key: value)
     YAML_BLOCK_MAP_KEY, // YAML block mapping key wrapper

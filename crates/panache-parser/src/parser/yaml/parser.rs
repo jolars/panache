@@ -235,13 +235,13 @@ pub fn parse_stream(input: &str) -> SyntaxNode {
                 builder.start_node(SyntaxKind::YAML_FLOW_SEQUENCE.into());
                 block_stack.push(BlockFrame::FlowSequence { item_open: false });
                 let text = &input[tok.start.index..tok.end.index];
-                builder.token(SyntaxKind::YAML_SCALAR.into(), text);
+                builder.token(SyntaxKind::YAML_FLOW_INDICATOR.into(), text);
                 continue;
             }
             TokenKind::FlowSequenceEnd => {
                 close_open_sub_wrapper(&mut builder, &mut block_stack);
                 let text = &input[tok.start.index..tok.end.index];
-                builder.token(SyntaxKind::YAML_SCALAR.into(), text);
+                builder.token(SyntaxKind::YAML_FLOW_INDICATOR.into(), text);
                 if matches!(
                     block_stack.last(),
                     Some(BlockFrame::FlowSequence { .. } | BlockFrame::FlowMap { .. })
@@ -261,13 +261,13 @@ pub fn parse_stream(input: &str) -> SyntaxNode {
                     in_value: false,
                 });
                 let text = &input[tok.start.index..tok.end.index];
-                builder.token(SyntaxKind::YAML_SCALAR.into(), text);
+                builder.token(SyntaxKind::YAML_FLOW_INDICATOR.into(), text);
                 continue;
             }
             TokenKind::FlowMappingEnd => {
                 close_open_sub_wrapper(&mut builder, &mut block_stack);
                 let text = &input[tok.start.index..tok.end.index];
-                builder.token(SyntaxKind::YAML_SCALAR.into(), text);
+                builder.token(SyntaxKind::YAML_FLOW_INDICATOR.into(), text);
                 if matches!(
                     block_stack.last(),
                     Some(BlockFrame::FlowMap { .. } | BlockFrame::FlowSequence { .. })
@@ -282,7 +282,7 @@ pub fn parse_stream(input: &str) -> SyntaxNode {
                 // container level (between peer entries/items).
                 close_open_sub_wrapper(&mut builder, &mut block_stack);
                 let text = &input[tok.start.index..tok.end.index];
-                builder.token(SyntaxKind::YAML_SCALAR.into(), text);
+                builder.token(SyntaxKind::YAML_FLOW_INDICATOR.into(), text);
                 continue;
             }
             TokenKind::Key => {
@@ -512,10 +512,22 @@ pub fn parse_stream(input: &str) -> SyntaxNode {
                 }
                 builder.token(kind.into(), text);
             }
+            TokenKind::Scalar(_) => {
+                // A scalar is emitted as a `YAML_SCALAR` *node* whose
+                // leaves are the per-physical-line content fragments
+                // (`YAML_SCALAR_TEXT`) interleaved with `NEWLINE` tokens.
+                // The byte slice is unchanged, so this is lossless; the
+                // node shape lets the formatter/LSP navigate scalar lines
+                // (and, later, hashpipe line prefixes) as real structure.
+                ensure_doc_open(&mut builder, &mut doc_open);
+                doc_only_has_directives = false;
+                emit_scalar_node(&mut builder, text);
+            }
             _ => {
-                // Any non-trivia content opens an implicit document
-                // when one isn't already in progress and counts as
-                // body content (clears the directives-only flag).
+                // Any other non-trivia content (Anchor, Tag, Alias, ...)
+                // opens an implicit document when one isn't already in
+                // progress and counts as body content (clears the
+                // directives-only flag).
                 ensure_doc_open(&mut builder, &mut doc_open);
                 doc_only_has_directives = false;
                 builder.token(kind.into(), text);
@@ -750,6 +762,20 @@ fn close_block_containers(builder: &mut GreenNodeBuilder<'_>, stack: &mut Vec<Bl
     }
 }
 
+/// Emit a scalar token's bytes as a `YAML_SCALAR` node wrapping a single
+/// `YAML_SCALAR_TEXT` content leaf (the leaf carries the full scalar
+/// source, including any embedded line breaks for multi-line scalars).
+/// The node text equals `text` exactly, so this is byte-lossless. The
+/// node wrapper is what lets the formatter/LSP treat a scalar as real
+/// structure and is the seam a later step uses to interleave hashpipe
+/// line-prefix leaves (which is also where per-line fragmentation will
+/// land — see the yaml-formatter cutover plan, step 2).
+fn emit_scalar_node(builder: &mut GreenNodeBuilder<'static>, text: &str) {
+    builder.start_node(SyntaxKind::YAML_SCALAR.into());
+    builder.token(SyntaxKind::YAML_SCALAR_TEXT.into(), text);
+    builder.finish_node();
+}
+
 fn map_token_to_syntax_kind(kind: TokenKind) -> SyntaxKind {
     match kind {
         TokenKind::Trivia(TriviaKind::Whitespace) => SyntaxKind::WHITESPACE,
@@ -757,26 +783,32 @@ fn map_token_to_syntax_kind(kind: TokenKind) -> SyntaxKind {
         TokenKind::Trivia(TriviaKind::Comment) => SyntaxKind::YAML_COMMENT,
         TokenKind::DocumentStart => SyntaxKind::YAML_DOCUMENT_START,
         TokenKind::DocumentEnd => SyntaxKind::YAML_DOCUMENT_END,
-        TokenKind::Directive => SyntaxKind::YAML_SCALAR,
+        TokenKind::Directive => SyntaxKind::YAML_DIRECTIVE,
         TokenKind::BlockEntry => SyntaxKind::YAML_BLOCK_SEQ_ENTRY,
-        TokenKind::FlowEntry => SyntaxKind::YAML_SCALAR,
-        TokenKind::FlowSequenceStart | TokenKind::FlowSequenceEnd => SyntaxKind::YAML_SCALAR,
-        TokenKind::FlowMappingStart | TokenKind::FlowMappingEnd => SyntaxKind::YAML_SCALAR,
+        TokenKind::FlowEntry => SyntaxKind::YAML_FLOW_INDICATOR,
+        TokenKind::FlowSequenceStart | TokenKind::FlowSequenceEnd => {
+            SyntaxKind::YAML_FLOW_INDICATOR
+        }
+        TokenKind::FlowMappingStart | TokenKind::FlowMappingEnd => SyntaxKind::YAML_FLOW_INDICATOR,
         TokenKind::Value => SyntaxKind::YAML_COLON,
         TokenKind::Anchor => SyntaxKind::YAML_ANCHOR,
         TokenKind::Alias => SyntaxKind::YAML_ALIAS,
         TokenKind::Tag => SyntaxKind::YAML_TAG,
-        TokenKind::Scalar(_) => SyntaxKind::YAML_SCALAR,
+        // Scalar tokens are emitted as a `YAML_SCALAR` *node* (split into
+        // per-line `YAML_SCALAR_TEXT` leaves) via `emit_scalar_node`, not
+        // through this token-kind map. This arm is the leaf kind for a
+        // scalar's content fragment, used by that helper.
+        TokenKind::Scalar(_) => SyntaxKind::YAML_SCALAR_TEXT,
         // Source-backed `Key` (the explicit `?` indicator) — there is
         // no dedicated SyntaxKind yet, route to YAML_KEY for now.
         TokenKind::Key => SyntaxKind::YAML_KEY,
         // Synthetic markers handled before this map; defensive
-        // fallback.
+        // fallback (never emitted as bytes).
         TokenKind::StreamStart
         | TokenKind::StreamEnd
         | TokenKind::BlockSequenceStart
         | TokenKind::BlockMappingStart
-        | TokenKind::BlockEnd => SyntaxKind::YAML_SCALAR,
+        | TokenKind::BlockEnd => SyntaxKind::YAML_FLOW_INDICATOR,
     }
 }
 
@@ -1027,16 +1059,14 @@ mod tests {
             let key = entry_key(entry);
             // Empty key: the KEY holds only the `:` value indicator.
             assert!(
-                !key.children_with_tokens().any(|el| el
-                    .as_token()
-                    .is_some_and(|t| t.kind() == SyntaxKind::YAML_SCALAR)),
+                !key.children().any(|n| n.kind() == SyntaxKind::YAML_SCALAR),
                 "empty key should carry no scalar, got {key:?}",
             );
             let value = entry_value(entry);
             assert!(
-                value.children_with_tokens().any(|el| el
-                    .as_token()
-                    .is_some_and(|t| t.kind() == SyntaxKind::YAML_SCALAR && t.text() == scalar)),
+                value
+                    .children()
+                    .any(|n| n.kind() == SyntaxKind::YAML_SCALAR && n.text() == scalar),
                 "value should be {scalar:?}, got {value:?}",
             );
         }
@@ -1061,9 +1091,9 @@ mod tests {
             "colon should be the trailing token of YAML_BLOCK_MAP_KEY",
         );
         assert!(
-            value.children_with_tokens().any(|el| el
-                .as_token()
-                .is_some_and(|t| t.kind() == SyntaxKind::YAML_SCALAR)),
+            value
+                .children()
+                .any(|n| n.kind() == SyntaxKind::YAML_SCALAR),
             "scalar `value` should live inside YAML_BLOCK_MAP_VALUE",
         );
         assert_eq!(tree.text().to_string(), input);
@@ -1242,9 +1272,7 @@ mod tests {
         let key = entry_key(&entries[0]);
         // KEY has no scalar; only the colon.
         assert!(
-            !key.children_with_tokens().any(|el| el
-                .as_token()
-                .is_some_and(|t| t.kind() == SyntaxKind::YAML_SCALAR)),
+            !key.children().any(|n| n.kind() == SyntaxKind::YAML_SCALAR),
             "empty-key shorthand has no scalar in KEY",
         );
         assert!(
@@ -1255,9 +1283,9 @@ mod tests {
         );
         let value = entry_value(&entries[0]);
         assert!(
-            value.children_with_tokens().any(|el| el
-                .as_token()
-                .is_some_and(|t| t.kind() == SyntaxKind::YAML_SCALAR)),
+            value
+                .children()
+                .any(|n| n.kind() == SyntaxKind::YAML_SCALAR),
             "VALUE owns the `value` scalar",
         );
         assert_eq!(tree.text().to_string(), input);
@@ -1351,9 +1379,9 @@ mod tests {
                 .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_VALUE)
                 .expect("entry has YAML_FLOW_MAP_VALUE");
             assert!(
-                value.children_with_tokens().any(|el| el
-                    .as_token()
-                    .is_some_and(|t| t.kind() == SyntaxKind::YAML_SCALAR)),
+                value
+                    .children()
+                    .any(|n| n.kind() == SyntaxKind::YAML_SCALAR),
                 "flow VALUE owns its scalar",
             );
         }

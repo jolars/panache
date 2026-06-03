@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..2266
@@ -11,11 +12,13 @@ DOCUMENT@0..2266
         YAML_BLOCK_MAP@4..40
           YAML_BLOCK_MAP_ENTRY@4..40
             YAML_BLOCK_MAP_KEY@4..10
-              YAML_SCALAR@4..9 "title"
+              YAML_SCALAR@4..9
+                YAML_SCALAR_TEXT@4..9 "title"
               YAML_COLON@9..10 ":"
             YAML_BLOCK_MAP_VALUE@10..40
               WHITESPACE@10..11 " "
-              YAML_SCALAR@11..39 "\"Nested List Wrapping ..."
+              YAML_SCALAR@11..39
+                YAML_SCALAR_TEXT@11..39 "\"Nested List Wrapping ..."
               NEWLINE@39..40 "\n"
     YAML_METADATA_DELIM@40..43 "---"
     NEWLINE@43..44 "\n"

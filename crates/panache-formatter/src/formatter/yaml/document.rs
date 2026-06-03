@@ -375,9 +375,9 @@ fn canonical_indent_depth(root: &SyntaxNode, offset: usize) -> Option<usize> {
         TokenAtOffset::None => return Some(0),
     };
 
-    if token.kind() == SyntaxKind::YAML_SCALAR && token.text().contains('\n') {
+    if token.kind() == SyntaxKind::YAML_SCALAR_TEXT && token.text().contains('\n') {
         // Multi-line scalar continuation: block scalars (`|`/`>`) bake
-        // their interior indent into the single `YAML_SCALAR` token —
+        // their interior indent into the single `YAML_SCALAR_TEXT` leaf —
         // proper canonicalization needs a real block-scalar renderer, so
         // preserve verbatim. Plain / single- / double-quoted multi-line
         // scalars have their continuation lines canonicalized to the
@@ -738,13 +738,13 @@ fn apply_plain_scalar_wrap(buf: String, opts: &YamlFormatOptions) -> String {
         if value_has_decoration(&value_node) {
             continue;
         }
-        let Some(scalar) = value_node.children_with_tokens().find_map(|c| match c {
-            rowan::NodeOrToken::Token(t) if t.kind() == SyntaxKind::YAML_SCALAR => Some(t),
-            _ => None,
-        }) else {
+        let Some(scalar) = value_node
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_SCALAR)
+        else {
             continue;
         };
-        let text = scalar.text();
+        let text = scalar.text().to_string();
         if text.starts_with('\'')
             || text.starts_with('"')
             || text.starts_with('|')
@@ -771,7 +771,7 @@ fn apply_plain_scalar_wrap(buf: String, opts: &YamlFormatOptions) -> String {
         }
         let scalar_col = buf[line_start..scalar_start].chars().count();
         let indent = depth * 2;
-        let wrapped = wrap_plain_scalar_text(text, scalar_col, indent, opts.line_width);
+        let wrapped = wrap_plain_scalar_text(&text, scalar_col, indent, opts.line_width);
         if wrapped == text {
             continue;
         }

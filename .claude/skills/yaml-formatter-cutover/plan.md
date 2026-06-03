@@ -91,6 +91,38 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
 
 _(Update as phases complete. Earliest entries on top.)_
 
+- **Phase 2c step 1 — `YAML_SCALAR` promoted from token to node.** The
+  enabling CST reshape for hashpipe embedding (and the long-term shape the
+  formatter/LSP want). A scalar value is now a `YAML_SCALAR` **node**
+  wrapping a single `YAML_SCALAR_TEXT` content leaf, instead of a single
+  `YAML_SCALAR` token. The wrapper is the seam a later step uses to
+  interleave hashpipe `#|` line-prefix leaves as clean tokens (the
+  "no offsets" requirement). To make `YAML_SCALAR` unambiguously a node,
+  the two other things the parser had been emitting as `YAML_SCALAR`
+  *tokens* got their own leaf kinds: flow punctuation (`[ ] { } ,`) →
+  `YAML_FLOW_INDICATOR`, and directive lines (`%YAML`/`%TAG`) →
+  `YAML_DIRECTIVE`. Builder change is `emit_scalar_node` in
+  `parser/yaml/parser.rs`; the typed `YamlScalar` wrapper
+  (`syntax/yaml_ast.rs`) is now node-based (`.raw()` returns `String`).
+  **Single-leaf, not fragmented:** the leaf still carries embedded
+  newlines for multi-line scalars, so `events.rs` flat-token
+  reconstruction stays byte-identical — per-line fragmentation is
+  deferred to step 2 where the `#|` prefix actually needs to interleave.
+  Blast radius was the two parity-gated files (`validator.rs`,
+  `events.rs`, ~40 `YAML_SCALAR` sites each — direct-child scans switched
+  to node lookups; content descendant-filters switched to
+  `YAML_SCALAR_TEXT`; flow/directive checks switched to the new kinds),
+  plus the live formatter (`formatter/yaml/document.rs`). Guardrails held:
+  yaml-test-suite **event parity unchanged** (the projection produces
+  identical events from the new shape), **losslessness unchanged**, and
+  the 297 yaml-test-suite CST snapshots + the YAML golden parser cases
+  re-blessed (audited in aggregate: every removed `YAML_SCALAR` token maps
+  1:1 to `YAML_SCALAR`+`YAML_SCALAR_TEXT` / `YAML_FLOW_INDICATOR` /
+  `YAML_DIRECTIVE`, no other kinds touched). Full workspace `cargo test`,
+  clippy `-D warnings`, and fmt clean. Resolves the open questions
+  "Block-scalar interior re-indent" (option a, parser-side token lift) and
+  "Style-as-CST-kind promotion" directionally — scalars are now navigable
+  structure. Remaining 2c steps below.
 - **Phase 3.2 — hashpipe corpus + finishing.** Closes the 2c-independent
   half of Phase 3. (1) Added a dedicated hashpipe corpus under
   `crates/panache-formatter/tests/fixtures/yaml_corpus/hashpipe/` —
@@ -810,38 +842,55 @@ consumers + the diagnostics infra migrated; `yaml_parser` removed from
 the three manifests. **Re-parse-on-demand parity swap — host CST shape
 unchanged.** See "what landed."
 
-### 2c — Embed the in-tree YAML CST into the host document CST — OUTSTANDING
+### 2c — Embed the in-tree YAML CST into the host document CST — IN PROGRESS
 
-This is the actual end goal: the YAML tokens (`YAML_STREAM` /
-`YAML_DOCUMENT` / `YAML_BLOCK_MAP` / `YAML_BLOCK_MAP_ENTRY` / … /
-`YAML_SCALAR`) should live **inside the full document CST**, so
-frontmatter and hashpipe bodies are real structure, not opaque text
-that gets re-parsed on demand.
+End goal: the YAML tokens (`YAML_STREAM` / `YAML_DOCUMENT` /
+`YAML_BLOCK_MAP` / … / `YAML_SCALAR`) live **inside the full document
+CST**, so frontmatter and hashpipe bodies are real structure, not opaque
+text re-parsed on demand. Frontmatter embedding already landed
+(`emit_yaml_block` in `blocks/metadata.rs` splices the `parse_stream`
+subtree under `YAML_METADATA_CONTENT`). Hashpipe is the remaining target,
+and the user directive for it is **"handle the `#|` prefixes as part of
+the YAML regions — no offsets"**: the YAML CST's token ranges must be host
+ranges directly (prefixes included as trivia), retiring the
+`normalize_hashpipe_header` offset-remapping layer entirely.
 
-- **Parser side.** Change `crates/panache-parser/src/parser/blocks/metadata.rs`
-  so that instead of emitting `YAML_METADATA_CONTENT` as raw line
-  tokens (`emit_line_tokens`), it runs the in-tree parser over the
-  frontmatter region and nests the resulting `YAML_STREAM` subtree
-  under `YAML_METADATA_CONTENT`. Must stay byte-lossless (every byte of
-  the region, including indentation/trivia, preserved) so the document
-  round-trips. Do the same for the hashpipe preamble content node
-  (`HASHPIPE_YAML_CONTENT`), carrying the `#|`-prefix → YAML-offset
-  mapping that `extract_hashpipe_region` already computes.
-- **Consumer simplification.** Once structure is in the host tree,
-  rewire `collect_yaml_regions` / the value-extraction consumers to
-  read the embedded subtree (via the `yaml_ast` wrappers, casting host
-  nodes directly) instead of re-parsing `region.content`. Drops the
-  second parse and the offset-remapping layer.
-- **Snapshot + losslessness churn.** Every YAML-touching parser CST
-  snapshot (`crates/panache-parser/tests/snapshots/`) shifts and needs
-  intentional re-blessing; the losslessness checks become the guardrail
-  that the embedded subtree preserves bytes. Land parser corpus cases
-  for the frontmatter/hashpipe embedding under the parser fixtures.
-- **Consumer audit.** Linter rules, LSP, salsa indexers, pandoc-ast
-  projector — anything that currently walks `YAML_METADATA_CONTENT` via
-  `.text()` keeps working (the content node still exists), but new
-  features (key goto, folding, semantic tokens, hover) become possible
-  by walking the nested `YAML_*` structure.
+Staged (each landable independently; the offset layer dies last):
+
+- **Step 1 — `YAML_SCALAR` as a node — DONE** (see "what landed"). A
+  scalar is now a `YAML_SCALAR` node wrapping a `YAML_SCALAR_TEXT` leaf;
+  flow punctuation/directives got `YAML_FLOW_INDICATOR`/`YAML_DIRECTIVE`.
+  This is the wrapper that lets `#|` prefixes (and per-line content) live
+  as clean child tokens. Single-leaf for now (no fragmentation).
+- **Step 2 — prefix-aware scanner + builder.** Add `line_prefix` to the
+  scanner for prefix-excluded column/indent accounting (the riskiest spot
+  is `auto_detect_block_scalar_indent`); add
+  `parse_stream_with_prefix` / `validate_yaml_with_prefix`; teach
+  `emit_scalar_node` to fragment multi-line scalars at line breaks and
+  peel a `YAML_LINE_PREFIX` leaf off each continuation line. Land
+  parser-crate-first, parity-tested against the current normalizer.
+- **Step 3 — cook/value over prefixed scalars.** `.value()` walks the
+  `YAML_SCALAR_TEXT` leaves, skipping prefix/newline leaves (cheap, since
+  they're discrete tokens now — no string-stripping).
+- **Step 4 — host embedding.** Rewire `parse_fenced_code_block`
+  (`blocks/code_blocks.rs`) to splice a prefix-aware `parse_stream`
+  subtree into `HASHPIPE_YAML_CONTENT` (mirroring the frontmatter
+  validate→splice→fallback pattern); keep
+  `compute_hashpipe_preamble_line_count` for region detection; retire the
+  `HASHPIPE_PREFIX` token + `emit_hashpipe_option_line/continuation`
+  (keep the shared `CHUNK_OPTION*` kinds — still used by inline fence
+  options).
+- **Step 5 — consumer rewire + drop offset layer.** Repoint
+  `formatter/hashpipe.rs` and `syntax/yaml.rs`
+  (`collect_hashpipe_regions` / `extract_hashpipe_region`) to read the
+  embedded subtree; delete `hashpipe_normalizer.rs` and the
+  `yaml_to_host_offsets` machinery.
+
+**Consumer audit.** Linter rules, LSP, salsa indexers, pandoc-ast
+projector — anything that walks `YAML_METADATA_CONTENT`/
+`HASHPIPE_YAML_CONTENT` via `.text()` keeps working (the content node
+still exists), but new features (key goto, folding, semantic tokens,
+hover) become possible by walking the nested `YAML_*` structure.
 
 ### 2d — Drop `pretty_yaml` — OUTSTANDING
 

@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 5GBF
@@ -12,17 +13,21 @@ YAML_STREAM@0..83
     YAML_BLOCK_MAP@0..83
       YAML_BLOCK_MAP_ENTRY@0..46
         YAML_BLOCK_MAP_KEY@0..8
-          YAML_SCALAR@0..7 "Folding"
+          YAML_SCALAR@0..7
+            YAML_SCALAR_TEXT@0..7 "Folding"
           YAML_COLON@7..8 ":"
         YAML_BLOCK_MAP_VALUE@8..46
           NEWLINE@8..9 "\n"
           WHITESPACE@9..11 "  "
-          YAML_SCALAR@11..45 "\"Empty line\n   \t\n  as ..."
+          YAML_SCALAR@11..45
+            YAML_SCALAR_TEXT@11..45 "\"Empty line\n   \t\n  as ..."
           NEWLINE@45..46 "\n"
       YAML_BLOCK_MAP_ENTRY@46..83
         YAML_BLOCK_MAP_KEY@46..55
-          YAML_SCALAR@46..54 "Chomping"
+          YAML_SCALAR@46..54
+            YAML_SCALAR_TEXT@46..54 "Chomping"
           YAML_COLON@54..55 ":"
         YAML_BLOCK_MAP_VALUE@55..83
           WHITESPACE@55..56 " "
-          YAML_SCALAR@56..83 "|\n  Clipped empty lin ..."
+          YAML_SCALAR@56..83
+            YAML_SCALAR_TEXT@56..83 "|\n  Clipped empty lin ..."

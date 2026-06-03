@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 5WE3
@@ -14,7 +15,8 @@ YAML_STREAM@0..94
         YAML_BLOCK_MAP_KEY@0..29
           YAML_KEY@0..1 "?"
           WHITESPACE@1..2 " "
-          YAML_SCALAR@2..14 "explicit key"
+          YAML_SCALAR@2..14
+            YAML_SCALAR_TEXT@2..14 "explicit key"
           WHITESPACE@14..15 " "
           YAML_COMMENT@15..28 "# Empty value"
           NEWLINE@28..29 "\n"
@@ -23,7 +25,8 @@ YAML_STREAM@0..94
         YAML_BLOCK_MAP_KEY@29..46
           YAML_KEY@29..30 "?"
           WHITESPACE@30..31 " "
-          YAML_SCALAR@31..45 "|\n  block key\n"
+          YAML_SCALAR@31..45
+            YAML_SCALAR_TEXT@31..45 "|\n  block key\n"
           YAML_COLON@45..46 ":"
         YAML_BLOCK_MAP_VALUE@46..94
           WHITESPACE@46..47 " "
@@ -31,7 +34,8 @@ YAML_STREAM@0..94
             YAML_BLOCK_SEQUENCE_ITEM@47..74
               YAML_BLOCK_SEQ_ENTRY@47..48 "-"
               WHITESPACE@48..49 " "
-              YAML_SCALAR@49..52 "one"
+              YAML_SCALAR@49..52
+                YAML_SCALAR_TEXT@49..52 "one"
               WHITESPACE@52..53 " "
               YAML_COMMENT@53..71 "# Explicit compact"
               NEWLINE@71..72 "\n"
@@ -39,7 +43,8 @@ YAML_STREAM@0..94
             YAML_BLOCK_SEQUENCE_ITEM@74..94
               YAML_BLOCK_SEQ_ENTRY@74..75 "-"
               WHITESPACE@75..76 " "
-              YAML_SCALAR@76..79 "two"
+              YAML_SCALAR@76..79
+                YAML_SCALAR_TEXT@76..79 "two"
               WHITESPACE@79..80 " "
               YAML_COMMENT@80..93 "# block value"
               NEWLINE@93..94 "\n"

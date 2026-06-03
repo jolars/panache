@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: S3PD
@@ -12,11 +13,13 @@ YAML_STREAM@0..62
     YAML_BLOCK_MAP@0..62
       YAML_BLOCK_MAP_ENTRY@0..25
         YAML_BLOCK_MAP_KEY@0..10
-          YAML_SCALAR@0..9 "plain key"
+          YAML_SCALAR@0..9
+            YAML_SCALAR_TEXT@0..9 "plain key"
           YAML_COLON@9..10 ":"
         YAML_BLOCK_MAP_VALUE@10..25
           WHITESPACE@10..11 " "
-          YAML_SCALAR@11..24 "in-line value"
+          YAML_SCALAR@11..24
+            YAML_SCALAR_TEXT@11..24 "in-line value"
           NEWLINE@24..25 "\n"
       YAML_BLOCK_MAP_ENTRY@25..40
         YAML_BLOCK_MAP_KEY@25..26
@@ -27,7 +30,8 @@ YAML_STREAM@0..62
           NEWLINE@39..40 "\n"
       YAML_BLOCK_MAP_ENTRY@40..62
         YAML_BLOCK_MAP_KEY@40..53
-          YAML_SCALAR@40..52 "\"quoted key\""
+          YAML_SCALAR@40..52
+            YAML_SCALAR_TEXT@40..52 "\"quoted key\""
           YAML_COLON@52..53 ":"
         YAML_BLOCK_MAP_VALUE@53..62
           NEWLINE@53..54 "\n"
@@ -35,5 +39,6 @@ YAML_STREAM@0..62
             YAML_BLOCK_SEQUENCE_ITEM@54..62
               YAML_BLOCK_SEQ_ENTRY@54..55 "-"
               WHITESPACE@55..56 " "
-              YAML_SCALAR@56..61 "entry"
+              YAML_SCALAR@56..61
+                YAML_SCALAR_TEXT@56..61 "entry"
               NEWLINE@61..62 "\n"

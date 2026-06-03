@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: EHF6
@@ -12,12 +13,13 @@ YAML_STREAM@0..37
     YAML_TAG@0..5 "!!map"
     WHITESPACE@5..6 " "
     YAML_FLOW_MAP@6..36
-      YAML_SCALAR@6..7 "{"
+      YAML_FLOW_INDICATOR@6..7 "{"
       NEWLINE@7..8 "\n"
       WHITESPACE@8..10 "  "
       YAML_FLOW_MAP_ENTRY@10..35
         YAML_FLOW_MAP_KEY@10..12
-          YAML_SCALAR@10..11 "k"
+          YAML_SCALAR@10..11
+            YAML_SCALAR_TEXT@10..11 "k"
           YAML_COLON@11..12 ":"
         YAML_FLOW_MAP_VALUE@12..35
           WHITESPACE@12..13 " "
@@ -25,17 +27,19 @@ YAML_STREAM@0..37
           NEWLINE@18..19 "\n"
           WHITESPACE@19..21 "  "
           YAML_FLOW_SEQUENCE@21..34
-            YAML_SCALAR@21..22 "["
+            YAML_FLOW_INDICATOR@21..22 "["
             WHITESPACE@22..23 " "
             YAML_FLOW_SEQUENCE_ITEM@23..24
-              YAML_SCALAR@23..24 "a"
-            YAML_SCALAR@24..25 ","
+              YAML_SCALAR@23..24
+                YAML_SCALAR_TEXT@23..24 "a"
+            YAML_FLOW_INDICATOR@24..25 ","
             WHITESPACE@25..26 " "
             YAML_FLOW_SEQUENCE_ITEM@26..33
               YAML_TAG@26..31 "!!str"
               WHITESPACE@31..32 " "
-              YAML_SCALAR@32..33 "b"
-            YAML_SCALAR@33..34 "]"
+              YAML_SCALAR@32..33
+                YAML_SCALAR_TEXT@32..33 "b"
+            YAML_FLOW_INDICATOR@33..34 "]"
           NEWLINE@34..35 "\n"
-      YAML_SCALAR@35..36 "}"
+      YAML_FLOW_INDICATOR@35..36 "}"
     NEWLINE@36..37 "\n"

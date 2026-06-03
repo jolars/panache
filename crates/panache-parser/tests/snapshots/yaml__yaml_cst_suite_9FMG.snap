@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 9FMG
@@ -12,7 +13,8 @@ YAML_STREAM@0..36
     YAML_BLOCK_MAP@0..36
       YAML_BLOCK_MAP_ENTRY@0..31
         YAML_BLOCK_MAP_KEY@0..2
-          YAML_SCALAR@0..1 "a"
+          YAML_SCALAR@0..1
+            YAML_SCALAR_TEXT@0..1 "a"
           YAML_COLON@1..2 ":"
         YAML_BLOCK_MAP_VALUE@2..31
           NEWLINE@2..3 "\n"
@@ -20,7 +22,8 @@ YAML_STREAM@0..36
           YAML_BLOCK_MAP@5..31
             YAML_BLOCK_MAP_ENTRY@5..19
               YAML_BLOCK_MAP_KEY@5..7
-                YAML_SCALAR@5..6 "b"
+                YAML_SCALAR@5..6
+                  YAML_SCALAR_TEXT@5..6 "b"
                 YAML_COLON@6..7 ":"
               YAML_BLOCK_MAP_VALUE@7..19
                 NEWLINE@7..8 "\n"
@@ -28,16 +31,19 @@ YAML_STREAM@0..36
                 YAML_BLOCK_MAP@12..19
                   YAML_BLOCK_MAP_ENTRY@12..19
                     YAML_BLOCK_MAP_KEY@12..14
-                      YAML_SCALAR@12..13 "c"
+                      YAML_SCALAR@12..13
+                        YAML_SCALAR_TEXT@12..13 "c"
                       YAML_COLON@13..14 ":"
                     YAML_BLOCK_MAP_VALUE@14..19
                       WHITESPACE@14..15 " "
-                      YAML_SCALAR@15..16 "d"
+                      YAML_SCALAR@15..16
+                        YAML_SCALAR_TEXT@15..16 "d"
                       NEWLINE@16..17 "\n"
                       WHITESPACE@17..19 "  "
             YAML_BLOCK_MAP_ENTRY@19..31
               YAML_BLOCK_MAP_KEY@19..21
-                YAML_SCALAR@19..20 "e"
+                YAML_SCALAR@19..20
+                  YAML_SCALAR_TEXT@19..20 "e"
                 YAML_COLON@20..21 ":"
               YAML_BLOCK_MAP_VALUE@21..31
                 NEWLINE@21..22 "\n"
@@ -45,17 +51,21 @@ YAML_STREAM@0..36
                 YAML_BLOCK_MAP@26..31
                   YAML_BLOCK_MAP_ENTRY@26..31
                     YAML_BLOCK_MAP_KEY@26..28
-                      YAML_SCALAR@26..27 "f"
+                      YAML_SCALAR@26..27
+                        YAML_SCALAR_TEXT@26..27 "f"
                       YAML_COLON@27..28 ":"
                     YAML_BLOCK_MAP_VALUE@28..31
                       WHITESPACE@28..29 " "
-                      YAML_SCALAR@29..30 "g"
+                      YAML_SCALAR@29..30
+                        YAML_SCALAR_TEXT@29..30 "g"
                       NEWLINE@30..31 "\n"
       YAML_BLOCK_MAP_ENTRY@31..36
         YAML_BLOCK_MAP_KEY@31..33
-          YAML_SCALAR@31..32 "h"
+          YAML_SCALAR@31..32
+            YAML_SCALAR_TEXT@31..32 "h"
           YAML_COLON@32..33 ":"
         YAML_BLOCK_MAP_VALUE@33..36
           WHITESPACE@33..34 " "
-          YAML_SCALAR@34..35 "i"
+          YAML_SCALAR@34..35
+            YAML_SCALAR_TEXT@34..35 "i"
           NEWLINE@35..36 "\n"

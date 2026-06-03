@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: 9DXL
@@ -12,11 +13,13 @@ YAML_STREAM@0..62
     YAML_BLOCK_MAP@0..18
       YAML_BLOCK_MAP_ENTRY@0..18
         YAML_BLOCK_MAP_KEY@0..8
-          YAML_SCALAR@0..7 "Mapping"
+          YAML_SCALAR@0..7
+            YAML_SCALAR_TEXT@0..7 "Mapping"
           YAML_COLON@7..8 ":"
         YAML_BLOCK_MAP_VALUE@8..18
           WHITESPACE@8..9 " "
-          YAML_SCALAR@9..17 "Document"
+          YAML_SCALAR@9..17
+            YAML_SCALAR_TEXT@9..17 "Document"
           NEWLINE@17..18 "\n"
   YAML_DOCUMENT@18..33
     YAML_DOCUMENT_START@18..21 "---"
@@ -26,16 +29,18 @@ YAML_STREAM@0..62
     YAML_DOCUMENT_END@30..33 "..."
   NEWLINE@33..34 "\n"
   YAML_DOCUMENT@34..62
-    YAML_SCALAR@34..43 "%YAML 1.2"
+    YAML_DIRECTIVE@34..43 "%YAML 1.2"
     NEWLINE@43..44 "\n"
     YAML_DOCUMENT_START@44..47 "---"
     NEWLINE@47..48 "\n"
     YAML_BLOCK_MAP@48..62
       YAML_BLOCK_MAP_ENTRY@48..62
         YAML_BLOCK_MAP_KEY@48..58
-          YAML_SCALAR@48..57 "matches %"
+          YAML_SCALAR@48..57
+            YAML_SCALAR_TEXT@48..57 "matches %"
           YAML_COLON@57..58 ":"
         YAML_BLOCK_MAP_VALUE@58..62
           WHITESPACE@58..59 " "
-          YAML_SCALAR@59..61 "20"
+          YAML_SCALAR@59..61
+            YAML_SCALAR_TEXT@59..61 "20"
           NEWLINE@61..62 "\n"

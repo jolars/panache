@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: A2M4
@@ -14,7 +15,8 @@ YAML_STREAM@0..28
         YAML_BLOCK_MAP_KEY@0..5
           YAML_KEY@0..1 "?"
           WHITESPACE@1..2 " "
-          YAML_SCALAR@2..3 "a"
+          YAML_SCALAR@2..3
+            YAML_SCALAR_TEXT@2..3 "a"
           NEWLINE@3..4 "\n"
           YAML_COLON@4..5 ":"
         YAML_BLOCK_MAP_VALUE@5..28
@@ -23,7 +25,8 @@ YAML_STREAM@0..28
             YAML_BLOCK_SEQUENCE_ITEM@6..12
               YAML_BLOCK_SEQ_ENTRY@6..7 "-"
               WHITESPACE@7..8 "\t"
-              YAML_SCALAR@8..9 "b"
+              YAML_SCALAR@8..9
+                YAML_SCALAR_TEXT@8..9 "b"
               NEWLINE@9..10 "\n"
               WHITESPACE@10..12 "  "
             YAML_BLOCK_SEQUENCE_ITEM@12..28
@@ -33,11 +36,13 @@ YAML_STREAM@0..28
                 YAML_BLOCK_SEQUENCE_ITEM@15..24
                   YAML_BLOCK_SEQ_ENTRY@15..16 "-"
                   WHITESPACE@16..17 "\t"
-                  YAML_SCALAR@17..18 "c"
+                  YAML_SCALAR@17..18
+                    YAML_SCALAR_TEXT@17..18 "c"
                   NEWLINE@18..19 "\n"
                   WHITESPACE@19..24 "     "
                 YAML_BLOCK_SEQUENCE_ITEM@24..28
                   YAML_BLOCK_SEQ_ENTRY@24..25 "-"
                   WHITESPACE@25..26 " "
-                  YAML_SCALAR@26..27 "d"
+                  YAML_SCALAR@26..27
+                    YAML_SCALAR_TEXT@26..27 "d"
                   NEWLINE@27..28 "\n"

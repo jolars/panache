@@ -72,15 +72,15 @@ mod tests {
         assert_eq!(
             token_kinds,
             vec![
-                SyntaxKind::YAML_SCALAR,
+                SyntaxKind::YAML_SCALAR_TEXT,
                 SyntaxKind::YAML_COLON,
                 SyntaxKind::WHITESPACE,
-                SyntaxKind::YAML_SCALAR,
+                SyntaxKind::YAML_SCALAR_TEXT,
                 SyntaxKind::NEWLINE,
-                SyntaxKind::YAML_SCALAR,
+                SyntaxKind::YAML_SCALAR_TEXT,
                 SyntaxKind::YAML_COLON,
                 SyntaxKind::WHITESPACE,
-                SyntaxKind::YAML_SCALAR,
+                SyntaxKind::YAML_SCALAR_TEXT,
                 SyntaxKind::NEWLINE,
             ]
         );
@@ -90,9 +90,9 @@ mod tests {
         tree.descendants()
             .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)
             .map(|key| {
-                key.children_with_tokens()
+                key.descendants_with_tokens()
                     .filter_map(|el| el.into_token())
-                    .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+                    .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR_TEXT)
                     .map(|tok| tok.text().to_string())
                     .collect::<Vec<_>>()
                     .join("")
@@ -159,10 +159,9 @@ mod tests {
             .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
             .flat_map(|value| {
                 value
-                    .children_with_tokens()
-                    .filter_map(|el| el.into_token())
-                    .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
-                    .map(|tok| tok.text().to_string())
+                    .children()
+                    .filter(|n| n.kind() == SyntaxKind::YAML_SCALAR)
+                    .map(|n| n.text().to_string())
                     .collect::<Vec<_>>()
             })
             .collect();
@@ -186,7 +185,12 @@ mod tests {
         let scalar_tokens: Vec<String> = tree
             .descendants_with_tokens()
             .filter_map(|el| el.into_token())
-            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+            .filter(|tok| {
+                matches!(
+                    tok.kind(),
+                    SyntaxKind::YAML_SCALAR_TEXT | SyntaxKind::YAML_DIRECTIVE
+                )
+            })
             .map(|tok| tok.text().to_string())
             .collect();
 

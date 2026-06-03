@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 312
 expression: snapshot
 ---
 case_id: XW4D
@@ -12,34 +13,40 @@ YAML_STREAM@0..158
     YAML_BLOCK_MAP@0..158
       YAML_BLOCK_MAP_ENTRY@0..28
         YAML_BLOCK_MAP_KEY@0..2
-          YAML_SCALAR@0..1 "a"
+          YAML_SCALAR@0..1
+            YAML_SCALAR_TEXT@0..1 "a"
           YAML_COLON@1..2 ":"
         YAML_BLOCK_MAP_VALUE@2..28
           WHITESPACE@2..3 " "
-          YAML_SCALAR@3..20 "\"double\n  quotes\""
+          YAML_SCALAR@3..20
+            YAML_SCALAR_TEXT@3..20 "\"double\n  quotes\""
           WHITESPACE@20..21 " "
           YAML_COMMENT@21..27 "# lala"
           NEWLINE@27..28 "\n"
       YAML_BLOCK_MAP_ENTRY@28..52
         YAML_BLOCK_MAP_KEY@28..30
-          YAML_SCALAR@28..29 "b"
+          YAML_SCALAR@28..29
+            YAML_SCALAR_TEXT@28..29 "b"
           YAML_COLON@29..30 ":"
         YAML_BLOCK_MAP_VALUE@30..52
           WHITESPACE@30..31 " "
-          YAML_SCALAR@31..43 "plain\n value"
+          YAML_SCALAR@31..43
+            YAML_SCALAR_TEXT@31..43 "plain\n value"
           WHITESPACE@43..45 "  "
           YAML_COMMENT@45..51 "# lala"
           NEWLINE@51..52 "\n"
       YAML_BLOCK_MAP_ENTRY@52..67
         YAML_BLOCK_MAP_KEY@52..56
-          YAML_SCALAR@52..55 "c  "
+          YAML_SCALAR@52..55
+            YAML_SCALAR_TEXT@52..55 "c  "
           YAML_COLON@55..56 ":"
         YAML_BLOCK_MAP_VALUE@56..67
           WHITESPACE@56..57 " "
           YAML_COMMENT@57..62 "#lala"
           NEWLINE@62..63 "\n"
           WHITESPACE@63..65 "  "
-          YAML_SCALAR@65..66 "d"
+          YAML_SCALAR@65..66
+            YAML_SCALAR_TEXT@65..66 "d"
           NEWLINE@66..67 "\n"
       YAML_BLOCK_MAP_ENTRY@67..109
         YAML_BLOCK_MAP_KEY@67..85
@@ -52,7 +59,8 @@ YAML_STREAM@0..158
             YAML_BLOCK_SEQUENCE_ITEM@77..84
               YAML_BLOCK_SEQ_ENTRY@77..78 "-"
               WHITESPACE@78..79 " "
-              YAML_SCALAR@79..83 "seq1"
+              YAML_SCALAR@79..83
+                YAML_SCALAR_TEXT@79..83 "seq1"
               NEWLINE@83..84 "\n"
           YAML_COLON@84..85 ":"
         YAML_BLOCK_MAP_VALUE@85..109
@@ -67,11 +75,13 @@ YAML_STREAM@0..158
               YAML_COMMENT@96..101 "#lala"
               NEWLINE@101..102 "\n"
               WHITESPACE@102..104 "  "
-              YAML_SCALAR@104..108 "seq2"
+              YAML_SCALAR@104..108
+                YAML_SCALAR_TEXT@104..108 "seq2"
               NEWLINE@108..109 "\n"
       YAML_BLOCK_MAP_ENTRY@109..134
         YAML_BLOCK_MAP_KEY@109..111
-          YAML_SCALAR@109..110 "e"
+          YAML_SCALAR@109..110
+            YAML_SCALAR_TEXT@109..110 "e"
           YAML_COLON@110..111 ":"
         YAML_BLOCK_MAP_VALUE@111..134
           NEWLINE@111..112 "\n"
@@ -88,16 +98,20 @@ YAML_STREAM@0..158
               YAML_BLOCK_MAP@129..134
                 YAML_BLOCK_MAP_ENTRY@129..134
                   YAML_BLOCK_MAP_KEY@129..131
-                    YAML_SCALAR@129..130 "x"
+                    YAML_SCALAR@129..130
+                      YAML_SCALAR_TEXT@129..130 "x"
                     YAML_COLON@130..131 ":"
                   YAML_BLOCK_MAP_VALUE@131..134
                     WHITESPACE@131..132 " "
-                    YAML_SCALAR@132..133 "y"
+                    YAML_SCALAR@132..133
+                      YAML_SCALAR_TEXT@132..133 "y"
                     NEWLINE@133..134 "\n"
       YAML_BLOCK_MAP_ENTRY@134..158
         YAML_BLOCK_MAP_KEY@134..140
-          YAML_SCALAR@134..139 "block"
+          YAML_SCALAR@134..139
+            YAML_SCALAR_TEXT@134..139 "block"
           YAML_COLON@139..140 ":"
         YAML_BLOCK_MAP_VALUE@140..158
           WHITESPACE@140..141 " "
-          YAML_SCALAR@141..158 "> # lala\n  abcde\n"
+          YAML_SCALAR@141..158
+            YAML_SCALAR_TEXT@141..158 "> # lala\n  abcde\n"
