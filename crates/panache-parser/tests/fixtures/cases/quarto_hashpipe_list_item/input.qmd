@@ -1,0 +1,8 @@
+1.  An executable cell nested in a list item:
+
+    ```{r}
+    #| label: fig-nested
+    #| fig-cap: "A caption that wraps
+    #|   across two lines"
+    x <- 1
+    ```

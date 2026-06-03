@@ -3,7 +3,7 @@
 use super::{
     AstNode, ChunkInfoItem, ChunkLabel, ChunkLabelEntry, ChunkLabelSource, ChunkOption,
     ChunkOptionEntry, ChunkOptionSource, ChunkOptions, HashpipeYamlPreamble, PanacheLanguage,
-    SyntaxKind, SyntaxNode, collect_option_entries_from_descendants,
+    SyntaxKind, SyntaxNode, YamlDocument, YamlScalarStyle,
 };
 
 pub struct CodeBlock(SyntaxNode);
@@ -66,39 +66,60 @@ impl CodeBlock {
         self.0.descendants().find_map(HashpipeYamlPreamble::cast)
     }
 
-    pub fn hashpipe_chunk_options(&self) -> Vec<ChunkOption> {
-        self.hashpipe_chunk_option_entries()
-            .into_iter()
-            .map(ChunkOptionEntry::into_option)
-            .collect()
-    }
-
-    pub fn inline_chunk_options(&self) -> Vec<ChunkOption> {
-        self.inline_chunk_option_entries()
-            .into_iter()
-            .map(ChunkOptionEntry::into_option)
-            .collect()
-    }
-
     pub fn inline_chunk_option_entries(&self) -> Vec<ChunkOptionEntry> {
         self.info()
             .map(|info| {
                 info.chunk_options()
-                    .map(|option| ChunkOptionEntry::new(option, ChunkOptionSource::InlineInfo))
+                    .map(|option| {
+                        ChunkOptionEntry::from_inline_option(&option, ChunkOptionSource::InlineInfo)
+                    })
                     .collect()
             })
             .unwrap_or_default()
     }
 
+    /// Chunk options from the embedded hashpipe YAML block map. The preamble's
+    /// `HASHPIPE_YAML_CONTENT` carries a spliced YAML document (host-aligned
+    /// ranges), so each top-level `key: value` entry becomes one option:
+    /// cooked value, host-range spans, and a quoted flag from the scalar
+    /// style. Non-scalar values (e.g. a `fig-subcap:` sequence) yield an entry
+    /// with no value, matching the legacy option-line behavior.
     pub fn hashpipe_chunk_option_entries(&self) -> Vec<ChunkOptionEntry> {
-        self.hashpipe_yaml_preamble()
-            .map(|preamble| {
-                collect_option_entries_from_descendants(
-                    preamble.syntax(),
+        let Some(map) = self
+            .hashpipe_yaml_preamble()
+            .and_then(|preamble| {
+                preamble
+                    .syntax()
+                    .children()
+                    .find(|n| n.kind() == SyntaxKind::HASHPIPE_YAML_CONTENT)
+            })
+            .and_then(|content| content.children().find_map(YamlDocument::cast))
+            .and_then(|doc| doc.block_map())
+        else {
+            return Vec::new();
+        };
+
+        map.entries()
+            .map(|entry| {
+                let key_scalar = entry.key().and_then(|key| key.scalar());
+                let value_scalar = entry.value().and_then(|value| value.as_scalar());
+                let is_quoted = value_scalar.as_ref().is_some_and(|scalar| {
+                    matches!(
+                        scalar.style(),
+                        YamlScalarStyle::SingleQuoted | YamlScalarStyle::DoubleQuoted
+                    )
+                });
+                ChunkOptionEntry::new(
+                    entry.key_text(),
+                    value_scalar.as_ref().map(|scalar| scalar.value()),
+                    key_scalar.map(|scalar| scalar.text_range()),
+                    value_scalar.as_ref().map(|scalar| scalar.text_range()),
+                    is_quoted,
+                    entry.syntax().text_range(),
                     ChunkOptionSource::HashpipeYaml,
                 )
             })
-            .unwrap_or_default()
+            .collect()
     }
 
     pub fn merged_chunk_option_entries(&self) -> Vec<ChunkOptionEntry> {
@@ -122,13 +143,6 @@ impl CodeBlock {
         }
 
         merged
-    }
-
-    pub fn chunk_options(&self) -> Vec<ChunkOption> {
-        self.merged_chunk_option_entries()
-            .into_iter()
-            .map(ChunkOptionEntry::into_option)
-            .collect()
     }
 
     pub fn inline_chunk_options_node(&self) -> Option<ChunkOptions> {
@@ -169,10 +183,10 @@ impl CodeBlock {
             }
             let value_range = entry
                 .value_range()
-                .unwrap_or_else(|| entry.option().syntax().text_range());
+                .unwrap_or_else(|| entry.declaration_range());
             labels.push(ChunkLabelEntry::new(
                 value,
-                entry.option().syntax().text_range(),
+                entry.declaration_range(),
                 value_range,
                 ChunkLabelSource::LabelOption,
             ));
@@ -189,11 +203,11 @@ impl CodeBlock {
     }
 
     pub fn has_chunk_option_key_with_nonempty_value(&self, key_name: &str) -> bool {
-        self.chunk_options().into_iter().any(|option| {
-            option
+        self.merged_chunk_option_entries().into_iter().any(|entry| {
+            entry
                 .key()
                 .is_some_and(|key| key.eq_ignore_ascii_case(key_name))
-                && option.value().is_some_and(|value| !value.is_empty())
+                && entry.value().is_some_and(|value| !value.is_empty())
         })
     }
 

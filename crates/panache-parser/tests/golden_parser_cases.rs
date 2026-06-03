@@ -544,6 +544,7 @@ golden_test_cases!(
     plain_continuation_edge_cases,
     quarto_code_blocks,
     quarto_hashpipe,
+    quarto_hashpipe_list_item,
     quarto_shortcodes,
     raw_blocks,
     raw_inline_format_attr,

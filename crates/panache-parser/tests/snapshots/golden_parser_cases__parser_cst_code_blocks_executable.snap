@@ -51,22 +51,30 @@ DOCUMENT@0..397
     CODE_CONTENT@84..126
       HASHPIPE_YAML_PREAMBLE@84..115
         HASHPIPE_YAML_CONTENT@84..115
-          CHUNK_OPTION@84..98
-            HASHPIPE_PREFIX@84..86 "#|"
-            WHITESPACE@86..87 " "
-            CHUNK_OPTION_KEY@87..91 "echo"
-            TEXT@91..92 ":"
-            WHITESPACE@92..93 " "
-            CHUNK_OPTION_VALUE@93..98 "false"
-          NEWLINE@98..99 "\n"
-          CHUNK_OPTION@99..114
-            HASHPIPE_PREFIX@99..101 "#|"
-            WHITESPACE@101..102 " "
-            CHUNK_OPTION_KEY@102..111 "fig-width"
-            TEXT@111..112 ":"
-            WHITESPACE@112..113 " "
-            CHUNK_OPTION_VALUE@113..114 "8"
-          NEWLINE@114..115 "\n"
+          YAML_LINE_PREFIX@84..87 "#| "
+          YAML_DOCUMENT@87..115
+            YAML_BLOCK_MAP@87..115
+              YAML_BLOCK_MAP_ENTRY@87..102
+                YAML_BLOCK_MAP_KEY@87..92
+                  YAML_SCALAR@87..91
+                    YAML_SCALAR_TEXT@87..91 "echo"
+                  YAML_COLON@91..92 ":"
+                YAML_BLOCK_MAP_VALUE@92..102
+                  WHITESPACE@92..93 " "
+                  YAML_SCALAR@93..98
+                    YAML_SCALAR_TEXT@93..98 "false"
+                  NEWLINE@98..99 "\n"
+                  YAML_LINE_PREFIX@99..102 "#| "
+              YAML_BLOCK_MAP_ENTRY@102..115
+                YAML_BLOCK_MAP_KEY@102..112
+                  YAML_SCALAR@102..111
+                    YAML_SCALAR_TEXT@102..111 "fig-width"
+                  YAML_COLON@111..112 ":"
+                YAML_BLOCK_MAP_VALUE@112..115
+                  WHITESPACE@112..113 " "
+                  YAML_SCALAR@113..114
+                    YAML_SCALAR_TEXT@113..114 "8"
+                  NEWLINE@114..115 "\n"
       TEXT@115..125 "plot(1:10)"
       NEWLINE@125..126 "\n"
     CODE_FENCE_CLOSE@126..130
@@ -91,14 +99,19 @@ DOCUMENT@0..397
     CODE_CONTENT@158..192
       HASHPIPE_YAML_PREAMBLE@158..172
         HASHPIPE_YAML_CONTENT@158..172
-          CHUNK_OPTION@158..171
-            HASHPIPE_PREFIX@158..160 "#|"
-            WHITESPACE@160..161 " "
-            CHUNK_OPTION_KEY@161..165 "eval"
-            TEXT@165..166 ":"
-            WHITESPACE@166..167 " "
-            CHUNK_OPTION_VALUE@167..171 "true"
-          NEWLINE@171..172 "\n"
+          YAML_LINE_PREFIX@158..161 "#| "
+          YAML_DOCUMENT@161..172
+            YAML_BLOCK_MAP@161..172
+              YAML_BLOCK_MAP_ENTRY@161..172
+                YAML_BLOCK_MAP_KEY@161..166
+                  YAML_SCALAR@161..165
+                    YAML_SCALAR_TEXT@161..165 "eval"
+                  YAML_COLON@165..166 ":"
+                YAML_BLOCK_MAP_VALUE@166..172
+                  WHITESPACE@166..167 " "
+                  YAML_SCALAR@167..171
+                    YAML_SCALAR_TEXT@167..171 "true"
+                  NEWLINE@171..172 "\n"
       TEXT@172..191 "import pandas as pd"
       NEWLINE@191..192 "\n"
     CODE_FENCE_CLOSE@192..196
@@ -123,22 +136,30 @@ DOCUMENT@0..397
     CODE_CONTENT@233..279
       HASHPIPE_YAML_PREAMBLE@233..267
         HASHPIPE_YAML_CONTENT@233..267
-          CHUNK_OPTION@233..251
-            HASHPIPE_PREFIX@233..235 "#|"
-            WHITESPACE@235..236 " "
-            CHUNK_OPTION_KEY@236..241 "label"
-            TEXT@241..242 ":"
-            WHITESPACE@242..243 " "
-            CHUNK_OPTION_VALUE@243..251 "fig-plot"
-          NEWLINE@251..252 "\n"
-          CHUNK_OPTION@252..266
-            HASHPIPE_PREFIX@252..254 "#|"
-            WHITESPACE@254..255 " "
-            CHUNK_OPTION_KEY@255..259 "echo"
-            TEXT@259..260 ":"
-            WHITESPACE@260..261 " "
-            CHUNK_OPTION_VALUE@261..266 "false"
-          NEWLINE@266..267 "\n"
+          YAML_LINE_PREFIX@233..236 "#| "
+          YAML_DOCUMENT@236..267
+            YAML_BLOCK_MAP@236..267
+              YAML_BLOCK_MAP_ENTRY@236..255
+                YAML_BLOCK_MAP_KEY@236..242
+                  YAML_SCALAR@236..241
+                    YAML_SCALAR_TEXT@236..241 "label"
+                  YAML_COLON@241..242 ":"
+                YAML_BLOCK_MAP_VALUE@242..255
+                  WHITESPACE@242..243 " "
+                  YAML_SCALAR@243..251
+                    YAML_SCALAR_TEXT@243..251 "fig-plot"
+                  NEWLINE@251..252 "\n"
+                  YAML_LINE_PREFIX@252..255 "#| "
+              YAML_BLOCK_MAP_ENTRY@255..267
+                YAML_BLOCK_MAP_KEY@255..260
+                  YAML_SCALAR@255..259
+                    YAML_SCALAR_TEXT@255..259 "echo"
+                  YAML_COLON@259..260 ":"
+                YAML_BLOCK_MAP_VALUE@260..267
+                  WHITESPACE@260..261 " "
+                  YAML_SCALAR@261..266
+                    YAML_SCALAR_TEXT@261..266 "false"
+                  NEWLINE@266..267 "\n"
       TEXT@267..278 "using Plots"
       NEWLINE@278..279 "\n"
     CODE_FENCE_CLOSE@279..283
@@ -158,24 +179,25 @@ DOCUMENT@0..397
     CODE_CONTENT@291..393
       HASHPIPE_YAML_PREAMBLE@291..386
         HASHPIPE_YAML_CONTENT@291..386
-          CHUNK_OPTION@291..323
-            HASHPIPE_PREFIX@291..293 "#|"
-            WHITESPACE@293..294 " "
-            CHUNK_OPTION_KEY@294..301 "fig-cap"
-            TEXT@301..302 ":"
-            WHITESPACE@302..303 " "
-            CHUNK_OPTION_VALUE@303..323 "\"A multiline caption"
-          NEWLINE@323..324 "\n"
-          CHUNK_OPTION@324..370
-            HASHPIPE_PREFIX@324..326 "#|"
-            WHITESPACE@326..328 "  "
-            CHUNK_OPTION_VALUE@328..370 "that spans multiple l ..."
-          NEWLINE@370..371 "\n"
-          CHUNK_OPTION@371..385
-            HASHPIPE_PREFIX@371..373 "#|"
-            WHITESPACE@373..375 "  "
-            CHUNK_OPTION_VALUE@375..385 "wrapping.\""
-          NEWLINE@385..386 "\n"
+          YAML_LINE_PREFIX@291..294 "#| "
+          YAML_DOCUMENT@294..386
+            YAML_BLOCK_MAP@294..386
+              YAML_BLOCK_MAP_ENTRY@294..386
+                YAML_BLOCK_MAP_KEY@294..302
+                  YAML_SCALAR@294..301
+                    YAML_SCALAR_TEXT@294..301 "fig-cap"
+                  YAML_COLON@301..302 ":"
+                YAML_BLOCK_MAP_VALUE@302..386
+                  WHITESPACE@302..303 " "
+                  YAML_SCALAR@303..385
+                    YAML_SCALAR_TEXT@303..323 "\"A multiline caption"
+                    NEWLINE@323..324 "\n"
+                    YAML_LINE_PREFIX@324..327 "#| "
+                    YAML_SCALAR_TEXT@327..370 " that spans multiple  ..."
+                    NEWLINE@370..371 "\n"
+                    YAML_LINE_PREFIX@371..374 "#| "
+                    YAML_SCALAR_TEXT@374..385 " wrapping.\""
+                  NEWLINE@385..386 "\n"
       TEXT@386..392 "a <- 1"
       NEWLINE@392..393 "\n"
     CODE_FENCE_CLOSE@393..397

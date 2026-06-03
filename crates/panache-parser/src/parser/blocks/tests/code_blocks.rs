@@ -297,7 +297,7 @@ fn definition_list_inline_fence_parses_as_code_block() {
 }
 
 #[test]
-fn executable_chunk_parses_hashpipe_label_as_chunk_option() {
+fn executable_chunk_embeds_hashpipe_label_as_yaml() {
     let input = "```{r}\n#| label: foobar\na <- 1\n```\n";
     let node = parse_blocks_quarto(input);
 
@@ -305,34 +305,29 @@ fn executable_chunk_parses_hashpipe_label_as_chunk_option() {
     let info = get_code_info(&code_block).expect("expected code info");
     assert_eq!(info, "{r}");
 
-    let has_label_option = code_block.descendants().any(|n| {
-        if n.kind() != SyntaxKind::CHUNK_OPTION {
-            return false;
-        }
-        let key = n
-            .children_with_tokens()
-            .find_map(|el| match el {
-                rowan::NodeOrToken::Token(t) if t.kind() == SyntaxKind::CHUNK_OPTION_KEY => {
-                    Some(t.text().to_string())
-                }
-                _ => None,
-            })
-            .unwrap_or_default();
-        let value = n
-            .children_with_tokens()
-            .find_map(|el| match el {
-                rowan::NodeOrToken::Token(t) if t.kind() == SyntaxKind::CHUNK_OPTION_VALUE => {
-                    Some(t.text().to_string())
-                }
-                _ => None,
-            })
-            .unwrap_or_default();
-        key == "label" && value == "foobar"
-    });
+    // Hashpipe options are now embedded YAML structure, not CHUNK_OPTION.
     assert!(
-        has_label_option,
-        "expected hashpipe label to be parsed as CHUNK_OPTION"
+        code_block
+            .descendants()
+            .any(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP),
+        "expected the hashpipe preamble to embed a YAML block map"
     );
+    assert!(
+        !code_block
+            .descendants()
+            .any(|n| n.kind() == SyntaxKind::CHUNK_OPTION),
+        "hashpipe options should no longer emit CHUNK_OPTION nodes"
+    );
+
+    // The label key and value survive as YAML scalar-text leaves.
+    let scalar_texts: Vec<String> = code_block
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|t| t.kind() == SyntaxKind::YAML_SCALAR_TEXT)
+        .map(|t| t.text().to_string())
+        .collect();
+    assert!(scalar_texts.iter().any(|t| t == "label"));
+    assert!(scalar_texts.iter().any(|t| t == "foobar"));
 }
 
 #[test]
@@ -476,7 +471,7 @@ fn executable_chunk_emits_hashpipe_yaml_content_node() {
 }
 
 #[test]
-fn executable_chunk_emits_hashpipe_prefix_token_kind() {
+fn executable_chunk_carries_hashpipe_prefix_as_yaml_line_prefix() {
     let input = "```{r}\n#| echo: false\nx <- 1\n```\n";
     let node = parse_blocks_quarto(input);
     let code_block = find_first(&node, SyntaxKind::CODE_BLOCK).expect("expected code block");
@@ -489,13 +484,23 @@ fn executable_chunk_emits_hashpipe_prefix_token_kind() {
         .find(|n| n.kind() == SyntaxKind::HASHPIPE_YAML_PREAMBLE)
         .expect("expected hashpipe preamble node");
 
+    // The `#|` marker is now carried as YAML_LINE_PREFIX trivia inside the
+    // embedded YAML (marker plus its one trailing space), not a
+    // HASHPIPE_PREFIX token.
     let prefix_tokens: Vec<_> = preamble
         .descendants_with_tokens()
         .filter_map(|el| el.into_token())
-        .filter(|t| t.kind() == SyntaxKind::HASHPIPE_PREFIX)
+        .filter(|t| t.kind() == SyntaxKind::YAML_LINE_PREFIX)
         .map(|t| t.text().to_string())
         .collect();
-    assert_eq!(prefix_tokens, vec!["#|".to_string()]);
+    assert_eq!(prefix_tokens, vec!["#| ".to_string()]);
+    assert!(
+        !preamble
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .any(|t| t.kind() == SyntaxKind::HASHPIPE_PREFIX),
+        "hashpipe `#|` should no longer emit a HASHPIPE_PREFIX token"
+    );
 }
 
 #[test]

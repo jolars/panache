@@ -1,0 +1,61 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..167
+  LIST@0..167
+    LIST_ITEM@0..167
+      LIST_MARKER@0..2 "1."
+      WHITESPACE@2..4 "  "
+      PLAIN@4..46
+        TEXT@4..45 "An executable cell ne ..."
+        NEWLINE@45..46 "\n"
+      BLANK_LINE@46..47
+        BLANK_LINE@46..47 "\n"
+      CODE_BLOCK@47..167
+        WHITESPACE@47..51 "    "
+        CODE_FENCE_OPEN@51..58
+          CODE_FENCE_MARKER@51..54 "```"
+          CODE_INFO@54..57
+            TEXT@54..55 "{"
+            CODE_LANGUAGE@55..56 "r"
+            CHUNK_OPTIONS@56..57
+              TEXT@56..57 "}"
+          NEWLINE@57..58 "\n"
+        CODE_CONTENT@58..159
+          HASHPIPE_YAML_PREAMBLE@58..148
+            HASHPIPE_YAML_CONTENT@58..148
+              YAML_LINE_PREFIX@58..65 "    #| "
+              YAML_DOCUMENT@65..148
+                YAML_BLOCK_MAP@65..148
+                  YAML_BLOCK_MAP_ENTRY@65..90
+                    YAML_BLOCK_MAP_KEY@65..71
+                      YAML_SCALAR@65..70
+                        YAML_SCALAR_TEXT@65..70 "label"
+                      YAML_COLON@70..71 ":"
+                    YAML_BLOCK_MAP_VALUE@71..90
+                      WHITESPACE@71..72 " "
+                      YAML_SCALAR@72..82
+                        YAML_SCALAR_TEXT@72..82 "fig-nested"
+                      NEWLINE@82..83 "\n"
+                      YAML_LINE_PREFIX@83..90 "    #| "
+                  YAML_BLOCK_MAP_ENTRY@90..148
+                    YAML_BLOCK_MAP_KEY@90..98
+                      YAML_SCALAR@90..97
+                        YAML_SCALAR_TEXT@90..97 "fig-cap"
+                      YAML_COLON@97..98 ":"
+                    YAML_BLOCK_MAP_VALUE@98..148
+                      WHITESPACE@98..99 " "
+                      YAML_SCALAR@99..147
+                        YAML_SCALAR_TEXT@99..120 "\"A caption that wraps"
+                        NEWLINE@120..121 "\n"
+                        YAML_LINE_PREFIX@121..128 "    #| "
+                        YAML_SCALAR_TEXT@128..147 "  across two lines\""
+                      NEWLINE@147..148 "\n"
+          WHITESPACE@148..152 "    "
+          TEXT@152..158 "x <- 1"
+          NEWLINE@158..159 "\n"
+        WHITESPACE@159..163 "    "
+        CODE_FENCE_CLOSE@163..167
+          CODE_FENCE_MARKER@163..166 "```"
+          NEWLINE@166..167 "\n"

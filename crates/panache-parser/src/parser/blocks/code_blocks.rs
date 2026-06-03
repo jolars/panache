@@ -7,6 +7,8 @@ use rowan::GreenNodeBuilder;
 use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
 use super::container_prefix::{StrippedLines, advance_columns};
 use crate::parser::utils::container_stack::byte_index_at_column;
+use crate::parser::utils::tree_copy::copy_green_children;
+use crate::parser::yaml::{parse_stream_with_prefix, validate_yaml_with_prefix};
 
 // Container-prefix primitives live in `container_prefix.rs` (the lower
 // layer that hosts `StrippedLines`); re-export so existing call sites in
@@ -682,140 +684,36 @@ pub(crate) fn compute_hashpipe_preamble_line_count(
     line_idx
 }
 
-fn emit_hashpipe_option_line(
-    builder: &mut GreenNodeBuilder<'static>,
-    line_without_newline: &str,
+/// Compute the composite per-line prefix marker for a hashpipe preamble:
+/// the uniform container prefix (blockquote markers / list indent /
+/// content indent) plus any leading whitespace up to and including the
+/// hashpipe comment marker (`prefix`), taken from the first preamble line.
+///
+/// Within a preamble the container prefix is uniform per line, so matching
+/// this composite marker via `strip_prefix` lets the prefix-aware YAML
+/// parser splice a nested (list-/blockquote-indented) cell exactly as a
+/// top-level one, peeling the whole prefix into one `YAML_LINE_PREFIX`
+/// leaf. A non-uniform preamble fails validation and falls back to opaque
+/// tokens.
+fn hashpipe_composite_marker<'a>(
+    first_line: &'a str,
     prefix: &str,
-) -> bool {
-    if !is_hashpipe_option_line(line_without_newline, prefix) {
-        return false;
-    }
-
-    let trimmed_start = trim_start_spaces_tabs(line_without_newline);
-    let leading_ws_len = line_without_newline
-        .len()
-        .saturating_sub(trimmed_start.len());
-    let after_prefix = &trimmed_start[prefix.len()..];
-    let ws_after_prefix_len = after_prefix
-        .len()
-        .saturating_sub(trim_start_spaces_tabs(after_prefix).len());
-    let rest = &after_prefix[ws_after_prefix_len..];
-    let Some(colon_idx) = rest.find(':') else {
-        return false;
-    };
-
-    let key_with_ws = &rest[..colon_idx];
-    let key = trim_end_spaces_tabs(key_with_ws);
-    if key.is_empty() {
-        return false;
-    }
-    let key_ws_suffix = &key_with_ws[key.len()..];
-
-    let after_colon = &rest[colon_idx + 1..];
-    let value_ws_prefix_len = after_colon
-        .len()
-        .saturating_sub(trim_start_spaces_tabs(after_colon).len());
-    let value_with_trailing = &after_colon[value_ws_prefix_len..];
-    let value = trim_end_spaces_tabs(value_with_trailing);
-    let value_ws_suffix = &value_with_trailing[value.len()..];
-
-    builder.start_node(SyntaxKind::CHUNK_OPTION.into());
-    if leading_ws_len > 0 {
-        builder.token(
-            SyntaxKind::WHITESPACE.into(),
-            &line_without_newline[..leading_ws_len],
-        );
-    }
-    builder.token(SyntaxKind::HASHPIPE_PREFIX.into(), prefix);
-    if ws_after_prefix_len > 0 {
-        builder.token(
-            SyntaxKind::WHITESPACE.into(),
-            &after_prefix[..ws_after_prefix_len],
-        );
-    }
-
-    builder.token(SyntaxKind::CHUNK_OPTION_KEY.into(), key);
-    if !key_ws_suffix.is_empty() {
-        builder.token(SyntaxKind::WHITESPACE.into(), key_ws_suffix);
-    }
-    builder.token(SyntaxKind::TEXT.into(), ":");
-    if value_ws_prefix_len > 0 {
-        builder.token(
-            SyntaxKind::WHITESPACE.into(),
-            &after_colon[..value_ws_prefix_len],
-        );
-    }
-
-    if !value.is_empty() {
-        if let Some(quote) = value.chars().next()
-            && (quote == '"' || quote == '\'')
-            && value.ends_with(quote)
-            && value.len() >= 2
-        {
-            builder.token(SyntaxKind::CHUNK_OPTION_QUOTE.into(), &value[..1]);
-            builder.token(
-                SyntaxKind::CHUNK_OPTION_VALUE.into(),
-                &value[1..value.len() - 1],
-            );
-            builder.token(
-                SyntaxKind::CHUNK_OPTION_QUOTE.into(),
-                &value[value.len() - 1..],
-            );
-        } else {
-            builder.token(SyntaxKind::CHUNK_OPTION_VALUE.into(), value);
-        }
-    }
-
-    if !value_ws_suffix.is_empty() {
-        builder.token(SyntaxKind::WHITESPACE.into(), value_ws_suffix);
-    }
-    builder.finish_node();
-    true
-}
-
-fn emit_hashpipe_continuation_line(
-    builder: &mut GreenNodeBuilder<'static>,
-    line_without_newline: &str,
-    prefix: &str,
-) -> bool {
-    if !is_hashpipe_continuation_line(line_without_newline, prefix) {
-        return false;
-    }
-    let trimmed_start = trim_start_spaces_tabs(line_without_newline);
-    let leading_ws_len = line_without_newline
-        .len()
-        .saturating_sub(trimmed_start.len());
-    let after_prefix = &trimmed_start[prefix.len()..];
-    let ws_after_prefix_len = after_prefix
-        .len()
-        .saturating_sub(trim_start_spaces_tabs(after_prefix).len());
-    let continuation_with_trailing = &after_prefix[ws_after_prefix_len..];
-    let continuation_value = trim_end_spaces_tabs(continuation_with_trailing);
-    if continuation_value.is_empty() {
-        return false;
-    }
-    let continuation_ws_suffix = &continuation_with_trailing[continuation_value.len()..];
-
-    builder.start_node(SyntaxKind::CHUNK_OPTION.into());
-    if leading_ws_len > 0 {
-        builder.token(
-            SyntaxKind::WHITESPACE.into(),
-            &line_without_newline[..leading_ws_len],
-        );
-    }
-    builder.token(SyntaxKind::HASHPIPE_PREFIX.into(), prefix);
-    if ws_after_prefix_len > 0 {
-        builder.token(
-            SyntaxKind::WHITESPACE.into(),
-            &after_prefix[..ws_after_prefix_len],
-        );
-    }
-    builder.token(SyntaxKind::CHUNK_OPTION_VALUE.into(), continuation_value);
-    if !continuation_ws_suffix.is_empty() {
-        builder.token(SyntaxKind::WHITESPACE.into(), continuation_ws_suffix);
-    }
-    builder.finish_node();
-    true
+    bq_depth: usize,
+    list_content_col: usize,
+    bq_outer: bool,
+    content_indent: usize,
+) -> &'a str {
+    let after_container = strip_content_line_prefixes(
+        first_line,
+        bq_depth,
+        list_content_col,
+        bq_outer,
+        content_indent,
+    );
+    let container_len = first_line.len() - after_container.len();
+    let ws_before = after_container.len() - trim_start_spaces_tabs(after_container).len();
+    let marker_len = (container_len + ws_before + prefix.len()).min(first_line.len());
+    &first_line[..marker_len]
 }
 
 fn is_hashpipe_option_line(line_without_newline: &str, prefix: &str) -> bool {
@@ -1260,18 +1158,51 @@ pub(crate) fn parse_fenced_code_block(
             if prepared_hashpipe_lines > 0 {
                 builder.start_node(SyntaxKind::HASHPIPE_YAML_PREAMBLE.into());
                 builder.start_node(SyntaxKind::HASHPIPE_YAML_CONTENT.into());
-                while line_idx < prepared_hashpipe_lines {
-                    let after_indent = window.emit_prefix_at(builder, start_pos + 1 + line_idx);
-                    let (line_without_newline, newline_str) = strip_newline(after_indent);
-                    if !emit_hashpipe_option_line(builder, line_without_newline, prefix) {
-                        let _ =
-                            emit_hashpipe_continuation_line(builder, line_without_newline, prefix);
+
+                // Exact host bytes of the preamble region: the lines retain
+                // their trailing LF/CRLF, so concatenation rebuilds the
+                // source between the open fence and the body exactly.
+                let content: String = content_lines[..prepared_hashpipe_lines].concat();
+                // Composite per-line marker (container prefix + `#|`). Uniform
+                // across the preamble, so a nested cell splices as a top-level
+                // one (see `hashpipe_composite_marker`).
+                let marker = hashpipe_composite_marker(
+                    content_lines[0],
+                    prefix,
+                    bq_depth,
+                    list_content_col,
+                    bq_outer,
+                    content_indent,
+                );
+
+                if validate_yaml_with_prefix(&content, marker).is_none() {
+                    // Splice the prefix-aware YAML subtree: token ranges are
+                    // host ranges directly, the composite prefix peeled into
+                    // `YAML_LINE_PREFIX` trivia. Mirrors the frontmatter
+                    // `emit_yaml_block` validate→splice→fallback pattern.
+                    let stream = parse_stream_with_prefix(&content, marker)
+                        .green()
+                        .into_owned();
+                    copy_green_children(builder, &stream);
+                } else {
+                    // Malformed hashpipe YAML: fall back to opaque line
+                    // tokens (container prefix + TEXT + NEWLINE), preserving
+                    // the bytes without imposing a structure that didn't parse.
+                    while line_idx < prepared_hashpipe_lines {
+                        let after_indent = window.emit_prefix_at(builder, start_pos + 1 + line_idx);
+                        let (line_without_newline, newline_str) = strip_newline(after_indent);
+                        if !line_without_newline.is_empty() {
+                            builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+                        }
+                        if !newline_str.is_empty() {
+                            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+                        }
+                        line_idx += 1;
                     }
-                    if !newline_str.is_empty() {
-                        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-                    }
-                    line_idx += 1;
                 }
+                // Whether spliced or fallback, the preamble lines are consumed.
+                line_idx = prepared_hashpipe_lines;
+
                 builder.finish_node(); // HASHPIPE_YAML_CONTENT
                 builder.finish_node(); // HASHPIPE_YAML_PREAMBLE
             }

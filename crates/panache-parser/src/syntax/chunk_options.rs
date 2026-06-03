@@ -197,23 +197,55 @@ pub enum ChunkOptionSource {
     HashpipeYaml,
 }
 
+/// A single chunk option, decoupled from its source CST shape. Inline
+/// options come from `CHUNK_OPTION` nodes on the fence info line; hashpipe
+/// options come from the embedded YAML block map under
+/// `HASHPIPE_YAML_CONTENT`. Both project to the same key/value/range view so
+/// `CodeBlock::merged_chunk_option_entries` can mix them.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChunkOptionEntry {
-    option: ChunkOption,
+    key: Option<String>,
+    value: Option<String>,
+    key_range: Option<rowan::TextRange>,
+    value_range: Option<rowan::TextRange>,
+    is_quoted: bool,
+    declaration_range: rowan::TextRange,
     source: ChunkOptionSource,
 }
 
 impl ChunkOptionEntry {
-    pub fn new(option: ChunkOption, source: ChunkOptionSource) -> Self {
-        Self { option, source }
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        key: Option<String>,
+        value: Option<String>,
+        key_range: Option<rowan::TextRange>,
+        value_range: Option<rowan::TextRange>,
+        is_quoted: bool,
+        declaration_range: rowan::TextRange,
+        source: ChunkOptionSource,
+    ) -> Self {
+        Self {
+            key,
+            value,
+            key_range,
+            value_range,
+            is_quoted,
+            declaration_range,
+            source,
+        }
     }
 
-    pub fn option(&self) -> &ChunkOption {
-        &self.option
-    }
-
-    pub fn into_option(self) -> ChunkOption {
-        self.option
+    /// Build an entry from an inline `CHUNK_OPTION` node (fence info line).
+    pub fn from_inline_option(option: &ChunkOption, source: ChunkOptionSource) -> Self {
+        Self::new(
+            option.key(),
+            option.value(),
+            option.key_range(),
+            option.value_range(),
+            option.is_quoted(),
+            option.syntax().text_range(),
+            source,
+        )
     }
 
     pub fn source(&self) -> ChunkOptionSource {
@@ -221,23 +253,29 @@ impl ChunkOptionEntry {
     }
 
     pub fn key(&self) -> Option<String> {
-        self.option.key()
+        self.key.clone()
     }
 
     pub fn key_range(&self) -> Option<rowan::TextRange> {
-        self.option.key_range()
+        self.key_range
     }
 
     pub fn value(&self) -> Option<String> {
-        self.option.value()
+        self.value.clone()
     }
 
     pub fn value_range(&self) -> Option<rowan::TextRange> {
-        self.option.value_range()
+        self.value_range
     }
 
     pub fn is_quoted(&self) -> bool {
-        self.option.is_quoted()
+        self.is_quoted
+    }
+
+    /// The full source range of the option declaration (the `CHUNK_OPTION`
+    /// node for inline options, the `YAML_BLOCK_MAP_ENTRY` for hashpipe).
+    pub fn declaration_range(&self) -> rowan::TextRange {
+        self.declaration_range
     }
 }
 
@@ -343,19 +381,9 @@ impl ChunkOptions {
 
     pub fn option_entries(&self, source: ChunkOptionSource) -> Vec<ChunkOptionEntry> {
         self.options()
-            .map(|option| ChunkOptionEntry::new(option, source))
+            .map(|option| ChunkOptionEntry::from_inline_option(&option, source))
             .collect()
     }
-}
-
-pub fn collect_option_entries_from_descendants(
-    root: &SyntaxNode,
-    source: ChunkOptionSource,
-) -> Vec<ChunkOptionEntry> {
-    root.descendants()
-        .filter_map(ChunkOption::cast)
-        .map(|option| ChunkOptionEntry::new(option, source))
-        .collect()
 }
 
 #[cfg(test)]
