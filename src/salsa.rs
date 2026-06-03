@@ -90,12 +90,43 @@ pub fn refdef_set(db: &dyn Db, file: FileText, config: FileConfig) -> crate::par
 /// The refdef set is consumed via the [`refdef_set`] query so that
 /// edits which don't change refdefs short-circuit at the refdef layer
 /// without re-scanning the document inside `parse`.
-#[salsa::tracked(returns(ref), lru = 64)]
-pub fn parsed_tree(db: &dyn Db, file: FileText, config: FileConfig) -> rowan::GreenNode {
+/// A cached parse: the green tree plus the embedded-sublanguage syntax errors
+/// (host-ranged malformed YAML) the parser surfaced. Parsed once and cached
+/// together so both the tree and the diagnostics are available without a second
+/// pass.
+#[derive(Debug, Clone)]
+pub struct ParsedDocument {
+    pub green: rowan::GreenNode,
+    pub errors: Vec<crate::parser::SyntaxError>,
+}
+
+#[salsa::tracked(returns(ref), lru = 64, no_eq, unsafe(non_update_types))]
+pub fn parsed_document(db: &dyn Db, file: FileText, config: FileConfig) -> ParsedDocument {
     let refdefs = refdef_set(db, file, config).clone();
-    crate::parser::parse_with_refdefs(file.text(db), Some(config.config(db).clone()), refdefs)
-        .green()
-        .into_owned()
+    let (tree, errors) = crate::parser::parse_with_refdefs_and_errors(
+        file.text(db),
+        Some(config.config(db).clone()),
+        refdefs,
+    );
+    ParsedDocument {
+        green: tree.green().into_owned(),
+        errors,
+    }
+}
+
+/// The cached green tree for `(file, config)`.
+pub fn parsed_tree(db: &dyn Db, file: FileText, config: FileConfig) -> &rowan::GreenNode {
+    &parsed_document(db, file, config).green
+}
+
+/// The embedded-sublanguage syntax errors (malformed YAML) for `(file, config)`,
+/// with host-aligned ranges — ready to turn into diagnostics.
+pub fn parse_syntax_errors(
+    db: &dyn Db,
+    file: FileText,
+    config: FileConfig,
+) -> &[crate::parser::SyntaxError] {
+    &parsed_document(db, file, config).errors
 }
 
 /// Materialize the cached parse for `(file, config)` as a fresh `SyntaxNode`.
@@ -261,41 +292,32 @@ pub fn built_in_lint_plan(
     };
 
     let mut diagnostics = Vec::new();
-    if let Some(parsed) = frontmatter
-        && let Some(err) = parsed.error()
-    {
-        let host_offset = parsed
-            .parse_error_host_offset()
-            .expect("yaml parse error offset must map to host offset");
-        diagnostics.push(
-            crate::linter::metadata_diagnostics::yaml_parse_error_at_offset_diagnostic(
-                text,
-                host_offset,
-                Some(err.message()),
-            ),
-        );
-    } else if let Some(Err(yaml_error)) = yaml
+    // YAML *syntax* errors (frontmatter + hashpipe) come straight from the
+    // parser's syntax-error channel with host-aligned ranges — no re-parse, no
+    // offset remapping. The parser computed these while deciding CST shape.
+    diagnostics.extend(
+        parse_syntax_errors(db, file, config)
+            .iter()
+            .filter(|err| err.source == crate::parser::SyntaxErrorSource::Yaml)
+            .map(|err| {
+                let host_offset: usize = err.range.start().into();
+                crate::linter::metadata_diagnostics::yaml_parse_error_at_offset_diagnostic(
+                    text,
+                    host_offset,
+                    Some(err.message.as_str()),
+                )
+            }),
+    );
+    // Frontmatter that parses cleanly but whose *metadata extraction* fails is a
+    // separate, semantic error (not a YAML syntax error), so it stays on its own
+    // path. When frontmatter has a syntax error, `yaml` is `None` (extraction is
+    // skipped), so this never double-reports.
+    if let Some(Err(yaml_error)) = yaml
         && let Some(diag) =
             crate::linter::metadata_diagnostics::yaml_error_diagnostic(&yaml_error, text)
     {
         diagnostics.push(diag);
     }
-    diagnostics.extend(parsed_yaml_regions.iter().filter_map(|parsed| {
-        if !parsed.is_hashpipe() {
-            return None;
-        }
-        let err = parsed.error()?;
-        let host_offset = parsed
-            .parse_error_host_offset()
-            .expect("yaml parse error offset must map to host offset");
-        Some(
-            crate::linter::metadata_diagnostics::yaml_parse_error_at_offset_diagnostic(
-                text,
-                host_offset,
-                Some(err.message()),
-            ),
-        )
-    }));
 
     diagnostics.extend(crate::linter::lint_with_metadata(
         &tree,
