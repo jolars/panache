@@ -28,20 +28,22 @@ pub struct YamlRegion {
     pub region_range: Range<usize>,
     pub content_range: Range<usize>,
     pub content: String,
-    pub yaml_to_host_offsets: Vec<usize>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ParsedYamlRegion {
     region: YamlRegion,
-    parse_result: Result<SyntaxNode, YamlParseError>,
+    /// The host content node (`YAML_METADATA_CONTENT` / `HASHPIPE_YAML_CONTENT`)
+    /// carrying the embedded `YAML_DOCUMENT` subtree, when the parser embedded a
+    /// valid one. `None` for malformed YAML (opaque fallback). Validity and
+    /// document shape derive from its presence — no standalone re-parse.
+    embedded: Option<SyntaxNode>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedYamlRegionSnapshot {
     region: YamlRegion,
     parse_ok: bool,
-    error: Option<YamlParseError>,
     document_shape_summary: Option<String>,
 }
 
@@ -136,10 +138,6 @@ impl YamlEmbeddedCst {
 
     pub fn yaml_content(&self) -> &str {
         self.parsed.content()
-    }
-
-    pub fn host_offset_for_yaml_offset(&self, yaml_offset: usize) -> Option<usize> {
-        self.parsed.host_offset_for_yaml_offset(yaml_offset)
     }
 }
 
@@ -236,23 +234,22 @@ impl ParsedYamlRegion {
         matches!(self.region.kind, YamlRegionKind::Hashpipe)
     }
 
+    /// The embedded YAML document root, when the parser embedded a valid
+    /// subtree. The host content node carries `YAML_DOCUMENT` children directly,
+    /// which [`YamlAstRoot`] walks.
     pub fn root(&self) -> Option<YamlAstRoot<'_>> {
-        self.parse_result
-            .as_ref()
-            .ok()
-            .map(|node| YamlAstRoot { node })
-    }
-
-    pub fn error(&self) -> Option<YamlParseError> {
-        self.parse_result.as_ref().err().cloned()
+        self.embedded.as_ref().map(|node| YamlAstRoot { node })
     }
 
     pub fn root_kind(&self) -> Option<YamlAstRootKind> {
         self.root().map(|root| root.kind())
     }
 
+    /// Whether the region's YAML is well-formed — i.e. the parser embedded a
+    /// structured subtree rather than falling back to opaque tokens. This is the
+    /// parser's own verdict, so it cannot diverge from the syntax-error channel.
     pub fn is_valid(&self) -> bool {
-        self.parse_result.is_ok()
+        self.embedded.is_some()
     }
 
     pub fn host_range(&self) -> Range<usize> {
@@ -275,15 +272,6 @@ impl ParsedYamlRegion {
         &self.region.content
     }
 
-    pub fn host_offset_for_yaml_offset(&self, yaml_offset: usize) -> Option<usize> {
-        self.region.yaml_to_host_offsets.get(yaml_offset).copied()
-    }
-
-    pub fn parse_error_host_offset(&self) -> Option<usize> {
-        self.error()
-            .and_then(|err| self.host_offset_for_yaml_offset(err.offset()))
-    }
-
     pub fn document_shape_summary(&self) -> Option<String> {
         let root = self.root()?;
         let doc_count = root.document_count();
@@ -298,7 +286,6 @@ impl ParsedYamlRegion {
         ParsedYamlRegionSnapshot {
             region: self.region.clone(),
             parse_ok: self.is_valid(),
-            error: self.error(),
             document_shape_summary: self.document_shape_summary(),
         }
     }
@@ -321,17 +308,8 @@ impl ParsedYamlRegionSnapshot {
         self.parse_ok
     }
 
-    pub fn error(&self) -> Option<&YamlParseError> {
-        self.error.as_ref()
-    }
-
     pub fn host_range(&self) -> Range<usize> {
         self.region.host_range.clone()
-    }
-
-    pub fn parse_error_host_offset(&self) -> Option<usize> {
-        let err = self.error()?;
-        self.region.yaml_to_host_offsets.get(err.offset()).copied()
     }
 
     pub fn document_shape_summary(&self) -> Option<&str> {
@@ -372,10 +350,7 @@ pub fn collect_frontmatter_yaml_region(tree: &SyntaxNode) -> Option<YamlRegion> 
         kind: YamlRegionKind::Frontmatter,
         host_range: frontmatter.host_range.clone(),
         region_range: frontmatter.host_range,
-        content_range: content_range.clone(),
-        yaml_to_host_offsets: (0..=frontmatter.content.len())
-            .map(|offset| content_range.start + offset)
-            .collect(),
+        content_range,
         content: frontmatter.content,
     })
 }
@@ -452,17 +427,15 @@ pub fn collect_parsed_yaml_regions(tree: &SyntaxNode) -> Vec<ParsedYamlRegion> {
     collect_yaml_regions(tree)
         .into_iter()
         .map(|region| {
-            let parse_result = match &region.kind {
-                YamlRegionKind::Frontmatter => embedded_frontmatter
-                    .clone()
-                    .map(Ok)
-                    .unwrap_or_else(|| parse_region_yaml(&region.content)),
-                YamlRegionKind::Hashpipe => parse_region_yaml(&region.content),
+            // Validity and document shape come from the host-embedded subtree the
+            // parser produced — no standalone re-parse. `None` (malformed YAML,
+            // opaque fallback) means invalid; the parser's syntax-error channel
+            // carries the diagnostic for those.
+            let embedded = match &region.kind {
+                YamlRegionKind::Frontmatter => embedded_frontmatter.clone(),
+                YamlRegionKind::Hashpipe => embedded_hashpipe_stream(tree, &region.region_range),
             };
-            ParsedYamlRegion {
-                parse_result,
-                region,
-            }
+            ParsedYamlRegion { embedded, region }
         })
         .collect()
 }
@@ -470,10 +443,10 @@ pub fn collect_parsed_yaml_regions(tree: &SyntaxNode) -> Vec<ParsedYamlRegion> {
 /// Locate the embedded YAML subtree under the frontmatter's
 /// YAML_METADATA_CONTENT node, if the host parser embedded one (valid
 /// frontmatter). The content node plays the stream container role for the
-/// singleton-stream embedding, so we return it directly when it actually
-/// carries a YAML_DOCUMENT child. Returns `None` for malformed frontmatter,
-/// where the content node holds opaque line tokens and the standalone
-/// re-parse surfaces the diagnostic.
+/// singleton-stream embedding, so we return it directly when the parser
+/// embedded YAML. Returns `None` for malformed frontmatter, where the content
+/// node holds opaque line tokens and the syntax-error channel carries the
+/// diagnostic.
 fn embedded_frontmatter_stream(tree: &SyntaxNode) -> Option<SyntaxNode> {
     let metadata = tree
         .descendants()
@@ -481,27 +454,35 @@ fn embedded_frontmatter_stream(tree: &SyntaxNode) -> Option<SyntaxNode> {
     let content_node = metadata
         .children()
         .find(|child| child.kind() == SyntaxKind::YAML_METADATA_CONTENT)?;
-    content_node
-        .children()
-        .any(|child| child.kind() == SyntaxKind::YAML_DOCUMENT)
-        .then_some(content_node)
+    (!is_opaque_yaml_fallback(&content_node)).then_some(content_node)
 }
 
-/// Parse a YAML region's content with the in-tree parser, returning the CST on
-/// success or the first structural diagnostic as a [`YamlParseError`].
-fn parse_region_yaml(content: &str) -> Result<SyntaxNode, YamlParseError> {
-    let report = crate::parser::yaml::parse_yaml_report(content);
-    match report.tree {
-        Some(tree) => Ok(tree),
-        None => Err(report
-            .diagnostics
-            .first()
-            .map(YamlParseError::from_diagnostic)
-            .unwrap_or_else(|| YamlParseError {
-                offset: 0,
-                message: "invalid YAML".to_string(),
-            })),
-    }
+/// Locate the embedded YAML subtree under the hashpipe preamble's
+/// `HASHPIPE_YAML_CONTENT` node whose range matches `region_range`, when the
+/// host parser embedded one (valid hashpipe YAML). Mirrors
+/// [`embedded_frontmatter_stream`]. Returns `None` for malformed YAML (opaque
+/// fallback).
+fn embedded_hashpipe_stream(tree: &SyntaxNode, region_range: &Range<usize>) -> Option<SyntaxNode> {
+    tree.descendants()
+        .filter(|node| node.kind() == SyntaxKind::HASHPIPE_YAML_CONTENT)
+        .find(|node| {
+            let start: usize = node.text_range().start().into();
+            let end: usize = node.text_range().end().into();
+            start == region_range.start && end == region_range.end
+        })
+        .filter(|node| !is_opaque_yaml_fallback(node))
+}
+
+/// Whether a host YAML content node holds the parser's *opaque fallback* — raw
+/// `TEXT` line tokens emitted when the YAML failed to validate — rather than an
+/// embedded YAML subtree. Valid embeddings carry `YAML_*` nodes (or, for empty
+/// content, nothing) and never a raw `TEXT` token, so its presence is the
+/// reliable malformed-YAML fingerprint. Empty content (valid empty YAML) is not
+/// opaque.
+fn is_opaque_yaml_fallback(content_node: &SyntaxNode) -> bool {
+    content_node
+        .children_with_tokens()
+        .any(|element| element.kind() == SyntaxKind::TEXT)
 }
 
 pub fn collect_parsed_frontmatter_region(tree: &SyntaxNode) -> Option<ParsedYamlRegion> {
@@ -581,8 +562,11 @@ fn extract_hashpipe_region(
     if lines.is_empty() {
         return None;
     }
+    // Rebuild the prefix-stripped YAML payload (used for the region's `content`
+    // shape view). Host↔stripped offset mapping is no longer needed here: the
+    // parser embeds a host-aligned YAML subtree and surfaces malformed-YAML
+    // diagnostics through its own syntax-error channel.
     let mut collected = String::new();
-    let mut yaml_to_host_offsets = Vec::new();
     let mut offset = 0usize;
     for line in &lines {
         let line = *line;
@@ -600,19 +584,12 @@ fn extract_hashpipe_region(
             .strip_prefix(' ')
             .or_else(|| after_prefix.strip_prefix('\t'))
             .unwrap_or(after_prefix);
-        let after_prefix_start = indent_len + (trimmed.len() - after_prefix.len());
-        let payload_start = after_prefix_start + (after_prefix.len() - payload.len());
-        let line_host_start = content_start + offset;
-        yaml_to_host_offsets
-            .extend((0..payload.len()).map(|i| line_host_start + payload_start + i));
-        yaml_to_host_offsets.extend((0..eol.len()).map(|i| line_host_start + line_core.len() + i));
         collected.push_str(payload);
         collected.push_str(eol);
         offset += line.len();
     }
     let start = content_start;
     let region_end = content_start + offset;
-    yaml_to_host_offsets.push(region_end);
     let id = format!("hashpipe:{}:{}:{}", language, host_start, start);
     Some(YamlRegion {
         id,
@@ -621,7 +598,6 @@ fn extract_hashpipe_region(
         region_range: start..region_end,
         content_range: start..region_end,
         content: collected,
-        yaml_to_host_offsets,
     })
 }
 
@@ -649,24 +625,45 @@ mod tests {
     }
 
     #[test]
-    fn parsed_yaml_region_maps_parse_error_to_host_offset() {
-        let input = "```{r}\n#| echo: [\n1 + 1\n```\n";
+    fn parsed_hashpipe_region_validity_derives_from_embedded_subtree() {
         let config = crate::options::ParserOptions {
             flavor: crate::options::Flavor::Quarto,
             extensions: crate::options::Extensions::for_flavor(crate::options::Flavor::Quarto),
             ..Default::default()
         };
-        let tree = crate::parser::parse(input, Some(config));
-        let parsed = collect_parsed_yaml_regions(&tree);
-        let hashpipe = parsed
-            .iter()
+        // Malformed hashpipe YAML: no embedded subtree → invalid, no root.
+        let bad = crate::parser::parse("```{r}\n#| echo: [\n1 + 1\n```\n", Some(config.clone()));
+        let bad_region = collect_parsed_yaml_regions(&bad)
+            .into_iter()
             .find(|region| region.is_hashpipe())
             .expect("hashpipe region");
-        let host_offset = hashpipe
-            .parse_error_host_offset()
-            .expect("expected parse error host offset");
-        let expected = input.find('[').expect("expected '[' in input");
-        assert_eq!(host_offset, expected);
+        assert!(!bad_region.is_valid());
+        assert!(bad_region.root().is_none());
+
+        // Well-formed hashpipe YAML: embedded subtree → valid, root present.
+        let good = crate::parser::parse("```{r}\n#| echo: false\n1 + 1\n```\n", Some(config));
+        let good_region = collect_parsed_yaml_regions(&good)
+            .into_iter()
+            .find(|region| region.is_hashpipe())
+            .expect("hashpipe region");
+        assert!(good_region.is_valid());
+        assert!(good_region.root().is_some());
+    }
+
+    #[test]
+    fn empty_frontmatter_is_valid() {
+        // Valid empty YAML embeds an empty content node (no document, no opaque
+        // TEXT). It must still count as valid — not malformed.
+        let tree = crate::parser::parse("---\n---\n\nbody\n", None);
+        let parsed = collect_parsed_frontmatter_region(&tree).expect("frontmatter");
+        assert!(parsed.is_valid());
+    }
+
+    #[test]
+    fn malformed_frontmatter_is_invalid() {
+        let tree = crate::parser::parse("---\ntitle: [\n---\n", None);
+        let parsed = collect_parsed_frontmatter_region(&tree).expect("frontmatter");
+        assert!(!parsed.is_valid());
     }
 
     #[test]
@@ -735,17 +732,5 @@ mod tests {
         let embedded = collect_embedded_frontmatter_yaml_cst(&tree).expect("frontmatter embedding");
         let _host = embedded.frontmatter_host().expect("frontmatter host");
         assert!(embedded.hashpipe_host().is_none());
-    }
-
-    #[test]
-    fn yaml_offset_map_includes_eof_position() {
-        let input = "---\ntitle: Test\n---\n";
-        let tree = crate::parser::parse(input, None);
-        let parsed = collect_parsed_frontmatter_region(&tree).expect("frontmatter");
-        let eof_yaml_offset = parsed.content().len();
-        assert_eq!(
-            parsed.host_offset_for_yaml_offset(eof_yaml_offset),
-            Some(parsed.content_range().end)
-        );
     }
 }
