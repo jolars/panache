@@ -254,6 +254,7 @@ golden_test_cases!(
     footnote_continuation_idempotency_reflow,
     footnote_def_paragraph,
     footnote_definition_list,
+    footnote_paragraph_no_list_interrupt,
     footnote_ref_in_footnote_def_is_text,
     footnote_with_blockquote,
     four_space_rule_continuation_2sp,
@@ -623,6 +624,7 @@ golden_test_cases!(
     wikilinks_both_enabled,
     yaml_metadata,
     yaml_metadata_dots_closer,
+    yaml_metadata_embedded_subtree,
     yaml_metadata_normalization,
     yaml_metadata_opening_blank_not_metadata,
 );

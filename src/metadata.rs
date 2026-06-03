@@ -7,9 +7,10 @@
 //! # Architecture
 //!
 //! - YAML frontmatter remains **opaque** in the CST (stored as TEXT nodes)
-//! - Semantic parsing happens on-demand using `yaml_parser` AST traversal
+//! - Semantic parsing happens on-demand via the in-tree YAML AST wrappers
+//!   ([`panache_parser::syntax::parse_yaml_document`])
 //! - Metadata offsets are derived from YAML token ranges and mapped to document offsets
-//! - CSL-YAML bibliography parsing is handled through `yaml_parser`
+//! - CSL-YAML bibliography parsing is handled through the same in-tree wrappers
 //!
 //! # Usage
 //!
@@ -68,8 +69,8 @@ pub struct DocumentMetadata {
 
 /// Extract metadata from a syntax tree.
 ///
-/// Finds YAML frontmatter in the document, parses it with `yaml_parser`,
-/// and extracts structured metadata including bibliography paths.
+/// Finds YAML frontmatter in the document, parses it with the in-tree YAML
+/// parser, and extracts structured metadata including bibliography paths.
 ///
 /// # Arguments
 ///

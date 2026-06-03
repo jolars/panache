@@ -18,9 +18,10 @@ mod shortcodes;
 mod smart;
 mod tables;
 mod utils;
-// Shadow in-tree YAML formatter (Phase 1 of the cutover plan).
-// Not wired into the live pipeline; cross-validated against
-// pretty_yaml by `tests/yaml_cross_validation.rs` once it lands.
+// In-tree YAML formatter. Live as of Phase 2a: `yaml_engine.rs` routes
+// live YAML output through `yaml::format_yaml` (pretty_yaml retired from
+// the formatting path, kept only as the cross-validation reference in
+// `tests/yaml_cross_validation.rs`).
 // See `.claude/skills/yaml-formatter-cutover/SKILL.md`.
 #[allow(dead_code)]
 pub mod yaml;

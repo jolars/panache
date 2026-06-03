@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 283
 expression: snapshot
 ---
 case_id: AB8U
@@ -8,13 +7,11 @@ input: "- single multiline\n - sequence entry\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..37
-  YAML_METADATA_CONTENT@0..37
-    YAML_STREAM@0..37
-      YAML_DOCUMENT@0..37
-        YAML_BLOCK_SEQUENCE@0..37
-          YAML_BLOCK_SEQUENCE_ITEM@0..37
-            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
-            WHITESPACE@1..2 " "
-            YAML_SCALAR@2..36 "single multiline\n - s ..."
-            NEWLINE@36..37 "\n"
+YAML_STREAM@0..37
+  YAML_DOCUMENT@0..37
+    YAML_BLOCK_SEQUENCE@0..37
+      YAML_BLOCK_SEQUENCE_ITEM@0..37
+        YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+        WHITESPACE@1..2 " "
+        YAML_SCALAR@2..36 "single multiline\n - s ..."
+        NEWLINE@36..37 "\n"

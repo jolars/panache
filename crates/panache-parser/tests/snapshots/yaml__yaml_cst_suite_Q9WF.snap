@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 283
 expression: snapshot
 ---
 case_id: Q9WF
@@ -8,60 +7,58 @@ input: "{ first: Sammy, last: Sosa }:\n# Statistics:\n  hr:  # Home runs\n     6
 diagnostics:
 
 cst:
-DOCUMENT@0..97
-  YAML_METADATA_CONTENT@0..97
-    YAML_STREAM@0..97
-      YAML_DOCUMENT@0..97
-        YAML_BLOCK_MAP@0..97
-          YAML_BLOCK_MAP_ENTRY@0..97
-            YAML_BLOCK_MAP_KEY@0..29
-              YAML_FLOW_MAP@0..28
-                YAML_SCALAR@0..1 "{"
-                WHITESPACE@1..2 " "
-                YAML_FLOW_MAP_ENTRY@2..14
-                  YAML_FLOW_MAP_KEY@2..8
-                    YAML_SCALAR@2..7 "first"
-                    YAML_COLON@7..8 ":"
-                  YAML_FLOW_MAP_VALUE@8..14
-                    WHITESPACE@8..9 " "
-                    YAML_SCALAR@9..14 "Sammy"
-                YAML_SCALAR@14..15 ","
-                WHITESPACE@15..16 " "
-                YAML_FLOW_MAP_ENTRY@16..27
-                  YAML_FLOW_MAP_KEY@16..21
-                    YAML_SCALAR@16..20 "last"
-                    YAML_COLON@20..21 ":"
-                  YAML_FLOW_MAP_VALUE@21..27
-                    WHITESPACE@21..22 " "
-                    YAML_SCALAR@22..27 "Sosa "
-                YAML_SCALAR@27..28 "}"
-              YAML_COLON@28..29 ":"
-            YAML_BLOCK_MAP_VALUE@29..97
-              NEWLINE@29..30 "\n"
-              YAML_COMMENT@30..43 "# Statistics:"
-              NEWLINE@43..44 "\n"
-              WHITESPACE@44..46 "  "
-              YAML_BLOCK_MAP@46..97
-                YAML_BLOCK_MAP_ENTRY@46..73
-                  YAML_BLOCK_MAP_KEY@46..49
-                    YAML_SCALAR@46..48 "hr"
-                    YAML_COLON@48..49 ":"
-                  YAML_BLOCK_MAP_VALUE@49..73
-                    WHITESPACE@49..51 "  "
-                    YAML_COMMENT@51..62 "# Home runs"
-                    NEWLINE@62..63 "\n"
-                    WHITESPACE@63..68 "     "
-                    YAML_SCALAR@68..70 "65"
-                    NEWLINE@70..71 "\n"
-                    WHITESPACE@71..73 "  "
-                YAML_BLOCK_MAP_ENTRY@73..97
-                  YAML_BLOCK_MAP_KEY@73..77
-                    YAML_SCALAR@73..76 "avg"
-                    YAML_COLON@76..77 ":"
-                  YAML_BLOCK_MAP_VALUE@77..97
-                    WHITESPACE@77..78 " "
-                    YAML_COMMENT@78..87 "# Average"
-                    NEWLINE@87..88 "\n"
-                    WHITESPACE@88..91 "   "
-                    YAML_SCALAR@91..96 "0.278"
-                    NEWLINE@96..97 "\n"
+YAML_STREAM@0..97
+  YAML_DOCUMENT@0..97
+    YAML_BLOCK_MAP@0..97
+      YAML_BLOCK_MAP_ENTRY@0..97
+        YAML_BLOCK_MAP_KEY@0..29
+          YAML_FLOW_MAP@0..28
+            YAML_SCALAR@0..1 "{"
+            WHITESPACE@1..2 " "
+            YAML_FLOW_MAP_ENTRY@2..14
+              YAML_FLOW_MAP_KEY@2..8
+                YAML_SCALAR@2..7 "first"
+                YAML_COLON@7..8 ":"
+              YAML_FLOW_MAP_VALUE@8..14
+                WHITESPACE@8..9 " "
+                YAML_SCALAR@9..14 "Sammy"
+            YAML_SCALAR@14..15 ","
+            WHITESPACE@15..16 " "
+            YAML_FLOW_MAP_ENTRY@16..27
+              YAML_FLOW_MAP_KEY@16..21
+                YAML_SCALAR@16..20 "last"
+                YAML_COLON@20..21 ":"
+              YAML_FLOW_MAP_VALUE@21..27
+                WHITESPACE@21..22 " "
+                YAML_SCALAR@22..27 "Sosa "
+            YAML_SCALAR@27..28 "}"
+          YAML_COLON@28..29 ":"
+        YAML_BLOCK_MAP_VALUE@29..97
+          NEWLINE@29..30 "\n"
+          YAML_COMMENT@30..43 "# Statistics:"
+          NEWLINE@43..44 "\n"
+          WHITESPACE@44..46 "  "
+          YAML_BLOCK_MAP@46..97
+            YAML_BLOCK_MAP_ENTRY@46..73
+              YAML_BLOCK_MAP_KEY@46..49
+                YAML_SCALAR@46..48 "hr"
+                YAML_COLON@48..49 ":"
+              YAML_BLOCK_MAP_VALUE@49..73
+                WHITESPACE@49..51 "  "
+                YAML_COMMENT@51..62 "# Home runs"
+                NEWLINE@62..63 "\n"
+                WHITESPACE@63..68 "     "
+                YAML_SCALAR@68..70 "65"
+                NEWLINE@70..71 "\n"
+                WHITESPACE@71..73 "  "
+            YAML_BLOCK_MAP_ENTRY@73..97
+              YAML_BLOCK_MAP_KEY@73..77
+                YAML_SCALAR@73..76 "avg"
+                YAML_COLON@76..77 ":"
+              YAML_BLOCK_MAP_VALUE@77..97
+                WHITESPACE@77..78 " "
+                YAML_COMMENT@78..87 "# Average"
+                NEWLINE@87..88 "\n"
+                WHITESPACE@88..91 "   "
+                YAML_SCALAR@91..96 "0.278"
+                NEWLINE@96..97 "\n"

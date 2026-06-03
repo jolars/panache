@@ -7,18 +7,51 @@ DOCUMENT@0..347
     YAML_METADATA_DELIM@0..3 "---"
     NEWLINE@3..4 "\n"
     YAML_METADATA_CONTENT@4..95
-      TEXT@4..26 "title: \"Test Document\""
-      NEWLINE@26..27 "\n"
-      TEXT@27..43 "author: John Doe"
-      NEWLINE@43..44 "\n"
-      TEXT@44..60 "date: 2024-01-01"
-      NEWLINE@60..61 "\n"
-      TEXT@61..70 "keywords:"
-      NEWLINE@70..71 "\n"
-      TEXT@71..83 "  - markdown"
-      NEWLINE@83..84 "\n"
-      TEXT@84..94 "  - quarto"
-      NEWLINE@94..95 "\n"
+      YAML_DOCUMENT@4..95
+        YAML_BLOCK_MAP@4..95
+          YAML_BLOCK_MAP_ENTRY@4..27
+            YAML_BLOCK_MAP_KEY@4..10
+              YAML_SCALAR@4..9 "title"
+              YAML_COLON@9..10 ":"
+            YAML_BLOCK_MAP_VALUE@10..27
+              WHITESPACE@10..11 " "
+              YAML_SCALAR@11..26 "\"Test Document\""
+              NEWLINE@26..27 "\n"
+          YAML_BLOCK_MAP_ENTRY@27..44
+            YAML_BLOCK_MAP_KEY@27..34
+              YAML_SCALAR@27..33 "author"
+              YAML_COLON@33..34 ":"
+            YAML_BLOCK_MAP_VALUE@34..44
+              WHITESPACE@34..35 " "
+              YAML_SCALAR@35..43 "John Doe"
+              NEWLINE@43..44 "\n"
+          YAML_BLOCK_MAP_ENTRY@44..61
+            YAML_BLOCK_MAP_KEY@44..49
+              YAML_SCALAR@44..48 "date"
+              YAML_COLON@48..49 ":"
+            YAML_BLOCK_MAP_VALUE@49..61
+              WHITESPACE@49..50 " "
+              YAML_SCALAR@50..60 "2024-01-01"
+              NEWLINE@60..61 "\n"
+          YAML_BLOCK_MAP_ENTRY@61..95
+            YAML_BLOCK_MAP_KEY@61..70
+              YAML_SCALAR@61..69 "keywords"
+              YAML_COLON@69..70 ":"
+            YAML_BLOCK_MAP_VALUE@70..95
+              NEWLINE@70..71 "\n"
+              WHITESPACE@71..73 "  "
+              YAML_BLOCK_SEQUENCE@73..95
+                YAML_BLOCK_SEQUENCE_ITEM@73..86
+                  YAML_BLOCK_SEQ_ENTRY@73..74 "-"
+                  WHITESPACE@74..75 " "
+                  YAML_SCALAR@75..83 "markdown"
+                  NEWLINE@83..84 "\n"
+                  WHITESPACE@84..86 "  "
+                YAML_BLOCK_SEQUENCE_ITEM@86..95
+                  YAML_BLOCK_SEQ_ENTRY@86..87 "-"
+                  WHITESPACE@87..88 " "
+                  YAML_SCALAR@88..94 "quarto"
+                  NEWLINE@94..95 "\n"
     YAML_METADATA_DELIM@95..98 "---"
     NEWLINE@98..99 "\n"
   HEADING@99..114
@@ -44,8 +77,16 @@ DOCUMENT@0..347
     YAML_METADATA_DELIM@199..202 "---"
     NEWLINE@202..203 "\n"
     YAML_METADATA_CONTENT@203..238
-      TEXT@203..237 "subtitle: \"A subtitle ..."
-      NEWLINE@237..238 "\n"
+      YAML_DOCUMENT@203..238
+        YAML_BLOCK_MAP@203..238
+          YAML_BLOCK_MAP_ENTRY@203..238
+            YAML_BLOCK_MAP_KEY@203..212
+              YAML_SCALAR@203..211 "subtitle"
+              YAML_COLON@211..212 ":"
+            YAML_BLOCK_MAP_VALUE@212..238
+              WHITESPACE@212..213 " "
+              YAML_SCALAR@213..237 "\"A subtitle added later\""
+              NEWLINE@237..238 "\n"
     YAML_METADATA_DELIM@238..241 "---"
     NEWLINE@241..242 "\n"
   BLANK_LINE@242..243

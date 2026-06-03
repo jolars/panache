@@ -7,30 +7,28 @@ input: "name: Mark McGwire\naccomplishment: >\n  Mark set a major league\n  home
 diagnostics:
 
 cst:
-DOCUMENT@0..138
-  YAML_METADATA_CONTENT@0..138
-    YAML_STREAM@0..138
-      YAML_DOCUMENT@0..138
-        YAML_BLOCK_MAP@0..138
-          YAML_BLOCK_MAP_ENTRY@0..19
-            YAML_BLOCK_MAP_KEY@0..5
-              YAML_SCALAR@0..4 "name"
-              YAML_COLON@4..5 ":"
-            YAML_BLOCK_MAP_VALUE@5..19
-              WHITESPACE@5..6 " "
-              YAML_SCALAR@6..18 "Mark McGwire"
-              NEWLINE@18..19 "\n"
-          YAML_BLOCK_MAP_ENTRY@19..90
-            YAML_BLOCK_MAP_KEY@19..34
-              YAML_SCALAR@19..33 "accomplishment"
-              YAML_COLON@33..34 ":"
-            YAML_BLOCK_MAP_VALUE@34..90
-              WHITESPACE@34..35 " "
-              YAML_SCALAR@35..90 ">\n  Mark set a major  ..."
-          YAML_BLOCK_MAP_ENTRY@90..138
-            YAML_BLOCK_MAP_KEY@90..96
-              YAML_SCALAR@90..95 "stats"
-              YAML_COLON@95..96 ":"
-            YAML_BLOCK_MAP_VALUE@96..138
-              WHITESPACE@96..97 " "
-              YAML_SCALAR@97..138 "|\n  65 Home Runs\n  0. ..."
+YAML_STREAM@0..138
+  YAML_DOCUMENT@0..138
+    YAML_BLOCK_MAP@0..138
+      YAML_BLOCK_MAP_ENTRY@0..19
+        YAML_BLOCK_MAP_KEY@0..5
+          YAML_SCALAR@0..4 "name"
+          YAML_COLON@4..5 ":"
+        YAML_BLOCK_MAP_VALUE@5..19
+          WHITESPACE@5..6 " "
+          YAML_SCALAR@6..18 "Mark McGwire"
+          NEWLINE@18..19 "\n"
+      YAML_BLOCK_MAP_ENTRY@19..90
+        YAML_BLOCK_MAP_KEY@19..34
+          YAML_SCALAR@19..33 "accomplishment"
+          YAML_COLON@33..34 ":"
+        YAML_BLOCK_MAP_VALUE@34..90
+          WHITESPACE@34..35 " "
+          YAML_SCALAR@35..90 ">\n  Mark set a major  ..."
+      YAML_BLOCK_MAP_ENTRY@90..138
+        YAML_BLOCK_MAP_KEY@90..96
+          YAML_SCALAR@90..95 "stats"
+          YAML_COLON@95..96 ":"
+        YAML_BLOCK_MAP_VALUE@96..138
+          WHITESPACE@96..97 " "
+          YAML_SCALAR@97..138 "|\n  65 Home Runs\n  0. ..."

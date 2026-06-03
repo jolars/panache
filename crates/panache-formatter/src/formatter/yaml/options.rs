@@ -2,9 +2,9 @@
 //!
 //! Kept dependency-lean and free of host config concerns. The bridge
 //! that maps from the host `Config` (line-width, wrap mode) into
-//! `YamlFormatOptions` lives at the call site, currently
-//! `yaml_engine.rs`. Cutover (Phase 2) re-points that bridge from
-//! `pretty_yaml::config::FormatOptions` to this struct.
+//! `YamlFormatOptions` lives at the call site, `yaml_engine.rs`
+//! (`yaml_wrap_for_config`). As of Phase 2a that bridge targets this
+//! struct rather than `pretty_yaml::config::FormatOptions`.
 
 /// Wrapping policy for plain scalars. Quoted (`"…"` / `'…'`) and
 /// block (`>` / `|`) styles are never wrapped — see `STYLE.md` (the

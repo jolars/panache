@@ -7,9 +7,7 @@ input: "\"6 leading\n    \t  tab\"\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..23
-  YAML_METADATA_CONTENT@0..23
-    YAML_STREAM@0..23
-      YAML_DOCUMENT@0..23
-        YAML_SCALAR@0..22 "\"6 leading\n    \t  tab\""
-        NEWLINE@22..23 "\n"
+YAML_STREAM@0..23
+  YAML_DOCUMENT@0..23
+    YAML_SCALAR@0..22 "\"6 leading\n    \t  tab\""
+    NEWLINE@22..23 "\n"

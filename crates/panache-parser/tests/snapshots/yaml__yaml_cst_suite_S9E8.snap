@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 279
 expression: snapshot
 ---
 case_id: S9E8
@@ -8,54 +7,52 @@ input: "sequence:\n- one\n- two\nmapping:\n  ? sky\n  : blue\n  sea : green\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..62
-  YAML_METADATA_CONTENT@0..62
-    YAML_STREAM@0..62
-      YAML_DOCUMENT@0..62
-        YAML_BLOCK_MAP@0..62
-          YAML_BLOCK_MAP_ENTRY@0..22
-            YAML_BLOCK_MAP_KEY@0..9
-              YAML_SCALAR@0..8 "sequence"
-              YAML_COLON@8..9 ":"
-            YAML_BLOCK_MAP_VALUE@9..22
-              NEWLINE@9..10 "\n"
-              YAML_BLOCK_SEQUENCE@10..22
-                YAML_BLOCK_SEQUENCE_ITEM@10..16
-                  YAML_BLOCK_SEQ_ENTRY@10..11 "-"
-                  WHITESPACE@11..12 " "
-                  YAML_SCALAR@12..15 "one"
-                  NEWLINE@15..16 "\n"
-                YAML_BLOCK_SEQUENCE_ITEM@16..22
-                  YAML_BLOCK_SEQ_ENTRY@16..17 "-"
-                  WHITESPACE@17..18 " "
-                  YAML_SCALAR@18..21 "two"
-                  NEWLINE@21..22 "\n"
-          YAML_BLOCK_MAP_ENTRY@22..62
-            YAML_BLOCK_MAP_KEY@22..30
-              YAML_SCALAR@22..29 "mapping"
-              YAML_COLON@29..30 ":"
-            YAML_BLOCK_MAP_VALUE@30..62
-              NEWLINE@30..31 "\n"
-              WHITESPACE@31..33 "  "
-              YAML_BLOCK_MAP@33..62
-                YAML_BLOCK_MAP_ENTRY@33..50
-                  YAML_BLOCK_MAP_KEY@33..42
-                    YAML_KEY@33..34 "?"
-                    WHITESPACE@34..35 " "
-                    YAML_SCALAR@35..38 "sky"
-                    NEWLINE@38..39 "\n"
-                    WHITESPACE@39..41 "  "
-                    YAML_COLON@41..42 ":"
-                  YAML_BLOCK_MAP_VALUE@42..50
-                    WHITESPACE@42..43 " "
-                    YAML_SCALAR@43..47 "blue"
-                    NEWLINE@47..48 "\n"
-                    WHITESPACE@48..50 "  "
-                YAML_BLOCK_MAP_ENTRY@50..62
-                  YAML_BLOCK_MAP_KEY@50..55
-                    YAML_SCALAR@50..54 "sea "
-                    YAML_COLON@54..55 ":"
-                  YAML_BLOCK_MAP_VALUE@55..62
-                    WHITESPACE@55..56 " "
-                    YAML_SCALAR@56..61 "green"
-                    NEWLINE@61..62 "\n"
+YAML_STREAM@0..62
+  YAML_DOCUMENT@0..62
+    YAML_BLOCK_MAP@0..62
+      YAML_BLOCK_MAP_ENTRY@0..22
+        YAML_BLOCK_MAP_KEY@0..9
+          YAML_SCALAR@0..8 "sequence"
+          YAML_COLON@8..9 ":"
+        YAML_BLOCK_MAP_VALUE@9..22
+          NEWLINE@9..10 "\n"
+          YAML_BLOCK_SEQUENCE@10..22
+            YAML_BLOCK_SEQUENCE_ITEM@10..16
+              YAML_BLOCK_SEQ_ENTRY@10..11 "-"
+              WHITESPACE@11..12 " "
+              YAML_SCALAR@12..15 "one"
+              NEWLINE@15..16 "\n"
+            YAML_BLOCK_SEQUENCE_ITEM@16..22
+              YAML_BLOCK_SEQ_ENTRY@16..17 "-"
+              WHITESPACE@17..18 " "
+              YAML_SCALAR@18..21 "two"
+              NEWLINE@21..22 "\n"
+      YAML_BLOCK_MAP_ENTRY@22..62
+        YAML_BLOCK_MAP_KEY@22..30
+          YAML_SCALAR@22..29 "mapping"
+          YAML_COLON@29..30 ":"
+        YAML_BLOCK_MAP_VALUE@30..62
+          NEWLINE@30..31 "\n"
+          WHITESPACE@31..33 "  "
+          YAML_BLOCK_MAP@33..62
+            YAML_BLOCK_MAP_ENTRY@33..50
+              YAML_BLOCK_MAP_KEY@33..42
+                YAML_KEY@33..34 "?"
+                WHITESPACE@34..35 " "
+                YAML_SCALAR@35..38 "sky"
+                NEWLINE@38..39 "\n"
+                WHITESPACE@39..41 "  "
+                YAML_COLON@41..42 ":"
+              YAML_BLOCK_MAP_VALUE@42..50
+                WHITESPACE@42..43 " "
+                YAML_SCALAR@43..47 "blue"
+                NEWLINE@47..48 "\n"
+                WHITESPACE@48..50 "  "
+            YAML_BLOCK_MAP_ENTRY@50..62
+              YAML_BLOCK_MAP_KEY@50..55
+                YAML_SCALAR@50..54 "sea "
+                YAML_COLON@54..55 ":"
+              YAML_BLOCK_MAP_VALUE@55..62
+                WHITESPACE@55..56 " "
+                YAML_SCALAR@56..61 "green"
+                NEWLINE@61..62 "\n"

@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 283
 expression: snapshot
 ---
 case_id: KK5P
@@ -8,119 +7,117 @@ input: "complex1:\n  ? - a\ncomplex2:\n  ? - a\n  : b\ncomplex3:\n  ? - a\n  : >
 diagnostics:
 
 cst:
-DOCUMENT@0..124
-  YAML_METADATA_CONTENT@0..124
-    YAML_STREAM@0..124
-      YAML_DOCUMENT@0..124
-        YAML_BLOCK_MAP@0..124
-          YAML_BLOCK_MAP_ENTRY@0..18
-            YAML_BLOCK_MAP_KEY@0..9
-              YAML_SCALAR@0..8 "complex1"
-              YAML_COLON@8..9 ":"
-            YAML_BLOCK_MAP_VALUE@9..18
-              NEWLINE@9..10 "\n"
-              WHITESPACE@10..12 "  "
-              YAML_BLOCK_MAP@12..18
-                YAML_BLOCK_MAP_ENTRY@12..18
-                  YAML_BLOCK_MAP_KEY@12..18
-                    YAML_KEY@12..13 "?"
-                    WHITESPACE@13..14 " "
-                    YAML_BLOCK_SEQUENCE@14..18
-                      YAML_BLOCK_SEQUENCE_ITEM@14..18
-                        YAML_BLOCK_SEQ_ENTRY@14..15 "-"
-                        WHITESPACE@15..16 " "
-                        YAML_SCALAR@16..17 "a"
-                        NEWLINE@17..18 "\n"
-                  YAML_BLOCK_MAP_VALUE@18..18
-          YAML_BLOCK_MAP_ENTRY@18..42
-            YAML_BLOCK_MAP_KEY@18..27
-              YAML_SCALAR@18..26 "complex2"
-              YAML_COLON@26..27 ":"
-            YAML_BLOCK_MAP_VALUE@27..42
-              NEWLINE@27..28 "\n"
-              WHITESPACE@28..30 "  "
-              YAML_BLOCK_MAP@30..42
-                YAML_BLOCK_MAP_ENTRY@30..42
-                  YAML_BLOCK_MAP_KEY@30..39
-                    YAML_KEY@30..31 "?"
-                    WHITESPACE@31..32 " "
-                    YAML_BLOCK_SEQUENCE@32..38
-                      YAML_BLOCK_SEQUENCE_ITEM@32..38
-                        YAML_BLOCK_SEQ_ENTRY@32..33 "-"
-                        WHITESPACE@33..34 " "
-                        YAML_SCALAR@34..35 "a"
-                        NEWLINE@35..36 "\n"
-                        WHITESPACE@36..38 "  "
-                    YAML_COLON@38..39 ":"
-                  YAML_BLOCK_MAP_VALUE@39..42
-                    WHITESPACE@39..40 " "
-                    YAML_SCALAR@40..41 "b"
-                    NEWLINE@41..42 "\n"
-          YAML_BLOCK_MAP_ENTRY@42..72
-            YAML_BLOCK_MAP_KEY@42..51
-              YAML_SCALAR@42..50 "complex3"
-              YAML_COLON@50..51 ":"
-            YAML_BLOCK_MAP_VALUE@51..72
-              NEWLINE@51..52 "\n"
-              WHITESPACE@52..54 "  "
-              YAML_BLOCK_MAP@54..72
-                YAML_BLOCK_MAP_ENTRY@54..72
-                  YAML_BLOCK_MAP_KEY@54..63
-                    YAML_KEY@54..55 "?"
-                    WHITESPACE@55..56 " "
-                    YAML_BLOCK_SEQUENCE@56..62
-                      YAML_BLOCK_SEQUENCE_ITEM@56..62
-                        YAML_BLOCK_SEQ_ENTRY@56..57 "-"
-                        WHITESPACE@57..58 " "
-                        YAML_SCALAR@58..59 "a"
-                        NEWLINE@59..60 "\n"
-                        WHITESPACE@60..62 "  "
-                    YAML_COLON@62..63 ":"
-                  YAML_BLOCK_MAP_VALUE@63..72
-                    WHITESPACE@63..64 " "
-                    YAML_SCALAR@64..72 ">\n    b\n"
-          YAML_BLOCK_MAP_ENTRY@72..98
-            YAML_BLOCK_MAP_KEY@72..81
-              YAML_SCALAR@72..80 "complex4"
-              YAML_COLON@80..81 ":"
-            YAML_BLOCK_MAP_VALUE@81..98
-              NEWLINE@81..82 "\n"
-              WHITESPACE@82..84 "  "
-              YAML_BLOCK_MAP@84..98
-                YAML_BLOCK_MAP_ENTRY@84..98
-                  YAML_BLOCK_MAP_KEY@84..97
-                    YAML_KEY@84..85 "?"
-                    WHITESPACE@85..86 " "
-                    YAML_SCALAR@86..94 ">\n    a\n"
-                    WHITESPACE@94..96 "  "
-                    YAML_COLON@96..97 ":"
-                  YAML_BLOCK_MAP_VALUE@97..98
-                    NEWLINE@97..98 "\n"
-          YAML_BLOCK_MAP_ENTRY@98..124
-            YAML_BLOCK_MAP_KEY@98..107
-              YAML_SCALAR@98..106 "complex5"
-              YAML_COLON@106..107 ":"
-            YAML_BLOCK_MAP_VALUE@107..124
-              NEWLINE@107..108 "\n"
-              WHITESPACE@108..110 "  "
-              YAML_BLOCK_MAP@110..124
-                YAML_BLOCK_MAP_ENTRY@110..124
-                  YAML_BLOCK_MAP_KEY@110..119
-                    YAML_KEY@110..111 "?"
-                    WHITESPACE@111..112 " "
-                    YAML_BLOCK_SEQUENCE@112..118
-                      YAML_BLOCK_SEQUENCE_ITEM@112..118
-                        YAML_BLOCK_SEQ_ENTRY@112..113 "-"
-                        WHITESPACE@113..114 " "
-                        YAML_SCALAR@114..115 "a"
-                        NEWLINE@115..116 "\n"
-                        WHITESPACE@116..118 "  "
-                    YAML_COLON@118..119 ":"
-                  YAML_BLOCK_MAP_VALUE@119..124
-                    WHITESPACE@119..120 " "
-                    YAML_BLOCK_SEQUENCE@120..124
-                      YAML_BLOCK_SEQUENCE_ITEM@120..124
-                        YAML_BLOCK_SEQ_ENTRY@120..121 "-"
-                        WHITESPACE@121..122 " "
-                        YAML_SCALAR@122..123 "b"
-                        NEWLINE@123..124 "\n"
+YAML_STREAM@0..124
+  YAML_DOCUMENT@0..124
+    YAML_BLOCK_MAP@0..124
+      YAML_BLOCK_MAP_ENTRY@0..18
+        YAML_BLOCK_MAP_KEY@0..9
+          YAML_SCALAR@0..8 "complex1"
+          YAML_COLON@8..9 ":"
+        YAML_BLOCK_MAP_VALUE@9..18
+          NEWLINE@9..10 "\n"
+          WHITESPACE@10..12 "  "
+          YAML_BLOCK_MAP@12..18
+            YAML_BLOCK_MAP_ENTRY@12..18
+              YAML_BLOCK_MAP_KEY@12..18
+                YAML_KEY@12..13 "?"
+                WHITESPACE@13..14 " "
+                YAML_BLOCK_SEQUENCE@14..18
+                  YAML_BLOCK_SEQUENCE_ITEM@14..18
+                    YAML_BLOCK_SEQ_ENTRY@14..15 "-"
+                    WHITESPACE@15..16 " "
+                    YAML_SCALAR@16..17 "a"
+                    NEWLINE@17..18 "\n"
+              YAML_BLOCK_MAP_VALUE@18..18
+      YAML_BLOCK_MAP_ENTRY@18..42
+        YAML_BLOCK_MAP_KEY@18..27
+          YAML_SCALAR@18..26 "complex2"
+          YAML_COLON@26..27 ":"
+        YAML_BLOCK_MAP_VALUE@27..42
+          NEWLINE@27..28 "\n"
+          WHITESPACE@28..30 "  "
+          YAML_BLOCK_MAP@30..42
+            YAML_BLOCK_MAP_ENTRY@30..42
+              YAML_BLOCK_MAP_KEY@30..39
+                YAML_KEY@30..31 "?"
+                WHITESPACE@31..32 " "
+                YAML_BLOCK_SEQUENCE@32..38
+                  YAML_BLOCK_SEQUENCE_ITEM@32..38
+                    YAML_BLOCK_SEQ_ENTRY@32..33 "-"
+                    WHITESPACE@33..34 " "
+                    YAML_SCALAR@34..35 "a"
+                    NEWLINE@35..36 "\n"
+                    WHITESPACE@36..38 "  "
+                YAML_COLON@38..39 ":"
+              YAML_BLOCK_MAP_VALUE@39..42
+                WHITESPACE@39..40 " "
+                YAML_SCALAR@40..41 "b"
+                NEWLINE@41..42 "\n"
+      YAML_BLOCK_MAP_ENTRY@42..72
+        YAML_BLOCK_MAP_KEY@42..51
+          YAML_SCALAR@42..50 "complex3"
+          YAML_COLON@50..51 ":"
+        YAML_BLOCK_MAP_VALUE@51..72
+          NEWLINE@51..52 "\n"
+          WHITESPACE@52..54 "  "
+          YAML_BLOCK_MAP@54..72
+            YAML_BLOCK_MAP_ENTRY@54..72
+              YAML_BLOCK_MAP_KEY@54..63
+                YAML_KEY@54..55 "?"
+                WHITESPACE@55..56 " "
+                YAML_BLOCK_SEQUENCE@56..62
+                  YAML_BLOCK_SEQUENCE_ITEM@56..62
+                    YAML_BLOCK_SEQ_ENTRY@56..57 "-"
+                    WHITESPACE@57..58 " "
+                    YAML_SCALAR@58..59 "a"
+                    NEWLINE@59..60 "\n"
+                    WHITESPACE@60..62 "  "
+                YAML_COLON@62..63 ":"
+              YAML_BLOCK_MAP_VALUE@63..72
+                WHITESPACE@63..64 " "
+                YAML_SCALAR@64..72 ">\n    b\n"
+      YAML_BLOCK_MAP_ENTRY@72..98
+        YAML_BLOCK_MAP_KEY@72..81
+          YAML_SCALAR@72..80 "complex4"
+          YAML_COLON@80..81 ":"
+        YAML_BLOCK_MAP_VALUE@81..98
+          NEWLINE@81..82 "\n"
+          WHITESPACE@82..84 "  "
+          YAML_BLOCK_MAP@84..98
+            YAML_BLOCK_MAP_ENTRY@84..98
+              YAML_BLOCK_MAP_KEY@84..97
+                YAML_KEY@84..85 "?"
+                WHITESPACE@85..86 " "
+                YAML_SCALAR@86..94 ">\n    a\n"
+                WHITESPACE@94..96 "  "
+                YAML_COLON@96..97 ":"
+              YAML_BLOCK_MAP_VALUE@97..98
+                NEWLINE@97..98 "\n"
+      YAML_BLOCK_MAP_ENTRY@98..124
+        YAML_BLOCK_MAP_KEY@98..107
+          YAML_SCALAR@98..106 "complex5"
+          YAML_COLON@106..107 ":"
+        YAML_BLOCK_MAP_VALUE@107..124
+          NEWLINE@107..108 "\n"
+          WHITESPACE@108..110 "  "
+          YAML_BLOCK_MAP@110..124
+            YAML_BLOCK_MAP_ENTRY@110..124
+              YAML_BLOCK_MAP_KEY@110..119
+                YAML_KEY@110..111 "?"
+                WHITESPACE@111..112 " "
+                YAML_BLOCK_SEQUENCE@112..118
+                  YAML_BLOCK_SEQUENCE_ITEM@112..118
+                    YAML_BLOCK_SEQ_ENTRY@112..113 "-"
+                    WHITESPACE@113..114 " "
+                    YAML_SCALAR@114..115 "a"
+                    NEWLINE@115..116 "\n"
+                    WHITESPACE@116..118 "  "
+                YAML_COLON@118..119 ":"
+              YAML_BLOCK_MAP_VALUE@119..124
+                WHITESPACE@119..120 " "
+                YAML_BLOCK_SEQUENCE@120..124
+                  YAML_BLOCK_SEQUENCE_ITEM@120..124
+                    YAML_BLOCK_SEQ_ENTRY@120..121 "-"
+                    WHITESPACE@121..122 " "
+                    YAML_SCALAR@122..123 "b"
+                    NEWLINE@123..124 "\n"

@@ -7,13 +7,11 @@ input: "--- |\n \n  \n  literal\n   \n  \n  text\n\n # Comment\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..47
-  YAML_METADATA_CONTENT@0..47
-    YAML_STREAM@0..47
-      YAML_DOCUMENT@0..47
-        YAML_DOCUMENT_START@0..3 "---"
-        WHITESPACE@3..4 " "
-        YAML_SCALAR@4..36 "|\n \n  \n  literal\n   \n ..."
-        WHITESPACE@36..37 " "
-        YAML_COMMENT@37..46 "# Comment"
-        NEWLINE@46..47 "\n"
+YAML_STREAM@0..47
+  YAML_DOCUMENT@0..47
+    YAML_DOCUMENT_START@0..3 "---"
+    WHITESPACE@3..4 " "
+    YAML_SCALAR@4..36 "|\n \n  \n  literal\n   \n ..."
+    WHITESPACE@36..37 " "
+    YAML_COMMENT@37..46 "# Comment"
+    NEWLINE@46..47 "\n"

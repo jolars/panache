@@ -1,6 +1,8 @@
 //! YAML metadata block parsing utilities.
 
 use crate::parser::utils::helpers::{emit_line_tokens, strip_newline};
+use crate::parser::utils::tree_copy::copy_green_children;
+use crate::parser::yaml::{parse_stream, validate_yaml};
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -88,8 +90,35 @@ pub(crate) fn emit_yaml_block(
     }
 
     builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
+    // Reconstruct the frontmatter content as a contiguous byte string. The
+    // lines returned by `split_lines_inclusive` are non-overlapping slices
+    // of the original input that retain their trailing LF / CRLF, so
+    // concatenating them rebuilds the source bytes between the delimiters
+    // exactly (including CRLF).
+    let mut content = String::new();
     for content_line in lines.iter().take(closing_pos).skip(pos + 1) {
-        emit_line_tokens(builder, content_line);
+        content.push_str(content_line);
+    }
+
+    // Embed the in-tree YAML CST under YAML_METADATA_CONTENT when the
+    // content validates. On validation failure, fall back to the
+    // opaque line-token shape so downstream re-parse (and the host
+    // CST snapshot of malformed YAML) keep their current behavior.
+    //
+    // `parse_stream` returns a `YAML_STREAM` wrapping one or more
+    // `YAML_DOCUMENT` children. The wrapper is the YAML-spec stream
+    // container — but inside frontmatter the host's
+    // `YAML_METADATA_CONTENT` already plays that role (and
+    // `find_yaml_block_closing_pos` guarantees a single document by
+    // stopping at the first internal `---` / `...`). Splice the stream's
+    // children in directly to avoid the redundant wrapper.
+    if validate_yaml(&content).is_none() {
+        let stream_green = parse_stream(&content).green().into_owned();
+        copy_green_children(builder, &stream_green);
+    } else {
+        for content_line in lines.iter().take(closing_pos).skip(pos + 1) {
+            emit_line_tokens(builder, content_line);
+        }
     }
     builder.finish_node(); // YAML_METADATA_CONTENT
 
@@ -422,5 +451,60 @@ mod tests {
         let input = "    ---\n    title: Test\n    ...\n";
         let tree = crate::parse(input, Some(crate::ParserOptions::default()));
         assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn test_valid_yaml_content_embeds_yaml_document_subtree() {
+        let input = "---\ntitle: Test\nlist:\n  - a\n---\n";
+        let tree = crate::parse(input, Some(crate::ParserOptions::default()));
+        assert_eq!(tree.text().to_string(), input);
+        let content = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::YAML_METADATA)
+            .and_then(|m| {
+                m.children()
+                    .find(|c| c.kind() == SyntaxKind::YAML_METADATA_CONTENT)
+            })
+            .expect("yaml metadata content node");
+        // YAML_METADATA_CONTENT plays the singleton-stream role; the
+        // YAML_STREAM wrapper is dropped during embedding. The direct
+        // child is the YAML_DOCUMENT covering the full content range.
+        let first_child = content
+            .children()
+            .next()
+            .expect("embedded yaml subtree child");
+        assert_eq!(first_child.kind(), SyntaxKind::YAML_DOCUMENT);
+        assert_eq!(first_child.text_range(), content.text_range());
+        assert!(
+            content
+                .descendants()
+                .all(|n| n.kind() != SyntaxKind::YAML_STREAM),
+            "host embed should not carry the redundant YAML_STREAM wrapper"
+        );
+    }
+
+    #[test]
+    fn test_invalid_yaml_content_falls_back_to_line_tokens() {
+        // Unterminated single-quoted scalar is rejected by the YAML
+        // validator. The host parser must keep the legacy line-token
+        // shape so losslessness holds and the downstream re-parse still
+        // reports the diagnostic.
+        let input = "---\ntitle: 'unterminated\n---\n";
+        let tree = crate::parse(input, Some(crate::ParserOptions::default()));
+        assert_eq!(tree.text().to_string(), input);
+        let content = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::YAML_METADATA)
+            .and_then(|m| {
+                m.children()
+                    .find(|c| c.kind() == SyntaxKind::YAML_METADATA_CONTENT)
+            })
+            .expect("yaml metadata content node");
+        assert!(
+            content
+                .children()
+                .all(|c| c.kind() != SyntaxKind::YAML_DOCUMENT),
+            "invalid YAML must not embed a YAML_DOCUMENT subtree"
+        );
     }
 }

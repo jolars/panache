@@ -22,6 +22,10 @@ mod scanner;
 mod validator;
 
 pub use events::{project_events, project_events_from_tree};
+// Re-exported crate-internally so the typed YAML AST wrappers in
+// `crate::syntax::yaml_ast` can cook scalar tokens without re-implementing
+// the quote/escape/fold rules. The modules themselves stay private.
+pub(crate) use cooking::cook;
 pub use model::{
     ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
     YamlParseReport, diagnostic_codes,
@@ -30,7 +34,9 @@ pub use parser::{
     ShadowParserReport, parse_shadow, parse_stream, parse_yaml_report, parse_yaml_tree,
     shadow_parser_check,
 };
+pub(crate) use scanner::ScalarStyle;
 pub use scanner::{ShadowScannerReport, shadow_scanner_check};
+pub(crate) use validator::validate_yaml;
 
 #[doc(hidden)]
 pub fn validate_yaml_for_test(input: &str) -> Option<YamlDiagnostic> {
@@ -45,7 +51,7 @@ mod tests {
     #[test]
     fn builds_basic_rowan_tree_for_multiline_mapping() {
         let tree = parse_yaml_tree("title: My Title\nauthor: Me\n").expect("tree");
-        assert_eq!(tree.kind(), SyntaxKind::DOCUMENT);
+        assert_eq!(tree.kind(), SyntaxKind::YAML_STREAM);
         assert_eq!(tree.text().to_string(), "title: My Title\nauthor: Me\n");
 
         let mapping = tree

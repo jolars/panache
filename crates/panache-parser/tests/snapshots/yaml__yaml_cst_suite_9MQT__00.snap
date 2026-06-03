@@ -7,11 +7,9 @@ input: "--- \"a\n...x\nb\"\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..15
-  YAML_METADATA_CONTENT@0..15
-    YAML_STREAM@0..15
-      YAML_DOCUMENT@0..15
-        YAML_DOCUMENT_START@0..3 "---"
-        WHITESPACE@3..4 " "
-        YAML_SCALAR@4..14 "\"a\n...x\nb\""
-        NEWLINE@14..15 "\n"
+YAML_STREAM@0..15
+  YAML_DOCUMENT@0..15
+    YAML_DOCUMENT_START@0..3 "---"
+    WHITESPACE@3..4 " "
+    YAML_SCALAR@4..14 "\"a\n...x\nb\""
+    NEWLINE@14..15 "\n"

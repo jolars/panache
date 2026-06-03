@@ -7,36 +7,34 @@ input: "canonical: !!binary \"\\\n R0lGODlhDAAMAIQAAP//9/X17unp5WZmZgAAAOfn515eX
 diagnostics:
 
 cst:
-DOCUMENT@0..636
-  YAML_METADATA_CONTENT@0..636
-    YAML_STREAM@0..636
-      YAML_DOCUMENT@0..636
-        YAML_BLOCK_MAP@0..636
-          YAML_BLOCK_MAP_ENTRY@0..283
-            YAML_BLOCK_MAP_KEY@0..10
-              YAML_SCALAR@0..9 "canonical"
-              YAML_COLON@9..10 ":"
-            YAML_BLOCK_MAP_VALUE@10..283
-              WHITESPACE@10..11 " "
-              YAML_TAG@11..19 "!!binary"
-              WHITESPACE@19..20 " "
-              YAML_SCALAR@20..282 "\"\\\n R0lGODlhDAAMAIQAA ..."
-              NEWLINE@282..283 "\n"
-          YAML_BLOCK_MAP_ENTRY@283..559
-            YAML_BLOCK_MAP_KEY@283..291
-              YAML_SCALAR@283..290 "generic"
-              YAML_COLON@290..291 ":"
-            YAML_BLOCK_MAP_VALUE@291..559
-              WHITESPACE@291..292 " "
-              YAML_TAG@292..300 "!!binary"
-              WHITESPACE@300..301 " "
-              YAML_SCALAR@301..559 "|\n R0lGODlhDAAMAIQAAP ..."
-          YAML_BLOCK_MAP_ENTRY@559..636
-            YAML_BLOCK_MAP_KEY@559..571
-              YAML_SCALAR@559..570 "description"
-              YAML_COLON@570..571 ":"
-            YAML_BLOCK_MAP_VALUE@571..636
-              NEWLINE@571..572 "\n"
-              WHITESPACE@572..573 " "
-              YAML_SCALAR@573..635 "The binary value abov ..."
-              NEWLINE@635..636 "\n"
+YAML_STREAM@0..636
+  YAML_DOCUMENT@0..636
+    YAML_BLOCK_MAP@0..636
+      YAML_BLOCK_MAP_ENTRY@0..283
+        YAML_BLOCK_MAP_KEY@0..10
+          YAML_SCALAR@0..9 "canonical"
+          YAML_COLON@9..10 ":"
+        YAML_BLOCK_MAP_VALUE@10..283
+          WHITESPACE@10..11 " "
+          YAML_TAG@11..19 "!!binary"
+          WHITESPACE@19..20 " "
+          YAML_SCALAR@20..282 "\"\\\n R0lGODlhDAAMAIQAA ..."
+          NEWLINE@282..283 "\n"
+      YAML_BLOCK_MAP_ENTRY@283..559
+        YAML_BLOCK_MAP_KEY@283..291
+          YAML_SCALAR@283..290 "generic"
+          YAML_COLON@290..291 ":"
+        YAML_BLOCK_MAP_VALUE@291..559
+          WHITESPACE@291..292 " "
+          YAML_TAG@292..300 "!!binary"
+          WHITESPACE@300..301 " "
+          YAML_SCALAR@301..559 "|\n R0lGODlhDAAMAIQAAP ..."
+      YAML_BLOCK_MAP_ENTRY@559..636
+        YAML_BLOCK_MAP_KEY@559..571
+          YAML_SCALAR@559..570 "description"
+          YAML_COLON@570..571 ":"
+        YAML_BLOCK_MAP_VALUE@571..636
+          NEWLINE@571..572 "\n"
+          WHITESPACE@572..573 " "
+          YAML_SCALAR@573..635 "The binary value abov ..."
+          NEWLINE@635..636 "\n"

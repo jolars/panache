@@ -7,42 +7,302 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
 
 ## Status
 
-- **Phase 1 (shadow formatter):** in progress. 1.1 module skeleton
-  landed (byte-passthrough stub); 1.2 STYLE.md relocated; 1.3
-  cross-validation harness landed with starter corpus; 1.4 rule 13
-  (trailing document newline); 1.5 rule 10 (strip trailing whitespace
-  per line); 1.6 rule 1 (canonical 2-space indent); 1.7 rule 2
-  (sequence indent — verified, no new code; rule 1 already canonicalizes
-  it) + rule 7 (blank-line collapse + leading-blank strip); 1.8 rule 8
-  (inline comment spacing, integrated into token walk; render pipeline
-  refactored to precompute per-line depths so rule 8's byte shifts
-  don't invalidate rule 1's offset lookup); 1.9 rule 5 (canonical flow
-  spacing; token walk refactored to recursive node walk so flow
-  containers can take over emission for their subtrees); 1.10 rule 6
-  (overflow wrap: re-parse the post-indent buffer, walk top-level flow
-  containers in reverse byte order, replace overflowing single-line
-  forms with canonical multi-line — items at parent_content_column + 2,
-  closing bracket at parent_content_column; multi-line input is parked
-  on the in-tree parser landing multi-line flow); 1.11 rule 3 (convert
-  single-quoted scalars to double-quoted when the de-escaped content
-  has none of `\`, `'`, `"`, or ASCII control chars; plain stays plain;
-  double stays double); 1.12 preserve-rule lockdown (rules 4 block-scalar
-  style, 9 comment positions, 11 empty scalars, 12 key order — no
-  formatter code, locked in by corpus + unit tests against pretty_yaml);
-  1.13 real-frontmatter harvest (six representative cases from
-  `tests/fixtures/cases/` + `docs/`) which surfaced a spec gap →
-  added rule 14 (collapse multi-space runs between block structural
-  indicators `:` / `-` and inline content to one space; trailing-only
-  runs deferred to rule 10). The spec is now 14 rules with corpus +
-  unit coverage. Phase 1 exit gated on the parser-side enablement of
-  multi-line flow input (parked here, on the parser side).
-- **Phase 2 (joint cutover):** not started, blocked on Phase 1.
-- **Phase 3 (hashpipe extension):** not started, blocked on Phase 2.
+- **Phase 1 (shadow formatter):** in progress. 1.1–1.15b as
+  previously recorded; 1.15b adds the plain-scalar overflow analog of
+  rule 6 — when a single-line plain scalar in a block-map value
+  pushes its line past `line_width`, greedy word-wrap onto
+  continuation lines indented at `depth * 2` (the value column,
+  matching rule 1's multi-line continuation indent so wrap output
+  round-trips). Quoted/block/decorated/seq-item scalars skip. Probe
+  results post-fix: 17/17 input + 16/16 expected frontmatter, 35/35
+  expected hashpipe, **20/21 input hashpipe** — the remaining gap
+  (`issue_194_idempotency_lsj_tbl_cap`) is the deliberate
+  trailing-space-vs-strip tradeoff governed by rule 10 (we strip a
+  one-char trailing space pretty_yaml keeps for fold-semantic
+  preservation), which already aligns with the host fixture's
+  expected output.
+- **Phase 2 (joint cutover):** consumer audit done (see "what landed"
+  below). Headline: the two crates have **independent** removal
+  blockers and should be sequenced, not removed in one commit as the
+  original framing assumed.
+  - `pretty_yaml` (formatting only) is the small, clean cutover —
+    swap the two `yaml_engine.rs::format_yaml_with_config` bodies
+    (`src/yaml_engine.rs` **and** `crates/panache-formatter/src/yaml_engine.rs`,
+    both live) from `pretty_yaml::format_text` to
+    `formatter::yaml::format_yaml`. It is a text→text swap; the
+    in-tree formatter modules have **zero** runtime `pretty_yaml`
+    references (all comment-only), and the validator's `pretty_yaml`
+    mentions are comment/test-name only too.
+  - `yaml_parser` removal is the large blocker the original plan
+    under-scoped. Beyond the CST/diagnostics bridge
+    (`crates/panache-parser/src/syntax/yaml.rs`, Category B), it is
+    the **value-extraction AST** for semantic metadata — `src/metadata/yaml.rs`,
+    `src/metadata/project.rs`, `src/bib/csl_yaml.rs`, `src/includes.rs`,
+    and `crates/panache-formatter/src/formatter/hashpipe.rs` all walk
+    `yaml_parser::ast::{Root, BlockMap, BlockMapEntry, BlockMapValue,
+    Flow, FlowSeq, BlockSeq}` and `SyntaxKind::{SINGLE,DOUBLE}_QUOTED_SCALAR`
+    to read titles/authors/bibliography/includes/project-config/chunk-options.
+    The in-tree parser exposes only a raw rowan `SyntaxNode`
+    (`parse_yaml_tree`/`parse_yaml_report`) — **no typed AST**. So
+    `yaml_parser` removal needs either typed accessors over the
+    in-tree CST or a serde-based value reader; that's its own
+    multi-file workstream, not part of the formatter cutover.
+  - **CST embedding is the end goal, not a non-issue** (correcting the
+    original framing). Today `blocks/metadata.rs` emits frontmatter as
+    opaque **raw line tokens** under `YAML_METADATA_CONTENT` (the
+    hashpipe preamble is the same), and YAML *structure* is recovered
+    only by **re-parsing the content string on demand**. That was true
+    of `yaml_parser` too (it was always `parse(&content)` on demand,
+    never embedded), so retiring `yaml_parser` did **not** require
+    embedding — which is the only sense in which it was a "non-issue":
+    the *dependency cutover* doesn't depend on it. But the whole point
+    of the in-tree parser is to put the YAML tokens (`YAML_STREAM` /
+    `YAML_DOCUMENT` / `YAML_BLOCK_MAP` / …) **inside the full document
+    CST**, so the frontmatter and hashpipe bodies stop being opaque
+    text. That gives one parse instead of parse-then-reparse, and lets
+    the linter/LSP/formatter navigate YAML structure in the host tree
+    (key goto, folding, semantic tokens, hover) instead of re-parsing a
+    substring with offset remapping. This is now its own phase (2c).
+  - Recommended sequencing: (2a) `pretty_yaml` formatter swap first
+    (small, no host-golden shift expected) — **DONE**; (2b)
+    `yaml_parser` value-extraction migration (typed AST wrappers over
+    the in-tree CST) + diagnostics repoint + drop the `yaml_parser` dep
+    — **DONE** (re-parse-on-demand parity swap; host CST shape
+    unchanged); (2c) **embed the in-tree YAML CST into the host
+    document CST** so frontmatter/hashpipe carry real YAML structure
+    — **OUTSTANDING** (the actual end goal; its own workstream, see
+    Phase 2c below); (2d) drop `pretty_yaml` (retire the
+    cross-validation test) — **OUTSTANDING** (`pretty_yaml` is
+    runtime-unused since 2a; only `yaml_cross_validation.rs` references
+    it, and it still pulls `yaml_parser` in transitively).
+- **Phase 3 (hashpipe extension):** functionally already on the in-tree
+  stack — hashpipe *value extraction* migrated to the in-tree wrappers
+  in 2b, and hashpipe *option-body formatting* has gone through
+  `yaml_engine::format_yaml_with_config` (the in-tree formatter) since
+  2a. Remaining: dedicated hashpipe corpus fixtures
+  (`tests/fixtures/yaml_corpus/hashpipe/`), removing stale
+  `pretty_yaml`-era comments/workarounds in `hashpipe.rs`, and folding
+  hashpipe into the 2c CST embedding (the preamble content node).
 
 ## What landed since drafting
 
 _(Update as phases complete. Earliest entries on top.)_
 
+- **Phase 2b — `yaml_parser` retirement via in-tree typed AST
+  wrappers.** Built `crates/panache-parser/src/syntax/yaml_ast.rs`: a
+  typed wrapper layer over the in-tree YAML CST in the house
+  rust-analyzer/rowan style (`YamlDocument`, `YamlBlockMap`,
+  `YamlBlockMapEntry`/`Key`/`Value`, block/flow sequences & maps, a
+  token-backed `YamlScalar` with `raw()` / cooked `value()` / `style()`
+  / `text_range()`, a `YamlNode` union, and a public `YamlScalarStyle`),
+  plus `parse_yaml_document` / `parse_yaml_documents` that descend the
+  `DOCUMENT > YAML_METADATA_CONTENT > YAML_STREAM` envelope. Cooking
+  reuses `crate::parser::yaml::cook` (re-exported `pub(crate)`). The
+  colon-in-key gotcha (`YAML_BLOCK_MAP_KEY` includes `:`) is handled by
+  reading the scalar token child. Migrated all five value-extraction
+  consumers off `yaml_parser::ast` onto the wrappers — `src/includes.rs`,
+  `src/metadata/project.rs`, `src/metadata/yaml.rs`, `src/bib/csl_yaml.rs`
+  (metadata/bib/includes use cooked `value()`, fixing the old greedy
+  `trim_matches` bug; pinned by a new `metadata::yaml` test), and
+  `crates/panache-formatter/src/formatter/hashpipe.rs` (uses `raw()` +
+  `text_range()` + `value.tag()` to preserve `#|` round-trip bytes).
+  Repointed the diagnostics/validation infra in
+  `crates/panache-parser/src/syntax/yaml.rs` (`validate_yaml_text`,
+  `ParsedYamlRegion`, `YamlAstRoot`, `document_shape_summary`) onto
+  `parse_yaml_report`; offset + `"Root docs=N first=Kind"` parity held.
+  Removed `yaml_parser` from all three `Cargo.toml`s (root,
+  `panache-parser`, `panache-formatter`); it survives in `Cargo.lock`
+  only as a transitive dep of `pretty_yaml` (2d). **Architecture note:
+  this is a re-parse-on-demand *parity* swap** — like `yaml_parser`
+  before it, structure is recovered by re-parsing the frontmatter
+  content string; the host document CST is **unchanged** (still opaque
+  `YAML_METADATA_CONTENT` line tokens), which is why every losslessness
+  / CST-snapshot test passed untouched. Embedding the YAML tokens into
+  the host CST is the separate, still-outstanding end goal (Phase 2c
+  below). Full workspace suite green (incl. 280 golden cases +
+  `yaml_cross_validation`), clippy `-D warnings` clean, fmt clean,
+  `debug format --checks all` green on frontmatter-rich and hashpipe
+  docs.
+- **Phase 2a — `pretty_yaml` formatter swap (live cutover).** The
+  in-tree formatter is now the live YAML formatting path. Swapped both
+  `format_yaml_with_config` bodies (`src/yaml_engine.rs` and
+  `crates/panache-formatter/src/yaml_engine.rs`, byte-identical copies)
+  from `pretty_yaml::format_text` to
+  `panache_formatter::formatter::yaml::format_yaml`, bridging
+  `config.line_width` → `YamlFormatOptions.line_width` and
+  `config.wrap` → `YamlFormatOptions.wrap` via a new
+  `yaml_wrap_for_config` (Preserve → `WrapMode::Preserve`, all else →
+  `Always`, mirroring the old `prose_wrap_for_config` mapping). The
+  `validate_yaml` gate (still `yaml_parser`-backed, Phase 2b) is kept
+  in front, so behavior on invalid YAML is unchanged. Both plain
+  frontmatter and hashpipe option bodies cut over together since they
+  share the `format_yaml_with_config` chokepoint — no partial cutover.
+  **Behavior gap found + fixed:** the in-tree wrap passes consulted
+  only `line_width`, never `opts.wrap`, so `WrapMode::Preserve` was
+  ignored (the corpus harness only ever ran the default `Always`).
+  Probed pretty_yaml to pin the correct semantics: `ProseWrap::Preserve`
+  leaves overflowing *plain scalars* on their line but still wraps
+  overflowing *flow collections* (flow wrapping is a print-width
+  concern, not prose). Fix: gate `apply_plain_scalar_wrap` on
+  `WrapMode::Always` in `document.rs`; leave `apply_flow_wrap`
+  unconditional. New unit test
+  `preserve_wrap_mode_leaves_plain_scalar_unwrapped` pins both
+  directions (plain scalar preserved; flow still wraps under Preserve).
+  Renamed the two `prose_wrap_follows_panache_wrap_mode` engine tests to
+  `wrap_mode_follows_panache_wrap_mode` asserting against
+  `formatter::yaml::WrapMode`. Updated stale "shadow / not wired" doc
+  comments in `formatter/yaml.rs`, `formatter/yaml/options.rs`, and
+  `formatter.rs`. **No host golden fixture changed** — the full
+  workspace suite (incl. `golden_cases`) is green unmodified,
+  confirming byte parity with the retired pretty_yaml path across the
+  fixture set. `pretty_yaml` is now used only by the cross-validation
+  test (`yaml_cross_validation.rs`); the `Cargo.toml` deps are left in
+  place for 2c. clippy + fmt clean.
+- **Phase 2.0 — consumer/dependency audit (no code).** Mapped every
+  `yaml_parser` and `pretty_yaml` touch point ahead of the cutover.
+  Findings (full detail in the Phase 2 status bullet above):
+  `pretty_yaml` is formatting-only and lives in two live
+  `yaml_engine.rs` copies (`src/` host + `crates/panache-formatter/`),
+  both a clean text→text swap to `formatter::yaml::format_yaml`; the
+  in-tree formatter modules and the parser validator reference
+  `pretty_yaml` in comments/test-names only (no runtime dep).
+  `yaml_parser` is the real blocker — besides the CST/diagnostics
+  bridge it backs typed value extraction in `src/metadata/yaml.rs`,
+  `src/metadata/project.rs`, `src/bib/csl_yaml.rs`, `src/includes.rs`,
+  and `formatter/hashpipe.rs`, none of which have an in-tree
+  equivalent (the in-tree parser yields a raw rowan CST, no typed
+  AST). The narrow "CST-kind no-op swap" the original plan worried
+  about is a non-issue: host consumers only touch the wrapper kinds
+  (`YAML_METADATA`/`_CONTENT`/`_DELIM`, `YAML_CONTENT`,
+  `YAML_PREAMBLE`) via `.text()`, never interior structural kinds.
+  Conclusion: split Phase 2 into 2a (`pretty_yaml` formatter swap,
+  small) and 2b (`yaml_parser` value-extraction migration, its own
+  workstream); drop both deps in 2c. No source changes this session.
+
+- **Phase 1.15b — plain-scalar overflow wrap (rule 6's block-map
+  analog).** Closes the last functional gap from the Phase 2 readiness
+  probe (18/21 → 20/21 input hashpipe parity). Added
+  `apply_plain_scalar_wrap` to
+  `crates/panache-formatter/src/formatter/yaml/document.rs::render`,
+  inserted between rule 6's flow wrap and rule 10's trailing-WS strip.
+  Strategy: re-parse the post-indent buffer, walk
+  `YAML_BLOCK_MAP_VALUE` nodes; for each value whose direct child is a
+  single-line plain `YAML_SCALAR` (skip quoted `'…'`/`"…"`, block
+  `|`/`>`, multi-line, or values decorated with tags / anchors /
+  aliases / inline comments / inside a block sequence), greedy
+  word-wrap the scalar onto continuation lines at `depth * 2`
+  (matching rule 1's multi-line continuation column so wrap output
+  round-trips). Multi-space runs that aren't break points stay
+  verbatim; a multi-space run that IS the break point is consumed
+  entirely by `\n + indent` (pretty_yaml leaves the leading char as a
+  trailing space to preserve YAML's plain-scalar fold semantics, but
+  rule 10 would strip it anyway, so consuming it here keeps pass-2
+  byte-stable — same family of trades against pretty_yaml's semantic
+  preservation as rule 10's stance). Block-sequence values are
+  deliberately deferred: pretty_yaml's wrap continuation there
+  (`parent_content_col + 2`) disagrees with rule 1's multi-line
+  continuation (`depth * 2`), so pretty_yaml itself fails idempotency
+  on that shape — picking one column without breaking pass-2
+  stability needs a spec decision we don't need today (no host fixture
+  exercises a long single-line plain scalar in a block sequence).
+  Seven new corpus cases under
+  `tests/fixtures/yaml_corpus/plain_wrap/`:
+  `simple_block_map_overflow` (top-level depth 1),
+  `nested_block_map_overflow` (depth 2 with col-4 continuation),
+  `multiple_entries_one_overflows` (two-entry map; only the long
+  entry wraps), `already_wrapped_round_trip` (pretty_yaml output fed
+  back; sticks unchanged), `non_overflow_stays_single_line`
+  (no wrap at width 80), `quoted_value_preserved` (long `"…"` stays),
+  `block_scalar_value_preserved` (long `|` stays). Four new unit
+  tests in `yaml.rs` (`rule_6_plain_scalar_wraps_at_block_map_value`,
+  `rule_6_plain_scalar_wrap_skips_non_plain_and_short`,
+  `rule_6_plain_scalar_wrap_skips_inline_comment_and_decoration`,
+  `rule_6_plain_scalar_wrap_skips_block_sequence_value`). STYLE.md
+  rule 6 amended with the plain-scalar overflow paragraph (greedy
+  wrap, depth*2 continuation, scope restrictions, multi-space
+  semantics) and the header note bumped to reference 1.15b. yaml.rs
+  status block bumped. No live-pipeline changes. The one remaining
+  input-hashpipe gap (`issue_194_idempotency_lsj_tbl_cap`,
+  `*clinicaltrial.csv*  data`) is the deliberate rule 10 strip vs
+  pretty_yaml fold-semantic preserve trade — host fixture already
+  expects our shape, so the cutover commit is now clear.
+- **Phase 1.15 — multi-line scalar continuation canonicalization
+  (rule 1 extension).** Probe-driven: a one-shot survey under
+  `crates/panache-formatter/tests/yaml_fixture_survey.rs` (now
+  removed) ran `format_yaml` and `pretty_yaml::format_text` over the
+  YAML frontmatter and hashpipe payloads of every fixture under
+  `tests/fixtures/cases/`. Result: 7/35 expected-hashpipe and 8/21
+  input-hashpipe divergences clustered around multi-line plain /
+  single-quoted / double-quoted scalars whose continuation lines lost
+  their indent because rule 1's depth formula
+  (`entry/item ancestors − 1`) returned 0 for the continuation line's
+  containing entry. Fix: extend `canonical_indent_depth` in
+  `crates/panache-formatter/src/formatter/yaml/document.rs` to handle
+  multi-line `YAML_SCALAR` continuation lines explicitly — block
+  scalars (`|`/`>`) still preserve verbatim (no real renderer yet);
+  plain / single- / double-quoted continuation lines indent at
+  `entry/item ancestors * 2` (one level deeper than the default; the
+  scalar belongs to the value side of the entry, so its column is the
+  value column rather than the key column). Five new corpus cases
+  under `tests/fixtures/yaml_corpus/multiline_scalars/`
+  (`plain_continuation_canonical`, `double_quoted_continuation_canonical`,
+  `single_quoted_continuation_canonical`,
+  `double_quoted_continuation_one_space`,
+  `nested_value_continuation`). Two new unit tests in `yaml.rs`
+  (`rule_1_canonicalizes_multiline_plain_scalar_continuation`,
+  `rule_1_canonicalizes_multiline_quoted_scalar_continuation`).
+  STYLE.md rule 1 amended with the value-column note. The probe
+  results after this fix: 14/14 expected frontmatter, 15/15 input
+  frontmatter, 35/35 expected hashpipe, 18/21 input hashpipe parity.
+  The remaining 3 input-hashpipe gaps are all long single-line plain
+  scalars that pretty_yaml wraps and the in-tree formatter leaves
+  untouched — these are the Phase 2 blocker (plain-scalar overflow
+  wrap, rule 6's analog for block-map scalar values). The probe and
+  CST shape probes were one-shot tools and were removed after the fix
+  landed. No live-pipeline changes.
+- **Phase 1.14 — multi-line flow round-trip (parser + formatter).**
+  Two coupled changes that unblock the "multi-line flow input is
+  sticky" behavior parked in Phase 1.10. Parser-side: relaxed
+  `check_flow_continuation_indent` in
+  `crates/panache-parser/src/parser/yaml/validator.rs` so that a
+  continuation line whose first non-whitespace byte is the flow's
+  matching closing indicator (`]` for `YAML_FLOW_SEQUENCE`, `}` for
+  `YAML_FLOW_MAP`) is exempt from the strict `col > threshold` rule.
+  YAML 1.2 §7.1 reads the spec stricter than mainstream parsers — but
+  pretty_yaml, libyaml (via pandoc), and yaml.v3 (via yq) all emit
+  and accept the closing bracket on its own line at the parent
+  block-map's indent column, and the `parser` rule names pandoc as
+  the behavioral reference. Verified via probes (pandoc `-t native`
+  + yq) on depth-0 closing-`]`, depth-0 closing-`}`, and depth-1
+  nested cases. Five new unit tests in
+  `parser/yaml/validator.rs::tests` cover accept (depth-0 seq /
+  depth-1 seq / depth-0 map) and reject (CML9 comment line at parent
+  indent, 9C9N content lines at parent indent) directions; the three
+  existing yaml-test-suite snapshots (CML9, 9C9N, VJP3/00) still
+  carry their `LEX_WRONG_INDENTED_FLOW` diagnostics because the
+  carve-out only spares the closing indicator, not content/comment
+  lines at the threshold. Triage regen produced no bucket changes
+  (308 passes_now / 94 error_contract_ok unchanged).
+
+  Formatter-side: rule 1's
+  `canonical_indent_depth` returns `None` when the offset lands on a
+  continuation line of an enclosing multi-line `YAML_FLOW_SEQUENCE` /
+  `YAML_FLOW_MAP` (the ancestor flow's text contains a `\n` between
+  its start and the offset). Without this carve-out, rule 1 would
+  re-indent multi-line flow content as if it were block-map keys at
+  depth 0 (column 0), destroying the wrap that rule 6 produced and
+  breaking idempotency on every `flow_wrap/*.yaml` corpus case once
+  the parser stopped rejecting their pass-1 outputs. Three new
+  corpus cases under
+  `tests/fixtures/yaml_corpus/flow_wrap/`
+  (`sticky_multiline_depth_0`, `sticky_multiline_depth_1`,
+  `sticky_multiline_map`) feed pre-wrapped pretty_yaml output back
+  through the harness — they must parity-match pretty_yaml and
+  round-trip unchanged. One new unit test in
+  `formatter/yaml.rs::tests::rule_6_wrap_round_trips_multiline_input`
+  pins the depth-0 seq case at the API level. STYLE.md unchanged
+  (the spec already documented rule 6's wrap shape; this fixes
+  implementation). No live-pipeline changes — still shadow.
 - **Phase 1.13 — real-frontmatter harvest + rule 14
   (block-structural spacing).** Pulled six representative frontmatter
   blocks into `tests/fixtures/yaml_corpus/real/`:
@@ -500,57 +760,89 @@ root-causing).
 - Any parser CST shape gaps surfaced by the harness are fixed in
   `panache-parser` (separate commits).
 
-## Phase 2 — Joint cutover
+## Phase 2 — Cutover
 
-When Phase 1 exits, swap parser and formatter in one commit.
+Sequenced, not one commit (the original "joint cutover" framing was
+wrong — the pieces have independent blockers).
 
-### 2.1 — Parser side
+### 2a — `pretty_yaml` formatter swap — DONE
 
-- Update `crates/panache-parser/src/syntax/yaml.rs` to call the
-  in-tree parser (`parse_yaml_report`) and surface its CST shape into
-  the host CST.
-- Audit downstream consumers of the YAML CST shape: linter rules,
-  LSP, anything that walks
-  `SyntaxKind::YAML_*` nodes. The in-tree parser's `YAML_*` kinds
-  must already be the host CST's kinds for this to be a no-op (verify
-  before cutover).
+Both `yaml_engine.rs::format_yaml_with_config` bodies now call
+`formatter::yaml::format_yaml`. See "what landed."
 
-### 2.2 — Formatter side
+### 2b — `yaml_parser` value-extraction migration + dep drop — DONE
 
-- Replace `crates/panache-formatter/src/yaml_engine.rs::format_text`
-  call with `formatter::yaml::format_yaml`.
-- Remove the `pretty_yaml` dependency from
-  `crates/panache-formatter/Cargo.toml`.
-- Remove the `yaml_parser` dependency from `Cargo.toml` (root).
+Typed AST wrappers (`syntax/yaml_ast.rs`) over the in-tree CST; all five
+consumers + the diagnostics infra migrated; `yaml_parser` removed from
+the three manifests. **Re-parse-on-demand parity swap — host CST shape
+unchanged.** See "what landed."
 
-### 2.3 — Golden case regen
+### 2c — Embed the in-tree YAML CST into the host document CST — OUTSTANDING
 
-Expect host-level golden cases under `tests/fixtures/cases/*/` to
-shift on YAML-affecting cases. Each delta must:
-- Match the style spec (and pretty_yaml's output, by construction), or
-- Be a fix for a known bug captured by a `tests/yaml_corpus/` case, or
-- Be challenged before accepting.
+This is the actual end goal: the YAML tokens (`YAML_STREAM` /
+`YAML_DOCUMENT` / `YAML_BLOCK_MAP` / `YAML_BLOCK_MAP_ENTRY` / … /
+`YAML_SCALAR`) should live **inside the full document CST**, so
+frontmatter and hashpipe bodies are real structure, not opaque text
+that gets re-parsed on demand.
+
+- **Parser side.** Change `crates/panache-parser/src/parser/blocks/metadata.rs`
+  so that instead of emitting `YAML_METADATA_CONTENT` as raw line
+  tokens (`emit_line_tokens`), it runs the in-tree parser over the
+  frontmatter region and nests the resulting `YAML_STREAM` subtree
+  under `YAML_METADATA_CONTENT`. Must stay byte-lossless (every byte of
+  the region, including indentation/trivia, preserved) so the document
+  round-trips. Do the same for the hashpipe preamble content node
+  (`HASHPIPE_YAML_CONTENT`), carrying the `#|`-prefix → YAML-offset
+  mapping that `extract_hashpipe_region` already computes.
+- **Consumer simplification.** Once structure is in the host tree,
+  rewire `collect_yaml_regions` / the value-extraction consumers to
+  read the embedded subtree (via the `yaml_ast` wrappers, casting host
+  nodes directly) instead of re-parsing `region.content`. Drops the
+  second parse and the offset-remapping layer.
+- **Snapshot + losslessness churn.** Every YAML-touching parser CST
+  snapshot (`crates/panache-parser/tests/snapshots/`) shifts and needs
+  intentional re-blessing; the losslessness checks become the guardrail
+  that the embedded subtree preserves bytes. Land parser corpus cases
+  for the frontmatter/hashpipe embedding under the parser fixtures.
+- **Consumer audit.** Linter rules, LSP, salsa indexers, pandoc-ast
+  projector — anything that currently walks `YAML_METADATA_CONTENT` via
+  `.text()` keeps working (the content node still exists), but new
+  features (key goto, folding, semantic tokens, hover) become possible
+  by walking the nested `YAML_*` structure.
+
+### 2d — Drop `pretty_yaml` — OUTSTANDING
+
+`pretty_yaml` is runtime-unused since 2a; only
+`crates/panache-formatter/tests/yaml_cross_validation.rs` references it,
+and it transitively pulls `yaml_parser` into `Cargo.lock`. Retire or
+re-base that cross-validation test (the in-tree formatter's own corpus +
+idempotency harness is the durable bar), then remove `pretty_yaml` from
+the root and `panache-formatter` manifests. After this, both
+`yaml_parser` and `pretty_yaml` are gone from `Cargo.lock`.
 
 ### Exit criteria for Phase 2
 
-- `yaml_parser` and `pretty_yaml` removed from `Cargo.lock`.
-- All host golden cases green; deltas annotated.
-- `cargo test` workspace green.
-- Triage of parser-side regressions (if any) — should be zero per the
-  shape audit, but verify.
+- `yaml_parser` and `pretty_yaml` removed from `Cargo.lock` (2d).
+- Host document CST carries nested YAML structure for frontmatter and
+  hashpipe; no on-demand re-parse of frontmatter content remains (2c).
+- All host golden + parser CST snapshots green; deltas annotated.
+- `cargo test` workspace green; losslessness holds across the embedding.
 
 ## Phase 3 — Hashpipe extension
 
 Same parser + formatter, exercised through the existing hashpipe
 normalization path.
 
-### 3.1 — Wire-up
+### 3.1 — Wire-up — effectively DONE via 2a + 2b
 
-- `crates/panache-formatter/src/formatter/hashpipe.rs` already calls
-  the YAML engine for option bodies. Re-point it to
-  `formatter::yaml::format_yaml` with hashpipe normalization.
-- Confirm `normalize_hashpipe_input` behaviour matches what the
-  formatter expects (it strips `#|`; the formatter re-prefixes).
+`hashpipe.rs` formats option bodies through
+`yaml_engine::format_yaml_with_config` (line ~770), which 2a repointed
+to `formatter::yaml::format_yaml` — so hashpipe formatting already runs
+on the in-tree formatter; there was no separate hashpipe formatting path
+to cut over. Hashpipe *value extraction* migrated to the in-tree
+wrappers in 2b. `normalize_hashpipe_input` behaviour is unchanged
+(strips `#|`; the formatter re-prefixes). Remaining wire-up work folds
+into 2c (nest the hashpipe preamble's YAML structure into the host CST).
 
 ### 3.2 — Hashpipe-specific fixtures
 

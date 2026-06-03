@@ -3,12 +3,14 @@
 //! Two layers live in this module:
 //!
 //! 1. **Orchestrator** — [`parse_shadow`], [`parse_yaml_tree`], and
-//!    [`parse_yaml_report`]. These wrap [`parse_stream`] in the
-//!    `DOCUMENT > YAML_METADATA_CONTENT > YAML_STREAM` envelope
-//!    expected by the host CST, run the structural
-//!    [`super::validator::validate_yaml`] pass, and surface
-//!    diagnostics. Shadow-mode (`parse_shadow`) keeps a probe path the
-//!    integration harness can flip on for prototype reporting.
+//!    [`parse_yaml_report`]. These drive [`parse_stream`] for a pure-YAML
+//!    parse rooted at `YAML_STREAM`, run the structural
+//!    [`super::validator::validate_yaml`] pass, and surface diagnostics.
+//!    Host envelope wrappers (`DOCUMENT`, `YAML_METADATA_CONTENT`,
+//!    `HASHPIPE_YAML_CONTENT`) are added by the host parser at embedding
+//!    sites and are not concerns of the standalone YAML parse path.
+//!    Shadow-mode (`parse_shadow`) keeps a probe path the integration
+//!    harness can flip on for prototype reporting.
 //!
 //! 2. **Streaming parser** — [`parse_stream`] drives
 //!    [`super::scanner::Scanner`] and emits the rowan green tree. Each
@@ -121,40 +123,10 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
         };
     }
 
-    let stream = parse_stream(input);
-    let mut builder = GreenNodeBuilder::new();
-    builder.start_node(SyntaxKind::DOCUMENT.into());
-    builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
-    let stream_green = stream.green().into_owned();
-    builder.start_node(SyntaxKind::YAML_STREAM.into());
-    for child in stream_green.children() {
-        match child {
-            rowan::NodeOrToken::Node(n) => {
-                push_green_node(&mut builder, n);
-            }
-            rowan::NodeOrToken::Token(t) => {
-                builder.token(t.kind(), t.text());
-            }
-        }
-    }
-    builder.finish_node(); // YAML_STREAM
-    builder.finish_node(); // YAML_METADATA_CONTENT
-    builder.finish_node(); // DOCUMENT
     YamlParseReport {
-        tree: Some(SyntaxNode::new_root(builder.finish())),
+        tree: Some(parse_stream(input)),
         diagnostics: Vec::new(),
     }
-}
-
-fn push_green_node(builder: &mut GreenNodeBuilder<'_>, node: &rowan::GreenNodeData) {
-    builder.start_node(node.kind());
-    for child in node.children() {
-        match child {
-            rowan::NodeOrToken::Node(n) => push_green_node(builder, n),
-            rowan::NodeOrToken::Token(t) => builder.token(t.kind(), t.text()),
-        }
-    }
-    builder.finish_node();
 }
 
 /// Drive the scanner over `input` and build a CST. Always returns a

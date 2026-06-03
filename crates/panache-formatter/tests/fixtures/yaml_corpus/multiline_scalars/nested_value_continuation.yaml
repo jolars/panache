@@ -1,0 +1,3 @@
+outer:
+  inner: A long plain scalar value that already spans
+    two lines under the inner key.

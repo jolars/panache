@@ -7,9 +7,7 @@ input: "\"2 inline\\\ttab\"\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..16
-  YAML_METADATA_CONTENT@0..16
-    YAML_STREAM@0..16
-      YAML_DOCUMENT@0..16
-        YAML_SCALAR@0..15 "\"2 inline\\\ttab\""
-        NEWLINE@15..16 "\n"
+YAML_STREAM@0..16
+  YAML_DOCUMENT@0..16
+    YAML_SCALAR@0..15 "\"2 inline\\\ttab\""
+    NEWLINE@15..16 "\n"

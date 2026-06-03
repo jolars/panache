@@ -26,6 +26,7 @@ pub mod references;
 pub mod shortcodes;
 pub mod tables;
 pub mod yaml;
+pub mod yaml_ast;
 
 pub use alerts::*;
 pub use ast::*;
@@ -49,6 +50,7 @@ pub use references::*;
 pub use shortcodes::*;
 pub use tables::*;
 pub use yaml::*;
+pub use yaml_ast::*;
 
 pub type SyntaxNode = rowan::SyntaxNode<PanacheLanguage>;
 pub type SyntaxToken = rowan::SyntaxToken<PanacheLanguage>;

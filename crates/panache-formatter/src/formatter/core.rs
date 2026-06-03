@@ -1008,16 +1008,28 @@ impl Formatter {
                 }
 
                 // Walk descendants and skip BLOCK_QUOTE_MARKER + the immediately
-                // following WHITESPACE; the parser keeps those tokens inside
-                // HTML_BLOCK_CONTENT for losslessness but the BLOCK_QUOTE
-                // handler is the source of truth for marker re-emission.
+                // following WHITESPACE when the marker is a "leaked" prefix from
+                // an enclosing BLOCK_QUOTE (parser keeps prefix tokens inside
+                // HTML_BLOCK_CONTENT for losslessness; the enclosing BLOCK_QUOTE
+                // handler re-emits markers dynamically). When the marker's parent
+                // is itself a BLOCK_QUOTE, the BLOCK_QUOTE is a structural child
+                // of this HTML_BLOCK and the marker is part of the child — keep
+                // it so the quote isn't flattened to a paragraph (issue #350).
                 let mut text = String::new();
                 let mut skip_next_ws = false;
                 for el in node.descendants_with_tokens() {
                     if let NodeOrToken::Token(t) = el {
                         match t.kind() {
                             SyntaxKind::BLOCK_QUOTE_MARKER => {
-                                skip_next_ws = true;
+                                let parent_is_block_quote = t
+                                    .parent()
+                                    .is_some_and(|p| p.kind() == SyntaxKind::BLOCK_QUOTE);
+                                if parent_is_block_quote {
+                                    skip_next_ws = false;
+                                    text.push_str(t.text());
+                                } else {
+                                    skip_next_ws = true;
+                                }
                             }
                             SyntaxKind::WHITESPACE if skip_next_ws => {
                                 skip_next_ws = false;

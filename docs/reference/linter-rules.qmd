@@ -856,7 +856,8 @@ warning[footnote-ref-in-footnote-def]: Footnote reference '[^b]' inside a footno
 ### `stray-fenced-div-markers` {#stray-fenced-div-markers}
 
 Detects runs of three or more colons (`:::`, `::::`, ...) that appear inside
-paragraph text instead of parsing as fenced div markers.
+inline text (paragraphs, tight list items, definition list bodies, table cells)
+instead of parsing as fenced div markers.
 
 Severity
 :   Warning
@@ -886,11 +887,12 @@ Description
     flagging the same condition at lint time.
 
     The rule fires on any run of three or more `:` characters that survives as plain
-    text inside a paragraph. Code spans (`` `:::` ``), indented code blocks, and raw
-    HTML blocks are not flagged because the colons there are not paragraph text.
-    Authentic prose mentions of `:::` (writing about Pandoc syntax) should be
-    wrapped in backticks anyway---runs of three or more consecutive colons are
-    otherwise extremely rare in natural text.
+    text inside paragraph-like inline content (paragraphs, tight list items,
+    definition list bodies, table cells). Code spans (`` `:::` ``), indented code
+    blocks, and raw HTML blocks are not flagged because the colons there are not
+    inline text. Authentic prose mentions of `:::` (writing about Pandoc syntax)
+    should be wrapped in backticks anyway---runs of three or more consecutive colons
+    are otherwise extremely rare in natural text.
 
 **Example violations:**
 

@@ -7,8 +7,6 @@ input: ">\n Sammy Sosa completed another\n fine season with great stats.\n\n   6
 diagnostics:
 
 cst:
-DOCUMENT@0..120
-  YAML_METADATA_CONTENT@0..120
-    YAML_STREAM@0..120
-      YAML_DOCUMENT@0..120
-        YAML_SCALAR@0..120 ">\n Sammy Sosa complet ..."
+YAML_STREAM@0..120
+  YAML_DOCUMENT@0..120
+    YAML_SCALAR@0..120 ">\n Sammy Sosa complet ..."

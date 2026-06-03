@@ -22,7 +22,7 @@ impl Rule for StrayFencedDivMarkersRule {
         let mut diagnostics = Vec::new();
 
         for node in tree.descendants() {
-            if node.kind() != SyntaxKind::PARAGRAPH {
+            if !matches!(node.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN) {
                 continue;
             }
             for elem in node.descendants_with_tokens() {
@@ -340,6 +340,18 @@ mod tests {
         let diagnostics = parse_and_lint(input);
         assert_eq!(diagnostics.len(), 1);
         assert!(diagnostics[0].message.contains("appears as text"));
+    }
+
+    #[test]
+    fn flags_colons_trailing_a_tight_list_item() {
+        // Issue #333 follow-up: in a tight list item the inline content lives
+        // under PLAIN, not PARAGRAPH. The rule must still catch ':::' there.
+        let input = "- a list item :::\n";
+        let diagnostics = parse_and_lint(input);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "stray-fenced-div-markers");
+        assert_eq!(diagnostics[0].location.line, 1);
+        assert!(diagnostics[0].message.contains(":::"));
     }
 
     #[test]

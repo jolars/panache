@@ -1,0 +1,2 @@
+tbl-cap: This is a long caption that should wrap onto multiple lines because it
+  exceeds the line width of eighty.

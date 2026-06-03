@@ -7,12 +7,10 @@ input: "- |+\n   \n"
 diagnostics:
 
 cst:
-DOCUMENT@0..9
-  YAML_METADATA_CONTENT@0..9
-    YAML_STREAM@0..9
-      YAML_DOCUMENT@0..9
-        YAML_BLOCK_SEQUENCE@0..9
-          YAML_BLOCK_SEQUENCE_ITEM@0..9
-            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
-            WHITESPACE@1..2 " "
-            YAML_SCALAR@2..9 "|+\n   \n"
+YAML_STREAM@0..9
+  YAML_DOCUMENT@0..9
+    YAML_BLOCK_SEQUENCE@0..9
+      YAML_BLOCK_SEQUENCE_ITEM@0..9
+        YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+        WHITESPACE@1..2 " "
+        YAML_SCALAR@2..9 "|+\n   \n"

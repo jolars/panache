@@ -3218,13 +3218,17 @@ impl<'a> Parser<'a> {
                     if matches!(block_match.effect, BlockEffect::OpenList)
                         && self.is_paragraph_open()
                         && !lists::in_list(&self.containers)
-                        && self.content_container_indent_to_strip() == 0
+                        && (self.content_container_indent_to_strip() == 0
+                            || self.in_footnote_definition())
                     {
                         // CommonMark §5.2: bullet lists and ordered lists with
                         // start = 1 may interrupt a paragraph; ordered lists
                         // with any other start cannot. Pandoc-markdown forbids
                         // *any* list from interrupting a paragraph without a
-                        // blank line.
+                        // blank line. Footnote-definition bodies are also
+                        // strict in pandoc-native: even `1.` is treated as
+                        // paragraph text, not a sublist (verified via
+                        // `pandoc -f markdown -t native`).
                         let allow_interrupt =
                             self.config.dialect == crate::options::Dialect::CommonMark && {
                                 use super::block_dispatcher::ListPrepared;

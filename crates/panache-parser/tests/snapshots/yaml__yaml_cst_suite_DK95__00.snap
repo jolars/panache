@@ -7,17 +7,15 @@ input: "foo:\n \tbar\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..11
-  YAML_METADATA_CONTENT@0..11
-    YAML_STREAM@0..11
-      YAML_DOCUMENT@0..11
-        YAML_BLOCK_MAP@0..11
-          YAML_BLOCK_MAP_ENTRY@0..11
-            YAML_BLOCK_MAP_KEY@0..4
-              YAML_SCALAR@0..3 "foo"
-              YAML_COLON@3..4 ":"
-            YAML_BLOCK_MAP_VALUE@4..11
-              NEWLINE@4..5 "\n"
-              WHITESPACE@5..7 " \t"
-              YAML_SCALAR@7..10 "bar"
-              NEWLINE@10..11 "\n"
+YAML_STREAM@0..11
+  YAML_DOCUMENT@0..11
+    YAML_BLOCK_MAP@0..11
+      YAML_BLOCK_MAP_ENTRY@0..11
+        YAML_BLOCK_MAP_KEY@0..4
+          YAML_SCALAR@0..3 "foo"
+          YAML_COLON@3..4 ":"
+        YAML_BLOCK_MAP_VALUE@4..11
+          NEWLINE@4..5 "\n"
+          WHITESPACE@5..7 " \t"
+          YAML_SCALAR@7..10 "bar"
+          NEWLINE@10..11 "\n"

@@ -7,9 +7,7 @@ input: "\"3 leading\n    \ttab\"\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..21
-  YAML_METADATA_CONTENT@0..21
-    YAML_STREAM@0..21
-      YAML_DOCUMENT@0..21
-        YAML_SCALAR@0..20 "\"3 leading\n    \ttab\""
-        NEWLINE@20..21 "\n"
+YAML_STREAM@0..21
+  YAML_DOCUMENT@0..21
+    YAML_SCALAR@0..20 "\"3 leading\n    \ttab\""
+    NEWLINE@20..21 "\n"

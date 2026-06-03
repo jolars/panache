@@ -3,10 +3,10 @@
 use std::path::Path;
 
 use rowan::TextSize;
-use rowan::ast::AstNode as _;
 
 use super::{BibliographyInfo, BibliographyParse, DocumentMetadata, InlineReference};
 use crate::bib;
+use crate::syntax::{YamlBlockMap, YamlBlockMapValue, parse_yaml_document};
 
 /// Errors that can occur during YAML parsing.
 #[derive(Debug, Clone)]
@@ -77,31 +77,19 @@ pub(super) fn parse_frontmatter(
         }
     })?;
 
-    let root = yaml_parser::ast::Root::cast(yaml_parser::parse(&yaml_content).map_err(|err| {
-        let content_byte_offset = err.offset().min(yaml_content.len());
-        let (line, column) = byte_offset_to_line_col_1based(&yaml_content, content_byte_offset);
-        YamlError::ParseError {
-            message: err.message().to_string(),
-            line: line as u64,
-            column: column as u64,
-            byte_offset: Some(doc_base_offset + content_byte_offset),
-        }
-    })?)
-    .ok_or_else(|| YamlError::StructureError("Invalid YAML root".to_string()))?;
-    let map = root
-        .documents()
-        .next()
-        .and_then(|doc| doc.block())
-        .and_then(|block| block.block_map());
+    // The structural validity gate above already produced any parse error;
+    // here we only need the tree to extract values from.
+    let map = parse_yaml_document(&yaml_content).and_then(|doc| doc.block_map());
 
     let title = map
         .as_ref()
         .and_then(|map| map_entry_value(map, "title"))
+        .as_ref()
         .and_then(block_map_value_to_scalar);
     let bibliography_values = map
         .as_ref()
         .and_then(|map| map_entry_value(map, "bibliography"))
-        .map(block_map_value_to_scalar_list)
+        .map(|value| block_map_value_to_scalar_list(&value))
         .unwrap_or_default();
     let bibliography = if bibliography_values.is_empty() {
         None
@@ -135,7 +123,7 @@ pub(super) fn parse_frontmatter(
     let inline_references = map
         .as_ref()
         .and_then(|map| map_entry_value(map, "references"))
-        .map(|value| extract_inline_references_from_yaml(value, doc_base_offset, doc_path))
+        .map(|value| extract_inline_references_from_yaml(&value, doc_base_offset, doc_path))
         .unwrap_or_default();
 
     Ok(DocumentMetadata {
@@ -150,83 +138,47 @@ pub(super) fn parse_frontmatter(
     })
 }
 
-fn map_entry_value(
-    map: &yaml_parser::ast::BlockMap,
-    key: &str,
-) -> Option<yaml_parser::ast::BlockMapValue> {
-    map.entries()
-        .find(|entry| block_map_entry_key(entry).as_deref() == Some(key))
-        .and_then(|entry| entry.value())
+fn map_entry_value(map: &YamlBlockMap, key: &str) -> Option<YamlBlockMapValue> {
+    map.value_of(key)
 }
 
-fn block_map_entry_key(entry: &yaml_parser::ast::BlockMapEntry) -> Option<String> {
-    let key = entry.key()?;
-    if let Some(flow) = key.flow() {
-        return flow_scalar_text(&flow);
-    }
-    let block = key.block()?;
-    let flow = block_to_flow_scalar(&block)?;
-    flow_scalar_text(&flow)
+fn block_map_value_to_scalar(value: &YamlBlockMapValue) -> Option<ScalarValue> {
+    value.as_scalar().map(scalar_value)
 }
 
-fn block_map_value_to_scalar(value: yaml_parser::ast::BlockMapValue) -> Option<ScalarValue> {
-    if let Some(flow) = value.flow() {
-        return flow_scalar(&flow);
+fn block_map_value_to_scalar_list(value: &YamlBlockMapValue) -> Vec<ScalarValue> {
+    if let Some(single) = value.as_scalar() {
+        return vec![scalar_value(single)];
     }
-    let block = value.block()?;
-    let flow = block_to_flow_scalar(&block)?;
-    flow_scalar(&flow)
-}
-
-fn block_map_value_to_scalar_list(value: yaml_parser::ast::BlockMapValue) -> Vec<ScalarValue> {
-    if let Some(single) = block_map_value_to_scalar(value.clone()) {
-        return vec![single];
-    }
-    if let Some(flow) = value.flow()
-        && let Some(seq) = flow.flow_seq()
-    {
+    if let Some(seq) = value.as_flow_sequence() {
         return seq
-            .entries()
-            .into_iter()
-            .flat_map(|entries| entries.entries())
-            .filter_map(|entry| entry.flow().and_then(|flow| flow_scalar(&flow)))
+            .items()
+            .filter_map(|i| i.as_scalar())
+            .map(scalar_value)
             .collect();
     }
-    if let Some(block) = value.block()
-        && let Some(seq) = block.block_seq()
-    {
+    if let Some(seq) = value.as_block_sequence() {
         return seq
-            .entries()
-            .filter_map(|entry| {
-                if let Some(flow) = entry.flow() {
-                    return flow_scalar(&flow);
-                }
-                let block = entry.block()?;
-                let flow = block_to_flow_scalar(&block)?;
-                flow_scalar(&flow)
-            })
+            .items()
+            .filter_map(|i| i.as_scalar())
+            .map(scalar_value)
             .collect();
     }
     Vec::new()
 }
 
 fn extract_inline_references_from_yaml(
-    references: yaml_parser::ast::BlockMapValue,
+    references: &YamlBlockMapValue,
     doc_base_offset: usize,
     doc_path: &Path,
 ) -> Vec<InlineReference> {
-    let Some(block) = references.block() else {
+    let Some(seq) = references.as_block_sequence() else {
         return Vec::new();
     };
-    let Some(seq) = block.block_seq() else {
-        return Vec::new();
-    };
-    seq.entries()
-        .filter_map(|entry| {
-            let block = entry.block()?;
-            let map = block.block_map()?;
-            let id_value = map_entry_value(&map, "id")?;
-            let id = block_map_value_to_scalar(id_value)?;
+    seq.items()
+        .filter_map(|item| {
+            let map = item.as_block_map()?;
+            let id = block_map_value_to_scalar(&map.value_of("id")?)?;
             Some(InlineReference {
                 id: id.value,
                 range: absolute_text_range(doc_base_offset, id.range),
@@ -236,37 +188,12 @@ fn extract_inline_references_from_yaml(
         .collect()
 }
 
-fn block_to_flow_scalar(block: &yaml_parser::ast::Block) -> Option<yaml_parser::ast::Flow> {
-    block
-        .syntax()
-        .children()
-        .find_map(yaml_parser::ast::Flow::cast)
-}
-
-fn flow_scalar(flow: &yaml_parser::ast::Flow) -> Option<ScalarValue> {
-    let token = if let Some(token) = flow.plain_scalar() {
-        token
-    } else if let Some(token) = flow.single_quoted_scalar() {
-        token
-    } else {
-        flow.double_qouted_scalar()?
-    };
-    let mut value = token.text().to_string();
-    if token.kind() == yaml_parser::SyntaxKind::SINGLE_QUOTED_SCALAR {
-        value = value.trim_matches('\'').to_string();
-    } else if token.kind() == yaml_parser::SyntaxKind::DOUBLE_QUOTED_SCALAR {
-        value = value.trim_matches('"').to_string();
+fn scalar_value(scalar: crate::syntax::YamlScalar) -> ScalarValue {
+    let range = scalar.text_range();
+    ScalarValue {
+        value: scalar.value(),
+        range: range.start().into()..range.end().into(),
     }
-    let start: usize = token.text_range().start().into();
-    let end: usize = token.text_range().end().into();
-    Some(ScalarValue {
-        value,
-        range: start..end,
-    })
-}
-
-fn flow_scalar_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
-    flow_scalar(flow).map(|scalar| scalar.value)
 }
 
 fn absolute_text_range(base_offset: usize, range: std::ops::Range<usize>) -> rowan::TextRange {
@@ -392,6 +319,15 @@ mod tests {
         let input = "---\ntitle: Test\n...";
         let stripped = strip_yaml_delimiters(input);
         assert_eq!(stripped, "title: Test");
+    }
+
+    #[test]
+    fn test_title_cooks_single_quoted_escaped_apostrophe() {
+        // The in-tree wrappers cook quoted scalars (vs. the old naive
+        // `trim_matches`), so a doubled single quote decodes to one apostrophe.
+        let yaml = "---\ntitle: 'it''s a test'\n---";
+        let metadata = parse_frontmatter(yaml, TextSize::from(0), Path::new("test.qmd")).unwrap();
+        assert_eq!(metadata.title.as_deref(), Some("it's a test"));
     }
 
     #[test]

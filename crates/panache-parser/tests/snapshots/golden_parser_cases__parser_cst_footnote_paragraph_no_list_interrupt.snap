@@ -1,0 +1,29 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..188
+  FOOTNOTE_DEFINITION@0..168
+    FOOTNOTE_LABEL_START@0..2 "[^"
+    FOOTNOTE_LABEL_ID@2..3 "a"
+    FOOTNOTE_LABEL_END@3..4 "]"
+    FOOTNOTE_LABEL_COLON@4..5 ":"
+    WHITESPACE@5..6 " "
+    PARAGRAPH@6..168
+      TEXT@6..40 "opener and some text  ..."
+      NEWLINE@40..41 "\n"
+      TEXT@41..81 "    multiple indented ..."
+      NEWLINE@81..82 "\n"
+      TEXT@82..125 "    0. this leading o ..."
+      NEWLINE@125..126 "\n"
+      TEXT@126..167 "    start a new list  ..."
+      NEWLINE@167..168 "\n"
+  BLANK_LINE@168..169
+    BLANK_LINE@168..169 "\n"
+  PARAGRAPH@169..188
+    TEXT@169..183 "text with ref "
+    FOOTNOTE_REFERENCE@183..187
+      FOOTNOTE_LABEL_START@183..185 "[^"
+      FOOTNOTE_LABEL_ID@185..186 "a"
+      FOOTNOTE_LABEL_END@186..187 "]"
+    NEWLINE@187..188 "\n"

@@ -7,24 +7,22 @@ input: "Folding:\n  \"Empty line\n\n  as a line feed\"\nChomping: |\n  Clipped e
 diagnostics:
 
 cst:
-DOCUMENT@0..79
-  YAML_METADATA_CONTENT@0..79
-    YAML_STREAM@0..79
-      YAML_DOCUMENT@0..79
-        YAML_BLOCK_MAP@0..79
-          YAML_BLOCK_MAP_ENTRY@0..42
-            YAML_BLOCK_MAP_KEY@0..8
-              YAML_SCALAR@0..7 "Folding"
-              YAML_COLON@7..8 ":"
-            YAML_BLOCK_MAP_VALUE@8..42
-              NEWLINE@8..9 "\n"
-              WHITESPACE@9..11 "  "
-              YAML_SCALAR@11..41 "\"Empty line\n\n  as a l ..."
-              NEWLINE@41..42 "\n"
-          YAML_BLOCK_MAP_ENTRY@42..79
-            YAML_BLOCK_MAP_KEY@42..51
-              YAML_SCALAR@42..50 "Chomping"
-              YAML_COLON@50..51 ":"
-            YAML_BLOCK_MAP_VALUE@51..79
-              WHITESPACE@51..52 " "
-              YAML_SCALAR@52..79 "|\n  Clipped empty lin ..."
+YAML_STREAM@0..79
+  YAML_DOCUMENT@0..79
+    YAML_BLOCK_MAP@0..79
+      YAML_BLOCK_MAP_ENTRY@0..42
+        YAML_BLOCK_MAP_KEY@0..8
+          YAML_SCALAR@0..7 "Folding"
+          YAML_COLON@7..8 ":"
+        YAML_BLOCK_MAP_VALUE@8..42
+          NEWLINE@8..9 "\n"
+          WHITESPACE@9..11 "  "
+          YAML_SCALAR@11..41 "\"Empty line\n\n  as a l ..."
+          NEWLINE@41..42 "\n"
+      YAML_BLOCK_MAP_ENTRY@42..79
+        YAML_BLOCK_MAP_KEY@42..51
+          YAML_SCALAR@42..50 "Chomping"
+          YAML_COLON@50..51 ":"
+        YAML_BLOCK_MAP_VALUE@51..79
+          WHITESPACE@51..52 " "
+          YAML_SCALAR@52..79 "|\n  Clipped empty lin ..."

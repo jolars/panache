@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 283
 expression: snapshot
 ---
 case_id: JS2J
@@ -8,26 +7,24 @@ input: "First occurrence: &anchor Value\nSecond occurrence: *anchor\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..59
-  YAML_METADATA_CONTENT@0..59
-    YAML_STREAM@0..59
-      YAML_DOCUMENT@0..59
-        YAML_BLOCK_MAP@0..59
-          YAML_BLOCK_MAP_ENTRY@0..32
-            YAML_BLOCK_MAP_KEY@0..17
-              YAML_SCALAR@0..16 "First occurrence"
-              YAML_COLON@16..17 ":"
-            YAML_BLOCK_MAP_VALUE@17..32
-              WHITESPACE@17..18 " "
-              YAML_ANCHOR@18..25 "&anchor"
-              WHITESPACE@25..26 " "
-              YAML_SCALAR@26..31 "Value"
-              NEWLINE@31..32 "\n"
-          YAML_BLOCK_MAP_ENTRY@32..59
-            YAML_BLOCK_MAP_KEY@32..50
-              YAML_SCALAR@32..49 "Second occurrence"
-              YAML_COLON@49..50 ":"
-            YAML_BLOCK_MAP_VALUE@50..59
-              WHITESPACE@50..51 " "
-              YAML_ALIAS@51..58 "*anchor"
-              NEWLINE@58..59 "\n"
+YAML_STREAM@0..59
+  YAML_DOCUMENT@0..59
+    YAML_BLOCK_MAP@0..59
+      YAML_BLOCK_MAP_ENTRY@0..32
+        YAML_BLOCK_MAP_KEY@0..17
+          YAML_SCALAR@0..16 "First occurrence"
+          YAML_COLON@16..17 ":"
+        YAML_BLOCK_MAP_VALUE@17..32
+          WHITESPACE@17..18 " "
+          YAML_ANCHOR@18..25 "&anchor"
+          WHITESPACE@25..26 " "
+          YAML_SCALAR@26..31 "Value"
+          NEWLINE@31..32 "\n"
+      YAML_BLOCK_MAP_ENTRY@32..59
+        YAML_BLOCK_MAP_KEY@32..50
+          YAML_SCALAR@32..49 "Second occurrence"
+          YAML_COLON@49..50 ":"
+        YAML_BLOCK_MAP_VALUE@50..59
+          WHITESPACE@50..51 " "
+          YAML_ALIAS@51..58 "*anchor"
+          NEWLINE@58..59 "\n"

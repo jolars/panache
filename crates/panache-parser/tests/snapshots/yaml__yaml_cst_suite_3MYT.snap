@@ -7,11 +7,9 @@ input: "---\nk:#foo\n &a !t s\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..20
-  YAML_METADATA_CONTENT@0..20
-    YAML_STREAM@0..20
-      YAML_DOCUMENT@0..20
-        YAML_DOCUMENT_START@0..3 "---"
-        NEWLINE@3..4 "\n"
-        YAML_SCALAR@4..19 "k:#foo\n &a !t s"
-        NEWLINE@19..20 "\n"
+YAML_STREAM@0..20
+  YAML_DOCUMENT@0..20
+    YAML_DOCUMENT_START@0..3 "---"
+    NEWLINE@3..4 "\n"
+    YAML_SCALAR@4..19 "k:#foo\n &a !t s"
+    NEWLINE@19..20 "\n"

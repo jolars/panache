@@ -1,0 +1,2 @@
+outer:
+  inner: This is a nested long value that needs to wrap because of the line width limit.

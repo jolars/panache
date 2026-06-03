@@ -7,11 +7,9 @@ input: "%YAMLL 1.1\n---\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..15
-  YAML_METADATA_CONTENT@0..15
-    YAML_STREAM@0..15
-      YAML_DOCUMENT@0..15
-        YAML_SCALAR@0..10 "%YAMLL 1.1"
-        NEWLINE@10..11 "\n"
-        YAML_DOCUMENT_START@11..14 "---"
-        NEWLINE@14..15 "\n"
+YAML_STREAM@0..15
+  YAML_DOCUMENT@0..15
+    YAML_SCALAR@0..10 "%YAMLL 1.1"
+    NEWLINE@10..11 "\n"
+    YAML_DOCUMENT_START@11..14 "---"
+    NEWLINE@14..15 "\n"

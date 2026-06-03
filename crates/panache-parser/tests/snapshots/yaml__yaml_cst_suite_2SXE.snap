@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 283
 expression: snapshot
 ---
 case_id: 2SXE
@@ -8,29 +7,27 @@ input: "&a: key: &a value\nfoo:\n  *a:\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..29
-  YAML_METADATA_CONTENT@0..29
-    YAML_STREAM@0..29
-      YAML_DOCUMENT@0..29
-        YAML_BLOCK_MAP@0..29
-          YAML_BLOCK_MAP_ENTRY@0..18
-            YAML_BLOCK_MAP_KEY@0..8
-              YAML_ANCHOR@0..3 "&a:"
-              WHITESPACE@3..4 " "
-              YAML_SCALAR@4..7 "key"
-              YAML_COLON@7..8 ":"
-            YAML_BLOCK_MAP_VALUE@8..18
-              WHITESPACE@8..9 " "
-              YAML_ANCHOR@9..11 "&a"
-              WHITESPACE@11..12 " "
-              YAML_SCALAR@12..17 "value"
-              NEWLINE@17..18 "\n"
-          YAML_BLOCK_MAP_ENTRY@18..29
-            YAML_BLOCK_MAP_KEY@18..22
-              YAML_SCALAR@18..21 "foo"
-              YAML_COLON@21..22 ":"
-            YAML_BLOCK_MAP_VALUE@22..29
-              NEWLINE@22..23 "\n"
-              WHITESPACE@23..25 "  "
-              YAML_ALIAS@25..28 "*a:"
-              NEWLINE@28..29 "\n"
+YAML_STREAM@0..29
+  YAML_DOCUMENT@0..29
+    YAML_BLOCK_MAP@0..29
+      YAML_BLOCK_MAP_ENTRY@0..18
+        YAML_BLOCK_MAP_KEY@0..8
+          YAML_ANCHOR@0..3 "&a:"
+          WHITESPACE@3..4 " "
+          YAML_SCALAR@4..7 "key"
+          YAML_COLON@7..8 ":"
+        YAML_BLOCK_MAP_VALUE@8..18
+          WHITESPACE@8..9 " "
+          YAML_ANCHOR@9..11 "&a"
+          WHITESPACE@11..12 " "
+          YAML_SCALAR@12..17 "value"
+          NEWLINE@17..18 "\n"
+      YAML_BLOCK_MAP_ENTRY@18..29
+        YAML_BLOCK_MAP_KEY@18..22
+          YAML_SCALAR@18..21 "foo"
+          YAML_COLON@21..22 ":"
+        YAML_BLOCK_MAP_VALUE@22..29
+          NEWLINE@22..23 "\n"
+          WHITESPACE@23..25 "  "
+          YAML_ALIAS@25..28 "*a:"
+          NEWLINE@28..29 "\n"

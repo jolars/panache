@@ -7,8 +7,6 @@ input: "# Comment only.\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..16
-  YAML_METADATA_CONTENT@0..16
-    YAML_STREAM@0..16
-      YAML_COMMENT@0..15 "# Comment only."
-      NEWLINE@15..16 "\n"
+YAML_STREAM@0..16
+  YAML_COMMENT@0..15 "# Comment only."
+  NEWLINE@15..16 "\n"

@@ -9,7 +9,9 @@ and Prettier 3.6.2 on a 15-case battery of representative frontmatter --- both
 agree on the spec; rule 6's bracket placement is the one point where they
 differ, and the rule pins pretty_yaml's choice. Rule 13 (trailing newline) and
 rule 14 (block-structural spacing) were cross-validated against pretty_yaml
-later, during the Phase 1 corpus harness rollout.
+later, during the Phase 1 corpus harness rollout. Rule 6's plain-scalar overflow
+analog (block-map values) was cross-validated against pretty_yaml during Phase
+1.15b on the `plain_wrap/` corpus.
 
 pretty_yaml is the cross-validation reference because it implements the same
 rules. It is not the source of truth: this document is. If the formatter
@@ -24,11 +26,14 @@ the load-bearing invariants.
    the line's containing `YAML_BLOCK_MAP_ENTRY` + `YAML_BLOCK_SEQUENCE_ITEM`
    ancestors. Root-level entries/items get 0 spaces. Tab-indented input is
    rejected by the in-tree parser outright, so the formatter never sees it.
-   Block-scalar (`|`/`>`) interior lines are currently preserved verbatim ---
-   the indent sits inside one multi-line `YAML_SCALAR` token and full
-   canonicalization needs a real block-scalar renderer (tracked separately;
-   keeps pretty_yaml parity on already-canonical cases, diverges on
-   non-canonical block-scalar indent).
+   Multi-line plain / single-quoted / double-quoted scalar continuation lines
+   indent at `2 * entry/item nesting depth` (one level deeper than the default
+   --- the value column, not the key column), since the continuation belongs to
+   the value side of the entry. Block-scalar (`|`/`>`) interior lines are
+   currently preserved verbatim --- the indent sits inside one multi-line
+   `YAML_SCALAR` token and full canonicalization needs a real block-scalar
+   renderer (tracked separately; keeps pretty_yaml parity on already-canonical
+   cases, diverges on non-canonical block-scalar indent).
 2. **Sequence items** indented +2 from the parent key (`categories:\n  - foo`,
    never `- foo` at parent column).
 3. **Quote style preference:** plain → double-quoted → single-quoted only when
@@ -72,7 +77,27 @@ the load-bearing invariants.
    flow container with `\n` between its brackets) currently passes through
    verbatim because the in-tree parser rejects it; the "multi-line input is
    sticky" behavior pretty_yaml shows lands when the parser learns to accept
-   those inputs.
+   those inputs. **Plain-scalar overflow** in a block-map value follows the
+   analogous wrap: when a single-line plain scalar pushes its line past
+   `line_width`, greedy word-wrap onto continuation lines indented at
+   `entry/item depth * 2` (the value column, matching rule 1's multi-line scalar
+   continuation indent so wrap output round-trips). Quoted (`'…'`, `"…"`) and
+   block (`|`/`>`) scalars never wrap. Already-multi-line scalars are left to
+   rule 1's continuation rule. Scalars decorated with tags (`!!str`), anchors
+   (`&name`), aliases (`*name`), or trailed by inline comments are skipped (the
+   rare-shape escape valve; matches pretty_yaml on the cases that appear in the
+   corpus). Plain scalars inside block sequences are also skipped: pretty_yaml's
+   wrap-continuation column there (`parent_content_col + 2`) disagrees with rule
+   1's multi-line continuation column (`depth * 2`), so pretty_yaml itself isn't
+   idempotent on that shape --- deferred until the parser/formatter can pick one
+   column without losing pass-2 stability. Multi-space runs that are NOT the
+   chosen break point are preserved verbatim mid-value; a multi-space run that
+   IS the break point is consumed entirely by `\n` + continuation indent
+   (pretty_yaml leaves the leading char as a trailing space to preserve YAML's
+   plain-scalar fold semantics, but rule 10 strips it anyway, so consuming the
+   run keeps pass-2 byte-stable --- one of the deliberate trades against
+   pretty_yaml's semantic preservation, in the same family as rule 10's "no
+   trailing whitespace anywhere" stance).
 7. **Blank lines:** runs of multiple interior blank lines collapse to one max.
    Leading blank lines (before the first content line) are stripped entirely ---
    mirrors rule 13's no-trailing-blanks invariant; preamble whitespace at the

@@ -7,10 +7,8 @@ input: ">\n\n folded\n line\n\n next\n line\n   * bullet\n\n   * list\n   * line
 diagnostics:
 
 cst:
-DOCUMENT@0..88
-  YAML_METADATA_CONTENT@0..88
-    YAML_STREAM@0..88
-      YAML_DOCUMENT@0..88
-        YAML_SCALAR@0..78 ">\n\n folded\n line\n\n ne ..."
-        YAML_COMMENT@78..87 "# Comment"
-        NEWLINE@87..88 "\n"
+YAML_STREAM@0..88
+  YAML_DOCUMENT@0..88
+    YAML_SCALAR@0..78 ">\n\n folded\n line\n\n ne ..."
+    YAML_COMMENT@78..87 "# Comment"
+    NEWLINE@87..88 "\n"

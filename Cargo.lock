@@ -1225,7 +1225,6 @@ dependencies = [
  "uuid",
  "which",
  "wincode",
- "yaml_parser",
 ]
 
 [[package]]
@@ -1240,7 +1239,6 @@ dependencies = [
  "similar-asserts",
  "toml",
  "unicode-width",
- "yaml_parser",
 ]
 
 [[package]]
@@ -1257,7 +1255,6 @@ dependencies = [
  "smallvec",
  "toml",
  "unicode-width",
- "yaml_parser",
 ]
 
 [[package]]

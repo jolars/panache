@@ -7,11 +7,9 @@ input: "%YAML 1.1  # comment\n---\n"
 diagnostics:
 
 cst:
-DOCUMENT@0..25
-  YAML_METADATA_CONTENT@0..25
-    YAML_STREAM@0..25
-      YAML_DOCUMENT@0..25
-        YAML_SCALAR@0..20 "%YAML 1.1  # comment"
-        NEWLINE@20..21 "\n"
-        YAML_DOCUMENT_START@21..24 "---"
-        NEWLINE@24..25 "\n"
+YAML_STREAM@0..25
+  YAML_DOCUMENT@0..25
+    YAML_SCALAR@0..20 "%YAML 1.1  # comment"
+    NEWLINE@20..21 "\n"
+    YAML_DOCUMENT_START@21..24 "---"
+    NEWLINE@24..25 "\n"

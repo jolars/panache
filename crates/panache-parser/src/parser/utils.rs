@@ -23,5 +23,7 @@ pub mod list_item_buffer;
 pub mod marker_utils;
 #[path = "utils/text_buffer.rs"]
 pub mod text_buffer;
+#[path = "utils/tree_copy.rs"]
+pub(crate) mod tree_copy;
 #[path = "utils/yaml_regions.rs"]
 pub mod yaml_regions;

@@ -7,140 +7,138 @@ input: "%TAG ! tag:clarkevans.com,2002:\n--- !shape\n  # Use the ! handle for pr
 diagnostics:
 
 cst:
-DOCUMENT@0..298
-  YAML_METADATA_CONTENT@0..298
-    YAML_STREAM@0..298
-      YAML_DOCUMENT@0..298
-        YAML_SCALAR@0..31 "%TAG ! tag:clarkevans ..."
-        NEWLINE@31..32 "\n"
-        YAML_DOCUMENT_START@32..35 "---"
-        WHITESPACE@35..36 " "
-        YAML_TAG@36..42 "!shape"
-        NEWLINE@42..43 "\n"
-        WHITESPACE@43..45 "  "
-        YAML_COMMENT@45..78 "# Use the ! handle fo ..."
-        NEWLINE@78..79 "\n"
-        WHITESPACE@79..81 "  "
-        YAML_COMMENT@81..113 "# tag:clarkevans.com, ..."
-        NEWLINE@113..114 "\n"
-        YAML_BLOCK_SEQUENCE@114..298
-          YAML_BLOCK_SEQUENCE_ITEM@114..170
-            YAML_BLOCK_SEQ_ENTRY@114..115 "-"
-            WHITESPACE@115..116 " "
-            YAML_TAG@116..123 "!circle"
-            NEWLINE@123..124 "\n"
-            WHITESPACE@124..126 "  "
-            YAML_BLOCK_MAP@126..170
-              YAML_BLOCK_MAP_ENTRY@126..160
-                YAML_BLOCK_MAP_KEY@126..133
-                  YAML_SCALAR@126..132 "center"
-                  YAML_COLON@132..133 ":"
-                YAML_BLOCK_MAP_VALUE@133..160
-                  WHITESPACE@133..134 " "
-                  YAML_ANCHOR@134..141 "&ORIGIN"
-                  WHITESPACE@141..142 " "
-                  YAML_FLOW_MAP@142..157
-                    YAML_SCALAR@142..143 "{"
-                    YAML_FLOW_MAP_ENTRY@143..148
-                      YAML_FLOW_MAP_KEY@143..145
-                        YAML_SCALAR@143..144 "x"
-                        YAML_COLON@144..145 ":"
-                      YAML_FLOW_MAP_VALUE@145..148
-                        WHITESPACE@145..146 " "
-                        YAML_SCALAR@146..148 "73"
-                    YAML_SCALAR@148..149 ","
-                    WHITESPACE@149..150 " "
-                    YAML_FLOW_MAP_ENTRY@150..156
-                      YAML_FLOW_MAP_KEY@150..152
-                        YAML_SCALAR@150..151 "y"
-                        YAML_COLON@151..152 ":"
-                      YAML_FLOW_MAP_VALUE@152..156
-                        WHITESPACE@152..153 " "
-                        YAML_SCALAR@153..156 "129"
-                    YAML_SCALAR@156..157 "}"
-                  NEWLINE@157..158 "\n"
-                  WHITESPACE@158..160 "  "
-              YAML_BLOCK_MAP_ENTRY@160..170
-                YAML_BLOCK_MAP_KEY@160..167
-                  YAML_SCALAR@160..166 "radius"
-                  YAML_COLON@166..167 ":"
-                YAML_BLOCK_MAP_VALUE@167..170
-                  WHITESPACE@167..168 " "
-                  YAML_SCALAR@168..169 "7"
-                  NEWLINE@169..170 "\n"
-          YAML_BLOCK_SEQUENCE_ITEM@170..223
-            YAML_BLOCK_SEQ_ENTRY@170..171 "-"
-            WHITESPACE@171..172 " "
-            YAML_TAG@172..177 "!line"
-            NEWLINE@177..178 "\n"
-            WHITESPACE@178..180 "  "
-            YAML_BLOCK_MAP@180..223
-              YAML_BLOCK_MAP_ENTRY@180..197
-                YAML_BLOCK_MAP_KEY@180..186
-                  YAML_SCALAR@180..185 "start"
-                  YAML_COLON@185..186 ":"
-                YAML_BLOCK_MAP_VALUE@186..197
-                  WHITESPACE@186..187 " "
-                  YAML_ALIAS@187..194 "*ORIGIN"
-                  NEWLINE@194..195 "\n"
-                  WHITESPACE@195..197 "  "
-              YAML_BLOCK_MAP_ENTRY@197..223
-                YAML_BLOCK_MAP_KEY@197..204
-                  YAML_SCALAR@197..203 "finish"
-                  YAML_COLON@203..204 ":"
-                YAML_BLOCK_MAP_VALUE@204..223
-                  WHITESPACE@204..205 " "
-                  YAML_FLOW_MAP@205..222
-                    YAML_SCALAR@205..206 "{"
-                    WHITESPACE@206..207 " "
-                    YAML_FLOW_MAP_ENTRY@207..212
-                      YAML_FLOW_MAP_KEY@207..209
-                        YAML_SCALAR@207..208 "x"
-                        YAML_COLON@208..209 ":"
-                      YAML_FLOW_MAP_VALUE@209..212
-                        WHITESPACE@209..210 " "
-                        YAML_SCALAR@210..212 "89"
-                    YAML_SCALAR@212..213 ","
-                    WHITESPACE@213..214 " "
-                    YAML_FLOW_MAP_ENTRY@214..221
-                      YAML_FLOW_MAP_KEY@214..216
-                        YAML_SCALAR@214..215 "y"
-                        YAML_COLON@215..216 ":"
-                      YAML_FLOW_MAP_VALUE@216..221
-                        WHITESPACE@216..217 " "
-                        YAML_SCALAR@217..221 "102 "
-                    YAML_SCALAR@221..222 "}"
-                  NEWLINE@222..223 "\n"
-          YAML_BLOCK_SEQUENCE_ITEM@223..298
-            YAML_BLOCK_SEQ_ENTRY@223..224 "-"
-            WHITESPACE@224..225 " "
-            YAML_TAG@225..231 "!label"
-            NEWLINE@231..232 "\n"
-            WHITESPACE@232..234 "  "
-            YAML_BLOCK_MAP@234..298
-              YAML_BLOCK_MAP_ENTRY@234..251
-                YAML_BLOCK_MAP_KEY@234..240
-                  YAML_SCALAR@234..239 "start"
-                  YAML_COLON@239..240 ":"
-                YAML_BLOCK_MAP_VALUE@240..251
-                  WHITESPACE@240..241 " "
-                  YAML_ALIAS@241..248 "*ORIGIN"
-                  NEWLINE@248..249 "\n"
-                  WHITESPACE@249..251 "  "
-              YAML_BLOCK_MAP_ENTRY@251..269
-                YAML_BLOCK_MAP_KEY@251..257
-                  YAML_SCALAR@251..256 "color"
-                  YAML_COLON@256..257 ":"
-                YAML_BLOCK_MAP_VALUE@257..269
-                  WHITESPACE@257..258 " "
-                  YAML_SCALAR@258..266 "0xFFEEBB"
-                  NEWLINE@266..267 "\n"
-                  WHITESPACE@267..269 "  "
-              YAML_BLOCK_MAP_ENTRY@269..298
-                YAML_BLOCK_MAP_KEY@269..274
-                  YAML_SCALAR@269..273 "text"
-                  YAML_COLON@273..274 ":"
-                YAML_BLOCK_MAP_VALUE@274..298
-                  WHITESPACE@274..275 " "
-                  YAML_SCALAR@275..297 "Pretty vector drawing."
-                  NEWLINE@297..298 "\n"
+YAML_STREAM@0..298
+  YAML_DOCUMENT@0..298
+    YAML_SCALAR@0..31 "%TAG ! tag:clarkevans ..."
+    NEWLINE@31..32 "\n"
+    YAML_DOCUMENT_START@32..35 "---"
+    WHITESPACE@35..36 " "
+    YAML_TAG@36..42 "!shape"
+    NEWLINE@42..43 "\n"
+    WHITESPACE@43..45 "  "
+    YAML_COMMENT@45..78 "# Use the ! handle fo ..."
+    NEWLINE@78..79 "\n"
+    WHITESPACE@79..81 "  "
+    YAML_COMMENT@81..113 "# tag:clarkevans.com, ..."
+    NEWLINE@113..114 "\n"
+    YAML_BLOCK_SEQUENCE@114..298
+      YAML_BLOCK_SEQUENCE_ITEM@114..170
+        YAML_BLOCK_SEQ_ENTRY@114..115 "-"
+        WHITESPACE@115..116 " "
+        YAML_TAG@116..123 "!circle"
+        NEWLINE@123..124 "\n"
+        WHITESPACE@124..126 "  "
+        YAML_BLOCK_MAP@126..170
+          YAML_BLOCK_MAP_ENTRY@126..160
+            YAML_BLOCK_MAP_KEY@126..133
+              YAML_SCALAR@126..132 "center"
+              YAML_COLON@132..133 ":"
+            YAML_BLOCK_MAP_VALUE@133..160
+              WHITESPACE@133..134 " "
+              YAML_ANCHOR@134..141 "&ORIGIN"
+              WHITESPACE@141..142 " "
+              YAML_FLOW_MAP@142..157
+                YAML_SCALAR@142..143 "{"
+                YAML_FLOW_MAP_ENTRY@143..148
+                  YAML_FLOW_MAP_KEY@143..145
+                    YAML_SCALAR@143..144 "x"
+                    YAML_COLON@144..145 ":"
+                  YAML_FLOW_MAP_VALUE@145..148
+                    WHITESPACE@145..146 " "
+                    YAML_SCALAR@146..148 "73"
+                YAML_SCALAR@148..149 ","
+                WHITESPACE@149..150 " "
+                YAML_FLOW_MAP_ENTRY@150..156
+                  YAML_FLOW_MAP_KEY@150..152
+                    YAML_SCALAR@150..151 "y"
+                    YAML_COLON@151..152 ":"
+                  YAML_FLOW_MAP_VALUE@152..156
+                    WHITESPACE@152..153 " "
+                    YAML_SCALAR@153..156 "129"
+                YAML_SCALAR@156..157 "}"
+              NEWLINE@157..158 "\n"
+              WHITESPACE@158..160 "  "
+          YAML_BLOCK_MAP_ENTRY@160..170
+            YAML_BLOCK_MAP_KEY@160..167
+              YAML_SCALAR@160..166 "radius"
+              YAML_COLON@166..167 ":"
+            YAML_BLOCK_MAP_VALUE@167..170
+              WHITESPACE@167..168 " "
+              YAML_SCALAR@168..169 "7"
+              NEWLINE@169..170 "\n"
+      YAML_BLOCK_SEQUENCE_ITEM@170..223
+        YAML_BLOCK_SEQ_ENTRY@170..171 "-"
+        WHITESPACE@171..172 " "
+        YAML_TAG@172..177 "!line"
+        NEWLINE@177..178 "\n"
+        WHITESPACE@178..180 "  "
+        YAML_BLOCK_MAP@180..223
+          YAML_BLOCK_MAP_ENTRY@180..197
+            YAML_BLOCK_MAP_KEY@180..186
+              YAML_SCALAR@180..185 "start"
+              YAML_COLON@185..186 ":"
+            YAML_BLOCK_MAP_VALUE@186..197
+              WHITESPACE@186..187 " "
+              YAML_ALIAS@187..194 "*ORIGIN"
+              NEWLINE@194..195 "\n"
+              WHITESPACE@195..197 "  "
+          YAML_BLOCK_MAP_ENTRY@197..223
+            YAML_BLOCK_MAP_KEY@197..204
+              YAML_SCALAR@197..203 "finish"
+              YAML_COLON@203..204 ":"
+            YAML_BLOCK_MAP_VALUE@204..223
+              WHITESPACE@204..205 " "
+              YAML_FLOW_MAP@205..222
+                YAML_SCALAR@205..206 "{"
+                WHITESPACE@206..207 " "
+                YAML_FLOW_MAP_ENTRY@207..212
+                  YAML_FLOW_MAP_KEY@207..209
+                    YAML_SCALAR@207..208 "x"
+                    YAML_COLON@208..209 ":"
+                  YAML_FLOW_MAP_VALUE@209..212
+                    WHITESPACE@209..210 " "
+                    YAML_SCALAR@210..212 "89"
+                YAML_SCALAR@212..213 ","
+                WHITESPACE@213..214 " "
+                YAML_FLOW_MAP_ENTRY@214..221
+                  YAML_FLOW_MAP_KEY@214..216
+                    YAML_SCALAR@214..215 "y"
+                    YAML_COLON@215..216 ":"
+                  YAML_FLOW_MAP_VALUE@216..221
+                    WHITESPACE@216..217 " "
+                    YAML_SCALAR@217..221 "102 "
+                YAML_SCALAR@221..222 "}"
+              NEWLINE@222..223 "\n"
+      YAML_BLOCK_SEQUENCE_ITEM@223..298
+        YAML_BLOCK_SEQ_ENTRY@223..224 "-"
+        WHITESPACE@224..225 " "
+        YAML_TAG@225..231 "!label"
+        NEWLINE@231..232 "\n"
+        WHITESPACE@232..234 "  "
+        YAML_BLOCK_MAP@234..298
+          YAML_BLOCK_MAP_ENTRY@234..251
+            YAML_BLOCK_MAP_KEY@234..240
+              YAML_SCALAR@234..239 "start"
+              YAML_COLON@239..240 ":"
+            YAML_BLOCK_MAP_VALUE@240..251
+              WHITESPACE@240..241 " "
+              YAML_ALIAS@241..248 "*ORIGIN"
+              NEWLINE@248..249 "\n"
+              WHITESPACE@249..251 "  "
+          YAML_BLOCK_MAP_ENTRY@251..269
+            YAML_BLOCK_MAP_KEY@251..257
+              YAML_SCALAR@251..256 "color"
+              YAML_COLON@256..257 ":"
+            YAML_BLOCK_MAP_VALUE@257..269
+              WHITESPACE@257..258 " "
+              YAML_SCALAR@258..266 "0xFFEEBB"
+              NEWLINE@266..267 "\n"
+              WHITESPACE@267..269 "  "
+          YAML_BLOCK_MAP_ENTRY@269..298
+            YAML_BLOCK_MAP_KEY@269..274
+              YAML_SCALAR@269..273 "text"
+              YAML_COLON@273..274 ":"
+            YAML_BLOCK_MAP_VALUE@274..298
+              WHITESPACE@274..275 " "
+              YAML_SCALAR@275..297 "Pretty vector drawing."
+              NEWLINE@297..298 "\n"

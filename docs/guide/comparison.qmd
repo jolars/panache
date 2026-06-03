@@ -69,7 +69,7 @@ longer accepts.
 | mdformat          | ●          | ◐[^8] | ○      | ○      | ○          | ○             | ○   |
 | Pandoc            | ●          | ●     | ●      | ◐[^9]  | ◐[^9]      | ◐[^10]        | ○   |
 | Prettier          | ●          | ●     | ○      | ○      | ○          | ○             | ●   |
-| rumdl             | ●          | ●     | ○      | ◐[^12] | ◐[^12]     | ○             | ○   |
+| rumdl             | ●          | ●     | ◐[^13] | ◐[^12] | ◐[^12]     | ○             | ○   |
 
 : Markdown dialect coverage across the tools.
 :::
@@ -97,6 +97,14 @@ longer accepts.
 [^12]: rumdl will lint `.qmd` and `.Rmd` files and skip YAML frontmatter, but it
     does not parse Quarto/R Markdown executable code blocks, shortcodes, or
     cross-reference syntax -- those are treated as plain Markdown.
+
+[^13]: `rumdl --flavor pandoc` recognises fenced divs, bracketed spans,
+    inline/block attributes, citations (`@key`/`[@key]`), inline footnotes,
+    definition lists, line blocks, grid and multi-line tables, pipe-table
+    captions, example lists/references, sub/superscript, and Pandoc YAML
+    metadata, and uses them to suppress false positives and resolve Pandoc
+    constructs. It does not build a lossless Pandoc CST, so those constructs are
+    linted but not reformatted.
 
 For raw speed numbers, see [Performance](performance.qmd). This page focuses on
 *scope* and *behaviour* differences, not benchmarks.
@@ -313,10 +321,13 @@ heavily inspired by `markdownlint` and ports many of its rules.
   semantics intended for editor integration). Either way, every "format" run
   goes through the lint engine and applies whichever fixes the enabled rules
   produce; rules that do not produce fixes leave their target untouched.
-- *No Pandoc/Quarto syntax model.* rumdl operates on CommonMark + GFM
-  extensions. Fenced divs, bracketed spans, block attributes, raw blocks, Pandoc
-  tables with captions, and similar constructs are either rewritten as plain
-  Markdown or left untouched in ways that can break downstream Pandoc rendering.
+- *Pandoc-aware linting, not lossless Pandoc parsing.* `rumdl --flavor pandoc`
+  recognises fenced divs, bracketed spans, inline/block attributes, citations,
+  inline footnotes, definition lists, line blocks, grid and multi-line tables,
+  pipe-table captions, example lists, sub/superscript, and Pandoc YAML metadata,
+  and uses that knowledge to suppress false positives (e.g. resolving anchors
+  via Pandoc's heading-slug rules). It does not build a lossless Pandoc CST, so
+  those constructs are linted but not reformatted.
 - *Idempotency is rule-dependent.* Because formatting is a side effect of fix
   application, idempotency depends on the rule set; panache aims for
   `format(format(x)) == format(x)` regardless of configuration.
