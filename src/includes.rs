@@ -9,7 +9,7 @@ use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::syntax::{
     AstNode, AttributeNode, CodeBlock, FootnoteDefinition, ReferenceDefinition, Shortcode,
-    SyntaxKind, SyntaxNode,
+    SyntaxKind, SyntaxNode, YamlBlockMapValue, parse_yaml_document,
 };
 use crate::utils::normalize_label;
 
@@ -449,71 +449,23 @@ fn read_quarto_render(project_root: &Path) -> Option<Vec<String>> {
         return None;
     }
     let yaml = std::fs::read_to_string(quarto_config).ok()?;
-    let root = yaml_parser::ast::Root::cast(yaml_parser::parse(&yaml).ok()?)?;
-    let document = root.documents().next()?;
-    let top_level = document.block()?.block_map()?;
-    let project_entry = top_level
-        .entries()
-        .find(|entry| block_map_entry_key(entry).as_deref() == Some("project"))?;
-    let project_map = project_entry.value()?.block()?.block_map()?;
-    let render_entry = project_map
-        .entries()
-        .find(|entry| block_map_entry_key(entry).as_deref() == Some("render"))?;
-    block_map_value_to_string_vec(render_entry.value()?)
+    let render = parse_yaml_document(&yaml)?
+        .block_map()?
+        .value_of("project")?
+        .as_block_map()?
+        .value_of("render")?;
+    block_map_value_to_string_vec(&render)
 }
 
-fn block_map_entry_key(entry: &yaml_parser::ast::BlockMapEntry) -> Option<String> {
-    let key = entry.key()?;
-    if let Some(flow) = key.flow() {
-        return flow_scalar_text(&flow);
+fn block_map_value_to_string_vec(value: &YamlBlockMapValue) -> Option<Vec<String>> {
+    if let Some(scalar) = value.as_scalar() {
+        return Some(vec![scalar.value()]);
     }
-    let block = key.block()?;
-    let flow = block_to_flow_scalar(&block)?;
-    flow_scalar_text(&flow)
-}
-
-fn block_map_value_to_string_vec(value: yaml_parser::ast::BlockMapValue) -> Option<Vec<String>> {
-    if let Some(flow) = value.flow()
-        && let Some(single) = flow_scalar_text(&flow)
-    {
-        return Some(vec![single]);
-    }
-    let block = value.block()?;
-    if let Some(sequence) = block.block_seq() {
-        let mut out = Vec::new();
-        for entry in sequence.entries() {
-            let item = if let Some(flow) = entry.flow() {
-                flow_scalar_text(&flow)
-            } else if let Some(block) = entry.block() {
-                block_to_flow_scalar(&block).and_then(|flow| flow_scalar_text(&flow))
-            } else {
-                None
-            }?;
-            out.push(item);
-        }
-        return Some(out);
-    }
-    None
-}
-
-fn block_to_flow_scalar(block: &yaml_parser::ast::Block) -> Option<yaml_parser::ast::Flow> {
-    block
-        .syntax()
-        .children()
-        .find_map(yaml_parser::ast::Flow::cast)
-}
-
-fn flow_scalar_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
-    if let Some(token) = flow.plain_scalar() {
-        return Some(token.text().to_string());
-    }
-    if let Some(token) = flow.single_quoted_scalar() {
-        return Some(token.text().trim_matches('\'').to_string());
-    }
-    if let Some(token) = flow.double_qouted_scalar() {
-        return Some(token.text().trim_matches('"').to_string());
-    }
-    None
+    let sequence = value.as_block_sequence()?;
+    sequence
+        .items()
+        .map(|item| item.as_scalar().map(|s| s.value()))
+        .collect()
 }
 
 fn is_quarto_render_target(path: &Path, root: &Path, render: Option<&[String]>) -> bool {

@@ -22,6 +22,10 @@ mod scanner;
 mod validator;
 
 pub use events::{project_events, project_events_from_tree};
+// Re-exported crate-internally so the typed YAML AST wrappers in
+// `crate::syntax::yaml_ast` can cook scalar tokens without re-implementing
+// the quote/escape/fold rules. The modules themselves stay private.
+pub(crate) use cooking::cook;
 pub use model::{
     ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
     YamlParseReport, diagnostic_codes,
@@ -30,6 +34,7 @@ pub use parser::{
     ShadowParserReport, parse_shadow, parse_stream, parse_yaml_report, parse_yaml_tree,
     shadow_parser_check,
 };
+pub(crate) use scanner::ScalarStyle;
 pub use scanner::{ShadowScannerReport, shadow_scanner_check};
 
 #[doc(hidden)]

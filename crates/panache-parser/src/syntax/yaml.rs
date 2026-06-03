@@ -1,7 +1,10 @@
 use std::ops::Range;
 
 use crate::parser::utils::yaml_regions::hashpipe_language_and_prefix;
-use crate::syntax::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode};
+use crate::parser::yaml::YamlDiagnostic;
+use crate::syntax::{
+    AstNode, PanacheLanguage, SyntaxKind, SyntaxNode, YamlDocument, YamlScalarStyle,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct YamlFrontmatterRegion {
@@ -31,7 +34,7 @@ pub struct YamlRegion {
 #[derive(Debug, Clone)]
 pub struct ParsedYamlRegion {
     region: YamlRegion,
-    parse_result: Result<yaml_parser::SyntaxNode, yaml_parser::SyntaxError>,
+    parse_result: Result<SyntaxNode, YamlParseError>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,40 +159,40 @@ pub enum YamlDocumentKind {
 
 #[derive(Debug, Clone, Copy)]
 pub struct YamlAstRoot<'a> {
-    node: &'a yaml_parser::SyntaxNode,
+    node: &'a SyntaxNode,
 }
 
-impl<'a> YamlAstRoot<'a> {
+impl YamlAstRoot<'_> {
     pub fn kind(&self) -> YamlAstRootKind {
-        debug_assert_eq!(self.node.kind(), yaml_parser::SyntaxKind::ROOT);
         YamlAstRootKind::Root
     }
 
     pub fn document_count(&self) -> usize {
-        yaml_parser::ast::Root::cast(self.node.clone())
-            .map(|root| root.documents().count())
-            .unwrap_or(0)
+        self.documents().count()
     }
 
     pub fn first_document_kind(&self) -> Option<YamlDocumentKind> {
-        let root = yaml_parser::ast::Root::cast(self.node.clone())?;
-        let doc = root.documents().next()?;
-        if let Some(block) = doc.block() {
-            if block.block_map().is_some() {
-                return Some(YamlDocumentKind::BlockMap);
-            }
-            if block.block_seq().is_some() {
-                return Some(YamlDocumentKind::BlockSeq);
-            }
-            if block.block_scalar().is_some() {
-                return Some(YamlDocumentKind::BlockScalar);
-            }
-            return Some(YamlDocumentKind::Empty);
+        let doc = self.documents().next()?;
+        if doc.block_map().is_some() {
+            return Some(YamlDocumentKind::BlockMap);
         }
-        if doc.flow().is_some() {
+        if doc.block_sequence().is_some() {
+            return Some(YamlDocumentKind::BlockSeq);
+        }
+        if let Some(scalar) = doc.scalar() {
+            return Some(match scalar.style() {
+                YamlScalarStyle::Literal | YamlScalarStyle::Folded => YamlDocumentKind::BlockScalar,
+                _ => YamlDocumentKind::Flow,
+            });
+        }
+        if doc.flow_map().is_some() || doc.flow_sequence().is_some() {
             return Some(YamlDocumentKind::Flow);
         }
         Some(YamlDocumentKind::Empty)
+    }
+
+    fn documents(&self) -> impl Iterator<Item = YamlDocument> + '_ {
+        self.node.descendants().filter_map(YamlDocument::cast)
     }
 }
 
@@ -208,10 +211,10 @@ impl YamlParseError {
         &self.message
     }
 
-    fn from_parser(err: &yaml_parser::SyntaxError) -> Self {
+    fn from_diagnostic(diag: &YamlDiagnostic) -> Self {
         Self {
-            offset: err.offset(),
-            message: err.message().to_string(),
+            offset: diag.byte_start,
+            message: diag.message.to_string(),
         }
     }
 }
@@ -241,10 +244,7 @@ impl ParsedYamlRegion {
     }
 
     pub fn error(&self) -> Option<YamlParseError> {
-        self.parse_result.as_ref().err().map(|err| YamlParseError {
-            offset: err.offset(),
-            message: err.message().to_string(),
-        })
+        self.parse_result.as_ref().err().cloned()
     }
 
     pub fn root_kind(&self) -> Option<YamlAstRootKind> {
@@ -451,10 +451,27 @@ pub fn collect_parsed_yaml_regions(tree: &SyntaxNode) -> Vec<ParsedYamlRegion> {
     collect_yaml_regions(tree)
         .into_iter()
         .map(|region| ParsedYamlRegion {
-            parse_result: yaml_parser::parse(&region.content),
+            parse_result: parse_region_yaml(&region.content),
             region,
         })
         .collect()
+}
+
+/// Parse a YAML region's content with the in-tree parser, returning the CST on
+/// success or the first structural diagnostic as a [`YamlParseError`].
+fn parse_region_yaml(content: &str) -> Result<SyntaxNode, YamlParseError> {
+    let report = crate::parser::yaml::parse_yaml_report(content);
+    match report.tree {
+        Some(tree) => Ok(tree),
+        None => Err(report
+            .diagnostics
+            .first()
+            .map(YamlParseError::from_diagnostic)
+            .unwrap_or_else(|| YamlParseError {
+                offset: 0,
+                message: "invalid YAML".to_string(),
+            })),
+    }
 }
 
 pub fn collect_parsed_frontmatter_region(tree: &SyntaxNode) -> Option<ParsedYamlRegion> {
@@ -471,9 +488,13 @@ pub fn collect_parsed_yaml_region_snapshots(tree: &SyntaxNode) -> Vec<ParsedYaml
 }
 
 pub fn validate_yaml_text(input: &str) -> Result<(), YamlParseError> {
-    yaml_parser::parse(input)
-        .map(|_| ())
-        .map_err(|err| YamlParseError::from_parser(&err))
+    match crate::parser::yaml::parse_yaml_report(input)
+        .diagnostics
+        .first()
+    {
+        Some(diag) => Err(YamlParseError::from_diagnostic(diag)),
+        None => Ok(()),
+    }
 }
 
 pub fn collect_embedded_yaml_cst(tree: &SyntaxNode) -> Vec<YamlEmbeddedCst> {

@@ -2,6 +2,7 @@ use rowan::ast::AstNode as _;
 use std::collections::HashMap;
 
 use crate::bib::{ParsedEntry, Span};
+use crate::syntax::{YamlBlockMap, YamlBlockMapValue, parse_yaml_document};
 
 /// Parse CSL-YAML file and extract full entry data (id, type, fields).
 ///
@@ -10,16 +11,17 @@ pub fn parse_csl_yaml_full(input: &str) -> Result<Vec<ParsedEntry>, String> {
     let entry_maps = parse_csl_entry_maps(input)?;
     let mut result = Vec::new();
     for entry in entry_maps {
-        let id =
-            block_map_value_to_scalar(map_entry_value(&entry, "id").ok_or_else(|| {
-                "Invalid CSL-YAML: entry missing required 'id' field".to_string()
-            })?)
+        let id_value = map_entry_value(&entry, "id")
+            .ok_or_else(|| "Invalid CSL-YAML: entry missing required 'id' field".to_string())?;
+        let id = block_map_value_to_scalar(&id_value)
             .ok_or_else(|| "Invalid CSL-YAML: 'id' must be a scalar".to_string())?;
-        let entry_type = map_entry_value(&entry, "type").and_then(block_map_value_to_scalar);
+        let entry_type = map_entry_value(&entry, "type")
+            .as_ref()
+            .and_then(block_map_value_to_scalar);
         let span = find_yaml_id_span(input, &id);
         let mut string_fields = HashMap::new();
         for item in entry.entries() {
-            let Some(key) = block_map_entry_key(&item) else {
+            let Some(key) = item.key_text() else {
                 continue;
             };
             let Some(value) = item.value() else {
@@ -45,30 +47,18 @@ pub fn parse_csl_yaml_entries(input: &str) -> Result<Vec<(String, Span)>, String
     })
 }
 
-fn parse_csl_entry_maps(input: &str) -> Result<Vec<yaml_parser::ast::BlockMap>, String> {
-    let root = yaml_parser::ast::Root::cast(
-        yaml_parser::parse(input).map_err(|err| format!("Invalid CSL-YAML: {}", err.message()))?,
-    )
-    .ok_or_else(|| "Invalid CSL-YAML: missing root node".to_string())?;
-    let document = root
-        .documents()
-        .next()
-        .ok_or_else(|| "Invalid CSL-YAML: no YAML document found".to_string())?;
-    let block = document
-        .block()
-        .ok_or_else(|| "Invalid CSL-YAML: expected block content".to_string())?;
-    if let Some(map) = block.block_map() {
+fn parse_csl_entry_maps(input: &str) -> Result<Vec<YamlBlockMap>, String> {
+    let document = parse_yaml_document(input)
+        .ok_or_else(|| "Invalid CSL-YAML: missing root node".to_string())?;
+    if let Some(map) = document.block_map() {
         return Ok(vec![map]);
     }
-    let seq = block
-        .block_seq()
+    let seq = document
+        .block_sequence()
         .ok_or_else(|| "Invalid CSL-YAML: expected sequence of entries".to_string())?;
     let mut entries = Vec::new();
-    for entry in seq.entries() {
-        let Some(entry_block) = entry.block() else {
-            return Err("Invalid CSL-YAML: sequence entry must be a mapping".to_string());
-        };
-        let Some(map) = entry_block.block_map() else {
+    for item in seq.items() {
+        let Some(map) = item.as_block_map() else {
             return Err("Invalid CSL-YAML: sequence entry must be a mapping".to_string());
         };
         entries.push(map);
@@ -76,76 +66,40 @@ fn parse_csl_entry_maps(input: &str) -> Result<Vec<yaml_parser::ast::BlockMap>, 
     Ok(entries)
 }
 
-fn map_entry_value(
-    map: &yaml_parser::ast::BlockMap,
-    key: &str,
-) -> Option<yaml_parser::ast::BlockMapValue> {
-    map.entries()
-        .find(|entry| block_map_entry_key(entry).as_deref() == Some(key))
-        .and_then(|entry| entry.value())
+fn map_entry_value(map: &YamlBlockMap, key: &str) -> Option<YamlBlockMapValue> {
+    map.value_of(key)
 }
 
-fn block_map_entry_key(entry: &yaml_parser::ast::BlockMapEntry) -> Option<String> {
-    let key = entry.key()?;
-    if let Some(flow) = key.flow() {
-        return flow_scalar_text(&flow);
-    }
-    let block = key.block()?;
-    let flow = block_to_flow_scalar(&block)?;
-    flow_scalar_text(&flow)
+fn block_map_value_to_scalar(value: &YamlBlockMapValue) -> Option<String> {
+    value.as_scalar().map(|scalar| scalar.value())
 }
 
-fn block_map_value_to_scalar(value: yaml_parser::ast::BlockMapValue) -> Option<String> {
-    if let Some(flow) = value.flow() {
-        return flow_scalar_text(&flow);
-    }
-    let block = value.block()?;
-    let flow = block_to_flow_scalar(&block)?;
-    flow_scalar_text(&flow)
-}
-
-fn block_map_value_to_string(value: &yaml_parser::ast::BlockMapValue) -> String {
+fn block_map_value_to_string(value: &YamlBlockMapValue) -> String {
     if let Some(author) = author_list_to_string(value) {
         return author;
     }
-    block_map_value_to_scalar(value.clone()).unwrap_or_else(|| value.syntax().text().to_string())
+    block_map_value_to_scalar(value).unwrap_or_else(|| value.syntax().text().to_string())
 }
 
-fn author_list_to_string(value: &yaml_parser::ast::BlockMapValue) -> Option<String> {
-    let block = value.block()?;
-    let seq = block.block_seq()?;
+fn author_list_to_string(value: &YamlBlockMapValue) -> Option<String> {
+    let seq = value.as_block_sequence()?;
     let mut names = Vec::new();
-    for entry in seq.entries() {
-        let entry_block = entry.block()?;
-        let map = entry_block.block_map()?;
-        let family = map_entry_value(&map, "family").and_then(block_map_value_to_scalar)?;
-        let given = map_entry_value(&map, "given").and_then(block_map_value_to_scalar);
+    for item in seq.items() {
+        let map = item.as_block_map()?;
+        let family = map
+            .value_of("family")
+            .as_ref()
+            .and_then(block_map_value_to_scalar)?;
+        let given = map
+            .value_of("given")
+            .as_ref()
+            .and_then(block_map_value_to_scalar);
         names.push(match given {
             Some(given) if !given.is_empty() => format!("{}, {}", family, given),
             _ => family,
         });
     }
     (!names.is_empty()).then(|| names.join("; "))
-}
-
-fn block_to_flow_scalar(block: &yaml_parser::ast::Block) -> Option<yaml_parser::ast::Flow> {
-    block
-        .syntax()
-        .children()
-        .find_map(yaml_parser::ast::Flow::cast)
-}
-
-fn flow_scalar_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
-    if let Some(token) = flow.plain_scalar() {
-        return Some(token.text().to_string());
-    }
-    if let Some(token) = flow.single_quoted_scalar() {
-        return Some(token.text().trim_matches('\'').to_string());
-    }
-    if let Some(token) = flow.double_qouted_scalar() {
-        return Some(token.text().trim_matches('"').to_string());
-    }
-    None
 }
 
 /// Find span of id field in YAML text.

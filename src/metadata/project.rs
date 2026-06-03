@@ -1,14 +1,15 @@
 use std::path::{Path, PathBuf};
 
 use rowan::TextRange;
-use rowan::ast::AstNode as _;
 use std::collections::HashMap;
 
 use super::bibliography::{BibliographyInfo, BibliographyParse};
 use super::yaml::{YamlError, strip_yaml_delimiters};
 use super::{DocumentMetadata, InlineReference, extract_citations};
 use crate::bib;
-use crate::syntax::SyntaxNode;
+use crate::syntax::{
+    SyntaxNode, YamlBlockMapValue, YamlBlockSequence, YamlFlowSequence, parse_yaml_document,
+};
 
 enum ProjectRoot {
     Quarto(PathBuf),
@@ -233,7 +234,7 @@ struct ParsedMetadataFields {
 }
 
 fn parse_yaml_metadata_fields(yaml_text: &str) -> Result<ParsedMetadataFields, YamlError> {
-    let root = yaml_parser::ast::Root::cast(yaml_parser::parse(yaml_text).map_err(|err| {
+    crate::yaml_engine::validate_yaml(yaml_text).map_err(|err| {
         let (line, column) = byte_offset_to_line_col_1based(yaml_text, err.offset());
         YamlError::ParseError {
             message: err.message().to_string(),
@@ -241,33 +242,31 @@ fn parse_yaml_metadata_fields(yaml_text: &str) -> Result<ParsedMetadataFields, Y
             column: column as u64,
             byte_offset: Some(err.offset()),
         }
-    })?)
-    .ok_or_else(|| YamlError::StructureError("Invalid YAML root".to_string()))?;
-    let Some(map) = root
-        .documents()
-        .next()
-        .and_then(|doc| doc.block())
-        .and_then(|block| block.block_map())
-    else {
+    })?;
+    let Some(map) = parse_yaml_document(yaml_text).and_then(|doc| doc.block_map()) else {
         return Ok(ParsedMetadataFields::default());
     };
-    let title = metadata_map_entry_value(&map, "title")
-        .and_then(block_map_value_to_scalar)
+    let title = map
+        .value_of("title")
+        .and_then(|value| block_map_value_to_scalar(&value))
         .map(|entry| entry.value);
-    let bibliography = metadata_map_entry_value(&map, "bibliography")
-        .map(block_map_value_to_scalar_list)
+    let bibliography = map
+        .value_of("bibliography")
+        .map(|value| block_map_value_to_scalar_list(&value))
         .unwrap_or_default()
         .into_iter()
         .map(|entry| entry.value)
         .collect();
-    let metadata_files = metadata_map_entry_value(&map, "metadata-files")
-        .map(block_map_value_to_scalar_list)
+    let metadata_files = map
+        .value_of("metadata-files")
+        .map(|value| block_map_value_to_scalar_list(&value))
         .unwrap_or_default()
         .into_iter()
         .map(|entry| entry.value)
         .collect();
-    let references = metadata_map_entry_value(&map, "references")
-        .map(extract_reference_ids)
+    let references = map
+        .value_of("references")
+        .map(|value| extract_reference_ids(&value))
         .unwrap_or_default();
     Ok(ParsedMetadataFields {
         title,
@@ -277,116 +276,50 @@ fn parse_yaml_metadata_fields(yaml_text: &str) -> Result<ParsedMetadataFields, Y
     })
 }
 
-fn metadata_map_entry_value(
-    map: &yaml_parser::ast::BlockMap,
-    key: &str,
-) -> Option<yaml_parser::ast::BlockMapValue> {
-    map.entries()
-        .find(|entry| metadata_block_map_entry_key(entry).as_deref() == Some(key))
-        .and_then(|entry| entry.value())
-}
-
-fn metadata_block_map_entry_key(entry: &yaml_parser::ast::BlockMapEntry) -> Option<String> {
-    let key = entry.key()?;
-    if let Some(flow) = key.flow() {
-        return metadata_flow_scalar_text(&flow);
-    }
-    let block = key.block()?;
-    let flow = metadata_block_to_flow_scalar(&block)?;
-    metadata_flow_scalar_text(&flow)
-}
-
-fn extract_reference_ids(value: yaml_parser::ast::BlockMapValue) -> Vec<MetadataScalar> {
-    let Some(block) = value.block() else {
+fn extract_reference_ids(value: &YamlBlockMapValue) -> Vec<MetadataScalar> {
+    let Some(seq) = value.as_block_sequence() else {
         return Vec::new();
     };
-    let Some(seq) = block.block_seq() else {
-        return Vec::new();
-    };
-    seq.entries()
-        .filter_map(|entry| {
-            let block = entry.block()?;
-            let map = block.block_map()?;
-            let id = metadata_map_entry_value(&map, "id")?;
-            block_map_value_to_scalar(id)
+    seq.items()
+        .filter_map(|item| {
+            let map = item.as_block_map()?;
+            let id = map.value_of("id")?;
+            block_map_value_to_scalar(&id)
         })
         .collect()
 }
 
-fn block_map_value_to_scalar(value: yaml_parser::ast::BlockMapValue) -> Option<MetadataScalar> {
-    if let Some(flow) = value.flow() {
-        return flow_scalar(&flow);
-    }
-    let block = value.block()?;
-    let flow = metadata_block_to_flow_scalar(&block)?;
-    flow_scalar(&flow)
+fn block_map_value_to_scalar(value: &YamlBlockMapValue) -> Option<MetadataScalar> {
+    value.as_scalar().map(metadata_scalar)
 }
 
-fn block_map_value_to_scalar_list(value: yaml_parser::ast::BlockMapValue) -> Vec<MetadataScalar> {
-    if let Some(single) = block_map_value_to_scalar(value.clone()) {
-        return vec![single];
+fn block_map_value_to_scalar_list(value: &YamlBlockMapValue) -> Vec<MetadataScalar> {
+    if let Some(single) = value.as_scalar() {
+        return vec![metadata_scalar(single)];
     }
-    if let Some(flow) = value.flow()
-        && let Some(seq) = flow.flow_seq()
-    {
+    if let Some(seq) = value.as_flow_sequence() {
         return seq
-            .entries()
-            .into_iter()
-            .flat_map(|entries| entries.entries())
-            .filter_map(|entry| entry.flow().and_then(|flow| flow_scalar(&flow)))
+            .items()
+            .filter_map(|i| i.as_scalar())
+            .map(metadata_scalar)
             .collect();
     }
-    if let Some(block) = value.block()
-        && let Some(seq) = block.block_seq()
-    {
+    if let Some(seq) = value.as_block_sequence() {
         return seq
-            .entries()
-            .filter_map(|entry| {
-                if let Some(flow) = entry.flow() {
-                    return flow_scalar(&flow);
-                }
-                let block = entry.block()?;
-                let flow = metadata_block_to_flow_scalar(&block)?;
-                flow_scalar(&flow)
-            })
+            .items()
+            .filter_map(|i| i.as_scalar())
+            .map(metadata_scalar)
             .collect();
     }
     Vec::new()
 }
 
-fn metadata_block_to_flow_scalar(
-    block: &yaml_parser::ast::Block,
-) -> Option<yaml_parser::ast::Flow> {
-    block
-        .syntax()
-        .children()
-        .find_map(yaml_parser::ast::Flow::cast)
-}
-
-fn flow_scalar(flow: &yaml_parser::ast::Flow) -> Option<MetadataScalar> {
-    let token = if let Some(token) = flow.plain_scalar() {
-        token
-    } else if let Some(token) = flow.single_quoted_scalar() {
-        token
-    } else {
-        flow.double_qouted_scalar()?
-    };
-    let mut value = token.text().to_string();
-    if token.kind() == yaml_parser::SyntaxKind::SINGLE_QUOTED_SCALAR {
-        value = value.trim_matches('\'').to_string();
-    } else if token.kind() == yaml_parser::SyntaxKind::DOUBLE_QUOTED_SCALAR {
-        value = value.trim_matches('"').to_string();
+fn metadata_scalar(scalar: crate::syntax::YamlScalar) -> MetadataScalar {
+    let range = scalar.text_range();
+    MetadataScalar {
+        value: scalar.value(),
+        range: range.start().into()..range.end().into(),
     }
-    let start: usize = token.text_range().start().into();
-    let end: usize = token.text_range().end().into();
-    Some(MetadataScalar {
-        value,
-        range: start..end,
-    })
-}
-
-fn metadata_flow_scalar_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
-    flow_scalar(flow).map(|scalar| scalar.value)
 }
 
 fn byte_offset_to_line_col_1based(input: &str, offset: usize) -> (usize, usize) {
@@ -498,35 +431,28 @@ pub(crate) fn read_bookdown_files(root: &Path) -> Option<BookdownFiles> {
 }
 
 fn parse_bookdown_rmd_files(yaml: &str) -> Option<BookdownFiles> {
-    let root = yaml_parser::ast::Root::cast(yaml_parser::parse(yaml).ok()?)?;
-    let document = root.documents().next()?;
-    let top_level = document.block()?.block_map()?;
-    let rmd_entry = top_level
-        .entries()
-        .find(|entry| block_map_entry_key(entry).as_deref() == Some("rmd_files"))?;
-    let value = rmd_entry.value()?;
-    if let Some(flow) = value.flow() {
-        return flow
-            .flow_seq()
-            .map(|seq| BookdownFiles::List(flow_seq_to_strings(&seq)));
+    let value = parse_yaml_document(yaml)?
+        .block_map()?
+        .value_of("rmd_files")?;
+    if let Some(seq) = value.as_flow_sequence() {
+        return Some(BookdownFiles::List(flow_seq_to_strings(&seq)));
     }
-    let block = value.block()?;
-    if let Some(seq) = block.block_seq() {
+    if let Some(seq) = value.as_block_sequence() {
         return Some(BookdownFiles::List(block_seq_to_strings(&seq)));
     }
-    if let Some(map) = block.block_map() {
+    if let Some(map) = value.as_block_map() {
         let formats = map
             .entries()
             .filter_map(|entry| {
-                let key = block_map_entry_key(&entry)?;
+                let key = entry.key_text()?;
                 let value = entry.value()?;
-                let files = if let Some(flow) = value.flow() {
-                    flow.flow_seq().map(|seq| flow_seq_to_strings(&seq))
-                } else if let Some(block) = value.block() {
-                    block.block_seq().map(|seq| block_seq_to_strings(&seq))
+                let files = if let Some(seq) = value.as_flow_sequence() {
+                    flow_seq_to_strings(&seq)
+                } else if let Some(seq) = value.as_block_sequence() {
+                    block_seq_to_strings(&seq)
                 } else {
-                    None
-                }?;
+                    return None;
+                };
                 Some((key, files))
             })
             .collect();
@@ -535,58 +461,15 @@ fn parse_bookdown_rmd_files(yaml: &str) -> Option<BookdownFiles> {
     None
 }
 
-fn block_map_entry_key(entry: &yaml_parser::ast::BlockMapEntry) -> Option<String> {
-    let key = entry.key()?;
-    if let Some(flow) = key.flow() {
-        return flow_scalar_text(&flow);
-    }
-    let block = key.block()?;
-    let flow = block_to_flow_scalar(&block)?;
-    flow_scalar_text(&flow)
-}
-
-fn block_to_flow_scalar(block: &yaml_parser::ast::Block) -> Option<yaml_parser::ast::Flow> {
-    block
-        .syntax()
-        .children()
-        .find_map(yaml_parser::ast::Flow::cast)
-}
-
-fn flow_scalar_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
-    if let Some(token) = flow.plain_scalar() {
-        return Some(token.text().to_string());
-    }
-    if let Some(token) = flow.single_quoted_scalar() {
-        return Some(token.text().trim_matches('\'').to_string());
-    }
-    if let Some(token) = flow.double_qouted_scalar() {
-        return Some(token.text().trim_matches('"').to_string());
-    }
-    None
-}
-
-fn block_seq_to_strings(seq: &yaml_parser::ast::BlockSeq) -> Vec<PathBuf> {
-    seq.entries()
-        .filter_map(|entry| {
-            if let Some(flow) = entry.flow() {
-                return flow_scalar_text(&flow).map(PathBuf::from);
-            }
-            if let Some(block) = entry.block() {
-                return block_to_flow_scalar(&block)
-                    .and_then(|flow| flow_scalar_text(&flow))
-                    .map(PathBuf::from);
-            }
-            None
-        })
+fn block_seq_to_strings(seq: &YamlBlockSequence) -> Vec<PathBuf> {
+    seq.items()
+        .filter_map(|item| item.as_scalar().map(|s| PathBuf::from(s.value())))
         .collect()
 }
 
-fn flow_seq_to_strings(seq: &yaml_parser::ast::FlowSeq) -> Vec<PathBuf> {
-    seq.entries()
-        .into_iter()
-        .flat_map(|entries| entries.entries())
-        .filter_map(|entry| entry.flow().and_then(|flow| flow_scalar_text(&flow)))
-        .map(PathBuf::from)
+fn flow_seq_to_strings(seq: &YamlFlowSequence) -> Vec<PathBuf> {
+    seq.items()
+        .filter_map(|item| item.as_scalar().map(|s| PathBuf::from(s.value())))
         .collect()
 }
 

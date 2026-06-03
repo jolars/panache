@@ -4,7 +4,10 @@
 //! line wrapping and language-specific comment prefixes.
 
 use crate::config::WrapMode;
-use crate::syntax::{AstNode, ChunkInfoItem, CodeInfo, SyntaxNode};
+use crate::syntax::{
+    AstNode, ChunkInfoItem, CodeInfo, SyntaxNode, YamlBlockMapEntry, YamlNode, YamlScalarStyle,
+    parse_yaml_document,
+};
 use crate::yaml_engine;
 use panache_parser::parser::utils::chunk_options::ChunkOptionValue;
 use panache_parser::parser::utils::chunk_options::hashpipe_comment_prefix;
@@ -324,135 +327,93 @@ pub fn split_options_from_cst_with_content(
 }
 
 fn extract_options_from_normalized_yaml(normalized_yaml: &str) -> Option<Vec<(String, String)>> {
-    let yaml_syntax = yaml_parser::parse(normalized_yaml).ok()?;
-    let root = yaml_parser::ast::Root::cast(yaml_syntax)?;
-    let map = root
-        .documents()
-        .next()
-        .and_then(|doc| doc.block())
-        .and_then(|block| block.block_map())?;
-
+    let map = parse_yaml_document(normalized_yaml)?.block_map()?;
     let mut options = Vec::new();
     for entry in map.entries() {
-        let key = hashpipe_map_entry_key(&entry)?;
+        let key = entry.key_text()?;
         let value = hashpipe_map_entry_value_text(normalized_yaml, &entry);
         options.push((key, value));
     }
     Some(options)
 }
 
-fn hashpipe_map_entry_key(entry: &yaml_parser::ast::BlockMapEntry) -> Option<String> {
-    let key = entry.key()?;
-    if let Some(flow) = key.flow() {
-        return hashpipe_flow_scalar_text(&flow);
-    }
-    let block = key.block()?;
-    let flow = hashpipe_block_to_flow_scalar(&block)?;
-    hashpipe_flow_scalar_text(&flow)
-}
-
-fn hashpipe_map_entry_value_text(
-    normalized_yaml: &str,
-    entry: &yaml_parser::ast::BlockMapEntry,
-) -> String {
+fn hashpipe_map_entry_value_text(normalized_yaml: &str, entry: &YamlBlockMapEntry) -> String {
     let Some(value) = entry.value() else {
         return String::new();
     };
 
-    if let Some(flow) = value.flow() {
-        return hashpipe_flow_value_text(&flow).unwrap_or_else(|| {
-            let range = flow.syntax().text_range();
-            let start: usize = range.start().into();
-            let end: usize = range.end().into();
-            normalized_yaml[start..end].trim().to_string()
-        });
-    }
-
-    if let Some(block) = value.block() {
-        let range = block.syntax().text_range();
-        let start: usize = range.start().into();
-        let end: usize = range.end().into();
-        let raw =
-            restore_omitted_first_line_indent(normalized_yaml, start, &normalized_yaml[start..end]);
-        // Preserve block values as block values when round-tripping through
-        // hashpipe YAML normalization. Without this, sequence/map values can be
-        // re-emitted as `key: - item` on a second pass (issue #172).
-        if raw.starts_with('\n') {
-            return raw;
+    match value.as_node() {
+        // Plain / quoted scalar: raw text (quotes preserved), multi-line plain
+        // scalars folded for deterministic re-wrap, with any tag re-prepended.
+        // Block scalars (`|` / `>`) are scalars too but must round-trip as block
+        // values, so they take the block-preserving path below.
+        Some(YamlNode::Scalar(scalar)) => match scalar.style() {
+            YamlScalarStyle::Literal | YamlScalarStyle::Folded => {
+                let (start, end) = range_usize(scalar.text_range());
+                block_value_text(normalized_yaml, start, end)
+            }
+            YamlScalarStyle::Plain if scalar.raw().contains('\n') => {
+                // Normalize wrapped plain scalars to a single logical line.
+                let folded = fold_multiline_plain_scalar(scalar.raw());
+                prepend_tag(value.tag(), folded)
+            }
+            _ => prepend_tag(value.tag(), scalar.raw().to_string()),
+        },
+        // Flow container: slice its range and trim (single logical line).
+        Some(YamlNode::FlowSequence(n)) => slice_trim(normalized_yaml, n.syntax()),
+        Some(YamlNode::FlowMap(n)) => slice_trim(normalized_yaml, n.syntax()),
+        // Block container: preserve as a block value (issue #172) with the
+        // omitted-first-line indent restored.
+        Some(YamlNode::BlockMap(n)) => {
+            let (start, end) = range_usize(n.syntax().text_range());
+            block_value_text(normalized_yaml, start, end)
         }
-        let trimmed = raw.trim_start();
-        if trimmed.starts_with('|') || trimmed.starts_with('>') {
-            return raw;
+        Some(YamlNode::BlockSequence(n)) => {
+            let (start, end) = range_usize(n.syntax().text_range());
+            block_value_text(normalized_yaml, start, end)
         }
-        return format!("\n{raw}");
-    }
-
-    let range = value.syntax().text_range();
-    let start: usize = range.start().into();
-    let end: usize = range.end().into();
-    normalized_yaml[start..end].to_string()
-}
-
-fn hashpipe_block_to_flow_scalar(
-    block: &yaml_parser::ast::Block,
-) -> Option<yaml_parser::ast::Flow> {
-    block
-        .syntax()
-        .children()
-        .find_map(yaml_parser::ast::Flow::cast)
-}
-
-fn hashpipe_flow_scalar_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
-    let token = if let Some(token) = flow.plain_scalar() {
-        token
-    } else if let Some(token) = flow.single_quoted_scalar() {
-        token
-    } else if let Some(token) = flow.double_qouted_scalar() {
-        token
-    } else {
-        return None;
-    };
-    let mut value = token.text().to_string();
-    if token.kind() == yaml_parser::SyntaxKind::SINGLE_QUOTED_SCALAR {
-        value = value.trim_matches('\'').to_string();
-    } else if token.kind() == yaml_parser::SyntaxKind::DOUBLE_QUOTED_SCALAR {
-        value = value.trim_matches('"').to_string();
-    }
-    Some(value)
-}
-
-fn hashpipe_flow_value_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
-    let scalar = if let Some(token) = flow.plain_scalar() {
-        let text = token.text().to_string();
-        if text.contains('\n') {
-            // Normalize wrapped plain scalars to a single logical line so
-            // re-emission uses deterministic hashpipe wrapping.
-            fold_multiline_plain_scalar(&text)
-        } else {
-            text
+        // Empty value: slice the value node range verbatim.
+        None => {
+            let (start, end) = range_usize(value.syntax().text_range());
+            normalized_yaml[start..end].to_string()
         }
-    } else if let Some(token) = flow.single_quoted_scalar() {
-        token.text().to_string()
-    } else if let Some(token) = flow.double_qouted_scalar() {
-        token.text().to_string()
-    } else {
-        return None;
-    };
-    Some(prepend_flow_tag(flow, scalar))
+    }
 }
 
-/// Prepend a YAML tag property (e.g. `!expr`) back onto a scalar value so the
-/// formatter can re-emit user-supplied tags. Quarto's `!expr` tag for knitr
-/// requires byte-for-byte preservation.
-fn prepend_flow_tag(flow: &yaml_parser::ast::Flow, scalar: String) -> String {
-    let Some(props) = flow.properties() else {
+fn range_usize(range: rowan::TextRange) -> (usize, usize) {
+    (range.start().into(), range.end().into())
+}
+
+fn slice_trim(normalized_yaml: &str, node: &SyntaxNode) -> String {
+    let (start, end) = range_usize(node.text_range());
+    normalized_yaml[start..end].trim().to_string()
+}
+
+/// Slice a block value's source and preserve it as a block value when
+/// round-tripping through hashpipe YAML normalization. Without the `\n`
+/// prefixing, sequence/map values can be re-emitted as `key: - item` on a
+/// second pass (issue #172).
+fn block_value_text(normalized_yaml: &str, start: usize, end: usize) -> String {
+    let raw =
+        restore_omitted_first_line_indent(normalized_yaml, start, &normalized_yaml[start..end]);
+    if raw.starts_with('\n') {
+        return raw;
+    }
+    let trimmed = raw.trim_start();
+    if trimmed.starts_with('|') || trimmed.starts_with('>') {
+        return raw;
+    }
+    format!("\n{raw}")
+}
+
+/// Prepend a YAML tag (e.g. `!expr`) back onto a scalar value so the formatter
+/// can re-emit user-supplied tags. Quarto's `!expr` tag for knitr requires
+/// byte-for-byte preservation.
+fn prepend_tag(tag: Option<crate::syntax::SyntaxToken>, scalar: String) -> String {
+    let Some(tag) = tag else {
         return scalar;
     };
-    let Some(tag) = props.tag_property() else {
-        return scalar;
-    };
-    let tag_text = tag.syntax().text().to_string();
-    let tag_text = tag_text.trim();
+    let tag_text = tag.text().trim();
     if tag_text.is_empty() {
         return scalar;
     }

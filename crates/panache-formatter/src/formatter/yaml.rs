@@ -11,9 +11,10 @@
 //! through [`format_yaml`] instead of `pretty_yaml::format_text`; both
 //! plain frontmatter and hashpipe option bodies share that chokepoint.
 //! `pretty_yaml` remains only as the cross-validation reference in
-//! `crates/panache-formatter/tests/yaml_cross_validation.rs`. The
-//! `yaml_parser` crate is still used for value extraction and the
-//! CST/diagnostics bridge (Phase 2b). See
+//! `crates/panache-formatter/tests/yaml_cross_validation.rs`. The external
+//! `yaml_parser` crate has been retired (Phase 2b): value extraction and the
+//! CST/diagnostics bridge now run on the in-tree parser via the typed YAML AST
+//! wrappers (`panache_parser::syntax::parse_yaml_document`). See
 //! `.claude/skills/yaml-formatter-cutover/SKILL.md` for scope.
 //!
 //! Phase 1.15b status: cross-validation harness live; rules 1
