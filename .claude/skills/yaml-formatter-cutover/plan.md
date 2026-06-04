@@ -7,8 +7,7 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
 
 ## Status
 
-- **Phase 1 (shadow formatter):** in progress. 1.1–1.15b as
-  previously recorded; 1.15b adds the plain-scalar overflow analog of
+- **Phase 1 (shadow formatter):** DONE (1.1–1.15b). 1.15b adds the plain-scalar overflow analog of
   rule 6 — when a single-line plain scalar in a block-map value
   pushes its line past `line_width`, greedy word-wrap onto
   continuation lines indented at `depth * 2` (the value column,
@@ -70,11 +69,12 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
     — **DONE** (re-parse-on-demand parity swap; host CST shape
     unchanged); (2c) **embed the in-tree YAML CST into the host
     document CST** so frontmatter/hashpipe carry real YAML structure
-    — **OUTSTANDING** (the actual end goal; its own workstream, see
-    Phase 2c below); (2d) drop `pretty_yaml` (retire the
-    cross-validation test) — **OUTSTANDING** (`pretty_yaml` is
-    runtime-unused since 2a; only `yaml_cross_validation.rs` references
-    it, and it still pulls `yaml_parser` in transitively).
+    — **DONE** (all 5 steps landed; see Phase 2c section + "what
+    landed"); (2d) drop `pretty_yaml` (retire the
+    cross-validation test) — **PARTIAL** (`pretty_yaml` recategorized to
+    a dev-dependency; the *full* drop — evicting `pretty_yaml` +
+    `yaml_parser` from `Cargo.lock` — is date-gated to **~2026-09** and
+    is the **single remaining open item** in this plan).
 - **Phase 3 (hashpipe extension):** functionally already on the in-tree
   stack — hashpipe *value extraction* migrated to the in-tree wrappers
   in 2b, and hashpipe *option-body formatting* has gone through
@@ -84,13 +84,41 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
   stale `pretty_yaml`-era comment in `hashpipe.rs` de-staled, and the
   host `issue_*_hashpipe_*` goldens audited (no `pretty_yaml` quirks
   remain — they were reconciled to in-tree output when 2a went live).
-  Remaining: folding hashpipe into the 2c CST embedding (the preamble
-  content node) — deferred **with 2c**, not part of Phase 3 proper.
+  The anchor/alias corpus gap (the spec's "Anchors / tags") was closed
+  later (anchor case added; see "what landed"), and the unregistered
+  `issue_179` host golden was wired in + reconciled to in-tree output.
+  Folding hashpipe into the 2c CST embedding (the preamble content node)
+  landed as part of 2c (now DONE), so **Phase 3 is complete**.
 
 ## What landed since drafting
 
 _(Update as phases complete. Earliest entries on top.)_
 
+- **Plan close-out — anchor corpus gap + `issue_179` wiring + Status
+  reconciliation.** Closes all remaining *actionable* work; only the
+  date-gated 2d full drop (~2026-09) stays open. (1) Added
+  `crates/panache-formatter/tests/fixtures/yaml_corpus/hashpipe/anchor_alias.yaml`
+  (`fig-width: &dim 6` / `fig-height: *dim`) — the spec's "Anchors / tags"
+  bullet only had a tag case; the anchor/alias path was uncovered. The
+  cross-validation harness auto-discovered it and it passed parity vs
+  `pretty_yaml` **and** idempotency on the first run (no formatter/parser
+  fix needed — the `YAML_ANCHOR`/`YAML_ALIAS` handling at
+  `formatter/yaml/document.rs:821` already round-trips). (2) Registered
+  `issue_179_hashpipe_one_space_list_idempotency` in `tests/golden_cases.rs`
+  (it existed on disk but was never wired in — the pre-existing gap flagged
+  in the 3.2 entry below). Registering it surfaced a **stale, pre-cutover
+  `expected.qmd`**: the in-tree output canonicalizes the malformed one-space
+  block-seq indent (`#| - ROC` → `#|   - ROC`, the deeper item nests to 4),
+  leaves the **quoted** `fig-cap` unwrapped (rule 6 skips quoted scalars,
+  per 1.15b — pretty_yaml wrapped it), and inserts a blank line before the
+  code body — all three are intended in-tree behavior, consistent with the
+  already-green `issue_185` (which wraps its *plain* `tbl-cap` and inserts
+  the same blank line). Output is idempotent + lossless (`debug format
+  --checks all` green); regenerated `expected.qmd` via `UPDATE_EXPECTED=1`
+  (scoped to the one case), same reconciliation the other hashpipe goldens
+  got at 2a. (3) Reconciled the stale top-level Status section
+  (Phase 1 → DONE, 2c → DONE, 2d → PARTIAL with the ~2026-09 trigger named
+  as the single open item, Phase 3 → complete). No source/runtime changes.
 - **Phase 2d (partial) — `pretty_yaml` recategorized as a dev-dependency.**
   `pretty_yaml` has been runtime-unused since 2a, yet sat under
   `[dependencies]` in both the root `panache` crate (where nothing —
@@ -912,7 +940,7 @@ consumers + the diagnostics infra migrated; `yaml_parser` removed from
 the three manifests. **Re-parse-on-demand parity swap — host CST shape
 unchanged.** See "what landed."
 
-### 2c — Embed the in-tree YAML CST into the host document CST — IN PROGRESS
+### 2c — Embed the in-tree YAML CST into the host document CST — DONE
 
 End goal: the YAML tokens (`YAML_STREAM` / `YAML_DOCUMENT` /
 `YAML_BLOCK_MAP` / … / `YAML_SCALAR`) live **inside the full document
