@@ -62,7 +62,7 @@ impl Rule for MathContentRule {
                     };
                     match token.kind() {
                         SyntaxKind::MATH_GROUP_CLOSE if node.kind() != SyntaxKind::MATH_GROUP => {
-                            out.push(warn(
+                            out.push(err(
                                 token.text_range(),
                                 "math-unexpected-close-brace",
                                 "unmatched closing brace `}`",
@@ -73,7 +73,7 @@ impl Rule for MathContentRule {
                             if node.kind() != SyntaxKind::MATH_ENVIRONMENT
                                 && token.text() == r"\end" =>
                         {
-                            out.push(warn(
+                            out.push(err(
                                 token.text_range(),
                                 "math-unexpected-end",
                                 r"`\end` without a matching `\begin`",
@@ -102,7 +102,7 @@ fn check_unclosed_group(group: &SyntaxNode, input: &str, out: &mut Vec<Diagnosti
         .children_with_tokens()
         .find(|c| c.kind() == SyntaxKind::MATH_GROUP_OPEN)
     {
-        out.push(warn(
+        out.push(err(
             open.text_range(),
             "math-unclosed-group",
             "unclosed `{` group",
@@ -124,7 +124,7 @@ fn check_environment(env: &SyntaxNode, input: &str, out: &mut Vec<Diagnostic>) {
         let range = begin_idx
             .map(|i| children[i].text_range())
             .unwrap_or_else(|| env.text_range());
-        out.push(warn(
+        out.push(err(
             range,
             "math-unclosed-environment",
             r"`\begin` without a matching `\end`",
@@ -141,7 +141,7 @@ fn check_environment(env: &SyntaxNode, input: &str, out: &mut Vec<Diagnostic>) {
         // Point at the offending `\end` name (or the `\end` token if unnamed).
         let range =
             group_range_after(&children, end_idx).unwrap_or_else(|| children[end_idx].text_range());
-        out.push(warn(
+        out.push(err(
             range,
             "math-mismatched-environment",
             r"`\end` name does not match the open `\begin`",
@@ -174,8 +174,13 @@ fn group_range_after(children: &[SyntaxElement], idx: usize) -> Option<TextRange
     })
 }
 
-fn warn(range: TextRange, code: &'static str, message: &'static str, input: &str) -> Diagnostic {
-    Diagnostic::warning(Location::from_range(range, input), code, message)
+/// Malformed math is build-breaking — `quarto render` to PDF hard-fails on an
+/// unclosed brace or mismatched environment, and MathJax/KaTeX silently drop the
+/// equation. So these ride at `Error` severity. The rule stays suppressible via
+/// `[lint.rules] math-syntax = false` (or an ignore directive) for the rare
+/// macro-expanded TeX that only *looks* unbalanced to a structural parser.
+fn err(range: TextRange, code: &'static str, message: &'static str, input: &str) -> Diagnostic {
+    Diagnostic::error(Location::from_range(range, input), code, message)
 }
 
 #[cfg(test)]

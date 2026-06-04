@@ -943,7 +943,7 @@ Detects structural problems in the TeX content of inline (`$...$`) and display
 unclosed or mismatched environments.
 
 Severity
-:   Warning
+:   Error
 
 Auto-fix
 :   No
@@ -964,14 +964,19 @@ Description
 
 :   The math parser captures math content losslessly even when it is malformed,
     so a stray brace or unterminated environment never breaks parsing or
-    formatting --- but it usually means the equation will not render as the
-    author intended. This rule surfaces the structural problems the parser
-    already detected, with the diagnostic pointing at the offending byte (the
-    unclosed `{`, the stray `}`, or the mismatched `\end`).
+    formatting --- but it is build-breaking downstream: `quarto render` to PDF
+    hard-fails on an unclosed brace or mismatched environment, and MathJax/KaTeX
+    silently drop the equation. That is why these ride at `error` severity. This
+    rule surfaces the structural problems the parser already detected, with the
+    diagnostic pointing at the offending byte (the unclosed `{`, the stray `}`,
+    or the mismatched `\end`).
 
     The check is purely syntactic: TeX is a macro language, so the rule does not
     validate command names, argument arity, or semantics --- only brace and
-    environment nesting.
+    environment nesting. Because a macro can expand to braces or an environment the
+    structural parser cannot see, valid TeX can occasionally look unbalanced; in
+    that rare case disable the rule with `[lint.rules] math-syntax     = false` or
+    an ignore directive.
 
 **Example violation:**
 
@@ -982,7 +987,7 @@ The mass-energy relation is $E = mc^{2$.
 **Diagnostic:**
 
 ```
-warning[math-unclosed-group]: unclosed `{` group
+error[math-unclosed-group]: unclosed `{` group
  --> document.qmd:1:38
   |
 1 | The mass-energy relation is $E = mc^{2$.
