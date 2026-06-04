@@ -379,6 +379,7 @@ golden_test_cases!(
     issue_171_gfm_inline_links,
     issue_231_gfm_tilde_idempotency,
     issue_172_hashpipe_inline_list_idempotency,
+    issue_179_hashpipe_one_space_list_idempotency,
     issue_hashpipe_nested_list_indent,
     issue_176_display_math_colon_idempotency,
     issue_187_list_plus_wrap_idempotency,
