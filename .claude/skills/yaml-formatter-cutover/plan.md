@@ -953,12 +953,28 @@ Staged (each landable independently; the offset layer dies last):
   - **Semantic note for Step 5/downstream:** hashpipe option `value` is now
     the *cooked* scalar (quotes stripped, multi-line folded) and
     `value_range` for a quoted scalar spans the quotes.
-- **Step 5 — consumer rewire + drop offset layer — OUTSTANDING.** Repoint
-  `formatter/hashpipe.rs` and `syntax/yaml.rs`
-  (`collect_hashpipe_regions` / `extract_hashpipe_region`) to read the
-  embedded subtree; delete `hashpipe_normalizer.rs` and the
-  `yaml_to_host_offsets` machinery. (These still read region `.text()`,
-  which the byte-lossless splice preserves, so they keep working today.)
+- **Step 5 — consumer rewire + drop offset layer — DONE.** Done via a
+  **parser syntax-error channel** rather than the planned offset-remap:
+  digging in showed the parser already validates the embedded YAML (to pick
+  CST shape) and *discarded* the verdict, forcing the linter to re-parse +
+  map offsets just to recover it. Now `parse_with_errors` returns the tree
+  plus host-ranged `SyntaxError`s (rust-analyzer `Parse { green, errors }`
+  style); the two validation sites (`parse_fenced_code_block`,
+  `emit_yaml_block`) map the diagnostic to host via a lockstep strip+offset
+  pass (`locate_yaml_diagnostic`) and push into an `Rc`-backed `Diagnostics`
+  sink on `BlockContext`. salsa caches `(green, errors)` once
+  (`parsed_document`) and `built_in_lint_plan` emits `yaml-parse-error`
+  straight from the channel. With errors off the channel, `syntax/yaml.rs`
+  dropped `yaml_to_host_offsets` / `parse_error_host_offset` / the
+  `parse_region_yaml` re-parse — region validity/shape now derive from the
+  embedded subtree (`is_valid` = parser spliced; empty-vs-opaque told apart
+  by the absence of raw `TEXT`). The formatter reads the embedded
+  `HASHPIPE_YAML_CONTENT` (prefix-stripped reconstruction + preamble
+  line-count split) and `hashpipe_normalizer.rs` is deleted. A latent parser
+  bug surfaced and was fixed: a blank `#|` line inside a literal block scalar
+  truncated the preamble scan (`compute_hashpipe_preamble_line_count` now
+  keeps it when followed by another prefixed line — `issue_201`). The parser
+  stays diagnostics-only-for-validatable-sublanguages; Markdown emits none.
 
 **Consumer audit.** Linter rules, LSP, salsa indexers, pandoc-ast
 projector — anything that walks `YAML_METADATA_CONTENT`/
