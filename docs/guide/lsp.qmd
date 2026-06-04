@@ -65,6 +65,12 @@ Diagnostics
     - Parser errors
     - External linter integration (e.g., R code linting)
 
+    Built-in diagnostics are debounced: a burst of keystrokes coalesces into a
+    single lint pass once you pause briefly, so typing stays responsive on large
+    documents. External linters (e.g. `jarl`, `ruff`) are more expensive --- they
+    spawn a subprocess per embedded code block --- so they run **on save** rather
+    than on every keystroke. Save your file to refresh external-linter diagnostics.
+
 Code actions
 
 :   Quick fixes and refactorings (`textDocument/codeAction`)
@@ -470,10 +476,13 @@ Most editors support folding with default key bindings (e.g., `za` in Neovim,
 Linting errors and warnings appear in real-time as you type:
 
 Built-in rules
-:   Heading hierarchy, duplicate references, citation validation, parser errors
+:   Heading hierarchy, duplicate references, citation validation, parser errors.
+    Run debounced as you type.
 
 External linters
-:   Code block linting (e.g., `jarl` for R when configured in `[linters]`)
+:   Code block linting (e.g., `jarl` for R when configured in `[linters]`). Run
+    on save, not on every keystroke, since each pass spawns a subprocess per
+    embedded code block.
 
 Diagnostics appear as:
 

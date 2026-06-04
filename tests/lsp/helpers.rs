@@ -151,6 +151,17 @@ impl TestLspServer {
         self.lsp.did_change(params).await;
     }
 
+    /// Save a document (simulates the `textDocument/didSave` notification).
+    pub async fn save_document(&self, uri: &str) {
+        let params = DidSaveTextDocumentParams {
+            text_document: TextDocumentIdentifier {
+                uri: uri.parse().unwrap(),
+            },
+            text: None,
+        };
+        self.lsp.did_save(params).await;
+    }
+
     /// Format a document.
     ///
     /// Simulates the `textDocument/formatting` request.

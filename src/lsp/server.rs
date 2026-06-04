@@ -91,6 +91,11 @@ impl LanguageServer for PanacheLsp {
                     TextDocumentSyncOptions {
                         open_close: Some(true),
                         change: Some(TextDocumentSyncKind::INCREMENTAL),
+                        // Expensive external linters run on save (not per
+                        // keystroke); we don't need the document text included.
+                        save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
+                            include_text: Some(false),
+                        })),
                         ..Default::default()
                     },
                 )),
@@ -214,7 +219,20 @@ impl LanguageServer for PanacheLsp {
             Arc::clone(&self.workspace_root),
             Arc::clone(&self.salsa_db),
             Arc::clone(&self.runtime_settings),
+            Arc::clone(&self.pending_diagnostics),
             &self.client,
+            params,
+        )
+        .await;
+    }
+
+    async fn did_save(&self, params: DidSaveTextDocumentParams) {
+        documents::did_save(
+            &self.client,
+            Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
+            Arc::clone(&self.workspace_root),
+            Arc::clone(&self.pending_diagnostics),
             params,
         )
         .await;
@@ -225,6 +243,7 @@ impl LanguageServer for PanacheLsp {
             &self.client,
             Arc::clone(&self.document_map),
             Arc::clone(&self.salsa_db),
+            Arc::clone(&self.pending_diagnostics),
             params,
         )
         .await;

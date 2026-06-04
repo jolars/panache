@@ -92,7 +92,8 @@ pub(crate) async fn did_change_watched_files(
                 .collect()
         };
 
-        // Re-lint each affected document
+        // Re-lint each affected document. A bibliography change is infrequent,
+        // so run the full pass (external linters included).
         for uri in &affected_documents {
             lint_and_publish(
                 client,
@@ -100,6 +101,7 @@ pub(crate) async fn did_change_watched_files(
                 &salsa_db,
                 &workspace_root,
                 uri.clone(),
+                true,
             )
             .await;
         }

@@ -17,6 +17,16 @@ use std::time::Instant;
 
 type CombinedEditRanges = (String, (usize, usize), (usize, usize));
 
+/// Per-document handles for in-flight debounced lint passes, keyed by URI
+/// string (since `Uri` is not `Send`). A newer edit aborts the pending handle
+/// for the same document before scheduling a fresh one.
+pub(crate) type PendingDiagnostics = Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>;
+
+/// Idle time after the last edit before a debounced lint pass fires. Rapid
+/// keystrokes keep resetting this window so only the final edit in a burst
+/// triggers diagnostics, instead of every keystroke queuing a full lint.
+const DIAGNOSTICS_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(200);
+
 fn apply_changes_descending_with_combined_ranges(
     original_text: &str,
     changes: &[TextDocumentContentChangeEvent],
@@ -149,13 +159,16 @@ pub(crate) async fn did_open(
         .log_message(MessageType::INFO, format!("Opened document: {}", uri))
         .await;
 
-    // Run linter and publish diagnostics
+    // Run linter and publish diagnostics. Open is a one-time event (not
+    // per-keystroke), so run external linters now to surface their diagnostics
+    // immediately rather than waiting for the first save.
     lint_and_publish(
         client,
         &document_map,
         &salsa_db,
         &workspace_root,
         params.text_document.uri,
+        true,
     )
     .await;
     log::debug!("did_open complete in {:?}", start.elapsed());
@@ -167,6 +180,7 @@ pub(crate) async fn did_change(
     workspace_root: Arc<Mutex<Option<std::path::PathBuf>>>,
     salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     runtime_settings: Arc<Mutex<LspRuntimeSettings>>,
+    pending_diagnostics: PendingDiagnostics,
     client: &Client,
     params: DidChangeTextDocumentParams,
 ) {
@@ -177,8 +191,7 @@ pub(crate) async fn did_change(
     let config = get_config(client, &workspace_root, &params.text_document.uri).await;
 
     // Apply incremental changes sequentially
-    let mut dependent_uris: Option<Vec<Uri>> = None;
-    let (graph_text, graph_path, salsa_file, salsa_config) = {
+    let (graph_text, graph_path, _salsa_file, salsa_config) = {
         let (salsa_file, salsa_config, original_tree_green) = {
             let document_map = document_map.lock().await;
             let Some(doc_state) = document_map.get(&uri_string) else {
@@ -336,7 +349,94 @@ pub(crate) async fn did_change(
     if let Some(state) = document_map.lock().await.get_mut(&uri_string) {
         state.path = graph_path.clone();
     }
-    if let Some(path) = graph_path.as_ref() {
+
+    // Parsing and document-state updates above are synchronous so requests
+    // (formatting, hover, ...) always see the latest tree. The expensive part
+    // -- project-graph recompute + linting (+ external linters) -- is deferred
+    // to a debounced task so a burst of keystrokes collapses into one lint and
+    // a save's `formatting` request never queues behind per-keystroke work.
+    schedule_debounced_lint(
+        client,
+        Arc::clone(&document_map),
+        Arc::clone(&salsa_db),
+        Arc::clone(&workspace_root),
+        pending_diagnostics,
+        params.text_document.uri,
+    )
+    .await;
+
+    log::debug!(
+        "did_change complete (parse+state) in {:?}; lint debounced",
+        start.elapsed()
+    );
+}
+
+/// Schedule a debounced, external-linter-free lint pass for `uri`.
+///
+/// A still-pending pass for the same document is aborted first, so a burst of
+/// keystrokes only ever results in a single lint after the user pauses for
+/// [`DIAGNOSTICS_DEBOUNCE`]. External linters are skipped here and deferred to
+/// [`did_save`]; only the fast built-in rules run on change.
+async fn schedule_debounced_lint(
+    client: &Client,
+    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
+    workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    pending_diagnostics: PendingDiagnostics,
+    uri: Uri,
+) {
+    // `Uri` is not `Send`, so the spawned task carries the string form and
+    // reparses it past the spawn boundary.
+    let key = uri.to_string();
+    let client = client.clone();
+
+    let mut pending = pending_diagnostics.lock().await;
+    // Cancel the previous still-pending pass for this document (aborting an
+    // already-finished handle is a no-op). The map therefore holds at most one
+    // handle per open document; entries are dropped on save/close.
+    if let Some(prev) = pending.insert(
+        key.clone(),
+        tokio::spawn(async move {
+            tokio::time::sleep(DIAGNOSTICS_DEBOUNCE).await;
+            let Ok(uri) = key.parse::<Uri>() else {
+                return;
+            };
+            relint_with_dependents(
+                &client,
+                &document_map,
+                &salsa_db,
+                &workspace_root,
+                uri,
+                false,
+            )
+            .await;
+        }),
+    ) {
+        prev.abort();
+    }
+}
+
+/// Recompute the project graph for `uri`, re-lint any dependent documents, then
+/// lint the document itself. Dependents are always linted built-in-only to
+/// bound cost; `run_external` controls only the target document's own pass.
+async fn relint_with_dependents(
+    client: &Client,
+    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+    workspace_root: &Arc<Mutex<Option<PathBuf>>>,
+    uri: Uri,
+    run_external: bool,
+) {
+    let (salsa_file, salsa_config, path) = {
+        let map = document_map.lock().await;
+        let Some(state) = map.get(&uri.to_string()) else {
+            return;
+        };
+        (state.salsa_file, state.salsa_config, state.path.clone())
+    };
+
+    let mut dependent_uris: Vec<Uri> = Vec::new();
+    if let Some(path) = path.as_ref() {
         let (dependents, tracked_paths) = {
             let db = salsa_db.lock().await;
             let graph =
@@ -352,32 +452,48 @@ pub(crate) async fn did_change(
                 let _ = db.ensure_file_text_cached(tracked);
             }
         }
-        if !dependents.is_empty() {
-            dependent_uris = Some(
-                dependents
-                    .into_iter()
-                    .filter_map(Uri::from_file_path)
-                    .collect(),
-            );
-        }
+        dependent_uris = dependents
+            .into_iter()
+            .filter_map(Uri::from_file_path)
+            .collect();
     }
 
-    if let Some(uris) = dependent_uris {
-        for uri in uris {
-            lint_and_publish(client, &document_map, &salsa_db, &workspace_root, uri).await;
-        }
+    for dep in dependent_uris {
+        lint_and_publish(client, document_map, salsa_db, workspace_root, dep, false).await;
     }
-
-    // Run linter and publish diagnostics
     lint_and_publish(
         client,
-        &document_map,
-        &salsa_db,
-        &workspace_root,
-        params.text_document.uri,
+        document_map,
+        salsa_db,
+        workspace_root,
+        uri,
+        run_external,
     )
     .await;
-    log::debug!("did_change complete in {:?}", start.elapsed());
+}
+
+/// Handle textDocument/didSave notification.
+///
+/// Save is the point at which the heavier external linters (e.g. `jarl`,
+/// `ruff`) run -- they are skipped on every keystroke (see
+/// [`schedule_debounced_lint`]) and refreshed here. Any pending debounced pass
+/// is cancelled first so the save's full pass is the authoritative one.
+pub(crate) async fn did_save(
+    client: &Client,
+    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
+    workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    pending_diagnostics: PendingDiagnostics,
+    params: DidSaveTextDocumentParams,
+) {
+    let uri = params.text_document.uri;
+    {
+        let mut pending = pending_diagnostics.lock().await;
+        if let Some(prev) = pending.remove(&uri.to_string()) {
+            prev.abort();
+        }
+    }
+    relint_with_dependents(client, &document_map, &salsa_db, &workspace_root, uri, true).await;
 }
 
 /// Handle textDocument/didClose notification
@@ -385,10 +501,15 @@ pub(crate) async fn did_close(
     client: &Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
+    pending_diagnostics: PendingDiagnostics,
     params: DidCloseTextDocumentParams,
 ) {
     let uri = params.text_document.uri.to_string();
     document_map.lock().await.remove(&uri);
+    // Cancel any pending debounced lint for the now-closed document.
+    if let Some(handle) = pending_diagnostics.lock().await.remove(&uri) {
+        handle.abort();
+    }
 
     let states: Vec<DocumentState> = {
         let map = document_map.lock().await;

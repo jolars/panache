@@ -43,6 +43,8 @@ pub struct PanacheLsp {
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     runtime_settings: Arc<Mutex<LspRuntimeSettings>>,
+    /// In-flight debounced lint tasks, keyed by document URI string.
+    pending_diagnostics: documents::PendingDiagnostics,
 }
 
 impl PanacheLsp {
@@ -53,6 +55,7 @@ impl PanacheLsp {
             workspace_root: Arc::new(Mutex::new(None)),
             salsa_db: Arc::new(Mutex::new(crate::salsa::SalsaDb::default())),
             runtime_settings: Arc::new(Mutex::new(LspRuntimeSettings::default())),
+            pending_diagnostics: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 

@@ -9,15 +9,25 @@ use super::super::conversions::convert_diagnostic;
 use super::super::helpers::get_config;
 use crate::lsp::DocumentState;
 
-/// Parse document and run linter, then publish diagnostics
+/// Parse document and run linter, then publish diagnostics.
+///
+/// When `run_external` is false, external linters (e.g. `jarl`, `ruff`) are
+/// skipped — they spawn one subprocess per embedded code block and are by far
+/// the most expensive part of a lint pass, so per-keystroke `did_change` runs
+/// pass `false` and defer them to `did_save`.
 pub(crate) async fn lint_and_publish(
     client: &Client,
     document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
     salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
     workspace_root: &Arc<Mutex<Option<PathBuf>>>,
     uri: Uri,
+    run_external: bool,
 ) {
-    log::debug!("lint_and_publish uri={}", *uri);
+    log::debug!(
+        "lint_and_publish uri={} run_external={}",
+        *uri,
+        run_external
+    );
     // Get document state
     let doc_state = {
         let map = document_map.lock().await;
@@ -56,7 +66,7 @@ pub(crate) async fn lint_and_publish(
     let external_jobs = lint_plan.external_jobs;
 
     #[cfg(not(target_arch = "wasm32"))]
-    if !external_jobs.is_empty() {
+    if run_external && !external_jobs.is_empty() {
         let registry = Arc::new(crate::linter::external_linters::ExternalLinterRegistry::new());
         let max_parallel = config.external_max_parallel.max(1);
         let semaphore = Arc::new(Semaphore::new(max_parallel));
