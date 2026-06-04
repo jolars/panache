@@ -1201,6 +1201,35 @@ mod tests {
     }
 
     #[test]
+    fn experimental_format_math_defaults_off() {
+        let cfg = parse_config_str("flavor = \"quarto\"\n", Path::new("panache.toml"))
+            .expect("config without [experimental] must parse");
+        assert!(
+            !cfg.experimental.format_math,
+            "format-math must default to false"
+        );
+    }
+
+    #[test]
+    fn experimental_format_math_opt_in_parses() {
+        let toml = "[experimental]\nformat-math = true\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("[experimental] format-math must parse");
+        assert!(cfg.experimental.format_math, "opt-in must enable the gate");
+    }
+
+    #[test]
+    fn unknown_key_inside_experimental_section_is_rejected() {
+        let toml = "[experimental]\nformat-maths = true\n";
+        let err = parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("typo'd [experimental] key must error");
+        assert!(
+            err.to_string().contains("format-maths"),
+            "error must name the offending key: {err}"
+        );
+    }
+
+    #[test]
     fn unknown_extension_name_is_rejected() {
         let toml = "[extensions]\nquato-crossrefs = true\n";
         let err = parse_config_str(toml, Path::new("panache.toml"))

@@ -405,6 +405,39 @@ tab-width = 4
 `tab-width`
 :   Number of spaces per tab when normalizing (default 4).
 
+## Experimental Features
+
+The `[experimental]` table gates features that are **opt-in and unstable**.
+Their behavior --- and the option surface itself --- may change, or be removed,
+**without a major release**. Do not depend on them for stable output.
+
+```toml
+[experimental]
+format-math = false
+```
+
+### `format-math`
+
+When enabled, Panache reformats the **content** of math spans (`$...$`,
+`$$...$$`, and `\(...\)` / `\[...\]`) structurally:
+
+- inline whitespace runs collapse to a single space;
+- environment bodies (`\begin{aligned}…\end{aligned}` and friends) are indented
+  two spaces and laid out one row per line;
+- `\\` line breaks are normalized to a trailing `\\`;
+- `&` columns in alignment environments are aligned.
+
+Only structurally-safe transforms are applied --- never operator spacing,
+`\frac`/`\dfrac` rewriting, or inserting alignment `&`. Column alignment uses
+**source character widths**, so it tidies the source rather than aligning
+rendered glyphs (`\alpha` counts as six columns). Malformed math (unbalanced
+braces or environments) and content with a lone unescaped `$` is left verbatim.
+
+Standalone TeX blocks (a bare `\begin{env}…\end{env}` that is not wrapped in
+math delimiters) are not affected --- they are kept opaque by the parser.
+
+Default is `false` (math content is emitted verbatim).
+
 ## Extensions
 
 Panache supports most of the Pandoc extensions. Defaults vary by flavor, but you

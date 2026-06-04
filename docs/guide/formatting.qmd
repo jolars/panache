@@ -763,6 +763,50 @@ Output
     $$
     ```
 
+### Content-Aware Math Formatting (experimental)
+
+By default the *content* between math delimiters is emitted verbatim. Enabling
+the experimental [`format-math`](configuration.qmd#format-math) option turns on
+structural reformatting of that content --- inline whitespace collapse,
+environment-body indentation, `\\` normalization, and `&`-column alignment:
+
+```toml
+[experimental]
+format-math = true
+```
+
+Input
+
+:   ```markdown
+    $$
+    \begin{aligned}
+    x &= 1 \\
+    y &= 22 \\
+    z &= 333
+    \end{aligned}
+    $$
+    ```
+
+Output
+
+:   ```markdown
+    $$
+    \begin{aligned}
+      x & = 1   \\
+      y & = 22  \\
+      z & = 333
+    \end{aligned}
+    $$
+    ```
+
+The `&` columns and the trailing `\\` are both aligned.
+
+Only structurally-safe transforms run; operator spacing and macro contents are
+never rewritten. Alignment uses **source character widths** (it tidies the
+source, it does not align rendered glyphs), and malformed math is left
+untouched. The option is unstable and may change without a major release --- see
+[Experimental Features](configuration.qmd#experimental-features).
+
 ## Links
 
 For links, Panache preserves the original link text and URL but normalizes the

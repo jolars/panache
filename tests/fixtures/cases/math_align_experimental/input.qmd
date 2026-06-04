@@ -1,0 +1,9 @@
+# Aligned
+
+$$
+\begin{aligned}
+x &= 1 \\
+y &= 22 \\
+z &= 333
+\end{aligned}
+$$

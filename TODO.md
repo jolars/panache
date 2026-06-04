@@ -977,6 +977,11 @@ design decisions, and per-session workflow. Parser invariants:
       CLI + LSP. Derives the five diagnostics directly from the embedded
       `MATH_CONTENT` CST shape (no re-parse); spans are the offending tokens'
       host ranges.
-- [ ] Math formatter that reformats content semantics-safely (align `&` columns,
+- [x] Math formatter that reformats content semantics-safely (align `&` columns,
       indent environment bodies, normalize `\\`) while preserving idempotency
       (`format(format(math)) == format(math)`), behind an experimental gate.
+      Landed as `[experimental] format-math` (default off) routing
+      `$$`/`$`/`\[`/`\(` math content through
+      `crates/panache-formatter/src/formatter/math/`. Standalone `\begin{env}`
+      TeX blocks stay opaque (parser keeps them as `TEX_BLOCK`) --- a possible
+      follow-up.

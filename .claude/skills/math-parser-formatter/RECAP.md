@@ -32,70 +32,80 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Math diagnostics surfaced via linter + LSP** (branch `feat/math-content-cst`).
-The Phase-1 diagnostics (unclosed/mismatched braces + environments) were
-computed at parse and discarded; they now reach CLI + LSP as the always-on
-**`math-syntax`** lint rule.
+**Math formatter (Phases 2+3) + `math-syntax` → Error** (branch
+`feat/math-content-cst`). Shipped the experimental content-aware math formatter
+and promoted the lint severity.
 
-Two design decisions (locked with the user):
-1. **Registry lint rule**, NOT the parser's `SyntaxError` channel. YAML *must*
-   validate at parse time because it changes CST shape on error; math **always**
-   embeds losslessly, so the verdict is pure linter policy. A registry rule also
-   gets `[lint.rules]` opt-out + ignore-directive filtering and keeps the parser
-   lossless-only.
-2. **Derive diagnostics from the embedded CST shape, NOT a re-parse.** The first
-   cut reconstructed the content, re-ran `parse_math_report`, and mapped offsets
-   through a `math_content_segments` helper — three passes over content already
-   parsed once (smelly; half-violates `math-parser.md`'s "no re-parse" rule).
-   The rule now reads the five conditions straight off the tree; the embedded
-   `MATH_*` tokens already carry host ranges, so a span is just the offending
-   token's `text_range()` — no reconstruction, no offset mapping, and the
-   blockquote-prefix wrinkle vanishes. Key realization: the lossless CST is
-   *designed* for downstream tools to recompute structural facts, so reading the
-   tree is the intended pattern; the parser's inline-emission offset gap
-   (`ParagraphBuffer` reconstructs inline text as a fresh `String`) is real but
-   irrelevant here because the **final red tree already has correct host
-   offsets** — not worth a refactor.
+Decisions locked with the user this session:
+1. **Config shape is `[experimental] format-math` (default false)**, a *new
+   top-level* host-config table — NOT `experimental_math_formatting` under
+   `[format]` as the old plan suggested. Documented as opt-in / API-may-break.
+   Mirrored onto formatter `Config::experimental_format_math`; plumbed in
+   `to_formatter_config`. Schema regenerated (`ExperimentalConfig`).
+2. **`math-syntax` diagnostics promoted Warning → Error.** The channel (a
+   suppressible registry rule) was right, but warning *severity* undersold a
+   build-breaking error (`quarto render` hard-fails). One-line change in the
+   `err()` helper (`src/linter/rules/math_content.rs`); docs updated.
+3. **Env-body indent hardcoded to 2 spaces** (opinionated; `math_indent` left
+   untouched — it still flat-indents non-environment `$$` content). Promote to a
+   knob later only on pushback.
+4. **Full scope incl. `&`-alignment** (not deferred).
+5. **Operators not being tokenized is NOT a blocker** — every transform is
+   structural (keys off `&`/`\\`/env/group tokens); cells are opaque text
+   measured by *source* char width. Operator spacing stays out of scope.
 
-CST signatures the rule reads (`src/linter/rules/math_content.rs`):
-- `math-unclosed-group` — `MATH_GROUP` with no `MATH_GROUP_CLOSE` child (→ `{`).
-- `math-unexpected-close-brace` — `MATH_GROUP_CLOSE` whose parent ≠ `MATH_GROUP`.
-- `math-unclosed-environment` — `MATH_ENVIRONMENT` with no `\end` command (→ `\begin`).
-- `math-mismatched-environment` — env begin/end name groups differ (→ end name).
-- `math-unexpected-end` — `\end` `MATH_COMMAND` whose parent ≠ `MATH_ENVIRONMENT`.
+Architecture (`crates/panache-formatter/src/formatter/math/` + `math.rs`):
+- **Re-parses the clean content string** (`parse_math_report`) like the YAML
+  formatter does, NOT a walk of the host-embedded subtree — dissolves the
+  blockquote-prefix problem. `format_math(content, opts) -> String`, delimiter-
+  free in/out; bails to verbatim on gate-off, lone-`$`, or any parse diagnostic.
+- `render.rs`: `MathContext::{Inline, Display, EnvironmentBody}`. Rows split on
+  top-level `\\`/newline; cells on top-level `&`; **trim-before-measure +
+  trailing-only padding** is the idempotency engine (see `STYLE.md`). Canonical
+  separator ` & ` (latexindent style — `&=` becomes `& =`). **Trailing `\\` also
+  align**: the last column is padded too, but only on rows that carry a `\\`
+  (a final/soft-break row's last cell stays unpadded → no trailing whitespace).
+  Cell internals (operator spacing) never touched.
+- Gated at three call sites, OFF byte-identical: `core.rs` block DISPLAY_MATH
+  (env + non-env), `inline.rs` INLINE_MATH (inline + display sub-form) and
+  standalone DISPLAY_MATH. Gated inline read switched to `InlineMath::content()`
+  (prefix-stripping).
 
-Shipped:
-- `src/linter/rules/math_content.rs` — `MathContentRule` (`name = "math-syntax"`),
-  pure CST reader; per-code kebab Warnings. No parser-crate changes (the
-  earlier `math_content_segments` helper + `parser::math` re-export were
-  removed). `pub mod` in `linter/rules.rs`; registered always-on in `linter.rs`
-  (no math ext ⇒ no math nodes ⇒ no-op). No `lsp`/`salsa` changes.
-- Docs: `docs/reference/linter-rules.qmd` umbrella `### math-syntax` + five
-  `####` sub-anchors (so the renderer's `#{code}` help URL resolves, matching
-  the `undefined-references` multi-code convention).
-- Tests: 10 rule unit tests (5 codes + well-formed + nested envs + blockquote
-  host-range guard); LSP
-  `tests/lsp/test_diagnostics.rs::test_math_parse_error_in_built_in_lint_plan`.
-- Workspace green / 0 failed; clippy + fmt clean. CLI smoke verified.
+Verified: 12 sub-formatter unit tests + 4 format-API integration tests + 3
+golden cases (`math_align_experimental`, `math_blockquote_experimental`,
+`math_format_off_default`); 284 host goldens green (OFF path byte-identical);
+CLI `debug format --checks all` passes (idempotency + losslessness) on `$$`,
+`\[`, and **blockquote** display math. Clippy + fmt clean.
 
-Traps noted:
-- The renderer suggests `[lint.rules] {code} = false`, but disabling is gated on
-  the umbrella **rule name** (`math-syntax`), not the code — same pre-existing
-  behavior as `undefined-references`. Not a regression.
-- The CST-reader couples to the parser's `MATH_*` shaping (begin/end as
-  `MATH_COMMAND` children of `MATH_ENVIRONMENT`, stray close/end emitted into the
-  enclosing node). That contract is locked by the parser golden snapshots; if it
-  changes, update this rule in lockstep.
+Traps / scope notes:
+- **Standalone `\begin{env}…\end{env}` TeX blocks parse as `TEX_BLOCK` with
+  OPAQUE `TEXT` (no `MATH_CONTENT`)** — Phase 1 only embedded structure into
+  `$$`/`$`/`\[`/`\(` spans. So the formatter does NOT reformat bare TeX blocks;
+  embedding `MATH_CONTENT` into `TEX_BLOCK` is a parser change (future work).
+- **R3 (blockquote re-prefixing) resolved**: the block emitter re-prefixes each
+  formatted line with `> ` automatically; multi-line aligned bodies in `>` work.
+- `MathContext::EnvironmentBody` (raw `\begin` *delimiters*) is wired + unit-
+  tested but rarely hit at block level (those are `TEX_BLOCK`s); kept defensive.
 
 ### Suggested next sub-targets
-1. **Phase 2** — formatter `experimental_math_formatting` gate + verbatim/inline
-   split (regenerate `panache.schema.json`).
-2. **Representative TeX corpus** (Phase 0 leftover) to drive Phases 2–4.
+1. **Phase 4** — dev-oracle (latexindent/KaTeX) cross-validation + idempotency
+   corpus harness.
+2. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
+   blocks become formattable, then extend the formatter to them.
+3. Representative TeX corpus (Phase 0 leftover).
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Math diagnostics surfaced via linter + LSP** — Phase-1 diagnostics now reach
+  CLI + LSP as the always-on `math-syntax` registry rule
+  (`src/linter/rules/math_content.rs`), a pure CST reader (no re-parse) deriving
+  the five codes off the embedded tree shape; spans are the offending tokens'
+  host ranges. (This session promoted those five from Warning → Error.) The rule
+  couples to the parser's `MATH_*` shaping (begin/end as `MATH_COMMAND` children
+  of `MATH_ENVIRONMENT`; stray close/end in the enclosing node) — locked by
+  parser golden snapshots; update in lockstep if it changes.
 - **Phase 1 (parser CST) + scaffolding** — branch `feat/math-content-cst`,
   `feat(parser): parse math content into a structural CST`. Lossless
   `MATH_CONTENT` CST (groups/envs/commands/`&`/`\\`/scripts/comments/ws) +

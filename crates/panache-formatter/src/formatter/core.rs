@@ -2498,12 +2498,26 @@ impl Formatter {
                     }
                 };
 
+                use crate::formatter::math::{self, MathContext, MathFormatOptions};
+
                 if is_environment {
                     self.output.push_str(open);
                     if let Some(content) = math_content {
-                        self.output.push_str(&content);
-                        if !content.ends_with('\n') {
+                        // Experimental gate: reformat the bare environment body
+                        // (align `&`, indent, normalize `\\`); else verbatim.
+                        let opts = MathFormatOptions::from_config(
+                            &self.config,
+                            MathContext::EnvironmentBody,
+                        );
+                        if opts.enabled {
                             self.output.push('\n');
+                            self.output.push_str(&math::format_math(&content, &opts));
+                            self.output.push('\n');
+                        } else {
+                            self.output.push_str(&content);
+                            if !content.ends_with('\n') {
+                                self.output.push('\n');
+                            }
                         }
                     }
                     self.output.push_str(close);
@@ -2518,11 +2532,17 @@ impl Formatter {
 
                 // Math content
                 if let Some(content) = math_content {
-                    let math_indent = self.config.math_indent;
-                    for line in content.trim().lines() {
-                        self.output.push_str(&" ".repeat(math_indent));
-                        self.output.push_str(line.trim_end());
+                    let opts = MathFormatOptions::from_config(&self.config, MathContext::Display);
+                    if opts.enabled {
+                        self.output.push_str(&math::format_math(&content, &opts));
                         self.output.push('\n');
+                    } else {
+                        let math_indent = self.config.math_indent;
+                        for line in content.trim().lines() {
+                            self.output.push_str(&" ".repeat(math_indent));
+                            self.output.push_str(line.trim_end());
+                            self.output.push('\n');
+                        }
                     }
                 }
 

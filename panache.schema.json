@@ -14,6 +14,18 @@
         }
       ]
     },
+    "ExperimentalConfig": {
+      "additionalProperties": false,
+      "description": "Experimental, opt-in features.\n\nEverything under `[experimental]` is unstable: behavior and the option\nsurface itself may change (or be removed) **without a major release**. Do not\ndepend on it for stable output.",
+      "properties": {
+        "format-math": {
+          "default": false,
+          "description": "Reformat the *content* of math (`$...$`, `$$...$$`, environments)\nstructurally — collapse inline whitespace, indent environment bodies,\nnormalize `\\\\` line breaks, and align `&` columns. Default off: math is\nemitted verbatim. Only structurally-safe transforms are applied; no\noperator spacing, no macro rewriting.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
     "Flavor": {
       "description": "Markdown flavor to parse and format against.",
       "enum": [
@@ -313,6 +325,17 @@
         "array",
         "null"
       ]
+    },
+    "experimental": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExperimentalConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Opt-in experimental features (`[experimental]`). Unstable surface."
     },
     "extend-exclude": {
       "default": [],

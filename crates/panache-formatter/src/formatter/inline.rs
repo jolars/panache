@@ -1,8 +1,9 @@
 use crate::config::{Config, MathDelimiterStyle};
 use crate::formatter::core::{normalize_attribute_text, normalize_span_attributes};
+use crate::formatter::math::{self, MathContext, MathFormatOptions};
 use crate::formatter::shortcodes::format_shortcode;
 use crate::formatter::smart::normalize_smart_punctuation;
-use crate::syntax::{DisplayMath, SyntaxKind, SyntaxNode};
+use crate::syntax::{DisplayMath, InlineMath, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
 
@@ -445,13 +446,29 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 }
             };
 
-            // Output formatted math
+            // Experimental gate: reformat content structurally (clean content
+            // read via the prefix-stripping `InlineMath::content()`). Off ⇒
+            // verbatim (byte-identical to before).
             if is_display_math {
-                // Display math is always block-level with newlines
-                format!("{}\n{}\n{}", open, content.trim(), close)
+                let opts = MathFormatOptions::from_config(config, MathContext::Display);
+                if opts.enabled {
+                    let clean = InlineMath::cast(node.clone())
+                        .map(|m| m.content())
+                        .unwrap_or_else(|| content.clone());
+                    format!("{}\n{}\n{}", open, math::format_math(&clean, &opts), close)
+                } else {
+                    format!("{}\n{}\n{}", open, content.trim(), close)
+                }
             } else {
-                // Inline math stays inline
-                format!("{}{}{}", open, content, close)
+                let opts = MathFormatOptions::from_config(config, MathContext::Inline);
+                if opts.enabled {
+                    let clean = InlineMath::cast(node.clone())
+                        .map(|m| m.content())
+                        .unwrap_or_else(|| content.clone());
+                    format!("{}{}{}", open, math::format_math(&clean, &opts), close)
+                } else {
+                    format!("{}{}{}", open, content, close)
+                }
             }
         }
         SyntaxKind::DISPLAY_MATH => {
@@ -491,10 +508,17 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
 
             let mut result = String::new();
             if is_environment {
+                let opts = MathFormatOptions::from_config(config, MathContext::EnvironmentBody);
                 result.push_str(open);
-                result.push_str(&content);
-                if !content.ends_with('\n') {
+                if opts.enabled {
                     result.push('\n');
+                    result.push_str(&math::format_math(&content, &opts));
+                    result.push('\n');
+                } else {
+                    result.push_str(&content);
+                    if !content.ends_with('\n') {
+                        result.push('\n');
+                    }
                 }
                 result.push_str(close);
                 return result;
@@ -507,25 +531,31 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             result.push_str(open);
             result.push('\n');
 
-            // Process content: trim overall, then strip common leading whitespace
-            let trimmed_content = content.trim();
-            if !trimmed_content.is_empty() {
-                // Find minimum indentation across all non-empty lines
-                let min_indent = trimmed_content
-                    .lines()
-                    .filter(|line| !line.trim().is_empty())
-                    .map(|line| line.len() - line.trim_start().len())
-                    .min()
-                    .unwrap_or(0);
+            let opts = MathFormatOptions::from_config(config, MathContext::Display);
+            if opts.enabled {
+                result.push_str(&math::format_math(&content, &opts));
+                result.push('\n');
+            } else {
+                // Process content: trim overall, then strip common leading whitespace
+                let trimmed_content = content.trim();
+                if !trimmed_content.is_empty() {
+                    // Find minimum indentation across all non-empty lines
+                    let min_indent = trimmed_content
+                        .lines()
+                        .filter(|line| !line.trim().is_empty())
+                        .map(|line| line.len() - line.trim_start().len())
+                        .min()
+                        .unwrap_or(0);
 
-                // Strip common indentation from each line
-                for line in trimmed_content.lines() {
-                    if line.len() >= min_indent {
-                        result.push_str(&line[min_indent..]);
-                    } else {
-                        result.push_str(line);
+                    // Strip common indentation from each line
+                    for line in trimmed_content.lines() {
+                        if line.len() >= min_indent {
+                            result.push_str(&line[min_indent..]);
+                        } else {
+                            result.push_str(line);
+                        }
+                        result.push('\n');
                     }
-                    result.push('\n');
                 }
             }
 

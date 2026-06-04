@@ -99,6 +99,7 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
         formatters,
         external_max_parallel: config.external_max_parallel,
         parser: config.parser,
+        experimental_format_math: config.experimental.format_math,
     }
 }
 

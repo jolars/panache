@@ -342,6 +342,22 @@ impl StyleConfig {
     // No flavor-specific defaults needed - just use field defaults
 }
 
+/// Experimental, opt-in features.
+///
+/// Everything under `[experimental]` is unstable: behavior and the option
+/// surface itself may change (or be removed) **without a major release**. Do not
+/// depend on it for stable output.
+#[derive(Debug, Clone, Default, Deserialize, JsonSchema, PartialEq)]
+#[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
+pub struct ExperimentalConfig {
+    /// Reformat the *content* of math (`$...$`, `$$...$$`, environments)
+    /// structurally — collapse inline whitespace, indent environment bodies,
+    /// normalize `\\` line breaks, and align `&` columns. Default off: math is
+    /// emitted verbatim. Only structurally-safe transforms are applied; no
+    /// operator spacing, no macro rewriting.
+    pub format_math: bool,
+}
+
 /// Linter configuration.
 /// Preferred shape is `[lint.rules] rule-name = true/false`.
 /// Legacy `[lint] rule-name = true/false` is still supported (deprecated).
@@ -530,6 +546,10 @@ struct RawConfig {
     extend_include: Vec<String>,
     #[serde(default)]
     flavor_overrides: HashMap<String, Flavor>,
+
+    /// Opt-in experimental features (`[experimental]`). Unstable surface.
+    #[serde(default)]
+    experimental: Option<ExperimentalConfig>,
 }
 
 fn default_line_width() -> usize {
@@ -791,6 +811,7 @@ impl RawConfig {
             include: self.include,
             extend_include: self.extend_include,
             flavor_overrides: self.flavor_overrides,
+            experimental: self.experimental.unwrap_or_default(),
         }
     }
 }
@@ -1012,6 +1033,8 @@ pub struct Config {
     pub include: Option<Vec<String>>,
     pub extend_include: Vec<String>,
     pub flavor_overrides: HashMap<String, Flavor>,
+    /// Opt-in experimental features (`[experimental]`). Unstable surface.
+    pub experimental: ExperimentalConfig,
 }
 
 impl<'de> Deserialize<'de> for Config {
@@ -1066,6 +1089,7 @@ impl Default for Config {
             include: None,
             extend_include: Vec::new(),
             flavor_overrides: HashMap::new(),
+            experimental: ExperimentalConfig::default(),
         }
     }
 }

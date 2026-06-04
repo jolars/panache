@@ -2,6 +2,57 @@ use panache_formatter::config::{Extensions, Flavor};
 use panache_formatter::format;
 use panache_formatter::{Config, ConfigBuilder};
 
+/// Config with `tex_math_dollars` on (Quarto default) and the experimental math
+/// formatter toggled.
+fn math_config(format_math: bool) -> Config {
+    let flavor = Flavor::Quarto;
+    Config {
+        flavor,
+        parser_extensions: Extensions::for_flavor(flavor),
+        experimental_format_math: format_math,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn experimental_format_math_defaults_off() {
+    // Regression lock: an alignment block is emitted verbatim by default.
+    let input = "$$\n\\begin{aligned}\nx &= 1 \\\\\ny &= 22\n\\end{aligned}\n$$\n";
+    let output = format(input, Some(math_config(false)), None);
+    similar_asserts::assert_eq!(output, input);
+}
+
+#[test]
+fn experimental_format_math_aligns_environment() {
+    let input = "$$\n\\begin{aligned}\nx &= 1 \\\\\ny &= 22 \\\\\nz &= 333\n\\end{aligned}\n$$\n";
+    // `&` columns and trailing `\\` both align.
+    let expected = "$$\n\\begin{aligned}\n  x & = 1   \\\\\n  y & = 22  \\\\\n  z & = 333\n\\end{aligned}\n$$\n";
+    let output = format(input, Some(math_config(true)), None);
+    similar_asserts::assert_eq!(output, expected);
+    // Idempotent.
+    let twice = format(&output, Some(math_config(true)), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn experimental_format_math_collapses_inline_whitespace() {
+    let input = "Inline $a   +   b$ end.\n";
+    let output = format(input, Some(math_config(true)), None);
+    assert!(output.contains("$a + b$"), "got: {output}");
+    let twice = format(&output, Some(math_config(true)), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn experimental_format_math_preserves_malformed() {
+    // Unclosed group → bail to verbatim even with the gate on.
+    let input = "$$\n\\frac{1}{2\n$$\n";
+    let output = format(input, Some(math_config(true)), None);
+    assert!(output.contains("\\frac{1}{2"), "got: {output}");
+    let twice = format(&output, Some(math_config(true)), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
 #[test]
 fn math_no_wrap() {
     let cfg = ConfigBuilder::default().line_width(10).build();

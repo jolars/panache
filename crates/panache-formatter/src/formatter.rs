@@ -24,6 +24,10 @@ mod utils;
 // `tests/yaml_cross_validation.rs`).
 #[allow(dead_code)]
 pub mod yaml;
+// In-tree math content formatter (experimental, opt-in via
+// `Config::experimental_format_math`). Off → callers emit math verbatim; on →
+// `math::format_math` reformats content structurally.
+pub mod math;
 
 // Re-export the main types
 pub use code_blocks::ExternalCodeBlock;

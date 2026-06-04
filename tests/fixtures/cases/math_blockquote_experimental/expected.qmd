@@ -1,0 +1,8 @@
+# Quoted
+
+> $$
+> \begin{aligned}
+>   a  & = 1 \\
+>   bb & = 2
+> \end{aligned}
+> $$
