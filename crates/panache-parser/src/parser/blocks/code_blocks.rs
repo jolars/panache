@@ -663,23 +663,32 @@ pub(crate) fn compute_hashpipe_preamble_line_count(
     bq_outer: bool,
     content_indent: usize,
 ) -> usize {
-    let mut line_idx = 0usize;
+    let preview = |idx: usize| -> Option<&str> {
+        let line = content_lines.get(idx)?;
+        let after_indent =
+            strip_content_line_prefixes(line, bq_depth, list_content_col, bq_outer, content_indent);
+        Some(strip_newline(after_indent).0)
+    };
 
-    while line_idx < content_lines.len() {
-        let preview_after_indent = strip_content_line_prefixes(
-            content_lines[line_idx],
-            bq_depth,
-            list_content_col,
-            bq_outer,
-            content_indent,
-        );
-        let (preview_without_newline, _) = strip_newline(preview_after_indent);
-        if !is_hashpipe_option_line(preview_without_newline, prefix)
-            && !is_hashpipe_continuation_line(preview_without_newline, prefix)
+    let mut line_idx = 0usize;
+    while let Some(preview_without_newline) = preview(line_idx) {
+        if is_hashpipe_option_line(preview_without_newline, prefix)
+            || is_hashpipe_continuation_line(preview_without_newline, prefix)
         {
-            break;
+            line_idx += 1;
+            continue;
         }
-        line_idx += 1;
+        // A blank `#|` line continues the preamble only when followed by another
+        // prefixed line — i.e. it is a blank interior line of a block scalar
+        // (issue_201). A trailing blank `#|` before body code ends the preamble.
+        if is_hashpipe_blank_line(preview_without_newline, prefix)
+            && preview(line_idx + 1)
+                .is_some_and(|next| trim_start_spaces_tabs(next).starts_with(prefix))
+        {
+            line_idx += 1;
+            continue;
+        }
+        break;
     }
 
     line_idx
@@ -747,6 +756,20 @@ fn is_hashpipe_continuation_line(line_without_newline: &str, prefix: &str) -> bo
         return false;
     }
     !trim_start_spaces_tabs(after_prefix).is_empty()
+}
+
+/// A bare/blank hashpipe line — the marker followed only by optional whitespace
+/// (e.g. `#|`). Such a line is a valid blank *inside* a block scalar (the
+/// `issue_201` literal-with-blank-line case) or a trailing blank in the preamble,
+/// so it continues the preamble rather than ending it. Without this, the
+/// preamble scan stops at the blank and the parser truncates the block scalar,
+/// embedding only the lines before it.
+fn is_hashpipe_blank_line(line_without_newline: &str, prefix: &str) -> bool {
+    let trimmed_start = trim_start_spaces_tabs(line_without_newline);
+    let Some(after_prefix) = trimmed_start.strip_prefix(prefix) else {
+        return false;
+    };
+    trim_start_spaces_tabs(after_prefix).is_empty()
 }
 
 /// Check if a line is a valid closing fence for the given fence info.
@@ -1406,6 +1429,31 @@ mod tests {
         assert_eq!(fence.fence_char, '`');
         assert_eq!(fence.fence_count, 3);
         assert_eq!(fence.info_string, "python");
+    }
+
+    #[test]
+    fn hashpipe_preamble_includes_blank_line_in_block_scalar() {
+        // A blank `#|` line inside a literal block scalar must stay in the
+        // preamble (issue_201) — otherwise the scalar is truncated.
+        let lines = [
+            "#| fig-alt: |\n",
+            "#|   First paragraph.\n",
+            "#|\n",
+            "#|   Second paragraph.\n",
+            "plot(1)\n",
+        ];
+        assert_eq!(
+            compute_hashpipe_preamble_line_count(&lines, "#|", 0, 0, false, 0),
+            4
+        );
+    }
+
+    #[test]
+    fn hashpipe_blank_line_predicate() {
+        assert!(is_hashpipe_blank_line("#|", "#|"));
+        assert!(is_hashpipe_blank_line("#|   ", "#|"));
+        assert!(!is_hashpipe_blank_line("#| key: v", "#|"));
+        assert!(!is_hashpipe_blank_line("plot(1)", "#|"));
     }
 
     #[test]

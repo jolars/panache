@@ -1,7 +1,6 @@
 use crate::config::{Config, Flavor};
 use crate::syntax::{AstNode, SyntaxKind, SyntaxNode};
 use panache_parser::parser::blocks::code_blocks::{CodeBlockType, InfoString};
-use panache_parser::parser::utils::hashpipe_normalizer::normalize_hashpipe_header;
 use rowan::NodeOrToken;
 use std::collections::HashMap;
 
@@ -311,9 +310,24 @@ fn extract_code_block_parts(node: &SyntaxNode) -> (Option<SyntaxNode>, Option<St
     (info_node, language, content)
 }
 
-fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)> {
-    let normalized = normalize_hashpipe_header(content, prefix)?;
-    let header_end = normalized.header_byte_span.end;
+/// Split container-stripped code-block `content` into its leading hashpipe
+/// preamble (the `#|` header lines) and the remaining body, using the parser's
+/// embedded `HASHPIPE_YAML_CONTENT` extent. The preamble is the first
+/// `line_count` physical lines of `content` (container prefixes are already
+/// stripped from both, so line counts line up). Returns `None` when the block
+/// has no hashpipe preamble.
+fn split_hashpipe_header(content: &str, code_block_node: &SyntaxNode) -> Option<(String, String)> {
+    let line_count = hashpipe::hashpipe_preamble_line_count(code_block_node)?;
+    let mut header_end = 0usize;
+    for _ in 0..line_count {
+        match content[header_end..].find('\n') {
+            Some(rel) => header_end += rel + 1,
+            None => {
+                header_end = content.len();
+                break;
+            }
+        }
+    }
     Some((
         content[..header_end].to_string(),
         content[header_end..].to_string(),
@@ -545,7 +559,7 @@ fn format_info_string(info_node: &SyntaxNode, info: &InfoString) -> String {
 /// while keeping complex expressions in the inline position.
 /// If the language's comment syntax is unknown, returns false to fall back to inline format.
 fn format_code_block_hashpipe(
-    _code_block_node: &SyntaxNode,
+    code_block_node: &SyntaxNode,
     info_node: &SyntaxNode,
     content: &str,
     fence_char: char,
@@ -565,7 +579,7 @@ fn format_code_block_hashpipe(
         return false; // Unknown language - fall back to inline format
     };
     let ((simple, complex), had_content_hashpipe) =
-        hashpipe::split_options_from_cst_with_content(info_node, content, comment_prefix);
+        hashpipe::split_options_from_cst_with_content(info_node, code_block_node);
 
     // Try to get hashpipe lines - returns None for unknown languages
     let hashpipe_lines = match hashpipe::format_as_hashpipe(
@@ -595,15 +609,9 @@ fn format_code_block_hashpipe(
 
     // Add content, dropping already-parsed leading hashpipe header lines to avoid duplication.
     let body = if had_content_hashpipe {
-        if let Some(prefix) = hashpipe::get_comment_prefix(language) {
-            if let Some((_header, body)) = split_hashpipe_header(content, prefix) {
-                body
-            } else {
-                content.to_string()
-            }
-        } else {
-            content.to_string()
-        }
+        split_hashpipe_header(content, code_block_node)
+            .map(|(_header, body)| body)
+            .unwrap_or_else(|| content.to_string())
     } else {
         content.to_string()
     };
@@ -811,8 +819,8 @@ pub fn collect_code_blocks(
                 _ => String::new(),
             });
 
-            if let Some(prefix_str) = hashpipe::get_comment_prefix(&language)
-                && let Some((header, body)) = split_hashpipe_header(&content, prefix_str)
+            if hashpipe::get_comment_prefix(&language).is_some()
+                && let Some((header, body)) = split_hashpipe_header(&content, &node)
             {
                 formatter_input = body;
                 prefix = Some(header);
@@ -834,11 +842,27 @@ pub fn collect_code_blocks(
 #[cfg(test)]
 mod tests {
     use super::split_hashpipe_header;
+    use crate::config::{Extensions, Flavor, ParserOptions};
+    use crate::syntax::SyntaxKind;
 
     #[test]
     fn split_hashpipe_header_handles_empty_value_with_indented_list() {
+        // Parse a real Quarto chunk so the embedded HASHPIPE_YAML preamble exists;
+        // the split is driven by that node's line count.
+        let input = "```{r}\n#| fig-cap:\n#|   - A\n#|   - B\n```\n";
+        let options = ParserOptions {
+            flavor: Flavor::Quarto,
+            extensions: Extensions::for_flavor(Flavor::Quarto),
+            ..Default::default()
+        };
+        let tree = crate::parser::parse(input, Some(options));
+        let code_block = tree
+            .descendants()
+            .find(|node| node.kind() == SyntaxKind::CODE_BLOCK)
+            .expect("code block");
+
         let content = "#| fig-cap:\n#|   - A\n#|   - B\n";
-        let split = split_hashpipe_header(content, "#|");
+        let split = split_hashpipe_header(content, &code_block);
         assert!(split.is_some(), "expected hashpipe header split");
         let (header, body) = split.unwrap();
         assert_eq!(header, content);

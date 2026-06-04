@@ -5,15 +5,56 @@
 
 use crate::config::WrapMode;
 use crate::syntax::{
-    AstNode, ChunkInfoItem, CodeInfo, SyntaxNode, YamlBlockMapEntry, YamlNode, YamlScalarStyle,
-    parse_yaml_document,
+    AstNode, ChunkInfoItem, CodeInfo, SyntaxKind, SyntaxNode, YamlBlockMapEntry, YamlNode,
+    YamlScalarStyle, parse_yaml_document,
 };
 use crate::yaml_engine;
 use panache_parser::parser::utils::chunk_options::ChunkOptionValue;
 use panache_parser::parser::utils::chunk_options::hashpipe_comment_prefix;
-use panache_parser::parser::utils::hashpipe_normalizer::normalize_hashpipe_header;
 
 use super::code_blocks::ChunkOptionRepr;
+
+/// The physical-line count of a code block's hashpipe preamble
+/// (`HASHPIPE_YAML_CONTENT`), or `None` when the block has no preamble. Used to
+/// split the leading `#|` header off the body — valid or malformed, the parser
+/// wraps the preamble lines in the same node.
+pub(super) fn hashpipe_preamble_line_count(code_block_node: &SyntaxNode) -> Option<usize> {
+    let content_node = code_block_node
+        .descendants()
+        .find(|node| node.kind() == SyntaxKind::HASHPIPE_YAML_CONTENT)?;
+    Some(content_node.text().to_string().matches('\n').count())
+}
+
+/// The embedded hashpipe YAML content node (carrying a `YAML_DOCUMENT`), when the
+/// parser embedded a valid subtree. `None` for blocks with no preamble or with
+/// malformed YAML (opaque fallback → no options extracted).
+fn embedded_hashpipe_content(code_block_node: &SyntaxNode) -> Option<SyntaxNode> {
+    code_block_node
+        .descendants()
+        .find(|node| node.kind() == SyntaxKind::HASHPIPE_YAML_CONTENT)
+        .filter(|node| {
+            node.children()
+                .any(|child| child.kind() == SyntaxKind::YAML_DOCUMENT)
+        })
+}
+
+/// Reconstruct the prefix-stripped YAML text of an embedded hashpipe preamble —
+/// the same normalized string the retired `normalize_hashpipe_header` produced.
+/// Each line's `YAML_LINE_PREFIX` trivia (the composite `#|` marker plus one
+/// following space) is dropped and EOLs are normalized to `\n`.
+fn preamble_normalized_yaml(content_node: &SyntaxNode) -> String {
+    let mut out = String::new();
+    for element in content_node.descendants_with_tokens() {
+        let Some(token) = element.as_token() else {
+            continue;
+        };
+        if token.kind() == SyntaxKind::YAML_LINE_PREFIX {
+            continue;
+        }
+        out.push_str(token.text());
+    }
+    out.replace("\r\n", "\n")
+}
 
 /// A chunk option with a classified value (simple or expression).
 type ClassifiedOption = (String, ChunkOptionValue);
@@ -164,8 +205,7 @@ pub fn normalize_value(value: &str) -> String {
 /// When both sources provide the same normalized key, inline info-string options win.
 pub fn split_options_from_cst_with_content(
     info_node: &SyntaxNode,
-    content: &str,
-    prefix: &str,
+    code_block_node: &SyntaxNode,
 ) -> ((Vec<ClassifiedOption>, Vec<ChunkOptionRepr>), bool) {
     #[derive(Clone)]
     enum Entry {
@@ -301,14 +341,18 @@ pub fn split_options_from_cst_with_content(
         );
     }
 
-    // 2) Existing leading hashpipe options from CODE_CONTENT text (lower precedence).
-    // Parse multiline quoted values so rewrapping can normalize them.
-    if let Some(normalized) = normalize_hashpipe_header(content, prefix)
-        && let Some(options) = extract_options_from_normalized_yaml(&normalized.normalized_yaml)
-    {
-        had_content_hashpipe = true;
-        for (key, value) in options {
-            push_content_option(&mut entries, key, value, false);
+    // 2) Existing leading hashpipe options from the embedded YAML preamble
+    // (lower precedence). The parser already stripped the `#|` markers into
+    // `YAML_LINE_PREFIX` trivia and embedded a real YAML subtree; reconstruct the
+    // prefix-stripped text from it and reuse the value-extraction logic. Parsing
+    // multiline quoted values lets rewrapping normalize them.
+    if let Some(content_node) = embedded_hashpipe_content(code_block_node) {
+        let normalized_yaml = preamble_normalized_yaml(&content_node);
+        if let Some(options) = extract_options_from_normalized_yaml(&normalized_yaml) {
+            had_content_hashpipe = true;
+            for (key, value) in options {
+                push_content_option(&mut entries, key, value, false);
+            }
         }
     }
 
