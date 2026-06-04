@@ -1,0 +1,2 @@
+fig-width: &dim 6
+fig-height: *dim
