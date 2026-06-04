@@ -20,7 +20,24 @@ DOCUMENT@0..240
   PARAGRAPH@102..136
     DISPLAY_MATH@102..135
       DISPLAY_MATH_MARKER@102..104 "$$"
-      TEXT@104..133 "\n\\text{Price} = \\$100 ..."
+      MATH_CONTENT@104..133
+        MATH_NEWLINE@104..105 "\n"
+        MATH_COMMAND@105..110 "\\text"
+        MATH_GROUP@110..117
+          MATH_GROUP_OPEN@110..111 "{"
+          MATH_TEXT@111..116 "Price"
+          MATH_GROUP_CLOSE@116..117 "}"
+        MATH_SPACE@117..118 " "
+        MATH_TEXT@118..119 "="
+        MATH_SPACE@119..120 " "
+        MATH_COMMAND@120..122 "\\$"
+        MATH_TEXT@122..125 "100"
+        MATH_SPACE@125..126 " "
+        MATH_TEXT@126..127 "+"
+        MATH_SPACE@127..128 " "
+        MATH_COMMAND@128..130 "\\$"
+        MATH_TEXT@130..132 "50"
+        MATH_NEWLINE@132..133 "\n"
       DISPLAY_MATH_MARKER@133..135 "$$"
     NEWLINE@135..136 "\n"
   BLANK_LINE@136..137
@@ -29,7 +46,16 @@ DOCUMENT@0..240
     TEXT@137..149 "And inline: "
     DISPLAY_MATH@149..172
       DISPLAY_MATH_MARKER@149..151 "$$"
-      TEXT@151..170 "\\text{Cost: } \\$200"
+      MATH_CONTENT@151..170
+        MATH_COMMAND@151..156 "\\text"
+        MATH_GROUP@156..164
+          MATH_GROUP_OPEN@156..157 "{"
+          MATH_TEXT@157..162 "Cost:"
+          MATH_SPACE@162..163 " "
+          MATH_GROUP_CLOSE@163..164 "}"
+        MATH_SPACE@164..165 " "
+        MATH_COMMAND@165..167 "\\$"
+        MATH_TEXT@167..170 "200"
       DISPLAY_MATH_MARKER@170..172 "$$"
     TEXT@172..190 " in the paragraph."
     NEWLINE@190..191 "\n"
@@ -43,6 +69,24 @@ DOCUMENT@0..240
   PARAGRAPH@211..240
     DISPLAY_MATH@211..239
       DISPLAY_MATH_MARKER@211..213 "$$"
-      TEXT@213..237 "\na = \\$x + \\$y \\neq \\$z\n"
+      MATH_CONTENT@213..237
+        MATH_NEWLINE@213..214 "\n"
+        MATH_TEXT@214..215 "a"
+        MATH_SPACE@215..216 " "
+        MATH_TEXT@216..217 "="
+        MATH_SPACE@217..218 " "
+        MATH_COMMAND@218..220 "\\$"
+        MATH_TEXT@220..221 "x"
+        MATH_SPACE@221..222 " "
+        MATH_TEXT@222..223 "+"
+        MATH_SPACE@223..224 " "
+        MATH_COMMAND@224..226 "\\$"
+        MATH_TEXT@226..227 "y"
+        MATH_SPACE@227..228 " "
+        MATH_COMMAND@228..232 "\\neq"
+        MATH_SPACE@232..233 " "
+        MATH_COMMAND@233..235 "\\$"
+        MATH_TEXT@235..236 "z"
+        MATH_NEWLINE@236..237 "\n"
       DISPLAY_MATH_MARKER@237..239 "$$"
     NEWLINE@239..240 "\n"

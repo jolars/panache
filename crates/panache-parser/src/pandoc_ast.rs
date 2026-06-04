@@ -4473,15 +4473,10 @@ fn strip_inline_code_padding(s: &str) -> String {
 }
 
 fn math_inline(node: &SyntaxNode, kind: &'static str) -> Inline {
-    let mut content = String::new();
-    for el in node.children_with_tokens() {
-        if let NodeOrToken::Token(t) = el {
-            match t.kind() {
-                SyntaxKind::INLINE_MATH_MARKER | SyntaxKind::DISPLAY_MATH_MARKER => {}
-                _ => content.push_str(t.text()),
-            }
-        }
-    }
+    // The raw math content lives in a `MATH_CONTENT` subtree (a structural TeX
+    // CST); reconstruct it excluding any host container prefixes interleaved on
+    // continuation lines (e.g. blockquote `>`).
+    let content = crate::syntax::math::math_content_text(node);
     Inline::Math(kind, content)
 }
 

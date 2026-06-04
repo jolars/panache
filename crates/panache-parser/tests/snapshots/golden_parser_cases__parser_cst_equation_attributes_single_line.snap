@@ -11,7 +11,16 @@ DOCUMENT@0..91
   PARAGRAPH@33..63
     DISPLAY_MATH@33..47
       DISPLAY_MATH_MARKER@33..35 "$$"
-      TEXT@35..45 " E = mc^2 "
+      MATH_CONTENT@35..45
+        MATH_SPACE@35..36 " "
+        MATH_TEXT@36..37 "E"
+        MATH_SPACE@37..38 " "
+        MATH_TEXT@38..39 "="
+        MATH_SPACE@39..40 " "
+        MATH_TEXT@40..42 "mc"
+        MATH_SCRIPT@42..43 "^"
+        MATH_TEXT@43..44 "2"
+        MATH_SPACE@44..45 " "
       DISPLAY_MATH_MARKER@45..47 "$$"
     WHITESPACE@47..48 " "
     ATTRIBUTE@48..62

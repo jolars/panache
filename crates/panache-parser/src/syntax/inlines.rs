@@ -42,14 +42,11 @@ impl InlineMath {
             .map(|token| token.text().to_string())
     }
 
+    /// The raw math content between the delimiters, reconstructed from the
+    /// `MATH_CONTENT` subtree (excluding host container prefixes — see
+    /// [`super::math::math_content_text`]).
     pub fn content(&self) -> String {
-        self.0
-            .children_with_tokens()
-            .filter_map(|child| child.into_token())
-            .filter(|token| token.kind() != SyntaxKind::INLINE_MATH_MARKER)
-            .map(|token| token.text().to_string())
-            .collect::<Vec<_>>()
-            .join("")
+        super::math::math_content_text(&self.0)
     }
 
     pub fn content_range(&self) -> Option<rowan::TextRange> {

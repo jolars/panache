@@ -2,6 +2,48 @@
 
 use super::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode};
 
+/// Reconstruct the raw math content of a math node from its `MATH_CONTENT`
+/// subtree, keeping only the math tokens.
+///
+/// Container machinery (blockquotes, list continuations, …) interleaves host
+/// prefix tokens (`BLOCK_QUOTE_MARKER`, `WHITESPACE`, `NEWLINE`) into the
+/// subtree on continuation lines for lossless capture. Those prefixes are not
+/// part of the math, so they are excluded here — otherwise e.g. a blockquote
+/// `>` would leak into the content and re-accumulate on every format pass.
+pub fn math_content_text(math: &SyntaxNode) -> String {
+    let Some(content) = math
+        .children()
+        .find(|node| node.kind() == SyntaxKind::MATH_CONTENT)
+    else {
+        return String::new();
+    };
+    content
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|tok| is_math_content_token(tok.kind()))
+        .map(|tok| tok.text().to_string())
+        .collect()
+}
+
+/// Whether `kind` is a math-content token emitted by the math parser (as
+/// opposed to a host container prefix interleaved into the subtree).
+fn is_math_content_token(kind: SyntaxKind) -> bool {
+    matches!(
+        kind,
+        SyntaxKind::MATH_TEXT
+            | SyntaxKind::MATH_SPACE
+            | SyntaxKind::MATH_NEWLINE
+            | SyntaxKind::MATH_COMMAND
+            | SyntaxKind::MATH_GROUP_OPEN
+            | SyntaxKind::MATH_GROUP_CLOSE
+            | SyntaxKind::MATH_ALIGN
+            | SyntaxKind::MATH_SCRIPT
+            | SyntaxKind::MATH_LINE_BREAK
+            | SyntaxKind::MATH_COMMENT
+            | SyntaxKind::MATH_EQUATION_LABEL
+    )
+}
+
 pub struct DisplayMath(SyntaxNode);
 
 impl AstNode for DisplayMath {
@@ -42,14 +84,11 @@ impl DisplayMath {
             .map(|token| token.text().to_string())
     }
 
+    /// The raw math content between the delimiters, reconstructed from the
+    /// `MATH_CONTENT` subtree (excluding host container prefixes — see
+    /// [`math_content_text`]).
     pub fn content(&self) -> String {
-        self.0
-            .children_with_tokens()
-            .filter_map(|child| child.into_token())
-            .filter(|token| token.kind() == SyntaxKind::TEXT)
-            .map(|token| token.text().to_string())
-            .collect::<Vec<_>>()
-            .join("")
+        math_content_text(&self.0)
     }
 
     pub fn is_environment_form(&self) -> bool {

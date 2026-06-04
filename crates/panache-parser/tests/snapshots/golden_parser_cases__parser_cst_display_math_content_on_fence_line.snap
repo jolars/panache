@@ -20,7 +20,18 @@ DOCUMENT@0..244
   PARAGRAPH@101..117
     DISPLAY_MATH@101..116
       DISPLAY_MATH_MARKER@101..103 "$$"
-      TEXT@103..114 " x = y + z\n"
+      MATH_CONTENT@103..114
+        MATH_SPACE@103..104 " "
+        MATH_TEXT@104..105 "x"
+        MATH_SPACE@105..106 " "
+        MATH_TEXT@106..107 "="
+        MATH_SPACE@107..108 " "
+        MATH_TEXT@108..109 "y"
+        MATH_SPACE@109..110 " "
+        MATH_TEXT@110..111 "+"
+        MATH_SPACE@111..112 " "
+        MATH_TEXT@112..113 "z"
+        MATH_NEWLINE@113..114 "\n"
       DISPLAY_MATH_MARKER@114..116 "$$"
     NEWLINE@116..117 "\n"
   BLANK_LINE@117..118
@@ -33,7 +44,14 @@ DOCUMENT@0..244
   PARAGRAPH@145..157
     DISPLAY_MATH@145..156
       DISPLAY_MATH_MARKER@145..147 "$$"
-      TEXT@147..154 "\na = b "
+      MATH_CONTENT@147..154
+        MATH_NEWLINE@147..148 "\n"
+        MATH_TEXT@148..149 "a"
+        MATH_SPACE@149..150 " "
+        MATH_TEXT@150..151 "="
+        MATH_SPACE@151..152 " "
+        MATH_TEXT@152..153 "b"
+        MATH_SPACE@153..154 " "
       DISPLAY_MATH_MARKER@154..156 "$$"
     NEWLINE@156..157 "\n"
   BLANK_LINE@157..158
@@ -46,7 +64,16 @@ DOCUMENT@0..244
   PARAGRAPH@178..193
     DISPLAY_MATH@178..192
       DISPLAY_MATH_MARKER@178..180 "$$"
-      TEXT@180..190 " E = mc^2 "
+      MATH_CONTENT@180..190
+        MATH_SPACE@180..181 " "
+        MATH_TEXT@181..182 "E"
+        MATH_SPACE@182..183 " "
+        MATH_TEXT@183..184 "="
+        MATH_SPACE@184..185 " "
+        MATH_TEXT@185..187 "mc"
+        MATH_SCRIPT@187..188 "^"
+        MATH_TEXT@188..189 "2"
+        MATH_SPACE@189..190 " "
       DISPLAY_MATH_MARKER@190..192 "$$"
     NEWLINE@192..193 "\n"
   BLANK_LINE@193..194
@@ -59,6 +86,17 @@ DOCUMENT@0..244
   PARAGRAPH@214..244
     DISPLAY_MATH@214..243
       DISPLAY_MATH_MARKER@214..216 "\\["
-      TEXT@216..241 " \\alpha + \\beta = \\ga ..."
+      MATH_CONTENT@216..241
+        MATH_SPACE@216..217 " "
+        MATH_COMMAND@217..223 "\\alpha"
+        MATH_SPACE@223..224 " "
+        MATH_TEXT@224..225 "+"
+        MATH_SPACE@225..226 " "
+        MATH_COMMAND@226..231 "\\beta"
+        MATH_SPACE@231..232 " "
+        MATH_TEXT@232..233 "="
+        MATH_SPACE@233..234 " "
+        MATH_COMMAND@234..240 "\\gamma"
+        MATH_NEWLINE@240..241 "\n"
       DISPLAY_MATH_MARKER@241..243 "\\]"
     NEWLINE@243..244 "\n"

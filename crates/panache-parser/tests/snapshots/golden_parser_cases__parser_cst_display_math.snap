@@ -11,7 +11,19 @@ DOCUMENT@0..292
   PARAGRAPH@32..50
     DISPLAY_MATH@32..49
       DISPLAY_MATH_MARKER@32..34 "$$"
-      TEXT@34..47 "\n  x = y + z\n"
+      MATH_CONTENT@34..47
+        MATH_NEWLINE@34..35 "\n"
+        MATH_SPACE@35..37 "  "
+        MATH_TEXT@37..38 "x"
+        MATH_SPACE@38..39 " "
+        MATH_TEXT@39..40 "="
+        MATH_SPACE@40..41 " "
+        MATH_TEXT@41..42 "y"
+        MATH_SPACE@42..43 " "
+        MATH_TEXT@43..44 "+"
+        MATH_SPACE@44..45 " "
+        MATH_TEXT@45..46 "z"
+        MATH_NEWLINE@46..47 "\n"
       DISPLAY_MATH_MARKER@47..49 "$$"
     NEWLINE@49..50 "\n"
   BLANK_LINE@50..51
@@ -25,7 +37,12 @@ DOCUMENT@0..292
     TEXT@69..97 "Here's inline display ..."
     DISPLAY_MATH@97..106
       DISPLAY_MATH_MARKER@97..99 "$$"
-      TEXT@99..104 "a = b"
+      MATH_CONTENT@99..104
+        MATH_TEXT@99..100 "a"
+        MATH_SPACE@100..101 " "
+        MATH_TEXT@101..102 "="
+        MATH_SPACE@102..103 " "
+        MATH_TEXT@103..104 "b"
       DISPLAY_MATH_MARKER@104..106 "$$"
     TEXT@106..148 " that should be conve ..."
     NEWLINE@148..149 "\n"
@@ -39,7 +56,22 @@ DOCUMENT@0..292
   PARAGRAPH@177..199
     DISPLAY_MATH@177..198
       DISPLAY_MATH_MARKER@177..179 "$$"
-      TEXT@179..196 "\n\\frac{a}{b} = c\n"
+      MATH_CONTENT@179..196
+        MATH_NEWLINE@179..180 "\n"
+        MATH_COMMAND@180..185 "\\frac"
+        MATH_GROUP@185..188
+          MATH_GROUP_OPEN@185..186 "{"
+          MATH_TEXT@186..187 "a"
+          MATH_GROUP_CLOSE@187..188 "}"
+        MATH_GROUP@188..191
+          MATH_GROUP_OPEN@188..189 "{"
+          MATH_TEXT@189..190 "b"
+          MATH_GROUP_CLOSE@190..191 "}"
+        MATH_SPACE@191..192 " "
+        MATH_TEXT@192..193 "="
+        MATH_SPACE@193..194 " "
+        MATH_TEXT@194..195 "c"
+        MATH_NEWLINE@195..196 "\n"
       DISPLAY_MATH_MARKER@196..198 "$$"
     NEWLINE@198..199 "\n"
   BLANK_LINE@199..200

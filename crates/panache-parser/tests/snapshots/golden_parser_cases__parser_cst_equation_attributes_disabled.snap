@@ -11,7 +11,16 @@ DOCUMENT@0..140
   PARAGRAPH@69..99
     DISPLAY_MATH@69..83
       DISPLAY_MATH_MARKER@69..71 "$$"
-      TEXT@71..81 "\nE = mc^2\n"
+      MATH_CONTENT@71..81
+        MATH_NEWLINE@71..72 "\n"
+        MATH_TEXT@72..73 "E"
+        MATH_SPACE@73..74 " "
+        MATH_TEXT@74..75 "="
+        MATH_SPACE@75..76 " "
+        MATH_TEXT@76..78 "mc"
+        MATH_SCRIPT@78..79 "^"
+        MATH_TEXT@79..80 "2"
+        MATH_NEWLINE@80..81 "\n"
       DISPLAY_MATH_MARKER@81..83 "$$"
     TEXT@83..98 " {#eq-einstein}"
     NEWLINE@98..99 "\n"

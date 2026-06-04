@@ -16,7 +16,12 @@ DOCUMENT@0..223
     TEXT@15..28 "Simple math: "
     INLINE_MATH@28..35
       INLINE_MATH_MARKER@28..29 "$"
-      TEXT@29..34 "x = y"
+      MATH_CONTENT@29..34
+        MATH_TEXT@29..30 "x"
+        MATH_SPACE@30..31 " "
+        MATH_TEXT@31..32 "="
+        MATH_SPACE@32..33 " "
+        MATH_TEXT@33..34 "y"
       INLINE_MATH_MARKER@34..35 "$"
     NEWLINE@35..36 "\n"
   BLANK_LINE@36..37
@@ -36,7 +41,14 @@ DOCUMENT@0..223
       TEXT@84..93 "equation "
       INLINE_MATH@93..103
         INLINE_MATH_MARKER@93..94 "$"
-        TEXT@94..102 "E = mc^2"
+        MATH_CONTENT@94..102
+          MATH_TEXT@94..95 "E"
+          MATH_SPACE@95..96 " "
+          MATH_TEXT@96..97 "="
+          MATH_SPACE@97..98 " "
+          MATH_TEXT@98..100 "mc"
+          MATH_SCRIPT@100..101 "^"
+          MATH_TEXT@101..102 "2"
         INLINE_MATH_MARKER@102..103 "$"
       TEXT@103..108 " here"
       EMPHASIS_MARKER@108..109 "*"
@@ -47,12 +59,14 @@ DOCUMENT@0..223
     TEXT@111..126 "Adjacent math: "
     INLINE_MATH@126..129
       INLINE_MATH_MARKER@126..127 "$"
-      TEXT@127..128 "x"
+      MATH_CONTENT@127..128
+        MATH_TEXT@127..128 "x"
       INLINE_MATH_MARKER@128..129 "$"
     TEXT@129..134 " and "
     INLINE_MATH@134..137
       INLINE_MATH_MARKER@134..135 "$"
-      TEXT@135..136 "y"
+      MATH_CONTENT@135..136
+        MATH_TEXT@135..136 "y"
       INLINE_MATH_MARKER@136..137 "$"
     TEXT@137..147 " variables"
     NEWLINE@147..148 "\n"
@@ -62,7 +76,16 @@ DOCUMENT@0..223
     TEXT@149..158 "Complex: "
     INLINE_MATH@158..179
       INLINE_MATH_MARKER@158..159 "$"
-      TEXT@159..178 "\\frac{n!}{k!(n-k)!}"
+      MATH_CONTENT@159..178
+        MATH_COMMAND@159..164 "\\frac"
+        MATH_GROUP@164..168
+          MATH_GROUP_OPEN@164..165 "{"
+          MATH_TEXT@165..167 "n!"
+          MATH_GROUP_CLOSE@167..168 "}"
+        MATH_GROUP@168..178
+          MATH_GROUP_OPEN@168..169 "{"
+          MATH_TEXT@169..177 "k!(n-k)!"
+          MATH_GROUP_CLOSE@177..178 "}"
       INLINE_MATH_MARKER@178..179 "$"
     NEWLINE@179..180 "\n"
   BLANK_LINE@180..181
@@ -71,6 +94,13 @@ DOCUMENT@0..223
     TEXT@181..199 "Multiple dollars: "
     DISPLAY_MATH@199..222
       DISPLAY_MATH_MARKER@199..201 "$$"
-      TEXT@201..220 "\\text{display math}"
+      MATH_CONTENT@201..220
+        MATH_COMMAND@201..206 "\\text"
+        MATH_GROUP@206..220
+          MATH_GROUP_OPEN@206..207 "{"
+          MATH_TEXT@207..214 "display"
+          MATH_SPACE@214..215 " "
+          MATH_TEXT@215..219 "math"
+          MATH_GROUP_CLOSE@219..220 "}"
       DISPLAY_MATH_MARKER@220..222 "$$"
     NEWLINE@222..223 "\n"

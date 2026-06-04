@@ -92,7 +92,25 @@ pub enum SyntaxKind {
     DISPLAY_MATH_MARKER, // $$
     INLINE_MATH,
     DISPLAY_MATH,
-    MATH_CONTENT,
+    MATH_CONTENT, // wrapper node for parsed TeX math content (subtree root)
+
+    // Math content (structural TeX CST under MATH_CONTENT)
+    MATH_GROUP,       // { ... } brace group (node)
+    MATH_ENVIRONMENT, // \begin{env} ... \end{env} (node)
+    MATH_GROUP_OPEN,  // {
+    MATH_GROUP_CLOSE, // }
+    MATH_COMMAND,     // \foo control word or \% control symbol
+    MATH_LINE_BREAK,  // \\
+    MATH_ALIGN,       // & alignment tab
+    MATH_SCRIPT,      // ^ or _
+    MATH_COMMENT,     // % to end of line (TeX comment)
+    MATH_TEXT,        // run of ordinary atoms
+    MATH_SPACE,       // run of spaces/tabs
+    MATH_NEWLINE,     // newline within math content
+    // Bookdown equation label `(\#eq:label)`, recognized only when the
+    // `bookdown_equation_references` extension is enabled. A single token over
+    // the whole `(\#eq:...)` span so the indexer/LSP can target it precisely.
+    MATH_EQUATION_LABEL,
 
     // Footnotes
     INLINE_FOOTNOTE_START, // ^[

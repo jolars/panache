@@ -12,6 +12,7 @@ use rowan::{GreenNode, GreenToken, NodeOrToken};
 pub mod blocks;
 pub mod diagnostics;
 pub mod inlines;
+pub mod math;
 pub mod utils;
 pub mod yaml;
 

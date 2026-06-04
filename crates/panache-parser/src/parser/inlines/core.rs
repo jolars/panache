@@ -46,10 +46,11 @@ use super::mark::{emit_mark, try_parse_mark};
 use super::math::{
     emit_display_math, emit_display_math_environment, emit_double_backslash_display_math,
     emit_double_backslash_inline_math, emit_gfm_inline_math, emit_inline_math,
-    emit_single_backslash_display_math, emit_single_backslash_inline_math, try_parse_display_math,
-    try_parse_double_backslash_display_math, try_parse_double_backslash_inline_math,
-    try_parse_gfm_inline_math, try_parse_inline_math, try_parse_math_environment,
-    try_parse_single_backslash_display_math, try_parse_single_backslash_inline_math,
+    emit_single_backslash_display_math, emit_single_backslash_inline_math, math_opts,
+    try_parse_display_math, try_parse_double_backslash_display_math,
+    try_parse_double_backslash_inline_math, try_parse_gfm_inline_math, try_parse_inline_math,
+    try_parse_math_environment, try_parse_single_backslash_display_math,
+    try_parse_single_backslash_inline_math,
 };
 use super::native_spans::{emit_native_span, try_parse_native_span};
 use super::raw_inline::is_raw_inline;
@@ -764,7 +765,7 @@ fn parse_inline_range_impl(
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
                     log::trace!("Matched double backslash display math at pos {}", pos);
-                    emit_double_backslash_display_math(builder, content);
+                    emit_double_backslash_display_math(builder, content, math_opts(config));
                     pos += len;
                     text_start = pos;
                     continue;
@@ -776,7 +777,7 @@ fn parse_inline_range_impl(
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
                     log::trace!("Matched double backslash inline math at pos {}", pos);
-                    emit_double_backslash_inline_math(builder, content);
+                    emit_double_backslash_inline_math(builder, content, math_opts(config));
                     pos += len;
                     text_start = pos;
                     continue;
@@ -791,7 +792,7 @@ fn parse_inline_range_impl(
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
                     log::trace!("Matched single backslash display math at pos {}", pos);
-                    emit_single_backslash_display_math(builder, content);
+                    emit_single_backslash_display_math(builder, content, math_opts(config));
                     pos += len;
                     text_start = pos;
                     continue;
@@ -803,7 +804,7 @@ fn parse_inline_range_impl(
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
                     log::trace!("Matched single backslash inline math at pos {}", pos);
-                    emit_single_backslash_inline_math(builder, content);
+                    emit_single_backslash_inline_math(builder, content, math_opts(config));
                     pos += len;
                     text_start = pos;
                     continue;
@@ -819,7 +820,13 @@ fn parse_inline_range_impl(
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
                 log::trace!("Matched math environment at pos {}", pos);
-                emit_display_math_environment(builder, begin_marker, content, end_marker);
+                emit_display_math_environment(
+                    builder,
+                    begin_marker,
+                    content,
+                    end_marker,
+                    math_opts(config),
+                );
                 pos += len;
                 text_start = pos;
                 continue;
@@ -1126,7 +1133,7 @@ fn parse_inline_range_impl(
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
             log::trace!("Matched GFM inline math at pos {}", pos);
-            emit_gfm_inline_math(builder, content);
+            emit_gfm_inline_math(builder, content, math_opts(config));
             pos += len;
             text_start = pos;
             continue;
@@ -1178,7 +1185,7 @@ fn parse_inline_range_impl(
                 };
 
                 let total_len = len + attr_len;
-                emit_display_math(builder, content, dollar_count);
+                emit_display_math(builder, content, dollar_count, math_opts(config));
 
                 // Emit attributes if present, structured over the raw source
                 // bytes (leading whitespace split out as its own token).
@@ -1206,7 +1213,7 @@ fn parse_inline_range_impl(
                 }
 
                 log::trace!("Matched inline math at pos {}", pos);
-                emit_inline_math(builder, content);
+                emit_inline_math(builder, content, math_opts(config));
                 pos += len;
                 text_start = pos;
                 continue;

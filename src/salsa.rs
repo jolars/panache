@@ -792,11 +792,19 @@ pub fn symbol_usage_index_from_tree(
         let Some(token) = element.into_token() else {
             continue;
         };
-        if token.kind() != SyntaxKind::TEXT {
-            continue;
+        match token.kind() {
+            SyntaxKind::TEXT => {
+                collect_bookdown_declarations_from_text_token(&token, &mut index, extensions);
+                collect_example_label_usages_from_text_token(&token, &mut index);
+            }
+            // Bookdown equation labels `(\#eq:label)` inside math are parsed
+            // into a dedicated token; its text is exactly one declaration, so
+            // the same scanner registers it (with full + value ranges).
+            SyntaxKind::MATH_EQUATION_LABEL => {
+                collect_bookdown_declarations_from_text_token(&token, &mut index, extensions);
+            }
+            _ => {}
         }
-        collect_bookdown_declarations_from_text_token(&token, &mut index, extensions);
-        collect_example_label_usages_from_text_token(&token, &mut index);
     }
 
     for attribute in tree.descendants().filter_map(AttributeNode::cast) {
@@ -1265,79 +1273,116 @@ fn collect_bookdown_definitions<'db>(
     path: &Path,
     collect_equation_definitions: bool,
 ) {
-    use crate::parser::inlines::bookdown::{
-        try_parse_bookdown_definition, try_parse_bookdown_equation_definition,
-        try_parse_bookdown_text_reference,
-    };
-
+    // Prose bookdown declarations / text references live in `TEXT` tokens.
+    // Bookdown *equation* labels `(\#eq:label)` inside math are parsed into a
+    // dedicated `MATH_EQUATION_LABEL` token (gated on the same extension), so
+    // we read them straight off the CST rather than re-scanning math text.
     for element in tree.descendants_with_tokens() {
         db.unwind_if_revision_cancelled();
         let Some(token) = element.into_token() else {
             continue;
         };
-        if token.kind() != SyntaxKind::TEXT {
+        match token.kind() {
+            SyntaxKind::TEXT => {
+                scan_bookdown_definitions_in_text(
+                    db,
+                    index,
+                    path,
+                    collect_equation_definitions,
+                    token.text(),
+                    token.text_range().start().into(),
+                );
+            }
+            SyntaxKind::MATH_EQUATION_LABEL if collect_equation_definitions => {
+                // Token text is the whole `(\#eq:label)`.
+                if let Some((_len, label)) =
+                    crate::parser::inlines::bookdown::try_parse_bookdown_equation_definition(
+                        token.text(),
+                    )
+                {
+                    let location = DefinitionLocation {
+                        path: path.to_path_buf(),
+                        range: token.text_range(),
+                    };
+                    insert_crossref(db, index, label, location);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Scan a single text span for bookdown `(\#...)` declarations and text
+/// references, inserting any found into `index`. `base_start` is the document
+/// byte offset of `text[0]` so emitted ranges are document-absolute.
+fn scan_bookdown_definitions_in_text<'db>(
+    db: &'db dyn Db,
+    index: &mut InternedDefinitionIndex<'db>,
+    path: &Path,
+    collect_equation_definitions: bool,
+    text: &str,
+    base_start: usize,
+) {
+    use crate::parser::inlines::bookdown::{
+        try_parse_bookdown_definition, try_parse_bookdown_equation_definition,
+        try_parse_bookdown_text_reference,
+    };
+
+    let mut offset = 0usize;
+    let bytes = text.as_bytes();
+    while offset < bytes.len() {
+        db.unwind_if_revision_cancelled();
+        if bytes[offset] != b'(' {
+            offset += 1;
             continue;
         }
-        let text = token.text();
-        let mut offset = 0usize;
-        let bytes = text.as_bytes();
-        while offset < bytes.len() {
-            db.unwind_if_revision_cancelled();
-            if bytes[offset] != b'(' {
-                offset += 1;
-                continue;
-            }
-            let slice = &text[offset..];
-            if collect_equation_definitions
-                && let Some((len, label)) = try_parse_bookdown_equation_definition(slice)
-            {
-                let start: usize = token.text_range().start().into();
-                let range = rowan::TextRange::new(
-                    rowan::TextSize::from((start + offset) as u32),
-                    rowan::TextSize::from((start + offset + len) as u32),
-                );
-                let location = DefinitionLocation {
-                    path: path.to_path_buf(),
-                    range,
-                };
-                insert_crossref(db, index, label, location);
-                offset += len;
-                continue;
-            }
-            if let Some((len, label)) = try_parse_bookdown_definition(slice) {
-                if label.starts_with("eq:") && !collect_equation_definitions {
-                    offset += len;
-                    continue;
-                }
-                let start: usize = token.text_range().start().into();
-                let range = rowan::TextRange::new(
-                    rowan::TextSize::from((start + offset) as u32),
-                    rowan::TextSize::from((start + offset + len) as u32),
-                );
-                let location = DefinitionLocation {
-                    path: path.to_path_buf(),
-                    range,
-                };
-                insert_crossref(db, index, label, location);
-                offset += len;
-                continue;
-            }
-            if let Some((len, label)) = try_parse_bookdown_text_reference(slice) {
-                let start: usize = token.text_range().start().into();
-                let range = rowan::TextRange::new(
-                    rowan::TextSize::from((start + offset) as u32),
-                    rowan::TextSize::from((start + offset + len) as u32),
-                );
-                let location = DefinitionLocation {
-                    path: path.to_path_buf(),
-                    range,
-                };
-                insert_crossref(db, index, label, location);
-                offset += len;
-                continue;
-            }
-            offset += 1;
+        let slice = &text[offset..];
+        if collect_equation_definitions
+            && let Some((len, label)) = try_parse_bookdown_equation_definition(slice)
+        {
+            let range = rowan::TextRange::new(
+                rowan::TextSize::from((base_start + offset) as u32),
+                rowan::TextSize::from((base_start + offset + len) as u32),
+            );
+            let location = DefinitionLocation {
+                path: path.to_path_buf(),
+                range,
+            };
+            insert_crossref(db, index, label, location);
+            offset += len;
+            continue;
         }
+        if let Some((len, label)) = try_parse_bookdown_definition(slice) {
+            if label.starts_with("eq:") && !collect_equation_definitions {
+                offset += len;
+                continue;
+            }
+            let range = rowan::TextRange::new(
+                rowan::TextSize::from((base_start + offset) as u32),
+                rowan::TextSize::from((base_start + offset + len) as u32),
+            );
+            let location = DefinitionLocation {
+                path: path.to_path_buf(),
+                range,
+            };
+            insert_crossref(db, index, label, location);
+            offset += len;
+            continue;
+        }
+        if let Some((len, label)) = try_parse_bookdown_text_reference(slice) {
+            let range = rowan::TextRange::new(
+                rowan::TextSize::from((base_start + offset) as u32),
+                rowan::TextSize::from((base_start + offset + len) as u32),
+            );
+            let location = DefinitionLocation {
+                path: path.to_path_buf(),
+                range,
+            };
+            insert_crossref(db, index, label, location);
+            offset += len;
+            continue;
+        }
+        offset += 1;
     }
 }
 

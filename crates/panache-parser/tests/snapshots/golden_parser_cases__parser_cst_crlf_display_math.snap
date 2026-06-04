@@ -15,7 +15,14 @@ DOCUMENT@0..60
   PARAGRAPH@10..25
     DISPLAY_MATH@10..23
       DISPLAY_MATH_MARKER@10..12 "$$"
-      TEXT@12..21 "\r\nx = y\r\n"
+      MATH_CONTENT@12..21
+        MATH_NEWLINE@12..14 "\r\n"
+        MATH_TEXT@14..15 "x"
+        MATH_SPACE@15..16 " "
+        MATH_TEXT@16..17 "="
+        MATH_SPACE@17..18 " "
+        MATH_TEXT@18..19 "y"
+        MATH_NEWLINE@19..21 "\r\n"
       DISPLAY_MATH_MARKER@21..23 "$$"
     NEWLINE@23..25 "\r\n"
   BLANK_LINE@25..27
@@ -28,6 +35,17 @@ DOCUMENT@0..60
   PARAGRAPH@41..60
     DISPLAY_MATH@41..58
       DISPLAY_MATH_MARKER@41..43 "$$"
-      TEXT@43..56 "\r\na + b = c\r\n"
+      MATH_CONTENT@43..56
+        MATH_NEWLINE@43..45 "\r\n"
+        MATH_TEXT@45..46 "a"
+        MATH_SPACE@46..47 " "
+        MATH_TEXT@47..48 "+"
+        MATH_SPACE@48..49 " "
+        MATH_TEXT@49..50 "b"
+        MATH_SPACE@50..51 " "
+        MATH_TEXT@51..52 "="
+        MATH_SPACE@52..53 " "
+        MATH_TEXT@53..54 "c"
+        MATH_NEWLINE@54..56 "\r\n"
       DISPLAY_MATH_MARKER@56..58 "$$"
     NEWLINE@58..60 "\r\n"

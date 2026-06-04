@@ -386,15 +386,12 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::DISPLAY_MATH_MARKER)
             });
 
-            // Get the actual content (TEXT token, not node)
+            // Content now lives in a `MATH_CONTENT` subtree; its text is the
+            // raw bytes between the delimiters (verbatim path).
             let content = node
-                .children_with_tokens()
-                .find_map(|c| match c {
-                    NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
-                        Some(t.text().to_string())
-                    }
-                    _ => None,
-                })
+                .children()
+                .find(|n| n.kind() == SyntaxKind::MATH_CONTENT)
+                .map(|n| n.text().to_string())
                 .unwrap_or_default();
 
             // Get original marker to determine input format

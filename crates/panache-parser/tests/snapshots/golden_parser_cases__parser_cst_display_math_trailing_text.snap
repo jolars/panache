@@ -11,7 +11,16 @@ DOCUMENT@0..106
   PARAGRAPH@68..106
     DISPLAY_MATH@68..82
       DISPLAY_MATH_MARKER@68..70 "$$"
-      TEXT@70..80 "\nE = mc^2\n"
+      MATH_CONTENT@70..80
+        MATH_NEWLINE@70..71 "\n"
+        MATH_TEXT@71..72 "E"
+        MATH_SPACE@72..73 " "
+        MATH_TEXT@73..74 "="
+        MATH_SPACE@74..75 " "
+        MATH_TEXT@75..77 "mc"
+        MATH_SCRIPT@77..78 "^"
+        MATH_TEXT@78..79 "2"
+        MATH_NEWLINE@79..80 "\n"
       DISPLAY_MATH_MARKER@80..82 "$$"
     TEXT@82..105 " some text coming here."
     NEWLINE@105..106 "\n"
