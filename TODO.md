@@ -614,48 +614,6 @@ intentionally excluded.
       inline-parsed paragraphs (current approach parses inlines into a temp
       tree, then replays while inserting markers)
 
-### Long-term YAML parser groundwork
-
-- [x] Build an in-tree YAML parser module (`src/parser/yaml.rs`) as a long-term
-      project with lossless CST goals.
-- [x] Add shared YAML input/model groundwork for plain YAML files and
-      hashpipe-prefixed YAML (frontmatter/chunk metadata), including host-range
-      mapping scaffolding.
-- [ ] Complete one production-grade shared parser core for plain + hashpipe YAML
-      with full feature coverage.
-- [x] Add shadow/read-only rollout scaffolding for in-tree YAML parsing.
-- [ ] Add robust parity checks against existing YAML behavior before any
-      formatter or edit-path replacement.
-- [ ] Add first-class YAML formatting support after parser parity, using shared
-      CST and idempotency-focused formatting tests for both plain YAML and
-      hashpipe-prefixed YAML.
-- [x] Add pinned yaml-test-suite fixtures under `tests/fixtures/yaml-test-suite`
-      with an update script (`scripts/update-yaml-test-suite-fixtures.sh`).
-- [ ] Unify `quoted_val_event` / `quoted_val_event_multi_line` in
-      `parser/yaml/events.rs` onto the auto-detecting
-      `cooking::cook_single_quoted` / `cook_double_quoted` entries; audit the
-      \~20 call sites for input whitespace state so the trim semantics stay
-      correct.
-- [ ] Stage the in-tree YAML formatter cutover per
-      `.claude/skills/yaml-formatter-cutover/plan.md` (sibling to
-      `yaml-shadow-expand`). Joint cutover retires `yaml_parser` and
-      `pretty_yaml` in one commit.
-      - [ ] Phase 1 --- Build a shadow in-tree YAML formatter at
-            `crates/panache-formatter/src/formatter/yaml/`, parity-checked
-            against `pretty_yaml` minus an enumerated divergence list, with
-            idempotency asserted per case.
-      - [ ] Phase 2 --- Joint cutover: swap `src/syntax/yaml.rs` to the in-tree
-            parser and `yaml_engine.rs` to the in-tree formatter in one commit;
-            drop `yaml_parser` and `pretty_yaml` deps.
-      - [ ] Phase 3 --- Extend the same parser+formatter pipeline to hashpipe
-            YAML via `normalize_hashpipe_input`; retire pretty_yaml-specific
-            workarounds in `formatter/hashpipe.rs`.
-- [ ] Promote YAML scalar style into the CST as typed `SyntaxKind` variants
-      (`YAML_PLAIN_SCALAR` / `YAML_*_QUOTED_SCALAR` / `YAML_LITERAL_SCALAR` /
-      `YAML_FOLDED_SCALAR`) and add a `Scalar` AST wrapper. Likely forced by the
-      formatter cutover (Phase 1); decide preemptive vs reactive in `plan.md`
-      open questions.
-
 ## Parser - Coverage
 
 This section tracks implementation status of Pandoc Markdown features based on

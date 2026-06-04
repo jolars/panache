@@ -1,8 +1,4 @@
-use panache_parser::parser::yaml::{
-    ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_shadow, parse_stream,
-    parse_yaml_report, parse_yaml_tree, project_events, project_events_from_tree,
-    shadow_parser_check, shadow_scanner_check,
-};
+use panache_parser::parser::yaml::{parse_yaml_report, project_events};
 use panache_parser::syntax::SyntaxNode as ParserSyntaxNode;
 use serde_json::json;
 use std::fs;
@@ -127,21 +123,6 @@ fn fixture_case_events(case_path: &Path) -> Vec<String> {
 
 fn cst_text(node: &ParserSyntaxNode) -> String {
     format!("{:#?}\n", node)
-}
-
-fn render_shadow_report(
-    label: &str,
-    report: &panache_parser::parser::yaml::ShadowYamlReport,
-) -> String {
-    format!(
-        "{label}\noutcome={:?}\nreason={}\nkind={:?}\nbytes={}\nlines={}\nnormalized={:?}\n",
-        report.outcome,
-        report.shadow_reason,
-        report.input_kind,
-        report.input_len_bytes,
-        report.line_count,
-        report.normalized_input
-    )
 }
 
 #[test]
@@ -385,113 +366,6 @@ fn yaml_allowlist_projected_event_parity() {
 }
 
 #[test]
-fn yaml_shadow_defaults_to_noop_and_does_not_replace_pipeline() {
-    let report = parse_shadow("title: Shadow", ShadowYamlOptions::default());
-    assert_eq!(report.outcome, ShadowYamlOutcome::SkippedDisabled);
-    assert_eq!(report.shadow_reason, "shadow-disabled");
-    assert!(report.normalized_input.is_none());
-
-    let parsed = parse_yaml_tree("title: Shadow");
-    assert!(parsed.is_some());
-}
-
-#[test]
-fn yaml_shadow_report_snapshot_shape() {
-    let disabled = parse_shadow("title: Snapshot", ShadowYamlOptions::default());
-    let enabled_plain = parse_shadow(
-        "title: Snapshot",
-        ShadowYamlOptions {
-            enabled: true,
-            input_kind: YamlInputKind::Plain,
-        },
-    );
-    let enabled_hashpipe = parse_shadow(
-        "#| title: Snapshot",
-        ShadowYamlOptions {
-            enabled: true,
-            input_kind: YamlInputKind::Hashpipe,
-        },
-    );
-
-    let snapshot = [
-        render_shadow_report("[disabled]", &disabled),
-        render_shadow_report("[enabled-plain]", &enabled_plain),
-        render_shadow_report("[enabled-hashpipe]", &enabled_hashpipe),
-    ]
-    .join("\n");
-
-    let expected = "[disabled]
-outcome=SkippedDisabled
-reason=shadow-disabled
-kind=Plain
-bytes=15
-lines=1
-normalized=None
-
-[enabled-plain]
-outcome=PrototypeParsed
-reason=prototype-basic-mapping-parsed
-kind=Plain
-bytes=15
-lines=1
-normalized=Some(\"title: Snapshot\")
-
-[enabled-hashpipe]
-outcome=PrototypeParsed
-reason=prototype-basic-mapping-parsed
-kind=Hashpipe
-bytes=18
-lines=1
-normalized=Some(\"title: Snapshot\")
-";
-
-    assert_eq!(snapshot, expected);
-}
-
-#[test]
-fn yaml_shadow_report_snapshot_multiline_crlf_shape() {
-    let plain_multiline = parse_shadow(
-        "title: Snapshot\r\nauthor: Me\r\n",
-        ShadowYamlOptions {
-            enabled: true,
-            input_kind: YamlInputKind::Plain,
-        },
-    );
-    let hashpipe_multiline = parse_shadow(
-        "#| title: Snapshot\r\n#| author: Me\r\n",
-        ShadowYamlOptions {
-            enabled: true,
-            input_kind: YamlInputKind::Hashpipe,
-        },
-    );
-
-    let snapshot = [
-        render_shadow_report("[enabled-plain-crlf-multiline]", &plain_multiline),
-        render_shadow_report("[enabled-hashpipe-crlf-multiline]", &hashpipe_multiline),
-    ]
-    .join("\n");
-
-    let expected = "[enabled-plain-crlf-multiline]
-outcome=PrototypeParsed
-reason=prototype-basic-mapping-parsed
-kind=Plain
-bytes=29
-lines=2
-normalized=Some(\"title: Snapshot\\r\\nauthor: Me\\r\\n\")
-
-[enabled-hashpipe-crlf-multiline]
-outcome=PrototypeParsed
-reason=prototype-basic-mapping-parsed
-kind=Hashpipe
-bytes=35
-lines=2
-normalized=Some(\"title: Snapshot\\nauthor: Me\")
-";
-
-    assert_eq!(snapshot, expected);
-}
-
-#[test]
 fn yaml_document_start_emitted_as_dedicated_token() {
     use panache_parser::syntax::SyntaxKind;
 
@@ -691,8 +565,8 @@ fn yaml_flat_map_with_empty_value_projected_events() {
 /// trivia (comments / whitespace / a bare `...` marker) produce a
 /// `YAML_STREAM` with no `YAML_DOCUMENT` children, which the events
 /// projection emits as just `+STR -STR`. Regressing this would re-introduce
-/// the comment-only-document bug fixed at the start of the shadow parser
-/// refactor sequence.
+/// the comment-only-document bug fixed while building the YAML parser's
+/// empty-stream handling.
 #[test]
 fn yaml_empty_stream_projects_no_document_events() {
     for input in ["# Comment only.\n", "...\n", "# comment\n...\n"] {
@@ -701,186 +575,6 @@ fn yaml_empty_stream_projects_no_document_events() {
             events,
             vec!["+STR", "-STR"],
             "input {input:?} should project to an empty stream"
-        );
-    }
-}
-
-/// Manual harness: run the new streaming scanner over every allowlisted
-/// fixture and assert byte-completeness (no gaps, no overlaps, last
-/// non-synthetic token reaches `input.len()`). This gates the
-/// step-12 cutover — the new scanner cannot replace the line-based
-/// lexer until every allowlisted case is byte-complete. Ignored by
-/// default so the regular test run stays fast; invoke with
-/// `cargo test -p panache-parser --test yaml -- --ignored
-/// shadow_scanner_byte_completeness_over_allowlist` after each scanner
-/// step.
-#[test]
-#[ignore = "manual scanner-completeness check over allowlisted fixtures"]
-fn shadow_scanner_byte_completeness_over_allowlist() {
-    let mut failures: Vec<(String, String)> = Vec::new();
-    for (case_id, case_path) in allowlisted_case_paths() {
-        let input_path = case_path.join("in.yaml");
-        if !input_path.exists() {
-            continue;
-        }
-        let input = fs::read_to_string(&input_path)
-            .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
-        let report = shadow_scanner_check(&input);
-        if !report.byte_complete {
-            failures.push((
-                case_id,
-                format!(
-                    "byte_complete=false: last_token_end={}, input_len={}, gap_at={:?}, \
-                     overlapping={}, diagnostic_codes={:?}",
-                    report.last_token_end,
-                    report.input_len,
-                    report.gap_at,
-                    report.overlapping,
-                    report.diagnostic_codes,
-                ),
-            ));
-        }
-    }
-    if !failures.is_empty() {
-        let summary = failures
-            .iter()
-            .map(|(id, msg)| format!("- {id}: {msg}"))
-            .collect::<Vec<_>>()
-            .join("\n");
-        panic!(
-            "scanner not byte-complete over {} allowlisted case(s):\n{summary}",
-            failures.len(),
-        );
-    }
-}
-
-/// Manual harness: run the v2 parser scaffold over every allowlisted
-/// fixture and assert text-losslessness — i.e. `tree.text() == input`.
-/// Byte-completeness invariant the streaming builder must hold over
-/// every allowlisted fixture. Ignored by default; invoke with:
-///
-///   cargo test -p panache-parser --test yaml -- --ignored \
-///     shadow_parser_text_losslessness_over_allowlist
-#[test]
-#[ignore = "manual streaming-parser losslessness check over allowlisted fixtures"]
-fn shadow_parser_text_losslessness_over_allowlist() {
-    let mut failures: Vec<String> = Vec::new();
-    for (case_id, case_path) in allowlisted_case_paths() {
-        let input_path = case_path.join("in.yaml");
-        if !input_path.exists() {
-            continue;
-        }
-        let input = fs::read_to_string(&input_path)
-            .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
-        let report = shadow_parser_check(&input);
-        if !report.text_lossless {
-            failures.push(format!("- {case_id}"));
-        }
-    }
-    if !failures.is_empty() {
-        panic!(
-            "streaming parser not text-lossless over {} allowlisted case(s):\n{}",
-            failures.len(),
-            failures.join("\n"),
-        );
-    }
-}
-
-/// Manual harness: project events from both the live (legacy) shadow parser
-/// and the streaming parser and report the cases where they diverge. A
-/// passing case means the streaming parser's CST is event-equivalent to
-/// the legacy projection for that fixture.
-///
-/// Ignored by default; the full diff is too large to gate normal runs on.
-/// Invoke with:
-///
-///     cargo test -p panache-parser --test yaml -- --ignored \
-///         shadow_parser_event_parity_over_allowlist --nocapture
-///
-/// Failure mode: the test panics with a count plus a per-case bullet of
-/// the first diverging line so we can triage by shared root cause.
-#[test]
-#[ignore = "manual streaming-vs-legacy event parity check over allowlisted fixtures"]
-fn shadow_parser_event_parity_over_allowlist() {
-    let mut matches: usize = 0;
-    let mut mismatches: Vec<String> = Vec::new();
-    let mut considered: usize = 0;
-    let mut skipped_v1_rejects: usize = 0;
-    for (case_id, case_path) in allowlisted_case_paths() {
-        let input_path = case_path.join("in.yaml");
-        if !input_path.exists() {
-            continue;
-        }
-        let input = fs::read_to_string(&input_path)
-            .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
-        let legacy_events = project_events(&input);
-        // Legacy projection returning no events means it rejected the input
-        // as malformed. Those cases live on the allowlist for other reasons
-        // (e.g. error contract coverage); they don't say anything about
-        // whether the streaming CST is event-equivalent. Skip them so the
-        // parity number tracks structural progress, not error-rejection
-        // differences.
-        if legacy_events.is_empty() {
-            skipped_v1_rejects += 1;
-            continue;
-        }
-        considered += 1;
-        // The projection layer was written for the legacy CST shape and
-        // `expect`s its way through several structural assumptions (e.g.
-        // `YAML_KEY` tokens inside `YAML_BLOCK_MAP_KEY` nodes). The streaming
-        // parser emits a different shape today, so projecting its tree can
-        // panic. Treat a panic as a parity failure on that case rather than
-        // aborting the whole run.
-        let streaming_tree = parse_stream(&input);
-        let streaming_events = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            project_events_from_tree(&streaming_tree)
-        })) {
-            Ok(events) => events,
-            Err(_) => {
-                mismatches.push(format!(
-                    "- {case_id}: projection panicked on streaming tree"
-                ));
-                continue;
-            }
-        };
-        if legacy_events == streaming_events {
-            matches += 1;
-            continue;
-        }
-        let first_diff = legacy_events
-            .iter()
-            .zip(streaming_events.iter())
-            .position(|(a, b)| a != b)
-            .map(|idx| {
-                let legacy_line = legacy_events
-                    .get(idx)
-                    .map(String::as_str)
-                    .unwrap_or("<eos>");
-                let streaming_line = streaming_events
-                    .get(idx)
-                    .map(String::as_str)
-                    .unwrap_or("<eos>");
-                format!("@{idx}: legacy={legacy_line:?} streaming={streaming_line:?}")
-            })
-            .unwrap_or_else(|| {
-                format!(
-                    "len mismatch: legacy={} streaming={}",
-                    legacy_events.len(),
-                    streaming_events.len()
-                )
-            });
-        mismatches.push(format!("- {case_id}: {first_diff}"));
-    }
-    eprintln!(
-        "streaming event parity: {matches}/{considered} legacy-accepted allowlisted case(s) \
-         match (mismatches: {}, skipped because legacy rejects: {skipped_v1_rejects})",
-        mismatches.len(),
-    );
-    if !mismatches.is_empty() {
-        let body = mismatches.join("\n");
-        panic!(
-            "streaming event projection diverges from legacy on {} allowlisted case(s):\n{body}",
-            mismatches.len(),
         );
     }
 }

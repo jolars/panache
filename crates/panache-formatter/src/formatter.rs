@@ -18,11 +18,10 @@ mod shortcodes;
 mod smart;
 mod tables;
 mod utils;
-// In-tree YAML formatter. Live as of Phase 2a: `yaml_engine.rs` routes
-// live YAML output through `yaml::format_yaml` (pretty_yaml retired from
-// the formatting path, kept only as the cross-validation reference in
+// In-tree YAML formatter: `yaml_engine.rs` routes live YAML output
+// through `yaml::format_yaml` (pretty_yaml retired from the formatting
+// path, kept only as the cross-validation reference in
 // `tests/yaml_cross_validation.rs`).
-// See `.claude/skills/yaml-formatter-cutover/SKILL.md`.
 #[allow(dead_code)]
 pub mod yaml;
 

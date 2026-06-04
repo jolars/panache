@@ -1,27 +1,24 @@
-//! In-tree YAML formatter (live as of Phase 2a of the cutover plan).
+//! In-tree YAML formatter.
 //!
 //! Consumes the in-tree parser CST
 //! ([`panache_parser::parser::yaml::parse_yaml_tree`]) and emits
 //! deterministically-styled YAML text per the 14 style rules in
-//! `STYLE.md` (next to this file) — the canonical spec, relocated
-//! from `.claude/skills/yaml-formatter-cutover/plan.md` in Phase 1.2.
+//! `STYLE.md` (next to this file) — the canonical spec.
 //!
-//! **Live as of Phase 2a.** [`crate::yaml_engine::format_yaml_with_config`]
-//! (and the host `src/yaml_engine.rs` copy) now route live YAML output
-//! through [`format_yaml`] instead of `pretty_yaml::format_text`; both
-//! plain frontmatter and hashpipe option bodies share that chokepoint.
-//! `pretty_yaml` remains only as the cross-validation reference in
-//! `crates/panache-formatter/tests/yaml_cross_validation.rs`. The external
-//! `yaml_parser` crate has been retired (Phase 2b): value extraction and the
-//! CST/diagnostics bridge now run on the in-tree parser via the typed YAML AST
-//! wrappers (`panache_parser::syntax::parse_yaml_document`). See
-//! `.claude/skills/yaml-formatter-cutover/SKILL.md` for scope.
+//! This is the live YAML formatting path:
+//! [`crate::yaml_engine::format_yaml_with_config`] (and the host
+//! `src/yaml_engine.rs` copy) route YAML output through [`format_yaml`];
+//! both plain frontmatter and hashpipe option bodies share that
+//! chokepoint. `pretty_yaml` remains only as the cross-validation
+//! reference in `crates/panache-formatter/tests/yaml_cross_validation.rs`.
+//! Value extraction and the CST/diagnostics bridge run on the in-tree
+//! parser via the typed YAML AST wrappers
+//! (`panache_parser::syntax::parse_yaml_document`).
 //!
-//! Phase 1.15b status: cross-validation harness live; rules 1
+//! Implemented rules: cross-validation harness live; rules 1
 //! (canonical 2-space indent driven by entry/item nesting depth;
 //! multi-line plain / single-quoted / double-quoted scalar
-//! continuation lines indent one level deeper at the value column —
-//! Phase 1.15 extension surfaced by the Phase 2 readiness probe),
+//! continuation lines indent one level deeper at the value column),
 //! 2 (sequence items indent +2 from parent key — carried by rule 1's
 //! depth math, no separate code), 3 (prefer double-quoted over
 //! single-quoted unless the de-escaped content has `\`, `'`, `"`, or
@@ -33,7 +30,7 @@
 //! past `line_width`, rewrite each item onto its own line at the
 //! parent entry/item's content column + 2, with trailing comma and a
 //! standalone closing bracket; opening bracket stays on the key
-//! line; plus the Phase 1.15b plain-scalar analog for block-map
+//! line; plus the plain-scalar analog for block-map
 //! values — greedy word-wrap at `depth * 2` continuation column,
 //! quoted/block/decorated/seq-item scalars skipped), 7 (collapse
 //! blank-line runs; strip leading blanks entirely), 8 (one space

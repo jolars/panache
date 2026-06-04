@@ -1,7 +1,7 @@
-//! v2-aware diagnostic validator.
+//! YAML structural diagnostic validator.
 //!
-//! Detection runs over the streaming scanner's token output and the v2
-//! CST. Each cluster of error-contract patterns lands as its own
+//! Detection runs over the streaming scanner's token output and the
+//! YAML CST. Each cluster of error-contract patterns lands as its own
 //! checker function. The public entry [`validate_yaml`] composes them
 //! in priority order and is wired into
 //! [`super::parser::parse_yaml_report`] as the structural-validation
@@ -128,9 +128,6 @@
 //! invalid comma inside a `!!str,` tag suffix outside flow context)
 //! has the same root cause and is deferred until the scanner's tag
 //! name class tightens.
-//!
-//! See `.claude/skills/yaml-shadow-expand/scanner-rewrite.md` for the
-//! cutover plan and per-cluster detection scope.
 #![allow(dead_code)]
 
 use std::collections::HashSet;
@@ -1973,8 +1970,8 @@ fn first_entry_has_colon_only_key(block_map: &SyntaxNode) -> bool {
 /// Node-property–only scalars (`&anchor`, `!tag`, `*alias`) are
 /// exempt: the scanner currently folds anchor/alias/tag indicators
 /// into plain-scalar tokens, so a placeholder scalar like `&node1`
-/// preceding the actual value's block collection is a parser shadow
-/// that should not be flagged. `scalar_is_content_implicit_key`
+/// preceding the actual value's block collection is a structural
+/// placeholder that should not be flagged. `scalar_is_content_implicit_key`
 /// already encodes that exemption.
 ///
 /// Covers fixture U44R (`key1: "quoted1"\n   key2: ...`).
@@ -2033,10 +2030,10 @@ fn check_block_collection_after_value_scalar(tree: &SyntaxNode) -> Option<YamlDi
 /// column.
 ///
 /// YAML 1.2 §7.1 requires flow content nested inside a block-map
-/// value to be indented strictly past the block context. The v1
-/// lexer surfaces this as `LEX_WRONG_INDENTED_FLOW` with the contract
+/// value to be indented strictly past the block context. This surfaces
+/// as `LEX_WRONG_INDENTED_FLOW` with the contract
 /// `line_indent <= flow_base_indent` where `flow_base_indent` is the
-/// indent of the line that opened the flow. The v2-aware analog: walk
+/// indent of the line that opened the flow. The check: walk
 /// each `YAML_FLOW_SEQUENCE` / `YAML_FLOW_MAP` whose ancestor chain
 /// includes a `YAML_BLOCK_MAP_VALUE`, and verify that every line
 /// inside the flow node's byte range starts at a column strictly

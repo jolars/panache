@@ -24,7 +24,6 @@ insta = { version = "1.47.2", features = ["json"] }
 # The in-tree formatter is the source of truth. Drop this dep (and re-base
 # the parity test onto golden expected outputs) once the in-tree YAML
 # formatter has been stable in releases for a few months — revisit ~2026-09.
-# See .claude/skills/yaml-formatter-cutover/plan.md (Phase 2d).
 pretty_yaml = "0.6.0"
 similar-asserts = "2.0.0"
 toml = "1.1.2"

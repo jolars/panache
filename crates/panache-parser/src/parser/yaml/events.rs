@@ -1,4 +1,4 @@
-//! YAML event projection: walk a shadow-parser CST and produce a
+//! YAML event projection: walk a YAML parser CST and produce a
 //! yaml-test-suite style event stream (`+STR`, `+DOC`, `+MAP`, `=VAL :foo`,
 //! ...).
 //!
@@ -110,7 +110,7 @@ fn hex_digit_value(byte: u8) -> Option<u8> {
     }
 }
 
-/// Walk the shadow CST for `input` and return the projected yaml-test-suite
+/// Walk the YAML CST for `input` and return the projected yaml-test-suite
 /// event stream. Returns an empty vector if the input fails to parse.
 pub fn project_events(input: &str) -> Vec<String> {
     let Some(tree) = parse_yaml_tree(input) else {
@@ -119,9 +119,9 @@ pub fn project_events(input: &str) -> Vec<String> {
     project_events_from_tree(&tree)
 }
 
-/// Walk a shadow-parser CST and return the projected yaml-test-suite event
-/// stream. Decoupled from `parse_yaml_tree` so the v2 parser can reuse the
-/// same projection for parity comparisons.
+/// Walk a YAML parser CST and return the projected yaml-test-suite event
+/// stream. Decoupled from `parse_yaml_tree` so callers that already hold a
+/// tree (e.g. yaml-test-suite parity checks) can reuse the same projection.
 pub fn project_events_from_tree(tree: &SyntaxNode) -> Vec<String> {
     let mut events = vec!["+STR".to_string()];
     let stream = tree

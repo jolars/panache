@@ -1,8 +1,7 @@
 //! Streaming, char-by-char YAML scanner (libyaml/PyYAML-style).
 //!
-//! Replaces the line-based `lexer.rs` once parity is reached. The plan
-//! and resolved design decisions live in
-//! `.claude/skills/yaml-shadow-expand/scanner-rewrite.md`.
+//! This is the production YAML scanner — the single source of YAML
+//! tokenization for the parser.
 //!
 //! Currently implements: trivia, document markers, directives, flow
 //! indicators, block indicators (`-`/`?`/`:`) with the simple-key
@@ -127,7 +126,7 @@ pub(crate) struct Scanner<'a> {
     stream_end_emitted: bool,
     /// Optional embedded-YAML line prefix (e.g. hashpipe `#|`). When set,
     /// the scanner recognizes the marker (plus at most one trailing
-    /// space, mirroring `strip_hashpipe_prefix`) at each physical line
+    /// space, mirroring `strip_line_prefix`) at each physical line
     /// start, consumes it as `Trivia(LinePrefix)` (or leaves it embedded
     /// inside a multi-line scalar span for the builder to peel), and
     /// resets the column so the prefix is excluded from indent/column
@@ -175,7 +174,7 @@ impl<'a> Scanner<'a> {
 
     /// Match the configured line prefix at byte `offset` (a physical line
     /// start). Returns the matched length in bytes — the marker plus at
-    /// most one following space, mirroring `strip_hashpipe_prefix` — or
+    /// most one following space, mirroring `strip_line_prefix` — or
     /// `None` when no prefix is configured or the bytes don't match.
     fn prefix_byte_len_at(&self, offset: usize) -> Option<usize> {
         let marker = self.line_prefix.as_deref()?;
@@ -1542,70 +1541,6 @@ impl<'a> Scanner<'a> {
             }
         }
         Some(c)
-    }
-}
-
-/// Byte-completeness report from running the streaming scanner over an
-/// input. Used by the integration harness to gate the cutover (step 12)
-/// — until every allowlisted fixture is covered byte-completely with no
-/// overlaps or gaps, the new scanner cannot replace the line-based
-/// lexer.
-#[derive(Debug, Clone)]
-pub struct ShadowScannerReport {
-    /// True when token spans cover the entire input contiguously and
-    /// no two non-synthetic tokens overlap.
-    pub byte_complete: bool,
-    /// Total tokens emitted (including trivia and stream markers).
-    pub token_count: usize,
-    /// Diagnostic codes emitted during scanning, in order.
-    pub diagnostic_codes: Vec<&'static str>,
-    /// Highest end-index reached across non-synthetic tokens.
-    pub last_token_end: usize,
-    pub input_len: usize,
-    /// First byte index where coverage is missing, if any.
-    pub gap_at: Option<usize>,
-    /// True if any non-synthetic token's start index is below the
-    /// preceding token's end (a regression in the splice/queue logic).
-    pub overlapping: bool,
-}
-
-/// Drive the streaming scanner to completion over `input` and return a
-/// byte-completeness report. This is exposed so the integration harness
-/// in `tests/yaml.rs` can run the scanner over every allowlisted
-/// fixture without depending on internal `Token`/`Scanner` types.
-pub fn shadow_scanner_check(input: &str) -> ShadowScannerReport {
-    let mut scanner = Scanner::new(input);
-    let mut tokens = Vec::new();
-    while let Some(tok) = scanner.next_token() {
-        tokens.push(tok);
-    }
-    let mut cursor = 0usize;
-    let mut overlapping = false;
-    let mut gap_at: Option<usize> = None;
-    for tok in &tokens {
-        match tok.kind {
-            TokenKind::StreamStart | TokenKind::StreamEnd => {}
-            _ => {
-                if tok.start.index < cursor {
-                    overlapping = true;
-                } else if tok.start.index > cursor && gap_at.is_none() {
-                    gap_at = Some(cursor);
-                }
-                if tok.end.index > cursor {
-                    cursor = tok.end.index;
-                }
-            }
-        }
-    }
-    let byte_complete = !overlapping && gap_at.is_none() && cursor == input.len();
-    ShadowScannerReport {
-        byte_complete,
-        token_count: tokens.len(),
-        diagnostic_codes: scanner.diagnostics.iter().map(|d| d.code).collect(),
-        last_token_end: cursor,
-        input_len: input.len(),
-        gap_at,
-        overlapping,
     }
 }
 

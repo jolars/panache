@@ -14,10 +14,10 @@ YAML test-suite harness changes must stay fixture-driven and parity-oriented.
   without checking both `test.event` and `error`.
 - If an `error` file exists for a case, do not allowlist it unless tests
   explicitly model the expected error behavior.
-- Keep `allowlist.txt` intentionally small; add one case at a time with focused
-  rationale.
-- Keep `blocked.txt` reasons specific and actionable so future work can target
-  concrete parser gaps.
+- The allowlist now covers the suite at event parity. When adding or
+  regenerating cases, still verify each against both `test.event` and `error`
+  rather than bulk-adding, and regenerate `triage.json` (the `#[ignore]`d
+  `yaml_suite_generate_triage_report` harness) to confirm no bucket regresses.
 - Prefer structured snapshots for CST/parity data (rowan's `{:#?}` debug tree
   via `insta`, or projected event streams from
   `parser::yaml::project_events`) over ad-hoc freeform text.

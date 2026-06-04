@@ -1,12 +1,11 @@
-//! YAML parser groundwork for long-term Panache integration.
+//! In-tree YAML parser. Produces a lossless, Panache-compatible CST that
+//! the host parser embeds directly into the document tree (frontmatter and
+//! hashpipe option bodies) and that the in-tree YAML formatter consumes.
 //!
-//! This module is intentionally minimal and currently acts as a placeholder for a
-//! future in-tree YAML parser that can produce Panache-compatible CST structures.
-//! Initial goals:
-//! - support plain YAML and hashpipe-prefixed YAML from shared parsing primitives,
-//! - preserve lossless syntax/trivia needed for exact host document ranges,
-//! - enable shadow-mode comparison against the existing YAML engine before rollout.
-//! - prepare for first-class YAML formatting support once parser parity is proven.
+//! - supports plain YAML and hashpipe-prefixed YAML from shared parsing
+//!   primitives (see [`parse_stream`] / [`parse_stream_with_prefix`]),
+//! - preserves lossless syntax/trivia needed for exact host document ranges,
+//! - backs first-class YAML formatting via `crate::syntax::yaml_ast`.
 
 #[path = "yaml/cooking.rs"]
 mod cooking;
@@ -26,17 +25,12 @@ pub use events::{project_events, project_events_from_tree};
 // `crate::syntax::yaml_ast` can cook scalar tokens without re-implementing
 // the quote/escape/fold rules. The modules themselves stay private.
 pub(crate) use cooking::cook;
-pub use model::{
-    ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
-    YamlParseReport, diagnostic_codes,
-};
+pub use model::{YamlDiagnostic, YamlParseReport, diagnostic_codes};
 pub use parser::{
-    ShadowParserReport, locate_yaml_diagnostic, parse_shadow, parse_stream,
-    parse_stream_with_prefix, parse_yaml_report, parse_yaml_tree, shadow_parser_check,
-    validate_yaml_with_prefix,
+    locate_yaml_diagnostic, parse_stream, parse_stream_with_prefix, parse_yaml_report,
+    parse_yaml_tree, validate_yaml_with_prefix,
 };
 pub(crate) use scanner::ScalarStyle;
-pub use scanner::{ShadowScannerReport, shadow_scanner_check};
 
 #[doc(hidden)]
 pub fn validate_yaml_for_test(input: &str) -> Option<YamlDiagnostic> {
@@ -565,70 +559,5 @@ mod tests {
             .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
             .count();
         assert_eq!(nested_entry_count, 1);
-    }
-
-    #[test]
-    fn shadow_parse_is_disabled_by_default() {
-        let report = parse_shadow("title: My Title", ShadowYamlOptions::default());
-        assert_eq!(report.outcome, ShadowYamlOutcome::SkippedDisabled);
-        assert_eq!(report.shadow_reason, "shadow-disabled");
-        assert_eq!(report.normalized_input, None);
-    }
-
-    #[test]
-    fn shadow_parse_skips_when_disabled_even_for_valid_input() {
-        let report = parse_shadow(
-            "title: My Title",
-            ShadowYamlOptions {
-                enabled: false,
-                input_kind: YamlInputKind::Plain,
-            },
-        );
-        assert_eq!(report.outcome, ShadowYamlOutcome::SkippedDisabled);
-        assert_eq!(report.shadow_reason, "shadow-disabled");
-    }
-
-    #[test]
-    fn shadow_parse_reports_prototype_parsed_when_enabled() {
-        let report = parse_shadow(
-            "title: My Title",
-            ShadowYamlOptions {
-                enabled: true,
-                input_kind: YamlInputKind::Plain,
-            },
-        );
-        assert_eq!(report.outcome, ShadowYamlOutcome::PrototypeParsed);
-        assert_eq!(report.shadow_reason, "prototype-basic-mapping-parsed");
-        assert_eq!(report.normalized_input.as_deref(), Some("title: My Title"));
-    }
-
-    #[test]
-    fn shadow_parse_reports_prototype_rejected_when_enabled() {
-        // An unterminated flow sequence is rejected by the v2-aware
-        // structural validator, which is the rejection signal exercised
-        // by the shadow parse plumbing.
-        let report = parse_shadow(
-            "[ a, b",
-            ShadowYamlOptions {
-                enabled: true,
-                input_kind: YamlInputKind::Plain,
-            },
-        );
-        assert_eq!(report.outcome, ShadowYamlOutcome::PrototypeRejected);
-        assert_eq!(report.shadow_reason, "prototype-basic-mapping-rejected");
-    }
-
-    #[test]
-    fn shadow_parse_accepts_hashpipe_mode_but_remains_prototype_scoped() {
-        let report = parse_shadow(
-            "#| title: My Title",
-            ShadowYamlOptions {
-                enabled: true,
-                input_kind: YamlInputKind::Hashpipe,
-            },
-        );
-        assert_eq!(report.outcome, ShadowYamlOutcome::PrototypeParsed);
-        assert_eq!(report.shadow_reason, "prototype-basic-mapping-parsed");
-        assert_eq!(report.normalized_input.as_deref(), Some("title: My Title"));
     }
 }

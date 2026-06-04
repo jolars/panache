@@ -2,15 +2,13 @@
 //!
 //! Two layers live in this module:
 //!
-//! 1. **Orchestrator** — [`parse_shadow`], [`parse_yaml_tree`], and
-//!    [`parse_yaml_report`]. These drive [`parse_stream`] for a pure-YAML
-//!    parse rooted at `YAML_STREAM`, run the structural
+//! 1. **Orchestrator** — [`parse_yaml_tree`] and [`parse_yaml_report`].
+//!    These drive [`parse_stream`] for a pure-YAML parse rooted at
+//!    `YAML_STREAM`, run the structural
 //!    [`super::validator::validate_yaml`] pass, and surface diagnostics.
 //!    Host envelope wrappers (`DOCUMENT`, `YAML_METADATA_CONTENT`,
 //!    `HASHPIPE_YAML_CONTENT`) are added by the host parser at embedding
 //!    sites and are not concerns of the standalone YAML parse path.
-//!    Shadow-mode (`parse_shadow`) keeps a probe path the integration
-//!    harness can flip on for prototype reporting.
 //!
 //! 2. **Streaming parser** — [`parse_stream`] drives
 //!    [`super::scanner::Scanner`] and emits the rowan green tree. Each
@@ -36,69 +34,8 @@
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
-use super::model::{
-    ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
-    YamlParseReport,
-};
+use super::model::{YamlDiagnostic, YamlParseReport};
 use super::scanner::{Scanner, TokenKind, TriviaKind};
-
-/// Parse YAML in shadow mode using prototype groundwork only.
-///
-/// This API is intentionally read-only and does not replace production YAML
-/// parsing. By default it is disabled and reports `SkippedDisabled`.
-pub fn parse_shadow(input: &str, options: ShadowYamlOptions) -> ShadowYamlReport {
-    let line_count = input.lines().count().max(1);
-
-    if !options.enabled {
-        return ShadowYamlReport {
-            outcome: ShadowYamlOutcome::SkippedDisabled,
-            shadow_reason: "shadow-disabled",
-            input_kind: options.input_kind,
-            input_len_bytes: input.len(),
-            line_count,
-            normalized_input: None,
-        };
-    }
-
-    let normalized = match options.input_kind {
-        YamlInputKind::Plain => input.to_owned(),
-        YamlInputKind::Hashpipe => normalize_hashpipe_input(input),
-    };
-
-    let parsed = parse_yaml_tree(&normalized).is_some();
-
-    ShadowYamlReport {
-        outcome: if parsed {
-            ShadowYamlOutcome::PrototypeParsed
-        } else {
-            ShadowYamlOutcome::PrototypeRejected
-        },
-        shadow_reason: if parsed {
-            "prototype-basic-mapping-parsed"
-        } else {
-            "prototype-basic-mapping-rejected"
-        },
-        input_kind: options.input_kind,
-        input_len_bytes: input.len(),
-        line_count,
-        normalized_input: Some(normalized),
-    }
-}
-
-fn normalize_hashpipe_input(input: &str) -> String {
-    input
-        .lines()
-        .map(strip_hashpipe_prefix)
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn strip_hashpipe_prefix(line: &str) -> &str {
-    if let Some(rest) = line.strip_prefix("#|") {
-        return rest.strip_prefix(' ').unwrap_or(rest);
-    }
-    line
-}
 
 /// Strip a per-line `prefix` (marker plus at most one following space)
 /// from every line, joining with `\n`. The stripped baseline a
@@ -187,12 +124,12 @@ pub fn locate_yaml_diagnostic(input: &str, prefix: &str) -> Option<(YamlDiagnost
     Some((diag, start, end))
 }
 
-/// Parse prototype YAML tree structure from input
+/// Parse YAML tree structure from input, or `None` if it fails to parse.
 pub fn parse_yaml_tree(input: &str) -> Option<SyntaxNode> {
     parse_yaml_report(input).tree
 }
 
-/// Parse prototype YAML tree structure and include diagnostics on failure.
+/// Parse YAML tree structure and include diagnostics on failure.
 ///
 /// Diagnostics flow through the structural
 /// [`super::validator::validate_yaml`] pass, which composes per-cluster
@@ -944,7 +881,7 @@ fn emit_scalar_fragments(
 }
 
 /// Match an embedded line prefix at the start of `s`: the `marker` plus
-/// at most one following space (mirroring `strip_hashpipe_prefix` and the
+/// at most one following space (mirroring `strip_line_prefix` and the
 /// scanner's `prefix_byte_len_at`). Returns the matched byte length.
 fn prefix_match_len(s: &str, marker: &str) -> Option<usize> {
     let after = s.strip_prefix(marker)?;
@@ -988,35 +925,19 @@ fn map_token_to_syntax_kind(kind: TokenKind) -> SyntaxKind {
     }
 }
 
-/// Public byte-completeness report from running the parser over an
-/// input. The harness in `tests/yaml.rs` uses this to gate each
-/// sub-commit on losslessness.
-#[derive(Debug, Clone)]
-pub struct ShadowParserReport {
-    /// True if `tree.text() == input`.
-    pub text_lossless: bool,
-    /// Number of children directly under YAML_STREAM (a coarse proxy
-    /// for "did we emit any nesting yet"); useful to track structural
-    /// progression across sub-commits.
-    pub stream_child_count: usize,
-}
-
-/// Run the parser and return a losslessness report. Exposed so the
-/// integration harness can run over allowlisted fixtures without
-/// depending on private types.
-pub fn shadow_parser_check(input: &str) -> ShadowParserReport {
-    let tree = parse_stream(input);
-    let text = tree.text().to_string();
-    ShadowParserReport {
-        text_lossless: text == input,
-        stream_child_count: tree.children().count(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::syntax::SyntaxKind;
+
+    /// `parse_stream` must reproduce its input byte-for-byte.
+    fn assert_lossless(input: &str) {
+        assert_eq!(
+            parse_stream(input).text().to_string(),
+            input,
+            "input {input:?} not preserved"
+        );
+    }
 
     #[test]
     fn strip_with_offsets_matches_strip_line_prefix() {
@@ -1096,44 +1017,37 @@ mod tests {
 
     #[test]
     fn returns_byte_lossless_cst_for_empty_input() {
-        let report = shadow_parser_check("");
-        assert!(report.text_lossless);
+        assert_lossless("");
     }
 
     #[test]
     fn returns_byte_lossless_cst_for_simple_mapping() {
-        let report = shadow_parser_check("key: value\n");
-        assert!(report.text_lossless);
+        assert_lossless("key: value\n");
     }
 
     #[test]
     fn returns_byte_lossless_cst_for_block_sequence() {
-        let report = shadow_parser_check("- a\n- b\n");
-        assert!(report.text_lossless);
+        assert_lossless("- a\n- b\n");
     }
 
     #[test]
     fn returns_byte_lossless_cst_for_flow_mapping() {
-        let report = shadow_parser_check("{a: b, c: d}\n");
-        assert!(report.text_lossless);
+        assert_lossless("{a: b, c: d}\n");
     }
 
     #[test]
     fn returns_byte_lossless_cst_for_block_scalar() {
-        let report = shadow_parser_check("key: |\n  hello\n  world\n");
-        assert!(report.text_lossless);
+        assert_lossless("key: |\n  hello\n  world\n");
     }
 
     #[test]
     fn returns_byte_lossless_cst_for_quoted_scalar() {
-        let report = shadow_parser_check("\"key\": \"value\"\n");
-        assert!(report.text_lossless);
+        assert_lossless("\"key\": \"value\"\n");
     }
 
     #[test]
     fn returns_byte_lossless_cst_for_multi_line_plain_scalar() {
-        let report = shadow_parser_check("key: hello\n  world\n");
-        assert!(report.text_lossless);
+        assert_lossless("key: hello\n  world\n");
     }
 
     #[test]
@@ -1142,9 +1056,7 @@ mod tests {
         // even in flow context, so the builder must NOT drop it
         // (only zero-width `Key` splices from `fetch_value` should be
         // dropped). Regression: an earlier draft filtered every Key.
-        let input = "{ ?foo: bar }\n";
-        let report = shadow_parser_check(input);
-        assert!(report.text_lossless, "input {input:?} not preserved");
+        assert_lossless("{ ?foo: bar }\n");
     }
 
     #[test]
@@ -1154,9 +1066,7 @@ mod tests {
         // flow terminator (`}`/`]`/`,`). Otherwise the trailing
         // newline got swallowed into the scalar (`42\n` instead of
         // `42`) and the closer's byte position drifted.
-        let input = "{a: 42\n}\n";
-        let report = shadow_parser_check(input);
-        assert!(report.text_lossless, "input {input:?} not preserved");
+        assert_lossless("{a: 42\n}\n");
     }
 
     fn document_count(tree: &SyntaxNode) -> usize {

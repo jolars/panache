@@ -359,15 +359,16 @@ Instead of listing every file, understand the patterns:
 - `external_formatters.rs`, `external_linters.rs`: Tests that exercise external
   tool execution (shfmt etc.) --- kept here because the formatter crate doesn't
   invoke external tools; that's a host concern.
-- YAML suite groundwork uses vendored fixtures under
-  `tests/fixtures/yaml-test-suite/` refreshed via
-  `scripts/update-yaml-test-suite-fixtures.sh`; incremental coverage is tracked
-  by `tests/yaml/allowlist.txt`.
-- Long-term YAML parser groundwork lives in
-  `crates/panache-parser/src/parser/yaml.rs`; treat it as an incremental,
-  shadow-mode-first effort toward full CST/LSP/formatting integration.
-- This YAML work is intentionally long-horizon (many months). Do not frame it as
-  a near-term replacement for the existing `yaml_parser` dependency.
+- The YAML test suite uses vendored fixtures under
+  `crates/panache-parser/tests/fixtures/yaml-test-suite/` refreshed via
+  `scripts/update-yaml-test-suite-fixtures.sh`; allowlisted coverage is tracked
+  by `crates/panache-parser/tests/yaml/allowlist.txt`.
+- The in-tree YAML parser (`crates/panache-parser/src/parser/yaml.rs`) is the
+  production YAML parser. It retired the external `yaml_parser` crate; its
+  lossless CST is embedded into the host document tree for frontmatter and
+  hashpipe option bodies, and it backs the in-tree YAML formatter
+  (`crates/panache-formatter/src/formatter/yaml/`). `pretty_yaml` survives only
+  as a temporary dev-only cross-validation oracle (revisit \~2026-09).
 
 **Parser-crate tests** (`crates/panache-parser/tests/`):
 

@@ -16,7 +16,7 @@ pub enum SyntaxKind {
     HARD_LINE_BREAK,   // \<newline>
     DIV_MARKER,        // :::
 
-    // YAML tokens (metadata and shadow YAML CST parser)
+    // YAML tokens (metadata and in-tree YAML CST parser)
     YAML_METADATA_DELIM, // --- or ... (for YAML blocks)
     YAML_KEY,            // YAML mapping key token
     YAML_COLON,          // YAML mapping key-value separator
@@ -28,8 +28,8 @@ pub enum SyntaxKind {
     YAML_DIRECTIVE,      // YAML directive line (%YAML, %TAG)
     YAML_COMMENT,        // YAML inline comment token
     YAML_LINE_PREFIX,    // Embedded-YAML per-line prefix trivia (hashpipe `#|`)
-    YAML_DOCUMENT_START, // YAML document start marker (---) in shadow parser
-    YAML_DOCUMENT_END,   // YAML document end marker (...) in shadow parser
+    YAML_DOCUMENT_START, // YAML document start marker (---)
+    YAML_DOCUMENT_END,   // YAML document end marker (...)
 
     BLOCK_QUOTE_MARKER, // >
     ALERT_MARKER,       // [!NOTE], [!TIP], etc.
@@ -165,10 +165,10 @@ pub enum SyntaxKind {
     // YAML nodes
     YAML_METADATA,
     YAML_METADATA_CONTENT,    // Content lines inside YAML metadata block
-    YAML_STREAM, // Shadow parser only: YAML 1.2 stream wrapper (zero or more YAML_DOCUMENT children + trivia)
-    YAML_DOCUMENT, // Shadow parser only: a single YAML document (markers + body)
+    YAML_STREAM, // YAML 1.2 stream wrapper (zero or more YAML_DOCUMENT children + trivia)
+    YAML_DOCUMENT, // a single YAML document (markers + body)
     YAML_SCALAR, // YAML scalar value node (wraps YAML_SCALAR_TEXT content + NEWLINE/prefix leaves)
-    YAML_BLOCK_MAP, // YAML block mapping container (prototype shadow parser)
+    YAML_BLOCK_MAP, // YAML block mapping container
     YAML_BLOCK_MAP_ENTRY, // YAML block mapping entry (key: value)
     YAML_BLOCK_MAP_KEY, // YAML block mapping key wrapper
     YAML_BLOCK_MAP_VALUE, // YAML block mapping value wrapper

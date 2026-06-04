@@ -183,5 +183,4 @@ branch in the formatter.
 
 New rules need cross-validation against pretty_yaml before landing. If they
 conflict, decide explicitly which is right and document the decision. See
-`.claude/rules/yaml-formatter.md` and
-`.claude/skills/yaml-formatter-cutover/plan.md` for the process context.
+`.claude/rules/yaml-formatter.md` for the process context.
