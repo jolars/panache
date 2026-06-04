@@ -613,6 +613,22 @@ pub(crate) fn try_parse_simple_table(
         return None;
     }
 
+    // Cheap gate before the O(buffer) `strip_all` below: a simple table's
+    // separator must sit on the dispatch line or the line just after it (see
+    // `find_separator_line`). Table detection runs at every block start, so
+    // stripping the whole line buffer for every prose/math paragraph that
+    // can't be a table was quadratic on large documents. Peek just those one
+    // or two lines via `strip_at` and bail before materializing the full view.
+    let gate_first = window.strip_at(start_pos);
+    let separator_here = try_parse_table_separator(gate_first).is_some();
+    let separator_next = !separator_here
+        && start_pos + 1 < lines.len()
+        && !gate_first.trim().is_empty()
+        && try_parse_table_separator(window.strip_at(start_pos + 1)).is_some();
+    if !separator_here && !separator_next {
+        return None;
+    }
+
     // Detection scans run against the container-prefix-stripped view so a
     // table nested in `list → blockquote` (e.g. `- >  a   b`) has its `  > `
     // prefix removed before the separator/column-shape checks. With an empty
@@ -1148,6 +1164,22 @@ pub(crate) fn try_parse_pipe_table(
     let lines = window.raw();
     let start_pos = window.pos();
     if start_pos + 1 >= lines.len() {
+        return None;
+    }
+
+    // Cheap gate before the O(buffer) `strip_all` below: a pipe table's first
+    // line must contain a `|` (it is either the header or, headerless, the
+    // delimiter row), unless this is a caption-led table. Table detection runs
+    // at every block start, so stripping the whole line buffer for every
+    // prose/math paragraph was quadratic on large documents. When there is no
+    // container prefix (the common case) `strip_at`/`is_caption_followed_by_table`
+    // see exactly the same bytes as the stripped view, so this peek is
+    // equivalent to the checks below; with a non-empty prefix we skip the gate
+    // and fall through rather than risk a mismatch.
+    if window.prefix().ops().is_empty()
+        && !window.strip_at(start_pos).contains('|')
+        && !is_caption_followed_by_table(lines, start_pos)
+    {
         return None;
     }
 
@@ -1951,6 +1983,21 @@ pub(crate) fn try_parse_grid_table(
     // With an empty prefix `stripped == lines`. Emission re-emits the prefix
     // bytes as tokens via the window; captions/blank lines read raw `lines`.
     //
+    // Cheap gate before the O(buffer) `strip_all` below: a grid table's first
+    // line is a grid separator (`+---+`/`+===+`), unless this is a caption-led
+    // table. Table detection runs at every block start, so stripping the whole
+    // line buffer for every prose/math paragraph was quadratic on large
+    // documents. When there is no container prefix (the common case) the
+    // dispatch line's bytes are identical to the stripped view this function
+    // builds below, so this peek is equivalent to the `try_parse_grid_separator`
+    // check; with a non-empty prefix we skip the gate and fall through.
+    if window.prefix().ops().is_empty()
+        && try_parse_grid_separator(window.strip_at(start_pos)).is_none()
+        && !is_caption_followed_by_table(lines, start_pos)
+    {
+        return None;
+    }
+
     // `strip_all` keeps the dispatch line's list-indent (via
     // `strip_line_0_for_emission`) so emission re-injects those bytes
     // correctly. For grid-border *detection*, the strict column-0 check in
@@ -2434,6 +2481,23 @@ pub(crate) fn try_parse_multiline_table(
         return None;
     }
 
+    // Cheap gate before the O(buffer) `strip_all` below: a multiline table's
+    // first line is either a full-width dash separator or a column separator.
+    // Table detection runs at every block start, so stripping the whole line
+    // buffer for every paragraph that can't begin a multiline table was
+    // quadratic on large documents. Peek just the dispatch line via `strip_at`
+    // and bail before materializing the full view.
+    let first_line = window.strip_at(start_pos);
+
+    // First line can be either:
+    // 1. A full-width dash separator (for tables with headers)
+    // 2. A column separator (for headerless tables)
+    let is_full_width_start = try_parse_multiline_separator(first_line).is_some();
+    let is_column_sep_start = !is_full_width_start && is_column_separator(first_line);
+    if !is_full_width_start && !is_column_sep_start {
+        return None;
+    }
+
     // Detection scans run against the container-prefix-stripped view so a
     // multiline table nested in `list → blockquote` (e.g. `- > ----`) has its
     // `  > ` prefix removed before the separator/blank-row shape checks. The
@@ -2442,22 +2506,11 @@ pub(crate) fn try_parse_multiline_table(
     // the prefix bytes as tokens via the window; captions read raw `lines`.
     let stripped = window.strip_all();
 
-    let first_line = stripped[start_pos];
-
-    // First line can be either:
-    // 1. A full-width dash separator (for tables with headers)
-    // 2. A column separator (for headerless tables)
-    let is_full_width_start = try_parse_multiline_separator(first_line).is_some();
-    let is_column_sep_start = !is_full_width_start && is_column_separator(first_line);
     let headerless_columns = if is_column_sep_start {
-        try_parse_table_separator(first_line)
+        try_parse_table_separator(stripped[start_pos])
     } else {
         None
     };
-
-    if !is_full_width_start && !is_column_sep_start {
-        return None;
-    }
 
     // Look ahead to find the structure
     let mut pos = start_pos + 1;
