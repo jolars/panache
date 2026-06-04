@@ -1207,7 +1207,6 @@ dependencies = [
  "panache-formatter",
  "panache-parser",
  "predicates",
- "pretty_yaml",
  "rayon",
  "regex",
  "rowan",

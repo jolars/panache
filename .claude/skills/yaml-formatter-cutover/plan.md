@@ -91,6 +91,30 @@ matching the `scanner-rewrite.md` precedent in `yaml-shadow-expand/`.
 
 _(Update as phases complete. Earliest entries on top.)_
 
+- **Phase 2d (partial) — `pretty_yaml` recategorized as a dev-dependency.**
+  `pretty_yaml` has been runtime-unused since 2a, yet sat under
+  `[dependencies]` in both the root `panache` crate (where nothing —
+  src/tests/benches — referenced it; a dead edge) and `panache-formatter`
+  (where only `tests/yaml_cross_validation.rs` uses it; `src/` mentions it
+  in comments only). Fixed the categorization: removed the dead entry from
+  root `Cargo.toml` and moved the formatter's entry from `[dependencies]`
+  to `[dev-dependencies]`. **No test/source change** — the cross-validation
+  test keeps its `format_yaml == pretty_yaml::format_text` parity oracle and
+  idempotency check (the parity oracle is the only per-case correctness bar
+  for the 112-case corpus, so it stays live). The `pretty_yaml`-referencing
+  doc comments across `formatter/yaml*.rs`, `formatter.rs`, and parser
+  `validator.rs` remain accurate (we still cross-validate), so none were
+  touched. **Payoff:** both published crates stop shipping `pretty_yaml`
+  (and transitively `yaml_parser`) as normal dependencies — downstream
+  consumers get a slimmer tree; only dev/test builds in this repo pull them
+  now. Verified: `cargo tree -e normal` shows no `pretty_yaml` under either
+  crate, `-e dev` shows it under `panache-formatter`; the sole `Cargo.lock`
+  delta is dropping the `pretty_yaml` edge from the `panache` package block
+  (both packages remain, as accepted). Full workspace `cargo test`, clippy
+  `-D warnings`, fmt clean. **Deliberately deferred:** the *full* drop (and
+  thus evicting `pretty_yaml` + `yaml_parser` from `Cargo.lock`) needs the
+  parity oracle retired/re-based first — the Phase 2 exit criterion is
+  knowingly not yet met.
 - **Phase 2c step 2 — prefix-aware scanner + builder.** Landed as two
   parser-crate commits. (1) `refactor(parser): fragment multi-line YAML
   scalars at line breaks` — `emit_scalar_node` now splits a multi-line
@@ -982,15 +1006,31 @@ projector — anything that walks `YAML_METADATA_CONTENT`/
 still exists), but new features (key goto, folding, semantic tokens,
 hover) become possible by walking the nested `YAML_*` structure.
 
-### 2d — Drop `pretty_yaml` — OUTSTANDING
+### 2d — Drop `pretty_yaml` — PARTIAL (recategorized; full drop deferred)
 
 `pretty_yaml` is runtime-unused since 2a; only
 `crates/panache-formatter/tests/yaml_cross_validation.rs` references it,
-and it transitively pulls `yaml_parser` into `Cargo.lock`. Retire or
-re-base that cross-validation test (the in-tree formatter's own corpus +
-idempotency harness is the durable bar), then remove `pretty_yaml` from
-the root and `panache-formatter` manifests. After this, both
-`yaml_parser` and `pretty_yaml` are gone from `Cargo.lock`.
+and it transitively pulls `yaml_parser` into `Cargo.lock`.
+
+**Done (this slice):** recategorized the dependency to match its actual
+use — dropped the dead entry from the root `panache` `[dependencies]` and
+moved it to `panache-formatter` `[dev-dependencies]`. The cross-validation
+parity oracle (and idempotency check) stays live, so no test rebase was
+needed. Both published crates (`panache`, `panache-formatter`) now stop
+shipping `pretty_yaml`/`yaml_parser` as normal dependencies; only dev/test
+builds in this repo pull them. See "what landed."
+
+**Deferred (full drop) — trigger: a few months of stable releases.** The
+dev-dependency is explicitly temporary. Once the in-tree YAML formatter has
+shipped without YAML-formatting regressions for ~3 months (cutover landed
+mid-2026; **revisit ~2026-09**), retire or re-base the cross-validation test
+(the in-tree formatter's own corpus + idempotency harness is the durable
+bar; capture golden expected outputs in place of the parity oracle), then
+remove `pretty_yaml` from the dev-dependencies too. Only after that are both
+`yaml_parser` and `pretty_yaml` gone from `Cargo.lock` — the Phase 2 exit
+criterion is **knowingly not yet met** by the partial slice. The trigger is
+also recorded as a `TEMPORARY` comment on the dev-dependency in
+`crates/panache-formatter/Cargo.toml`.
 
 ### Exit criteria for Phase 2
 
