@@ -20,6 +20,24 @@ This document tracks implementation status for Panache's features.
       for HIGH vs LOW revalidation cost.
 - [x] Finalize and document durability update/invalidation policy based on
       measurements before broader rollout.
+- [x] Debounce per-keystroke diagnostics and defer external linters to save.
+      `did_change` now does only synchronous parse + state update and schedules
+      a 200ms-debounced built-in lint; external linters (jarl, ruff, ...) run on
+      `did_save`. Fixed format-on-save stalling behind a per-keystroke lint
+      convoy on large docs (\~1.5s to \~0.11s round-trip).
+- [ ] Share a single CST pre-order walk across the \~30 built-in lint rules.
+      Each rule currently walks the tree independently (\~15% of the post-fix
+      \~118ms `built_in_lint_plan` on a 73KB chapter is rowan `Preorder`
+      iteration across rules + `symbol_usage_index`). A shared walk that
+      dispatches nodes to interested rules would cut this. Linter-architecture
+      change; measure against the lint-plan harness before/after.
+- [ ] Honor `experimental.incrementalParsing` from `settings` /
+      `workspace/didChangeConfiguration`, not just initialize
+      `initializationOptions`. Editors that send it via `settings` (observed in
+      the wild) currently get a no-op toggle (every `did_change` logs
+      `full_reparse...incremental_disabled`). Low priority --- parse is \~7ms
+      either way --- but the toggle is silently ineffective. Pairs with the
+      existing "Configuration via LSP" item below.
 
 ### Core LSP Capabilities
 
@@ -613,6 +631,23 @@ intentionally excluded.
 - [ ] Avoid temporary green tree when injecting `BLOCK_QUOTE_MARKER` tokens into
       inline-parsed paragraphs (current approach parses inlines into a temp
       tree, then replays while inserting markers)
+- [x] Gate table detection before the whole-buffer `StrippedLines::strip_all`.
+      All four table parsers stripped the entire line buffer before their first
+      shape check, and detection runs at every block start → O(block-starts ×
+      lines), only under Pandoc/RMarkdown flavor (those table types enabled).
+      Hoisted each parser's first-line predicate ahead of `strip_all` via
+      `strip_at` (commit
+      `perf(parser): gate table detection before       whole-buffer strip`).
+      73KB math-heavy chapter parse/lint-plan recompute \~250ms → \~118ms;
+      CommonMark unaffected. Behavior-preserving (goldens, CST snapshots,
+      commonmark allowlist unchanged).
+- [ ] Reduce green-tree build cost on large docs. After the table-gate fix, the
+      residual \~118ms `built_in_lint_plan` is \~half rowan tree-build
+      (`NodeCache::token`, `Arc::drop_slow`, malloc/free) proportional to token
+      count. Coalescing per-line `TEXT`+`NEWLINE` pairs in raw/code/math blocks
+      into single tokens would cut it. Invasive --- verify CST snapshots and the
+      formatter round-trip before changing emitter shape (see the
+      rowan-internals note in the `perf-investigation` skill).
 
 ## Parser - Coverage
 
