@@ -1039,6 +1039,13 @@ impl<'a> Scanner<'a> {
             start,
             end,
         });
+        // The loop breaks at the *start* of the terminating (dedented) line,
+        // before its embedded prefix. `consume_one_line_break` (unlike
+        // `scan_newline`) doesn't peel the next line's prefix, so consume it
+        // here — otherwise the main trivia loop sees the `#` of `#|` and
+        // mis-scans the following option (e.g. `#| echo: false` after a block
+        // scalar) as a YAML comment, dropping it. No-op for prefix-less YAML.
+        self.consume_line_prefix_token();
     }
 
     /// Look ahead through blank lines to find the first non-blank

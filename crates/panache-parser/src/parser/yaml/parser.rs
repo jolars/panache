@@ -1074,6 +1074,27 @@ mod tests {
     }
 
     #[test]
+    fn block_scalar_followed_by_option_is_not_swallowed_as_comment() {
+        // Regression: a prefixed option after a `|` block scalar was scanned as a
+        // YAML comment (the terminating line's `#|` prefix wasn't peeled), which
+        // dropped the option. Both keys must survive as structure.
+        let input = "#| fig-cap: |\n#|   A caption\n#| echo: false\n";
+        let tree = parse_stream_with_prefix(input, "#|");
+        assert_eq!(tree.to_string(), input, "byte-lossless");
+        let entries = tree
+            .descendants()
+            .filter(|node| node.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+            .count();
+        assert_eq!(entries, 2, "expected fig-cap and echo entries");
+        assert!(
+            !tree
+                .descendants_with_tokens()
+                .any(|element| element.kind() == SyntaxKind::YAML_COMMENT),
+            "the option line must not be scanned as a comment"
+        );
+    }
+
+    #[test]
     fn returns_byte_lossless_cst_for_empty_input() {
         let report = shadow_parser_check("");
         assert!(report.text_lossless);
