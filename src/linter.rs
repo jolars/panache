@@ -105,6 +105,10 @@ fn default_registry(config: &Config) -> RuleRegistry {
     if config.lint.is_rule_enabled("empty-list-item") {
         registry.register(Box::new(rules::empty_list_item::EmptyListItemRule));
     }
+    // Always-on: no math extension means no math nodes, so the walk no-ops.
+    if config.lint.is_rule_enabled("math-syntax") {
+        registry.register(Box::new(rules::math_content::MathContentRule));
+    }
     if ext.header_attributes && config.lint.is_rule_enabled("heading-eaten-attrs") {
         registry.register(Box::new(rules::heading_eaten_attrs::HeadingEatenAttrsRule));
     }

@@ -267,6 +267,29 @@ async fn test_hashpipe_yaml_parse_error_in_built_in_lint_plan() {
 }
 
 #[tokio::test]
+async fn test_math_parse_error_in_built_in_lint_plan() {
+    let server = TestLspServer::new();
+    // Unclosed `{` group inside inline math (Quarto enables tex_math by default).
+    let content = "The relation $E = mc^{2$ holds.\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let diagnostics = server
+        .get_built_in_diagnostics("file:///test.qmd")
+        .await
+        .expect("diagnostics");
+
+    let math_error = diagnostics
+        .iter()
+        .find(|diag| diag.code == "math-unclosed-group")
+        .expect("expected math-unclosed-group diagnostic");
+    // Span points at the unclosed `{` (line 1, column 22).
+    assert_eq!(math_error.location.line, 1);
+    assert_eq!(math_error.location.column, 22);
+}
+
+#[tokio::test]
 async fn test_hashpipe_folded_scalar_parse_error_maps_to_host_position() {
     let server = TestLspServer::new();
     let content = "```{r}\n#| fig-cap: >-\n#|   A folded caption\n#| bad: [\na <- 1\n```\n";

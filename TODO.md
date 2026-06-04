@@ -971,8 +971,12 @@ design decisions, and per-session workflow. Parser invariants:
       math (`MATH_CONTENT` subtree; groups, environments, commands, alignment,
       scripts, comments) with a diagnostics side-channel. Landed in
       `crates/panache-parser/src/parser/math.rs`.
-- [ ] Surface math diagnostics (unclosed/mismatched braces and environments)
-      through the linter and LSP.
+- [x] Surface math diagnostics (unclosed/mismatched braces and environments)
+      through the linter and LSP. Landed as the always-on `math-syntax` lint
+      rule (`src/linter/rules/math_content.rs`), surfaced via the registry to
+      CLI + LSP. Derives the five diagnostics directly from the embedded
+      `MATH_CONTENT` CST shape (no re-parse); spans are the offending tokens'
+      host ranges.
 - [ ] Math formatter that reformats content semantics-safely (align `&` columns,
       indent environment bodies, normalize `\\`) while preserving idempotency
       (`format(format(math)) == format(math)`), behind an experimental gate.

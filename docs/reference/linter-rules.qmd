@@ -936,6 +936,83 @@ the preceding line pulls it into a paragraph
           div instead of paragraph text
 ```
 
+### `math-syntax` {#math-syntax}
+
+Detects structural problems in the TeX content of inline (`$...$`) and display
+(`$$...$$`, `\[...\]`, `\begin{env}...\end{env}`) math: unbalanced braces and
+unclosed or mismatched environments.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Requirements
+:   Requires a `tex-math-*` extension (e.g. `extensions.tex-math-dollars`,
+    default for Pandoc, Quarto, and R Markdown flavors). With no math extension
+    enabled there are no math spans, so the rule never fires.
+
+Diagnostic codes
+:   [`math-unclosed-group`](#math-unclosed-group),
+    [`math-unexpected-close-brace`](#math-unexpected-close-brace),
+    [`math-unclosed-environment`](#math-unclosed-environment),
+    [`math-mismatched-environment`](#math-mismatched-environment),
+    [`math-unexpected-end`](#math-unexpected-end)
+
+Description
+
+:   The math parser captures math content losslessly even when it is malformed,
+    so a stray brace or unterminated environment never breaks parsing or
+    formatting --- but it usually means the equation will not render as the
+    author intended. This rule surfaces the structural problems the parser
+    already detected, with the diagnostic pointing at the offending byte (the
+    unclosed `{`, the stray `}`, or the mismatched `\end`).
+
+    The check is purely syntactic: TeX is a macro language, so the rule does not
+    validate command names, argument arity, or semantics --- only brace and
+    environment nesting.
+
+**Example violation:**
+
+```markdown
+The mass-energy relation is $E = mc^{2$.
+```
+
+**Diagnostic:**
+
+```
+warning[math-unclosed-group]: unclosed `{` group
+ --> document.qmd:1:38
+  |
+1 | The mass-energy relation is $E = mc^{2$.
+  |                                      ^
+```
+
+**Resolution:** Balance the braces or close the environment. No auto-fix is
+provided because the correct repair (which brace to add, where) is an
+author-intent decision.
+
+#### `math-unclosed-group` {#math-unclosed-group}
+
+Emitted when a `{` is never closed before the end of the math content.
+
+#### `math-unexpected-close-brace` {#math-unexpected-close-brace}
+
+Emitted when a `}` appears with no matching `{`.
+
+#### `math-unclosed-environment` {#math-unclosed-environment}
+
+Emitted when a `\begin{env}` is never closed by a matching `\end{env}`.
+
+#### `math-mismatched-environment` {#math-mismatched-environment}
+
+Emitted when a `\begin{a}` is closed by `\end{b}` with a different name.
+
+#### `math-unexpected-end` {#math-unexpected-end}
+
+Emitted when an `\end` appears with no open `\begin`.
+
 ## YAML diagnostics
 
 Panache emits YAML diagnostics when embedded YAML content is invalid. These
