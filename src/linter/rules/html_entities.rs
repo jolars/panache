@@ -3,10 +3,9 @@ use std::sync::OnceLock;
 
 use rowan::TextRange;
 
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Location};
-use crate::linter::rules::Rule;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::linter::rules::{LintContext, Rule};
+use crate::syntax::SyntaxKind;
 
 use panache_parser::entities::ENTITIES;
 
@@ -17,23 +16,16 @@ impl Rule for HtmlEntitiesRule {
         "html-entities"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        _config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn wants_text_tokens(&self) -> bool {
+        true
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let input = cx.input;
         let mut diagnostics = Vec::new();
 
-        for elem in tree.descendants_with_tokens() {
-            let Some(token) = elem.into_token() else {
-                continue;
-            };
-            if token.kind() != SyntaxKind::TEXT {
-                continue;
-            }
-            if has_excluded_ancestor(&token) {
+        for token in cx.text_tokens() {
+            if has_excluded_ancestor(token) {
                 continue;
             }
 
@@ -314,12 +306,13 @@ fn levenshtein(a: &str, b: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
 
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config::default();
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = HtmlEntitiesRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]

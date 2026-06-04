@@ -1,9 +1,8 @@
 use rowan::TextRange;
 
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Location};
-use crate::linter::rules::Rule;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::linter::rules::{LintContext, Rule};
+use crate::syntax::SyntaxKind;
 
 pub struct StrayFencedDivMarkersRule;
 
@@ -12,19 +11,19 @@ impl Rule for StrayFencedDivMarkersRule {
         "stray-fenced-div-markers"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        _config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::PARAGRAPH, SyntaxKind::PLAIN]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let input = cx.input;
         let mut diagnostics = Vec::new();
 
-        for node in tree.descendants() {
-            if !matches!(node.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN) {
-                continue;
-            }
+        for node in cx
+            .nodes(SyntaxKind::PARAGRAPH)
+            .iter()
+            .chain(cx.nodes(SyntaxKind::PLAIN).iter())
+        {
             for elem in node.descendants_with_tokens() {
                 let Some(token) = elem.into_token() else {
                     continue;
@@ -175,7 +174,7 @@ mod tests {
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config::default();
         let tree = crate::parser::parse(input, Some(config.clone()));
-        StrayFencedDivMarkersRule.check(&tree, input, &config, None)
+        StrayFencedDivMarkersRule.check_tree(&tree, input, &config, None)
     }
 
     #[test]

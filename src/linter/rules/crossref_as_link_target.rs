@@ -1,7 +1,6 @@
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Edit, Fix, Location};
-use crate::linter::rules::Rule;
-use crate::syntax::{ImageLink, Link, LinkDest, SyntaxNode};
+use crate::linter::rules::{LintContext, Rule};
+use crate::syntax::{ImageLink, Link, LinkDest, SyntaxKind};
 use rowan::ast::AstNode;
 use rowan::{TextRange, TextSize};
 
@@ -12,22 +11,31 @@ impl Rule for CrossrefAsLinkTargetRule {
         "crossref-as-link-target"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        _config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::LINK, SyntaxKind::IMAGE_LINK]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let input = cx.input;
         let mut diagnostics = Vec::new();
 
-        for link in tree.descendants().filter_map(Link::cast) {
+        for link in cx
+            .nodes(SyntaxKind::LINK)
+            .iter()
+            .cloned()
+            .filter_map(Link::cast)
+        {
             if let Some(dest) = link.dest() {
                 push_if_at_target(&dest, input, &mut diagnostics);
             }
         }
 
-        for image in tree.descendants().filter_map(ImageLink::cast) {
+        for image in cx
+            .nodes(SyntaxKind::IMAGE_LINK)
+            .iter()
+            .cloned()
+            .filter_map(ImageLink::cast)
+        {
             if let Some(dest) = image.dest() {
                 push_if_at_target(&dest, input, &mut diagnostics);
             }
@@ -88,7 +96,7 @@ mod tests {
         let config = pandoc_config();
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = CrossrefAsLinkTargetRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]

@@ -1,11 +1,9 @@
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::Rule;
+use crate::linter::rules::{LintContext, Rule};
 use crate::metadata::{
     bibliography_range_map, format_bibliography_load_error, inline_bib_conflicts,
     inline_reference_contains, inline_reference_duplicates,
 };
-use crate::syntax::SyntaxNode;
 
 pub struct CitationKeysRule;
 
@@ -14,13 +12,8 @@ impl Rule for CitationKeysRule {
         "citation-keys"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        config: &Config,
-        metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let (tree, input, config, metadata) = (cx.tree, cx.input, cx.config, cx.metadata);
         if !config.extensions.citations {
             return Vec::new();
         }
@@ -154,9 +147,9 @@ mod tests {
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = CitationKeysRule;
         if let Some(metadata) = metadata {
-            return rule.check(&tree, input, &config, Some(&metadata));
+            return rule.check_tree(&tree, input, &config, Some(&metadata));
         }
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]
@@ -298,7 +291,7 @@ mod tests {
             raw_yaml: String::new(),
         };
 
-        let diagnostics = rule.check(&tree, input, &config, Some(&metadata));
+        let diagnostics = rule.check_tree(&tree, input, &config, Some(&metadata));
         assert!(diagnostics.is_empty());
     }
 
@@ -331,7 +324,7 @@ mod tests {
             raw_yaml: String::new(),
         };
 
-        let diagnostics = rule.check(&tree, input, &config, Some(&metadata));
+        let diagnostics = rule.check_tree(&tree, input, &config, Some(&metadata));
         assert!(diagnostics.is_empty());
     }
 }

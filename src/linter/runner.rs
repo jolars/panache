@@ -1,5 +1,6 @@
+use std::collections::HashSet;
+
 use crate::config::Config;
-use crate::directives::DirectiveTracker;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::linter::code_block_collector::concatenate_with_blanks_and_mapping;
 use crate::linter::diagnostics::Diagnostic;
@@ -9,8 +10,10 @@ use crate::linter::external_linters::ExternalLinterRegistry;
 use crate::linter::external_linters::run_linter;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::linter::external_linters::{find_missing_linter_commands, log_missing_linter_commands};
+use crate::linter::index::LintIndex;
+use crate::linter::rules::LintContext;
 use crate::linter::rules::RuleRegistry;
-use crate::syntax::SyntaxNode;
+use crate::syntax::{SyntaxKind, SyntaxNode};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::utils::collect_code_blocks;
 
@@ -33,60 +36,6 @@ impl LintRunner {
         self.run_with_metadata(tree, input, config, None)
     }
 
-    /// Build a list of text ranges that should be ignored for linting.
-    fn build_ignored_ranges(&self, tree: &SyntaxNode) -> Vec<(usize, usize)> {
-        use crate::directives::extract_directive_from_node;
-
-        let mut tracker = DirectiveTracker::new();
-        let mut ignored_ranges = Vec::new();
-        let mut current_ignore_start: Option<usize> = None;
-
-        // Walk the tree and track ignore regions
-        for node in tree.preorder() {
-            let node = match node {
-                rowan::WalkEvent::Enter(n) => n,
-                rowan::WalkEvent::Leave(_) => continue,
-            };
-
-            // Check for directive comments
-            if let Some(directive) = extract_directive_from_node(&node) {
-                tracker.process_directive(&directive);
-
-                // Track when we enter/exit ignore regions
-                if matches!(directive, crate::directives::Directive::Start(_))
-                    && tracker.is_linting_ignored()
-                    && current_ignore_start.is_none()
-                {
-                    let start: usize = node.text_range().end().into();
-                    current_ignore_start = Some(start);
-                    log::debug!("Ignore region starts at byte {}", start);
-                } else if matches!(directive, crate::directives::Directive::End(_))
-                    && !tracker.is_linting_ignored()
-                    && let Some(start) = current_ignore_start
-                {
-                    let end: usize = node.text_range().start().into();
-                    log::debug!(
-                        "Ignore region ends at byte {}, adding range ({}, {})",
-                        end,
-                        start,
-                        end
-                    );
-                    ignored_ranges.push((start, end));
-                    current_ignore_start = None;
-                }
-            }
-        }
-
-        // Handle unclosed ignore region (extends to end of document)
-        if let Some(start) = current_ignore_start {
-            log::debug!("Unclosed ignore region from byte {}", start);
-            ignored_ranges.push((start, usize::MAX));
-        }
-
-        log::debug!("Total ignored ranges: {:?}", ignored_ranges);
-        ignored_ranges
-    }
-
     pub fn run_with_metadata(
         &self,
         tree: &SyntaxNode,
@@ -96,13 +45,30 @@ impl LintRunner {
     ) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
 
-        // Build map of ignored ranges
-        let ignored_ranges = self.build_ignored_ranges(tree);
+        // One shared walk for every registered rule: bucket the nodes/tokens
+        // they collectively care about (and compute ignore regions in the same
+        // pass) instead of each rule re-walking the whole tree.
+        let mut want_kinds: HashSet<SyntaxKind> = HashSet::new();
+        let mut want_tokens = false;
+        for rule in self.registry.rules() {
+            want_kinds.extend(rule.node_interests().iter().copied());
+            want_tokens |= rule.wants_text_tokens();
+        }
+        let index = LintIndex::build(tree, &want_kinds, want_tokens);
+        let ignored_ranges = index.ignored_ranges();
+
+        let cx = LintContext {
+            tree,
+            input,
+            config,
+            metadata,
+            index: &index,
+        };
 
         // Run built-in rules
         for rule in self.registry.rules() {
             log::debug!("Running lint rule: {}", rule.name());
-            let rule_diagnostics = rule.check(tree, input, config, metadata);
+            let rule_diagnostics = rule.check(&cx);
             log::debug!(
                 "Rule {} found {} diagnostic(s)",
                 rule.name(),

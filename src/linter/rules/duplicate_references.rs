@@ -1,6 +1,5 @@
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::Rule;
+use crate::linter::rules::{LintContext, Rule};
 use crate::syntax::SyntaxNode;
 
 pub struct DuplicateReferencesRule;
@@ -10,13 +9,8 @@ impl Rule for DuplicateReferencesRule {
         "duplicate-reference-labels"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        _config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let (tree, input) = (cx.tree, cx.input);
         let mut diagnostics = Vec::new();
 
         // Check for duplicate reference definitions
@@ -196,7 +190,7 @@ mod tests {
         let tree = crate::parser::parse(input, Some(config.clone()));
 
         let rule = DuplicateReferencesRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]
@@ -337,7 +331,7 @@ plot(1:10)
         };
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = DuplicateReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "duplicate-reference-labels");
         assert!(diagnostics[0].message.contains("fig-plot"));
@@ -364,7 +358,7 @@ plot(1:10)
         };
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = DuplicateReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert_eq!(diagnostics.len(), 0);
     }
 
@@ -385,7 +379,7 @@ A reference to [Heading](#EM).
         };
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = DuplicateReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert_eq!(diagnostics.len(), 0);
     }
 
@@ -404,7 +398,7 @@ A reference to [Heading](#EM).
         };
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = DuplicateReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert_eq!(diagnostics.len(), 0);
     }
 }

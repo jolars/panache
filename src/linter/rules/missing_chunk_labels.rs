@@ -1,7 +1,7 @@
-use crate::config::{Config, Flavor};
+use crate::config::Flavor;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, CodeBlock, SyntaxNode};
+use crate::linter::rules::{LintContext, Rule};
+use crate::syntax::{AstNode, CodeBlock, SyntaxKind};
 
 pub struct MissingChunkLabelsRule;
 
@@ -10,19 +10,23 @@ impl Rule for MissingChunkLabelsRule {
         "missing-chunk-labels"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
-        if !matches!(config.flavor, Flavor::Quarto | Flavor::RMarkdown) {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::CODE_BLOCK]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        if !matches!(cx.config.flavor, Flavor::Quarto | Flavor::RMarkdown) {
             return Vec::new();
         }
+        let input = cx.input;
 
         let mut diagnostics = Vec::new();
-        for code_block in tree.descendants().filter_map(CodeBlock::cast) {
+        for code_block in cx
+            .nodes(SyntaxKind::CODE_BLOCK)
+            .iter()
+            .cloned()
+            .filter_map(CodeBlock::cast)
+        {
             if !code_block.is_executable_chunk() {
                 continue;
             }
@@ -49,6 +53,7 @@ impl Rule for MissingChunkLabelsRule {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
 
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config {
@@ -58,7 +63,7 @@ mod tests {
         };
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = MissingChunkLabelsRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]

@@ -1,6 +1,5 @@
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Location};
-use crate::linter::rules::Rule;
+use crate::linter::rules::{LintContext, Rule};
 use crate::syntax::{Heading, InlineHtml, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
@@ -12,16 +11,20 @@ impl Rule for HeadingEatenAttrsRule {
         "heading-eaten-attrs"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        _config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::HEADING]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let input = cx.input;
         let mut diagnostics = Vec::new();
 
-        for heading in tree.descendants().filter_map(Heading::cast) {
+        for heading in cx
+            .nodes(SyntaxKind::HEADING)
+            .iter()
+            .cloned()
+            .filter_map(Heading::cast)
+        {
             let content = match heading.content() {
                 Some(c) => c,
                 None => continue,
@@ -105,7 +108,7 @@ mod tests {
     fn lint(input: &str) -> Vec<Diagnostic> {
         let config = Config::default();
         let tree = crate::parser::parse(input, Some(config.clone()));
-        HeadingEatenAttrsRule.check(&tree, input, &config, None)
+        HeadingEatenAttrsRule.check_tree(&tree, input, &config, None)
     }
 
     #[test]

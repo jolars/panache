@@ -1,7 +1,7 @@
-use crate::config::{Config, Flavor};
+use crate::config::Flavor;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, ChunkOptionEntry, CodeBlock, Crossref, SyntaxNode};
+use crate::linter::rules::{LintContext, Rule};
+use crate::syntax::{AstNode, ChunkOptionEntry, CodeBlock, Crossref, SyntaxKind, SyntaxNode};
 use crate::utils::{crossref_resolution_labels, normalize_anchor_label, normalize_label};
 use std::collections::HashMap;
 
@@ -12,21 +12,25 @@ impl Rule for FigureCrossrefCaptionsRule {
         "figure-crossref-captions"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
-        if !matches!(config.flavor, Flavor::Quarto | Flavor::RMarkdown) {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::CODE_BLOCK, SyntaxKind::CROSSREF]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        if !matches!(cx.config.flavor, Flavor::Quarto | Flavor::RMarkdown) {
             return Vec::new();
         }
+        let (input, config) = (cx.input, cx.config);
 
-        let chunk_labels = collect_chunk_figure_caption_state(tree);
+        let chunk_labels = collect_chunk_figure_caption_state(cx.nodes(SyntaxKind::CODE_BLOCK));
         let mut diagnostics = Vec::new();
 
-        for crossref in tree.descendants().filter_map(Crossref::cast) {
+        for crossref in cx
+            .nodes(SyntaxKind::CROSSREF)
+            .iter()
+            .cloned()
+            .filter_map(Crossref::cast)
+        {
             for key in crossref.keys() {
                 let label = key.text();
                 let normalized = normalize_anchor_label(&label);
@@ -63,10 +67,10 @@ impl Rule for FigureCrossrefCaptionsRule {
     }
 }
 
-fn collect_chunk_figure_caption_state(tree: &SyntaxNode) -> HashMap<String, bool> {
+fn collect_chunk_figure_caption_state(code_blocks: &[SyntaxNode]) -> HashMap<String, bool> {
     let mut out = HashMap::new();
 
-    for code_block in tree.descendants().filter_map(CodeBlock::cast) {
+    for code_block in code_blocks.iter().cloned().filter_map(CodeBlock::cast) {
         let labels: Vec<String> = code_block
             .chunk_label_entries()
             .into_iter()
@@ -100,6 +104,7 @@ fn is_bookdown_figure_crossref(label: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
 
     fn parse_and_lint(input: &str, flavor: Flavor) -> Vec<Diagnostic> {
         let mut config = Config {
@@ -109,7 +114,7 @@ mod tests {
         config.extensions = crate::config::Extensions::for_flavor(flavor);
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = FigureCrossrefCaptionsRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]

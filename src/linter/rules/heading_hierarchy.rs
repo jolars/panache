@@ -1,6 +1,5 @@
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Edit, Fix, Location};
-use crate::linter::rules::Rule;
+use crate::linter::rules::{LintContext, Rule};
 use crate::syntax::{Heading, SyntaxNode};
 use rowan::ast::AstNode;
 
@@ -11,13 +10,8 @@ impl Rule for HeadingHierarchyRule {
         "heading-hierarchy"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let (tree, input, config) = (cx.tree, cx.input, cx.config);
         let mut diagnostics = Vec::new();
         let headings = collect_headings(tree, &config.extensions);
 
@@ -107,7 +101,7 @@ mod tests {
         let tree = crate::parser::parse(input, Some(config.clone()));
 
         let rule = HeadingHierarchyRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]

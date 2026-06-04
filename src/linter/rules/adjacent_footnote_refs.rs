@@ -1,9 +1,8 @@
 use rowan::{NodeOrToken, TextRange};
 
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Edit, Fix, Location};
-use crate::linter::rules::Rule;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::linter::rules::{LintContext, Rule};
+use crate::syntax::SyntaxKind;
 
 pub struct AdjacentFootnoteRefsRule;
 
@@ -12,19 +11,15 @@ impl Rule for AdjacentFootnoteRefsRule {
         "adjacent-footnote-refs"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        _config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::FOOTNOTE_REFERENCE]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let input = cx.input;
         let mut diagnostics = Vec::new();
 
-        for node in tree.descendants() {
-            if node.kind() != SyntaxKind::FOOTNOTE_REFERENCE {
-                continue;
-            }
+        for node in cx.nodes(SyntaxKind::FOOTNOTE_REFERENCE) {
             let Some(prev) = node.prev_sibling_or_token() else {
                 continue;
             };
@@ -63,11 +58,12 @@ impl Rule for AdjacentFootnoteRefsRule {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
 
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config::default();
         let tree = crate::parser::parse(input, Some(config.clone()));
-        AdjacentFootnoteRefsRule.check(&tree, input, &config, None)
+        AdjacentFootnoteRefsRule.check_tree(&tree, input, &config, None)
     }
 
     #[test]

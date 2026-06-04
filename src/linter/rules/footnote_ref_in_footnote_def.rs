@@ -1,9 +1,8 @@
 use rowan::TextRange;
 
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Location};
-use crate::linter::rules::Rule;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::linter::rules::{LintContext, Rule};
+use crate::syntax::SyntaxKind;
 
 pub struct FootnoteRefInFootnoteDefRule;
 
@@ -12,20 +11,15 @@ impl Rule for FootnoteRefInFootnoteDefRule {
         "footnote-ref-in-footnote-def"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        _config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::FOOTNOTE_DEFINITION]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let input = cx.input;
         let mut diagnostics = Vec::new();
 
-        for def in tree.descendants() {
-            if def.kind() != SyntaxKind::FOOTNOTE_DEFINITION {
-                continue;
-            }
-
+        for def in cx.nodes(SyntaxKind::FOOTNOTE_DEFINITION) {
             // Walk every TEXT token under this definition and scan for
             // `[^id]` shapes. Iterating TEXT tokens (not the raw byte range)
             // naturally excludes inline code spans, math, raw HTML, etc. —
@@ -121,7 +115,7 @@ mod tests {
             ..Config::default()
         };
         let tree = crate::parser::parse(input, Some(config.clone()));
-        FootnoteRefInFootnoteDefRule.check(&tree, input, &config, None)
+        FootnoteRefInFootnoteDefRule.check_tree(&tree, input, &config, None)
     }
 
     #[test]

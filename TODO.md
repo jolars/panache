@@ -25,12 +25,19 @@ This document tracks implementation status for Panache's features.
       a 200ms-debounced built-in lint; external linters (jarl, ruff, ...) run on
       `did_save`. Fixed format-on-save stalling behind a per-keystroke lint
       convoy on large docs (\~1.5s to \~0.11s round-trip).
-- [ ] Share a single CST pre-order walk across the \~30 built-in lint rules.
-      Each rule currently walks the tree independently (\~15% of the post-fix
-      \~118ms `built_in_lint_plan` on a 73KB chapter is rowan `Preorder`
-      iteration across rules + `symbol_usage_index`). A shared walk that
-      dispatches nodes to interested rules would cut this. Linter-architecture
-      change; measure against the lint-plan harness before/after.
+- [x] Share a single CST pre-order walk across the built-in lint rules. Done for
+      the rule corpus: rules declare `node_interests()`/`wants_text_tokens()`
+      and the runner builds one `LintIndex` (`src/linter/index.rs`) bucketing
+      nodes by `SyntaxKind` (and folding in ignore-range tracking), so each rule
+      reads `cx.nodes(KIND)` instead of `tree.descendants()`. Measured via
+      `examples/profile_lint.rs`: `pandoc_manual.md` 53.9ms → 47.9ms (-11%),
+      `large_authoring.qmd` (Quarto) 3.53ms → 2.98ms (-16%), diagnostics
+      unchanged.
+- [ ] Follow-up: fold `symbol_usage_index_from_tree`'s \~12 internal
+      `tree.descendants()` walks (`src/salsa.rs`) into one dispatching walk too
+      --- the other named component of the old `Preorder` cost. Keep
+      `SymbolUsageIndex`'s value-equality semantics byte-identical (salsa
+      short-circuiting depends on it).
 - [ ] Honor `experimental.incrementalParsing` from `settings` /
       `workspace/didChangeConfiguration`, not just initialize
       `initializationOptions`. Editors that send it via `settings` (observed in

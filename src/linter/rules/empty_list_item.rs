@@ -1,6 +1,5 @@
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::Rule;
+use crate::linter::rules::{LintContext, Rule};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
@@ -11,21 +10,16 @@ impl Rule for EmptyListItemRule {
         "empty-list-item"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        _config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::LIST_ITEM]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let input = cx.input;
         let mut diagnostics = Vec::new();
 
-        for node in tree.descendants() {
-            if node.kind() != SyntaxKind::LIST_ITEM {
-                continue;
-            }
-
-            if let Some(diag) = classify(&node, input) {
+        for node in cx.nodes(SyntaxKind::LIST_ITEM) {
+            if let Some(diag) = classify(node, input) {
                 diagnostics.push(diag);
             }
         }
@@ -133,11 +127,12 @@ fn setext_dash_underline_only_content(list_item: &SyntaxNode) -> Option<SyntaxNo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
 
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config::default();
         let tree = crate::parser::parse(input, Some(config.clone()));
-        EmptyListItemRule.check(&tree, input, &config, None)
+        EmptyListItemRule.check_tree(&tree, input, &config, None)
     }
 
     #[test]

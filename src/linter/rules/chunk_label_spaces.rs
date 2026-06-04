@@ -1,7 +1,6 @@
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, ChunkInfoItem, ChunkLabel, ChunkLabelSource, CodeBlock, SyntaxNode};
+use crate::linter::rules::{LintContext, Rule};
+use crate::syntax::{AstNode, ChunkInfoItem, ChunkLabel, ChunkLabelSource, CodeBlock, SyntaxKind};
 
 pub struct ChunkLabelSpacesRule;
 
@@ -10,16 +9,20 @@ impl Rule for ChunkLabelSpacesRule {
         "chunk-label-spaces"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        _config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::CODE_BLOCK]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let input = cx.input;
         let mut diagnostics = Vec::new();
 
-        for block in tree.descendants().filter_map(CodeBlock::cast) {
+        for block in cx
+            .nodes(SyntaxKind::CODE_BLOCK)
+            .iter()
+            .cloned()
+            .filter_map(CodeBlock::cast)
+        {
             diagnostics.extend(check_chunk_label_spaces(&block, input));
         }
 
@@ -103,7 +106,7 @@ fn check_implicit_label_spaces(block: &CodeBlock, input: &str) -> Vec<Diagnostic
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Flavor;
+    use crate::config::{Config, Flavor};
 
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config {
@@ -113,7 +116,7 @@ mod tests {
         };
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = ChunkLabelSpacesRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]

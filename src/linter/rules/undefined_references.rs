@@ -1,7 +1,9 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, Crossref, FootnoteReference, Link, SyntaxNode, UnresolvedReference};
+use crate::linter::rules::{LintContext, Rule};
+use crate::syntax::{
+    AstNode, Crossref, FootnoteReference, Link, SyntaxKind, SyntaxNode, UnresolvedReference,
+};
 use crate::utils::{
     crossref_resolution_labels, implicit_heading_ids, normalize_anchor_label, normalize_label,
 };
@@ -14,18 +16,27 @@ impl Rule for UndefinedReferencesRule {
         "undefined-references"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        config: &Config,
-        metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[
+            SyntaxKind::LINK,
+            SyntaxKind::UNRESOLVED_REFERENCE,
+            SyntaxKind::FOOTNOTE_REFERENCE,
+            SyntaxKind::CROSSREF,
+        ]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let (tree, input, config, metadata) = (cx.tree, cx.input, cx.config, cx.metadata);
         let mut diagnostics = Vec::new();
 
         let labels = collect_definition_labels(tree, config, metadata);
 
-        for link in tree.descendants().filter_map(Link::cast) {
+        for link in cx
+            .nodes(SyntaxKind::LINK)
+            .iter()
+            .cloned()
+            .filter_map(Link::cast)
+        {
             if link.dest().is_some() {
                 continue;
             }
@@ -53,7 +64,12 @@ impl Rule for UndefinedReferencesRule {
         // `crates/panache-parser/src/parser/inlines/inline_ir.rs`).
         // Image-shape variants (`![alt][missing]`) flow through the
         // same wrapper; flag them too.
-        for unresolved in tree.descendants().filter_map(UnresolvedReference::cast) {
+        for unresolved in cx
+            .nodes(SyntaxKind::UNRESOLVED_REFERENCE)
+            .iter()
+            .cloned()
+            .filter_map(UnresolvedReference::cast)
+        {
             let Some((label_text, location_node)) = extract_unresolved_label_and_node(&unresolved)
             else {
                 continue;
@@ -73,7 +89,12 @@ impl Rule for UndefinedReferencesRule {
             ));
         }
 
-        for footnote_ref in tree.descendants().filter_map(FootnoteReference::cast) {
+        for footnote_ref in cx
+            .nodes(SyntaxKind::FOOTNOTE_REFERENCE)
+            .iter()
+            .cloned()
+            .filter_map(FootnoteReference::cast)
+        {
             let id = footnote_ref.id();
             let normalized = normalize_label(&id);
             if normalized.is_empty() || labels.footnote_ids.contains(&normalized) {
@@ -87,7 +108,12 @@ impl Rule for UndefinedReferencesRule {
             ));
         }
 
-        for crossref in tree.descendants().filter_map(Crossref::cast) {
+        for crossref in cx
+            .nodes(SyntaxKind::CROSSREF)
+            .iter()
+            .cloned()
+            .filter_map(Crossref::cast)
+        {
             for key in crossref.keys() {
                 let label = key.text();
                 let normalized = normalize_anchor_label(&label);
@@ -257,7 +283,7 @@ mod tests {
         let config = Config::default();
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]
@@ -300,7 +326,7 @@ mod tests {
         config.extensions.auto_identifiers = false;
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "undefined-reference-label");
     }
@@ -318,7 +344,7 @@ mod tests {
         config.extensions.quarto_crossrefs = true;
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert!(
             diagnostics
                 .iter()
@@ -341,7 +367,7 @@ mod tests {
         config.extensions.quarto_crossrefs = true;
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert!(
             diagnostics
                 .iter()
@@ -362,7 +388,7 @@ mod tests {
         config.extensions.quarto_crossrefs = true;
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert!(diagnostics.is_empty());
     }
 
@@ -377,7 +403,7 @@ mod tests {
         config.extensions.quarto_crossrefs = true;
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "undefined-reference-label");
         assert!(diagnostics[0].message.contains("@fig-missing"));
@@ -394,7 +420,7 @@ mod tests {
         config.extensions.bookdown_references = true;
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert!(diagnostics.is_empty());
     }
 
@@ -412,7 +438,7 @@ mod tests {
         config.extensions.bookdown_references = true;
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert!(
             diagnostics.is_empty(),
             "tab:moth-phenotype should resolve via the table caption's (\\#tab:moth-phenotype) declaration, got: {:?}",
@@ -431,7 +457,7 @@ mod tests {
         config.extensions.bookdown_references = true;
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert!(diagnostics.is_empty());
     }
 
@@ -448,7 +474,7 @@ mod tests {
         config.extensions.bookdown_equation_references = true;
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert!(diagnostics.is_empty());
     }
 
@@ -463,7 +489,7 @@ mod tests {
         config.extensions.bookdown_references = true;
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
-        let diagnostics = rule.check(&tree, input, &config, None);
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
         assert!(diagnostics.is_empty());
     }
 
@@ -492,7 +518,7 @@ mod tests {
         let metadata = crate::metadata::extract_project_metadata(&tree, &root.join("2-two.Rmd"))
             .expect("metadata");
         let rule = UndefinedReferencesRule;
-        let diagnostics = rule.check(&tree, &input, &config, Some(&metadata));
+        let diagnostics = rule.check_tree(&tree, &input, &config, Some(&metadata));
         assert!(
             diagnostics
                 .iter()

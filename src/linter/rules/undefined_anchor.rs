@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::Rule;
-use crate::syntax::{AttributeNode, Citation, Link, SyntaxNode};
+use crate::linter::rules::{LintContext, Rule};
+use crate::syntax::{AttributeNode, Citation, Link, SyntaxKind, SyntaxNode};
 use crate::utils::implicit_heading_ids;
 use rowan::ast::AstNode;
 use std::collections::HashSet;
@@ -13,17 +13,21 @@ impl Rule for UndefinedAnchorRule {
         "undefined-anchor"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        config: &Config,
-        metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::LINK]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let (tree, input, config, metadata) = (cx.tree, cx.input, cx.config, cx.metadata);
         let anchors = collect_anchors(tree, config, metadata);
         let mut diagnostics = Vec::new();
 
-        for link in tree.descendants().filter_map(Link::cast) {
+        for link in cx
+            .nodes(SyntaxKind::LINK)
+            .iter()
+            .cloned()
+            .filter_map(Link::cast)
+        {
             let Some(dest) = link.dest() else {
                 continue;
             };
@@ -139,13 +143,13 @@ mod tests {
         let config = Config::default();
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedAnchorRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     fn parse_and_lint_with_config(input: &str, config: Config) -> Vec<Diagnostic> {
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedAnchorRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]
@@ -396,7 +400,7 @@ mod tests {
         let tree = crate::parser::parse(&input, Some(config.clone()));
         let metadata = crate::metadata::extract_project_metadata(&tree, &path).expect("metadata");
         let rule = UndefinedAnchorRule;
-        let diagnostics = rule.check(&tree, &input, &config, Some(&metadata));
+        let diagnostics = rule.check_tree(&tree, &input, &config, Some(&metadata));
         assert!(
             diagnostics.iter().all(|d| d.code != "undefined-anchor"),
             "cross-file anchor should resolve in bookdown projects: {:?}",
@@ -426,7 +430,7 @@ mod tests {
         let tree = crate::parser::parse(&input, Some(config.clone()));
         let metadata = crate::metadata::extract_project_metadata(&tree, &path).expect("metadata");
         let rule = UndefinedAnchorRule;
-        let diagnostics = rule.check(&tree, &input, &config, Some(&metadata));
+        let diagnostics = rule.check_tree(&tree, &input, &config, Some(&metadata));
         assert_eq!(diagnostics.len(), 1, "got {:?}", diagnostics);
         assert_eq!(diagnostics[0].code, "undefined-anchor");
     }

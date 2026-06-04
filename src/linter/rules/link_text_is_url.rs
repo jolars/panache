@@ -1,9 +1,8 @@
 use rowan::ast::AstNode;
 
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Edit, Fix, Location};
-use crate::linter::rules::Rule;
-use crate::syntax::{Link, SyntaxNode};
+use crate::linter::rules::{LintContext, Rule};
+use crate::syntax::{Link, SyntaxKind};
 
 pub struct LinkTextIsUrlRule;
 
@@ -12,21 +11,22 @@ impl Rule for LinkTextIsUrlRule {
         "link-text-is-url"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
-        let is_commonmark = panache_parser::Dialect::for_flavor(config.flavor)
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::LINK]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let input = cx.input;
+        let is_commonmark = panache_parser::Dialect::for_flavor(cx.config.flavor)
             == panache_parser::Dialect::CommonMark;
         let mut diagnostics = Vec::new();
 
-        for node in tree.descendants() {
-            let Some(link) = Link::cast(node) else {
-                continue;
-            };
+        for link in cx
+            .nodes(SyntaxKind::LINK)
+            .iter()
+            .cloned()
+            .filter_map(Link::cast)
+        {
             // Skip reference-style links: this rule is only about inline `[text](url)`.
             if link.reference().is_some() {
                 continue;
@@ -108,12 +108,13 @@ fn split_url_and_title(body: &str) -> Option<(String, bool)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
 
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config::default();
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = LinkTextIsUrlRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]
@@ -176,7 +177,7 @@ mod tests {
         config.extensions = panache_parser::Extensions::for_flavor(config.flavor);
         let input = "[mailto:a@b.com](mailto:a@b.com)\n";
         let tree = crate::parser::parse(input, Some(config.clone()));
-        let diagnostics = LinkTextIsUrlRule.check(&tree, input, &config, None);
+        let diagnostics = LinkTextIsUrlRule.check_tree(&tree, input, &config, None);
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(
             diagnostics[0].fix.as_ref().unwrap().edits[0].replacement,

@@ -61,7 +61,11 @@ info), regardless of whether it ships with an auto-fix.
 3. **Write a failing test first** (TDD per `AGENTS.md`). Either:
    - a unit test inside the new module under `#[cfg(test)] mod tests`, using
      `crate::parser::parse(input, Some(config.clone()))` and calling
-     `Rule::check` directly, **or**
+     `Rule::check_tree(&tree, input, &config, metadata)`. `check_tree` is the
+     default trait method that builds a one-off `LintIndex` for just this
+     rule's declared interests and runs it — tests use it because `Rule::check`
+     itself takes a `&LintContext`, which the runner (not tests) constructs.
+     **or**
    - an integration fixture under `tests/linting/<rule_name>.{md,qmd,Rmd}` and
      a `#[test]` in `tests/linting.rs` that calls `lint_file(...)` and filters
      by `d.code == "<rule-name>"`.
@@ -69,26 +73,38 @@ info), regardless of whether it ships with an auto-fix.
    edge case the rule explicitly handles.
 
 4. **Implement the rule** in `src/linter/rules/<rule_name>.rs`:
-   - Walk via `tree.descendants()` and match on `SyntaxKind` for raw kinds, or
-     cast to typed wrappers (`Heading::cast(node)`, `FootnoteReference::cast`,
-     etc.) when available — typed wrappers are preferred wherever they exist.
+   - Rules do **not** walk the tree themselves. The runner does one shared
+     `tree.preorder_with_tokens()` pass and buckets nodes by `SyntaxKind`;
+     declare which kinds you want via `node_interests()` and read your bucket
+     with `cx.nodes(KIND)` instead of `tree.descendants()`. This keeps a lint
+     pass at one traversal no matter how many rules exist.
+   - Cast bucket nodes to typed wrappers where available
+     (`cx.nodes(SyntaxKind::LINK).iter().cloned().filter_map(Link::cast)`) —
+     typed wrappers are preferred wherever they exist. For multi-kind rules,
+     list every kind in `node_interests()` and iterate each bucket.
+   - To scan `TEXT` tokens (e.g. byte-pattern checks), return `true` from
+     `wants_text_tokens()` and iterate `cx.text_tokens()`.
+   - Salsa-index-backed rules (those that use
+     `symbol_usage_index_from_tree(.., cx.tree, ..)` and never read a bucket)
+     leave `node_interests()` at its empty default.
    - Build `Location` with `Location::from_range(range, input)` or
-     `Location::from_node(&node, input)`.
+     `Location::from_node(node, input)`.
    - For auto-fixes, prefer **insertions** (zero-width `TextRange::new(p, p)`)
      and **replacements over a precise span** rather than rewriting whole
      nodes. Multi-edit fixes are allowed but must be independent — they are
      applied in source order.
-   - Honor the trait signature exactly:
+   - Honor the trait shape exactly. Declare interests, then take a
+     `&LintContext` (which bundles `tree`/`input`/`config`/`metadata`/`index`):
      ```rust
-     fn check(
-         &self,
-         tree: &SyntaxNode,
-         input: &str,
-         config: &Config,
-         metadata: Option<&crate::metadata::DocumentMetadata>,
-     ) -> Vec<Diagnostic>
+     fn node_interests(&self) -> &'static [SyntaxKind] {
+         &[SyntaxKind::LINK] // omit (defaults to &[]) for index-backed rules
+     }
+
+     fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+         let input = cx.input; // also cx.tree / cx.config / cx.metadata as needed
+         // ... iterate cx.nodes(SyntaxKind::LINK) ...
+     }
      ```
-     Even unused params should keep their names (`_config`, `_metadata`).
 
 5. **Wire it up:**
    - Add `pub mod <rule_name>;` to `src/linter/rules.rs` (alphabetical, with

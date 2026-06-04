@@ -1,7 +1,6 @@
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::Rule;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::linter::rules::{LintContext, Rule};
+use crate::syntax::SyntaxKind;
 
 pub struct EmojiAliasesRule;
 
@@ -10,23 +9,19 @@ impl Rule for EmojiAliasesRule {
         "unknown-emoji-alias"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
-        if !config.extensions.emoji {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::EMOJI]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        if !cx.config.extensions.emoji {
             return Vec::new();
         }
+        let input = cx.input;
 
         let mut diagnostics = Vec::new();
 
-        for node in tree
-            .descendants()
-            .filter(|node| node.kind() == SyntaxKind::EMOJI)
-        {
+        for node in cx.nodes(SyntaxKind::EMOJI) {
             let raw = node.to_string();
             let Some(alias) = raw.strip_prefix(':').and_then(|s| s.strip_suffix(':')) else {
                 continue;
@@ -34,7 +29,7 @@ impl Rule for EmojiAliasesRule {
 
             if emojis::get_by_shortcode(alias).is_none() {
                 diagnostics.push(Diagnostic::warning(
-                    Location::from_node(&node, input),
+                    Location::from_node(node, input),
                     "unknown-emoji-alias",
                     format!("Unknown emoji alias '{}'", raw),
                 ));
@@ -48,13 +43,14 @@ impl Rule for EmojiAliasesRule {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
 
     fn parse_and_lint(input: &str, emoji_enabled: bool) -> Vec<Diagnostic> {
         let mut config = Config::default();
         config.extensions.emoji = emoji_enabled;
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = EmojiAliasesRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]

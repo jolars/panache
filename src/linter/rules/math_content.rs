@@ -21,9 +21,8 @@
 
 use rowan::TextRange;
 
-use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::Rule;
+use crate::linter::rules::{LintContext, Rule};
 use crate::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
 
 pub struct MathContentRule;
@@ -33,20 +32,16 @@ impl Rule for MathContentRule {
         "math-syntax"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        _config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[SyntaxKind::MATH_CONTENT]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let input = cx.input;
         let mut out = Vec::new();
         // Bound the walk to math subtrees: every malformed-math token lives under
         // a `MATH_CONTENT` node.
-        for content in tree
-            .descendants()
-            .filter(|n| n.kind() == SyntaxKind::MATH_CONTENT)
-        {
+        for content in cx.nodes(SyntaxKind::MATH_CONTENT) {
             for node in content.descendants() {
                 match node.kind() {
                     SyntaxKind::MATH_GROUP => check_unclosed_group(&node, input, &mut out),
@@ -186,6 +181,7 @@ fn err(range: TextRange, code: &'static str, message: &'static str, input: &str)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
 
     /// Lint with the `tex_math_dollars` extension on — the default `Config` is
     /// plain Markdown and would emit no math nodes at all.
@@ -193,7 +189,7 @@ mod tests {
         let mut config = Config::default();
         config.extensions.tex_math_dollars = true;
         let tree = crate::parser::parse(input, Some(config.clone()));
-        MathContentRule.check(&tree, input, &config, None)
+        MathContentRule.check_tree(&tree, input, &config, None)
     }
 
     fn codes(diags: &[Diagnostic]) -> Vec<&str> {
@@ -252,7 +248,7 @@ mod tests {
         let config = Config::default();
         let input = "# Heading\n\nText with `\\end{x}` in a code span.\n";
         let tree = crate::parser::parse(input, Some(config.clone()));
-        let diags = MathContentRule.check(&tree, input, &config, None);
+        let diags = MathContentRule.check_tree(&tree, input, &config, None);
         assert!(diags.is_empty());
     }
 

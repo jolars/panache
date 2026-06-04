@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::Rule;
+use crate::linter::rules::{LintContext, Rule};
 use crate::syntax::{
     AstNode, FootnoteReference, ImageLink, Link, SyntaxKind, SyntaxNode, UnresolvedReference,
 };
@@ -16,16 +16,27 @@ impl Rule for UnusedDefinitionsRule {
         "unused-definitions"
     }
 
-    fn check(
-        &self,
-        tree: &SyntaxNode,
-        input: &str,
-        config: &Config,
-        metadata: Option<&crate::metadata::DocumentMetadata>,
-    ) -> Vec<Diagnostic> {
+    fn node_interests(&self) -> &'static [SyntaxKind] {
+        &[
+            SyntaxKind::LINK,
+            SyntaxKind::IMAGE_LINK,
+            SyntaxKind::UNRESOLVED_REFERENCE,
+            SyntaxKind::FOOTNOTE_REFERENCE,
+        ]
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        let (tree, input, config, metadata) = (cx.tree, cx.input, cx.config, cx.metadata);
         let db = crate::salsa::SalsaDb::default();
         let index = crate::salsa::symbol_usage_index_from_tree(&db, tree, &config.extensions);
-        let mut used = collect_usage_labels(tree);
+        let mut used = collect_usage_labels(
+            cx.nodes(SyntaxKind::LINK)
+                .iter()
+                .chain(cx.nodes(SyntaxKind::IMAGE_LINK).iter())
+                .chain(cx.nodes(SyntaxKind::UNRESOLVED_REFERENCE).iter())
+                .chain(cx.nodes(SyntaxKind::FOOTNOTE_REFERENCE).iter())
+                .cloned(),
+        );
 
         if let Some(metadata) = metadata {
             extend_usage_labels_from_project(&mut used, metadata, config);
@@ -68,101 +79,116 @@ struct UsageLabels {
     footnote_ids: HashSet<String>,
 }
 
-fn collect_usage_labels(tree: &SyntaxNode) -> UsageLabels {
-    let mut reference_labels: HashSet<String> = tree
-        .descendants()
-        .filter_map(Link::cast)
-        .filter_map(|link| {
-            if link
-                .syntax()
-                .ancestors()
-                .any(|ancestor| ancestor.kind() == SyntaxKind::REFERENCE_DEFINITION)
-            {
-                return None;
-            }
-            if link.dest().is_some() {
-                return None;
-            }
-            if let Some(link_ref) = link.reference() {
-                let label = normalize_label(&link_ref.label());
-                if !label.is_empty() {
-                    return Some(label);
+/// Collect reference/footnote usage labels from a stream of candidate nodes.
+///
+/// Driven off pre-bucketed nodes for the local document (one shared walk) and
+/// off `other_tree.descendants()` for project sibling files; both feed the same
+/// per-node classifiers so the logic stays single-sourced.
+fn collect_usage_labels(nodes: impl Iterator<Item = SyntaxNode>) -> UsageLabels {
+    let mut reference_labels: HashSet<String> = HashSet::new();
+    let mut footnote_ids: HashSet<String> = HashSet::new();
+
+    for node in nodes {
+        match node.kind() {
+            SyntaxKind::LINK => {
+                if let Some(label) = Link::cast(node).and_then(usage_label_from_link) {
+                    reference_labels.insert(label);
                 }
             }
-            link.text()
-                .map(|text| normalize_label(&text.text_content()))
-        })
-        .filter(|label| !label.is_empty())
-        .collect();
-
-    // Reference-style images (`![alt][label]`, collapsed `![label][]`,
-    // shortcut `![label]`) resolve to `IMAGE_LINK` rather than `LINK`,
-    // so they count as usages of the label they reference too. Mirror
-    // the `Link` logic: skip inline images (they carry a destination,
-    // not a label) and fall back to the alt text for collapsed/shortcut
-    // shapes whose `LINK_REF` is empty or absent.
-    reference_labels.extend(
-        tree.descendants()
-            .filter_map(ImageLink::cast)
-            .filter_map(|image| {
-                if image
-                    .syntax()
-                    .ancestors()
-                    .any(|ancestor| ancestor.kind() == SyntaxKind::REFERENCE_DEFINITION)
+            // Reference-style images (`![alt][label]`, collapsed `![label][]`,
+            // shortcut `![label]`) resolve to `IMAGE_LINK` rather than `LINK`,
+            // so they count as usages of the label they reference too.
+            SyntaxKind::IMAGE_LINK => {
+                if let Some(label) = ImageLink::cast(node).and_then(usage_label_from_image) {
+                    reference_labels.insert(label);
+                }
+            }
+            // Bracket-shape patterns whose label didn't resolve as a refdef
+            // still count as a usage of the label they reference — so a
+            // `[GitHub]` shortcut counts as using the `[github]:` definition
+            // even if that definition lives in another file.
+            SyntaxKind::UNRESOLVED_REFERENCE => {
+                if let Some(label) =
+                    UnresolvedReference::cast(node).and_then(usage_label_from_unresolved)
                 {
-                    return None;
+                    reference_labels.insert(label);
                 }
-                if image.dest().is_some() {
-                    return None;
-                }
-                if let Some(link_ref) = image.reference() {
-                    let label = normalize_label(&link_ref.label());
-                    if !label.is_empty() {
-                        return Some(label);
+            }
+            SyntaxKind::FOOTNOTE_REFERENCE => {
+                if let Some(footnote) = FootnoteReference::cast(node) {
+                    let id = normalize_label(&footnote.id());
+                    if !id.is_empty() {
+                        footnote_ids.insert(id);
                     }
                 }
-                image
-                    .alt()
-                    .map(|alt| normalize_label(&alt.text()))
-                    .filter(|label| !label.is_empty())
-            }),
-    );
-
-    // Bracket-shape patterns whose label didn't resolve as a refdef
-    // still count as a usage of the label they reference — so a
-    // `[GitHub]` shortcut counts as using the `[github]:` definition
-    // even if that definition lives in another file (or hasn't been
-    // wired into the refdef set yet). The wrapper exposes both forms.
-    reference_labels.extend(
-        tree.descendants()
-            .filter_map(UnresolvedReference::cast)
-            .filter_map(|unresolved| {
-                if let Some(label) = unresolved.label() {
-                    let normalized = normalize_label(&label);
-                    if !normalized.is_empty() {
-                        return Some(normalized);
-                    }
-                }
-                let text = unresolved.text();
-                let normalized = normalize_label(&text);
-                if normalized.is_empty() {
-                    None
-                } else {
-                    Some(normalized)
-                }
-            }),
-    );
-
-    let footnote_ids = tree
-        .descendants()
-        .filter_map(FootnoteReference::cast)
-        .map(|footnote| normalize_label(&footnote.id()))
-        .filter(|id| !id.is_empty())
-        .collect();
+            }
+            _ => {}
+        }
+    }
 
     UsageLabels {
         reference_labels,
         footnote_ids,
+    }
+}
+
+fn usage_label_from_link(link: Link) -> Option<String> {
+    if link
+        .syntax()
+        .ancestors()
+        .any(|ancestor| ancestor.kind() == SyntaxKind::REFERENCE_DEFINITION)
+    {
+        return None;
+    }
+    if link.dest().is_some() {
+        return None;
+    }
+    if let Some(link_ref) = link.reference() {
+        let label = normalize_label(&link_ref.label());
+        if !label.is_empty() {
+            return Some(label);
+        }
+    }
+    link.text()
+        .map(|text| normalize_label(&text.text_content()))
+        .filter(|label| !label.is_empty())
+}
+
+fn usage_label_from_image(image: ImageLink) -> Option<String> {
+    if image
+        .syntax()
+        .ancestors()
+        .any(|ancestor| ancestor.kind() == SyntaxKind::REFERENCE_DEFINITION)
+    {
+        return None;
+    }
+    if image.dest().is_some() {
+        return None;
+    }
+    if let Some(link_ref) = image.reference() {
+        let label = normalize_label(&link_ref.label());
+        if !label.is_empty() {
+            return Some(label);
+        }
+    }
+    image
+        .alt()
+        .map(|alt| normalize_label(&alt.text()))
+        .filter(|label| !label.is_empty())
+}
+
+fn usage_label_from_unresolved(unresolved: UnresolvedReference) -> Option<String> {
+    if let Some(label) = unresolved.label() {
+        let normalized = normalize_label(&label);
+        if !normalized.is_empty() {
+            return Some(normalized);
+        }
+    }
+    let normalized = normalize_label(&unresolved.text());
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized)
     }
 }
 
@@ -190,7 +216,7 @@ fn extend_usage_labels_from_project(
 fn extend_usage_labels_from_file(usage: &mut UsageLabels, path: &Path, config: &Config) {
     if let Ok(other_input) = std::fs::read_to_string(path) {
         let other_tree = crate::parser::parse(&other_input, Some(config.clone()));
-        let other_usage = collect_usage_labels(&other_tree);
+        let other_usage = collect_usage_labels(other_tree.descendants());
         usage.reference_labels.extend(other_usage.reference_labels);
         usage.footnote_ids.extend(other_usage.footnote_ids);
     }
@@ -207,7 +233,7 @@ mod tests {
         let config = Config::default();
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UnusedDefinitionsRule;
-        rule.check(&tree, input, &config, None)
+        rule.check_tree(&tree, input, &config, None)
     }
 
     #[test]
@@ -306,7 +332,7 @@ mod tests {
         let metadata = crate::metadata::extract_project_metadata(&tree, &doc1).expect("metadata");
 
         let rule = UnusedDefinitionsRule;
-        let diagnostics = rule.check(&tree, &input, &config, Some(&metadata));
+        let diagnostics = rule.check_tree(&tree, &input, &config, Some(&metadata));
         assert!(diagnostics.is_empty());
     }
 
@@ -331,7 +357,7 @@ mod tests {
         let metadata = crate::metadata::extract_project_metadata(&tree, &doc1).expect("metadata");
 
         let rule = UnusedDefinitionsRule;
-        let diagnostics = rule.check(&tree, &input, &config, Some(&metadata));
+        let diagnostics = rule.check_tree(&tree, &input, &config, Some(&metadata));
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "unused-definition-label");
     }
@@ -348,7 +374,7 @@ mod tests {
         let metadata = crate::metadata::extract_project_metadata(&tree, &doc).expect("metadata");
 
         let rule = UnusedDefinitionsRule;
-        let diagnostics = rule.check(&tree, &input, &config, Some(&metadata));
+        let diagnostics = rule.check_tree(&tree, &input, &config, Some(&metadata));
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "unused-definition-label");
     }
