@@ -18,7 +18,7 @@ rowan = "0.16.1"
 serde = { version = "1.0.228", features = ["derive"], optional = true }
 serde_json = "1.0"
 schemars = { version = "1.0", optional = true }
-log = { version = "0.4.28", features = ["release_max_level_debug"] }
+log = { version = "0.4.31", features = ["release_max_level_debug"] }
 smallvec = "1"
 unicode-width = "0.2"
 
