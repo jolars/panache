@@ -46,65 +46,83 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Parse operators into `MATH_OPERATOR` (parser-only).** Split `+ - * = < >` out
-of the catch-all `MATH_TEXT` atom runs into a dedicated **neutral**
-`MATH_OPERATOR` token — one token per char — so a future formatter phase can do
-operator-aware spacing/precedence. NOT committed yet; sits on top of the existing
-working tree (still effectively `feat/math-content-cst` lineage).
+**Phase 4 — dev-oracle cross-validation + idempotency corpus.** *DONE* (branch
+`feat/math-oracle-corpus`, not yet committed). Pure test/validation
+infrastructure; production formatter code untouched.
 
-The session was mostly a **design debate the user opened twice** and we
-converged; the conclusion is now a persistent invariant above (operator
-class/precedence is interpretation, not CST — the `cooking.rs` analog). Net: the
-parser only tokenizes; the eventual class/precedence table is a *shared
-formatter/LSP module*, never `MATH_BIN_OP`/`MATH_REL_OP` kinds. The user
-initially wanted a "fully-cooked CST" (YAML scanner→events→cook-once pattern);
-the resolution is that YAML cooks *structure the grammar defines* into the tree
-but cooks *scalar value interpretation* as a shared pure fn — and operator class
-is the latter kind.
+**The reframing that drove this** (answers the user's opening question — "what's
+the best oracle, given latexindent doesn't do operator spacing/precedence?"):
+math has **no output oracle**. Unlike YAML, where `pretty_yaml` *is* an output
+oracle and byte-exact parity is the right assertion, nothing produces Panache's
+eventual math output text (latexindent does `&`/`\\` alignment but no operator
+spacing; KaTeX-class tools *render* rather than reformat). So we keep
+pretty_yaml's *wiring* but flip the *assertion* from "byte-equal to oracle
+output" to **"semantically equivalent to oracle parse"** —
+`render(x) == render(format(x))` on normalized MathML. Invariance survives
+Phases 5/6 because spacing/line-breaks are presentation a renderer collapses.
 
-Changes (all parser-crate + one whitelist):
-- `syntax/kind.rs`: new `MATH_OPERATOR` variant (comment block above it).
-- `parser/math.rs`: dispatch arm `c if is_operator(c) => bump 1 MATH_OPERATOR`
-  *before* the `parse_text` fallback; new `is_operator()` (`+ - * = < >`);
-  `is_special()` now `is_operator(c) || matches!(…)` so text runs stop at ops.
-- `syntax/math.rs`: added `MATH_OPERATOR` to the `is_math_content_token()`
-  whitelist — **critical**, else `math_content_text()` (formatter re-parse,
-  projector, salsa) drops operators and breaks losslessness.
-- **Formatter unchanged**: `render.rs::push_token` already routes non-space
-  tokens through `push_str(text)`, so OFF and ON paths stay byte-identical;
-  operator-aware formatting is a separate future phase.
+Three-tier strategy (decisions confirmed with user via AskUserQuestion):
+- **Tier 1 (primary, no dep):** `tests/math_corpus_properties.rs` — idempotency +
+  parser losslessness (`parse(x).text()==x`) + gate-off verbatim over the corpus.
+- **Tier 2 (oracle):** `tests/math_cross_validation.rs` — dev-only
+  **`pulldown-latex`** (pure-Rust LaTeX→MathML, ~95% KaTeX coverage, no JS
+  engine; chosen over `katex` JS-engine crate and the immature `katex-rs` 0.2).
+  Four-way rule: oracle-rejects-input → skip(counted); rejects `format(x)` only →
+  **fail** (broke parseability); MathML differs → **fail** (meaning drift); equal
+  → pass. Skip-fraction guard (>40% fails) keeps coverage honest.
+- **Tier 3 (symbol→atom-class table):** **deferred to Phase 5** (lands with the
+  interpretation module that consumes it — no orphan fixture).
+- **latexindent: deferred entirely** (can't validate Phase 5/6 output; only
+  duplicates Tier-1 idempotency; revisit as optional Phase 4b).
 
-Scope notes:
-- Command operators (`\cdot`, `\leq`, …) stay `MATH_COMMAND` (classify by name in
-  the future shared module). `( ) [ ] / : | , ;` stay `MATH_TEXT` (out of scope).
-- One token per char, no coalescing of adjacent ops (`a<=b` → `OP(<) OP(=)`);
-  unary vs binary minus NOT distinguished (both `MATH_OPERATOR`).
+Key API notes for the oracle: `Parser::new(tex, &Storage::new())` yields
+`Result<Event, ParserError>`; `push_mathml` renders parse *errors as inline error
+nodes* rather than returning `Err`, so detect rejection by
+`.collect::<Result<Vec<_>,_>>()` **first**, then render the validated events.
+MathML (not HTML) is the surface — HTML's measured widths false-positive on
+benign spacing. `MathContext`: `inline/` → Inline, everything else → Display
+(`EnvironmentBody` not yet reachable; standalone `\begin{env}` still opaque
+`TEX_BLOCK`).
 
-Verified: math parser unit tests (79) incl. updated `plain_text_is_one_atom_run`
-+ `line_break_alignment_and_scripts` and new operator tests; new golden fixture
-`inline_math_operators`; **17 parser CST snapshots** regenerated — audited every
-changed line = pure `MATH_TEXT`→`MATH_OPERATOR` retag / text-run split over
-identical byte ranges, zero structural/nesting diffs; full `cargo test
---workspace` green (formatter math goldens byte-identical); clippy + fmt clean;
-CLI `parse` shows the tokens and `debug format --checks all` passes (lossless +
-idempotent) on inline + display `&`-aligned operator math.
+Deliverables: `crates/panache-formatter/tests/fixtures/math_corpus/` (56 bare
+`.tex` cases across inline/display/environments/groups/scripts/operators/
+comments/escapes + `macro_dependent/` Tier-1-only + README), the two harness
+files, and the `pulldown-latex` dev-dep (TEMPORARY note in `Cargo.toml`).
+
+Verified: both harnesses green; `oracle_discriminates_meaning_from_spacing`
+permanent test pins that the oracle isn't vacuous (`a+b`==`a + b`, `a+b`!=`a-b`);
+confirmed **0/54 oracle skips** (full coverage) and that format_math is
+non-identity on ~all cases (collapse/align/indent) so the invariance check
+exercises real transforms; `cargo test --workspace` (29 binaries) + clippy + fmt
+clean; CLI `debug format --checks all` passes on gate-on aligned math.
 
 ### Suggested next sub-targets
-1. **Shared `math` interpretation module** (the `cooking.rs` analog): operator
-   table keyed on operator text + command name → class + break-priority; consumed
-   by the formatter (class-based spacing) and later LSP. This is the gateway to
-   "format with operator precedence" (the user's stated goal — both spacing AND
-   precedence-aware line-breaking of long display math).
-2. **Phase 4** — dev-oracle (latexindent/KaTeX) cross-validation + idempotency
-   corpus harness.
+1. **Phase 5 — shared `math` interpretation module** (the `cooking.rs` analog):
+   operator table keyed on operator text + command name → class + break-priority;
+   consumed by the formatter (class-based spacing `a+b`→`a + b`) and later LSP.
+   The gateway to "format with operator precedence". **Tier 3** (vendored
+   symbol→atom-class table, asserted via `pulldown-latex`'s Event stream) lands
+   here. Use the new corpus's `operators/` stressors (`unary_minus`,
+   `double_minus`) as the regression bed.
+2. **Phase 6 — semantic line-breaking + continuation indent.**
 3. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
-   blocks become formattable, then extend the formatter to them.
-4. Optional structural cooking (legit parser work, orthogonal to operators):
-   script attachment, known-command argument grouping.
+   blocks become formattable (would make `MathContext::EnvironmentBody` reachable).
+4. Optional structural cooking (orthogonal to operators): script attachment,
+   known-command argument grouping.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
+
+- **Phase 1b — operators into `MATH_OPERATOR`** — split `+ - * = < >` out of
+  `MATH_TEXT` into a dedicated *neutral* `MATH_OPERATOR` token (one per char), so
+  a future phase can do operator-aware spacing/precedence. Committed `303e05bd`.
+  Parser only tokenizes; class/precedence is *interpretation* (a shared
+  formatter/LSP module, the `cooking.rs` analog), never `MATH_BIN_OP`/`MATH_REL_OP`
+  kinds — see the persistent invariant above. `MATH_OPERATOR` added to the
+  `is_math_content_token()` whitelist (critical for losslessness). Command
+  operators (`\cdot`, `\leq`) stay `MATH_COMMAND`; `( ) [ ] / : | , ;` stay
+  `MATH_TEXT`; unary vs binary minus not distinguished.
 
 - **Math formatter (Phases 2+3) + `math-syntax` → Error** — shipped the
   experimental content-aware formatter behind `[experimental] format-math`

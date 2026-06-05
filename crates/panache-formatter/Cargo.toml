@@ -25,5 +25,12 @@ insta = { version = "1.47.2", features = ["json"] }
 # the parity test onto golden expected outputs) once the in-tree YAML
 # formatter has been stable in releases for a few months — revisit ~2026-09.
 pretty_yaml = "0.6.0"
+# TEMPORARY: dev-only math cross-validation oracle (tests/math_cross_validation.rs).
+# Renders TeX content to MathML so the math formatter can be checked for
+# meaning-preservation (render(x) == render(format(x))). The in-tree formatter is
+# the source of truth; this is a correctness signal, never a runtime dependency.
+# Revisit alongside the YAML oracle once the math formatter has been stable in
+# releases for a few months.
+pulldown-latex = "0.7.1"
 similar-asserts = "2.0.0"
 toml = "1.1.2"
