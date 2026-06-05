@@ -15,7 +15,7 @@ DOCUMENT@0..91
         MATH_SPACE@35..36 " "
         MATH_TEXT@36..37 "E"
         MATH_SPACE@37..38 " "
-        MATH_TEXT@38..39 "="
+        MATH_OPERATOR@38..39 "="
         MATH_SPACE@39..40 " "
         MATH_TEXT@40..42 "mc"
         MATH_SCRIPT@42..43 "^"

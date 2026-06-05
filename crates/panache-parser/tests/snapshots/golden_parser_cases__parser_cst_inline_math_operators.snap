@@ -1,0 +1,130 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..183
+  HEADING@0..24
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..23
+      TEXT@2..23 "Inline Math Operators"
+    NEWLINE@23..24 "\n"
+  BLANK_LINE@24..25
+    BLANK_LINE@24..25 "\n"
+  PARAGRAPH@25..45
+    TEXT@25..33 "Spaced: "
+    INLINE_MATH@33..44
+      INLINE_MATH_MARKER@33..34 "$"
+      MATH_CONTENT@34..43
+        MATH_TEXT@34..35 "a"
+        MATH_SPACE@35..36 " "
+        MATH_OPERATOR@36..37 "+"
+        MATH_SPACE@37..38 " "
+        MATH_TEXT@38..39 "b"
+        MATH_SPACE@39..40 " "
+        MATH_OPERATOR@40..41 "="
+        MATH_SPACE@41..42 " "
+        MATH_TEXT@42..43 "c"
+      INLINE_MATH_MARKER@43..44 "$"
+    NEWLINE@44..45 "\n"
+  BLANK_LINE@45..46
+    BLANK_LINE@45..46 "\n"
+  PARAGRAPH@46..61
+    TEXT@46..53 "Tight: "
+    INLINE_MATH@53..60
+      INLINE_MATH_MARKER@53..54 "$"
+      MATH_CONTENT@54..59
+        MATH_TEXT@54..55 "a"
+        MATH_OPERATOR@55..56 "+"
+        MATH_TEXT@56..57 "b"
+        MATH_OPERATOR@57..58 "="
+        MATH_TEXT@58..59 "c"
+      INLINE_MATH_MARKER@59..60 "$"
+    NEWLINE@60..61 "\n"
+  BLANK_LINE@61..62
+    BLANK_LINE@61..62 "\n"
+  PARAGRAPH@62..85
+    TEXT@62..73 "Relations: "
+    INLINE_MATH@73..84
+      INLINE_MATH_MARKER@73..74 "$"
+      MATH_CONTENT@74..83
+        MATH_TEXT@74..75 "x"
+        MATH_SPACE@75..76 " "
+        MATH_OPERATOR@76..77 "<"
+        MATH_SPACE@77..78 " "
+        MATH_TEXT@78..79 "y"
+        MATH_SPACE@79..80 " "
+        MATH_OPERATOR@80..81 ">"
+        MATH_SPACE@81..82 " "
+        MATH_TEXT@82..83 "z"
+      INLINE_MATH_MARKER@83..84 "$"
+    NEWLINE@84..85 "\n"
+  BLANK_LINE@85..86
+    BLANK_LINE@85..86 "\n"
+  PARAGRAPH@86..112
+    TEXT@86..100 "Mixed binary: "
+    INLINE_MATH@100..111
+      INLINE_MATH_MARKER@100..101 "$"
+      MATH_CONTENT@101..110
+        MATH_TEXT@101..102 "a"
+        MATH_SPACE@102..103 " "
+        MATH_OPERATOR@103..104 "-"
+        MATH_SPACE@104..105 " "
+        MATH_TEXT@105..106 "b"
+        MATH_SPACE@106..107 " "
+        MATH_OPERATOR@107..108 "*"
+        MATH_SPACE@108..109 " "
+        MATH_TEXT@109..110 "c"
+      INLINE_MATH_MARKER@110..111 "$"
+    NEWLINE@111..112 "\n"
+  BLANK_LINE@112..113
+    BLANK_LINE@112..113 "\n"
+  PARAGRAPH@113..149
+    TEXT@113..126 "In a script: "
+    INLINE_MATH@126..134
+      INLINE_MATH_MARKER@126..127 "$"
+      MATH_CONTENT@127..133
+        MATH_TEXT@127..128 "e"
+        MATH_SCRIPT@128..129 "^"
+        MATH_GROUP@129..133
+          MATH_GROUP_OPEN@129..130 "{"
+          MATH_OPERATOR@130..131 "-"
+          MATH_TEXT@131..132 "x"
+          MATH_GROUP_CLOSE@132..133 "}"
+      INLINE_MATH_MARKER@133..134 "$"
+    TEXT@134..139 " and "
+    INLINE_MATH@139..148
+      INLINE_MATH_MARKER@139..140 "$"
+      MATH_CONTENT@140..147
+        MATH_TEXT@140..142 "10"
+        MATH_SCRIPT@142..143 "^"
+        MATH_GROUP@143..147
+          MATH_GROUP_OPEN@143..144 "{"
+          MATH_OPERATOR@144..145 "-"
+          MATH_TEXT@145..146 "3"
+          MATH_GROUP_CLOSE@146..147 "}"
+      INLINE_MATH_MARKER@147..148 "$"
+    NEWLINE@148..149 "\n"
+  BLANK_LINE@149..150
+    BLANK_LINE@149..150 "\n"
+  PARAGRAPH@150..183
+    TEXT@150..165 "In a fraction: "
+    INLINE_MATH@165..182
+      INLINE_MATH_MARKER@165..166 "$"
+      MATH_CONTENT@166..181
+        MATH_COMMAND@166..171 "\\frac"
+        MATH_GROUP@171..176
+          MATH_GROUP_OPEN@171..172 "{"
+          MATH_TEXT@172..173 "a"
+          MATH_OPERATOR@173..174 "+"
+          MATH_TEXT@174..175 "b"
+          MATH_GROUP_CLOSE@175..176 "}"
+        MATH_GROUP@176..181
+          MATH_GROUP_OPEN@176..177 "{"
+          MATH_TEXT@177..178 "c"
+          MATH_OPERATOR@178..179 "-"
+          MATH_TEXT@179..180 "d"
+          MATH_GROUP_CLOSE@180..181 "}"
+      INLINE_MATH_MARKER@181..182 "$"
+    NEWLINE@182..183 "\n"

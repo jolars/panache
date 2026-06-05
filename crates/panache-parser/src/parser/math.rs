@@ -201,6 +201,11 @@ impl MathParser<'_> {
                 },
                 '&' => self.bump_bytes(1, SyntaxKind::MATH_ALIGN),
                 '^' | '_' => self.bump_bytes(1, SyntaxKind::MATH_SCRIPT),
+                // Operator atoms (`+ - * = < >`), one token per char. Class and
+                // precedence are *not* assigned here: TeX itself coerces a
+                // binary atom to ordinary by its neighbors (unary minus), so the
+                // class is a property of list position, owned by the formatter.
+                c if is_operator(c) => self.bump_bytes(1, SyntaxKind::MATH_OPERATOR),
                 '%' => self.parse_comment(),
                 ' ' | '\t' => self.parse_spaces(),
                 '\n' => self.bump_bytes(1, SyntaxKind::MATH_NEWLINE),
@@ -337,10 +342,18 @@ impl MathParser<'_> {
 
 /// Characters that terminate a [`SyntaxKind::MATH_TEXT`] run.
 fn is_special(c: char) -> bool {
-    matches!(
-        c,
-        '\\' | '{' | '}' | '&' | '^' | '_' | '%' | ' ' | '\t' | '\n' | '\r'
-    )
+    is_operator(c)
+        || matches!(
+            c,
+            '\\' | '{' | '}' | '&' | '^' | '_' | '%' | ' ' | '\t' | '\n' | '\r'
+        )
+}
+
+/// Operator atoms split out of ordinary text into their own
+/// [`SyntaxKind::MATH_OPERATOR`] token. The TeX mathbin (`+ - *`) and mathrel
+/// (`= < >`) core; the formatter assigns class/precedence/spacing downstream.
+fn is_operator(c: char) -> bool {
+    matches!(c, '+' | '-' | '*' | '=' | '<' | '>')
 }
 
 #[cfg(test)]
@@ -388,8 +401,67 @@ mod tests {
 
     #[test]
     fn plain_text_is_one_atom_run() {
-        assert_eq!(token_kinds("a+b=c"), vec![SyntaxKind::MATH_TEXT]);
+        // A run with no structural or operator chars stays a single atom.
+        assert_eq!(token_kinds("abc"), vec![SyntaxKind::MATH_TEXT]);
+        assert_lossless("abc");
+        // `/`, `.`, and parens are ordinary atoms, not operators.
+        assert_eq!(token_kinds("f(x)/2.5"), vec![SyntaxKind::MATH_TEXT]);
+        assert_lossless("f(x)/2.5");
+    }
+
+    #[test]
+    fn operators_split_atom_runs() {
+        // `+ - * = < >` each break the surrounding text into their own
+        // MATH_OPERATOR token. Class/precedence is deferred to the formatter.
+        assert_eq!(
+            token_kinds("a+b=c"),
+            vec![
+                SyntaxKind::MATH_TEXT,     // a
+                SyntaxKind::MATH_OPERATOR, // +
+                SyntaxKind::MATH_TEXT,     // b
+                SyntaxKind::MATH_OPERATOR, // =
+                SyntaxKind::MATH_TEXT,     // c
+            ]
+        );
         assert_lossless("a+b=c");
+    }
+
+    #[test]
+    fn each_operator_char_is_its_own_token() {
+        for op in ["+", "-", "*", "=", "<", ">"] {
+            assert_eq!(
+                token_kinds(op),
+                vec![SyntaxKind::MATH_OPERATOR],
+                "operator {op:?}"
+            );
+            assert_lossless(op);
+        }
+        // Adjacent operators do not coalesce — one token per char.
+        assert_eq!(
+            token_kinds("a<=b"),
+            vec![
+                SyntaxKind::MATH_TEXT,
+                SyntaxKind::MATH_OPERATOR, // <
+                SyntaxKind::MATH_OPERATOR, // =
+                SyntaxKind::MATH_TEXT,
+            ]
+        );
+        // Unary vs binary minus is NOT distinguished here — both are operators.
+        assert_eq!(
+            token_kinds("-x"),
+            vec![SyntaxKind::MATH_OPERATOR, SyntaxKind::MATH_TEXT]
+        );
+        assert_lossless("-x");
+        // An escaped special stays a control symbol, never an operator.
+        assert_eq!(token_kinds(r"\<"), vec![SyntaxKind::MATH_COMMAND]);
+        assert_lossless(r"\<");
+    }
+
+    #[test]
+    fn operators_inside_groups_and_scripts_are_lossless() {
+        for content in [r"e^{-x}", r"10^{-3}", r"\frac{a+b}{c-d}", r"x_{i+1}"] {
+            assert_lossless(content);
+        }
     }
 
     #[test]
@@ -431,7 +503,7 @@ mod tests {
                 SyntaxKind::MATH_TEXT,       // x
                 SyntaxKind::MATH_SPACE,      // ' '
                 SyntaxKind::MATH_ALIGN,      // &
-                SyntaxKind::MATH_TEXT,       // =
+                SyntaxKind::MATH_OPERATOR,   // =
                 SyntaxKind::MATH_SPACE,      // ' '
                 SyntaxKind::MATH_TEXT,       // 1
                 SyntaxKind::MATH_SPACE,      // ' '

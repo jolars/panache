@@ -24,7 +24,7 @@ DOCUMENT@0..206
       MATH_CONTENT@118..123
         MATH_TEXT@118..119 "x"
         MATH_SPACE@119..120 " "
-        MATH_TEXT@120..121 "="
+        MATH_OPERATOR@120..121 "="
         MATH_SPACE@121..122 " "
         MATH_TEXT@122..123 "y"
       DISPLAY_MATH_MARKER@123..125 "$$"
@@ -44,7 +44,7 @@ DOCUMENT@0..206
         MATH_NEWLINE@178..179 "\n"
         MATH_TEXT@179..180 "a"
         MATH_SPACE@180..181 " "
-        MATH_TEXT@181..182 "="
+        MATH_OPERATOR@181..182 "="
         MATH_SPACE@182..183 " "
         MATH_TEXT@183..184 "b"
         MATH_NEWLINE@184..185 "\n"

@@ -38,6 +38,7 @@ fn is_math_content_token(kind: SyntaxKind) -> bool {
             | SyntaxKind::MATH_GROUP_CLOSE
             | SyntaxKind::MATH_ALIGN
             | SyntaxKind::MATH_SCRIPT
+            | SyntaxKind::MATH_OPERATOR
             | SyntaxKind::MATH_LINE_BREAK
             | SyntaxKind::MATH_COMMENT
             | SyntaxKind::MATH_EQUATION_LABEL

@@ -135,7 +135,7 @@ DOCUMENT@0..1387
         MATH_CONTENT@277..282
           MATH_TEXT@277..278 "a"
           MATH_SPACE@278..279 " "
-          MATH_TEXT@279..280 "*"
+          MATH_OPERATOR@279..280 "*"
           MATH_SPACE@280..281 " "
           MATH_TEXT@281..282 "b"
         INLINE_MATH_MARKER@282..283 "$"
@@ -153,7 +153,8 @@ DOCUMENT@0..1387
         MATH_CONTENT@298..304
           MATH_TEXT@298..299 "a"
           MATH_SPACE@299..300 " "
-          MATH_TEXT@300..302 "**"
+          MATH_OPERATOR@300..301 "*"
+          MATH_OPERATOR@301..302 "*"
           MATH_SPACE@302..303 " "
           MATH_TEXT@303..304 "b"
         INLINE_MATH_MARKER@304..305 "$"

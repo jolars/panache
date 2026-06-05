@@ -432,6 +432,7 @@ golden_test_cases!(
     inline_code_attributes_lossless,
     inline_footnotes,
     inline_math,
+    inline_math_operators,
     grid_table,
     grid_table_in_list_blockquote,
     grid_table_indented_is_paragraph,

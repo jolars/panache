@@ -19,7 +19,7 @@ DOCUMENT@0..223
       MATH_CONTENT@29..34
         MATH_TEXT@29..30 "x"
         MATH_SPACE@30..31 " "
-        MATH_TEXT@31..32 "="
+        MATH_OPERATOR@31..32 "="
         MATH_SPACE@32..33 " "
         MATH_TEXT@33..34 "y"
       INLINE_MATH_MARKER@34..35 "$"
@@ -44,7 +44,7 @@ DOCUMENT@0..223
         MATH_CONTENT@94..102
           MATH_TEXT@94..95 "E"
           MATH_SPACE@95..96 " "
-          MATH_TEXT@96..97 "="
+          MATH_OPERATOR@96..97 "="
           MATH_SPACE@97..98 " "
           MATH_TEXT@98..100 "mc"
           MATH_SCRIPT@100..101 "^"
@@ -84,7 +84,9 @@ DOCUMENT@0..223
           MATH_GROUP_CLOSE@167..168 "}"
         MATH_GROUP@168..178
           MATH_GROUP_OPEN@168..169 "{"
-          MATH_TEXT@169..177 "k!(n-k)!"
+          MATH_TEXT@169..173 "k!(n"
+          MATH_OPERATOR@173..174 "-"
+          MATH_TEXT@174..177 "k)!"
           MATH_GROUP_CLOSE@177..178 "}"
       INLINE_MATH_MARKER@178..179 "$"
     NEWLINE@179..180 "\n"

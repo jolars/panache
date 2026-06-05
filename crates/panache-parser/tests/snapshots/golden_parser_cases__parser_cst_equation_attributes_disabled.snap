@@ -15,7 +15,7 @@ DOCUMENT@0..140
         MATH_NEWLINE@71..72 "\n"
         MATH_TEXT@72..73 "E"
         MATH_SPACE@73..74 " "
-        MATH_TEXT@74..75 "="
+        MATH_OPERATOR@74..75 "="
         MATH_SPACE@75..76 " "
         MATH_TEXT@76..78 "mc"
         MATH_SCRIPT@78..79 "^"

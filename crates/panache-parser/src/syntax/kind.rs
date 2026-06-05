@@ -104,9 +104,12 @@ pub enum SyntaxKind {
     MATH_ALIGN,       // & alignment tab
     MATH_SCRIPT,      // ^ or _
     MATH_COMMENT,     // % to end of line (TeX comment)
-    MATH_TEXT,        // run of ordinary atoms
-    MATH_SPACE,       // run of spaces/tabs
-    MATH_NEWLINE,     // newline within math content
+    // `+ - * = < >` operator atom; one token per char. Class/precedence are
+    // contextual (unary minus, `\mathbin`) and deferred to the formatter.
+    MATH_OPERATOR,
+    MATH_TEXT,    // run of ordinary atoms
+    MATH_SPACE,   // run of spaces/tabs
+    MATH_NEWLINE, // newline within math content
     // Bookdown equation label `(\#eq:label)`, recognized only when the
     // `bookdown_equation_references` extension is enabled. A single token over
     // the whole `(\#eq:...)` span so the indexer/LSP can target it precisely.

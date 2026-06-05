@@ -27,77 +27,98 @@ still-relevant trap into Persistent traps. Keep it short.
 - **Background revert trap**: a process (suspected pre-commit `git stash`)
   reverted tracked edits once mid-session; untracked files survived. Re-apply if
   source edits vanish.
+- **Operator class/precedence is NOT a CST concern — settled, do not
+  relitigate.** The parser emits a *neutral* `MATH_OPERATOR` token (one per char,
+  `+ - * = < >`); it does NOT tag bin/rel or build a precedence tree. Rationale:
+  TeX assigns atom class contextually during mlist→hlist (Appendix G coerces a
+  Bin atom after Bin/Rel/Open/Punct to Ord — that *is* unary minus), it's
+  override-able (`\mathbin`) and macro-dependent, and there is no
+  operator-precedence grammar in TeX (the math list is flat). Class/precedence is
+  the analog of YAML's *scalar cooking* (`parser/yaml/cooking.rs`): a pure
+  interpretation shared between consumers, NOT a tree shape. So when the
+  formatting phase needs class+precedence, build a **shared `math` interpretation
+  module** (operator table keyed on operator text *and* command name → class +
+  break-priority) consumed by formatter + LSP — never `MATH_BIN_OP`/`MATH_REL_OP`
+  kinds. (Structural cooking that *would* be legit future parser work: script
+  attachment, known-command argument grouping — orthogonal to operators.)
 
 --------------------------------------------------------------------------------
 
 ## Latest session
 
-**Math formatter (Phases 2+3) + `math-syntax` → Error** (branch
-`feat/math-content-cst`). Shipped the experimental content-aware math formatter
-and promoted the lint severity.
+**Parse operators into `MATH_OPERATOR` (parser-only).** Split `+ - * = < >` out
+of the catch-all `MATH_TEXT` atom runs into a dedicated **neutral**
+`MATH_OPERATOR` token — one token per char — so a future formatter phase can do
+operator-aware spacing/precedence. NOT committed yet; sits on top of the existing
+working tree (still effectively `feat/math-content-cst` lineage).
 
-Decisions locked with the user this session:
-1. **Config shape is `[experimental] format-math` (default false)**, a *new
-   top-level* host-config table — NOT `experimental_math_formatting` under
-   `[format]` as the old plan suggested. Documented as opt-in / API-may-break.
-   Mirrored onto formatter `Config::experimental_format_math`; plumbed in
-   `to_formatter_config`. Schema regenerated (`ExperimentalConfig`).
-2. **`math-syntax` diagnostics promoted Warning → Error.** The channel (a
-   suppressible registry rule) was right, but warning *severity* undersold a
-   build-breaking error (`quarto render` hard-fails). One-line change in the
-   `err()` helper (`src/linter/rules/math_content.rs`); docs updated.
-3. **Env-body indent hardcoded to 2 spaces** (opinionated; `math_indent` left
-   untouched — it still flat-indents non-environment `$$` content). Promote to a
-   knob later only on pushback.
-4. **Full scope incl. `&`-alignment** (not deferred).
-5. **Operators not being tokenized is NOT a blocker** — every transform is
-   structural (keys off `&`/`\\`/env/group tokens); cells are opaque text
-   measured by *source* char width. Operator spacing stays out of scope.
+The session was mostly a **design debate the user opened twice** and we
+converged; the conclusion is now a persistent invariant above (operator
+class/precedence is interpretation, not CST — the `cooking.rs` analog). Net: the
+parser only tokenizes; the eventual class/precedence table is a *shared
+formatter/LSP module*, never `MATH_BIN_OP`/`MATH_REL_OP` kinds. The user
+initially wanted a "fully-cooked CST" (YAML scanner→events→cook-once pattern);
+the resolution is that YAML cooks *structure the grammar defines* into the tree
+but cooks *scalar value interpretation* as a shared pure fn — and operator class
+is the latter kind.
 
-Architecture (`crates/panache-formatter/src/formatter/math/` + `math.rs`):
-- **Re-parses the clean content string** (`parse_math_report`) like the YAML
-  formatter does, NOT a walk of the host-embedded subtree — dissolves the
-  blockquote-prefix problem. `format_math(content, opts) -> String`, delimiter-
-  free in/out; bails to verbatim on gate-off, lone-`$`, or any parse diagnostic.
-- `render.rs`: `MathContext::{Inline, Display, EnvironmentBody}`. Rows split on
-  top-level `\\`/newline; cells on top-level `&`; **trim-before-measure +
-  trailing-only padding** is the idempotency engine (see `STYLE.md`). Canonical
-  separator ` & ` (latexindent style — `&=` becomes `& =`). **Trailing `\\` also
-  align**: the last column is padded too, but only on rows that carry a `\\`
-  (a final/soft-break row's last cell stays unpadded → no trailing whitespace).
-  Cell internals (operator spacing) never touched.
-- Gated at three call sites, OFF byte-identical: `core.rs` block DISPLAY_MATH
-  (env + non-env), `inline.rs` INLINE_MATH (inline + display sub-form) and
-  standalone DISPLAY_MATH. Gated inline read switched to `InlineMath::content()`
-  (prefix-stripping).
+Changes (all parser-crate + one whitelist):
+- `syntax/kind.rs`: new `MATH_OPERATOR` variant (comment block above it).
+- `parser/math.rs`: dispatch arm `c if is_operator(c) => bump 1 MATH_OPERATOR`
+  *before* the `parse_text` fallback; new `is_operator()` (`+ - * = < >`);
+  `is_special()` now `is_operator(c) || matches!(…)` so text runs stop at ops.
+- `syntax/math.rs`: added `MATH_OPERATOR` to the `is_math_content_token()`
+  whitelist — **critical**, else `math_content_text()` (formatter re-parse,
+  projector, salsa) drops operators and breaks losslessness.
+- **Formatter unchanged**: `render.rs::push_token` already routes non-space
+  tokens through `push_str(text)`, so OFF and ON paths stay byte-identical;
+  operator-aware formatting is a separate future phase.
 
-Verified: 12 sub-formatter unit tests + 4 format-API integration tests + 3
-golden cases (`math_align_experimental`, `math_blockquote_experimental`,
-`math_format_off_default`); 284 host goldens green (OFF path byte-identical);
-CLI `debug format --checks all` passes (idempotency + losslessness) on `$$`,
-`\[`, and **blockquote** display math. Clippy + fmt clean.
+Scope notes:
+- Command operators (`\cdot`, `\leq`, …) stay `MATH_COMMAND` (classify by name in
+  the future shared module). `( ) [ ] / : | , ;` stay `MATH_TEXT` (out of scope).
+- One token per char, no coalescing of adjacent ops (`a<=b` → `OP(<) OP(=)`);
+  unary vs binary minus NOT distinguished (both `MATH_OPERATOR`).
 
-Traps / scope notes:
-- **Standalone `\begin{env}…\end{env}` TeX blocks parse as `TEX_BLOCK` with
-  OPAQUE `TEXT` (no `MATH_CONTENT`)** — Phase 1 only embedded structure into
-  `$$`/`$`/`\[`/`\(` spans. So the formatter does NOT reformat bare TeX blocks;
-  embedding `MATH_CONTENT` into `TEX_BLOCK` is a parser change (future work).
-- **R3 (blockquote re-prefixing) resolved**: the block emitter re-prefixes each
-  formatted line with `> ` automatically; multi-line aligned bodies in `>` work.
-- `MathContext::EnvironmentBody` (raw `\begin` *delimiters*) is wired + unit-
-  tested but rarely hit at block level (those are `TEX_BLOCK`s); kept defensive.
+Verified: math parser unit tests (79) incl. updated `plain_text_is_one_atom_run`
++ `line_break_alignment_and_scripts` and new operator tests; new golden fixture
+`inline_math_operators`; **17 parser CST snapshots** regenerated — audited every
+changed line = pure `MATH_TEXT`→`MATH_OPERATOR` retag / text-run split over
+identical byte ranges, zero structural/nesting diffs; full `cargo test
+--workspace` green (formatter math goldens byte-identical); clippy + fmt clean;
+CLI `parse` shows the tokens and `debug format --checks all` passes (lossless +
+idempotent) on inline + display `&`-aligned operator math.
 
 ### Suggested next sub-targets
-1. **Phase 4** — dev-oracle (latexindent/KaTeX) cross-validation + idempotency
+1. **Shared `math` interpretation module** (the `cooking.rs` analog): operator
+   table keyed on operator text + command name → class + break-priority; consumed
+   by the formatter (class-based spacing) and later LSP. This is the gateway to
+   "format with operator precedence" (the user's stated goal — both spacing AND
+   precedence-aware line-breaking of long display math).
+2. **Phase 4** — dev-oracle (latexindent/KaTeX) cross-validation + idempotency
    corpus harness.
-2. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
+3. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
    blocks become formattable, then extend the formatter to them.
-3. Representative TeX corpus (Phase 0 leftover).
+4. Optional structural cooking (legit parser work, orthogonal to operators):
+   script attachment, known-command argument grouping.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Math formatter (Phases 2+3) + `math-syntax` → Error** — shipped the
+  experimental content-aware formatter behind `[experimental] format-math`
+  (default false), mirrored onto `Config::experimental_format_math`. Re-parses
+  the clean content string (`parse_math_report`) like the YAML formatter;
+  `format_math(content, opts)` in `crates/panache-formatter/src/formatter/math/`
+  + `math.rs`, `MathContext::{Inline,Display,EnvironmentBody}`; rows split on
+  top-level `\\`/newline, cells on top-level `&`; **trim-before-measure +
+  trailing-only padding** = idempotency engine (see `STYLE.md`), canonical ` & `
+  separator. Bails to verbatim on gate-off / lone-`$` / any parse diagnostic.
+  Gated at 3 call sites (`core.rs`, `inline.rs`), OFF byte-identical. Promoted
+  `math-syntax` diagnostics Warning→Error (`src/linter/rules/math_content.rs`).
+  Standalone `\begin…\end` blocks parse as `TEX_BLOCK` with opaque `TEXT` (no
+  `MATH_CONTENT`) — not reformatted; embedding is future parser work.
 - **Math diagnostics surfaced via linter + LSP** — Phase-1 diagnostics now reach
   CLI + LSP as the always-on `math-syntax` registry rule
   (`src/linter/rules/math_content.rs`), a pure CST reader (no re-parse) deriving
