@@ -19,10 +19,14 @@ design plan is `~/.claude/plans/i-want-to-plan-foamy-pascal.md`.
   accessors in `crates/panache-parser/src/syntax/{math,inlines}.rs`.
 - Formatter (future phases): a new `crates/panache-formatter/src/formatter/math/`
   mirroring `formatter/yaml/`, gated behind an experimental option.
-- Goal: parse math *content* into a lossless structural CST (done, Phase 1) and
-  reformat it **semantics-safely** (align `&` columns, indent environment
-  bodies, normalize `\\`, collapse spaces) — never macro rewriting, never
-  `\frac`/`\dfrac` canonicalization, never operator-spacing policy.
+- Goal: parse math *content* into a lossless structural CST (Phase 1 done;
+  operator atoms now tokenized) and reformat it **semantics-safely**. *In scope*:
+  align `&` columns, indent environment bodies, normalize `\\`, collapse spaces
+  (done); **operator-precedence-aware spacing** (`a+b` → `a + b`, class-based);
+  and **semantic line-breaking + indenting of long display math** (wrap at the
+  lowest-precedence operators, indent continuations). *Out of scope*: macro
+  rewriting, `\frac`/`\dfrac` canonicalization, and anything that needs macro
+  expansion.
 - **There is no pandoc oracle for math *formatting*** — pandoc passes math
   content through untouched. Use an external dev-only oracle (latexindent /
   KaTeX parser) for cross-validation, à la `pretty_yaml` for YAML.
@@ -41,6 +45,13 @@ design plan is `~/.claude/plans/i-want-to-plan-foamy-pascal.md`.
 - **`MATH_SPACE`/`MATH_NEWLINE` stay distinct** from host `WHITESPACE`/`NEWLINE`
   so `math_content_text()` can strip container prefixes the block machinery
   interleaves into `MATH_CONTENT` (blockquote `>` etc.). See `.claude/rules/math-parser.md`.
+- **Operators are tokenized but never classified in the CST.** `+ - * = < >`
+  emit a neutral `MATH_OPERATOR` token (one per char); bin/rel/precedence is
+  *interpretation* (contextual unary minus, `\mathbin`, macro-dependent) — the
+  analog of YAML scalar cooking. It lives in a **shared formatter/LSP module**
+  keyed on operator text + command name (class + break-priority), never
+  `MATH_BIN_OP`/`MATH_REL_OP` kinds. That module is the gateway to both
+  precedence-aware spacing and semantic line-breaking.
 
 ## Related rules to read first
 
@@ -53,23 +64,32 @@ design plan is `~/.claude/plans/i-want-to-plan-foamy-pascal.md`.
 
 - **Phase 0 — scaffolding.** SyntaxKinds, this skill + rule, corpus. *Skill/rule
   DONE; representative TeX corpus still TODO.*
-- **Phase 1 — TeX tokenizer + structural CST (parser).** *DONE* — committed on
-  branch `feat/math-content-cst` (`feat(parser): parse math content into a
-  structural CST`). Lossless `MATH_CONTENT` CST, diagnostics side-channel,
-  bookdown labels, accessors/projector/indexers updated.
-- **Phase 2 — formatter experimental gate + inline math.** Add
-  `experimental_math_formatting` (default false) to the formatter config, mirror
-  onto host `Config`, regenerate `panache.schema.json`. Off → verbatim; on →
-  conservative inline spacing normalization.
-- **Phase 3 — display math + environments.** `&`-column alignment,
-  environment-body indentation (respect `math_indent`), `\\` normalization.
-  Honor `has_unescaped_single_dollar_in_content()` preservation.
-- **Phase 4 — dev-oracle cross-validation + idempotency corpus.**
-- **Phase 5 — docs + stabilization** (`docs/guide/formatting.qmd`,
+- **Phase 1 — TeX tokenizer + structural CST (parser).** *DONE*. Lossless
+  `MATH_CONTENT` CST, diagnostics side-channel, bookdown labels,
+  accessors/projector/indexers.
+- **Phase 1b — operator atoms (parser).** *DONE* (`feat(parser): tokenize math
+  operators into MATH_OPERATOR`). Neutral `MATH_OPERATOR` token, no class.
+- **Phase 2 — formatter experimental gate + inline math.** *DONE*. Gate is
+  `[experimental] format-math` (default false), mirrored onto
+  `Config::experimental_format_math`, schema regenerated. Off → verbatim; on →
+  inline spacing normalization.
+- **Phase 3 — display math + environments.** *DONE*. `&`-column alignment,
+  environment-body indentation, `\\` normalization; honors
+  `has_unescaped_single_dollar_in_content()`.
+- **Phase 4 — dev-oracle cross-validation + idempotency corpus.** (Cross-checks
+  the Phase 5/6 spacing + breaking work against latexindent/KaTeX.)
+- **Phase 5 — operator interpretation module + precedence-aware spacing.** The
+  `cooking.rs` analog: classify operators (text + command name) → class +
+  break-priority; apply class-based spacing (`a+b` → `a + b`). Shared with LSP.
+- **Phase 6 — semantic line-breaking + indenting.** Wrap long display math at
+  lowest-precedence operators, indent continuations (uses Phase 5 priorities).
+- **Phase 7 — docs + stabilization** (`docs/guide/formatting.qmd`,
   `configuration.qmd`); consider flipping the gate per flavor (separate
   decision).
-- **Surface math diagnostics via linter/LSP** — independent of the formatter
-  phases; can land any time after Phase 1.
+- **Surface math diagnostics via linter/LSP** — *DONE* (promoted Warning→Error).
+- **Optional structural cooking (parser, orthogonal to operators):** script
+  attachment, known-command argument grouping — legit future CST work if a
+  formatting phase needs the structure.
 
 ## Session workflow
 
