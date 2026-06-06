@@ -465,7 +465,10 @@ pub(crate) fn is_gfm_math_fence(fence: &FenceInfo) -> bool {
 
 /// Try to detect a fenced code block opening from content.
 /// Returns fence info if this is a valid opening fence.
-pub(crate) fn try_parse_fence_open(content: &str) -> Option<FenceInfo> {
+pub(crate) fn try_parse_fence_open(
+    content: &str,
+    dialect: crate::options::Dialect,
+) -> Option<FenceInfo> {
     let trimmed = strip_leading_spaces(content);
 
     // Check for fence opening (``` or ~~~)
@@ -495,6 +498,32 @@ pub(crate) fn try_parse_fence_open(content: &str) -> Option<FenceInfo> {
     // Backtick-fenced blocks cannot have backticks in the info string.
     if fence_char == '`' && info_string.contains('`') {
         return None;
+    }
+
+    // In Pandoc-markdown, a fence info string is valid only as one of:
+    //   `lang`            a single bare language word,
+    //   `{attrs}`         a brace-delimited attribute block, or
+    //   `lang {attrs}`    a single language word plus an attribute block,
+    // with nothing trailing after the attribute block. Anything else — a
+    // multi-word bare info string (```` ```haskell foo ````), a word before
+    // the brace (```` ```a b {.x} ````), or content after the closing brace
+    // (```` ```{.x} foo ````) — is not a code fence: pandoc reads the backtick
+    // run as an inline code span (and a tilde run as plain inline text).
+    // CommonMark and GFM instead take the first word as the language class and
+    // accept the rest, so this restriction is gated to the Pandoc dialect.
+    if dialect == crate::options::Dialect::Pandoc {
+        let bare = info_string.trim();
+        if !bare.is_empty() {
+            let is_valid = if let Some(brace_start) = bare.find('{') {
+                let before = bare[..brace_start].trim();
+                !before.contains(char::is_whitespace) && bare.ends_with('}')
+            } else {
+                bare.split_whitespace().nth(1).is_none()
+            };
+            if !is_valid {
+                return None;
+            }
+        }
     }
 
     Some(FenceInfo {
@@ -1423,12 +1452,43 @@ pub(crate) fn parse_fenced_math_block(
 mod tests {
     use super::*;
 
+    use crate::options::Dialect;
+
     #[test]
     fn test_backtick_fence() {
-        let fence = try_parse_fence_open("```python").unwrap();
+        let fence = try_parse_fence_open("```python", Dialect::Pandoc).unwrap();
         assert_eq!(fence.fence_char, '`');
         assert_eq!(fence.fence_count, 3);
         assert_eq!(fence.info_string, "python");
+    }
+
+    #[test]
+    fn multiword_bare_info_is_not_a_fence_in_pandoc() {
+        // ```haskell foo => inline code span in pandoc-markdown, not a fence.
+        assert!(try_parse_fence_open("```haskell foo", Dialect::Pandoc).is_none());
+        assert!(try_parse_fence_open("~~~haskell foo", Dialect::Pandoc).is_none());
+        assert!(try_parse_fence_open("```@example foo bar", Dialect::Pandoc).is_none());
+        // A single bare word (with surrounding space) is still a valid fence.
+        assert!(try_parse_fence_open("```haskell ", Dialect::Pandoc).is_some());
+        assert!(try_parse_fence_open("``` haskell", Dialect::Pandoc).is_some());
+        // Braced attribute forms carry their own whitespace and stay valid.
+        assert!(try_parse_fence_open("```{.haskell .foo}", Dialect::Pandoc).is_some());
+        // Mixed `lang {attrs}` form (e.g. Quarto's `bash {filename="..."}`)
+        // is valid; extra words or trailing content after the brace are not.
+        assert!(try_parse_fence_open("```bash {filename=\"Terminal\"}", Dialect::Pandoc).is_some());
+        assert!(try_parse_fence_open("```haskell {.numberLines}", Dialect::Pandoc).is_some());
+        assert!(try_parse_fence_open("```haskell {.numberLines} foo", Dialect::Pandoc).is_none());
+        assert!(try_parse_fence_open("```haskell foo {.x}", Dialect::Pandoc).is_none());
+        assert!(try_parse_fence_open("```{.x} foo", Dialect::Pandoc).is_none());
+    }
+
+    #[test]
+    fn multiword_bare_info_is_a_fence_in_commonmark() {
+        // CommonMark/GFM take the first word as the language class and keep
+        // the rest of the info string, so the fence is still recognized.
+        let fence = try_parse_fence_open("```haskell foo", Dialect::CommonMark).unwrap();
+        assert_eq!(fence.info_string, "haskell foo");
+        assert!(try_parse_fence_open("~~~haskell foo", Dialect::CommonMark).is_some());
     }
 
     #[test]
@@ -1458,7 +1518,7 @@ mod tests {
 
     #[test]
     fn test_tilde_fence() {
-        let fence = try_parse_fence_open("~~~").unwrap();
+        let fence = try_parse_fence_open("~~~", Dialect::Pandoc).unwrap();
         assert_eq!(fence.fence_char, '~');
         assert_eq!(fence.fence_count, 3);
         assert_eq!(fence.info_string, "");
@@ -1466,18 +1526,18 @@ mod tests {
 
     #[test]
     fn test_long_fence() {
-        let fence = try_parse_fence_open("`````").unwrap();
+        let fence = try_parse_fence_open("`````", Dialect::Pandoc).unwrap();
         assert_eq!(fence.fence_count, 5);
     }
 
     #[test]
     fn test_two_backticks_invalid() {
-        assert!(try_parse_fence_open("``").is_none());
+        assert!(try_parse_fence_open("``", Dialect::Pandoc).is_none());
     }
 
     #[test]
     fn test_backtick_fence_with_backtick_in_info_is_invalid() {
-        assert!(try_parse_fence_open("`````hi````there`````").is_none());
+        assert!(try_parse_fence_open("`````hi````there`````", Dialect::Pandoc).is_none());
     }
 
     #[test]

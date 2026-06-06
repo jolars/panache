@@ -1,0 +1,37 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..63
+  CODE_BLOCK@0..28
+    CODE_FENCE_OPEN@0..16
+      CODE_FENCE_MARKER@0..3 "```"
+      CODE_INFO@3..15
+        CODE_LANGUAGE@3..11 "@example"
+        TEXT@11..15 " foo"
+      NEWLINE@15..16 "\n"
+    CODE_CONTENT@16..24
+      TEXT@16..23 "a = 1+1"
+      NEWLINE@23..24 "\n"
+    CODE_FENCE_CLOSE@24..28
+      CODE_FENCE_MARKER@24..27 "```"
+      NEWLINE@27..28 "\n"
+  BLANK_LINE@28..29
+    BLANK_LINE@28..29 "\n"
+  PARAGRAPH@29..43
+    TEXT@29..42 "A real block:"
+    NEWLINE@42..43 "\n"
+  BLANK_LINE@43..44
+    BLANK_LINE@43..44 "\n"
+  CODE_BLOCK@44..63
+    CODE_FENCE_OPEN@44..53
+      CODE_FENCE_MARKER@44..47 "```"
+      CODE_INFO@47..52
+        CODE_LANGUAGE@47..52 "julia"
+      NEWLINE@52..53 "\n"
+    CODE_CONTENT@53..59
+      TEXT@53..58 "b = 2"
+      NEWLINE@58..59 "\n"
+    CODE_FENCE_CLOSE@59..63
+      CODE_FENCE_MARKER@59..62 "```"
+      NEWLINE@62..63 "\n"

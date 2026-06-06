@@ -1709,7 +1709,7 @@ impl BlockParser for FencedCodeBlockParser {
             content
         };
 
-        let fence = try_parse_fence_open(content_to_check)?;
+        let fence = try_parse_fence_open(content_to_check, ctx.config.dialect)?;
         if (fence.fence_char == '`' && !ctx.config.extensions.backtick_code_blocks)
             || (fence.fence_char == '~' && !ctx.config.extensions.fenced_code_blocks)
         {
@@ -1844,7 +1844,7 @@ impl BlockParser for FencedCodeBlockParser {
             } else {
                 content
             };
-            try_parse_fence_open(content_to_check).expect("Fence should exist")
+            try_parse_fence_open(content_to_check, ctx.config.dialect).expect("Fence should exist")
         };
 
         // All container geometry travels inside the window's prefix; the

@@ -484,7 +484,7 @@ impl<'a> Parser<'a> {
             return None;
         }
         let text_owned = text.to_string();
-        let fence = code_blocks::try_parse_fence_open(&text_owned)?;
+        let fence = code_blocks::try_parse_fence_open(&text_owned, self.config.dialect)?;
         let common_mark_dialect = self.config.dialect == crate::options::Dialect::CommonMark;
         let has_info = !fence.info_string.trim().is_empty();
         let bq_depth = self.current_blockquote_depth();
@@ -1440,7 +1440,9 @@ impl<'a> Parser<'a> {
                             )
                         };
                         extras = self.dispatch_bq_after_list_item(finish);
-                    } else if let Some(fence) = code_blocks::try_parse_fence_open(content_slice) {
+                    } else if let Some(fence) =
+                        code_blocks::try_parse_fence_open(content_slice, self.config.dialect)
+                    {
                         self.containers.push(Container::Definition {
                             content_col,
                             plain_open: false,
@@ -2190,8 +2192,8 @@ impl<'a> Parser<'a> {
                 // append in this case.
                 let is_commonmark = self.config.dialect == crate::options::Dialect::CommonMark;
                 let interrupts_via_hr = is_commonmark && try_parse_horizontal_rule(line).is_some();
-                let interrupts_via_fence =
-                    is_commonmark && code_blocks::try_parse_fence_open(line).is_some();
+                let interrupts_via_fence = is_commonmark
+                    && code_blocks::try_parse_fence_open(line, self.config.dialect).is_some();
                 // A fenced-div closing fence terminates the blockquote rather
                 // than being swallowed as lazy paragraph text — but only while
                 // we're actually inside an open div. At the top level a lone
@@ -2257,8 +2259,8 @@ impl<'a> Parser<'a> {
             {
                 let is_commonmark = self.config.dialect == crate::options::Dialect::CommonMark;
                 let interrupts_via_hr = is_commonmark && try_parse_horizontal_rule(line).is_some();
-                let interrupts_via_fence =
-                    is_commonmark && code_blocks::try_parse_fence_open(line).is_some();
+                let interrupts_via_fence = is_commonmark
+                    && code_blocks::try_parse_fence_open(line, self.config.dialect).is_some();
                 if !interrupts_via_hr && !interrupts_via_fence {
                     if bq_depth > 0 {
                         let marker_info = self.marker_info_for_line(
@@ -2587,7 +2589,8 @@ impl<'a> Parser<'a> {
             // Fenced code blocks inside list items need marker emission in this branch.
             // If we keep continuation buffering for these lines, opening fence markers in
             // blockquote contexts can be dropped from CST text.
-            if list_item_continuation && code_blocks::try_parse_fence_open(inner_content).is_some()
+            if list_item_continuation
+                && code_blocks::try_parse_fence_open(inner_content, self.config.dialect).is_some()
             {
                 list_item_continuation = false;
             }
