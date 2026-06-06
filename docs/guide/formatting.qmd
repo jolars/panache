@@ -312,6 +312,19 @@ Output
     ```
     ````
 
+For a bare (unbraced) info string only the first word is the language class, but
+the rest of the info string is preserved verbatim rather than dropped. This
+keeps tool-specific metadata intact --- for example Documenter.jl's
+`@example foo`, `jldoctest; setup = :(...)`, or `@repl bar`:
+
+::: callout-note
+Multi-word bare info strings are only valid code fences under the CommonMark and
+GFM flavors. In the Pandoc flavor (matching `pandoc -t markdown`) a bare info
+string must be a single word; ```` ```@example foo ```` is parsed as an inline
+code span instead, so use a CommonMark-family flavor for documents that rely on
+this syntax.
+:::
+
 ### Indented Code Blocks
 
 Indented code blocks are normalized to fenced code blocks for consistency:

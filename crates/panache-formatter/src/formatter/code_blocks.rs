@@ -498,7 +498,14 @@ fn format_info_string(info_node: &SyntaxNode, info: &InfoString) -> String {
         CodeBlockType::DisplayShortcut { language } => {
             // Display block with shortcut syntax
             if info.attributes.is_empty() {
-                language.clone()
+                // Preserve the full info string, not just the first word.
+                // Only the first word is the language class, but the rest is
+                // meaningful, opaque metadata (e.g. Documenter.jl's
+                // `@example foo`, `jldoctest; setup = :(...)`, `@repl bar`)
+                // that must survive formatting. This bare multi-word form only
+                // reaches the formatter under CommonMark/GFM; the Pandoc
+                // dialect parses it as an inline code span upstream.
+                info.raw.trim().to_string()
             } else {
                 format!(
                     "{} {{{}}}",
