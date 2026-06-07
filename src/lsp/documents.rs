@@ -6,7 +6,7 @@ use tower_lsp_server::ls_types::*;
 
 use super::conversions::{apply_content_change, apply_content_change_with_edit_ranges};
 use super::handlers::diagnostics::lint_and_publish;
-use super::helpers::get_config;
+use super::helpers::{catch_cancelled, clone_salsa_db, get_config};
 use crate::lsp::{DocumentState, LspRuntimeSettings};
 use crate::parser::{parse_incremental_suffix_with_refdefs, parse_with_refdefs};
 use crate::syntax::SyntaxNode;
@@ -437,14 +437,25 @@ async fn relint_with_dependents(
 
     let mut dependent_uris: Vec<Uri> = Vec::new();
     if let Some(path) = path.as_ref() {
-        let (dependents, tracked_paths) = {
-            let db = salsa_db.lock().await;
-            let graph =
-                crate::salsa::project_graph(&*db, salsa_file, salsa_config, path.to_path_buf())
-                    .clone();
-            let dependents = graph.dependents(path, None);
-            let tracked_paths = tracked_paths_for_graph(path, &graph);
-            (dependents, tracked_paths)
+        // Run the (possibly cold, ~120ms) project-graph read on a cloned handle
+        // with the lock released, so an interactive request doesn't queue behind
+        // it. A concurrent edit cancels this background pass; the edit reschedules.
+        // Scope the clone so it drops before the `&mut` write below — salsa's
+        // write path waits to become the only live handle, so read handles are
+        // dropped as soon as the read finishes.
+        let read = {
+            let db = clone_salsa_db(salsa_db).await;
+            catch_cancelled(|| {
+                let graph =
+                    crate::salsa::project_graph(&db, salsa_file, salsa_config, path.to_path_buf())
+                        .clone();
+                let dependents = graph.dependents(path, None);
+                let tracked_paths = tracked_paths_for_graph(path, &graph);
+                (dependents, tracked_paths)
+            })
+        };
+        let Some((dependents, tracked_paths)) = read else {
+            return;
         };
         {
             let mut db = salsa_db.lock().await;

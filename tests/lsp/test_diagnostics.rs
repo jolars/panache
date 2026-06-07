@@ -182,6 +182,57 @@ async fn test_code_actions_offer_source_fix_all_for_fixable_diagnostics() {
     );
 }
 
+/// Saving a document in a multi-file include graph drives
+/// `relint_with_dependents`, which reads `project_graph` (and the lint plan) on
+/// *cloned* salsa handles with the global lock released, then performs
+/// `ensure_file_text_cached` writes for the tracked include paths. This guards
+/// that the cloned-handle read path stays live: the save completes (the timeout
+/// catches any hang from a read handle outliving a write) without panicking, and
+/// the parent's built-in lint plan still resolves afterwards.
+#[tokio::test]
+async fn test_save_in_include_graph_completes_and_resolves_diagnostics() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let parent_path = root.join("parent.qmd");
+    let child_path = root.join("child.qmd");
+
+    std::fs::write(&child_path, "# Child Heading\n\n### Skipped Level\n").unwrap();
+    std::fs::write(
+        &parent_path,
+        "{{< include child.qmd >}}\n\n# Parent Heading\n",
+    )
+    .unwrap();
+
+    let server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).unwrap().to_string();
+    server.initialize(&root_uri).await;
+
+    let parent_uri = Uri::from_file_path(&parent_path).unwrap().to_string();
+    server
+        .open_document(
+            &parent_uri,
+            &std::fs::read_to_string(&parent_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    // `did_save` awaits `relint_with_dependents` synchronously: the cloned-handle
+    // `project_graph` read, then `ensure_file_text_cached` writes on the tracked
+    // include path. The timeout is a liveness guard (a read handle outliving a
+    // write would hang here).
+    tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        server.save_document(&parent_uri),
+    )
+    .await
+    .expect("save in an include graph must complete");
+
+    assert!(
+        server.get_built_in_diagnostics(&parent_uri).await.is_some(),
+        "built-in diagnostics should still resolve after the save"
+    );
+}
+
 #[tokio::test]
 async fn test_code_actions_do_not_offer_source_fix_all_without_fixes() {
     let server = TestLspServer::new();

@@ -45,6 +45,34 @@ This document tracks implementation status for Panache's features.
       `full_reparse...incremental_disabled`). Low priority --- parse is \~7ms
       either way --- but the toggle is silently ineffective. Pairs with the
       existing "Configuration via LSP" item below.
+- [x] Run heavy background-lint salsa reads on a cloned db handle instead of
+      under the global lock. `relint_with_dependents` and `lint_and_publish`
+      held the single `Mutex<SalsaDb>` across the cold `project_graph` (\~120ms)
+      eval, so interactive requests (formatting/hover) queued behind a
+      background lint pass. salsa 0.26's db is `Send` but deliberately `!Sync`,
+      so reads now clone a per-task handle (`clone_salsa_db`, a cheap `Arc`
+      bump) and run the query with the lock released; `catch_cancelled` aborts a
+      pass a concurrent edit cancels. (An `RwLock<SalsaDb>` was the first idea
+      but the `!Sync` db rules it out --- `RwLock` needs `T: Sync` for
+      concurrent readers.)
+- [ ] Follow-up: offload the cold `project_graph` / `built_in_lint_plan` reads
+      to `spawn_blocking` if a cold relint is shown to starve the async runtime
+      (returns are owned/`Send`; pass `GreenNode`, not the red `SyntaxNode`,
+      across the boundary).
+- [ ] Follow-up: extend clone-out to the interactive navigation reads
+      (goto-definition/references/hover reach `project_graph` under the lock via
+      `get_definition_index_with_includes`) if profiling shows they stall behind
+      a cold graph. Would need `Cancelled::catch` + retry on the interactive
+      path rather than abort.
+- [ ] Revisit the LSP framework (tower-lsp-server vs `async-lsp` vs
+      rust-analyzer `lsp-server`) only if a future change actually fights
+      tower-lsp's per-handler-task model. `async-lsp` is the leading candidate
+      (tower-based, omnitrait `LanguageServer` keeps the `server.rs` shape,
+      shares `lsp-types`, first-class cancellation + `AnyEvent` loop injection;
+      caveat: 0.2.x, \~1 maintainer). A `Notifier`-trait + Result-alias
+      insulation seam would make any migration near-mechanical. Not pursued
+      speculatively --- the salsa lock contention that prompted the question was
+      a lock-granularity problem, not a framework problem.
 
 ### Core LSP Capabilities
 

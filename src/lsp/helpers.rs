@@ -18,6 +18,31 @@ use rowan::{NodeOrToken, TextRange, TextSize};
 
 use super::config::{load_config, load_config_with_source};
 
+/// Clone the salsa database handle out from under the global lock.
+///
+/// salsa's database is `Send` but deliberately `!Sync` (it carries per-thread
+/// local state), so concurrent reads use a cloned per-task handle rather than a
+/// shared `&db`. Cloning is a cheap `Arc` bump and all clones share the same
+/// query storage. Locking only long enough to clone lets a long read-query run
+/// *without* holding the lock, so interactive requests no longer queue behind a
+/// background lint pass's cold `project_graph` evaluation.
+pub(crate) async fn clone_salsa_db(
+    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+) -> crate::salsa::SalsaDb {
+    salsa_db.lock().await.clone()
+}
+
+/// Run a salsa read-query on a cloned handle, returning `None` if a concurrent
+/// write cancelled it.
+///
+/// A `&mut` write on another handle cancels in-flight queries (salsa unwinds
+/// with [`salsa::Cancelled`]). Background passes treat cancellation as "abort,
+/// the newer edit reschedules"; only salsa's own cancellation is caught — any
+/// other panic resumes unwinding.
+pub(crate) fn catch_cancelled<T>(f: impl FnOnce() -> T) -> Option<T> {
+    salsa::Cancelled::catch(std::panic::AssertUnwindSafe(f)).ok()
+}
+
 /// Helper to get document content from the document map
 pub(crate) async fn get_document_content(
     document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,

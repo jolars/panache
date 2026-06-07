@@ -6,7 +6,7 @@ use tower_lsp_server::Client;
 use tower_lsp_server::ls_types::*;
 
 use super::super::conversions::convert_diagnostic;
-use super::super::helpers::get_config;
+use super::super::helpers::{catch_cancelled, clone_salsa_db, get_config};
 use crate::lsp::DocumentState;
 
 /// Parse document and run linter, then publish diagnostics.
@@ -52,15 +52,27 @@ pub(crate) async fn lint_and_publish(
 
     // Use helper to load config
     let config = get_config(client, workspace_root, &uri).await;
+    let path = doc_state
+        .path
+        .clone()
+        .or_else(|| uri.to_file_path().map(|p| p.into_owned()))
+        .unwrap_or_else(|| PathBuf::from("<memory>"));
     let lint_plan = {
-        let path = doc_state
-            .path
+        // Cloned handle, lock released: the lint-plan read can be cold. A
+        // concurrent edit cancels it; the debounced reschedule retries.
+        let db = clone_salsa_db(salsa_db).await;
+        match catch_cancelled(|| {
+            crate::salsa::built_in_lint_plan(
+                &db,
+                doc_state.salsa_file,
+                doc_state.salsa_config,
+                path,
+            )
             .clone()
-            .or_else(|| uri.to_file_path().map(|p| p.into_owned()))
-            .unwrap_or_else(|| PathBuf::from("<memory>"));
-        let db = salsa_db.lock().await;
-        crate::salsa::built_in_lint_plan(&*db, doc_state.salsa_file, doc_state.salsa_config, path)
-            .clone()
+        }) {
+            Some(plan) => plan,
+            None => return,
+        }
     };
     let mut panache_diagnostics = lint_plan.diagnostics;
     let external_jobs = lint_plan.external_jobs;
@@ -111,26 +123,34 @@ pub(crate) async fn lint_and_publish(
     all_diagnostics.extend(lsp_diagnostics);
 
     let mut published_root = false;
+    let root_path = uri
+        .to_file_path()
+        .map(|p| p.into_owned())
+        .unwrap_or_else(|| PathBuf::from("<memory>"));
     let by_path: HashMap<PathBuf, Vec<crate::linter::diagnostics::Diagnostic>> = {
-        let db = salsa_db.lock().await;
-        let root_path = uri
-            .to_file_path()
-            .map(|p| p.into_owned())
-            .unwrap_or_else(|| PathBuf::from("<memory>"));
-        let mut by_path: HashMap<PathBuf, Vec<crate::linter::diagnostics::Diagnostic>> =
-            HashMap::new();
-        for entry in crate::salsa::project_graph::accumulated::<crate::salsa::GraphDiagnostic>(
-            &*db,
-            doc_state.salsa_file,
-            doc_state.salsa_config,
-            root_path.clone(),
-        ) {
+        // `accumulated` forces the (possibly cold) project-graph eval; run it on
+        // a cloned handle with the lock released so interactive reads aren't
+        // blocked. A concurrent edit cancels it and the reschedule retries.
+        let db = clone_salsa_db(salsa_db).await;
+        let Some(by_path) = catch_cancelled(|| {
+            let mut by_path: HashMap<PathBuf, Vec<crate::linter::diagnostics::Diagnostic>> =
+                HashMap::new();
+            for entry in crate::salsa::project_graph::accumulated::<crate::salsa::GraphDiagnostic>(
+                &db,
+                doc_state.salsa_file,
+                doc_state.salsa_config,
+                root_path.clone(),
+            ) {
+                by_path
+                    .entry(entry.0.path.clone())
+                    .or_default()
+                    .push(entry.0.diagnostic.clone());
+            }
+            by_path.entry(root_path.clone()).or_default();
             by_path
-                .entry(entry.0.path.clone())
-                .or_default()
-                .push(entry.0.diagnostic.clone());
-        }
-        by_path.entry(root_path).or_default();
+        }) else {
+            return;
+        };
         by_path
     };
 
