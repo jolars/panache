@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.10.0](https://github.com/jolars/panache/compare/panache-formatter-v0.9.0...panache-formatter-v0.10.0) (2026-06-07)
+
+### Features
+- **formatter:** add experimental math content formatter ([`a0e5f51`](https://github.com/jolars/panache/commit/a0e5f51c4ca7cde204eb3fe1f277f74775272571))
+- **parser:** parse math content into a structural CST ([`cfb0c45`](https://github.com/jolars/panache/commit/cfb0c45f5173b49a49853660d1f4030debedd26c))
+- **parser:** swap YAML parser to our built-in parser ([`4ed243a`](https://github.com/jolars/panache/commit/4ed243ab2c8d9d9d5a0bc404ffaccf44c9b28ea7))
+- **formatter:** swap YAML formatting over to our own formatter ([`9e722e5`](https://github.com/jolars/panache/commit/9e722e5b9a9a412bb20d523ab354cee520326a96))
+- **extensions:** add `wikilinks_title_after/before_pipe` ([`49500f1`](https://github.com/jolars/panache/commit/49500f12b27851789942b18b13db68d4fd691726))
+
+### Bug Fixes
+- **formatter:** preserve full code fence info string ([`e9638be`](https://github.com/jolars/panache/commit/e9638bef4529d43349a51d92293f4d4182a9181b)), closes [#356](https://github.com/jolars/panache/issues/356)
+- **parser:** don't strip blockquote markers in `<details>` ([`4579dd8`](https://github.com/jolars/panache/commit/4579dd8204db754ca44451d3accd361b702f1675)), closes [#350](https://github.com/jolars/panache/issues/350)
+- **formatter:** align nested pipe tables to container indent (#346) ([`1095aee`](https://github.com/jolars/panache/commit/1095aee302e3b97c9c19958bfc777abb2deb0c96))
+
+### Dependencies
+- updated crates/panache-parser to v0.15.0
+
 ## [0.9.0](https://github.com/jolars/panache/compare/panache-formatter-v0.8.0...panache-formatter-v0.9.0) (2026-06-02)
 
 ### Features
