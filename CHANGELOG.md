@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [2.52.0](https://github.com/jolars/panache/compare/v2.51.0...v2.52.0) (2026-06-07)
 
 This release comes with two major changes:
 
@@ -24,6 +24,44 @@ This release comes with two major changes:
   hashpipe YAML syntax for Quarto/R Markdown documents. The changes won't be
   immediately visible to users, but will pave the way for better linting
   and LSP features in the future.
+
+### Features
+- **parser:** tokenize math operators into `MATH_OPERATOR` ([`303e05b`](https://github.com/jolars/panache/commit/303e05bdd245f08fdb7c2244df6c1df198faaea4))
+- **formatter:** add experimental math content formatter ([`a0e5f51`](https://github.com/jolars/panache/commit/a0e5f51c4ca7cde204eb3fe1f277f74775272571))
+- **linter:** surface math diagnostics via `math-syntax` rule ([`20c0b5b`](https://github.com/jolars/panache/commit/20c0b5b682c1fde65bd70e9f27e77738384f74ae))
+- **parser:** parse math content into a structural CST ([`cfb0c45`](https://github.com/jolars/panache/commit/cfb0c45f5173b49a49853660d1f4030debedd26c))
+- **lsp:** source YAML parse-error diagnostics from the parser channel ([`ad2ec30`](https://github.com/jolars/panache/commit/ad2ec306aa92dd1eeffa0145a21b8c334087e4c7))
+- **parser:** prefix-aware YAML scanner and builder ([`66a8e99`](https://github.com/jolars/panache/commit/66a8e99bdcb6c2b803bfa9ce227b132031006f3d))
+- **parser:** swap YAML parser to our built-in parser ([`4ed243a`](https://github.com/jolars/panache/commit/4ed243ab2c8d9d9d5a0bc404ffaccf44c9b28ea7))
+- **formatter:** swap YAML formatting over to our own formatter ([`9e722e5`](https://github.com/jolars/panache/commit/9e722e5b9a9a412bb20d523ab354cee520326a96))
+- **extensions:** add `space_reference_links` extension ([`309739d`](https://github.com/jolars/panache/commit/309739dbaf54dc84d588fbc45285bcb96795177e))
+- **extensions:** add `wikilinks_title_after/before_pipe` ([`49500f1`](https://github.com/jolars/panache/commit/49500f12b27851789942b18b13db68d4fd691726))
+- **parser:** add syntax-error channel for embedded YAML ([`523fb62`](https://github.com/jolars/panache/commit/523fb62306ab9e0749651b6e4103cf8e3510f9d2))
+- **parser:** embed prefix-aware YAML under HASHPIPE_YAML_CONTENT ([`d515896`](https://github.com/jolars/panache/commit/d515896f6da9ad307015c69c5348ee1d077d7b2a))
+- **parser:** drop host envelope from standalone YAML parse ([`5fecc99`](https://github.com/jolars/panache/commit/5fecc99a61e8429c97764f0a34590ef5d28c223f))
+- inline YAML parser CST into Panache's CST ([`d240130`](https://github.com/jolars/panache/commit/d240130a59cc8018227d7d4fe71fae9b39ea0947))
+
+### Bug Fixes
+- **formatter:** preserve full code fence info string ([`e9638be`](https://github.com/jolars/panache/commit/e9638bef4529d43349a51d92293f4d4182a9181b)), closes [#356](https://github.com/jolars/panache/issues/356)
+- **linter:** raise `math-syntax` diagnostics to error ([`238a3de`](https://github.com/jolars/panache/commit/238a3de0f6e58aa8dfc1af41f1d2135b9630f46c))
+- **linter:** catch stray `:::` inside tight list items ([`d88856d`](https://github.com/jolars/panache/commit/d88856de74824812c73086a4b65c9a21f20ad9a8)), closes [#333](https://github.com/jolars/panache/issues/333)
+- **parser:** don't strip blockquote markers in `<details>` ([`4579dd8`](https://github.com/jolars/panache/commit/4579dd8204db754ca44451d3accd361b702f1675)), closes [#350](https://github.com/jolars/panache/issues/350)
+- **formatter:** align nested pipe tables to container indent (#346) ([`1095aee`](https://github.com/jolars/panache/commit/1095aee302e3b97c9c19958bfc777abb2deb0c96))
+- **parser:** reject bare multi-word fence info in Pandoc ([`395b000`](https://github.com/jolars/panache/commit/395b0008c0a46f7a490d982f793f2dbe0f3a7737))
+- **parser:** peel line prefix after a hashpipe block scalar ([`e246d30`](https://github.com/jolars/panache/commit/e246d30ca7aedf6cc96707dd30a14247f4736760))
+- **parser:** don't start list at continuation for footnote def ([`9494b14`](https://github.com/jolars/panache/commit/9494b143e69cdb8d02ab99ad88b087ff9970a8ee)), closes [#348](https://github.com/jolars/panache/issues/348)
+- **parser:** detect grid borders on dispatch line inside list items ([`e7fa051`](https://github.com/jolars/panache/commit/e7fa05124e3b4c2d14aceb13ce154bda022270e4))
+- **parser:** lift tables and fenced divs from list-item content ([`6f3821c`](https://github.com/jolars/panache/commit/6f3821c4d7bedbcd47d56ad0851eac015f05adcd))
+
+### Performance Improvements
+- **lsp:** run heavy lint reads on cloned salsa handle ([`111f6cc`](https://github.com/jolars/panache/commit/111f6cc6e3f10ea7c9343776e022a80464da7056))
+- **linter:** share one CST walk across built-in rules ([`8569bbf`](https://github.com/jolars/panache/commit/8569bbf01b25329c4377a7baad22ada08ae7e207))
+- **lsp:** debounce diagnostics, lint externally on save ([`99310a5`](https://github.com/jolars/panache/commit/99310a52918869abb1ddbd8bcd538fe26f289f64))
+- **parser:** gate table detection before whole-buffer strip ([`f27fc80`](https://github.com/jolars/panache/commit/f27fc80f0e2b4fa7a351d35d0a7195e048ca666c))
+
+### Dependencies
+- updated crates/panache-formatter to v0.10.0
+- updated crates/panache-parser to v0.15.0
 
 ## [2.51.0](https://github.com/jolars/panache/compare/v2.50.0...v2.51.0) (2026-06-02)
 

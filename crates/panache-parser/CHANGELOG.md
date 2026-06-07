@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.15.0](https://github.com/jolars/panache/compare/panache-parser-v0.14.0...panache-parser-v0.15.0) (2026-06-07)
+
+### Features
+- **parser:** tokenize math operators into `MATH_OPERATOR` ([`303e05b`](https://github.com/jolars/panache/commit/303e05bdd245f08fdb7c2244df6c1df198faaea4))
+- **parser:** parse math content into a structural CST ([`cfb0c45`](https://github.com/jolars/panache/commit/cfb0c45f5173b49a49853660d1f4030debedd26c))
+- **parser:** add syntax-error channel for embedded YAML ([`523fb62`](https://github.com/jolars/panache/commit/523fb62306ab9e0749651b6e4103cf8e3510f9d2))
+- **parser:** embed prefix-aware YAML under HASHPIPE_YAML_CONTENT ([`d515896`](https://github.com/jolars/panache/commit/d515896f6da9ad307015c69c5348ee1d077d7b2a))
+- **parser:** prefix-aware YAML scanner and builder ([`66a8e99`](https://github.com/jolars/panache/commit/66a8e99bdcb6c2b803bfa9ce227b132031006f3d))
+- **parser:** drop host envelope from standalone YAML parse ([`5fecc99`](https://github.com/jolars/panache/commit/5fecc99a61e8429c97764f0a34590ef5d28c223f))
+- inline YAML parser CST into Panache's CST ([`d240130`](https://github.com/jolars/panache/commit/d240130a59cc8018227d7d4fe71fae9b39ea0947))
+- **parser:** swap YAML parser to our built-in parser ([`4ed243a`](https://github.com/jolars/panache/commit/4ed243ab2c8d9d9d5a0bc404ffaccf44c9b28ea7))
+- **extensions:** add `space_reference_links` extension ([`309739d`](https://github.com/jolars/panache/commit/309739dbaf54dc84d588fbc45285bcb96795177e))
+- **extensions:** add `wikilinks_title_after/before_pipe` ([`49500f1`](https://github.com/jolars/panache/commit/49500f12b27851789942b18b13db68d4fd691726))
+
+### Bug Fixes
+- **parser:** reject bare multi-word fence info in Pandoc ([`395b000`](https://github.com/jolars/panache/commit/395b0008c0a46f7a490d982f793f2dbe0f3a7737))
+- **parser:** peel line prefix after a hashpipe block scalar ([`e246d30`](https://github.com/jolars/panache/commit/e246d30ca7aedf6cc96707dd30a14247f4736760))
+- **parser:** don't start list at continuation for footnote def ([`9494b14`](https://github.com/jolars/panache/commit/9494b143e69cdb8d02ab99ad88b087ff9970a8ee)), closes [#348](https://github.com/jolars/panache/issues/348)
+- **parser:** detect grid borders on dispatch line inside list items ([`e7fa051`](https://github.com/jolars/panache/commit/e7fa05124e3b4c2d14aceb13ce154bda022270e4))
+- **parser:** lift tables and fenced divs from list-item content ([`6f3821c`](https://github.com/jolars/panache/commit/6f3821c4d7bedbcd47d56ad0851eac015f05adcd))
+
+### Performance Improvements
+- **parser:** gate table detection before whole-buffer strip ([`f27fc80`](https://github.com/jolars/panache/commit/f27fc80f0e2b4fa7a351d35d0a7195e048ca666c))
+
 ## [0.14.0](https://github.com/jolars/panache/compare/panache-parser-v0.13.0...panache-parser-v0.14.0) (2026-06-02)
 
 ### Features
