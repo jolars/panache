@@ -1,22 +1,20 @@
 //! Tests for navigation features (document symbols, folding, goto definition).
 
 use super::helpers::*;
+use lsp_types::*;
 use std::fs;
 use tempfile::TempDir;
-use tower_lsp_server::ls_types::*;
 
-#[tokio::test]
-async fn test_document_symbols_hierarchical() {
-    let server = TestLspServer::new();
+#[test]
+fn test_document_symbols_hierarchical() {
+    let mut server = TestLspServer::new();
 
     // Open a document with nested headings
     let content = "# Top Level\n\n## Section 1\n\nContent.\n\n## Section 2\n\n### Subsection\n\nMore content.";
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
     // Request document symbols
-    let symbols = server.get_symbols("file:///test.qmd").await;
+    let symbols = server.get_symbols("file:///test.qmd");
 
     assert!(symbols.is_some());
     if let Some(DocumentSymbolResponse::Nested(syms)) = symbols {
@@ -39,17 +37,15 @@ async fn test_document_symbols_hierarchical() {
     }
 }
 
-#[tokio::test]
-async fn test_document_symbols_with_table() {
-    let server = TestLspServer::new();
+#[test]
+fn test_document_symbols_with_table() {
+    let mut server = TestLspServer::new();
 
     // Open a document with heading and table
     let content = "# Report\n\n| Col1 | Col2 |\n|------|------|\n| A    | B    |\n\nText.";
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
-    let symbols = server.get_symbols("file:///test.qmd").await;
+    let symbols = server.get_symbols("file:///test.qmd");
 
     assert!(symbols.is_some());
     if let Some(DocumentSymbolResponse::Nested(syms)) = symbols {
@@ -69,15 +65,13 @@ async fn test_document_symbols_with_table() {
     }
 }
 
-#[tokio::test]
-async fn test_document_symbols_include_yaml_frontmatter_symbol() {
-    let server = TestLspServer::new();
+#[test]
+fn test_document_symbols_include_yaml_frontmatter_symbol() {
+    let mut server = TestLspServer::new();
     let content = "---\ntitle: Report\n---\n\n# Report\n\nBody.";
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
-    let symbols = server.get_symbols("file:///test.qmd").await;
+    let symbols = server.get_symbols("file:///test.qmd");
     let Some(DocumentSymbolResponse::Nested(syms)) = symbols else {
         panic!("Expected nested document symbols");
     };
@@ -87,15 +81,13 @@ async fn test_document_symbols_include_yaml_frontmatter_symbol() {
     );
 }
 
-#[tokio::test]
-async fn test_document_symbols_headings_use_outline_visible_kind_for_qmd() {
-    let server = TestLspServer::new();
+#[test]
+fn test_document_symbols_headings_use_outline_visible_kind_for_qmd() {
+    let mut server = TestLspServer::new();
     let content = "---\ntitle: Report\n---\n\n# Report\n\n## Details\n";
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
-    let symbols = server.get_symbols("file:///test.qmd").await;
+    let symbols = server.get_symbols("file:///test.qmd");
     let Some(DocumentSymbolResponse::Nested(syms)) = symbols else {
         panic!("Expected nested document symbols");
     };
@@ -107,15 +99,13 @@ async fn test_document_symbols_headings_use_outline_visible_kind_for_qmd() {
     assert_eq!(heading.kind, SymbolKind::NAMESPACE);
 }
 
-#[tokio::test]
-async fn test_document_symbols_headings_use_outline_visible_kind_for_rmd() {
-    let server = TestLspServer::new();
+#[test]
+fn test_document_symbols_headings_use_outline_visible_kind_for_rmd() {
+    let mut server = TestLspServer::new();
     let content = "---\ntitle: Report\n---\n\n# Report\n\n## Details\n";
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
-    let symbols = server.get_symbols("file:///test.Rmd").await;
+    let symbols = server.get_symbols("file:///test.Rmd");
     let Some(DocumentSymbolResponse::Nested(syms)) = symbols else {
         panic!("Expected nested document symbols");
     };
@@ -127,17 +117,15 @@ async fn test_document_symbols_headings_use_outline_visible_kind_for_rmd() {
     assert_eq!(heading.kind, SymbolKind::NAMESPACE);
 }
 
-#[tokio::test]
-async fn test_folding_ranges_headings() {
-    let server = TestLspServer::new();
+#[test]
+fn test_folding_ranges_headings() {
+    let mut server = TestLspServer::new();
 
     // Open a document with multiple headings
     let content = "# Heading 1\n\nContent 1.\n\n# Heading 2\n\nContent 2.";
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
-    let ranges = server.get_folding_ranges("file:///test.qmd").await;
+    let ranges = server.get_folding_ranges("file:///test.qmd");
 
     assert!(ranges.is_some());
     let ranges = ranges.unwrap();
@@ -149,17 +137,15 @@ async fn test_folding_ranges_headings() {
     assert_eq!(ranges[0].start_line, 0);
 }
 
-#[tokio::test]
-async fn test_folding_ranges_code_block() {
-    let server = TestLspServer::new();
+#[test]
+fn test_folding_ranges_code_block() {
+    let mut server = TestLspServer::new();
 
     // Open a document with a code block
     let content = "# Doc\n\n```python\nprint('hello')\nprint('world')\n```\n\nText.";
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
-    let ranges = server.get_folding_ranges("file:///test.qmd").await;
+    let ranges = server.get_folding_ranges("file:///test.qmd");
 
     assert!(ranges.is_some());
     let ranges = ranges.unwrap();
@@ -172,17 +158,17 @@ async fn test_folding_ranges_code_block() {
     assert!(code_fold.is_some(), "Should have fold for code block");
 }
 
-#[tokio::test]
-async fn test_workspace_symbols_include_open_standalone_document() {
-    let server = TestLspServer::new();
+#[test]
+fn test_workspace_symbols_include_open_standalone_document() {
+    let mut server = TestLspServer::new();
     let content = "# Intro\n\n## Methods\n";
     let temp_dir = TempDir::new().unwrap();
     let uri = Uri::from_file_path(temp_dir.path().join("standalone.md"))
         .unwrap()
         .to_string();
-    server.open_document(&uri, content, "markdown").await;
+    server.open_document(&uri, content, "markdown");
 
-    let symbols = server.get_workspace_symbols("intro").await;
+    let symbols = server.get_workspace_symbols("intro");
     let Some(symbols) = symbols else {
         panic!("Expected workspace symbols");
     };
@@ -191,9 +177,9 @@ async fn test_workspace_symbols_include_open_standalone_document() {
     assert_eq!(symbols[0].name, "Intro");
 }
 
-#[tokio::test]
-async fn test_workspace_symbols_include_multiple_open_documents() {
-    let server = TestLspServer::new();
+#[test]
+fn test_workspace_symbols_include_multiple_open_documents() {
+    let mut server = TestLspServer::new();
     let temp_dir = TempDir::new().unwrap();
     let doc1_uri = Uri::from_file_path(temp_dir.path().join("doc1.qmd"))
         .unwrap()
@@ -201,14 +187,10 @@ async fn test_workspace_symbols_include_multiple_open_documents() {
     let doc2_uri = Uri::from_file_path(temp_dir.path().join("doc2.qmd"))
         .unwrap()
         .to_string();
-    server
-        .open_document(&doc1_uri, "# Alpha\n\n## Shared\n", "quarto")
-        .await;
-    server
-        .open_document(&doc2_uri, "# Beta\n\n## Shared\n", "quarto")
-        .await;
+    server.open_document(&doc1_uri, "# Alpha\n\n## Shared\n", "quarto");
+    server.open_document(&doc2_uri, "# Beta\n\n## Shared\n", "quarto");
 
-    let symbols = server.get_workspace_symbols("shared").await;
+    let symbols = server.get_workspace_symbols("shared");
     let Some(symbols) = symbols else {
         panic!("Expected workspace symbols");
     };
@@ -219,8 +201,8 @@ async fn test_workspace_symbols_include_multiple_open_documents() {
     assert_ne!(symbols[0].location.uri, symbols[1].location.uri);
 }
 
-#[tokio::test]
-async fn test_workspace_symbols_include_graph_documents() {
+#[test]
+fn test_workspace_symbols_include_graph_documents() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     let parent_path = root.join("parent.qmd");
@@ -233,18 +215,16 @@ async fn test_workspace_symbols_include_graph_documents() {
     )
     .unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(root).unwrap().to_string();
-    server.initialize(&root_uri).await;
-    server
-        .open_document(
-            &Uri::from_file_path(&parent_path).unwrap().to_string(),
-            &fs::read_to_string(&parent_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(&root_uri);
+    server.open_document(
+        &Uri::from_file_path(&parent_path).unwrap().to_string(),
+        &fs::read_to_string(&parent_path).unwrap(),
+        "quarto",
+    );
 
-    let symbols = server.get_workspace_symbols("child heading").await;
+    let symbols = server.get_workspace_symbols("child heading");
     let Some(symbols) = symbols else {
         panic!("Expected workspace symbols");
     };

@@ -1,4 +1,4 @@
-use tower_lsp_server::ls_types::*;
+use lsp_types::*;
 
 use crate::linter;
 use crate::linter::Severity as PanacheSeverity;

@@ -1,20 +1,37 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tower_lsp_server::{Client, LspService, Server};
+// `lsp_types::Uri` (fluent_uri-backed) trips `clippy::mutable_key_type` when used
+// as a `HashMap`/`HashSet` key, but we never mutate keys and the protocol type
+// `WorkspaceEdit.changes` mandates `HashMap<Uri, _>`. Allow it module-wide.
+#![allow(clippy::mutable_key_type)]
 
+use std::path::PathBuf;
+use std::time::Duration;
+
+use crossbeam_channel::select;
+use lsp_server::{Connection, Message};
+use lsp_types::InitializeParams;
+use lsp_types::notification::Notification as _;
 use rowan::GreenNode;
 
 mod config;
 mod context;
 mod conversions;
+mod dispatch;
 mod documents;
+pub(crate) mod global_state;
 mod handlers;
 mod helpers;
 mod navigation;
-mod server;
 mod symbols;
+mod task_pool;
+#[doc(hidden)]
+pub mod testing;
+mod uri_ext;
+
+pub(crate) use global_state::{ClientSender, GlobalState};
+#[doc(hidden)]
+pub use testing::{LspTester, WorkspaceSymbolSummary};
+#[doc(hidden)]
+pub use uri_ext::UriExt;
 
 /// State for a single document in the LSP.
 #[derive(Clone)]
@@ -36,81 +53,70 @@ pub struct LspRuntimeSettings {
     pub experimental_incremental_parsing: bool,
 }
 
-pub struct PanacheLsp {
-    client: Client,
-    // Use String keys since Uri doesn't implement Send
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    runtime_settings: Arc<Mutex<LspRuntimeSettings>>,
-    /// In-flight debounced lint tasks, keyed by document URI string.
-    pending_diagnostics: documents::PendingDiagnostics,
+fn to_io<E: std::fmt::Display>(e: E) -> std::io::Error {
+    std::io::Error::other(e.to_string())
 }
 
-impl PanacheLsp {
-    pub fn new(client: Client) -> Self {
-        Self {
-            client,
-            document_map: Arc::new(Mutex::new(HashMap::new())),
-            workspace_root: Arc::new(Mutex::new(None)),
-            salsa_db: Arc::new(Mutex::new(crate::salsa::SalsaDb::default())),
-            runtime_settings: Arc::new(Mutex::new(LspRuntimeSettings::default())),
-            pending_diagnostics: Arc::new(Mutex::new(HashMap::new())),
+/// Run the language server over stdio until the client disconnects.
+pub fn run() -> std::io::Result<()> {
+    let (connection, io_threads) = Connection::stdio();
+
+    let capabilities = serde_json::to_value(dispatch::server_capabilities()).map_err(to_io)?;
+    // Performs the full initialize/initialized handshake and returns the params.
+    let init_value = connection.initialize(capabilities).map_err(to_io)?;
+    let init_params: InitializeParams = serde_json::from_value(init_value).map_err(to_io)?;
+
+    let mut gs = GlobalState::new(ClientSender::new(connection.sender.clone()));
+    gs.on_initialize(init_params);
+    gs.on_initialized();
+
+    main_loop(&mut gs, &connection)?;
+
+    drop(connection);
+    io_threads.join()?;
+    Ok(())
+}
+
+fn main_loop(gs: &mut GlobalState, conn: &Connection) -> std::io::Result<()> {
+    // Clone the worker-result receiver so the `select!` doesn't borrow `gs`.
+    let task_rx = gs.task_receiver.clone();
+
+    loop {
+        // Block until the next message, a finished task, or the nearest lint
+        // deadline (so debounced lints fire even when the client is idle).
+        let timeout = gs
+            .next_lint_timeout()
+            .unwrap_or_else(|| Duration::from_secs(3600));
+
+        select! {
+            recv(conn.receiver) -> msg => {
+                let Ok(msg) = msg else { break };
+                match msg {
+                    Message::Request(req) => {
+                        if conn.handle_shutdown(&req).map_err(to_io)? {
+                            break;
+                        }
+                        gs.on_request(req);
+                    }
+                    Message::Notification(not) => {
+                        if not.method == lsp_types::notification::Exit::METHOD {
+                            break;
+                        }
+                        gs.on_notification(not);
+                    }
+                    Message::Response(resp) => gs.on_client_response(resp),
+                }
+            }
+            recv(task_rx) -> task => {
+                if let Ok(task) = task {
+                    gs.on_task(task);
+                }
+            }
+            default(timeout) => {}
         }
+
+        gs.dispatch_due_lints();
     }
-
-    /// Get access to the document map for testing purposes.
-    ///
-    /// This method is only available when the `lsp` feature is enabled
-    /// and is intended for use in integration tests.
-    #[doc(hidden)]
-    pub fn document_map(&self) -> Arc<Mutex<HashMap<String, DocumentState>>> {
-        Arc::clone(&self.document_map)
-    }
-
-    /// Get access to the workspace root for testing purposes.
-    ///
-    /// This method is only available when the `lsp` feature is enabled
-    /// and is intended for use in integration tests.
-    #[doc(hidden)]
-    pub fn workspace_root(&self) -> Arc<Mutex<Option<PathBuf>>> {
-        Arc::clone(&self.workspace_root)
-    }
-
-    /// Get access to the salsa database for testing purposes.
-    #[doc(hidden)]
-    pub fn salsa_db(&self) -> Arc<Mutex<crate::salsa::SalsaDb>> {
-        Arc::clone(&self.salsa_db)
-    }
-
-    #[doc(hidden)]
-    pub fn runtime_settings(&self) -> Arc<Mutex<LspRuntimeSettings>> {
-        Arc::clone(&self.runtime_settings)
-    }
-
-    /// Trigger didChangeWatchedFiles for tests.
-    #[doc(hidden)]
-    pub async fn did_change_watched_files(
-        &self,
-        params: tower_lsp_server::ls_types::DidChangeWatchedFilesParams,
-    ) {
-        crate::lsp::handlers::file_watcher::did_change_watched_files(
-            &self.client,
-            Arc::clone(&self.document_map),
-            Arc::clone(&self.salsa_db),
-            Arc::clone(&self.workspace_root),
-            params,
-        )
-        .await;
-    }
-}
-
-pub async fn run() -> std::io::Result<()> {
-    let stdin = tokio::io::stdin();
-    let stdout = tokio::io::stdout();
-
-    let (service, socket) = LspService::new(PanacheLsp::new);
-    Server::new(stdin, stdout, socket).serve(service).await;
 
     Ok(())
 }

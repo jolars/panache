@@ -1,12 +1,6 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
+use lsp_types::*;
 
-use tokio::sync::Mutex;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::*;
-
-use crate::lsp::DocumentState;
+use crate::lsp::global_state::StateSnapshot;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 use crate::syntax::{AstNode, Link};
 use crate::utils::{normalize_anchor_label, normalize_label};
@@ -14,46 +8,30 @@ use crate::utils::{normalize_anchor_label, normalize_label};
 use super::super::conversions::{offset_to_position, position_to_offset};
 use super::super::helpers;
 
-pub(crate) async fn references(
-    client: &tower_lsp_server::Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
-    params: ReferenceParams,
-) -> Result<Option<Vec<Location>>> {
+pub(crate) fn references(snap: &StateSnapshot, params: ReferenceParams) -> Option<Vec<Location>> {
     let uri = params.text_document_position.text_document.uri;
     let position = params.text_document_position.position;
     let include_declaration = params.context.include_declaration;
-    let config = helpers::get_config(client, &workspace_root, &uri).await;
+    let config = snap.config(&uri);
 
-    let Some(ctx) =
-        crate::lsp::context::get_open_document_context(&document_map, &salsa_db, &uri).await
-    else {
-        return Ok(None);
-    };
+    let ctx = crate::lsp::context::get_open_document_context(snap, &uri)?;
     let salsa_file = ctx.salsa_file;
     let salsa_config = ctx.salsa_config;
     let doc_path = ctx.path.clone();
     let content = ctx.content.clone();
     let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
 
-    let Some(doc_path) = doc_path.clone() else {
-        return Ok(None);
-    };
-    let Some(offset) = position_to_offset(&content, position) else {
-        return Ok(None);
-    };
+    let doc_path = doc_path.clone()?;
+    let offset = position_to_offset(&content, position)?;
     if helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset) {
-        return Ok(None);
+        return None;
     }
 
     let target = {
         let root = ctx.syntax_root();
         resolve_symbol_target_at_offset(&root, offset)
     };
-    let Some(target) = target else {
-        return Ok(None);
-    };
+    let target = target?;
 
     let heading_link_is_explicit_anchor = if matches!(target, SymbolTarget::HeadingLink(_)) {
         let root = ctx.syntax_root();
@@ -65,14 +43,13 @@ pub(crate) async fn references(
     let mut locations = Vec::new();
     let citation_def_index = {
         let docs = crate::lsp::navigation::project_symbol_documents(
-            &salsa_db,
+            &snap.db,
             salsa_file,
             salsa_config,
             &doc_path,
             &uri,
             &content,
-        )
-        .await;
+        );
 
         for doc in docs {
             let doc_uri = doc.uri;
@@ -184,10 +161,9 @@ pub(crate) async fn references(
         if include_declaration {
             let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
             if yaml_ok {
-                let db = salsa_db.lock().await;
                 Some(
                     crate::salsa::citation_definition_index(
-                        &*db,
+                        &snap.db,
                         salsa_file,
                         salsa_config,
                         doc_path.clone(),
@@ -205,9 +181,8 @@ pub(crate) async fn references(
     if include_declaration
         && let (SymbolTarget::Citation(key), Some(index)) = (&target, citation_def_index.as_ref())
     {
-        let db = salsa_db.lock().await;
         locations.extend(helpers::citation_definition_locations(
-            index, key, &uri, &content, &*db,
+            index, key, &uri, &content, &snap.db,
         ));
     }
 
@@ -223,9 +198,9 @@ pub(crate) async fn references(
     locations.dedup_by(|a, b| a.uri == b.uri && a.range == b.range);
 
     if locations.is_empty() {
-        return Ok(None);
+        return None;
     }
-    Ok(Some(locations))
+    Some(locations)
 }
 
 fn add_locations(out: &mut Vec<Location>, uri: &Uri, text: &str, ranges: &[rowan::TextRange]) {

@@ -1,87 +1,44 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tower_lsp_server::Client;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::*;
+//! `textDocument/formatting` and `rangeFormatting`.
+//!
+//! Runs on a [`TaskPool`](crate::lsp::task_pool) worker over a
+//! [`StateSnapshot`]; formatting itself is the synchronous [`crate::format`],
+//! which routes through the synchronous external-formatter path.
 
-use super::super::conversions::offset_to_position;
-use super::super::helpers::{
-    get_document_and_config, get_document_config_and_source, is_uri_excluded,
+use lsp_types::{
+    DocumentFormattingParams, DocumentRangeFormattingParams, Position, Range, TextEdit,
 };
-use crate::lsp::DocumentState;
+
+use super::super::conversions::{offset_to_position, position_to_offset};
+use super::super::helpers::is_uri_excluded;
+use crate::lsp::global_state::StateSnapshot;
 use crate::{parser, range_utils};
 
-/// Handle textDocument/formatting request
-pub(crate) async fn format_document(
-    client: &Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
+/// Handle `textDocument/formatting`.
+pub(crate) fn format_document(
+    snap: &StateSnapshot,
     params: DocumentFormattingParams,
-) -> Result<Option<Vec<TextEdit>>> {
+) -> Option<Vec<TextEdit>> {
     let uri = params.text_document.uri;
-    log::debug!("format_document uri={}", *uri);
+    log::debug!("format_document uri={}", uri.as_str());
 
-    client
-        .log_message(
-            MessageType::INFO,
-            format!("Formatting request for {}", *uri),
-        )
-        .await;
-
-    // Use helper to get document, config, and the source needed for
-    // exclude-pattern resolution.
-    let (text, config, source, workspace_root) = match get_document_config_and_source(
-        client,
-        &document_map,
-        &salsa_db,
-        &workspace_root,
-        &uri,
-    )
-    .await
-    {
-        Some(result) => result,
-        None => {
-            client
-                .log_message(MessageType::ERROR, format!("Document not found: {}", *uri))
-                .await;
-            return Ok(None);
-        }
-    };
+    let (text, config, source, workspace_root) = snap.document_config_and_source(&uri)?;
 
     if is_uri_excluded(&uri, &config, &source, workspace_root.as_deref()) {
-        client
-            .log_message(
-                MessageType::INFO,
-                format!("Skipping formatting (matched exclude pattern): {}", *uri),
-            )
-            .await;
-        return Ok(None);
+        log::info!(
+            "Skipping formatting (matched exclude pattern): {}",
+            uri.as_str()
+        );
+        return None;
     }
 
-    // Run formatting in a blocking task (because rowan::SyntaxNode isn't Send)
-    // but use format_async inside to support external formatters
-    let text_clone = text.clone();
-    let formatted = tokio::task::spawn_blocking(move || {
-        // Create a new tokio runtime for async external formatters
-        tokio::runtime::Runtime::new()
-            .expect("Failed to create runtime")
-            .block_on(crate::format_async(&text_clone, Some(config), None))
-    })
-    .await
-    .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
+    let formatted = crate::format(&text, Some(config), None);
 
-    // If the content didn't change, return None
     if formatted == text {
-        return Ok(None);
+        return None;
     }
 
-    // Calculate the range to replace (entire document)
-    // Use text.len() to ensure we include any trailing newlines
+    // Replace the entire document; use text.len() to include trailing newlines.
     let end_position = offset_to_position(&text, text.len());
-
     let range = Range {
         start: Position {
             line: 0,
@@ -90,151 +47,63 @@ pub(crate) async fn format_document(
         end: end_position,
     };
 
-    Ok(Some(vec![TextEdit {
+    Some(vec![TextEdit {
         range,
         new_text: formatted,
-    }]))
+    }])
 }
 
-/// Handle textDocument/rangeFormatting request
-pub(crate) async fn format_range(
-    client: &Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
+/// Handle `textDocument/rangeFormatting`.
+///
+/// Range formatting intentionally bypasses `exclude`/`extend-exclude`: it only
+/// fires when the user explicitly selects text and asks to format it, mirroring
+/// the CLI's "explicit file target bypasses excludes" rule.
+pub(crate) fn format_range(
+    snap: &StateSnapshot,
     params: DocumentRangeFormattingParams,
-) -> Result<Option<Vec<TextEdit>>> {
+) -> Option<Vec<TextEdit>> {
     let uri = params.text_document.uri;
     let range = params.range;
     log::debug!(
         "format_range uri={} start={:?} end={:?}",
-        *uri,
+        uri.as_str(),
         range.start,
         range.end
     );
 
-    client
-        .log_message(
-            MessageType::INFO,
-            format!(
-                "Range formatting request for {} (lines {}-{})",
-                *uri,
-                range.start.line + 1,
-                range.end.line + 1
-            ),
-        )
-        .await;
+    let (text, config) = snap.document_and_config(&uri)?;
 
-    // Range formatting intentionally bypasses `exclude`/`extend-exclude`:
-    // unlike whole-document formatting (which fires on save and would otherwise
-    // rewrite opted-out files), a range request only happens when the user
-    // explicitly selects text and asks to format it. Treat that as the LSP
-    // equivalent of the CLI's "explicit file target bypasses excludes" rule.
-    let (text, config) = match get_document_and_config(
-        client,
-        &document_map,
-        &salsa_db,
-        &workspace_root,
-        &uri,
-    )
-    .await
-    {
-        Some(result) => result,
-        None => {
-            client
-                .log_message(MessageType::ERROR, format!("Document not found: {}", *uri))
-                .await;
-            return Ok(None);
-        }
-    };
-
-    // Convert LSP range (0-indexed lines, end-exclusive) to panache range (1-indexed, inclusive)
+    // Convert LSP range (0-indexed lines, end-exclusive) to panache range
+    // (1-indexed, inclusive).
     let start_line = (range.start.line + 1) as usize;
     let mut end_line = (range.end.line + 1) as usize;
     if range.end.character == 0 && range.end.line > range.start.line {
         end_line = range.end.line as usize;
     }
 
-    let start_offset = super::super::conversions::position_to_offset(&text, range.start);
-    let end_offset = super::super::conversions::position_to_offset(&text, range.end);
-    client
-        .log_message(
-            MessageType::INFO,
-            format!(
-                "Range formatting selection bytes {:?}..{:?} (start {:?}, end {:?})",
-                start_offset, end_offset, range.start, range.end
-            ),
-        )
-        .await;
+    let _ = (
+        position_to_offset(&text, range.start),
+        position_to_offset(&text, range.end),
+    );
 
-    // Run range formatting in a blocking task
-    let text_clone = text.clone();
-    let config_clone = config.clone();
-    let formatted = tokio::task::spawn_blocking(move || {
-        let tree = parser::parse(&text_clone, Some(config_clone.clone()));
-        let expanded_range =
-            range_utils::expand_line_range_to_blocks(&tree, &text_clone, start_line, end_line);
+    let tree = parser::parse(&text, Some(config.clone()));
+    let expanded_range =
+        range_utils::expand_line_range_to_blocks(&tree, &text, start_line, end_line);
+    let formatted = crate::format(&text, Some(config), Some((start_line, end_line)));
 
-        let output = tokio::runtime::Runtime::new()
-            .expect("Failed to create runtime")
-            .block_on(crate::format_async(
-                &text_clone,
-                Some(config_clone),
-                Some((start_line, end_line)),
-            ));
-        (output, expanded_range)
-    })
-    .await
-    .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
-
-    let (formatted, expanded_range) = formatted;
-
-    // If the formatted range is empty or unchanged, return None
     if formatted.is_empty() || formatted == text {
-        return Ok(None);
+        return None;
     }
 
-    if let Some((start_offset, end_offset)) = expanded_range {
-        client
-            .log_message(
-                MessageType::INFO,
-                format!(
-                    "Range formatting expanded to byte range {}..{}",
-                    start_offset, end_offset
-                ),
-            )
-            .await;
-    }
+    let (start_offset, end_offset) = expanded_range?;
 
-    // Calculate the actual range that was formatted (expanded to block boundaries)
-    // For simplicity, we'll replace the entire selected range with the formatted output
-    // The range expansion is already handled by panache's range_utils
-
-    // Find where the formatted text should be placed
-    // Since range formatting returns only the formatted blocks, we need to determine
-    // the byte offsets in the original text to replace
-
-    let Some((start_offset, end_offset)) = expanded_range else {
-        return Ok(None);
-    };
-
-    // Create the edit range
     let edit_range = Range {
         start: offset_to_position(&text, start_offset),
         end: offset_to_position(&text, end_offset.min(text.len())),
     };
-    client
-        .log_message(
-            MessageType::INFO,
-            format!(
-                "Range formatting edit range {:?}..{:?}",
-                edit_range.start, edit_range.end
-            ),
-        )
-        .await;
 
-    Ok(Some(vec![TextEdit {
+    Some(vec![TextEdit {
         range: edit_range,
         new_text: formatted,
-    }]))
+    }])
 }

@@ -1,54 +1,40 @@
+use lsp_types::*;
 use serde_json::json;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tower_lsp_server::Client;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::*;
 
-use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
-use crate::lsp::helpers::get_document_content_and_tree;
+use crate::lsp::global_state::StateSnapshot;
 use crate::syntax::{AstNode, Document, Heading, ImageLink, SyntaxKind, SyntaxNode, Table};
 
-pub async fn document_symbol(
-    _client: &Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
+pub(crate) fn document_symbol(
+    snap: &StateSnapshot,
     params: DocumentSymbolParams,
-) -> Result<Option<DocumentSymbolResponse>> {
+) -> Option<DocumentSymbolResponse> {
     let uri = params.text_document.uri;
-    log::debug!("document_symbol request for: {}", *uri);
-    let parsed_yaml_regions = {
-        let map = document_map.lock().await;
-        map.get(&uri.to_string())
-            .map(|state| state.parsed_yaml_regions.clone())
-            .unwrap_or_default()
+    log::debug!("document_symbol request for: {}", uri.as_str());
+    let parsed_yaml_regions = snap
+        .document_state(&uri)
+        .map(|state| state.parsed_yaml_regions)
+        .unwrap_or_default();
+    let (content, syntax_tree) = match snap.document_content_and_tree(&uri) {
+        Some(result) => result,
+        None => {
+            log::warn!("Document not found in document_map: {}", uri.as_str());
+            return None;
+        }
     };
-    // Use helper to get document content and tree
-    let (content, syntax_tree) =
-        match get_document_content_and_tree(&document_map, &salsa_db, &uri).await {
-            Some(result) => result,
-            None => {
-                log::warn!("Document not found in document_map: {}", *uri);
-                return Ok(None);
-            }
-        };
     log::debug!("Document content length: {} bytes", content.len());
     let yaml_frontmatter_region = parsed_yaml_regions
         .iter()
         .find(|region| region.is_frontmatter());
 
-    // Build symbols synchronously (SyntaxNode is not Send)
+    // Build symbols synchronously (SyntaxNode is not Send).
     let symbols = build_document_symbols(&syntax_tree, &content, yaml_frontmatter_region);
 
     log::debug!("Found {} top-level symbols", symbols.len());
     if symbols.is_empty() {
-        Ok(None)
+        None
     } else {
-        Ok(Some(DocumentSymbolResponse::Nested(symbols)))
+        Some(DocumentSymbolResponse::Nested(symbols))
     }
 }
 

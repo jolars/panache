@@ -1,13 +1,10 @@
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tower_lsp_server::ls_types::{Location, Range, Uri};
+
+use lsp_types::{Location, Range, Uri};
 
 use crate::Config;
 use crate::config::ConfigSource;
-use crate::lsp::DocumentState;
-use crate::salsa::Db;
+use crate::lsp::uri_ext::UriExt;
 use crate::syntax::{
     AstNode, AttributeNode, Citation, CodeBlock, CodeSpan, Crossref, FootnoteDefinition,
     FootnoteReference, ImageLink, InlineMath, Link, LinkRef, ParsedYamlRegionSnapshot,
@@ -16,101 +13,14 @@ use crate::syntax::{
 use crate::utils::{normalize_anchor_label, normalize_label};
 use rowan::{NodeOrToken, TextRange, TextSize};
 
-use super::config::{load_config, load_config_with_source};
-
-/// Clone the salsa database handle out from under the global lock.
+/// Run a salsa read-query, returning `None` if a concurrent write cancelled it.
 ///
-/// salsa's database is `Send` but deliberately `!Sync` (it carries per-thread
-/// local state), so concurrent reads use a cloned per-task handle rather than a
-/// shared `&db`. Cloning is a cheap `Arc` bump and all clones share the same
-/// query storage. Locking only long enough to clone lets a long read-query run
-/// *without* holding the lock, so interactive requests no longer queue behind a
-/// background lint pass's cold `project_graph` evaluation.
-pub(crate) async fn clone_salsa_db(
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
-) -> crate::salsa::SalsaDb {
-    salsa_db.lock().await.clone()
-}
-
-/// Run a salsa read-query on a cloned handle, returning `None` if a concurrent
-/// write cancelled it.
-///
-/// A `&mut` write on another handle cancels in-flight queries (salsa unwinds
-/// with [`salsa::Cancelled`]). Background passes treat cancellation as "abort,
-/// the newer edit reschedules"; only salsa's own cancellation is caught — any
-/// other panic resumes unwinding.
+/// A `&mut` write on the main thread cancels in-flight reads on cloned handles
+/// (salsa unwinds with [`salsa::Cancelled`]). Pooled reads treat cancellation as
+/// "abort"; only salsa's own cancellation is caught — any other panic resumes
+/// unwinding.
 pub(crate) fn catch_cancelled<T>(f: impl FnOnce() -> T) -> Option<T> {
     salsa::Cancelled::catch(std::panic::AssertUnwindSafe(f)).ok()
-}
-
-/// Helper to get document content from the document map
-pub(crate) async fn get_document_content(
-    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
-    uri: &Uri,
-) -> Option<String> {
-    let state = {
-        let doc_map = document_map.lock().await;
-        doc_map.get(&uri.to_string())?.clone()
-    };
-    let db = salsa_db.lock().await;
-    Some(state.salsa_file.text(&*db).clone())
-}
-
-/// Helper to get document content and tree from the document map
-pub(crate) async fn get_document_content_and_tree(
-    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
-    uri: &Uri,
-) -> Option<(String, SyntaxNode)> {
-    let state = {
-        let doc_map = document_map.lock().await;
-        doc_map.get(&uri.to_string())?.clone()
-    };
-    let db = salsa_db.lock().await;
-    Some((
-        state.salsa_file.text(&*db).clone(),
-        SyntaxNode::new_root(state.tree.clone()),
-    ))
-}
-
-/// Helper to load config with URI-based flavor detection
-pub(crate) async fn get_config(
-    client: &tower_lsp_server::Client,
-    workspace_root: &Arc<Mutex<Option<PathBuf>>>,
-    uri: &Uri,
-) -> Config {
-    let workspace_root = workspace_root.lock().await.clone();
-    load_config(client, &workspace_root, Some(uri)).await
-}
-
-/// Combined helper: get document and config in one call
-pub(crate) async fn get_document_and_config(
-    client: &tower_lsp_server::Client,
-    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: &Arc<Mutex<Option<PathBuf>>>,
-    uri: &Uri,
-) -> Option<(String, Config)> {
-    let content = get_document_content(document_map, salsa_db, uri).await?;
-    let config = get_config(client, workspace_root, uri).await;
-    Some((content, config))
-}
-
-/// Like [`get_document_and_config`] but also returns the [`ConfigSource`] and
-/// resolved workspace root, so callers (e.g. formatting handlers) can match the
-/// document URI against `exclude`/`extend_exclude` patterns.
-pub(crate) async fn get_document_config_and_source(
-    client: &tower_lsp_server::Client,
-    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: &Arc<Mutex<Option<PathBuf>>>,
-    uri: &Uri,
-) -> Option<(String, Config, ConfigSource, Option<PathBuf>)> {
-    let content = get_document_content(document_map, salsa_db, uri).await?;
-    let workspace_root = workspace_root.lock().await.clone();
-    let (config, source) = load_config_with_source(client, &workspace_root, Some(uri)).await;
-    Some((content, config, source, workspace_root))
 }
 
 /// Returns `true` when `uri` resolves to a file path that matches the
@@ -163,37 +73,6 @@ fn relative_to_anchor(path: &Path, anchor: &Path) -> Option<PathBuf> {
         .strip_prefix(&canon_anchor)
         .ok()
         .map(Path::to_path_buf)
-}
-
-pub(crate) async fn get_definition_index_with_includes(
-    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
-    uri: &Uri,
-) -> crate::salsa::DefinitionIndex {
-    let (salsa_file, salsa_config, root_path) = {
-        let doc_map = document_map.lock().await;
-        let Some(state) = doc_map.get(&uri.to_string()) else {
-            return crate::salsa::DefinitionIndex::default();
-        };
-        let root_path = state
-            .path
-            .clone()
-            .unwrap_or_else(|| PathBuf::from("<memory>"));
-        (state.salsa_file, state.salsa_config, root_path)
-    };
-    let db = salsa_db.lock().await;
-    let graph =
-        crate::salsa::project_graph(&*db, salsa_file, salsa_config, root_path.clone()).clone();
-    let mut index =
-        crate::salsa::definition_index(&*db, salsa_file, salsa_config, root_path).clone();
-    for path in graph.documents().iter() {
-        if let Some(include_file) = db.file_text(path.clone()) {
-            let include_index =
-                crate::salsa::definition_index(&*db, include_file, salsa_config, path.clone());
-            index.merge_from(include_index);
-        }
-    }
-    index
 }
 
 pub(crate) fn citation_definition_locations(

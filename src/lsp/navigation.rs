@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
-use tokio::sync::Mutex;
-use tower_lsp_server::ls_types::{Location, Range, Uri};
+use crate::lsp::uri_ext::UriExt;
+use lsp_types::{Location, Range, Uri};
 
 use crate::salsa::Db;
+use crate::salsa::SalsaDb;
 
 use super::conversions;
 
@@ -21,36 +21,26 @@ pub(crate) struct ProjectDocumentBundle {
     pub(crate) parse_config: crate::config::Config,
 }
 
-pub(crate) async fn project_document_inputs(
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+pub(crate) fn project_document_inputs(
+    db: &SalsaDb,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
     current_content: &str,
 ) -> Vec<(PathBuf, String)> {
-    let doc_paths = project_document_paths(salsa_db, salsa_file, salsa_config, doc_path).await;
-    document_inputs_for_paths(salsa_db, doc_path, current_content, doc_paths).await
+    let doc_paths = project_document_paths(db, salsa_file, salsa_config, doc_path);
+    document_inputs_for_paths(db, doc_path, current_content, doc_paths)
 }
 
-pub(crate) async fn project_document_bundle(
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+pub(crate) fn project_document_bundle(
+    db: &SalsaDb,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
     current_content: &str,
 ) -> ProjectDocumentBundle {
-    let inputs = project_document_inputs(
-        salsa_db,
-        salsa_file,
-        salsa_config,
-        doc_path,
-        current_content,
-    )
-    .await;
-    let parse_config = {
-        let db = salsa_db.lock().await;
-        salsa_config.config(&*db).clone()
-    };
+    let inputs = project_document_inputs(db, salsa_file, salsa_config, doc_path, current_content);
+    let parse_config = salsa_config.config(db).clone();
 
     ProjectDocumentBundle {
         inputs,
@@ -65,15 +55,14 @@ pub(crate) fn parse_with_config(
     crate::parse(input, Some(parse_config.clone()))
 }
 
-pub(crate) async fn project_document_paths(
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+pub(crate) fn project_document_paths(
+    db: &SalsaDb,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
 ) -> Vec<PathBuf> {
-    let db = salsa_db.lock().await;
     let mut doc_paths =
-        crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.to_path_buf())
+        crate::salsa::project_graph(db, salsa_file, salsa_config, doc_path.to_path_buf())
             .documents()
             .iter()
             .cloned()
@@ -87,8 +76,8 @@ pub(crate) async fn project_document_paths(
     doc_paths
 }
 
-pub(crate) async fn document_inputs_for_paths(
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+pub(crate) fn document_inputs_for_paths(
+    db: &SalsaDb,
     doc_path: &Path,
     current_content: &str,
     mut doc_paths: Vec<PathBuf>,
@@ -99,13 +88,12 @@ pub(crate) async fn document_inputs_for_paths(
     doc_paths.sort();
     doc_paths.dedup();
 
-    let db = salsa_db.lock().await;
     let mut inputs = Vec::new();
     for path in doc_paths {
         let text = if path == doc_path {
             current_content.to_string()
         } else if let Some(file) = db.file_text(path.clone()) {
-            file.text(&*db).clone()
+            file.text(db).clone()
         } else {
             continue;
         };
@@ -115,55 +103,38 @@ pub(crate) async fn document_inputs_for_paths(
     inputs
 }
 
-pub(crate) async fn project_symbol_documents(
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+pub(crate) fn project_symbol_documents(
+    db: &SalsaDb,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
     current_uri: &Uri,
     current_content: &str,
 ) -> Vec<IndexedDocument> {
-    let inputs = project_document_inputs(
-        salsa_db,
-        salsa_file,
-        salsa_config,
-        doc_path,
-        current_content,
-    )
-    .await;
-
-    indexed_documents_from_inputs(
-        salsa_db,
-        salsa_file,
-        salsa_config,
-        doc_path,
-        current_uri,
-        inputs,
-    )
-    .await
+    let inputs = project_document_inputs(db, salsa_file, salsa_config, doc_path, current_content);
+    indexed_documents_from_inputs(db, salsa_file, salsa_config, doc_path, current_uri, inputs)
 }
 
-pub(crate) async fn indexed_documents_from_inputs(
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+pub(crate) fn indexed_documents_from_inputs(
+    db: &SalsaDb,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
     current_uri: &Uri,
     inputs: Vec<(PathBuf, String)>,
 ) -> Vec<IndexedDocument> {
-    let db = salsa_db.lock().await;
     let mut docs = Vec::new();
     for (path, text) in inputs {
         let file = if path == doc_path {
             salsa_file
-        } else if let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) {
+        } else if let Some(file) = crate::salsa::Db::file_text(db, path.clone()) {
             file
         } else {
             continue;
         };
 
         let symbol_index =
-            crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone()).clone();
+            crate::salsa::symbol_usage_index(db, file, salsa_config, path.clone()).clone();
         let uri = if path == doc_path {
             current_uri.clone()
         } else {

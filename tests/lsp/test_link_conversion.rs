@@ -1,7 +1,7 @@
 //! Tests for inline ↔ reference link conversion code actions.
 
 use super::helpers::*;
-use tower_lsp_server::ls_types::*;
+use lsp_types::*;
 
 fn find_action_title<'a>(
     actions: &'a [CodeActionOrCommand],
@@ -13,18 +13,15 @@ fn find_action_title<'a>(
     })
 }
 
-#[tokio::test]
-async fn offers_convert_inline_link_to_reference() {
-    let server = TestLspServer::new();
+#[test]
+fn offers_convert_inline_link_to_reference() {
+    let mut server = TestLspServer::new();
     let content = "See [the docs](https://example.com/) here.\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     // Cursor inside the inline link's text.
     let actions = server
         .get_code_actions("file:///test.md", 0, 6, 0, 6)
-        .await
         .expect("code actions response");
 
     let convert = find_action_title(&actions, "Convert to reference link")
@@ -46,17 +43,14 @@ async fn offers_convert_inline_link_to_reference() {
     );
 }
 
-#[tokio::test]
-async fn offers_convert_reference_link_to_inline_and_drops_orphan_def() {
-    let server = TestLspServer::new();
+#[test]
+fn offers_convert_reference_link_to_inline_and_drops_orphan_def() {
+    let mut server = TestLspServer::new();
     let content = "[docs][d]\n\n[d]: https://example.com/\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     let actions = server
         .get_code_actions("file:///test.md", 0, 2, 0, 2)
-        .await
         .expect("code actions response");
 
     let convert = find_action_title(&actions, "Convert to inline link")
@@ -72,17 +66,14 @@ async fn offers_convert_reference_link_to_inline_and_drops_orphan_def() {
     assert_eq!(edits[1].new_text, "", "deletes the orphaned def line");
 }
 
-#[tokio::test]
-async fn reference_to_inline_keeps_shared_def() {
-    let server = TestLspServer::new();
+#[test]
+fn reference_to_inline_keeps_shared_def() {
+    let mut server = TestLspServer::new();
     let content = "[a][d] and [b][d]\n\n[d]: https://example.com/\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     let actions = server
         .get_code_actions("file:///test.md", 0, 1, 0, 1)
-        .await
         .expect("code actions response");
 
     let convert = find_action_title(&actions, "Convert to inline link")
@@ -96,17 +87,14 @@ async fn reference_to_inline_keeps_shared_def() {
     assert_eq!(edits.len(), 1, "shared def must stay in place");
 }
 
-#[tokio::test]
-async fn inline_to_reference_reuses_existing_def() {
-    let server = TestLspServer::new();
+#[test]
+fn inline_to_reference_reuses_existing_def() {
+    let mut server = TestLspServer::new();
     let content = "See [the docs](https://example.com/) here.\n\n[home]: https://example.com/\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     let actions = server
         .get_code_actions("file:///test.md", 0, 6, 0, 6)
-        .await
         .expect("code actions response");
 
     let convert = find_action_title(&actions, "Convert to reference link")

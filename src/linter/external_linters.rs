@@ -3,11 +3,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-#[cfg(feature = "lsp")]
-use std::process::{Command, Stdio};
-#[cfg(feature = "lsp")]
-use std::time::Duration;
-
 #[cfg(not(target_arch = "wasm32"))]
 use crate::external_tools_common::{
     find_missing_commands, log_warning_once, missing_commands_warning_message,
@@ -266,68 +261,6 @@ pub fn log_missing_linter_commands(missing: &HashSet<String>) {
 
 fn missing_linter_warning_message(missing: &HashSet<String>) -> Option<String> {
     missing_commands_warning_message(missing, "linter", "linting")
-}
-
-#[cfg(feature = "lsp")]
-pub async fn run_linter(
-    linter_name: &str,
-    language: &str,
-    code: &str,
-    original_input: &str,
-    registry: &ExternalLinterRegistry,
-    mappings: Option<&[BlockMapping]>,
-) -> Result<Vec<Diagnostic>, LinterError> {
-    let linter_info = registry
-        .get(linter_name)
-        .ok_or_else(|| LinterError::SpawnFailed(format!("unknown linter: {}", linter_name)))?;
-    if !registry
-        .supports_language(linter_name, language)
-        .unwrap_or(false)
-    {
-        return Err(LinterError::SpawnFailed(format!(
-            "unsupported linter-language mapping: {} for {}",
-            linter_name, language
-        )));
-    }
-
-    let (_temp_dir, temp_path) = create_linter_temp_input(language, code)?;
-
-    let mut cmd = Command::new(linter_info.command);
-    cmd.args(linter_info.args.iter());
-    append_language_specific_args(&mut cmd, linter_name, language);
-    if (linter_name.eq_ignore_ascii_case("eslint") || linter_name.eq_ignore_ascii_case("clippy"))
-        && let Some(parent) = temp_path.parent()
-    {
-        cmd.current_dir(parent);
-    }
-    cmd.arg(&temp_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    let output = tokio::time::timeout(Duration::from_secs(30), async {
-        tokio::task::spawn_blocking(move || cmd.output()).await
-    })
-    .await
-    .map_err(|_| LinterError::Timeout)?
-    .map_err(|e| LinterError::IoError(e.into()))??;
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-
-    if !output.status.success() && stdout.trim().is_empty() && stderr.trim().is_empty() {
-        return Err(LinterError::NonZeroExit {
-            code: output.status.code().unwrap_or(-1),
-            stderr: stderr.to_string(),
-        });
-    }
-
-    let linter_output = if stdout.trim().is_empty() {
-        stderr.as_ref()
-    } else {
-        stdout.as_ref()
-    };
-
-    parse_linter_output(linter_name, linter_output, code, original_input, mappings)
 }
 
 pub fn parse_linter_output(

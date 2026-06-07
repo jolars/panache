@@ -1,37 +1,30 @@
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
 
-use tokio::sync::Mutex;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::{DocumentLink, DocumentLinkParams, Range, Uri};
+use crate::lsp::uri_ext::UriExt;
+use lsp_types::{DocumentLink, DocumentLinkParams, Range, Uri};
 
-use crate::lsp::DocumentState;
+use crate::lsp::global_state::StateSnapshot;
 use crate::syntax::{AstNode, AutoLink, ImageLink, Link, Shortcode};
 use crate::utils::normalize_label;
 use serde_json::json;
 
 use super::super::conversions;
 
-pub(crate) async fn document_links(
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
+pub(crate) fn document_links(
+    snap: &StateSnapshot,
     params: DocumentLinkParams,
-) -> Result<Option<Vec<DocumentLink>>> {
+) -> Option<Vec<DocumentLink>> {
     let uri = params.text_document.uri;
 
-    let Some(ctx) =
-        crate::lsp::context::get_open_document_context(&document_map, &salsa_db, &uri).await
-    else {
-        return Ok(None);
-    };
+    let ctx = crate::lsp::context::get_open_document_context(snap, &uri)?;
     let content = ctx.content.clone();
     let doc_path = ctx.path.clone();
     let salsa_file = ctx.salsa_file;
     let salsa_config = ctx.salsa_config;
 
     let reference_targets = if let Some(path) = doc_path.as_deref() {
-        build_reference_targets(&salsa_db, salsa_file, salsa_config, path, &content, &uri).await
+        build_reference_targets(&snap.db, salsa_file, salsa_config, path, &content, &uri)
     } else {
         HashMap::new()
     };
@@ -170,10 +163,10 @@ pub(crate) async fn document_links(
     }
 
     if links.is_empty() {
-        return Ok(None);
+        return None;
     }
 
-    Ok(Some(links))
+    Some(links)
 }
 
 fn build_document_link(
@@ -195,7 +188,7 @@ fn build_document_link(
     }
 }
 
-pub(crate) async fn document_link_resolve(mut link: DocumentLink) -> Result<DocumentLink> {
+pub(crate) fn document_link_resolve(_snap: &StateSnapshot, mut link: DocumentLink) -> DocumentLink {
     if link.tooltip.is_none()
         && let Some(data) = &link.data
         && let Some(tooltip) = data.get("tooltip").and_then(|value| value.as_str())
@@ -211,7 +204,7 @@ pub(crate) async fn document_link_resolve(mut link: DocumentLink) -> Result<Docu
         link.target = Some(uri);
     }
 
-    Ok(link)
+    link
 }
 
 fn text_range_to_lsp_range(content: &str, range: rowan::TextRange) -> Range {
@@ -284,8 +277,8 @@ pub(crate) struct ReferenceTarget {
     pub(crate) base_uri: Option<Uri>,
 }
 
-pub(crate) async fn build_reference_targets(
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+pub(crate) fn build_reference_targets(
+    db: &crate::salsa::SalsaDb,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
@@ -293,13 +286,12 @@ pub(crate) async fn build_reference_targets(
     fallback_uri: &Uri,
 ) -> HashMap<String, ReferenceTarget> {
     let bundle = crate::lsp::navigation::project_document_bundle(
-        salsa_db,
+        db,
         salsa_file,
         salsa_config,
         doc_path,
         doc_content,
-    )
-    .await;
+    );
 
     let mut out = HashMap::new();
     for (path, input) in bundle.inputs {
@@ -378,8 +370,9 @@ mod tests {
         extract_first_destination_token, looks_like_uri_scheme, resolve_link_target,
         split_fragment, with_fragment,
     };
+    use crate::lsp::uri_ext::UriExt;
+    use lsp_types::Uri;
     use tempfile::TempDir;
-    use tower_lsp_server::ls_types::Uri;
 
     #[test]
     fn extracts_first_destination_token_before_title() {

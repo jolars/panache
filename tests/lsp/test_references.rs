@@ -1,10 +1,10 @@
 use super::helpers::*;
+use lsp_types::Uri;
 use std::fs;
-use tower_lsp_server::ls_types::Uri;
 
-#[tokio::test]
-async fn test_references_crossref_chunk_label_without_declaration() {
-    let server = TestLspServer::new();
+#[test]
+fn test_references_crossref_chunk_label_without_declaration() {
+    let mut server = TestLspServer::new();
     let content = r#"See @fig-plot and again @fig-plot.
 
 ```{r}
@@ -12,22 +12,19 @@ async fn test_references_crossref_chunk_label_without_declaration() {
 plot(1:10)
 ```
 "#;
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
     let refs = server
         .references("file:///test.qmd", 0, 6, false)
-        .await
         .expect("references");
 
     assert_eq!(refs.len(), 2);
     assert!(refs.iter().all(|loc| loc.range.start.line == 0));
 }
 
-#[tokio::test]
-async fn test_references_crossref_chunk_label_with_declaration() {
-    let server = TestLspServer::new();
+#[test]
+fn test_references_crossref_chunk_label_with_declaration() {
+    let mut server = TestLspServer::new();
     let content = r#"See @fig-plot and again @fig-plot.
 
 ```{r}
@@ -35,13 +32,10 @@ async fn test_references_crossref_chunk_label_with_declaration() {
 plot(1:10)
 ```
 "#;
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
     let refs = server
         .references("file:///test.qmd", 3, 12, true)
-        .await
         .expect("references");
 
     assert!(refs.iter().any(|loc| loc.range.start.line == 0));
@@ -53,9 +47,9 @@ plot(1:10)
     assert_eq!(declaration.range.end.character, 18);
 }
 
-#[tokio::test]
-async fn test_references_bookdown_crossref_chunk_label_with_declaration() {
-    let server = TestLspServer::new();
+#[test]
+fn test_references_bookdown_crossref_chunk_label_with_declaration() {
+    let mut server = TestLspServer::new();
     let content = r#"Figure \@ref(fig:a-label)
 Figure \@ref(fig:a-label)
 
@@ -65,13 +59,10 @@ Figure \@ref(fig:a-label)
 plot(1, 1)
 ```
 "#;
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
     let refs = server
         .references("file:///test.Rmd", 0, 16, true)
-        .await
         .expect("references");
 
     assert!(refs.iter().filter(|loc| loc.range.start.line == 0).count() == 1);
@@ -79,9 +70,9 @@ plot(1, 1)
     assert!(refs.iter().any(|loc| loc.range.start.line == 4));
 }
 
-#[tokio::test]
-async fn test_references_bookdown_theorem_crossref_with_declaration() {
-    let server = TestLspServer::new();
+#[test]
+fn test_references_bookdown_theorem_crossref_with_declaration() {
+    let mut server = TestLspServer::new();
     let content = r#"Exercise \@ref(exr:mu)
 Again \@ref(exr:mu)
 
@@ -89,13 +80,10 @@ Again \@ref(exr:mu)
 foobar
 :::
 "#;
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
     let refs = server
         .references("file:///test.Rmd", 0, 18, true)
-        .await
         .expect("references");
 
     assert!(refs.iter().filter(|loc| loc.range.start.line == 0).count() == 1);
@@ -103,9 +91,9 @@ foobar
     assert!(refs.iter().any(|loc| loc.range.start.line == 3));
 }
 
-#[tokio::test]
-async fn test_references_bookdown_equation_crossref_with_declaration() {
-    let server = TestLspServer::new();
+#[test]
+fn test_references_bookdown_equation_crossref_with_declaration() {
+    let mut server = TestLspServer::new();
     let content = r#"\@ref(eq:foo)
 \@ref(eq:foo)
 
@@ -113,13 +101,10 @@ async fn test_references_bookdown_equation_crossref_with_declaration() {
   a (\#eq:foo)
 \end{align}
 "#;
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
     let refs = server
         .references("file:///test.Rmd", 0, 7, true)
-        .await
         .expect("references");
 
     assert!(refs.iter().filter(|loc| loc.range.start.line == 0).count() == 1);
@@ -127,9 +112,9 @@ async fn test_references_bookdown_equation_crossref_with_declaration() {
     assert!(refs.iter().any(|loc| loc.range.start.line == 4));
 }
 
-#[tokio::test]
-async fn test_references_bookdown_equation_crossref_with_mixed_case_label() {
-    let server = TestLspServer::new();
+#[test]
+fn test_references_bookdown_equation_crossref_with_mixed_case_label() {
+    let mut server = TestLspServer::new();
     let content = r#"\@ref(eq:solveG)
 \@ref(eq:solveG)
 
@@ -138,13 +123,10 @@ async fn test_references_bookdown_equation_crossref_with_mixed_case_label() {
   (\#eq:solveG)
 \end{equation}
 "#;
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
     let refs = server
         .references("file:///test.Rmd", 0, 7, true)
-        .await
         .expect("references");
 
     assert!(refs.iter().filter(|loc| loc.range.start.line == 0).count() == 1);
@@ -152,21 +134,18 @@ async fn test_references_bookdown_equation_crossref_with_mixed_case_label() {
     assert!(refs.iter().any(|loc| loc.range.start.line == 5));
 }
 
-#[tokio::test]
-async fn test_references_bookdown_table_caption_declaration_resolves_usages() {
+#[test]
+fn test_references_bookdown_table_caption_declaration_resolves_usages() {
     // Cursor on the `(\#tab:moth-phenotype)` declaration inside a pipe-table
     // caption should find the matching `\@ref(tab:moth-phenotype)` usage.
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let content = "\\@ref(tab:moth-phenotype)).\n\n  | a   | b   |\n  | :-: | :-: |\n  |  c  |  d  |\n\n  : (\\#tab:moth-phenotype)\n";
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
     // Line 6 is the caption "  : (\#tab:moth-phenotype)"; column 8 lands
     // inside the `tab:moth-phenotype` label.
     let refs = server
         .references("file:///test.Rmd", 6, 8, true)
-        .await
         .expect("references");
 
     assert!(
@@ -181,9 +160,9 @@ async fn test_references_bookdown_table_caption_declaration_resolves_usages() {
     );
 }
 
-#[tokio::test]
-async fn test_references_bookdown_theorem_from_div_id_with_declaration() {
-    let server = TestLspServer::new();
+#[test]
+fn test_references_bookdown_theorem_from_div_id_with_declaration() {
+    let mut server = TestLspServer::new();
     let content = r#"Exercise \@ref(exr:mu)
 Again \@ref(exr:mu)
 
@@ -191,13 +170,10 @@ Again \@ref(exr:mu)
 foobar
 :::
 "#;
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
     let refs = server
         .references("file:///test.Rmd", 3, 7, true)
-        .await
         .expect("references");
 
     assert!(refs.iter().filter(|loc| loc.range.start.line == 0).count() == 1);
@@ -205,9 +181,9 @@ foobar
     assert!(refs.iter().any(|loc| loc.range.start.line == 3));
 }
 
-#[tokio::test]
-async fn test_references_heading_ids_are_case_sensitive() {
-    let server = TestLspServer::new();
+#[test]
+fn test_references_heading_ids_are_case_sensitive() {
+    let mut server = TestLspServer::new();
     let content = r#"# Heading {#em}
 
 A reference to [Heading](#em).
@@ -216,13 +192,10 @@ A reference to [Heading](#em).
 
 A reference to [Heading](#EM).
 "#;
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     let refs = server
         .references("file:///test.md", 6, 27, true)
-        .await
         .expect("references");
 
     assert_eq!(refs.len(), 2);
@@ -230,8 +203,8 @@ A reference to [Heading](#EM).
     assert!(refs.iter().any(|loc| loc.range.start.line == 6));
 }
 
-#[tokio::test]
-async fn test_references_citation_without_declaration() {
+#[test]
+fn test_references_citation_without_declaration() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
@@ -254,26 +227,21 @@ async fn test_references_citation_without_declaration() {
 
     let doc1_uri = Uri::from_file_path(&doc1_path).unwrap();
     let root_uri = Uri::from_file_path(root).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc1_uri.as_str(),
-            &fs::read_to_string(&doc1_path).unwrap(),
-            "quarto",
-        )
-        .await;
-    server
-        .open_document(
-            Uri::from_file_path(&doc2_path).unwrap().as_str(),
-            &fs::read_to_string(&doc2_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc1_uri.as_str(),
+        &fs::read_to_string(&doc1_path).unwrap(),
+        "quarto",
+    );
+    server.open_document(
+        Uri::from_file_path(&doc2_path).unwrap().as_str(),
+        &fs::read_to_string(&doc2_path).unwrap(),
+        "quarto",
+    );
 
     let refs = server
         .references(doc1_uri.as_str(), 3, 7, false)
-        .await
         .expect("references");
 
     assert_eq!(refs.len(), 2);
@@ -283,8 +251,8 @@ async fn test_references_citation_without_declaration() {
     );
 }
 
-#[tokio::test]
-async fn test_references_citation_with_declaration() {
+#[test]
+fn test_references_citation_with_declaration() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
@@ -302,27 +270,24 @@ async fn test_references_citation_with_declaration() {
     let doc_uri = Uri::from_file_path(&doc_path).unwrap();
     let bib_uri = Uri::from_file_path(&bib_path).unwrap();
     let root_uri = Uri::from_file_path(root).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
     let refs = server
         .references(doc_uri.as_str(), 3, 7, true)
-        .await
         .expect("references");
 
     assert!(refs.iter().any(|loc| loc.uri == bib_uri));
     assert!(refs.iter().any(|loc| loc.uri == doc_uri));
 }
 
-#[tokio::test]
-async fn test_references_citation_skips_bibliography_declaration_for_invalid_yaml() {
+#[test]
+fn test_references_citation_skips_bibliography_declaration_for_invalid_yaml() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
@@ -336,19 +301,16 @@ async fn test_references_citation_skips_bibliography_declaration_for_invalid_yam
     let doc_uri = Uri::from_file_path(&doc_path).unwrap();
     let bib_uri = Uri::from_file_path(&bib_path).unwrap();
     let root_uri = Uri::from_file_path(root).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
     let refs = server
         .references(doc_uri.as_str(), 3, 7, true)
-        .await
         .expect("references");
 
     assert!(
@@ -361,8 +323,8 @@ async fn test_references_citation_skips_bibliography_declaration_for_invalid_yam
     );
 }
 
-#[tokio::test]
-async fn test_references_returns_none_inside_yaml_frontmatter() {
+#[test]
+fn test_references_returns_none_inside_yaml_frontmatter() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
@@ -381,38 +343,32 @@ async fn test_references_returns_none_inside_yaml_frontmatter() {
 
     let doc_uri = Uri::from_file_path(&doc_path).unwrap();
     let root_uri = Uri::from_file_path(root).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
-    let refs = server.references(doc_uri.as_str(), 1, 10, true).await;
+    let refs = server.references(doc_uri.as_str(), 1, 10, true);
     assert!(
         refs.is_none(),
         "Expected no references when cursor is inside YAML frontmatter"
     );
 }
 
-#[tokio::test]
-async fn test_references_heading_hash_link_and_id_are_consistent() {
-    let server = TestLspServer::new();
+#[test]
+fn test_references_heading_hash_link_and_id_are_consistent() {
+    let mut server = TestLspServer::new();
     let content = "# Heading {#heading}\n\nSee [label](#heading).\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     let hash_locations = server
         .references("file:///test.md", 2, 14, true)
-        .await
         .expect("references from hash link");
     let id_locations = server
         .references("file:///test.md", 0, 12, true)
-        .await
         .expect("references from heading id");
 
     assert_eq!(hash_locations, id_locations);
@@ -420,32 +376,27 @@ async fn test_references_heading_hash_link_and_id_are_consistent() {
     assert!(hash_locations.iter().any(|loc| loc.range.start.line == 2));
 }
 
-#[tokio::test]
-async fn test_references_shortcut_label_matching_explicit_heading_id_returns_none() {
-    let server = TestLspServer::new();
+#[test]
+fn test_references_shortcut_label_matching_explicit_heading_id_returns_none() {
+    let mut server = TestLspServer::new();
     let content = "[improving-performance].\n\n# Improving Performance {#improving-performance}\n";
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
-    let refs = server.references("file:///test.Rmd", 0, 2, true).await;
+    let refs = server.references("file:///test.Rmd", 0, 2, true);
     assert!(
         refs.is_none(),
         "Expected no references for shortcut label matching only a heading id"
     );
 }
 
-#[tokio::test]
-async fn test_references_footnote_definition_finds_all_footnote_occurrences() {
-    let server = TestLspServer::new();
+#[test]
+fn test_references_footnote_definition_finds_all_footnote_occurrences() {
+    let mut server = TestLspServer::new();
     let content = "A footnote[^1] first.\nAnother[^1] second.\n\n[^1]: Footnote content.\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     let refs = server
         .references("file:///test.md", 3, 3, true)
-        .await
         .expect("references");
 
     assert_eq!(refs.len(), 3);

@@ -1,22 +1,20 @@
 //! Tests for completion (citation completion).
 
 use super::helpers::*;
+use lsp_types::{CompletionItemKind, CompletionResponse, Uri};
 use std::fs;
 use tempfile::TempDir;
-use tower_lsp_server::ls_types::{CompletionItemKind, CompletionResponse, Uri};
 
-#[tokio::test]
-async fn test_completion_without_citation_context() {
-    let server = TestLspServer::new();
+#[test]
+fn test_completion_without_citation_context() {
+    let mut server = TestLspServer::new();
 
     // Open a document without citation context
     let content = "Just plain text.";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     // Request completion in plain text
-    let result = server.completion("file:///test.md", 0, 5).await;
+    let result = server.completion("file:///test.md", 0, 5);
 
     // Should return None when not in citation context
     assert!(
@@ -25,24 +23,20 @@ async fn test_completion_without_citation_context() {
     );
 }
 
-#[tokio::test]
-async fn test_completion_in_citation_without_bibliography() {
-    let server = TestLspServer::new();
+#[test]
+fn test_completion_in_citation_without_bibliography() {
+    let mut server = TestLspServer::new();
 
     // Open a document with citation syntax but no bibliography configured
     let content = "Text with [@] citation.";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     // Request completion at @ position
-    let result = server
-        .completion(
-            "file:///test.md",
-            0,
-            12, // Position after [@
-        )
-        .await;
+    let result = server.completion(
+        "file:///test.md",
+        0,
+        12, // Position after [@
+    );
 
     // Should return None when no bibliography is configured
     assert!(
@@ -51,9 +45,9 @@ async fn test_completion_in_citation_without_bibliography() {
     );
 }
 
-#[tokio::test]
-async fn test_completion_with_project_bibliography() {
-    let server = TestLspServer::new();
+#[test]
+fn test_completion_with_project_bibliography() {
+    let mut server = TestLspServer::new();
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
 
@@ -61,16 +55,14 @@ async fn test_completion_with_project_bibliography() {
     fs::write(root.join("refs.bib"), "@book{known,}\n").unwrap();
 
     let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let doc_path = root.join("doc.qmd");
     let doc_uri = Uri::from_file_path(doc_path).expect("doc uri");
     let content = "Text [@] citation.";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
-    let result = server.completion(doc_uri.as_str(), 0, 7).await;
+    let result = server.completion(doc_uri.as_str(), 0, 7);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("Expected completion items");
     };
@@ -81,9 +73,9 @@ async fn test_completion_with_project_bibliography() {
     );
 }
 
-#[tokio::test]
-async fn test_completion_preserves_bibliography_key_case() {
-    let server = TestLspServer::new();
+#[test]
+fn test_completion_preserves_bibliography_key_case() {
+    let mut server = TestLspServer::new();
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
 
@@ -91,16 +83,14 @@ async fn test_completion_preserves_bibliography_key_case() {
     fs::write(root.join("refs.bib"), "@article{Eddelbuettel:2011,}\n").unwrap();
 
     let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let doc_path = root.join("doc.qmd");
     let doc_uri = Uri::from_file_path(doc_path).expect("doc uri");
     let content = "Text [@] citation.";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
-    let result = server.completion(doc_uri.as_str(), 0, 7).await;
+    let result = server.completion(doc_uri.as_str(), 0, 7);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("Expected completion items");
     };
@@ -112,23 +102,21 @@ async fn test_completion_preserves_bibliography_key_case() {
     );
 }
 
-#[tokio::test]
-async fn test_completion_with_inline_references() {
-    let server = TestLspServer::new();
+#[test]
+fn test_completion_with_inline_references() {
+    let mut server = TestLspServer::new();
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
 
     let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let doc_path = root.join("doc.qmd");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
     let content = "---\nreferences:\n  - id: inline\n    title: Inline\n---\n\nText [@] citation.";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
-    let result = server.completion(doc_uri.as_str(), 6, 7).await;
+    let result = server.completion(doc_uri.as_str(), 6, 7);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("Expected completion items");
     };
@@ -139,25 +127,23 @@ async fn test_completion_with_inline_references() {
     );
 }
 
-#[tokio::test]
-async fn test_completion_with_csl_yaml_bibliography() {
-    let server = TestLspServer::new();
+#[test]
+fn test_completion_with_csl_yaml_bibliography() {
+    let mut server = TestLspServer::new();
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
 
     std::fs::write(root.join("refs.yaml"), "- id: cslkey\n  title: Sample\n").unwrap();
 
     let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let doc_path = root.join("doc.qmd");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
     let content = "---\nbibliography: refs.yaml\n---\n\nText [@] citation.";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
-    let result = server.completion(doc_uri.as_str(), 4, 7).await;
+    let result = server.completion(doc_uri.as_str(), 4, 7);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("Expected completion items");
     };
@@ -168,9 +154,9 @@ async fn test_completion_with_csl_yaml_bibliography() {
     );
 }
 
-#[tokio::test]
-async fn test_completion_with_csl_json_bibliography() {
-    let server = TestLspServer::new();
+#[test]
+fn test_completion_with_csl_json_bibliography() {
+    let mut server = TestLspServer::new();
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
 
@@ -181,16 +167,14 @@ async fn test_completion_with_csl_json_bibliography() {
     .unwrap();
 
     let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let doc_path = root.join("doc.qmd");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
     let content = "---\nbibliography: refs.json\n---\n\nText [@] citation.";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
-    let result = server.completion(doc_uri.as_str(), 4, 7).await;
+    let result = server.completion(doc_uri.as_str(), 4, 7);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("Expected completion items");
     };
@@ -201,25 +185,23 @@ async fn test_completion_with_csl_json_bibliography() {
     );
 }
 
-#[tokio::test]
-async fn test_completion_with_ris_bibliography() {
-    let server = TestLspServer::new();
+#[test]
+fn test_completion_with_ris_bibliography() {
+    let mut server = TestLspServer::new();
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
 
     std::fs::write(root.join("refs.ris"), "TY  - JOUR\nID  - riskey\nER  - \n").unwrap();
 
     let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let doc_path = root.join("doc.qmd");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
     let content = "---\nbibliography: refs.ris\n---\n\nText [@] citation.";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
-    let result = server.completion(doc_uri.as_str(), 4, 7).await;
+    let result = server.completion(doc_uri.as_str(), 4, 7);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("Expected completion items");
     };
@@ -230,65 +212,59 @@ async fn test_completion_with_ris_bibliography() {
     );
 }
 
-#[tokio::test]
-async fn test_completion_returns_none_for_invalid_yaml_frontmatter() {
-    let server = TestLspServer::new();
+#[test]
+fn test_completion_returns_none_for_invalid_yaml_frontmatter() {
+    let mut server = TestLspServer::new();
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
 
     std::fs::write(root.join("refs.yaml"), "- id: cslkey\n  title: Sample\n").unwrap();
 
     let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let doc_path = root.join("doc.qmd");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
     let content = "---\nbibliography: [\n---\n\nText [@] citation.";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
-    let result = server.completion(doc_uri.as_str(), 4, 7).await;
+    let result = server.completion(doc_uri.as_str(), 4, 7);
     assert!(
         result.is_none(),
         "Expected no completion when YAML frontmatter is invalid"
     );
 }
 
-#[tokio::test]
-async fn test_completion_returns_none_inside_yaml_frontmatter() {
-    let server = TestLspServer::new();
+#[test]
+fn test_completion_returns_none_inside_yaml_frontmatter() {
+    let mut server = TestLspServer::new();
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     std::fs::write(root.join("refs.bib"), "@book{known,}\n").unwrap();
 
     let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let doc_path = root.join("doc.qmd");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
     let content = "---\ntitle: \"@\"\nbibliography: refs.bib\n---\n\nText [@] citation.";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
-    let result = server.completion(doc_uri.as_str(), 1, 9).await;
+    let result = server.completion(doc_uri.as_str(), 1, 9);
     assert!(
         result.is_none(),
         "Expected no citation completion when cursor is inside YAML frontmatter"
     );
 }
 
-#[tokio::test]
-async fn test_completion_includes_only_crossrefable_chunk_labels() {
-    let server = TestLspServer::new();
+#[test]
+fn test_completion_includes_only_crossrefable_chunk_labels() {
+    let mut server = TestLspServer::new();
 
     let content = "```{r}\n#| label: setup\n1 + 1\n```\n\n```{r}\n#| label: fig-plot\n#| fig-cap: \"Plot\"\nplot(1:10)\n```\n\nSee @\n";
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
-    let result = server.completion("file:///test.qmd", 11, 6).await;
+    let result = server.completion("file:///test.qmd", 11, 6);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("Expected completion items");
     };
@@ -319,9 +295,9 @@ fn open_doc_with_files(_server: &TestLspServer, files: &[(&str, &str)]) -> (Temp
     (temp_dir, doc_uri)
 }
 
-#[tokio::test]
-async fn test_image_path_completion_lists_image_files_only() {
-    let server = TestLspServer::new();
+#[test]
+fn test_image_path_completion_lists_image_files_only() {
+    let mut server = TestLspServer::new();
     let (_tmp, doc_uri) = open_doc_with_files(
         &server,
         &[
@@ -332,12 +308,10 @@ async fn test_image_path_completion_lists_image_files_only() {
     );
 
     let content = "![](images/)\n";
-    server
-        .open_document(doc_uri.as_str(), content, "markdown")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "markdown");
 
     // Cursor between `images/` and `)`: line 0, char 11.
-    let result = server.completion(doc_uri.as_str(), 0, 11).await;
+    let result = server.completion(doc_uri.as_str(), 0, 11);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("expected completion items");
     };
@@ -350,9 +324,9 @@ async fn test_image_path_completion_lists_image_files_only() {
     );
 }
 
-#[tokio::test]
-async fn test_image_path_completion_includes_video_files() {
-    let server = TestLspServer::new();
+#[test]
+fn test_image_path_completion_includes_video_files() {
+    let mut server = TestLspServer::new();
     let (_tmp, doc_uri) = open_doc_with_files(
         &server,
         &[
@@ -363,12 +337,10 @@ async fn test_image_path_completion_includes_video_files() {
     );
 
     let content = "![](media/)\n";
-    server
-        .open_document(doc_uri.as_str(), content, "markdown")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "markdown");
 
     // Cursor between `media/` and `)`: line 0, char 10.
-    let result = server.completion(doc_uri.as_str(), 0, 10).await;
+    let result = server.completion(doc_uri.as_str(), 0, 10);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("expected completion items");
     };
@@ -384,17 +356,15 @@ async fn test_image_path_completion_includes_video_files() {
     );
 }
 
-#[tokio::test]
-async fn test_image_path_completion_includes_subdirectory() {
-    let server = TestLspServer::new();
+#[test]
+fn test_image_path_completion_includes_subdirectory() {
+    let mut server = TestLspServer::new();
     let (_tmp, doc_uri) = open_doc_with_files(&server, &[("images/nested/keep.png", "")]);
 
     let content = "![](images/)\n";
-    server
-        .open_document(doc_uri.as_str(), content, "markdown")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "markdown");
 
-    let result = server.completion(doc_uri.as_str(), 0, 11).await;
+    let result = server.completion(doc_uri.as_str(), 0, 11);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("expected completion items");
     };
@@ -405,19 +375,17 @@ async fn test_image_path_completion_includes_subdirectory() {
     assert_eq!(folder.kind, Some(CompletionItemKind::FOLDER));
 }
 
-#[tokio::test]
-async fn test_image_path_completion_filters_by_typed_prefix() {
-    let server = TestLspServer::new();
+#[test]
+fn test_image_path_completion_filters_by_typed_prefix() {
+    let mut server = TestLspServer::new();
     let (_tmp, doc_uri) =
         open_doc_with_files(&server, &[("images/foo.png", ""), ("images/bar.png", "")]);
 
     let content = "![](images/f)\n";
-    server
-        .open_document(doc_uri.as_str(), content, "markdown")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "markdown");
 
     // Cursor between `f` and `)`: line 0, char 12.
-    let result = server.completion(doc_uri.as_str(), 0, 12).await;
+    let result = server.completion(doc_uri.as_str(), 0, 12);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("expected completion items");
     };
@@ -429,19 +397,17 @@ async fn test_image_path_completion_filters_by_typed_prefix() {
     );
 }
 
-#[tokio::test]
-async fn test_link_path_completion_includes_all_files() {
-    let server = TestLspServer::new();
+#[test]
+fn test_link_path_completion_includes_all_files() {
+    let mut server = TestLspServer::new();
     let (_tmp, doc_uri) =
         open_doc_with_files(&server, &[("docs/intro.md", ""), ("docs/notes.txt", "")]);
 
     let content = "[see](docs/)\n";
-    server
-        .open_document(doc_uri.as_str(), content, "markdown")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "markdown");
 
     // Cursor between `docs/` and `)`: line 0, char 11.
-    let result = server.completion(doc_uri.as_str(), 0, 11).await;
+    let result = server.completion(doc_uri.as_str(), 0, 11);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("expected completion items");
     };
@@ -453,30 +419,28 @@ async fn test_link_path_completion_includes_all_files() {
     );
 }
 
-#[tokio::test]
-async fn test_no_path_completion_inside_image_alt_text() {
-    let server = TestLspServer::new();
+#[test]
+fn test_no_path_completion_inside_image_alt_text() {
+    let mut server = TestLspServer::new();
     let (_tmp, doc_uri) = open_doc_with_files(&server, &[("images/foo.png", "")]);
 
     let content = "![images/](images/)\n";
-    server
-        .open_document(doc_uri.as_str(), content, "markdown")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "markdown");
 
     // Cursor inside the alt text `![images/]`, between `/` and `]`: line 0, char 9.
-    let result = server.completion(doc_uri.as_str(), 0, 9).await;
+    let result = server.completion(doc_uri.as_str(), 0, 9);
     assert!(
         result.is_none(),
         "alt-text region must not trigger path completion"
     );
 }
 
-#[tokio::test]
-async fn test_completion_capability_registers_path_trigger_characters() {
-    let server = TestLspServer::new();
+#[test]
+fn test_completion_capability_registers_path_trigger_characters() {
+    let mut server = TestLspServer::new();
     let temp_dir = TempDir::new().unwrap();
     let root_uri = Uri::from_file_path(temp_dir.path()).expect("temp dir absolute");
-    let init = server.initialize_result(root_uri.as_str()).await;
+    let init = server.initialize_result(root_uri.as_str());
     let triggers = init
         .capabilities
         .completion_provider
@@ -508,24 +472,22 @@ fn open_quarto_doc_with_files(
     (temp_dir, doc_uri)
 }
 
-#[tokio::test]
-async fn test_shortcode_include_completes_quarto_files() {
-    let server = TestLspServer::new();
+#[test]
+fn test_shortcode_include_completes_quarto_files() {
+    let mut server = TestLspServer::new();
     let (tmp, doc_uri) = open_quarto_doc_with_files(
         &server,
         &[("_intro.qmd", ""), ("_setup.R", ""), ("scratch.txt", "")],
         "doc.qmd",
     );
     let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let content = "{{< include _ >}}\n";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
     // Cursor between `_` and ` `: line 0, char 13.
-    let result = server.completion(doc_uri.as_str(), 0, 13).await;
+    let result = server.completion(doc_uri.as_str(), 0, 13);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("expected completion items");
     };
@@ -541,24 +503,22 @@ async fn test_shortcode_include_completes_quarto_files() {
     );
 }
 
-#[tokio::test]
-async fn test_shortcode_include_resolves_absolute_path_against_workspace_root() {
-    let server = TestLspServer::new();
+#[test]
+fn test_shortcode_include_resolves_absolute_path_against_workspace_root() {
+    let mut server = TestLspServer::new();
     let (tmp, doc_uri) = open_quarto_doc_with_files(
         &server,
         &[("chapters/_intro.qmd", ""), ("subdir/doc.qmd", "")],
         "subdir/doc.qmd",
     );
     let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let content = "{{< include /chapters/ >}}\n";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
     // Cursor between `/chapters/` and ` `: line 0, char 22.
-    let result = server.completion(doc_uri.as_str(), 0, 22).await;
+    let result = server.completion(doc_uri.as_str(), 0, 22);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("expected completion items");
     };
@@ -569,24 +529,22 @@ async fn test_shortcode_include_resolves_absolute_path_against_workspace_root() 
     );
 }
 
-#[tokio::test]
-async fn test_shortcode_embed_filters_to_notebooks() {
-    let server = TestLspServer::new();
+#[test]
+fn test_shortcode_embed_filters_to_notebooks() {
+    let mut server = TestLspServer::new();
     let (tmp, doc_uri) = open_quarto_doc_with_files(
         &server,
         &[("nb.ipynb", ""), ("sibling.qmd", ""), ("notes.md", "")],
         "doc.qmd",
     );
     let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let content = "{{< embed  >}}\n";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
     // Cursor between `embed ` and ` >}}`: line 0, char 11.
-    let result = server.completion(doc_uri.as_str(), 0, 11).await;
+    let result = server.completion(doc_uri.as_str(), 0, 11);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("expected completion items");
     };
@@ -602,44 +560,40 @@ async fn test_shortcode_embed_filters_to_notebooks() {
     );
 }
 
-#[tokio::test]
-async fn test_shortcode_embed_returns_none_after_hash() {
-    let server = TestLspServer::new();
+#[test]
+fn test_shortcode_embed_returns_none_after_hash() {
+    let mut server = TestLspServer::new();
     let (tmp, doc_uri) = open_quarto_doc_with_files(&server, &[("nb.ipynb", "")], "doc.qmd");
     let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let content = "{{< embed nb.ipynb# >}}\n";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
     // Cursor after `#`: line 0, char 19.
-    let result = server.completion(doc_uri.as_str(), 0, 19).await;
+    let result = server.completion(doc_uri.as_str(), 0, 19);
     assert!(
         result.is_none(),
         "cell-id completion is out of scope for v1"
     );
 }
 
-#[tokio::test]
-async fn test_shortcode_video_filters_to_video_extensions() {
-    let server = TestLspServer::new();
+#[test]
+fn test_shortcode_video_filters_to_video_extensions() {
+    let mut server = TestLspServer::new();
     let (tmp, doc_uri) = open_quarto_doc_with_files(
         &server,
         &[("clip.mp4", ""), ("clip.webm", ""), ("thumb.png", "")],
         "doc.qmd",
     );
     let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let content = "{{< video  >}}\n";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
     // Cursor between `video ` and ` >}}`: line 0, char 11.
-    let result = server.completion(doc_uri.as_str(), 0, 11).await;
+    let result = server.completion(doc_uri.as_str(), 0, 11);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("expected completion items");
     };
@@ -655,44 +609,40 @@ async fn test_shortcode_video_filters_to_video_extensions() {
     );
 }
 
-#[tokio::test]
-async fn test_shortcode_video_returns_none_for_url_prefix() {
-    let server = TestLspServer::new();
+#[test]
+fn test_shortcode_video_returns_none_for_url_prefix() {
+    let mut server = TestLspServer::new();
     let (tmp, doc_uri) = open_quarto_doc_with_files(&server, &[("clip.mp4", "")], "doc.qmd");
     let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let content = "{{< video https:// >}}\n";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
     // Cursor after `https://`: line 0, char 18.
-    let result = server.completion(doc_uri.as_str(), 0, 18).await;
+    let result = server.completion(doc_uri.as_str(), 0, 18);
     assert!(
         result.is_none(),
         "URL prefixes should not produce filesystem suggestions"
     );
 }
 
-#[tokio::test]
-async fn test_shortcode_placeholder_filters_to_images() {
-    let server = TestLspServer::new();
+#[test]
+fn test_shortcode_placeholder_filters_to_images() {
+    let mut server = TestLspServer::new();
     let (tmp, doc_uri) = open_quarto_doc_with_files(
         &server,
         &[("pic.png", ""), ("vector.svg", ""), ("clip.mp4", "")],
         "doc.qmd",
     );
     let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let content = "{{< placeholder  >}}\n";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
     // Cursor between `placeholder ` and ` >}}`: line 0, char 17.
-    let result = server.completion(doc_uri.as_str(), 0, 17).await;
+    let result = server.completion(doc_uri.as_str(), 0, 17);
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("expected completion items");
     };
@@ -708,62 +658,56 @@ async fn test_shortcode_placeholder_filters_to_images() {
     );
 }
 
-#[tokio::test]
-async fn test_shortcode_unknown_name_returns_none() {
-    let server = TestLspServer::new();
+#[test]
+fn test_shortcode_unknown_name_returns_none() {
+    let mut server = TestLspServer::new();
     let (tmp, doc_uri) = open_quarto_doc_with_files(&server, &[("a.qmd", "")], "doc.qmd");
     let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let content = "{{< lipsum  >}}\n";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
     // Cursor between `lipsum ` and ` >}}`: line 0, char 12.
-    let result = server.completion(doc_uri.as_str(), 0, 12).await;
+    let result = server.completion(doc_uri.as_str(), 0, 12);
     assert!(
         result.is_none(),
         "unknown shortcodes should not trigger path completion"
     );
 }
 
-#[tokio::test]
-async fn test_shortcode_completion_skipped_in_plain_markdown() {
-    let server = TestLspServer::new();
+#[test]
+fn test_shortcode_completion_skipped_in_plain_markdown() {
+    let mut server = TestLspServer::new();
     // `.git/HEAD` anchors the project boundary so config discovery doesn't
     // leak in from an ancestor `panache.toml` on the host.
     let (tmp, doc_uri) =
         open_quarto_doc_with_files(&server, &[(".git/HEAD", ""), ("_intro.qmd", "")], "doc.md");
     let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let content = "{{< include _ >}}\n";
-    server
-        .open_document(doc_uri.as_str(), content, "markdown")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "markdown");
 
-    let result = server.completion(doc_uri.as_str(), 0, 13).await;
+    let result = server.completion(doc_uri.as_str(), 0, 13);
     assert!(
         result.is_none(),
         "shortcode completion should be Quarto-only"
     );
 }
 
-#[tokio::test]
-async fn test_shortcode_completion_skipped_on_named_arg() {
-    let server = TestLspServer::new();
+#[test]
+fn test_shortcode_completion_skipped_on_named_arg() {
+    let mut server = TestLspServer::new();
     let (tmp, doc_uri) = open_quarto_doc_with_files(&server, &[("nb.ipynb", "")], "doc.qmd");
     let root_uri = Uri::from_file_path(tmp.path()).expect("workspace uri");
-    server.initialize(root_uri.as_str()).await;
+    server.initialize(root_uri.as_str());
 
     let content = "{{< embed nb.ipynb echo=t >}}\n";
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
     // Cursor inside `echo=t|`: line 0, char 25 (just after the `t`).
-    let result = server.completion(doc_uri.as_str(), 0, 25).await;
+    let result = server.completion(doc_uri.as_str(), 0, 25);
     assert!(
         result.is_none(),
         "named args should not trigger path completion"

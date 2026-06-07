@@ -3,7 +3,7 @@
 //! Provides functions to convert footnotes between inline and reference styles.
 
 use crate::syntax::{AstNode, FootnoteDefinition, FootnoteReference, InlineFootnote, SyntaxNode};
-use tower_lsp_server::ls_types::{Range, TextEdit};
+use lsp_types::{Range, TextEdit};
 
 use super::super::conversions::offset_to_position;
 

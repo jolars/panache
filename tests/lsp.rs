@@ -7,9 +7,13 @@
 
 // The lsp feature is required for these tests
 #![cfg(feature = "lsp")]
+// `lsp_types::Uri` (fluent_uri-backed) trips `clippy::mutable_key_type` as a
+// `HashMap` key, but `WorkspaceEdit.changes` mandates it and keys are never mutated.
+#![allow(clippy::mutable_key_type)]
 
 mod lsp {
     pub(super) mod helpers;
+    pub(super) mod test_cancellation;
     pub(super) mod test_completion;
     pub(super) mod test_config_discovery;
     pub(super) mod test_diagnostics;

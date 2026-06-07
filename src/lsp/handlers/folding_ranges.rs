@@ -1,40 +1,25 @@
+use lsp_types::*;
 use rowan::ast::AstNode;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tower_lsp_server::Client;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::*;
 
-use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
-use crate::lsp::helpers::get_document_content_and_tree;
+use crate::lsp::global_state::StateSnapshot;
 use crate::syntax::{CodeBlock, Document, FencedDiv, SyntaxKind, SyntaxNode, YamlMetadata};
 
-pub async fn folding_range(
-    _client: &Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
+pub(crate) fn folding_range(
+    snap: &StateSnapshot,
     params: FoldingRangeParams,
-) -> Result<Option<Vec<FoldingRange>>> {
+) -> Option<Vec<FoldingRange>> {
     let uri = params.text_document.uri;
 
-    // Use helper to get document content and tree
-    let (content, syntax_tree) =
-        match get_document_content_and_tree(&document_map, &salsa_db, &uri).await {
-            Some(result) => result,
-            None => return Ok(None),
-        };
+    let (content, syntax_tree) = snap.document_content_and_tree(&uri)?;
 
-    // Build folding ranges synchronously (SyntaxNode is not Send)
+    // Build folding ranges synchronously (SyntaxNode is not Send).
     let ranges = build_folding_ranges(&syntax_tree, &content);
 
     if ranges.is_empty() {
-        Ok(None)
+        None
     } else {
-        Ok(Some(ranges))
+        Some(ranges)
     }
 }
 

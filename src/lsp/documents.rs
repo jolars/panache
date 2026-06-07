@@ -1,31 +1,32 @@
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tower_lsp_server::Client;
-use tower_lsp_server::ls_types::*;
+//! Document lifecycle notifications (`didOpen`/`didChange`/`didSave`/`didClose`).
+//!
+//! These run synchronously on the main-loop thread with `&mut GlobalState`: they
+//! are the sole writers of the salsa database and the document map. Parsing and
+//! state updates happen inline so interactive requests always see the latest
+//! tree; the expensive lint (project-graph recompute + diagnostics) is dispatched
+//! to the [`TaskPool`](crate::lsp::task_pool) — debounced for `didChange`,
+//! immediate for `didOpen`/`didSave`.
 
-use super::conversions::{apply_content_change, apply_content_change_with_edit_ranges};
-use super::handlers::diagnostics::lint_and_publish;
-use super::helpers::{catch_cancelled, clone_salsa_db, get_config};
-use crate::lsp::{DocumentState, LspRuntimeSettings};
-use crate::parser::{parse_incremental_suffix_with_refdefs, parse_with_refdefs};
-use crate::syntax::SyntaxNode;
-use rowan::GreenNode;
-use salsa::{Durability, Setter};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use lsp_types::{
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, MessageType, TextDocumentContentChangeEvent,
+};
+use rowan::GreenNode;
+use salsa::{Durability, Setter};
+
+use super::config::load_config;
+use super::conversions::{apply_content_change, apply_content_change_with_edit_ranges};
+use super::global_state::GlobalState;
+use super::uri_ext::UriExt;
+use crate::lsp::DocumentState;
+use crate::parser::{parse_incremental_suffix_with_refdefs, parse_with_refdefs};
+use crate::syntax::SyntaxNode;
+
 type CombinedEditRanges = (String, (usize, usize), (usize, usize));
-
-/// Per-document handles for in-flight debounced lint passes, keyed by URI
-/// string (since `Uri` is not `Send`). A newer edit aborts the pending handle
-/// for the same document before scheduling a fresh one.
-pub(crate) type PendingDiagnostics = Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>;
-
-/// Idle time after the last edit before a debounced lint pass fires. Rapid
-/// keystrokes keep resetting this window so only the final edit in a burst
-/// triggers diagnostics, instead of every keystroke queuing a full lint.
-const DIAGNOSTICS_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(200);
 
 fn apply_changes_descending_with_combined_ranges(
     original_text: &str,
@@ -89,281 +90,184 @@ fn tracked_paths_for_graph(
     tracked
 }
 
-/// Handle textDocument/didOpen notification
-pub(crate) async fn did_open(
-    client: &Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    workspace_root: Arc<Mutex<Option<std::path::PathBuf>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    params: DidOpenTextDocumentParams,
-) {
-    let uri = params.text_document.uri.to_string();
+/// Handle `textDocument/didOpen`.
+pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) {
+    let uri = params.text_document.uri.clone();
+    let uri_string = uri.to_string();
     let text = params.text_document.text.clone();
-    log::debug!("did_open uri={}, bytes={}", uri, text.len());
+    log::debug!("did_open uri={uri_string}, bytes={}", text.len());
     let start = Instant::now();
-    let config = get_config(client, &workspace_root, &params.text_document.uri).await;
+
+    let config = load_config(&gs.workspace_root, Some(&uri));
     let (tree, parsed_yaml_regions) = {
         let syntax_tree = crate::parse(&text, Some(config.clone()));
         let parsed_yaml_regions = crate::syntax::collect_parsed_yaml_region_snapshots(&syntax_tree);
         (GreenNode::from(syntax_tree.green()), parsed_yaml_regions)
     };
-    let (salsa_file, salsa_config) = {
-        let mut db = salsa_db.lock().await;
-        let path = params
-            .text_document
-            .uri
-            .to_file_path()
-            .map(|p| p.into_owned())
-            .unwrap_or_else(|| std::path::PathBuf::from("<memory>"));
-        (
-            db.update_file_text_with_durability(path, text.clone(), Durability::LOW),
-            {
-                let cfg = crate::salsa::FileConfig::new(&*db, config.clone());
-                cfg.set_config(&mut *db)
-                    .with_durability(Durability::MEDIUM)
-                    .to(config.clone());
-                cfg
-            },
-        )
-    };
-    let doc_path = params
-        .text_document
-        .uri
-        .to_file_path()
-        .map(|p| p.into_owned());
 
-    // Store document state
-    {
-        let mut map = document_map.lock().await;
-        map.insert(
-            uri.clone(),
-            DocumentState {
-                path: doc_path.clone(),
-                salsa_file,
-                salsa_config,
-                tree,
-                parsed_yaml_regions,
-            },
-        );
-    }
+    let doc_path = uri.to_file_path().map(|p| p.into_owned());
+    let path_for_salsa = doc_path
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("<memory>"));
+    let salsa_file =
+        gs.salsa
+            .update_file_text_with_durability(path_for_salsa, text.clone(), Durability::LOW);
+    let salsa_config = {
+        let cfg = crate::salsa::FileConfig::new(&gs.salsa, config.clone());
+        cfg.set_config(&mut gs.salsa)
+            .with_durability(Durability::MEDIUM)
+            .to(config.clone());
+        cfg
+    };
+
+    gs.document_map_mut().insert(
+        uri_string.clone(),
+        DocumentState {
+            path: doc_path.clone(),
+            salsa_file,
+            salsa_config,
+            tree,
+            parsed_yaml_regions,
+        },
+    );
+
     if let Some(path) = doc_path.as_ref() {
-        let mut db = salsa_db.lock().await;
         let graph =
-            crate::salsa::project_graph(&*db, salsa_file, salsa_config, path.clone()).clone();
+            crate::salsa::project_graph(&gs.salsa, salsa_file, salsa_config, path.clone()).clone();
         for tracked in tracked_paths_for_graph(path, &graph) {
-            let _ = db.ensure_file_text_cached(tracked);
+            let _ = gs.salsa.ensure_file_text_cached(tracked);
         }
     }
 
-    client
-        .log_message(MessageType::INFO, format!("Opened document: {}", uri))
-        .await;
+    gs.sender
+        .log_message(MessageType::INFO, format!("Opened document: {uri_string}"));
 
-    // Run linter and publish diagnostics. Open is a one-time event (not
-    // per-keystroke), so run external linters now to surface their diagnostics
-    // immediately rather than waiting for the first save.
-    lint_and_publish(
-        client,
-        &document_map,
-        &salsa_db,
-        &workspace_root,
-        params.text_document.uri,
-        true,
-    )
-    .await;
+    // Open is a one-time event: run external linters now so their diagnostics
+    // surface immediately rather than waiting for the first save.
+    gs.spawn_lint(uri, false, true);
     log::debug!("did_open complete in {:?}", start.elapsed());
 }
 
-/// Handle textDocument/didChange notification
-pub(crate) async fn did_change(
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    workspace_root: Arc<Mutex<Option<std::path::PathBuf>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    runtime_settings: Arc<Mutex<LspRuntimeSettings>>,
-    pending_diagnostics: PendingDiagnostics,
-    client: &Client,
-    params: DidChangeTextDocumentParams,
-) {
-    let uri_string = params.text_document.uri.to_string();
+/// Handle `textDocument/didChange`.
+pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentParams) {
+    let uri = params.text_document.uri.clone();
+    let uri_string = uri.to_string();
     let change_count = params.content_changes.len();
-    log::debug!("did_change uri={}, changes={}", uri_string, change_count);
+    log::debug!("did_change uri={uri_string}, changes={change_count}");
     let start = Instant::now();
-    let config = get_config(client, &workspace_root, &params.text_document.uri).await;
 
-    // Apply incremental changes sequentially
-    let (graph_text, graph_path, _salsa_file, salsa_config) = {
-        let (salsa_file, salsa_config, original_tree_green) = {
-            let document_map = document_map.lock().await;
-            let Some(doc_state) = document_map.get(&uri_string) else {
-                return;
-            };
-            (
-                doc_state.salsa_file,
-                doc_state.salsa_config,
-                doc_state.tree.clone(),
-            )
-        };
-        let original_text = {
-            let db = salsa_db.lock().await;
-            salsa_file.text(&*db).clone()
-        };
+    let config = load_config(&gs.workspace_root, Some(&uri));
+    let incremental_enabled = gs.runtime_settings.experimental_incremental_parsing;
 
-        let incremental_enabled = {
-            runtime_settings
-                .lock()
-                .await
-                .experimental_incremental_parsing
-        };
-
-        // Compute the post-edit text and (when incremental parsing is
-        // enabled and edit ranges can be derived) the old/new edit
-        // ranges. Decoupling this from the parse call lets us update
-        // salsa's `FileText` early so the parser and downstream salsa
-        // queries share one cached `refdef_set` per text change.
-        let change_count = params.content_changes.len();
-        let (updated_text, edit_ranges) = if !incremental_enabled {
-            let mut text = original_text.clone();
-            for change in params.content_changes.iter() {
-                text = apply_content_change(&text, change);
-            }
-            (text, None)
-        } else if change_count == 1 {
-            let change = &params.content_changes[0];
-            match apply_content_change_with_edit_ranges(&original_text, change) {
-                Some((text, old_edit, new_edit)) => (text, Some((old_edit, new_edit))),
-                None => (apply_content_change(&original_text, change), None),
-            }
-        } else {
-            match apply_changes_descending_with_combined_ranges(
-                &original_text,
-                &params.content_changes,
-            ) {
-                Some((text, old_edit, new_edit)) => (text, Some((old_edit, new_edit))),
-                None => {
-                    let mut text = original_text.clone();
-                    for change in params.content_changes.iter() {
-                        text = apply_content_change(&text, change);
-                    }
-                    (text, None)
-                }
-            }
-        };
-
-        // Push the new text into salsa first so `refdef_set` reflects
-        // it; then the parser reuses the cached refdef map and
-        // downstream salsa queries (linter, project graph, ...) hit
-        // the same cache instead of re-scanning the document.
-        let doc_path_for_salsa = params
-            .text_document
-            .uri
-            .to_file_path()
-            .map(|p| p.into_owned());
-        let refdefs = {
-            let mut db = salsa_db.lock().await;
-            if let Some(path) = doc_path_for_salsa.as_ref() {
-                db.update_file_text(path.clone(), updated_text.clone());
-            } else {
-                salsa_file
-                    .set_text(&mut *db)
-                    .with_durability(Durability::LOW)
-                    .to(updated_text.clone());
-            }
-            crate::salsa::refdef_set(&*db, salsa_file, salsa_config).clone()
-        };
-
-        let (green, strategy) = if let Some((old_edit, new_edit)) = edit_ranges {
-            let old_tree = SyntaxNode::new_root(original_tree_green);
-            let updated = parse_incremental_suffix_with_refdefs(
-                &updated_text,
-                Some(config.clone()),
-                refdefs.clone(),
-                &old_tree,
-                old_edit,
-                new_edit,
-            );
-            let label = match (change_count, updated.strategy) {
-                (1, "section_window") => "section_window_single_change_experimental",
-                (1, "suffix_window") => "suffix_incremental_single_change_experimental",
-                (1, _) => "full_reparse_single_change_incremental_fallback",
-                (_, "section_window") => "section_window_multi_change_coalesced_experimental",
-                (_, "suffix_window") => "suffix_incremental_multi_change_coalesced_experimental",
-                (_, _) => "full_reparse_multi_change_incremental_fallback",
-            };
-            (GreenNode::from(updated.tree.green()), label)
-        } else {
-            let parsed = parse_with_refdefs(&updated_text, Some(config.clone()), refdefs);
-            let label = if !incremental_enabled {
-                if change_count == 1 {
-                    "full_reparse_single_change_incremental_disabled"
-                } else {
-                    "full_reparse_multi_change"
-                }
-            } else if change_count == 1 {
-                "full_reparse_single_change_fallback"
-            } else {
-                "full_reparse_multi_change_incremental_fallback"
-            };
-            (GreenNode::from(parsed.green()), label)
-        };
-
-        log::debug!(
-            "did_change parse strategy={} changes={}",
-            strategy,
-            params.content_changes.len()
-        );
-
-        let parsed_yaml_regions = crate::syntax::collect_parsed_yaml_region_snapshots(
-            &SyntaxNode::new_root(green.clone()),
-        );
-        {
-            let mut document_map = document_map.lock().await;
-            let Some(doc_state) = document_map.get_mut(&uri_string) else {
-                return;
-            };
-            doc_state.tree = green;
-            doc_state.parsed_yaml_regions = parsed_yaml_regions;
-        }
-
-        (
-            Some(updated_text),
-            params
-                .text_document
-                .uri
-                .to_file_path()
-                .map(|p| p.into_owned()),
-            salsa_file,
-            salsa_config,
-        )
+    let Some((salsa_file, salsa_config, original_tree_green)) = gs
+        .document_map
+        .get(&uri_string)
+        .map(|doc| (doc.salsa_file, doc.salsa_config, doc.tree.clone()))
+    else {
+        return;
     };
-    // File text was already pushed into salsa before the parse to
-    // populate the `refdef_set` cache; only the config and any
-    // downstream-tracked side state remain to be updated here.
-    let _ = graph_text;
-    {
-        let mut db = salsa_db.lock().await;
-        salsa_config
-            .set_config(&mut *db)
-            .with_durability(Durability::MEDIUM)
-            .to(config.clone());
+
+    let original_text = salsa_file.text(&gs.salsa).clone();
+
+    // Compute the post-edit text and (when incremental parsing is enabled and
+    // edit ranges can be derived) the old/new edit ranges.
+    let (updated_text, edit_ranges) = if !incremental_enabled {
+        let mut text = original_text.clone();
+        for change in params.content_changes.iter() {
+            text = apply_content_change(&text, change);
+        }
+        (text, None)
+    } else if change_count == 1 {
+        let change = &params.content_changes[0];
+        match apply_content_change_with_edit_ranges(&original_text, change) {
+            Some((text, old_edit, new_edit)) => (text, Some((old_edit, new_edit))),
+            None => (apply_content_change(&original_text, change), None),
+        }
+    } else {
+        match apply_changes_descending_with_combined_ranges(&original_text, &params.content_changes)
+        {
+            Some((text, old_edit, new_edit)) => (text, Some((old_edit, new_edit))),
+            None => {
+                let mut text = original_text.clone();
+                for change in params.content_changes.iter() {
+                    text = apply_content_change(&text, change);
+                }
+                (text, None)
+            }
+        }
+    };
+
+    // Push the new text into salsa first so `refdef_set` reflects it; the parser
+    // then reuses the cached refdef map and downstream queries hit the same cache.
+    let doc_path_for_salsa = uri.to_file_path().map(|p| p.into_owned());
+    if let Some(path) = doc_path_for_salsa.as_ref() {
+        gs.salsa
+            .update_file_text(path.clone(), updated_text.clone());
+    } else {
+        salsa_file
+            .set_text(&mut gs.salsa)
+            .with_durability(Durability::LOW)
+            .to(updated_text.clone());
     }
-    if let Some(state) = document_map.lock().await.get_mut(&uri_string) {
-        state.path = graph_path.clone();
+    let refdefs = crate::salsa::refdef_set(&gs.salsa, salsa_file, salsa_config).clone();
+
+    let (green, strategy) = if let Some((old_edit, new_edit)) = edit_ranges {
+        let old_tree = SyntaxNode::new_root(original_tree_green);
+        let updated = parse_incremental_suffix_with_refdefs(
+            &updated_text,
+            Some(config.clone()),
+            refdefs.clone(),
+            &old_tree,
+            old_edit,
+            new_edit,
+        );
+        let label = match (change_count, updated.strategy) {
+            (1, "section_window") => "section_window_single_change_experimental",
+            (1, "suffix_window") => "suffix_incremental_single_change_experimental",
+            (1, _) => "full_reparse_single_change_incremental_fallback",
+            (_, "section_window") => "section_window_multi_change_coalesced_experimental",
+            (_, "suffix_window") => "suffix_incremental_multi_change_coalesced_experimental",
+            (_, _) => "full_reparse_multi_change_incremental_fallback",
+        };
+        (GreenNode::from(updated.tree.green()), label)
+    } else {
+        let parsed = parse_with_refdefs(&updated_text, Some(config.clone()), refdefs);
+        let label = if !incremental_enabled {
+            if change_count == 1 {
+                "full_reparse_single_change_incremental_disabled"
+            } else {
+                "full_reparse_multi_change"
+            }
+        } else if change_count == 1 {
+            "full_reparse_single_change_fallback"
+        } else {
+            "full_reparse_multi_change_incremental_fallback"
+        };
+        (GreenNode::from(parsed.green()), label)
+    };
+
+    log::debug!("did_change parse strategy={strategy} changes={change_count}");
+
+    let parsed_yaml_regions =
+        crate::syntax::collect_parsed_yaml_region_snapshots(&SyntaxNode::new_root(green.clone()));
+
+    if let Some(doc_state) = gs.document_map_mut().get_mut(&uri_string) {
+        doc_state.tree = green;
+        doc_state.parsed_yaml_regions = parsed_yaml_regions;
+        doc_state.path = doc_path_for_salsa.clone();
+    } else {
+        return;
     }
 
-    // Parsing and document-state updates above are synchronous so requests
-    // (formatting, hover, ...) always see the latest tree. The expensive part
-    // -- project-graph recompute + linting (+ external linters) -- is deferred
-    // to a debounced task so a burst of keystrokes collapses into one lint and
-    // a save's `formatting` request never queues behind per-keystroke work.
-    schedule_debounced_lint(
-        client,
-        Arc::clone(&document_map),
-        Arc::clone(&salsa_db),
-        Arc::clone(&workspace_root),
-        pending_diagnostics,
-        params.text_document.uri,
-    )
-    .await;
+    salsa_config
+        .set_config(&mut gs.salsa)
+        .with_durability(Durability::MEDIUM)
+        .to(config.clone());
+
+    // Defer the expensive lint to a debounced pass so a burst of keystrokes
+    // collapses into one lint and a save's formatting request never queues
+    // behind per-keystroke work.
+    gs.schedule_lint(&uri);
 
     log::debug!(
         "did_change complete (parse+state) in {:?}; lint debounced",
@@ -371,192 +275,61 @@ pub(crate) async fn did_change(
     );
 }
 
-/// Schedule a debounced, external-linter-free lint pass for `uri`.
+/// Handle `textDocument/didSave`.
 ///
-/// A still-pending pass for the same document is aborted first, so a burst of
-/// keystrokes only ever results in a single lint after the user pauses for
-/// [`DIAGNOSTICS_DEBOUNCE`]. External linters are skipped here and deferred to
-/// [`did_save`]; only the fast built-in rules run on change.
-async fn schedule_debounced_lint(
-    client: &Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
-    pending_diagnostics: PendingDiagnostics,
-    uri: Uri,
-) {
-    // `Uri` is not `Send`, so the spawned task carries the string form and
-    // reparses it past the spawn boundary.
-    let key = uri.to_string();
-    let client = client.clone();
-
-    let mut pending = pending_diagnostics.lock().await;
-    // Cancel the previous still-pending pass for this document (aborting an
-    // already-finished handle is a no-op). The map therefore holds at most one
-    // handle per open document; entries are dropped on save/close.
-    if let Some(prev) = pending.insert(
-        key.clone(),
-        tokio::spawn(async move {
-            tokio::time::sleep(DIAGNOSTICS_DEBOUNCE).await;
-            let Ok(uri) = key.parse::<Uri>() else {
-                return;
-            };
-            relint_with_dependents(
-                &client,
-                &document_map,
-                &salsa_db,
-                &workspace_root,
-                uri,
-                false,
-            )
-            .await;
-        }),
-    ) {
-        prev.abort();
-    }
-}
-
-/// Recompute the project graph for `uri`, re-lint any dependent documents, then
-/// lint the document itself. Dependents are always linted built-in-only to
-/// bound cost; `run_external` controls only the target document's own pass.
-async fn relint_with_dependents(
-    client: &Client,
-    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: &Arc<Mutex<Option<PathBuf>>>,
-    uri: Uri,
-    run_external: bool,
-) {
-    let (salsa_file, salsa_config, path) = {
-        let map = document_map.lock().await;
-        let Some(state) = map.get(&uri.to_string()) else {
-            return;
-        };
-        (state.salsa_file, state.salsa_config, state.path.clone())
-    };
-
-    let mut dependent_uris: Vec<Uri> = Vec::new();
-    if let Some(path) = path.as_ref() {
-        // Run the (possibly cold, ~120ms) project-graph read on a cloned handle
-        // with the lock released, so an interactive request doesn't queue behind
-        // it. A concurrent edit cancels this background pass; the edit reschedules.
-        // Scope the clone so it drops before the `&mut` write below — salsa's
-        // write path waits to become the only live handle, so read handles are
-        // dropped as soon as the read finishes.
-        let read = {
-            let db = clone_salsa_db(salsa_db).await;
-            catch_cancelled(|| {
-                let graph =
-                    crate::salsa::project_graph(&db, salsa_file, salsa_config, path.to_path_buf())
-                        .clone();
-                let dependents = graph.dependents(path, None);
-                let tracked_paths = tracked_paths_for_graph(path, &graph);
-                (dependents, tracked_paths)
-            })
-        };
-        let Some((dependents, tracked_paths)) = read else {
-            return;
-        };
-        {
-            let mut db = salsa_db.lock().await;
-            for tracked in tracked_paths {
-                let _ = db.ensure_file_text_cached(tracked);
-            }
-        }
-        dependent_uris = dependents
-            .into_iter()
-            .filter_map(Uri::from_file_path)
-            .collect();
-    }
-
-    for dep in dependent_uris {
-        lint_and_publish(client, document_map, salsa_db, workspace_root, dep, false).await;
-    }
-    lint_and_publish(
-        client,
-        document_map,
-        salsa_db,
-        workspace_root,
-        uri,
-        run_external,
-    )
-    .await;
-}
-
-/// Handle textDocument/didSave notification.
-///
-/// Save is the point at which the heavier external linters (e.g. `jarl`,
-/// `ruff`) run -- they are skipped on every keystroke (see
-/// [`schedule_debounced_lint`]) and refreshed here. Any pending debounced pass
-/// is cancelled first so the save's full pass is the authoritative one.
-pub(crate) async fn did_save(
-    client: &Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
-    pending_diagnostics: PendingDiagnostics,
-    params: DidSaveTextDocumentParams,
-) {
+/// Save is the point at which heavier external linters run (skipped on every
+/// keystroke). Any pending debounced pass is superseded by the fresh generation
+/// that [`GlobalState::spawn_lint`] bumps.
+pub(crate) fn did_save(gs: &mut GlobalState, params: DidSaveTextDocumentParams) {
     let uri = params.text_document.uri;
-    {
-        let mut pending = pending_diagnostics.lock().await;
-        if let Some(prev) = pending.remove(&uri.to_string()) {
-            prev.abort();
-        }
-    }
-    relint_with_dependents(client, &document_map, &salsa_db, &workspace_root, uri, true).await;
+    gs.lint_deadlines.remove(&uri.to_string());
+    // A `did_change` arriving while this save's external-linter pass is in
+    // flight will bump the generation and discard its result; the next
+    // debounced pass then runs built-in-only, so external diagnostics stay
+    // stale until the next save. Accepted trade-off — keystroke debouncing
+    // matters more than freshness of an inherently slow signal.
+    gs.spawn_lint(uri, true, true);
 }
 
-/// Handle textDocument/didClose notification
-pub(crate) async fn did_close(
-    client: &Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    pending_diagnostics: PendingDiagnostics,
-    params: DidCloseTextDocumentParams,
-) {
-    let uri = params.text_document.uri.to_string();
-    document_map.lock().await.remove(&uri);
-    // Cancel any pending debounced lint for the now-closed document.
-    if let Some(handle) = pending_diagnostics.lock().await.remove(&uri) {
-        handle.abort();
-    }
+/// Handle `textDocument/didClose`.
+pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams) {
+    let uri = params.text_document.uri.clone();
+    let uri_string = uri.to_string();
+    gs.document_map_mut().remove(&uri_string);
+    gs.forget_lint(&uri);
 
-    let states: Vec<DocumentState> = {
-        let map = document_map.lock().await;
-        map.values().cloned().collect()
-    };
+    let states: Vec<DocumentState> = gs.document_map.values().cloned().collect();
     let mut retained = HashSet::new();
-    let mut db = salsa_db.lock().await;
     for state in states {
         let Some(path) = state.path.clone() else {
             continue;
         };
-        let graph =
-            crate::salsa::project_graph(&*db, state.salsa_file, state.salsa_config, path.clone())
-                .clone();
+        let graph = crate::salsa::project_graph(
+            &gs.salsa,
+            state.salsa_file,
+            state.salsa_config,
+            path.clone(),
+        )
+        .clone();
         for tracked in tracked_paths_for_graph(&path, &graph) {
             retained.insert(tracked.clone());
-            let _ = db.ensure_file_text_cached(tracked);
+            let _ = gs.salsa.ensure_file_text_cached(tracked);
         }
     }
-    for cached in db.cached_file_paths() {
+    for cached in gs.salsa.cached_file_paths() {
         if retained.contains(&cached) || cached.as_os_str() == "<memory>" {
             continue;
         }
-        let _ = db.evict_file_text(&cached);
+        let _ = gs.salsa.evict_file_text(&cached);
     }
 
-    // Clear diagnostics
-    client
-        .publish_diagnostics(params.text_document.uri, vec![], None)
-        .await;
+    gs.sender.publish_diagnostics(uri, vec![], None);
 }
 
 #[cfg(test)]
 mod tests {
     use super::apply_changes_descending_with_combined_ranges;
-    use tower_lsp_server::ls_types::{Position, Range, TextDocumentContentChangeEvent};
+    use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 
     fn change(
         start_line: u32,

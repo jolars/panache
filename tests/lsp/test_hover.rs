@@ -1,10 +1,10 @@
 //! Tests for hover (footnote and citation previews).
 
 use super::helpers::*;
-use tower_lsp_server::ls_types::*;
+use lsp_types::*;
 
-#[tokio::test]
-async fn test_hover_on_included_footnote() {
+#[test]
+fn test_hover_on_included_footnote() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let child_path = temp_dir.path().join("_child.qmd");
     let parent_path = temp_dir.path().join("parent.qmd");
@@ -12,19 +12,17 @@ async fn test_hover_on_included_footnote() {
     std::fs::write(&child_path, "[^1]: Included footnote content.\n").unwrap();
     std::fs::write(&parent_path, "{{< include _child.qmd >}}\nRef[^1].\n").unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
     let parent_uri = Uri::from_file_path(&parent_path).expect("parent uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            parent_uri.as_str(),
-            &std::fs::read_to_string(&parent_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        parent_uri.as_str(),
+        &std::fs::read_to_string(&parent_path).unwrap(),
+        "quarto",
+    );
 
-    let hover = server.hover(parent_uri.as_str(), 1, 4).await;
+    let hover = server.hover(parent_uri.as_str(), 1, 4);
 
     let Some(h) = hover else {
         panic!("Expected hover content");
@@ -36,8 +34,8 @@ async fn test_hover_on_included_footnote() {
     }
 }
 
-#[tokio::test]
-async fn test_hover_included_updates_after_watcher_change() {
+#[test]
+fn test_hover_included_updates_after_watcher_change() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let child_path = temp_dir.path().join("_child.qmd");
     let parent_path = temp_dir.path().join("parent.qmd");
@@ -45,61 +43,53 @@ async fn test_hover_included_updates_after_watcher_change() {
     std::fs::write(&child_path, "[^1]: Included footnote content.\n").unwrap();
     std::fs::write(&parent_path, "{{< include _child.qmd >}}\nRef[^1].\n").unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
     let parent_uri = Uri::from_file_path(&parent_path).expect("parent uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            parent_uri.as_str(),
-            &std::fs::read_to_string(&parent_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        parent_uri.as_str(),
+        &std::fs::read_to_string(&parent_path).unwrap(),
+        "quarto",
+    );
 
     // First hover caches the included file and its definition index.
     assert!(
-        server.hover(parent_uri.as_str(), 1, 4).await.is_some(),
+        server.hover(parent_uri.as_str(), 1, 4).is_some(),
         "Sanity check: should resolve hover before edit"
     );
 
     // Change the included file on disk so the footnote no longer exists.
     std::fs::write(&child_path, "[^2]: Included footnote content.\n").unwrap();
-    server
-        .did_change_watched_files(vec![FileEvent {
-            uri: Uri::from_file_path(&child_path).expect("child uri"),
-            typ: FileChangeType::CHANGED,
-        }])
-        .await;
+    server.did_change_watched_files(vec![FileEvent {
+        uri: Uri::from_file_path(&child_path).expect("child uri"),
+        typ: FileChangeType::CHANGED,
+    }]);
 
-    let hover = server.hover(parent_uri.as_str(), 1, 4).await;
+    let hover = server.hover(parent_uri.as_str(), 1, 4);
     assert!(
         hover.is_none(),
         "After watcher update, hover should no longer resolve"
     );
 }
 
-#[tokio::test]
-async fn test_hover_on_footnote_reference() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_footnote_reference() {
+    let mut server = TestLspServer::new();
 
     // Open a document with footnote
     let content = r#"Text with footnote[^1] here.
 
 [^1]: This is the footnote content with details.
 "#;
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     // Request hover on the footnote reference [^1]
-    let hover = server
-        .hover(
-            "file:///test.md",
-            0,  // Line with footnote[^1]
-            20, // Character position inside [^1]
-        )
-        .await;
+    let hover = server.hover(
+        "file:///test.md",
+        0,  // Line with footnote[^1]
+        20, // Character position inside [^1]
+    );
 
     assert!(hover.is_some(), "Should have hover info for footnote");
 
@@ -117,43 +107,37 @@ async fn test_hover_on_footnote_reference() {
     }
 }
 
-#[tokio::test]
-async fn test_hover_on_plain_text() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_plain_text() {
+    let mut server = TestLspServer::new();
 
     // Open a document without any special elements
     let content = "Just plain text without footnotes.";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     // Request hover in plain text
-    let hover = server.hover("file:///test.md", 0, 10).await;
+    let hover = server.hover("file:///test.md", 0, 10);
 
     assert!(hover.is_none(), "Should not have hover for plain text");
 }
 
-#[tokio::test]
-async fn test_hover_on_footnote_with_formatting() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_footnote_with_formatting() {
+    let mut server = TestLspServer::new();
 
     // Open a document with formatted footnote
     let content = r#"Reference[^note] in text.
 
 [^note]: Footnote with *emphasis* and `code`.
 "#;
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     // Request hover on footnote
-    let hover = server
-        .hover(
-            "file:///test.md",
-            0,  // Line with [^note]
-            10, // Inside [^note]
-        )
-        .await;
+    let hover = server.hover(
+        "file:///test.md",
+        0,  // Line with [^note]
+        10, // Inside [^note]
+    );
 
     assert!(hover.is_some(), "Should have hover for formatted footnote");
 
@@ -166,8 +150,8 @@ async fn test_hover_on_footnote_with_formatting() {
     }
 }
 
-#[tokio::test]
-async fn test_hover_on_citation_preview() {
+#[test]
+fn test_hover_on_citation_preview() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     let bib_path = root.join("refs.bib");
@@ -185,19 +169,17 @@ async fn test_hover_on_citation_preview() {
     )
     .unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(root).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &std::fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &std::fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
-    let result = server.hover(doc_uri.as_str(), 4, 7).await;
+    let result = server.hover(doc_uri.as_str(), 4, 7);
     let Some(Hover { contents, .. }) = result else {
         panic!("Expected hover content");
     };
@@ -222,24 +204,20 @@ async fn test_hover_on_citation_preview() {
     assert!(content.contains("Journal Name"));
 }
 
-#[tokio::test]
-async fn test_hover_on_undefined_footnote() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_undefined_footnote() {
+    let mut server = TestLspServer::new();
 
     // Open a document with footnote reference but no definition
     let content = "Text with undefined[^missing] footnote.";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     // Request hover on undefined footnote
-    let hover = server
-        .hover(
-            "file:///test.md",
-            0,
-            25, // Inside [^missing]
-        )
-        .await;
+    let hover = server.hover(
+        "file:///test.md",
+        0,
+        25, // Inside [^missing]
+    );
 
     // Should return None when footnote definition doesn't exist
     assert!(
@@ -248,8 +226,8 @@ async fn test_hover_on_undefined_footnote() {
     );
 }
 
-#[tokio::test]
-async fn test_hover_returns_none_inside_yaml_frontmatter() {
+#[test]
+fn test_hover_returns_none_inside_yaml_frontmatter() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     let bib_path = root.join("refs.bib");
@@ -262,40 +240,34 @@ async fn test_hover_returns_none_inside_yaml_frontmatter() {
     )
     .unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(root).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &std::fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &std::fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
-    let hover = server.hover(doc_uri.as_str(), 1, 10).await;
+    let hover = server.hover(doc_uri.as_str(), 1, 10);
     assert!(
         hover.is_none(),
         "Expected no hover when cursor is inside YAML frontmatter"
     );
 }
 
-#[tokio::test]
-async fn test_hover_on_heading_reference_shows_section_preview() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_heading_reference_shows_section_preview() {
+    let mut server = TestLspServer::new();
     let content = "# Intro {#intro}\n\nFirst paragraph in intro section.\n\n## Next\n\nTail.\n\nSee [go](#intro).\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
-    let hover = server
-        .hover(
-            "file:///test.md",
-            8,  // See [go](#intro).
-            10, // Inside intro anchor text
-        )
-        .await;
+    let hover = server.hover(
+        "file:///test.md",
+        8,  // See [go](#intro).
+        10, // Inside intro anchor text
+    );
 
     let Some(h) = hover else {
         panic!("Expected hover content for heading reference");
@@ -309,36 +281,30 @@ async fn test_hover_on_heading_reference_shows_section_preview() {
     assert!(content.contains("First paragraph in intro section."));
 }
 
-#[tokio::test]
-async fn test_hover_on_heading_declaration_returns_none() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_heading_declaration_returns_none() {
+    let mut server = TestLspServer::new();
     let content = "# Intro {#intro}\n\nBody.\n\nSee [go](#intro).\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
-    let hover = server.hover("file:///test.md", 0, 3).await;
+    let hover = server.hover("file:///test.md", 0, 3);
     assert!(
         hover.is_none(),
         "Heading declaration should not produce section preview hover"
     );
 }
 
-#[tokio::test]
-async fn test_hover_on_heading_reference_with_empty_section_shows_title_only() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_heading_reference_with_empty_section_shows_title_only() {
+    let mut server = TestLspServer::new();
     let content = "# Intro {#intro}\n\n## Next\n\nSee [go](#intro).\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
-    let hover = server
-        .hover(
-            "file:///test.md",
-            4, // See [go](#intro).
-            10,
-        )
-        .await;
+    let hover = server.hover(
+        "file:///test.md",
+        4, // See [go](#intro).
+        10,
+    );
 
     let Some(h) = hover else {
         panic!("Expected hover content for heading reference");
@@ -352,19 +318,17 @@ async fn test_hover_on_heading_reference_with_empty_section_shows_title_only() {
     assert!(!content.contains("..."));
 }
 
-#[tokio::test]
-async fn test_hover_on_heading_reference_crops_preview() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_heading_reference_crops_preview() {
+    let mut server = TestLspServer::new();
     let long_body = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(8);
     let content = format!(
         "# Intro {{#intro}}\n\n{}\n\n## Next\n\nSee [go](#intro).\n",
         long_body
     );
-    server
-        .open_document("file:///test.md", &content, "markdown")
-        .await;
+    server.open_document("file:///test.md", &content, "markdown");
 
-    let hover = server.hover("file:///test.md", 6, 10).await;
+    let hover = server.hover("file:///test.md", 6, 10);
     let Some(h) = hover else {
         panic!("Expected hover content for heading reference");
     };
@@ -378,21 +342,17 @@ async fn test_hover_on_heading_reference_crops_preview() {
     );
 }
 
-#[tokio::test]
-async fn test_hover_on_reference_link_definition_to_heading_shows_section_preview() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_reference_link_definition_to_heading_shows_section_preview() {
+    let mut server = TestLspServer::new();
     let content = "# Intro {#bar}\n\nSection body here.\n\nSee [foo][myref].\n\n[myref]: #bar\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
-    let hover = server
-        .hover(
-            "file:///test.md",
-            4,  // See [foo][myref].
-            11, // inside [myref]
-        )
-        .await;
+    let hover = server.hover(
+        "file:///test.md",
+        4,  // See [foo][myref].
+        11, // inside [myref]
+    );
 
     let Some(h) = hover else {
         panic!("Expected hover content for reference-style heading link");
@@ -406,30 +366,26 @@ async fn test_hover_on_reference_link_definition_to_heading_shows_section_previe
     assert!(content.contains("Section body here."));
 }
 
-#[tokio::test]
-async fn test_hover_on_reference_link_definition_to_non_heading_returns_none() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_reference_link_definition_to_non_heading_returns_none() {
+    let mut server = TestLspServer::new();
     let content = "# Intro {#bar}\n\nSection body here.\n\nSee [foo][myref].\n\n[myref]: https://example.com\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
-    let hover = server.hover("file:///test.md", 4, 11).await;
+    let hover = server.hover("file:///test.md", 4, 11);
     assert!(
         hover.is_none(),
         "Non-heading reference definitions should not produce section preview hover"
     );
 }
 
-#[tokio::test]
-async fn test_hover_on_equation_reference_shows_equation_preview() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_equation_reference_shows_equation_preview() {
+    let mut server = TestLspServer::new();
     let content = "$$\na = b + c\n$$ {#eq-foo}\n\n@eq-foo\n";
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
-    let hover = server.hover("file:///test.qmd", 4, 4).await;
+    let hover = server.hover("file:///test.qmd", 4, 4);
     let Some(h) = hover else {
         panic!("Expected hover content for equation reference");
     };
@@ -443,16 +399,14 @@ async fn test_hover_on_equation_reference_shows_equation_preview() {
     assert!(content.contains("a = b + c"));
 }
 
-#[tokio::test]
-async fn test_hover_on_equation_reference_crops_preview_lines() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_equation_reference_crops_preview_lines() {
+    let mut server = TestLspServer::new();
     let content =
         "$$\nline1\nline2\nline3\nline4\nline5\nline6\nline7\n$$ {#eq-long}\n\n@eq-long\n";
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
-    let hover = server.hover("file:///test.qmd", 10, 4).await;
+    let hover = server.hover("file:///test.qmd", 10, 4);
     let Some(h) = hover else {
         panic!("Expected hover content for equation reference");
     };
@@ -465,8 +419,8 @@ async fn test_hover_on_equation_reference_crops_preview_lines() {
     assert!(content.contains("\n...\n```"));
 }
 
-#[tokio::test]
-async fn test_hover_on_direct_local_markdown_link_shows_linked_doc_preview() {
+#[test]
+fn test_hover_on_direct_local_markdown_link_shows_linked_doc_preview() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let doc_path = temp_dir.path().join("doc.qmd");
     let linked_path = temp_dir.path().join("linked.md");
@@ -478,19 +432,17 @@ async fn test_hover_on_direct_local_markdown_link_shows_linked_doc_preview() {
     .unwrap();
     std::fs::write(&doc_path, "See [linked](./linked.md).\n").unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &std::fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &std::fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
-    let hover = server.hover(doc_uri.as_str(), 0, 17).await;
+    let hover = server.hover(doc_uri.as_str(), 0, 17);
     let Some(h) = hover else {
         panic!("Expected hover content for direct local markdown link");
     };
@@ -504,8 +456,8 @@ async fn test_hover_on_direct_local_markdown_link_shows_linked_doc_preview() {
     assert!(content.contains("Linked paragraph preview text."));
 }
 
-#[tokio::test]
-async fn test_hover_on_reference_definition_local_markdown_link_shows_linked_doc_preview() {
+#[test]
+fn test_hover_on_reference_definition_local_markdown_link_shows_linked_doc_preview() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let doc_path = temp_dir.path().join("doc.qmd");
     let linked_path = temp_dir.path().join("linked.qmd");
@@ -517,19 +469,17 @@ async fn test_hover_on_reference_definition_local_markdown_link_shows_linked_doc
     .unwrap();
     std::fs::write(&doc_path, "See [linked][ref].\n\n[ref]: ./linked.qmd\n").unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &std::fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &std::fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
-    let hover = server.hover(doc_uri.as_str(), 0, 14).await;
+    let hover = server.hover(doc_uri.as_str(), 0, 14);
     let Some(h) = hover else {
         panic!("Expected hover content for reference-definition local markdown link");
     };
@@ -543,30 +493,26 @@ async fn test_hover_on_reference_definition_local_markdown_link_shows_linked_doc
     assert!(content.contains("Ref linked paragraph preview text."));
 }
 
-#[tokio::test]
-async fn test_hover_on_missing_local_markdown_link_returns_none() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_missing_local_markdown_link_returns_none() {
+    let mut server = TestLspServer::new();
     let content = "See [missing](./does-not-exist.md).\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
-    let hover = server.hover("file:///test.md", 0, 20).await;
+    let hover = server.hover("file:///test.md", 0, 20);
     assert!(
         hover.is_none(),
         "Missing local linked document should not produce hover preview"
     );
 }
 
-#[tokio::test]
-async fn test_hover_on_external_url_link_returns_none_for_linked_doc_preview() {
-    let server = TestLspServer::new();
+#[test]
+fn test_hover_on_external_url_link_returns_none_for_linked_doc_preview() {
+    let mut server = TestLspServer::new();
     let content = "See [site](https://example.com).\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
-    let hover = server.hover("file:///test.md", 0, 13).await;
+    let hover = server.hover("file:///test.md", 0, 13);
     assert!(
         hover.is_none(),
         "External URL links should not produce linked-document previews"

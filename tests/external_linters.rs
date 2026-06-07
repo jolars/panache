@@ -5,8 +5,8 @@ mod tests {
     use panache::{Config, linter, parse};
     use std::collections::HashMap;
 
-    #[tokio::test]
-    async fn test_jarl_linter_integration() {
+    #[test]
+    fn test_jarl_linter_integration() {
         // Skip if jarl not available
         if which::which("jarl").is_err() {
             println!("Skipping jarl test - jarl not installed");
@@ -28,7 +28,7 @@ result <- TRUE
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         assert!(!diagnostics.is_empty(), "Expected diagnostics from jarl");
 
@@ -50,8 +50,8 @@ result <- TRUE
         assert_eq!(fix.edits[0].replacement, "anyNA(x)");
     }
 
-    #[tokio::test]
-    async fn test_multiple_r_blocks_concatenation() {
+    #[test]
+    fn test_multiple_r_blocks_concatenation() {
         if which::which("jarl").is_err() {
             println!("Skipping jarl test - jarl not installed");
             return;
@@ -74,7 +74,7 @@ any(is.na(y))
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         // Should find 2 any_is_na violations
         let any_is_na_diags: Vec<_> = diagnostics
@@ -92,8 +92,8 @@ any(is.na(y))
         assert!(any_is_na_diags[1].fix.is_some());
     }
 
-    #[tokio::test]
-    async fn test_no_external_linters_configured() {
+    #[test]
+    fn test_no_external_linters_configured() {
         let input = r#"```r
 x = 1
 ```
@@ -102,7 +102,7 @@ x = 1
         let config = Config::default(); // No linters configured
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         // Should only have built-in rule diagnostics (if any)
         // No jarl diagnostics
@@ -113,8 +113,8 @@ x = 1
         assert_eq!(external_diags.len(), 0);
     }
 
-    #[tokio::test]
-    async fn test_ruff_linter_integration() {
+    #[test]
+    fn test_ruff_linter_integration() {
         // Skip if ruff not available
         if which::which("ruff").is_err() {
             println!("Skipping ruff test - ruff not installed");
@@ -134,7 +134,7 @@ import os
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         let ruff_diags: Vec<_> = diagnostics.iter().filter(|d| d.code == "F401").collect();
         assert_eq!(ruff_diags.len(), 1, "Expected 1 Ruff F401 diagnostic");
@@ -147,8 +147,8 @@ import os
         assert!(ruff_diags[0].fix.is_some(), "Ruff fixes should be enabled");
     }
 
-    #[tokio::test]
-    async fn test_ruff_fix_application_end_to_end() {
+    #[test]
+    fn test_ruff_fix_application_end_to_end() {
         if which::which("ruff").is_err() {
             println!("Skipping ruff test - ruff not installed");
             return;
@@ -168,7 +168,7 @@ print("ok")
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         let with_fixes: Vec<_> = diagnostics.iter().filter(|d| d.fix.is_some()).collect();
         assert!(!with_fixes.is_empty(), "Expected at least one Ruff fix");
@@ -205,8 +205,8 @@ print("ok")
         assert!(output.contains("```python"));
     }
 
-    #[tokio::test]
-    async fn test_shellcheck_linter_integration() {
+    #[test]
+    fn test_shellcheck_linter_integration() {
         if which::which("shellcheck").is_err() {
             println!("Skipping shellcheck test - shellcheck not installed");
             return;
@@ -225,7 +225,7 @@ echo $UNSET
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         let shell_diags: Vec<_> = diagnostics.iter().filter(|d| d.code == "SC2086").collect();
         assert_eq!(
@@ -244,8 +244,8 @@ echo $UNSET
         );
     }
 
-    #[tokio::test]
-    async fn test_shellcheck_sc2148_not_reported_when_shell_is_known() {
+    #[test]
+    fn test_shellcheck_sc2148_not_reported_when_shell_is_known() {
         if which::which("shellcheck").is_err() {
             println!("Skipping shellcheck test - shellcheck not installed");
             return;
@@ -264,7 +264,7 @@ echo "hello"
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         let sc2148: Vec<_> = diagnostics.iter().filter(|d| d.code == "SC2148").collect();
         assert!(
@@ -273,8 +273,8 @@ echo "hello"
         );
     }
 
-    #[tokio::test]
-    async fn test_shellcheck_fix_application_end_to_end() {
+    #[test]
+    fn test_shellcheck_fix_application_end_to_end() {
         if which::which("shellcheck").is_err() {
             println!("Skipping shellcheck test - shellcheck not installed");
             return;
@@ -293,7 +293,7 @@ echo $UNSET
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         let with_fixes: Vec<_> = diagnostics.iter().filter(|d| d.fix.is_some()).collect();
         assert!(
@@ -327,8 +327,8 @@ echo $UNSET
         assert!(output.contains("```sh"));
     }
 
-    #[tokio::test]
-    async fn test_eslint_linter_integration() {
+    #[test]
+    fn test_eslint_linter_integration() {
         if which::which("eslint").is_err() {
             println!("Skipping eslint test - eslint not installed");
             return;
@@ -348,7 +348,7 @@ console.log(1)
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         let eslint_diags: Vec<_> = diagnostics
             .iter()
@@ -366,8 +366,8 @@ console.log(1)
         );
     }
 
-    #[tokio::test]
-    async fn test_eslint_fix_application_end_to_end() {
+    #[test]
+    fn test_eslint_fix_application_end_to_end() {
         if which::which("eslint").is_err() {
             println!("Skipping eslint test - eslint not installed");
             return;
@@ -387,7 +387,7 @@ console.log(1)
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         let with_fixes: Vec<_> = diagnostics.iter().filter(|d| d.fix.is_some()).collect();
         assert!(
@@ -421,8 +421,8 @@ console.log(1)
         assert!(output.contains("```js"));
     }
 
-    #[tokio::test]
-    async fn test_staticcheck_linter_integration() {
+    #[test]
+    fn test_staticcheck_linter_integration() {
         if which::which("staticcheck").is_err() || which::which("go").is_err() {
             println!("Skipping staticcheck test - staticcheck and/or go not installed");
             return;
@@ -445,7 +445,7 @@ func main() {
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         // Ensure we don't surface fallback package-level compile diagnostics caused
         // by bad temp-file naming/placement.
@@ -459,8 +459,8 @@ func main() {
         );
     }
 
-    #[tokio::test]
-    async fn test_clippy_linter_integration() {
+    #[test]
+    fn test_clippy_linter_integration() {
         if which::which("clippy-driver").is_err() {
             println!("Skipping clippy test - clippy-driver not installed");
             return;
@@ -482,7 +482,7 @@ fn main() {
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         if diagnostics.is_empty() {
             println!(
@@ -499,8 +499,8 @@ fn main() {
         );
     }
 
-    #[tokio::test]
-    async fn test_unknown_linter() {
+    #[test]
+    fn test_unknown_linter() {
         let input = r#"```r
 x <- 1
 ```
@@ -512,14 +512,14 @@ x <- 1
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let _diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let _diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         // Should handle gracefully - just skip external linting
         // Test passes if no panic occurs
     }
 
-    #[tokio::test]
-    async fn test_unsupported_linter_language_mapping_is_skipped() {
+    #[test]
+    fn test_unsupported_linter_language_mapping_is_skipped() {
         let input = r#"# Test
 
 ```python
@@ -533,7 +533,7 @@ import os
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         // External linter mapping is unsupported, so no external diagnostics should appear.
         assert!(
@@ -544,8 +544,8 @@ import os
         );
     }
 
-    #[tokio::test]
-    async fn test_fix_application_end_to_end() {
+    #[test]
+    fn test_fix_application_end_to_end() {
         // This test demonstrates that auto-fixes work end-to-end:
         // 1. Parse markdown with R code
         // 2. Run Jarl to get diagnostics with fixes
@@ -575,7 +575,7 @@ More text.
         config.linters = linters;
 
         let tree = parse(input, Some(config.clone()));
-        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
 
         // Get diagnostics with fixes
         let with_fixes: Vec<_> = diagnostics.iter().filter(|d| d.fix.is_some()).collect();
