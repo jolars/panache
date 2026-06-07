@@ -2,16 +2,28 @@
 
 ## Unreleased
 
-Panache has relied on the external `yaml_parser` and `pretty_yaml` crates for
-YAML parsing and formatting, respectively. But with this release, we have now
-shifted over to our own hand-crafted YAML parser and formatter, fully
-compatible with the YAML 1.2 spec. YAML syntax is now also a first-class
-citizen in the Panache CST, with all markers and trivia preserved, even in the
-hashpipe YAML syntax for Quarto/R Markdown documents. This means that
-downstream users of the parser can now easily access and manipulate both
-metadata YAML and code chunk YAML (hashpipe), and it paves the way for our
-language server and linter to effortlessly provide diagnostics, code actions,
-renaming, and more for the YAML syntax in both contexts.
+This release comes with two major changes:
+
+- There is now an experimental math parser and formatter in Panache! The formatter
+  can be enabled via the following setting:
+
+  ```toml
+  [experimental]
+  format-math = true
+  ```
+
+  The formatter is very basic at the moment, only supporting alignment and
+  whitespace normalization, but the intent is for it to eventually support
+  operator-precedence-aware line breaking and other features.
+
+- Panache now has its own YAML parser and formatter! We have previously relied
+  on the external `yaml_parser` and `pretty_yaml` crates. But with this release,
+  we have now shifted over to our own hand-crafted YAML parser and formatter,
+  fully compatible with the YAML 1.2 spec. YAML syntax is now also a first-class
+  citizen in the Panache CST, with all markers and trivia preserved, even in the
+  hashpipe YAML syntax for Quarto/R Markdown documents. The changes won't be
+  immediately visible to users, but will pave the way for better linting
+  and LSP features in the future.
 
 ## [2.51.0](https://github.com/jolars/panache/compare/v2.50.0...v2.51.0) (2026-06-02)
 
