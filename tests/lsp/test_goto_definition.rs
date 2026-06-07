@@ -1,10 +1,10 @@
 //! Tests for goto definition (references, footnotes, citations).
 
 use super::helpers::*;
-use tower_lsp_server::ls_types::*;
+use lsp_types::*;
 
-#[tokio::test]
-async fn test_goto_definition_in_included_document() {
+#[test]
+fn test_goto_definition_in_included_document() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let child_path = temp_dir.path().join("_child.qmd");
     let parent_path = temp_dir.path().join("parent.qmd");
@@ -16,19 +16,17 @@ async fn test_goto_definition_in_included_document() {
     )
     .unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
     let parent_uri = Uri::from_file_path(&parent_path).expect("parent uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            parent_uri.as_str(),
-            &std::fs::read_to_string(&parent_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        parent_uri.as_str(),
+        &std::fs::read_to_string(&parent_path).unwrap(),
+        "quarto",
+    );
 
-    let result = server.goto_definition(parent_uri.as_str(), 1, 12).await;
+    let result = server.goto_definition(parent_uri.as_str(), 1, 12);
 
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
@@ -39,8 +37,8 @@ async fn test_goto_definition_in_included_document() {
     );
 }
 
-#[tokio::test]
-async fn test_goto_definition_included_updates_after_watcher_change() {
+#[test]
+fn test_goto_definition_included_updates_after_watcher_change() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let child_path = temp_dir.path().join("_child.qmd");
     let parent_path = temp_dir.path().join("parent.qmd");
@@ -52,64 +50,53 @@ async fn test_goto_definition_included_updates_after_watcher_change() {
     )
     .unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
     let parent_uri = Uri::from_file_path(&parent_path).expect("parent uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            parent_uri.as_str(),
-            &std::fs::read_to_string(&parent_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        parent_uri.as_str(),
+        &std::fs::read_to_string(&parent_path).unwrap(),
+        "quarto",
+    );
 
     // First request caches the included file and its definition index.
     assert!(
-        server
-            .goto_definition(parent_uri.as_str(), 1, 12)
-            .await
-            .is_some(),
+        server.goto_definition(parent_uri.as_str(), 1, 12).is_some(),
         "Sanity check: should resolve definition before edit"
     );
 
     // Change the included file on disk so the reference no longer exists.
     std::fs::write(&child_path, "[ref2]: https://example.com\n").unwrap();
-    server
-        .did_change_watched_files(vec![FileEvent {
-            uri: Uri::from_file_path(&child_path).expect("child uri"),
-            typ: FileChangeType::CHANGED,
-        }])
-        .await;
+    server.did_change_watched_files(vec![FileEvent {
+        uri: Uri::from_file_path(&child_path).expect("child uri"),
+        typ: FileChangeType::CHANGED,
+    }]);
 
-    let result = server.goto_definition(parent_uri.as_str(), 1, 12).await;
+    let result = server.goto_definition(parent_uri.as_str(), 1, 12);
     assert!(
         result.is_none(),
         "After watcher update, definition should no longer resolve"
     );
 }
 
-#[tokio::test]
-async fn test_goto_reference_definition() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_reference_definition() {
+    let mut server = TestLspServer::new();
 
     // Open a document with reference link and its definition
     let content = r#"See [this link][ref] for more info.
 
 [ref]: https://example.com "Title"
 "#;
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     // Request goto definition at the reference [ref]
-    let result = server
-        .goto_definition(
-            "file:///test.md",
-            0,  // Line with [this link][ref]
-            15, // Character position inside [ref]
-        )
-        .await;
+    let result = server.goto_definition(
+        "file:///test.md",
+        0,  // Line with [this link][ref]
+        15, // Character position inside [ref]
+    );
 
     assert!(result.is_some(), "Should find definition");
 
@@ -121,27 +108,23 @@ async fn test_goto_reference_definition() {
     }
 }
 
-#[tokio::test]
-async fn test_goto_footnote_definition() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_footnote_definition() {
+    let mut server = TestLspServer::new();
 
     // Open a document with footnote reference and definition
     let content = r#"This has a footnote[^1] in the text.
 
 [^1]: This is the footnote content.
 "#;
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     // Request goto definition at the footnote reference [^1]
-    let result = server
-        .goto_definition(
-            "file:///test.md",
-            0,  // Line with footnote[^1]
-            20, // Character position inside [^1]
-        )
-        .await;
+    let result = server.goto_definition(
+        "file:///test.md",
+        0,  // Line with footnote[^1]
+        20, // Character position inside [^1]
+    );
 
     assert!(result.is_some(), "Should find footnote definition");
 
@@ -153,43 +136,37 @@ async fn test_goto_footnote_definition() {
     }
 }
 
-#[tokio::test]
-async fn test_goto_definition_no_match() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_no_match() {
+    let mut server = TestLspServer::new();
 
     // Open a document without any references
     let content = "Just plain text with no references.";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     // Request goto definition in plain text
-    let result = server.goto_definition("file:///test.md", 0, 10).await;
+    let result = server.goto_definition("file:///test.md", 0, 10);
 
     assert!(result.is_none(), "Should return None for plain text");
 }
 
-#[tokio::test]
-async fn test_goto_definition_image_reference() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_image_reference() {
+    let mut server = TestLspServer::new();
 
     // Open a document with image reference
     let content = "![Alt text][img]
 
 [img]: image.png
 ";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
     // Request goto definition at the image reference [img]
-    let result = server
-        .goto_definition(
-            "file:///test.md",
-            0,  // Line with ![Alt text][img]
-            12, // Character position inside [img]
-        )
-        .await;
+    let result = server.goto_definition(
+        "file:///test.md",
+        0,  // Line with ![Alt text][img]
+        12, // Character position inside [img]
+    );
 
     if let Some(GotoDefinitionResponse::Scalar(location)) = result {
         assert_eq!(location.range.start.line, 2);
@@ -198,8 +175,8 @@ async fn test_goto_definition_image_reference() {
     }
 }
 
-#[tokio::test]
-async fn test_goto_definition_csl_yaml_bibliography() {
+#[test]
+fn test_goto_definition_csl_yaml_bibliography() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     let bib_path = root.join("refs.yaml");
@@ -212,19 +189,17 @@ async fn test_goto_definition_csl_yaml_bibliography() {
     )
     .unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(root).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &std::fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &std::fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
-    let result = server.goto_definition(doc_uri.as_str(), 4, 7).await;
+    let result = server.goto_definition(doc_uri.as_str(), 4, 7);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
@@ -234,8 +209,8 @@ async fn test_goto_definition_csl_yaml_bibliography() {
     );
 }
 
-#[tokio::test]
-async fn test_goto_definition_csl_json_bibliography() {
+#[test]
+fn test_goto_definition_csl_json_bibliography() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     let bib_path = root.join("refs.json");
@@ -248,19 +223,17 @@ async fn test_goto_definition_csl_json_bibliography() {
     )
     .unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(root).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &std::fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &std::fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
-    let result = server.goto_definition(doc_uri.as_str(), 4, 7).await;
+    let result = server.goto_definition(doc_uri.as_str(), 4, 7);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
@@ -270,8 +243,8 @@ async fn test_goto_definition_csl_json_bibliography() {
     );
 }
 
-#[tokio::test]
-async fn test_goto_definition_citation_returns_none_for_invalid_yaml_frontmatter() {
+#[test]
+fn test_goto_definition_citation_returns_none_for_invalid_yaml_frontmatter() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     let bib_path = root.join("refs.yaml");
@@ -280,27 +253,25 @@ async fn test_goto_definition_citation_returns_none_for_invalid_yaml_frontmatter
     std::fs::write(&bib_path, "- id: cslkey\n  title: Sample\n").unwrap();
     std::fs::write(&doc_path, "---\nbibliography: [\n---\n\nSee [@cslkey].\n").unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(root).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &std::fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &std::fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
-    let result = server.goto_definition(doc_uri.as_str(), 4, 7).await;
+    let result = server.goto_definition(doc_uri.as_str(), 4, 7);
     assert!(
         result.is_none(),
         "Expected no citation definition when YAML frontmatter is invalid"
     );
 }
 
-#[tokio::test]
-async fn test_goto_definition_ris_bibliography() {
+#[test]
+fn test_goto_definition_ris_bibliography() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     let bib_path = root.join("refs.ris");
@@ -313,19 +284,17 @@ async fn test_goto_definition_ris_bibliography() {
     )
     .unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(root).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &std::fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &std::fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
-    let result = server.goto_definition(doc_uri.as_str(), 4, 7).await;
+    let result = server.goto_definition(doc_uri.as_str(), 4, 7);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
@@ -335,9 +304,9 @@ async fn test_goto_definition_ris_bibliography() {
     );
 }
 
-#[tokio::test]
-async fn test_goto_definition_chunk_label_hashpipe() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_chunk_label_hashpipe() {
+    let mut server = TestLspServer::new();
 
     let content = r#"See @fig-plot.
 
@@ -346,20 +315,18 @@ async fn test_goto_definition_chunk_label_hashpipe() {
 plot(1:10)
 ```
 "#;
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
-    let result = server.goto_definition("file:///test.qmd", 0, 7).await;
+    let result = server.goto_definition("file:///test.qmd", 0, 7);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
     assert_eq!(location.range.start.line, 3);
 }
 
-#[tokio::test]
-async fn test_goto_definition_bookdown_crossref_chunk_label() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_bookdown_crossref_chunk_label() {
+    let mut server = TestLspServer::new();
 
     let content = r#"Figure \@ref(fig:a-label)
 
@@ -369,20 +336,18 @@ async fn test_goto_definition_bookdown_crossref_chunk_label() {
 plot(1, 1)
 ```
 "#;
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
-    let result = server.goto_definition("file:///test.Rmd", 0, 16).await;
+    let result = server.goto_definition("file:///test.Rmd", 0, 16);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
     assert_eq!(location.range.start.line, 3);
 }
 
-#[tokio::test]
-async fn test_goto_definition_bookdown_theorem_crossref_fenced_div() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_bookdown_theorem_crossref_fenced_div() {
+    let mut server = TestLspServer::new();
 
     let content = r#"Exercise \@ref(exr:mu)
 
@@ -390,20 +355,18 @@ async fn test_goto_definition_bookdown_theorem_crossref_fenced_div() {
 foobar
 :::
 "#;
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
-    let result = server.goto_definition("file:///test.Rmd", 0, 18).await;
+    let result = server.goto_definition("file:///test.Rmd", 0, 18);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
     assert_eq!(location.range.start.line, 2);
 }
 
-#[tokio::test]
-async fn test_goto_definition_bookdown_equation_crossref() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_bookdown_equation_crossref() {
+    let mut server = TestLspServer::new();
 
     let content = r#"\begin{align}
   a (\#eq:foo)  \\
@@ -412,20 +375,18 @@ async fn test_goto_definition_bookdown_equation_crossref() {
 
 \@ref(eq:foo), \@ref(eq:bar)
 "#;
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
-    let result = server.goto_definition("file:///test.Rmd", 5, 7).await;
+    let result = server.goto_definition("file:///test.Rmd", 5, 7);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
     assert_eq!(location.range.start.line, 1);
 }
 
-#[tokio::test]
-async fn test_goto_definition_bookdown_section_crossref_with_hyphenated_slug() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_bookdown_section_crossref_with_hyphenated_slug() {
+    let mut server = TestLspServer::new();
 
     let content = r#"# Heading
 
@@ -435,20 +396,18 @@ A ref to \@ref(heading).
 
 A ref to \@ref(heading-2).
 "#;
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
-    let result = server.goto_definition("file:///test.Rmd", 6, 16).await;
+    let result = server.goto_definition("file:///test.Rmd", 6, 16);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
     assert_eq!(location.range.start.line, 4);
 }
 
-#[tokio::test]
-async fn test_goto_definition_heading_ids_are_case_sensitive() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_heading_ids_are_case_sensitive() {
+    let mut server = TestLspServer::new();
 
     let content = r#"# Heading {#em}
 
@@ -458,19 +417,17 @@ A reference to [Heading](#em).
 
 A reference to [Heading](#EM).
 "#;
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
-    let result = server.goto_definition("file:///test.md", 6, 27).await;
+    let result = server.goto_definition("file:///test.md", 6, 27);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
     assert_eq!(location.range.start.line, 4);
 }
 
-#[tokio::test]
-async fn test_goto_definition_returns_none_inside_yaml_frontmatter() {
+#[test]
+fn test_goto_definition_returns_none_inside_yaml_frontmatter() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     let bib_path = root.join("refs.bib");
@@ -483,177 +440,159 @@ async fn test_goto_definition_returns_none_inside_yaml_frontmatter() {
     )
     .unwrap();
 
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let root_uri = Uri::from_file_path(root).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &std::fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &std::fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
-    let result = server.goto_definition(doc_uri.as_str(), 1, 10).await;
+    let result = server.goto_definition(doc_uri.as_str(), 1, 10);
     assert!(
         result.is_none(),
         "Expected no goto definition when cursor is inside YAML frontmatter"
     );
 }
 
-#[tokio::test]
-async fn test_goto_definition_shortcut_heading_reference() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_shortcut_heading_reference() {
+    let mut server = TestLspServer::new();
 
     let content = "# Heading {#heading}\n\nA ref to [heading].\n\nA ref to [foobar](#heading).\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
-    let result = server.goto_definition("file:///test.md", 2, 11).await;
+    let result = server.goto_definition("file:///test.md", 2, 11);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
     assert_eq!(location.range.start.line, 0);
 }
 
-#[tokio::test]
-async fn test_goto_definition_inline_hash_heading_reference() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_inline_hash_heading_reference() {
+    let mut server = TestLspServer::new();
 
     let content = "# Heading {#heading}\n\nA ref to [heading].\n\nA ref to [foobar](#heading).\n";
-    server
-        .open_document("file:///test.md", content, "markdown")
-        .await;
+    server.open_document("file:///test.md", content, "markdown");
 
-    let result = server.goto_definition("file:///test.md", 4, 21).await;
+    let result = server.goto_definition("file:///test.md", 4, 21);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
     assert_eq!(location.range.start.line, 0);
 }
 
-#[tokio::test]
-async fn test_goto_definition_shortcut_implicit_heading_reference_with_spaces() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_shortcut_implicit_heading_reference_with_spaces() {
+    let mut server = TestLspServer::new();
 
     let content = "# Unordered Lists\n\n[unordered lists]\n";
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
-    let result = server.goto_definition("file:///test.qmd", 2, 2).await;
+    let result = server.goto_definition("file:///test.qmd", 2, 2);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
     assert_eq!(location.range.start.line, 0);
 }
 
-#[tokio::test]
-async fn test_goto_definition_shortcut_hyphenated_heading_reference_returns_none() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_shortcut_hyphenated_heading_reference_returns_none() {
+    let mut server = TestLspServer::new();
 
     let content = "# Unordered Lists\n\n[unordered-lists]\n";
-    server
-        .open_document("file:///test.qmd", content, "quarto")
-        .await;
+    server.open_document("file:///test.qmd", content, "quarto");
 
-    let result = server.goto_definition("file:///test.qmd", 2, 2).await;
+    let result = server.goto_definition("file:///test.qmd", 2, 2);
     assert!(
         result.is_none(),
         "Expected no definition for non-implicit shortcut label"
     );
 }
 
-#[tokio::test]
-async fn test_goto_definition_shortcut_label_matching_explicit_heading_id_returns_none() {
-    let server = TestLspServer::new();
+#[test]
+fn test_goto_definition_shortcut_label_matching_explicit_heading_id_returns_none() {
+    let mut server = TestLspServer::new();
 
     let content = "[improving-performance].\n\n# Improving Performance {#improving-performance}\n";
-    server
-        .open_document("file:///test.Rmd", content, "rmarkdown")
-        .await;
+    server.open_document("file:///test.Rmd", content, "rmarkdown");
 
-    let result = server.goto_definition("file:///test.Rmd", 0, 2).await;
+    let result = server.goto_definition("file:///test.Rmd", 0, 2);
     assert!(
         result.is_none(),
         "Expected no definition for shortcut label matching only a heading id"
     );
 }
 
-#[tokio::test]
-async fn test_goto_definition_numbered_example_label() {
+#[test]
+fn test_goto_definition_numbered_example_label() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     let doc_path = root.join("doc.qmd");
     std::fs::write(root.join("panache.toml"), "flavor = \"pandoc\"\n").unwrap();
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let content = "(@good) This is a good example.\n\nAs (@good) illustrates, details follow.\n";
     std::fs::write(&doc_path, content).unwrap();
     let root_uri = Uri::from_file_path(root).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
-    let result = server.goto_definition(doc_uri.as_str(), 2, 7).await;
+    let result = server.goto_definition(doc_uri.as_str(), 2, 7);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
     assert_eq!(location.range.start.line, 0);
 }
 
-#[tokio::test]
-async fn test_goto_definition_numbered_example_label_missing_returns_none() {
+#[test]
+fn test_goto_definition_numbered_example_label_missing_returns_none() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     let doc_path = root.join("doc.qmd");
     std::fs::write(root.join("panache.toml"), "flavor = \"pandoc\"\n").unwrap();
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let content = "As (@missing) illustrates, details follow.\n";
     std::fs::write(&doc_path, content).unwrap();
     let root_uri = Uri::from_file_path(root).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
-    let result = server.goto_definition(doc_uri.as_str(), 0, 6).await;
+    let result = server.goto_definition(doc_uri.as_str(), 0, 6);
     assert!(
         result.is_none(),
         "Expected no definition for missing numbered example label"
     );
 }
 
-#[tokio::test]
-async fn test_goto_definition_numbered_example_label_targets_first_duplicate() {
+#[test]
+fn test_goto_definition_numbered_example_label_targets_first_duplicate() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     let doc_path = root.join("doc.qmd");
     std::fs::write(root.join("panache.toml"), "flavor = \"pandoc\"\n").unwrap();
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let content =
         "(@foo) First definition.\n\nText.\n\n(@foo) Second occurrence.\n\nAs (@foo) shows.\n";
     std::fs::write(&doc_path, content).unwrap();
     let root_uri = Uri::from_file_path(root).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(doc_uri.as_str(), content, "quarto")
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(doc_uri.as_str(), content, "quarto");
 
-    let result = server.goto_definition(doc_uri.as_str(), 6, 6).await;
+    let result = server.goto_definition(doc_uri.as_str(), 6, 6);
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");
     };
     assert_eq!(location.range.start.line, 0);
 }
 
-#[tokio::test]
-async fn test_goto_definition_numbered_example_label_extension_off_returns_none() {
+#[test]
+fn test_goto_definition_numbered_example_label_extension_off_returns_none() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
     let doc_path = root.join("doc.md");
@@ -662,17 +601,15 @@ async fn test_goto_definition_numbered_example_label_extension_off_returns_none(
         "flavor = \"pandoc\"\n[extensions]\nexample-lists = false\n",
     )
     .unwrap();
-    let server = TestLspServer::new();
+    let mut server = TestLspServer::new();
     let content = "(@good) This is a good example.\n\nAs (@good) illustrates, details follow.\n";
     std::fs::write(&doc_path, content).unwrap();
     let root_uri = Uri::from_file_path(root).expect("root uri");
     let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(doc_uri.as_str(), content, "markdown")
-        .await;
+    server.initialize(root_uri.as_str());
+    server.open_document(doc_uri.as_str(), content, "markdown");
 
-    let result = server.goto_definition(doc_uri.as_str(), 2, 7).await;
+    let result = server.goto_definition(doc_uri.as_str(), 2, 7);
     assert!(
         result.is_none(),
         "Expected no definition when example_lists is disabled"

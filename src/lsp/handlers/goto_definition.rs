@@ -5,36 +5,25 @@
 //! - Reference images: `![alt][ref]` → `[ref]: url`
 //! - Footnote references: `[^id]` → `[^id]: content`
 
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::*;
+use crate::lsp::uri_ext::UriExt;
+use lsp_types::*;
 
-use crate::lsp::DocumentState;
+use crate::lsp::global_state::StateSnapshot;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 use crate::syntax::{AstNode, Link};
 
 use super::super::{conversions, helpers};
 
 /// Handle textDocument/definition request
-pub(crate) async fn goto_definition(
-    client: &tower_lsp_server::Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
+pub(crate) fn goto_definition(
+    snap: &StateSnapshot,
     params: GotoDefinitionParams,
-) -> Result<Option<GotoDefinitionResponse>> {
+) -> Option<GotoDefinitionResponse> {
     let uri = &params.text_document_position_params.text_document.uri;
     let position = params.text_document_position_params.position;
-    let config = helpers::get_config(client, &workspace_root, uri).await;
+    let config = snap.config(uri);
 
-    let Some(ctx) =
-        crate::lsp::context::get_open_document_context(&document_map, &salsa_db, uri).await
-    else {
-        return Ok(None);
-    };
+    let ctx = crate::lsp::context::get_open_document_context(snap, uri)?;
     let salsa_file = ctx.salsa_file;
     let salsa_config = ctx.salsa_config;
     let doc_path = ctx.path.clone();
@@ -43,10 +32,14 @@ pub(crate) async fn goto_definition(
     let citation_def_index = if let Some(doc_path) = doc_path.clone() {
         let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
         if yaml_ok {
-            let db = salsa_db.lock().await;
             Some(
-                crate::salsa::citation_definition_index(&*db, salsa_file, salsa_config, doc_path)
-                    .clone(),
+                crate::salsa::citation_definition_index(
+                    &snap.db,
+                    salsa_file,
+                    salsa_config,
+                    doc_path,
+                )
+                .clone(),
             )
         } else {
             None
@@ -57,11 +50,9 @@ pub(crate) async fn goto_definition(
 
     let this_path = ctx.path.clone();
     let content_for_offset = ctx.content.clone();
-    let Some(offset) = conversions::position_to_offset(&content_for_offset, position) else {
-        return Ok(None);
-    };
+    let offset = conversions::position_to_offset(&content_for_offset, position)?;
     if helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset) {
-        return Ok(None);
+        return None;
     }
 
     enum PendingDefinition {
@@ -101,27 +92,21 @@ pub(crate) async fn goto_definition(
         (content, pending, heading_link_is_explicit_anchor)
     };
 
-    let Some(pending) = pending else {
-        return Ok(None);
-    };
+    let pending = pending?;
 
-    // Cross-document lookup (done after CST traversal to avoid holding non-Send nodes across await).
+    // Cross-document lookup.
     let doc_indices = {
-        let Some(doc_path) = doc_path.clone() else {
-            return Ok(None);
-        };
+        let doc_path = doc_path.clone()?;
         crate::lsp::navigation::project_symbol_documents(
-            &salsa_db,
+            &snap.db,
             salsa_file,
             salsa_config,
             &doc_path,
             uri,
             &content,
         )
-        .await
     };
-    let definition_index =
-        helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
+    let definition_index = snap.definition_index_with_includes(uri);
 
     if let PendingDefinition::HeadingId(label) = &pending {
         for doc in &doc_indices {
@@ -130,7 +115,7 @@ pub(crate) async fn goto_definition(
             {
                 let location =
                     crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
-                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                return Some(GotoDefinitionResponse::Scalar(location));
             }
         }
     }
@@ -143,7 +128,7 @@ pub(crate) async fn goto_definition(
                 {
                     let location =
                         crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
-                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                    return Some(GotoDefinitionResponse::Scalar(location));
                 }
             }
         }
@@ -157,7 +142,7 @@ pub(crate) async fn goto_definition(
                         let location = crate::lsp::navigation::location_from_range(
                             &doc.uri, &doc.text, *range,
                         );
-                        return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                        return Some(GotoDefinitionResponse::Scalar(location));
                     }
                 }
             }
@@ -168,7 +153,7 @@ pub(crate) async fn goto_definition(
                 {
                     let location =
                         crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
-                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                    return Some(GotoDefinitionResponse::Scalar(location));
                 }
             }
         }
@@ -184,7 +169,7 @@ pub(crate) async fn goto_definition(
                 {
                     let location =
                         crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
-                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                    return Some(GotoDefinitionResponse::Scalar(location));
                 }
 
                 if config.extensions.implicit_header_references
@@ -196,7 +181,7 @@ pub(crate) async fn goto_definition(
                 {
                     let location =
                         crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
-                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                    return Some(GotoDefinitionResponse::Scalar(location));
                 }
             }
         }
@@ -212,7 +197,7 @@ pub(crate) async fn goto_definition(
                 {
                     let location =
                         crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
-                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                    return Some(GotoDefinitionResponse::Scalar(location));
                 }
             }
         }
@@ -225,7 +210,7 @@ pub(crate) async fn goto_definition(
             {
                 let location =
                     crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
-                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                return Some(GotoDefinitionResponse::Scalar(location));
             }
         }
     }
@@ -242,7 +227,7 @@ pub(crate) async fn goto_definition(
             {
                 let location =
                     crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
-                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                return Some(GotoDefinitionResponse::Scalar(location));
             }
         }
     }
@@ -250,16 +235,13 @@ pub(crate) async fn goto_definition(
     let definition =
         match pending {
             PendingDefinition::Citation(key) => {
-                let Some(index) = citation_def_index.as_ref() else {
-                    return Ok(None);
-                };
-                let db = salsa_db.lock().await;
+                let index = citation_def_index.as_ref()?;
                 let mut locations =
-                    helpers::citation_definition_locations(index, &key, uri, &content, &*db);
+                    helpers::citation_definition_locations(index, &key, uri, &content, &snap.db);
                 if locations.is_empty() {
-                    return Ok(None);
+                    return None;
                 }
-                return Ok(Some(GotoDefinitionResponse::Scalar(locations.remove(0))));
+                return Some(GotoDefinitionResponse::Scalar(locations.remove(0)));
             }
             PendingDefinition::Crossref(label) => definition_index
                 .find_crossref_resolved(&label, config.extensions.bookdown_references),
@@ -285,17 +267,14 @@ pub(crate) async fn goto_definition(
             }
         };
 
-    let Some(definition) = definition else {
-        return Ok(None);
-    };
+    let definition = definition?;
 
     let target_uri = Uri::from_file_path(definition.path()).unwrap_or_else(|| uri.clone());
     let target_text = if Some(definition.path().to_path_buf()) == this_path {
         content
     } else {
-        let db = salsa_db.lock().await;
-        crate::salsa::Db::file_text(&*db, definition.path().to_path_buf())
-            .map(|file| file.text(&*db).clone())
+        crate::salsa::Db::file_text(&snap.db, definition.path().to_path_buf())
+            .map(|file| file.text(&snap.db).clone())
             .unwrap_or_default()
     };
     let start = conversions::offset_to_position(&target_text, definition.range().start().into());
@@ -304,7 +283,7 @@ pub(crate) async fn goto_definition(
         uri: target_uri,
         range: Range { start, end },
     };
-    Ok(Some(GotoDefinitionResponse::Scalar(location)))
+    Some(GotoDefinitionResponse::Scalar(location))
 }
 
 fn is_explicit_heading_anchor_at_offset(root: &crate::syntax::SyntaxNode, offset: usize) -> bool {

@@ -3,7 +3,7 @@
 //! Provides functions to convert lists between loose/compact and bullet/ordered/task styles.
 
 use crate::syntax::{AstNode, List, ListKind, SyntaxKind, SyntaxNode, SyntaxToken};
-use tower_lsp_server::ls_types::{Range, TextEdit};
+use lsp_types::{Range, TextEdit};
 
 use super::super::conversions::offset_to_position;
 
@@ -339,7 +339,7 @@ fn checkbox_removal_end_offset(text: &str, checkbox_end: usize) -> usize {
 mod tests {
     use super::*;
     use crate::parse;
-    use tower_lsp_server::ls_types::Position;
+    use lsp_types::Position;
 
     fn apply_text_edits(input: &str, edits: &[TextEdit]) -> String {
         fn position_to_offset(text: &str, position: Position) -> usize {

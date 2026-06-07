@@ -3,16 +3,13 @@
 //! Provides hover information for:
 //! - Footnote references: `[^id]` → shows footnote content from `[^id]: content`
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::Path;
-use std::path::PathBuf;
-use std::sync::Arc;
 
-use tokio::sync::Mutex;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::*;
+use crate::lsp::uri_ext::UriExt;
+use lsp_types::*;
 
-use crate::lsp::DocumentState;
+use crate::lsp::global_state::StateSnapshot;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 use crate::metadata::inline_reference_contains;
 use crate::syntax::{
@@ -23,47 +20,31 @@ use crate::utils::{crossref_resolution_labels, normalize_label};
 use super::super::{conversions, helpers};
 
 /// Handle textDocument/hover request
-pub(crate) async fn hover(
-    _client: &tower_lsp_server::Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
-    params: HoverParams,
-) -> Result<Option<Hover>> {
+pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> {
     let uri = &params.text_document_position_params.text_document.uri;
     let position = params.text_document_position_params.position;
 
-    let Some(ctx) =
-        crate::lsp::context::get_open_document_context(&document_map, &salsa_db, uri).await
-    else {
-        return Ok(None);
-    };
+    let ctx = crate::lsp::context::get_open_document_context(snap, uri)?;
     let salsa_file = ctx.salsa_file;
     let salsa_config = ctx.salsa_config;
     let doc_path = ctx.path.clone();
     let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
 
-    let Some(doc_path) = doc_path else {
-        return Ok(None);
-    };
+    let doc_path = doc_path?;
     let content_for_offset = ctx.content.clone();
-    let Some(offset) = conversions::position_to_offset(&content_for_offset, position) else {
-        return Ok(None);
-    };
+    let offset = conversions::position_to_offset(&content_for_offset, position)?;
     let in_frontmatter_region =
         helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset);
     if in_frontmatter_region {
-        return Ok(None);
+        return None;
     }
     let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
     if !yaml_ok {
-        return Ok(None);
+        return None;
     }
 
-    let metadata = {
-        let db = salsa_db.lock().await;
-        crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path.clone()).clone()
-    };
+    let metadata =
+        crate::salsa::metadata(&snap.db, salsa_file, salsa_config, doc_path.clone()).clone();
 
     let target = {
         let root = ctx.syntax_root();
@@ -72,24 +53,23 @@ pub(crate) async fn hover(
 
     if let Some(SymbolTarget::HeadingLink(label)) = target.as_ref() {
         let doc_indices = crate::lsp::navigation::project_symbol_documents(
-            &salsa_db,
+            &snap.db,
             salsa_file,
             salsa_config,
             &doc_path,
             uri,
             &content_for_offset,
-        )
-        .await;
+        );
 
         for doc in &doc_indices {
             if let Some(markdown) = section_hover_markdown(doc, label) {
-                return Ok(Some(Hover {
+                return Some(Hover {
                     contents: HoverContents::Markup(MarkupContent {
                         kind: MarkupKind::Markdown,
                         value: markdown,
                     }),
                     range: None,
-                }));
+                });
             }
         }
     }
@@ -99,14 +79,13 @@ pub(crate) async fn hover(
     }) = target.as_ref()
     {
         let doc_indices = crate::lsp::navigation::project_symbol_documents(
-            &salsa_db,
+            &snap.db,
             salsa_file,
             salsa_config,
             &doc_path,
             uri,
             &content_for_offset,
-        )
-        .await;
+        );
 
         for doc in &doc_indices {
             let Some(heading_label) = reference_definition_heading_target(doc, label) else {
@@ -114,46 +93,45 @@ pub(crate) async fn hover(
             };
             for candidate_doc in &doc_indices {
                 if let Some(markdown) = section_hover_markdown(candidate_doc, &heading_label) {
-                    return Ok(Some(Hover {
+                    return Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: MarkupKind::Markdown,
                             value: markdown,
                         }),
                         range: None,
-                    }));
+                    });
                 }
             }
         }
     }
     if let Some(SymbolTarget::Crossref(label)) = target.as_ref() {
         let doc_indices = crate::lsp::navigation::project_symbol_documents(
-            &salsa_db,
+            &snap.db,
             salsa_file,
             salsa_config,
             &doc_path,
             uri,
             &content_for_offset,
-        )
-        .await;
+        );
 
         for doc in &doc_indices {
             if let Some(markdown) = equation_hover_markdown(doc, label) {
-                return Ok(Some(Hover {
+                return Some(Hover {
                     contents: HoverContents::Markup(MarkupContent {
                         kind: MarkupKind::Markdown,
                         value: markdown,
                     }),
                     range: None,
-                }));
+                });
             }
             if let Some(markdown) = section_hover_markdown(doc, label) {
-                return Ok(Some(Hover {
+                return Some(Hover {
                     contents: HoverContents::Markup(MarkupContent {
                         kind: MarkupKind::Markdown,
                         value: markdown,
                     }),
                     range: None,
-                }));
+                });
             }
         }
     }
@@ -163,29 +141,25 @@ pub(crate) async fn hover(
     };
     if let Some(markdown) = linked_document_hover_markdown(
         link_target.as_deref(),
-        &salsa_db,
+        &snap.db,
         salsa_file,
         salsa_config,
         &doc_path,
         &content_for_offset,
         uri,
-    )
-    .await
-    {
-        return Ok(Some(Hover {
+    ) {
+        return Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
                 kind: MarkupKind::Markdown,
                 value: markdown,
             }),
             range: None,
-        }));
+        });
     }
 
     let pending_footnote = {
         let root = ctx.syntax_root();
-        let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
-            return Ok(None);
-        };
+        let mut node = helpers::find_node_at_offset(&root, offset)?;
 
         // Walk up the tree to find a footnote reference or citation
         loop {
@@ -202,24 +176,24 @@ pub(crate) async fn hover(
                 {
                     let summary = format_bibliography_entry(entry);
                     if !summary.is_empty() {
-                        return Ok(Some(Hover {
+                        return Some(Hover {
                             contents: HoverContents::Markup(MarkupContent {
                                 kind: MarkupKind::Markdown,
                                 value: summary,
                             }),
                             range: None,
-                        }));
+                        });
                     }
                 }
 
                 if inline_reference_contains(&metadata.inline_references, &key) {
-                    return Ok(Some(Hover {
+                    return Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: MarkupKind::Markdown,
                             value: "Inline YAML reference".to_string(),
                         }),
                         range: None,
-                    }));
+                    });
                 }
             }
 
@@ -231,20 +205,17 @@ pub(crate) async fn hover(
         }
     };
 
-    let Some(label) = pending_footnote else {
-        return Ok(None);
-    };
+    let label = pending_footnote?;
 
     // Cross-document footnote lookup via symbol usage index.
     let doc_indices = crate::lsp::navigation::project_symbol_documents(
-        &salsa_db,
+        &snap.db,
         salsa_file,
         salsa_config,
         &doc_path,
         uri,
         &content_for_offset,
-    )
-    .await;
+    );
 
     for doc in doc_indices {
         let Some(ranges) = doc.symbol_index.footnote_definitions(&label) else {
@@ -264,16 +235,16 @@ pub(crate) async fn hover(
         };
 
         let trimmed = footnote_def.content().trim().to_string();
-        return Ok(Some(Hover {
+        return Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
                 kind: MarkupKind::Markdown,
                 value: trimmed,
             }),
             range: None,
-        }));
+        });
     }
 
-    Ok(None)
+    None
 }
 
 const HOVER_PREVIEW_MAX_CHARS: usize = 180;
@@ -469,9 +440,9 @@ fn crop_preview_lines(text: &str, max_lines: usize) -> String {
     out
 }
 
-async fn linked_document_hover_markdown(
+fn linked_document_hover_markdown(
     raw_link_target: Option<&str>,
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+    db: &crate::salsa::SalsaDb,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
@@ -480,15 +451,14 @@ async fn linked_document_hover_markdown(
 ) -> Option<String> {
     let link_target = raw_link_target?;
     let target_uri = resolve_local_markdown_target(
-        salsa_db,
+        db,
         salsa_file,
         salsa_config,
         doc_path,
         content,
         uri,
         link_target,
-    )
-    .await?;
+    )?;
     let target_path = target_uri.to_file_path()?;
     if target_path == doc_path {
         return None;
@@ -521,8 +491,8 @@ fn hovered_link_target(root: &crate::syntax::SyntaxNode, offset: usize) -> Optio
     }
 }
 
-async fn resolve_local_markdown_target(
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+fn resolve_local_markdown_target(
+    db: &crate::salsa::SalsaDb,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
@@ -532,14 +502,13 @@ async fn resolve_local_markdown_target(
 ) -> Option<Uri> {
     let resolved = if let Some(label) = raw_target.strip_prefix("[ref]:") {
         let ref_targets = crate::lsp::handlers::document_links::build_reference_targets(
-            salsa_db,
+            db,
             salsa_file,
             salsa_config,
             doc_path,
             content,
             uri,
-        )
-        .await;
+        );
         let target = ref_targets.get(label)?;
         crate::lsp::handlers::document_links::resolve_link_target(
             &target.raw_target,

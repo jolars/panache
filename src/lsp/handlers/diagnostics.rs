@@ -1,178 +1,153 @@
+//! Lint pipeline: pure, synchronous computation of the diagnostics to publish.
+//!
+//! These functions run on a [`TaskPool`](crate::lsp::task_pool) worker over a
+//! [`StateSnapshot`]. They never touch the client directly — they *return* the
+//! publishes, and the main loop turns them into `textDocument/publishDiagnostics`
+//! notifications (dropping stale ones via the lint generation counter).
+
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::{Mutex, Semaphore};
-use tower_lsp_server::Client;
-use tower_lsp_server::ls_types::*;
+
+use lsp_types::{Diagnostic, Uri};
 
 use super::super::conversions::convert_diagnostic;
-use super::super::helpers::{catch_cancelled, clone_salsa_db, get_config};
-use crate::lsp::DocumentState;
+use crate::lsp::global_state::StateSnapshot;
+use crate::lsp::uri_ext::UriExt;
 
-/// Parse document and run linter, then publish diagnostics.
+/// A single `publishDiagnostics` payload: target URI, optional version, diags.
+pub(crate) type Publish = (Uri, Option<i32>, Vec<Diagnostic>);
+
+/// Compute diagnostics for `uri` and any documents that depend on it.
 ///
-/// When `run_external` is false, external linters (e.g. `jarl`, `ruff`) are
-/// skipped — they spawn one subprocess per embedded code block and are by far
-/// the most expensive part of a lint pass, so per-keystroke `did_change` runs
-/// pass `false` and defer them to `did_save`.
-pub(crate) async fn lint_and_publish(
-    client: &Client,
-    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: &Arc<Mutex<Option<PathBuf>>>,
-    uri: Uri,
+/// Mirrors the old `relint_with_dependents` → `lint_and_publish` flow: the
+/// project graph's dependents are linted built-in-only (to bound cost), then the
+/// target document itself is linted (with external linters iff `run_external`).
+pub(crate) fn compute_publishes_with_dependents(
+    snap: &StateSnapshot,
+    uri: &Uri,
     run_external: bool,
-) {
+) -> Vec<Publish> {
+    let mut publishes = Vec::new();
+
+    // Find documents that include `uri`; lint each built-in-only first.
+    if let Some(state) = snap.document_state(uri)
+        && let Some(path) = state.path.as_ref()
+    {
+        let graph = crate::salsa::project_graph(
+            &snap.db,
+            state.salsa_file,
+            state.salsa_config,
+            path.clone(),
+        )
+        .clone();
+        for dependent in graph.dependents(path, None) {
+            if let Some(dep_uri) = Uri::from_file_path(&dependent) {
+                publishes.extend(compute_publishes(snap, &dep_uri, false));
+            }
+        }
+    }
+
+    publishes.extend(compute_publishes(snap, uri, run_external));
+    publishes
+}
+
+/// Compute the diagnostics publishes for a single document.
+///
+/// Combines the built-in lint plan (+ external linters when `run_external`) with
+/// the project-graph accumulated diagnostics, keyed by file path. Returns one
+/// [`Publish`] per affected document.
+pub(crate) fn compute_publishes(
+    snap: &StateSnapshot,
+    uri: &Uri,
+    run_external: bool,
+) -> Vec<Publish> {
     log::debug!(
-        "lint_and_publish uri={} run_external={}",
-        *uri,
+        "compute_publishes uri={} run_external={}",
+        uri.as_str(),
         run_external
     );
-    // Get document state
-    let doc_state = {
-        let map = document_map.lock().await;
-        map.get(&uri.to_string()).cloned()
+
+    let Some(doc_state) = snap.document_state(uri) else {
+        log::warn!("Document not found for lint: {}", uri.as_str());
+        return Vec::new();
     };
 
-    let Some(doc_state) = doc_state else {
-        client
-            .log_message(
-                MessageType::WARNING,
-                format!("Document not found: {}", *uri),
-            )
-            .await;
-        return;
-    };
-
-    let text = {
-        let db = salsa_db.lock().await;
-        doc_state.salsa_file.text(&*db).clone()
-    };
-    let mut all_diagnostics = Vec::new();
-
-    // Use helper to load config
-    let config = get_config(client, workspace_root, &uri).await;
+    let text = doc_state.salsa_file.text(&snap.db).clone();
     let path = doc_state
         .path
         .clone()
         .or_else(|| uri.to_file_path().map(|p| p.into_owned()))
         .unwrap_or_else(|| PathBuf::from("<memory>"));
-    let lint_plan = {
-        // Cloned handle, lock released: the lint-plan read can be cold. A
-        // concurrent edit cancels it; the debounced reschedule retries.
-        let db = clone_salsa_db(salsa_db).await;
-        match catch_cancelled(|| {
-            crate::salsa::built_in_lint_plan(
-                &db,
-                doc_state.salsa_file,
-                doc_state.salsa_config,
-                path,
-            )
-            .clone()
-        }) {
-            Some(plan) => plan,
-            None => return,
-        }
-    };
+
+    let lint_plan = crate::salsa::built_in_lint_plan(
+        &snap.db,
+        doc_state.salsa_file,
+        doc_state.salsa_config,
+        path,
+    )
+    .clone();
+
     let mut panache_diagnostics = lint_plan.diagnostics;
     let external_jobs = lint_plan.external_jobs;
 
     #[cfg(not(target_arch = "wasm32"))]
     if run_external && !external_jobs.is_empty() {
-        let registry = Arc::new(crate::linter::external_linters::ExternalLinterRegistry::new());
-        let max_parallel = config.external_max_parallel.max(1);
-        let semaphore = Arc::new(Semaphore::new(max_parallel));
-        let mut join_set = tokio::task::JoinSet::new();
-
-        for job in external_jobs {
-            let Ok(permit) = semaphore.clone().acquire_owned().await else {
-                break;
-            };
-            let registry = registry.clone();
-            let input = text.clone();
-            join_set.spawn(async move {
-                let _permit = permit;
-                crate::linter::external_linters::run_linter(
-                    &job.linter_name,
-                    &job.language,
-                    &job.content,
-                    &input,
-                    registry.as_ref(),
-                    Some(job.mappings.as_slice()),
-                )
-                .await
-            });
-        }
-
-        while let Some(res) = join_set.join_next().await {
-            match res {
-                Ok(Ok(diags)) => panache_diagnostics.extend(diags),
-                Ok(Err(e)) => log::warn!("External linter failed: {}", e),
-                Err(e) => log::warn!("External linter task join error: {}", e),
+        let registry = crate::linter::external_linters::ExternalLinterRegistry::new();
+        for job in &external_jobs {
+            match crate::linter::external_linters_sync::run_linter_sync(
+                &job.linter_name,
+                &job.language,
+                &job.content,
+                &text,
+                &registry,
+                Some(job.mappings.as_slice()),
+            ) {
+                Ok(diags) => panache_diagnostics.extend(diags),
+                Err(e) => log::warn!("External linter failed: {e}"),
             }
         }
-
         panache_diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
     }
 
-    let lsp_diagnostics: Vec<Diagnostic> = panache_diagnostics
+    let own_diagnostics: Vec<Diagnostic> = panache_diagnostics
         .iter()
         .map(|d| convert_diagnostic(d, &text))
         .collect();
 
-    all_diagnostics.extend(lsp_diagnostics);
-
-    let mut published_root = false;
     let root_path = uri
         .to_file_path()
         .map(|p| p.into_owned())
         .unwrap_or_else(|| PathBuf::from("<memory>"));
-    let by_path: HashMap<PathBuf, Vec<crate::linter::diagnostics::Diagnostic>> = {
-        // `accumulated` forces the (possibly cold) project-graph eval; run it on
-        // a cloned handle with the lock released so interactive reads aren't
-        // blocked. A concurrent edit cancels it and the reschedule retries.
-        let db = clone_salsa_db(salsa_db).await;
-        let Some(by_path) = catch_cancelled(|| {
-            let mut by_path: HashMap<PathBuf, Vec<crate::linter::diagnostics::Diagnostic>> =
-                HashMap::new();
-            for entry in crate::salsa::project_graph::accumulated::<crate::salsa::GraphDiagnostic>(
-                &db,
-                doc_state.salsa_file,
-                doc_state.salsa_config,
-                root_path.clone(),
-            ) {
-                by_path
-                    .entry(entry.0.path.clone())
-                    .or_default()
-                    .push(entry.0.diagnostic.clone());
-            }
-            by_path.entry(root_path.clone()).or_default();
-            by_path
-        }) else {
-            return;
-        };
-        by_path
-    };
 
+    let mut by_path: HashMap<PathBuf, Vec<crate::linter::diagnostics::Diagnostic>> = HashMap::new();
+    for entry in crate::salsa::project_graph::accumulated::<crate::salsa::GraphDiagnostic>(
+        &snap.db,
+        doc_state.salsa_file,
+        doc_state.salsa_config,
+        root_path.clone(),
+    ) {
+        by_path
+            .entry(entry.0.path.clone())
+            .or_default()
+            .push(entry.0.diagnostic.clone());
+    }
+    by_path.entry(root_path).or_default();
+
+    let mut publishes = Vec::new();
+    let mut published_root = false;
     for (path, diags) in by_path {
         if path.as_os_str() == "<memory>" {
             continue;
         }
         let target_uri = Uri::from_file_path(&path).unwrap_or_else(|| uri.clone());
 
-        let target_text = if target_uri == uri {
+        let target_text = if target_uri == *uri {
             text.clone()
         } else {
-            let Some(target_state) = document_map
-                .lock()
-                .await
-                .get(&target_uri.to_string())
-                .cloned()
-            else {
+            let Some(target_state) = snap.document_state(&target_uri) else {
                 continue;
             };
-            let db = salsa_db.lock().await;
-            target_state.salsa_file.text(&*db).clone()
+            target_state.salsa_file.text(&snap.db).clone()
         };
 
         let mapped: Vec<Diagnostic> = diags
@@ -180,17 +155,19 @@ pub(crate) async fn lint_and_publish(
             .map(|d| convert_diagnostic(d, &target_text))
             .collect();
 
-        if target_uri == uri {
-            let mut merged = all_diagnostics.clone();
+        if target_uri == *uri {
+            let mut merged = own_diagnostics.clone();
             merged.extend(mapped);
-            client.publish_diagnostics(uri.clone(), merged, None).await;
+            publishes.push((uri.clone(), None, merged));
             published_root = true;
         } else {
-            client.publish_diagnostics(target_uri, mapped, None).await;
+            publishes.push((target_uri, None, mapped));
         }
     }
 
     if !published_root {
-        client.publish_diagnostics(uri, all_diagnostics, None).await;
+        publishes.push((uri.clone(), None, own_diagnostics));
     }
+
+    publishes
 }

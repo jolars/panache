@@ -1,48 +1,27 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::{Mutex, Semaphore};
-use tower_lsp_server::Client;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::*;
+
+use crate::lsp::uri_ext::UriExt;
+use lsp_types::*;
 
 use crate::linter;
-use crate::lsp::DocumentState;
+use crate::lsp::global_state::StateSnapshot;
 use crate::syntax::{AstNode, List};
 
 use super::super::conversions::{convert_diagnostic, offset_to_position, position_to_offset};
-use super::super::helpers::get_document_and_config;
 use super::{footnote_conversion, heading_link_conversion, link_conversion, list_conversion};
 
 /// Handle textDocument/codeAction request
-pub(crate) async fn code_action(
-    client: &Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
+pub(crate) fn code_action(
+    snap: &StateSnapshot,
     params: CodeActionParams,
-) -> Result<Option<CodeActionResponse>> {
+) -> Option<CodeActionResponse> {
     let uri = params.text_document.uri;
-    // Use helper to get document and config
-    let (text, config) = match get_document_and_config(
-        client,
-        &document_map,
-        &salsa_db,
-        &workspace_root,
-        &uri,
-    )
-    .await
-    {
-        Some(result) => result,
-        None => return Ok(None),
-    };
+    let (text, config) = snap.document_and_config(&uri)?;
     let request_range = params.range;
-    let parsed_yaml_regions = {
-        let map = document_map.lock().await;
-        map.get(&uri.to_string())
-            .map(|state| state.parsed_yaml_regions.clone())
-            .unwrap_or_default()
-    };
+    let parsed_yaml_regions = snap
+        .document_state(&uri)
+        .map(|state| state.parsed_yaml_regions)
+        .unwrap_or_default();
     let request_start_offset = position_to_offset(&text, request_range.start);
     let request_end_offset = position_to_offset(&text, request_range.end)
         .or_else(|| request_start_offset.map(|start| start.saturating_add(1)));
@@ -68,23 +47,20 @@ pub(crate) async fn code_action(
         mappings: Vec<crate::linter::code_block_collector::BlockMapping>,
     }
 
-    // Phase A (blocking): parse + built-in lint + collect external jobs
-    let text_clone = text.clone();
-    let config_clone = config.clone();
+    // Parse + built-in lint + collect external jobs (synchronous).
     let doc_path = uri.to_file_path().map(|path| path.into_owned());
-    let phase_a = tokio::task::spawn_blocking(move || {
-        let tree = crate::parse(&text_clone, Some(config_clone.clone()));
+    let (mut diagnostics, external_jobs) = {
+        let tree = crate::parse(&text, Some(config.clone()));
         let metadata = doc_path
             .as_ref()
             .and_then(|path| crate::metadata::extract_project_metadata(&tree, path).ok());
 
-        let mut diagnostics =
-            linter::lint_with_metadata(&tree, &text_clone, &config_clone, metadata.as_ref());
+        let mut diagnostics = linter::lint_with_metadata(&tree, &text, &config, metadata.as_ref());
         let mut jobs = Vec::new();
 
-        if !config_clone.linters.is_empty() {
-            let code_blocks = crate::utils::collect_code_blocks(&tree, &text_clone);
-            for (language, linter_name) in &config_clone.linters {
+        if !config.linters.is_empty() {
+            let code_blocks = crate::utils::collect_code_blocks(&tree, &text);
+            for (language, linter_name) in &config.linters {
                 let Some(blocks) = code_blocks.get(language) else {
                     continue;
                 };
@@ -107,47 +83,24 @@ pub(crate) async fn code_action(
 
         diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
         (diagnostics, jobs)
-    })
-    .await
-    .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
-
-    let (mut diagnostics, external_jobs) = phase_a;
+    };
 
     #[cfg(not(target_arch = "wasm32"))]
     if !external_jobs.is_empty() {
-        let registry = Arc::new(crate::linter::external_linters::ExternalLinterRegistry::new());
-        let max_parallel = config.external_max_parallel.max(1);
-        let semaphore = Arc::new(Semaphore::new(max_parallel));
-        let mut join_set = tokio::task::JoinSet::new();
-
+        let registry = crate::linter::external_linters::ExternalLinterRegistry::new();
         for job in external_jobs {
-            let Ok(permit) = semaphore.clone().acquire_owned().await else {
-                break;
-            };
-            let registry = registry.clone();
-            let input = text.clone();
-            join_set.spawn(async move {
-                let _permit = permit;
-                crate::linter::external_linters::run_linter(
-                    &job.linter_name,
-                    &job.language,
-                    &job.content,
-                    &input,
-                    registry.as_ref(),
-                    Some(job.mappings.as_slice()),
-                )
-                .await
-            });
-        }
-
-        while let Some(res) = join_set.join_next().await {
-            match res {
-                Ok(Ok(diags)) => diagnostics.extend(diags),
-                Ok(Err(e)) => log::warn!("External linter failed: {}", e),
-                Err(e) => log::warn!("External linter task join error: {}", e),
+            match crate::linter::external_linters_sync::run_linter_sync(
+                &job.linter_name,
+                &job.language,
+                &job.content,
+                &text,
+                &registry,
+                Some(job.mappings.as_slice()),
+            ) {
+                Ok(diags) => diagnostics.extend(diags),
+                Err(e) => log::warn!("External linter failed: {e}"),
             }
         }
-
         diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
     }
 
@@ -542,7 +495,7 @@ pub(crate) async fn code_action(
         }
     }
 
-    Ok(Some(actions))
+    Some(actions)
 }
 
 fn range_contains(outer: Range, inner: Range) -> bool {

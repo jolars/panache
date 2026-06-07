@@ -3,7 +3,7 @@
 use crate::config::Extensions;
 use crate::syntax::{AstNode, Heading, Link, SyntaxNode, UnresolvedReference};
 use crate::utils::{implicit_heading_ids, normalize_label};
-use tower_lsp_server::ls_types::{Range, TextEdit};
+use lsp_types::{Range, TextEdit};
 
 use super::super::conversions::offset_to_position;
 

@@ -9,7 +9,7 @@
 
 use std::collections::HashSet;
 
-use tower_lsp_server::ls_types::{Range, TextEdit};
+use lsp_types::{Range, TextEdit};
 
 use crate::syntax::{AstNode, Link, ReferenceDefinition, SyntaxNode};
 use crate::utils::normalize_label;

@@ -1,15 +1,15 @@
 use super::helpers::*;
+use lsp_types::Uri;
 use std::fs;
 use tempfile::TempDir;
-use tower_lsp_server::ls_types::Uri;
 
-#[tokio::test]
-async fn test_initialize_advertises_will_rename_file_operations() {
+#[test]
+fn test_initialize_advertises_will_rename_file_operations() {
     let temp_dir = TempDir::new().unwrap();
     let root_uri = Uri::from_file_path(temp_dir.path()).unwrap();
 
-    let server = TestLspServer::new();
-    let init = server.initialize_result(root_uri.as_str()).await;
+    let mut server = TestLspServer::new();
+    let init = server.initialize_result(root_uri.as_str());
 
     let workspace_caps = init.capabilities.workspace.expect("workspace capabilities");
     let file_ops = workspace_caps
@@ -30,8 +30,8 @@ async fn test_initialize_advertises_will_rename_file_operations() {
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_returns_edit_for_markdown_links() {
+#[test]
+fn test_will_rename_files_returns_edit_for_markdown_links() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
@@ -46,24 +46,20 @@ async fn test_will_rename_files_returns_edit_for_markdown_links() {
     let root_uri = Uri::from_file_path(root).unwrap();
     let doc_uri = Uri::from_file_path(&doc_path).unwrap();
 
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
     let old_uri = Uri::from_file_path(root.join("tables.qmd")).unwrap();
     let new_uri = Uri::from_file_path(root.join("tabular.qmd")).unwrap();
-    let edit = server
-        .will_rename_files(vec![(
-            old_uri.as_str().to_string(),
-            new_uri.as_str().to_string(),
-        )])
-        .await;
+    let edit = server.will_rename_files(vec![(
+        old_uri.as_str().to_string(),
+        new_uri.as_str().to_string(),
+    )]);
 
     let edit = edit.expect("expected workspace edit");
     let changes = edit.changes.expect("changes");
@@ -78,8 +74,8 @@ async fn test_will_rename_files_returns_edit_for_markdown_links() {
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_scans_standalone_workspace_documents() {
+#[test]
+fn test_will_rename_files_scans_standalone_workspace_documents() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     let docs_dir = root.join("docs");
@@ -96,17 +92,15 @@ async fn test_will_rename_files_scans_standalone_workspace_documents() {
     let a_uri = Uri::from_file_path(&a_path).unwrap();
     let b_uri = Uri::from_file_path(&b_path).unwrap();
 
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
 
     // Open only one doc to verify fallback scanning also captures closed docs.
-    server
-        .open_document(
-            a_uri.as_str(),
-            &fs::read_to_string(&a_path).unwrap(),
-            "markdown",
-        )
-        .await;
+    server.open_document(
+        a_uri.as_str(),
+        &fs::read_to_string(&a_path).unwrap(),
+        "markdown",
+    );
 
     let old_uri = Uri::from_file_path(&image_path).unwrap();
     let new_uri = Uri::from_file_path(docs_dir.join("tabular.qmd")).unwrap();
@@ -115,7 +109,6 @@ async fn test_will_rename_files_scans_standalone_workspace_documents() {
             old_uri.as_str().to_string(),
             new_uri.as_str().to_string(),
         )])
-        .await
         .expect("expected workspace edit");
 
     let changes = edit.changes.expect("changes");
@@ -129,8 +122,8 @@ async fn test_will_rename_files_scans_standalone_workspace_documents() {
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_updates_include_shortcode_path() {
+#[test]
+fn test_will_rename_files_updates_include_shortcode_path() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
@@ -140,15 +133,13 @@ async fn test_will_rename_files_updates_include_shortcode_path() {
 
     let root_uri = Uri::from_file_path(root).unwrap();
     let doc_uri = Uri::from_file_path(&doc_path).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
     let old_uri = Uri::from_file_path(root.join("tables.qmd")).unwrap();
     let new_uri = Uri::from_file_path(root.join("tabular.qmd")).unwrap();
@@ -157,7 +148,6 @@ async fn test_will_rename_files_updates_include_shortcode_path() {
             old_uri.as_str().to_string(),
             new_uri.as_str().to_string(),
         )])
-        .await
         .expect("expected workspace edit");
     let changes = edit.changes.expect("changes");
     let edits = changes.get(&doc_uri).expect("doc edits");
@@ -167,8 +157,8 @@ async fn test_will_rename_files_updates_include_shortcode_path() {
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_ignores_escaped_shortcode() {
+#[test]
+fn test_will_rename_files_ignores_escaped_shortcode() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
@@ -178,24 +168,20 @@ async fn test_will_rename_files_ignores_escaped_shortcode() {
 
     let root_uri = Uri::from_file_path(root).unwrap();
     let doc_uri = Uri::from_file_path(&doc_path).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
-    server
-        .open_document(
-            doc_uri.as_str(),
-            &fs::read_to_string(&doc_path).unwrap(),
-            "quarto",
-        )
-        .await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
 
     let old_uri = Uri::from_file_path(root.join("tables.qmd")).unwrap();
     let new_uri = Uri::from_file_path(root.join("tabular.qmd")).unwrap();
-    let edit = server
-        .will_rename_files(vec![(
-            old_uri.as_str().to_string(),
-            new_uri.as_str().to_string(),
-        )])
-        .await;
+    let edit = server.will_rename_files(vec![(
+        old_uri.as_str().to_string(),
+        new_uri.as_str().to_string(),
+    )]);
 
     assert!(
         edit.is_none(),
@@ -203,8 +189,8 @@ async fn test_will_rename_files_ignores_escaped_shortcode() {
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_updates_quarto_navbar_href() {
+#[test]
+fn test_will_rename_files_updates_quarto_navbar_href() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     let old_page = root.join("index.qmd");
@@ -218,15 +204,14 @@ async fn test_will_rename_files_updates_quarto_navbar_href() {
 
     let root_uri = Uri::from_file_path(root).unwrap();
     let quarto_uri = Uri::from_file_path(root.join("_quarto.yml")).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
 
     let edit = server
         .will_rename_files(vec![(
             Uri::from_file_path(&old_page).unwrap().as_str().to_string(),
             Uri::from_file_path(&new_page).unwrap().as_str().to_string(),
         )])
-        .await
         .expect("expected workspace edit");
     let changes = edit.changes.expect("changes");
     let edits = changes.get(&quarto_uri).expect("quarto edits");
@@ -236,8 +221,8 @@ async fn test_will_rename_files_updates_quarto_navbar_href() {
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_updates_quarto_navbar_bare_entry() {
+#[test]
+fn test_will_rename_files_updates_quarto_navbar_bare_entry() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     let old_page = root.join("talks.qmd");
@@ -251,15 +236,14 @@ async fn test_will_rename_files_updates_quarto_navbar_bare_entry() {
 
     let root_uri = Uri::from_file_path(root).unwrap();
     let quarto_uri = Uri::from_file_path(root.join("_quarto.yml")).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
 
     let edit = server
         .will_rename_files(vec![(
             Uri::from_file_path(&old_page).unwrap().as_str().to_string(),
             Uri::from_file_path(&new_page).unwrap().as_str().to_string(),
         )])
-        .await
         .expect("expected workspace edit");
     let changes = edit.changes.expect("changes");
     let edits = changes.get(&quarto_uri).expect("quarto edits");
@@ -269,8 +253,8 @@ async fn test_will_rename_files_updates_quarto_navbar_bare_entry() {
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_ignores_non_navbar_yaml_paths() {
+#[test]
+fn test_will_rename_files_ignores_non_navbar_yaml_paths() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     let old_page = root.join("index.qmd");
@@ -283,23 +267,21 @@ async fn test_will_rename_files_ignores_non_navbar_yaml_paths() {
     .unwrap();
 
     let root_uri = Uri::from_file_path(root).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
 
-    let edit = server
-        .will_rename_files(vec![(
-            Uri::from_file_path(&old_page).unwrap().as_str().to_string(),
-            Uri::from_file_path(&new_page).unwrap().as_str().to_string(),
-        )])
-        .await;
+    let edit = server.will_rename_files(vec![(
+        Uri::from_file_path(&old_page).unwrap().as_str().to_string(),
+        Uri::from_file_path(&new_page).unwrap().as_str().to_string(),
+    )]);
     assert!(
         edit.is_none(),
         "non-navbar YAML paths should not be rewritten in this slice"
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_updates_quarto_book_chapter_entry() {
+#[test]
+fn test_will_rename_files_updates_quarto_book_chapter_entry() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     let old_page = root.join("intro.qmd");
@@ -313,15 +295,14 @@ async fn test_will_rename_files_updates_quarto_book_chapter_entry() {
 
     let root_uri = Uri::from_file_path(root).unwrap();
     let quarto_uri = Uri::from_file_path(root.join("_quarto.yml")).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
 
     let edit = server
         .will_rename_files(vec![(
             Uri::from_file_path(&old_page).unwrap().as_str().to_string(),
             Uri::from_file_path(&new_page).unwrap().as_str().to_string(),
         )])
-        .await
         .expect("expected workspace edit");
     let changes = edit.changes.expect("changes");
     let edits = changes.get(&quarto_uri).expect("quarto edits");
@@ -331,8 +312,8 @@ async fn test_will_rename_files_updates_quarto_book_chapter_entry() {
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_updates_quarto_book_part_file() {
+#[test]
+fn test_will_rename_files_updates_quarto_book_part_file() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     let old_page = root.join("dice.qmd");
@@ -346,15 +327,14 @@ async fn test_will_rename_files_updates_quarto_book_part_file() {
 
     let root_uri = Uri::from_file_path(root).unwrap();
     let quarto_uri = Uri::from_file_path(root.join("_quarto.yml")).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
 
     let edit = server
         .will_rename_files(vec![(
             Uri::from_file_path(&old_page).unwrap().as_str().to_string(),
             Uri::from_file_path(&new_page).unwrap().as_str().to_string(),
         )])
-        .await
         .expect("expected workspace edit");
     let changes = edit.changes.expect("changes");
     let edits = changes.get(&quarto_uri).expect("quarto edits");
@@ -364,8 +344,8 @@ async fn test_will_rename_files_updates_quarto_book_part_file() {
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_ignores_quarto_book_part_title() {
+#[test]
+fn test_will_rename_files_ignores_quarto_book_part_title() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     let old_page = root.join("dice.qmd");
@@ -378,23 +358,21 @@ async fn test_will_rename_files_ignores_quarto_book_part_title() {
     .unwrap();
 
     let root_uri = Uri::from_file_path(root).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
 
-    let edit = server
-        .will_rename_files(vec![(
-            Uri::from_file_path(&old_page).unwrap().as_str().to_string(),
-            Uri::from_file_path(&new_page).unwrap().as_str().to_string(),
-        )])
-        .await;
+    let edit = server.will_rename_files(vec![(
+        Uri::from_file_path(&old_page).unwrap().as_str().to_string(),
+        Uri::from_file_path(&new_page).unwrap().as_str().to_string(),
+    )]);
     assert!(
         edit.is_none(),
         "book part title should not be treated as file path"
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_updates_quarto_book_appendix_entry() {
+#[test]
+fn test_will_rename_files_updates_quarto_book_appendix_entry() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     let old_page = root.join("tools.qmd");
@@ -408,15 +386,14 @@ async fn test_will_rename_files_updates_quarto_book_appendix_entry() {
 
     let root_uri = Uri::from_file_path(root).unwrap();
     let quarto_uri = Uri::from_file_path(root.join("_quarto.yml")).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
 
     let edit = server
         .will_rename_files(vec![(
             Uri::from_file_path(&old_page).unwrap().as_str().to_string(),
             Uri::from_file_path(&new_page).unwrap().as_str().to_string(),
         )])
-        .await
         .expect("expected workspace edit");
     let changes = edit.changes.expect("changes");
     let edits = changes.get(&quarto_uri).expect("quarto edits");
@@ -426,8 +403,8 @@ async fn test_will_rename_files_updates_quarto_book_appendix_entry() {
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_updates_quarto_bibliography_scalar() {
+#[test]
+fn test_will_rename_files_updates_quarto_bibliography_scalar() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     let old_file = root.join("references.bib");
@@ -437,15 +414,14 @@ async fn test_will_rename_files_updates_quarto_bibliography_scalar() {
 
     let root_uri = Uri::from_file_path(root).unwrap();
     let quarto_uri = Uri::from_file_path(root.join("_quarto.yml")).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
 
     let edit = server
         .will_rename_files(vec![(
             Uri::from_file_path(&old_file).unwrap().as_str().to_string(),
             Uri::from_file_path(&new_file).unwrap().as_str().to_string(),
         )])
-        .await
         .expect("expected workspace edit");
     let changes = edit.changes.expect("changes");
     let edits = changes.get(&quarto_uri).expect("quarto edits");
@@ -455,8 +431,8 @@ async fn test_will_rename_files_updates_quarto_bibliography_scalar() {
     );
 }
 
-#[tokio::test]
-async fn test_will_rename_files_updates_quarto_bibliography_list_entry() {
+#[test]
+fn test_will_rename_files_updates_quarto_bibliography_list_entry() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
     let old_file = root.join("references.bib");
@@ -470,15 +446,14 @@ async fn test_will_rename_files_updates_quarto_bibliography_list_entry() {
 
     let root_uri = Uri::from_file_path(root).unwrap();
     let quarto_uri = Uri::from_file_path(root.join("_quarto.yml")).unwrap();
-    let server = TestLspServer::new();
-    server.initialize(root_uri.as_str()).await;
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
 
     let edit = server
         .will_rename_files(vec![(
             Uri::from_file_path(&old_file).unwrap().as_str().to_string(),
             Uri::from_file_path(&new_file).unwrap().as_str().to_string(),
         )])
-        .await
         .expect("expected workspace edit");
     let changes = edit.changes.expect("changes");
     let edits = changes.get(&quarto_uri).expect("quarto edits");

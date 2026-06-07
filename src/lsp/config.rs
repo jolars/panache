@@ -1,27 +1,24 @@
 use std::path::{Path, PathBuf};
-use tower_lsp_server::Client;
-use tower_lsp_server::ls_types::{MessageType, Uri};
+
+use lsp_types::Uri;
 
 use crate::config::ConfigSource;
+use crate::lsp::uri_ext::UriExt;
 
 /// Load config from workspace root, falling back to default
 ///
 /// If `document_uri` is provided, the file extension will be used to auto-detect
 /// the flavor (.qmd → Quarto, .Rmd/.Rmarkdown → RMarkdown)
-pub(crate) async fn load_config(
-    client: &Client,
+pub(crate) fn load_config(
     workspace_root: &Option<PathBuf>,
     document_uri: Option<&Uri>,
 ) -> crate::Config {
-    load_config_with_source(client, workspace_root, document_uri)
-        .await
-        .0
+    load_config_with_source(workspace_root, document_uri).0
 }
 
 /// Like [`load_config`] but also returns the [`ConfigSource`] so callers can
 /// resolve the project anchor used by `exclude`/`include` patterns.
-pub(crate) async fn load_config_with_source(
-    client: &Client,
+pub(crate) fn load_config_with_source(
     workspace_root: &Option<PathBuf>,
     document_uri: Option<&Uri>,
 ) -> (crate::Config, ConfigSource) {
@@ -46,22 +43,12 @@ pub(crate) async fn load_config_with_source(
         match crate::config::load(None, &start_dir, input_file.as_deref(), None) {
             Ok((config, source)) => {
                 if let Some(p) = source.path() {
-                    client
-                        .log_message(
-                            MessageType::INFO,
-                            format!("Loaded config from {}", p.display()),
-                        )
-                        .await;
+                    log::info!("Loaded config from {}", p.display());
                 }
                 return (config, source);
             }
             Err(e) => {
-                client
-                    .log_message(
-                        MessageType::WARNING,
-                        format!("Failed to load config: {}", e),
-                    )
-                    .await;
+                log::warn!("Failed to load config: {e}");
             }
         }
     }

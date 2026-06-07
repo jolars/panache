@@ -1,12 +1,10 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::path::Path;
 
-use tokio::sync::Mutex;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::*;
+use crate::lsp::uri_ext::UriExt;
+use lsp_types::*;
 
-use crate::lsp::DocumentState;
+use crate::lsp::global_state::StateSnapshot;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 use crate::metadata::{inline_bib_conflicts, inline_reference_map};
 
@@ -15,7 +13,7 @@ use super::super::helpers;
 use crate::utils::{normalize_anchor_label, normalize_label};
 
 struct RenameScanContext<'a> {
-    salsa_db: &'a Arc<Mutex<crate::salsa::SalsaDb>>,
+    db: &'a crate::salsa::SalsaDb,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &'a Path,
@@ -23,23 +21,13 @@ struct RenameScanContext<'a> {
     content: &'a str,
 }
 
-pub(crate) async fn rename(
-    client: &tower_lsp_server::Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
-    params: RenameParams,
-) -> Result<Option<WorkspaceEdit>> {
+pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<WorkspaceEdit> {
     let uri = params.text_document_position.text_document.uri;
     let position = params.text_document_position.position;
     let new_name = params.new_name;
-    let config = helpers::get_config(client, &workspace_root, &uri).await;
+    let config = snap.config(&uri);
 
-    let Some(ctx) =
-        crate::lsp::context::get_open_document_context(&document_map, &salsa_db, &uri).await
-    else {
-        return Ok(None);
-    };
+    let ctx = crate::lsp::context::get_open_document_context(snap, &uri)?;
 
     let salsa_file = ctx.salsa_file;
     let salsa_config = ctx.salsa_config;
@@ -47,9 +35,7 @@ pub(crate) async fn rename(
     let content = ctx.content.clone();
     let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
 
-    let Some(doc_path) = doc_path.clone() else {
-        return Ok(None);
-    };
+    let doc_path = doc_path.clone()?;
     let Some(offset) = position_to_offset(&content, position) else {
         log::debug!(
             "rename: position_to_offset failed uri={:?} line={} char={}",
@@ -57,10 +43,10 @@ pub(crate) async fn rename(
             position.line,
             position.character
         );
-        return Ok(None);
+        return None;
     };
     if helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset) {
-        return Ok(None);
+        return None;
     }
     let target = {
         let root = ctx.syntax_root();
@@ -80,7 +66,7 @@ pub(crate) async fn rename(
     if let Some(SymbolTarget::Crossref(old_key)) = target.as_ref() {
         let changes = rename_crossref_symbol(
             &RenameScanContext {
-                salsa_db: &salsa_db,
+                db: &snap.db,
                 salsa_file,
                 salsa_config,
                 doc_path: &doc_path,
@@ -90,21 +76,20 @@ pub(crate) async fn rename(
             old_key,
             &new_name,
             config.extensions.bookdown_references,
-        )
-        .await;
+        );
         if changes.is_empty() {
-            return Ok(None);
+            return None;
         }
-        return Ok(Some(WorkspaceEdit {
+        return Some(WorkspaceEdit {
             changes: Some(changes),
             ..Default::default()
-        }));
+        });
     }
 
     if let Some(SymbolTarget::ChunkLabel(old_key)) = target.as_ref() {
         let changes = rename_chunk_label_symbol(
             &RenameScanContext {
-                salsa_db: &salsa_db,
+                db: &snap.db,
                 salsa_file,
                 salsa_config,
                 doc_path: &doc_path,
@@ -114,21 +99,20 @@ pub(crate) async fn rename(
             old_key,
             &new_name,
             config.extensions.bookdown_references,
-        )
-        .await;
+        );
         if changes.is_empty() {
-            return Ok(None);
+            return None;
         }
-        return Ok(Some(WorkspaceEdit {
+        return Some(WorkspaceEdit {
             changes: Some(changes),
             ..Default::default()
-        }));
+        });
     }
 
     if let Some(SymbolTarget::ExampleLabel(old_key)) = target.as_ref() {
         let changes = rename_example_label_symbol(
             &RenameScanContext {
-                salsa_db: &salsa_db,
+                db: &snap.db,
                 salsa_file,
                 salsa_config,
                 doc_path: &doc_path,
@@ -138,15 +122,14 @@ pub(crate) async fn rename(
             old_key,
             &new_name,
             config.extensions.example_lists,
-        )
-        .await;
+        );
         if changes.is_empty() {
-            return Ok(None);
+            return None;
         }
-        return Ok(Some(WorkspaceEdit {
+        return Some(WorkspaceEdit {
             changes: Some(changes),
             ..Default::default()
-        }));
+        });
     }
 
     if let Some(SymbolTarget::HeadingLink(old_key) | SymbolTarget::HeadingId(old_key)) =
@@ -156,14 +139,13 @@ pub(crate) async fn rename(
         let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
         let per_doc = crate::lsp::navigation::project_symbol_documents(
-            &salsa_db,
+            &snap.db,
             salsa_file,
             salsa_config,
             &doc_path,
             &uri,
             &content,
-        )
-        .await;
+        );
 
         for doc in per_doc {
             let doc_uri = doc.uri;
@@ -179,13 +161,13 @@ pub(crate) async fn rename(
         }
 
         if changes.is_empty() {
-            return Ok(None);
+            return None;
         }
 
-        return Ok(Some(WorkspaceEdit {
+        return Some(WorkspaceEdit {
             changes: Some(changes),
             ..Default::default()
-        }));
+        });
     }
 
     if let Some(SymbolTarget::Reference {
@@ -194,37 +176,36 @@ pub(crate) async fn rename(
     }) = target.as_ref()
     {
         let symbol_index = {
-            let db = salsa_db.lock().await;
-            crate::salsa::symbol_usage_index(&*db, salsa_file, salsa_config, doc_path.clone())
-                .clone()
+            let db = &snap.db;
+            crate::salsa::symbol_usage_index(db, salsa_file, salsa_config, doc_path.clone()).clone()
         };
         let ranges = symbol_index.footnote_rename_ranges(label);
         let edits = text_edits_from_ranges(&ranges, &content, &new_name);
         if edits.is_empty() {
-            return Ok(None);
+            return None;
         }
         let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
         changes.insert(uri.clone(), edits);
-        return Ok(Some(WorkspaceEdit {
+        return Some(WorkspaceEdit {
             changes: Some(changes),
             ..Default::default()
-        }));
+        });
     }
 
     if !helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions) {
-        return Ok(None);
+        return None;
     }
 
     let metadata = {
-        let db = salsa_db.lock().await;
-        crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path.clone()).clone()
+        let db = &snap.db;
+        crate::salsa::metadata(db, salsa_file, salsa_config, doc_path.clone()).clone()
     };
     let (old_key, old_norm) = match target {
         Some(SymbolTarget::Citation(key)) => {
             let norm = normalize_label(&key);
             (key, norm)
         }
-        _ => return Ok(None),
+        _ => return None,
     };
 
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
@@ -248,9 +229,9 @@ pub(crate) async fn rename(
         for entry in bib_entries {
             let bib_path = entry.source_file.clone();
             let bib_text = {
-                let db = salsa_db.lock().await;
-                crate::salsa::Db::file_text(&*db, bib_path.clone())
-                    .map(|file| file.text(&*db).clone())
+                let db = &snap.db;
+                crate::salsa::Db::file_text(db, bib_path.clone())
+                    .map(|file| file.text(db).clone())
                     .unwrap_or_default()
             };
             let bib_start = offset_to_position(&bib_text, entry.span.start);
@@ -268,8 +249,8 @@ pub(crate) async fn rename(
     }
 
     let graph = {
-        let db = salsa_db.lock().await;
-        crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone()).clone()
+        let db = &snap.db;
+        crate::salsa::project_graph(db, salsa_file, salsa_config, doc_path.clone()).clone()
     };
 
     for bib_path in &bib_paths {
@@ -288,9 +269,9 @@ pub(crate) async fn rename(
             let text = if entry.path == doc_path {
                 content.clone()
             } else {
-                let db = salsa_db.lock().await;
-                crate::salsa::Db::file_text(&*db, entry.path.clone())
-                    .map(|file| file.text(&*db).clone())
+                let db = &snap.db;
+                crate::salsa::Db::file_text(db, entry.path.clone())
+                    .map(|file| file.text(db).clone())
                     .unwrap_or_default()
             };
             let start = offset_to_position(&text, entry.range.start().into());
@@ -317,19 +298,16 @@ pub(crate) async fn rename(
         doc_paths.push(doc_path.clone());
     }
 
-    let citation_usage_inputs = crate::lsp::navigation::document_inputs_for_paths(
-        &salsa_db, &doc_path, &content, doc_paths,
-    )
-    .await;
+    let citation_usage_inputs =
+        crate::lsp::navigation::document_inputs_for_paths(&snap.db, &doc_path, &content, doc_paths);
     let citation_usage_docs = crate::lsp::navigation::indexed_documents_from_inputs(
-        &salsa_db,
+        &snap.db,
         salsa_file,
         salsa_config,
         &doc_path,
         &uri,
         citation_usage_inputs,
-    )
-    .await;
+    );
     for doc in citation_usage_docs {
         let doc_uri = doc.uri;
         let text = doc.text;
@@ -344,13 +322,13 @@ pub(crate) async fn rename(
     }
 
     if changes.is_empty() {
-        return Ok(None);
+        return None;
     }
 
-    Ok(Some(WorkspaceEdit {
+    Some(WorkspaceEdit {
         changes: Some(changes),
         ..Default::default()
-    }))
+    })
 }
 
 fn text_edits_from_ranges(
@@ -370,7 +348,7 @@ fn text_edits_from_ranges(
     edits
 }
 
-async fn rename_crossref_symbol(
+fn rename_crossref_symbol(
     ctx: &RenameScanContext<'_>,
     old_key: &str,
     new_name: &str,
@@ -381,14 +359,13 @@ async fn rename_crossref_symbol(
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
     let per_doc = crate::lsp::navigation::project_symbol_documents(
-        ctx.salsa_db,
+        ctx.db,
         ctx.salsa_file,
         ctx.salsa_config,
         ctx.doc_path,
         ctx.uri,
         ctx.content,
-    )
-    .await;
+    );
 
     for doc in per_doc {
         let doc_uri = doc.uri;
@@ -441,7 +418,7 @@ async fn rename_crossref_symbol(
     changes
 }
 
-async fn rename_chunk_label_symbol(
+fn rename_chunk_label_symbol(
     ctx: &RenameScanContext<'_>,
     old_key: &str,
     new_name: &str,
@@ -452,14 +429,13 @@ async fn rename_chunk_label_symbol(
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
     let per_doc = crate::lsp::navigation::project_symbol_documents(
-        ctx.salsa_db,
+        ctx.db,
         ctx.salsa_file,
         ctx.salsa_config,
         ctx.doc_path,
         ctx.uri,
         ctx.content,
-    )
-    .await;
+    );
 
     for doc in per_doc {
         let doc_uri = doc.uri;
@@ -485,7 +461,7 @@ async fn rename_chunk_label_symbol(
     changes
 }
 
-async fn rename_example_label_symbol(
+fn rename_example_label_symbol(
     ctx: &RenameScanContext<'_>,
     old_key: &str,
     new_name: &str,
@@ -499,14 +475,13 @@ async fn rename_example_label_symbol(
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
     let per_doc = crate::lsp::navigation::project_symbol_documents(
-        ctx.salsa_db,
+        ctx.db,
         ctx.salsa_file,
         ctx.salsa_config,
         ctx.doc_path,
         ctx.uri,
         ctx.content,
-    )
-    .await;
+    );
 
     for doc in per_doc {
         let doc_uri = doc.uri;

@@ -1,37 +1,31 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use rowan::GreenNode;
-use tokio::sync::Mutex;
-use tower_lsp_server::Client;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::{
+use lsp_types::{
     Location, OneOf, Position, Range, SymbolKind, Uri, WorkspaceSymbol, WorkspaceSymbolParams,
     WorkspaceSymbolResponse,
 };
+use rowan::GreenNode;
 
 use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
+use crate::lsp::global_state::StateSnapshot;
+use crate::lsp::uri_ext::UriExt;
 use crate::salsa::{Db, HeadingOutlineEntry};
 use crate::syntax::{AstNode, Document, Heading, SyntaxNode};
 
-pub(crate) async fn workspace_symbol(
-    _client: &Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
+pub(crate) fn workspace_symbol(
+    snap: &StateSnapshot,
     params: WorkspaceSymbolParams,
-) -> Result<Option<WorkspaceSymbolResponse>> {
-    let open_documents: Vec<(String, DocumentState)> = {
-        let map = document_map.lock().await;
-        map.iter()
-            .map(|(uri, state)| (uri.clone(), state.clone()))
-            .collect()
-    };
+) -> Option<WorkspaceSymbolResponse> {
+    let open_documents: Vec<(String, DocumentState)> = snap
+        .document_map
+        .iter()
+        .map(|(uri, state)| (uri.clone(), state.clone()))
+        .collect();
 
     if open_documents.is_empty() {
-        return Ok(None);
+        return None;
     }
 
     let mut candidate_paths: HashSet<PathBuf> = HashSet::new();
@@ -51,12 +45,11 @@ pub(crate) async fn workspace_symbol(
             }
 
             let graph_paths = crate::lsp::navigation::project_document_paths(
-                &salsa_db,
+                &snap.db,
                 state.salsa_file,
                 state.salsa_config,
                 path,
-            )
-            .await;
+            );
 
             for graph_path in graph_paths {
                 candidate_paths.insert(graph_path.clone());
@@ -67,35 +60,29 @@ pub(crate) async fn workspace_symbol(
         }
     }
 
-    if !memory_states.is_empty() {
-        let db = salsa_db.lock().await;
-        for (uri, file, tree) in memory_states {
-            let content = file.text(&*db).clone();
-            memory_docs.push((uri, content, tree));
-        }
+    for (uri, file, tree) in memory_states {
+        let content = file.text(&snap.db).clone();
+        memory_docs.push((uri, content, tree));
     }
 
     let query = params.query.trim().to_lowercase();
     let mut symbols = Vec::new();
 
-    {
-        let db = salsa_db.lock().await;
-        for path in candidate_paths {
-            let Some(file) = db.file_text(path.clone()) else {
-                continue;
-            };
-            let Some(config) = path_configs.get(&path).copied() else {
-                continue;
-            };
-            let uri = Uri::from_file_path(&path).or_else(|| path_uris.get(&path).cloned());
-            let Some(uri) = uri else {
-                continue;
-            };
+    for path in candidate_paths {
+        let Some(file) = snap.db.file_text(path.clone()) else {
+            continue;
+        };
+        let Some(config) = path_configs.get(&path).copied() else {
+            continue;
+        };
+        let uri = Uri::from_file_path(&path).or_else(|| path_uris.get(&path).cloned());
+        let Some(uri) = uri else {
+            continue;
+        };
 
-            let content = file.text(&*db).clone();
-            let outline = crate::salsa::heading_outline(&*db, file, config, path).clone();
-            symbols.extend(symbols_for_document(&uri, &content, &outline, &query));
-        }
+        let content = file.text(&snap.db).clone();
+        let outline = crate::salsa::heading_outline(&snap.db, file, config, path).clone();
+        symbols.extend(symbols_for_document(&uri, &content, &outline, &query));
     }
 
     for (uri, content, green) in memory_docs {
@@ -113,9 +100,9 @@ pub(crate) async fn workspace_symbol(
     });
 
     if symbols.is_empty() {
-        Ok(None)
+        None
     } else {
-        Ok(Some(WorkspaceSymbolResponse::Nested(symbols)))
+        Some(WorkspaceSymbolResponse::Nested(symbols))
     }
 }
 
@@ -261,8 +248,9 @@ fn compare_positions(a: Option<&Position>, b: Option<&Position>) -> std::cmp::Or
 #[cfg(test)]
 mod tests {
     use super::{heading_outline_from_root, symbols_for_document};
+    use crate::lsp::uri_ext::UriExt;
+    use lsp_types::Uri;
     use std::env;
-    use tower_lsp_server::ls_types::Uri;
 
     #[test]
     fn extracts_heading_symbols_with_container_names() {

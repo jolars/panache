@@ -1551,9 +1551,7 @@ fn main() -> io::Result<()> {
         },
         #[cfg(feature = "lsp")]
         Commands::Lsp { .. } => {
-            // LSP needs tokio runtime
-            let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(async { panache::lsp::run().await })?;
+            panache::lsp::run()?;
             Ok(())
         }
         Commands::Lint {

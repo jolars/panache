@@ -1,27 +1,22 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
+use crate::lsp::uri_ext::UriExt;
+use lsp_types::{Range, RenameFilesParams, TextEdit, Uri, WorkspaceEdit};
 use rowan::TextSize;
-use tokio::sync::Mutex;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::{Range, RenameFilesParams, TextEdit, Uri, WorkspaceEdit};
 
-use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
+use crate::lsp::global_state::StateSnapshot;
 use crate::syntax::{AstNode, ImageLink, Link, Shortcode, SyntaxKind};
 
 use super::document_links::{extract_first_destination_token, resolve_link_target};
 use super::shortcode_args::{shortcode_token_value_span, shortcode_tokens};
 
-pub(crate) async fn will_rename_files(
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
+pub(crate) fn will_rename_files(
+    snap: &StateSnapshot,
     params: RenameFilesParams,
-) -> Result<Option<WorkspaceEdit>> {
-    let root = workspace_root.lock().await.clone();
-    let docs = candidate_documents_for_scan(&root, &document_map, &salsa_db).await;
+) -> Option<WorkspaceEdit> {
+    let docs = candidate_documents_for_scan(snap);
 
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
     for rename in &params.files {
@@ -61,13 +56,13 @@ pub(crate) async fn will_rename_files(
     );
 
     if changes.is_empty() {
-        return Ok(None);
+        return None;
     }
 
-    Ok(Some(WorkspaceEdit {
+    Some(WorkspaceEdit {
         changes: Some(changes),
         ..Default::default()
-    }))
+    })
 }
 
 #[derive(Clone)]
@@ -83,13 +78,9 @@ struct CandidateEdit {
     edit: TextEdit,
 }
 
-async fn candidate_documents_for_scan(
-    workspace_root: &Option<PathBuf>,
-    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
-) -> Vec<DocInput> {
+fn candidate_documents_for_scan(snap: &StateSnapshot) -> Vec<DocInput> {
     let mut by_path: HashMap<PathBuf, DocInput> = HashMap::new();
-    if let Some(root) = workspace_root {
+    if let Some(root) = snap.workspace_root.as_ref() {
         let has_quarto = root.join("_quarto.yml").exists();
         let has_bookdown = root.join("_bookdown.yml").exists();
 
@@ -130,16 +121,12 @@ async fn candidate_documents_for_scan(
         }
     }
 
-    let states = {
-        let docs = document_map.lock().await;
-        docs.values().cloned().collect::<Vec<_>>()
-    };
-    let db = salsa_db.lock().await;
+    let states = snap.document_map.values().cloned().collect::<Vec<_>>();
     for state in states {
         let Some(path) = state.path.clone() else {
             continue;
         };
-        let text = state.salsa_file.text(&*db).clone();
+        let text = state.salsa_file.text(&snap.db).clone();
         let Some(uri) = Uri::from_file_path(&path) else {
             continue;
         };

@@ -1,13 +1,9 @@
 //! Handler for textDocument/completion LSP requests.
 
-use std::collections::HashMap;
+use lsp_types::*;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::*;
 
-use crate::lsp::DocumentState;
+use crate::lsp::global_state::StateSnapshot;
 use crate::syntax::{AstNode, ImageLink, Link, LinkDest, Shortcode, SyntaxKind, SyntaxNode};
 use crate::utils::normalize_anchor_label;
 
@@ -51,48 +47,29 @@ const EMBED_EXTENSIONS: &[&str] = &["ipynb", "qmd"];
 
 const MAX_PATH_COMPLETIONS: usize = 250;
 
-pub(crate) async fn completion(
-    client: &tower_lsp_server::Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
+pub(crate) fn completion(
+    snap: &StateSnapshot,
     params: CompletionParams,
-) -> Result<Option<CompletionResponse>> {
+) -> Option<CompletionResponse> {
     let uri = &params.text_document_position.text_document.uri;
     let position = params.text_document_position.position;
-    let config = helpers::get_config(client, &workspace_root, uri).await;
+    let config = snap.config(uri);
 
-    // SyntaxNode is !Send, so derive everything we need from it inside a
-    // sync block and let it drop before we hit any subsequent .await.
-    let Some((text, offset, link_ctx_opt, shortcode_ctx_opt)) = ({
-        let Some((text, root)) =
-            helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
-        else {
-            return Ok(None);
-        };
-        let Some(offset) = super::super::conversions::position_to_offset(&text, position) else {
-            return Ok(None);
-        };
-        let link_ctx_opt = link_dest_context(&root, &text, offset);
-        let shortcode_ctx_opt = if link_ctx_opt.is_none() && config.extensions.quarto_shortcodes {
-            shortcode_arg_context(&root, &text, offset)
-        } else {
-            None
-        };
-        Some((text, offset, link_ctx_opt, shortcode_ctx_opt))
-    }) else {
-        return Ok(None);
+    let (text, root) = snap.document_content_and_tree(uri)?;
+    let offset = super::super::conversions::position_to_offset(&text, position)?;
+    let link_ctx_opt = link_dest_context(&root, &text, offset);
+    let shortcode_ctx_opt = if link_ctx_opt.is_none() && config.extensions.quarto_shortcodes {
+        shortcode_arg_context(&root, &text, offset)
+    } else {
+        None
     };
+    drop(root);
 
     // Path-completion branches: cursor inside `[text](…)` / `![alt](…)` destination,
     // or inside a path-bearing Quarto shortcode argument.
     if link_ctx_opt.is_some() || shortcode_ctx_opt.is_some() {
-        let (doc_path, ws_root) = {
-            let map = document_map.lock().await;
-            let doc = map.get(&uri.to_string()).and_then(|s| s.path.clone());
-            let ws = workspace_root.lock().await.clone();
-            (doc, ws)
-        };
+        let doc_path = snap.document_state(uri).and_then(|s| s.path);
+        let ws_root = snap.workspace_root.clone();
 
         let request = if let Some(ctx) = link_ctx_opt {
             link_dest_path_request(&ctx, doc_path.as_deref())
@@ -103,60 +80,49 @@ pub(crate) async fn completion(
         };
 
         return match request {
-            Some(req) => match path_completion_items(req, &text, offset).await {
-                Some(items) if !items.is_empty() => Ok(Some(CompletionResponse::Array(items))),
-                _ => Ok(None),
+            Some(req) => match path_completion_items(req, &text, offset) {
+                Some(items) if !items.is_empty() => Some(CompletionResponse::Array(items)),
+                _ => None,
             },
-            None => Ok(None),
+            None => None,
         };
     }
 
-    let Some(query) = citation_query_prefix(&text, offset) else {
-        return Ok(None);
-    };
+    let query = citation_query_prefix(&text, offset)?;
 
-    let (salsa_file, salsa_config, doc_path, parsed_yaml_regions) = {
-        let map = document_map.lock().await;
-        match map.get(&uri.to_string()) {
-            Some(state) => (
-                state.salsa_file,
-                state.salsa_config,
-                state.path.clone(),
-                state.parsed_yaml_regions.clone(),
-            ),
-            None => return Ok(None),
-        }
+    let (salsa_file, salsa_config, doc_path, parsed_yaml_regions) = match snap.document_state(uri) {
+        Some(state) => (
+            state.salsa_file,
+            state.salsa_config,
+            state.path.clone(),
+            state.parsed_yaml_regions.clone(),
+        ),
+        None => return None,
     };
 
     let offset_in_frontmatter =
         helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset);
     if offset_in_frontmatter {
-        return Ok(None);
+        return None;
     }
 
-    let Some(doc_path) = doc_path else {
-        return Ok(None);
-    };
+    let doc_path = doc_path?;
     let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
     if !yaml_ok {
-        return Ok(None);
+        return None;
     }
 
-    let metadata = {
-        let db = salsa_db.lock().await;
-        crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path.clone()).clone()
-    };
+    let metadata =
+        crate::salsa::metadata(&snap.db, salsa_file, salsa_config, doc_path.clone()).clone();
     let parse = metadata.bibliography_parse.as_ref();
-    let symbol_index = {
-        let db = salsa_db.lock().await;
-        crate::salsa::symbol_usage_index(&*db, salsa_file, salsa_config, doc_path).clone()
-    };
+    let symbol_index =
+        crate::salsa::symbol_usage_index(&snap.db, salsa_file, salsa_config, doc_path).clone();
 
     let has_crossref_candidates = symbol_index
         .crossref_declaration_entries()
         .any(|(key, _)| is_supported_crossref_completion_key(key));
     if parse.is_none() && metadata.inline_references.is_empty() && !has_crossref_candidates {
-        return Ok(None);
+        return None;
     }
 
     let mut seen = std::collections::HashSet::new();
@@ -218,10 +184,10 @@ pub(crate) async fn completion(
     }
 
     if items.is_empty() {
-        return Ok(None);
+        return None;
     }
 
-    Ok(Some(CompletionResponse::Array(items)))
+    Some(CompletionResponse::Array(items))
 }
 
 fn citation_query_prefix(text: &str, offset: usize) -> Option<String> {
@@ -476,7 +442,7 @@ fn shortcode_path_request(
     })
 }
 
-async fn path_completion_items(
+fn path_completion_items(
     req: PathRequest,
     text: &str,
     offset: usize,
@@ -486,14 +452,9 @@ async fn path_completion_items(
         None => (String::new(), req.effective_prefix.clone()),
     };
     let target_dir = req.base_dir.join(&subdir);
-    let name_prefix_owned = name_prefix.clone();
     let accept = req.accept_file;
 
-    let entries = tokio::task::spawn_blocking(move || {
-        read_dir_entries(&target_dir, &name_prefix_owned, accept.as_ref())
-    })
-    .await
-    .ok()?;
+    let entries = read_dir_entries(&target_dir, &name_prefix, accept.as_ref());
 
     let name_start = offset.saturating_sub(name_prefix.len());
     let range = Range::new(

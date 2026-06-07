@@ -1,32 +1,18 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-
-use tokio::sync::Mutex;
-use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::ls_types::*;
-
-use crate::lsp::DocumentState;
+use lsp_types::{PrepareRenameResponse, Range, TextDocumentPositionParams};
 
 use super::super::conversions::{offset_to_position, position_to_offset};
 use super::super::helpers;
+use crate::lsp::context::get_open_document_context;
+use crate::lsp::global_state::StateSnapshot;
 
-pub(crate) async fn prepare_rename(
-    client: &tower_lsp_server::Client,
-    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
+pub(crate) fn prepare_rename(
+    snap: &StateSnapshot,
     params: TextDocumentPositionParams,
-) -> Result<Option<PrepareRenameResponse>> {
+) -> Option<PrepareRenameResponse> {
     let uri = params.text_document.uri;
     let position = params.position;
-    let _config = helpers::get_config(client, &workspace_root, &uri).await;
 
-    let Some(ctx) =
-        crate::lsp::context::get_open_document_context(&document_map, &salsa_db, &uri).await
-    else {
-        return Ok(None);
-    };
+    let ctx = get_open_document_context(snap, &uri)?;
 
     let content = ctx.content.clone();
     let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
@@ -38,10 +24,10 @@ pub(crate) async fn prepare_rename(
             position.line,
             position.character
         );
-        return Ok(None);
+        return None;
     };
     if helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset) {
-        return Ok(None);
+        return None;
     }
 
     let root = ctx.syntax_root();
@@ -55,7 +41,7 @@ pub(crate) async fn prepare_rename(
             position.character,
             offset
         );
-        return Ok(None);
+        return None;
     };
 
     let start_offset: usize = range.start().into();
@@ -67,25 +53,13 @@ pub(crate) async fn prepare_rename(
             start_offset,
             end_offset
         );
-        return Ok(None);
+        return None;
     };
 
     let start = offset_to_position(&content, range.start().into());
     let end = offset_to_position(&content, range.end().into());
-    log::debug!(
-        "prepare_rename: uri={:?} req=({}, {}) offset={} range=({}, {})..({}, {}) placeholder={:?}",
-        uri,
-        position.line,
-        position.character,
-        offset,
-        start.line,
-        start.character,
-        end.line,
-        end.character,
-        placeholder
-    );
-    Ok(Some(PrepareRenameResponse::RangeWithPlaceholder {
+    Some(PrepareRenameResponse::RangeWithPlaceholder {
         range: Range { start, end },
         placeholder: placeholder.to_string(),
-    }))
+    })
 }

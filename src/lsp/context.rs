@@ -1,11 +1,8 @@
-use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use tokio::sync::Mutex;
-use tower_lsp_server::ls_types::Uri;
+use lsp_types::Uri;
 
-use crate::lsp::DocumentState;
+use crate::lsp::global_state::StateSnapshot;
 use crate::syntax::{ParsedYamlRegionSnapshot, SyntaxNode};
 
 #[derive(Clone)]
@@ -24,20 +21,12 @@ impl OpenDocumentContext {
     }
 }
 
-pub(crate) async fn get_open_document_context(
-    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+pub(crate) fn get_open_document_context(
+    snap: &StateSnapshot,
     uri: &Uri,
 ) -> Option<OpenDocumentContext> {
-    let state = {
-        let map = document_map.lock().await;
-        map.get(&uri.to_string())?.clone()
-    };
-
-    let content = {
-        let db = salsa_db.lock().await;
-        state.salsa_file.text(&*db).clone()
-    };
+    let state = snap.document_map.get(&uri.to_string())?.clone();
+    let content = state.salsa_file.text(&snap.db).clone();
 
     Some(OpenDocumentContext {
         salsa_file: state.salsa_file,
