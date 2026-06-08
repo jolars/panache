@@ -770,6 +770,65 @@ intentionally excluded.
       formatter round-trip before changing emitter shape (see the
       rowan-internals note in the `perf-investigation` skill).
 
+### YAML validation: consumer fidelity vs YAML 1.2 (needs design decision)
+
+Surfaced 2026-06-08 while fixing a real bug: pandoc rejected a user's
+frontmatter (`description:` with an empty inline value followed by an
+*unindented* blurb) but `panache lint`/LSP stayed silent.
+
+**Landed** (commits `f8f804c8`, `83a73a13`): the in-tree YAML scanner already
+mirrors libyaml's required-simple-key rule and emits
+`LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND`, but `validate_yaml`
+(`crates/panache-parser/src/parser/yaml/validator.rs`) never harvested it. Added
+a harvest check (modeled on `check_unterminated_quoted`). 12 yaml-test- suite
+error fixtures now report the libyaml-faithful message at libyaml's exact
+line/column (verified against Ruby Psych). This bug class (scanner diagnostics
+the validator drops) is now closed --- audited all 6 `LEX_*` codes.
+
+**The bigger open question --- which YAML dialect should the validator target?**
+panache currently validates against **YAML 1.2** (the yaml-test-suite allowlist
+at `crates/panache-parser/tests/yaml/allowlist.txt`). But the *real consumers*
+are stricter and differ by context (see memory
+`project_yaml_consumer_parsers.md`):
+
+- **Frontmatter** → pandoc → Haskell `yaml`/**libyaml** (≈ YAML 1.1).
+- **Hashpipe `#|` cell options** → Quarto → **js-yaml** (YAML 1.2). In a Quarto
+  doc the frontmatter is read by BOTH, so it must satisfy the stricter one.
+- They **agree** on big structural rejections (implicit empty keys, duplicate
+  keys, reserved `@`); they **diverge** on e.g. **tabs as indentation** (pandoc
+  ACCEPTS, quarto/js-yaml REJECTS --- confirmed in frontmatter and hashpipe).
+  Scalar-typing differences (yes/no, sexagesimal, octal) are invisible to
+  parse-acceptance (pandoc treats metadata scalars as strings), so they don't
+  matter for "will it parse" validation.
+
+**Concretely deferred work:**
+
+- [ ] **Implicit empty keys.** A `YAML_BLOCK_MAP_KEY` whose only non-trivia
+      child is `YAML_COLON` (`:`, `a: b`⏎`: c`, `- : c`, `k:`⏎`: c`) is valid
+      YAML 1.2 but rejected by BOTH pandoc and quarto. A drafted
+      `check_implicit_empty_block_key` (reuse `PARSE_INVALID_KEY_TOKEN`; skip
+      explicit `?` keys and anchor/tag keys, which both consumers accept) was
+      **written and reverted** this session --- it works and matches the real
+      consumers, but flips 8 allowlisted YAML-1.2 "valid" cases (NHX8, 2JQS,
+      S3PD, 6M2F, M2N8/00, SM9W/01, UKK6/00, an NKF9 sub-doc) to rejected. All 8
+      are rejected by pandoc --- so this is a deliberate move toward consumer
+      fidelity, not a false positive. Decide first whether to take it.
+- [ ] **Decide the policy:** keep targeting abstract YAML 1.2 (lenient; won't
+      catch what pandoc/quarto reject), or target the real consumers. If the
+      latter, the allowlist contract changes (those 8 cases move out of the
+      valid bucket --- and the `yaml-tests.md` rule about not allowlisting
+      `error` cases needs a companion note about 1.2-valid-but-consumer-rejected
+      cases).
+- [ ] **Context/flavor-aware strictness** for cases where libyaml and js-yaml
+      genuinely diverge (tabs, and audit for others). Keys naturally off the
+      existing `flavor` (Quarto vs Pandoc) and the YAML location (frontmatter vs
+      hashpipe `#|`). Only needed for the divergent cases; the agreed-upon
+      rejections can stay uniform.
+- [ ] **Remaining false-negative** noted in passing: `? : x` (one-line explicit
+      empty key) is rejected by pandoc but the drafted check leaves it alone (it
+      has a `?`). Lower priority; characterize against both consumers before
+      tightening.
+
 ## Parser - Coverage
 
 This section tracks implementation status of Pandoc Markdown features based on
