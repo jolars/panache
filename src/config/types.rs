@@ -238,6 +238,18 @@ pub enum TabStopMode {
     Preserve,
 }
 
+/// Indentation style for tables at the top level of a document.
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum TableIndentStyle {
+    /// Indent pipe, simple, and multiline tables by two columns (default).
+    #[default]
+    Unified,
+    /// Keep pipe tables flush at column 0, as Pandoc's pipe-table writers do;
+    /// simple and multiline tables stay indented two columns.
+    Pandoc,
+}
+
 /// User-supplied no-break abbreviations for sentence wrapping.
 ///
 /// Accepts either a flat list applied to every document, or a table keyed by
@@ -300,6 +312,8 @@ pub struct StyleConfig {
     pub math_delimiter_style: MathDelimiterStyle,
     /// Math indentation (spaces)
     pub math_indent: usize,
+    /// Indentation style for top-level tables
+    pub table_indent: TableIndentStyle,
     /// Tab stop handling (normalize or preserve)
     pub tab_stops: TabStopMode,
     /// Tab width for expanding tabs when normalizing
@@ -328,6 +342,7 @@ impl Default for StyleConfig {
             blank_lines: BlankLines::Collapse,
             math_delimiter_style: MathDelimiterStyle::default(),
             math_indent: 0,
+            table_indent: TableIndentStyle::default(),
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
             built_in_greedy_wrap: true,
@@ -771,6 +786,7 @@ impl RawConfig {
                 blank_lines: self.blank_lines,
                 math_delimiter_style: self.math_delimiter_style,
                 math_indent: self.math_indent,
+                table_indent: TableIndentStyle::default(),
                 tab_stops: self.tab_stops,
                 tab_width: self.tab_width,
                 built_in_greedy_wrap: true,
@@ -793,6 +809,7 @@ impl RawConfig {
             blank_lines: style.blank_lines,
             math_delimiter_style: style.math_delimiter_style,
             math_indent: style.math_indent,
+            table_indent: style.table_indent,
             tab_stops: style.tab_stops,
             tab_width: style.tab_width,
             formatters: resolve_formatters(self.formatters),
@@ -1008,6 +1025,7 @@ pub struct Config {
     pub line_width: usize,
     pub math_indent: usize,
     pub math_delimiter_style: MathDelimiterStyle,
+    pub table_indent: TableIndentStyle,
     pub tab_stops: TabStopMode,
     pub tab_width: usize,
     pub wrap: Option<WrapMode>,
@@ -1071,6 +1089,7 @@ impl Default for Config {
             line_width: 80,
             math_indent: 0,
             math_delimiter_style: MathDelimiterStyle::default(),
+            table_indent: TableIndentStyle::default(),
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
             wrap: Some(WrapMode::Reflow),

@@ -25,6 +25,10 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
         crate::config::TabStopMode::Normalize => panache_formatter::TabStopMode::Normalize,
         crate::config::TabStopMode::Preserve => panache_formatter::TabStopMode::Preserve,
     };
+    let table_indent = match config.table_indent {
+        crate::config::TableIndentStyle::Unified => panache_formatter::TableIndentStyle::Unified,
+        crate::config::TableIndentStyle::Pandoc => panache_formatter::TableIndentStyle::Pandoc,
+    };
     let wrap = config.wrap.as_ref().map(|wrap| match wrap {
         crate::config::WrapMode::Preserve => panache_formatter::WrapMode::Preserve,
         crate::config::WrapMode::Reflow => panache_formatter::WrapMode::Reflow,
@@ -86,6 +90,7 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
         line_width: config.line_width,
         math_indent: config.math_indent,
         math_delimiter_style,
+        table_indent,
         tab_stops,
         tab_width: config.tab_width,
         wrap,

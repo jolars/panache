@@ -262,6 +262,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "table-indent": {
+          "$ref": "#/$defs/TableIndentStyle",
+          "description": "Indentation style for top-level tables"
+        },
         "wrap": {
           "anyOf": [
             {
@@ -287,6 +291,21 @@
         {
           "const": "preserve",
           "description": "Preserve tabs in literal code spans/blocks.",
+          "type": "string"
+        }
+      ]
+    },
+    "TableIndentStyle": {
+      "description": "Indentation style for tables at the top level of a document.",
+      "oneOf": [
+        {
+          "const": "unified",
+          "description": "Indent pipe, simple, and multiline tables by two columns (default).",
+          "type": "string"
+        },
+        {
+          "const": "pandoc",
+          "description": "Keep pipe tables flush at column 0, as Pandoc's pipe-table writers do;\nsimple and multiline tables stay indented two columns.",
           "type": "string"
         }
       ]

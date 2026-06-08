@@ -26,6 +26,17 @@ pub enum MathDelimiterStyle {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TableIndentStyle {
+    /// Indent pipe, simple, and multiline tables by two columns at the top
+    /// level (default).
+    #[default]
+    Unified,
+    /// Keep pipe tables flush at column 0, as Pandoc's pipe-table writers do;
+    /// simple and multiline tables stay indented two columns.
+    Pandoc,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TabStopMode {
     /// Normalize tabs to spaces (4-column tab stop).
     #[default]
@@ -166,6 +177,7 @@ pub struct Config {
     pub line_width: usize,
     pub math_indent: usize,
     pub math_delimiter_style: MathDelimiterStyle,
+    pub table_indent: TableIndentStyle,
     pub tab_stops: TabStopMode,
     pub tab_width: usize,
     pub wrap: Option<WrapMode>,
@@ -202,6 +214,7 @@ impl Default for Config {
             line_width: 80,
             math_indent: 0,
             math_delimiter_style: MathDelimiterStyle::default(),
+            table_indent: TableIndentStyle::default(),
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
             wrap: Some(WrapMode::Reflow),
@@ -246,6 +259,11 @@ impl ConfigBuilder {
 
     pub fn tab_stops(mut self, mode: TabStopMode) -> Self {
         self.config.tab_stops = mode;
+        self
+    }
+
+    pub fn table_indent(mut self, style: TableIndentStyle) -> Self {
+        self.config.table_indent = style;
         self
     }
 

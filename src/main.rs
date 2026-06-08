@@ -18,7 +18,7 @@ use cache::{
 };
 use cli::{Cli, CliFlavor, ColorMode, Commands, DebugChecks, DebugCommands, ParseOutput};
 use diagnostic_renderer::print_diagnostics;
-use panache::config::{Flavor, WrapMode};
+use panache::config::{Flavor, TableIndentStyle, WrapMode};
 
 impl From<CliFlavor> for Flavor {
     fn from(value: CliFlavor) -> Self {
@@ -69,6 +69,18 @@ fn apply_format_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Re
                 };
                 cfg.wrap = Some(mode);
             }
+            "table-indent" => {
+                let style = match value {
+                    "unified" => TableIndentStyle::Unified,
+                    "pandoc" => TableIndentStyle::Pandoc,
+                    other => {
+                        return Err(format!(
+                            "invalid value for `table-indent`: `{other}` (expected one of: unified, pandoc)"
+                        ));
+                    }
+                };
+                cfg.table_indent = style;
+            }
             ext_key if ext_key.starts_with("extensions.") => {
                 let name = ext_key["extensions.".len()..].trim();
                 if name.is_empty() {
@@ -89,7 +101,7 @@ fn apply_format_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Re
             }
             other => {
                 return Err(format!(
-                    "unknown config key in --option: `{other}` (supported: line-width, wrap, extensions.<name>)"
+                    "unknown config key in --option: `{other}` (supported: line-width, wrap, table-indent, extensions.<name>)"
                 ));
             }
         }
@@ -2461,6 +2473,23 @@ mod tests {
             let mut c = cfg();
             let err = apply_format_overrides(&mut c, &["nope=1".to_string()]).unwrap_err();
             assert!(err.contains("unknown config key"), "{err}");
+        }
+
+        #[test]
+        fn table_indent_override_sets_pandoc_style() {
+            use panache::config::TableIndentStyle;
+            let mut c = cfg();
+            assert_eq!(c.table_indent, TableIndentStyle::Unified);
+            apply_format_overrides(&mut c, &["table-indent=pandoc".to_string()]).unwrap();
+            assert_eq!(c.table_indent, TableIndentStyle::Pandoc);
+        }
+
+        #[test]
+        fn table_indent_override_rejects_unknown_value() {
+            let mut c = cfg();
+            let err =
+                apply_format_overrides(&mut c, &["table-indent=flush".to_string()]).unwrap_err();
+            assert!(err.contains("invalid value for `table-indent`"), "{err}");
         }
     }
 }
