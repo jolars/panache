@@ -1170,8 +1170,18 @@ Parallel execution
 Sequential chains
 :   Multiple formatters per language run in order
 
+Result caching
+:   Identical code blocks (same language and content) are formatted once and the
+    result is reused, so a document with repeated blocks spawns one process
+    instead of one per block. In a long-lived process (the LSP) results are also
+    reused across edits, so reformatting after changing one block does not
+    re-spawn the formatter for the untouched blocks. The cache keys on the
+    formatter command, arguments, language, and block content --- but **not** on
+    the formatter's own config files (see *Config files* below).
+
 Error handling
-:   Failed formatters preserve original code with a warning
+:   Failed formatters preserve original code with a warning (failures are never
+    cached)
 
 Language compatibility
 :   Built-in presets are checked against the configured language key (for
@@ -1188,7 +1198,8 @@ Timeout
 
 Config files
 :   Formatters respect their own config files (`.prettierrc`, `pyproject.toml`,
-    etc.)
+    etc.). Because result caching does not track these files, edits to them are
+    picked up on the next cold run (or, in the LSP, after a restart).
 
 ### Presets {#formatter-presets}
 

@@ -43,6 +43,53 @@ if true; then echo ok; fi
 }
 
 #[test]
+fn identical_blocks_are_deduplicated_and_all_formatted() {
+    // Multiple identical same-language blocks share one formatter invocation
+    // (dedup), but every block must still receive the formatted output.
+    if which::which("shfmt").is_err() {
+        println!("Skipping shfmt test - shfmt not installed");
+        return;
+    }
+
+    let mut formatters = HashMap::new();
+    formatters.insert(
+        "sh".to_string(),
+        vec![panache::config::FormatterConfig {
+            cmd: "shfmt".to_string(),
+            args: vec![],
+            enabled: true,
+            stdin: true,
+        }],
+    );
+
+    let config = Config {
+        flavor: Flavor::Quarto,
+        extensions: Extensions::for_flavor(Flavor::Quarto),
+        formatters,
+        ..Default::default()
+    };
+
+    // Three byte-identical blocks (2-space indent, which shfmt rewrites to a
+    // tab) plus one distinct block.
+    let input = "```sh\nif true; then\n  echo ok\nfi\n```\n\n```sh\nif true; then\n  echo ok\nfi\n```\n\n```sh\nif true; then\n  echo ok\nfi\n```\n\n```sh\nif false; then\n  echo no\nfi\n```\n";
+
+    let output = format(input, Some(config), None);
+
+    // Every occurrence of the repeated block is formatted (2-space -> tab from
+    // shfmt, then expanded to `tab_width` spaces by panache), and the distinct
+    // block is formatted too.
+    assert_eq!(
+        output.matches("if true; then\n    echo ok\nfi").count(),
+        3,
+        "all three identical blocks should be formatted:\n{output}"
+    );
+    assert!(
+        output.contains("if false; then\n    echo no\nfi"),
+        "distinct block should be formatted:\n{output}"
+    );
+}
+
+#[test]
 fn code_block_with_external_formatter() {
     // Use 'tr' to uppercase as a simple mock formatter
     let mut formatters = HashMap::new();

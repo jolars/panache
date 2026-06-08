@@ -115,19 +115,26 @@ This document tracks implementation status for Panache's features.
       across the in-flight files (`div_ceil(budget, workers)`), so a handful of
       files saturate the budget while a large batch still collapses to
       \~1-per-file and avoids oversubscribing inner-pool threads.
-- [ ] Follow-up (external-tool budget, benchmarking): the formatter invokes one
-      subprocess *per code block* (`run_formatters_parallel` in
-      `src/external_formatters_sync.rs` does
-      `into_par_iter().filter_map(|block|       … format_code_sync …)`), whereas
-      the linter concatenates all same-language blocks into a *single*
-      invocation (`concatenate_with_blanks_and_mapping` in
-      `src/linter/runner.rs`). For a doc with N same-language blocks that's N
-      `black`/`shfmt` spawns vs. the linter's 1. Measure process-spawn +
-      stdin/stdout overhead (each `format_with_stdin` also spawns a timeout
-      thread) against actual format time for realistic block sizes; if spawn
-      dominates, batch same-language blocks through one subprocess using the
-      linter's concatenate-with-mapping approach to map output back per block.
-      Likely a bigger throughput win than any pool tuning.
+- [x] Follow-up (external-tool budget): the formatter spawned one subprocess
+      *per code block* (`run_formatters_parallel` in
+      `src/external_formatters_sync.rs`), unlike the linter's single
+      concatenated invocation. Measured (2026-06-08, 20-line blocks, N=10):
+      spawn cost is entirely a cold-start-interpreter problem --- `prettier`
+      (Node) ≈160 ms startup, 10 spawns 1609 ms vs 1 batched 333 ms; native
+      tools negligible (`shfmt` 51→17 ms, `ruff` 89→10 ms). Rejected the
+      linter's concatenate-and-map batching: formatting rewrites the text
+      (destroys the split point; `black` normalizes the blank gaps) and merging
+      blocks changes the semantic unit, so whole-file tools (`isort`,
+      `goimports`) produce wrong output. Done instead (safe, no unit merging):
+      `run_formatter_chain` dedups identical blocks within a run (one chain per
+      unique `(language, formatter_input)`) and memoizes results in a
+      process-global cache keyed on `(chain fingerprint, language, input)`. A
+      long-lived LSP reuses results across edits, so the save loop no longer
+      re-spawns the formatter for untouched blocks; cold CLI runs still get
+      in-run dedup. Cache does not track the tool's own config files
+      (`.prettierrc` etc.) --- same contract as the file-level cache; documented
+      in `configuration.qmd`. End to end: 10 identical `prettier` blocks 203 →
+      108 ms.
 - [ ] Follow-up (external-tool budget, benchmarking): confirm the shared budget
       didn't regress the single-command path. On a doc with hundreds of code
       blocks the per-block `Mutex` acquire in `acquire_external_tool_permit`
