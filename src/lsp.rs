@@ -77,6 +77,13 @@ pub fn run() -> std::io::Result<()> {
     Ok(())
 }
 
+/// How long `select!` parks when there's no pending lint deadline. crossbeam's
+/// `select!` arms are fixed at compile time, so we can't drop the timeout arm
+/// when idle; instead we wake on a coarse interval. The exact value is
+/// irrelevant — any client message or worker result wakes us immediately, and
+/// `dispatch_due_lints` re-arms a real deadline the moment one is scheduled.
+const IDLE_TICK: Duration = Duration::from_secs(3600);
+
 fn main_loop(gs: &mut GlobalState, conn: &Connection) -> std::io::Result<()> {
     // Clone the worker-result receiver so the `select!` doesn't borrow `gs`.
     let task_rx = gs.task_receiver.clone();
@@ -84,9 +91,7 @@ fn main_loop(gs: &mut GlobalState, conn: &Connection) -> std::io::Result<()> {
     loop {
         // Block until the next message, a finished task, or the nearest lint
         // deadline (so debounced lints fire even when the client is idle).
-        let timeout = gs
-            .next_lint_timeout()
-            .unwrap_or_else(|| Duration::from_secs(3600));
+        let timeout = gs.next_lint_timeout().unwrap_or(IDLE_TICK);
 
         select! {
             recv(conn.receiver) -> msg => {

@@ -20,6 +20,14 @@ use super::helpers::catch_cancelled;
 use super::uri_ext::UriExt;
 use super::{documents, handlers};
 
+/// Which worker pool a request runs on: the shared `Main` pool for interactive
+/// reads, or the single-thread `Fmt` pool that isolates slow external
+/// formatters from hover/completion latency.
+enum RequestPool {
+    Main,
+    Fmt,
+}
+
 /// Build the static server capabilities advertised at `initialize`.
 pub(crate) fn server_capabilities() -> ServerCapabilities {
     use lsp_types::*;
@@ -354,7 +362,7 @@ impl GlobalState {
         P: Send + 'static,
         R: Serialize + Send + 'static,
     {
-        self.spawn_request_on(false, id, params, f);
+        self.spawn_request_on(RequestPool::Main, id, params, f);
     }
 
     /// Spawn a formatting request on the dedicated `fmt_pool` so a slow
@@ -369,12 +377,12 @@ impl GlobalState {
         P: Send + 'static,
         R: Serialize + Send + 'static,
     {
-        self.spawn_request_on(true, id, params, f);
+        self.spawn_request_on(RequestPool::Fmt, id, params, f);
     }
 
     fn spawn_request_on<P, R>(
         &mut self,
-        use_fmt_pool: bool,
+        pool: RequestPool,
         id: RequestId,
         params: P,
         f: fn(&StateSnapshot, P) -> R,
@@ -384,10 +392,9 @@ impl GlobalState {
     {
         self.in_flight.insert(id.clone());
         let snap = self.snapshot();
-        let pool = if use_fmt_pool {
-            &self.fmt_pool
-        } else {
-            &self.pool
+        let pool = match pool {
+            RequestPool::Main => &self.pool,
+            RequestPool::Fmt => &self.fmt_pool,
         };
         let sender = pool.result_sender();
         pool.spawn(move || {
