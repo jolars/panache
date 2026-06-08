@@ -1,0 +1,5 @@
+```{python}
+#| fig-cap: >
+#|   Suboptimality versus wall-clock time on the Rosenbrock function (200-iteration cap, `Vec<f64>` backend, AMD Ryzen 9 7900). Lower and further left is better; Basin is drawn with a heavier line.
+
+```

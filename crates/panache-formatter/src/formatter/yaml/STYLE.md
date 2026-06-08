@@ -138,6 +138,25 @@ the load-bearing invariants.
     governs block-level structural runs. Added in Phase 1.13 after the real-
     frontmatter harvest surfaced inputs (e.g. `echo:    false`) that rules 1, 5,
     and 8 didn't reach.
+15. **Folded (`>`) block-scalar wrapping.** Under a wrapping mode (rule's
+    "Plain-scalar wrapping" section), an overlong body line of a *folded* block
+    scalar (`>`, `>-`, `>+`) is greedy-wrapped to `line_width` at the body's
+    base indent. This is loss-free: a single line break between two equally-
+    indented non-empty lines folds to one space, so breaking an overlong line
+    round-trips. Only lines that *exceed* `line_width` are broken --- short
+    lines are never joined, which keeps near-boundary inputs byte-stable.
+    Folding-significant lines are left verbatim: blank lines (which fold to a
+    newline) and more-indented lines (which are literal within a folded scalar).
+    Bails on an explicit indentation indicator (`>2`), a header trailing
+    comment, or an empty body. **Literal (`|`) block scalars never wrap** ---
+    their newlines are significant content. **Deliberate divergence from
+    pretty_yaml**, which preserves all block scalars verbatim: rule 15 is the
+    one sanctioned point where the in-tree formatter wraps a block scalar.
+    Because of that, rule-15 wrapping is *not* exercised in the pretty_yaml
+    cross-validation corpus (it would always "fail" parity); coverage lives in
+    `crates/panache-formatter/tests/format/yaml_folded_wrap.rs` instead. Added
+    after the `fig-cap: >` Quarto hashpipe caption (a single overlong folded
+    line) stayed unwrapped through both frontmatter and hashpipe paths.
 
 ## Notes
 
@@ -157,15 +176,19 @@ Panache's `wrap` setting, which `yaml_engine.rs` maps onto pretty_yaml's
 
 - `wrap: preserve` → `ProseWrap::Preserve` --- nothing wraps.
 - `wrap: reflow` (default) / `sentence` / `semantic` → `ProseWrap::Always` ---
-  plain scalars wrap with +2 indent continuation lines; quoted (`"…"`, `'…'`)
-  and block (`>`, `|`) styles never wrap regardless of mode.
+  plain scalars wrap with +2 indent continuation lines; folded (`>`) block
+  scalars wrap their overlong body lines per rule 15; quoted (`"…"`, `'…'`) and
+  literal (`|`) block scalars never wrap regardless of mode.
 
 The in-tree formatter inherits this mapping at cutover. The spec-adjacent
-invariant worth pinning: **only plain scalars are ever wrapped; quoted and block
-styles are preserved verbatim regardless of wrap mode**. Wrapping a quoted
-scalar would change escape behavior (double-quoted) or require backslash
-handling not present in single-quoted; wrapping a block scalar would change `>`
-folding or `|` literal semantics.
+invariant worth pinning: **plain scalars and folded (`>`) block scalars wrap;
+quoted and literal (`|`) block scalars are preserved verbatim regardless of wrap
+mode**. Wrapping a quoted scalar would change escape behavior (double-quoted) or
+require backslash handling not present in single-quoted; wrapping a `|` literal
+scalar would change its significant newlines. Folding (`>`) is the one block
+style whose line breaks are *defined* to collapse to spaces, so reflowing its
+body is loss-free (rule 15) --- this is a deliberate divergence from
+pretty_yaml, which preserves all block scalars.
 
 Edge case worth knowing about: a plain scalar containing `key: value`-shaped
 text (colon followed by space, mid-content) is already ambiguous to strict YAML
@@ -175,12 +198,15 @@ accept it, the formatter must avoid wrapping at that boundary.
 
 ## Adding a new rule
 
-Adding a 14th rule is a deliberate act. If Phase 1 development surfaces an edge
-case neither the spec nor pretty_yaml currently covers, the resolution is a new
-rule here (with a one-line rationale and a fixture under
+Adding a new rule is a deliberate act. If development surfaces an edge case
+neither the spec nor pretty_yaml currently covers, the resolution is a new rule
+here (with a one-line rationale and a fixture under
 `crates/panache-formatter/tests/fixtures/yaml_corpus/`) --- not a special-case
 branch in the formatter.
 
 New rules need cross-validation against pretty_yaml before landing. If they
-conflict, decide explicitly which is right and document the decision. See
+conflict, decide explicitly which is right and document the decision. Most rules
+become the spec *because* pretty_yaml agrees; rule 15 (folded-scalar wrapping)
+is the one case so far where we decided to diverge --- its coverage lives in
+in-tree-only tests rather than the parity corpus. See
 `.claude/rules/yaml-formatter.md` for the process context.

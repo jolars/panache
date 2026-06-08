@@ -756,11 +756,21 @@ fn apply_plain_scalar_wrap(buf: String, opts: &YamlFormatOptions) -> String {
             continue;
         };
         let text = scalar.text().to_string();
-        if text.starts_with('\'')
-            || text.starts_with('"')
-            || text.starts_with('|')
-            || text.starts_with('>')
-        {
+        // Folded block scalars (`>`, `>-`, `>+`) reflow overlong body lines
+        // to `line_width` — their single line breaks fold to spaces, so this
+        // is loss-free (STYLE.md rule 15). Literal (`|`) scalars never wrap
+        // (newlines are significant); quoted scalars never wrap either.
+        if text.starts_with('>') {
+            if let Some(wrapped) = wrap_folded_scalar_text(&text, opts.line_width)
+                && wrapped != text
+            {
+                let scalar_start = usize::from(scalar.text_range().start());
+                let scalar_end = usize::from(scalar.text_range().end());
+                edits.push((scalar_start, scalar_end, wrapped));
+            }
+            continue;
+        }
+        if text.starts_with('\'') || text.starts_with('"') || text.starts_with('|') {
             continue;
         }
         if text.contains('\n') {
@@ -884,4 +894,57 @@ fn wrap_plain_scalar_text(text: &str, start_col: usize, indent: usize, width: us
         }
     }
     out
+}
+
+/// Reflow an overlong **folded** (`>`) block scalar's body lines to
+/// `width`, returning the rewritten scalar text (header + body) or `None`
+/// when the scalar isn't a simple folded scalar we can safely reflow.
+///
+/// Folding semantics make this loss-free: a single line break between two
+/// equally-indented non-empty lines folds to one space, so breaking an
+/// overlong line at the base indent round-trips. To stay byte-stable
+/// against pretty_yaml's preserve-everything stance on the short cases
+/// (STYLE.md rule 15), we only *break* lines that exceed `width` — short
+/// lines are never joined. Lines that carry folding-significant meaning
+/// are left verbatim: blank lines (which fold to a newline) and
+/// more-indented lines (which are literal within a folded scalar).
+///
+/// Bails (`None`) on an explicit indentation indicator (`>2`), a header
+/// trailing comment, or an empty body — the rare shapes where reflowing
+/// would need to reason about the indent the indicator pins.
+fn wrap_folded_scalar_text(text: &str, width: usize) -> Option<String> {
+    let nl = text.find('\n')?;
+    let header = &text[..nl];
+    // Chars after `>`: only an optional chomping indicator is in scope.
+    let chomping = header.trim_end().get(1..)?;
+    if !(chomping.is_empty() || chomping == "-" || chomping == "+") {
+        return None;
+    }
+    let body = &text[nl + 1..];
+    let lines: Vec<&str> = body.split('\n').collect();
+    let leading_spaces = |line: &str| line.len() - line.trim_start_matches(' ').len();
+    let base_indent = lines
+        .iter()
+        .find(|l| !l.trim().is_empty())
+        .map(|l| leading_spaces(l))?;
+    if base_indent == 0 {
+        return None;
+    }
+    let indent_str = " ".repeat(base_indent);
+    let mut out_lines: Vec<String> = Vec::with_capacity(lines.len());
+    for line in &lines {
+        // Blank lines and more-indented (literal) lines are folding-
+        // significant; only base-indent prose lines that overflow wrap.
+        if line.trim().is_empty()
+            || leading_spaces(line) != base_indent
+            || line.chars().count() <= width
+        {
+            out_lines.push((*line).to_string());
+            continue;
+        }
+        let content = &line[base_indent..];
+        let wrapped = wrap_plain_scalar_text(content, base_indent, base_indent, width);
+        out_lines.push(format!("{indent_str}{wrapped}"));
+    }
+    Some(format!("{header}\n{}", out_lines.join("\n")))
 }

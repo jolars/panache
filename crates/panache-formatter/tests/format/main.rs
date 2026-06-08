@@ -33,4 +33,5 @@ mod subscript;
 mod superscript;
 mod tables;
 mod tex;
+mod yaml_folded_wrap;
 mod yaml_frontmatter;
