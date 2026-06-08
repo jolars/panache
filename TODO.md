@@ -114,6 +114,27 @@ This document tracks implementation status for Panache's features.
       trade-off (N files could share the full budget instead of 1 each).
       Re-benchmark nested format/lint over many files and decide whether to drop
       the override.
+- [ ] Follow-up (external-tool budget, benchmarking): the formatter invokes one
+      subprocess *per code block* (`run_formatters_parallel` in
+      `src/external_formatters_sync.rs` does
+      `into_par_iter().filter_map(|block|       … format_code_sync …)`), whereas
+      the linter concatenates all same-language blocks into a *single*
+      invocation (`concatenate_with_blanks_and_mapping` in
+      `src/linter/runner.rs`). For a doc with N same-language blocks that's N
+      `black`/`shfmt` spawns vs. the linter's 1. Measure process-spawn +
+      stdin/stdout overhead (each `format_with_stdin` also spawns a timeout
+      thread) against actual format time for realistic block sizes; if spawn
+      dominates, batch same-language blocks through one subprocess using the
+      linter's concatenate-with-mapping approach to map output back per block.
+      Likely a bigger throughput win than any pool tuning.
+- [ ] Follow-up (external-tool budget, benchmarking): confirm the shared budget
+      didn't regress the single-command path. On a doc with hundreds of code
+      blocks the per-block `Mutex` acquire in `acquire_external_tool_permit`
+      (`src/external_tools_common.rs`) is one lock op per block --- cheap vs. a
+      subprocess, but verify it isn't contended via an
+      `examples/profile_lint.rs`-style measurement. Pairs with building a small
+      repeatable CLI harness (polyglot fixtures + `hyperfine`) that also serves
+      the `--parallel`-override and batching benchmarks above.
 - [x] Follow-up (lsp-server): minor cleanups. Done: (b) the
       `Duration::from_secs(3600)` `select!` fallback is now a documented
       `IDLE_TICK` const in `src/lsp.rs`; (c) `spawn_request_on`'s
@@ -122,6 +143,14 @@ This document tracks implementation status for Panache's features.
       dependency-lean formatter crate isn't worth the cross-crate coupling for a
       5-line default; (d) `DocumentMap` stays keyed by `String` --- a `Uri` key
       trips `clippy::mutable_key_type`, which is the whole reason it's a string.
+- [ ] Follow-up (lsp-server, benchmarking): the dedicated `fmt_pool` is a single
+      thread (`src/lsp/global_state.rs`), deliberately isolating format latency
+      from hover/completion. Fine for interactive single-doc editing, but
+      format-on-save across many open buffers would serialize through one
+      worker. Only worth measuring if a user reports format-on-save lag ---
+      lowest priority; the isolation rationale is sound. If revisited, bench a
+      small N-thread `fmt_pool` against the current single-thread design under a
+      multi-buffer save burst.
 
 ### Core LSP Capabilities
 
