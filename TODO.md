@@ -64,15 +64,60 @@ This document tracks implementation status for Panache's features.
       `get_definition_index_with_includes`) if profiling shows they stall behind
       a cold graph. Would need `Cancelled::catch` + retry on the interactive
       path rather than abort.
-- [ ] Revisit the LSP framework (tower-lsp-server vs `async-lsp` vs
-      rust-analyzer `lsp-server`) only if a future change actually fights
-      tower-lsp's per-handler-task model. `async-lsp` is the leading candidate
-      (tower-based, omnitrait `LanguageServer` keeps the `server.rs` shape,
-      shares `lsp-types`, first-class cancellation + `AnyEvent` loop injection;
-      caveat: 0.2.x, \~1 maintainer). A `Notifier`-trait + Result-alias
-      insulation seam would make any migration near-mechanical. Not pursued
-      speculatively --- the salsa lock contention that prompted the question was
-      a lock-granularity problem, not a framework problem.
+- [x] Revisit the LSP framework --- switched to rust-analyzer's `lsp-server` (PR
+      #357). Synchronous main loop: `GlobalState` is the sole salsa writer (no
+      lock), heavy reads dispatch to a small `TaskPool` over a cheap
+      `StateSnapshot`, formatting runs on a dedicated single-thread `fmt_pool`,
+      and cancellation rides `salsa::Cancelled` + `$/cancelRequest`. Main pool
+      defaults to `num_cpus::get_physical()` (matching RA). Resolved the
+      salsa-lock contention that prompted the question by construction rather
+      than lock-granularity tricks. (Chose `lsp-server` over the earlier
+      `async-lsp` candidate to drop the async runtime entirely.)
+- [ ] Follow-up (lsp-server): respond with `InternalError` when a pooled handler
+      panics. In `spawn_request_on` (`src/lsp/dispatch.rs`) a handler panic
+      (non-`salsa::Cancelled`) unwinds past `sender.send(task)`, so the
+      `in_flight` id is never resolved and the client hangs; the worker's
+      `catch_unwind` (`src/lsp/task_pool.rs`) keeps the worker alive but
+      swallows the panic. Catch at the job level and post an error
+      `Task::Response` for the id before logging (rust-analyzer does this).
+      Possible mild regression vs tower-lsp, which surfaced panics through its
+      service layer. Correctness gap, not just a smell.
+- [ ] Follow-up (lsp-server): drop the dead `runtime_settings` field from
+      `StateSnapshot` (`src/lsp/global_state.rs`). It is `#[allow(dead_code)]`
+      and never read off the snapshot --- only `GlobalState`'s own copy is read
+      (in `did_change`, on the main thread) --- yet it is cloned into every
+      per-request snapshot. Remove it (and the `snapshot()` clone), or replace
+      the allow with a note if it is reserved for forthcoming handler use.
+- [ ] Follow-up (lsp-server): avoid cloning the full `DocumentState` per
+      request. `StateSnapshot::document_state()` and
+      `definition_index_with_includes()` clone the whole `DocumentState`
+      including the `Vec<ParsedYamlRegionSnapshot>` (path / salsa handles /
+      `GreenNode` are cheap `Arc` bumps; the YAML-regions vec is a real
+      allocation) on hot paths (hover/completion). Arc-wrap the regions vec or
+      return a borrowed view. Profile-gated --- only worth it if it shows up.
+- [ ] Follow-up (lsp-server): `$/cancelRequest` does not interrupt in-flight
+      work. `on_cancel` only relabels the eventual reply as `RequestCanceled`;
+      the pooled job still runs to completion (salsa cancellation fires on a
+      write, not an explicit cancel), so a cancelled hover/format burns its full
+      CPU cost. Largely inherent (RA is similar); investigate a cooperative
+      cancel flag checked at coarse points. Lowest priority.
+- [ ] Follow-up (external-tool budget): formatters (`run_formatters_parallel`)
+      and the now-parallel external-linter loop (`src/linter/runner.rs`) each
+      build an independent rayon pool capped at `external_max_parallel`, so a
+      concurrent format + lint can spin up to 2x that many subprocess threads.
+      Coordinate a single shared external-tool thread budget across both paths.
+      Marked in code as `TODO(external-tool-budget)`.
+- [ ] Follow-up (lsp-server): minor cleanups. (a) Duplicated
+      `default_external_max_parallel` --- identical
+      `available_parallelism().clamp(1, 8)` in `src/config/types.rs` and
+      `crates/panache-formatter/src/config.rs`; extract a shared helper.
+      (b) `Duration::from_secs(3600)` sentinel in `main_loop` (`src/lsp.rs`) as
+          a stand-in for "block until a message" --- document it or find a
+          cleaner `select!` idiom. (c)
+          `spawn_request_on(use_fmt_pool: bool, ...)` reads worse than an enum
+          or passing the pool directly. (d) `DocumentMap` keyed by `String`
+          forces `uri.to_string()` on every notification (`schedule_lint` /
+          `forget_lint` / `did_save`); consider keying by `Uri`.
 
 ### Core LSP Capabilities
 
