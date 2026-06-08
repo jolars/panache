@@ -504,6 +504,29 @@ missing-chunk-labels = false
 }
 
 #[test]
+fn test_lint_reports_frontmatter_yaml_parse_error() {
+    // Regression: a frontmatter key with an empty inline value whose
+    // continuation is NOT indented past the key. pandoc/libyaml reject
+    // this ("could not find expected ':'"); panache previously accepted
+    // the unindented lines as a multi-line plain scalar value.
+    let temp_dir = TempDir::new().unwrap();
+    let doc_path = temp_dir.path().join("doc.md");
+    fs::write(
+        &doc_path,
+        "---\ntitle: Demo\ndescription:\nBasin is my new Rust library\n  with pluggable backends\n---\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["lint", "--color", "never", doc_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("yaml-parse-error"))
+        .stdout(predicate::str::contains("YAML parse error"));
+}
+
+#[test]
 fn test_lint_csl_yaml_bibliography() {
     let temp_dir = TempDir::new().unwrap();
     let bib_path = temp_dir.path().join("refs.yaml");

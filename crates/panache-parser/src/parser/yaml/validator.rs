@@ -155,6 +155,9 @@ pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
     if let Some(diag) = check_unterminated_quoted(input) {
         return Some(diag);
     }
+    if let Some(diag) = check_required_simple_key(input) {
+        return Some(diag);
+    }
     let tree = parse_stream(input);
     if let Some(diag) = check_trailing_content(&tree) {
         return Some(diag);
@@ -244,6 +247,38 @@ fn check_unterminated_quoted(input: &str) -> Option<YamlDiagnostic> {
         .diagnostics()
         .iter()
         .find(|d| d.code == diagnostic_codes::LEX_UNTERMINATED_QUOTED_SCALAR)
+        .cloned()
+}
+
+/// Lex-level cluster — a required simple key that never met its `:`.
+///
+/// The streaming scanner registers a plain/quoted scalar at the current
+/// block indent as a *required* simple-key candidate (libyaml's
+/// `required = !flow_level && indent == column`): at that position a
+/// value cannot legally appear, so the token MUST become a mapping key
+/// by being followed by a `:`. When such a candidate ages out across a
+/// line break (or at stream end) without its `:`, the scanner records
+/// `LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND` — libyaml's "could not find
+/// expected ':'". The classic shape is a block-mapping key with an empty
+/// inline value whose continuation is NOT indented past the key:
+///
+/// ```text
+/// description:
+/// not indented enough to be the value
+/// next: ...
+/// ```
+///
+/// libyaml/pandoc reject this (the unindented line is a fresh key with no
+/// `:`); the scanner agrees but, like the other lex diagnostics, only
+/// records it on its diagnostic channel. `validate_yaml` otherwise reads
+/// the token stream, so surface it here.
+fn check_required_simple_key(input: &str) -> Option<YamlDiagnostic> {
+    let mut scanner = Scanner::new(input);
+    while scanner.next_token().is_some() {}
+    scanner
+        .diagnostics()
+        .iter()
+        .find(|d| d.code == diagnostic_codes::LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND)
         .cloned()
 }
 
@@ -2604,6 +2639,41 @@ mod tests {
     }
 
     #[test]
+    fn required_simple_key_empty_value_then_unindented_line() {
+        // A block-mapping key with an empty inline value whose
+        // continuation is NOT indented past the key. libyaml/pandoc
+        // reject this: the unindented line is a fresh simple key with no
+        // `:` ("could not find expected ':'"). Regression for a
+        // frontmatter `description:` followed by an unindented blurb.
+        let input = "\
+description:
+Basin is my new Rust library for numerical optimization
+  with pluggable linear-algebra backends
+categories:
+  - Rust
+";
+        let diag = run(input).expect("expected diagnostic");
+        assert_eq!(
+            diag.code,
+            diagnostic_codes::LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn required_simple_key_indented_value_passes() {
+        // The same shape, but the value IS indented past the key, so it
+        // is a legitimate multi-line plain scalar — no diagnostic.
+        let input = "\
+description:
+  Basin is my new Rust library for numerical optimization
+  with pluggable linear-algebra backends
+categories:
+  - Rust
+";
+        assert!(run(input).is_none(), "got {:?}", run(input));
+    }
+
+    #[test]
     fn unterminated_quoted_scalar_at_eof_cq3w() {
         // CQ3W: a double-quoted value that never reaches its closing quote.
         let input = "---\nkey: \"missing closing quote";
@@ -3516,10 +3586,17 @@ mod tests {
     #[test]
     fn anchor_without_target_gt5m() {
         // GT5M: `- item1\n&node\n- item2` — anchor between sequence
-        // items has no target node.
+        // items has no target node. The `&node` sits at the sequence
+        // indent (column 0), so the scanner registers it as a *required*
+        // simple key; when `- item2` arrives without an intervening `:`,
+        // it surfaces the same "could not find expected ':'" that
+        // libyaml reports for this fixture (line 2, column 1).
         let input = "- item1\n&node\n- item2\n";
         let diag = run(input).expect("expected diagnostic");
-        assert_eq!(diag.code, diagnostic_codes::PARSE_ANCHOR_WITHOUT_TARGET);
+        assert_eq!(
+            diag.code,
+            diagnostic_codes::LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND
+        );
     }
 
     #[test]
