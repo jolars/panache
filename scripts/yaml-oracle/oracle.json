@@ -1,0 +1,3633 @@
+{
+  "generated_by": "scripts/yaml-oracle/audit.mjs — regenerate after any yaml-test-suite refresh",
+  "tools": {
+    "pandoc": "pandoc 3.9.0.2",
+    "quarto": "1.8.26",
+    "node": "v24.15.0",
+    "js_yaml": "unknown",
+    "ruby_psych": "psych 5.2.2 libyaml 0.2.5",
+    "r_yaml": "R 4.5.3 yaml 2.3.12"
+  },
+  "fixture_checksum": "d6371d8bdff588e9c32cebc2569bea3428ebe0a874b59ff802fd974aad0bd3ac",
+  "case_count": 402,
+  "cases": [
+    {
+      "id": "229Q",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "236B",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): could not find expected ':' while scanning a simple key at line 3 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 4, column 0, while scanning a simple key: could not find expected ':'",
+      "jsyaml": "err:can not read a block mapping entry; a multiline key may not be an implicit key (4:1) 1 | foo: 2 | bar 3 | invalid 4 | -----^",
+      "ryaml": "err:Scanner error: while scanning a simple key at line 3, column 1 could not find expected ':' at line 4, column 1"
+    },
+    {
+      "id": "26DV",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:bad indentation of a mapping entry (12:19) 9 | top5 : 10 | scalar5 11 | top6: 12 | &anchor6 'key6' : scalar6 ------------------------^",
+      "ryaml": "ok"
+    },
+    {
+      "id": "27NA",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "2AUY",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "2CMS",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): mapping values are not allowed in this context at line 3 column 10",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 9: mapping values are not allowed in this context",
+      "jsyaml": "err:end of the stream or a document separator is expected (3:10) 1 | this 2 | is 3 | invalid: x --------------^",
+      "ryaml": "err:Scanner error: mapping values are not allowed in this context at line 3, column 10"
+    },
+    {
+      "id": "2EBW",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "2G84/00",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found an indentation indicator equal to 0 while scanning a block scalar at line 1 column 5",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:bad explicit indentation width of a block scalar; it cannot be less than one (1:6) 1 | --- |0 ----------^",
+      "ryaml": "err:Scanner error: while scanning a block scalar at line 1, column 5 found an indentation indicator equal to 0 at line 1, column 6"
+    },
+    {
+      "id": "2G84/01",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected comment or line break while scanning a block scalar at line 1 column 5",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:bad explicit indentation width of a block scalar; it cannot be less than one (1:7) 1 | --- |10 -----------^",
+      "ryaml": "err:Scanner error: while scanning a block scalar at line 1, column 5 did not find expected comment or line break at line 1, column 7"
+    },
+    {
+      "id": "2G84/02",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "2G84/03",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "2JQS",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 0, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line (1:1) 1 | : a -----^ 2 | : b",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 1, column 1"
+    },
+    {
+      "id": "2LFX",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found unknown directive name while scanning a directive at line 1 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a directive at line 1, column 1 found unknown directive name at line 1, column 5"
+    },
+    {
+      "id": "2SXE",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): mapping values are not allowed in this context at line 1 column 8",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 7: mapping values are not allowed in this context",
+      "jsyaml": "err:end of the stream or a document separator is expected (1:8) 1 | &a: key: &a value ------------^ 2 | foo: 3 | *a:",
+      "ryaml": "err:Scanner error: mapping values are not allowed in this context at line 1, column 8"
+    },
+    {
+      "id": "2XXW",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "33X3",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "35KP",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "ok"
+    },
+    {
+      "id": "36F6",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "3ALJ",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "3GZX",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "3HFZ",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "err:Parser error: did not find expected <document start> at line 3, column 5"
+    },
+    {
+      "id": "3MYT",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "3R3P",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "3RLN/00",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "3RLN/01",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "3RLN/02",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "3RLN/03",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "3RLN/04",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "3RLN/05",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "3UYS",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "4ABK",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found unexpected ':' while scanning a plain scalar at line 4 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 4, column 13, while scanning a plain scalar: found unexpected ':'",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a plain scalar at line 4, column 1 found unexpected ':' at line 4, column 14"
+    },
+    {
+      "id": "4CQQ",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "4EJS",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 3 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:tab characters must not be used in indentation (3:1) 1 | --- 2 | a: 3 | →b: -----^ 4 | →→c: value",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 3, column 1 found character that cannot start any token at line 3, column 1"
+    },
+    {
+      "id": "4FJ6",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:nested arrays are not supported inside keys (3:20) 1 | --- 2 | [ 3 | [ a, [ [[b,c]]: d, e]]: 23 ------------------------^ 4 | ]",
+      "ryaml": "ok"
+    },
+    {
+      "id": "4GC6",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "4H7K",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:end of the stream or a document separator is expected (2:13) 1 | --- 2 | [ a, b, c ] ] -----------------^",
+      "ryaml": "err:Parser error: did not find expected <document start> at line 2, column 13"
+    },
+    {
+      "id": "4HVU",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 4, column 2, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:bad indentation of a mapping entry (4:3) 1 | key: 2 | - ok 3 | - also ok 4 | - wrong -------^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 4, column 3"
+    },
+    {
+      "id": "4JVG",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 4, column 2, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:duplication of an anchor property (2:3) 1 | top1: &node1 2 | &k1 key1: val1 -------^ 3 | top2: &node2 4 | &v2 val2",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 4, column 3"
+    },
+    {
+      "id": "4MUZ/00",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or '}' while parsing a flow mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 0, while parsing a flow mapping: did not find expected ',' or '}'",
+      "jsyaml": "err:missed comma between flow collection entries (2:1) 1 | {\"foo\" 2 | : \"bar\"} -----^",
+      "ryaml": "err:Parser error: while parsing a flow mapping at line 1, column 1 did not find expected ',' or '}' at line 2, column 1"
+    },
+    {
+      "id": "4MUZ/01",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or '}' while parsing a flow mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 0, while parsing a flow mapping: did not find expected ',' or '}'",
+      "jsyaml": "err:missed comma between flow collection entries (2:1) 1 | {\"foo\" 2 | : bar} -----^",
+      "ryaml": "err:Parser error: while parsing a flow mapping at line 1, column 1 did not find expected ',' or '}' at line 2, column 1"
+    },
+    {
+      "id": "4MUZ/02",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or '}' while parsing a flow mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 0, while parsing a flow mapping: did not find expected ',' or '}'",
+      "jsyaml": "err:missed comma between flow collection entries (2:1) 1 | {foo 2 | : bar} -----^",
+      "ryaml": "err:Parser error: while parsing a flow mapping at line 1, column 1 did not find expected ',' or '}' at line 2, column 1"
+    },
+    {
+      "id": "4Q9F",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "4QFQ",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "4RWC",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "4UYU",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "4V8U",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "4WA9",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "4ZYM",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "52DL",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "54T7",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "55WF",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found unknown escape character while parsing a quoted scalar at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown escape sequence (2:3) 1 | --- 2 | \"\\.\" -------^",
+      "ryaml": "err:Scanner error: while parsing a quoted scalar at line 2, column 1 found unknown escape character at line 2, column 2"
+    },
+    {
+      "id": "565N",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "57H4",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "58MP",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected node content while parsing a flow node at line 1 column 5",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 4, while parsing a flow node: did not find expected node content",
+      "jsyaml": "ok",
+      "ryaml": "err:Parser error: while parsing a flow node at line 1, column 5 did not find expected node content at line 1, column 5"
+    },
+    {
+      "id": "5BVJ",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "5C5M",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "5GBF",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "5KJE",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "5LLU",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 5, column 1, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:bad indentation of a mapping entry (5:2) 2 | 3 | 4 | 5 | invalid ------^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 5, column 2"
+    },
+    {
+      "id": "5MUD",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or '}' while parsing a flow mapping at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:missed comma between flow collection entries (3:3) 1 | --- 2 | { \"foo\" 3 | :bar } -------^",
+      "ryaml": "err:Parser error: while parsing a flow mapping at line 2, column 1 did not find expected ',' or '}' at line 3, column 3"
+    },
+    {
+      "id": "5NYZ",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "5T43",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected node content while parsing a flow node at line 2 column 11",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 10, while parsing a flow node: did not find expected node content",
+      "jsyaml": "ok",
+      "ryaml": "err:Parser error: while parsing a flow node at line 2, column 11 did not find expected node content at line 2, column 11"
+    },
+    {
+      "id": "5TRB",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found unexpected document indicator while scanning a quoted scalar at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unexpected end of the document within a double quoted scalar (3:1) 1 | --- 2 | \" 3 | --- -----^ 4 | \"",
+      "ryaml": "err:Scanner error: while scanning a quoted scalar at line 2, column 1 found unexpected document indicator at line 3, column 1"
+    },
+    {
+      "id": "5TYM",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown tag !<!my-light> (4:1) 1 | %TAG !m! !my- 2 | --- # Bulb here 3 | !m!light fluorescent 4 | ... -----^ 5 | %TAG !m! !my- 6 | --- # Color here",
+      "ryaml": "ok"
+    },
+    {
+      "id": "5U3A",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): block sequence entries are not allowed in this context at line 1 column 6",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 5: block sequence entries are not allowed in this context",
+      "jsyaml": "err:bad indentation of a mapping entry (1:6) 1 | key: - a ----------^ 2 | - b",
+      "ryaml": "err:Scanner error: block sequence entries are not allowed in this context at line 1, column 6"
+    },
+    {
+      "id": "5WE3",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "62EZ",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:bad indentation of a mapping entry (2:12) 1 | --- 2 | x: { y: z }in: valid ----------------^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 2, column 1 did not find expected key at line 2, column 12"
+    },
+    {
+      "id": "652Z",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "65WH",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6BCT",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 3 column 4",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 3, column 4 found character that cannot start any token at line 3, column 4"
+    },
+    {
+      "id": "6BFJ",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:duplication of an anchor property (3:1) 1 | --- 2 | &mapping 3 | &key [ &item a, b, c ]: value -----^",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6CA3",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 1 column 1",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 1, column 1 found character that cannot start any token at line 1, column 1"
+    },
+    {
+      "id": "6CK3",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown tag !<!local> (3:13) 1 | %TAG !e! tag:example.com,2000:app/ 2 | --- 3 | - !local foo -----------------^ 4 | - !!str bar 5 | - !e!tag%21 baz",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6FWR",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6H3V",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6HB6",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6JQW",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6JTT",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or ']' while parsing a flow sequence at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unexpected end of the stream within a flow collection (3:1) 1 | --- 2 | [ [ a, b, c ] 3 | -----^",
+      "ryaml": "err:Parser error: while parsing a flow sequence at line 2, column 1 did not find expected ',' or ']' at line 3, column 1"
+    },
+    {
+      "id": "6JWB",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6KGN",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6LVF",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found unknown directive name while scanning a directive at line 1 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a directive at line 1, column 1 found unknown directive name at line 1, column 5"
+    },
+    {
+      "id": "6M2F",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 0, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line (3:1) 1 | ? &a a 2 | : &b b 3 | : *a -----^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 3, column 1"
+    },
+    {
+      "id": "6PBE",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6S55",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): could not find expected ':' while scanning a simple key at line 4 column 2",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 5, column 0, while scanning a simple key: could not find expected ':'",
+      "jsyaml": "err:bad indentation of a mapping entry (4:2) 1 | key: 2 | - bar 3 | - baz 4 | invalid ------^",
+      "ryaml": "err:Scanner error: while scanning a simple key at line 4, column 2 could not find expected ':' at line 5, column 1"
+    },
+    {
+      "id": "6SLA",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6VJK",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6WLZ",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown tag !<!foo> (3:11) 1 | # Private 2 | --- 3 | !foo \"bar\" ---------------^ 4 | ... 5 | # Global",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6WPF",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6XDY",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "ok"
+    },
+    {
+      "id": "6ZKB",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "ok"
+    },
+    {
+      "id": "735Y",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "74H7",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:end of the stream or a document separator is expected (1:8) 1 | !!str a: b ------------^ 2 | c: !!int 42 3 | e: !!str f",
+      "ryaml": "ok"
+    },
+    {
+      "id": "753E",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "7A4E",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "7BMT",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:duplication of an anchor property (3:3) 1 | --- 2 | top1: &node1 3 | &k1 key1: one -------^ 4 | top2: &node2 # comment 5 | key2: two",
+      "ryaml": "ok"
+    },
+    {
+      "id": "7BUB",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "7FWL",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:end of the stream or a document separator is expected (1:30) 1 | !<tag:yaml.org,2002:str> foo : ----------------------------------^ 2 | !<!bar> baz",
+      "ryaml": "ok"
+    },
+    {
+      "id": "7LBH",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): could not find expected ':' while scanning a simple key at line 2 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 3, while scanning a simple key: could not find expected ':'",
+      "jsyaml": "err:can not read a block mapping entry; a multiline key may not be an implicit key (3:4) 1 | \"a\\nb\": 1 2 | \"c 3 | d\": 1 --------^",
+      "ryaml": "err:Scanner error: while scanning a simple key at line 2, column 1 could not find expected ':' at line 3, column 4"
+    },
+    {
+      "id": "7MNF",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): could not find expected ':' while scanning a simple key at line 3 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 4, column 0, while scanning a simple key: could not find expected ':'",
+      "jsyaml": "err:can not read a block mapping entry; a multiline key may not be an implicit key (4:1) 1 | top1: 2 | key1: val1 3 | top2 4 | -----^",
+      "ryaml": "err:Scanner error: while scanning a simple key at line 3, column 1 could not find expected ':' at line 4, column 1"
+    },
+    {
+      "id": "7T8X",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "7TMG",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "7W2P",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "7Z25",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "err:Parser error: did not find expected <document start> at line 4, column 1"
+    },
+    {
+      "id": "7ZZ5",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "82AN",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "87E4",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "8CWC",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "8G76",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "8KB6",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "8MK2",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "8QBE",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "8UDB",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "8XDJ",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 2, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:bad indentation of a mapping entry (3:3) 1 | key: word1 2 | # xxx 3 | word2 -------^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 3, column 3"
+    },
+    {
+      "id": "8XYN",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected alphabetic or numeric character while scanning an anchor at line 2 column 3",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning an anchor at line 2, column 3 did not find expected alphabetic or numeric character at line 2, column 4"
+    },
+    {
+      "id": "93JH",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "93WF",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "96L6",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "96NN/00",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found a tab character where an indentation space is expected while scanning a block scalar at line 1 column 6",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a block scalar at line 1, column 6 found a tab character where an indentation space is expected at line 2, column 2"
+    },
+    {
+      "id": "96NN/01",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found a tab character where an indentation space is expected while scanning a block scalar at line 1 column 6",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a block scalar at line 1, column 6 found a tab character where an indentation space is expected at line 2, column 2"
+    },
+    {
+      "id": "98YD",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9BXH",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9C9N",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9CWY",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): could not find expected ':' while scanning a simple key at line 4 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 5, column 0, while scanning a simple key: could not find expected ':'",
+      "jsyaml": "err:can not read a block mapping entry; a multiline key may not be an implicit key (5:1) 2 | - item1 3 | - item2 4 | invalid 5 | -----^",
+      "ryaml": "err:Scanner error: while scanning a simple key at line 4, column 1 could not find expected ':' at line 5, column 1"
+    },
+    {
+      "id": "9DXL",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9FMG",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9HCY",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown tag !<!foo> (1:11) 1 | !foo \"bar\" ---------------^ 2 | %TAG ! tag:example.com,2000:app/ 3 | ---",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9J7A",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9JBA",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9KAX",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:duplication of an anchor property (14:1) 11 | !!str scalar3 12 | --- 13 | &a4 !!map 14 | &a5 !!str key5: value4 ------^ 15 | --- 16 | a6: 1",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9KBC",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): mapping values are not allowed in this context at line 1 column 9",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: mapping values are not allowed in this context at line 1, column 9"
+    },
+    {
+      "id": "9MAG",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected node content while parsing a flow node at line 2 column 3",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected the node content, but found ',' (2:3) 1 | --- 2 | [ , a, b, c ] -------^",
+      "ryaml": "err:Parser error: while parsing a flow node at line 2, column 3 did not find expected node content at line 2, column 3"
+    },
+    {
+      "id": "9MMA",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected <document start> at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 0: did not find expected <document start>",
+      "jsyaml": "err:directives end mark is expected (2:1) 1 | %YAML 1.2 2 | -----^",
+      "ryaml": "err:Parser error: did not find expected <document start> at line 2, column 1"
+    },
+    {
+      "id": "9MMW",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $[0][2]: Non-string keys are not supported",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9MQT/00",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9MQT/01",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found unexpected document indicator while scanning a quoted scalar at line 1 column 5",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unexpected end of the document within a double quoted scalar (2:1) 1 | --- \"a 2 | ... x -----^ 3 | b\"",
+      "ryaml": "err:Scanner error: while scanning a quoted scalar at line 1, column 5 found unexpected document indicator at line 2, column 1"
+    },
+    {
+      "id": "9SA2",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or '}' while parsing a flow mapping at line 3 column 3",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:missed comma between flow collection entries (4:8) 1 | --- 2 | - { \"single line\": value} 3 | - { \"multi 4 | line\": value} ------------^",
+      "ryaml": "err:Parser error: while parsing a flow mapping at line 3, column 3 did not find expected ',' or '}' at line 4, column 8"
+    },
+    {
+      "id": "9SHH",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9TFX",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9U5K",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9WXW",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown tag !<!foo> (2:11) 1 | # Private 2 | !foo \"bar\" ---------------^ 3 | ... 4 | # Global",
+      "ryaml": "ok"
+    },
+    {
+      "id": "9YRD",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "A2M4",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 2 column 4",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 2, column 4 found character that cannot start any token at line 2, column 4"
+    },
+    {
+      "id": "A6F9",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "A984",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "AB8U",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "AVM7",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "AZ63",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "AZW3",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "B3HG",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "B63P",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected <document start> at line 1 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:directives end mark is expected (2:1) 1 | %YAML 1.2 2 | ... -----^",
+      "ryaml": "err:Parser error: did not find expected <document start> at line 2, column 1"
+    },
+    {
+      "id": "BD7L",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected '-' indicator while parsing a block collection at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 0, while parsing a block collection: did not find expected '-' indicator",
+      "jsyaml": "err:end of the stream or a document separator is expected (3:1) 1 | - item1 2 | - item2 3 | invalid: x -----^",
+      "ryaml": "err:Parser error: while parsing a block collection at line 1, column 1 did not find expected '-' indicator at line 3, column 1"
+    },
+    {
+      "id": "BEC7",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found incompatible YAML document at line 1 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "err:Parser error: found incompatible YAML document at line 1, column 1"
+    },
+    {
+      "id": "BF9H",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:bad indentation of a mapping entry (4:8) 1 | --- 2 | plain: a 3 | b # end of scalar 4 | c ------------^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 2, column 1 did not find expected key at line 4, column 8"
+    },
+    {
+      "id": "BS4K",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 0: did not find expected <document start>",
+      "jsyaml": "err:end of the stream or a document separator is expected (2:1) 1 | word1 # comment 2 | word2 -----^",
+      "ryaml": "err:Parser error: did not find expected <document start> at line 2, column 1"
+    },
+    {
+      "id": "BU8L",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "C2DT",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "C2SP",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): mapping values are not allowed in this context at line 2 column 2",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 1: mapping values are not allowed in this context",
+      "jsyaml": "err:end of the stream or a document separator is expected (2:2) 1 | [23 2 | ]: 42 ------^",
+      "ryaml": "err:Scanner error: mapping values are not allowed in this context at line 2, column 2"
+    },
+    {
+      "id": "C4HZ",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown tag !<tag:clarkevans.com,2002:circle> (8:1) 5 | - !circle 6 | center: &ORIGIN {x: 73, y: 129} 7 | radius: 7 8 | - !line -----^ 9 | start: *ORIGIN 10 | finish: { x: 89, y: 102 }",
+      "ryaml": "ok"
+    },
+    {
+      "id": "CC74",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown tag !<tag:example.com,2000:app/foo> (3:13) 1 | %TAG !e! tag:example.com,2000:app/ 2 | --- 3 | !e!foo \"bar\" -----------------^",
+      "ryaml": "ok"
+    },
+    {
+      "id": "CFD4",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected node content while parsing a flow node at line 1 column 5",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 4, while parsing a flow node: did not find expected node content",
+      "jsyaml": "ok",
+      "ryaml": "err:Parser error: while parsing a flow node at line 1, column 5 did not find expected node content at line 1, column 5"
+    },
+    {
+      "id": "CML9",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or ']' while parsing a flow sequence at line 1 column 6",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 2, while parsing a flow sequence: did not find expected ',' or ']'",
+      "jsyaml": "err:missed comma between flow collection entries (3:3) 1 | key: [ word1 2 | # xxx 3 | word2 ] -------^",
+      "ryaml": "err:Parser error: while parsing a flow sequence at line 1, column 6 did not find expected ',' or ']' at line 3, column 3"
+    },
+    {
+      "id": "CN3R",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "CPZ3",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "CQ3W",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found unexpected end of stream while scanning a quoted scalar at line 2 column 6",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unexpected end of the stream within a double quoted scalar (3:1) 1 | --- 2 | key: \"missing closing quote 3 | -----^",
+      "ryaml": "err:Scanner error: while scanning a quoted scalar at line 2, column 6 found unexpected end of stream at line 2, column 28"
+    },
+    {
+      "id": "CT4Q",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "CTN5",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected node content while parsing a flow node at line 2 column 12",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected the node content, but found ',' (2:12) 1 | --- 2 | [ a, b, c, , ] ----------------^",
+      "ryaml": "err:Parser error: while parsing a flow node at line 2, column 12 did not find expected node content at line 2, column 12"
+    },
+    {
+      "id": "CUP7",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:unknown tag !<!local> (1:31) 1 | anchored: !local &anchor value -----------------------------------^ 2 | alias: *anchor",
+      "ryaml": "ok"
+    },
+    {
+      "id": "CVW2",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "CXX2",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): mapping values are not allowed in this context at line 1 column 14",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:end of the stream or a document separator is expected (1:14) 1 | --- &anchor a: b ------------------^",
+      "ryaml": "err:Scanner error: mapping values are not allowed in this context at line 1, column 14"
+    },
+    {
+      "id": "D49Q",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): could not find expected ':' while scanning a simple key at line 2 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 3, while scanning a simple key: could not find expected ':'",
+      "jsyaml": "err:can not read a block mapping entry; a multiline key may not be an implicit key (3:4) 1 | 'a\\nb': 1 2 | 'c 3 | d': 1 --------^",
+      "ryaml": "err:Scanner error: while scanning a simple key at line 2, column 1 could not find expected ':' at line 3, column 4"
+    },
+    {
+      "id": "D83L",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "D88J",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "D9TU",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DBG4",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected node content while parsing a flow node at line 8 column 5",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 8, column 4, while parsing a flow node: did not find expected node content",
+      "jsyaml": "ok",
+      "ryaml": "err:Parser error: while parsing a flow node at line 8, column 5 did not find expected node content at line 8, column 5"
+    },
+    {
+      "id": "DC7X",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DE56/00",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DE56/01",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DE56/02",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DE56/03",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DE56/04",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DE56/05",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DFF7",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DHP8",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DK3J",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "err:Parser error: did not find expected <document start> at line 2, column 1"
+    },
+    {
+      "id": "DK4H",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or ']' while parsing a flow sequence at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:missed comma between flow collection entries (3:3) 1 | --- 2 | [ key 3 | : value ] -------^",
+      "ryaml": "err:Parser error: while parsing a flow sequence at line 2, column 1 did not find expected ',' or ']' at line 3, column 3"
+    },
+    {
+      "id": "DK95/00",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 2 column 2",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 2, column 2 found character that cannot start any token at line 2, column 2"
+    },
+    {
+      "id": "DK95/01",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DK95/02",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DK95/03",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 1 column 2",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 1, column 2 found character that cannot start any token at line 1, column 2"
+    },
+    {
+      "id": "DK95/04",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found a tab character that violates indentation while scanning a plain scalar at line 1 column 6",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a plain scalar at line 1, column 6 found a tab character that violates indentation at line 2, column 1"
+    },
+    {
+      "id": "DK95/05",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DK95/06",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found a tab character that violates indentation while scanning a plain scalar at line 2 column 6",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 5: mapping values are not allowed in this context",
+      "jsyaml": "err:tab characters must not be used in indentation (3:3) 1 | foo: 2 | a: 1 3 | →b: 2 -------^",
+      "ryaml": "err:Scanner error: while scanning a plain scalar at line 2, column 6 found a tab character that violates indentation at line 3, column 3"
+    },
+    {
+      "id": "DK95/07",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DK95/08",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "DMG6",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 1, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:bad indentation of a mapping entry (3:2) 1 | key: 2 | ok: 1 3 | wrong: 2 ------^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 3, column 2"
+    },
+    {
+      "id": "DWX9",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "E76Z",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:end of the stream or a document separator is expected (1:5) 1 | &a a: &b b ---------^ 2 | *b : *a",
+      "ryaml": "ok"
+    },
+    {
+      "id": "EB22",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:end of the stream or a document separator is expected (3:1) 1 | --- 2 | scalar1 # comment 3 | %YAML 1.2 -----^ 4 | --- 5 | scalar2",
+      "ryaml": "ok"
+    },
+    {
+      "id": "EHF6",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "EW3V",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): mapping values are not allowed in this context at line 2 column 4",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 3: mapping values are not allowed in this context",
+      "jsyaml": "err:bad indentation of a mapping entry (2:4) 1 | k1: v1 2 | k2: v2 --------^",
+      "ryaml": "err:Scanner error: mapping values are not allowed in this context at line 2, column 4"
+    },
+    {
+      "id": "EX5H",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "EXG3",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "F2C7",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "F3CP",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "F6MC",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "F8F9",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "FBC9",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "FH7J",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:bad indentation of a sequence entry (3:10) 1 | - !!str 2 | - 3 | !!null : a --------------^ 4 | b: !!str 5 | - !!str : !!null",
+      "ryaml": "ok"
+    },
+    {
+      "id": "FP8R",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "err:Parser error: did not find expected <document start> at line 2, column 1"
+    },
+    {
+      "id": "FQ7F",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "FRK4",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found unexpected ':' while scanning a plain scalar at line 2 column 5",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 8, while scanning a plain scalar: found unexpected ':'",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a plain scalar at line 2, column 5 found unexpected ':' at line 2, column 9"
+    },
+    {
+      "id": "FTA2",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "FUP4",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "G4RS",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "G5U8",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:missed comma between flow collection entries (2:4) 1 | --- 2 | - [-, -] --------^",
+      "ryaml": "ok"
+    },
+    {
+      "id": "G7JE",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): could not find expected ':' while scanning a simple key at line 2 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 2, while scanning a simple key: could not find expected ':'",
+      "jsyaml": "err:can not read a block mapping entry; a multiline key may not be an implicit key (3:3) 1 | a\\nb: 1 2 | c 3 | d: 1 -------^",
+      "ryaml": "err:Scanner error: while scanning a simple key at line 2, column 1 could not find expected ':' at line 3, column 3"
+    },
+    {
+      "id": "G992",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "G9HC",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): could not find expected ':' while scanning a simple key at line 3 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:can not read a block mapping entry; a multiline key may not be an implicit key (4:1) 1 | --- 2 | seq: 3 | &anchor 4 | - a -----^ 5 | - b",
+      "ryaml": "err:Scanner error: while scanning a simple key at line 3, column 1 could not find expected ':' at line 4, column 1"
+    },
+    {
+      "id": "GDY7",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): could not find expected ':' while scanning a simple key at line 2 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 0, while scanning a simple key: could not find expected ':'",
+      "jsyaml": "err:can not read an implicit mapping pair; a colon is missed (2:9) 1 | key: value 2 | this is #not a: key -------------^",
+      "ryaml": "err:Scanner error: while scanning a simple key at line 2, column 1 could not find expected ':' at line 3, column 1"
+    },
+    {
+      "id": "GH63",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "GT5M",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): could not find expected ':' while scanning a simple key at line 2 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 0, while scanning a simple key: could not find expected ':'",
+      "jsyaml": "err:end of the stream or a document separator is expected (2:1) 1 | - item1 2 | &node -----^ 3 | - item2",
+      "ryaml": "err:Scanner error: while scanning a simple key at line 2, column 1 could not find expected ':' at line 3, column 1"
+    },
+    {
+      "id": "H2RW",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "H3Z8",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "H7J7",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): could not find expected ':' while scanning a simple key at line 2 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 2, while scanning a simple key: could not find expected ':'",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a simple key at line 2, column 1 could not find expected ':' at line 3, column 3"
+    },
+    {
+      "id": "H7TQ",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected comment or line break while scanning a directive at line 1 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:YAML directive accepts exactly one argument (2:1) 1 | %YAML 1.2 foo 2 | --- -----^",
+      "ryaml": "err:Scanner error: while scanning a directive at line 1, column 1 did not find expected comment or line break at line 1, column 11"
+    },
+    {
+      "id": "HM87/00",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected node content while parsing a flow node at line 1 column 2",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 1, while parsing a flow node: did not find expected node content",
+      "jsyaml": "ok",
+      "ryaml": "err:Parser error: while parsing a flow node at line 1, column 2 did not find expected node content at line 1, column 2"
+    },
+    {
+      "id": "HM87/01",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "HMK4",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "HMQ5",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:end of the stream or a document separator is expected (1:16) 1 | !!str &a1 \"foo\": --------------------^ 2 | !!str bar 3 | &a2 baz : *a1",
+      "ryaml": "ok"
+    },
+    {
+      "id": "HRE5",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found unknown escape character while parsing a quoted scalar at line 2 column 9",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown escape sequence (2:18) 1 | --- 2 | double: \"quoted \\' scalar\" ----------------------^",
+      "ryaml": "err:Scanner error: while parsing a quoted scalar at line 2, column 9 found unknown escape character at line 2, column 17"
+    },
+    {
+      "id": "HS5T",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "HU3P",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): mapping values are not allowed in this context at line 3 column 5",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 4: mapping values are not allowed in this context",
+      "jsyaml": "err:bad indentation of a mapping entry (3:5) 1 | key: 2 | word1 word2 3 | no: key ---------^",
+      "ryaml": "err:Scanner error: mapping values are not allowed in this context at line 3, column 5"
+    },
+    {
+      "id": "HWV9",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected node content while parsing a block node at line 1 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "err:Parser error: while parsing a block node at line 1, column 1 did not find expected node content at line 1, column 1"
+    },
+    {
+      "id": "J3BT",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "J5UC",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "J7PZ",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "J7VC",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "J9HZ",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "JEF9/00",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "JEF9/01",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "JEF9/02",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "JHB9",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "ok"
+    },
+    {
+      "id": "JKF3",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): mapping values are not allowed in this context at line 2 column 5",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 4: mapping values are not allowed in this context",
+      "jsyaml": "err:end of the stream or a document separator is expected (2:5) 1 | - - \"bar 2 | bar\": x ---------^",
+      "ryaml": "err:Scanner error: mapping values are not allowed in this context at line 2, column 5"
+    },
+    {
+      "id": "JQ4R",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "JR7V",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "JS2J",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "JTV5",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "JY7Z",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 16, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:bad indentation of a mapping entry (2:17) 1 | key1: \"quoted1\" 2 | key2: \"quoted2\" no key: nor value ---------------------^ 3 | key3: \"quoted3\"",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 2, column 17"
+    },
+    {
+      "id": "K3WX",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or '}' while parsing a flow mapping at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:missed comma between flow collection entries (3:3) 1 | --- 2 | { \"foo\" # comment 3 | :bar } -------^",
+      "ryaml": "err:Parser error: while parsing a flow mapping at line 2, column 1 did not find expected ',' or '}' at line 3, column 3"
+    },
+    {
+      "id": "K4SU",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "K527",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "K54U",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "K858",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "KH5V/00",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "KH5V/01",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "KH5V/02",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "KK5P",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $.complex1: Non-string keys are not supported",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "KMK3",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "KS4U",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:end of the stream or a document separator is expected (5:1) 2 | [ 3 | sequence item 4 | ] 5 | invalid item -----^",
+      "ryaml": "err:Parser error: did not find expected <document start> at line 5, column 1"
+    },
+    {
+      "id": "KSS4",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "ok"
+    },
+    {
+      "id": "L24T/00",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "L24T/01",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "L383",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "ok"
+    },
+    {
+      "id": "L94M",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "L9U5",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "LE5A",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "LHL4",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected whitespace or line break while scanning a tag at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:tag suffix cannot contain flow indicator characters (2:14) 1 | --- 2 | !invalid{}tag scalar ------------------^",
+      "ryaml": "err:Scanner error: while scanning a tag at line 2, column 1 did not find expected whitespace or line break at line 2, column 9"
+    },
+    {
+      "id": "LP6E",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "LQZ7",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "LX3P",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $: Non-string keys are not supported",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "M29M",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "M2N8/00",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 5",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $[0]: Non-string keys are not supported",
+      "jsyaml": "err:incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line (1:5) 1 | - ? : x ---------^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 5 did not find expected key at line 1, column 5"
+    },
+    {
+      "id": "M2N8/01",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $: Non-string keys are not supported",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "M5C3",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "M5DY",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $: Non-string keys are not supported",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "M6YH",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "M7A3",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "err:Parser error: did not find expected <document start> at line 6, column 1"
+    },
+    {
+      "id": "M7NX",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "M9B4",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "MJS9",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "MUS6/00",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:ill-formed argument of the YAML directive (2:1) 1 | %YAML 1.1#... 2 | --- -----^",
+      "ryaml": "ok"
+    },
+    {
+      "id": "MUS6/01",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:end of the stream or a document separator is expected (3:1) 1 | %YAML 1.2 2 | --- 3 | %YAML 1.2 -----^ 4 | ---",
+      "ryaml": "ok"
+    },
+    {
+      "id": "MUS6/02",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "MUS6/03",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "MUS6/04",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "MUS6/05",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found unknown directive name while scanning a directive at line 1 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a directive at line 1, column 1 found unknown directive name at line 1, column 5"
+    },
+    {
+      "id": "MUS6/06",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found unknown directive name while scanning a directive at line 1 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a directive at line 1, column 1 found unknown directive name at line 1, column 7"
+    },
+    {
+      "id": "MXS3",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "MYW6",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "MZX3",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "N4JP",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 1, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:bad indentation of a mapping entry (3:2) 1 | map: 2 | key1: \"quoted1\" 3 | key2: \"bad indentation\" ------^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 3, column 2"
+    },
+    {
+      "id": "N782",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected node content while parsing a flow node at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:missed comma between flow collection entries (2:1) 1 | [ 2 | --- , -----^ 3 | ... 4 | ]",
+      "ryaml": "err:Parser error: while parsing a flow node at line 2, column 1 did not find expected node content at line 2, column 1"
+    },
+    {
+      "id": "NAT4",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "NB6Z",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "NHX8",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 0, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line (1:1) 1 | : -----^ 2 | 3 |",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 1, column 1"
+    },
+    {
+      "id": "NJ66",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or '}' while parsing a flow mapping at line 3 column 3",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:missed comma between flow collection entries (4:7) 1 | --- 2 | - { single line: value} 3 | - { multi 4 | line: value} -----------^",
+      "ryaml": "err:Parser error: while parsing a flow mapping at line 3, column 3 did not find expected ',' or '}' at line 4, column 7"
+    },
+    {
+      "id": "NKF9",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line (3:1) 1 | --- 2 | key: value 3 | : empty key -----^ 4 | --- 5 | {",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 2, column 1 did not find expected key at line 3, column 1"
+    },
+    {
+      "id": "NP9H",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "P2AD",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "P2EQ",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): block sequence entries are not allowed in this context at line 2 column 11",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:bad indentation of a sequence entry (2:11) 1 | --- 2 | - { y: z }- invalid ---------------^",
+      "ryaml": "err:Scanner error: block sequence entries are not allowed in this context at line 2, column 11"
+    },
+    {
+      "id": "P76L",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown tag !<tag:example.com,2000:app/int> (3:13) 1 | %TAG !! tag:example.com,2000:app/ 2 | --- 3 | !!int 1 - 3 # Interval, not integer -----------------^",
+      "ryaml": "ok"
+    },
+    {
+      "id": "P94K",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "PBJ2",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "PRH3",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "PUW8",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "ok"
+    },
+    {
+      "id": "PW8X",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:bad indentation of a sequence entry (4:6) 1 | - &a 2 | - a 3 | - 4 | &a : a ----------^ 5 | b: &b 6 | -",
+      "ryaml": "ok"
+    },
+    {
+      "id": "Q4CL",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 16, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:bad indentation of a mapping entry (2:17) 1 | key1: \"quoted1\" 2 | key2: \"quoted2\" trailing content ---------------------^ 3 | key3: \"quoted3\"",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 2, column 17"
+    },
+    {
+      "id": "Q5MG",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 1 column 1",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 1, column 1 found character that cannot start any token at line 1, column 1"
+    },
+    {
+      "id": "Q88A",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "Q8AD",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "Q9WF",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $: Non-string keys are not supported",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "QB6E",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "QF4Y",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "QLJ7",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown tag !<tag:example.com,2011:A> (4:1) 1 | %TAG !prefix! tag:example.com,2011: 2 | --- !prefix!A 3 | a: b 4 | --- !prefix!B -----^ 5 | c: d 6 | --- !prefix!C",
+      "ryaml": "err:Parser error: while parsing a node at line 4, column 5 found undefined tag handle at line 4, column 5"
+    },
+    {
+      "id": "QT73",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected node content while parsing a block node at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "err:Parser error: while parsing a block node at line 2, column 1 did not find expected node content at line 2, column 1"
+    },
+    {
+      "id": "R4YG",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found a tab character where an indentation space is expected while scanning a block scalar at line 9 column 3",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 11, column 1, while parsing a block collection: did not find expected '-' indicator",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a block scalar at line 9, column 3 found a tab character where an indentation space is expected at line 10, column 2"
+    },
+    {
+      "id": "R52L",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "RHX7",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:end of the stream or a document separator is expected (3:1) 1 | --- 2 | key: value 3 | %YAML 1.2 -----^ 4 | ---",
+      "ryaml": "ok"
+    },
+    {
+      "id": "RLU9",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "RR7F",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "RTP8",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "RXY3",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found unexpected document indicator while scanning a quoted scalar at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unexpected end of the document within a single quoted scalar (3:1) 1 | --- 2 | ' 3 | ... -----^ 4 | '",
+      "ryaml": "err:Scanner error: while scanning a quoted scalar at line 2, column 1 found unexpected document indicator at line 3, column 1"
+    },
+    {
+      "id": "RZP5",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $: Non-string keys are not supported",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "RZT7",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "ok"
+    },
+    {
+      "id": "S3PD",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 0, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line (2:1) 1 | plain key: in-line value 2 | : # Both empty -----^ 3 | \"quoted key\": 4 | - entry",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 2, column 1"
+    },
+    {
+      "id": "S4GJ",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected comment or line break while scanning a block scalar at line 2 column 9",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:a line break is expected (2:11) 1 | --- 2 | folded: > first line ---------------^ 3 | second line",
+      "ryaml": "err:Scanner error: while scanning a block scalar at line 2, column 9 did not find expected comment or line break at line 2, column 11"
+    },
+    {
+      "id": "S4JQ",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "S4T7",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "S7BG",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "S98Z",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "S9E8",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "SBG9",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $: Non-string keys are not supported",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "SF5V",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): found duplicate %YAML directive at line 1 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:duplication of %YAML directive (3:1) 1 | %YAML 1.2 2 | %YAML 1.2 3 | --- -----^",
+      "ryaml": "err:Parser error: found duplicate %YAML directive at line 2, column 1"
+    },
+    {
+      "id": "SKE5",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "SM9W/00",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "SM9W/01",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 0, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line (1:1) 1 | : -----^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 1, column 1"
+    },
+    {
+      "id": "SR86",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 9, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:alias node should not have any properties (3:1) 1 | key1: &a value 2 | key2: &b *a 3 | -----^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 2, column 10"
+    },
+    {
+      "id": "SSW6",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "SU5Z",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "SU74",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 3, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:alias node should not have any properties (2:11) 1 | key1: &alias value1 2 | &b *alias : value2 ---------------^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 1 did not find expected key at line 2, column 4"
+    },
+    {
+      "id": "SY6V",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): block sequence entries are not allowed in this context at line 1 column 9",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 8: block sequence entries are not allowed in this context",
+      "jsyaml": "err:end of the stream or a document separator is expected (1:9) 1 | &anchor - sequence entry -------------^",
+      "ryaml": "err:Scanner error: block sequence entries are not allowed in this context at line 1, column 9"
+    },
+    {
+      "id": "SYW4",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "T26H",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "T4YY",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "T5N4",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "T833",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or '}' while parsing a flow mapping at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:missed comma between flow collection entries (4:5) 1 | --- 2 | { 3 | foo: 1 4 | bar: 2 } ---------^",
+      "ryaml": "err:Parser error: while parsing a flow mapping at line 2, column 1 did not find expected ',' or '}' at line 4, column 5"
+    },
+    {
+      "id": "TD5N",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): could not find expected ':' while scanning a simple key at line 3 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 4, column 0, while scanning a simple key: could not find expected ':'",
+      "jsyaml": "err:end of the stream or a document separator is expected (3:1) 1 | - item1 2 | - item2 3 | invalid -----^",
+      "ryaml": "err:Scanner error: while scanning a simple key at line 3, column 1 could not find expected ':' at line 4, column 1"
+    },
+    {
+      "id": "TE2A",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "TL85",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "TS54",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "U3C3",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "U3XV",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:duplication of an anchor property (3:3) 1 | --- 2 | top1: &node1 3 | &k1 key1: one -------^ 4 | top2: &node2 # comment 5 | key2: two",
+      "ryaml": "ok"
+    },
+    {
+      "id": "U44R",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 2 column 3",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 3, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:bad indentation of a mapping entry (3:4) 1 | map: 2 | key1: \"quoted1\" 3 | key2: \"bad indentation\" --------^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 2, column 3 did not find expected key at line 3, column 4"
+    },
+    {
+      "id": "U99R",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected whitespace or line break while scanning a tag at line 1 column 3",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 7, while scanning a tag: did not find expected whitespace or line break",
+      "jsyaml": "err:tag suffix cannot contain flow indicator characters (1:9) 1 | - !!str, xxx -------------^",
+      "ryaml": "err:Scanner error: while scanning a tag at line 1, column 3 did not find expected whitespace or line break at line 1, column 8"
+    },
+    {
+      "id": "U9NS",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:expected a single document in the stream, but found more",
+      "ryaml": "ok"
+    },
+    {
+      "id": "UDM2",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "UDR7",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "UGM3",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown tag !<tag:clarkevans.com,2002:invoice> (30:1) 27 | Late afternoon is best. 28 | Backup contact is Nancy 29 | Billsmer @ 338-4338. 30 | ------^",
+      "ryaml": "ok"
+    },
+    {
+      "id": "UKK6/00",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 1 column 3",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 2, while parsing a block mapping: did not find expected key Consider enclosing the entire field in 'single quotes'",
+      "jsyaml": "err:incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line (1:3) 1 | - : -------^",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 1, column 3 did not find expected key at line 1, column 3"
+    },
+    {
+      "id": "UKK6/01",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "UKK6/02",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "UT92",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or '}' while parsing a flow mapping at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:missed comma between flow collection entries (3:3) 1 | --- 2 | { matches 3 | % : 20 } -------^ 4 | ... 5 | ---",
+      "ryaml": "err:Parser error: while parsing a flow mapping at line 2, column 1 did not find expected ',' or '}' at line 3, column 3"
+    },
+    {
+      "id": "UV7Q",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "V55R",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "V9D5",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $[1]: Non-string keys are not supported",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "VJP3/00",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or '}' while parsing a flow mapping at line 1 column 4",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 0, while parsing a flow mapping: did not find expected ',' or '}'",
+      "jsyaml": "err:missed comma between flow collection entries (3:1) 1 | k: { 2 | k 3 | : -----^ 4 | v 5 | }",
+      "ryaml": "err:Parser error: while parsing a flow mapping at line 1, column 4 did not find expected ',' or '}' at line 3, column 1"
+    },
+    {
+      "id": "VJP3/01",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or '}' while parsing a flow mapping at line 1 column 4",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 3, column 1, while parsing a flow mapping: did not find expected ',' or '}'",
+      "jsyaml": "err:missed comma between flow collection entries (3:2) 1 | k: { 2 | k 3 | : ------^ 4 | v 5 | }",
+      "ryaml": "err:Parser error: while parsing a flow mapping at line 1, column 4 did not find expected ',' or '}' at line 3, column 2"
+    },
+    {
+      "id": "W42U",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "W4TN",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): could not find expected directive name while scanning a directive at line 3 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a directive at line 3, column 1 could not find expected directive name at line 3, column 2"
+    },
+    {
+      "id": "W5VH",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected alphabetic or numeric character while scanning an anchor at line 1 column 4",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 4, while scanning an anchor: did not find expected alphabetic or numeric character",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning an anchor at line 1, column 4 did not find expected alphabetic or numeric character at line 1, column 5"
+    },
+    {
+      "id": "W9L4",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): did not find expected key while parsing a block mapping at line 2 column 1",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:bad indentation of a mapping entry (4:3) 1 | --- 2 | block scalar: | 3 | 4 | more spaces at the beginning -------^ 5 | are invalid",
+      "ryaml": "err:Parser error: while parsing a block mapping at line 2, column 1 did not find expected key at line 4, column 3"
+    },
+    {
+      "id": "WZ62",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:tag suffix cannot contain flow indicator characters (2:15) 1 | { 2 | foo : !!str, -------------------^ 3 | !!str : bar, 4 | }",
+      "ryaml": "ok"
+    },
+    {
+      "id": "X38W",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $: Non-string keys are not supported",
+      "jsyaml": "err:duplicated mapping key (1:21) 1 | { &a [a, &b b]: *b, *a : [c, *b, d]} -------------------------^",
+      "ryaml": "err:Duplicate map key: 'a'"
+    },
+    {
+      "id": "X4QW",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:a line break is expected (1:9) 1 | block: ># comment -------------^ 2 | scalar",
+      "ryaml": "ok"
+    },
+    {
+      "id": "X8DW",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "XLQ9",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "XV9V",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "XW4D",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $: Non-string keys are not supported",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "Y2GN",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "Y79Y/000",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found a tab character where an indentation space is expected while scanning a block scalar at line 1 column 6",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a block scalar at line 1, column 6 found a tab character where an indentation space is expected at line 2, column 1"
+    },
+    {
+      "id": "Y79Y/001",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found a tab character where an indentation space is expected while scanning a block scalar at line 1 column 6",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning a block scalar at line 1, column 6 found a tab character where an indentation space is expected at line 2, column 2"
+    },
+    {
+      "id": "Y79Y/002",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "Y79Y/003",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "Y79Y/004",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 1 column 2",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:bad indentation of a sequence entry (1:3) 1 | -→- -------^",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 1, column 2 found character that cannot start any token at line 1, column 2"
+    },
+    {
+      "id": "Y79Y/005",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 1 column 3",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:bad indentation of a sequence entry (1:4) 1 | - →- --------^",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 1, column 3 found character that cannot start any token at line 1, column 3"
+    },
+    {
+      "id": "Y79Y/006",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 1 column 2",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $: Non-string keys are not supported",
+      "jsyaml": "err:bad indentation of a mapping entry (1:3) 1 | ?→- -------^",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 1, column 2 found character that cannot start any token at line 1, column 2"
+    },
+    {
+      "id": "Y79Y/007",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 2 column 2",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $: Non-string keys are not supported",
+      "jsyaml": "err:bad indentation of a mapping entry (2:3) 1 | ? - 2 | :→- -------^",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 2, column 2 found character that cannot start any token at line 2, column 2"
+    },
+    {
+      "id": "Y79Y/008",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 1 column 2",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $: Non-string keys are not supported",
+      "jsyaml": "err:bad indentation of a mapping entry (1:6) 1 | ?→key: ----------^",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 1, column 2 found character that cannot start any token at line 1, column 2"
+    },
+    {
+      "id": "Y79Y/009",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 2 column 2",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): Error in $: Non-string keys are not supported",
+      "jsyaml": "err:bad indentation of a mapping entry (2:6) 1 | ? key: 2 | :→key: ----------^",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 2, column 2 found character that cannot start any token at line 2, column 2"
+    },
+    {
+      "id": "Y79Y/010",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): found character that cannot start any token while scanning for the next token at line 1 column 2",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "err:Scanner error: while scanning for the next token at line 1, column 2 found character that cannot start any token at line 1, column 2"
+    },
+    {
+      "id": "YD5X",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "YJV2",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:missed comma between flow collection entries (1:2) 1 | [-] ------^",
+      "ryaml": "ok"
+    },
+    {
+      "id": "Z67P",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:unknown tag !<!foo> (5:1) 2 | value 3 | folded: !foo >1 4 | value 5 | -----^",
+      "ryaml": "ok"
+    },
+    {
+      "id": "Z9M4",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:unknown tag !<tag:example.com,2000:app/foo> (3:15) 1 | %TAG !e! tag:example.com,2000:app/ 2 | --- 3 | - !e!foo \"bar\" -------------------^",
+      "ryaml": "ok"
+    },
+    {
+      "id": "ZCZ6",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): mapping values are not allowed in this context at line 1 column 5",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 1, column 4: mapping values are not allowed in this context",
+      "jsyaml": "err:bad indentation of a mapping entry (1:5) 1 | a: b: c: d ---------^",
+      "ryaml": "err:Scanner error: mapping values are not allowed in this context at line 1, column 5"
+    },
+    {
+      "id": "ZF4X",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "ZH7C",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "err:end of the stream or a document separator is expected (1:5) 1 | &a a: b ---------^ 2 | c: &d d",
+      "ryaml": "ok"
+    },
+    {
+      "id": "ZK9H",
+      "yaml12": "valid",
+      "multidoc": false,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "ok",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "ZL4Z",
+      "yaml12": "error",
+      "multidoc": true,
+      "psych_libyaml": "err:(<unknown>): mapping values are not allowed in this context at line 2 column 7",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "err:bad indentation of a mapping entry (2:7) 1 | --- 2 | a: 'b': c -----------^",
+      "ryaml": "err:Scanner error: mapping values are not allowed in this context at line 2, column 7"
+    },
+    {
+      "id": "ZVH3",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected '-' indicator while parsing a block collection at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 1, while parsing a block collection: did not find expected '-' indicator",
+      "jsyaml": "err:bad indentation of a sequence entry (2:2) 1 | - key: value 2 | - item1 ------^",
+      "ryaml": "err:Parser error: while parsing a block collection at line 1, column 1 did not find expected '-' indicator at line 2, column 2"
+    },
+    {
+      "id": "ZWK4",
+      "yaml12": "valid",
+      "multidoc": true,
+      "psych_libyaml": "ok",
+      "pandoc_direct": "n/a-multidoc",
+      "jsyaml": "ok",
+      "ryaml": "ok"
+    },
+    {
+      "id": "ZXT5",
+      "yaml12": "error",
+      "multidoc": false,
+      "psych_libyaml": "err:(<unknown>): did not find expected ',' or ']' while parsing a flow sequence at line 1 column 1",
+      "pandoc_direct": "err:Error parsing YAML metadata at (line 1, column 1): YAML parse exception at line 2, column 2, while parsing a flow sequence: did not find expected ',' or ']'",
+      "jsyaml": "err:missed comma between flow collection entries (2:3) 1 | [ \"key\" 2 | :value ] -------^",
+      "ryaml": "err:Parser error: while parsing a flow sequence at line 1, column 1 did not find expected ',' or ']' at line 2, column 3"
+    }
+  ]
+}

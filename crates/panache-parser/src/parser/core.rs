@@ -512,6 +512,7 @@ impl<'a> Parser<'a> {
             fence,
             Some(&text_owned),
             &self.diagnostics,
+            self.config.flavor,
         );
         Some(new_pos.saturating_sub(self.pos).saturating_sub(1))
     }
@@ -1483,6 +1484,7 @@ impl<'a> Parser<'a> {
                                 fence,
                                 Some(&fence_line),
                                 &self.diagnostics,
+                                self.config.flavor,
                             )
                         };
                         extras = new_pos.saturating_sub(self.pos).saturating_sub(1);

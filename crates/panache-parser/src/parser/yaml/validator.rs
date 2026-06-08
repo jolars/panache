@@ -137,14 +137,34 @@ use rowan::NodeOrToken;
 
 use super::model::{YamlDiagnostic, diagnostic_codes};
 use super::parser::parse_stream;
+use super::profile::{ConsumerSet, YamlConsumer, YamlValidationContext};
 use super::scanner::{Scanner, Token, TokenKind};
 
-/// Run every implemented diagnostic cluster over `input`, returning the
-/// first failure. Order matches the per-cluster priority chosen at
-/// integration time — directive-level checks run before structural
-/// checks because they govern whether a stream is even a valid stream
-/// shape.
+/// Validate against the abstract YAML 1.2 substrate (no consumer-only checks).
+/// This is the contract the yaml-test-suite holds the parser to; its verdicts
+/// never depend on flavor or location. Production callers use
+/// [`validate_yaml_with_context`].
 pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
+    validate_yaml_with_context(input, YamlValidationContext::substrate())
+}
+
+/// Run every implemented diagnostic cluster over `input` under `ctx`, returning
+/// the first failure.
+///
+/// Two pools run in order:
+///
+/// 1. **Substrate (YAML 1.2) checks** — the `check_*` clusters below, in
+///    per-cluster priority order (directive-level before structural). These
+///    fire in every context today; a future per-consumer *suppression* hook
+///    (for the context-dependent tab leniency documented in
+///    `tests/yaml/consumer-matrix.md`) would gate individual checks here.
+/// 2. **Consumer-only checks** — valid YAML 1.2 that a real consumer rejects
+///    (implicit empty keys, duplicate keys). These never run on the substrate
+///    path, which is exactly what keeps the yaml-test-suite verdicts unchanged.
+pub(crate) fn validate_yaml_with_context(
+    input: &str,
+    ctx: YamlValidationContext,
+) -> Option<YamlDiagnostic> {
     let tokens = collect_tokens(input);
     if let Some(diag) = check_directives(input, &tokens) {
         return Some(diag);
@@ -216,7 +236,149 @@ pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
     if let Some(diag) = check_invalid_tag_chars(&tree) {
         return Some(diag);
     }
+
+    // Pool 2: consumer-only checks. Never on the substrate path.
+    if ctx.is_substrate() {
+        return None;
+    }
+    check_consumer_rejections(&tree, ctx)
+}
+
+/// Consumer-only checks: valid YAML 1.2 that a real consumer rejects. Each is
+/// gated on whether an active consumer in `ctx` makes that rejection. See
+/// `tests/yaml/consumer-matrix.md`.
+fn check_consumer_rejections(
+    tree: &SyntaxNode,
+    ctx: YamlValidationContext,
+) -> Option<YamlDiagnostic> {
+    // Implicit empty block mapping key — rejected by EVERY real consumer.
+    if ctx.any_rejects(ConsumerSet::all())
+        && let Some(diag) = check_implicit_empty_block_key(tree)
+    {
+        return Some(diag);
+    }
+    // Duplicate mapping key — rejected by js-yaml (Quarto) and R `yaml`
+    // (RMarkdown), but NOT pandoc/libyaml (which take the last value).
+    let dup_rejectors = ConsumerSet::of(YamlConsumer::Jsyaml).with(YamlConsumer::RYaml);
+    if ctx.any_rejects(dup_rejectors)
+        && let Some(diag) = check_duplicate_keys(tree)
+    {
+        return Some(diag);
+    }
     None
+}
+
+/// Trivia inside a mapping key that carries no key identity.
+fn is_key_trivia(kind: SyntaxKind) -> bool {
+    matches!(
+        kind,
+        SyntaxKind::WHITESPACE
+            | SyntaxKind::NEWLINE
+            | SyntaxKind::YAML_COMMENT
+            | SyntaxKind::YAML_LINE_PREFIX
+    )
+}
+
+/// Consumer check — implicit empty block mapping key.
+///
+/// A `YAML_BLOCK_MAP_KEY` whose only non-trivia child is the `:` (`:`,
+/// `: a`⏎`: b`, `- :`, a nested `: x`) is valid YAML 1.2 but rejected by every
+/// real consumer. Block-only by construction: flow-context empty keys (`[:x]`,
+/// `{x: :x}`) are accepted by libyaml/js-yaml and live under `YAML_FLOW_MAP_KEY`,
+/// so they are never matched here. Explicit (`?`) keys and anchored/tagged keys
+/// carry a non-colon child and are likewise skipped.
+fn check_implicit_empty_block_key(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    for key in tree
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)
+    {
+        let mut non_trivia = key
+            .children_with_tokens()
+            .filter(|el| !is_key_trivia(el.kind()));
+        let first = non_trivia.next();
+        let is_colon_only = matches!(&first, Some(el) if el.kind() == SyntaxKind::YAML_COLON)
+            && non_trivia.next().is_none();
+        if is_colon_only {
+            let range = first.expect("checked above").text_range();
+            return Some(YamlDiagnostic {
+                code: diagnostic_codes::CONSUMER_IMPLICIT_EMPTY_KEY,
+                message: "implicit empty mapping key is rejected by pandoc and quarto",
+                byte_start: range.start().into(),
+                byte_end: range.end().into(),
+            });
+        }
+    }
+    None
+}
+
+/// Consumer check — duplicate mapping key (js-yaml only).
+///
+/// Within a single block or flow mapping, two entries with the same simple
+/// scalar key are rejected by js-yaml (`duplicated mapping key`); libyaml and
+/// pandoc accept them (last value wins). Only *simple scalar* keys are tracked;
+/// explicit (`?`), anchored/tagged, and collection keys are skipped, so the
+/// comparison never produces a false positive. Key identity is the scalar's
+/// source text — a conservative match that can miss `a` vs `"a"` (a false
+/// negative, never a false positive).
+fn check_duplicate_keys(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+    for map in tree.descendants().filter(|n| {
+        matches!(
+            n.kind(),
+            SyntaxKind::YAML_BLOCK_MAP | SyntaxKind::YAML_FLOW_MAP
+        )
+    }) {
+        let (entry_kind, key_kind) = if map.kind() == SyntaxKind::YAML_BLOCK_MAP {
+            (
+                SyntaxKind::YAML_BLOCK_MAP_ENTRY,
+                SyntaxKind::YAML_BLOCK_MAP_KEY,
+            )
+        } else {
+            (
+                SyntaxKind::YAML_FLOW_MAP_ENTRY,
+                SyntaxKind::YAML_FLOW_MAP_KEY,
+            )
+        };
+        let mut seen: HashSet<String> = HashSet::new();
+        for entry in map.children().filter(|n| n.kind() == entry_kind) {
+            let Some(key) = entry.children().find(|n| n.kind() == key_kind) else {
+                continue;
+            };
+            let Some(name) = simple_scalar_key_text(&key) else {
+                continue;
+            };
+            if !seen.insert(name) {
+                let range = key.text_range();
+                return Some(YamlDiagnostic {
+                    code: diagnostic_codes::CONSUMER_DUPLICATE_KEY,
+                    message: "duplicate mapping key is rejected by quarto and rmarkdown",
+                    byte_start: range.start().into(),
+                    byte_end: range.end().into(),
+                });
+            }
+        }
+    }
+    None
+}
+
+/// The source text of a mapping key that is a single simple scalar, or `None`
+/// if the key is explicit (`?`), anchored/tagged, a collection, or otherwise
+/// not a lone scalar.
+fn simple_scalar_key_text(key: &SyntaxNode) -> Option<String> {
+    let mut scalar: Option<SyntaxNode> = None;
+    for child in key.children_with_tokens() {
+        match child.kind() {
+            SyntaxKind::YAML_COLON => {}
+            k if is_key_trivia(k) => {}
+            SyntaxKind::YAML_SCALAR => {
+                if scalar.is_some() {
+                    return None;
+                }
+                scalar = child.into_node();
+            }
+            _ => return None,
+        }
+    }
+    scalar.map(|node| node.text().to_string())
 }
 
 fn collect_tokens(input: &str) -> Vec<Token> {
@@ -2636,6 +2798,33 @@ mod tests {
 
     fn run(input: &str) -> Option<YamlDiagnostic> {
         validate_yaml(input)
+    }
+
+    #[test]
+    fn validate_yaml_equals_substrate_context() {
+        // `validate_yaml` must stay a thin wrapper over the substrate context so
+        // the yaml-test-suite verdicts can never drift from it.
+        let samples = [
+            "title: ok\n",               // valid
+            "this\n is\n  invalid: x\n", // structural 1.2 error
+            ": a\n",                     // valid 1.2 (implicit empty key) — Pool-2 only
+            "a: 1\na: 2\n",              // valid 1.2 (duplicate key) — Pool-2 only
+        ];
+        for input in samples {
+            assert_eq!(
+                validate_yaml(input),
+                validate_yaml_with_context(input, YamlValidationContext::substrate()),
+                "substrate wrapper drifted for {input:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn substrate_never_runs_consumer_only_checks() {
+        // Implicit empty key and duplicate key are valid YAML 1.2: the substrate
+        // path must accept them (Pool-2 is gated off), keeping suite parity.
+        assert!(validate_yaml(": a\n").is_none());
+        assert!(validate_yaml("a: 1\na: 2\n").is_none());
     }
 
     #[test]

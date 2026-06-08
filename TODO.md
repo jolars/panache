@@ -805,38 +805,52 @@ memory `project_yaml_consumer_parsers.md`):
   parse-acceptance (pandoc treats metadata scalars as strings), so they don't
   matter for "will it parse" validation.
 
-**Concretely deferred work:**
+**Policy landed (2026-06-08): consumer profiles on top of a 1.2 substrate.**
 
-- [ ] **Implicit empty keys.** A `YAML_BLOCK_MAP_KEY` whose only non-trivia
-      child is `YAML_COLON` (`:`, `a: b`⏎`: c`, `- : c`, `k:`⏎`: c`) is valid
-      YAML 1.2 but rejected by BOTH pandoc and quarto. A drafted
-      `check_implicit_empty_block_key` (reuse `PARSE_INVALID_KEY_TOKEN`; skip
-      explicit `?` keys and anchor/tag keys, which both consumers accept) was
-      **written and reverted** this session --- it works and matches the real
-      consumers, but flips 8 allowlisted YAML-1.2 "valid" cases (NHX8, 2JQS,
-      S3PD, 6M2F, M2N8/00, SM9W/01, UKK6/00, an NKF9 sub-doc) to rejected. All 8
-      are rejected by pandoc --- so this is a deliberate move toward consumer
-      fidelity, not a false positive. Decide first whether to take it.
-- [ ] **Decide the policy:** keep targeting abstract YAML 1.2 (lenient; won't
-      catch what pandoc/quarto reject), or target the real consumers. The latter
-      means **deliberately overriding the upstream yaml-test-suite verdict** for
-      those 8 cases --- they ship with a `test.event` and no `error` marker
-      (valid per 1.2), so tightening moves them from the valid/event-parity
-      bucket to the error-contract bucket in our mirror. That's a contract
-      divergence from upstream, not just an internal allowlist tweak: update the
-      `.claude/rules/yaml-tests.md` guidance (which currently assumes
-      allowlisted-valid == upstream-valid) and the stale allowlist header, and
-      decide how the harness should record "1.2-valid but consumer-rejected" so
-      a future suite refresh doesn't silently flip them back.
-- [ ] **Context/flavor-aware strictness** for cases where libyaml and js-yaml
-      genuinely diverge (tabs, and audit for others). Keys naturally off the
-      existing `flavor` (Quarto vs Pandoc) and the YAML location (frontmatter vs
-      hashpipe `#|`). Only needed for the divergent cases; the agreed-upon
-      rejections can stay uniform.
-- [ ] **Remaining false-negative** noted in passing: `? : x` (one-line explicit
-      empty key) is rejected by pandoc but the drafted check leaves it alone (it
-      has a `?`). Lower priority; characterize against both consumers before
-      tightening.
+The validator now targets the real consumers, conditioned on (flavor, location),
+without disturbing the 1.2 substrate. A `YamlValidationContext`
+(`crates/panache-parser/src/parser/yaml/profile.rs`) maps (flavor, location) →
+active consumer set; `validate_yaml_with_context` runs the existing \~25
+substrate checks (Pool 1) followed by consumer-only checks (Pool 2) that never
+run on the substrate path. `validate_yaml` stays a substrate wrapper, so the
+yaml-test-suite verdicts are **unchanged** (no upstream-verdict override, no
+allowlist churn). Flavor is threaded into `emit_yaml_block` /
+`parse_fenced_code_block`; the parser's syntax-error channel carries the
+consumer diagnostics straight to lint/LSP. The accept/reject ground truth came
+from an empirical audit of every suite case through libyaml (Ruby Psych),
+pandoc, and js-yaml --- see `scripts/yaml-oracle/` and the full classification
+in `crates/panache-parser/tests/yaml/consumer-matrix.md`.
+
+- [x] **Implicit empty keys** --- `check_implicit_empty_block_key`, Pool 2,
+      rejected by libyaml+js-yaml (every real flavor). Block-only, so the
+      flow-context empty keys both consumers accept (`[:x]`, `{x: :x}`) are
+      untouched. The 8 allowlisted 1.2-valid cases stay valid (Pool 2 is skipped
+      on the substrate path).
+- [x] **Duplicate keys** --- `check_duplicate_keys`, Pool 2, rejected by js-yaml
+      (Quarto) AND R's `yaml` package (RMarkdown), but NOT pandoc/libyaml (last
+      value wins). R-yaml is a measured third consumer: libyaml-based but adds a
+      duplicate-key (and tab) rejection, so RMarkdown
+      frontmatter={libyaml,ryaml} and hashpipe={ryaml}. The oracle audit now has
+      an `ryaml` column (R 4.5.3, yaml 2.3.12) and the soundness test covers
+      RMarkdown.
+- [ ] **Tabs as indentation --- DEFERRED (needs parser surgery).** The audit
+      disproved the blanket "pandoc accepts tabs" assumption: pandoc accepts
+      tabs in scalar content / flow / after a block-seq dash but **rejects**
+      them in explicit-key context (Y79Y/006--009). The panache check that fires
+      (`PARSE_UNEXPECTED_INDENT`) is overloaded across 12 cases with mixed
+      pandoc verdicts, so it cannot be suppressed at check granularity. Acting
+      on it requires emitting a tab-context-specific diagnostic so the accepted
+      contexts can be gated per-consumer. The (flavor, location) plumbing landed
+      here is the prerequisite; a Pool-1 `suppressed_for` hook is the intended
+      extension point (documented in `validate_yaml_with_context`).
+- [ ] **pandoc metadata-must-be-a-mapping --- OUT OF SCOPE.** 11 frontmatter
+      cases (e.g. `LX3P` `[flow]: block`, top-level sequences) where pandoc
+      rejects but libyaml accepts. This is a frontmatter-shape rule, not YAML
+      parse validity --- a candidate future lint. See
+      `scripts/yaml-oracle/oracle-discrepancies.md`.
+- [ ] **`? : x`** (one-line explicit empty key) is rejected by pandoc but the
+      empty-key check intentionally skips explicit (`?`) keys. Low priority;
+      characterize against both consumers before tightening.
 
 ## Parser - Coverage
 

@@ -35,6 +35,7 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
 use super::model::{YamlDiagnostic, YamlParseReport};
+use super::profile::YamlValidationContext;
 use super::scanner::{Scanner, TokenKind, TriviaKind};
 
 /// Strip a per-line `prefix` (marker plus at most one following space)
@@ -104,16 +105,30 @@ fn strip_line_prefix_with_offsets(input: &str, prefix: &str) -> (String, Vec<usi
 /// [`validate_yaml_with_prefix`]. The host parser adds the region's document
 /// start to emit a host-ranged `SyntaxError` for malformed embedded YAML.
 pub fn locate_yaml_diagnostic(input: &str, prefix: &str) -> Option<(YamlDiagnostic, usize, usize)> {
+    locate_yaml_diagnostic_ctx(input, prefix, YamlValidationContext::substrate())
+}
+
+/// Like [`locate_yaml_diagnostic`], but validates under `ctx` — the
+/// (flavor, location) consumer profile for this YAML region. The host parser
+/// builds `ctx` from the document flavor and whether the region is frontmatter
+/// or a hashpipe `#|` body, so consumer-only rejections (implicit empty keys,
+/// duplicate keys) surface for the parsers that actually read the YAML.
+pub fn locate_yaml_diagnostic_ctx(
+    input: &str,
+    prefix: &str,
+    ctx: YamlValidationContext,
+) -> Option<(YamlDiagnostic, usize, usize)> {
     if prefix.is_empty() {
-        let diag = super::validator::validate_yaml(input)?;
+        let diag = super::validator::validate_yaml_with_context(input, ctx)?;
         let start = diag.byte_start.min(input.len());
         let end = diag.byte_end.min(input.len()).max(start);
         return Some((diag, start, end));
     }
     // Validate cheaply first (no offset table) — the common, valid path returns
-    // here with the same verdict as `validate_yaml_with_prefix`. Only build the
-    // lockstep offset map when there's actually a diagnostic to locate.
-    let diag = super::validator::validate_yaml(&strip_line_prefix(input, prefix))?;
+    // here. Only build the lockstep offset map when there's actually a
+    // diagnostic to locate.
+    let diag =
+        super::validator::validate_yaml_with_context(&strip_line_prefix(input, prefix), ctx)?;
     let (_stripped, offsets) = strip_line_prefix_with_offsets(input, prefix);
     let start = offsets.get(diag.byte_start).copied().unwrap_or(input.len());
     let end = offsets

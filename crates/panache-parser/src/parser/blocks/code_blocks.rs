@@ -7,9 +7,12 @@ use rowan::{GreenNodeBuilder, TextRange};
 
 use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
 use super::container_prefix::{StrippedLines, advance_columns};
+use crate::options::Flavor;
 use crate::parser::utils::container_stack::byte_index_at_column;
 use crate::parser::utils::tree_copy::copy_green_children;
-use crate::parser::yaml::{locate_yaml_diagnostic, parse_stream_with_prefix};
+use crate::parser::yaml::{
+    YamlValidationContext, locate_yaml_diagnostic_ctx, parse_stream_with_prefix,
+};
 
 // Container-prefix primitives live in `container_prefix.rs` (the lower
 // layer that hosts `StrippedLines`); re-export so existing call sites in
@@ -1100,6 +1103,7 @@ pub(crate) fn parse_fenced_code_block(
     fence: FenceInfo,
     first_line_override: Option<&str>,
     diags: &Diagnostics,
+    flavor: Flavor,
 ) -> usize {
     let lines = window.raw();
     let start_pos = window.pos();
@@ -1229,7 +1233,10 @@ pub(crate) fn parse_fenced_code_block(
                     content_indent,
                 );
 
-                if let Some((diag, start_off, end_off)) = locate_yaml_diagnostic(&content, marker) {
+                let yaml_ctx = YamlValidationContext::hashpipe(flavor);
+                if let Some((diag, start_off, end_off)) =
+                    locate_yaml_diagnostic_ctx(&content, marker, yaml_ctx)
+                {
                     // Malformed hashpipe YAML: record the syntax error at its
                     // host position — the parser already computed the verdict,
                     // so it surfaces the diagnostic here instead of discarding

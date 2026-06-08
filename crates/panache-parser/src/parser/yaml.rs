@@ -15,6 +15,8 @@ mod events;
 mod model;
 #[path = "yaml/parser.rs"]
 mod parser;
+#[path = "yaml/profile.rs"]
+mod profile;
 #[path = "yaml/scanner.rs"]
 mod scanner;
 #[path = "yaml/validator.rs"]
@@ -27,9 +29,10 @@ pub use events::{project_events, project_events_from_tree};
 pub(crate) use cooking::cook;
 pub use model::{YamlDiagnostic, YamlParseReport, diagnostic_codes};
 pub use parser::{
-    locate_yaml_diagnostic, parse_stream, parse_stream_with_prefix, parse_yaml_report,
-    parse_yaml_tree, validate_yaml_with_prefix,
+    locate_yaml_diagnostic, locate_yaml_diagnostic_ctx, parse_stream, parse_stream_with_prefix,
+    parse_yaml_report, parse_yaml_tree, validate_yaml_with_prefix,
 };
+pub use profile::{ConsumerSet, YamlConsumer, YamlLocation, YamlValidationContext};
 pub(crate) use scanner::ScalarStyle;
 
 #[doc(hidden)]

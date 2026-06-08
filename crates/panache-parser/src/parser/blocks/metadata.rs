@@ -1,9 +1,10 @@
 //! YAML metadata block parsing utilities.
 
+use crate::options::Flavor;
 use crate::parser::diagnostics::{Diagnostics, SyntaxError, SyntaxErrorSource};
 use crate::parser::utils::helpers::{emit_line_tokens, strip_newline};
 use crate::parser::utils::tree_copy::copy_green_children;
-use crate::parser::yaml::{locate_yaml_diagnostic, parse_stream};
+use crate::parser::yaml::{YamlValidationContext, locate_yaml_diagnostic_ctx, parse_stream};
 use crate::syntax::SyntaxKind;
 use rowan::{GreenNodeBuilder, TextRange};
 
@@ -20,9 +21,10 @@ pub(crate) fn try_parse_yaml_block(
     builder: &mut GreenNodeBuilder<'static>,
     at_document_start: bool,
     diags: &Diagnostics,
+    flavor: Flavor,
 ) -> Option<usize> {
     let closing_pos = find_yaml_block_closing_pos(lines, pos, at_document_start)?;
-    emit_yaml_block(lines, pos, closing_pos, builder, diags)
+    emit_yaml_block(lines, pos, closing_pos, builder, diags, flavor)
 }
 
 pub(crate) fn find_yaml_block_closing_pos(
@@ -78,6 +80,7 @@ pub(crate) fn emit_yaml_block(
     closing_pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
     diags: &Diagnostics,
+    flavor: Flavor,
 ) -> Option<usize> {
     if pos >= lines.len() || closing_pos <= pos || closing_pos >= lines.len() {
         return None;
@@ -115,7 +118,8 @@ pub(crate) fn emit_yaml_block(
     // `find_yaml_block_closing_pos` guarantees a single document by
     // stopping at the first internal `---` / `...`). Splice the stream's
     // children in directly to avoid the redundant wrapper.
-    if let Some((diag, start_off, end_off)) = locate_yaml_diagnostic(&content, "") {
+    let yaml_ctx = YamlValidationContext::frontmatter(flavor);
+    if let Some((diag, start_off, end_off)) = locate_yaml_diagnostic_ctx(&content, "", yaml_ctx) {
         // Malformed frontmatter YAML: record the syntax error at its host
         // position (the parser already has the verdict), then fall back to the
         // opaque line-token shape. `content` begins at `lines[pos + 1]`, a
@@ -318,7 +322,14 @@ mod tests {
     fn test_yaml_block_at_start() {
         let lines = vec!["---", "title: Test", "---", "Content"];
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_yaml_block(&lines, 0, &mut builder, true, &Diagnostics::default());
+        let result = try_parse_yaml_block(
+            &lines,
+            0,
+            &mut builder,
+            true,
+            &Diagnostics::default(),
+            Flavor::Pandoc,
+        );
         assert_eq!(result, Some(3));
     }
 
@@ -326,7 +337,14 @@ mod tests {
     fn test_yaml_block_not_at_start() {
         let lines = vec!["Paragraph", "", "---", "title: Test", "---", "Content"];
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_yaml_block(&lines, 2, &mut builder, false, &Diagnostics::default());
+        let result = try_parse_yaml_block(
+            &lines,
+            2,
+            &mut builder,
+            false,
+            &Diagnostics::default(),
+            Flavor::Pandoc,
+        );
         assert_eq!(result, Some(5));
     }
 
@@ -334,7 +352,14 @@ mod tests {
     fn test_horizontal_rule_not_yaml() {
         let lines = vec!["---", "", "Content"];
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_yaml_block(&lines, 0, &mut builder, true, &Diagnostics::default());
+        let result = try_parse_yaml_block(
+            &lines,
+            0,
+            &mut builder,
+            true,
+            &Diagnostics::default(),
+            Flavor::Pandoc,
+        );
         assert_eq!(result, None); // Followed by blank line, so not YAML
     }
 
@@ -342,7 +367,14 @@ mod tests {
     fn test_yaml_with_dots_closer() {
         let lines = vec!["---", "title: Test", "...", "Content"];
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_yaml_block(&lines, 0, &mut builder, true, &Diagnostics::default());
+        let result = try_parse_yaml_block(
+            &lines,
+            0,
+            &mut builder,
+            true,
+            &Diagnostics::default(),
+            Flavor::Pandoc,
+        );
         assert_eq!(result, Some(3));
     }
 
@@ -350,7 +382,14 @@ mod tests {
     fn test_yaml_without_closing_delimiter_is_not_yaml_block() {
         let lines = vec!["---", "title: Test", "Content"];
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_yaml_block(&lines, 0, &mut builder, true, &Diagnostics::default());
+        let result = try_parse_yaml_block(
+            &lines,
+            0,
+            &mut builder,
+            true,
+            &Diagnostics::default(),
+            Flavor::Pandoc,
+        );
         assert_eq!(result, None);
     }
 
