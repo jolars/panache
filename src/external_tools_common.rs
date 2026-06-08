@@ -2,10 +2,90 @@
 
 use std::collections::HashSet;
 use std::io::IsTerminal;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Condvar, Mutex, OnceLock};
 
 static WARNED_MESSAGES: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 static COLOR_OVERRIDE: OnceLock<Option<bool>> = OnceLock::new();
+
+/// Process-wide ceiling on concurrent external-tool subprocesses, shared by the
+/// external-formatter and external-linter paths.
+///
+/// Both paths build their own per-batch rayon pools (each capped at
+/// `external_max_parallel`); without a shared budget, a concurrent format + lint
+/// could spin up to 2× that many subprocesses. Every external subprocess
+/// acquires a [`Permit`] from this single budget first, so the live total never
+/// exceeds the configured cap regardless of how the two paths are composed.
+static EXTERNAL_TOOL_BUDGET: OnceLock<ExternalToolBudget> = OnceLock::new();
+
+/// A counting semaphore: at most `count` permits may be held at once.
+pub struct ExternalToolBudget {
+    available: Mutex<usize>,
+    released: Condvar,
+}
+
+impl ExternalToolBudget {
+    /// Create a budget allowing up to `n` concurrent permits (`n >= 1`).
+    pub fn new(n: usize) -> Self {
+        Self {
+            available: Mutex::new(n.max(1)),
+            released: Condvar::new(),
+        }
+    }
+
+    /// Acquire a permit, blocking while none are available. The returned
+    /// [`Permit`] releases the slot on drop (including on unwind).
+    pub fn acquire(&'static self) -> Permit {
+        let mut available = self.available.lock().expect("budget mutex poisoned");
+        while *available == 0 {
+            available = self
+                .released
+                .wait(available)
+                .expect("budget mutex poisoned");
+        }
+        *available -= 1;
+        Permit { budget: self }
+    }
+}
+
+/// RAII guard returned by [`ExternalToolBudget::acquire`]; returns its slot to
+/// the budget when dropped.
+pub struct Permit {
+    budget: &'static ExternalToolBudget,
+}
+
+impl Drop for Permit {
+    fn drop(&mut self) {
+        let mut available = self.budget.available.lock().expect("budget mutex poisoned");
+        *available += 1;
+        self.budget.released.notify_one();
+    }
+}
+
+/// Size the shared external-tool budget. Idempotent — the first caller wins, so
+/// concurrent per-file config loads race safely. Call before the per-file
+/// `--parallel` override so the budget reflects the user-configured value.
+pub fn init_external_tool_budget(n: usize) {
+    EXTERNAL_TOOL_BUDGET.get_or_init(|| ExternalToolBudget::new(n));
+}
+
+/// Acquire a permit from the shared external-tool budget, blocking until one is
+/// free. Lazily initializes the budget to the machine default if
+/// [`init_external_tool_budget`] was never called (direct library/`crate::format`
+/// callers and tests).
+pub fn acquire_external_tool_permit() -> Permit {
+    EXTERNAL_TOOL_BUDGET
+        .get_or_init(|| ExternalToolBudget::new(default_external_tool_budget()))
+        .acquire()
+}
+
+/// Conservative machine default, mirroring `default_external_max_parallel`:
+/// available parallelism clamped to `[1, 8]`.
+fn default_external_tool_budget() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
+        .clamp(1, 8)
+}
 
 /// Find missing commands from an iterator of command names.
 #[cfg(not(target_arch = "wasm32"))]
@@ -112,8 +192,8 @@ fn has_path_separator(cmd: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        default_stderr_warning_color, find_missing_commands, format_warning_line, log_warning_once,
-        missing_commands_warning_message,
+        ExternalToolBudget, default_stderr_warning_color, find_missing_commands,
+        format_warning_line, log_warning_once, missing_commands_warning_message,
     };
     use std::collections::HashSet;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -123,6 +203,47 @@ mod tests {
     fn unique_message(prefix: &str) -> String {
         let n = TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
         format!("{}-{}", prefix, n)
+    }
+
+    #[test]
+    fn budget_caps_concurrent_permits() {
+        const CAP: usize = 3;
+        const THREADS: usize = 12;
+
+        // `acquire` needs a `&'static` budget; leak one for the test.
+        let budget: &'static ExternalToolBudget = Box::leak(Box::new(ExternalToolBudget::new(CAP)));
+        let live = AtomicUsize::new(0);
+        let peak = AtomicUsize::new(0);
+
+        std::thread::scope(|scope| {
+            for _ in 0..THREADS {
+                scope.spawn(|| {
+                    let _permit = budget.acquire();
+                    let now = live.fetch_add(1, Ordering::SeqCst) + 1;
+                    peak.fetch_max(now, Ordering::SeqCst);
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                    live.fetch_sub(1, Ordering::SeqCst);
+                });
+            }
+        });
+
+        assert!(
+            peak.load(Ordering::SeqCst) <= CAP,
+            "observed {} concurrent permits, expected <= {CAP}",
+            peak.load(Ordering::SeqCst)
+        );
+        // All permits returned: a fresh acquire must not block forever.
+        let _permit = budget.acquire();
+    }
+
+    #[test]
+    fn budget_recovers_after_permit_drop() {
+        let budget: &'static ExternalToolBudget = Box::leak(Box::new(ExternalToolBudget::new(1)));
+        {
+            let _permit = budget.acquire();
+        }
+        // The single slot is free again after the guard dropped.
+        let _permit = budget.acquire();
     }
 
     #[test]

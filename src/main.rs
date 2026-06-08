@@ -1054,6 +1054,9 @@ fn main() -> io::Result<()> {
                     eprintln!("Error: {err}");
                     std::process::exit(2);
                 }
+                // Size the shared external-tool budget from the user-configured
+                // value before the per-file `--parallel` override forces it to 1.
+                panache::init_external_tool_budget(cfg.external_max_parallel);
                 if parallel {
                     cfg.external_max_parallel = 1;
                 }
@@ -1714,6 +1717,9 @@ fn main() -> io::Result<()> {
                     Some(file_path),
                     cli.flavor.map(Flavor::from),
                 )?;
+                // Size the shared external-tool budget from the user-configured
+                // value before the per-file `--parallel` override forces it to 1.
+                panache::init_external_tool_budget(cfg.external_max_parallel);
                 if parallel {
                     cfg.external_max_parallel = 1;
                 }

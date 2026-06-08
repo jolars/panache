@@ -98,12 +98,22 @@ This document tracks implementation status for Panache's features.
       write, not an explicit cancel), so a cancelled hover/format burns its full
       CPU cost. Largely inherent (RA is similar); investigate a cooperative
       cancel flag checked at coarse points. Lowest priority --- deferred.
-- [ ] Follow-up (external-tool budget): formatters (`run_formatters_parallel`)
-      and the now-parallel external-linter loop (`src/linter/runner.rs`) each
-      build an independent rayon pool capped at `external_max_parallel`, so a
-      concurrent format + lint can spin up to 2x that many subprocess threads.
-      Coordinate a single shared external-tool thread budget across both paths.
-      Marked in code as `TODO(external-tool-budget)`.
+- [x] Follow-up (external-tool budget): formatters (`run_formatters_parallel`)
+      and the parallel external-linter loop (`src/linter/runner.rs`) each build
+      an independent rayon pool capped at `external_max_parallel`, so a
+      concurrent format + lint could spin up to 2x that many subprocess threads.
+      Done: a process-wide counting semaphore (`ExternalToolBudget` in
+      `src/external_tools_common.rs`) now bounds the live subprocess count
+      across both paths. Each block (formatter) / job (linter) acquires a
+      permit; the budget is sized from the user-configured
+      `external_max_parallel`.
+- [ ] Follow-up (external-tool budget, benchmarking): the CLI still forces
+      `external_max_parallel = 1` per file when processing multiple files in
+      parallel (`src/main.rs`). With the shared budget now providing a real
+      global ceiling, this per-file forcing may no longer be the best throughput
+      trade-off (N files could share the full budget instead of 1 each).
+      Re-benchmark nested format/lint over many files and decide whether to drop
+      the override.
 - [x] Follow-up (lsp-server): minor cleanups. Done: (b) the
       `Duration::from_secs(3600)` `select!` fallback is now a documented
       `IDLE_TICK` const in `src/lsp.rs`; (c) `spawn_request_on`'s

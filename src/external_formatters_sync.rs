@@ -264,6 +264,11 @@ pub fn run_formatters_parallel(
                 let original = block.original;
                 let hashpipe_prefix = block.hashpipe_prefix;
 
+                // Bound concurrent subprocesses to the shared external-tool
+                // budget. Held for the whole chain; the chain runs sequentially,
+                // so at most one subprocess per permit is live at a time.
+                let _permit = crate::external_tools_common::acquire_external_tool_permit();
+
                 for (idx, formatter_cfg) in formatter_configs.iter().enumerate() {
                     let formatter_cmd = formatter_cfg.cmd.trim();
 

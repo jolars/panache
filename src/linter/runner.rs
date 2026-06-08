@@ -186,6 +186,9 @@ impl LintRunner {
             );
 
             let concatenated_result = concatenate_with_blanks_and_mapping(blocks);
+            // One job == one subprocess. Bound concurrency to the shared
+            // external-tool budget (also held by the formatter path).
+            let _permit = crate::external_tools_common::acquire_external_tool_permit();
             match crate::linter::external_linters_sync::run_linter_sync(
                 linter_name,
                 language,
@@ -215,11 +218,9 @@ impl LintRunner {
             jobs.into_iter().flat_map(run_one).collect()
         } else {
             use rayon::prelude::*;
-            // TODO(external-tool-budget): formatters (`run_formatters_parallel`)
-            // and linters each build their own pool capped at
-            // `external_max_parallel`, so a concurrent format + lint can spin up
-            // to 2× that many subprocess threads. Coordinate a single shared
-            // external-tool thread budget across both paths at a later stage.
+            // This pool sizes how many jobs dispatch at once; the live
+            // subprocess count is bounded by the shared external-tool budget
+            // acquired in `run_one`, which the formatter path shares too.
             let cap = config.external_max_parallel.max(1).min(jobs.len());
             let pool = rayon::ThreadPoolBuilder::new()
                 .num_threads(cap)
