@@ -244,6 +244,50 @@ echo $UNSET
         );
     }
 
+    /// Exercises the multi-language fan-out path (two configured linters in one
+    /// document → the parallel branch in `LintRunner`). Asserts both linters'
+    /// diagnostics survive the merge with their per-language line mapping
+    /// intact, regardless of completion order.
+    #[test]
+    fn test_multi_language_linters_run_in_parallel() {
+        if which::which("ruff").is_err() || which::which("shellcheck").is_err() {
+            println!("Skipping multi-language test - ruff and/or shellcheck not installed");
+            return;
+        }
+
+        let input = r#"# Test
+
+```python
+import os
+```
+
+```sh
+echo $UNSET
+```
+"#;
+
+        let mut config = Config::default();
+        let mut linters = HashMap::new();
+        linters.insert("python".to_string(), "ruff".to_string());
+        linters.insert("sh".to_string(), "shellcheck".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
+
+        let ruff_diags: Vec<_> = diagnostics.iter().filter(|d| d.code == "F401").collect();
+        assert_eq!(ruff_diags.len(), 1, "Expected 1 Ruff F401 diagnostic");
+        assert_eq!(ruff_diags[0].location.line, 4); // import os
+
+        let shell_diags: Vec<_> = diagnostics.iter().filter(|d| d.code == "SC2086").collect();
+        assert_eq!(
+            shell_diags.len(),
+            1,
+            "Expected 1 ShellCheck SC2086 diagnostic"
+        );
+        assert_eq!(shell_diags[0].location.line, 8); // echo $UNSET
+    }
+
     #[test]
     fn test_shellcheck_sc2148_not_reported_when_shell_is_known() {
         if which::which("shellcheck").is_err() {
