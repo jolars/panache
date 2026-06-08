@@ -16,6 +16,7 @@ extend-exclude = [
 [formatters]
 r = "air"
 toml = "taplo"
+rust = "rustfmt"
 bash = "shfmt"
 sh = "shfmt"
 python = "ruff"

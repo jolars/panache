@@ -285,6 +285,21 @@ fn effective_parallelism(cli_jobs: usize, n_files: usize) -> usize {
         .min(n_files)
 }
 
+/// Per-file share of the shared external-tool budget when the outer pool
+/// processes `workers` files concurrently.
+///
+/// The shared budget ([`panache::init_external_tool_budget`]) caps the *global*
+/// live-subprocess count, so each in-flight file may dispatch up to its share
+/// without the total ever exceeding the user-configured ceiling. Splitting the
+/// budget — rather than forcing 1-per-file — lets a handful of files still
+/// saturate it (3 files, budget 8 → 3 each; the budget then caps live
+/// subprocesses at 8), while a large batch collapses to 1-per-file
+/// (`workers >= budget`) and avoids oversubscribing threads across many inner
+/// pools.
+fn per_file_external_parallel(budget: usize, workers: usize) -> usize {
+    budget.div_ceil(workers.max(1)).max(1)
+}
+
 /// Build a rayon thread pool sized to `n` workers.
 fn build_pool(n: usize) -> rayon::ThreadPool {
     rayon::ThreadPoolBuilder::new()
@@ -1055,10 +1070,13 @@ fn main() -> io::Result<()> {
                     std::process::exit(2);
                 }
                 // Size the shared external-tool budget from the user-configured
-                // value before the per-file `--parallel` override forces it to 1.
+                // value, then split that ceiling across the files processed
+                // concurrently so a few files can saturate it while a large
+                // batch stays at ~1-per-file.
                 panache::init_external_tool_budget(cfg.external_max_parallel);
                 if parallel {
-                    cfg.external_max_parallel = 1;
+                    cfg.external_max_parallel =
+                        per_file_external_parallel(cfg.external_max_parallel, workers);
                 }
 
                 if let Some(path) = cfg_source.path() {
@@ -1718,10 +1736,13 @@ fn main() -> io::Result<()> {
                     cli.flavor.map(Flavor::from),
                 )?;
                 // Size the shared external-tool budget from the user-configured
-                // value before the per-file `--parallel` override forces it to 1.
+                // value, then split that ceiling across the files processed
+                // concurrently so a few files can saturate it while a large
+                // batch stays at ~1-per-file.
                 panache::init_external_tool_budget(cfg.external_max_parallel);
                 if parallel {
-                    cfg.external_max_parallel = 1;
+                    cfg.external_max_parallel =
+                        per_file_external_parallel(cfg.external_max_parallel, workers);
                 }
 
                 if let Some(path) = cfg_source.path() {
@@ -2297,8 +2318,32 @@ fn runtime_diagnostic_from_cached(diag: &cache::CachedDiagnostic) -> panache::li
 
 #[cfg(test)]
 mod tests {
-    use super::{ColorMode, resolve_color};
+    use super::{ColorMode, per_file_external_parallel, resolve_color};
     use std::ffi::OsStr;
+
+    #[test]
+    fn few_files_split_the_budget_to_saturate_it() {
+        // 3 files sharing a budget of 8: each dispatches up to 3, so the inner
+        // pools can collectively keep the budget (capped at 8) busy.
+        assert_eq!(per_file_external_parallel(8, 3), 3);
+        // 2 files split an even budget exactly.
+        assert_eq!(per_file_external_parallel(8, 2), 4);
+    }
+
+    #[test]
+    fn many_files_collapse_to_one_per_file() {
+        // workers >= budget: no point dispatching more than one per file.
+        assert_eq!(per_file_external_parallel(8, 8), 1);
+        assert_eq!(per_file_external_parallel(8, 16), 1);
+    }
+
+    #[test]
+    fn per_file_share_never_drops_below_one() {
+        assert_eq!(per_file_external_parallel(1, 4), 1);
+        assert_eq!(per_file_external_parallel(0, 4), 1);
+        // A degenerate zero worker count must not divide by zero.
+        assert_eq!(per_file_external_parallel(4, 0), 4);
+    }
 
     #[test]
     fn auto_disables_color_when_term_is_dumb() {

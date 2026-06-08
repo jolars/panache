@@ -107,13 +107,14 @@ This document tracks implementation status for Panache's features.
       across both paths. Each block (formatter) / job (linter) acquires a
       permit; the budget is sized from the user-configured
       `external_max_parallel`.
-- [ ] Follow-up (external-tool budget, benchmarking): the CLI still forces
+- [x] Follow-up (external-tool budget): the CLI used to force
       `external_max_parallel = 1` per file when processing multiple files in
-      parallel (`src/main.rs`). With the shared budget now providing a real
-      global ceiling, this per-file forcing may no longer be the best throughput
-      trade-off (N files could share the full budget instead of 1 each).
-      Re-benchmark nested format/lint over many files and decide whether to drop
-      the override.
+      parallel, which underused the shared budget for small batches (2-3 files
+      could only run 2-3 external subprocesses even with a budget of 8). Done:
+      `per_file_external_parallel` in `src/main.rs` now splits the shared budget
+      across the in-flight files (`div_ceil(budget, workers)`), so a handful of
+      files saturate the budget while a large batch still collapses to
+      \~1-per-file and avoids oversubscribing inner-pool threads.
 - [ ] Follow-up (external-tool budget, benchmarking): the formatter invokes one
       subprocess *per code block* (`run_formatters_parallel` in
       `src/external_formatters_sync.rs` does
