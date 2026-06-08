@@ -1,5 +1,10 @@
-# yaml-test-suite case IDs currently covered by our incremental Panache YAML parser harness.
-# Keep this list intentionally small and grow it with parser capability.
+# yaml-test-suite case IDs covered by the Panache YAML parser harness.
+# This now covers the ENTIRE vendored suite (all cases, valid + error-contract),
+# not a curated subset. Each case's valid/error verdict is inherited from the
+# upstream `test.event` / `error` files. See TODO.md "YAML validation: consumer
+# fidelity vs YAML 1.2": tightening toward pandoc/quarto would deliberately
+# override the upstream verdict for some 1.2-valid cases, so do not assume
+# allowlisted == upstream-valid when editing this list.
 D9TU
 3UYS
 4UYU

@@ -786,10 +786,14 @@ line/column (verified against Ruby Psych). This bug class (scanner diagnostics
 the validator drops) is now closed --- audited all 6 `LEX_*` codes.
 
 **The bigger open question --- which YAML dialect should the validator target?**
-panache currently validates against **YAML 1.2** (the yaml-test-suite allowlist
-at `crates/panache-parser/tests/yaml/allowlist.txt`). But the *real consumers*
-are stricter and differ by context (see memory
-`project_yaml_consumer_parsers.md`):
+panache currently validates against **YAML 1.2**, pinned by the allowlist
+(`crates/panache-parser/tests/yaml/allowlist.txt`), which covers the **entire**
+vendored yaml-test-suite --- all 402 cases (308 valid held to event-parity + 94
+held to error-contract), NOT a curated subset. (The file's header comment "Keep
+this list intentionally small" is stale; it was grown to full coverage.) So each
+case's valid/error status is inherited from the upstream suite's `test.event` /
+`error` files. But the *real consumers* are stricter and differ by context (see
+memory `project_yaml_consumer_parsers.md`):
 
 - **Frontmatter** → pandoc → Haskell `yaml`/**libyaml** (≈ YAML 1.1).
 - **Hashpipe `#|` cell options** → Quarto → **js-yaml** (YAML 1.2). In a Quarto
@@ -814,11 +818,16 @@ are stricter and differ by context (see memory
       are rejected by pandoc --- so this is a deliberate move toward consumer
       fidelity, not a false positive. Decide first whether to take it.
 - [ ] **Decide the policy:** keep targeting abstract YAML 1.2 (lenient; won't
-      catch what pandoc/quarto reject), or target the real consumers. If the
-      latter, the allowlist contract changes (those 8 cases move out of the
-      valid bucket --- and the `yaml-tests.md` rule about not allowlisting
-      `error` cases needs a companion note about 1.2-valid-but-consumer-rejected
-      cases).
+      catch what pandoc/quarto reject), or target the real consumers. The latter
+      means **deliberately overriding the upstream yaml-test-suite verdict** for
+      those 8 cases --- they ship with a `test.event` and no `error` marker
+      (valid per 1.2), so tightening moves them from the valid/event-parity
+      bucket to the error-contract bucket in our mirror. That's a contract
+      divergence from upstream, not just an internal allowlist tweak: update the
+      `.claude/rules/yaml-tests.md` guidance (which currently assumes
+      allowlisted-valid == upstream-valid) and the stale allowlist header, and
+      decide how the harness should record "1.2-valid but consumer-rejected" so
+      a future suite refresh doesn't silently flip them back.
 - [ ] **Context/flavor-aware strictness** for cases where libyaml and js-yaml
       genuinely diverge (tabs, and audit for others). Keys naturally off the
       existing `flavor` (Quarto vs Pandoc) and the YAML location (frontmatter vs
