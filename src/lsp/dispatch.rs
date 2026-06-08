@@ -391,13 +391,35 @@ impl GlobalState {
         };
         let sender = pool.result_sender();
         pool.spawn(move || {
-            let task = match catch_cancelled(|| f(&snap, params)) {
-                Some(value) => Task::Response(Response::new_ok(id, value)),
-                None => Task::Response(Response::new_err(
+            // `catch_cancelled` maps a salsa cancellation to `None` and
+            // re-raises every other panic. Catch those here so a handler bug
+            // becomes an `InternalError` response rather than unwinding past
+            // the send and leaving the request id forever unanswered (the
+            // client would hang). The worker's own `catch_unwind` only ever
+            // sees non-request jobs after this.
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                catch_cancelled(|| f(&snap, params))
+            }));
+            let task = match outcome {
+                Ok(Some(value)) => Task::Response(Response::new_ok(id, value)),
+                Ok(None) => Task::Response(Response::new_err(
                     id,
                     ErrorCode::ContentModified as i32,
                     "content modified".to_owned(),
                 )),
+                Err(panic) => {
+                    let msg = panic
+                        .downcast_ref::<&'static str>()
+                        .copied()
+                        .or_else(|| panic.downcast_ref::<String>().map(String::as_str))
+                        .unwrap_or("<non-string panic payload>");
+                    log::error!("LSP request handler panicked: {msg}");
+                    Task::Response(Response::new_err(
+                        id,
+                        ErrorCode::InternalError as i32,
+                        "internal error: request handler panicked".to_owned(),
+                    ))
+                }
             };
             let _ = sender.send(task);
         });
@@ -460,6 +482,42 @@ impl GlobalState {
             };
             // Debounced (per-keystroke) pass: dependents, built-in only.
             self.spawn_lint(uri, true, false);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lsp::global_state::ClientSender;
+    use std::time::Duration;
+
+    fn panicking_handler(_: &StateSnapshot, _: ()) {
+        panic!("boom");
+    }
+
+    /// A handler panic must come back as an `InternalError` response for the
+    /// request id, not vanish — otherwise the client waits forever.
+    #[test]
+    fn panicking_handler_yields_internal_error_response() {
+        let (tx, _client_rx) = crossbeam_channel::unbounded();
+        let mut gs = GlobalState::new(ClientSender::new(tx));
+
+        let id = RequestId::from(1);
+        gs.spawn_request::<(), ()>(id.clone(), (), panicking_handler);
+
+        let task = gs
+            .task_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("pooled handler should post a result even on panic");
+
+        match task {
+            Task::Response(resp) => {
+                assert_eq!(resp.id, id);
+                let err = resp.error.expect("panic should produce an error response");
+                assert_eq!(err.code, ErrorCode::InternalError as i32);
+            }
+            _ => panic!("expected a Task::Response"),
         }
     }
 }
