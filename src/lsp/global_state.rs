@@ -102,8 +102,6 @@ pub(crate) struct StateSnapshot {
     pub(crate) db: crate::salsa::SalsaDb,
     pub(crate) document_map: Arc<DocumentMap>,
     pub(crate) workspace_root: Option<PathBuf>,
-    #[allow(dead_code)]
-    pub(crate) runtime_settings: LspRuntimeSettings,
 }
 
 impl StateSnapshot {
@@ -256,7 +254,6 @@ impl GlobalState {
             db: self.salsa.clone(),
             document_map: Arc::clone(&self.document_map),
             workspace_root: self.workspace_root.clone(),
-            runtime_settings: self.runtime_settings.clone(),
         }
     }
 
