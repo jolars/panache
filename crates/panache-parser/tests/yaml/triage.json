@@ -3,7 +3,7 @@
     {
       "case_id": "236B",
       "diagnostic_codes": [
-        "YAML_PARSE_UNEXPECTED_DEDENT"
+        "YAML_LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND"
       ],
       "event_parity": false
     },
@@ -108,21 +108,21 @@
     {
       "case_id": "6S55",
       "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
+        "YAML_LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND"
       ],
       "event_parity": false
     },
     {
       "case_id": "7LBH",
       "diagnostic_codes": [
-        "YAML_PARSE_UNEXPECTED_DEDENT"
+        "YAML_LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND"
       ],
       "event_parity": false
     },
     {
       "case_id": "7MNF",
       "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
+        "YAML_LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND"
       ],
       "event_parity": false
     },
@@ -143,7 +143,7 @@
     {
       "case_id": "9CWY",
       "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
+        "YAML_LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND"
       ],
       "event_parity": false
     },
@@ -262,7 +262,7 @@
     {
       "case_id": "D49Q",
       "diagnostic_codes": [
-        "YAML_PARSE_UNEXPECTED_DEDENT"
+        "YAML_LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND"
       ],
       "event_parity": false
     },
@@ -318,35 +318,35 @@
     {
       "case_id": "G7JE",
       "diagnostic_codes": [
-        "YAML_PARSE_UNEXPECTED_DEDENT"
+        "YAML_LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND"
       ],
       "event_parity": false
     },
     {
       "case_id": "G9HC",
       "diagnostic_codes": [
-        "YAML_PARSE_UNEXPECTED_DEDENT"
+        "YAML_LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND"
       ],
       "event_parity": false
     },
     {
       "case_id": "GDY7",
       "diagnostic_codes": [
-        "YAML_PARSE_UNEXPECTED_DEDENT"
+        "YAML_LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND"
       ],
       "event_parity": false
     },
     {
       "case_id": "GT5M",
       "diagnostic_codes": [
-        "YAML_PARSE_ANCHOR_WITHOUT_TARGET"
+        "YAML_LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND"
       ],
       "event_parity": false
     },
     {
       "case_id": "H7J7",
       "diagnostic_codes": [
-        "YAML_PARSE_NODE_PROPERTY_UNDERINDENTED"
+        "YAML_LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND"
       ],
       "event_parity": false
     },
@@ -528,7 +528,7 @@
     {
       "case_id": "TD5N",
       "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
+        "YAML_LEX_REQUIRED_SIMPLE_KEY_NOT_FOUND"
       ],
       "event_parity": false
     },
