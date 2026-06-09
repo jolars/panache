@@ -586,6 +586,21 @@ intentionally excluded.
 - [x] Simple tables
 - [x] Pipe tables
 - [x] Grid tables
+      - [x] Column-spanning cells (#359): cells that straddle a boundary the
+            rest of the table observes are laid out span-aware
+            (`format_colspan_grid_table` in
+            `crates/panache-formatter/src/formatter/tables.rs`) instead of being
+            truncated/padded to the header's column count (which silently
+            dropped cell content). Canonical grid from separator `+` positions
+            only; columns sized to content; misaligned input falls back to a
+            lossless verbatim copy.
+      - [ ] Row-spanning grids (a `|` content row containing `+`, e.g.
+            `grid_table_planets`) still use the older
+            `format_spanning_grid_table_raw` passthrough, which re-pads but
+            carries data-specific hacks (`col_count == 12` alignment guesses for
+            the planets fixture) rather than modeling the rowspan structure.
+            Fold this into the same span-aware engine so the special-cases go
+            away; coordinate the colspan + rowspan geometry in one layout pass.
 - [x] Multiline tables
 
 ## Parser

@@ -291,6 +291,7 @@ golden_test_cases!(
     math_blockquote_experimental,
     math_format_off_default,
     grid_table,
+    grid_table_column_span,
     grid_table_nordics,
     grid_table_reflow,
     grid_table_planets,

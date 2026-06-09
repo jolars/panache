@@ -4,8 +4,8 @@ use crate::formatter::inline_layout::wrap_text_first_fit;
 use crate::formatter::sentence_wrap::{ResolvedProfile, resolve_profile, split_sentence_text};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
-use std::collections::HashMap;
-use unicode_width::UnicodeWidthStr;
+use std::collections::{BTreeSet, HashMap};
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Default indent (in spaces) for table types that self-indent at the top level
 /// (pipe, simple, multiline). Grid tables instead honor the container indent
@@ -1166,6 +1166,435 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
     }
 }
 
+/// Display-column positions of every `+`/`|` grid marker on a line, measured
+/// after stripping `common_indent` leading spaces. Grid markers line up by
+/// display column (not byte/char index), so wide characters are accounted for.
+fn grid_marker_columns(line: &str, common_indent: usize) -> BTreeSet<usize> {
+    let body = line
+        .char_indices()
+        .nth(common_indent)
+        .map(|(i, _)| &line[i..])
+        .unwrap_or("")
+        .trim_end();
+    let mut cols = BTreeSet::new();
+    let mut col = 0usize;
+    for ch in body.chars() {
+        if ch == '+' || ch == '|' {
+            cols.insert(col);
+        }
+        col += UnicodeWidthChar::width(ch).unwrap_or(0);
+    }
+    cols
+}
+
+/// Detect column-spanning grid tables: cells that straddle a column boundary
+/// present elsewhere in the table (the canonical pandoc colspan, written by
+/// omitting the `|`/`+` at that boundary on the spanning line). The structured
+/// formatter assumes every row carries the full set of columns and would
+/// truncate or pad spanning rows, dropping content. Such tables are preserved
+/// verbatim instead. Rowspan-style lines (a `|` row containing `+`) are handled
+/// earlier by `format_spanning_grid_table_raw`, so they never reach here.
+fn grid_table_has_column_spans(raw_table: &str) -> bool {
+    let grid_lines: Vec<&str> = raw_table
+        .lines()
+        .filter(|line| {
+            let t = line.trim_start();
+            let te = line.trim_end();
+            t.starts_with('+') || (t.starts_with('|') && te.ends_with('|'))
+        })
+        .collect();
+    if grid_lines.len() < 2 {
+        return false;
+    }
+
+    let common_indent = grid_lines
+        .iter()
+        .map(|line| line.chars().take_while(|c| *c == ' ').count())
+        .min()
+        .unwrap_or(0);
+
+    let per_line: Vec<BTreeSet<usize>> = grid_lines
+        .iter()
+        .map(|line| grid_marker_columns(line, common_indent))
+        .collect();
+    let union: BTreeSet<usize> = per_line.iter().flatten().copied().collect();
+
+    // A span exists when some line is missing a marker that other lines place
+    // strictly between this line's own outer markers -- i.e. a cell crosses a
+    // boundary the rest of the table observes.
+    per_line.iter().any(|cols| {
+        let (Some(&min), Some(&max)) = (cols.iter().next(), cols.iter().next_back()) else {
+            return false;
+        };
+        union
+            .iter()
+            .any(|&b| b > min && b < max && !cols.contains(&b))
+    })
+}
+
+/// One cell of a column-spanning grid table: its trimmed text plus the
+/// half-open range of canonical (fine) columns it covers.
+struct SpanCell {
+    start: usize,
+    end: usize,
+    text: String,
+}
+
+/// Split a content line into cells keyed by display column. Each cell records
+/// the display columns of its bounding `|` markers so it can be mapped onto the
+/// canonical boundary grid. Leading text before the first `|` is ignored (grid
+/// rows always open with `|`).
+fn split_colspan_cells(body: &str) -> Vec<(usize, usize, String)> {
+    let mut cells = Vec::new();
+    let mut col = 0usize;
+    let mut seg_start: Option<usize> = None;
+    let mut buf = String::new();
+    for ch in body.trim_end().chars() {
+        if ch == '|' {
+            if let Some(start) = seg_start {
+                cells.push((start, col, buf.trim().to_string()));
+                buf.clear();
+            }
+            seg_start = Some(col);
+        } else if seg_start.is_some() {
+            buf.push(ch);
+        }
+        col += UnicodeWidthChar::width(ch).unwrap_or(0);
+    }
+    cells
+}
+
+/// Interior width (excluding the single padding space on each side) of a cell
+/// occupying `span` fine columns whose individual content widths are `widths`.
+/// Merging n columns reclaims the n-1 internal `+`/`|` markers and their
+/// flanking padding: `sum(widths) + 3*(n-1)`.
+fn colspan_interior(widths: &[usize]) -> usize {
+    let sum: usize = widths.iter().sum();
+    sum + 3 * widths.len().saturating_sub(1)
+}
+
+/// Render one separator segment (between two `+`) of `interior` dashes, using
+/// `fill` (`-` or `=`) and applying alignment colons only when the segment sits
+/// on the alignment-bearing separator.
+fn render_separator_segment(
+    interior: usize,
+    fill: char,
+    align: Alignment,
+    on_align_line: bool,
+) -> String {
+    let mut seg: Vec<char> = std::iter::repeat_n(fill, interior + 2).collect();
+    if on_align_line && seg.len() >= 2 {
+        match align {
+            Alignment::Center => {
+                *seg.first_mut().unwrap() = ':';
+                *seg.last_mut().unwrap() = ':';
+            }
+            Alignment::Left => *seg.first_mut().unwrap() = ':',
+            Alignment::Right => *seg.last_mut().unwrap() = ':',
+            Alignment::Default => {}
+        }
+    }
+    seg.into_iter().collect()
+}
+
+/// Pad `text` to `interior` display columns under `align`.
+fn pad_colspan_cell(text: &str, interior: usize, align: Alignment) -> String {
+    let pad = interior.saturating_sub(text.width());
+    match align {
+        Alignment::Right => format!("{}{}", " ".repeat(pad), text),
+        Alignment::Center => {
+            let left = pad / 2;
+            format!("{}{}{}", " ".repeat(left), text, " ".repeat(pad - left))
+        }
+        _ => format!("{}{}", text, " ".repeat(pad)),
+    }
+}
+
+/// Lossless fallback: re-emit the (already de-captioned) table lines with only
+/// the common block indent stripped, then re-apply `indent`. Used when a table
+/// doesn't fit the colspan model we can lay out cleanly.
+fn colspan_verbatim(lines: &[&str], common_indent: usize, indent: usize) -> String {
+    let mut out = String::new();
+    for line in lines {
+        out.push_str(dedent_line(line, common_indent));
+        out.push('\n');
+    }
+    indent_table_block(&out, indent)
+}
+
+fn dedent_line(line: &str, common_indent: usize) -> &str {
+    line.char_indices()
+        .nth(common_indent)
+        .map(|(i, _)| &line[i..])
+        .unwrap_or("")
+        .trim_end()
+}
+
+/// Format a column-spanning grid table: cells that straddle column boundaries
+/// (pandoc colspans, written by omitting the `|`/`+` at a boundary). Unlike the
+/// structured path this never drops cells -- it lays every row out on the
+/// canonical grid formed by the union of all boundaries, sizes columns to fit
+/// their content, and re-emits spanning cells and separators across the columns
+/// they cover. Idempotent: the output's widths feed back unchanged. See #359.
+fn format_colspan_grid_table(
+    raw_table: &str,
+    config: &Config,
+    profile: ResolvedProfile<'_>,
+    indent: usize,
+) -> String {
+    let mut lines: Vec<&str> = raw_table.lines().collect();
+    while lines.last().is_some_and(|l| l.trim().is_empty()) {
+        lines.pop();
+    }
+
+    // Peel a leading/trailing caption line off the table body.
+    let mut caption: Option<String> = None;
+    let take_caption = |line: &str| -> Option<String> {
+        let t = line.trim_start();
+        t.strip_prefix(':')
+            .or_else(|| t.strip_prefix("Table:"))
+            .or_else(|| t.strip_prefix("table:"))
+            .map(|rest| format!(": {}", rest.trim()))
+    };
+    if let Some(first) = lines.first().copied()
+        && let Some(cap) = take_caption(first)
+    {
+        caption = Some(cap);
+        lines.remove(0);
+        while lines.first().is_some_and(|l| l.trim().is_empty()) {
+            lines.remove(0);
+        }
+    }
+    if caption.is_none()
+        && let Some(last) = lines.last().copied()
+        && let Some(cap) = take_caption(last)
+    {
+        caption = Some(cap);
+        lines.pop();
+        while lines.last().is_some_and(|l| l.trim().is_empty()) {
+            lines.pop();
+        }
+    }
+
+    if lines.is_empty() {
+        return indent_table_block(raw_table, indent);
+    }
+
+    let common_indent = lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .map(|line| line.chars().take_while(|c| *c == ' ').count())
+        .min()
+        .unwrap_or(0);
+
+    // Classify each table line and collect the canonical boundary columns
+    // (the union of every `+`/`|` marker position across all rows).
+    enum Line {
+        Separator {
+            cols: Vec<usize>,
+            is_header: bool,
+            has_align: bool,
+        },
+        Content(Vec<(usize, usize, String)>),
+    }
+    let mut parsed: Vec<Line> = Vec::new();
+    let mut boundary_set: BTreeSet<usize> = BTreeSet::new();
+    for raw in &lines {
+        let body = dedent_line(raw, common_indent);
+        let t = body.trim_start();
+        if t.starts_with('+') {
+            let mut cols = Vec::new();
+            let mut col = 0usize;
+            for ch in body.chars() {
+                if ch == '+' {
+                    cols.push(col);
+                }
+                col += UnicodeWidthChar::width(ch).unwrap_or(0);
+            }
+            boundary_set.extend(cols.iter().copied());
+            parsed.push(Line::Separator {
+                cols,
+                is_header: body.contains('='),
+                has_align: body.contains(':'),
+            });
+        } else if t.starts_with('|') {
+            // Only separators define the canonical grid: every content `|` in a
+            // valid grid table aligns to a separator `+`. Content pipes do NOT
+            // contribute boundaries, so a stray misaligned pipe can't inject a
+            // phantom column the separators can't close.
+            parsed.push(Line::Content(split_colspan_cells(body)));
+        } else {
+            // Unexpected line shape; bail out to a faithful verbatim copy.
+            return colspan_verbatim(&lines, common_indent, indent);
+        }
+    }
+
+    let boundaries: Vec<usize> = boundary_set.into_iter().collect();
+    let ncols = boundaries.len().saturating_sub(1);
+    if ncols == 0 {
+        return indent_table_block(raw_table, indent);
+    }
+    let idx_of = |col: usize| -> Option<usize> { boundaries.iter().position(|&b| b == col) };
+
+    // If any content pipe doesn't land on a separator boundary the table is
+    // malformed (or uses a construct we don't model); preserve it verbatim
+    // rather than emit borders that don't line up.
+    let aligned = parsed.iter().all(|line| match line {
+        Line::Content(cells) => cells
+            .iter()
+            .all(|(s, e, _)| idx_of(*s).is_some() && idx_of(*e).is_some()),
+        Line::Separator { .. } => true,
+    });
+    if !aligned {
+        return colspan_verbatim(&lines, common_indent, indent);
+    }
+
+    // Size each fine column to its widest single-column cell, then grow spans
+    // that still don't fit. Process shorter spans first so longer spans see the
+    // already-grown widths.
+    let mut widths = vec![0usize; ncols];
+    let mut spanning: Vec<SpanCell> = Vec::new();
+    for line in &parsed {
+        if let Line::Content(cells) = line {
+            for (s, e, text) in cells {
+                let (Some(si), Some(ei)) = (idx_of(*s), idx_of(*e)) else {
+                    continue;
+                };
+                if ei <= si {
+                    continue;
+                }
+                if ei - si == 1 {
+                    widths[si] = widths[si].max(text.width());
+                } else {
+                    spanning.push(SpanCell {
+                        start: si,
+                        end: ei,
+                        text: text.clone(),
+                    });
+                }
+            }
+        }
+    }
+    spanning.sort_by_key(|c| c.end - c.start);
+    for cell in &spanning {
+        let span = cell.end - cell.start;
+        let cap = colspan_interior(&widths[cell.start..cell.end]);
+        let need = cell.text.width();
+        if need > cap {
+            let deficit = need - cap;
+            let per = deficit / span;
+            let rem = deficit % span;
+            for (k, w) in widths[cell.start..cell.end].iter_mut().enumerate() {
+                *w += per + usize::from(k < rem);
+            }
+        }
+    }
+
+    // Per-column alignment comes from the header underline (`===`) if present,
+    // else the first separator -- mirroring how pandoc reads grid alignment.
+    let align_line_pos = parsed
+        .iter()
+        .position(|l| {
+            matches!(
+                l,
+                Line::Separator {
+                    is_header: true,
+                    ..
+                }
+            )
+        })
+        .or_else(|| {
+            parsed
+                .iter()
+                .position(|l| matches!(l, Line::Separator { .. }))
+        });
+    let mut alignments = vec![Alignment::Default; ncols];
+    if let Some(pos) = align_line_pos
+        && let Line::Separator { cols, .. } = &parsed[pos]
+    {
+        let marker_idx: Vec<usize> = cols.iter().filter_map(|&c| idx_of(c)).collect();
+        let body = dedent_line(lines[pos], common_indent);
+        let segments = colspan_separator_segments(body);
+        for (seg, win) in segments.iter().zip(marker_idx.windows(2)) {
+            for slot in &mut alignments[win[0]..win[1]] {
+                *slot = *seg;
+            }
+        }
+    }
+    let on_align_line = |pos: usize| align_line_pos == Some(pos);
+
+    // Emit every line on the canonical grid.
+    let mut out = String::new();
+    for (pos, line) in parsed.iter().enumerate() {
+        match line {
+            Line::Separator {
+                cols,
+                is_header,
+                has_align,
+            } => {
+                let fill = if *is_header { '=' } else { '-' };
+                let emit_align = on_align_line(pos) && (*is_header || *has_align);
+                let present: Vec<usize> = cols.iter().filter_map(|&c| idx_of(c)).collect();
+                out.push('+');
+                for win in present.windows(2) {
+                    let (p, q) = (win[0], win[1]);
+                    let interior = colspan_interior(&widths[p..q]);
+                    let align = alignments[p];
+                    out.push_str(&render_separator_segment(interior, fill, align, emit_align));
+                    out.push('+');
+                }
+                out.push('\n');
+            }
+            Line::Content(cells) => {
+                out.push('|');
+                for (s, e, text) in cells {
+                    let (Some(si), Some(ei)) = (idx_of(*s), idx_of(*e)) else {
+                        continue;
+                    };
+                    if ei <= si {
+                        continue;
+                    }
+                    let interior = colspan_interior(&widths[si..ei]);
+                    let padded = pad_colspan_cell(text, interior, alignments[si]);
+                    out.push(' ');
+                    out.push_str(&padded);
+                    out.push_str(" |");
+                }
+                out.push('\n');
+            }
+        }
+    }
+
+    if let Some(caption) = caption {
+        let caption = format_table_caption_with_language(&caption, config, profile);
+        out.push('\n');
+        out.push_str(&caption);
+        out.push('\n');
+    }
+    indent_table_block(&out, indent)
+}
+
+/// Alignment of each segment (between `+`) of a separator line, read from the
+/// leading/trailing `:` of its dash run.
+fn colspan_separator_segments(separator: &str) -> Vec<Alignment> {
+    let trimmed = separator.trim();
+    trimmed
+        .split('+')
+        .skip(1)
+        .take(trimmed.matches('+').count().saturating_sub(1))
+        .map(|seg| {
+            let starts = seg.starts_with(':');
+            let ends = seg.ends_with(':');
+            match (starts, ends) {
+                (true, true) => Alignment::Center,
+                (true, false) => Alignment::Left,
+                (false, true) => Alignment::Right,
+                (false, false) => Alignment::Default,
+            }
+        })
+        .collect()
+}
+
 /// Format a grid table with consistent alignment and padding
 pub fn format_grid_table(node: &SyntaxNode, config: &Config, indent: usize) -> String {
     let raw_table = node.text().to_string();
@@ -1176,6 +1605,14 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config, indent: usize) -> S
         .any(|line| line.trim_start().starts_with('|') && line.contains('+'))
     {
         return format_spanning_grid_table_raw(&raw_table, config, profile, indent);
+    }
+
+    // Column-spanning grid tables (cells straddling a boundary the rest of the
+    // table observes) can't be reflowed by the structured path: it assumes a
+    // uniform column count and truncates/pads the spanning rows, dropping cell
+    // content. Lay them out span-aware instead. See #359.
+    if grid_table_has_column_spans(&raw_table) {
+        return format_colspan_grid_table(&raw_table, config, profile, indent);
     }
 
     let mut table_data = extract_grid_table_data(node, config);

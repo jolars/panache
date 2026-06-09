@@ -673,6 +673,39 @@ Output
     +--------------------+
     ```
 
+#### Column-spanning cells
+
+A grid table cell may span several columns by omitting the interior `|`/`+`
+markers at the boundaries it crosses (a Pandoc colspan). Such cells are
+**preserved**: every spanned column is kept and the spanning cell is re-laid out
+across them, so no content is dropped. Here the columns are sized to fit their
+content (rather than held at the source border widths), and the spanning header
+keeps its span:
+
+Input
+
+:   ```markdown
+    +---------+
+    |a        |
+    +:=:+:===:+
+    | aa|  ab |
+    +---+-----+
+    ```
+
+Output
+
+:   ```markdown
+    +---------+
+    |    a    |
+    +:==:+:==:+
+    | aa | ab |
+    +----+----+
+    ```
+
+If a row's `|` markers don't line up with any column boundary the separators
+define, the table can't be placed on a single grid; it is then left untouched so
+nothing is lost.
+
 ### Simple Tables
 
 We normalize simple tables so that cell contents align with the alignment

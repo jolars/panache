@@ -433,3 +433,60 @@ fn test_simple_table_compresses_oversized_separator_columns() {
     let result = format(input, None, None);
     assert_eq!(result, expected);
 }
+
+// --- Column-spanning grid tables (issue #359) -------------------------------
+
+#[test]
+fn test_grid_colspan_preserves_all_cells_and_reflows() {
+    // A header cell spanning both body columns must keep its span and the body
+    // cells must not be truncated/padded away. See #359.
+    let input = "+---------+\n|a        |\n+:=:+:===:+\n| aa|  ab |\n+---+-----+\n";
+    let expected = "+---------+\n|    a    |\n+:==:+:==:+\n| aa | ab |\n+----+----+\n";
+    assert_eq!(format(input, None, None), expected);
+}
+
+#[test]
+fn test_grid_colspan_headerless_span_top_separator_alignment() {
+    let input =
+        "+:-----------:+\n|           a |\n+--+----------+\n|aa|ab        |\n+--+----------+\n";
+    let expected = "+:-------:+\n|    a    |\n+----+----+\n| aa | ab |\n+----+----+\n";
+    assert_eq!(format(input, None, None), expected);
+}
+
+#[test]
+fn test_grid_colspan_does_not_drop_spanned_columns() {
+    // Five fine columns with a two-cell spanning header. The structured path
+    // used to truncate every row to the first separator's 3 columns, dropping
+    // the 4th/5th cells; the span-aware path keeps them.
+    let input = concat!(
+        "+-----+-------------------+-------------------+\n",
+        "|     | $s = 3$           | $s = 2$           |\n",
+        "+-----+---------+---------+---------+---------+\n",
+        "| $i$ | $m_{i}$ | $r_{i}$ | $m_{i}$ | $r_{i}$ |\n",
+        "+=====+=========+=========+=========+=========+\n",
+        "| 0   | 8       | 1       | 6       | 2       |\n",
+        "+-----+---------+---------+---------+---------+\n",
+    );
+    let result = format(input, None, None);
+    assert!(result.contains("| 0   | 8       | 1       | 6       | 2       |"));
+    assert!(result.contains("| $i$ | $m_{i}$ | $r_{i}$ | $m_{i}$ | $r_{i}$ |"));
+}
+
+#[test]
+fn test_grid_colspan_is_idempotent() {
+    let input = "+---------+\n|a        |\n+:=:+:===:+\n| aa|  ab |\n+---+-----+\n";
+    let first = format(input, None, None);
+    let second = format(&first, None, None);
+    assert_eq!(first, second);
+}
+
+#[test]
+fn test_grid_colspan_misaligned_pipe_is_preserved_losslessly() {
+    // A content pipe that lands on no separator boundary can't be laid out on
+    // the grid; the table is preserved verbatim rather than emitting borders
+    // that don't line up.
+    let input = "+---+---+\n| a | b |\n+---+---+\n| a very wide spanning header |\n+---+---+\n| c | d |\n+---+---+\n";
+    let result = format(input, None, None);
+    assert!(result.contains("| a very wide spanning header |"));
+    assert_eq!(format(&result, None, None), result, "must be idempotent");
+}
