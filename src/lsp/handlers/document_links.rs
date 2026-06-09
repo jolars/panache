@@ -24,7 +24,7 @@ pub(crate) fn document_links(
     let salsa_config = ctx.salsa_config;
 
     let reference_targets = if let Some(path) = doc_path.as_deref() {
-        build_reference_targets(&snap.db, salsa_file, salsa_config, path, &content, &uri)
+        build_reference_targets(snap.db(), salsa_file, salsa_config, path, &content, &uri)
     } else {
         HashMap::new()
     };
@@ -278,7 +278,7 @@ pub(crate) struct ReferenceTarget {
 }
 
 pub(crate) fn build_reference_targets(
-    db: &crate::salsa::SalsaDb,
+    db: &dyn crate::salsa::Db,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,

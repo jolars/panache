@@ -44,7 +44,7 @@ pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> 
     }
 
     let metadata =
-        crate::salsa::metadata(&snap.db, salsa_file, salsa_config, doc_path.clone()).clone();
+        crate::salsa::metadata(snap.db(), salsa_file, salsa_config, doc_path.clone()).clone();
 
     let target = {
         let root = ctx.syntax_root();
@@ -53,7 +53,7 @@ pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> 
 
     if let Some(SymbolTarget::HeadingLink(label)) = target.as_ref() {
         let doc_indices = crate::lsp::navigation::project_symbol_documents(
-            &snap.db,
+            snap.db(),
             salsa_file,
             salsa_config,
             &doc_path,
@@ -79,7 +79,7 @@ pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> 
     }) = target.as_ref()
     {
         let doc_indices = crate::lsp::navigation::project_symbol_documents(
-            &snap.db,
+            snap.db(),
             salsa_file,
             salsa_config,
             &doc_path,
@@ -106,7 +106,7 @@ pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> 
     }
     if let Some(SymbolTarget::Crossref(label)) = target.as_ref() {
         let doc_indices = crate::lsp::navigation::project_symbol_documents(
-            &snap.db,
+            snap.db(),
             salsa_file,
             salsa_config,
             &doc_path,
@@ -141,7 +141,7 @@ pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> 
     };
     if let Some(markdown) = linked_document_hover_markdown(
         link_target.as_deref(),
-        &snap.db,
+        snap.db(),
         salsa_file,
         salsa_config,
         &doc_path,
@@ -209,7 +209,7 @@ pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> 
 
     // Cross-document footnote lookup via symbol usage index.
     let doc_indices = crate::lsp::navigation::project_symbol_documents(
-        &snap.db,
+        snap.db(),
         salsa_file,
         salsa_config,
         &doc_path,
@@ -442,7 +442,7 @@ fn crop_preview_lines(text: &str, max_lines: usize) -> String {
 
 fn linked_document_hover_markdown(
     raw_link_target: Option<&str>,
-    db: &crate::salsa::SalsaDb,
+    db: &dyn crate::salsa::Db,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
@@ -492,7 +492,7 @@ fn hovered_link_target(root: &crate::syntax::SyntaxNode, offset: usize) -> Optio
 }
 
 fn resolve_local_markdown_target(
-    db: &crate::salsa::SalsaDb,
+    db: &dyn crate::salsa::Db,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,

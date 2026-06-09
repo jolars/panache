@@ -1872,6 +1872,31 @@ impl SalsaDb {
     }
 }
 
+/// A read-only view of [`SalsaDb`] handed to worker threads.
+///
+/// Wraps the salsa handle and exposes only shared (`&dyn Db`) access, so a
+/// worker can run read queries but cannot reach the `&mut` setters / input
+/// updates that mutate state. This encodes the single-writer invariant the
+/// [`StateSnapshot`] doc comment relies on: the main loop's owned `SalsaDb` is
+/// the sole writer. Mirrors rust-analyzer's `Analysis` / `AnalysisHost` split.
+///
+/// [`StateSnapshot`]: crate::lsp::global_state::StateSnapshot
+#[derive(Clone)]
+pub struct Analysis {
+    db: SalsaDb,
+}
+
+impl Analysis {
+    pub(crate) fn new(db: SalsaDb) -> Self {
+        Self { db }
+    }
+
+    /// Shared database handle for read queries. Never yields `&mut`.
+    pub(crate) fn db(&self) -> &dyn Db {
+        &self.db
+    }
+}
+
 #[salsa::db]
 impl salsa::Database for SalsaDb {}
 

@@ -34,7 +34,7 @@ pub(crate) fn compute_publishes_with_dependents(
         && let Some(path) = state.path.as_ref()
     {
         let graph = crate::salsa::project_graph(
-            &snap.db,
+            snap.db(),
             state.salsa_file,
             state.salsa_config,
             path.clone(),
@@ -72,7 +72,7 @@ pub(crate) fn compute_publishes(
         return Vec::new();
     };
 
-    let text = doc_state.salsa_file.text(&snap.db).clone();
+    let text = doc_state.salsa_file.text(snap.db()).clone();
     let path = doc_state
         .path
         .clone()
@@ -80,7 +80,7 @@ pub(crate) fn compute_publishes(
         .unwrap_or_else(|| PathBuf::from("<memory>"));
 
     let lint_plan = crate::salsa::built_in_lint_plan(
-        &snap.db,
+        snap.db(),
         doc_state.salsa_file,
         doc_state.salsa_config,
         path,
@@ -121,7 +121,7 @@ pub(crate) fn compute_publishes(
 
     let mut by_path: HashMap<PathBuf, Vec<crate::linter::diagnostics::Diagnostic>> = HashMap::new();
     for entry in crate::salsa::project_graph::accumulated::<crate::salsa::GraphDiagnostic>(
-        &snap.db,
+        snap.db(),
         doc_state.salsa_file,
         doc_state.salsa_config,
         root_path.clone(),
@@ -147,7 +147,7 @@ pub(crate) fn compute_publishes(
             let Some(target_state) = snap.document_state(&target_uri) else {
                 continue;
             };
-            target_state.salsa_file.text(&snap.db).clone()
+            target_state.salsa_file.text(snap.db()).clone()
         };
 
         let mapped: Vec<Diagnostic> = diags

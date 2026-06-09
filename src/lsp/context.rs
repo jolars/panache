@@ -26,7 +26,7 @@ pub(crate) fn get_open_document_context(
     uri: &Uri,
 ) -> Option<OpenDocumentContext> {
     let state = snap.document_map.get(&uri.to_string())?.clone();
-    let content = state.salsa_file.text(&snap.db).clone();
+    let content = state.salsa_file.text(snap.db()).clone();
 
     Some(OpenDocumentContext {
         salsa_file: state.salsa_file,

@@ -23,7 +23,6 @@ use super::config::{load_config, load_config_with_source};
 use super::task_pool::{TaskPool, default_pool_size};
 use crate::Config;
 use crate::config::ConfigSource;
-use crate::salsa::Db;
 use crate::syntax::SyntaxNode;
 
 /// The owning map of open documents, keyed by URI string (the URI itself is used
@@ -93,18 +92,27 @@ impl ClientSender {
 /// A cheap, `Send` read-only view of the server state dispatched to worker
 /// threads.
 ///
-/// `db` is a clone of the salsa handle (an `Arc` bump; `Send` but `!Sync`, so
-/// each worker owns its own). `document_map` is an `Arc` of the owning map.
-/// Crucially this never carries a `rowan::SyntaxNode` (a `!Send` cursor) — only
-/// `GreenNode`s inside `DocumentState`, from which workers build cursors
-/// locally.
+/// `analysis` is a read-only [`Analysis`] view over a clone of the salsa handle
+/// (an `Arc` bump; `Send` but `!Sync`, so each worker owns its own). It exposes
+/// only shared (`&dyn Db`) access via [`StateSnapshot::db`], so a worker cannot
+/// reach the `&mut` setters that only the main loop's `SalsaDb` handle has.
+/// `document_map` is an `Arc` of the owning map. Crucially this never carries a
+/// `rowan::SyntaxNode` (a `!Send` cursor) — only `GreenNode`s inside
+/// `DocumentState`, from which workers build cursors locally.
+///
+/// [`Analysis`]: crate::salsa::Analysis
 pub(crate) struct StateSnapshot {
-    pub(crate) db: crate::salsa::SalsaDb,
+    analysis: crate::salsa::Analysis,
     pub(crate) document_map: Arc<DocumentMap>,
     pub(crate) workspace_root: Option<PathBuf>,
 }
 
 impl StateSnapshot {
+    /// Shared, read-only database handle for worker read queries.
+    pub(crate) fn db(&self) -> &dyn crate::salsa::Db {
+        self.analysis.db()
+    }
+
     /// Clone the [`DocumentState`] for `uri`, if open.
     pub(crate) fn document_state(&self, uri: &Uri) -> Option<DocumentState> {
         self.document_map.get(&uri.to_string()).cloned()
@@ -113,14 +121,14 @@ impl StateSnapshot {
     /// The current text of `uri`, read from salsa.
     pub(crate) fn document_content(&self, uri: &Uri) -> Option<String> {
         let state = self.document_map.get(&uri.to_string())?;
-        Some(state.salsa_file.text(&self.db).clone())
+        Some(state.salsa_file.text(self.db()).clone())
     }
 
     /// The current text and a freshly-rooted syntax tree for `uri`.
     pub(crate) fn document_content_and_tree(&self, uri: &Uri) -> Option<(String, SyntaxNode)> {
         let state = self.document_map.get(&uri.to_string())?;
         Some((
-            state.salsa_file.text(&self.db).clone(),
+            state.salsa_file.text(self.db()).clone(),
             SyntaxNode::new_root(state.tree.clone()),
         ))
     }
@@ -160,7 +168,7 @@ impl StateSnapshot {
             .clone()
             .unwrap_or_else(|| PathBuf::from("<memory>"));
         let (salsa_file, salsa_config) = (state.salsa_file, state.salsa_config);
-        let db = &self.db;
+        let db = self.db();
         let graph =
             crate::salsa::project_graph(db, salsa_file, salsa_config, root_path.clone()).clone();
         let mut index =
@@ -251,7 +259,7 @@ impl GlobalState {
     /// A cheap read snapshot for a worker thread.
     pub(crate) fn snapshot(&self) -> StateSnapshot {
         StateSnapshot {
-            db: self.salsa.clone(),
+            analysis: crate::salsa::Analysis::new(self.salsa.clone()),
             document_map: Arc::clone(&self.document_map),
             workspace_root: self.workspace_root.clone(),
         }

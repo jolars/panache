@@ -43,7 +43,7 @@ pub(crate) fn references(snap: &StateSnapshot, params: ReferenceParams) -> Optio
     let mut locations = Vec::new();
     let citation_def_index = {
         let docs = crate::lsp::navigation::project_symbol_documents(
-            &snap.db,
+            snap.db(),
             salsa_file,
             salsa_config,
             &doc_path,
@@ -163,7 +163,7 @@ pub(crate) fn references(snap: &StateSnapshot, params: ReferenceParams) -> Optio
             if yaml_ok {
                 Some(
                     crate::salsa::citation_definition_index(
-                        &snap.db,
+                        snap.db(),
                         salsa_file,
                         salsa_config,
                         doc_path.clone(),
@@ -182,7 +182,11 @@ pub(crate) fn references(snap: &StateSnapshot, params: ReferenceParams) -> Optio
         && let (SymbolTarget::Citation(key), Some(index)) = (&target, citation_def_index.as_ref())
     {
         locations.extend(helpers::citation_definition_locations(
-            index, key, &uri, &content, &snap.db,
+            index,
+            key,
+            &uri,
+            &content,
+            snap.db(),
         ));
     }
 

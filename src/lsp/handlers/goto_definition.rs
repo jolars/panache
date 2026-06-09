@@ -34,7 +34,7 @@ pub(crate) fn goto_definition(
         if yaml_ok {
             Some(
                 crate::salsa::citation_definition_index(
-                    &snap.db,
+                    snap.db(),
                     salsa_file,
                     salsa_config,
                     doc_path,
@@ -98,7 +98,7 @@ pub(crate) fn goto_definition(
     let doc_indices = {
         let doc_path = doc_path.clone()?;
         crate::lsp::navigation::project_symbol_documents(
-            &snap.db,
+            snap.db(),
             salsa_file,
             salsa_config,
             &doc_path,
@@ -237,7 +237,7 @@ pub(crate) fn goto_definition(
             PendingDefinition::Citation(key) => {
                 let index = citation_def_index.as_ref()?;
                 let mut locations =
-                    helpers::citation_definition_locations(index, &key, uri, &content, &snap.db);
+                    helpers::citation_definition_locations(index, &key, uri, &content, snap.db());
                 if locations.is_empty() {
                     return None;
                 }
@@ -273,8 +273,8 @@ pub(crate) fn goto_definition(
     let target_text = if Some(definition.path().to_path_buf()) == this_path {
         content
     } else {
-        crate::salsa::Db::file_text(&snap.db, definition.path().to_path_buf())
-            .map(|file| file.text(&snap.db).clone())
+        crate::salsa::Db::file_text(snap.db(), definition.path().to_path_buf())
+            .map(|file| file.text(snap.db()).clone())
             .unwrap_or_default()
     };
     let start = conversions::offset_to_position(&target_text, definition.range().start().into());

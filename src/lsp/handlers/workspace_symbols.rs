@@ -11,7 +11,7 @@ use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
 use crate::lsp::global_state::StateSnapshot;
 use crate::lsp::uri_ext::UriExt;
-use crate::salsa::{Db, HeadingOutlineEntry};
+use crate::salsa::HeadingOutlineEntry;
 use crate::syntax::{AstNode, Document, Heading, SyntaxNode};
 
 pub(crate) fn workspace_symbol(
@@ -45,7 +45,7 @@ pub(crate) fn workspace_symbol(
             }
 
             let graph_paths = crate::lsp::navigation::project_document_paths(
-                &snap.db,
+                snap.db(),
                 state.salsa_file,
                 state.salsa_config,
                 path,
@@ -61,7 +61,7 @@ pub(crate) fn workspace_symbol(
     }
 
     for (uri, file, tree) in memory_states {
-        let content = file.text(&snap.db).clone();
+        let content = file.text(snap.db()).clone();
         memory_docs.push((uri, content, tree));
     }
 
@@ -69,7 +69,7 @@ pub(crate) fn workspace_symbol(
     let mut symbols = Vec::new();
 
     for path in candidate_paths {
-        let Some(file) = snap.db.file_text(path.clone()) else {
+        let Some(file) = snap.db().file_text(path.clone()) else {
             continue;
         };
         let Some(config) = path_configs.get(&path).copied() else {
@@ -80,8 +80,8 @@ pub(crate) fn workspace_symbol(
             continue;
         };
 
-        let content = file.text(&snap.db).clone();
-        let outline = crate::salsa::heading_outline(&snap.db, file, config, path).clone();
+        let content = file.text(snap.db()).clone();
+        let outline = crate::salsa::heading_outline(snap.db(), file, config, path).clone();
         symbols.extend(symbols_for_document(&uri, &content, &outline, &query));
     }
 

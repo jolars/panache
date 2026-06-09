@@ -4,7 +4,6 @@ use crate::lsp::uri_ext::UriExt;
 use lsp_types::{Location, Range, Uri};
 
 use crate::salsa::Db;
-use crate::salsa::SalsaDb;
 
 use super::conversions;
 
@@ -22,7 +21,7 @@ pub(crate) struct ProjectDocumentBundle {
 }
 
 pub(crate) fn project_document_inputs(
-    db: &SalsaDb,
+    db: &dyn Db,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
@@ -33,7 +32,7 @@ pub(crate) fn project_document_inputs(
 }
 
 pub(crate) fn project_document_bundle(
-    db: &SalsaDb,
+    db: &dyn Db,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
@@ -56,7 +55,7 @@ pub(crate) fn parse_with_config(
 }
 
 pub(crate) fn project_document_paths(
-    db: &SalsaDb,
+    db: &dyn Db,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
@@ -77,7 +76,7 @@ pub(crate) fn project_document_paths(
 }
 
 pub(crate) fn document_inputs_for_paths(
-    db: &SalsaDb,
+    db: &dyn Db,
     doc_path: &Path,
     current_content: &str,
     mut doc_paths: Vec<PathBuf>,
@@ -104,7 +103,7 @@ pub(crate) fn document_inputs_for_paths(
 }
 
 pub(crate) fn project_symbol_documents(
-    db: &SalsaDb,
+    db: &dyn Db,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
@@ -116,7 +115,7 @@ pub(crate) fn project_symbol_documents(
 }
 
 pub(crate) fn indexed_documents_from_inputs(
-    db: &SalsaDb,
+    db: &dyn Db,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,

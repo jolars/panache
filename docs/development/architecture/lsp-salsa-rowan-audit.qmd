@@ -173,6 +173,20 @@ churn them:
 
 ### 3.1 Type-level read/write split --- *highest leverage, lowest risk* {#g1}
 
+::: callout-note
+## Adopted
+
+`StateSnapshot` now carries a read-only `crate::salsa::Analysis` newtype instead
+of a raw `SalsaDb`, exposing workers only `snap.db() -> &dyn Db`. Because every
+salsa mutation (`set_text`/`set_config`, `update_file_text`, `evict_file_text`,
+`ensure_file_text_cached`) requires `&mut`, the shared-only view removes all
+`&mut` reachability from worker threads at compile time --- the single-writer
+rule is now a type-level guarantee on the read path. The `&mut`-capable handle
+stays private to the main loop's `GlobalState.salsa`. (Input *creation* via
+`&dyn Db` remains possible but is benign --- a fresh orphan id that mutates
+nothing --- mirroring rust-analyzer, whose `with_db` does not block it either.)
+:::
+
 - **rust-analyzer:** `AnalysisHost` is the only writer (`apply_change`);
   `Analysis` is an immutable snapshot exposing only `&self` reads, each routed
   through `with_db(|db| …)` → `Cancelled::catch`. The single-writer rule is a

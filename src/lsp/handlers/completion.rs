@@ -113,10 +113,10 @@ pub(crate) fn completion(
     }
 
     let metadata =
-        crate::salsa::metadata(&snap.db, salsa_file, salsa_config, doc_path.clone()).clone();
+        crate::salsa::metadata(snap.db(), salsa_file, salsa_config, doc_path.clone()).clone();
     let parse = metadata.bibliography_parse.as_ref();
     let symbol_index =
-        crate::salsa::symbol_usage_index(&snap.db, salsa_file, salsa_config, doc_path).clone();
+        crate::salsa::symbol_usage_index(snap.db(), salsa_file, salsa_config, doc_path).clone();
 
     let has_crossref_candidates = symbol_index
         .crossref_declaration_entries()

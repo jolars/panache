@@ -13,7 +13,7 @@ use super::super::helpers;
 use crate::utils::{normalize_anchor_label, normalize_label};
 
 struct RenameScanContext<'a> {
-    db: &'a crate::salsa::SalsaDb,
+    db: &'a dyn crate::salsa::Db,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     doc_path: &'a Path,
@@ -66,7 +66,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
     if let Some(SymbolTarget::Crossref(old_key)) = target.as_ref() {
         let changes = rename_crossref_symbol(
             &RenameScanContext {
-                db: &snap.db,
+                db: snap.db(),
                 salsa_file,
                 salsa_config,
                 doc_path: &doc_path,
@@ -89,7 +89,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
     if let Some(SymbolTarget::ChunkLabel(old_key)) = target.as_ref() {
         let changes = rename_chunk_label_symbol(
             &RenameScanContext {
-                db: &snap.db,
+                db: snap.db(),
                 salsa_file,
                 salsa_config,
                 doc_path: &doc_path,
@@ -112,7 +112,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
     if let Some(SymbolTarget::ExampleLabel(old_key)) = target.as_ref() {
         let changes = rename_example_label_symbol(
             &RenameScanContext {
-                db: &snap.db,
+                db: snap.db(),
                 salsa_file,
                 salsa_config,
                 doc_path: &doc_path,
@@ -139,7 +139,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
         let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
         let per_doc = crate::lsp::navigation::project_symbol_documents(
-            &snap.db,
+            snap.db(),
             salsa_file,
             salsa_config,
             &doc_path,
@@ -176,7 +176,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
     }) = target.as_ref()
     {
         let symbol_index = {
-            let db = &snap.db;
+            let db = snap.db();
             crate::salsa::symbol_usage_index(db, salsa_file, salsa_config, doc_path.clone()).clone()
         };
         let ranges = symbol_index.footnote_rename_ranges(label);
@@ -197,7 +197,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
     }
 
     let metadata = {
-        let db = &snap.db;
+        let db = snap.db();
         crate::salsa::metadata(db, salsa_file, salsa_config, doc_path.clone()).clone()
     };
     let (old_key, old_norm) = match target {
@@ -229,7 +229,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
         for entry in bib_entries {
             let bib_path = entry.source_file.clone();
             let bib_text = {
-                let db = &snap.db;
+                let db = snap.db();
                 crate::salsa::Db::file_text(db, bib_path.clone())
                     .map(|file| file.text(db).clone())
                     .unwrap_or_default()
@@ -249,7 +249,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
     }
 
     let graph = {
-        let db = &snap.db;
+        let db = snap.db();
         crate::salsa::project_graph(db, salsa_file, salsa_config, doc_path.clone()).clone()
     };
 
@@ -269,7 +269,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
             let text = if entry.path == doc_path {
                 content.clone()
             } else {
-                let db = &snap.db;
+                let db = snap.db();
                 crate::salsa::Db::file_text(db, entry.path.clone())
                     .map(|file| file.text(db).clone())
                     .unwrap_or_default()
@@ -298,10 +298,14 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
         doc_paths.push(doc_path.clone());
     }
 
-    let citation_usage_inputs =
-        crate::lsp::navigation::document_inputs_for_paths(&snap.db, &doc_path, &content, doc_paths);
+    let citation_usage_inputs = crate::lsp::navigation::document_inputs_for_paths(
+        snap.db(),
+        &doc_path,
+        &content,
+        doc_paths,
+    );
     let citation_usage_docs = crate::lsp::navigation::indexed_documents_from_inputs(
-        &snap.db,
+        snap.db(),
         salsa_file,
         salsa_config,
         &doc_path,

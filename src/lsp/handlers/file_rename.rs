@@ -126,7 +126,7 @@ fn candidate_documents_for_scan(snap: &StateSnapshot) -> Vec<DocInput> {
         let Some(path) = state.path.clone() else {
             continue;
         };
-        let text = state.salsa_file.text(&snap.db).clone();
+        let text = state.salsa_file.text(snap.db()).clone();
         let Some(uri) = Uri::from_file_path(&path) else {
             continue;
         };
