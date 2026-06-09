@@ -487,6 +487,17 @@ impl GlobalState {
             let Ok(uri) = key.parse::<Uri>() else {
                 continue;
             };
+            // A keystroke burst may have added an include/bibliography since the
+            // last pass. `file_text` no longer lazy-loads (audit §3.2), so load
+            // any newly-referenced file on the writer here --- coalesced onto the
+            // debounce boundary --- before `spawn_lint` takes its snapshot.
+            if let Some((salsa_file, salsa_config, Some(path))) = self
+                .document_map
+                .get(&key)
+                .map(|doc| (doc.salsa_file, doc.salsa_config, doc.path.clone()))
+            {
+                documents::load_project_files(self, salsa_file, salsa_config, path);
+            }
             // Debounced (per-keystroke) pass: dependents, built-in only.
             self.spawn_lint(uri, true, false);
         }

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::config::Config;
 use crate::linter::diagnostics::Diagnostic;
@@ -23,6 +23,21 @@ pub struct FileText {
 pub struct FileConfig {
     #[returns(ref)]
     pub config: Config,
+}
+
+/// A monotonically-increasing counter the writer bumps whenever it loads a new
+/// file into the cache. Queries that resolve sibling files by path (`metadata`,
+/// `project_graph`) read it so that loading a previously-absent include or
+/// bibliography file invalidates their memo.
+///
+/// This is necessary because `Db::file_text` is a pure lookup, not a tracked
+/// query: when a query calls it for an absent path it gets `None` and salsa
+/// records *no* dependency on that path. Loading the file later would otherwise
+/// leave a stale memo computed while the file was absent. Reading this counter
+/// gives those queries a real dependency that the writer can invalidate.
+#[salsa::input]
+pub struct CacheGeneration {
+    pub generation: u64,
 }
 
 #[salsa::interned]
@@ -141,6 +156,9 @@ pub fn metadata(
     config: FileConfig,
     path: PathBuf,
 ) -> DocumentMetadata {
+    // Depend on the cache generation so loading a referenced bibliography file
+    // (a `db.file_text` lookup below) re-runs this query (audit §3.2).
+    let _ = db.cache_generation().generation(db);
     let tree = parsed_tree_root(db, file, config);
     let mut metadata =
         crate::metadata::extract_project_metadata_without_bibliography_parse(&tree, &path)
@@ -1634,6 +1652,10 @@ pub fn project_graph(
     config: FileConfig,
     root_path: PathBuf,
 ) -> ProjectGraph {
+    // Depend on the cache generation so loading a previously-absent include
+    // (the `db.file_text` lookups in `visit_document`/below) re-runs this query
+    // with the freshly-loaded contents (audit §3.2).
+    let _ = db.cache_generation().generation(db);
     let mut graph = InternedProjectGraph::default();
     let mut visited = HashSet::new();
     let mut definitions = crate::includes::DefinitionIndex::default();
@@ -1656,6 +1678,12 @@ pub fn project_graph(
             if visited.contains(&path) {
                 continue;
             }
+            // Record the project document even when it isn't loaded yet, so the
+            // writer's `load_project_files` fixpoint can see it in the graph,
+            // load it, and re-run (mirrors how includes record an edge before
+            // the `file_text` check). Without this, an unloaded sibling would
+            // vanish from the graph and never get discovered (audit §3.2).
+            graph.add_document(db, &path);
             if let Some(include_file) = db.file_text(path.clone()) {
                 visit_document(
                     db,
@@ -1754,7 +1782,14 @@ fn visit_document<'db>(
 }
 #[salsa::db]
 pub trait Db: salsa::Database {
+    /// Pure lookup of a previously-loaded file. Returns `None` for any path the
+    /// writer has not loaded; it never touches the filesystem. Loading is the
+    /// writer's responsibility (`crate::lsp::documents::load_project_files`).
     fn file_text(&self, path: PathBuf) -> Option<FileText>;
+
+    /// The shared [`CacheGeneration`] input. Path-resolving queries read its
+    /// `generation` to take a dependency on "what the writer has loaded".
+    fn cache_generation(&self) -> CacheGeneration;
 }
 
 #[salsa::db]
@@ -1762,29 +1797,27 @@ pub trait Db: salsa::Database {
 pub struct SalsaDb {
     storage: salsa::Storage<Self>,
     file_cache: Arc<Mutex<HashMap<PathBuf, FileText>>>,
+    /// The single [`CacheGeneration`] input, shared across cloned handles.
+    /// Created once at construction (below) on the writer, so worker reads
+    /// only ever observe it, never mint it.
+    cache_generation: Arc<OnceLock<CacheGeneration>>,
 }
 
 impl Default for SalsaDb {
     fn default() -> Self {
-        Self {
+        let db = Self {
             storage: salsa::Storage::default(),
             file_cache: Arc::new(Mutex::new(HashMap::new())),
-        }
+            cache_generation: Arc::new(OnceLock::new()),
+        };
+        // Mint the input now (on the constructing thread) so the `OnceLock` is
+        // populated before any cloned worker handle reads it.
+        db.cache_generation();
+        db
     }
 }
 
 impl SalsaDb {
-    fn get_or_load_file_text(&self, path: PathBuf) -> Option<FileText> {
-        let mut cache = self.file_cache.lock().ok()?;
-        if let Some(file) = cache.get(&path) {
-            return Some(*file);
-        }
-        let contents = std::fs::read_to_string(&path).ok()?;
-        let file = FileText::new(self, contents);
-        cache.insert(path, file);
-        Some(file)
-    }
-
     pub fn file_text_if_cached(&self, path: &Path) -> Option<FileText> {
         let cache = self.file_cache.lock().expect("file cache lock poisoned");
         cache.get(path).copied()
@@ -1870,6 +1903,69 @@ impl SalsaDb {
         let mut cache = self.file_cache.lock().expect("file cache lock poisoned");
         cache.remove(path).is_some()
     }
+
+    /// Bump the cache generation so path-resolving queries (`project_graph`,
+    /// `metadata`) that observed an absent file are invalidated and re-run with
+    /// the newly-loaded contents. Called by the writer after loading files.
+    pub fn bump_cache_generation(&mut self) {
+        let counter = self.cache_generation();
+        let next = counter.generation(self).wrapping_add(1);
+        counter.set_generation(self).to(next);
+    }
+
+    /// Discover and load every file `project_graph` references for `root_file`,
+    /// on the writer, until the referenced set reaches a fixpoint.
+    ///
+    /// `Db::file_text` is a pure lookup (audit §3.2), so a query only sees files
+    /// already loaded. Each pass runs `project_graph` (which records the root,
+    /// its included/sibling documents, and bibliography/metadata edges even when
+    /// a file is unloaded), loads any referenced-but-uncached path from disk,
+    /// then bumps the cache generation so the next `project_graph` re-runs and
+    /// recurses into the freshly-loaded files (revealing their own transitive
+    /// references). Terminates once a pass loads nothing new: the referenced set
+    /// is the finite transitive closure of `root_path`, each pass only adds to
+    /// the cache, and a file missing on disk stays uncached without retrying.
+    ///
+    /// Returns the final tracked path set (the caller uses it for retention).
+    pub fn load_referenced_files(
+        &mut self,
+        root_file: FileText,
+        config: FileConfig,
+        root_path: PathBuf,
+    ) -> HashSet<PathBuf> {
+        loop {
+            let tracked = {
+                let graph = project_graph(self, root_file, config, root_path.clone());
+                let mut tracked = HashSet::new();
+                tracked.insert(root_path.clone());
+                for document in graph.documents() {
+                    tracked.insert(document.clone());
+                    for dependency in graph.dependencies(document, None) {
+                        tracked.insert(dependency);
+                    }
+                }
+                tracked
+            };
+            let mut loaded_new = false;
+            for path in &tracked {
+                if path.as_os_str() == "<memory>" {
+                    continue;
+                }
+                if self.file_text_if_cached(path).is_some() {
+                    continue;
+                }
+                // Returns true only when it newly loads a file; a missing-on-disk
+                // path returns false and is left uncached.
+                if self.ensure_file_text_cached(path.clone()) {
+                    loaded_new = true;
+                }
+            }
+            if !loaded_new {
+                return tracked;
+            }
+            self.bump_cache_generation();
+        }
+    }
 }
 
 /// A read-only view of [`SalsaDb`] handed to worker threads.
@@ -1902,8 +1998,21 @@ impl salsa::Database for SalsaDb {}
 
 #[salsa::db]
 impl Db for SalsaDb {
+    // A pure lookup: queries and worker threads observe only files that the
+    // writer has already loaded. Discovery-and-load of includes/bibliography is
+    // the writer's job (see `crate::lsp::documents::load_project_files`), so
+    // this never reads `std::fs` and never creates an input off a `&self` path
+    // --- restoring query purity and the single-writer invariant (audit §3.2).
     fn file_text(&self, path: PathBuf) -> Option<FileText> {
-        self.get_or_load_file_text(path)
+        self.file_text_if_cached(&path)
+    }
+
+    fn cache_generation(&self) -> CacheGeneration {
+        // Created once on the writer (in `Default`); cloned worker handles
+        // share the same `OnceLock` and only ever read it back.
+        *self
+            .cache_generation
+            .get_or_init(|| CacheGeneration::new(self, 0))
     }
 }
 
@@ -2613,5 +2722,23 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(stable_path);
+    }
+
+    #[test]
+    fn file_text_is_a_pure_lookup_and_never_reads_disk() {
+        let db = SalsaDb::default();
+
+        // A real file exists on disk, but it was never loaded through a writer
+        // method. `file_text` must NOT read it --- it is a pure cache lookup
+        // (audit §3.2). Loading is the writer's responsibility.
+        let path = unique_temp_path("file-text-purity", ".qmd");
+        std::fs::write(&path, "on disk but not loaded").expect("write probe file");
+
+        assert!(
+            db.file_text(path.clone()).is_none(),
+            "file_text must return None for an unloaded path even when the file exists on disk"
+        );
+
+        let _ = std::fs::remove_file(path);
     }
 }

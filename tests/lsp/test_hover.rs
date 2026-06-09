@@ -74,6 +74,55 @@ fn test_hover_included_updates_after_watcher_change() {
 }
 
 #[test]
+fn test_hover_loads_include_added_during_edit() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let child_path = temp_dir.path().join("_new.qmd");
+    let parent_path = temp_dir.path().join("parent.qmd");
+
+    std::fs::write(&child_path, "[^9]: New footnote content.\n").unwrap();
+    // Parent references the footnote but does NOT include the child yet.
+    std::fs::write(&parent_path, "Ref[^9].\n").unwrap();
+
+    let mut server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
+    let parent_uri = Uri::from_file_path(&parent_path).expect("parent uri");
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        parent_uri.as_str(),
+        &std::fs::read_to_string(&parent_path).unwrap(),
+        "quarto",
+    );
+
+    // Not referenced yet: the writer never loaded the child, and `file_text` no
+    // longer lazy-loads on the read path, so hover cannot resolve.
+    assert_eq!(server.get_cached_file_text(&child_path), None);
+    assert!(server.hover(parent_uri.as_str(), 0, 4).is_none());
+
+    // Add the include. The newly-referenced file must be loaded on the writer
+    // during the debounced pass that `pump` drives.
+    server.edit_document(
+        parent_uri.as_str(),
+        vec![full_document_change("{{< include _new.qmd >}}\nRef[^9].\n")],
+    );
+    server.pump(std::time::Duration::from_millis(500));
+
+    assert!(
+        server.get_cached_file_text(&child_path).is_some(),
+        "an include added during editing should be loaded on the writer"
+    );
+
+    let hover = server.hover(parent_uri.as_str(), 1, 4);
+    let Some(h) = hover else {
+        panic!("Expected hover to resolve the included footnote after the edit");
+    };
+    if let HoverContents::Markup(markup) = h.contents {
+        assert!(markup.value.contains("New footnote content"));
+    } else {
+        panic!("Expected markup hover content");
+    }
+}
+
+#[test]
 fn test_hover_on_footnote_reference() {
     let mut server = TestLspServer::new();
 

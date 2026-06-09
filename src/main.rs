@@ -1950,7 +1950,7 @@ fn lint_documents_with_includes(
     let mut results = Vec::new();
     let mut visited = HashSet::new();
     let mut active = HashSet::new();
-    let db = panache::salsa::SalsaDb::default();
+    let mut db = panache::salsa::SalsaDb::default();
     // Construct one FileConfig handle per batch and one FileText per file.
     // Salsa cache keys are handle identity, not value equality, so reusing
     // these across built_in_lint_plan / project_graph::accumulated within a
@@ -1962,6 +1962,11 @@ fn lint_documents_with_includes(
     // of standalone files this avoids 1+ parse per file.
     let file_config = panache::salsa::FileConfig::new(&db, cfg.clone());
     let root_file_text = panache::salsa::FileText::new(&db, root_input.to_string());
+    // `Db::file_text` is a pure lookup (audit §3.2): it no longer lazy-loads
+    // includes/bibliography from disk inside queries. Load the project's
+    // referenced files onto the writer up front so `project_graph` and
+    // `metadata` (cross-doc diagnostics, bibliography parse) see them.
+    db.load_referenced_files(root_file_text, file_config, root_path.clone());
     lint_loaded_document_with_includes(
         root_path,
         root_input,

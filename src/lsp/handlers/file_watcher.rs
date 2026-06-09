@@ -1,5 +1,7 @@
 //! File watcher handler for bibliography files.
 
+use std::path::PathBuf;
+
 use salsa::Durability;
 
 use lsp_types::{DidChangeWatchedFilesParams, MessageType, Uri};
@@ -10,6 +12,25 @@ use crate::lsp::global_state::GlobalState;
 use crate::lsp::uri_ext::UriExt;
 
 pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWatchedFilesParams) {
+    // A watcher event means the filesystem changed in a way salsa cannot see
+    // (a referenced include/bibliography file created or removed). `collect_includes`
+    // resolution and the project walk are filesystem-dependent, so bump the
+    // cache generation to force `project_graph`/`metadata` to re-discover
+    // (audit §3.2; the underlying fs reads are residual G3).
+    gs.salsa.bump_cache_generation();
+
+    // `file_text` no longer lazy-loads, so load any newly-created file an open
+    // document now references on the writer here --- before the cached-text sync
+    // and the re-lint below, so both observe fresh content.
+    let open_docs: Vec<(crate::salsa::FileText, crate::salsa::FileConfig, PathBuf)> = gs
+        .document_map
+        .values()
+        .filter_map(|state| Some((state.salsa_file, state.salsa_config, state.path.clone()?)))
+        .collect();
+    for (salsa_file, salsa_config, path) in open_docs {
+        crate::lsp::documents::load_project_files(gs, salsa_file, salsa_config, path);
+    }
+
     for change in params.changes {
         let Some(path) = change.uri.to_file_path().map(|p| p.into_owned()) else {
             continue;

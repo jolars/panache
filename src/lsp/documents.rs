@@ -8,7 +8,7 @@
 //! immediate for `didOpen`/`didSave`.
 
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Instant;
 
 use lsp_types::{
@@ -75,19 +75,18 @@ fn apply_changes_descending_with_combined_ranges(
     ))
 }
 
-fn tracked_paths_for_graph(
-    root_path: &Path,
-    graph: &crate::salsa::ProjectGraph,
+/// Discover and load every file the project graph references for `root_path`,
+/// on the writer. Thin wrapper over [`crate::salsa::SalsaDb::load_referenced_files`]
+/// (shared with the CLI lint path); returns the final tracked set for
+/// `did_close` retention.
+pub(crate) fn load_project_files(
+    gs: &mut GlobalState,
+    salsa_file: crate::salsa::FileText,
+    salsa_config: crate::salsa::FileConfig,
+    root_path: PathBuf,
 ) -> HashSet<PathBuf> {
-    let mut tracked = HashSet::new();
-    tracked.insert(root_path.to_path_buf());
-    for document in graph.documents() {
-        tracked.insert(document.clone());
-        for dependency in graph.dependencies(document, None) {
-            tracked.insert(dependency);
-        }
-    }
-    tracked
+    gs.salsa
+        .load_referenced_files(salsa_file, salsa_config, root_path)
 }
 
 /// Handle `textDocument/didOpen`.
@@ -132,11 +131,7 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     );
 
     if let Some(path) = doc_path.as_ref() {
-        let graph =
-            crate::salsa::project_graph(&gs.salsa, salsa_file, salsa_config, path.clone()).clone();
-        for tracked in tracked_paths_for_graph(path, &graph) {
-            let _ = gs.salsa.ensure_file_text_cached(tracked);
-        }
+        load_project_files(gs, salsa_file, salsa_config, path.clone());
     }
 
     gs.sender
@@ -283,6 +278,15 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
 pub(crate) fn did_save(gs: &mut GlobalState, params: DidSaveTextDocumentParams) {
     let uri = params.text_document.uri;
     gs.lint_deadlines.remove(&uri.to_string());
+    // A save may have introduced new includes/bibliography since the document
+    // was opened; load them on the writer before the lint snapshot is taken.
+    if let Some((salsa_file, salsa_config, Some(path))) = gs
+        .document_map
+        .get(&uri.to_string())
+        .map(|doc| (doc.salsa_file, doc.salsa_config, doc.path.clone()))
+    {
+        load_project_files(gs, salsa_file, salsa_config, path);
+    }
     // A `did_change` arriving while this save's external-linter pass is in
     // flight will bump the generation and discard its result; the next
     // debounced pass then runs built-in-only, so external diagnostics stay
@@ -304,17 +308,8 @@ pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams
         let Some(path) = state.path.clone() else {
             continue;
         };
-        let graph = crate::salsa::project_graph(
-            &gs.salsa,
-            state.salsa_file,
-            state.salsa_config,
-            path.clone(),
-        )
-        .clone();
-        for tracked in tracked_paths_for_graph(&path, &graph) {
-            retained.insert(tracked.clone());
-            let _ = gs.salsa.ensure_file_text_cached(tracked);
-        }
+        let tracked = load_project_files(gs, state.salsa_file, state.salsa_config, path);
+        retained.extend(tracked);
     }
     for cached in gs.salsa.cached_file_paths() {
         if retained.contains(&cached) || cached.as_os_str() == "<memory>" {

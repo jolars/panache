@@ -204,6 +204,30 @@ nothing --- mirroring rust-analyzer, whose `with_db` does not block it either.)
 
 ### 3.2 Filesystem access inside the database --- *panache-specific, high impact* {#g2}
 
+::: callout-note
+## Adopted
+
+`Db::file_text` is now a pure cache lookup: it returns `None` for any path the
+writer has not loaded and never touches `std::fs` or creates an input off a
+`&self` read path. Discovery-and-load moved to the writer in
+`SalsaDb::load_referenced_files` --- a fixpoint that runs `project_graph`, loads
+every referenced include/sibling/bibliography file from disk, and repeats until
+the referenced set is stable. The LSP drives it from `did_open`/`did_save`/
+`did_close`, the debounced lint dispatch (so includes added mid-edit load on the
+writer, not lazily on a worker), and the file watcher; the CLI lint path calls
+the same method up front.
+
+Because `file_text` is a plain trait method (not a tracked query), an *absent*
+lookup records no salsa dependency, so loading a file would otherwise leave
+`project_graph`/`metadata` memos stale. A `CacheGeneration` salsa input that
+both queries read, bumped by the writer after each load, supplies the missing
+invalidation. `project_graph` also now records project-walk siblings with
+`add_document` *before* the `file_text` check so unloaded siblings stay visible
+to the fixpoint. The residual filesystem reads inside `project_graph` (the
+`find_project_documents` walk and `collect_includes` existence checks) are
+unchanged and remain tracked by [G3](#g3).
+:::
+
 - **rust-analyzer:** the `vfs` crate provides consistent file-system snapshots;
   all file contents enter the database as inputs via `apply_change` on the
   writer. **Queries never touch the filesystem** --- the database is a pure
@@ -225,20 +249,64 @@ nothing --- mirroring rust-analyzer, whose `with_db` does not block it either.)
   `file_cache` becomes the FileId/VFS map). Files: `src/salsa.rs`,
   `src/lsp/global_state.rs`, `src/lsp/documents.rs`.
 
-### 3.3 FileId / SourceRoot --- *lower leverage, removes a wart* {#g3}
+### 3.3 FileId / SourceRoot --- *promoted by G2: enables per-file invalidation* {#g3}
 
 - **rust-analyzer:** an opaque `FileId` plus a `vfs`; handlers convert URI →
   `FileId` at the boundary so paths never leak into analysis, and `SourceRoot`s
-  are the unit durability is assigned to.
+  are the unit durability is assigned to. Critically, `file_text` is an input
+  *keyed by `FileId`* whose value is `Option<Arc<str>>` --- an absent file is an
+  input set to `None`, so a query that reads it takes a real salsa dependency on
+  that file's presence.
 - **panache:** keys directly on `PathBuf`; in-memory buffers fall back to a
   `<memory>` sentinel path (`src/lsp/global_state.rs:161`); durability is set
-  per-input ad hoc.
-- **Recommend:** a thin `FileId` newtype + a small file-source map (subsuming
-  `file_cache`), and grouping inputs into `SourceRoot`s so library/installed/bib
-  files get `Durability::HIGH` as a unit. Lower leverage for a single-root tool,
-  but it removes the sentinel-path wart and is the right foundation for G2 and
-  for future multi-root workspaces. Files: `src/salsa.rs`,
-  `src/lsp/global_state.rs`.
+  per-input ad hoc. `Db::file_text` is a *plain trait method* (a cache lookup),
+  not a tracked input --- so an absent lookup records no dependency. [G2](#g2)
+  worked around this with a single global `CacheGeneration` input that
+  `project_graph`/`metadata` read and the writer bumps after every load.
+
+#### Why this is now the highest-value next step
+
+The `CacheGeneration` firewall G2 introduced is correct but *coarse*: every load
+bumps one global counter, invalidating **all** `project_graph`/`metadata` memos,
+not just the consumers of the file that changed. Loads are infrequent today
+(open/save/watcher/debounce, never per-keystroke) and the tool is single-root,
+so the blast radius is tolerable --- but it scales with
+`(open documents × files loaded)`, and it is a manual invalidation channel
+sitting outside the dependency graph, which is exactly the smell §3.2 set out to
+remove. Adopting a `FileId`-keyed tracked `file_text` input replaces it with
+salsa's own per-file invalidation:
+
+- An unloaded path is an input set to `None`; `project_graph` reading it takes a
+  dependency on *that file's* presence. The writer setting it to `Some(text)`
+  invalidates **only** the queries that read *that* file --- no global pulse.
+- `CacheGeneration` and its read-sites in `project_graph`/`metadata`, plus the
+  manual `bump_cache_generation` calls in `load_referenced_files` and the file
+  watcher, can then be **deleted**.
+- The `load_referenced_files` fixpoint stays (discovery is still parse-driven
+  --- a VFS does not enumerate includes for us), but its passes converge through
+  ordinary input writes rather than a generation counter.
+
+#### Design
+
+- A thin `FileId` newtype + a `vfs`-style path↔id map subsuming `file_cache`.
+  Handlers convert URI → `FileId` at the boundary so `PathBuf` stops leaking
+  into analysis (retires the `<memory>` sentinel: in-memory buffers are just a
+  `FileId` with no backing path).
+- `file_text` becomes `#[salsa::input]` keyed by `FileId`, value
+  `Option<Arc<str>>`. The writer creates the (possibly `None`) input on first
+  reference and sets contents on load; absent-vs-empty stays distinguishable
+  (preserving the bibliography "failed to read" diagnostic that a plain empty
+  string would lose).
+- Group inputs into `SourceRoot`s so library/installed/bibliography files get
+  `Durability::HIGH` as a unit instead of per-input ad hoc.
+- Optionally fold the residual filesystem reads §3.2 left in `project_graph`
+  (the `find_project_documents` walk and `collect_includes` existence checks)
+  behind the VFS snapshot, making `project_graph` a pure function of its inputs
+  --- the last piece of the §3.2 goal.
+- Files: `src/salsa.rs` (FileId, tracked `file_text`, delete `CacheGeneration`),
+  `src/lsp/global_state.rs`, `src/lsp/documents.rs`, `src/main.rs`
+  (`load_referenced_files` caller). Also the foundation for future multi-root
+  workspaces.
 
 ### 3.4 Firewall coverage / `no_eq` overuse --- *medium leverage* {#g4}
 
