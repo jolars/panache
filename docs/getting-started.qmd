@@ -2,8 +2,8 @@
 title: Getting Started
 description: >
   This guide gets you from zero to a productive Panache setup. You will install
-  the CLI, verify it works, connect your editor, run the core commands
-  (`format` and  `lint`), and learn how to configure Panache.
+  the CLI, verify it works, connect your editor, run the core commands (`format`
+  and  `lint`), and learn how to configure Panache.
 ---
 
 ## Installation

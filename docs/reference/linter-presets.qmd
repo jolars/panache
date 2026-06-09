@@ -1,8 +1,8 @@
 ---
 title: "Linter Presets"
 description: >
-  This section provides a reference for the
-  external linter presets available in Panache.
+  This section provides a reference for the external linter presets available in
+  Panache.
 ---
 
 Read the [Configuration Guide](../guide/configuration.qmd#external-code-linters)

@@ -214,14 +214,16 @@ fn hashpipe_block_scalar_formatting_is_idempotent() {
 
 #[test]
 fn hashpipe_folded_block_scalar_formatting_is_idempotent() {
+    // Folded body lines reflow per rule 15: these two short lines fold to
+    // spaces and join under the default reflow mode. The `>-` header
+    // (style + chomping) is preserved.
     let input = "```{r}\n#| fig-cap: >-\n#|   A folded caption\n#|   spanning some lines\nplot(1:10)\n```\n";
     let output1 = format(input, Some(quarto_config()), None);
     let output2 = format(&output1, Some(quarto_config()), None);
 
     assert_eq!(output1, output2, "Formatting should be idempotent");
     assert!(output2.contains("#| fig-cap: >-"));
-    assert!(output2.contains("#|   A folded caption"));
-    assert!(output2.contains("#|   spanning some lines"));
+    assert!(output2.contains("#|   A folded caption spanning some lines"));
 }
 
 #[test]

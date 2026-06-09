@@ -34,8 +34,10 @@ the load-bearing invariants.
    `YAML_SCALAR` token and full canonicalization needs a real block-scalar
    renderer (tracked separately; keeps pretty_yaml parity on already-canonical
    cases, diverges on non-canonical block-scalar indent).
+
 2. **Sequence items** indented +2 from the parent key (`categories:\n  - foo`,
    never `- foo` at parent column).
+
 3. **Quote style preference:** plain → double-quoted → single-quoted only when
    content contains characters that would need backslash-escaping in
    double-quoted form (e.g. `'C:\Users\test'`). Operationally, the formatter
@@ -51,8 +53,10 @@ the load-bearing invariants.
    content has `'` because that's the one case where converting (`'don''t'` →
    `"don't"`) would change the user's explicit choice of escape character
    without simplifying anything; pretty_yaml does the same.
+
 4. **Block scalar style** (literal `|` vs folded `>`): preserved from input.
    They carry different YAML semantics and are not interchangeable.
+
 5. **Flow spacing:** `{ key: value }` with one space inside braces; `[a, b, c]`
    with no space inside brackets, one space after each comma, one space after
    each `:`. Multi-line flow containers and flow containers with embedded
@@ -62,6 +66,7 @@ the load-bearing invariants.
    `{key:value}`, no space to disambiguate `:`), the inner bytes are emitted
    verbatim between `{` and `}` --- matches pretty_yaml's "normalize spacing
    around structure, don't re-parse content" behavior.
+
 6. **Flow wrap on line-width overflow:** each item on its own line, trailing
    comma, **opening bracket stays on the key line**
    (`keywords: [\n  first,\n  ...\n]`). This is the one point of disagreement
@@ -98,28 +103,35 @@ the load-bearing invariants.
    run keeps pass-2 byte-stable --- one of the deliberate trades against
    pretty_yaml's semantic preservation, in the same family as rule 10's "no
    trailing whitespace anywhere" stance).
+
 7. **Blank lines:** runs of multiple interior blank lines collapse to one max.
    Leading blank lines (before the first content line) are stripped entirely ---
    mirrors rule 13's no-trailing-blanks invariant; preamble whitespace at the
    top of a frontmatter document is never meaningful. Cross-validated against
    pretty_yaml on the `tests/fixtures/yaml_corpus/blank_lines/` cases.
+
 8. **Inline comments:** exactly one space before `#`. Applies only to inline
    comments (comments with non-whitespace content earlier on the same line);
    standalone comments (preceded by `NEWLINE` or at file start) keep their
    original surrounding whitespace. Implemented inside the token walk because
    line-level passes can't reliably distinguish `#` inside quoted scalars from a
    comment indicator.
+
 9. **Comment positions** (above key, inline, between keys): preserved. Comments
    are user-authored content.
+
 10. **Trailing whitespace** on every line: stripped. ASCII space and tab only
     (CRLF round-trips because `\r` is preserved). Applies uniformly, including
     inside `|`/`>` block scalars --- pretty_yaml does the same; this trades the
     "trailing space carries semantics inside `|`" YAML-spec quirk for the "no
     trailing whitespace anywhere" invariant.
+
 11. **Empty scalars:** `key:` stays `key:`, never canonicalized to `key: null`
     or `key: ""`.
+
 12. **Key order:** preserved. Frontmatter is content the user wrote; reordering
     would surprise.
+
 13. **Trailing document newline:** always exactly one `\n` at EOF. Missing
     trailing newline → add one; multiple trailing newlines → collapse to one.
     Cross-validated against pretty_yaml on the standard zero/one/many cases
@@ -128,6 +140,7 @@ the load-bearing invariants.
     Whitespace-only inputs (e.g. `"   "`) are out of scope for rule 13 alone ---
     pretty_yaml canonicalizes those more aggressively, and the divergence
     resolves once the trailing-whitespace rule (#10) lands.
+
 14. **Block-structural spacing.** A whitespace run sitting between a block
     structural indicator (`:` after a block-map key, `-` after a block-sequence
     item marker) and inline content on the same line collapses to exactly one
@@ -138,25 +151,43 @@ the load-bearing invariants.
     governs block-level structural runs. Added in Phase 1.13 after the real-
     frontmatter harvest surfaced inputs (e.g. `echo:    false`) that rules 1, 5,
     and 8 didn't reach.
-15. **Folded (`>`) block-scalar wrapping.** Under a wrapping mode (rule's
-    "Plain-scalar wrapping" section), an overlong body line of a *folded* block
-    scalar (`>`, `>-`, `>+`) is greedy-wrapped to `line_width` at the body's
-    base indent. This is loss-free: a single line break between two equally-
-    indented non-empty lines folds to one space, so breaking an overlong line
-    round-trips. Only lines that *exceed* `line_width` are broken --- short
-    lines are never joined, which keeps near-boundary inputs byte-stable.
-    Folding-significant lines are left verbatim: blank lines (which fold to a
-    newline) and more-indented lines (which are literal within a folded scalar).
-    Bails on an explicit indentation indicator (`>2`), a header trailing
-    comment, or an empty body. **Literal (`|`) block scalars never wrap** ---
-    their newlines are significant content. **Deliberate divergence from
-    pretty_yaml**, which preserves all block scalars verbatim: rule 15 is the
-    one sanctioned point where the in-tree formatter wraps a block scalar.
-    Because of that, rule-15 wrapping is *not* exercised in the pretty_yaml
-    cross-validation corpus (it would always "fail" parity); coverage lives in
-    `crates/panache-formatter/tests/format/yaml_folded_wrap.rs` instead. Added
-    after the `fig-cap: >` Quarto hashpipe caption (a single overlong folded
-    line) stayed unwrapped through both frontmatter and hashpipe paths.
+
+15. **Folded (`>`) block-scalar wrapping.** A *folded* block scalar (`>`, `>-`,
+    `>+`) reflows its prose per the active wrap mode, exactly like a markdown
+    paragraph. This is loss-free: within a folded scalar a single line break
+    between two equally-indented non-empty lines folds to one space, so the body
+    can be rejoined and re-broken anywhere without changing the parsed value.
+    The body is grouped into paragraphs of contiguous base-indent prose lines;
+    folding-significant lines act as separators and pass through verbatim ---
+    blank lines (which fold to a newline) and more-indented lines (which are
+    literal within a folded scalar). Each paragraph is then re-laid-out:
+    - **`reflow`** (default): join the paragraph and greedy-fill to
+      `line_width`. Short lines *are* joined --- the whole paragraph is
+      rewrapped.
+    - **`sentence`**: join the paragraph, then emit one sentence per line.
+    - **`semantic`**: keep the author's existing line breaks and additionally
+      split each on sentence boundaries (semantic linefeeds).
+    - **`preserve`**: leave the body's line breaks exactly as written.
+
+    The sentence/semantic modes reuse the same sentence-boundary engine
+    (`sentence_wrap`) as markdown prose, so YAML frontmatter prose wraps the
+    same way as the document body. Bails (leaves verbatim) on an explicit
+    indentation indicator (`>2`), a header trailing comment, or an empty body.
+    **Literal (`|`) block scalars never wrap** --- their newlines are
+    significant content; **quoted scalars never wrap** either.
+
+    **Deliberate divergence from pretty_yaml**, which preserves every block
+    scalar verbatim: rule 15 is the sanctioned point where the in-tree formatter
+    reflows a block scalar. (This revises the earlier "only break overlong
+    lines, never join" calibration --- joining is what makes reflow actually
+    reflow.) Because of that, folded scalars are *exempt from the pretty_yaml
+    parity check* in the cross-validation corpus (idempotency is still
+    asserted); behavioral coverage lives in
+    `crates/panache-formatter/tests/format/yaml_folded_wrap.rs`. Single-line
+    *plain* scalars wrap under the same modes (see rule 6's "plain-scalar
+    overflow"). Added after the `fig-cap: >` Quarto hashpipe caption stayed
+    unwrapped, then revised so a hand-wrapped folded `description:` reflows
+    cleanly instead of stranding orphan words.
 
 ## Notes
 

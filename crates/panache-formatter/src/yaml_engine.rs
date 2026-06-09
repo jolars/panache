@@ -1,6 +1,4 @@
 use crate::config::Config;
-#[cfg(not(target_arch = "wasm32"))]
-use crate::config::WrapMode;
 use crate::syntax::YamlParseError;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -16,22 +14,8 @@ pub(crate) fn validate_yaml(_input: &str) -> Result<(), YamlParseError> {
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn format_yaml_with_config(input: &str, config: &Config) -> Result<String, String> {
     validate_yaml(input).map_err(|e| e.message().to_string())?;
-    let options = crate::formatter::yaml::YamlFormatOptions {
-        line_width: config.line_width,
-        wrap: yaml_wrap_for_config(config),
-    };
+    let options = crate::formatter::yaml::options_from_config(config);
     Ok(crate::formatter::yaml::format_yaml(input, &options))
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn yaml_wrap_for_config(config: &Config) -> crate::formatter::yaml::WrapMode {
-    use crate::formatter::yaml::WrapMode as YamlWrapMode;
-    match config.wrap {
-        Some(WrapMode::Preserve) => YamlWrapMode::Preserve,
-        Some(WrapMode::Reflow) | Some(WrapMode::Sentence) | Some(WrapMode::Semantic) | None => {
-            YamlWrapMode::Always
-        }
-    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -41,9 +25,9 @@ pub(crate) fn format_yaml_with_config(input: &str, _config: &Config) -> Result<S
 
 #[cfg(test)]
 mod tests {
-    use super::validate_yaml;
     #[cfg(not(target_arch = "wasm32"))]
-    use super::{format_yaml_with_config, yaml_wrap_for_config};
+    use super::format_yaml_with_config;
+    use super::validate_yaml;
     use crate::config::{Config, WrapMode};
 
     #[test]
@@ -63,22 +47,19 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn wrap_mode_follows_panache_wrap_mode() {
-        use crate::formatter::yaml::WrapMode as YamlWrapMode;
-        let preserve = Config {
-            wrap: Some(WrapMode::Preserve),
-            ..Default::default()
+        use crate::formatter::yaml::{WrapMode as YamlWrapMode, options_from_config};
+        let mode = |wrap| {
+            options_from_config(&Config {
+                wrap,
+                ..Default::default()
+            })
+            .wrap
         };
-        let reflow = Config {
-            wrap: Some(WrapMode::Reflow),
-            ..Default::default()
-        };
-        let sentence = Config {
-            wrap: Some(WrapMode::Sentence),
-            ..Default::default()
-        };
-        assert_eq!(yaml_wrap_for_config(&preserve), YamlWrapMode::Preserve);
-        assert_eq!(yaml_wrap_for_config(&reflow), YamlWrapMode::Always);
-        assert_eq!(yaml_wrap_for_config(&sentence), YamlWrapMode::Always);
+        assert_eq!(mode(Some(WrapMode::Preserve)), YamlWrapMode::Preserve);
+        assert_eq!(mode(Some(WrapMode::Reflow)), YamlWrapMode::Reflow);
+        assert_eq!(mode(Some(WrapMode::Sentence)), YamlWrapMode::Sentence);
+        assert_eq!(mode(Some(WrapMode::Semantic)), YamlWrapMode::Semantic);
+        assert_eq!(mode(None), YamlWrapMode::Reflow);
     }
 
     #[cfg(not(target_arch = "wasm32"))]

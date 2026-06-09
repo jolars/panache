@@ -45,6 +45,7 @@ use panache_parser::syntax::{SyntaxKind, SyntaxToken};
 use rowan::{TextSize, TokenAtOffset};
 
 use super::options::{WrapMode, YamlFormatOptions};
+use crate::formatter::sentence_wrap::{self, ResolvedProfile};
 
 /// Render the given CST root into a string. The root is expected to be
 /// the `DOCUMENT` node returned by
@@ -695,36 +696,36 @@ fn parent_content_col(node: &SyntaxNode) -> usize {
     }
 }
 
-/// STYLE.md rule 6 (plain-scalar overflow analog): when a single-line
-/// plain scalar value in a block-map entry pushes its line past
-/// `opts.line_width`, wrap it across multiple lines. Continuation lines
-/// land at `depth * 2` (the value column — same indent the Phase 1.15
-/// multi-line-continuation rule uses, so a wrapped output round-trips
-/// without further reshaping).
+/// STYLE.md rule 6 (plain-scalar overflow analog) and rule 15 (folded
+/// block-scalar wrapping): re-lay-out block-map scalar values per the
+/// active wrap mode.
 ///
-/// Scope: block-map values only. Quoted (`'…'`, `"…"`) and block
-/// (`|`/`>`) scalars never wrap per the "Plain-scalar wrapping" section
-/// of `STYLE.md`. Already-multi-line scalars are skipped (rule 1's
+/// Folded (`>`/`>-`/`>+`) scalars reflow per [`reflow_folded_scalar`]
+/// under every wrapping mode. Single-line plain scalars wrap too:
+/// under [`WrapMode::Reflow`] when the line exceeds `opts.line_width`
+/// (continuation lines at `depth * 2`, the value column); under
+/// [`WrapMode::Sentence`] / [`WrapMode::Semantic`] split into one
+/// sentence per line.
+///
+/// Scope: block-map values only. Quoted (`'…'`, `"…"`) and literal
+/// (`|`) scalars never wrap per the "Plain-scalar wrapping" section of
+/// `STYLE.md`. Multi-line plain scalars are skipped (rule 1's
 /// continuation pass handles them). Scalars in block sequences are
-/// skipped: pretty_yaml's wrap-continuation column there (parent
-/// content + 2) disagrees with rule 1's multi-line-continuation column
-/// (`depth * 2`), so pretty_yaml itself isn't idempotent on that shape
-/// and we defer it.
+/// skipped: the wrap-continuation column there (parent content + 2)
+/// disagrees with rule 1's multi-line-continuation column (`depth * 2`),
+/// so that shape isn't idempotent and we defer it.
 ///
 /// Inline comments and tag/anchor decorations on the value side cause
-/// the scalar to skip wrap — keeping the algorithm simple and matching
-/// pretty_yaml on the cases that actually appear in the corpus.
+/// the scalar to skip wrap — keeping the algorithm simple.
 ///
-/// Gated on [`WrapMode::Always`]: under [`WrapMode::Preserve`] plain
-/// scalars are left on their original line regardless of width, matching
-/// pretty_yaml's `ProseWrap::Preserve`. (Flow-container wrapping in
-/// [`apply_flow_wrap`] is *not* gated — pretty_yaml wraps overflowing
-/// flow collections under both prose-wrap modes, since that is a
-/// print-width concern rather than prose wrapping.)
+/// Under [`WrapMode::Preserve`] this pass is a no-op (early return):
+/// every scalar keeps its original line breaks. (Flow-container
+/// wrapping in [`apply_flow_wrap`] is *not* gated on the prose-wrap
+/// mode — overflowing flow collections wrap under every mode, since
+/// that is a print-width concern rather than prose wrapping.)
 ///
 /// Implementation: re-parse the post-flow-wrap buffer, walk
-/// `YAML_BLOCK_MAP_VALUE` nodes, identify single-line plain scalars
-/// whose line exceeds `line_width`, and rewrite each scalar with
+/// `YAML_BLOCK_MAP_VALUE` nodes, and rewrite each affected scalar with
 /// `replace_range` (reverse byte order, so earlier offsets remain
 /// valid).
 fn apply_plain_scalar_wrap(buf: String, opts: &YamlFormatOptions) -> String {
@@ -734,6 +735,7 @@ fn apply_plain_scalar_wrap(buf: String, opts: &YamlFormatOptions) -> String {
     let Some(tree) = panache_parser::parser::yaml::parse_yaml_tree(&buf) else {
         return buf;
     };
+    let profile = sentence_wrap::profile_from(opts.lang.as_deref(), &opts.no_break_abbreviations);
 
     let mut edits: Vec<(usize, usize, String)> = Vec::new();
     for value_node in tree
@@ -756,16 +758,17 @@ fn apply_plain_scalar_wrap(buf: String, opts: &YamlFormatOptions) -> String {
             continue;
         };
         let text = scalar.text().to_string();
-        // Folded block scalars (`>`, `>-`, `>+`) reflow overlong body lines
-        // to `line_width` — their single line breaks fold to spaces, so this
-        // is loss-free (STYLE.md rule 15). Literal (`|`) scalars never wrap
-        // (newlines are significant); quoted scalars never wrap either.
+        let scalar_start = usize::from(scalar.text_range().start());
+        let scalar_end = usize::from(scalar.text_range().end());
+        // Folded block scalars (`>`, `>-`, `>+`) reflow per wrap mode —
+        // their single line breaks fold to spaces, so joining and
+        // re-breaking is loss-free (STYLE.md rule 15). Literal (`|`)
+        // scalars never wrap (newlines are significant); quoted scalars
+        // never wrap either.
         if text.starts_with('>') {
-            if let Some(wrapped) = wrap_folded_scalar_text(&text, opts.line_width)
+            if let Some(wrapped) = reflow_folded_scalar(&text, opts, profile)
                 && wrapped != text
             {
-                let scalar_start = usize::from(scalar.text_range().start());
-                let scalar_end = usize::from(scalar.text_range().end());
                 edits.push((scalar_start, scalar_end, wrapped));
             }
             continue;
@@ -773,6 +776,8 @@ fn apply_plain_scalar_wrap(buf: String, opts: &YamlFormatOptions) -> String {
         if text.starts_with('\'') || text.starts_with('"') || text.starts_with('|') {
             continue;
         }
+        // Multi-line plain scalars are left to the continuation-indent
+        // rule; only single-line plain values wrap here.
         if text.contains('\n') {
             continue;
         }
@@ -780,19 +785,32 @@ fn apply_plain_scalar_wrap(buf: String, opts: &YamlFormatOptions) -> String {
         if depth == 0 {
             continue;
         }
-        let scalar_start = usize::from(scalar.text_range().start());
-        let scalar_end = usize::from(scalar.text_range().end());
         let line_start = buf[..scalar_start].rfind('\n').map(|p| p + 1).unwrap_or(0);
-        let line_end = buf[scalar_end..]
-            .find('\n')
-            .map(|p| scalar_end + p)
-            .unwrap_or(buf.len());
-        if buf[line_start..line_end].chars().count() <= opts.line_width {
-            continue;
-        }
         let scalar_col = buf[line_start..scalar_start].chars().count();
         let indent = depth * 2;
-        let wrapped = wrap_plain_scalar_text(&text, scalar_col, indent, opts.line_width);
+        let wrapped = match opts.wrap {
+            WrapMode::Reflow => {
+                let line_end = buf[scalar_end..]
+                    .find('\n')
+                    .map(|p| scalar_end + p)
+                    .unwrap_or(buf.len());
+                if buf[line_start..line_end].chars().count() <= opts.line_width {
+                    continue;
+                }
+                wrap_plain_scalar_text(&text, scalar_col, indent, opts.line_width)
+            }
+            // For a single-line plain value, semantic == sentence (there
+            // are no author line breaks to preserve): both split into one
+            // sentence per line at the value column.
+            WrapMode::Sentence | WrapMode::Semantic => {
+                let sentences = sentence_wrap::split_sentence_text(&text, profile);
+                if sentences.len() <= 1 {
+                    continue;
+                }
+                join_sentences_as_plain(&sentences, indent)
+            }
+            WrapMode::Preserve => continue,
+        };
         if wrapped == text {
             continue;
         }
@@ -802,6 +820,24 @@ fn apply_plain_scalar_wrap(buf: String, opts: &YamlFormatOptions) -> String {
     let mut out = buf;
     for (start, end, replacement) in edits.into_iter().rev() {
         out.replace_range(start..end, &replacement);
+    }
+    out
+}
+
+/// Lay out a sequence of sentences as a multi-line plain scalar value:
+/// the first sentence stays on the key line; each subsequent sentence
+/// starts a continuation line at the value column (`indent` spaces).
+/// Plain multi-line scalars fold their line breaks to spaces, so this
+/// round-trips back to the original prose.
+fn join_sentences_as_plain(sentences: &[String], indent: usize) -> String {
+    let indent_str = " ".repeat(indent);
+    let mut out = String::new();
+    for (i, sentence) in sentences.iter().enumerate() {
+        if i > 0 {
+            out.push('\n');
+            out.push_str(&indent_str);
+        }
+        out.push_str(sentence);
     }
     out
 }
@@ -896,23 +932,37 @@ fn wrap_plain_scalar_text(text: &str, start_col: usize, indent: usize, width: us
     out
 }
 
-/// Reflow an overlong **folded** (`>`) block scalar's body lines to
-/// `width`, returning the rewritten scalar text (header + body) or `None`
+/// Number of leading ASCII spaces on `line`.
+fn leading_spaces(line: &str) -> usize {
+    line.len() - line.trim_start_matches(' ').len()
+}
+
+/// Reflow a **folded** (`>`) block scalar's body per the active wrap
+/// mode, returning the rewritten scalar text (header + body) or `None`
 /// when the scalar isn't a simple folded scalar we can safely reflow.
 ///
-/// Folding semantics make this loss-free: a single line break between two
-/// equally-indented non-empty lines folds to one space, so breaking an
-/// overlong line at the base indent round-trips. To stay byte-stable
-/// against pretty_yaml's preserve-everything stance on the short cases
-/// (STYLE.md rule 15), we only *break* lines that exceed `width` — short
-/// lines are never joined. Lines that carry folding-significant meaning
-/// are left verbatim: blank lines (which fold to a newline) and
-/// more-indented lines (which are literal within a folded scalar).
+/// Folding semantics make every mode loss-free: a single line break
+/// between two equally-indented non-empty lines folds to one space, so
+/// joining a folded paragraph and re-breaking it anywhere round-trips.
+/// The body is grouped into paragraphs of contiguous base-indent prose
+/// lines; folding-significant lines act as separators and pass through
+/// verbatim — blank lines (which fold to a newline) and more-indented
+/// lines (which are literal within a folded scalar). Each paragraph is
+/// then re-laid-out:
+///
+/// - **Reflow**: join the paragraph and greedy-fill to `line_width`.
+/// - **Sentence**: join the paragraph, then one sentence per line.
+/// - **Semantic**: keep the author's line breaks (each source line is a
+///   unit) and additionally split each on sentence boundaries.
 ///
 /// Bails (`None`) on an explicit indentation indicator (`>2`), a header
 /// trailing comment, or an empty body — the rare shapes where reflowing
 /// would need to reason about the indent the indicator pins.
-fn wrap_folded_scalar_text(text: &str, width: usize) -> Option<String> {
+fn reflow_folded_scalar(
+    text: &str,
+    opts: &YamlFormatOptions,
+    profile: ResolvedProfile<'_>,
+) -> Option<String> {
     let nl = text.find('\n')?;
     let header = &text[..nl];
     // Chars after `>`: only an optional chomping indicator is in scope.
@@ -922,7 +972,6 @@ fn wrap_folded_scalar_text(text: &str, width: usize) -> Option<String> {
     }
     let body = &text[nl + 1..];
     let lines: Vec<&str> = body.split('\n').collect();
-    let leading_spaces = |line: &str| line.len() - line.trim_start_matches(' ').len();
     let base_indent = lines
         .iter()
         .find(|l| !l.trim().is_empty())
@@ -931,20 +980,77 @@ fn wrap_folded_scalar_text(text: &str, width: usize) -> Option<String> {
         return None;
     }
     let indent_str = " ".repeat(base_indent);
+
     let mut out_lines: Vec<String> = Vec::with_capacity(lines.len());
+    let mut para: Vec<&str> = Vec::new();
     for line in &lines {
-        // Blank lines and more-indented (literal) lines are folding-
-        // significant; only base-indent prose lines that overflow wrap.
-        if line.trim().is_empty()
-            || leading_spaces(line) != base_indent
-            || line.chars().count() <= width
-        {
+        // Blank and more-indented (literal) lines are folding-significant:
+        // they break the current paragraph and pass through verbatim.
+        if line.trim().is_empty() || leading_spaces(line) != base_indent {
+            if !para.is_empty() {
+                emit_folded_paragraph(
+                    &para,
+                    base_indent,
+                    &indent_str,
+                    opts,
+                    profile,
+                    &mut out_lines,
+                );
+                para.clear();
+            }
             out_lines.push((*line).to_string());
-            continue;
+        } else {
+            para.push(&line[base_indent..]);
         }
-        let content = &line[base_indent..];
-        let wrapped = wrap_plain_scalar_text(content, base_indent, base_indent, width);
-        out_lines.push(format!("{indent_str}{wrapped}"));
     }
+    if !para.is_empty() {
+        emit_folded_paragraph(
+            &para,
+            base_indent,
+            &indent_str,
+            opts,
+            profile,
+            &mut out_lines,
+        );
+    }
+
     Some(format!("{header}\n{}", out_lines.join("\n")))
+}
+
+/// Re-lay-out one folded-scalar paragraph (`para`, the base-indent prose
+/// lines with their indent already stripped) per the active wrap mode,
+/// pushing fully-indented output lines onto `out`.
+fn emit_folded_paragraph(
+    para: &[&str],
+    base_indent: usize,
+    indent_str: &str,
+    opts: &YamlFormatOptions,
+    profile: ResolvedProfile<'_>,
+    out: &mut Vec<String>,
+) {
+    match opts.wrap {
+        WrapMode::Reflow => {
+            let prose = para.join(" ");
+            let wrapped = wrap_plain_scalar_text(&prose, base_indent, base_indent, opts.line_width);
+            out.push(format!("{indent_str}{wrapped}"));
+        }
+        WrapMode::Sentence => {
+            let prose = para.join(" ");
+            for sentence in sentence_wrap::split_sentence_text(&prose, profile) {
+                out.push(format!("{indent_str}{sentence}"));
+            }
+        }
+        WrapMode::Semantic => {
+            for line in para {
+                for sentence in sentence_wrap::split_sentence_text(line, profile) {
+                    out.push(format!("{indent_str}{sentence}"));
+                }
+            }
+        }
+        WrapMode::Preserve => {
+            for line in para {
+                out.push(format!("{indent_str}{line}"));
+            }
+        }
+    }
 }

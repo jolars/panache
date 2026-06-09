@@ -426,6 +426,46 @@ fn sentence_language_for(lang: Option<&str>) -> SentenceLanguage {
     }
 }
 
+/// Merge the user-configured no-break abbreviations that apply to `lang`:
+/// the `default` bucket plus the bucket for the language's primary subtag,
+/// each normalized to a comparison candidate. Shared by [`resolve_profile`]
+/// (markdown path) and the YAML formatter bridge so both resolve the same
+/// set.
+pub(super) fn merge_no_break_list(config: &Config, lang: Option<&str>) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Some(entries) = config.no_break_abbreviations.get("default") {
+        out.extend(
+            entries
+                .iter()
+                .map(|entry| normalize_abbreviation_candidate(entry)),
+        );
+    }
+    if let Some(code) = lang.map(primary_subtag)
+        && let Some(entries) = config.no_break_abbreviations.get(code)
+    {
+        out.extend(
+            entries
+                .iter()
+                .map(|entry| normalize_abbreviation_candidate(entry)),
+        );
+    }
+    out
+}
+
+/// Build a [`ResolvedProfile`] directly from a language code and an
+/// already-merged, already-normalized list of user no-break abbreviations.
+/// Used by the YAML formatter, which carries these as plain data on its
+/// options rather than holding a `Config`/`SyntaxNode`.
+pub(super) fn profile_from<'a>(
+    lang: Option<&str>,
+    extra_no_break: &'a [String],
+) -> ResolvedProfile<'a> {
+    ResolvedProfile {
+        builtin: sentence_language_for(lang).profile(),
+        extra_no_break,
+    }
+}
+
 /// Resolve the built-in profile plus any user-configured no-break abbreviations
 /// for `node`'s document language. `scratch` owns the normalized user entries
 /// for the lifetime of the returned profile. Built once per node-wrap; this
@@ -439,22 +479,7 @@ pub(super) fn resolve_profile<'a>(
     let language = sentence_language_for(lang.as_deref());
 
     scratch.clear();
-    if let Some(entries) = config.no_break_abbreviations.get("default") {
-        scratch.extend(
-            entries
-                .iter()
-                .map(|entry| normalize_abbreviation_candidate(entry)),
-        );
-    }
-    if let Some(code) = lang.as_deref().map(primary_subtag)
-        && let Some(entries) = config.no_break_abbreviations.get(code)
-    {
-        scratch.extend(
-            entries
-                .iter()
-                .map(|entry| normalize_abbreviation_candidate(entry)),
-        );
-    }
+    scratch.extend(merge_no_break_list(config, lang.as_deref()));
 
     ResolvedProfile {
         builtin: language.profile(),

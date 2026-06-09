@@ -86,6 +86,34 @@ mod scalar;
 
 pub use options::{WrapMode, YamlFormatOptions};
 
+/// Map a formatter [`Config`](crate::config::Config) onto the
+/// dependency-lean [`YamlFormatOptions`] the YAML formatter consumes.
+///
+/// This is the single bridge between host config and the YAML
+/// formatter: it maps the markdown wrap mode onto the YAML wrap mode
+/// (so YAML prose reflows the same way as document body prose) and
+/// resolves the sentence-boundary language profile inputs (the
+/// configured `lang` plus the merged no-break abbreviation list). Both
+/// `yaml_engine.rs` bridges (formatter-crate and host) funnel through
+/// here so the mapping lives in exactly one place.
+pub fn options_from_config(config: &crate::config::Config) -> YamlFormatOptions {
+    use crate::config::WrapMode as HostWrap;
+    let wrap = match config.wrap {
+        Some(HostWrap::Preserve) => WrapMode::Preserve,
+        Some(HostWrap::Sentence) => WrapMode::Sentence,
+        Some(HostWrap::Semantic) => WrapMode::Semantic,
+        Some(HostWrap::Reflow) | None => WrapMode::Reflow,
+    };
+    let lang = config.lang.clone();
+    let no_break_abbreviations = super::sentence_wrap::merge_no_break_list(config, lang.as_deref());
+    YamlFormatOptions {
+        line_width: config.line_width,
+        wrap,
+        lang,
+        no_break_abbreviations,
+    }
+}
+
 /// Format the given YAML source under the in-tree formatter.
 ///
 /// On a parse error (input the in-tree parser rejects outright),
@@ -446,17 +474,23 @@ mod tests {
     #[test]
     fn rule_4_block_scalar_style_preserved() {
         // Rule 4: literal `|` and folded `>` carry different YAML semantics
-        // and are not interchangeable. Chomping indicators (`-` / `+`) and
-        // indent indicators ride along with the header.
+        // and are not interchangeable. The header — style indicator plus
+        // chomping (`-` / `+`) — always rides through unchanged. Literal
+        // bodies are verbatim (newlines significant); folded bodies reflow
+        // per rule 15 (default `Reflow` joins short lines, loss-free).
         let opts = YamlFormatOptions::default();
         let literal = "msg: |\n  line one\n  line two\n";
         assert_eq!(format_yaml(literal, &opts), literal);
-        let folded = "msg: >\n  line one\n  line two\n";
-        assert_eq!(format_yaml(folded, &opts), folded);
         let literal_strip = "msg: |-\n  line one\n  line two\n";
         assert_eq!(format_yaml(literal_strip, &opts), literal_strip);
+        // Folded headers preserved; short folded bodies join under reflow.
+        let folded = "msg: >\n  line one\n  line two\n";
+        assert_eq!(format_yaml(folded, &opts), "msg: >\n  line one line two\n");
         let folded_keep = "msg: >+\n  line one\n  line two\n";
-        assert_eq!(format_yaml(folded_keep, &opts), folded_keep);
+        assert_eq!(
+            format_yaml(folded_keep, &opts),
+            "msg: >+\n  line one line two\n"
+        );
     }
 
     #[test]
@@ -602,13 +636,15 @@ mod tests {
         let preserve = YamlFormatOptions {
             line_width: 80,
             wrap: WrapMode::Preserve,
+            ..Default::default()
         };
-        let always = YamlFormatOptions {
+        let reflow = YamlFormatOptions {
             line_width: 80,
-            wrap: WrapMode::Always,
+            wrap: WrapMode::Reflow,
+            ..Default::default()
         };
         assert_eq!(format_yaml(input, &preserve), input);
-        assert_ne!(format_yaml(input, &always), input);
+        assert_ne!(format_yaml(input, &reflow), input);
 
         // Flow sequence wraps under both modes.
         let flow = "tags: [alpha, bravo, charlie, delta, echo, foxtrot, golf, hotel, india, juliet, kilo, lima]\n";
@@ -617,7 +653,7 @@ mod tests {
             flow_preserve.contains("[\n"),
             "flow should wrap under Preserve: {flow_preserve:?}"
         );
-        assert_eq!(format_yaml(flow, &always), flow_preserve);
+        assert_eq!(format_yaml(flow, &reflow), flow_preserve);
     }
 
     #[test]

@@ -177,7 +177,7 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
 
     #[cfg(not(target_arch = "wasm32"))]
     let formatted_yaml = if let Some(yaml_content) = frontmatter_yaml.clone() {
-        match crate::yaml_engine::format_yaml_with_config(&yaml_content, config) {
+        match crate::yaml_engine::format_yaml_with_config(&yaml_content, &formatter_config) {
             Ok(formatted) if formatted != yaml_content => Some((yaml_content, formatted)),
             _ => None,
         }

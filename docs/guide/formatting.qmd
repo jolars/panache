@@ -127,15 +127,20 @@ Output
 
 Under a wrapping mode (`reflow`, `sentence`, or `semantic`), Panache also wraps
 prose held in YAML --- both document frontmatter and Quarto/R&nbsp;Markdown
-hashpipe (`#|`) chunk options. Plain scalars reflow to `line-width`, and
-*folded* block scalars (those introduced with `>`, including the `>-` and `>+`
-chomping variants) have their overlong lines reflowed too, since a folded
-scalar's single line breaks fold to spaces. The continuation lines keep the
-scalar's indentation, and short lines are never joined.
+hashpipe (`#|`) chunk options --- following the same wrap mode as the document
+body. *Folded* block scalars (those introduced with `>`, including the `>-` and
+`>+` chomping variants) and plain scalars are reflowed; a folded scalar's single
+line breaks fold to spaces, so this never changes the value:
 
-Literal block scalars (`|`) are left untouched --- their line breaks are
-significant content --- as are quoted scalars. Under `wrap = "preserve"`,
-nothing in the YAML is reflowed.
+- `reflow` rejoins the whole paragraph and refills it to `line-width`, so a
+  hand-wrapped scalar with uneven lines is tidied up (short lines are joined).
+- `sentence` puts one sentence per line; `semantic` keeps your existing line
+  breaks and adds breaks at sentence boundaries.
+
+Blank lines and more-indented lines inside a folded scalar are significant and
+left in place. Literal block scalars (`|`) are left untouched --- their line
+breaks are significant content --- as are quoted scalars. Under
+`wrap = "preserve"`, nothing in the YAML is reflowed.
 
 Input
 

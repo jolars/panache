@@ -1,6 +1,3 @@
-use crate::config::Config;
-#[cfg(not(target_arch = "wasm32"))]
-use crate::config::WrapMode;
 use crate::syntax::YamlParseError;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -13,45 +10,44 @@ pub(crate) fn validate_yaml(_input: &str) -> Result<(), YamlParseError> {
     Ok(())
 }
 
+/// Format frontmatter YAML. The caller passes the already-bridged
+/// formatter [`Config`](panache_formatter::Config); wrap-mode and
+/// language resolution live in
+/// [`panache_formatter::formatter::yaml::options_from_config`] so the
+/// host and formatter-crate bridges stay identical.
 #[cfg(not(target_arch = "wasm32"))]
-pub(crate) fn format_yaml_with_config(input: &str, config: &Config) -> Result<String, String> {
+pub(crate) fn format_yaml_with_config(
+    input: &str,
+    config: &panache_formatter::Config,
+) -> Result<String, String> {
     validate_yaml(input).map_err(|e| e.message().to_string())?;
-    let options = panache_formatter::formatter::yaml::YamlFormatOptions {
-        line_width: config.line_width,
-        wrap: yaml_wrap_for_config(config),
-    };
+    let options = panache_formatter::formatter::yaml::options_from_config(config);
     Ok(panache_formatter::formatter::yaml::format_yaml(
         input, &options,
     ))
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn yaml_wrap_for_config(config: &Config) -> panache_formatter::formatter::yaml::WrapMode {
-    use panache_formatter::formatter::yaml::WrapMode as YamlWrapMode;
-    match config.wrap {
-        Some(WrapMode::Preserve) => YamlWrapMode::Preserve,
-        Some(WrapMode::Reflow) | Some(WrapMode::Sentence) | Some(WrapMode::Semantic) | None => {
-            YamlWrapMode::Always
-        }
-    }
-}
-
 #[cfg(target_arch = "wasm32")]
-pub(crate) fn format_yaml_with_config(input: &str, _config: &Config) -> Result<String, String> {
+pub(crate) fn format_yaml_with_config(
+    input: &str,
+    _config: &panache_formatter::Config,
+) -> Result<String, String> {
     Ok(input.to_string())
 }
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(target_arch = "wasm32"))]
+    use super::format_yaml_with_config;
     use super::validate_yaml;
     #[cfg(not(target_arch = "wasm32"))]
-    use super::{format_yaml_with_config, yaml_wrap_for_config};
-    use crate::config::{Config, WrapMode};
+    use panache_formatter::WrapMode;
 
     #[test]
     fn preserves_block_scalar_styles() {
         let input = "fig-cap: >-\n  A folded caption\n  spanning some lines\n";
-        let out = format_yaml_with_config(input, &Config::default()).expect("yaml should format");
+        let out = format_yaml_with_config(input, &panache_formatter::Config::default())
+            .expect("yaml should format");
         assert!(out.contains("fig-cap: >-"));
     }
 
@@ -64,35 +60,14 @@ mod tests {
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
-    fn wrap_mode_follows_panache_wrap_mode() {
-        use panache_formatter::formatter::yaml::WrapMode as YamlWrapMode;
-        let preserve = Config {
-            wrap: Some(WrapMode::Preserve),
-            ..Default::default()
-        };
-        let reflow = Config {
-            wrap: Some(WrapMode::Reflow),
-            ..Default::default()
-        };
-        let sentence = Config {
-            wrap: Some(WrapMode::Sentence),
-            ..Default::default()
-        };
-        assert_eq!(yaml_wrap_for_config(&preserve), YamlWrapMode::Preserve);
-        assert_eq!(yaml_wrap_for_config(&reflow), YamlWrapMode::Always);
-        assert_eq!(yaml_wrap_for_config(&sentence), YamlWrapMode::Always);
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    #[test]
     fn line_width_follows_panache_config() {
         let long = "title: This is a very long yaml scalar that should not stay on one line when width is narrow.\n";
-        let preserve = Config {
+        let preserve = panache_formatter::Config {
             line_width: 120,
             wrap: Some(WrapMode::Preserve),
             ..Default::default()
         };
-        let reflow = Config {
+        let reflow = panache_formatter::Config {
             line_width: 30,
             wrap: Some(WrapMode::Reflow),
             ..Default::default()

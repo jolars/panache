@@ -1,9 +1,9 @@
 ---
 title: Guide
 description: >
-  This guide provides instructions and examples for using Panache, including
-  how to set up the language server in your editor, run the linte or formatter
-  from the command line, and configuring the behavior of Panache.
+  This guide provides instructions and examples for using Panache, including how
+  to set up the language server in your editor, run the linte or formatter from
+  the command line, and configuring the behavior of Panache.
 ---
 
 - In [Formatting](formatting.qmd) you can find instructions on how to use

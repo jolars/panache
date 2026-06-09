@@ -59,10 +59,26 @@ fn pretty_yaml_opts(in_tree: &YamlFormatOptions) -> FormatOptions {
     let mut opts = FormatOptions::default();
     opts.layout.print_width = in_tree.line_width;
     opts.language.prose_wrap = match in_tree.wrap {
-        WrapMode::Always => ProseWrap::Always,
+        // pretty_yaml has no sentence/semantic prose modes; the reflow
+        // family maps to `Always`, preserve to `Preserve`. The harness
+        // only ever runs the default (`Reflow`) mode.
+        WrapMode::Reflow | WrapMode::Sentence | WrapMode::Semantic => ProseWrap::Always,
         WrapMode::Preserve => ProseWrap::Preserve,
     };
     opts
+}
+
+/// Folded (`>`) block scalars are a deliberate divergence from
+/// pretty_yaml: under STYLE.md rule 15 panache reflows their prose,
+/// while pretty_yaml preserves every block scalar verbatim. Such cases
+/// are exempt from the pretty_yaml *parity* check (idempotency is still
+/// asserted). Detected by a value whose block-scalar header is a folded
+/// indicator (`>`, `>-`, `>+`).
+fn contains_folded_scalar(input: &str) -> bool {
+    input.lines().any(|line| {
+        let trimmed = line.trim_end();
+        trimmed.ends_with('>') || trimmed.ends_with(">-") || trimmed.ends_with(">+")
+    })
 }
 
 #[test]
@@ -93,22 +109,26 @@ fn corpus_cross_validates_against_pretty_yaml() {
             }
         };
 
-        let pretty = match pretty_yaml::format_text(&input, &pretty_opts) {
-            Ok(s) => s,
-            Err(e) => {
-                failures.push(format!("[{id}] pretty_yaml rejected reference input: {e}"));
+        let in_tree = format_yaml(&input, &opts);
+
+        // Folded scalars deliberately diverge (rule 15); skip parity but
+        // still assert idempotency below.
+        if !contains_folded_scalar(&input) {
+            let pretty = match pretty_yaml::format_text(&input, &pretty_opts) {
+                Ok(s) => s,
+                Err(e) => {
+                    failures.push(format!("[{id}] pretty_yaml rejected reference input: {e}"));
+                    continue;
+                }
+            };
+            if in_tree != pretty {
+                failures.push(format!(
+                    "[{id}] parity break:\n  in_tree:\n{}\n  pretty:\n{}",
+                    indent_block(&in_tree),
+                    indent_block(&pretty),
+                ));
                 continue;
             }
-        };
-
-        let in_tree = format_yaml(&input, &opts);
-        if in_tree != pretty {
-            failures.push(format!(
-                "[{id}] parity break:\n  in_tree:\n{}\n  pretty:\n{}",
-                indent_block(&in_tree),
-                indent_block(&pretty),
-            ));
-            continue;
         }
 
         let pass2 = format_yaml(&in_tree, &opts);
