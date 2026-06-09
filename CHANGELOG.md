@@ -85,6 +85,7 @@ This release comes with two major changes:
 ### Dependencies
 - updated crates/panache-formatter to v0.9.0
 - updated crates/panache-parser to v0.14.0
+
 ## [2.50.0](https://github.com/jolars/panache/compare/v2.49.0...v2.50.0) (2026-05-29)
 
 ### Features
@@ -126,6 +127,7 @@ This release comes with two major changes:
 ### Dependencies
 - updated crates/panache-formatter to v0.8.0
 - updated crates/panache-parser to v0.13.0
+
 ## [2.49.0](https://github.com/jolars/panache/compare/v2.48.0...v2.49.0) (2026-05-26)
 
 The largest change in this release is likely a new wrap mode, `semantic`, which
