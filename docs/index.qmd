@@ -49,7 +49,7 @@ and in CI, with consistent behavior across all environments.
   blocks to enable language-aware formatting and linting of embedded code.
 - **Fast and reliable**: built in Rust for speed and stability, with a focus on
   correctness and consistent formatting. See the
-  [Comparisons](guide/comparisons.qmd) and [Performance](guide/performance.qmd)
+  [Comparisons](guide/comparison.qmd) and [Performance](guide/performance.qmd)
   articles for comparisons and benchmarks against other tools.
 
 ## Quick Start
