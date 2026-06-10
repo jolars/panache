@@ -75,7 +75,7 @@ async function findBundledBinary(
 async function resolveCommandPath(
   context: vscode.ExtensionContext,
   config: vscode.WorkspaceConfiguration,
-  outputChannel: vscode.OutputChannel,
+  outputChannel: vscode.LogOutputChannel,
 ): Promise<string> {
   const githubRepo = config.get<string>("githubRepo", "jolars/panache");
   const version = config.get<string>("version", "latest");
@@ -208,7 +208,7 @@ function mergeServerEnvironment(
 
 async function startClient(
   context: vscode.ExtensionContext,
-  outputChannel: vscode.OutputChannel,
+  outputChannel: vscode.LogOutputChannel,
 ): Promise<void> {
   const config = vscode.workspace.getConfiguration("panache");
   const commandPath = await resolveCommandPath(context, config, outputChannel);
@@ -309,7 +309,7 @@ async function startClient(
 
 async function restartClient(
   context: vscode.ExtensionContext,
-  outputChannel: vscode.OutputChannel,
+  outputChannel: vscode.LogOutputChannel,
 ): Promise<void> {
   if (client) {
     try {
@@ -326,6 +326,7 @@ async function restartClient(
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const outputChannel = vscode.window.createOutputChannel(
     "Panache Language Server",
+    { log: true },
   );
   context.subscriptions.push(outputChannel);
 
