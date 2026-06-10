@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.0](https://github.com/jolars/panache/compare/panache-parser-v0.15.0...panache-parser-v0.16.0) (2026-06-10)
+
+### Features
+- **parser:** condition YAML validation on consumer profiles ([`f77f153`](https://github.com/jolars/panache/commit/f77f153a7ad8d3339e31395f2b9b76535c01dff5))
+
+### Bug Fixes
+- **parser:** report YAML required-simple-key errors ([`f8f804c`](https://github.com/jolars/panache/commit/f8f804c89aceabced19e6063932f4621882b3f61))
+
 ## [0.15.0](https://github.com/jolars/panache/compare/panache-parser-v0.14.0...panache-parser-v0.15.0) (2026-06-07)
 
 ### Features
