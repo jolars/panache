@@ -8,7 +8,7 @@ use crate::metadata::DocumentMetadata;
 use crate::syntax::{
     AstNode, AttributeNode, Citation, CodeBlock, Crossref, FootnoteDefinition, FootnoteReference,
     Heading, Link, ListItem, ParsedYamlRegionSnapshot, ReferenceDefinition, SyntaxKind, SyntaxNode,
-    YamlRegion, collect_parsed_yaml_region_snapshots,
+    SyntaxToken, UnresolvedReference, YamlRegion, collect_parsed_yaml_region_snapshots,
 };
 use crate::utils::{implicit_heading_ids, normalize_anchor_label, normalize_label};
 use salsa::{Accumulator, Durability, Setter};
@@ -636,7 +636,76 @@ pub fn symbol_usage_index_from_tree(
 ) -> SymbolUsageIndex {
     let mut index = SymbolUsageIndex::default();
 
-    for def in tree.descendants().filter_map(ReferenceDefinition::cast) {
+    // Single pre-order walk buckets every node/token kind the passes below
+    // consume, replacing the ~12 separate `tree.descendants()` traversals that
+    // used to dominate this query. The replay loops are otherwise unchanged and
+    // run in their original order, so each `SymbolUsageIndex` field's push order
+    // stays byte-identical — value-equality (and the salsa short-circuiting that
+    // depends on it) is preserved. Covered by `folded_index_matches_reference`.
+    let mut reference_definitions: Vec<ReferenceDefinition> = Vec::new();
+    let mut footnote_definitions: Vec<FootnoteDefinition> = Vec::new();
+    let mut footnote_references: Vec<FootnoteReference> = Vec::new();
+    let mut list_items: Vec<ListItem> = Vec::new();
+    let mut headings: Vec<Heading> = Vec::new();
+    let mut links: Vec<Link> = Vec::new();
+    let mut unresolved_references: Vec<UnresolvedReference> = Vec::new();
+    let mut citation_nodes: Vec<SyntaxNode> = Vec::new();
+    let mut crossref_nodes: Vec<SyntaxNode> = Vec::new();
+    let mut text_tokens: Vec<SyntaxToken> = Vec::new();
+    let mut attribute_nodes: Vec<AttributeNode> = Vec::new();
+    let mut span_attribute_nodes: Vec<SyntaxNode> = Vec::new();
+    let mut code_blocks: Vec<CodeBlock> = Vec::new();
+
+    for element in tree.descendants_with_tokens() {
+        if let Some(node) = element.as_node() {
+            db.unwind_if_revision_cancelled();
+            if let Some(cast) = ReferenceDefinition::cast(node.clone()) {
+                reference_definitions.push(cast);
+            }
+            if let Some(cast) = FootnoteDefinition::cast(node.clone()) {
+                footnote_definitions.push(cast);
+            }
+            if let Some(cast) = FootnoteReference::cast(node.clone()) {
+                footnote_references.push(cast);
+            }
+            if let Some(cast) = ListItem::cast(node.clone()) {
+                list_items.push(cast);
+            }
+            if let Some(cast) = Heading::cast(node.clone()) {
+                headings.push(cast);
+            }
+            if let Some(cast) = Link::cast(node.clone()) {
+                links.push(cast);
+            }
+            if let Some(cast) = UnresolvedReference::cast(node.clone()) {
+                unresolved_references.push(cast);
+            }
+            if node.kind() == SyntaxKind::CITATION {
+                citation_nodes.push(node.clone());
+            }
+            if node.kind() == SyntaxKind::CROSSREF {
+                crossref_nodes.push(node.clone());
+            }
+            if let Some(cast) = AttributeNode::cast(node.clone()) {
+                attribute_nodes.push(cast);
+            }
+            if node.kind() == SyntaxKind::SPAN_ATTRIBUTES {
+                span_attribute_nodes.push(node.clone());
+            }
+            if let Some(cast) = CodeBlock::cast(node.clone()) {
+                code_blocks.push(cast);
+            }
+        } else if let Some(token) = element.as_token()
+            && matches!(
+                token.kind(),
+                SyntaxKind::TEXT | SyntaxKind::MATH_EQUATION_LABEL
+            )
+        {
+            text_tokens.push(token.clone());
+        }
+    }
+
+    for def in reference_definitions {
         db.unwind_if_revision_cancelled();
         let label = normalize_label(&def.label());
         if label.is_empty() {
@@ -649,7 +718,7 @@ pub fn symbol_usage_index_from_tree(
             .push(def.syntax().text_range());
     }
 
-    for def in tree.descendants().filter_map(FootnoteDefinition::cast) {
+    for def in footnote_definitions {
         db.unwind_if_revision_cancelled();
         let id = normalize_label(&def.id());
         if id.is_empty() {
@@ -669,7 +738,7 @@ pub fn symbol_usage_index_from_tree(
         }
     }
 
-    for footnote in tree.descendants().filter_map(FootnoteReference::cast) {
+    for footnote in footnote_references {
         db.unwind_if_revision_cancelled();
         let id = normalize_label(&footnote.id());
         if id.is_empty() {
@@ -684,7 +753,7 @@ pub fn symbol_usage_index_from_tree(
         }
     }
 
-    for item in tree.descendants().filter_map(ListItem::cast) {
+    for item in list_items {
         db.unwind_if_revision_cancelled();
         if let Some((label, range)) = extract_example_label_definition(&item) {
             index
@@ -695,7 +764,7 @@ pub fn symbol_usage_index_from_tree(
         }
     }
 
-    for heading in tree.descendants().filter_map(crate::syntax::Heading::cast) {
+    for heading in headings {
         db.unwind_if_revision_cancelled();
         let label = normalize_label(&heading.text());
         if label.is_empty() {
@@ -714,7 +783,7 @@ pub fn symbol_usage_index_from_tree(
         }
     }
 
-    for link in tree.descendants().filter_map(Link::cast) {
+    for link in links {
         db.unwind_if_revision_cancelled();
         if let Some(dest) = link.dest() {
             let Some(id) = dest.hash_anchor_id() else {
@@ -750,10 +819,7 @@ pub fn symbol_usage_index_from_tree(
     // `UNRESOLVED_REFERENCE` (Pandoc dialect with no matching refdef).
     // Index their inner text range so cross-file rename and
     // goto-definition cover both wrappers uniformly.
-    for unresolved in tree
-        .descendants()
-        .filter_map(crate::syntax::UnresolvedReference::cast)
-    {
+    for unresolved in unresolved_references {
         db.unwind_if_revision_cancelled();
         if unresolved.is_image() || unresolved.label().is_some() {
             continue;
@@ -776,10 +842,7 @@ pub fn symbol_usage_index_from_tree(
             .push(text_node.text_range());
     }
 
-    for node in tree
-        .descendants()
-        .filter(|node| node.kind() == SyntaxKind::CITATION)
-    {
+    for node in citation_nodes {
         db.unwind_if_revision_cancelled();
         let Some(citation) = Citation::cast(node) else {
             continue;
@@ -798,10 +861,7 @@ pub fn symbol_usage_index_from_tree(
         }
     }
 
-    for node in tree
-        .descendants()
-        .filter(|node| node.kind() == SyntaxKind::CROSSREF)
-    {
+    for node in crossref_nodes {
         db.unwind_if_revision_cancelled();
         let Some(crossref) = Crossref::cast(node) else {
             continue;
@@ -815,11 +875,8 @@ pub fn symbol_usage_index_from_tree(
         }
     }
 
-    for element in tree.descendants_with_tokens() {
+    for token in text_tokens {
         db.unwind_if_revision_cancelled();
-        let Some(token) = element.into_token() else {
-            continue;
-        };
         match token.kind() {
             SyntaxKind::TEXT => {
                 collect_bookdown_declarations_from_text_token(&token, &mut index, extensions);
@@ -835,7 +892,7 @@ pub fn symbol_usage_index_from_tree(
         }
     }
 
-    for attribute in tree.descendants().filter_map(AttributeNode::cast) {
+    for attribute in attribute_nodes {
         db.unwind_if_revision_cancelled();
         if let Some(id) = attribute.id() {
             index
@@ -875,10 +932,7 @@ pub fn symbol_usage_index_from_tree(
         }
     }
 
-    for span_attrs in tree
-        .descendants()
-        .filter(|n| n.kind() == SyntaxKind::SPAN_ATTRIBUTES)
-    {
+    for span_attrs in span_attribute_nodes {
         db.unwind_if_revision_cancelled();
         let text = span_attrs.text().to_string();
         let inner = text
@@ -904,7 +958,7 @@ pub fn symbol_usage_index_from_tree(
     // registers their ids in `crossref_declarations`. No dedicated
     // walk needed here.
 
-    for block in tree.descendants().filter_map(CodeBlock::cast) {
+    for block in code_blocks {
         db.unwind_if_revision_cancelled();
         for label in block.chunk_label_entries() {
             let value = label.value().to_string();

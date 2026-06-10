@@ -33,11 +33,17 @@ This document tracks implementation status for Panache's features.
       `examples/profile_lint.rs`: `pandoc_manual.md` 53.9ms → 47.9ms (-11%),
       `large_authoring.qmd` (Quarto) 3.53ms → 2.98ms (-16%), diagnostics
       unchanged.
-- [ ] Follow-up: fold `symbol_usage_index_from_tree`'s \~12 internal
+- [x] Follow-up: fold `symbol_usage_index_from_tree`'s \~12 internal
       `tree.descendants()` walks (`src/salsa.rs`) into one dispatching walk too
-      --- the other named component of the old `Preorder` cost. Keep
-      `SymbolUsageIndex`'s value-equality semantics byte-identical (salsa
-      short-circuiting depends on it).
+      --- the other named component of the old `Preorder` cost. Done via
+      bucket-and-replay: one `descendants_with_tokens()` pass buckets every
+      consumed node/token kind, then the existing replay loops run unchanged in
+      their original order, so `SymbolUsageIndex`'s value-equality stays
+      byte-identical (verified byte-for-byte against the prior multi-walk impl
+      across the bench + golden corpus during the migration). Measured via
+      `examples/profile_symbol_index.rs`: `pandoc_manual.md` 4.94ms → 2.35ms
+      (-52%), `configuration.qmd` (Quarto) 0.55ms → 0.24ms (-56%),
+      `large_authoring.qmd` 0.33ms → 0.16ms (-51%).
 - [ ] Honor `experimental.incrementalParsing` from `settings` /
       `workspace/didChangeConfiguration`, not just initialize
       `initializationOptions`. Editors that send it via `settings` (observed in
