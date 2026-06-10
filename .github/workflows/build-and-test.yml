@@ -51,6 +51,31 @@ jobs:
       - name: Run tests
         run: cargo test --workspace --verbose
 
+  extension:
+    name: VS Code Extension
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: editors/code/package-lock.json
+
+      - name: Install dependencies
+        working-directory: editors/code
+        run: npm ci
+
+      # Type-checks against @types/vscode + vscode-languageclient and bundles
+      # with esbuild. Mirrors the check-types + bundle steps that
+      # vscode:prepublish runs at release time, so dependency bumps that break
+      # the extension fail on the PR instead of at publish.
+      - name: Compile extension
+        working-directory: editors/code
+        run: npm run compile
+
   cargo-audit:
     name: Cargo Audit
     runs-on: ubuntu-latest
@@ -75,7 +100,7 @@ jobs:
 
   versionary:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [cargo-audit, cargo-deny, test]
+    needs: [cargo-audit, cargo-deny, test, extension]
     runs-on: ubuntu-latest
     permissions:
       contents: write
