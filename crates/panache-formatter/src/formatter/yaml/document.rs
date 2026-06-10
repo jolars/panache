@@ -400,10 +400,23 @@ fn canonical_indent_depth(root: &SyntaxNode, offset: usize) -> Option<usize> {
         let scalar_text = scalar.text().to_string();
         if scalar_text.contains('\n') {
             let scalar_start = usize::from(scalar.text_range().start());
-            if offset > scalar_start {
-                if scalar_text.starts_with('|') || scalar_text.starts_with('>') {
+            if scalar_text.starts_with('|') || scalar_text.starts_with('>') {
+                // Block scalars (`|`/`>`) bake their interior indent into
+                // the source — preserve continuation lines verbatim until a
+                // real block-scalar renderer exists. The indicator line
+                // (offset == scalar_start) falls through to rule 1's formula.
+                if offset > scalar_start {
                     return None;
                 }
+            } else if offset >= scalar_start {
+                // Plain / single- / double-quoted multi-line scalar. Both the
+                // first line — when the value opens its own line below the key
+                // (offset == scalar_start) — and the continuation lines
+                // (offset > scalar_start) canonicalize to the value's content
+                // column (depth * 2 spaces). Anchoring the first line here too
+                // keeps a value-on-its-own-line scalar aligned with its
+                // continuation; treating it as a default-depth line instead
+                // de-indents only the first line and splits the scalar.
                 let mut entry_item_ancestors = 0usize;
                 let mut node = scalar.parent();
                 while let Some(n) = node {
