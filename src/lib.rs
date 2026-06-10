@@ -115,6 +115,35 @@ pub fn format(input: &str, config: Option<Config>, range: Option<(usize, usize)>
 
     let config = config.unwrap_or_default();
 
+    // Parse document into complete CST (parser preserves all bytes including
+    // CRLF), then format that tree.
+    let tree = parser::parse(input, Some(config.clone()));
+    format_with_tree(input, &tree, &config, range)
+}
+
+/// Formats a document from an already-parsed CST, skipping the internal parse.
+///
+/// Behaves exactly like [`format`] but reuses a caller-owned `tree` instead of
+/// parsing `input` again. The LSP routes formatting through this so it can reuse
+/// its salsa-cached parse (matching hover/symbols) rather than parsing afresh on
+/// every format request.
+///
+/// `tree` MUST be the result of parsing `input` under `config`; passing a tree
+/// that doesn't correspond to `input`/`config` yields undefined output.
+///
+/// # Arguments
+///
+/// * `input` - The document content the `tree` was parsed from
+/// * `tree` - The CST produced by parsing `input` with `config`
+/// * `config` - The configuration used to parse `input`
+/// * `range` - Optional line range (start_line, end_line), 1-indexed and
+///   inclusive; see [`format`].
+pub fn format_with_tree(
+    input: &str,
+    tree: &SyntaxNode,
+    config: &Config,
+    range: Option<(usize, usize)>,
+) -> String {
     // Determine target line ending based on config
     let target_line_ending = match config.line_ending {
         Some(config::LineEnding::Lf) => "\n",
@@ -125,12 +154,9 @@ pub fn format(input: &str, config: Option<Config>, range: Option<(usize, usize)>
         }
     };
 
-    // Step 1: Parse document into complete CST (parser preserves all bytes including CRLF)
-    let tree = parser::parse(input, Some(config.clone()));
-
-    // Step 2: Expand line range to byte offsets and block boundaries if specified
+    // Expand line range to byte offsets and block boundaries if specified
     let expanded_range = range.and_then(|(start_line, end_line)| {
-        let result = range_utils::expand_line_range_to_blocks(&tree, input, start_line, end_line);
+        let result = range_utils::expand_line_range_to_blocks(tree, input, start_line, end_line);
         if let Some((start, end)) = result {
             log::debug!(
                 "Range lines {}:{} expanded to byte range {}:{} (text: {:?}...{:?})",
@@ -145,10 +171,10 @@ pub fn format(input: &str, config: Option<Config>, range: Option<(usize, usize)>
         result
     });
 
-    // Step 3: Format the final CST (synchronously, includes external formatter support)
-    let out = formatter::format_tree(&tree, &config, expanded_range);
+    // Format the final CST (synchronously, includes external formatter support)
+    let out = formatter::format_tree(tree, config, expanded_range);
 
-    // Step 4: Apply line ending normalization if needed
+    // Apply line ending normalization if needed
     apply_line_ending(&out, target_line_ending)
 }
 

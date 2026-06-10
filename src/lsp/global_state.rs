@@ -133,6 +133,20 @@ impl StateSnapshot {
         ))
     }
 
+    /// The salsa-cached syntax tree for `uri`, freshly rooted.
+    ///
+    /// This is the same parse hover/symbols read, so callers (e.g. formatting)
+    /// can reuse it instead of parsing the document again. Returns `None` if the
+    /// document isn't open.
+    pub(crate) fn parsed_tree(&self, uri: &Uri) -> Option<SyntaxNode> {
+        let state = self.document_map.get(&uri.to_string())?;
+        Some(crate::salsa::parsed_tree_root(
+            self.db(),
+            state.salsa_file,
+            state.salsa_config,
+        ))
+    }
+
     /// Load config with URI-based flavor detection.
     pub(crate) fn config(&self, uri: &Uri) -> Config {
         load_config(&self.workspace_root, Some(uri))

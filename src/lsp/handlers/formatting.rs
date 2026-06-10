@@ -31,7 +31,13 @@ pub(crate) fn format_document(
         return None;
     }
 
-    let formatted = crate::format(&text, Some(config), None);
+    // Reuse the salsa-cached parse (the one hover/symbols read) instead of
+    // parsing afresh, saving a parse per format request. Falls back to a fresh
+    // parse only if the document somehow isn't open.
+    let formatted = match snap.parsed_tree(&uri) {
+        Some(tree) => crate::format_with_tree(&text, &tree, &config, None),
+        None => crate::format(&text, Some(config), None),
+    };
 
     if formatted == text {
         return None;
@@ -86,10 +92,14 @@ pub(crate) fn format_range(
         position_to_offset(&text, range.end),
     );
 
-    let tree = parser::parse(&text, Some(config.clone()));
+    // Reuse the salsa-cached parse for both range expansion and formatting,
+    // rather than parsing twice (once here, once inside `format`).
+    let tree = snap
+        .parsed_tree(&uri)
+        .unwrap_or_else(|| parser::parse(&text, Some(config.clone())));
     let expanded_range =
         range_utils::expand_line_range_to_blocks(&tree, &text, start_line, end_line);
-    let formatted = crate::format(&text, Some(config), Some((start_line, end_line)));
+    let formatted = crate::format_with_tree(&text, &tree, &config, Some((start_line, end_line)));
 
     if formatted.is_empty() || formatted == text {
         return None;

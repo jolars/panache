@@ -429,11 +429,12 @@ salsa's own per-file invalidation:
   never pushed in-flight lints near the pool size. The portable `ThreadIntent`
   analog (shared pool + priority queue + lint cap) is therefore deferred until a
   real burst, or a low-core machine, shows `wait` tracking lint duration.
-- **Format path re-parses.** `format_document`
-  (`src/lsp/handlers/formatting.rs:34`) parses fresh rather than reading the
-  cached `parsed_document`. Routing it through the salsa parse would match
-  hover/symbols and save a parse per format. Perf/consistency note; idempotency
-  is unaffected.
+- **Format path re-parses.** *Resolved.* `format_document` and `format_range`
+  (`src/lsp/handlers/formatting.rs`) now format via `crate::format_with_tree`,
+  reusing the salsa-cached parse through `StateSnapshot::parsed_tree` (the same
+  parse hover/symbols read) instead of parsing fresh --- saving a parse per
+  format request (two per range format). Each falls back to a fresh parse only
+  if the document isn't open. Idempotency is unaffected.
 - **Disk-cache fingerprint trap.** Already captured in `AGENTS.md`: the
   dev-build tool fingerprint doesn't change on a code edit, so the CLI can serve
   stale cached diagnostics. A development footgun, not an architecture gap ---
