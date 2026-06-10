@@ -422,9 +422,13 @@ salsa's own per-file invalidation:
 
 - **No thread-intent priority.** panache isolates formatting on its own pool but
   has no `ThreadIntent::{Worker, LatencySensitive}` analog on the main pool, so
-  a heavy lint can still delay a latency-sensitive hover. Watch-item: if read
-  latency regresses under load, give background work a lower priority or a
-  separate pool.
+  a heavy lint can still delay a latency-sensitive hover. Measured 2026-06 on a
+  12-physical-core box with temporary per-read `wait=`/`run=` instrumentation:
+  read `wait≈0` across hover/symbol/definition/formatting even with concurrent
+  lint, and the contended burst (many docs sharing a `.bib` linting at once)
+  never pushed in-flight lints near the pool size. The portable `ThreadIntent`
+  analog (shared pool + priority queue + lint cap) is therefore deferred until a
+  real burst, or a low-core machine, shows `wait` tracking lint duration.
 - **Format path re-parses.** `format_document`
   (`src/lsp/handlers/formatting.rs:34`) parses fresh rather than reading the
   cached `parsed_document`. Routing it through the salsa parse would match
