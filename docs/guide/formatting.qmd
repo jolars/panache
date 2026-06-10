@@ -145,7 +145,7 @@ breaks are significant content --- as are quoted scalars. Under
 Input
 
 :   ````markdown
-    ```{python}
+    ```{{python}}
     #| fig-cap: >
     #|   Suboptimality versus wall-clock time on the Rosenbrock function (200-iteration cap, `Vec<f64>` backend). Lower and further left is better.
     ```
@@ -154,7 +154,7 @@ Input
 Output
 
 :   ````markdown
-    ```{python}
+    ```{{python}}
     #| fig-cap: >
     #|   Suboptimality versus wall-clock time on the Rosenbrock function
     #|   (200-iteration cap, `Vec<f64>` backend). Lower and further left is
