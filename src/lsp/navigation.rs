@@ -60,7 +60,7 @@ pub(crate) fn project_document_paths(
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
 ) -> Vec<PathBuf> {
-    let mut doc_paths = crate::salsa::project_graph(db, salsa_file, salsa_config)
+    let mut doc_paths = crate::salsa::project_structure(db, salsa_file, salsa_config)
         .documents()
         .iter()
         .cloned()

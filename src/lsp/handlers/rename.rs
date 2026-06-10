@@ -250,7 +250,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
 
     let graph = {
         let db = snap.db();
-        crate::salsa::project_graph(db, salsa_file, salsa_config).clone()
+        crate::salsa::project_structure(db, salsa_file, salsa_config).clone()
     };
 
     for bib_path in &bib_paths {

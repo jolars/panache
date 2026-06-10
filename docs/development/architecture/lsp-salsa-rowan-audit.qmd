@@ -366,6 +366,29 @@ salsa's own per-file invalidation:
   `Eq`-returning firewall query the way `refdef_set` already firewalls the parse
   (e.g. a `heading_anchors(file)` returning a `BTreeSet` that backdates when the
   anchor set is unchanged). Files: `src/salsa.rs`, new test under `tests/`.
+- **Status (addressed for the cross-file leak):** measurement showed the
+  per-file indices the recommendation names --- `definition_index`,
+  `heading_outline`, `symbol_usage_index` --- already return `Eq` types and
+  backdate, and an edit to one file never touches another's `FileText` input, so
+  their sibling memos were never the leak. The one real cross-file
+  over-invalidation was `project_graph`: it read each member's full parse
+  (`parsed_tree_root` -> `no_eq` `parsed_document`), so a body edit in any
+  member re-ran the *entire* graph (and pulsed the writer load fixpoint +
+  navigation). Fixed by lifting the range-free edge data into an `Eq` firewall
+  query `project_edges(file)` (plus a backdating `file_is_present(file)`
+  presence flag) and adding `project_structure(root)` --- the structural graph
+  the writer fixpoint, `definition_index_with_includes`, and the
+  navigation/workspace-symbol handlers now consume. `project_graph` is unchanged
+  and remains the `GraphDiagnostic` accumulator source, because
+  include/duplicate diagnostics carry byte ranges that must track edits (and the
+  cross-doc "first defined at path:line" message couples files through line
+  numbers, so a clean diagnostics split is deferred). The
+  incremental-invalidation test lives in `src/salsa.rs`
+  (`body_edit_in_member_reuses_structural_and_sibling_memos` plus a
+  `structural_edit_in_member_reexecutes_project_structure` over-suppression
+  guard), built on a salsa `WillExecute` event-log harness, rather than a
+  separate `tests/` file --- it reuses the existing salsa test fixtures and the
+  private logging constructor.
 
 ### 3.5 Structural incremental reparse + stable pointers --- *highest effort, gate on benchmarks* {#g5}
 

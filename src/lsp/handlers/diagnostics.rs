@@ -34,7 +34,8 @@ pub(crate) fn compute_publishes_with_dependents(
         && let Some(path) = state.path.as_ref()
     {
         let graph =
-            crate::salsa::project_graph(snap.db(), state.salsa_file, state.salsa_config).clone();
+            crate::salsa::project_structure(snap.db(), state.salsa_file, state.salsa_config)
+                .clone();
         for dependent in graph.dependents(path, None) {
             if let Some(dep_uri) = Uri::from_file_path(&dependent) {
                 publishes.extend(compute_publishes(snap, &dep_uri, false));

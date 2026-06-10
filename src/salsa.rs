@@ -1802,6 +1802,163 @@ fn visit_document<'db>(
         }
     }
 }
+
+/// The range-free project edges a single document contributes: the include,
+/// metadata-file, and bibliography paths that wire it into the project graph.
+///
+/// Lifted out of the parse so [`project_structure`] can backdate the same way
+/// [`refdef_set`] firewalls the parse (audit §3.4 / G4). These are *paths only*
+/// — none of the byte ranges that include/duplicate diagnostics carry. A
+/// paragraph-body edit shifts those ranges but leaves the path set unchanged, so
+/// salsa value-equality on `ProjectEdges` lets the structural graph short-circuit
+/// while [`project_graph`] (the diagnostics source, which *does* need current
+/// ranges) re-runs as before.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProjectEdges {
+    pub includes: Vec<PathBuf>,
+    pub metadata_files: Vec<PathBuf>,
+    pub bibliographies: Vec<PathBuf>,
+}
+
+#[salsa::tracked(returns(ref), lru = 64)]
+pub fn project_edges(db: &dyn Db, file: FileText, config: FileConfig) -> ProjectEdges {
+    // `collect_includes` probes the filesystem directly (a residual G3 read:
+    // an include edge only forms when the target exists on disk), so depend on
+    // the interned `FileSet` the way `project_graph` does --- interning a
+    // newly-created include (a watcher event) re-runs this query and re-resolves
+    // the probe. A content edit leaves the set unchanged, so the firewall holds.
+    let _ = db.file_set().ids(db);
+    // A pathless in-memory buffer has no project root and no resolvable
+    // includes, so it contributes no edges (mirrors `project_graph`).
+    let Some(path) = db.path_of(file) else {
+        return ProjectEdges::default();
+    };
+    let text = file.content_or_empty(db);
+    let tree = parsed_tree_root(db, file, config);
+    let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
+    let project_root = crate::includes::find_project_roots(&path).quarto_first();
+    let resolution = crate::includes::collect_includes(
+        &tree,
+        text,
+        base_dir,
+        project_root.as_deref(),
+        config.config(db),
+    );
+    let includes = resolution
+        .includes
+        .into_iter()
+        .map(|occ| occ.path)
+        .collect();
+    let (metadata_files, bibliographies) =
+        match crate::metadata::extract_project_metadata(&tree, &path) {
+            Ok(metadata) => {
+                let bibliographies = metadata
+                    .bibliography
+                    .map(|bibliography| bibliography.paths)
+                    .unwrap_or_default();
+                (metadata.metadata_files, bibliographies)
+            }
+            Err(_) => (Vec::new(), Vec::new()),
+        };
+    ProjectEdges {
+        includes,
+        metadata_files,
+        bibliographies,
+    }
+}
+
+/// Whether a file's input is loaded (`Some`) versus interned-but-absent (`None`).
+///
+/// A thin `Eq`-returning firewall over the raw text input: reading
+/// `file.text(db)` directly takes a dependency on the *content value*, so an
+/// edit (`Some("a")` -> `Some("b")`) would re-run every reader. Returning the
+/// `bool` presence flag backdates instead — only an actual load/unload
+/// (`None` <-> `Some`) flips it — which is exactly what [`project_structure`]
+/// needs to decide whether to recurse into a referenced file (audit §3.4 / G4).
+#[salsa::tracked]
+pub fn file_is_present(db: &dyn Db, file: FileText) -> bool {
+    file.text(db).is_some()
+}
+
+/// The structural project graph (documents + include/metadata/bibliography
+/// edges), with no diagnostics.
+///
+/// This is the backdating sibling of [`project_graph`]: it walks the project the
+/// same way, but reads each member's range-free [`project_edges`] and
+/// [`file_is_present`] instead of the member's full parse, so a paragraph-body
+/// edit in any member reuses this memo (audit §3.4 / G4). Every *structural*
+/// consumer — the writer's load fixpoint, `definition_index_with_includes`, and
+/// the navigation/workspace-symbol handlers — reads this query. `project_graph`
+/// remains the source of the `GraphDiagnostic` accumulator (include + cross-doc
+/// duplicate diagnostics) because those carry byte ranges that must track edits.
+#[salsa::tracked(returns(ref), lru = 32)]
+pub fn project_structure(db: &dyn Db, root_file: FileText, config: FileConfig) -> ProjectGraph {
+    // Depend on the set of interned files so interning a newly-referenced
+    // include/sibling re-runs this query (mirrors `project_graph`, audit §3.3).
+    let _ = db.file_set().ids(db);
+    let mut graph = InternedProjectGraph::default();
+    let Some(root_path) = db.path_of(root_file) else {
+        return graph.into_owned(db);
+    };
+    let mut visited = HashSet::new();
+    visit_structure(db, root_file, config, &root_path, &mut graph, &mut visited);
+    let roots = crate::includes::find_project_roots(&root_path);
+    if let Some(project_root) = roots.quarto_first() {
+        let is_bookdown = roots.bookdown.is_some();
+        for path in
+            crate::includes::find_project_documents(&project_root, config.config(db), is_bookdown)
+        {
+            db.unwind_if_revision_cancelled();
+            if visited.contains(&path) {
+                continue;
+            }
+            // Record the project document even when unloaded so the writer's
+            // fixpoint can see it, load it, and re-run (mirrors `project_graph`).
+            graph.add_document(db, &path);
+            let loaded = db
+                .file_text(path.clone())
+                .filter(|include_file| file_is_present(db, *include_file));
+            if let Some(include_file) = loaded {
+                visit_structure(db, include_file, config, &path, &mut graph, &mut visited);
+            }
+        }
+    }
+    graph.into_owned(db)
+}
+
+fn visit_structure<'db>(
+    db: &'db dyn Db,
+    file: FileText,
+    config: FileConfig,
+    path: &Path,
+    graph: &mut InternedProjectGraph<'db>,
+    visited: &mut HashSet<PathBuf>,
+) {
+    if !visited.insert(path.to_path_buf()) {
+        return;
+    }
+    graph.add_document(db, path);
+    let edges = project_edges(db, file, config);
+    for include in &edges.includes {
+        db.unwind_if_revision_cancelled();
+        graph.add_edge(db, path, include, EdgeKind::Include);
+        if include == path {
+            continue;
+        }
+        let loaded = db
+            .file_text(include.clone())
+            .filter(|include_file| file_is_present(db, *include_file));
+        if let Some(include_file) = loaded {
+            visit_structure(db, include_file, config, include, graph, visited);
+        }
+    }
+    for metadata_file in &edges.metadata_files {
+        graph.add_edge(db, path, metadata_file, EdgeKind::MetadataFile);
+    }
+    for bibliography in &edges.bibliographies {
+        graph.add_edge(db, path, bibliography, EdgeKind::Bibliography);
+    }
+}
 #[salsa::db]
 pub trait Db: salsa::Database {
     /// Pure lookup of a previously-loaded file. Returns `None` for any path the
@@ -2164,7 +2321,7 @@ impl SalsaDb {
     ) -> HashSet<PathBuf> {
         loop {
             let tracked = {
-                let graph = project_graph(self, root_file, config);
+                let graph = project_structure(self, root_file, config);
                 let mut tracked = HashSet::new();
                 tracked.insert(root_path.clone());
                 for document in graph.documents() {
@@ -3004,6 +3161,152 @@ mod tests {
             PROBE_WITHOUT_SET_RUNS.load(Ordering::Relaxed),
             1,
             "a per-file reader (metadata-shaped) is NOT re-run by an unrelated sibling load"
+        );
+    }
+
+    // --- audit §3.4 / G4: cross-file invalidation firewall -----------------
+
+    type ExecLog = Arc<Mutex<Vec<String>>>;
+
+    /// A `SalsaDb` that records the `database_key` of every tracked query salsa
+    /// *executes* (as opposed to validating from memo). Lets tests assert that a
+    /// paragraph-body edit in one project member reuses other files' memos
+    /// (audit §3.4 / G4), using the same event-callback hook salsa's own test
+    /// suite uses.
+    fn db_with_exec_log() -> (SalsaDb, ExecLog) {
+        let log: ExecLog = Arc::new(Mutex::new(Vec::new()));
+        let sink = log.clone();
+        let storage = salsa::Storage::new(Some(Box::new(move |event: salsa::Event| {
+            if let salsa::EventKind::WillExecute { database_key } = event.kind {
+                sink.lock().unwrap().push(format!("{database_key:?}"));
+            }
+        })));
+        let db = SalsaDb {
+            storage,
+            vfs: Vfs::default(),
+            file_set: Arc::new(OnceLock::new()),
+        };
+        db.file_set();
+        (db, log)
+    }
+
+    /// How many times a tracked query named `query` executed in the log. The
+    /// recorded key renders as `query(Id(..))`, so match on the `query(` prefix.
+    fn executed(log: &ExecLog, query: &str) -> usize {
+        let needle = format!("{query}(");
+        log.lock()
+            .unwrap()
+            .iter()
+            .filter(|key| key.starts_with(&needle))
+            .count()
+    }
+
+    /// A two-document Quarto project (`root.qmd` + `child.qmd`, both loaded) on
+    /// an execution-logging db. Returns the db, root's `FileText`, config, child
+    /// path, the exec log, and the `TempDir` guard (keep it alive for disk reads).
+    fn two_doc_project_logging() -> (
+        SalsaDb,
+        FileText,
+        FileConfig,
+        PathBuf,
+        ExecLog,
+        tempfile::TempDir,
+    ) {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let root = temp_dir.path();
+        std::fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+        let root_path = root.join("root.qmd");
+        let child_path = root.join("child.qmd");
+        std::fs::write(&root_path, "# Root\n\nRoot body.\n").unwrap();
+        std::fs::write(&child_path, "# Child\n\nChild body paragraph.\n").unwrap();
+
+        let (mut db, log) = db_with_exec_log();
+        let root_file =
+            db.update_file_text(root_path.clone(), "# Root\n\nRoot body.\n".to_string());
+        // Load the sibling so `project_structure` takes a (firewall-able)
+        // dependency on its `project_edges` / `file_is_present`.
+        db.update_file_text(
+            child_path.clone(),
+            "# Child\n\nChild body paragraph.\n".to_string(),
+        );
+        let config = FileConfig::new(&db, Config::default());
+        (db, root_file, config, child_path, log, temp_dir)
+    }
+
+    /// The cross-file firewall (audit §3.4 / G4): a paragraph-body edit in a
+    /// project member must NOT re-execute the structural `project_structure`
+    /// memo, nor the *other* file's `definition_index` / `heading_outline` /
+    /// `metadata` memos. Pre-firewall (`project_structure` read the member's full
+    /// parse) the `project_structure` assertion fails.
+    #[test]
+    fn body_edit_in_member_reuses_structural_and_sibling_memos() {
+        let (mut db, root_file, config, child_path, log, _temp_dir) = two_doc_project_logging();
+
+        // Prime every memo we care about for the root document, then clear.
+        project_structure(&db, root_file, config);
+        definition_index(&db, root_file, config);
+        heading_outline(&db, root_file, config);
+        metadata(&db, root_file, config);
+        log.lock().unwrap().clear();
+
+        // Edit ONLY the child's paragraph body: no heading, no definition, no
+        // include/metadata/bibliography edge changes.
+        db.update_file_text(child_path, "# Child\n\nA different body.\n".to_string());
+
+        project_structure(&db, root_file, config);
+        definition_index(&db, root_file, config);
+        heading_outline(&db, root_file, config);
+        metadata(&db, root_file, config);
+
+        assert_eq!(
+            executed(&log, "project_structure"),
+            0,
+            "a member body edit must not re-run the structural project graph"
+        );
+        assert_eq!(
+            executed(&log, "definition_index"),
+            0,
+            "the root's definition_index must be reused across a sibling body edit"
+        );
+        assert_eq!(
+            executed(&log, "heading_outline"),
+            0,
+            "the root's heading_outline must be reused across a sibling body edit"
+        );
+        assert_eq!(
+            executed(&log, "metadata"),
+            0,
+            "the root's metadata must be reused across a sibling body edit"
+        );
+        // The firewall really engaged: the child's edges were re-checked (and
+        // backdated) rather than skipped.
+        assert!(
+            executed(&log, "project_edges") >= 1,
+            "the edited child's project_edges should re-run and backdate"
+        );
+    }
+
+    /// The firewall must not over-suppress: a structural edit (adding a
+    /// bibliography edge to the child) changes `project_edges`, so it does NOT
+    /// backdate and `project_structure` re-runs (audit §3.4 / G4).
+    #[test]
+    fn structural_edit_in_member_reexecutes_project_structure() {
+        let (mut db, root_file, config, child_path, log, _temp_dir) = two_doc_project_logging();
+
+        project_structure(&db, root_file, config);
+        log.lock().unwrap().clear();
+
+        // Add a bibliography edge to the child via frontmatter.
+        db.update_file_text(
+            child_path,
+            "---\nbibliography: refs.bib\n---\n\n# Child\n\nChild body paragraph.\n".to_string(),
+        );
+
+        project_structure(&db, root_file, config);
+
+        assert!(
+            executed(&log, "project_structure") >= 1,
+            "adding a bibliography edge to a member must re-run the structural graph"
         );
     }
 

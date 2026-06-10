@@ -165,7 +165,7 @@ impl StateSnapshot {
         };
         let (salsa_file, salsa_config) = (state.salsa_file, state.salsa_config);
         let db = self.db();
-        let graph = crate::salsa::project_graph(db, salsa_file, salsa_config).clone();
+        let graph = crate::salsa::project_structure(db, salsa_file, salsa_config).clone();
         let mut index = crate::salsa::definition_index(db, salsa_file, salsa_config).clone();
         for path in graph.documents().iter() {
             if let Some(include_file) = db.file_text(path.clone()) {
