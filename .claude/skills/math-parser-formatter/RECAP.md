@@ -49,6 +49,17 @@ still-relevant trap into Persistent traps. Keep it short.
   merge (`<=`), but each sign char (`+ - *`) is its own atom so it can be unary —
   `=-` is `=` then unary `-` (`x = -y`), not a composite `=-` (`x =- y`). See
   `operators::split_operator_atoms`.
+- **CST grain vs interpretation — the line to hold.** A *fact* (unambiguous from
+  the bytes, no macro escape) belongs in the CST grain; a *guess* (fallible
+  without macro expansion, which we don't do) belongs in the interpretation
+  layer (`operators.rs`), never the CST. Operator **class** (bin/rel/unary) is a
+  guess — `\mathbin`/`\def`/`\mathcode` can override it — so it stays neutral in
+  the CST even though the parser *has* the same context the formatter does (no
+  information asymmetry; it's a principle, not a capability limit). Delimiters
+  and punctuation (`( ) [ ] , ;`) are the opposite: their category is
+  unambiguous at the character level, so they're fair game for the CST grain
+  (see next-sub-target #1) — that's why `text_tail_class` peeking inside
+  `MATH_TEXT` is a smell, not the class logic.
 
 --------------------------------------------------------------------------------
 
@@ -102,16 +113,37 @@ non-vacuous); gate-off goldens byte-identical; CLI `debug format --checks all`
 passes on tight-operator inline + aligned display math.
 
 ### Suggested next sub-targets
-1. **Phase 5b — command-operator spacing + Tier 3.** Re-space command operators
+1. **Parser: tokenize unambiguous delimiters/punctuation** (`( ) [ ] , ;`) out
+   of `MATH_TEXT` into neutral kinds (e.g. `MATH_OPEN`/`MATH_CLOSE`/`MATH_PUNCT`;
+   leave the ambiguous `| . /` as text). Lets the interpretation layer read token
+   *kinds* and **deletes `operators::text_tail_class`** (the one re-lexing smell —
+   today the formatter peeks at the last char of a `MATH_TEXT` run to spot `(`/`,`).
+   Lossless; touches `is_special`/dispatch in `parser/math.rs`, the
+   `is_math_content_token` whitelist (`syntax/math.rs`), every parser golden with
+   parens in math, and must move **in lockstep with the `math_content` linter
+   rule**. **Do this as the first commit of the Phase 6 slice, with the consumer**
+   (line-breaking walks the structured tree and wants clean atom grain) — not
+   speculatively, so the new kinds are validated against a real use. Decision
+   recorded with the user 2026-06-10; deferred from Phase 5 (clean checkpoint,
+   modest-but-not-zero churn). See the "CST grain vs interpretation" invariant.
+2. **Phase 5b — command-operator spacing + Tier 3.** Re-space command operators
    (`a\leq b`→`a \leq b`) — handle the command-terminating space carefully — and
    land the vendored symbol→atom-class fixture validated against `pulldown-latex`
    Events. The `operators::command_class` table is already there to drive both.
-2. **Phase 6 — semantic line-breaking + continuation indent** (add the
+3. **Phase 6 — semantic line-breaking + continuation indent** (add the
    break-priority column to `operators.rs`; use `operators/` corpus stressors).
-3. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
+   Walk the *structured* CST — do NOT flatten as the spacing pass does; flattening
+   then relinearizing fights bracket-matching / nesting depth.
+4. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
    blocks become formattable (would make `MathContext::EnvironmentBody` reachable).
-4. Optional structural cooking (orthogonal to operators): script attachment,
+5. Optional structural cooking (orthogonal to operators): script attachment,
    known-command argument grouping.
+
+**Placement note (deferred, YAGNI):** `operators.rs` lives in the formatter
+crate (`pub`), but the `cooking.rs` analog it mirrors lives in the *parser*
+crate. Only the formatter consumes it today, so leave it; **move it to the parser
+crate if/when a second consumer appears** (linter wanting atom info, LSP semantic
+tokens) so formatter + linter + LSP share one interpretation.
 
 --------------------------------------------------------------------------------
 
