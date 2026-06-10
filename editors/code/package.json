@@ -15,7 +15,7 @@
     "url": "https://github.com/jolars/panache/issues"
   },
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.91.0"
   },
   "categories": [
     "Formatters",
@@ -221,7 +221,7 @@
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
     "@types/node": "^25.9.1",
-    "@types/vscode": "1.90.0",
+    "@types/vscode": "^1.91.0",
     "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.28.0",
     "npm-run-all": "^4.1.5",
