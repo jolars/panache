@@ -3,8 +3,9 @@
 //! Consumes the lossless structural math CST built by
 //! [`panache_parser::parser::math`] and re-emits the content with structurally
 //! safe normalizations: inline whitespace collapse, environment-body
-//! indentation, `\\` line-break normalization, and `&`-column alignment. The
-//! canonical rules live in `STYLE.md` (next to this file).
+//! indentation, `\\` line-break normalization, `&`-column alignment, and
+//! precedence-aware operator spacing. The canonical rules live in `STYLE.md`
+//! (next to this file).
 //!
 //! Like the YAML formatter, this **re-parses the clean content string** rather
 //! than walking the host-embedded subtree. The host block machinery interleaves
@@ -12,10 +13,11 @@
 //! on continuation lines; re-parsing the already-prefix-stripped string (from
 //! [`panache_parser::syntax::math::math_content_text`]) sidesteps that entirely.
 //!
-//! **Scope is structural only** — no operator spacing, no `\frac`
-//! canonicalization, no auto-`&` insertion. Operators are deliberately not
-//! tokenized; alignment keys off the `&` token and treats cell contents as
-//! opaque text measured by source-character width.
+//! Operator spacing is *interpretation*, not a CST shape: the parser emits
+//! neutral `MATH_OPERATOR` tokens and the class/precedence logic lives in
+//! [`operators`] (the math analog of YAML scalar cooking), keyed on operator
+//! text + command name. Still out of scope: `\frac` canonicalization, auto-`&`
+//! insertion, and macro rewriting.
 //!
 //! The gate is [`crate::config::Config::experimental_format_math`]. Off (the
 //! default) callers emit math verbatim and never reach this module; on, they
@@ -24,6 +26,7 @@
 use panache_parser::parser::math::{MathParseOptions, parse_math_report};
 use panache_parser::syntax::SyntaxNode;
 
+pub mod operators;
 mod render;
 
 /// Where a math span sits, which decides how aggressively it is laid out.
@@ -196,13 +199,59 @@ mod tests {
     }
 
     #[test]
-    fn cell_internal_spacing_is_preserved() {
-        // The formatter aligns at `&` but never touches operator spacing inside
-        // a cell: `&=1` stays `=1`, `&= 22` stays `= 22`.
+    fn cell_operator_spacing_applied() {
+        // Operator spacing runs inside each cell: a tight `&=1` is normalized to
+        // `= 1`, so it lines up with an already-spaced `&= 22`.
         let input = "\\begin{aligned}\nx&=1\\\\\ny &= 22\n\\end{aligned}";
-        let expected = "\\begin{aligned}\n  x & =1   \\\\\n  y & = 22\n\\end{aligned}";
+        let expected = "\\begin{aligned}\n  x & = 1  \\\\\n  y & = 22\n\\end{aligned}";
         assert_eq!(fmt(input, MathContext::Display), expected);
         assert_idempotent(input, MathContext::Display);
+    }
+
+    #[test]
+    fn inline_spaces_binary_and_relation_operators() {
+        assert_eq!(fmt("a+b", MathContext::Inline), "a + b");
+        assert_eq!(fmt("a*b", MathContext::Inline), "a * b");
+        assert_eq!(fmt("a=b", MathContext::Inline), "a = b");
+        // Adjacent relation chars stay one spaced unit.
+        assert_eq!(fmt("a<=b", MathContext::Inline), "a <= b");
+        assert_eq!(fmt("a==b", MathContext::Inline), "a == b");
+        // A relation followed by a sign splits: the sign is unary.
+        assert_eq!(fmt("x=-y", MathContext::Inline), "x = -y");
+        // Commands are ordinary operands → the operator between them is binary.
+        assert_eq!(
+            fmt("\\alpha+\\beta", MathContext::Inline),
+            "\\alpha + \\beta"
+        );
+        // Operators inside groups are spaced too.
+        assert_eq!(fmt("{a+b}", MathContext::Inline), "{a + b}");
+        // A superscripted operand is ordinary, so the trailing `-` is binary.
+        assert_eq!(fmt("n^2-1", MathContext::Inline), "n^2 - 1");
+        for case in ["a+b", "a<=b", "x=-y", "\\alpha+\\beta", "{a+b}", "n^2-1"] {
+            assert_idempotent(case, MathContext::Inline);
+        }
+    }
+
+    #[test]
+    fn inline_keeps_unary_operators_tight() {
+        // Leading unary minus, and one written with a space, both canonicalize tight.
+        assert_eq!(fmt("-x", MathContext::Inline), "-x");
+        assert_eq!(fmt("- x", MathContext::Inline), "-x");
+        // After an opening delimiter (lumped into the text run) the minus is unary.
+        assert_eq!(fmt("f(-x)", MathContext::Inline), "f(-x)");
+        assert_eq!(fmt("f( - x)", MathContext::Inline), "f(-x)");
+        // After a relation the minus is unary, but the relation keeps its space.
+        assert_eq!(fmt("x = - y", MathContext::Inline), "x = -y");
+        // Inside a script group, after `{` the minus is unary.
+        assert_eq!(fmt("e^{- t}", MathContext::Inline), "e^{-t}");
+        // Two minuses (adjacent or spaced) are binary-then-unary: `a - -b`.
+        assert_eq!(fmt("a - -b", MathContext::Inline), "a - -b");
+        assert_eq!(fmt("a--b", MathContext::Inline), "a - -b");
+        for case in [
+            "-x", "- x", "f(-x)", "f( - x)", "x = - y", "e^{- t}", "a - -b", "a--b",
+        ] {
+            assert_idempotent(case, MathContext::Inline);
+        }
     }
 
     #[test]

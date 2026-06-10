@@ -20,7 +20,7 @@
       "properties": {
         "format-math": {
           "default": false,
-          "description": "Reformat the *content* of math (`$...$`, `$$...$$`, environments)\nstructurally — collapse inline whitespace, indent environment bodies,\nnormalize `\\\\` line breaks, and align `&` columns. Default off: math is\nemitted verbatim. Only structurally-safe transforms are applied; no\noperator spacing, no macro rewriting.",
+          "description": "Reformat the *content* of math (`$...$`, `$$...$$`, environments) —\ncollapse inline whitespace, indent environment bodies, normalize `\\\\`\nline breaks, align `&` columns, and apply precedence-aware operator\nspacing (`a+b` → `a + b`, unary `-x` stays tight). Default off: math is\nemitted verbatim. No macro rewriting or `\\frac` canonicalization.",
           "type": "boolean"
         }
       },

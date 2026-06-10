@@ -41,70 +41,73 @@ still-relevant trap into Persistent traps. Keep it short.
   break-priority) consumed by formatter + LSP — never `MATH_BIN_OP`/`MATH_REL_OP`
   kinds. (Structural cooking that *would* be legit future parser work: script
   attachment, known-command argument grouping — orthogonal to operators.)
+  **That module now exists** (Phase 5):
+  `crates/panache-formatter/src/formatter/math/operators.rs`, `pub` for LSP
+  reuse; break-priority column still TODO (Phase 6).
+- **Splitting a `MATH_OPERATOR` run: rel chars merge, sign chars split.** A run
+  of adjacent operator chars is NOT one atom. Adjacent relation chars (`= < >`)
+  merge (`<=`), but each sign char (`+ - *`) is its own atom so it can be unary —
+  `=-` is `=` then unary `-` (`x = -y`), not a composite `=-` (`x =- y`). See
+  `operators::split_operator_atoms`.
 
 --------------------------------------------------------------------------------
 
 ## Latest session
 
-**Phase 4 — dev-oracle cross-validation + idempotency corpus.** *DONE* (branch
-`feat/math-oracle-corpus`, not yet committed). Pure test/validation
-infrastructure; production formatter code untouched.
+**Phase 5 — operator interpretation module + precedence-aware spacing.** *DONE*
+(not yet committed). Formatter-only + new module; **parser untouched**.
 
-**The reframing that drove this** (answers the user's opening question — "what's
-the best oracle, given latexindent doesn't do operator spacing/precedence?"):
-math has **no output oracle**. Unlike YAML, where `pretty_yaml` *is* an output
-oracle and byte-exact parity is the right assertion, nothing produces Panache's
-eventual math output text (latexindent does `&`/`\\` alignment but no operator
-spacing; KaTeX-class tools *render* rather than reformat). So we keep
-pretty_yaml's *wiring* but flip the *assertion* from "byte-equal to oracle
-output" to **"semantically equivalent to oracle parse"** —
-`render(x) == render(format(x))` on normalized MathML. Invariance survives
-Phases 5/6 because spacing/line-breaks are presentation a renderer collapses.
+New module `crates/panache-formatter/src/formatter/math/operators.rs` (the
+`cooking.rs` analog, `pub` so LSP can reuse it later): `AtomClass`
+(Ord/Bin/Rel/Open/Close/Punct/Op), `split_operator_atoms`, `classify_operator`,
+`command_class` (curated `\leq`/`\cdot`/`\sum`/… table → class), `text_tail_class`
+(MATH_TEXT last char → Open/Close/Punct/Ord), `coerce` (TeX Bin→Ord unary rule),
+`is_spaced`. Pure, in-module unit-tested.
 
-Three-tier strategy (decisions confirmed with user via AskUserQuestion):
-- **Tier 1 (primary, no dep):** `tests/math_corpus_properties.rs` — idempotency +
-  parser losslessness (`parse(x).text()==x`) + gate-off verbatim over the corpus.
-- **Tier 2 (oracle):** `tests/math_cross_validation.rs` — dev-only
-  **`pulldown-latex`** (pure-Rust LaTeX→MathML, ~95% KaTeX coverage, no JS
-  engine; chosen over `katex` JS-engine crate and the immature `katex-rs` 0.2).
-  Four-way rule: oracle-rejects-input → skip(counted); rejects `format(x)` only →
-  **fail** (broke parseability); MathML differs → **fail** (meaning drift); equal
-  → pass. Skip-fraction guard (>40% fails) keeps coverage honest.
-- **Tier 3 (symbol→atom-class table):** **deferred to Phase 5** (lands with the
-  interpretation module that consumes it — no orphan fixture).
-- **latexindent: deferred entirely** (can't validate Phase 5/6 output; only
-  duplicates Tier-1 idempotency; revisit as optional Phase 4b).
+`render.rs::render_inline` rewritten from flatten+collapse to a **gap-based
+re-spacer**: flatten to `(kind,text)`, fold adjacent `MATH_OPERATOR` into a run,
+**split the run into atoms** (adjacent rel chars merge — `<=`; each sign char
+`+ - *` stands alone), classify+coerce each against the running prev-atom class,
+then emit gap-by-gap. Gap rule: a *spaced* op (Bin/Rel) forces one space and wins
+over a neighbor; a *tight* (unary) op strips adjacent space; otherwise preserve
+author whitespace (so `\alpha x` and `\text{ a }` survive). Result: `a+b`→`a + b`,
+`a<=b`→`a <= b`, unary `-x`/`f(-x)`/`e^{-t}` stay tight, `x=-y`→`x = -y`,
+`a--b`→`a - -b`.
 
-Key API notes for the oracle: `Parser::new(tex, &Storage::new())` yields
-`Result<Event, ParserError>`; `push_mathml` renders parse *errors as inline error
-nodes* rather than returning `Err`, so detect rejection by
-`.collect::<Result<Vec<_>,_>>()` **first**, then render the validated events.
-MathML (not HTML) is the surface — HTML's measured widths false-positive on
-benign spacing. `MathContext`: `inline/` → Inline, everything else → Display
-(`EnvironmentBody` not yet reachable; standalone `\begin{env}` still opaque
-`TEX_BLOCK`).
+**The `=-` trap (caught by the new golden, not unit tests):** an early
+"merge-the-whole-run" design turned `x=-y` into `x =- y`. Fix = split rule above
+(rel chars merge, sign chars split so they can be unary). Lesson: relation vs
+sign are different atoms; don't classify a mixed operator run as one unit.
 
-Deliverables: `crates/panache-formatter/tests/fixtures/math_corpus/` (56 bare
-`.tex` cases across inline/display/environments/groups/scripts/operators/
-comments/escapes + `macro_dependent/` Tier-1-only + README), the two harness
-files, and the `pulldown-latex` dev-dep (TEMPORARY note in `Cargo.toml`).
+**Scope decisions confirmed with user (AskUserQuestion):** char operators only
+this slice; **command-operator spacing (`\leq`/`\cdot`) → Phase 5b** (the table is
+built and used for prev-class, just not yet re-spaced); **Tier 3 symbol-class
+fixture → Phase 5b**; **unary = canonicalize tight** (strip author spaces, e.g.
+`- x`→`-x`), the one choice that forced the gap-based rewrite over insert-only.
 
-Verified: both harnesses green; `oracle_discriminates_meaning_from_spacing`
-permanent test pins that the oracle isn't vacuous (`a+b`==`a + b`, `a+b`!=`a-b`);
-confirmed **0/54 oracle skips** (full coverage) and that format_math is
-non-identity on ~all cases (collapse/align/indent) so the invariance check
-exercises real transforms; `cargo test --workspace` (29 binaries) + clippy + fmt
-clean; CLI `debug format --checks all` passes on gate-on aligned math.
+Deliverables also: rewrote `cell_internal_spacing_is_preserved` →
+`cell_operator_spacing_applied` + new unit tests; STYLE.md Rule 6 + idempotency
+bullet (dropped the old "never operator spacing"); `format_math` config doc +
+`panache.schema.json` (regen via `UPDATE_EXPECTED=1 cargo test --test
+config_schema` — note: the test *name* doesn't contain "config_schema", so
+`cargo test config_schema` is a no-op; use `--test`); docs/guide
+{configuration,formatting}.qmd; new golden case
+`tests/fixtures/cases/math_operator_spacing_experimental` (+ wired into
+`tests/golden_cases.rs`).
+
+Verified: `cargo test --workspace` (30 binaries) + clippy + fmt clean; Tier-1
+corpus + Tier-2 `pulldown-latex` MathML oracle green (spacing is
+meaning-preserving — `oracle_discriminates_meaning_from_spacing` still pins it
+non-vacuous); gate-off goldens byte-identical; CLI `debug format --checks all`
+passes on tight-operator inline + aligned display math.
 
 ### Suggested next sub-targets
-1. **Phase 5 — shared `math` interpretation module** (the `cooking.rs` analog):
-   operator table keyed on operator text + command name → class + break-priority;
-   consumed by the formatter (class-based spacing `a+b`→`a + b`) and later LSP.
-   The gateway to "format with operator precedence". **Tier 3** (vendored
-   symbol→atom-class table, asserted via `pulldown-latex`'s Event stream) lands
-   here. Use the new corpus's `operators/` stressors (`unary_minus`,
-   `double_minus`) as the regression bed.
-2. **Phase 6 — semantic line-breaking + continuation indent.**
+1. **Phase 5b — command-operator spacing + Tier 3.** Re-space command operators
+   (`a\leq b`→`a \leq b`) — handle the command-terminating space carefully — and
+   land the vendored symbol→atom-class fixture validated against `pulldown-latex`
+   Events. The `operators::command_class` table is already there to drive both.
+2. **Phase 6 — semantic line-breaking + continuation indent** (add the
+   break-priority column to `operators.rs`; use `operators/` corpus stressors).
 3. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
    blocks become formattable (would make `MathContext::EnvironmentBody` reachable).
 4. Optional structural cooking (orthogonal to operators): script attachment,
@@ -114,6 +117,13 @@ clean; CLI `debug format --checks all` passes on gate-on aligned math.
 
 ## Earlier sessions
 
+- **Phase 4 — dev-oracle cross-validation + idempotency corpus** — math has *no
+  output oracle*, so flip the assertion to invariance: `render(x) ==
+  render(format(x))` on normalized MathML. Tier 1 `tests/math_corpus_properties.rs`
+  (idempotency + losslessness + gate-off), Tier 2 `tests/math_cross_validation.rs`
+  (dev-only `pulldown-latex` LaTeX→MathML, four-way accept/skip/fail rule,
+  `oracle_discriminates_meaning_from_spacing` pins it non-vacuous). 56-case bare
+  `.tex` corpus under `tests/fixtures/math_corpus/`. Tier 3 deferred.
 - **Phase 1b — operators into `MATH_OPERATOR`** — split `+ - * = < >` out of
   `MATH_TEXT` into a dedicated *neutral* `MATH_OPERATOR` token (one per char), so
   a future phase can do operator-aware spacing/precedence. Committed `303e05bd`.

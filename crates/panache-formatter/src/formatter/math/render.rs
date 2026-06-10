@@ -9,6 +9,7 @@
 
 use rowan::NodeOrToken;
 
+use super::operators::{self, AtomClass};
 use super::{MathContext, MathFormatOptions};
 use crate::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
 
@@ -336,40 +337,158 @@ fn is_layout_whitespace(el: &SyntaxElement) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// Inline rendering: flatten tokens, whitespace runs → single space.
+// Inline rendering: flatten tokens, then re-space around operators.
 // ---------------------------------------------------------------------------
 
-/// Render a run of elements onto a single line, collapsing every whitespace run
-/// (including newlines) to one space. Groups and nested environments are
-/// flattened in document order. Not trimmed — callers trim at the cell/row
+/// Render a run of elements onto a single line. Groups and nested environments
+/// are flattened in document order, whitespace runs collapse to one space, and
+/// operators are re-spaced precedence-aware (`a+b` → `a + b`, unary `-x` stays
+/// tight) per [`super::operators`]. Not trimmed — callers trim at the cell/row
 /// level so that group interiors (`\text{ a }`) keep their spacing.
 fn render_inline(elems: &[SyntaxElement]) -> String {
-    let mut s = String::new();
-    for el in elems {
-        push_inline(&mut s, el);
-    }
-    collapse_spaces(&s)
+    let toks = flatten_tokens(elems);
+    collapse_spaces(&space_operators(&toks))
 }
 
-fn push_inline(s: &mut String, el: &SyntaxElement) {
-    match el {
-        NodeOrToken::Token(tok) => push_token(s, tok.kind(), tok.text()),
-        NodeOrToken::Node(node) => {
-            for tok in node
-                .descendants_with_tokens()
-                .filter_map(|e| e.into_token())
-            {
-                push_token(s, tok.kind(), tok.text());
+/// Flatten elements into `(kind, text)` tokens in document order, descending
+/// into group/environment nodes so `{`/`}` and nested-environment tokens appear
+/// in the stream (the spacing pass needs them for atom-class context).
+fn flatten_tokens(elems: &[SyntaxElement]) -> Vec<(SyntaxKind, String)> {
+    let mut out: Vec<(SyntaxKind, String)> = Vec::new();
+    for el in elems {
+        match el {
+            NodeOrToken::Token(tok) => out.push((tok.kind(), tok.text().to_string())),
+            NodeOrToken::Node(node) => {
+                for tok in node
+                    .descendants_with_tokens()
+                    .filter_map(|e| e.into_token())
+                {
+                    out.push((tok.kind(), tok.text().to_string()));
+                }
             }
         }
     }
+    out
 }
 
-fn push_token(s: &mut String, kind: SyntaxKind, text: &str) {
-    match kind {
-        SyntaxKind::MATH_SPACE | SyntaxKind::MATH_NEWLINE => s.push(' '),
-        _ => s.push_str(text),
+/// The spacing demand an emitted atom places on the gaps beside it.
+#[derive(Clone, Copy, PartialEq)]
+enum Demand {
+    /// Nothing emitted yet — no leading space before the first atom.
+    Start,
+    /// An ordinary atom: keep author whitespace, add nothing.
+    Plain,
+    /// A binary/relation operator run: one space on each side.
+    SpacedOp,
+    /// A unary (coerced) operator run: tight; strips adjacent author space.
+    TightOp,
+}
+
+/// Walk the flat token stream, grouping consecutive `MATH_OPERATOR` tokens into
+/// runs and emitting one space on each side of binary/relation runs while
+/// keeping unary runs tight. Author whitespace between non-operator atoms is
+/// preserved (a command-terminating space in `\alpha x`, a `\text{ a }`
+/// interior); whitespace adjacent to a tight unary operator is stripped, but a
+/// space demanded by a neighboring spaced operator still wins.
+fn space_operators(toks: &[(SyntaxKind, String)]) -> String {
+    let mut out = String::new();
+    let mut prev_class: Option<AtomClass> = None;
+    let mut prev_demand = Demand::Start;
+    let mut pending_space = false;
+
+    let mut i = 0;
+    while i < toks.len() {
+        let (kind, text) = &toks[i];
+        match *kind {
+            SyntaxKind::MATH_SPACE | SyntaxKind::MATH_NEWLINE => {
+                pending_space = true;
+                i += 1;
+            }
+            SyntaxKind::MATH_OPERATOR => {
+                // Collect the maximal run of *adjacent* operator tokens (a space
+                // between two operators breaks the run, so `- -` stays two),
+                // then split it into atoms: relation-char runs merge (`<=`),
+                // each sign char stands alone so it can be unary (`=-` → `= -`).
+                let mut run = String::new();
+                while i < toks.len() && toks[i].0 == SyntaxKind::MATH_OPERATOR {
+                    run.push_str(&toks[i].1);
+                    i += 1;
+                }
+                for atom in operators::split_operator_atoms(&run) {
+                    let class = operators::coerce(operators::classify_operator(atom), prev_class);
+                    let demand = if operators::is_spaced(class) {
+                        Demand::SpacedOp
+                    } else {
+                        Demand::TightOp
+                    };
+                    emit_atom(&mut out, prev_demand, demand, pending_space, atom);
+                    pending_space = false; // only the first atom sees the run's leading space
+                    prev_demand = demand;
+                    prev_class = Some(class);
+                }
+            }
+            SyntaxKind::MATH_COMMENT => {
+                // Transparent for class purposes (an operator looks back past a
+                // comment), but emitted verbatim.
+                emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, text);
+                pending_space = false;
+                prev_demand = Demand::Plain;
+                i += 1;
+            }
+            _ => {
+                emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, text);
+                pending_space = false;
+                prev_demand = Demand::Plain;
+                prev_class = atom_prev_class(*kind, text);
+                i += 1;
+            }
+        }
     }
+    out
+}
+
+/// Append `text`, inserting the resolved gap before it. The first atom
+/// (`prev == Start`) never gets a leading space.
+fn emit_atom(out: &mut String, prev: Demand, cur: Demand, pending_space: bool, text: &str) {
+    if prev != Demand::Start && gap_space(prev, cur, pending_space) {
+        out.push(' ');
+    }
+    out.push_str(text);
+}
+
+/// Resolve the gap between two adjacent atoms: a spaced operator always wins
+/// (one space); a tight operator otherwise strips the gap; plain atoms preserve
+/// author whitespace.
+fn gap_space(prev: Demand, cur: Demand, pending_space: bool) -> bool {
+    if prev == Demand::SpacedOp || cur == Demand::SpacedOp {
+        true
+    } else if prev == Demand::TightOp || cur == Demand::TightOp {
+        false
+    } else {
+        pending_space
+    }
+}
+
+/// The atom class a non-operator token presents to a *following* operator run.
+/// `None` resets context (a `\\` starts a fresh line, so a following `+`/`-` is
+/// unary).
+fn atom_prev_class(kind: SyntaxKind, text: &str) -> Option<AtomClass> {
+    let class = match kind {
+        SyntaxKind::MATH_TEXT => operators::text_tail_class(text),
+        SyntaxKind::MATH_COMMAND => {
+            let name = text.strip_prefix('\\').unwrap_or(text);
+            operators::command_class(name).unwrap_or(AtomClass::Ord)
+        }
+        SyntaxKind::MATH_GROUP_OPEN => AtomClass::Open,
+        SyntaxKind::MATH_GROUP_CLOSE => AtomClass::Close,
+        // `^`/`_` bind tightly; a `&` opens a fresh cell — both make a directly
+        // following `+`/`-` unary.
+        SyntaxKind::MATH_SCRIPT | SyntaxKind::MATH_ALIGN => AtomClass::Open,
+        SyntaxKind::MATH_LINE_BREAK => return None,
+        // MATH_EQUATION_LABEL and anything unforeseen: ordinary.
+        _ => AtomClass::Ord,
+    };
+    Some(class)
 }
 
 /// Collapse runs of spaces to a single space (tabs already became spaces). Safe

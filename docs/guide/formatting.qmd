@@ -886,11 +886,14 @@ Output
 
 The `&` columns and the trailing `\\` are both aligned.
 
-Only structurally-safe transforms run; operator spacing and macro contents are
-never rewritten. Alignment uses **source character widths** (it tidies the
-source, it does not align rendered glyphs), and malformed math is left
-untouched. The option is unstable and may change without a major release --- see
-[Experimental Features](configuration.qmd#experimental-features).
+Operators are spaced precedence-aware: a binary or relational operator gets one
+space on each side (`a+b` → `a + b`, `a<=b` → `a <= b`), while a unary minus or
+plus stays tight (`x = -y`, `f(-x)`). Macro contents are not rewritten (no
+`\frac` canonicalization, no auto-`&` insertion). Alignment uses **source
+character widths** (it tidies the source, it does not align rendered glyphs),
+and malformed math is left untouched. The option is unstable and may change
+without a major release --- see [Experimental
+Features](configuration.qmd#experimental-features).
 
 ## Links
 

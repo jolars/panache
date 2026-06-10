@@ -76,11 +76,17 @@ design plan is `~/.claude/plans/i-want-to-plan-foamy-pascal.md`.
 - **Phase 3 — display math + environments.** *DONE*. `&`-column alignment,
   environment-body indentation, `\\` normalization; honors
   `has_unescaped_single_dollar_in_content()`.
-- **Phase 4 — dev-oracle cross-validation + idempotency corpus.** (Cross-checks
-  the Phase 5/6 spacing + breaking work against latexindent/KaTeX.)
-- **Phase 5 — operator interpretation module + precedence-aware spacing.** The
-  `cooking.rs` analog: classify operators (text + command name) → class +
-  break-priority; apply class-based spacing (`a+b` → `a + b`). Shared with LSP.
+- **Phase 4 — dev-oracle cross-validation + idempotency corpus.** *DONE*.
+  Tier-1 corpus props + Tier-2 `pulldown-latex` MathML invariance oracle.
+- **Phase 5 — operator interpretation module + precedence-aware spacing.**
+  *DONE*. `formatter/math/operators.rs` (`cooking.rs` analog, `pub` for LSP):
+  classify char operators + curated command table → class; TeX Bin→Ord coercion;
+  gap-based re-spacer (`a+b`→`a + b`, unary `-x`/`f(-x)` tight, `x=-y`→`x = -y`).
+  Char operators only; **command-operator spacing + Tier 3 → Phase 5b**;
+  break-priority column → Phase 6.
+- **Phase 5b — command-operator spacing + Tier 3.** Re-space `\leq`/`\cdot`
+  (handle command-terminating space); vendored symbol→atom-class fixture vs
+  `pulldown-latex` Events.
 - **Phase 6 — semantic line-breaking + indenting.** Wrap long display math at
   lowest-precedence operators, indent continuations (uses Phase 5 priorities).
 - **Phase 7 — docs + stabilization** (`docs/guide/formatting.qmd`,

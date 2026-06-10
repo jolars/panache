@@ -1,11 +1,14 @@
 # Math content formatting --- canonical style rules
 
 The experimental math formatter (`Config::experimental_format_math`, default
-off) reformats the **content** of math spans structurally. It is deliberately
-conservative: **only structurally-safe transforms**, never operator spacing,
-macro rewriting, `\frac`/`\dfrac` canonicalization, or auto-`&` insertion. There
-is no pandoc oracle for math *formatting* (pandoc passes math through); the
-reference for alignment behavior is `latexindent`.
+off) reformats the **content** of math spans. It does structurally-safe layout
+(whitespace collapse, `&`-column alignment, environment indentation, `\\`
+normalization) plus **precedence-aware operator spacing** (see Rule 6). It stays
+conservative beyond that: never macro rewriting, `\frac`/`\dfrac`
+canonicalization, or auto-`&` insertion. There is no pandoc oracle for math
+*formatting* (pandoc passes math through); the reference for alignment behavior
+is `latexindent`, and operator spacing is meaning-validated against a dev-only
+MathML oracle (`tests/math_cross_validation.rs`).
 
 The formatter **re-parses the clean content string** (delimiters excluded) into
 a `MATH_CONTENT` CST and re-emits it. Re-parsing the already-prefix-stripped
@@ -65,6 +68,28 @@ Returned unchanged, never reflowed:
    A row whose sole content is a single nested environment (no `&`, no `\\`) is
    block-laid-out at the body indent rather than inlined.
 
+6. **Operator spacing.** The char operators `+ - * = < >` (the parser's neutral
+   `MATH_OPERATOR` tokens) are spaced by *interpretation*, not by CST shape ---
+   the class/precedence logic lives in `operators.rs`, the math analog of YAML
+   scalar cooking, keyed on operator text + command name. A run of adjacent
+   operator chars splits into atoms: adjacent **relation** chars (`= < >`) merge
+   into one composite relation (`<=`, `==` stay one unit), while each **sign**
+   char (`+ - *`) is its own atom --- so `=-` is a relation `=` then a sign `-`,
+   giving `x = -y`, and `a--b` is binary-then-unary `a - -b`. A sign atom in a
+   *unary* position --- list start, or after another Bin/Rel/Open/Punct/large-op
+   --- is coerced to ordinary (TeX's unary-minus rule). Binary/relation atoms
+   get one space on each side; unary atoms are **tight**, *stripping* adjacent
+   author spaces (`- x` → `-x`, `f( - x)` → `f(-x)`), except a space demanded by
+   a neighboring spaced operator still wins (`x = - y` → `x = -y`). The
+   preceding atom's class comes from the last significant token: a `MATH_TEXT`
+   run by its last char (`(`/`[` → open, `)`/`]` → close, `,`/`;` → punct), a
+   command via the `operators.rs` table (`\leq` → Rel, `\cdot` → Bin, `\sum` →
+   large op, else ordinary), `{`/`^`/`_`/`&` as unary-inducing, `\\` resetting
+   to start. Author whitespace between two ordinary atoms is preserved, so a
+   command-terminating space (`\alpha x`) and a `\text{ a }` interior survive.
+   Command operators themselves (`\leq`, `\cdot`) are not yet re-spaced ---
+   that, and a break-priority column for line-breaking, are later phases.
+
 ## Idempotency
 
 `format(format(x)) == format(x)` for every well-formed input. The alignment
@@ -81,3 +106,8 @@ engine guarantees it by construction:
 - The canonical `&` separator re-tokenizes to
   `MATH_SPACE MATH_ALIGN   MATH_SPACE`; pass 2 splits on the same `&` and trims
   the same surrounding spaces, so cell boundaries are stable.
+- **Operator spacing is a fixed point.** A spaced operator re-tokenizes to the
+  same `MATH_OPERATOR`(+`MATH_SPACE`) shape, and its class depends only on the
+  token stream --- which round-trips --- so pass 2 makes the identical decision.
+  Inserting at most one space per gap (then `collapse_spaces` + cell trim) and
+  stripping spaces only beside *tight* runs both converge in one pass.

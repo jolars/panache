@@ -350,11 +350,11 @@ impl StyleConfig {
 #[derive(Debug, Clone, Default, Deserialize, JsonSchema, PartialEq)]
 #[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
 pub struct ExperimentalConfig {
-    /// Reformat the *content* of math (`$...$`, `$$...$$`, environments)
-    /// structurally — collapse inline whitespace, indent environment bodies,
-    /// normalize `\\` line breaks, and align `&` columns. Default off: math is
-    /// emitted verbatim. Only structurally-safe transforms are applied; no
-    /// operator spacing, no macro rewriting.
+    /// Reformat the *content* of math (`$...$`, `$$...$$`, environments) —
+    /// collapse inline whitespace, indent environment bodies, normalize `\\`
+    /// line breaks, align `&` columns, and apply precedence-aware operator
+    /// spacing (`a+b` → `a + b`, unary `-x` stays tight). Default off: math is
+    /// emitted verbatim. No macro rewriting or `\frac` canonicalization.
     pub format_math: bool,
 }
 
