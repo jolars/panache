@@ -174,7 +174,7 @@ churn them:
 ### 3.1 Type-level read/write split --- *highest leverage, lowest risk* {#g1}
 
 ::: callout-note
-## Adopted
+#### Adopted
 
 `StateSnapshot` now carries a read-only `crate::salsa::Analysis` newtype instead
 of a raw `SalsaDb`, exposing workers only `snap.db() -> &dyn Db`. Because every
@@ -205,7 +205,7 @@ nothing --- mirroring rust-analyzer, whose `with_db` does not block it either.)
 ### 3.2 Filesystem access inside the database --- *panache-specific, high impact* {#g2}
 
 ::: callout-note
-## Adopted
+#### Adopted
 
 `Db::file_text` is now a pure cache lookup: it returns `None` for any path the
 writer has not loaded and never touches `std::fs` or creates an input off a
@@ -252,7 +252,7 @@ unchanged and remain tracked by [G3](#g3).
 ### 3.3 FileId / SourceRoot --- *promoted by G2: enables per-file invalidation* {#g3}
 
 ::: callout-note
-## Adopted (core)
+#### Adopted (core)
 
 A `FileId` newtype plus a `vfs`-style path↔id map (`src/salsa.rs`) subsumes the
 former `file_cache`. `file_text` is now a `#[salsa::input]` whose value is
