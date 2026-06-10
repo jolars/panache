@@ -67,7 +67,7 @@ num_cpus = { version = "1.16", optional = true }
 percent-encoding = { version = "2.3.2", optional = true }
 regex = "1.12.2"
 rowan = "0.16.1"
-salsa = "0.26.0"
+salsa = "0.27.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0"
 schemars = "1.0"
