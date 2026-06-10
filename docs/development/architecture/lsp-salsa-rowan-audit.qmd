@@ -389,6 +389,15 @@ salsa's own per-file invalidation:
   guard), built on a salsa `WillExecute` event-log harness, rather than a
   separate `tests/` file --- it reuses the existing salsa test fixtures and the
   private logging constructor.
+- **Remaining:** two follow-ups are deliberately open. (1) `project_graph` still
+  re-runs on a member's body edit (it is the diagnostics source), so the
+  per-file diagnostics firewall above is unstarted. (2) The wider `no_eq` family
+  the section opens with --- `metadata`, the `yaml_*` queries,
+  `built_in_lint_plan`, `citation_definition_index`, `bibliography_index` ---
+  was *not* swept: the new test only asserts the `project_structure` / sibling
+  per-file-index axis. Extending the harness with cases like "a body edit in
+  sibling A reuses B's `built_in_lint_plan`" and firewalling any that fail is
+  the natural next increment.
 
 ### 3.5 Structural incremental reparse + stable pointers --- *highest effort, gate on benchmarks* {#g5}
 
