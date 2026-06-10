@@ -177,7 +177,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
     {
         let symbol_index = {
             let db = snap.db();
-            crate::salsa::symbol_usage_index(db, salsa_file, salsa_config, doc_path.clone()).clone()
+            crate::salsa::symbol_usage_index(db, salsa_file, salsa_config).clone()
         };
         let ranges = symbol_index.footnote_rename_ranges(label);
         let edits = text_edits_from_ranges(&ranges, &content, &new_name);
@@ -198,7 +198,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
 
     let metadata = {
         let db = snap.db();
-        crate::salsa::metadata(db, salsa_file, salsa_config, doc_path.clone()).clone()
+        crate::salsa::metadata(db, salsa_file, salsa_config).clone()
     };
     let (old_key, old_norm) = match target {
         Some(SymbolTarget::Citation(key)) => {
@@ -231,7 +231,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
             let bib_text = {
                 let db = snap.db();
                 crate::salsa::Db::file_text(db, bib_path.clone())
-                    .map(|file| file.text(db).clone())
+                    .map(|file| file.content_or_empty(db).to_string())
                     .unwrap_or_default()
             };
             let bib_start = offset_to_position(&bib_text, entry.span.start);
@@ -250,7 +250,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
 
     let graph = {
         let db = snap.db();
-        crate::salsa::project_graph(db, salsa_file, salsa_config, doc_path.clone()).clone()
+        crate::salsa::project_graph(db, salsa_file, salsa_config).clone()
     };
 
     for bib_path in &bib_paths {
@@ -271,7 +271,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
             } else {
                 let db = snap.db();
                 crate::salsa::Db::file_text(db, entry.path.clone())
-                    .map(|file| file.text(db).clone())
+                    .map(|file| file.content_or_empty(db).to_string())
                     .unwrap_or_default()
             };
             let start = offset_to_position(&text, entry.range.start().into());

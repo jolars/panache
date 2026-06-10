@@ -91,7 +91,7 @@ pub(crate) fn citation_definition_locations(
                 default_content.to_string()
             } else {
                 db.file_text(entry.path.clone())
-                    .map(|file| file.text(db).clone())
+                    .map(|file| file.content_or_empty(db).to_string())
                     .unwrap_or_default()
             };
             out.push(Location {

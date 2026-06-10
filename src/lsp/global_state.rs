@@ -121,14 +121,14 @@ impl StateSnapshot {
     /// The current text of `uri`, read from salsa.
     pub(crate) fn document_content(&self, uri: &Uri) -> Option<String> {
         let state = self.document_map.get(&uri.to_string())?;
-        Some(state.salsa_file.text(self.db()).clone())
+        Some(state.salsa_file.content_or_empty(self.db()).to_string())
     }
 
     /// The current text and a freshly-rooted syntax tree for `uri`.
     pub(crate) fn document_content_and_tree(&self, uri: &Uri) -> Option<(String, SyntaxNode)> {
         let state = self.document_map.get(&uri.to_string())?;
         Some((
-            state.salsa_file.text(self.db()).clone(),
+            state.salsa_file.content_or_empty(self.db()).to_string(),
             SyntaxNode::new_root(state.tree.clone()),
         ))
     }
@@ -163,20 +163,13 @@ impl StateSnapshot {
         let Some(state) = self.document_map.get(&uri.to_string()) else {
             return crate::salsa::DefinitionIndex::default();
         };
-        let root_path = state
-            .path
-            .clone()
-            .unwrap_or_else(|| PathBuf::from("<memory>"));
         let (salsa_file, salsa_config) = (state.salsa_file, state.salsa_config);
         let db = self.db();
-        let graph =
-            crate::salsa::project_graph(db, salsa_file, salsa_config, root_path.clone()).clone();
-        let mut index =
-            crate::salsa::definition_index(db, salsa_file, salsa_config, root_path).clone();
+        let graph = crate::salsa::project_graph(db, salsa_file, salsa_config).clone();
+        let mut index = crate::salsa::definition_index(db, salsa_file, salsa_config).clone();
         for path in graph.documents().iter() {
             if let Some(include_file) = db.file_text(path.clone()) {
-                let include_index =
-                    crate::salsa::definition_index(db, include_file, salsa_config, path.clone());
+                let include_index = crate::salsa::definition_index(db, include_file, salsa_config);
                 index.merge_from(include_index);
             }
         }

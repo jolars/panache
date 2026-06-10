@@ -106,17 +106,17 @@ pub(crate) fn completion(
         return None;
     }
 
-    let doc_path = doc_path?;
+    // Bibliography/citation completions only apply to saved documents.
+    doc_path?;
     let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
     if !yaml_ok {
         return None;
     }
 
-    let metadata =
-        crate::salsa::metadata(snap.db(), salsa_file, salsa_config, doc_path.clone()).clone();
+    let metadata = crate::salsa::metadata(snap.db(), salsa_file, salsa_config).clone();
     let parse = metadata.bibliography_parse.as_ref();
     let symbol_index =
-        crate::salsa::symbol_usage_index(snap.db(), salsa_file, salsa_config, doc_path).clone();
+        crate::salsa::symbol_usage_index(snap.db(), salsa_file, salsa_config).clone();
 
     let has_crossref_candidates = symbol_index
         .crossref_declaration_entries()

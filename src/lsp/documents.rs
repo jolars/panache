@@ -105,12 +105,18 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     };
 
     let doc_path = uri.to_file_path().map(|p| p.into_owned());
-    let path_for_salsa = doc_path
-        .clone()
-        .unwrap_or_else(|| PathBuf::from("<memory>"));
-    let salsa_file =
-        gs.salsa
-            .update_file_text_with_durability(path_for_salsa, text.clone(), Durability::LOW);
+    // On-disk documents register under their path; an in-memory buffer gets a
+    // distinct `FileId` with no backing path (retires the `<memory>` sentinel,
+    // and avoids two untitled buffers colliding on one key) (audit §3.3 / G3).
+    let salsa_file = match doc_path.clone() {
+        Some(path) => {
+            gs.salsa
+                .update_file_text_with_durability(path, text.clone(), Durability::LOW)
+        }
+        None => gs
+            .salsa
+            .create_in_memory_file(text.clone(), Durability::LOW),
+    };
     let salsa_config = {
         let cfg = crate::salsa::FileConfig::new(&gs.salsa, config.clone());
         cfg.set_config(&mut gs.salsa)
@@ -162,7 +168,7 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
         return;
     };
 
-    let original_text = salsa_file.text(&gs.salsa).clone();
+    let original_text = salsa_file.content_or_empty(&gs.salsa).to_string();
 
     // Compute the post-edit text and (when incremental parsing is enabled and
     // edit ranges can be derived) the old/new edit ranges.
@@ -202,7 +208,7 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
         salsa_file
             .set_text(&mut gs.salsa)
             .with_durability(Durability::LOW)
-            .to(updated_text.clone());
+            .to(Some(std::sync::Arc::from(updated_text.clone())));
     }
     let refdefs = crate::salsa::refdef_set(&gs.salsa, salsa_file, salsa_config).clone();
 
@@ -312,7 +318,7 @@ pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams
         retained.extend(tracked);
     }
     for cached in gs.salsa.cached_file_paths() {
-        if retained.contains(&cached) || cached.as_os_str() == "<memory>" {
+        if retained.contains(&cached) {
             continue;
         }
         let _ = gs.salsa.evict_file_text(&cached);

@@ -43,8 +43,7 @@ pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> 
         return None;
     }
 
-    let metadata =
-        crate::salsa::metadata(snap.db(), salsa_file, salsa_config, doc_path.clone()).clone();
+    let metadata = crate::salsa::metadata(snap.db(), salsa_file, salsa_config).clone();
 
     let target = {
         let root = ctx.syntax_root();

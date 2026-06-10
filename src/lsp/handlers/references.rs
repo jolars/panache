@@ -162,13 +162,8 @@ pub(crate) fn references(snap: &StateSnapshot, params: ReferenceParams) -> Optio
             let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
             if yaml_ok {
                 Some(
-                    crate::salsa::citation_definition_index(
-                        snap.db(),
-                        salsa_file,
-                        salsa_config,
-                        doc_path.clone(),
-                    )
-                    .clone(),
+                    crate::salsa::citation_definition_index(snap.db(), salsa_file, salsa_config)
+                        .clone(),
                 )
             } else {
                 None

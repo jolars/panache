@@ -676,10 +676,10 @@ mod tests {
         let input = fs::read_to_string(&doc_path).unwrap();
         let config = Config::default();
         let graph = {
-            let db = crate::salsa::SalsaDb::default();
-            let file = crate::salsa::FileText::new(&db, input.clone());
+            let mut db = crate::salsa::SalsaDb::default();
+            let file = db.update_file_text(doc_path.clone(), input.clone());
             let config_input = crate::salsa::FileConfig::new(&db, config.clone());
-            crate::salsa::project_graph(&db, file, config_input, doc_path.clone()).clone()
+            crate::salsa::project_graph(&db, file, config_input).clone()
         };
 
         let metadata_deps =
@@ -704,10 +704,10 @@ mod tests {
         let input = fs::read_to_string(&doc_path).unwrap();
         let config = Config::default();
         let graph = {
-            let db = crate::salsa::SalsaDb::default();
-            let file = crate::salsa::FileText::new(&db, input.clone());
+            let mut db = crate::salsa::SalsaDb::default();
+            let file = db.update_file_text(doc_path.clone(), input.clone());
             let config_input = crate::salsa::FileConfig::new(&db, config.clone());
-            crate::salsa::project_graph(&db, file, config_input, doc_path.clone()).clone()
+            crate::salsa::project_graph(&db, file, config_input).clone()
         };
 
         assert!(graph.documents().contains(&doc_path));
@@ -789,10 +789,10 @@ mod tests {
         let input = fs::read_to_string(&doc_path).unwrap();
         let config = Config::default();
         let graph = {
-            let db = crate::salsa::SalsaDb::default();
-            let file = crate::salsa::FileText::new(&db, input.clone());
+            let mut db = crate::salsa::SalsaDb::default();
+            let file = db.update_file_text(doc_path.clone(), input.clone());
             let config_input = crate::salsa::FileConfig::new(&db, config.clone());
-            crate::salsa::project_graph(&db, file, config_input, doc_path.clone()).clone()
+            crate::salsa::project_graph(&db, file, config_input).clone()
         };
 
         assert!(graph.documents().contains(&doc_path));
@@ -819,10 +819,10 @@ mod tests {
         let input = fs::read_to_string(&other_path).unwrap();
         let config = Config::default();
         let graph = {
-            let db = crate::salsa::SalsaDb::default();
-            let file = crate::salsa::FileText::new(&db, input.clone());
+            let mut db = crate::salsa::SalsaDb::default();
+            let file = db.update_file_text(other_path.clone(), input.clone());
             let config_input = crate::salsa::FileConfig::new(&db, config.clone());
-            crate::salsa::project_graph(&db, file, config_input, other_path.clone()).clone()
+            crate::salsa::project_graph(&db, file, config_input).clone()
         };
 
         assert!(graph.documents().contains(&doc_path));
@@ -846,10 +846,10 @@ mod tests {
         let mut config = Config::default();
         config.extensions.bookdown_references = true;
         let _graph = {
-            let db = crate::salsa::SalsaDb::default();
-            let file = crate::salsa::FileText::new(&db, input.clone());
+            let mut db = crate::salsa::SalsaDb::default();
+            let file = db.update_file_text(doc_path.clone(), input.clone());
             let config_input = crate::salsa::FileConfig::new(&db, config.clone());
-            crate::salsa::project_graph(&db, file, config_input, doc_path.clone()).clone()
+            crate::salsa::project_graph(&db, file, config_input).clone()
         };
 
         let mut definitions = DefinitionIndex::default();

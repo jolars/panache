@@ -13,15 +13,25 @@ use crate::lsp::uri_ext::UriExt;
 
 pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWatchedFilesParams) {
     // A watcher event means the filesystem changed in a way salsa cannot see
-    // (a referenced include/bibliography file created or removed). `collect_includes`
-    // resolution and the project walk are filesystem-dependent, so bump the
-    // cache generation to force `project_graph`/`metadata` to re-discover
-    // (audit §3.2; the underlying fs reads are residual G3).
-    gs.salsa.bump_cache_generation();
+    // through its inputs: `collect_includes` / `find_project_documents` probe the
+    // filesystem directly (residual G3 reads), so a newly-created include is
+    // invisible to a memoized `project_graph`. Interning each changed path adds
+    // any new file to the `FileSet`, which re-runs `project_graph` (the only
+    // reader of the set) so those probes are re-evaluated --- a targeted, in-graph
+    // replacement for the former global `CacheGeneration` bump, which also
+    // invalidated every document's `metadata` memo (audit §3.3 / G3).
+    let changed_paths: Vec<PathBuf> = params
+        .changes
+        .iter()
+        .filter_map(|change| change.uri.to_file_path().map(|p| p.into_owned()))
+        .collect();
+    for path in &changed_paths {
+        gs.salsa.intern_file(Some(path.clone()));
+    }
 
-    // `file_text` no longer lazy-loads, so load any newly-created file an open
-    // document now references on the writer here --- before the cached-text sync
-    // and the re-lint below, so both observe fresh content.
+    // Reloading the open documents' referenced files on the writer then loads any
+    // newly-created file (flipping its `None`->`Some` text input) before the
+    // cached-text sync and re-lint below, so both observe fresh content.
     let open_docs: Vec<(crate::salsa::FileText, crate::salsa::FileConfig, PathBuf)> = gs
         .document_map
         .values()
@@ -77,17 +87,13 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
         let affected_documents: Vec<Uri> = states
             .into_iter()
             .filter_map(|(uri_str, state)| {
-                let doc_path = state.path?;
+                // Only saved documents can reference a bibliography on disk.
+                state.path.as_ref()?;
                 if !helpers::is_yaml_frontmatter_valid(&state.parsed_yaml_regions) {
                     return None;
                 }
-                let metadata = crate::salsa::metadata(
-                    &gs.salsa,
-                    state.salsa_file,
-                    state.salsa_config,
-                    doc_path,
-                )
-                .clone();
+                let metadata =
+                    crate::salsa::metadata(&gs.salsa, state.salsa_file, state.salsa_config).clone();
                 let bib_info = metadata.bibliography.as_ref()?;
                 if bib_info.paths.iter().any(|p| p == &path) {
                     uri_str.parse::<Uri>().ok()

@@ -337,7 +337,12 @@ impl LspTester {
 
     pub fn get_document_content(&self, uri: &str) -> Option<String> {
         let state = self.gs.document_map.get(uri)?;
-        Some(state.salsa_file.text(&self.gs.salsa).clone())
+        Some(
+            state
+                .salsa_file
+                .content_or_empty(&self.gs.salsa)
+                .to_string(),
+        )
     }
 
     pub fn get_document_tree(&self, uri: &str) -> Option<crate::SyntaxNode> {
@@ -349,7 +354,7 @@ impl LspTester {
 
     pub fn get_cached_file_text(&self, path: &std::path::Path) -> Option<String> {
         let file = self.gs.salsa.file_text(path.to_path_buf())?;
-        Some(file.text(&self.gs.salsa).clone())
+        Some(file.content_or_empty(&self.gs.salsa).to_string())
     }
 
     // --- main-loop pumping (publishes + cancel) ---
@@ -449,21 +454,10 @@ impl LspTester {
         &self,
         uri: &str,
     ) -> Option<Vec<crate::linter::diagnostics::Diagnostic>> {
-        use super::uri_ext::UriExt;
-        let parsed_uri: Uri = uri.parse().ok()?;
         let state = self.gs.document_map.get(uri)?;
-        let path = state
-            .path
-            .clone()
-            .or_else(|| parsed_uri.to_file_path().map(|p| p.into_owned()))
-            .unwrap_or_else(|| std::path::PathBuf::from("<memory>"));
-        let plan = crate::salsa::built_in_lint_plan(
-            &self.gs.salsa,
-            state.salsa_file,
-            state.salsa_config,
-            path,
-        )
-        .clone();
+        let plan =
+            crate::salsa::built_in_lint_plan(&self.gs.salsa, state.salsa_file, state.salsa_config)
+                .clone();
         Some(plan.diagnostics)
     }
 }

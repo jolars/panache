@@ -60,12 +60,11 @@ pub(crate) fn project_document_paths(
     salsa_config: crate::salsa::FileConfig,
     doc_path: &Path,
 ) -> Vec<PathBuf> {
-    let mut doc_paths =
-        crate::salsa::project_graph(db, salsa_file, salsa_config, doc_path.to_path_buf())
-            .documents()
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>();
+    let mut doc_paths = crate::salsa::project_graph(db, salsa_file, salsa_config)
+        .documents()
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>();
     if !doc_paths.contains(&doc_path.to_path_buf()) {
         doc_paths.push(doc_path.to_path_buf());
     }
@@ -92,7 +91,7 @@ pub(crate) fn document_inputs_for_paths(
         let text = if path == doc_path {
             current_content.to_string()
         } else if let Some(file) = db.file_text(path.clone()) {
-            file.text(db).clone()
+            file.content_or_empty(db).to_string()
         } else {
             continue;
         };
@@ -132,8 +131,7 @@ pub(crate) fn indexed_documents_from_inputs(
             continue;
         };
 
-        let symbol_index =
-            crate::salsa::symbol_usage_index(db, file, salsa_config, path.clone()).clone();
+        let symbol_index = crate::salsa::symbol_usage_index(db, file, salsa_config).clone();
         let uri = if path == doc_path {
             current_uri.clone()
         } else {

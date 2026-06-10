@@ -13,10 +13,30 @@ use crate::syntax::{
 use crate::utils::{implicit_heading_ids, normalize_anchor_label, normalize_label};
 use salsa::{Accumulator, Durability, Setter};
 
+/// Per-file text input. The value is `Option<Arc<str>>` so the writer can
+/// distinguish a file it has *referenced but not loaded* (`None` --- a missing
+/// include or unreadable bibliography) from a file that is *present but empty*
+/// (`Some("")`). That distinction backs the bibliography "failed to read"
+/// diagnostic (audit §3.3 / G3). `Arc<str>` lets worker reads share text
+/// without cloning.
 #[salsa::input]
 pub struct FileText {
     #[returns(ref)]
-    pub text: String,
+    pub text: Option<Arc<str>>,
+}
+
+impl FileText {
+    /// Create a *loaded* `FileText` from owned or borrowed text.
+    pub fn from_str(db: &dyn Db, text: impl Into<Arc<str>>) -> FileText {
+        FileText::new(db, Some(text.into()))
+    }
+
+    /// The file's text, or `""` when absent (`None`). Readers that treat an
+    /// unloaded file as empty use this; callers that must distinguish absent
+    /// from present-but-empty read [`FileText::text`] directly.
+    pub fn content_or_empty(self, db: &dyn Db) -> &str {
+        self.text(db).as_deref().unwrap_or("")
+    }
 }
 
 #[salsa::input]
@@ -25,19 +45,19 @@ pub struct FileConfig {
     pub config: Config,
 }
 
-/// A monotonically-increasing counter the writer bumps whenever it loads a new
-/// file into the cache. Queries that resolve sibling files by path (`metadata`,
-/// `project_graph`) read it so that loading a previously-absent include or
-/// bibliography file invalidates their memo.
+/// The set of [`FileId`]s the writer has interned. `project_graph` reads it to
+/// take a dependency on *which files exist*; the writer adds an id on first
+/// reference of a path (a real input write), which re-runs `project_graph` so
+/// it can resolve and recurse into the newly-referenced file.
 ///
-/// This is necessary because `Db::file_text` is a pure lookup, not a tracked
-/// query: when a query calls it for an absent path it gets `None` and salsa
-/// records *no* dependency on that path. Loading the file later would otherwise
-/// leave a stale memo computed while the file was absent. Reading this counter
-/// gives those queries a real dependency that the writer can invalidate.
+/// This replaces the former global `CacheGeneration` counter with an in-graph,
+/// *structural-only* signal: per-file **content** changes flow through each
+/// file's [`FileText`] input and never touch this set, so a sibling load no
+/// longer invalidates unrelated documents' `metadata` memos (audit §3.3 / G3).
 #[salsa::input]
-pub struct CacheGeneration {
-    pub generation: u64,
+pub struct FileSet {
+    #[returns(ref)]
+    pub ids: Arc<HashSet<FileId>>,
 }
 
 #[salsa::interned]
@@ -86,7 +106,7 @@ pub fn resolve_label(db: &dyn Db, label: InternedLabel<'_>) -> String {
 #[salsa::tracked(returns(ref), lru = 64)]
 pub fn refdef_set(db: &dyn Db, file: FileText, config: FileConfig) -> crate::parser::RefdefMap {
     let dialect = panache_parser::Dialect::for_flavor(config.config(db).flavor);
-    crate::parser::collect_refdef_labels(file.text(db), dialect)
+    crate::parser::collect_refdef_labels(file.content_or_empty(db), dialect)
 }
 
 /// Parse a `(file, config)` pair to a CST exactly once per `SalsaDb`. All
@@ -119,7 +139,7 @@ pub struct ParsedDocument {
 pub fn parsed_document(db: &dyn Db, file: FileText, config: FileConfig) -> ParsedDocument {
     let refdefs = refdef_set(db, file, config).clone();
     let (tree, errors) = crate::parser::parse_with_refdefs_and_errors(
-        file.text(db),
+        file.content_or_empty(db),
         Some(config.config(db).clone()),
         refdefs,
     );
@@ -150,15 +170,11 @@ pub fn parsed_tree_root(db: &dyn Db, file: FileText, config: FileConfig) -> Synt
 }
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
-pub fn metadata(
-    db: &dyn Db,
-    file: FileText,
-    config: FileConfig,
-    path: PathBuf,
-) -> DocumentMetadata {
-    // Depend on the cache generation so loading a referenced bibliography file
-    // (a `db.file_text` lookup below) re-runs this query (audit §3.2).
-    let _ = db.cache_generation().generation(db);
+pub fn metadata(db: &dyn Db, file: FileText, config: FileConfig) -> DocumentMetadata {
+    // Resolve the document's path from its `FileText` identity; an in-memory
+    // buffer has no path, so relative bibliography/metadata paths simply don't
+    // resolve (audit §3.3 / G3).
+    let path = db.path_of(file).unwrap_or_default();
     let tree = parsed_tree_root(db, file, config);
     let mut metadata =
         crate::metadata::extract_project_metadata_without_bibliography_parse(&tree, &path)
@@ -189,7 +205,17 @@ pub fn metadata(
             if !seen_paths.insert(bib_path.clone()) {
                 continue;
             }
-            let Some(bib_file) = db.file_text(bib_path.clone()) else {
+            // Resolve the bibliography to its per-file input and read its
+            // content. Taking a dependency on that input's value (`None` when
+            // the writer has referenced but not loaded the file) is what re-runs
+            // this query once the file loads --- no global firewall needed. A
+            // `None` input *or* an absent path is "failed to read"; a present
+            // file (even empty, `Some("")`) parses normally, preserving the
+            // absent-vs-empty distinction (audit §3.3 / G3).
+            let loaded = db
+                .file_text(bib_path.clone())
+                .filter(|bib_file| bib_file.text(db).is_some());
+            let Some(bib_file) = loaded else {
                 index.load_errors.push(crate::bib::BibLoadError {
                     path: bib_path.clone(),
                     message: "Failed to read file".to_string(),
@@ -215,8 +241,8 @@ pub fn yaml_metadata_parse_result(
     db: &dyn Db,
     file: FileText,
     config: FileConfig,
-    path: PathBuf,
 ) -> Result<(), crate::metadata::YamlError> {
+    let path = db.path_of(file).unwrap_or_default();
     let tree = parsed_tree_root(db, file, config);
     crate::metadata::extract_project_metadata_without_bibliography_parse(&tree, &path).map(|_| ())
 }
@@ -260,12 +286,7 @@ pub fn yaml_embedded_regions_in_host_range(
 }
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
-pub fn yaml_frontmatter_is_valid(
-    db: &dyn Db,
-    file: FileText,
-    config: FileConfig,
-    path: PathBuf,
-) -> bool {
+pub fn yaml_frontmatter_is_valid(db: &dyn Db, file: FileText, config: FileConfig) -> bool {
     let frontmatter = parsed_yaml_regions_for_file(db, file, config)
         .iter()
         .find(|region| region.is_frontmatter())
@@ -277,17 +298,12 @@ pub fn yaml_frontmatter_is_valid(
     if !frontmatter.is_valid() {
         return false;
     }
-    yaml_metadata_parse_result(db, file, config, path).is_ok()
+    yaml_metadata_parse_result(db, file, config).is_ok()
 }
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types), lru = 64)]
-pub fn built_in_lint_plan(
-    db: &dyn Db,
-    file: FileText,
-    config: FileConfig,
-    path: PathBuf,
-) -> BuiltInLintPlan {
-    let text = file.text(db);
+pub fn built_in_lint_plan(db: &dyn Db, file: FileText, config: FileConfig) -> BuiltInLintPlan {
+    let text = file.content_or_empty(db);
     let cfg = config.config(db).clone();
     let tree = parsed_tree_root(db, file, config);
     let parsed_yaml_regions: Vec<_> = parsed_yaml_regions_for_file(db, file, config).to_vec();
@@ -299,12 +315,12 @@ pub fn built_in_lint_plan(
     let has_frontmatter = frontmatter.is_some();
     let frontmatter_parse_ok = frontmatter.as_ref().is_none_or(|parsed| parsed.is_valid());
     let yaml = if has_frontmatter && frontmatter_parse_ok {
-        Some(yaml_metadata_parse_result(db, file, config, path.clone()).clone())
+        Some(yaml_metadata_parse_result(db, file, config).clone())
     } else {
         None
     };
     let metadata = if frontmatter_parse_ok && yaml.as_ref().is_none_or(Result::is_ok) {
-        Some(metadata(db, file, config, path).clone())
+        Some(metadata(db, file, config).clone())
     } else {
         None
     };
@@ -578,12 +594,7 @@ impl SymbolUsageIndex {
 }
 
 #[salsa::tracked(returns(ref), lru = 64)]
-pub fn symbol_usage_index(
-    db: &dyn Db,
-    file: FileText,
-    config: FileConfig,
-    _path: PathBuf,
-) -> SymbolUsageIndex {
+pub fn symbol_usage_index(db: &dyn Db, file: FileText, config: FileConfig) -> SymbolUsageIndex {
     let tree = parsed_tree_root(db, file, config);
     symbol_usage_index_from_tree(db, &tree, &config.config(db).extensions)
 }
@@ -593,7 +604,6 @@ pub fn heading_outline(
     db: &dyn Db,
     file: FileText,
     config: FileConfig,
-    _path: PathBuf,
 ) -> Vec<HeadingOutlineEntry> {
     let tree = parsed_tree_root(db, file, config);
     tree.descendants()
@@ -984,9 +994,8 @@ pub fn citation_definition_index(
     db: &dyn Db,
     file: FileText,
     config: FileConfig,
-    path: PathBuf,
 ) -> CitationDefinitionIndex {
-    let metadata = metadata(db, file, config, path).clone();
+    let metadata = metadata(db, file, config).clone();
     let mut out = CitationDefinitionIndex::default();
 
     if let Some(parse) = metadata.bibliography_parse.as_ref() {
@@ -1028,7 +1037,7 @@ pub fn citation_definition_index(
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
 pub fn bibliography_index(db: &dyn Db, file: FileText, path: PathBuf) -> crate::bib::BibIndex {
-    crate::bib::load_bibliography_from_text(file.text(db), &path)
+    crate::bib::load_bibliography_from_text(file.content_or_empty(db), &path)
 }
 
 // includes resolution logic lives in crate::includes.
@@ -1056,12 +1065,10 @@ struct InternedDefinitionIndex<'db> {
 }
 
 #[salsa::tracked(returns(ref), lru = 64)]
-pub fn definition_index(
-    db: &dyn Db,
-    file: FileText,
-    config: FileConfig,
-    path: PathBuf,
-) -> DefinitionIndex {
+pub fn definition_index(db: &dyn Db, file: FileText, config: FileConfig) -> DefinitionIndex {
+    // The definitions' source path is the document's own path, resolved from its
+    // `FileText` identity (empty for an in-memory buffer) (audit §3.3 / G3).
+    let path = db.path_of(file).unwrap_or_default();
     let tree = parsed_tree_root(db, file, config);
     let mut index = InternedDefinitionIndex::default();
 
@@ -1646,17 +1653,19 @@ pub struct GraphDiagnosticEntry {
 pub struct GraphDiagnostic(pub GraphDiagnosticEntry);
 
 #[salsa::tracked(returns(ref), lru = 32)]
-pub fn project_graph(
-    db: &dyn Db,
-    root_file: FileText,
-    config: FileConfig,
-    root_path: PathBuf,
-) -> ProjectGraph {
-    // Depend on the cache generation so loading a previously-absent include
-    // (the `db.file_text` lookups in `visit_document`/below) re-runs this query
-    // with the freshly-loaded contents (audit §3.2).
-    let _ = db.cache_generation().generation(db);
+pub fn project_graph(db: &dyn Db, root_file: FileText, config: FileConfig) -> ProjectGraph {
+    // Depend on the set of interned files so that the writer interning a
+    // newly-referenced include/sibling (adding its id to the set) re-runs this
+    // query and lets it resolve the new path. Per-file *content* arrival is
+    // tracked separately, via each file's `FileText` value read below (audit
+    // §3.3 / G3).
+    let _ = db.file_set().ids(db);
     let mut graph = InternedProjectGraph::default();
+    // A pathless in-memory buffer has no project root and no resolvable
+    // includes, so its project graph is empty (audit §3.3 / G3).
+    let Some(root_path) = db.path_of(root_file) else {
+        return graph.into_owned(db);
+    };
     let mut visited = HashSet::new();
     let mut definitions = crate::includes::DefinitionIndex::default();
     visit_document(
@@ -1684,7 +1693,14 @@ pub fn project_graph(
             // the `file_text` check). Without this, an unloaded sibling would
             // vanish from the graph and never get discovered (audit §3.2).
             graph.add_document(db, &path);
-            if let Some(include_file) = db.file_text(path.clone()) {
+            // Resolve the sibling to its input and read its content (taking a
+            // per-file dependency). Recurse only when it is actually loaded; an
+            // interned-but-absent file (`None`) records the dependency so a
+            // later load re-runs this query and recurses then.
+            let loaded = db
+                .file_text(path.clone())
+                .filter(|include_file| include_file.text(db).is_some());
+            if let Some(include_file) = loaded {
                 visit_document(
                     db,
                     &include_file,
@@ -1713,7 +1729,7 @@ fn visit_document<'db>(
         return;
     }
     graph.add_document(db, path);
-    let text = file.text(db);
+    let text = file.content_or_empty(db);
     let tree = parsed_tree_root(db, *file, config);
     let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
     let project_root = crate::includes::find_project_roots(path).quarto_first();
@@ -1730,7 +1746,13 @@ fn visit_document<'db>(
         if include.path == *path {
             continue;
         }
-        if let Some(include_file) = db.file_text(include.path.clone()) {
+        // Read the include's content (per-file dependency); recurse only when
+        // loaded. An interned-but-absent include records the dependency so a
+        // later load re-runs `project_graph` and recurses then (audit §3.3).
+        let loaded = db
+            .file_text(include.path.clone())
+            .filter(|include_file| include_file.text(db).is_some());
+        if let Some(include_file) = loaded {
             visit_document(
                 db,
                 &include_file,
@@ -1787,40 +1809,235 @@ pub trait Db: salsa::Database {
     /// writer's responsibility (`crate::lsp::documents::load_project_files`).
     fn file_text(&self, path: PathBuf) -> Option<FileText>;
 
-    /// The shared [`CacheGeneration`] input. Path-resolving queries read its
-    /// `generation` to take a dependency on "what the writer has loaded".
-    fn cache_generation(&self) -> CacheGeneration;
+    /// The immutable backing path for a document's [`FileText`], or `None` for
+    /// an in-memory buffer. Path-keyed queries resolve their document path this
+    /// way instead of taking a `PathBuf` parameter, so `PathBuf` stops leaking
+    /// into analysis and the `<memory>` sentinel is retired (audit §3.3 / G3).
+    fn path_of(&self, file: FileText) -> Option<PathBuf>;
+
+    /// The shared [`FileSet`] input. `project_graph` reads it to depend on the
+    /// set of interned files; the writer adds ids as it discovers references.
+    fn file_set(&self) -> FileSet;
+}
+
+/// Opaque, process-stable identity for a file (mirrors rust-analyzer's
+/// `vfs::FileId`). A plain newtype --- not a salsa interned struct --- because
+/// the LSP boundary must convert URI -> `FileId` synchronously on the main
+/// thread, outside any salsa query. Intra-query path interning still goes
+/// through [`InternedPath`].
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
+pub struct FileId(u32);
+
+/// The interior of [`Vfs`]: the path<->id bimap plus the id->input table. Only
+/// the writer mutates it (`alloc_id`/`insert`/`remove`); cloned worker handles
+/// share the same `Arc<Mutex<_>>` and only read.
+#[derive(Default)]
+struct VfsInner {
+    next_id: u32,
+    path_to_id: HashMap<PathBuf, FileId>,
+    /// Backing path for each id; `None` for an in-memory buffer with no file on
+    /// disk (retires the `<memory>` sentinel).
+    id_to_path: HashMap<FileId, Option<PathBuf>>,
+    id_to_input: HashMap<FileId, FileText>,
+    /// Reverse map: a [`FileText`] input back to its (immutable) backing path.
+    /// Lets path-keyed queries resolve a document's path from its `FileText`
+    /// identity rather than threading a `PathBuf` parameter (audit §3.3 / G3).
+    /// `None` for an in-memory buffer.
+    input_to_path: HashMap<FileText, Option<PathBuf>>,
+}
+
+/// A `vfs`-style path<->id map that subsumes the former `file_cache`
+/// (audit §3.3 / G3). Owned by [`SalsaDb`] behind an `Arc<Mutex<_>>` so cloned
+/// worker handles observe the same table.
+#[derive(Clone, Default)]
+struct Vfs {
+    inner: Arc<Mutex<VfsInner>>,
+}
+
+impl Vfs {
+    fn lock(&self) -> std::sync::MutexGuard<'_, VfsInner> {
+        self.inner.lock().expect("vfs lock poisoned")
+    }
+
+    fn id_for_path(&self, path: &Path) -> Option<FileId> {
+        self.lock().path_to_id.get(path).copied()
+    }
+
+    fn input_for_id(&self, id: FileId) -> Option<FileText> {
+        self.lock().id_to_input.get(&id).copied()
+    }
+
+    fn input_for_path(&self, path: &Path) -> Option<FileText> {
+        let inner = self.lock();
+        let id = inner.path_to_id.get(path)?;
+        inner.id_to_input.get(id).copied()
+    }
+
+    fn path_for_id(&self, id: FileId) -> Option<PathBuf> {
+        self.lock().id_to_path.get(&id).cloned().flatten()
+    }
+
+    /// The immutable backing path for a [`FileText`] input, or `None` for an
+    /// in-memory buffer / unregistered input.
+    fn path_for_input(&self, input: FileText) -> Option<PathBuf> {
+        self.lock().input_to_path.get(&input).cloned().flatten()
+    }
+
+    fn cached_paths(&self) -> Vec<PathBuf> {
+        self.lock().path_to_id.keys().cloned().collect()
+    }
+
+    /// Allocate a fresh id. Called only by the single writer.
+    fn alloc_id(&self) -> FileId {
+        let mut inner = self.lock();
+        let id = FileId(inner.next_id);
+        inner.next_id += 1;
+        id
+    }
+
+    /// Register an id's path and salsa input. Called only by the writer.
+    fn insert(&self, id: FileId, path: Option<PathBuf>, input: FileText) {
+        let mut inner = self.lock();
+        if let Some(path) = path.clone() {
+            inner.path_to_id.insert(path, id);
+        }
+        inner.id_to_path.insert(id, path.clone());
+        inner.id_to_input.insert(id, input);
+        inner.input_to_path.insert(input, path);
+    }
+
+    /// Forget a path's id/input mapping. Returns the removed [`FileId`], if any.
+    fn remove_path(&self, path: &Path) -> Option<FileId> {
+        let mut inner = self.lock();
+        let id = inner.path_to_id.remove(path)?;
+        inner.id_to_path.remove(&id);
+        if let Some(input) = inner.id_to_input.remove(&id) {
+            inner.input_to_path.remove(&input);
+        }
+        Some(id)
+    }
 }
 
 #[salsa::db]
 #[derive(Clone)]
 pub struct SalsaDb {
     storage: salsa::Storage<Self>,
-    file_cache: Arc<Mutex<HashMap<PathBuf, FileText>>>,
-    /// The single [`CacheGeneration`] input, shared across cloned handles.
-    /// Created once at construction (below) on the writer, so worker reads
-    /// only ever observe it, never mint it.
-    cache_generation: Arc<OnceLock<CacheGeneration>>,
+    vfs: Vfs,
+    /// The single [`FileSet`] input, shared across cloned handles. Created once
+    /// at construction (below) on the writer, so worker reads only ever observe
+    /// it, never mint it.
+    file_set: Arc<OnceLock<FileSet>>,
 }
 
 impl Default for SalsaDb {
     fn default() -> Self {
         let db = Self {
             storage: salsa::Storage::default(),
-            file_cache: Arc::new(Mutex::new(HashMap::new())),
-            cache_generation: Arc::new(OnceLock::new()),
+            vfs: Vfs::default(),
+            file_set: Arc::new(OnceLock::new()),
         };
         // Mint the input now (on the constructing thread) so the `OnceLock` is
         // populated before any cloned worker handle reads it.
-        db.cache_generation();
+        db.file_set();
         db
     }
 }
 
 impl SalsaDb {
     pub fn file_text_if_cached(&self, path: &Path) -> Option<FileText> {
-        let cache = self.file_cache.lock().expect("file cache lock poisoned");
-        cache.get(path).copied()
+        self.vfs.input_for_path(path)
+    }
+
+    /// Register a brand-new file: allocate a [`FileId`], store its input, and
+    /// add the id to the [`FileSet`] so `project_graph` (which depends on the
+    /// set) re-runs and can resolve the new path. Writer-only.
+    fn register_new(&mut self, path: Option<PathBuf>, input: FileText) -> FileId {
+        let id = self.vfs.alloc_id();
+        self.vfs.insert(id, path, input);
+        self.add_file_to_set(id);
+        id
+    }
+
+    /// Add `id` to the shared [`FileSet`] input (no-op if already present). The
+    /// set is structural-only, so it carries `MEDIUM` durability: a `LOW`
+    /// per-keystroke edit never rewrites it.
+    fn add_file_to_set(&mut self, id: FileId) {
+        let set = self.file_set();
+        let next = {
+            let current = set.ids(self);
+            if current.contains(&id) {
+                return;
+            }
+            let mut next = (**current).clone();
+            next.insert(id);
+            next
+        };
+        set.set_ids(self)
+            .with_durability(Durability::MEDIUM)
+            .to(Arc::new(next));
+    }
+
+    /// Return the [`FileId`] for `path`, minting it on first reference. A freshly
+    /// minted id gets an *absent* (`None`) text input and is added to the
+    /// [`FileSet`]; the writer fills in contents later via
+    /// [`SalsaDb::load_file_from_disk`] or a `set_text` update. Pass `None` for
+    /// an in-memory buffer with no backing file. Writer-only.
+    pub fn intern_file(&mut self, path: Option<PathBuf>) -> FileId {
+        if let Some(existing) = path.as_deref().and_then(|p| self.vfs.id_for_path(p)) {
+            return existing;
+        }
+        let input = FileText::new(self, None);
+        self.register_new(path, input)
+    }
+
+    /// Register an in-memory buffer (no backing path) with initial `text`,
+    /// returning its [`FileText`] input. The buffer gets a real [`FileId`] with
+    /// `path_of == None`, so it never collides with another untitled buffer and
+    /// never needs the `<memory>` sentinel (audit §3.3 / G3). Writer-only.
+    pub fn create_in_memory_file(&mut self, text: String, durability: Durability) -> FileText {
+        let id = self.intern_file(None);
+        let input = self
+            .vfs
+            .input_for_id(id)
+            .expect("input exists for a just-interned id");
+        input
+            .set_text(self)
+            .with_durability(durability)
+            .to(Some(Arc::from(text)));
+        input
+    }
+
+    pub fn load_file_from_disk(&mut self, id: FileId) -> bool {
+        self.load_file_from_disk_with_durability(id, Durability::HIGH)
+    }
+
+    /// Read `id`'s backing file from disk into its input. Returns `true` only
+    /// when this newly populates an absent (`None`) input (`None` -> `Some`);
+    /// `false` if `id` has no backing path, is already loaded, or the read
+    /// fails. A missing file therefore stays `None`, keeping "absent"
+    /// distinguishable from "present but empty". Writer-only.
+    pub fn load_file_from_disk_with_durability(
+        &mut self,
+        id: FileId,
+        durability: Durability,
+    ) -> bool {
+        let Some(path) = self.vfs.path_for_id(id) else {
+            return false;
+        };
+        let Some(input) = self.vfs.input_for_id(id) else {
+            return false;
+        };
+        if input.text(self).is_some() {
+            return false;
+        }
+        let Ok(contents) = std::fs::read_to_string(&path) else {
+            return false;
+        };
+        input
+            .set_text(self)
+            .with_durability(durability)
+            .to(Some(Arc::from(contents)));
+        true
     }
 
     pub fn update_file_text(&mut self, path: PathBuf, text: String) -> FileText {
@@ -1833,18 +2050,18 @@ impl SalsaDb {
         text: String,
         durability: Durability,
     ) -> FileText {
-        let existing = {
-            let cache = self.file_cache.lock().expect("file cache lock poisoned");
-            cache.get(&path).copied()
-        };
-        if let Some(file) = existing {
-            file.set_text(self).with_durability(durability).to(text);
+        let text: Arc<str> = Arc::from(text);
+        if let Some(file) = self.vfs.input_for_path(&path) {
+            file.set_text(self)
+                .with_durability(durability)
+                .to(Some(text));
             return file;
         }
-        let file = FileText::new(self, text.clone());
-        file.set_text(self).with_durability(durability).to(text);
-        let mut cache = self.file_cache.lock().expect("file cache lock poisoned");
-        cache.insert(path, file);
+        let file = FileText::new(self, Some(text.clone()));
+        file.set_text(self)
+            .with_durability(durability)
+            .to(Some(text));
+        self.register_new(Some(path), file);
         file
     }
 
@@ -1858,14 +2075,12 @@ impl SalsaDb {
         text: String,
         durability: Durability,
     ) -> bool {
-        let file = {
-            let cache = self.file_cache.lock().expect("file cache lock poisoned");
-            cache.get(path).copied()
-        };
-        let Some(file) = file else {
+        let Some(file) = self.vfs.input_for_path(path) else {
             return false;
         };
-        file.set_text(self).with_durability(durability).to(text);
+        file.set_text(self)
+            .with_durability(durability)
+            .to(Some(Arc::from(text)));
         true
     }
 
@@ -1878,39 +2093,48 @@ impl SalsaDb {
         path: PathBuf,
         durability: Durability,
     ) -> bool {
-        {
-            let cache = self.file_cache.lock().expect("file cache lock poisoned");
-            if cache.contains_key(&path) {
-                return true;
-            }
+        if self.vfs.input_for_path(&path).is_some() {
+            return true;
         }
         let Ok(contents) = std::fs::read_to_string(&path) else {
             return false;
         };
-        let file = FileText::new(self, contents.clone());
-        file.set_text(self).with_durability(durability).to(contents);
-        let mut cache = self.file_cache.lock().expect("file cache lock poisoned");
-        cache.insert(path, file);
+        let contents: Arc<str> = Arc::from(contents);
+        let file = FileText::new(self, Some(contents.clone()));
+        file.set_text(self)
+            .with_durability(durability)
+            .to(Some(contents));
+        self.register_new(Some(path), file);
         true
     }
 
     pub fn cached_file_paths(&self) -> Vec<PathBuf> {
-        let cache = self.file_cache.lock().expect("file cache lock poisoned");
-        cache.keys().cloned().collect()
+        self.vfs.cached_paths()
     }
 
     pub fn evict_file_text(&mut self, path: &Path) -> bool {
-        let mut cache = self.file_cache.lock().expect("file cache lock poisoned");
-        cache.remove(path).is_some()
+        let Some(id) = self.vfs.remove_path(path) else {
+            return false;
+        };
+        self.remove_file_from_set(id);
+        true
     }
 
-    /// Bump the cache generation so path-resolving queries (`project_graph`,
-    /// `metadata`) that observed an absent file are invalidated and re-run with
-    /// the newly-loaded contents. Called by the writer after loading files.
-    pub fn bump_cache_generation(&mut self) {
-        let counter = self.cache_generation();
-        let next = counter.generation(self).wrapping_add(1);
-        counter.set_generation(self).to(next);
+    /// Drop `id` from the shared [`FileSet`] input (no-op if absent).
+    fn remove_file_from_set(&mut self, id: FileId) {
+        let set = self.file_set();
+        let next = {
+            let current = set.ids(self);
+            if !current.contains(&id) {
+                return;
+            }
+            let mut next = (**current).clone();
+            next.remove(&id);
+            next
+        };
+        set.set_ids(self)
+            .with_durability(Durability::MEDIUM)
+            .to(Arc::new(next));
     }
 
     /// Discover and load every file `project_graph` references for `root_file`,
@@ -1919,12 +2143,17 @@ impl SalsaDb {
     /// `Db::file_text` is a pure lookup (audit §3.2), so a query only sees files
     /// already loaded. Each pass runs `project_graph` (which records the root,
     /// its included/sibling documents, and bibliography/metadata edges even when
-    /// a file is unloaded), loads any referenced-but-uncached path from disk,
-    /// then bumps the cache generation so the next `project_graph` re-runs and
-    /// recurses into the freshly-loaded files (revealing their own transitive
-    /// references). Terminates once a pass loads nothing new: the referenced set
-    /// is the finite transitive closure of `root_path`, each pass only adds to
-    /// the cache, and a file missing on disk stays uncached without retrying.
+    /// a file is unloaded), then for every referenced path **interns** it (which
+    /// mints a `None` input and adds its id to the [`FileSet`] on first
+    /// reference --- re-running `project_graph`) and **loads** it from disk. A
+    /// fresh `None`->`Some` load flips that file's per-file dependency, again
+    /// re-running `project_graph` so it recurses into the freshly-loaded file's
+    /// own references. Both convergence channels live inside salsa's dependency
+    /// graph; no `CacheGeneration` counter is needed (audit §3.3 / G3).
+    ///
+    /// Terminates once a pass loads no new content: the referenced set is the
+    /// finite transitive closure of `root_path`, each pass only adds inputs, and
+    /// a file missing on disk stays `None` (interned once, not retried).
     ///
     /// Returns the final tracked path set (the caller uses it for retention).
     pub fn load_referenced_files(
@@ -1935,7 +2164,7 @@ impl SalsaDb {
     ) -> HashSet<PathBuf> {
         loop {
             let tracked = {
-                let graph = project_graph(self, root_file, config, root_path.clone());
+                let graph = project_graph(self, root_file, config);
                 let mut tracked = HashSet::new();
                 tracked.insert(root_path.clone());
                 for document in graph.documents() {
@@ -1946,24 +2175,16 @@ impl SalsaDb {
                 }
                 tracked
             };
-            let mut loaded_new = false;
+            let mut progress = false;
             for path in &tracked {
-                if path.as_os_str() == "<memory>" {
-                    continue;
-                }
-                if self.file_text_if_cached(path).is_some() {
-                    continue;
-                }
-                // Returns true only when it newly loads a file; a missing-on-disk
-                // path returns false and is left uncached.
-                if self.ensure_file_text_cached(path.clone()) {
-                    loaded_new = true;
+                let id = self.intern_file(Some(path.clone()));
+                if self.load_file_from_disk(id) {
+                    progress = true;
                 }
             }
-            if !loaded_new {
+            if !progress {
                 return tracked;
             }
-            self.bump_cache_generation();
         }
     }
 }
@@ -2007,12 +2228,16 @@ impl Db for SalsaDb {
         self.file_text_if_cached(&path)
     }
 
-    fn cache_generation(&self) -> CacheGeneration {
+    fn path_of(&self, file: FileText) -> Option<PathBuf> {
+        self.vfs.path_for_input(file)
+    }
+
+    fn file_set(&self) -> FileSet {
         // Created once on the writer (in `Default`); cloned worker handles
         // share the same `OnceLock` and only ever read it back.
         *self
-            .cache_generation
-            .get_or_init(|| CacheGeneration::new(self, 0))
+            .file_set
+            .get_or_init(|| FileSet::new(self, Arc::new(HashSet::new())))
     }
 }
 
@@ -2032,12 +2257,32 @@ mod tests {
     #[salsa::tracked]
     fn stable_file_len(db: &dyn Db, file: FileText) -> usize {
         STABLE_QUERY_RUNS.fetch_add(1, Ordering::Relaxed);
-        file.text(db).len()
+        file.content_or_empty(db).len()
     }
 
     #[salsa::tracked]
     fn volatile_probe(db: &dyn Db, volatile: VolatileInput) -> u32 {
         volatile.value(db)
+    }
+
+    static PROBE_WITH_SET_RUNS: AtomicUsize = AtomicUsize::new(0);
+    static PROBE_WITHOUT_SET_RUNS: AtomicUsize = AtomicUsize::new(0);
+
+    /// Mirrors `project_graph`'s dependency shape: reads the [`FileSet`] (the
+    /// structural signal) *and* the file's content.
+    #[salsa::tracked]
+    fn probe_with_file_set(db: &dyn Db, file: FileText) -> usize {
+        PROBE_WITH_SET_RUNS.fetch_add(1, Ordering::Relaxed);
+        let _ = db.file_set().ids(db);
+        file.content_or_empty(db).len()
+    }
+
+    /// Mirrors `metadata`'s dependency shape: reads only the file's content, no
+    /// `FileSet` (its bibliography dependency is a separate per-file input).
+    #[salsa::tracked]
+    fn probe_without_file_set(db: &dyn Db, file: FileText) -> usize {
+        PROBE_WITHOUT_SET_RUNS.fetch_add(1, Ordering::Relaxed);
+        file.content_or_empty(db).len()
     }
 
     fn unique_temp_path(stem: &str, suffix: &str) -> PathBuf {
@@ -2082,7 +2327,7 @@ mod tests {
         };
         cfg.extensions.quarto_crossrefs = true;
         let config = FileConfig::new(&db, cfg);
-        let index = symbol_usage_index(&db, file, config, path);
+        let index = symbol_usage_index(&db, file, config);
 
         assert_eq!(index.crossref_usages("fig-plot").map(|v| v.len()), Some(1));
         assert_eq!(
@@ -2376,7 +2621,7 @@ mod tests {
         let file = db.update_file_text(path.clone(), "# Top\n\n## Child\n".to_string());
         let config = FileConfig::new(&db, crate::Config::default());
 
-        let outline = heading_outline(&db, file, config, path).clone();
+        let outline = heading_outline(&db, file, config).clone();
 
         assert_eq!(outline.len(), 2);
         assert_eq!(outline[0].title, "Top");
@@ -2413,7 +2658,7 @@ mod tests {
         );
         let config = FileConfig::new(&db, crate::Config::default());
 
-        let outline = heading_outline(&db, file, config, path).clone();
+        let outline = heading_outline(&db, file, config).clone();
         let levels: Vec<usize> = outline.iter().map(|entry| entry.level).collect();
         let titles: Vec<String> = outline.iter().map(|entry| entry.title.clone()).collect();
 
@@ -2433,7 +2678,7 @@ mod tests {
         let config = FileConfig::new(&db, cfg);
 
         let file = db.update_file_text(path.clone(), "---\ntitle: [\n---\n\n# Test\n".to_string());
-        let first = yaml_metadata_parse_result(&db, file, config, path.clone()).clone();
+        let first = yaml_metadata_parse_result(&db, file, config).clone();
         assert!(first.is_err(), "expected initial YAML parse failure");
 
         let fixed = crate::format(
@@ -2442,7 +2687,7 @@ mod tests {
             None,
         );
         let file = db.update_file_text(path.clone(), fixed);
-        let second = yaml_metadata_parse_result(&db, file, config, path).clone();
+        let second = yaml_metadata_parse_result(&db, file, config).clone();
         assert!(second.is_ok(), "expected YAML parse success after update");
     }
 
@@ -2541,13 +2786,13 @@ mod tests {
 
         let file = db.update_file_text(path.clone(), "# Test\n".to_string());
         assert!(
-            *yaml_frontmatter_is_valid(&db, file, config, path.clone()),
+            *yaml_frontmatter_is_valid(&db, file, config),
             "no frontmatter should be treated as valid for project metadata flows"
         );
 
         let file = db.update_file_text(path.clone(), "---\nbibliography: [\n---\n".to_string());
         assert!(
-            !*yaml_frontmatter_is_valid(&db, file, config, path.clone()),
+            !*yaml_frontmatter_is_valid(&db, file, config),
             "invalid frontmatter YAML should be invalid"
         );
 
@@ -2556,7 +2801,7 @@ mod tests {
             "---\nbibliography: refs.bib\n---\n".to_string(),
         );
         assert!(
-            *yaml_frontmatter_is_valid(&db, file, config, path),
+            *yaml_frontmatter_is_valid(&db, file, config),
             "valid frontmatter YAML should be valid"
         );
     }
@@ -2585,7 +2830,7 @@ mod tests {
         );
         let file = db.update_file_text(doc_path.clone(), "See [@known].\n".to_string());
 
-        let plan = built_in_lint_plan(&db, file, config, doc_path).clone();
+        let plan = built_in_lint_plan(&db, file, config).clone();
         assert!(
             plan.diagnostics
                 .iter()
@@ -2606,7 +2851,7 @@ mod tests {
         let path = PathBuf::from("/tmp/lint_yaml_summary_error.qmd");
         let file = db.update_file_text(path.clone(), "---\ntitle: [\n---\n".to_string());
 
-        let plan = built_in_lint_plan(&db, file, config, path).clone();
+        let plan = built_in_lint_plan(&db, file, config).clone();
         assert!(
             plan.diagnostics
                 .iter()
@@ -2628,7 +2873,7 @@ mod tests {
         let input = "```{r}\n#| echo: [\n1 + 1\n```\n".to_string();
         let file = db.update_file_text(path.clone(), input);
 
-        let plan = built_in_lint_plan(&db, file, config, path).clone();
+        let plan = built_in_lint_plan(&db, file, config).clone();
         assert!(
             plan.diagnostics.iter().any(|diagnostic| {
                 diagnostic.code == "yaml-parse-error"
@@ -2651,7 +2896,7 @@ mod tests {
         let input = "```{r}\n#| fig-subcap: - \"A\"\n#|   - \"B\"\n1 + 1\n```\n".to_string();
         let file = db.update_file_text(path.clone(), input);
 
-        let plan = built_in_lint_plan(&db, file, config, path).clone();
+        let plan = built_in_lint_plan(&db, file, config).clone();
         assert!(
             plan.diagnostics
                 .iter()
@@ -2722,6 +2967,44 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(stable_path);
+    }
+
+    /// The core G3 granularity win (audit §3.3): interning an unrelated sibling
+    /// (a `FileSet` change) re-runs queries that read the set --- like
+    /// `project_graph` --- but NOT per-file readers like `metadata`, whose
+    /// bibliography dependency is a per-file input rather than a global firewall.
+    /// Under the former global `CacheGeneration` counter, *both* would re-run.
+    #[test]
+    fn interning_a_sibling_reruns_file_set_readers_but_not_per_file_readers() {
+        let mut db = SalsaDb::default();
+        let file = db.update_file_text(PathBuf::from("/tmp/g3-granularity-a.md"), "a".to_string());
+
+        PROBE_WITH_SET_RUNS.store(0, Ordering::Relaxed);
+        PROBE_WITHOUT_SET_RUNS.store(0, Ordering::Relaxed);
+
+        // Prime both memos.
+        probe_with_file_set(&db, file);
+        probe_without_file_set(&db, file);
+        assert_eq!(PROBE_WITH_SET_RUNS.load(Ordering::Relaxed), 1);
+        assert_eq!(PROBE_WITHOUT_SET_RUNS.load(Ordering::Relaxed), 1);
+
+        // Intern an unrelated sibling: this adds an id to the `FileSet` but
+        // touches no existing file's content.
+        db.intern_file(Some(PathBuf::from("/tmp/g3-granularity-c.md")));
+
+        probe_with_file_set(&db, file);
+        probe_without_file_set(&db, file);
+
+        assert_eq!(
+            PROBE_WITH_SET_RUNS.load(Ordering::Relaxed),
+            2,
+            "a FileSet reader (project_graph-shaped) re-runs when a sibling is interned"
+        );
+        assert_eq!(
+            PROBE_WITHOUT_SET_RUNS.load(Ordering::Relaxed),
+            1,
+            "a per-file reader (metadata-shaped) is NOT re-run by an unrelated sibling load"
+        );
     }
 
     #[test]

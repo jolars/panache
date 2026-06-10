@@ -251,6 +251,44 @@ unchanged and remain tracked by [G3](#g3).
 
 ### 3.3 FileId / SourceRoot --- *promoted by G2: enables per-file invalidation* {#g3}
 
+::: callout-note
+## Adopted (core)
+
+A `FileId` newtype plus a `vfs`-style path↔id map (`src/salsa.rs`) subsumes the
+former `file_cache`. `file_text` is now a `#[salsa::input]` whose value is
+`Option<Arc<str>>` --- an *absent* (referenced-but-unloaded) file is the input
+set to `None`, so a query reading it takes a real per-file dependency on that
+file's presence, and absent (`None`) stays distinguishable from
+present-but-empty (`Some("")`) for the bibliography "failed to read" diagnostic.
+
+The global `CacheGeneration` counter is **deleted**. Discovery convergence now
+rides a `FileSet` salsa input (the set of interned ids): `project_graph` reads
+it, and the writer's `load_referenced_files` fixpoint interns each referenced
+path (adding its id to the set --- re-running `project_graph`) then loads it
+from disk (flipping `None`→`Some` --- re-running through the per-file
+dependency). Both channels live inside the dependency graph. The key granularity
+win: `metadata` reads no global firewall (its bibliography dependency is the
+per-file bib input), so a sibling load no longer invalidates unrelated
+documents' `metadata` memos.
+
+The `<memory>` sentinel is **retired**: the path-keyed tracked queries
+(`project_graph`, `metadata`, `built_in_lint_plan`, `definition_index`,
+`citation_definition_index`, `symbol_usage_index`, `heading_outline`, `yaml_*`)
+no longer take a `PathBuf`; they resolve the document path from the `FileText`
+identity via a VFS reverse map (`Db::path_of`). An in-memory buffer is a
+distinct `FileId` with `path_of == None` (fixing a latent collision where two
+untitled buffers shared one `"<memory>"` key); a pathless buffer yields an empty
+`project_graph`.
+
+**Deferred** (bullet 3 / bullet 4 below): grouping inputs into `SourceRoot`s as
+the durability unit (durability stays per-input --- HIGH for disk loads, MEDIUM
+for `FileSet`/config, LOW for open buffers), and folding the residual
+`find_project_documents` / `collect_includes` filesystem reads behind a VFS
+directory-listing input. The file watcher still bridges those residual fs reads,
+but via a targeted `intern_file` (re-running only `project_graph`) rather than
+the old global bump.
+:::
+
 - **rust-analyzer:** an opaque `FileId` plus a `vfs`; handlers convert URI →
   `FileId` at the boundary so paths never leak into analysis, and `SourceRoot`s
   are the unit durability is assigned to. Critically, `file_text` is an input

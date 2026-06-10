@@ -1623,9 +1623,8 @@ fn main() -> io::Result<()> {
                 let db = panache::salsa::SalsaDb::default();
                 let yaml_diags = panache::salsa::built_in_lint_plan(
                     &db,
-                    panache::salsa::FileText::new(&db, input.clone()),
+                    panache::salsa::FileText::from_str(&db, input.clone()),
                     panache::salsa::FileConfig::new(&db, cfg.clone()),
-                    stdin_path.to_path_buf(),
                 )
                 .diagnostics
                 .iter()
@@ -1961,8 +1960,12 @@ fn lint_documents_with_includes(
     // we determine the document participates in a project. For flat directories
     // of standalone files this avoids 1+ parse per file.
     let file_config = panache::salsa::FileConfig::new(&db, cfg.clone());
-    let root_file_text = panache::salsa::FileText::new(&db, root_input.to_string());
-    // `Db::file_text` is a pure lookup (audit §3.2): it no longer lazy-loads
+    // Register the root in the VFS (assigning it a FileId + FileSet entry) so the
+    // discovery loop's `intern_file(root_path)` resolves to this same input
+    // rather than minting a duplicate and re-reading the root from disk. The
+    // returned handle is reused below for cache hits across queries.
+    let root_file_text = db.update_file_text(root_path.clone(), root_input.to_string());
+    // `Db::file_text` is a pure lookup (audit §3.2/§3.3): it no longer lazy-loads
     // includes/bibliography from disk inside queries. Load the project's
     // referenced files onto the writer up front so `project_graph` and
     // `metadata` (cross-doc diagnostics, bibliography parse) see them.
@@ -2001,18 +2004,20 @@ fn lint_loaded_document_with_includes(
 
     // Reuse the root file's FileText handle (constructed in
     // lint_documents_with_includes) so the salsa cache hits across
-    // project_graph and built_in_lint_plan. For included files we mint a
-    // single fresh FileText and reuse it for both calls below.
-    let file_text =
-        file_text.unwrap_or_else(|| panache::salsa::FileText::new(db, input.to_string()));
+    // project_graph and built_in_lint_plan. For included files reuse the handle
+    // `load_referenced_files` already registered in the VFS, so the queries can
+    // resolve the document's path from its `FileText` identity (audit §3.3 / G3);
+    // mint a fresh (pathless) one only as a last resort.
+    let file_text = file_text
+        .or_else(|| db.file_text_if_cached(doc_path))
+        .unwrap_or_else(|| panache::salsa::FileText::from_str(db, input));
 
     // Source built-in diagnostics from the salsa-tracked plan rather than
     // running the rule registry a second time in the host. Salsa's plan
     // already covers built-in rules, frontmatter-yaml errors, and the metadata
     // pipeline; the host adds external linters (sync) and project-graph
     // diagnostics on top.
-    let plan =
-        panache::salsa::built_in_lint_plan(db, file_text, file_config, doc_path.clone()).clone();
+    let plan = panache::salsa::built_in_lint_plan(db, file_text, file_config).clone();
     let mut diagnostics = plan.diagnostics;
     if !plan.external_jobs.is_empty() {
         diagnostics.extend(run_external_lint_jobs_sync(&plan.external_jobs, input));
@@ -2038,7 +2043,7 @@ fn lint_loaded_document_with_includes(
     if roots.quarto.is_some() || roots.bookdown.is_some() || !resolution.includes.is_empty() {
         let graph_diags = panache::salsa::project_graph::accumulated::<
             panache::salsa::GraphDiagnostic,
-        >(db, file_text, file_config, doc_path.clone());
+        >(db, file_text, file_config);
         for entry in graph_diags {
             if entry.0.path == *doc_path {
                 diagnostics.push(entry.0.diagnostic.clone());

@@ -61,7 +61,7 @@ pub(crate) fn workspace_symbol(
     }
 
     for (uri, file, tree) in memory_states {
-        let content = file.text(snap.db()).clone();
+        let content = file.content_or_empty(snap.db()).to_string();
         memory_docs.push((uri, content, tree));
     }
 
@@ -80,8 +80,8 @@ pub(crate) fn workspace_symbol(
             continue;
         };
 
-        let content = file.text(snap.db()).clone();
-        let outline = crate::salsa::heading_outline(snap.db(), file, config, path).clone();
+        let content = file.content_or_empty(snap.db()).to_string();
+        let outline = crate::salsa::heading_outline(snap.db(), file, config).clone();
         symbols.extend(symbols_for_document(&uri, &content, &outline, &query));
     }
 
