@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0](https://github.com/jolars/panache/compare/panache-formatter-v0.10.0...panache-formatter-v0.11.0) (2026-06-10)
+
+### Features
+- **formatter:** enable wrap modes for folded yaml scalars ([`327f12c`](https://github.com/jolars/panache/commit/327f12cc8cc8f3d9ce8c48a8237c035811eda8a6))
+- **formatter:** wrap folded YAML scalars ([`b8dc1c0`](https://github.com/jolars/panache/commit/b8dc1c07497c0b6f010df58d1a302b775d7171c9))
+
+### Bug Fixes
+- **formatter:** don't indent multi-line YAML scalar ([`b9927fa`](https://github.com/jolars/panache/commit/b9927fa1c73e8e3696dcc7bc6e5d0d73f88afb31))
+- **formatter:** add span-aware grid table formatting ([`75e5b2e`](https://github.com/jolars/panache/commit/75e5b2e0a49f93e617f5bbf8474de6ce22cca014)), closes [#359](https://github.com/jolars/panache/issues/359)
+
+### Dependencies
+- updated crates/panache-parser to v0.16.0
+
 ## [0.10.0](https://github.com/jolars/panache/compare/panache-formatter-v0.9.0...panache-formatter-v0.10.0) (2026-06-07)
 
 ### Features

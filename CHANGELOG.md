@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.53.0](https://github.com/jolars/panache/compare/v2.52.0...v2.53.0) (2026-06-10)
+
+### Features
+- **formatter:** enable wrap modes for folded yaml scalars ([`327f12c`](https://github.com/jolars/panache/commit/327f12cc8cc8f3d9ce8c48a8237c035811eda8a6))
+- **formatter:** wrap folded YAML scalars ([`b8dc1c0`](https://github.com/jolars/panache/commit/b8dc1c07497c0b6f010df58d1a302b775d7171c9))
+- **parser:** condition YAML validation on consumer profiles ([`f77f153`](https://github.com/jolars/panache/commit/f77f153a7ad8d3339e31395f2b9b76535c01dff5))
+
+### Bug Fixes
+- **formatter:** add span-aware grid table formatting ([`75e5b2e`](https://github.com/jolars/panache/commit/75e5b2e0a49f93e617f5bbf8474de6ce22cca014)), closes [#359](https://github.com/jolars/panache/issues/359)
+- **parser:** report YAML required-simple-key errors ([`f8f804c`](https://github.com/jolars/panache/commit/f8f804c89aceabced19e6063932f4621882b3f61))
+- **lsp:** answer panicking request handlers with InternalError ([`c4dc85d`](https://github.com/jolars/panache/commit/c4dc85d7244b33c9af18354669e672cda8e6f2f2))
+- **formatter:** don't indent multi-line YAML scalar ([`b9927fa`](https://github.com/jolars/panache/commit/b9927fa1c73e8e3696dcc7bc6e5d0d73f88afb31))
+- **lsp:** adopt LogOutputChannel for vscode-languageclient 10 ([`ffd61cc`](https://github.com/jolars/panache/commit/ffd61cccaad08d418a06b4b06e30f0803b122c4c))
+
+### Performance Improvements
+- **lsp:** avoid reparse on formatting ([`95330af`](https://github.com/jolars/panache/commit/95330afd4599608d58901e604a2dc634456b04d0))
+- **lsp:** address cross-file leak and `project_graph` invalidation ([`bdf45f9`](https://github.com/jolars/panache/commit/bdf45f95c1994a30965d5ea0b1aeba711e59693d))
+- cache external formatter blocks ([`d6b81f9`](https://github.com/jolars/panache/commit/d6b81f98bcda6c95ee0d50a46d2dae5fd66abb64))
+- **cli:** use shared thread budget for format/lint of multiple files ([`83aa8ec`](https://github.com/jolars/panache/commit/83aa8ec79ebf27aa5daf3546d3f664944379f339))
+- **cli:** share one external-tool thread budget ([`91a61e0`](https://github.com/jolars/panache/commit/91a61e0b21ec76ae8c1dc1652a45a0e649101c98))
+- **linter:** run external linters across languages concurrently ([`02c1e38`](https://github.com/jolars/panache/commit/02c1e38ceb8f17f1334f4fb1b188bb775a01627f))
+
+### Dependencies
+- updated crates/panache-formatter to v0.11.0
+- updated crates/panache-parser to v0.16.0
+
 ## [2.52.0](https://github.com/jolars/panache/compare/v2.51.0...v2.52.0) (2026-06-07)
 
 This release comes with two major changes:

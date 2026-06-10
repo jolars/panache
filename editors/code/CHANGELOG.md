@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.46.0](https://github.com/jolars/panache/compare/panache-code-v2.45.0...panache-code-v2.46.0) (2026-06-10)
+
+### Bug Fixes
+- **lsp:** adopt LogOutputChannel for vscode-languageclient 10 ([`ffd61cc`](https://github.com/jolars/panache/commit/ffd61cccaad08d418a06b4b06e30f0803b122c4c))
+
+### Dependencies
+- updated panache to v2.53.0
+
 ## [2.45.0](https://github.com/jolars/panache/compare/panache-code-v2.44.0...panache-code-v2.45.0) (2026-06-07)
 
 ### Dependencies
