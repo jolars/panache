@@ -94,8 +94,18 @@ design plan is `~/.claude/plans/i-want-to-plan-foamy-pascal.md`.
   - *Commit 1 DONE*: parser tokenizes delimiters/punctuation (`( [` →
     `MATH_OPEN`, `) ]` → `MATH_CLOSE`, `, ;` → `MATH_PUNCT`; `| . /` stay text);
     formatter's `text_tail_class` replaced by kind-keyed `operators::delimiter_class`.
-    No behavior change. Remaining: the break-priority column + the line-breaking
-    walk over the structured CST.
+    No behavior change.
+  - *Commit 2 DONE*: `operators::break_priority` (Rel > Bin > 0) + new
+    `formatter/math/linebreak.rs`. Over-width display **free rows** break at
+    depth-0 relations (≥2), continuations align under the first relation; depth
+    tracked via open/close counter (`(`/`[`/`\left` vs `)`/`]`/`\right`), brace
+    groups opaque. `line_width` threaded onto `MathFormatOptions`. Idempotency:
+    `render.rs::split_logical_rows` joins soft newlines into one logical row
+    (only `\\` splits) — except a `%`-comment-terminating newline (significant,
+    or the next line is absorbed into the comment). **Scope (user-chosen):**
+    over-width only, relations only, align-under-relation, free rows only.
+    Remaining: binary-op breaking (needs seeded prev-class for isolation),
+    environment-body breaking, min-breaks-to-fit.
 - **Phase 7 — docs + stabilization** (`docs/guide/formatting.qmd`,
   `configuration.qmd`); consider flipping the gate per flavor (separate
   decision).

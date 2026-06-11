@@ -892,8 +892,34 @@ plus stays tight (`x = -y`, `f(-x)`). Command operators are spaced the same way
 (`a\cdot b` → `a \cdot b`, `x\leq y` → `x \leq y`). Macro contents are not
 rewritten (no `\frac` canonicalization, no auto-`&` insertion). Alignment uses
 **source character widths** (it tidies the source, it does not align rendered
-glyphs), and malformed math is left untouched. The option is unstable and may
-change without a major release --- see [Experimental
+glyphs), and malformed math is left untouched.
+
+A display equation (`$$…$$`) wider than `line-width` is broken at its top-level
+relations, with continuations aligned under the first relation:
+
+Input
+
+:   ```markdown
+    $$
+    A = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd
+    $$
+    ```
+
+Output
+
+:   ```markdown
+    $$
+    A = aaaaaaaaaa + bbbbbbbbbb
+      = cccccccccc + dddddddddd
+    $$
+    ```
+
+The break is source-cosmetic --- math ignores whitespace, so the rendered
+equation is unchanged. Relations break before binary operators (`+`, `\cdot`),
+which stay with their terms; operators inside `(…)`, `\left…\right`, or a `{…}`
+group (including `\frac{…}{…}` arguments) are never broken at. An equation with
+no top-level relation is left on one line even when it overflows. The option is
+unstable and may change without a major release --- see [Experimental
 Features](configuration.qmd#experimental-features).
 
 ## Links

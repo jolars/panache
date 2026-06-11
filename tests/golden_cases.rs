@@ -289,6 +289,7 @@ golden_test_cases!(
     inline_math,
     math_align_experimental,
     math_blockquote_experimental,
+    math_linebreak_experimental,
     math_operator_spacing_experimental,
     math_format_off_default,
     grid_table,

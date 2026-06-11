@@ -26,6 +26,7 @@
 use panache_parser::parser::math::{MathParseOptions, parse_math_report};
 use panache_parser::syntax::SyntaxNode;
 
+mod linebreak;
 pub mod operators;
 mod render;
 
@@ -51,6 +52,11 @@ pub struct MathFormatOptions {
     /// Flat per-line indent applied to non-environment `$$` content only
     /// (mirrors today's `math_indent`). Environment bodies ignore it.
     pub math_indent: usize,
+    /// Target line width (host `line-width`). Only the display free-row
+    /// line-breaker reads it: a free row wider than this is broken at its
+    /// highest-priority top-level operators. Inline and environment layout
+    /// ignore it.
+    pub line_width: usize,
     /// Recognize bookdown `(\#eq:label)` labels — must match the host's
     /// parse-time option so the re-parse reproduces the same token shape.
     pub bookdown_equation_labels: bool,
@@ -64,6 +70,7 @@ impl MathFormatOptions {
         Self {
             enabled: config.experimental_format_math,
             math_indent: config.math_indent,
+            line_width: config.line_width,
             bookdown_equation_labels: config.parser_extensions.bookdown_equation_references,
             context,
         }
@@ -137,6 +144,7 @@ mod tests {
         MathFormatOptions {
             enabled: true,
             math_indent: 0,
+            line_width: 80,
             bookdown_equation_labels: false,
             context,
         }
@@ -340,5 +348,58 @@ mod tests {
         let input = "E = mc^2";
         assert_eq!(fmt(input, MathContext::Display), "E = mc^2");
         assert_idempotent(input, MathContext::Display);
+    }
+
+    #[test]
+    fn display_breaks_overwidth_relation_chain() {
+        let narrow = MathFormatOptions {
+            line_width: 20,
+            ..opts(MathContext::Display)
+        };
+        let input = "A = bbbbbbbbbb = cccccccccc";
+        // First `=` stays; the second starts a continuation aligned under it.
+        let expected = "A = bbbbbbbbbb\n  = cccccccccc";
+        assert_eq!(format_math(input, &narrow), expected);
+        // Re-feeding the broken (multi-line) form recomputes the same layout.
+        let once = format_math(input, &narrow);
+        assert_eq!(format_math(&once, &narrow), once);
+    }
+
+    #[test]
+    fn display_leaves_fitting_chain_on_one_line() {
+        // The same content under a generous width is untouched (byte-identical
+        // to the pre-line-breaking behavior).
+        let wide = opts(MathContext::Display); // line_width 80
+        assert_eq!(
+            format_math("A = bbbbbbbbbb = cccccccccc", &wide),
+            "A = bbbbbbbbbb = cccccccccc"
+        );
+    }
+
+    #[test]
+    fn display_comment_terminating_newline_is_not_joined() {
+        // A `%` comment runs to EOL; the soft newline ending it must remain a row
+        // boundary, or the next line is absorbed into the comment (and lost from
+        // the rendered math). Regression for the logical-row re-join.
+        let wide = opts(MathContext::Display);
+        let input = "% leading comment\nx = 1";
+        assert_eq!(format_math(input, &wide), "% leading comment\nx = 1");
+        assert_idempotent(input, MathContext::Display);
+    }
+
+    #[test]
+    fn display_does_not_break_inside_delimiters_or_groups() {
+        let narrow = MathFormatOptions {
+            line_width: 12,
+            ..opts(MathContext::Display)
+        };
+        // A single over-width fraction with no top-level relation stays one line.
+        let frac = "\\frac{aaaaaaaa}{bbbbbbbb}";
+        assert_eq!(format_math(frac, &narrow), frac);
+        // A relation buried inside `\left(…\right)` is not a depth-0 break point.
+        let paren = "\\left( xxxx = yyyy \\right) + zzzz";
+        let once = format_math(paren, &narrow);
+        assert!(!once.contains('\n'), "should not break: {once:?}");
+        assert_eq!(format_math(&once, &narrow), once);
     }
 }

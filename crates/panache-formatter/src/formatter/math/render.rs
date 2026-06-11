@@ -10,7 +10,7 @@
 use rowan::NodeOrToken;
 
 use super::operators::{self, AtomClass};
-use super::{MathContext, MathFormatOptions};
+use super::{MathContext, MathFormatOptions, linebreak};
 use crate::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
 
 const INDENT: &str = "  ";
@@ -36,7 +36,7 @@ fn render_display(top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
 
     for el in top {
         if el.kind() == SyntaxKind::MATH_ENVIRONMENT {
-            flush_free_rows(&pending, &flat_indent, &mut lines);
+            flush_free_rows(&pending, &flat_indent, opts.line_width, &mut lines);
             pending.clear();
             if let Some(node) = el.as_node() {
                 lines.extend(render_environment_lines(node, 0, opts));
@@ -45,20 +45,39 @@ fn render_display(top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
             pending.push(el.clone());
         }
     }
-    flush_free_rows(&pending, &flat_indent, &mut lines);
+    flush_free_rows(&pending, &flat_indent, opts.line_width, &mut lines);
     lines.join("\n")
 }
 
-/// Free (non-environment) display content: one line per row, whitespace
-/// collapsed, never column-aligned (a bare `&` outside an environment is not a
-/// column separator).
-fn flush_free_rows(elems: &[SyntaxElement], indent: &str, lines: &mut Vec<String>) {
-    for row in split_rows(elems) {
+/// Free (non-environment) display content: one *logical* row per equation,
+/// whitespace collapsed, never column-aligned (a bare `&` outside an
+/// environment is not a column separator). A logical row is split only on a
+/// top-level hard break (`\\`); a soft newline is insignificant whitespace
+/// (math ignores it), so it is *not* a row boundary — this lets the line-breaker
+/// re-join its own continuations on a later pass and recompute the same layout
+/// (idempotency). Each logical row is then handed to [`linebreak::break_free_row`],
+/// which keeps it on one line unless it exceeds `line_width`.
+fn flush_free_rows(
+    elems: &[SyntaxElement],
+    indent: &str,
+    line_width: usize,
+    lines: &mut Vec<String>,
+) {
+    for row in split_logical_rows(elems) {
         if row.is_blank() {
             continue;
         }
-        let body = render_inline(&row.elems).trim().to_string();
-        lines.push(format!("{indent}{}", with_break(body, row.has_break)));
+        let physical = linebreak::break_free_row(&row.elems, line_width);
+        let last = physical.len() - 1;
+        for (i, content) in physical.into_iter().enumerate() {
+            // The trailing `\\` (if any) rides the final physical line.
+            let content = if i == last {
+                with_break(content, row.has_break)
+            } else {
+                content
+            };
+            lines.push(format!("{indent}{content}"));
+        }
     }
 }
 
@@ -285,6 +304,60 @@ impl Row {
     }
 }
 
+/// Split a flat element run into *logical* rows for free display content: only a
+/// top-level hard break (`\\`) ends a row. A soft newline stays *inside* the row
+/// as insignificant whitespace (the rendered equation is identical with or
+/// without it), so a multi-line author equation — or one the line-breaker split
+/// itself on a prior pass — collapses back to a single logical unit and is
+/// re-laid-out identically. Contrast [`split_rows`], which also breaks on soft
+/// newlines and is used for environment-body layout.
+///
+/// **Exception: a soft newline that terminates a `%` comment IS significant** —
+/// a comment runs to end-of-line, so joining past it would absorb the next
+/// line's content into the comment (and silently delete it from the rendered
+/// math). Such a newline ends the logical row. A `MATH_COMMENT` always runs up
+/// to the next newline, so it is the last content token before this newline;
+/// keeping the boundary leaves the comment alone on its line, matching the
+/// pre-line-breaking behavior.
+fn split_logical_rows(elems: &[SyntaxElement]) -> Vec<Row> {
+    let mut rows: Vec<Row> = Vec::new();
+    let mut cur: Vec<SyntaxElement> = Vec::new();
+    let mut cur_has_comment = false;
+    for el in elems {
+        match el.kind() {
+            SyntaxKind::MATH_LINE_BREAK => {
+                rows.push(Row {
+                    elems: std::mem::take(&mut cur),
+                    has_break: true,
+                });
+                cur_has_comment = false;
+            }
+            // A comment-terminating newline closes the row (drop the newline, as
+            // a soft break); any other soft newline is kept as in-row whitespace.
+            SyntaxKind::MATH_NEWLINE if cur_has_comment => {
+                rows.push(Row {
+                    elems: std::mem::take(&mut cur),
+                    has_break: false,
+                });
+                cur_has_comment = false;
+            }
+            kind => {
+                if kind == SyntaxKind::MATH_COMMENT {
+                    cur_has_comment = true;
+                }
+                cur.push(el.clone());
+            }
+        }
+    }
+    if !cur.is_empty() {
+        rows.push(Row {
+            elems: cur,
+            has_break: false,
+        });
+    }
+    rows
+}
+
 /// Split a flat element run into rows. A row ends at a top-level `\\` (hard
 /// break, recorded) or a top-level newline (soft break, dropped). Trailing
 /// content with no terminator is the final row.
@@ -345,7 +418,11 @@ fn is_layout_whitespace(el: &SyntaxElement) -> bool {
 /// operators are re-spaced precedence-aware (`a+b` → `a + b`, unary `-x` stays
 /// tight) per [`super::operators`]. Not trimmed — callers trim at the cell/row
 /// level so that group interiors (`\text{ a }`) keep their spacing.
-fn render_inline(elems: &[SyntaxElement]) -> String {
+///
+/// `pub(super)` so the line-breaker ([`linebreak`]) can render each broken
+/// segment through the same single-line path, guaranteeing the segments re-space
+/// exactly as the unbroken row would.
+pub(super) fn render_inline(elems: &[SyntaxElement]) -> String {
     let toks = flatten_tokens(elems);
     collapse_spaces(&space_operators(&toks))
 }

@@ -63,6 +63,53 @@ fn math_no_wrap() {
     similar_asserts::assert_eq!(output, input);
 }
 
+/// Config like [`math_config`] but with an explicit `line-width` for the
+/// experimental display line-breaker.
+fn math_config_width(format_math: bool, width: usize) -> Config {
+    Config {
+        line_width: width,
+        ..math_config(format_math)
+    }
+}
+
+#[test]
+fn experimental_format_math_breaks_overwidth_display_chain() {
+    let cfg = math_config_width(true, 30);
+    let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd\n$$\n";
+    // Breaks at the second (top-level) relation; the continuation aligns under
+    // the first `=`. The `+` sub-terms stay put (binary outranked by relations).
+    let expected = "$$\nA = aaaaaaaaaa + bbbbbbbbbb\n  = cccccccccc + dddddddddd\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    // Idempotent: the already-broken multi-line form re-joins and re-breaks
+    // to the identical layout.
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn experimental_format_math_leaves_fitting_display_untouched() {
+    // The same equation under the default 80-col width is not broken.
+    let cfg = math_config(true);
+    let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, input);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn experimental_format_math_does_not_break_overwidth_fraction() {
+    // No top-level relation ⇒ nothing to break against; the over-width fraction
+    // stays on one line (like an unbreakable long word in prose reflow).
+    let cfg = math_config_width(true, 12);
+    let input = "$$\n\\frac{aaaaaaaa}{bbbbbbbb}\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, input);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
 #[test]
 fn display_math_with_followup_text_is_idempotent_in_rmarkdown() {
     let flavor = Flavor::RMarkdown;

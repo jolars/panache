@@ -43,7 +43,8 @@ still-relevant trap into Persistent traps. Keep it short.
   attachment, known-command argument grouping — orthogonal to operators.)
   **That module now exists** (Phase 5):
   `crates/panache-formatter/src/formatter/math/operators.rs`, `pub` for LSP
-  reuse; break-priority column still TODO (Phase 6).
+  reuse; break-priority column landed (Phase 6 commit 2:
+  `operators::break_priority`, Rel > Bin > 0).
 - **Splitting a `MATH_OPERATOR` run: rel chars merge, sign chars split.** A run
   of adjacent operator chars is NOT one atom. Adjacent relation chars (`= < >`)
   merge (`<=`), but each sign char (`+ - *`) is its own atom so it can be unary —
@@ -67,48 +68,54 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Phase 6 commit 1 — tokenize delimiters/punctuation (parser) + delete
-`text_tail_class` (formatter).** *DONE* (not yet committed). The one re-lexing
-smell is gone: the formatter no longer peeks at a `MATH_TEXT` tail to recover a
-`(`/`,` class.
+**Phase 6 commit 2 — semantic line-breaking for over-width display free rows
+(formatter).** *DONE* (not yet committed). The deferred break-priority column +
+the break walk landed; user-chosen scope: **over-width only, relations only,
+align-under-relation, display free rows only**.
 
-- **Parser** (`parser/math.rs`): new `is_delimiter` helper + dispatch arms split
-  `( [` → `MATH_OPEN`, `) ]` → `MATH_CLOSE`, `, ;` → `MATH_PUNCT` (one token per
-  char). The ambiguous `| . /` deliberately stay `MATH_TEXT`. `is_special` gained
-  them so they bound text runs; `parse_text` lost its bookdown-`(` special case
-  (a `(` is now always a boundary, so the equation-label check still sees every
-  `(`). Three new `SyntaxKind`s after `MATH_OPERATOR`. New unit tests
-  (`delimiters_and_punctuation_split_atom_runs`, reworked `plain_text_*` /
-  `plain_parens_*`).
-- **Losslessness**: added the three kinds to `is_math_content_token`
-  (`syntax/math.rs`) — the critical whitelist that keeps `math_content_text` (and
-  thus the pandoc-ast projector + format roundtrip) lossless.
-- **Formatter**: `operators::text_tail_class` replaced by
-  `pub fn delimiter_class(kind) -> Option<AtomClass>` (kind-keyed, not char-keyed
-  — no duplication of the parser's char→kind grouping). `render.rs::atom_prev_class`
-  delegates to it; `MATH_TEXT` is now unconditionally `Ord`. New tokens hit the
-  existing `_ => Plain` arm in `space_operators`, so spacing is **byte-identical**.
-- **Tier-3 fixture**: `char_class` now parses the delimiter char and maps the
-  resulting kind through `delimiter_class` (validates the *full* parser→formatter
-  path + the pulldown oracle, not a standalone char fn). tsv/README comments
-  updated.
+- **`operators.rs`**: added `pub fn break_priority(AtomClass) -> u8` (Rel=2 >
+  Bin=1 > else 0; a coerced unary is `Ord`→0). The only `operators.rs` change.
+- **`linebreak.rs`** (NEW): `break_free_row(elems, line_width) -> Vec<String>`.
+  Renders the logical row inline once (reuse `render::render_inline`, now
+  `pub(super)`); if `<= line_width` returns it verbatim (byte-identical to old).
+  Else `relation_break_indices` walks **top-level elements** tracking an
+  open/close **depth counter** (`MATH_OPEN`/`MATH_CLOSE` + `\left`/`\right` cmds;
+  brace groups are nodes, never descended) and records depth-0 relation atom
+  *element indices* (operator-run atoms via `split_operator_atoms`/`classify_operator`,
+  plus command relations via `command_class==Rel`). Needs ≥2 relations: first
+  stays on line 0, each later one starts a continuation rendered **in isolation**
+  (safe — relations never coerce), indented to align under the first relation
+  (`align_col = char_width(prefix)+1`, or 0 if no prefix).
+- **`render.rs`**: `flush_free_rows` now uses **`split_logical_rows`** (soft
+  newlines are in-row whitespace, NOT row boundaries — only `\\` splits) so the
+  breaker's own continuations re-join and re-break identically next pass
+  (idempotency keystone). **Comment trap fixed**: a `MATH_NEWLINE` that
+  terminates a `%` comment IS significant (else the next line is absorbed into
+  the comment and deleted) → `split_logical_rows` closes the row when `cur` holds
+  a comment. (Caught by the `pulldown-latex` MathML oracle — `comments/comment_line.tex`
+  went `<math>x=1</math>` → empty. Real meaning-safety bug, now regression-tested.)
+- `line_width` threaded onto `MathFormatOptions` (+`from_config`); 3 direct
+  struct literals in corpus tests updated.
+- Tests: `break_priority` unit; `linebreak` unit (depth-0 only, parens/braces/
+  `\left\right` opaque, single-relation no-op, command relations); display
+  `format_math` unit incl. comment regression + idempotency; host `format()`
+  tests in `tests/format/math.rs`; golden `math_linebreak_experimental`
+  (`line-width=30`). STYLE.md Rule 7 + idempotency note; `docs/guide/formatting.qmd`.
 
-**No behavior change** — confirmed end-to-end: `$f(-x) = (a)-b + [1,2]$` →
-`$f(-x) = (a) - b + [1,2]$` (unary `-` after `(` tight, binary after `)` spaced,
-`,` tight). 4 parser CST snapshots regenerated (parens split out; ranges still
-contiguous/lossless; no `MATH_EQUATION_LABEL` touched). The `math-syntax` linter
-rule needed **no** change (it only walks groups/environments; new kinds fall
-through its `_`). Verified: `cargo test --workspace` (31 binaries) clean, clippy
-`-D warnings` clean, `cargo fmt --check` clean.
+**Verified end-to-end** (`line-width=30`): `A = … + … = … + …` → break before 2nd
+`=`, `+` sub-terms kept, continuation aligned under first `=`; idempotent.
+`cargo test --workspace`, clippy `-D warnings`, `cargo fmt --check` all clean.
 
 ### Suggested next sub-targets
-1. **Phase 6 — semantic line-breaking + continuation indent** (add the
-   break-priority column to `operators.rs`; use `operators/` corpus stressors).
-   Walk the *structured* CST — do NOT flatten as the spacing pass does; flattening
-   then relinearizing fights bracket-matching / nesting depth.
-2. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
+1. **Phase 6 follow-on — break at binary ops** when no relations (or RHS still
+   over-width). Blocked on the isolation-coercion issue: a continuation starting
+   with a binary op renders unary in isolation; needs a seeded prev-class
+   (`render_inline_seeded(elems, Some(Close))`) so the leading `+` stays binary.
+   Also consider min-breaks-to-fit instead of break-at-every-relation.
+2. **Environment-body line-breaking** (interacts with the `&`-column engine).
+3. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
    blocks become formattable (would make `MathContext::EnvironmentBody` reachable).
-3. Optional structural cooking (orthogonal to operators): script attachment,
+4. Optional structural cooking (orthogonal to operators): script attachment,
    known-command argument grouping.
 
 **Placement note (deferred, YAGNI):** `operators.rs` lives in the formatter
@@ -121,6 +128,11 @@ tokens) so formatter + linter + LSP share one interpretation.
 
 ## Earlier sessions
 
+- **Phase 6 commit 1 — tokenize delimiters/punctuation** (`7249710c`). Parser
+  splits `( [`→`MATH_OPEN`, `) ]`→`MATH_CLOSE`, `, ;`→`MATH_PUNCT` (`| . /` stay
+  text); formatter's `text_tail_class` replaced by kind-keyed
+  `operators::delimiter_class`; all three kinds added to the `math_content_text`
+  whitelist. No behavior change.
 - **Phase 5b leftover — Tier-3 symbol-class fixture** (committed `9e10d943`).
   Dev-only vendored `symbol-classes.tsv` (token/atom_class/oracle) + harness
   cross-checking `operators` against `pulldown-latex` Events; catches class drift

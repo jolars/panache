@@ -153,6 +153,22 @@ pub fn is_spaced(class: AtomClass) -> bool {
     matches!(class, AtomClass::Bin | AtomClass::Rel)
 }
 
+/// Break priority of an (already-coerced) atom class for semantic
+/// line-breaking: higher = break here first. A long display row breaks at its
+/// highest-priority depth-0 operators before any lower ones. Relations outrank
+/// binary operators — the TeX/amsmath convention is to break a long chain at
+/// its relations (`a = b = c`), keeping binary sub-terms together. Everything
+/// else is `0` (never a break site: ordinary atoms, delimiters, punctuation,
+/// large operators, and — crucially — a coerced *unary* `+`/`-`, which is
+/// [`AtomClass::Ord`] by the time it reaches here).
+pub fn break_priority(class: AtomClass) -> u8 {
+    match class {
+        AtomClass::Rel => 2,
+        AtomClass::Bin => 1,
+        _ => 0,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254,5 +270,32 @@ mod tests {
         assert!(!is_spaced(AtomClass::Close));
         assert!(!is_spaced(AtomClass::Punct));
         assert!(!is_spaced(AtomClass::Op));
+    }
+
+    #[test]
+    fn break_priority_ranks_rel_over_bin_over_rest() {
+        // Relations break first, then binary operators.
+        assert!(break_priority(AtomClass::Rel) > break_priority(AtomClass::Bin));
+        assert!(break_priority(AtomClass::Bin) > break_priority(AtomClass::Ord));
+        // Everything that is not a binary/relation operator is never a break
+        // site (priority 0) — including delimiters, punctuation, and large ops.
+        for class in [
+            AtomClass::Ord,
+            AtomClass::Open,
+            AtomClass::Close,
+            AtomClass::Punct,
+            AtomClass::Op,
+        ] {
+            assert_eq!(break_priority(class), 0, "{class:?}");
+        }
+        // Only spaced classes are break sites.
+        assert_eq!(
+            break_priority(AtomClass::Rel) > 0,
+            is_spaced(AtomClass::Rel)
+        );
+        assert_eq!(
+            break_priority(AtomClass::Bin) > 0,
+            is_spaced(AtomClass::Bin)
+        );
     }
 }

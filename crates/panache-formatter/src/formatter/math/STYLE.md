@@ -3,7 +3,8 @@
 The experimental math formatter (`Config::experimental_format_math`, default
 off) reformats the **content** of math spans. It does structurally-safe layout
 (whitespace collapse, `&`-column alignment, environment indentation, `\\`
-normalization) plus **precedence-aware operator spacing** (see Rule 6). It stays
+normalization) plus **precedence-aware operator spacing** (see Rule 6) and
+**semantic line-breaking of over-width display rows** (see Rule 7). It stays
 conservative beyond that: never macro rewriting, `\frac`/`\dfrac`
 canonicalization, or auto-`&` insertion. There is no pandoc oracle for math
 *formatting* (pandoc passes math through); the reference for alignment behavior
@@ -96,6 +97,38 @@ Returned unchanged, never reflowed:
    (`\left`/`\right`), and ordinary commands all keep their author space
    verbatim. A break-priority column for line-breaking is a later phase.
 
+7. **Display line-breaking.** A free display row (`$$…$$`, non-environment)
+   wider than `line-width` is broken at its highest-priority **top-level**
+   operators. Priority comes from `operators::break_priority`: **relations**
+   (`=`, `<=`, `\leq`, `\to`, ...) outrank binary operators, so a chain breaks
+   at its relations and keeps `+`/`\cdot` sub-terms together. The first relation
+   stays on the opening line; every later one starts a continuation line
+   **aligned under the first relation's column** (source-cosmetic only --- math
+   ignores whitespace, so the rendered equation is unchanged):
+
+   ```
+   A = aaaaaaaaaa + bbbbbbbbbb
+     = cccccccccc + dddddddddd
+   ```
+
+   - **Top-level only.** An operator at delimiter depth > 0 --- inside `(…)`,
+     `[…]`, or `\left…\right` (tracked by an open/close counter, since those are
+     *flat token runs*, not nesting nodes), or anywhere inside a `{…}` brace
+     group (a node we never descend, so `\frac{…}{…}` arguments are opaque) ---
+     is never a break candidate.
+   - **A logical row is one equation.** Free rows split into logical rows only
+     on a top-level hard `\\`; a soft newline is insignificant whitespace and
+     does **not** start a new row, so a multi-line authored equation collapses
+     to one unit and is re-laid-out. (Contrast environment-body rows, which keep
+     soft-newline boundaries.)
+   - **Scope (first cut):** relations only, and only when there are ≥ 2 of them.
+     A row with no top-level relations (e.g. a single wide `\frac{…}{…}`) is
+     left on one over-width line --- like an unbreakable long word in prose
+     reflow. Breaking at binary operators is deferred (a continuation starting
+     with a binary operator would mis-coerce to a unary sign in isolation;
+     relations never coerce, so they are safe). Inline and environment-body math
+     are not line-broken.
+
 ## Idempotency
 
 `format(format(x)) == format(x)` for every well-formed input. The alignment
@@ -117,3 +150,9 @@ engine guarantees it by construction:
   token stream --- which round-trips --- so pass 2 makes the identical decision.
   Inserting at most one space per gap (then `collapse_spaces` + cell trim) and
   stripping spaces only beside *tight* runs both converge in one pass.
+- **Line-breaking is a fixed point.** The breaker emits continuations on soft
+  newlines with leading alignment spaces. On pass 2 those soft newlines and
+  spaces are insignificant whitespace that re-joins into the single logical row
+  (Rule 7), and the continuation indent is recomputed from that row's structure
+  (never measured from the source), so the identical break points and alignment
+  column are reproduced.

@@ -67,6 +67,7 @@ fn opts(enabled: bool, context: MathContext) -> MathFormatOptions {
     MathFormatOptions {
         enabled,
         math_indent: 2,
+        line_width: 80,
         bookdown_equation_labels: false,
         context,
     }
