@@ -423,8 +423,17 @@ fn is_layout_whitespace(el: &SyntaxElement) -> bool {
 /// segment through the same single-line path, guaranteeing the segments re-space
 /// exactly as the unbroken row would.
 pub(super) fn render_inline(elems: &[SyntaxElement]) -> String {
+    render_inline_seeded(elems, None)
+}
+
+/// Like [`render_inline`] but seeds the preceding-atom class. The line-breaker
+/// uses this for a continuation that *starts* with a binary operator: rendered
+/// in isolation the `+`/`-` would coerce to a unary sign (`+b`), but seeding a
+/// closing-operand class keeps it binary (`+ b`). `None` reproduces
+/// [`render_inline`] exactly.
+pub(super) fn render_inline_seeded(elems: &[SyntaxElement], seed: Option<AtomClass>) -> String {
     let toks = flatten_tokens(elems);
-    collapse_spaces(&space_operators(&toks))
+    collapse_spaces(&space_operators(&toks, seed))
 }
 
 /// Flatten elements into `(kind, text)` tokens in document order, descending
@@ -467,9 +476,9 @@ enum Demand {
 /// preserved (a command-terminating space in `\alpha x`, a `\text{ a }`
 /// interior); whitespace adjacent to a tight unary operator is stripped, but a
 /// space demanded by a neighboring spaced operator still wins.
-fn space_operators(toks: &[(SyntaxKind, String)]) -> String {
+fn space_operators(toks: &[(SyntaxKind, String)], seed: Option<AtomClass>) -> String {
     let mut out = String::new();
-    let mut prev_class: Option<AtomClass> = None;
+    let mut prev_class: Option<AtomClass> = seed;
     let mut prev_demand = Demand::Start;
     let mut pending_space = false;
 

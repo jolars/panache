@@ -1,0 +1,5 @@
+flavor = "quarto"
+line-width = 20
+
+[experimental]
+format-math = true

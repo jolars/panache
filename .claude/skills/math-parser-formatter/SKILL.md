@@ -95,17 +95,23 @@ design plan is `~/.claude/plans/i-want-to-plan-foamy-pascal.md`.
     `MATH_OPEN`, `) ]` → `MATH_CLOSE`, `, ;` → `MATH_PUNCT`; `| . /` stay text);
     formatter's `text_tail_class` replaced by kind-keyed `operators::delimiter_class`.
     No behavior change.
-  - *Commit 2 DONE*: `operators::break_priority` (Rel > Bin > 0) + new
-    `formatter/math/linebreak.rs`. Over-width display **free rows** break at
+  - *Commit 2 DONE* (`9d7c2e5b`): `operators::break_priority` (Rel > Bin > 0) +
+    new `formatter/math/linebreak.rs`. Over-width display **free rows** break at
     depth-0 relations (≥2), continuations align under the first relation; depth
     tracked via open/close counter (`(`/`[`/`\left` vs `)`/`]`/`\right`), brace
     groups opaque. `line_width` threaded onto `MathFormatOptions`. Idempotency:
     `render.rs::split_logical_rows` joins soft newlines into one logical row
     (only `\\` splits) — except a `%`-comment-terminating newline (significant,
-    or the next line is absorbed into the comment). **Scope (user-chosen):**
-    over-width only, relations only, align-under-relation, free rows only.
-    Remaining: binary-op breaking (needs seeded prev-class for isolation),
-    environment-body breaking, min-breaks-to-fit.
+    or the next line is absorbed into the comment).
+  - *Commit 3 DONE*: nested **binary** breaking inside an over-width relation
+    segment — each `+ term` nests one indent step deeper (under the relation
+    RHS). `linebreak.rs` now uses `spaced_operator_breaks` (depth-0, coerced, so
+    unary signs excluded) + `break_binary_segment`; `render_inline_seeded(_,
+    Some(Close))` keeps a leading-`+` continuation binary (not unary) in
+    isolation. **Scope:** binary breaking only WITHIN a relation chain (≥2 rels);
+    standalone binary chains / single-relation / no-relation rows stay one line.
+    Remaining: binary breaking outside a relation chain, environment-body
+    breaking, min-breaks-to-fit.
 - **Phase 7 — docs + stabilization** (`docs/guide/formatting.qmd`,
   `configuration.qmd`); consider flipping the gate per flavor (separate
   decision).

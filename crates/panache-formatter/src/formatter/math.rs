@@ -377,6 +377,21 @@ mod tests {
     }
 
     #[test]
+    fn display_nests_binary_operators_under_relations() {
+        let narrow = MathFormatOptions {
+            line_width: 20,
+            ..opts(MathContext::Display)
+        };
+        let input = "A = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd";
+        // Relations break first; each over-width segment nests its `+` term
+        // one indent level deeper, under the relation's right-hand side.
+        let expected = "A = aaaaaaaaaa\n    + bbbbbbbbbb\n  = cccccccccc\n    + dddddddddd";
+        assert_eq!(format_math(input, &narrow), expected);
+        let once = format_math(input, &narrow);
+        assert_eq!(format_math(&once, &narrow), once);
+    }
+
+    #[test]
     fn display_comment_terminating_newline_is_not_joined() {
         // A `%` comment runs to EOL; the soft newline ending it must remain a row
         // boundary, or the next line is absorbed into the comment (and lost from

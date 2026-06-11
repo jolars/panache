@@ -68,9 +68,38 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
+**Phase 6 commit 3 — nested binary breaking under relation chains
+(formatter).** *DONE* (not yet committed). Follow-up to commit 2: when a relation
+segment is itself over-width, its top-level binary terms now break one indent
+step (`BINARY_NEST=2`) deeper, nesting under the relation's RHS:
+
+```
+A = aaaaaaaaaa
+    + bbbbbbbbbb
+  = cccccccccc
+    + dddddddddd
+```
+
+- `linebreak.rs` rewritten: `relation_break_indices` → general
+  `spaced_operator_breaks(elems) -> Vec<Break{index, class}>` (depth-0, **with
+  coercion** so unary `+`/`-` is excluded; mirrors `space_operators`' class
+  bookkeeping at top-level element grain). `break_free_row` segments at relations
+  (≥2), then `break_binary_segment` splits each over-width segment before each
+  depth-0 binary op (head keeps the leading relation; each `+ term` on its own
+  line at `rel_indent+2`).
+- **Coercion-in-isolation fix**: a binary continuation starts with `+`, which
+  would coerce to unary rendered alone (`+b`). Added `render_inline_seeded(elems,
+  Some(Close))` (seeds `prev_class`, keeps `prev_demand=Start` so no leading
+  space) so the leading `+` stays binary (`+ b`). `space_operators` gained a
+  `seed` param; `render_inline` = `render_inline_seeded(_, None)`, byte-identical.
+- **Scope still bounded**: binary breaking only INSIDE a relation chain (≥2
+  rels). Standalone binary chains / single-relation rows / no-relation rows stay
+  one (over-width) line. New golden `math_linebreak_nested_experimental`
+  (width 20); host + embedded tests incl. idempotency + `unary_sign_is_not_a_binary_break_point`.
+
 **Phase 6 commit 2 — semantic line-breaking for over-width display free rows
-(formatter).** *DONE* (not yet committed). The deferred break-priority column +
-the break walk landed; user-chosen scope: **over-width only, relations only,
+(formatter).** Committed `9d7c2e5b`. The deferred break-priority column +
+the break walk landed; user-chosen scope: **over-width only, relations first,
 align-under-relation, display free rows only**.
 
 - **`operators.rs`**: added `pub fn break_priority(AtomClass) -> u8` (Rel=2 >
@@ -107,11 +136,11 @@ align-under-relation, display free rows only**.
 `cargo test --workspace`, clippy `-D warnings`, `cargo fmt --check` all clean.
 
 ### Suggested next sub-targets
-1. **Phase 6 follow-on — break at binary ops** when no relations (or RHS still
-   over-width). Blocked on the isolation-coercion issue: a continuation starting
-   with a binary op renders unary in isolation; needs a seeded prev-class
-   (`render_inline_seeded(elems, Some(Close))`) so the leading `+` stays binary.
-   Also consider min-breaks-to-fit instead of break-at-every-relation.
+1. **Binary breaking outside a relation chain** — standalone binary chains and
+   single-relation rows still stay one over-width line (the nested case landed
+   in commit 3 via `render_inline_seeded`). Open question: continuation indent
+   with no relation column to nest under. Also consider min-breaks-to-fit instead
+   of break-at-every-operator.
 2. **Environment-body line-breaking** (interacts with the `&`-column engine).
 3. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
    blocks become formattable (would make `MathContext::EnvironmentBody` reachable).

@@ -88,6 +88,19 @@ fn experimental_format_math_breaks_overwidth_display_chain() {
 }
 
 #[test]
+fn experimental_format_math_nests_binary_under_relations() {
+    let cfg = math_config_width(true, 20);
+    let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd\n$$\n";
+    // Narrow enough that each relation segment overflows ⇒ the `+` terms nest
+    // one level deeper under the relation right-hand side.
+    let expected = "$$\nA = aaaaaaaaaa\n    + bbbbbbbbbb\n  = cccccccccc\n    + dddddddddd\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
 fn experimental_format_math_leaves_fitting_display_untouched() {
     // The same equation under the default 80-col width is not broken.
     let cfg = math_config(true);
