@@ -14,6 +14,12 @@ description = "An LSP, formatter, and linter for Markdown, Quarto, and R Markdow
 license.workspace = true
 repository.workspace = true
 homepage = "https://panache.bz"
+include = [
+    "/src/**/*",
+    "/build.rs",
+    "/README.md",
+    "/LICENSE",
+]
 keywords = ["quarto", "pandoc", "markdown", "formatter", "language-server"]
 categories = [
     "command-line-utilities",
