@@ -394,6 +394,7 @@ golden_test_cases!(
     issue_181_hashpipe_fig_subcap_idempotency,
     issue_189_hashpipe_figcap_idempotency,
     issue_hashpipe_folded_figcap_wrap,
+    issue_hashpipe_folded_scalar_no_blank,
     yaml_folded_description_reflow,
     issue_189_table_caption_heading_idempotency,
     issue_190_hashpipe_blank_line_losslessness,

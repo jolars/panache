@@ -1,0 +1,5 @@
+```{r}
+#| fig-cap: >
+#|   A short caption that fits on one line.
+#| fig-width: 4
+```

@@ -797,6 +797,11 @@ pub fn format_as_hashpipe(
                         rendered.push('\n');
                     }
                     rendered
+                } else if value.ends_with('\n') {
+                    // Block scalars (`>` / `|`) arrive already terminated by
+                    // their content newline; appending another would inject a
+                    // blank line inside the scalar before the next key.
+                    format!("{key}: {value}")
                 } else {
                     format!("{key}: {value}\n")
                 }
@@ -1019,6 +1024,41 @@ mod tests {
         assert_eq!(lines.len(), 2);
         assert_eq!(lines[0], "#| echo: true");
         assert_eq!(lines[1], "#| fig-width: 7");
+    }
+
+    #[test]
+    fn test_format_as_hashpipe_folded_scalar_no_extra_blank() {
+        // A folded (`>`) block-scalar value arrives from the content path
+        // already terminated by a newline. `format_as_hashpipe` must not
+        // append a second newline, which would otherwise inject a blank
+        // `#|` line inside the folded scalar before the next key (and
+        // silently change the scalar's value by adding a trailing newline).
+        let options = vec![
+            (
+                "fig-cap".to_string(),
+                ChunkOptionValue::Simple(">\n  A caption that spans\n  two lines.\n".to_string()),
+            ),
+            (
+                "fig-width".to_string(),
+                ChunkOptionValue::Simple("4".to_string()),
+            ),
+        ];
+
+        let lines = format_as_hashpipe("r", &options, 80, Some(&WrapMode::Preserve)).unwrap();
+
+        assert!(
+            !lines.iter().any(|l| l.trim_end() == "#|"),
+            "no blank hashpipe line should be introduced: {lines:?}"
+        );
+        assert_eq!(
+            lines,
+            vec![
+                "#| fig-cap: >",
+                "#|   A caption that spans",
+                "#|   two lines.",
+                "#| fig-width: 4",
+            ]
+        );
     }
 
     #[test]
