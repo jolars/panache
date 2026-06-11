@@ -40,18 +40,26 @@ impl ListItemIndent {
     /// 4-space code-block threshold, silently reinterpreting a sublist as an
     /// indented code block or lazy paragraph text.
     ///
-    /// Note this is *not* where an item's own lazy-wrapped paragraph text goes:
-    /// that lines up under the first-line content (`content_offset`, past the
-    /// checkbox), which is safe because lazy continuation can't be reinterpreted
-    /// as a block. Under the `four_space_rule` extension this is instead a flat
+    /// Under the `four_space_rule` extension this is instead a flat
     /// one-tab-width per nesting level, decoupled from marker width — so a wide
     /// `100.` marker still nests its children at four columns, not six.
     pub fn continuation_offset(&self) -> usize {
         if self.four_space_rule {
             self.tab_width
         } else {
-            self.marker_padding + self.marker_width + self.spaces_after
+            self.text_continuation_offset()
         }
+    }
+
+    /// Column (relative to the list's base indent) at which the item's *own*
+    /// wrapped paragraph text (lazy continuation) is placed: the list content
+    /// column, just past the marker and its trailing space. Excludes the task
+    /// checkbox (inline content, not block indent) and the `four_space_rule` tab
+    /// stop (which only governs nested *blocks*). Aligning continuation here —
+    /// rather than under the first-line text past the checkbox — keeps it at the
+    /// same column as any later block in the item, matching pandoc.
+    pub fn text_continuation_offset(&self) -> usize {
+        self.marker_padding + self.marker_width + self.spaces_after
     }
 
     /// Calculate the hanging indent (including base list indent).

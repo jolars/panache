@@ -162,16 +162,15 @@ fn sentence_wrap_keeps_task_list_hanging_indent() {
         line_width: 40,
         ..Default::default()
     };
-    // Continuation of a task item's own paragraph (lazy continuation) aligns
-    // under the first-line text, past the `[ ]` checkbox. This is safe — lazy
-    // continuation can't be reinterpreted as a block — and reads as belonging
-    // to the task. (Nested *blocks* drop the checkbox; see
-    // `nested_task_list_children_align_at_content_column`.)
+    // Continuation of a task item's own paragraph aligns at the list content
+    // column, not past the `[ ]` checkbox — so it sits at the same column as any
+    // later block in the item (matching pandoc), and never reaches the 4-space
+    // code-block threshold.
     let input = "- [ ] First sentence. Second sentence! Third sentence?\n";
     let expected = "\
 - [ ] First sentence.
-      Second sentence!
-      Third sentence?
+  Second sentence!
+  Third sentence?
 ";
     let output = format(input, Some(cfg), None);
     assert_eq!(output, expected);

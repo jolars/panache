@@ -9,6 +9,6 @@ blocks or lazy text.
     - [ ] c
 
 - [ ] parent task with a description that is long enough that it has to wrap
-      onto a second line
+  onto a second line
   - [ ] child task with its own long description that also needs to wrap to a
-        second line here
+    second line here

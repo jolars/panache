@@ -24,11 +24,11 @@ title: "List Wrapping Tests"
 ## Task Lists with Long Lines
 
 - [ ] This unchecked task has a very long description that should wrap properly
-      while maintaining the checkbox format.
+  while maintaining the checkbox format.
 - [x] Completed task
 - [ ] Another unchecked task with an extremely long description that includes
-      multiple sentences. The first sentence is long. The second sentence is
-      also quite long and helps test the wrapping behavior.
+  multiple sentences. The first sentence is long. The second sentence is
+  also quite long and helps test the wrapping behavior.
 
 ## Mixed List Types
 

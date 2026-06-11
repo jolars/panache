@@ -579,17 +579,17 @@ impl Formatter {
 
         let total_indent = indent;
         // `hanging` is the column for nested *blocks* (nested lists, continuation
-        // paragraphs after a blank line, code blocks). It excludes any task
-        // checkbox, because indenting children past the checkbox (col 6 for
-        // `- [ ] `) lands them at the 4-space code-block threshold and silently
-        // reinterprets a sublist as code/lazy text. `content_indent` is the
-        // column for the item's *own* wrapped paragraph text, which is lazy
-        // continuation and lines up under the first-line content after the
-        // marker *and* checkbox — safe to sit at col 6 because lazy continuation
-        // can't be reinterpreted as a block. The two are equal except under
-        // `four_space_rule` (nesting moves to a flat tab stop) and for task
-        // items (nesting drops the checkbox, continuation keeps it).
+        // blocks after a blank line); under `four_space_rule` it is a flat tab
+        // stop. `text_continuation` is where the item's *own* lazy-wrapped
+        // paragraph text goes — the list content column, just past the marker,
+        // excluding both the checkbox and the four-space tab stop. Both exclude
+        // the checkbox so children/continuation never land at the code-block
+        // threshold, and both put continuation at the same column as later blocks
+        // (matching pandoc). `content_indent` is only the *first line's* text
+        // column (past the marker and checkbox); it sizes the available width so
+        // the first line fills to `line_width`.
         let hanging = list_indent.hanging_indent(total_indent);
+        let text_continuation = total_indent + list_indent.text_continuation_offset();
         let content_indent = total_indent + list_indent.content_offset();
         let available_width = self.config.line_width.saturating_sub(content_indent);
 
@@ -889,7 +889,7 @@ impl Formatter {
                         self.output.push(' ');
                     }
                 } else {
-                    self.output.push_str(&" ".repeat(content_indent));
+                    self.output.push_str(&" ".repeat(text_continuation));
                 }
                 self.output.push_str(line.trim_start());
                 if !has_only_empty_nested_list {
@@ -916,7 +916,7 @@ impl Formatter {
                     // Lazy continuation of the item's paragraph aligns at the
                     // list content column, not past a task checkbox (which would
                     // hit the code-block threshold).
-                    self.output.push_str(&" ".repeat(content_indent));
+                    self.output.push_str(&" ".repeat(text_continuation));
                 }
                 if i > 0 {
                     self.output.push_str(text.trim_start());
@@ -950,7 +950,7 @@ impl Formatter {
                     // Lazy continuation of the item's paragraph aligns at the
                     // list content column, not past a task checkbox (which would
                     // hit the code-block threshold).
-                    self.output.push_str(&" ".repeat(content_indent));
+                    self.output.push_str(&" ".repeat(text_continuation));
                 }
                 let mut rendered_line = if i > 0 {
                     line.trim_start().to_string()
@@ -973,7 +973,7 @@ impl Formatter {
                             let trimmed = segment.trim_start();
                             if !trimmed.is_empty() {
                                 self.output.push('\n');
-                                self.output.push_str(&" ".repeat(content_indent));
+                                self.output.push_str(&" ".repeat(text_continuation));
                                 self.output.push_str(trimmed);
                             }
                         }
