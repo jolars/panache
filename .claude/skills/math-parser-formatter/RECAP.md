@@ -65,55 +65,42 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Phase 5 — operator interpretation module + precedence-aware spacing.** *DONE*
-(not yet committed). Formatter-only + new module; **parser untouched**.
+**Phase 5b — command-operator spacing.** *DONE* (not yet committed).
+Formatter-only, one localized arm; **parser, `operators.rs`, and config
+untouched**. (Spacing half only — the **Tier 3 symbol-class fixture is still
+deferred**, by user choice this slice.)
 
-New module `crates/panache-formatter/src/formatter/math/operators.rs` (the
-`cooking.rs` analog, `pub` so LSP can reuse it later): `AtomClass`
-(Ord/Bin/Rel/Open/Close/Punct/Op), `split_operator_atoms`, `classify_operator`,
-`command_class` (curated `\leq`/`\cdot`/`\sum`/… table → class), `text_tail_class`
-(MATH_TEXT last char → Open/Close/Punct/Ord), `coerce` (TeX Bin→Ord unary rule),
-`is_spaced`. Pure, in-module unit-tested.
+`render.rs::space_operators` got an explicit `MATH_COMMAND` arm (was swallowed by
+`_`). A command whose `operators::command_class` is `Bin`/`Rel` (after `coerce`)
+now demands `SpacedOp` — one space each side: `a\cdot b`→`a \cdot b`,
+`a\leq b`→`a \leq b`, `\alpha\cdot\beta`→`\alpha \cdot \beta`. Everything else
+(unary-position command op, `\sum` (Op), `\left`/`\right` (Open/Close), ordinary
+`\alpha`/`\frac`) stays `Plain`. **Crucial: command ops are NEVER `TightOp`** —
+a control word's terminating space is a separate `MATH_SPACE` token and is
+mandatory (`\leq b`→`\leqb` would name a different command), so stripping is
+forbidden; `SpacedOp` only ever forces *one* space, never zero. Set `prev_class`
+to the *coerced* class (TeX-faithful for the next atom). Deleted the now-dead
+`MATH_COMMAND` branch in `atom_prev_class` (handled inline now).
 
-`render.rs::render_inline` rewritten from flatten+collapse to a **gap-based
-re-spacer**: flatten to `(kind,text)`, fold adjacent `MATH_OPERATOR` into a run,
-**split the run into atoms** (adjacent rel chars merge — `<=`; each sign char
-`+ - *` stands alone), classify+coerce each against the running prev-atom class,
-then emit gap-by-gap. Gap rule: a *spaced* op (Bin/Rel) forces one space and wins
-over a neighbor; a *tight* (unary) op strips adjacent space; otherwise preserve
-author whitespace (so `\alpha x` and `\text{ a }` survive). Result: `a+b`→`a + b`,
-`a<=b`→`a <= b`, unary `-x`/`f(-x)`/`e^{-t}` stay tight, `x=-y`→`x = -y`,
-`a--b`→`a - -b`.
-
-**The `=-` trap (caught by the new golden, not unit tests):** an early
-"merge-the-whole-run" design turned `x=-y` into `x =- y`. Fix = split rule above
-(rel chars merge, sign chars split so they can be unary). Lesson: relation vs
-sign are different atoms; don't classify a mixed operator run as one unit.
-
-**Scope decisions confirmed with user (AskUserQuestion):** char operators only
-this slice; **command-operator spacing (`\leq`/`\cdot`) → Phase 5b** (the table is
-built and used for prev-class, just not yet re-spaced); **Tier 3 symbol-class
-fixture → Phase 5b**; **unary = canonicalize tight** (strip author spaces, e.g.
-`- x`→`-x`), the one choice that forced the gap-based rewrite over insert-only.
-
-Deliverables also: rewrote `cell_internal_spacing_is_preserved` →
-`cell_operator_spacing_applied` + new unit tests; STYLE.md Rule 6 + idempotency
-bullet (dropped the old "never operator spacing"); `format_math` config doc +
-`panache.schema.json` (regen via `UPDATE_EXPECTED=1 cargo test --test
-config_schema` — note: the test *name* doesn't contain "config_schema", so
-`cargo test config_schema` is a no-op; use `--test`); docs/guide
-{configuration,formatting}.qmd; new golden case
-`tests/fixtures/cases/math_operator_spacing_experimental` (+ wired into
-`tests/golden_cases.rs`).
+Deliverables: new unit test `inline_spaces_command_operators`
+(`crates/panache-formatter/src/formatter/math.rs`); extended golden
+`tests/fixtures/cases/math_operator_spacing_experimental` with `$a\cdot b$` /
+`$x\leq y$`; STYLE.md Rule 6 (command-operator sentence flipped from "not yet
+re-spaced" to the new rule + the never-tight caveat); `docs/guide/formatting.qmd`
+operator paragraph.
 
 Verified: `cargo test --workspace` (30 binaries) + clippy + fmt clean; Tier-1
-corpus + Tier-2 `pulldown-latex` MathML oracle green (spacing is
-meaning-preserving — `oracle_discriminates_meaning_from_spacing` still pins it
-non-vacuous); gate-off goldens byte-identical; CLI `debug format --checks all`
-passes on tight-operator inline + aligned display math.
+corpus + Tier-2 `pulldown-latex` MathML oracle green (adding spaces around
+`\cdot`/`\leq` is meaning-preserving); gate-off byte-verbatim (CLI `$a\cdot b$`
+unchanged); gate-on CLI `debug format --checks all` passes (`a \cdot b`,
+`x \leq y` spaced, `f(-x)`/`\sum x` untouched, idempotent + lossless).
 
 ### Suggested next sub-targets
-1. **Parser: tokenize unambiguous delimiters/punctuation** (`( ) [ ] , ;`) out
+1. **Phase 5b leftover — Tier 3 symbol-class fixture.** Land the vendored
+   symbol→atom-class fixture validated against `pulldown-latex` Events to harden
+   the `operators::command_class` table (dev-only, mirrors the Tier-2 oracle).
+   Bounded, no production-code change. Deferred this slice by user choice.
+2. **Parser: tokenize unambiguous delimiters/punctuation** (`( ) [ ] , ;`) out
    of `MATH_TEXT` into neutral kinds (e.g. `MATH_OPEN`/`MATH_CLOSE`/`MATH_PUNCT`;
    leave the ambiguous `| . /` as text). Lets the interpretation layer read token
    *kinds* and **deletes `operators::text_tail_class`** (the one re-lexing smell —
@@ -126,10 +113,6 @@ passes on tight-operator inline + aligned display math.
    speculatively, so the new kinds are validated against a real use. Decision
    recorded with the user 2026-06-10; deferred from Phase 5 (clean checkpoint,
    modest-but-not-zero churn). See the "CST grain vs interpretation" invariant.
-2. **Phase 5b — command-operator spacing + Tier 3.** Re-space command operators
-   (`a\leq b`→`a \leq b`) — handle the command-terminating space carefully — and
-   land the vendored symbol→atom-class fixture validated against `pulldown-latex`
-   Events. The `operators::command_class` table is already there to drive both.
 3. **Phase 6 — semantic line-breaking + continuation indent** (add the
    break-priority column to `operators.rs`; use `operators/` corpus stressors).
    Walk the *structured* CST — do NOT flatten as the spacing pass does; flattening
@@ -149,6 +132,18 @@ tokens) so formatter + linter + LSP share one interpretation.
 
 ## Earlier sessions
 
+- **Phase 5 — operator interpretation module + precedence-aware spacing**
+  (committed `adbebe06`). New `formatter/math/operators.rs` (the `cooking.rs`
+  analog, `pub` for LSP): `AtomClass`, `split_operator_atoms`,
+  `classify_operator`, `command_class` table, `text_tail_class`, `coerce` (TeX
+  Bin→Ord unary rule), `is_spaced`. `render.rs::render_inline` became a gap-based
+  re-spacer over the flat token stream: fold adjacent `MATH_OPERATOR` into a run,
+  split into atoms (rel chars `= < >` merge → `<=`; each sign `+ - *` stands
+  alone so it can be unary), classify+coerce vs running prev-class, emit gap-by-
+  gap. `a+b`→`a + b`, unary `-x`/`f(-x)`/`e^{-t}` tight, `x=-y`→`x = -y`,
+  `a--b`→`a - -b`. **The `=-` trap:** merging a whole run gave `x =- y`; the
+  split rule (rel merge, sign split) fixes it — relation vs sign are different
+  atoms.
 - **Phase 4 — dev-oracle cross-validation + idempotency corpus** — math has *no
   output oracle*, so flip the assertion to invariance: `render(x) ==
   render(format(x))` on normalized MathML. Tier 1 `tests/math_corpus_properties.rs`

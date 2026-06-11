@@ -255,6 +255,40 @@ mod tests {
     }
 
     #[test]
+    fn inline_spaces_command_operators() {
+        // Binary/relation command operators get one space on each side.
+        assert_eq!(fmt("a\\cdot b", MathContext::Inline), "a \\cdot b");
+        assert_eq!(fmt("a\\leq b", MathContext::Inline), "a \\leq b");
+        assert_eq!(fmt("x\\leq y", MathContext::Inline), "x \\leq y");
+        // Already-spaced input is a fixed point.
+        assert_eq!(fmt("a \\cdot b", MathContext::Inline), "a \\cdot b");
+        // No author space (a `\` terminates the prior control word) still spaces.
+        assert_eq!(
+            fmt("\\alpha\\cdot\\beta", MathContext::Inline),
+            "\\alpha \\cdot \\beta"
+        );
+        // Large operators (Op) are not binary-spaced; ordinary commands keep
+        // their terminating space verbatim.
+        assert_eq!(fmt("\\sum x", MathContext::Inline), "\\sum x");
+        assert_eq!(fmt("\\alpha x", MathContext::Inline), "\\alpha x");
+        // Delimiter commands (Open/Close) are not spaced.
+        assert_eq!(
+            fmt("\\left( x \\right)", MathContext::Inline),
+            "\\left( x \\right)"
+        );
+        for case in [
+            "a\\cdot b",
+            "a\\leq b",
+            "\\alpha\\cdot\\beta",
+            "\\sum x",
+            "\\alpha x",
+            "\\left( x \\right)",
+        ] {
+            assert_idempotent(case, MathContext::Inline);
+        }
+    }
+
+    #[test]
     fn environment_body_context_aligns_bare_body() {
         let input = "\nx &= 1 \\\\\ny &= 22\n";
         let expected = "  x & = 1  \\\\\n  y & = 22";

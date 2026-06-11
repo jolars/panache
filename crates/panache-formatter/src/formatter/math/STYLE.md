@@ -87,8 +87,14 @@ Returned unchanged, never reflowed:
    large op, else ordinary), `{`/`^`/`_`/`&` as unary-inducing, `\\` resetting
    to start. Author whitespace between two ordinary atoms is preserved, so a
    command-terminating space (`\alpha x`) and a `\text{ a }` interior survive.
-   Command operators themselves (`\leq`, `\cdot`) are not yet re-spaced ---
-   that, and a break-priority column for line-breaking, are later phases.
+   Command operators (`\leq`, `\cdot`) are re-spaced the same way: a binary or
+   relation command gets one space on each side (`a\cdot b` → `a \cdot b`,
+   `a\leq b` → `a \leq b`), classed via the `operators.rs` table. They are
+   **never** made tight, though --- a command's terminating space is mandatory
+   (stripping `\leq b` to `\leqb` would name a different control word), so a
+   unary-position command op, a large operator (`\sum`), a delimiter command
+   (`\left`/`\right`), and ordinary commands all keep their author space
+   verbatim. A break-priority column for line-breaking is a later phase.
 
 ## Idempotency
 

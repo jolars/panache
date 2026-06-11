@@ -1,7 +1,8 @@
 # Operator spacing
 
 Binary and relational operators get spaced: $a+b$, $a<=b$, and
-$\alpha+\beta$. A unary minus stays tight: $-x$ and $f(-x)$.
+$\alpha+\beta$. A unary minus stays tight: $-x$ and $f(-x)$. Command
+operators get spaced too: $a\cdot b$ and $x\leq y$.
 
 $$
 x=-y

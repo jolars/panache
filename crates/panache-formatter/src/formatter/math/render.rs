@@ -427,6 +427,34 @@ fn space_operators(toks: &[(SyntaxKind, String)]) -> String {
                     prev_class = Some(class);
                 }
             }
+            SyntaxKind::MATH_COMMAND => {
+                let name = text.strip_prefix('\\').unwrap_or(text);
+                let demand = match operators::command_class(name) {
+                    // A binary/relation command operator (`\cdot`, `\leq`) gets
+                    // one space on each side. A coerced (unary-position) command
+                    // op, a large operator (`\sum`), a delimiter (`\left`), or an
+                    // ordinary command (`\alpha`, `\frac`) stays Plain — never
+                    // TightOp — so the mandatory command-terminating space is
+                    // preserved, never stripped into a wrong control word.
+                    Some(raw) => {
+                        let class = operators::coerce(raw, prev_class);
+                        prev_class = Some(class);
+                        if operators::is_spaced(class) {
+                            Demand::SpacedOp
+                        } else {
+                            Demand::Plain
+                        }
+                    }
+                    None => {
+                        prev_class = Some(AtomClass::Ord);
+                        Demand::Plain
+                    }
+                };
+                emit_atom(&mut out, prev_demand, demand, pending_space, text);
+                pending_space = false;
+                prev_demand = demand;
+                i += 1;
+            }
             SyntaxKind::MATH_COMMENT => {
                 // Transparent for class purposes (an operator looks back past a
                 // comment), but emitted verbatim.
@@ -470,15 +498,12 @@ fn gap_space(prev: Demand, cur: Demand, pending_space: bool) -> bool {
 }
 
 /// The atom class a non-operator token presents to a *following* operator run.
-/// `None` resets context (a `\\` starts a fresh line, so a following `+`/`-` is
-/// unary).
+/// `MATH_COMMAND` is handled inline in [`space_operators`] (it sets `prev_class`
+/// from the coerced class), so it never reaches here. `None` resets context (a
+/// `\\` starts a fresh line, so a following `+`/`-` is unary).
 fn atom_prev_class(kind: SyntaxKind, text: &str) -> Option<AtomClass> {
     let class = match kind {
         SyntaxKind::MATH_TEXT => operators::text_tail_class(text),
-        SyntaxKind::MATH_COMMAND => {
-            let name = text.strip_prefix('\\').unwrap_or(text);
-            operators::command_class(name).unwrap_or(AtomClass::Ord)
-        }
         SyntaxKind::MATH_GROUP_OPEN => AtomClass::Open,
         SyntaxKind::MATH_GROUP_CLOSE => AtomClass::Close,
         // `^`/`_` bind tightly; a `&` opens a fresh cell — both make a directly

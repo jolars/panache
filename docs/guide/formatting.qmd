@@ -888,11 +888,12 @@ The `&` columns and the trailing `\\` are both aligned.
 
 Operators are spaced precedence-aware: a binary or relational operator gets one
 space on each side (`a+b` → `a + b`, `a<=b` → `a <= b`), while a unary minus or
-plus stays tight (`x = -y`, `f(-x)`). Macro contents are not rewritten (no
-`\frac` canonicalization, no auto-`&` insertion). Alignment uses **source
-character widths** (it tidies the source, it does not align rendered glyphs),
-and malformed math is left untouched. The option is unstable and may change
-without a major release --- see [Experimental
+plus stays tight (`x = -y`, `f(-x)`). Command operators are spaced the same way
+(`a\cdot b` → `a \cdot b`, `x\leq y` → `x \leq y`). Macro contents are not
+rewritten (no `\frac` canonicalization, no auto-`&` insertion). Alignment uses
+**source character widths** (it tidies the source, it does not align rendered
+glyphs), and malformed math is left untouched. The option is unstable and may
+change without a major release --- see [Experimental
 Features](configuration.qmd#experimental-features).
 
 ## Links
