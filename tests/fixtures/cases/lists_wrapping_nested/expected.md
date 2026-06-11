@@ -29,12 +29,12 @@ title: "Nested List Wrapping Tests"
 
 - [ ] Top level unchecked task with a very long description that should be
       wrapped while preserving the checkbox syntax and maintaining readability.
-      - [ ] Nested unchecked task that also has a long description requiring
-            wrapping
-            - [x] Deeply nested completed task with text that is long enough to
-                  require wrapping at this indentation level
-      - [x] Back to second level completed task with a very long line that tests
-            the formatter's ability to handle wrapped text in completed tasks.
+  - [ ] Nested unchecked task that also has a long description requiring
+        wrapping
+    - [x] Deeply nested completed task with text that is long enough to require
+          wrapping at this indentation level
+  - [x] Back to second level completed task with a very long line that tests the
+        formatter's ability to handle wrapped text in completed tasks.
 - [x] Another top level completed task
 
 ## Roman Numerals with Wrapping

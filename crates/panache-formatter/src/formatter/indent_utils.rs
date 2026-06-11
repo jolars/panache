@@ -31,17 +31,26 @@ impl ListItemIndent {
         self.marker_padding + self.marker_width + self.spaces_after + self.checkbox_width
     }
 
-    /// Column (relative to the list's base indent) at which continuation
-    /// paragraphs and nested lists are placed. By default this lines up with the
-    /// first-line content (`content_offset`); under the `four_space_rule`
-    /// extension it is a flat one-tab-width per nesting level, decoupled from
-    /// marker width — so a wide `100.` marker still nests its children at four
-    /// columns, not six.
+    /// Column (relative to the list's base indent) at which nested *blocks* are
+    /// placed: nested lists, and continuation paragraphs/blocks after a blank
+    /// line. This is the list *content column* — just past the marker and its
+    /// trailing space — and deliberately excludes `checkbox_width`. A task
+    /// checkbox (`[ ] `) is inline content, not part of the block indent:
+    /// aligning children past it (col 6 for `- [ ] `) lands them at/under the
+    /// 4-space code-block threshold, silently reinterpreting a sublist as an
+    /// indented code block or lazy paragraph text.
+    ///
+    /// Note this is *not* where an item's own lazy-wrapped paragraph text goes:
+    /// that lines up under the first-line content (`content_offset`, past the
+    /// checkbox), which is safe because lazy continuation can't be reinterpreted
+    /// as a block. Under the `four_space_rule` extension this is instead a flat
+    /// one-tab-width per nesting level, decoupled from marker width — so a wide
+    /// `100.` marker still nests its children at four columns, not six.
     pub fn continuation_offset(&self) -> usize {
         if self.four_space_rule {
             self.tab_width
         } else {
-            self.content_offset()
+            self.marker_padding + self.marker_width + self.spaces_after
         }
     }
 

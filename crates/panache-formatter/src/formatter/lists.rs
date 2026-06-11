@@ -578,13 +578,17 @@ impl Formatter {
         );
 
         let total_indent = indent;
-        // `hanging` is the column for nested blocks (nested lists, continuation
-        // paragraphs after a blank line, code blocks) — under `four_space_rule`
-        // these must sit at a flat tab stop. `content_indent` is the column for
-        // the item's *own* wrapped paragraph text, which is lazy continuation and
-        // just lines up with the first-line content after the marker. The two
-        // are equal except under `four_space_rule`, where the marker is left
-        // unpadded (content at e.g. col 2) while nesting moves to col 4.
+        // `hanging` is the column for nested *blocks* (nested lists, continuation
+        // paragraphs after a blank line, code blocks). It excludes any task
+        // checkbox, because indenting children past the checkbox (col 6 for
+        // `- [ ] `) lands them at the 4-space code-block threshold and silently
+        // reinterprets a sublist as code/lazy text. `content_indent` is the
+        // column for the item's *own* wrapped paragraph text, which is lazy
+        // continuation and lines up under the first-line content after the
+        // marker *and* checkbox — safe to sit at col 6 because lazy continuation
+        // can't be reinterpreted as a block. The two are equal except under
+        // `four_space_rule` (nesting moves to a flat tab stop) and for task
+        // items (nesting drops the checkbox, continuation keeps it).
         let hanging = list_indent.hanging_indent(total_indent);
         let content_indent = total_indent + list_indent.content_offset();
         let available_width = self.config.line_width.saturating_sub(content_indent);
@@ -909,8 +913,9 @@ impl Formatter {
                         self.output.push(' ');
                     }
                 } else {
-                    // Lazy continuation of the item's paragraph aligns with the
-                    // first-line content, not the nested-block hanging column.
+                    // Lazy continuation of the item's paragraph aligns at the
+                    // list content column, not past a task checkbox (which would
+                    // hit the code-block threshold).
                     self.output.push_str(&" ".repeat(content_indent));
                 }
                 if i > 0 {
@@ -942,8 +947,9 @@ impl Formatter {
                         self.output.push(' ');
                     }
                 } else {
-                    // Lazy continuation of the item's paragraph aligns with the
-                    // first-line content, not the nested-block hanging column.
+                    // Lazy continuation of the item's paragraph aligns at the
+                    // list content column, not past a task checkbox (which would
+                    // hit the code-block threshold).
                     self.output.push_str(&" ".repeat(content_indent));
                 }
                 let mut rendered_line = if i > 0 {
