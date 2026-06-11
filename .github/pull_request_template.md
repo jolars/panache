@@ -10,7 +10,7 @@
 
 - [ ] PR is focused and avoids unrelated changes
 - [ ] Commit messages follow [Conventional
-      Commits](https://www.conventionalcommits.org)
+  Commits](https://www.conventionalcommits.org)
 - [ ] Added or updated tests for behavior changes
 - [ ] Ran `cargo check`
 - [ ] Ran `cargo test`
