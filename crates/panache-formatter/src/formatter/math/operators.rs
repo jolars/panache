@@ -20,6 +20,8 @@
 //! break-priority column for semantic line-breaking, are Phase 5b/6. The table
 //! is a plain `match` so extending it stays trivial.
 
+use crate::syntax::SyntaxKind;
+
 /// TeX atom classes (the subset the formatter's spacing pass needs; see The
 /// TeXbook Appendix G).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,7 +105,7 @@ pub fn command_class(name: &str) -> Option<AtomClass> {
         "sum" | "prod" | "int" | "oint" | "coprod" | "bigcup" | "bigcap" | "bigoplus"
         | "bigotimes" | "bigvee" | "bigwedge" | "lim" => AtomClass::Op,
         // Delimiter commands (defensive; the common `\left(`/`\right)` path is
-        // already covered by the `(`/`)` text tail).
+        // already covered by the `(`/`)` MATH_OPEN/MATH_CLOSE tokens).
         "left" => AtomClass::Open,
         "right" => AtomClass::Close,
         _ => return None,
@@ -111,17 +113,22 @@ pub fn command_class(name: &str) -> Option<AtomClass> {
     Some(class)
 }
 
-/// Class of a `MATH_TEXT` run, derived from its **last non-space char**: an
-/// opening bracket makes a following `+`/`-` unary (`f(-x)`, since `(` is lumped
-/// into the `f(` text run), a closing bracket is a binary-inducing operand, and
-/// `,`/`;` are punctuation. Everything else (letters, digits, `.`) is ordinary.
-pub fn text_tail_class(text: &str) -> AtomClass {
-    match text.trim_end_matches([' ', '\t']).chars().next_back() {
-        Some('(' | '[') => AtomClass::Open,
-        Some(')' | ']') => AtomClass::Close,
-        Some(',' | ';') => AtomClass::Punct,
-        _ => AtomClass::Ord,
-    }
+/// Atom class of a delimiter/punctuation **token kind**. The parser tokenizes
+/// the unambiguous delimiters into dedicated kinds (`( [` → `MATH_OPEN`,
+/// `) ]` → `MATH_CLOSE`, `, ;` → `MATH_PUNCT`) because their TeX mathcode class
+/// is fixed at the character level — a CST fact, not the contextual
+/// *interpretation* operator class is. This maps those kinds onto the
+/// formatter's [`AtomClass`]: an opening delimiter makes a following `+`/`-`
+/// unary (`f(-x)`), a closing one is a binary-inducing operand, and `,`/`;` are
+/// punctuation. Returns `None` for any non-delimiter kind (the caller treats
+/// those as ordinary or handles them specially).
+pub fn delimiter_class(kind: SyntaxKind) -> Option<AtomClass> {
+    Some(match kind {
+        SyntaxKind::MATH_OPEN => AtomClass::Open,
+        SyntaxKind::MATH_CLOSE => AtomClass::Close,
+        SyntaxKind::MATH_PUNCT => AtomClass::Punct,
+        _ => return None,
+    })
 }
 
 /// TeX Bin→Ord coercion (the rule that yields unary minus): a [`AtomClass::Bin`]
@@ -191,17 +198,22 @@ mod tests {
     }
 
     #[test]
-    fn text_tail_classification() {
-        assert_eq!(text_tail_class("f("), AtomClass::Open);
-        assert_eq!(text_tail_class("x["), AtomClass::Open);
-        assert_eq!(text_tail_class("(a)"), AtomClass::Close);
-        assert_eq!(text_tail_class("x]"), AtomClass::Close);
-        assert_eq!(text_tail_class("a,"), AtomClass::Punct);
-        assert_eq!(text_tail_class("a;"), AtomClass::Punct);
-        assert_eq!(text_tail_class("ab"), AtomClass::Ord);
-        assert_eq!(text_tail_class("2.5"), AtomClass::Ord);
-        // Trailing whitespace is ignored when reading the tail char.
-        assert_eq!(text_tail_class("f( "), AtomClass::Open);
+    fn delimiter_kind_classification() {
+        assert_eq!(
+            delimiter_class(SyntaxKind::MATH_OPEN),
+            Some(AtomClass::Open)
+        );
+        assert_eq!(
+            delimiter_class(SyntaxKind::MATH_CLOSE),
+            Some(AtomClass::Close)
+        );
+        assert_eq!(
+            delimiter_class(SyntaxKind::MATH_PUNCT),
+            Some(AtomClass::Punct)
+        );
+        // Non-delimiter kinds are not the delimiter table's concern.
+        assert_eq!(delimiter_class(SyntaxKind::MATH_TEXT), None);
+        assert_eq!(delimiter_class(SyntaxKind::MATH_OPERATOR), None);
     }
 
     #[test]

@@ -191,14 +191,17 @@ impl MathParser<'_> {
                 }
                 '{' => self.parse_group(),
                 // Bookdown equation label `(\#eq:label)`, only when enabled.
-                // When off, `(` is not intercepted here and flows into an
-                // ordinary atom run, so the CST is unchanged for plain math.
+                // A non-matching `(` falls through to an ordinary open delimiter.
                 '(' if self.opts.bookdown_equation_labels => match self.equation_label_len() {
                     Some(len) => self.bump_bytes(len, SyntaxKind::MATH_EQUATION_LABEL),
-                    // A non-matching `(` is just one ordinary atom (it is a
-                    // text-run boundary only while the extension is on).
-                    None => self.bump_bytes(1, SyntaxKind::MATH_TEXT),
+                    None => self.bump_bytes(1, SyntaxKind::MATH_OPEN),
                 },
+                // Delimiters and punctuation: their TeX mathcode class is fixed
+                // at the character level, so it is a CST fact (unlike operator
+                // class). The ambiguous `| . /` stay in MATH_TEXT.
+                '(' | '[' => self.bump_bytes(1, SyntaxKind::MATH_OPEN),
+                ')' | ']' => self.bump_bytes(1, SyntaxKind::MATH_CLOSE),
+                ',' | ';' => self.bump_bytes(1, SyntaxKind::MATH_PUNCT),
                 '&' => self.bump_bytes(1, SyntaxKind::MATH_ALIGN),
                 '^' | '_' => self.bump_bytes(1, SyntaxKind::MATH_SCRIPT),
                 // Operator atoms (`+ - * = < >`), one token per char. Class and
@@ -319,14 +322,14 @@ impl MathParser<'_> {
         self.bump_bytes(len, SyntaxKind::MATH_SPACE);
     }
 
-    /// A run of ordinary atoms, up to the next structural character. While the
-    /// bookdown extension is on, `(` also bounds the run so every `(` reaches
-    /// the dispatcher's equation-label check.
+    /// A run of ordinary atoms, up to the next structural character. Delimiters
+    /// and punctuation (`( ) [ ] , ;`) bound the run too — they are now their
+    /// own tokens (including the `(` that the dispatcher's equation-label check
+    /// sees while the bookdown extension is on).
     fn parse_text(&mut self) {
-        let bookdown = self.opts.bookdown_equation_labels;
         let len = self
             .rest()
-            .find(|c: char| is_special(c) || (bookdown && c == '('))
+            .find(|c: char| is_special(c))
             .unwrap_or_else(|| self.rest().len());
         debug_assert!(len > 0, "parse_text on a special char");
         self.bump_bytes(len, SyntaxKind::MATH_TEXT);
@@ -343,10 +346,19 @@ impl MathParser<'_> {
 /// Characters that terminate a [`SyntaxKind::MATH_TEXT`] run.
 fn is_special(c: char) -> bool {
     is_operator(c)
+        || is_delimiter(c)
         || matches!(
             c,
             '\\' | '{' | '}' | '&' | '^' | '_' | '%' | ' ' | '\t' | '\n' | '\r'
         )
+}
+
+/// Delimiter/punctuation atoms split out of ordinary text into their own
+/// [`SyntaxKind::MATH_OPEN`]/[`SyntaxKind::MATH_CLOSE`]/[`SyntaxKind::MATH_PUNCT`]
+/// tokens. Their TeX mathcode class is fixed at the character level, so it is a
+/// CST fact; the ambiguous `| . /` are deliberately excluded (they stay text).
+fn is_delimiter(c: char) -> bool {
+    matches!(c, '(' | ')' | '[' | ']' | ',' | ';')
 }
 
 /// Operator atoms split out of ordinary text into their own
@@ -404,9 +416,43 @@ mod tests {
         // A run with no structural or operator chars stays a single atom.
         assert_eq!(token_kinds("abc"), vec![SyntaxKind::MATH_TEXT]);
         assert_lossless("abc");
-        // `/`, `.`, and parens are ordinary atoms, not operators.
-        assert_eq!(token_kinds("f(x)/2.5"), vec![SyntaxKind::MATH_TEXT]);
+        // `/` and `.` are ambiguous, so they stay ordinary atoms (not operators
+        // and not delimiters); only the parens split out.
+        assert_eq!(
+            token_kinds("f(x)/2.5"),
+            vec![
+                SyntaxKind::MATH_TEXT,  // f
+                SyntaxKind::MATH_OPEN,  // (
+                SyntaxKind::MATH_TEXT,  // x
+                SyntaxKind::MATH_CLOSE, // )
+                SyntaxKind::MATH_TEXT,  // /2.5
+            ]
+        );
         assert_lossless("f(x)/2.5");
+    }
+
+    #[test]
+    fn delimiters_and_punctuation_split_atom_runs() {
+        // `( [` open, `) ]` close, `, ;` punctuation — one token per char, with
+        // a fixed CST kind (their TeX mathcode class is character-level).
+        assert_eq!(
+            token_kinds("[a,b);"),
+            vec![
+                SyntaxKind::MATH_OPEN,  // [
+                SyntaxKind::MATH_TEXT,  // a
+                SyntaxKind::MATH_PUNCT, // ,
+                SyntaxKind::MATH_TEXT,  // b
+                SyntaxKind::MATH_CLOSE, // )
+                SyntaxKind::MATH_PUNCT, // ;
+            ]
+        );
+        assert_lossless("[a,b);");
+        // The ambiguous `| . /` are NOT delimiters — they stay in MATH_TEXT.
+        assert_eq!(token_kinds("a|b.c/d"), vec![SyntaxKind::MATH_TEXT]);
+        assert_lossless("a|b.c/d");
+        // An escaped delimiter stays a control symbol, never a delimiter token.
+        assert_eq!(token_kinds(r"\(\)\[\]"), vec![SyntaxKind::MATH_COMMAND; 4]);
+        assert_lossless(r"\(\)\[\]");
     }
 
     #[test]
@@ -670,9 +716,18 @@ mod tests {
     }
 
     #[test]
-    fn plain_parens_unchanged_when_disabled() {
-        // `(` must not fragment ordinary atom runs while the extension is off.
-        assert_eq!(token_kinds("f(x)"), vec![SyntaxKind::MATH_TEXT]);
+    fn plain_parens_tokenize_the_same_with_or_without_bookdown() {
+        // A non-label `(` is an ordinary open delimiter in both modes; only a
+        // genuine `(\#eq:...)` label is special, and only when the extension is
+        // on. So `f(x)` tokenizes identically either way.
+        let expected = vec![
+            SyntaxKind::MATH_TEXT,  // f
+            SyntaxKind::MATH_OPEN,  // (
+            SyntaxKind::MATH_TEXT,  // x
+            SyntaxKind::MATH_CLOSE, // )
+        ];
+        assert_eq!(token_kinds("f(x)"), expected);
+        assert_eq!(label_kinds("f(x)", BOOKDOWN), expected);
     }
 
     #[test]

@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..591
@@ -156,7 +157,10 @@ DOCUMENT@0..591
       DISPLAY_MATH_MARKER@509..511 "$$"
       MATH_CONTENT@511..521
         MATH_NEWLINE@511..512 "\n"
-        MATH_TEXT@512..516 "f(x)"
+        MATH_TEXT@512..513 "f"
+        MATH_OPEN@513..514 "("
+        MATH_TEXT@514..515 "x"
+        MATH_CLOSE@515..516 ")"
         MATH_SPACE@516..517 " "
         MATH_OPERATOR@517..518 "="
         MATH_SPACE@518..519 " "

@@ -17,7 +17,8 @@
 #
 # Lines beginning with `#` and blank lines are ignored.
 
-# --- char operators (classify_operator / text_tail_class) ---
+# --- char operators (classify_operator) + delimiters (parser kind ->
+#     delimiter_class) ---
 +	Bin	binop
 -	Bin	binop
 *	Bin	binop

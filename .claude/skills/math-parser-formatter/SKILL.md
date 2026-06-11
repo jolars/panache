@@ -91,6 +91,11 @@ design plan is `~/.claude/plans/i-want-to-plan-foamy-pascal.md`.
   recorded, not corrected.
 - **Phase 6 — semantic line-breaking + indenting.** Wrap long display math at
   lowest-precedence operators, indent continuations (uses Phase 5 priorities).
+  - *Commit 1 DONE*: parser tokenizes delimiters/punctuation (`( [` →
+    `MATH_OPEN`, `) ]` → `MATH_CLOSE`, `, ;` → `MATH_PUNCT`; `| . /` stay text);
+    formatter's `text_tail_class` replaced by kind-keyed `operators::delimiter_class`.
+    No behavior change. Remaining: the break-priority column + the line-breaking
+    walk over the structured CST.
 - **Phase 7 — docs + stabilization** (`docs/guide/formatting.qmd`,
   `configuration.qmd`); consider flipping the gate per flavor (separate
   decision).

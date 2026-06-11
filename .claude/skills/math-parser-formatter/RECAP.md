@@ -57,62 +57,58 @@ still-relevant trap into Persistent traps. Keep it short.
   the CST even though the parser *has* the same context the formatter does (no
   information asymmetry; it's a principle, not a capability limit). Delimiters
   and punctuation (`( ) [ ] , ;`) are the opposite: their category is
-  unambiguous at the character level, so they're fair game for the CST grain
-  (see next-sub-target #1) — that's why `text_tail_class` peeking inside
-  `MATH_TEXT` is a smell, not the class logic.
+  unambiguous at the character level, so they belong in the CST grain. **Done
+  (Phase 6 commit 1):** the parser tokenizes them into `MATH_OPEN`/`MATH_CLOSE`/
+  `MATH_PUNCT`, and the old `text_tail_class` (which re-lexed a `MATH_TEXT` tail)
+  is gone — the formatter reads the token kind via `operators::delimiter_class`.
+  `| . /` stay `MATH_TEXT` (their class needs macro context).
 
 --------------------------------------------------------------------------------
 
 ## Latest session
 
-**Phase 5b leftover — Tier 3 symbol-class fixture.** *DONE* (not yet committed).
-**Dev-only test + vendored fixture; no production code touched.** Phase 5b is now
-fully closed (spacing landed earlier `1e43f251`).
+**Phase 6 commit 1 — tokenize delimiters/punctuation (parser) + delete
+`text_tail_class` (formatter).** *DONE* (not yet committed). The one re-lexing
+smell is gone: the formatter no longer peeks at a `MATH_TEXT` tail to recover a
+`(`/`,` class.
 
-New vendored manifest
-`crates/panache-formatter/tests/fixtures/math_symbol_classes/symbol-classes.tsv`
-(96 rows: 84 command rows = the full `command_class` surface, 12 char-operator
-rows, plus 3 Ord controls) — three tab columns `token / atom_class / oracle`. New
-harness `crates/panache-formatter/tests/math_symbol_classes.rs` (4 tests) +
-fixture README. The fixture is an *independent* enumeration, so it catches drift
-both ways: a retyped class **and** a deleted command (lookup → `None`).
-Assertions: (1) `operators::command_class`/`classify_operator`/`text_tail_class`
-match each row; (2) the recorded `oracle` is what `pulldown-latex` actually emits
-for probe `a <token> b` (dev-only, mirrors the Tier-2 MathML oracle); plus a
-non-vacuity guard (`+`→binop ≠ `=`→relation) and a coverage floor (≥65 command
-rows, every class present).
+- **Parser** (`parser/math.rs`): new `is_delimiter` helper + dispatch arms split
+  `( [` → `MATH_OPEN`, `) ]` → `MATH_CLOSE`, `, ;` → `MATH_PUNCT` (one token per
+  char). The ambiguous `| . /` deliberately stay `MATH_TEXT`. `is_special` gained
+  them so they bound text runs; `parse_text` lost its bookdown-`(` special case
+  (a `(` is now always a boundary, so the equation-label check still sees every
+  `(`). Three new `SyntaxKind`s after `MATH_OPERATOR`. New unit tests
+  (`delimiters_and_punctuation_split_atom_runs`, reworked `plain_text_*` /
+  `plain_parens_*`).
+- **Losslessness**: added the three kinds to `is_math_content_token`
+  (`syntax/math.rs`) — the critical whitelist that keeps `math_content_text` (and
+  thus the pandoc-ast projector + format roundtrip) lossless.
+- **Formatter**: `operators::text_tail_class` replaced by
+  `pub fn delimiter_class(kind) -> Option<AtomClass>` (kind-keyed, not char-keyed
+  — no duplication of the parser's char→kind grouping). `render.rs::atom_prev_class`
+  delegates to it; `MATH_TEXT` is now unconditionally `Ord`. New tokens hit the
+  existing `_ => Plain` arm in `space_operators`, so spacing is **byte-identical**.
+- **Tier-3 fixture**: `char_class` now parses the delimiter char and maps the
+  resulting kind through `delimiter_class` (validates the *full* parser→formatter
+  path + the pulldown oracle, not a standalone char fn). tsv/README comments
+  updated.
 
-**Two recorded divergences** (oracle column records pulldown's view; we keep our
-class): `\lim` is `Op` for us / `Function` to pulldown (spacing-equivalent);
-`\asymp` is AMS-correct `Rel` for us / `BinaryOp` to pulldown (an oracle quirk we
-don't follow). `\left`/`\right`/`\frac` carry `oracle = skip` (no probeable
-standalone `Content` event). All documented in the fixture comments + README.
-
-Verified: new test green; `cargo test --workspace` (31 binaries) clean; clippy
-`-D warnings` clean; `cargo fmt --check` clean. No formatter behavior change, so
-goldens stay byte-identical.
+**No behavior change** — confirmed end-to-end: `$f(-x) = (a)-b + [1,2]$` →
+`$f(-x) = (a) - b + [1,2]$` (unary `-` after `(` tight, binary after `)` spaced,
+`,` tight). 4 parser CST snapshots regenerated (parens split out; ranges still
+contiguous/lossless; no `MATH_EQUATION_LABEL` touched). The `math-syntax` linter
+rule needed **no** change (it only walks groups/environments; new kinds fall
+through its `_`). Verified: `cargo test --workspace` (31 binaries) clean, clippy
+`-D warnings` clean, `cargo fmt --check` clean.
 
 ### Suggested next sub-targets
-1. **Parser: tokenize unambiguous delimiters/punctuation** (`( ) [ ] , ;`) out
-   of `MATH_TEXT` into neutral kinds (e.g. `MATH_OPEN`/`MATH_CLOSE`/`MATH_PUNCT`;
-   leave the ambiguous `| . /` as text). Lets the interpretation layer read token
-   *kinds* and **deletes `operators::text_tail_class`** (the one re-lexing smell —
-   today the formatter peeks at the last char of a `MATH_TEXT` run to spot `(`/`,`).
-   Lossless; touches `is_special`/dispatch in `parser/math.rs`, the
-   `is_math_content_token` whitelist (`syntax/math.rs`), every parser golden with
-   parens in math, and must move **in lockstep with the `math_content` linter
-   rule**. **Do this as the first commit of the Phase 6 slice, with the consumer**
-   (line-breaking walks the structured tree and wants clean atom grain) — not
-   speculatively, so the new kinds are validated against a real use. Decision
-   recorded with the user 2026-06-10; deferred from Phase 5 (clean checkpoint,
-   modest-but-not-zero churn). See the "CST grain vs interpretation" invariant.
-2. **Phase 6 — semantic line-breaking + continuation indent** (add the
+1. **Phase 6 — semantic line-breaking + continuation indent** (add the
    break-priority column to `operators.rs`; use `operators/` corpus stressors).
    Walk the *structured* CST — do NOT flatten as the spacing pass does; flattening
    then relinearizing fights bracket-matching / nesting depth.
-3. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
+2. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
    blocks become formattable (would make `MathContext::EnvironmentBody` reachable).
-4. Optional structural cooking (orthogonal to operators): script attachment,
+3. Optional structural cooking (orthogonal to operators): script attachment,
    known-command argument grouping.
 
 **Placement note (deferred, YAGNI):** `operators.rs` lives in the formatter
@@ -125,6 +121,12 @@ tokens) so formatter + linter + LSP share one interpretation.
 
 ## Earlier sessions
 
+- **Phase 5b leftover — Tier-3 symbol-class fixture** (committed `9e10d943`).
+  Dev-only vendored `symbol-classes.tsv` (token/atom_class/oracle) + harness
+  cross-checking `operators` against `pulldown-latex` Events; catches class drift
+  both ways (retyped class **and** deleted command). `\lim`/`\asymp` divergences
+  recorded, not corrected. (Its `char_class` delimiter path was rebased onto
+  `delimiter_class` in Phase 6 commit 1.)
 - **Phase 5b — command-operator spacing** (committed `1e43f251`). Formatter-only
   `render.rs` `MATH_COMMAND` arm: a command whose `command_class` is `Bin`/`Rel`
   (after `coerce`) demands `SpacedOp` (`a\cdot b`→`a \cdot b`); command ops are

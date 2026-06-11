@@ -501,9 +501,15 @@ fn gap_space(prev: Demand, cur: Demand, pending_space: bool) -> bool {
 /// `MATH_COMMAND` is handled inline in [`space_operators`] (it sets `prev_class`
 /// from the coerced class), so it never reaches here. `None` resets context (a
 /// `\\` starts a fresh line, so a following `+`/`-` is unary).
-fn atom_prev_class(kind: SyntaxKind, text: &str) -> Option<AtomClass> {
+fn atom_prev_class(kind: SyntaxKind, _text: &str) -> Option<AtomClass> {
+    // Delimiters/punctuation (`( ) [ ] , ;`) carry their class on the token
+    // kind now — the parser tokenizes them, so the formatter no longer re-lexes
+    // a `MATH_TEXT` tail to recover it.
+    if let Some(class) = operators::delimiter_class(kind) {
+        return Some(class);
+    }
     let class = match kind {
-        SyntaxKind::MATH_TEXT => operators::text_tail_class(text),
+        SyntaxKind::MATH_TEXT => AtomClass::Ord,
         SyntaxKind::MATH_GROUP_OPEN => AtomClass::Open,
         SyntaxKind::MATH_GROUP_CLOSE => AtomClass::Close,
         // `^`/`_` bind tightly; a `&` opens a fresh cell — both make a directly

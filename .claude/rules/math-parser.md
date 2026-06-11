@@ -57,6 +57,14 @@ YAML parser uses (`copy_green_node` from a sub-parser green node).
   (`\cdot`, `\leq`, …) stay `MATH_COMMAND`. Remember to keep `MATH_OPERATOR` in
   the `math_content_text()` whitelist (`syntax/math.rs`) — dropping it breaks
   losslessness.
+- **Delimiters and punctuation ARE classified in the CST** (the opposite of
+  operators). `( [` → `MATH_OPEN`, `) ]` → `MATH_CLOSE`, `, ;` → `MATH_PUNCT`,
+  one token per char, because their TeX mathcode class is fixed at the *character*
+  level — a fact, not the contextual guess operator class is. The ambiguous
+  `| . /` stay `MATH_TEXT` (their class needs macro context). The formatter maps
+  the kind via `operators::delimiter_class` (no `text_tail_class` re-lexing). Keep
+  all three kinds in the `math_content_text()` whitelist too — same losslessness
+  trap as `MATH_OPERATOR`.
 - **Single-pass.** The sub-parse happens once at emission in `inlines/math.rs`;
   don't add a re-parse/post-process pass.
 - Keep parser policy separate from formatter policy. The formatter side is gated

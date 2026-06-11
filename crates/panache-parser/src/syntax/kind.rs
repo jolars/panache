@@ -107,6 +107,13 @@ pub enum SyntaxKind {
     // `+ - * = < >` operator atom; one token per char. Class/precedence are
     // contextual (unary minus, `\mathbin`) and deferred to the formatter.
     MATH_OPERATOR,
+    // Delimiters and punctuation whose TeX mathcode class is fixed at the
+    // character level (unlike operator class, which is contextual): `( [` open,
+    // `) ]` close, `, ;` punctuation. One token per char. The ambiguous `| . /`
+    // stay in MATH_TEXT — their class needs macro context.
+    MATH_OPEN,    // ( or [
+    MATH_CLOSE,   // ) or ]
+    MATH_PUNCT,   // , or ;
     MATH_TEXT,    // run of ordinary atoms
     MATH_SPACE,   // run of spaces/tabs
     MATH_NEWLINE, // newline within math content
