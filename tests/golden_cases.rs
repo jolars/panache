@@ -316,6 +316,7 @@ golden_test_cases!(
     lists_code,
     lists_example,
     lists_fancy,
+    lists_indented_code,
     lists_nested,
     lists_ordered,
     lists_task,

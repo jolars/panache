@@ -416,7 +416,23 @@ impl Formatter {
 
         let indent_str = " ".repeat(indent);
 
-        self.format_container_code_block(node, &indent_str, indent, false, false, false);
+        // For an indented (non-fenced) code block inside a list item, the CST
+        // content whitespace embeds the list's content indent *plus* the 4-space
+        // code marker (e.g. `      code` = 2 for the list + 4 for the marker).
+        // The inner renderer only strips the 4-space marker, leaving the list
+        // indent in the content; re-prefixing with `indent` would then double
+        // it. Normalize the content by `indent` columns so the list indent is
+        // stripped once and re-applied once. Fenced blocks already carry their
+        // own fence indent and need no extra normalization.
+        let normalize_content_indent = !is_fenced && in_list_item;
+        self.format_container_code_block(
+            node,
+            &indent_str,
+            indent,
+            false,
+            normalize_content_indent,
+            false,
+        );
 
         // Ensure we end with exactly one newline
         if !self.output.ends_with('\n') {
