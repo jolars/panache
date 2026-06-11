@@ -1,0 +1,8 @@
+---
+title: "Changelog"
+description: >-
+  Release history and notable changes for Panache, the formatter, linter, and
+  language server for Quarto, Pandoc, and Markdown.
+---
+
+{{< include ../CHANGELOG.md >}}

@@ -1,5 +1,8 @@
 ---
 title: "CommonMark conformance"
+description: >-
+  How Panache's shared parser scores against the CommonMark spec test suite
+  under the CommonMark flavor, and where it currently diverges.
 ---
 
 ```{ojs}

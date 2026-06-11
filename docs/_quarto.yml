@@ -5,6 +5,7 @@ project:
     port: 4200
   post-render:
     - scripts/fix-sitemap.sh
+    - scripts/fix-logo-alt.sh
 
 website:
   title: "Panache"
@@ -58,7 +59,7 @@ website:
         text: Reference
       - href: development
         text: Development
-      - href: changelog.md
+      - href: changelog.qmd
         text: Changelog
       - text: Help
         menu:
@@ -122,7 +123,7 @@ website:
               text: "Architecture audit: LSP / salsa / rowan"
             - href: development/commonmark-conformance.qmd
               text: CommonMark conformance
-            - href: development/contributing.md
+            - href: development/contributing.qmd
               text: Contributing
 
 resources:

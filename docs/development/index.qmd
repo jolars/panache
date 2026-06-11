@@ -1,5 +1,8 @@
 ---
 title: "Development"
+description: >-
+  Developer documentation for Panache: the contributing guide, language server
+  internals, and architecture notes for the formatter, linter, and LSP.
 ---
 
 This section contains information for developers interested in contributing to

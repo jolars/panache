@@ -1,5 +1,8 @@
 ---
 title: "Architecture audit: LSP / salsa / rowan"
+description: >-
+  An audit comparing Panache's incremental language-server design against
+  rust-analyzer and salsa, recording the gaps worth adopting.
 ---
 
 *Audit date: 2026-06-09. Compares panache's incremental + language-server
