@@ -124,6 +124,33 @@ fn experimental_format_math_does_not_break_overwidth_fraction() {
 }
 
 #[test]
+fn experimental_format_math_breaks_standalone_binary_chain() {
+    // No relation at all: the first term is the head and each `+ term` aligns
+    // flush under it (the unifying rule — a binary continuation sits under the
+    // first term of its operand sequence).
+    let cfg = math_config_width(true, 12);
+    let input = "$$\naaaa + bbbb + cccc + dddd\n$$\n";
+    let expected = "$$\naaaa\n+ bbbb\n+ cccc\n+ dddd\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn experimental_format_math_nests_binary_under_single_relation() {
+    // One relation with an over-width binary RHS: the `+` terms nest under the
+    // right-hand side (no second relation to start a continuation against).
+    let cfg = math_config_width(true, 20);
+    let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb + cccccccccc\n$$\n";
+    let expected = "$$\nA = aaaaaaaaaa\n    + bbbbbbbbbb\n    + cccccccccc\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
 fn display_math_with_followup_text_is_idempotent_in_rmarkdown() {
     let flavor = Flavor::RMarkdown;
     let config = Config {

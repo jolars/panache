@@ -68,8 +68,43 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
+**Phase 6 commit 4 — binary breaking OUTSIDE a relation chain
+(formatter).** *DONE* (not yet committed). Closes suggested next sub-target #1.
+The `rels.len() < 2` bail in `break_free_row` became a 3-way branch reusing the
+existing `break_binary_segment` verbatim (no new helper, committed machinery
+byte-identical):
+
+- **`rels == 0`** (standalone binary chain `aaaa + bbbb + cccc`):
+  `break_binary_segment(elems, 0, 0, width)` — first term is the head, each
+  `+ term` **flush** (`bin_indent 0`) under it. User chose flush over a 2-space
+  hanging indent for the **unifying rule**: a binary continuation aligns under the
+  first term of its operand sequence — which the relation cases *already* satisfy
+  (`bin_indent = rel_indent+2 = prefix+3` == the RHS first-term column), so flush
+  (RHS == whole chain, col 0) is the one consistent extension; 2-space was the
+  lone exception.
+- **`rels == 1`** (`A = aaaa + bbbb + cccc`):
+  `break_binary_segment(elems, 0, rel_indent+BINARY_NEST, width)` — lone relation
+  on the opening line, binary RHS terms nest under the RHS (`bin_indent = 4` for a
+  single-char LHS, aligning under the RHS start).
+- **`rels >= 2`**: existing relation-chain path, moved under its arm unchanged.
+- **Break strategy = break-before-every-binary-op** (consistent with the
+  committed relation-chain breaker). Greedy *min-breaks-to-fit* was explicitly
+  considered and **deferred** to a future retrofit sub-target that would touch
+  all three paths at once (avoids two coexisting strategies / golden churn).
+- A row with **no** depth-0 relation or binary op (lone wide `\frac`) still stays
+  one line — falls through `break_binary_segment`'s empty-`bins` guard for free.
+- Tests: 4 new `linebreak.rs` unit tests + 2 host tests
+  (`tests/format/math.rs`, with idempotency) + golden
+  `math_linebreak_binary_chain_experimental` (width 20). **Updated** the
+  `math.rs` unit `display_does_not_break_inside_delimiters_or_groups`: its old
+  input `\left(…=…\right) + zzzz` now (correctly) breaks at the depth-0 `+`, so
+  the buried operators were moved *inside* the delimiters (`\left( x = y + w
+  \right)`) to keep testing delimiter opacity under the broader scope. STYLE.md
+  Rule 7 Scope + module doc + `docs/guide/formatting.qmd` updated. Verified
+  `cargo test --workspace`, clippy `-D warnings`, fmt, and e2e idempotency.
+
 **Phase 6 commit 3 — nested binary breaking under relation chains
-(formatter).** *DONE* (not yet committed). Follow-up to commit 2: when a relation
+(formatter).** Committed `0128da42`. Follow-up to commit 2: when a relation
 segment is itself over-width, its top-level binary terms now break one indent
 step (`BINARY_NEST=2`) deeper, nesting under the relation's RHS:
 
@@ -92,10 +127,8 @@ A = aaaaaaaaaa
   Some(Close))` (seeds `prev_class`, keeps `prev_demand=Start` so no leading
   space) so the leading `+` stays binary (`+ b`). `space_operators` gained a
   `seed` param; `render_inline` = `render_inline_seeded(_, None)`, byte-identical.
-- **Scope still bounded**: binary breaking only INSIDE a relation chain (≥2
-  rels). Standalone binary chains / single-relation rows / no-relation rows stay
-  one (over-width) line. New golden `math_linebreak_nested_experimental`
-  (width 20); host + embedded tests incl. idempotency + `unary_sign_is_not_a_binary_break_point`.
+- New golden `math_linebreak_nested_experimental` (width 20); host + embedded
+  tests incl. idempotency + `unary_sign_is_not_a_binary_break_point`.
 
 **Phase 6 commit 2 — semantic line-breaking for over-width display free rows
 (formatter).** Committed `9d7c2e5b`. The deferred break-priority column +
@@ -136,16 +169,22 @@ align-under-relation, display free rows only**.
 `cargo test --workspace`, clippy `-D warnings`, `cargo fmt --check` all clean.
 
 ### Suggested next sub-targets
-1. **Binary breaking outside a relation chain** — standalone binary chains and
-   single-relation rows still stay one over-width line (the nested case landed
-   in commit 3 via `render_inline_seeded`). Open question: continuation indent
-   with no relation column to nest under. Also consider min-breaks-to-fit instead
-   of break-at-every-operator.
+1. **Min-breaks-to-fit (greedy line-fill) retrofit** — all binary breaking
+   currently breaks before *every* depth-0 binary op. Greedy "pack terms until
+   the next exceeds width" gives fuller lines. Must retrofit **all three paths at
+   once** (relation-chain, single-relation, standalone) in `break_binary_segment`
+   to keep one strategy; will reshape committed goldens
+   (`math_linebreak_nested_experimental`, the new `..._binary_chain_...`, host
+   tests). Deferred from commit 4 by user choice.
 2. **Environment-body line-breaking** (interacts with the `&`-column engine).
 3. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
    blocks become formattable (would make `MathContext::EnvironmentBody` reachable).
 4. Optional structural cooking (orthogonal to operators): script attachment,
    known-command argument grouping.
+
+**Done:** binary breaking outside a relation chain (commit 4) — standalone +
+single-relation rows now break; the only over-width rows left untouched are those
+with no depth-0 relation *or* binary op (a lone wide `\frac`).
 
 **Placement note (deferred, YAGNI):** `operators.rs` lives in the formatter
 crate (`pub`), but the `cooking.rs` analog it mirrors lives in the *parser*

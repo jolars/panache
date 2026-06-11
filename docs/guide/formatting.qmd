@@ -921,10 +921,13 @@ The break is source-cosmetic --- math ignores whitespace, so the rendered
 equation is unchanged. Relations break before binary operators (`+`, `\cdot`),
 which only break further when their segment still overflows; operators inside
 `(…)`, `\left…\right`, or a `{…}` group (including `\frac{…}{…}` arguments) are
-never broken at. A unary `+`/`-` is never a break point. An equation with no
-top-level relation chain is left on one line even when it overflows. The option
-is unstable and may change without a major release --- see [Experimental
-Features](configuration.qmd#experimental-features).
+never broken at. A unary `+`/`-` is never a break point. An over-width row with
+a single relation breaks its binary right-hand side; one with no relation at all
+(a standalone binary chain) breaks with its head term flush-left and each
+following term on its own line. Only an equation with **no** top-level relation
+or binary operator (e.g. a single wide `\frac{…}{…}`) is left on one line when
+it overflows. The option is unstable and may change without a major release ---
+see [Experimental Features](configuration.qmd#experimental-features).
 
 ## Links
 

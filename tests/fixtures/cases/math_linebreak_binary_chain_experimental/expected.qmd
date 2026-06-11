@@ -1,0 +1,18 @@
+# Chain
+
+No relation:
+
+$$
+aaaaaaaa
++ bbbbbbbb
++ cccccccc
++ dddddddd
+$$
+
+One relation:
+
+$$
+A = aaaaaaaaaa
+    + bbbbbbbbbb
+    + cccccccccc
+$$

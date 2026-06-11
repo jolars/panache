@@ -408,11 +408,14 @@ mod tests {
             line_width: 12,
             ..opts(MathContext::Display)
         };
-        // A single over-width fraction with no top-level relation stays one line.
+        // A single over-width fraction with no top-level operator stays one line.
         let frac = "\\frac{aaaaaaaa}{bbbbbbbb}";
         assert_eq!(format_math(frac, &narrow), frac);
-        // A relation buried inside `\left(…\right)` is not a depth-0 break point.
-        let paren = "\\left( xxxx = yyyy \\right) + zzzz";
+        // Relation *and* binary operators buried inside `\left(…\right)` are not
+        // depth-0 break points, so this over-width row has no break candidate and
+        // stays on one line (the broader binary-breaking scope must still respect
+        // delimiter opacity).
+        let paren = "\\left( xxxx = yyyy + wwww \\right)";
         let once = format_math(paren, &narrow);
         assert!(!once.contains('\n'), "should not break: {once:?}");
         assert_eq!(format_math(&once, &narrow), once);

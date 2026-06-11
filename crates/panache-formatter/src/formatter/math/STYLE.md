@@ -136,12 +136,18 @@ Returned unchanged, never reflowed:
      (Contrast environment-body rows, which keep soft-newline boundaries.) The
      exception: a soft newline terminating a `%` comment stays a boundary, or
      the next line is absorbed into the comment.
-   - **Scope:** binary breaking happens **only inside a relation chain** (≥ 2
-     top-level relations). A standalone binary chain, or a single relation, is
-     left on one over-width line --- like an unbreakable long word in prose
-     reflow. A row with no top-level relation (e.g. a single wide `\frac{…}{…}`)
-     is likewise untouched. Inline and environment-body math are not
-     line-broken.
+   - **Scope:** every over-width free row with a top-level relation **or**
+     binary operator is broken. A **relation chain** (≥ 2 relations) splits at
+     its relations, then nests binary terms inside each over-width segment (as
+     above). A **single-relation** row splits its over-width binary RHS, each
+     `+ term` nested under the right-hand side. A **standalone binary chain**
+     (no relation) splits with the first term as the head and each `+ term`
+     flush under it. The unifying rule: a binary continuation aligns under the
+     **first term of its operand sequence** (for a relation segment that is its
+     RHS; for a bare chain it is the chain itself, so the `+` sits flush). A row
+     with **no** top-level relation or binary operator (e.g. a single wide
+     `\frac{…}{…}`) is left on one over-width line --- like an unbreakable long
+     word in prose reflow. Inline and environment-body math are not line-broken.
 
 ## Idempotency
 

@@ -41,11 +41,16 @@
 //!
 //! ## Scope (current)
 //!
-//! Binary breaking happens **only inside a relation chain** (≥ 2 top-level
-//! relations). A row that is a standalone binary chain, or has a single
-//! relation, is left on one line even when over-width (deferred — the
-//! continuation indent for a bare binary chain has no relation column to nest
-//! under). Inline and environment-body math are not line-broken.
+//! Every over-width free row with a top-level relation **or** binary operator is
+//! broken. A relation chain (≥ 2 relations) breaks at its relations first, then
+//! at the binary operators inside each over-width segment. A single-relation row
+//! breaks its over-width binary RHS, each `+ term` nested under the RHS. A
+//! standalone binary chain (no relation) breaks with the first term as the head
+//! and each `+ term` flush under it. The unifying rule across all three: a binary
+//! continuation aligns under the first term of its operand sequence. A row with
+//! no top-level relation or binary operator (e.g. a lone wide `\frac{…}{…}`)
+//! stays on one line, like an unbreakable long word in prose reflow. Inline and
+//! environment-body math are not line-broken.
 //!
 //! ## Idempotency
 //!
@@ -87,10 +92,15 @@ pub(super) fn break_free_row(elems: &[SyntaxElement], line_width: usize) -> Vec<
         .filter(|b| b.class == AtomClass::Rel)
         .map(|b| b.index)
         .collect();
-    // A chain needs ≥ 2 relations: the first stays on the opening line, every
-    // later one starts a continuation. Otherwise leave the (over-width) row.
-    if rels.len() < 2 {
-        return vec![single];
+
+    // Zero relations: a standalone binary chain. With no relation, the chain's
+    // first term *is* the head, so each `+ term` aligns flush under it (bin_indent
+    // 0) — the same rule the relation cases follow (a binary continuation aligns
+    // under the first term of its right-hand side). A row with no top-level binary
+    // op either (e.g. a lone wide `\frac`) falls through `break_binary_segment`'s
+    // empty-`bins` guard and stays on one (over-width) line.
+    if rels.is_empty() {
+        return break_binary_segment(elems, 0, 0, line_width);
     }
 
     // Relation continuations align under the first relation's column; binary
@@ -106,8 +116,16 @@ pub(super) fn break_free_row(elems: &[SyntaxElement], line_width: usize) -> Vec<
     };
     let bin_indent = rel_indent + BINARY_NEST;
 
-    // Segment boundaries: [0, rels[1], rels[2], …, len]. Segment 0 keeps the
-    // first relation; each later segment begins with a relation.
+    // One relation: the whole row is a single segment. It keeps the lone relation
+    // on the opening line; an over-width binary RHS breaks before each `+`, each
+    // term nested at `bin_indent` (under the RHS for a single-char LHS).
+    if rels.len() == 1 {
+        return break_binary_segment(elems, 0, bin_indent, line_width);
+    }
+
+    // ≥ 2 relations: a relation chain. The first relation stays on the opening
+    // line; every later one starts a continuation aligned under the first
+    // relation's column. Segment boundaries: [0, rels[1], rels[2], …, len].
     let bounds: Vec<usize> = std::iter::once(0)
         .chain(rels[1..].iter().copied())
         .chain(std::iter::once(elems.len()))
@@ -383,5 +401,42 @@ mod tests {
         // binary break candidate and stays on one (over-width) line.
         let out = lines("A = -tttttttttt = -uuuuuuuuuu", 12);
         assert_eq!(out, vec!["A = -tttttttttt", "  = -uuuuuuuuuu"]);
+    }
+
+    #[test]
+    fn single_relation_breaks_binary_terms() {
+        // One relation, over-width RHS binary chain: each `+ term` nests under
+        // the RHS (`bin_indent = rel_indent + 2 = 4` for the single-char LHS).
+        assert_eq!(
+            lines("A = aaaaaaaaaa + bbbbbbbbbb + cccccccccc", 20),
+            vec!["A = aaaaaaaaaa", "    + bbbbbbbbbb", "    + cccccccccc"],
+        );
+    }
+
+    #[test]
+    fn zero_relation_binary_chain_breaks_flush() {
+        // No relation: the first term is the head, each `+ term` flush under it
+        // (the same rule the relation cases follow — align under the first term).
+        assert_eq!(
+            lines("aaaa + bbbb + cccc + dddd", 12),
+            vec!["aaaa", "+ bbbb", "+ cccc", "+ dddd"],
+        );
+    }
+
+    #[test]
+    fn zero_relation_no_binary_stays_one_line() {
+        // No relation and no top-level binary (the ops live inside the `\frac`
+        // group, opaque) ⇒ the over-width row is left untouched.
+        assert_eq!(lines("\\frac{aaaaaaaa}{bbbbbbbb}", 12).len(), 1);
+    }
+
+    #[test]
+    fn zero_relation_leading_unary_sign_is_head() {
+        // A leading `-` coerces to unary (list start), so it joins the head
+        // rather than starting a break.
+        assert_eq!(
+            lines("-aaaaaaaa + bbbbbbbb + cccccccc", 12),
+            vec!["-aaaaaaaa", "+ bbbbbbbb", "+ cccccccc"],
+        );
     }
 }
