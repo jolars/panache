@@ -923,8 +923,16 @@ impl<'a> Parser<'a> {
             return false;
         }
 
+        // A marker reaching the deepest item's content column opens a sublist —
+        // but only within the [content_col, content_col + 4) band. At
+        // content_col + 4 or deeper, a sublist would be an indented code block,
+        // and (with no blank line) a code block can't interrupt the open
+        // paragraph, so pandoc treats the marker as lazy continuation text. Fall
+        // through to the continuation path in that case.
         let current_content_col = paragraphs::current_content_col(&self.containers);
-        if prepared.indent_cols >= current_content_col {
+        if prepared.indent_cols >= current_content_col
+            && prepared.indent_cols < current_content_col + 4
+        {
             return false;
         }
 
