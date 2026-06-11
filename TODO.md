@@ -14,17 +14,6 @@ This document tracks implementation status for Panache's features.
   either way --- but the toggle is silently ineffective. Pairs with the
   existing "Configuration via LSP" item below.
 
-- [ ] Follow-up: offload the cold `project_graph` / `built_in_lint_plan` reads
-  to `spawn_blocking` if a cold relint is shown to starve the async runtime
-  (returns are owned/`Send`; pass `GreenNode`, not the red `SyntaxNode`,
-  across the boundary).
-
-- [ ] Follow-up: extend clone-out to the interactive navigation reads
-  (goto-definition/references/hover reach `project_graph` under the lock via
-  `get_definition_index_with_includes`) if profiling shows they stall behind
-  a cold graph. Would need `Cancelled::catch` + retry on the interactive
-  path rather than abort.
-
 - [ ] Follow-up (lsp-server): avoid cloning the full `DocumentState` per
   request. `StateSnapshot::document_state()` and
   `definition_index_with_includes()` clone the whole `DocumentState`
