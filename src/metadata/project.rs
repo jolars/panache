@@ -179,6 +179,64 @@ fn extract_project_metadata_impl(
     Ok(metadata)
 }
 
+/// Validate ONLY the document's own YAML frontmatter, with no project-file
+/// reads. The LSP uses this so that project-manifest (`_quarto.yml` etc.) parse
+/// errors stay off the document's own diagnostics — those are surfaced on the
+/// manifest file's own URI instead (see `project_manifest_diagnostics`).
+pub(crate) fn validate_doc_frontmatter(tree: &SyntaxNode) -> Result<(), YamlError> {
+    let Some(yaml_text) = super::find_yaml_metadata_node(tree).map(|node| node.text().to_string())
+    else {
+        return Ok(());
+    };
+    let doc_yaml = strip_yaml_delimiters(&yaml_text);
+    parse_metadata_text(&doc_yaml).map(|_| ())
+}
+
+/// The project-manifest config files that contribute metadata to `doc_path`:
+/// `_quarto.yml` at the project root, every `_metadata.yml` from the root down
+/// to the document's directory (Quarto), or `_bookdown.yml`/`_output.yml`
+/// (bookdown). Only existing files are returned. Mirrors the resolution order in
+/// [`extract_project_metadata_impl`]; used to wire `EdgeKind::ProjectConfig`
+/// edges so these files become tracked salsa inputs.
+pub(crate) fn project_config_paths(doc_path: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    let Some(project_root) = find_project_root(doc_path) else {
+        return paths;
+    };
+    let doc_dir = doc_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf();
+    match project_root {
+        ProjectRoot::Quarto(project_root) => {
+            let quarto_file = project_root.join("_quarto.yml");
+            if quarto_file.exists() {
+                paths.push(quarto_file);
+            }
+            let mut dir = doc_dir.as_path();
+            while dir.starts_with(&project_root) {
+                let metadata_file = dir.join("_metadata.yml");
+                if metadata_file.exists() {
+                    paths.push(metadata_file);
+                }
+                if dir == project_root {
+                    break;
+                }
+                dir = dir.parent().unwrap_or(project_root.as_path());
+            }
+        }
+        ProjectRoot::Bookdown(project) => {
+            for bookdown_file in ["_bookdown.yml", "_output.yml"] {
+                let path = project.root.join(bookdown_file);
+                if path.exists() {
+                    paths.push(path);
+                }
+            }
+        }
+    }
+    paths
+}
+
 fn parse_metadata_text(yaml_text: &str) -> Result<MergeMetadata, YamlError> {
     if yaml_text.trim().is_empty() {
         return Ok(MergeMetadata::default());
@@ -322,7 +380,7 @@ fn metadata_scalar(scalar: crate::syntax::YamlScalar) -> MetadataScalar {
     }
 }
 
-fn byte_offset_to_line_col_1based(input: &str, offset: usize) -> (usize, usize) {
+pub(crate) fn byte_offset_to_line_col_1based(input: &str, offset: usize) -> (usize, usize) {
     let mut line = 1usize;
     let mut line_start = 0usize;
     let bytes = input.as_bytes();

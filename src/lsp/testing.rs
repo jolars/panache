@@ -372,6 +372,18 @@ impl LspTester {
     /// Drain `textDocument/publishDiagnostics` notifications scoped to `uri`.
     pub fn drain_publish_diagnostics(&self, uri: &str) -> Vec<PublishDiagnosticsParams> {
         let target: Uri = uri.parse().expect("valid uri");
+        self.drain_all_publish_diagnostics()
+            .into_iter()
+            .filter(|params| params.uri == target)
+            .collect()
+    }
+
+    /// Every `publishDiagnostics` notification since the last drain, across all
+    /// URIs. The per-URI [`Self::drain_publish_diagnostics`] consumes all client
+    /// messages, so use this when a single test must inspect publishes for more
+    /// than one URI (e.g. a diagnostic present on a manifest yet absent on the
+    /// document).
+    pub fn drain_all_publish_diagnostics(&self) -> Vec<PublishDiagnosticsParams> {
         self.drain_client_messages()
             .into_iter()
             .filter_map(|msg| match msg {
@@ -382,7 +394,6 @@ impl LspTester {
                 }
                 _ => None,
             })
-            .filter(|params| params.uri == target)
             .collect()
     }
 

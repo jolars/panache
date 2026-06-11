@@ -247,6 +247,79 @@ pub fn yaml_metadata_parse_result(
     crate::metadata::extract_project_metadata_without_bibliography_parse(&tree, &path).map(|_| ())
 }
 
+/// Like [`yaml_metadata_parse_result`], but validates ONLY the document's own
+/// frontmatter — no project-manifest (`_quarto.yml` etc.) reads. Project-file
+/// errors are surfaced on the manifest's own URI via
+/// [`project_manifest_diagnostics`], not misattributed to the open document.
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+pub fn doc_frontmatter_metadata_result(
+    db: &dyn Db,
+    file: FileText,
+    config: FileConfig,
+) -> Result<(), crate::metadata::YamlError> {
+    let tree = parsed_tree_root(db, file, config);
+    crate::metadata::project::validate_doc_frontmatter(&tree)
+}
+
+/// Per-file YAML parse errors in the project-manifest files reachable from this
+/// document's project: `_quarto.yml`, the `_metadata.yml` chain,
+/// `_bookdown.yml`/`_output.yml` (`EdgeKind::ProjectConfig`), and
+/// `metadata-files:` includes (`EdgeKind::MetadataFile`). Each entry pairs the
+/// manifest's path with its parse error so the LSP can publish a diagnostic on
+/// the manifest's own URI — rust-analyzer's `Cargo.toml` model.
+///
+/// Manifest text is read through `db.file_text` (a tracked input loaded by
+/// `load_referenced_files`), so editing a manifest re-runs this query — the same
+/// invalidation path the bibliography reads use (audit §3.3 / G3).
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+pub fn project_manifest_diagnostics(
+    db: &dyn Db,
+    file: FileText,
+    config: FileConfig,
+) -> Vec<(PathBuf, crate::metadata::YamlError)> {
+    let graph = project_structure(db, file, config);
+    let mut manifests: Vec<PathBuf> = Vec::new();
+    let mut seen = HashSet::new();
+    for document in graph.documents() {
+        for kind in [EdgeKind::ProjectConfig, EdgeKind::MetadataFile] {
+            for path in graph.dependencies(document, Some(kind)) {
+                if seen.insert(path.clone()) {
+                    manifests.push(path);
+                }
+            }
+        }
+    }
+
+    let mut diagnostics = Vec::new();
+    for path in manifests {
+        db.unwind_if_revision_cancelled();
+        // Tracked read: depending on the input's value re-runs this query when
+        // the manifest changes or loads. An interned-but-absent file (`None`)
+        // simply contributes no diagnostic.
+        let Some(file_text) = db.file_text(path.clone()) else {
+            continue;
+        };
+        let Some(text) = file_text.text(db).as_deref() else {
+            continue;
+        };
+        if let Err(err) = crate::yaml_engine::validate_yaml(text) {
+            let offset = err.offset();
+            let (line, column) =
+                crate::metadata::project::byte_offset_to_line_col_1based(text, offset);
+            diagnostics.push((
+                path,
+                crate::metadata::YamlError::ParseError {
+                    message: err.message().to_string(),
+                    line: line as u64,
+                    column: column as u64,
+                    byte_offset: Some(offset),
+                },
+            ));
+        }
+    }
+    diagnostics
+}
+
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
 pub fn yaml_regions_for_file(db: &dyn Db, file: FileText, config: FileConfig) -> Vec<YamlRegion> {
     parsed_yaml_regions_for_file(db, file, config)
@@ -298,7 +371,9 @@ pub fn yaml_frontmatter_is_valid(db: &dyn Db, file: FileText, config: FileConfig
     if !frontmatter.is_valid() {
         return false;
     }
-    yaml_metadata_parse_result(db, file, config).is_ok()
+    // Document-only: a broken project manifest (`_quarto.yml`) must not mark the
+    // document's own frontmatter invalid (its errors surface on the manifest URI).
+    doc_frontmatter_metadata_result(db, file, config).is_ok()
 }
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types), lru = 64)]
@@ -324,6 +399,16 @@ pub fn built_in_lint_plan(db: &dyn Db, file: FileText, config: FileConfig) -> Bu
     } else {
         None
     };
+    // The diagnostic below uses a *document-only* parse result: a broken project
+    // manifest (`_quarto.yml` etc.) must NOT be misattributed to the open
+    // document. Manifest errors are published on the manifest's own URI via
+    // `project_manifest_diagnostics`. (`yaml` above stays the full result so a
+    // broken manifest still gates metadata-dependent lints.)
+    let doc_frontmatter = if has_frontmatter && frontmatter_parse_ok {
+        Some(doc_frontmatter_metadata_result(db, file, config).clone())
+    } else {
+        None
+    };
 
     let mut diagnostics = Vec::new();
     // YAML *syntax* errors (frontmatter + hashpipe) come straight from the
@@ -342,11 +427,12 @@ pub fn built_in_lint_plan(db: &dyn Db, file: FileText, config: FileConfig) -> Bu
                 )
             }),
     );
-    // Frontmatter that parses cleanly but whose *metadata extraction* fails is a
-    // separate, semantic error (not a YAML syntax error), so it stays on its own
-    // path. When frontmatter has a syntax error, `yaml` is `None` (extraction is
-    // skipped), so this never double-reports.
-    if let Some(Err(yaml_error)) = yaml
+    // Doc frontmatter that parses cleanly but whose *metadata extraction* fails
+    // is a separate, semantic error (not a YAML syntax error), so it stays on its
+    // own path. When frontmatter has a syntax error, `doc_frontmatter` is `None`
+    // (extraction is skipped), so this never double-reports. Project-manifest
+    // errors are intentionally excluded here (see `doc_frontmatter`).
+    if let Some(Err(yaml_error)) = doc_frontmatter
         && let Some(diag) =
             crate::linter::metadata_diagnostics::yaml_error_diagnostic(&yaml_error, text)
     {
@@ -1597,6 +1683,11 @@ pub enum EdgeKind {
     Include,
     Bibliography,
     MetadataFile,
+    /// A project-manifest config file (`_quarto.yml`, `_metadata.yml`,
+    /// `_bookdown.yml`, `_output.yml`) the document inherits metadata from.
+    /// Distinct from `MetadataFile` (a `metadata-files:` include): these are the
+    /// project-root/ancestor configs resolved by directory walk.
+    ProjectConfig,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -1872,6 +1963,10 @@ pub struct ProjectEdges {
     pub includes: Vec<PathBuf>,
     pub metadata_files: Vec<PathBuf>,
     pub bibliographies: Vec<PathBuf>,
+    /// Project-manifest configs (`_quarto.yml`/`_metadata.yml`/`_bookdown.yml`/
+    /// `_output.yml`) resolved by directory walk. Path-only (existence-gated),
+    /// so the firewall holds on content edits.
+    pub project_configs: Vec<PathBuf>,
 }
 
 #[salsa::tracked(returns(ref), lru = 64)]
@@ -1914,10 +2009,12 @@ pub fn project_edges(db: &dyn Db, file: FileText, config: FileConfig) -> Project
             }
             Err(_) => (Vec::new(), Vec::new()),
         };
+    let project_configs = crate::metadata::project::project_config_paths(&path);
     ProjectEdges {
         includes,
         metadata_files,
         bibliographies,
+        project_configs,
     }
 }
 
@@ -2011,6 +2108,9 @@ fn visit_structure<'db>(
     }
     for bibliography in &edges.bibliographies {
         graph.add_edge(db, path, bibliography, EdgeKind::Bibliography);
+    }
+    for project_config in &edges.project_configs {
+        graph.add_edge(db, path, project_config, EdgeKind::ProjectConfig);
     }
 }
 #[salsa::db]
@@ -3047,6 +3147,76 @@ mod tests {
                 .iter()
                 .all(|diagnostic| diagnostic.code != "missing-bibliography-key"),
             "project bibliography should satisfy citation key lint without frontmatter"
+        );
+    }
+
+    #[test]
+    fn project_manifest_diagnostics_reports_and_clears_broken_quarto_yml() {
+        let temp_dir = tempfile::TempDir::new().expect("temp dir");
+        let root = temp_dir.path();
+        let doc_path = root.join("doc.qmd");
+        let quarto_path = root.join("_quarto.yml");
+        // Must exist on disk so `find_project_root` resolves the ProjectConfig edge.
+        std::fs::write(&quarto_path, "title: [\n").expect("project config");
+
+        let mut db = SalsaDb::default();
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+
+        // Load the manifest as a tracked input (mirrors `load_referenced_files`).
+        let _quarto_file = db.update_file_text(quarto_path.clone(), "title: [\n".to_string());
+        let file = db.update_file_text(doc_path.clone(), "# Doc\n".to_string());
+
+        let diags = project_manifest_diagnostics(&db, file, config).clone();
+        assert_eq!(diags.len(), 1, "expected one manifest diagnostic");
+        assert_eq!(
+            diags[0].0, quarto_path,
+            "diagnostic attributed to _quarto.yml"
+        );
+        assert!(matches!(
+            diags[0].1,
+            crate::metadata::YamlError::ParseError { .. }
+        ));
+
+        // Fixing the manifest input re-runs the query and clears the diagnostic.
+        let _ = db.update_file_text(quarto_path.clone(), "title: ok\n".to_string());
+        let diags = project_manifest_diagnostics(&db, file, config).clone();
+        assert!(
+            diags.is_empty(),
+            "valid manifest should produce no diagnostics, got {diags:?}"
+        );
+    }
+
+    #[test]
+    fn built_in_lint_plan_does_not_misattribute_manifest_error_to_document() {
+        let temp_dir = tempfile::TempDir::new().expect("temp dir");
+        let root = temp_dir.path();
+        let doc_path = root.join("doc.qmd");
+        let quarto_path = root.join("_quarto.yml");
+        std::fs::write(&quarto_path, "title: [\n").expect("project config");
+
+        let mut db = SalsaDb::default();
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+
+        let _quarto_file = db.update_file_text(quarto_path.clone(), "title: [\n".to_string());
+        // Document has perfectly valid frontmatter; only the manifest is broken.
+        let file = db.update_file_text(doc_path.clone(), "---\ntitle: Doc\n---\n".to_string());
+
+        let plan = built_in_lint_plan(&db, file, config).clone();
+        assert!(
+            plan.diagnostics
+                .iter()
+                .all(|diagnostic| diagnostic.code != "yaml-parse-error"),
+            "broken _quarto.yml must NOT surface a yaml-parse-error on the document"
         );
     }
 

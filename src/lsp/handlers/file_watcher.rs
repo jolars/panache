@@ -66,49 +66,78 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
             );
         }
 
-        if !is_bibliography {
+        // `.yml`/`.yaml` can be a project manifest (`_quarto.yml`/`_metadata.yml`/
+        // `_bookdown.yml`/`_output.yml` or a `metadata-files:` include) as well as
+        // a bibliography. A manifest change won't match any document's
+        // bibliography paths, so it needs its own reference check.
+        let is_manifest = matches!(extension, Some("yaml") | Some("yml"));
+        if !is_bibliography && !is_manifest {
             continue;
         }
 
         gs.sender.log_message(
             MessageType::INFO,
-            format!("Bibliography file changed: {}", path.display()),
+            format!("Referenced file changed: {}", path.display()),
         );
 
-        // Find all documents that reference this bibliography file and re-lint
-        // them. Consult salsa metadata so bib watcher updates take effect
-        // immediately.
+        // Find all open documents that reference the changed file — as a
+        // bibliography or as a project manifest — and re-lint them so the change
+        // takes effect immediately (bib indices refresh; manifest parse errors
+        // re-publish on, or clear from, the manifest's own URI). Consult salsa so
+        // the reads observe the freshly-synced content above.
         let states: Vec<(String, DocumentState)> = gs
             .document_map
             .iter()
             .map(|(uri_str, state)| (uri_str.clone(), state.clone()))
             .collect();
 
-        let affected_documents: Vec<Uri> = states
-            .into_iter()
-            .filter_map(|(uri_str, state)| {
-                // Only saved documents can reference a bibliography on disk.
-                state.path.as_ref()?;
+        let mut affected_documents: Vec<Uri> = Vec::new();
+        for (uri_str, state) in states {
+            // Only saved documents reference files on disk.
+            let Some(doc_path) = state.path.clone() else {
+                continue;
+            };
+            let Ok(uri) = uri_str.parse::<Uri>() else {
+                continue;
+            };
+
+            let mut relint = false;
+            if is_bibliography {
                 let parsed_yaml_regions = crate::salsa::parsed_yaml_regions_for_file(
                     &gs.salsa,
                     state.salsa_file,
                     state.salsa_config,
                 );
-                if !helpers::is_yaml_frontmatter_valid(parsed_yaml_regions) {
-                    return None;
+                if helpers::is_yaml_frontmatter_valid(parsed_yaml_regions) {
+                    let metadata =
+                        crate::salsa::metadata(&gs.salsa, state.salsa_file, state.salsa_config);
+                    if let Some(bib_info) = metadata.bibliography.as_ref()
+                        && bib_info.paths.iter().any(|p| p == &path)
+                    {
+                        relint = true;
+                    }
                 }
-                let metadata =
-                    crate::salsa::metadata(&gs.salsa, state.salsa_file, state.salsa_config).clone();
-                let bib_info = metadata.bibliography.as_ref()?;
-                if bib_info.paths.iter().any(|p| p == &path) {
-                    uri_str.parse::<Uri>().ok()
-                } else {
-                    None
-                }
-            })
-            .collect();
+            }
+            if !relint && is_manifest {
+                let graph = crate::salsa::project_structure(
+                    &gs.salsa,
+                    state.salsa_file,
+                    state.salsa_config,
+                );
+                relint = graph
+                    .dependencies(&doc_path, Some(crate::salsa::EdgeKind::ProjectConfig))
+                    .into_iter()
+                    .chain(
+                        graph.dependencies(&doc_path, Some(crate::salsa::EdgeKind::MetadataFile)),
+                    )
+                    .any(|p| p == path);
+            }
+            if relint {
+                affected_documents.push(uri);
+            }
+        }
 
-        // A bibliography change is infrequent, so run the full pass (external
+        // A referenced-file change is infrequent, so run the full pass (external
         // linters included) for each affected document.
         for uri in affected_documents {
             gs.spawn_lint(uri, false, true);

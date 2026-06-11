@@ -341,11 +341,37 @@ impl GlobalState {
                 generation,
                 key,
                 publishes,
+                manifest_uris,
             } => {
                 // Drop results superseded by a newer edit.
                 if self.lint_generations.get(&key).copied() == Some(generation) {
                     for (uri, version, diags) in publishes {
                         self.sender.publish_diagnostics(uri, diags, version);
+                    }
+                    // Clear-on-fix: a manifest this pass no longer reports gets an
+                    // empty publish — but only if no OTHER open document still
+                    // reports it (a shared `_quarto.yml` stays flagged until every
+                    // dependent is fixed/closed). The manifest URI differs from
+                    // `key`, so the generation guard alone never clears it.
+                    let previous = self
+                        .published_manifest_uris
+                        .get(&key)
+                        .cloned()
+                        .unwrap_or_default();
+                    for stale in previous.difference(&manifest_uris) {
+                        let still_referenced = self
+                            .published_manifest_uris
+                            .iter()
+                            .any(|(other_key, set)| other_key != &key && set.contains(stale));
+                        if !still_referenced {
+                            self.sender
+                                .publish_diagnostics(stale.clone(), Vec::new(), None);
+                        }
+                    }
+                    if manifest_uris.is_empty() {
+                        self.published_manifest_uris.remove(&key);
+                    } else {
+                        self.published_manifest_uris.insert(key, manifest_uris);
                     }
                 }
             }
@@ -444,8 +470,8 @@ impl GlobalState {
         let snap = self.snapshot();
         let sender = self.pool.result_sender();
         self.pool.spawn(move || {
-            let publishes = catch_cancelled(|| {
-                if with_dependents {
+            let result = catch_cancelled(|| {
+                let mut publishes = if with_dependents {
                     handlers::diagnostics::compute_publishes_with_dependents(
                         &snap,
                         &uri,
@@ -453,13 +479,22 @@ impl GlobalState {
                     )
                 } else {
                     handlers::diagnostics::compute_publishes(&snap, &uri, run_external)
-                }
+                };
+                // Project-manifest (`_quarto.yml` etc.) diagnostics, published on
+                // the manifest's own URI. Computed once for the primary document
+                // (the query already spans the whole project graph), so dependents
+                // don't recompute it.
+                let (manifest_pubs, manifest_uris) =
+                    handlers::diagnostics::manifest_publishes(&snap, &uri);
+                publishes.extend(manifest_pubs);
+                (publishes, manifest_uris)
             });
-            if let Some(publishes) = publishes {
+            if let Some((publishes, manifest_uris)) = result {
                 let _ = sender.send(Task::Diagnostics {
                     generation,
                     key,
                     publishes,
+                    manifest_uris,
                 });
             }
         });

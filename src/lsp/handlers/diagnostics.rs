@@ -5,7 +5,7 @@
 //! publishes, and the main loop turns them into `textDocument/publishDiagnostics`
 //! notifications (dropping stale ones via the lint generation counter).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use lsp_types::{Diagnostic, Uri};
@@ -16,6 +16,53 @@ use crate::lsp::uri_ext::UriExt;
 
 /// A single `publishDiagnostics` payload: target URI, optional version, diags.
 pub(crate) type Publish = (Uri, Option<i32>, Vec<Diagnostic>);
+
+/// YAML parse-error diagnostics for the project-manifest files (`_quarto.yml`,
+/// `_metadata.yml`, `_bookdown.yml`/`_output.yml`, and `metadata-files:`
+/// includes) reachable from `uri`'s project, each published against the
+/// manifest's OWN URI — even when that file isn't open in the editor (the
+/// rust-analyzer `Cargo.toml` model). Manifest text is read from salsa (a
+/// tracked input), not from an open document.
+///
+/// Returns the publishes plus the set of manifest URIs that received a
+/// diagnostic, so the main loop can clear them when the error is later fixed
+/// (see `GlobalState::published_manifest_uris`).
+pub(crate) fn manifest_publishes(snap: &StateSnapshot, uri: &Uri) -> (Vec<Publish>, HashSet<Uri>) {
+    let Some(doc_state) = snap.document_state(uri) else {
+        return (Vec::new(), HashSet::new());
+    };
+    let mut publishes = Vec::new();
+    let mut manifest_uris = HashSet::new();
+    let manifest_diags = crate::salsa::project_manifest_diagnostics(
+        snap.db(),
+        doc_state.salsa_file,
+        doc_state.salsa_config,
+    );
+    for (path, yaml_error) in manifest_diags {
+        let Some(target_uri) = Uri::from_file_path(path) else {
+            continue;
+        };
+        // The manifest is typically NOT an open document, so read its text from
+        // the tracked salsa input rather than the document map.
+        let Some(file_text) = snap.db().file_text(path.clone()) else {
+            continue;
+        };
+        let Some(manifest_text) = file_text.text(snap.db()).as_deref() else {
+            continue;
+        };
+        if let Some(diag) =
+            crate::linter::metadata_diagnostics::yaml_error_diagnostic(yaml_error, manifest_text)
+        {
+            publishes.push((
+                target_uri.clone(),
+                None,
+                vec![convert_diagnostic(&diag, manifest_text)],
+            ));
+            manifest_uris.insert(target_uri);
+        }
+    }
+    (publishes, manifest_uris)
+}
 
 /// Compute diagnostics for `uri` and any documents that depend on it.
 ///

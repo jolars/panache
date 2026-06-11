@@ -484,6 +484,15 @@ External linters
     on save, not on every keystroke, since each pass spawns a subprocess per
     embedded code block.
 
+Project manifests
+:   YAML parse errors in the project's manifest files --- `_quarto.yml`,
+    `_metadata.yml`, `_bookdown.yml`/`_output.yml`, and `metadata-files:`
+    includes --- are published as diagnostics on the *manifest file's own* URI
+    (much as `rust-analyzer` flags a broken `Cargo.toml`), even when that file
+    is not open. A malformed manifest would otherwise silently break
+    bibliography and cross-reference resolution in your documents. The
+    diagnostic clears automatically once the manifest is fixed and saved.
+
 Diagnostics appear as:
 
 - Squiggly underlines in the editor

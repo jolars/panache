@@ -218,6 +218,10 @@ pub(crate) enum Task {
         generation: u64,
         key: String,
         publishes: Vec<(Uri, Option<i32>, Vec<Diagnostic>)>,
+        /// Project-manifest URIs that received diagnostics this pass. The main
+        /// loop diffs these against the previous pass for `key` to clear (publish
+        /// empty) manifests whose error was fixed (clear-on-fix).
+        manifest_uris: HashSet<Uri>,
     },
 }
 
@@ -255,6 +259,12 @@ pub(crate) struct GlobalState {
     /// again on `spawn_lint`; the result is tagged with the dispatch-time
     /// value and dropped in `on_task` if a newer generation has been seen.
     pub(crate) lint_generations: HashMap<String, u64>,
+    /// Project-manifest URIs each open document's last lint pass published
+    /// diagnostics to, keyed by the document's lint key. The authoritative
+    /// clear-tracker: a manifest URI is cleared (published empty) only once no
+    /// open document still reports it (clear-on-fix without flicker across
+    /// documents that share a project).
+    pub(crate) published_manifest_uris: HashMap<String, HashSet<Uri>>,
 }
 
 impl GlobalState {
@@ -277,6 +287,7 @@ impl GlobalState {
             next_outgoing_id: 1,
             lint_deadlines: HashMap::new(),
             lint_generations: HashMap::new(),
+            published_manifest_uris: HashMap::new(),
         }
     }
 
@@ -337,5 +348,19 @@ impl GlobalState {
         let key = uri.to_string();
         self.lint_deadlines.remove(&key);
         self.lint_generations.remove(&key);
+        // Clear any project-manifest diagnostics this document owned, unless
+        // another open document still reports the same manifest.
+        if let Some(owned) = self.published_manifest_uris.remove(&key) {
+            for manifest_uri in owned {
+                let still_referenced = self
+                    .published_manifest_uris
+                    .values()
+                    .any(|set| set.contains(&manifest_uri));
+                if !still_referenced {
+                    self.sender
+                        .publish_diagnostics(manifest_uri, Vec::new(), None);
+                }
+            }
+        }
     }
 }
