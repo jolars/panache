@@ -14,16 +14,6 @@ This document tracks implementation status for Panache's features.
   either way --- but the toggle is silently ineffective. Pairs with the
   existing "Configuration via LSP" item below.
 
-- [ ] Follow-up (lsp-server): avoid cloning the full `DocumentState` per
-  request. `StateSnapshot::document_state()` and
-  `definition_index_with_includes()` clone the whole `DocumentState`
-  including the `Vec<ParsedYamlRegionSnapshot>` (path / salsa handles /
-  `GreenNode` are cheap `Arc` bumps; the YAML-regions vec is a real
-  allocation) on hot paths (hover/completion). Arc-wrap the regions vec or
-  return a borrowed view. Profile-gated --- deferred: the vec is typically a
-  single small region, and a fix ripples through `RequestContext` plus \~7
-  handlers, so not worth it without a profile showing it matters.
-
 - [ ] Follow-up (lsp-server): `$/cancelRequest` does not interrupt in-flight
   work. `on_cancel` only relabels the eventual reply as `RequestCanceled`;
   the pooled job still runs to completion (salsa cancellation fires on a

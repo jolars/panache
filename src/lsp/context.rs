@@ -3,14 +3,13 @@ use std::path::PathBuf;
 use lsp_types::Uri;
 
 use crate::lsp::global_state::StateSnapshot;
-use crate::syntax::{ParsedYamlRegionSnapshot, SyntaxNode};
+use crate::syntax::SyntaxNode;
 
 #[derive(Clone)]
 pub(crate) struct OpenDocumentContext {
     pub(crate) salsa_file: crate::salsa::FileText,
     pub(crate) salsa_config: crate::salsa::FileConfig,
     pub(crate) path: Option<PathBuf>,
-    pub(crate) parsed_yaml_regions: Vec<ParsedYamlRegionSnapshot>,
     pub(crate) tree: rowan::GreenNode,
     pub(crate) content: String,
 }
@@ -32,7 +31,6 @@ pub(crate) fn get_open_document_context(
         salsa_file: state.salsa_file,
         salsa_config: state.salsa_config,
         path: state.path,
-        parsed_yaml_regions: state.parsed_yaml_regions,
         tree: state.tree,
         content,
     })

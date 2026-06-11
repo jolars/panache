@@ -27,10 +27,10 @@ pub(crate) fn goto_definition(
     let salsa_file = ctx.salsa_file;
     let salsa_config = ctx.salsa_config;
     let doc_path = ctx.path.clone();
-    let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
+    let parsed_yaml_regions = snap.parsed_yaml_regions(uri);
 
     let citation_def_index = if doc_path.is_some() {
-        let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
+        let yaml_ok = helpers::is_yaml_frontmatter_valid(parsed_yaml_regions);
         if yaml_ok {
             Some(
                 crate::salsa::citation_definition_index(snap.db(), salsa_file, salsa_config)
@@ -46,7 +46,7 @@ pub(crate) fn goto_definition(
     let this_path = ctx.path.clone();
     let content_for_offset = ctx.content.clone();
     let offset = conversions::position_to_offset(&content_for_offset, position)?;
-    if helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset) {
+    if helpers::is_offset_in_yaml_frontmatter(parsed_yaml_regions, offset) {
         return None;
     }
 

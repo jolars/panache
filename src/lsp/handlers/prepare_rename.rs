@@ -15,7 +15,7 @@ pub(crate) fn prepare_rename(
     let ctx = get_open_document_context(snap, &uri)?;
 
     let content = ctx.content.clone();
-    let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
+    let parsed_yaml_regions = snap.parsed_yaml_regions(&uri);
 
     let Some(offset) = position_to_offset(&content, position) else {
         log::debug!(
@@ -26,7 +26,7 @@ pub(crate) fn prepare_rename(
         );
         return None;
     };
-    if helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset) {
+    if helpers::is_offset_in_yaml_frontmatter(parsed_yaml_regions, offset) {
         return None;
     }
 

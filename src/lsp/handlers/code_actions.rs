@@ -18,10 +18,7 @@ pub(crate) fn code_action(
     let uri = params.text_document.uri;
     let (text, config) = snap.document_and_config(&uri)?;
     let request_range = params.range;
-    let parsed_yaml_regions = snap
-        .document_state(&uri)
-        .map(|state| state.parsed_yaml_regions)
-        .unwrap_or_default();
+    let parsed_yaml_regions = snap.parsed_yaml_regions(&uri);
     let request_start_offset = position_to_offset(&text, request_range.start);
     let request_end_offset = position_to_offset(&text, request_range.end)
         .or_else(|| request_start_offset.map(|start| start.saturating_add(1)));

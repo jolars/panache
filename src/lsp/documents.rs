@@ -98,10 +98,9 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     let start = Instant::now();
 
     let config = load_config(&gs.workspace_root, Some(&uri));
-    let (tree, parsed_yaml_regions) = {
+    let tree = {
         let syntax_tree = crate::parse(&text, Some(config.clone()));
-        let parsed_yaml_regions = crate::syntax::collect_parsed_yaml_region_snapshots(&syntax_tree);
-        (GreenNode::from(syntax_tree.green()), parsed_yaml_regions)
+        GreenNode::from(syntax_tree.green())
     };
 
     let doc_path = uri.to_file_path().map(|p| p.into_owned());
@@ -132,7 +131,6 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
             salsa_file,
             salsa_config,
             tree,
-            parsed_yaml_regions,
         },
     );
 
@@ -249,12 +247,8 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
 
     log::debug!("did_change parse strategy={strategy} changes={change_count}");
 
-    let parsed_yaml_regions =
-        crate::syntax::collect_parsed_yaml_region_snapshots(&SyntaxNode::new_root(green.clone()));
-
     if let Some(doc_state) = gs.document_map_mut().get_mut(&uri_string) {
         doc_state.tree = green;
-        doc_state.parsed_yaml_regions = parsed_yaml_regions;
         doc_state.path = doc_path_for_salsa.clone();
     } else {
         return;

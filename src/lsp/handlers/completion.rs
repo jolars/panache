@@ -90,25 +90,20 @@ pub(crate) fn completion(
 
     let query = citation_query_prefix(&text, offset)?;
 
-    let (salsa_file, salsa_config, doc_path, parsed_yaml_regions) = match snap.document_state(uri) {
-        Some(state) => (
-            state.salsa_file,
-            state.salsa_config,
-            state.path.clone(),
-            state.parsed_yaml_regions.clone(),
-        ),
+    let (salsa_file, salsa_config, doc_path) = match snap.document_state(uri) {
+        Some(state) => (state.salsa_file, state.salsa_config, state.path.clone()),
         None => return None,
     };
+    let parsed_yaml_regions = snap.parsed_yaml_regions(uri);
 
-    let offset_in_frontmatter =
-        helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset);
+    let offset_in_frontmatter = helpers::is_offset_in_yaml_frontmatter(parsed_yaml_regions, offset);
     if offset_in_frontmatter {
         return None;
     }
 
     // Bibliography/citation completions only apply to saved documents.
     doc_path?;
-    let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
+    let yaml_ok = helpers::is_yaml_frontmatter_valid(parsed_yaml_regions);
     if !yaml_ok {
         return None;
     }

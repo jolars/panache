@@ -89,7 +89,12 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
             .filter_map(|(uri_str, state)| {
                 // Only saved documents can reference a bibliography on disk.
                 state.path.as_ref()?;
-                if !helpers::is_yaml_frontmatter_valid(&state.parsed_yaml_regions) {
+                let parsed_yaml_regions = crate::salsa::parsed_yaml_regions_for_file(
+                    &gs.salsa,
+                    state.salsa_file,
+                    state.salsa_config,
+                );
+                if !helpers::is_yaml_frontmatter_valid(parsed_yaml_regions) {
                     return None;
                 }
                 let metadata =

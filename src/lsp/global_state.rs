@@ -23,7 +23,7 @@ use super::config::{load_config, load_config_with_source};
 use super::task_pool::{TaskPool, default_pool_size};
 use crate::Config;
 use crate::config::ConfigSource;
-use crate::syntax::SyntaxNode;
+use crate::syntax::{ParsedYamlRegionSnapshot, SyntaxNode};
 
 /// The owning map of open documents, keyed by URI string (the URI itself is used
 /// only for protocol I/O).
@@ -188,6 +188,23 @@ impl StateSnapshot {
             }
         }
         index
+    }
+
+    /// Borrowed YAML region snapshots for `uri`, derived (and memoized) by salsa
+    /// from the document's parse tree. Empty slice if the document isn't open.
+    ///
+    /// This is the single source of truth: the regions are a pure projection of
+    /// the CST, so we read salsa's `returns(ref)` memo rather than caching a copy
+    /// on `DocumentState`.
+    pub(crate) fn parsed_yaml_regions(&self, uri: &Uri) -> &[ParsedYamlRegionSnapshot] {
+        let Some((file, config)) = self
+            .document_map
+            .get(&uri.to_string())
+            .map(|state| (state.salsa_file, state.salsa_config))
+        else {
+            return &[];
+        };
+        crate::salsa::parsed_yaml_regions_for_file(self.db(), file, config)
     }
 }
 

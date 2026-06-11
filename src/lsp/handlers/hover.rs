@@ -28,17 +28,16 @@ pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> 
     let salsa_file = ctx.salsa_file;
     let salsa_config = ctx.salsa_config;
     let doc_path = ctx.path.clone();
-    let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
+    let parsed_yaml_regions = snap.parsed_yaml_regions(uri);
 
     let doc_path = doc_path?;
     let content_for_offset = ctx.content.clone();
     let offset = conversions::position_to_offset(&content_for_offset, position)?;
-    let in_frontmatter_region =
-        helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset);
+    let in_frontmatter_region = helpers::is_offset_in_yaml_frontmatter(parsed_yaml_regions, offset);
     if in_frontmatter_region {
         return None;
     }
-    let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
+    let yaml_ok = helpers::is_yaml_frontmatter_valid(parsed_yaml_regions);
     if !yaml_ok {
         return None;
     }

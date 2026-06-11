@@ -11,10 +11,7 @@ pub(crate) fn document_symbol(
 ) -> Option<DocumentSymbolResponse> {
     let uri = params.text_document.uri;
     log::debug!("document_symbol request for: {}", uri.as_str());
-    let parsed_yaml_regions = snap
-        .document_state(&uri)
-        .map(|state| state.parsed_yaml_regions)
-        .unwrap_or_default();
+    let parsed_yaml_regions = snap.parsed_yaml_regions(&uri);
     let (content, syntax_tree) = match snap.document_content_and_tree(&uri) {
         Some(result) => result,
         None => {

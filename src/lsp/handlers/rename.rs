@@ -33,7 +33,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
     let salsa_config = ctx.salsa_config;
     let doc_path = ctx.path.clone();
     let content = ctx.content.clone();
-    let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
+    let parsed_yaml_regions = snap.parsed_yaml_regions(&uri);
 
     let doc_path = doc_path.clone()?;
     let Some(offset) = position_to_offset(&content, position) else {
@@ -45,7 +45,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
         );
         return None;
     };
-    if helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset) {
+    if helpers::is_offset_in_yaml_frontmatter(parsed_yaml_regions, offset) {
         return None;
     }
     let target = {
@@ -192,7 +192,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
         });
     }
 
-    if !helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions) {
+    if !helpers::is_yaml_frontmatter_valid(parsed_yaml_regions) {
         return None;
     }
 
