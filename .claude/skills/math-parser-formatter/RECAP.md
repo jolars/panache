@@ -65,42 +65,35 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Phase 5b — command-operator spacing.** *DONE* (not yet committed).
-Formatter-only, one localized arm; **parser, `operators.rs`, and config
-untouched**. (Spacing half only — the **Tier 3 symbol-class fixture is still
-deferred**, by user choice this slice.)
+**Phase 5b leftover — Tier 3 symbol-class fixture.** *DONE* (not yet committed).
+**Dev-only test + vendored fixture; no production code touched.** Phase 5b is now
+fully closed (spacing landed earlier `1e43f251`).
 
-`render.rs::space_operators` got an explicit `MATH_COMMAND` arm (was swallowed by
-`_`). A command whose `operators::command_class` is `Bin`/`Rel` (after `coerce`)
-now demands `SpacedOp` — one space each side: `a\cdot b`→`a \cdot b`,
-`a\leq b`→`a \leq b`, `\alpha\cdot\beta`→`\alpha \cdot \beta`. Everything else
-(unary-position command op, `\sum` (Op), `\left`/`\right` (Open/Close), ordinary
-`\alpha`/`\frac`) stays `Plain`. **Crucial: command ops are NEVER `TightOp`** —
-a control word's terminating space is a separate `MATH_SPACE` token and is
-mandatory (`\leq b`→`\leqb` would name a different command), so stripping is
-forbidden; `SpacedOp` only ever forces *one* space, never zero. Set `prev_class`
-to the *coerced* class (TeX-faithful for the next atom). Deleted the now-dead
-`MATH_COMMAND` branch in `atom_prev_class` (handled inline now).
+New vendored manifest
+`crates/panache-formatter/tests/fixtures/math_symbol_classes/symbol-classes.tsv`
+(96 rows: 84 command rows = the full `command_class` surface, 12 char-operator
+rows, plus 3 Ord controls) — three tab columns `token / atom_class / oracle`. New
+harness `crates/panache-formatter/tests/math_symbol_classes.rs` (4 tests) +
+fixture README. The fixture is an *independent* enumeration, so it catches drift
+both ways: a retyped class **and** a deleted command (lookup → `None`).
+Assertions: (1) `operators::command_class`/`classify_operator`/`text_tail_class`
+match each row; (2) the recorded `oracle` is what `pulldown-latex` actually emits
+for probe `a <token> b` (dev-only, mirrors the Tier-2 MathML oracle); plus a
+non-vacuity guard (`+`→binop ≠ `=`→relation) and a coverage floor (≥65 command
+rows, every class present).
 
-Deliverables: new unit test `inline_spaces_command_operators`
-(`crates/panache-formatter/src/formatter/math.rs`); extended golden
-`tests/fixtures/cases/math_operator_spacing_experimental` with `$a\cdot b$` /
-`$x\leq y$`; STYLE.md Rule 6 (command-operator sentence flipped from "not yet
-re-spaced" to the new rule + the never-tight caveat); `docs/guide/formatting.qmd`
-operator paragraph.
+**Two recorded divergences** (oracle column records pulldown's view; we keep our
+class): `\lim` is `Op` for us / `Function` to pulldown (spacing-equivalent);
+`\asymp` is AMS-correct `Rel` for us / `BinaryOp` to pulldown (an oracle quirk we
+don't follow). `\left`/`\right`/`\frac` carry `oracle = skip` (no probeable
+standalone `Content` event). All documented in the fixture comments + README.
 
-Verified: `cargo test --workspace` (30 binaries) + clippy + fmt clean; Tier-1
-corpus + Tier-2 `pulldown-latex` MathML oracle green (adding spaces around
-`\cdot`/`\leq` is meaning-preserving); gate-off byte-verbatim (CLI `$a\cdot b$`
-unchanged); gate-on CLI `debug format --checks all` passes (`a \cdot b`,
-`x \leq y` spaced, `f(-x)`/`\sum x` untouched, idempotent + lossless).
+Verified: new test green; `cargo test --workspace` (31 binaries) clean; clippy
+`-D warnings` clean; `cargo fmt --check` clean. No formatter behavior change, so
+goldens stay byte-identical.
 
 ### Suggested next sub-targets
-1. **Phase 5b leftover — Tier 3 symbol-class fixture.** Land the vendored
-   symbol→atom-class fixture validated against `pulldown-latex` Events to harden
-   the `operators::command_class` table (dev-only, mirrors the Tier-2 oracle).
-   Bounded, no production-code change. Deferred this slice by user choice.
-2. **Parser: tokenize unambiguous delimiters/punctuation** (`( ) [ ] , ;`) out
+1. **Parser: tokenize unambiguous delimiters/punctuation** (`( ) [ ] , ;`) out
    of `MATH_TEXT` into neutral kinds (e.g. `MATH_OPEN`/`MATH_CLOSE`/`MATH_PUNCT`;
    leave the ambiguous `| . /` as text). Lets the interpretation layer read token
    *kinds* and **deletes `operators::text_tail_class`** (the one re-lexing smell —
@@ -113,13 +106,13 @@ unchanged); gate-on CLI `debug format --checks all` passes (`a \cdot b`,
    speculatively, so the new kinds are validated against a real use. Decision
    recorded with the user 2026-06-10; deferred from Phase 5 (clean checkpoint,
    modest-but-not-zero churn). See the "CST grain vs interpretation" invariant.
-3. **Phase 6 — semantic line-breaking + continuation indent** (add the
+2. **Phase 6 — semantic line-breaking + continuation indent** (add the
    break-priority column to `operators.rs`; use `operators/` corpus stressors).
    Walk the *structured* CST — do NOT flatten as the spacing pass does; flattening
    then relinearizing fights bracket-matching / nesting depth.
-4. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
+3. **Embed `MATH_CONTENT` into `TEX_BLOCK`** (parser) so bare `\begin{env}`
    blocks become formattable (would make `MathContext::EnvironmentBody` reachable).
-5. Optional structural cooking (orthogonal to operators): script attachment,
+4. Optional structural cooking (orthogonal to operators): script attachment,
    known-command argument grouping.
 
 **Placement note (deferred, YAGNI):** `operators.rs` lives in the formatter
@@ -132,6 +125,10 @@ tokens) so formatter + linter + LSP share one interpretation.
 
 ## Earlier sessions
 
+- **Phase 5b — command-operator spacing** (committed `1e43f251`). Formatter-only
+  `render.rs` `MATH_COMMAND` arm: a command whose `command_class` is `Bin`/`Rel`
+  (after `coerce`) demands `SpacedOp` (`a\cdot b`→`a \cdot b`); command ops are
+  NEVER `TightOp` (the control word's terminating `MATH_SPACE` is mandatory).
 - **Phase 5 — operator interpretation module + precedence-aware spacing**
   (committed `adbebe06`). New `formatter/math/operators.rs` (the `cooking.rs`
   analog, `pub` for LSP): `AtomClass`, `split_operator_atoms`,

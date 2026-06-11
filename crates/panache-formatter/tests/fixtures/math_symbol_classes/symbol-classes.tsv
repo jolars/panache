@@ -1,0 +1,133 @@
+# Tier-3 vendored symbol → atom-class fixture.
+#
+# Pins `formatter::math::operators` (the math operator interpretation table)
+# against the `pulldown-latex` parser Event stream. See README.md.
+#
+# Tab-separated, three columns:
+#   token        the TeX symbol AS WRITTEN; leading `\` => command row, else
+#                a char row.
+#   atom_class   expected `operators::AtomClass`
+#                (Ord | Bin | Rel | Open | Close | Punct | Op).
+#                `Ord` on a command row means "not in the table" (command_class
+#                returns None; the formatter defaults such commands to Ord).
+#   oracle       expected pulldown-latex Content variant for the probe `a <tok> b`
+#                (binop | relation | largeop | function | open | close | punct |
+#                ordinary), or `skip` when the symbol emits no probeable Content
+#                event (delimiter framing, multi-arg visuals).
+#
+# Lines beginning with `#` and blank lines are ignored.
+
+# --- char operators (classify_operator / text_tail_class) ---
++	Bin	binop
+-	Bin	binop
+*	Bin	binop
+=	Rel	relation
+<	Rel	relation
+>	Rel	relation
+(	Open	open
+)	Close	close
+[	Open	open
+]	Close	close
+,	Punct	punct
+;	Punct	punct
+
+# --- relations (Rel) ---
+\leq	Rel	relation
+\le	Rel	relation
+\geq	Rel	relation
+\ge	Rel	relation
+\neq	Rel	relation
+\ne	Rel	relation
+\equiv	Rel	relation
+\approx	Rel	relation
+\sim	Rel	relation
+\simeq	Rel	relation
+\cong	Rel	relation
+\propto	Rel	relation
+\subset	Rel	relation
+\supset	Rel	relation
+\subseteq	Rel	relation
+\supseteq	Rel	relation
+\in	Rel	relation
+\ni	Rel	relation
+\notin	Rel	relation
+\to	Rel	relation
+\gets	Rel	relation
+\mapsto	Rel	relation
+\rightarrow	Rel	relation
+\leftarrow	Rel	relation
+\leftrightarrow	Rel	relation
+\Rightarrow	Rel	relation
+\Leftarrow	Rel	relation
+\Leftrightarrow	Rel	relation
+\implies	Rel	relation
+\iff	Rel	relation
+\perp	Rel	relation
+\parallel	Rel	relation
+\mid	Rel	relation
+\models	Rel	relation
+\vdash	Rel	relation
+\dashv	Rel	relation
+\prec	Rel	relation
+\succ	Rel	relation
+\preceq	Rel	relation
+\succeq	Rel	relation
+\ll	Rel	relation
+\gg	Rel	relation
+\doteq	Rel	relation
+# DIVERGENCE: AMS makes \asymp a relation (\mathrel); pulldown-latex emits it as
+# a binary op. We keep Rel (correct) and record the oracle quirk here so a
+# future pulldown bump that "fixes" it surfaces as a fixture review, not a
+# silent pass. See README.md.
+\asymp	Rel	binop
+
+# --- binary operators (Bin) ---
+\cdot	Bin	binop
+\times	Bin	binop
+\div	Bin	binop
+\pm	Bin	binop
+\mp	Bin	binop
+\ast	Bin	binop
+\star	Bin	binop
+\circ	Bin	binop
+\bullet	Bin	binop
+\oplus	Bin	binop
+\ominus	Bin	binop
+\otimes	Bin	binop
+\oslash	Bin	binop
+\odot	Bin	binop
+\cap	Bin	binop
+\cup	Bin	binop
+\uplus	Bin	binop
+\sqcap	Bin	binop
+\sqcup	Bin	binop
+\wedge	Bin	binop
+\vee	Bin	binop
+\setminus	Bin	binop
+\amalg	Bin	binop
+
+# --- large operators (Op) ---
+\sum	Op	largeop
+\prod	Op	largeop
+\int	Op	largeop
+\oint	Op	largeop
+\coprod	Op	largeop
+\bigcup	Op	largeop
+\bigcap	Op	largeop
+\bigoplus	Op	largeop
+\bigotimes	Op	largeop
+\bigvee	Op	largeop
+\bigwedge	Op	largeop
+# DIVERGENCE: pulldown-latex classifies \lim as a Function, not a large
+# operator. For spacing both are Op-like (Ord-like, and coerce a following
+# +/- to unary), so we keep Op and record the oracle's Function here.
+\lim	Op	function
+
+# --- delimiter commands (no standalone Content event) ---
+\left	Open	skip
+\right	Close	skip
+
+# --- ordinary controls (command_class returns None) ---
+\alpha	Ord	ordinary
+\beta	Ord	ordinary
+\frac	Ord	skip

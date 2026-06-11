@@ -84,9 +84,11 @@ design plan is `~/.claude/plans/i-want-to-plan-foamy-pascal.md`.
   gap-based re-spacer (`a+b`→`a + b`, unary `-x`/`f(-x)` tight, `x=-y`→`x = -y`).
   Char operators only; **command-operator spacing + Tier 3 → Phase 5b**;
   break-priority column → Phase 6.
-- **Phase 5b — command-operator spacing + Tier 3.** Re-space `\leq`/`\cdot`
-  (handle command-terminating space); vendored symbol→atom-class fixture vs
-  `pulldown-latex` Events.
+- **Phase 5b — command-operator spacing + Tier 3.** *DONE*. Re-spaced
+  `\leq`/`\cdot` (command-terminating space handled, never `TightOp`); landed the
+  dev-only vendored symbol→atom-class fixture (`tests/fixtures/math_symbol_classes/`)
+  cross-checked against `pulldown-latex` Events. `\lim`/`\asymp` divergences
+  recorded, not corrected.
 - **Phase 6 — semantic line-breaking + indenting.** Wrap long display math at
   lowest-precedence operators, indent continuations (uses Phase 5 priorities).
 - **Phase 7 — docs + stabilization** (`docs/guide/formatting.qmd`,
