@@ -4,46 +4,8 @@ This document tracks implementation status for Panache's features.
 
 ## Language Server
 
-- [x] Incremental parsing and caching for LSP performance
-- [x] Optimize incremental edit handling to avoid full-document reparses for
-  multi-change or complex `didChange` updates.
-
 ### Performance
 
-- [x] Introduce `#[salsa::interned]` for common keys (paths/labels).
-- [x] Measure interned key impact (memory/cost) and decide whether to expand to
-  additional key types.
-- [x] Wire conservative salsa durability defaults (`set_with_durability`): open
-  buffers LOW, config MEDIUM, dependency/disk-loaded files HIGH, watcher
-  refreshes MEDIUM.
-- [x] Add ignored durability measurement harness (`tests/durability_bench.rs`)
-  for HIGH vs LOW revalidation cost.
-- [x] Finalize and document durability update/invalidation policy based on
-  measurements before broader rollout.
-- [x] Debounce per-keystroke diagnostics and defer external linters to save.
-  `did_change` now does only synchronous parse + state update and schedules
-  a 200ms-debounced built-in lint; external linters (jarl, ruff, ...) run on
-  `did_save`. Fixed format-on-save stalling behind a per-keystroke lint
-  convoy on large docs (\~1.5s to \~0.11s round-trip).
-- [x] Share a single CST pre-order walk across the built-in lint rules. Done for
-  the rule corpus: rules declare `node_interests()`/`wants_text_tokens()`
-  and the runner builds one `LintIndex` (`src/linter/index.rs`) bucketing
-  nodes by `SyntaxKind` (and folding in ignore-range tracking), so each rule
-  reads `cx.nodes(KIND)` instead of `tree.descendants()`. Measured via
-  `examples/profile_lint.rs`: `pandoc_manual.md` 53.9ms → 47.9ms (-11%),
-  `large_authoring.qmd` (Quarto) 3.53ms → 2.98ms (-16%), diagnostics
-  unchanged.
-- [x] Follow-up: fold `symbol_usage_index_from_tree`'s \~12 internal
-  `tree.descendants()` walks (`src/salsa.rs`) into one dispatching walk too
-  --- the other named component of the old `Preorder` cost. Done via
-  bucket-and-replay: one `descendants_with_tokens()` pass buckets every
-  consumed node/token kind, then the existing replay loops run unchanged in
-  their original order, so `SymbolUsageIndex`'s value-equality stays
-  byte-identical (verified byte-for-byte against the prior multi-walk impl
-  across the bench + golden corpus during the migration). Measured via
-  `examples/profile_symbol_index.rs`: `pandoc_manual.md` 4.94ms → 2.35ms
-  (-52%), `configuration.qmd` (Quarto) 0.55ms → 0.24ms (-56%),
-  `large_authoring.qmd` 0.33ms → 0.16ms (-51%).
 - [ ] Honor `experimental.incrementalParsing` from `settings` /
   `workspace/didChangeConfiguration`, not just initialize
   `initializationOptions`. Editors that send it via `settings` (observed in
@@ -51,44 +13,18 @@ This document tracks implementation status for Panache's features.
   `full_reparse...incremental_disabled`). Low priority --- parse is \~7ms
   either way --- but the toggle is silently ineffective. Pairs with the
   existing "Configuration via LSP" item below.
-- [x] Run heavy background-lint salsa reads on a cloned db handle instead of
-  under the global lock. `relint_with_dependents` and `lint_and_publish`
-  held the single `Mutex<SalsaDb>` across the cold `project_graph` (\~120ms)
-  eval, so interactive requests (formatting/hover) queued behind a
-  background lint pass. salsa 0.26's db is `Send` but deliberately `!Sync`,
-  so reads now clone a per-task handle (`clone_salsa_db`, a cheap `Arc`
-  bump) and run the query with the lock released; `catch_cancelled` aborts a
-  pass a concurrent edit cancels. (An `RwLock<SalsaDb>` was the first idea
-  but the `!Sync` db rules it out --- `RwLock` needs `T: Sync` for
-  concurrent readers.)
+
 - [ ] Follow-up: offload the cold `project_graph` / `built_in_lint_plan` reads
   to `spawn_blocking` if a cold relint is shown to starve the async runtime
   (returns are owned/`Send`; pass `GreenNode`, not the red `SyntaxNode`,
   across the boundary).
+
 - [ ] Follow-up: extend clone-out to the interactive navigation reads
   (goto-definition/references/hover reach `project_graph` under the lock via
   `get_definition_index_with_includes`) if profiling shows they stall behind
   a cold graph. Would need `Cancelled::catch` + retry on the interactive
   path rather than abort.
-- [x] Revisit the LSP framework --- switched to rust-analyzer's `lsp-server` (PR
-  #357). Synchronous main loop: `GlobalState` is the sole salsa writer (no
-  lock), heavy reads dispatch to a small `TaskPool` over a cheap
-  `StateSnapshot`, formatting runs on a dedicated single-thread `fmt_pool`,
-  and cancellation rides `salsa::Cancelled` + `$/cancelRequest`. Main pool
-  defaults to `num_cpus::get_physical()` (matching RA). Resolved the
-  salsa-lock contention that prompted the question by construction rather
-  than lock-granularity tricks. (Chose `lsp-server` over the earlier
-  `async-lsp` candidate to drop the async runtime entirely.)
-- [x] Follow-up (lsp-server): respond with `InternalError` when a pooled handler
-  panics. `spawn_request_on` (`src/lsp/dispatch.rs`) now wraps the handler
-  in `catch_unwind` and posts an `InternalError` `Task::Response` on a
-  genuine panic (salsa cancellation still maps to `ContentModified`), so the
-  client gets an answer instead of hanging on a never-resolved request id.
-  Covered by a unit test
-  (`panicking_handler_yields_internal_error_response`).
-- [x] Follow-up (lsp-server): drop the dead `runtime_settings` field from
-  `StateSnapshot`. It was `#[allow(dead_code)]`, never read off a snapshot,
-  yet cloned into every per-request snapshot; removed it and the clone.
+
 - [ ] Follow-up (lsp-server): avoid cloning the full `DocumentState` per
   request. `StateSnapshot::document_state()` and
   `definition_index_with_includes()` clone the whole `DocumentState`
@@ -98,49 +34,14 @@ This document tracks implementation status for Panache's features.
   return a borrowed view. Profile-gated --- deferred: the vec is typically a
   single small region, and a fix ripples through `RequestContext` plus \~7
   handlers, so not worth it without a profile showing it matters.
+
 - [ ] Follow-up (lsp-server): `$/cancelRequest` does not interrupt in-flight
   work. `on_cancel` only relabels the eventual reply as `RequestCanceled`;
   the pooled job still runs to completion (salsa cancellation fires on a
   write, not an explicit cancel), so a cancelled hover/format burns its full
   CPU cost. Largely inherent (RA is similar); investigate a cooperative
   cancel flag checked at coarse points. Lowest priority --- deferred.
-- [x] Follow-up (external-tool budget): formatters (`run_formatters_parallel`)
-  and the parallel external-linter loop (`src/linter/runner.rs`) each build
-  an independent rayon pool capped at `external_max_parallel`, so a
-  concurrent format + lint could spin up to 2x that many subprocess threads.
-  Done: a process-wide counting semaphore (`ExternalToolBudget` in
-  `src/external_tools_common.rs`) now bounds the live subprocess count
-  across both paths. Each block (formatter) / job (linter) acquires a
-  permit; the budget is sized from the user-configured
-  `external_max_parallel`.
-- [x] Follow-up (external-tool budget): the CLI used to force
-  `external_max_parallel = 1` per file when processing multiple files in
-  parallel, which underused the shared budget for small batches (2-3 files
-  could only run 2-3 external subprocesses even with a budget of 8). Done:
-  `per_file_external_parallel` in `src/main.rs` now splits the shared budget
-  across the in-flight files (`div_ceil(budget, workers)`), so a handful of
-  files saturate the budget while a large batch still collapses to
-  \~1-per-file and avoids oversubscribing inner-pool threads.
-- [x] Follow-up (external-tool budget): the formatter spawned one subprocess
-  *per code block* (`run_formatters_parallel` in
-  `src/external_formatters_sync.rs`), unlike the linter's single
-  concatenated invocation. Measured (2026-06-08, 20-line blocks, N=10):
-  spawn cost is entirely a cold-start-interpreter problem --- `prettier`
-  (Node) ≈160 ms startup, 10 spawns 1609 ms vs 1 batched 333 ms; native
-  tools negligible (`shfmt` 51→17 ms, `ruff` 89→10 ms). Rejected the
-  linter's concatenate-and-map batching: formatting rewrites the text
-  (destroys the split point; `black` normalizes the blank gaps) and merging
-  blocks changes the semantic unit, so whole-file tools (`isort`,
-  `goimports`) produce wrong output. Done instead (safe, no unit merging):
-  `run_formatter_chain` dedups identical blocks within a run (one chain per
-  unique `(language, formatter_input)`) and memoizes results in a
-  process-global cache keyed on `(chain fingerprint, language, input)`. A
-  long-lived LSP reuses results across edits, so the save loop no longer
-  re-spawns the formatter for untouched blocks; cold CLI runs still get
-  in-run dedup. Cache does not track the tool's own config files
-  (`.prettierrc` etc.) --- same contract as the file-level cache; documented
-  in `configuration.qmd`. End to end: 10 identical `prettier` blocks 203 →
-  108 ms.
+
 - [ ] Follow-up (external-tool budget, benchmarking): confirm the shared budget
   didn't regress the single-command path. On a doc with hundreds of code
   blocks the per-block `Mutex` acquire in `acquire_external_tool_permit`
@@ -149,14 +50,7 @@ This document tracks implementation status for Panache's features.
   `examples/profile_lint.rs`-style measurement. Pairs with building a small
   repeatable CLI harness (polyglot fixtures + `hyperfine`) that also serves
   the `--parallel`-override and batching benchmarks above.
-- [x] Follow-up (lsp-server): minor cleanups. Done: (b) the
-  `Duration::from_secs(3600)` `select!` fallback is now a documented
-  `IDLE_TICK` const in `src/lsp.rs`; (c) `spawn_request_on`'s
-  `use_fmt_pool: bool` is now a `RequestPool` enum. Deliberately left: (a)
-  deduping `default_external_max_parallel` across the host and the
-  dependency-lean formatter crate isn't worth the cross-crate coupling for a
-  5-line default; (d) `DocumentMap` stays keyed by `String` --- a `Uri` key
-  trips `clippy::mutable_key_type`, which is the whole reason it's a string.
+
 - [ ] Follow-up (lsp-server, benchmarking): the dedicated `fmt_pool` is a single
   thread (`src/lsp/global_state.rs`), deliberately isolating format latency
   from hover/completion. Fine for interactive single-doc editing, but
@@ -166,46 +60,13 @@ This document tracks implementation status for Panache's features.
   small N-thread `fmt_pool` against the current single-thread design under a
   multi-buffer save burst.
 
-### Core LSP Capabilities
-
-- [x] `textDocument/formatting` - Full document formatting
-- [x] `textDocument/didOpen` - Track document opens
-- [x] `textDocument/didChange` - Track document changes (incremental sync)
-- [x] `textDocument/didClose` - Track document closes
-- [x] Configuration discovery from workspace root (`.panache.toml`)
-
-### Diagnostics
-
-- [x] Syntax error diagnostics - Report parsing errors as diagnostics
-- [x] Lint warnings - Configurable linting rules (e.g., heading levels, list
-  consistency)
-- [x] Citation validation - Validate citation keys against bibliography
-- [x] Footnote validation - Check for undefined footnotes (also in linter)
-- [x] Link validation - Check for broken internal links/references
-
 ### Code Actions
 
-- [x] Convert between bullet/ordered lists
-- [x] Convert loose/compact lists
-- [x] Convert list to task list - Convert `- item`/`1. item` to `- [ ] item`
 - [ ] Convert between table styles (simple, pipe, grid)
 - [ ] Convert between inline/reference links
-- [x] Convert between inline/reference footnotes
 
 ### Navigation & Symbols
 
-- [x] Document outline - `textDocument/documentSymbol` for headings, tables,
-  figures
-- [x] Folding ranges - `textDocument/foldingRange`
-  - [x] Code blocks
-  - [x] Sections (headings)
-- [x] Go to definition links, images, footnotes).
-  - [x] Go to definition for reference links - Jump to `[ref]: url` definition
-  - [x] Go to definition for citations - Jump to bibliography entry for `@cite`
-    keys
-  - [x] Go to definition for headings - Jump to heading target for internal
-    links
-  - [x] Go to definition for footnotes - Jump to footnote definition block
 - [x] Find references - Find all uses of a reference link/footnote/citation
   - [x] Find references for citations - Find all `@cite` uses of a bibliography
     entry
@@ -214,8 +75,6 @@ This document tracks implementation status for Panache's features.
 
 ### Completion
 
-- [x] Citation completion - `textDocument/completion` for `@cite` keys from
-  bibliography
 - [ ] Reference link completion - Complete `[text][ref]` from defined references
 - [ ] Heading link completion
 - [ ] Attribute completion - Complete class names and attributes in
@@ -234,20 +93,10 @@ support.
 - [ ] Citation key hints - Show bibliography entries for `@cite` keys
 - [ ] Footnote content hints - Show footnote content as inlay hints
 
-### Hover Information
-
-- [x] Link preview - `textDocument/hover` to show link target
-- [x] Reference preview - Show reference definition on hover
-- [x] Footnote preview - Show footnote content inline
-- [x] Citation preview - Show bibliography entry for citation
-- [x] Heading preview - Show section content or summary on hover
-
 ### Advanced
 
-- [x] Range formatting - `textDocument/rangeFormatting` for selected text only
 - [ ] On-type formatting - `textDocument/onTypeFormatting` for auto-formatting
   triggers (not sure about this, low priority)
-- [x] Document links - `textDocument/documentLink` for clickable links
 - [ ] Semantic tokens - Syntax highlighting via LSP
 - [ ] Rename
   - [x] Citations - Rename `@cite` keys and update bibliography
@@ -256,30 +105,13 @@ support.
   - [x] Footnotes - Rename footnote labels and update definitions/links
   - [x] Files - Rename linked markdown files and update links
   - [ ] Files - Rename other linked files, shortcodes, etc.
-- [x] Workspace symbols
-  - [x] General support for pandoc etc
-  - [x] Quarto - project-wide symbol search for figures, tables, sections
-  - [x] Rmarkdown (Bookdown)
 - [ ] Configuration via LSP - `workspace/didChangeConfiguration` to reload
   config
-
-## Configuration System
-
-- [x] Enable turning on or off linting rules in `[lint]` section
-- [x] Per-flavor extension overrides - `[extensions.gfm]`,
-- [x] Glob pattern flavor overrides - `[flavor_overrides]` with file patterns
-
-## Linter
-
-- [x] Add support for comments to disable linting on specific lines or blocks
-  (e.g., `<!-- something -->`)
-- [x] Auto-fixing for external code linters
 
 ### Future Lint Rules
 
 #### Syntax correctness
 
-- [x] Malformed fenced divs (unclosed, invalid attributes)
 - [ ] Broken table structures
 - [ ] Invalid citation syntax (`@citekey` malformations)
 - [ ] Unclosed inline math/code spans
@@ -287,8 +119,6 @@ support.
 
 #### Style/Best practices
 
-- [x] Inconsistent heading hierarchy (skip levels)
-- [x] Duplicate reference labels
 - [ ] Multiple top-level headings
 - [ ] Empty links/images
 - [ ] Unused reference definitions
@@ -297,7 +127,6 @@ support.
 
 ### Configuration
 
-- [x] Per-rule enable/disable in `.panache.toml` `[lint]` section
 - [ ] Severity levels (error, warning, info)
 - [ ] Auto-fix capability per rule (infrastructure exists, rules need
   implementation)
@@ -318,17 +147,6 @@ support.
 - How to balance parser error recovery vs. strict linting?
 - Performance: incremental linting for LSP mode?
 - LSP: incremental parsing cache (tree reuse on didChange)
-
-## Formatter
-
-- [x] Add support for comments to disable formatting on specific lines or blocks
-  (e.g., `<!-- something-->`)
-- [x] Language-aware sentence-wrap abbreviations (#307): select the no-break
-  list from the document `lang:` (English, Czech, German, Spanish, French
-  built-ins; primary-subtag fallback; `[format] lang` fallback) and let
-  users extend it via `[format] no-break-abbreviations` (flat list or
-  per-language table, merged with the built-ins). Spanish/French built-in
-  lists are conservative starters --- extend as false splits surface.
 
 ### External formatter presets backlog (conform.nvim parity)
 
@@ -578,26 +396,9 @@ intentionally excluded.
 
 ### Syntax AST wrappers
 
-- [x] Add wrappers for block quotes, code blocks/chunks, display math, and
-  fenced divs.
-- [x] Add wrappers for footnote definitions/references.
-- [x] Add wrapper for alert blocks.
-- [x] Add wrappers for YAML metadata/title blocks.
-- [x] Add wrappers for raw TeX blocks/commands.
-- [x] Add a Paragraph convenience wrapper for repeated semantic checks.
-
 ### Tables
 
-- [x] Simple tables
-- [x] Pipe tables
 - [x] Grid tables
-  - [x] Column-spanning cells (#359): cells that straddle a boundary the rest of
-    the table observes are laid out span-aware (`format_colspan_grid_table`
-    in `crates/panache-formatter/src/formatter/tables.rs`) instead of being
-    truncated/padded to the header's column count (which silently dropped
-    cell content). Canonical grid from separator `+` positions only; columns
-    sized to content; misaligned input falls back to a lossless verbatim
-    copy.
   - [ ] Row-spanning grids (a `|` content row containing `+`, e.g.
     `grid_table_planets`) still use the older
     `format_spanning_grid_table_raw` passthrough, which re-pads but carries
@@ -605,78 +406,10 @@ intentionally excluded.
     fixture) rather than modeling the rowspan structure. Fold this into the
     same span-aware engine so the special-cases go away; coordinate the
     colspan + rowspan geometry in one layout pass.
-- [x] Multiline tables
 
 ## Parser
 
 ### Architecture
-
-- [x] Unify the line-prefix stripping vocabulary used by the block dispatcher's
-  helpers. `ContainerPrefix` (in `parser/blocks/container_prefix.rs`)
-  bundles `list_content_col`, `bq_depth`, and a
-  `list_marker_consumed_on_line_0` flag. The three helpers
-  `pandoc_html_open_tag_closes`, `find_multiline_open_end`, and
-  `parse_html_block_with_wrapper` take it instead of bare `bq_depth`, so
-  stacked-container dispatches strip both marker families. `BqPrefixState`
-  and `LinePrefixState` collapsed into a unified `ContainerPrefixState` for
-  graft re-injection. Unblocked pandoc-conformance 0452/0453 (`- > <div>...`
-  single- and multi-line); html 257 → 259, total 452 → 454.
-
-- [x] Follow-up to the `ContainerPrefix` work: remove the dual `ctx.content` /
-  raw-`&self.lines, line_pos` redundancy in the `BlockParser` trait.
-  Completed across three landed refactors: stack-walked `ContainerPrefix`
-  (`SmallVec<[StripOp; 8]>` recipe of `ListAdvance` / `BlockQuoteMarker` /
-  `ContentIndent` ops); migration of all 21 `BlockParser` impls to read the
-  dispatch line via `lines.first()`; deletion of `BlockContext.content` and
-  `BlockContext.list_marker_consumed_on_line_0` (the latter routed directly
-  from `self.dispatch_list_marker_consumed` into
-  `ContainerPrefix::from_stack`); deletion of the unused `BlockPrefixInfo`
-  cache; and addition of the `footnote_with_blockquote` parser golden case
-  locking in the bq-in-footnote strip-order semantics. A drive-by bug fell
-  out: `shifted_blockquote_from_list` was sourcing `list_content_col` from
-  `paragraphs::current_content_col` (which folds in the `FootnoteDefinition`
-  content_col), double-counting the footnote indent for
-  `[FootnoteDef, BlockQuote, Paragraph]` stacks and leaving
-  continuation-line `>` bytes stranded as raw TEXT inside the paragraph.
-  Source `list_content_col` from `ListItem` only and gate the probe on
-  either `list_content_col > 0` or `current_blockquote_depth() > 0` so
-  paragraph-continuation lines starting with `>` inside footnotes
-  (angle-link variants) are not misclassified. - **Optional polish
-  (deferred)**: delete the `from_ctx` shim by threading `&[Container]` or a
-  pre-built prefix through `BlockContext` (4 callers remain: `parse_line`
-  top-level dispatch, the in-flight bq-detect emission path, and two
-  `ContinuationPolicy` helpers). The `dispatch_list_marker_consumed` toggle
-  in `parse_line`'s shifted-bq paths is a side-band signal that could be
-  replaced by a `StripOp::ListAdvanceConditional` variant so the prefix
-  self-encodes the semantic.
-
-- [x] Audit other multi-line-lookahead block parsers for the same misfire class.
-  Audit complete; all four findings fixed (fenced code, definition lists,
-  line blocks, pipe tables). - **The four findings** --- each was a forward
-  scanner whose raw-line scan tripped over the continuation `>` prefix under
-  `list → blockquote` nesting (fenced code/math, definition lists, pipe
-  tables, line blocks). All fixed and locked in by `*_in_list_blockquote`
-  parser golden cases (`fenced_code`, `definition_list`, `pipe_table`,
-  `line_block`); pandoc-native reads each as
-  `BulletList → BlockQuote → <block>`. Pipe tables, line blocks, and fenced
-  code/math were subsequently folded into the shared window (see the
-  follow-up below); definition lists stay scalar-threaded. (Formatter
-  round-trip for the nested pipe-table / line-block cases is still imperfect
-  --- the BLOCK_QUOTE walker doesn't re-emit `>` for continuation lines
-  under a LIST_ITEM; pre-existing, no test exercises it.) Implementation
-  detail lives in git history. - **Follow-up (window extraction) ---
-  COMPLETE.** Every multi-line- lookahead block parser (pipe / grid / simple
-  / multiline tables, line blocks, fenced code / math) now scans + emits
-  through the `StrippedLines` window (`container_prefix.rs`): detection on
-  `strip_all()` / `prefix()`, continuation lines re-emitting their `>` /
-  list-indent prefix via `emit_prefix_at` / `emit_or_dispatch_tail`. No
-  hold-outs remain. Standalone (empty-prefix) output stays byte-identical
-  throughout, and each parser is locked in by a `*_in_list_blockquote`
-  parser golden case. Definition lists are out of scope (single-line
-  consumer of a pre-stripped view, not a forward scanner). Multiline's
-  earlier "deeper than the window" deferral was empirically refuted: the
-  failure was raw-line detection, not blank-line segmentation, so the window
-  alone fixes it. Per-parser implementation detail lives in git history.
 
 - [ ] Stop letting `pandoc_ast.rs` drift into a second-stage parser. Load-
   bearing byte-walkers (`split_html_block_by_tags`, `parse_pandoc_blocks`
@@ -690,39 +423,6 @@ intentionally excluded.
   projector to recompute it. Each bucket below is its own bounded step,
   verified against pandoc-native + CommonMark (both must stay byte-identical
   or improve). Roadmap:
-
-  - [x] **References.** `[label]: url "title"` now emits `REFERENCE_URL` /
-    `REFERENCE_TITLE` nodes via a shared `reference_definition_spans` walker
-    that backs both detection and emission (no detect/emit drift). Projector
-    reads the nodes; `parse_ref_url` deleted, `parse_reference_def` is a
-    pure CST read. `ReferenceDefinition` gained `url()`/`title()`.
-
-  - [x] **Attributes --- the `ATTRIBUTE` node.** The Pandoc `{...}` `ATTRIBUTE`
-    node now emits `ATTR_ID` / `ATTR_CLASS` / `ATTR_KEY_VALUE` (`ATTR_KEY` +
-    `ATTR_VALUE`) children via a shared `attribute_content_spans` walker
-    that backs both detection (`parse_attribute_content`) and emission
-    (`emit_attribute_node`) --- no detect/emit drift. All `ATTRIBUTE`
-    emitters (headings, links, images, table captions, inline code, display
-    math) route through it; the lossy `emit_attributes` reconstructor is
-    gone. This fixed a live losslessness bug: inline-code / display-math
-    attrs were reordered + re-quoted in the parser
-    (`` `code`{.r #x key=v} `` → `` `code`{#x .r key="v"} ``); they now
-    round-trip byte-for-byte and the formatter applies the normalization
-    (via `normalize_attribute_text`, as headings already did).
-    `AttributeNode` gained `classes()` / `key_values()` and reads structured
-    children (precise `id_value_range` from the `ATTR_ID` token); the
-    projector reads via `attr_from_attribute_node`.
-
-  - [x] **Attributes --- `DIV_INFO`.** Fenced-div `::: {#id .class key=val}`
-    bodies now emit `ATTR_*` children via a shared
-    `emit_attribute_node_with_kinds` (factored out of `emit_attribute_node`;
-    `emit_div_info_node` keeps bare-word shorthand and malformed/empty
-    bodies as one opaque `TEXT` token). The projector reads the CST via
-    `attr_from_attribute_node` (gated by the new `attr_node_is_structured`),
-    falling back to `parse_div_info` for the bare-word case. `AttributeNode`
-    already cast `DIV_INFO`, so it now reads structured children. Zero
-    formatter churn (the formatter only reads `info_text()`, byte-identical
-    after restructuring).
 
   - [ ] **Attributes --- remaining node kinds.** Apply the same structuring to
     the other attribute-bearing nodes so `parse_attr_block` /
@@ -775,17 +475,6 @@ intentionally excluded.
 - [ ] Avoid temporary green tree when injecting `BLOCK_QUOTE_MARKER` tokens into
   inline-parsed paragraphs (current approach parses inlines into a temp
   tree, then replays while inserting markers)
-
-- [x] Gate table detection before the whole-buffer `StrippedLines::strip_all`.
-  All four table parsers stripped the entire line buffer before their first
-  shape check, and detection runs at every block start → O(block-starts ×
-  lines), only under Pandoc/RMarkdown flavor (those table types enabled).
-  Hoisted each parser's first-line predicate ahead of `strip_all` via
-  `strip_at` (commit
-  `perf(parser): gate table detection before       whole-buffer strip`).
-  73KB math-heavy chapter parse/lint-plan recompute \~250ms → \~118ms;
-  CommonMark unaffected. Behavior-preserving (goldens, CST snapshots,
-  commonmark allowlist unchanged).
 
 - [ ] Reduce green-tree build cost on large docs. After the table-gate fix, the
   residual \~118ms `built_in_lint_plan` is \~half rowan tree-build
@@ -846,18 +535,6 @@ from an empirical audit of every suite case through libyaml (Ruby Psych),
 pandoc, and js-yaml --- see `scripts/yaml-oracle/` and the full classification
 in `crates/panache-parser/tests/yaml/consumer-matrix.md`.
 
-- [x] **Implicit empty keys** --- `check_implicit_empty_block_key`, Pool 2,
-  rejected by libyaml+js-yaml (every real flavor). Block-only, so the
-  flow-context empty keys both consumers accept (`[:x]`, `{x: :x}`) are
-  untouched. The 8 allowlisted 1.2-valid cases stay valid (Pool 2 is skipped
-  on the substrate path).
-- [x] **Duplicate keys** --- `check_duplicate_keys`, Pool 2, rejected by js-yaml
-  (Quarto) AND R's `yaml` package (RMarkdown), but NOT pandoc/libyaml (last
-  value wins). R-yaml is a measured third consumer: libyaml-based but adds a
-  duplicate-key (and tab) rejection, so RMarkdown
-  frontmatter={libyaml,ryaml} and hashpipe={ryaml}. The oracle audit now has
-  an `ryaml` column (R 4.5.3, yaml 2.3.12) and the soundness test covers
-  RMarkdown.
 - [ ] **Tabs as indentation --- DEFERRED (needs parser surgery).** The audit
   disproved the blanket "pandoc accepts tabs" assumption: pandoc accepts
   tabs in scalar content / flow / after a block-seq dash but **rejects**
@@ -1173,16 +850,8 @@ for initial implementation.
 
 ### Known Differences from Pandoc
 
-#### Smart Abbreviation Non-Breaking Spaces
-
-- [x] Keep recognized abbreviations + following year together during wrapping
-  (for example `M.A. 2007`) so wrapping does not split them.
-- [x] Follow Pandoc `Ext_smart` behavior exactly by converting the post-
-  abbreviation space to a non-breaking space.
-
 ## Architecture
 
-- [x] Split out WASM support into a separate crate (`crates/panache-wasm`).
 - [ ] Separate additional functionality into dedicated crates (long-term).
 
 ## dprint Plugin
