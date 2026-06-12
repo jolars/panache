@@ -4,41 +4,6 @@ This document tracks implementation status for Panache's features.
 
 ## Language Server
 
-### Performance
-
-- [ ] Honor `experimental.incrementalParsing` from `settings` /
-  `workspace/didChangeConfiguration`, not just initialize
-  `initializationOptions`. Editors that send it via `settings` (observed in
-  the wild) currently get a no-op toggle (every `did_change` logs
-  `full_reparse...incremental_disabled`). Low priority --- parse is \~7ms
-  either way --- but the toggle is silently ineffective. Pairs with the
-  existing "Configuration via LSP" item below.
-
-- [ ] Follow-up (lsp-server): `$/cancelRequest` does not interrupt in-flight
-  work. `on_cancel` only relabels the eventual reply as `RequestCanceled`;
-  the pooled job still runs to completion (salsa cancellation fires on a
-  write, not an explicit cancel), so a cancelled hover/format burns its full
-  CPU cost. Largely inherent (RA is similar); investigate a cooperative
-  cancel flag checked at coarse points. Lowest priority --- deferred.
-
-- [ ] Follow-up (external-tool budget, benchmarking): confirm the shared budget
-  didn't regress the single-command path. On a doc with hundreds of code
-  blocks the per-block `Mutex` acquire in `acquire_external_tool_permit`
-  (`src/external_tools_common.rs`) is one lock op per block --- cheap vs. a
-  subprocess, but verify it isn't contended via an
-  `examples/profile_lint.rs`-style measurement. Pairs with building a small
-  repeatable CLI harness (polyglot fixtures + `hyperfine`) that also serves
-  the `--parallel`-override and batching benchmarks above.
-
-- [ ] Follow-up (lsp-server, benchmarking): the dedicated `fmt_pool` is a single
-  thread (`src/lsp/global_state.rs`), deliberately isolating format latency
-  from hover/completion. Fine for interactive single-doc editing, but
-  format-on-save across many open buffers would serialize through one
-  worker. Only worth measuring if a user reports format-on-save lag ---
-  lowest priority; the isolation rationale is sound. If revisited, bench a
-  small N-thread `fmt_pool` against the current single-thread design under a
-  multi-buffer save burst.
-
 ### Code Actions
 
 - [ ] Convert between table styles (simple, pipe, grid)
