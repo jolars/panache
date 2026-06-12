@@ -23,7 +23,7 @@ use super::blocks::code_blocks::{
     CodeBlockType, FenceInfo, InfoString, is_closing_fence, is_gfm_math_fence,
     parse_fenced_code_block, parse_fenced_math_block, try_parse_fence_open,
 };
-use super::blocks::container_prefix::StrippedLines;
+use super::blocks::container_prefix::{ContainerPrefix, StrippedLines};
 use super::blocks::definition_lists::{
     next_line_is_definition_marker, try_parse_definition_marker,
 };
@@ -1225,6 +1225,81 @@ enum TableKind {
 #[derive(Debug, Clone, Copy)]
 struct TablePrepared {
     kind: TableKind,
+    /// Line index where the table grid begins: past a leading caption when one
+    /// applies, else equal to the dispatch line.
+    table_pos: usize,
+}
+
+/// Line index where the table grid begins: past a leading caption (its
+/// continuation lines plus one optional blank) when `table_captions` applies,
+/// else `line_pos` itself.
+fn resolve_table_pos(ctx: &BlockContext, raw: &[&str], line_pos: usize) -> usize {
+    if !(ctx.config.extensions.table_captions && is_caption_followed_by_table(raw, line_pos)) {
+        return line_pos;
+    }
+    let mut pos = line_pos + 1;
+    while pos < raw.len() && !raw[pos].trim().is_empty() {
+        pos += 1;
+    }
+    if pos < raw.len() && raw[pos].trim().is_empty() {
+        pos += 1;
+    }
+    pos
+}
+
+/// Parse a single table `kind` at `pos` (anchored at `dispatch`) into `builder`,
+/// gated on the matching extension flag. The single per-kind dispatch shared by
+/// detection and emission.
+fn try_parse_kind(
+    ctx: &BlockContext,
+    kind: TableKind,
+    raw: &[&str],
+    pos: usize,
+    dispatch: usize,
+    prefix: &ContainerPrefix,
+    builder: &mut GreenNodeBuilder<'static>,
+) -> Option<usize> {
+    let window = StrippedLines::with_dispatch(raw, pos, dispatch, prefix);
+    match kind {
+        TableKind::Grid if ctx.config.extensions.grid_tables => {
+            try_parse_grid_table(&window, builder, ctx.config)
+        }
+        TableKind::Multiline if ctx.config.extensions.multiline_tables => {
+            try_parse_multiline_table(&window, builder, ctx.config)
+        }
+        TableKind::Pipe if ctx.config.extensions.pipe_tables => {
+            try_parse_pipe_table(&window, builder, ctx.config)
+        }
+        TableKind::Simple if ctx.config.extensions.simple_tables => {
+            try_parse_simple_table(&window, builder, ctx.config)
+        }
+        _ => None,
+    }
+}
+
+/// Try each table kind (Grid → Multiline → Pipe → Simple) at `pos`, anchored at
+/// `dispatch`, parsing the first match into `builder`. Returns the matched kind
+/// and the line count consumed. The single home for the kind cascade; callers
+/// pick the position-ordering policy.
+fn first_kind_at(
+    ctx: &BlockContext,
+    raw: &[&str],
+    pos: usize,
+    dispatch: usize,
+    prefix: &ContainerPrefix,
+    builder: &mut GreenNodeBuilder<'static>,
+) -> Option<(TableKind, usize)> {
+    for kind in [
+        TableKind::Grid,
+        TableKind::Multiline,
+        TableKind::Pipe,
+        TableKind::Simple,
+    ] {
+        if let Some(consumed) = try_parse_kind(ctx, kind, raw, pos, dispatch, prefix, builder) {
+            return Some((kind, consumed));
+        }
+    }
+    None
 }
 
 impl BlockParser for TableParser {
@@ -1254,6 +1329,8 @@ impl BlockParser for TableParser {
 
         // Correctness first: only claim a match if a real parse would succeed.
         // (Otherwise we can steal list items/paragraphs and drop content.)
+        // The throwaway builder is discarded; emission re-parses into the real
+        // tree using the cached kind and position.
         let mut tmp = GreenNodeBuilder::new();
 
         let detection = if ctx.has_blank_before || ctx.at_document_start {
@@ -1262,154 +1339,12 @@ impl BlockParser for TableParser {
             BlockDetectionResult::YesCanInterrupt
         };
 
-        // Handle caption-before-table lines by matching the *table kind* starting
-        // after the caption, but parsing from the caption line so the caption is
-        // included and consumed.
-        if ctx.config.extensions.table_captions && is_caption_followed_by_table(lines, line_pos) {
-            // Skip caption continuation lines and one optional blank line.
-            let mut table_pos = line_pos + 1;
-            while table_pos < lines.len() && !lines[table_pos].trim().is_empty() {
-                table_pos += 1;
-            }
-            if table_pos < lines.len() && lines[table_pos].trim().is_empty() {
-                table_pos += 1;
-            }
-
-            if ctx.config.extensions.grid_tables
-                && try_parse_grid_table(
-                    &StrippedLines::with_dispatch(lines, table_pos, line_pos, prefix),
-                    &mut tmp,
-                    ctx.config,
-                )
-                .is_some()
-            {
-                return Some((
-                    detection,
-                    Some(Box::new(TablePrepared {
-                        kind: TableKind::Grid,
-                    })),
-                ));
-            }
-
-            if ctx.config.extensions.multiline_tables
-                && try_parse_multiline_table(
-                    &StrippedLines::with_dispatch(lines, table_pos, line_pos, prefix),
-                    &mut tmp,
-                    ctx.config,
-                )
-                .is_some()
-            {
-                return Some((
-                    detection,
-                    Some(Box::new(TablePrepared {
-                        kind: TableKind::Multiline,
-                    })),
-                ));
-            }
-
-            if ctx.config.extensions.pipe_tables
-                && try_parse_pipe_table(
-                    &StrippedLines::with_dispatch(lines, table_pos, line_pos, prefix),
-                    &mut tmp,
-                    ctx.config,
-                )
-                .is_some()
-            {
-                return Some((
-                    detection,
-                    Some(Box::new(TablePrepared {
-                        kind: TableKind::Pipe,
-                    })),
-                ));
-            }
-
-            if ctx.config.extensions.simple_tables
-                && try_parse_simple_table(
-                    &StrippedLines::with_dispatch(lines, table_pos, line_pos, prefix),
-                    &mut tmp,
-                    ctx.config,
-                )
-                .is_some()
-            {
-                return Some((
-                    detection,
-                    Some(Box::new(TablePrepared {
-                        kind: TableKind::Simple,
-                    })),
-                ));
-            }
-
-            return None;
-        }
-
-        if ctx.config.extensions.grid_tables
-            && try_parse_grid_table(
-                &StrippedLines::with_dispatch(lines, line_pos, line_pos, prefix),
-                &mut tmp,
-                ctx.config,
-            )
-            .is_some()
-        {
-            return Some((
-                BlockDetectionResult::Yes,
-                Some(Box::new(TablePrepared {
-                    kind: TableKind::Grid,
-                })),
-            ));
-        }
-
-        if ctx.config.extensions.multiline_tables
-            && try_parse_multiline_table(
-                &StrippedLines::with_dispatch(lines, line_pos, line_pos, prefix),
-                &mut tmp,
-                ctx.config,
-            )
-            .is_some()
-        {
-            return Some((
-                BlockDetectionResult::Yes,
-                Some(Box::new(TablePrepared {
-                    kind: TableKind::Multiline,
-                })),
-            ));
-        }
-
-        if ctx.config.extensions.pipe_tables
-            && try_parse_pipe_table(
-                &StrippedLines::with_dispatch(lines, line_pos, line_pos, prefix),
-                &mut tmp,
-                ctx.config,
-            )
-            .is_some()
-        {
-            return Some((
-                BlockDetectionResult::Yes,
-                Some(Box::new(TablePrepared {
-                    kind: TableKind::Pipe,
-                })),
-            ));
-        }
-
-        if ctx.config.extensions.simple_tables
-            && try_parse_simple_table(
-                &StrippedLines::with_dispatch(lines, line_pos, line_pos, prefix),
-                &mut tmp,
-                ctx.config,
-            )
-            .is_some()
-        {
-            return Some((
-                BlockDetectionResult::Yes,
-                Some(Box::new(TablePrepared {
-                    kind: TableKind::Simple,
-                })),
-            ));
-        }
-
-        // (Optional) Caption-only lookahead without table parse shouldn't match.
-        // The real parsers already handle captions when invoked on the caption line.
-
-        None
+        // Caption-before-table lines match the *table kind* starting after the
+        // caption (`table_pos`), but parse from the caption line so the caption
+        // is included and consumed. `resolve_table_pos` owns that routing.
+        let table_pos = resolve_table_pos(ctx, lines, line_pos);
+        let (kind, _) = first_kind_at(ctx, lines, table_pos, line_pos, prefix, &mut tmp)?;
+        Some((detection, Some(Box::new(TablePrepared { kind, table_pos }))))
     }
 
     fn parse_prepared(
@@ -1423,111 +1358,35 @@ impl BlockParser for TableParser {
         let prefix = lines.prefix();
         let lines = lines.raw();
         let prepared = payload.and_then(|p| p.downcast_ref::<TablePrepared>().copied());
-        let caption_before_table =
-            ctx.config.extensions.table_captions && is_caption_followed_by_table(lines, line_pos);
-        let table_pos = if caption_before_table {
-            let mut pos = line_pos + 1;
-            while pos < lines.len() && !lines[pos].trim().is_empty() {
-                pos += 1;
-            }
-            if pos < lines.len() && lines[pos].trim().is_empty() {
-                pos += 1;
-            }
-            pos
-        } else {
-            line_pos
-        };
+        // Detection cached the table position; recompute only on the rare
+        // payload-missing path.
+        let table_pos =
+            prepared.map_or_else(|| resolve_table_pos(ctx, lines, line_pos), |p| p.table_pos);
 
-        let try_kind_at = |kind: TableKind,
-                           pos: usize,
-                           builder: &mut GreenNodeBuilder<'static>|
-         -> Option<usize> {
-            match kind {
-                TableKind::Grid => {
-                    if ctx.config.extensions.grid_tables {
-                        try_parse_grid_table(
-                            &StrippedLines::with_dispatch(lines, pos, line_pos, prefix),
-                            builder,
-                            ctx.config,
-                        )
-                    } else {
-                        None
-                    }
-                }
-                TableKind::Multiline => {
-                    if ctx.config.extensions.multiline_tables {
-                        try_parse_multiline_table(
-                            &StrippedLines::with_dispatch(lines, pos, line_pos, prefix),
-                            builder,
-                            ctx.config,
-                        )
-                    } else {
-                        None
-                    }
-                }
-                TableKind::Pipe => {
-                    if ctx.config.extensions.pipe_tables {
-                        try_parse_pipe_table(
-                            &StrippedLines::with_dispatch(lines, pos, line_pos, prefix),
-                            builder,
-                            ctx.config,
-                        )
-                    } else {
-                        None
-                    }
-                }
-                TableKind::Simple => {
-                    if ctx.config.extensions.simple_tables {
-                        try_parse_simple_table(
-                            &StrippedLines::with_dispatch(lines, pos, line_pos, prefix),
-                            builder,
-                            ctx.config,
-                        )
-                    } else {
-                        None
-                    }
-                }
+        // Happy path: use the cached kind. Try the caption line first (a bare
+        // table parses here), then the post-caption position.
+        if let Some(p) = prepared {
+            if let Some(n) = try_parse_kind(ctx, p.kind, lines, line_pos, line_pos, prefix, builder)
+            {
+                return n;
             }
-        };
+            if table_pos != line_pos
+                && let Some(n) =
+                    try_parse_kind(ctx, p.kind, lines, table_pos, line_pos, prefix, builder)
+            {
+                return n;
+            }
+        }
 
-        if let Some(prepared) = prepared
-            && let Some(n) = try_kind_at(prepared.kind, line_pos, builder)
+        // Fallback (rare): payload missing, or the cached kind failed to
+        // re-parse. Re-run the cascade at the caption line, then post-caption.
+        if let Some((_, n)) = first_kind_at(ctx, lines, line_pos, line_pos, prefix, builder) {
+            return n;
+        }
+        if table_pos != line_pos
+            && let Some((_, n)) = first_kind_at(ctx, lines, table_pos, line_pos, prefix, builder)
         {
             return n;
-        }
-        if let Some(prepared) = prepared
-            && caption_before_table
-            && let Some(n) = try_kind_at(prepared.kind, table_pos, builder)
-        {
-            return n;
-        }
-
-        // Fallback (should be rare) - match core order.
-        if let Some(n) = try_kind_at(TableKind::Grid, line_pos, builder) {
-            return n;
-        }
-        if let Some(n) = try_kind_at(TableKind::Multiline, line_pos, builder) {
-            return n;
-        }
-        if let Some(n) = try_kind_at(TableKind::Pipe, line_pos, builder) {
-            return n;
-        }
-        if let Some(n) = try_kind_at(TableKind::Simple, line_pos, builder) {
-            return n;
-        }
-        if caption_before_table {
-            if let Some(n) = try_kind_at(TableKind::Grid, table_pos, builder) {
-                return n;
-            }
-            if let Some(n) = try_kind_at(TableKind::Multiline, table_pos, builder) {
-                return n;
-            }
-            if let Some(n) = try_kind_at(TableKind::Pipe, table_pos, builder) {
-                return n;
-            }
-            if let Some(n) = try_kind_at(TableKind::Simple, table_pos, builder) {
-                return n;
-            }
         }
 
         debug_assert!(false, "TableParser::parse called without a matching table");
