@@ -48,6 +48,16 @@ use crate::parser::blocks::reference_links::try_parse_reference_definition;
 /// inline parsing call.
 pub type RefdefMap = Arc<HashSet<String>>;
 
+/// Secondary O(K) cap on the number of continuation lines the
+/// blockquote refdef strip walks. A blank `>` line terminates any
+/// refdef (the primary stop, since a refdef cannot contain a blank
+/// line); this cap only bounds a contrived all-`>`-with-content
+/// blockquote that has no blank lines, keeping per-line work O(K) so
+/// the whole scan stays O(N). A well-formed wrapped refdef spans only a
+/// handful of lines (label, destination, title-open, title-close), so
+/// 32 leaves generous headroom.
+const MAX_BLOCKQUOTE_REFDEF_LINES: usize = 32;
+
 /// Normalise a refdef label per CommonMark §4.7.
 ///
 /// 1. Strip leading and trailing whitespace.
@@ -116,7 +126,8 @@ pub fn collect_refdef_labels(input: &str, dialect: Dialect) -> RefdefMap {
                 continue;
             }
         } else if gate_byte == Some(b'>')
-            && let Some(stripped) = strip_blockquote_line(&input[pos..])
+            && let Some(stripped) =
+                strip_blockquote_line(&input[pos..], MAX_BLOCKQUOTE_REFDEF_LINES)
             && let Some((_, label, _, _)) = try_parse_reference_definition(&stripped, dialect)
         {
             set.insert(normalize_label(&label));
@@ -153,15 +164,27 @@ fn line_starts_with_blockquote(text: &str) -> bool {
 /// parsing. Returns `None` if no blockquote prefix is present.
 ///
 /// Refdefs can span multiple lines (e.g. the title can wrap), so we
-/// strip blockquote markers from each continuation line too. We stop at
-/// a blank line or a line that doesn't continue with a blockquote
-/// marker.
-fn strip_blockquote_line(text: &str) -> Option<String> {
+/// strip blockquote markers from each continuation line too. We stop at:
+///
+/// - a line that doesn't continue with a blockquote marker;
+/// - a continuation line that is blank after marker-stripping (a `>`
+///   separator) — a blank line terminates any refdef per CommonMark
+///   §4.7, so we must not slurp past it into the next blockquote
+///   paragraph; and
+/// - after `max_lines` continuation lines, as a hard O(K) cap so a
+///   blockquote with no blank lines can't make this O(N) per call.
+///
+/// Without these bounds the walk copies the entire remaining blockquote
+/// body on every `>`-line, which is O(N²) over a large blockquote.
+fn strip_blockquote_line(text: &str, max_lines: usize) -> Option<String> {
     if !line_starts_with_blockquote(text) {
         return None;
     }
     let mut out = String::with_capacity(text.len());
-    for line in text.split_inclusive('\n') {
+    for (idx, line) in text.split_inclusive('\n').enumerate() {
+        if idx > max_lines {
+            break;
+        }
         let bytes = line.as_bytes();
         let mut i = 0;
         while i < bytes.len() && i < 3 && bytes[i] == b' ' {
@@ -176,7 +199,14 @@ fn strip_blockquote_line(text: &str) -> Option<String> {
         if bytes.get(i) == Some(&b' ') {
             i += 1;
         }
-        out.push_str(&line[i..]);
+        let rest = &line[i..];
+        // A blank blockquote line (`>` with nothing after) terminates the
+        // refdef. Only applies to continuation lines: the first line is a
+        // refdef candidate by construction (the `>` gate matched content).
+        if idx > 0 && rest.trim().is_empty() {
+            break;
+        }
+        out.push_str(rest);
     }
     Some(out)
 }
@@ -223,6 +253,42 @@ mod tests {
     #[test]
     fn collapses_internal_whitespace() {
         assert_eq!(normalize_label("  foo   bar\tbaz  "), "foo bar baz");
+    }
+
+    #[test]
+    fn collects_blockquote_wrapped_refdef() {
+        // CommonMark spec example #218: a refdef inside a blockquote.
+        let input = "> [foo]: /url\n>\n> [foo]\n";
+        let map = collect_refdef_labels(input, Dialect::CommonMark);
+        assert!(map.contains("foo"));
+    }
+
+    #[test]
+    fn collects_blockquote_refdef_with_wrapped_title() {
+        // The destination and title wrap onto continuation lines, each
+        // still carrying the `>` marker.
+        let input = "> [foo]:\n>   /url\n>   \"the title\"\n";
+        let map = collect_refdef_labels(input, Dialect::CommonMark);
+        assert!(map.contains("foo"));
+    }
+
+    #[test]
+    fn collects_refdef_in_multiparagraph_blockquote() {
+        // A refdef in the first and last paragraph of a blockquote, with
+        // blank `>` separators between paragraphs. Both must be collected,
+        // proving the blank-stop doesn't skip past later definitions.
+        let input =
+            "> [foo]: /url\n>\n> first paragraph\n>\n> second paragraph\n>\n> [bar]: /url2\n";
+        let map = collect_refdef_labels(input, Dialect::CommonMark);
+        assert!(map.contains("foo"));
+        assert!(map.contains("bar"));
+    }
+
+    #[test]
+    fn ignores_non_refdef_blockquote_lines() {
+        let input = "> just some quoted text\n> more text\n";
+        let map = collect_refdef_labels(input, Dialect::CommonMark);
+        assert!(map.is_empty());
     }
 
     #[test]

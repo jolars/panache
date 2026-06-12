@@ -190,7 +190,7 @@ mod tests {
             "| --- | --- | --- |",
             "| 1   | 2   | 3   |",
         ];
-        assert!(is_caption_followed_by_table(&lines, 2));
+        assert!(is_caption_followed_by_table(&lines[..], 2));
         assert_eq!(next_line_is_definition_marker(&lines, 0), None);
     }
 

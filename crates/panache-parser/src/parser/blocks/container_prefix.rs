@@ -568,13 +568,6 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
         }
     }
 
-    /// Materialize the whole buffer's peek-stripped view (absolute
-    /// indexing, including lines before `base`). Byte-for-byte equal to
-    /// the `Vec<&str>` table scans previously hand-rolled.
-    pub fn strip_all(&self) -> Vec<&'a str> {
-        (0..self.raw.len()).map(|i| self.strip_at(i)).collect()
-    }
-
     /// Emit the continuation-line container prefix for the line at
     /// ABSOLUTE index `i` as kind-tagged tokens, returning the
     /// post-prefix tail. Thin wrapper over [`emit_content_line_prefixes`]
@@ -1031,25 +1024,24 @@ mod tests {
     }
 
     #[test]
-    fn strip_all_matches_hand_rolled_table_closure() {
-        // The materialized view pipe tables used to build by hand:
-        //   (0..len).map(|i| if i == dispatch { strip_line_0_for_emission }
-        //                     else            { strip })
+    fn strip_at_matches_hand_rolled_table_closure() {
+        // The per-line stripped view table detection reads through `LineView`
+        // (lazily, via `strip_at`):
+        //   strip_at(i) == if i == dispatch { strip_line_0_for_emission }
+        //                  else             { strip }
         let prefix =
             ContainerPrefix::from_ops(&[StripOp::ListAdvance(2), StripOp::BlockQuoteMarker], true);
         let raw = ["- > | a |", "  > |---|", "  > | 1 |"];
         let dispatch = 0;
         let lines = StrippedLines::with_dispatch(&raw, 0, dispatch, &prefix);
-        let expected: Vec<&str> = (0..raw.len())
-            .map(|i| {
-                if i == dispatch {
-                    prefix.strip_line_0_for_emission(raw[i])
-                } else {
-                    prefix.strip(raw[i])
-                }
-            })
-            .collect();
-        assert_eq!(lines.strip_all(), expected);
+        for (i, &raw_line) in raw.iter().enumerate() {
+            let expected = if i == dispatch {
+                prefix.strip_line_0_for_emission(raw_line)
+            } else {
+                prefix.strip(raw_line)
+            };
+            assert_eq!(lines.strip_at(i), expected, "strip_at({i})");
+        }
     }
 
     #[test]

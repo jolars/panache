@@ -13,6 +13,65 @@ use crate::parser::utils::inline_emission;
 
 use super::container_prefix::StrippedLines;
 
+/// Read-only indexed view over lines for table detection scans. Two
+/// backings:
+///
+/// - `[&str]` — a raw, unstripped line buffer, used by callers that scan
+///   the source directly (the block dispatcher's caption lookahead, list
+///   and definition-list probes).
+/// - [`StrippedLines`] / [`UniformStripView`] — a container-prefix-stripped
+///   view that strips each line lazily on access via
+///   [`StrippedLines::strip_at`]. Detection scans touch only a bounded
+///   range (they stop at the first blank line), so this stays
+///   O(scanned lines) rather than materializing the whole buffer. The old
+///   `strip_all` collected `0..raw.len()` on every call, which was
+///   quadratic when table detection runs at every block start inside a
+///   large blockquote or list.
+pub(crate) trait LineView {
+    /// The line at absolute index `i`.
+    fn line(&self, i: usize) -> &str;
+    /// Total number of lines (absolute upper bound for indices).
+    fn line_count(&self) -> usize;
+}
+
+impl LineView for [&str] {
+    fn line(&self, i: usize) -> &str {
+        self[i]
+    }
+    fn line_count(&self) -> usize {
+        self.len()
+    }
+}
+
+impl<'a, 'p> LineView for StrippedLines<'a, 'p> {
+    fn line(&self, i: usize) -> &str {
+        self.strip_at(i)
+    }
+    fn line_count(&self) -> usize {
+        self.raw().len()
+    }
+}
+
+/// A [`LineView`] over a [`StrippedLines`] window that strips *every* line —
+/// including the dispatch line — with the full container strip rather than
+/// the emission-safe line-0 strip. Grid-border detection needs this: a
+/// `+---+` border sitting at column 0 of a list item's inner content must
+/// not retain the list indent, or the strict column-0 check in
+/// `try_parse_grid_separator` would reject it. Emission still goes through
+/// the window, which preserves the indent bytes. This reproduces the old
+/// grid path's `stripped[dispatch] = prefix.strip(...)` override, but
+/// lazily.
+pub(crate) struct UniformStripView<'s, 'a, 'p>(&'s StrippedLines<'a, 'p>);
+
+impl<'s, 'a, 'p> LineView for UniformStripView<'s, 'a, 'p> {
+    fn line(&self, i: usize) -> &str {
+        self.0.prefix().strip(self.0.raw()[i])
+    }
+    fn line_count(&self) -> usize {
+        self.0.raw().len()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Alignment {
     Left,
@@ -180,22 +239,22 @@ fn line_is_fenced_div_fence(line: &str) -> bool {
     rest.is_empty() || rest.starts_with(char::is_whitespace)
 }
 
-fn is_valid_caption_start_before_table(lines: &[&str], pos: usize) -> bool {
-    if !is_table_caption_start(lines[pos]) {
+fn is_valid_caption_start_before_table(lines: &(impl LineView + ?Sized), pos: usize) -> bool {
+    if !is_table_caption_start(lines.line(pos)) {
         return false;
     }
 
-    if is_bare_colon_caption_start(lines[pos])
-        && bare_colon_caption_looks_like_definition_code_block(lines[pos])
+    if is_bare_colon_caption_start(lines.line(pos))
+        && bare_colon_caption_looks_like_definition_code_block(lines.line(pos))
     {
         return false;
     }
 
     // Avoid stealing definition-list definitions (":   ...") as table captions.
-    if is_bare_colon_caption_start(lines[pos])
+    if is_bare_colon_caption_start(lines.line(pos))
         && pos > 0
-        && !lines[pos - 1].trim().is_empty()
-        && !line_is_fenced_div_fence(lines[pos - 1])
+        && !lines.line(pos - 1).trim().is_empty()
+        && !line_is_fenced_div_fence(lines.line(pos - 1))
     {
         return false;
     }
@@ -218,8 +277,11 @@ fn is_multiline_table_start(line: &str) -> bool {
 
 /// Check if there's a table following a potential caption at this position.
 /// This is used to avoid parsing a caption as a paragraph when it belongs to a table.
-pub(crate) fn is_caption_followed_by_table(lines: &[&str], caption_pos: usize) -> bool {
-    if caption_pos >= lines.len() {
+pub(crate) fn is_caption_followed_by_table(
+    lines: &(impl LineView + ?Sized),
+    caption_pos: usize,
+) -> bool {
+    if caption_pos >= lines.line_count() {
         return false;
     }
 
@@ -233,25 +295,25 @@ pub(crate) fn is_caption_followed_by_table(lines: &[&str], caption_pos: usize) -
     // Skip continuation lines of caption (non-blank lines).
     // Stop at fenced-div fences (`:::`) — those close the enclosing div and
     // must not be folded into the caption.
-    while pos < lines.len()
-        && !lines[pos].trim().is_empty()
-        && !line_is_fenced_div_fence(lines[pos])
+    while pos < lines.line_count()
+        && !lines.line(pos).trim().is_empty()
+        && !line_is_fenced_div_fence(lines.line(pos))
     {
         // If we hit a table separator, we found a table
-        if try_parse_table_separator(lines[pos]).is_some() {
+        if try_parse_table_separator(lines.line(pos)).is_some() {
             return true;
         }
         pos += 1;
     }
 
     // Skip one blank line
-    if pos < lines.len() && lines[pos].trim().is_empty() {
+    if pos < lines.line_count() && lines.line(pos).trim().is_empty() {
         pos += 1;
     }
 
     // Check for table at next position
-    if pos < lines.len() {
-        let line = lines[pos];
+    if pos < lines.line_count() {
+        let line = lines.line(pos);
 
         // Check for grid table start (+---+---+ or +===+===+)
         if is_grid_table_start(line) {
@@ -269,8 +331,8 @@ pub(crate) fn is_caption_followed_by_table(lines: &[&str], caption_pos: usize) -
         }
 
         // Or could be a header line followed by separator (simple/pipe table with header)
-        if pos + 1 < lines.len() && !line.trim().is_empty() {
-            let next_line = lines[pos + 1];
+        if pos + 1 < lines.line_count() && !line.trim().is_empty() {
+            let next_line = lines.line(pos + 1);
             if try_parse_table_separator(next_line).is_some()
                 || try_parse_pipe_separator(next_line).is_some()
             {
@@ -282,14 +344,17 @@ pub(crate) fn is_caption_followed_by_table(lines: &[&str], caption_pos: usize) -
     false
 }
 
-fn caption_range_starting_at(lines: &[&str], start: usize) -> Option<(usize, usize)> {
-    if start >= lines.len() || !is_table_caption_start(lines[start]) {
+fn caption_range_starting_at(
+    lines: &(impl LineView + ?Sized),
+    start: usize,
+) -> Option<(usize, usize)> {
+    if start >= lines.line_count() || !is_table_caption_start(lines.line(start)) {
         return None;
     }
     let mut end = start + 1;
-    while end < lines.len()
-        && !lines[end].trim().is_empty()
-        && !line_is_fenced_div_fence(lines[end])
+    while end < lines.line_count()
+        && !lines.line(end).trim().is_empty()
+        && !line_is_fenced_div_fence(lines.line(end))
     {
         end += 1;
     }
@@ -298,7 +363,10 @@ fn caption_range_starting_at(lines: &[&str], start: usize) -> Option<(usize, usi
 
 /// Find caption before table (if any).
 /// Returns (caption_start, caption_end) positions, or None.
-fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<(usize, usize)> {
+fn find_caption_before_table(
+    lines: &(impl LineView + ?Sized),
+    table_start: usize,
+) -> Option<(usize, usize)> {
     if table_start == 0 {
         return None;
     }
@@ -308,7 +376,7 @@ fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<(usiz
     let mut pos = table_start - 1;
 
     // Skip one blank line if present
-    if lines[pos].trim().is_empty() {
+    if lines.line(pos).trim().is_empty() {
         if pos == 0 {
             return None;
         }
@@ -326,7 +394,7 @@ fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<(usiz
         let mut scan_pos = pos;
         while scan_pos > 0 {
             scan_pos -= 1;
-            let line = lines[scan_pos];
+            let line = lines.line(scan_pos);
 
             // If we hit a blank line or fenced-div fence, we've gone too far
             if line.trim().is_empty() || line_is_fenced_div_fence(line) {
@@ -335,7 +403,7 @@ fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<(usiz
 
             // If we find a caption start, this is the beginning of the multiline caption
             if is_valid_caption_start_before_table(lines, scan_pos) {
-                if scan_pos > 0 && !lines[scan_pos - 1].trim().is_empty() {
+                if scan_pos > 0 && !lines.line(scan_pos - 1).trim().is_empty() {
                     return None;
                 }
                 if previous_nonblank_looks_like_table(lines, scan_pos) {
@@ -347,7 +415,7 @@ fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<(usiz
         // Scanned to beginning without finding caption start
         None
     } else {
-        if pos > 0 && !lines[pos - 1].trim().is_empty() {
+        if pos > 0 && !lines.line(pos - 1).trim().is_empty() {
             return None;
         }
         if previous_nonblank_looks_like_table(lines, pos) {
@@ -358,14 +426,14 @@ fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<(usiz
     }
 }
 
-fn previous_nonblank_looks_like_table(lines: &[&str], pos: usize) -> bool {
+fn previous_nonblank_looks_like_table(lines: &(impl LineView + ?Sized), pos: usize) -> bool {
     if pos == 0 {
         return false;
     }
     let mut i = pos;
     while i > 0 {
         i -= 1;
-        let line = lines[i].trim();
+        let line = lines.line(i).trim();
         if line.is_empty() {
             continue;
         }
@@ -388,30 +456,33 @@ fn line_looks_like_table_syntax(line: &str) -> bool {
 
 /// Find caption after table (if any).
 /// Returns (caption_start, caption_end) positions, or None.
-fn find_caption_after_table(lines: &[&str], table_end: usize) -> Option<(usize, usize)> {
-    if table_end >= lines.len() {
+fn find_caption_after_table(
+    lines: &(impl LineView + ?Sized),
+    table_end: usize,
+) -> Option<(usize, usize)> {
+    if table_end >= lines.line_count() {
         return None;
     }
 
     let mut pos = table_end;
 
     // Skip one blank line if present
-    if pos < lines.len() && lines[pos].trim().is_empty() {
+    if pos < lines.line_count() && lines.line(pos).trim().is_empty() {
         pos += 1;
     }
 
-    if pos >= lines.len() {
+    if pos >= lines.line_count() {
         return None;
     }
 
     // Check if this line is a caption
-    if is_table_caption_start(lines[pos]) {
+    if is_table_caption_start(lines.line(pos)) {
         let caption_start = pos;
         // Find end of caption (continues until blank line or fenced-div fence)
         let mut caption_end = caption_start + 1;
-        while caption_end < lines.len()
-            && !lines[caption_end].trim().is_empty()
-            && !line_is_fenced_div_fence(lines[caption_end])
+        while caption_end < lines.line_count()
+            && !lines.line(caption_end).trim().is_empty()
+            && !line_is_fenced_div_fence(lines.line(caption_end))
         {
             caption_end += 1;
         }
@@ -629,24 +700,25 @@ pub(crate) fn try_parse_simple_table(
         return None;
     }
 
-    // Detection scans run against the container-prefix-stripped view so a
-    // table nested in `list → blockquote` (e.g. `- >  a   b`) has its `  > `
-    // prefix removed before the separator/column-shape checks. With an empty
-    // prefix `stripped == lines`. Emission re-emits the prefix bytes as
+    // Detection scans read the container-prefix-stripped view lazily through
+    // the window (see `LineView`): a table nested in `list → blockquote`
+    // (e.g. `- >  a   b`) has its `  > ` prefix removed before the
+    // separator/column-shape checks. With an empty prefix the stripped view
+    // equals the raw lines. Scans stop at the first blank line, so only a
+    // bounded range is ever stripped. Emission re-emits the prefix bytes as
     // tokens via the window; captions/blank lines still read raw `lines`.
-    let stripped = window.strip_all();
 
     // Look for a separator line
-    let separator_pos = find_separator_line(&stripped, start_pos)?;
+    let separator_pos = find_separator_line(window, start_pos)?;
     log::trace!("  found separator at line {}", separator_pos + 1);
 
-    let separator_line = stripped[separator_pos];
+    let separator_line = window.line(separator_pos);
     let mut columns = try_parse_table_separator(separator_line)?;
 
     // Determine if there's a header (separator not at start)
     let has_header = separator_pos > start_pos;
     let header_line = if has_header {
-        Some(stripped[separator_pos - 1])
+        Some(window.line(separator_pos - 1))
     } else {
         None
     };
@@ -655,7 +727,7 @@ pub(crate) fn try_parse_simple_table(
     determine_alignments(&mut columns, separator_line, header_line);
 
     // Find table end (blank line or end of input)
-    let end_pos = find_table_end(&stripped, separator_pos + 1);
+    let end_pos = find_table_end(window, separator_pos + 1);
 
     // Must have at least one data row (or it's just a separator)
     let data_rows = end_pos - separator_pos - 1;
@@ -665,13 +737,13 @@ pub(crate) fn try_parse_simple_table(
     }
 
     // Check for caption before table
-    let caption_before = find_caption_before_table(&stripped, start_pos);
+    let caption_before = find_caption_before_table(window, start_pos);
 
     // Check for caption after table
     let caption_after = if caption_before.is_some() {
         None
     } else {
-        find_caption_after_table(&stripped, end_pos)
+        find_caption_after_table(window, end_pos)
     };
 
     // Build the table
@@ -764,20 +836,20 @@ pub(crate) fn try_parse_simple_table(
 }
 
 /// Find the position of a separator line starting from pos.
-fn find_separator_line(lines: &[&str], start_pos: usize) -> Option<usize> {
+fn find_separator_line(lines: &(impl LineView + ?Sized), start_pos: usize) -> Option<usize> {
     log::trace!("  find_separator_line from line {}", start_pos + 1);
 
     // Check first line
-    log::trace!("    checking first line: {:?}", lines[start_pos]);
-    if try_parse_table_separator(lines[start_pos]).is_some() {
+    log::trace!("    checking first line: {:?}", lines.line(start_pos));
+    if try_parse_table_separator(lines.line(start_pos)).is_some() {
         log::trace!("    separator found at first line");
         return Some(start_pos);
     }
 
     // Check second line (for table with header)
-    if start_pos + 1 < lines.len()
-        && !lines[start_pos].trim().is_empty()
-        && try_parse_table_separator(lines[start_pos + 1]).is_some()
+    if start_pos + 1 < lines.line_count()
+        && !lines.line(start_pos).trim().is_empty()
+        && try_parse_table_separator(lines.line(start_pos + 1)).is_some()
     {
         return Some(start_pos + 1);
     }
@@ -785,20 +857,20 @@ fn find_separator_line(lines: &[&str], start_pos: usize) -> Option<usize> {
 }
 
 /// Find where the table ends (first blank line or end of input).
-fn find_table_end(lines: &[&str], start_pos: usize) -> usize {
-    for i in start_pos..lines.len() {
-        if lines[i].trim().is_empty() {
+fn find_table_end(lines: &(impl LineView + ?Sized), start_pos: usize) -> usize {
+    for i in start_pos..lines.line_count() {
+        if lines.line(i).trim().is_empty() {
             return i;
         }
         // Check if this could be a closing separator
-        if try_parse_table_separator(lines[i]).is_some() {
+        if try_parse_table_separator(lines.line(i)).is_some() {
             // Check if next line is blank or end
-            if i + 1 >= lines.len() || lines[i + 1].trim().is_empty() {
+            if i + 1 >= lines.line_count() || lines.line(i + 1).trim().is_empty() {
                 return i + 1;
             }
         }
     }
-    lines.len()
+    lines.line_count()
 }
 
 /// Emit a table row (header or data row) with inline-parsed cells for simple tables.
@@ -1167,38 +1239,33 @@ pub(crate) fn try_parse_pipe_table(
         return None;
     }
 
-    // Cheap gate before the O(buffer) `strip_all` below: a pipe table's first
-    // line must contain a `|` (it is either the header or, headerless, the
-    // delimiter row), unless this is a caption-led table. Table detection runs
-    // at every block start, so stripping the whole line buffer for every
-    // prose/math paragraph was quadratic on large documents. When there is no
-    // container prefix (the common case) `strip_at`/`is_caption_followed_by_table`
-    // see exactly the same bytes as the stripped view, so this peek is
-    // equivalent to the checks below; with a non-empty prefix we skip the gate
-    // and fall through rather than risk a mismatch.
-    if window.prefix().ops().is_empty()
-        && !window.strip_at(start_pos).contains('|')
-        && !is_caption_followed_by_table(lines, start_pos)
+    // Cheap gate: a pipe table's first line must contain a `|` (it is either
+    // the header or, headerless, the delimiter row), unless this is a
+    // caption-led table. Table detection runs at every block start, so doing
+    // any per-line work for every prose/math paragraph was quadratic on large
+    // documents. Peek the dispatch line and run the (bounded) caption probe on
+    // the same stripped `window` the detection below uses, so the gate applies
+    // inside containers (blockquote/list) too — not just at top level.
+    if !window.strip_at(start_pos).contains('|') && !is_caption_followed_by_table(window, start_pos)
     {
         return None;
     }
 
-    // Detection scans run against a container-prefix-stripped view, so a
-    // table nested in `list → blockquote` (e.g. `- > | a | b |`) has its
-    // `  > ` prefix removed before the separator/cell shape checks. Each
-    // entry is a no-alloc tail slice of the matching raw line; with an
-    // empty prefix `stripped == lines`. The dispatch line uses the
-    // emission-safe line-0 strip (its prefix was consumed by the core);
-    // every other line gets the full continuation strip. Emission still
-    // reads raw `lines` so the prefix bytes can be re-emitted as tokens.
-    let stripped = window.strip_all();
+    // Detection scans read the container-prefix-stripped view lazily through
+    // the window (see `LineView`), so a table nested in `list → blockquote`
+    // (e.g. `- > | a | b |`) has its `  > ` prefix removed before the
+    // separator/cell shape checks. The dispatch line uses the emission-safe
+    // line-0 strip (its prefix was consumed by the core); every other line
+    // gets the full continuation strip. Scans stop at the first blank line, so
+    // only a bounded range is stripped. Emission still reads raw `lines` so the
+    // prefix bytes can be re-emitted as tokens.
 
     // Check if this line is a caption followed by a table
     // If so, the actual table starts after the caption and blank line
-    let (actual_start, caption_before) = if is_caption_followed_by_table(&stripped, start_pos) {
-        let (cap_start, cap_end) = caption_range_starting_at(&stripped, start_pos)?;
+    let (actual_start, caption_before) = if is_caption_followed_by_table(window, start_pos) {
+        let (cap_start, cap_end) = caption_range_starting_at(window, start_pos)?;
         let mut pos = cap_end;
-        while pos < stripped.len() && stripped[pos].trim().is_empty() {
+        while pos < window.line_count() && window.line(pos).trim().is_empty() {
             pos += 1;
         }
         (pos, Some((cap_start, cap_end)))
@@ -1211,15 +1278,15 @@ pub(crate) fn try_parse_pipe_table(
     }
 
     // First line should have pipes (potential header)
-    if !stripped[actual_start].contains('|') {
+    if !window.line(actual_start).contains('|') {
         return None;
     }
 
     // Second line should be separator
-    let alignments = try_parse_pipe_separator(stripped[actual_start + 1])?;
+    let alignments = try_parse_pipe_separator(window.line(actual_start + 1))?;
 
     // Parse header cells
-    let header_cells = parse_pipe_table_row(stripped[actual_start]);
+    let header_cells = parse_pipe_table_row(window.line(actual_start));
 
     // Number of columns should match (approximately - be lenient)
     if header_cells.len() != alignments.len() && !header_cells.is_empty() {
@@ -1231,8 +1298,8 @@ pub(crate) fn try_parse_pipe_table(
 
     // Find table end (first blank line or end of input)
     let mut end_pos = actual_start + 2;
-    while end_pos < stripped.len() {
-        let line = stripped[end_pos];
+    while end_pos < window.line_count() {
+        let line = window.line(end_pos);
         if line.trim().is_empty() {
             break;
         }
@@ -1249,14 +1316,13 @@ pub(crate) fn try_parse_pipe_table(
     }
 
     // Check for caption before table (only if we didn't already detect it)
-    let caption_before =
-        caption_before.or_else(|| find_caption_before_table(&stripped, actual_start));
+    let caption_before = caption_before.or_else(|| find_caption_before_table(window, actual_start));
 
     // Check for caption after table
     let caption_after = if caption_before.is_some() {
         None
     } else {
-        find_caption_after_table(&stripped, end_pos)
+        find_caption_after_table(window, end_pos)
     };
 
     // Build the pipe table
@@ -1977,47 +2043,33 @@ pub(crate) fn try_parse_grid_table(
         return None;
     }
 
-    // Detection scans run against the container-prefix-stripped view so a
-    // grid table nested in `list → blockquote` (e.g. `- > +---+---+`) has its
-    // `  > ` prefix removed before the separator/content-row shape checks.
-    // With an empty prefix `stripped == lines`. Emission re-emits the prefix
-    // bytes as tokens via the window; captions/blank lines read raw `lines`.
-    //
-    // Cheap gate before the O(buffer) `strip_all` below: a grid table's first
-    // line is a grid separator (`+---+`/`+===+`), unless this is a caption-led
-    // table. Table detection runs at every block start, so stripping the whole
-    // line buffer for every prose/math paragraph was quadratic on large
-    // documents. When there is no container prefix (the common case) the
-    // dispatch line's bytes are identical to the stripped view this function
-    // builds below, so this peek is equivalent to the `try_parse_grid_separator`
-    // check; with a non-empty prefix we skip the gate and fall through.
-    if window.prefix().ops().is_empty()
-        && try_parse_grid_separator(window.strip_at(start_pos)).is_none()
-        && !is_caption_followed_by_table(lines, start_pos)
+    // Grid-border detection reads the stripped view through `UniformStripView`,
+    // which strips *every* line — including the dispatch line — with the full
+    // container strip. The strict column-0 check in `try_parse_grid_separator`
+    // would otherwise reject a `+---+` border sitting at column 0 of a list
+    // item's inner content if the dispatch line kept its list-indent. With an
+    // empty prefix the stripped view equals the raw lines. Emission still goes
+    // through `window.emit_or_dispatch_tail`, which preserves the indent bytes.
+    // Scans stop at the first blank line, so only a bounded range is stripped.
+    let view = UniformStripView(window);
+
+    // Cheap gate: a grid table's first line is a grid separator (`+---+`/`+===+`),
+    // unless this is a caption-led table. Table detection runs at every block
+    // start, so any per-line work for every prose/math paragraph was quadratic
+    // on large documents. Run the gate on the same `view` the detection uses, so
+    // it applies inside containers (blockquote/list) too — not just at top level.
+    if try_parse_grid_separator(view.line(start_pos)).is_none()
+        && !is_caption_followed_by_table(&view, start_pos)
     {
         return None;
     }
 
-    // `strip_all` keeps the dispatch line's list-indent (via
-    // `strip_line_0_for_emission`) so emission re-injects those bytes
-    // correctly. For grid-border *detection*, the strict column-0 check in
-    // `try_parse_grid_separator` would then reject a border that's actually
-    // sitting at column 0 of the list-item's inner content — so force the
-    // dispatch line to its fully-stripped view here. Emission still goes
-    // through `window.emit_or_dispatch_tail`, which preserves the indent
-    // bytes.
-    let mut stripped = window.strip_all();
-    let dispatch_pos = window.dispatch_pos();
-    if dispatch_pos < stripped.len() {
-        stripped[dispatch_pos] = window.prefix().strip(lines[dispatch_pos]);
-    }
-
     // Check if this line is a caption followed by a table
     // If so, the actual table starts after the caption and blank line
-    let (actual_start, caption_before) = if is_caption_followed_by_table(&stripped, start_pos) {
-        let (cap_start, cap_end) = caption_range_starting_at(&stripped, start_pos)?;
+    let (actual_start, caption_before) = if is_caption_followed_by_table(&view, start_pos) {
+        let (cap_start, cap_end) = caption_range_starting_at(&view, start_pos)?;
         let mut pos = cap_end;
-        while pos < stripped.len() && stripped[pos].trim().is_empty() {
+        while pos < view.line_count() && view.line(pos).trim().is_empty() {
             pos += 1;
         }
         (pos, Some((cap_start, cap_end)))
@@ -2030,7 +2082,7 @@ pub(crate) fn try_parse_grid_table(
     }
 
     // First line must be a grid separator
-    let first_line = stripped[actual_start];
+    let first_line = view.line(actual_start);
     let _columns = try_parse_grid_separator(first_line)?;
 
     // Track table structure
@@ -2040,7 +2092,7 @@ pub(crate) fn try_parse_grid_table(
 
     // Scan table lines
     while end_pos < lines.len() {
-        let line = stripped[end_pos];
+        let line = view.line(end_pos);
 
         // Check for blank line (table ends)
         if line.trim().is_empty() {
@@ -2082,14 +2134,13 @@ pub(crate) fn try_parse_grid_table(
     // But we'll be lenient and accept tables ending with content rows
 
     // Check for caption before table (only if we didn't already detected it)
-    let caption_before =
-        caption_before.or_else(|| find_caption_before_table(&stripped, actual_start));
+    let caption_before = caption_before.or_else(|| find_caption_before_table(&view, actual_start));
 
     // Check for caption after table
     let caption_after = if caption_before.is_some() {
         None
     } else {
-        find_caption_after_table(&stripped, end_pos)
+        find_caption_after_table(&view, end_pos)
     };
 
     // Build the grid table
@@ -2119,7 +2170,8 @@ pub(crate) fn try_parse_grid_table(
     let mut current_row_kind = SyntaxKind::TABLE_HEADER;
 
     // Emit table rows - accumulate multi-line cells
-    for (idx, &line) in stripped.iter().enumerate().take(end_pos).skip(actual_start) {
+    for idx in actual_start..end_pos {
+        let line = view.line(idx);
         if let Some(sep_cols) = try_parse_grid_separator(line) {
             // Separator line - emit any accumulated row first
             if !current_row_indices.is_empty() {
@@ -2180,7 +2232,7 @@ pub(crate) fn try_parse_grid_table(
     // Emit any remaining accumulated row
     if !current_row_indices.is_empty() {
         // Use first separator's columns for cell boundaries
-        if let Some(sep_cols) = try_parse_grid_separator(stripped[actual_start]) {
+        if let Some(sep_cols) = try_parse_grid_separator(view.line(actual_start)) {
             emit_grid_table_row(
                 builder,
                 window,
@@ -2440,7 +2492,7 @@ fn is_column_separator(line: &str) -> bool {
 }
 
 fn is_headerless_single_row_without_blank(
-    lines: &[&str],
+    lines: &(impl LineView + ?Sized),
     row_start: usize,
     row_end: usize,
     columns: &[Column],
@@ -2457,8 +2509,8 @@ fn is_headerless_single_row_without_blank(
         return false;
     };
 
-    for line in lines.iter().take(row_end).skip(row_start + 1) {
-        let (content, _) = strip_newline(line);
+    for i in (row_start + 1)..row_end {
+        let (content, _) = strip_newline(lines.line(i));
         let prefix_end = last_col.start.min(content.len());
         if !content[..prefix_end].trim().is_empty() {
             return false;
@@ -2481,12 +2533,11 @@ pub(crate) fn try_parse_multiline_table(
         return None;
     }
 
-    // Cheap gate before the O(buffer) `strip_all` below: a multiline table's
-    // first line is either a full-width dash separator or a column separator.
-    // Table detection runs at every block start, so stripping the whole line
-    // buffer for every paragraph that can't begin a multiline table was
-    // quadratic on large documents. Peek just the dispatch line via `strip_at`
-    // and bail before materializing the full view.
+    // Cheap gate: a multiline table's first line is either a full-width dash
+    // separator or a column separator. Table detection runs at every block
+    // start, so any per-line work for every paragraph that can't begin a
+    // multiline table was quadratic on large documents. Peek just the dispatch
+    // line via `strip_at` and bail before any further scanning.
     let first_line = window.strip_at(start_pos);
 
     // First line can be either:
@@ -2498,16 +2549,16 @@ pub(crate) fn try_parse_multiline_table(
         return None;
     }
 
-    // Detection scans run against the container-prefix-stripped view so a
-    // multiline table nested in `list → blockquote` (e.g. `- > ----`) has its
-    // `  > ` prefix removed before the separator/blank-row shape checks. The
-    // interior `>`-only row then strips to `""` and registers as a blank row
-    // separator. With an empty prefix `stripped == lines`. Emission re-emits
-    // the prefix bytes as tokens via the window; captions read raw `lines`.
-    let stripped = window.strip_all();
-
+    // Detection scans read the container-prefix-stripped view lazily through the
+    // window (see `LineView`) so a multiline table nested in `list → blockquote`
+    // (e.g. `- > ----`) has its `  > ` prefix removed before the
+    // separator/blank-row shape checks. The interior `>`-only row then strips to
+    // `""` and registers as a blank row separator. With an empty prefix the
+    // stripped view equals the raw lines. Scans stop at the first blank/closing
+    // line, so only a bounded range is stripped. Emission re-emits the prefix
+    // bytes as tokens via the window; captions read raw `lines`.
     let headerless_columns = if is_column_sep_start {
-        try_parse_table_separator(stripped[start_pos])
+        try_parse_table_separator(window.line(start_pos))
     } else {
         None
     };
@@ -2523,7 +2574,7 @@ pub(crate) fn try_parse_multiline_table(
 
     // Scan for header section and column separator
     while pos < lines.len() {
-        let line = stripped[pos];
+        let line = window.line(pos);
 
         // Check for column separator (defines columns) - only if we started with full-width
         if is_full_width_start && is_column_separator(line) && !found_column_sep {
@@ -2540,7 +2591,7 @@ pub(crate) fn try_parse_multiline_table(
             pos += 1;
             // Check if next line is a valid closing separator for this table shape.
             if pos < lines.len() {
-                let next = stripped[pos];
+                let next = window.line(pos);
                 let is_valid_closer = if is_full_width_start {
                     try_parse_multiline_separator(next).is_some()
                 } else {
@@ -2585,7 +2636,7 @@ pub(crate) fn try_parse_multiline_table(
             return None;
         }
         let columns = headerless_columns.as_deref()?;
-        if !is_headerless_single_row_without_blank(&stripped, start_pos + 1, pos - 1, columns) {
+        if !is_headerless_single_row_without_blank(window, start_pos + 1, pos - 1, columns) {
             return None;
         }
     }
@@ -2603,17 +2654,17 @@ pub(crate) fn try_parse_multiline_table(
     let end_pos = pos;
 
     // Extract column boundaries from the separator line
-    let columns = try_parse_table_separator(stripped[column_sep_pos])
+    let columns = try_parse_table_separator(window.line(column_sep_pos))
         .expect("Column separator must be valid");
 
     // Check for caption before table
-    let caption_before = find_caption_before_table(&stripped, start_pos);
+    let caption_before = find_caption_before_table(window, start_pos);
 
     // Check for caption after table
     let caption_after = if caption_before.is_some() {
         None
     } else {
-        find_caption_after_table(&stripped, end_pos)
+        find_caption_after_table(window, end_pos)
     };
 
     // Build the multiline table
@@ -2649,12 +2700,8 @@ pub(crate) fn try_parse_multiline_table(
     let mut in_header = has_header;
     let mut current_row_indices: Vec<usize> = Vec::new();
 
-    for (i, &line) in stripped
-        .iter()
-        .enumerate()
-        .take(end_pos)
-        .skip(start_pos + 1)
-    {
+    for i in (start_pos + 1)..end_pos {
+        let line = window.line(i);
         // Column separator (header/body divider)
         if i == column_sep_pos {
             // Emit any accumulated header lines

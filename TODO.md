@@ -433,38 +433,6 @@ intentionally excluded.
   instead of re-parsing. Larger change than the blockquote-marker item
   above; same "build temp CST then discard" anti-pattern.
 
-- [ ] Fix O(n²) parsing of large single blockquotes. A document that is one
-  giant blockquote of N blank-line-separated paragraphs parses in O(N²) wall
-  time (confirmed empirically: \~4× per doubling on parse-only timing; 250 →
-  4000 paragraphs is 16× the bytes but \~230× the parse time, 6 ms → 1425
-  ms). Two independent quadratic sources, both in the parse path, neither
-  related to the `InlineSink` work above. Profiled with `perf` on an N =
-  1000--2000 giant blockquote: `ContainerPrefix::strip` \~26% self,
-  `Vec::from_iter` (the `strip_all` collect) \~15%, `collect_refdef_labels`
-  \~16% self.
-
-  1. `collect_refdef_labels` (`inlines/refdef_map.rs`). For every line that
-     starts with `>` --- i.e. *every* line in a giant blockquote --- it calls
-     `strip_blockquote_line`, which walks and copies *all* following consecutive
-     blockquote lines into a fresh `String` before trying to parse a reference
-     definition from the front. Summed over N lines that is O(N²) time and
-     allocation. It is called once per `parse`, so the quadratic is internal to
-     the scan, not a per-line re-call. Fix: stop after the bytes a refdef could
-     actually consume (the first line, plus the few continuation lines a wrapped
-     title needs), instead of slurping the whole blockquote body per `>`-line.
-
-  2. Table-detection `strip_all` (`blocks/tables.rs` via
-     `container_prefix::StrippedLines::strip_all`). Each `try_parse_*_table`
-     detector calls `window.strip_all()`, which strips *every* line of the
-     buffer (`0..raw.len()`, including lines before `base`) into a `Vec<&str>`.
-     Detection runs per candidate block, and every blank-line-preceded paragraph
-     qualifies, so it is O(blocks × total_lines) = O(N²). The "cheap gate"
-     before `strip_all` does not save the giant-blockquote case. Fix: bound the
-     stripped view to the table-candidate lookahead window (a few lines) rather
-     than the whole buffer; `strip_all` over `0..raw.len()` is the wrong scope
-     for per-block detection. Shares the table detector with the parse-twice
-     item above --- worth tackling together.
-
 ### YAML validation: consumer fidelity vs YAML 1.2 (needs design decision)
 
 Surfaced 2026-06-08 while fixing a real bug: pandoc rejected a user's
