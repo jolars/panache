@@ -414,7 +414,7 @@ intentionally excluded.
   (`maybe_open_fenced_code_in_new_list_item`,
   `handle_definition_list_effect::Definition`) are gone.
 
-- [ ] De-duplicate table caption routing between `detect_prepared` and
+- [x] De-duplicate table caption routing between `detect_prepared` and
   `parse_prepared` (`block_dispatcher.rs`). The
   `is_caption_followed_by_table` check, the `table_pos` computation (skip
   caption continuation lines + one blank), and the try-each-table-kind
@@ -422,7 +422,9 @@ intentionally excluded.
   table-IR item under Performance), the two copies can drift --- a fix to
   one (e.g. the raw-vs-stripped caption issue below) silently won't reach
   the other. Fold into one shared helper; pairs naturally with the table-IR
-  change.
+  change. Done: routing lives in `resolve_table_pos` / `try_parse_kind` /
+  `first_kind_at`; `table_pos` cached on `TablePrepared`. The double-parse
+  cost is still open (tracked under the table-IR Performance item).
 
 - [ ] Reconcile `is_caption_followed_by_table`'s raw-vs-stripped callers and its
   duplicate table sniffing (`blocks/tables.rs`). It's a `pub(crate)` gate
