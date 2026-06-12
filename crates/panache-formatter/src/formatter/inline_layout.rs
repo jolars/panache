@@ -23,6 +23,12 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 ///   with display math (`tex_math_single_backslash`); under that extension a bare
 ///   pair of literal brackets in a paragraph would reparse as a `DISPLAY_MATH`
 ///   span after escaping, breaking idempotency.
+/// * `escape_pipes` - Whether `|` should be escaped. Callers set this to the
+///   union of the `|`-consuming extensions (`pipe_tables`, `line_blocks`,
+///   `grid_tables`): a literal `|` only needs escaping where it could
+///   round-trip into a pipe table, line block, or grid-table row. Flavors with
+///   none of these (e.g. CommonMark) leave it bare, matching pandoc's
+///   commonmark writer.
 fn escape_special_chars(
     text: &str,
     skip_emphasis_delim: bool,
@@ -30,6 +36,7 @@ fn escape_special_chars(
     next_is_text: bool,
     escape_underscores: bool,
     escape_square_brackets: bool,
+    escape_pipes: bool,
 ) -> String {
     let mut result = String::with_capacity(text.len() * 2);
     let is_single_underscore = text == "_";
@@ -85,6 +92,12 @@ fn escape_special_chars(
                 if escape_square_brackets {
                     result.push('\\');
                 }
+                result.push(ch);
+            }
+            // `|` is only special where pipe tables exist; under CommonMark it
+            // carries no meaning, so escaping it would be spurious (matching
+            // pandoc's commonmark vs. markdown writers).
+            '|' if !escape_pipes => {
                 result.push(ch);
             }
             // Escape special syntax characters
@@ -1006,6 +1019,9 @@ fn process_node_recursive(
                             next_is_text,
                             !in_link_text,
                             !config.parser_extensions.tex_math_single_backslash,
+                            config.parser_extensions.pipe_tables
+                                || config.parser_extensions.line_blocks
+                                || config.parser_extensions.grid_tables,
                         );
                         sink.push_piece(&processed_word);
                         saw_word = true;

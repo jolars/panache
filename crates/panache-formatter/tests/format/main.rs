@@ -22,6 +22,7 @@ mod math;
 mod nbsp;
 mod no_break_abbreviations;
 mod paragraphs;
+mod pipe_escape;
 mod preserve_wrap;
 mod quotes;
 mod raw_inline;
