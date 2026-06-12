@@ -414,6 +414,36 @@ intentionally excluded.
   (`maybe_open_fenced_code_in_new_list_item`,
   `handle_definition_list_effect::Definition`) are gone.
 
+- [ ] De-duplicate table caption routing between `detect_prepared` and
+  `parse_prepared` (`block_dispatcher.rs`). The
+  `is_caption_followed_by_table` check, the `table_pos` computation (skip
+  caption continuation lines + one blank), and the try-each-table-kind
+  cascade are spelled out twice. Beyond the double-parse cost (see the
+  table-IR item under Performance), the two copies can drift --- a fix to
+  one (e.g. the raw-vs-stripped caption issue below) silently won't reach
+  the other. Fold into one shared helper; pairs naturally with the table-IR
+  change.
+
+- [ ] Reconcile `is_caption_followed_by_table`'s raw-vs-stripped callers and its
+  duplicate table sniffing (`blocks/tables.rs`). It's a `pub(crate)` gate
+  consulted from the dispatcher, `definition_lists.rs`, `core.rs`, and the
+  detectors (via the new `LineView` trait). The dispatcher/deflists/core
+  pass *raw* lines while the detectors pass the container-stripped view ---
+  so a caption before a table *inside a blockquote* (`> Table: ...`) isn't
+  recognized at the dispatcher level (the raw line starts with `>`, failing
+  the caption-start check). Decide whether that's intended; if not, feed the
+  stripped window (now trivial via `LineView`) and land paired
+  pandoc-verified fixtures (commonmark + markdown). Separately, the function
+  re-implements grid/multiline/pipe/simple separator sniffing the detectors
+  also do --- two heuristics answering "is there a table here," a drift
+  risk.
+
+- [ ] Collapse the double `try_parse_definition_marker` call in
+  `next_line_is_definition_marker` (`blocks/definition_lists.rs`). It parses
+  the line once for `.is_some()` and again to destructure `marker`; a single
+  `if let Some((marker, ..)) = ...` covers both. Runs in a per-block
+  lookahead.
+
 ### Performance
 
 - [x] Avoid temporary green tree when injecting `BLOCK_QUOTE_MARKER` tokens into
@@ -432,6 +462,12 @@ intentionally excluded.
   (rows/cells/alignments) in `TablePrepared` so emission renders from the IR
   instead of re-parsing. Larger change than the blockquote-marker item
   above; same "build temp CST then discard" anti-pattern.
+
+- [ ] Use `memchr` for the refdef-map newline scan. `memchr_newline`
+  (`inlines/refdef_map.rs`) is a scalar `iter().position(|&b| b == b'\n')`
+  despite its name; `collect_refdef_labels` calls it once per line over the
+  whole document. Swap in the `memchr` crate (SIMD) for a free per-parse
+  speedup --- and the name stops lying.
 
 ### YAML validation: consumer fidelity vs YAML 1.2 (needs design decision)
 
