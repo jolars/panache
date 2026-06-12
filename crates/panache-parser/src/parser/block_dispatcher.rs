@@ -893,6 +893,7 @@ impl BlockParser for DefinitionListParser {
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         let content = lines.first();
         let line_pos = lines.pos();
+        let prefix = lines.prefix();
         let lines = lines.raw();
         if !ctx.config.extensions.definition_lists {
             return None;
@@ -902,10 +903,17 @@ impl BlockParser for DefinitionListParser {
             try_parse_definition_marker(content)
         {
             // If this `:` line is actually a table caption marker and a table
-            // follows, let TableParser claim it instead of starting a definition list.
+            // follows, let TableParser claim it instead of starting a definition
+            // list. The marker above was detected on the container-stripped
+            // `content`, so run the caption gate on the same stripped window
+            // (not raw `lines`) or a `> : caption` inside a blockquote would
+            // slip through this gate.
             if marker_char == ':'
                 && ctx.config.extensions.table_captions
-                && is_caption_followed_by_table(lines, line_pos)
+                && is_caption_followed_by_table(
+                    &StrippedLines::with_dispatch(lines, line_pos, line_pos, prefix),
+                    line_pos,
+                )
             {
                 return None;
             }
@@ -1233,15 +1241,32 @@ struct TablePrepared {
 /// Line index where the table grid begins: past a leading caption (its
 /// continuation lines plus one optional blank) when `table_captions` applies,
 /// else `line_pos` itself.
-fn resolve_table_pos(ctx: &BlockContext, raw: &[&str], line_pos: usize) -> usize {
-    if !(ctx.config.extensions.table_captions && is_caption_followed_by_table(raw, line_pos)) {
+///
+/// Runs caption detection and the blank-line skip on the container-stripped
+/// window (anchored at `line_pos`), not the raw lines. Inside a blockquote/list
+/// the raw caption line is `> Table: …` (or `> ` for the blank), which fails the
+/// caption-start check and reads as non-blank; the stripped view sees the bare
+/// `Table: …`/empty line. Multiline detection only recognizes a caption-led
+/// table when dispatched at the border, so getting this right is what keeps a
+/// caption-before multiline table in a blockquote from leaking into a paragraph.
+fn resolve_table_pos(
+    ctx: &BlockContext,
+    raw: &[&str],
+    line_pos: usize,
+    prefix: &ContainerPrefix,
+) -> usize {
+    if !ctx.config.extensions.table_captions {
+        return line_pos;
+    }
+    let window = StrippedLines::with_dispatch(raw, line_pos, line_pos, prefix);
+    if !is_caption_followed_by_table(&window, line_pos) {
         return line_pos;
     }
     let mut pos = line_pos + 1;
-    while pos < raw.len() && !raw[pos].trim().is_empty() {
+    while pos < raw.len() && !window.strip_at(pos).trim().is_empty() {
         pos += 1;
     }
-    if pos < raw.len() && raw[pos].trim().is_empty() {
+    if pos < raw.len() && window.strip_at(pos).trim().is_empty() {
         pos += 1;
     }
     pos
@@ -1342,7 +1367,7 @@ impl BlockParser for TableParser {
         // Caption-before-table lines match the *table kind* starting after the
         // caption (`table_pos`), but parse from the caption line so the caption
         // is included and consumed. `resolve_table_pos` owns that routing.
-        let table_pos = resolve_table_pos(ctx, lines, line_pos);
+        let table_pos = resolve_table_pos(ctx, lines, line_pos, prefix);
         let (kind, _) = first_kind_at(ctx, lines, table_pos, line_pos, prefix, &mut tmp)?;
         Some((detection, Some(Box::new(TablePrepared { kind, table_pos }))))
     }
@@ -1360,8 +1385,10 @@ impl BlockParser for TableParser {
         let prepared = payload.and_then(|p| p.downcast_ref::<TablePrepared>().copied());
         // Detection cached the table position; recompute only on the rare
         // payload-missing path.
-        let table_pos =
-            prepared.map_or_else(|| resolve_table_pos(ctx, lines, line_pos), |p| p.table_pos);
+        let table_pos = prepared.map_or_else(
+            || resolve_table_pos(ctx, lines, line_pos, prefix),
+            |p| p.table_pos,
+        );
 
         // Happy path: use the cached kind. Try the caption line first (a bare
         // table parses here), then the post-caption position.

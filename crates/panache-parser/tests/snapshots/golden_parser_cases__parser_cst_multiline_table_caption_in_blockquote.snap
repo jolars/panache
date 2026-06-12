@@ -1,0 +1,61 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..156
+  BLOCK_QUOTE@0..156
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    MULTILINE_TABLE@2..156
+      TABLE_CAPTION@2..22
+        TABLE_CAPTION_PREFIX@2..9 "Table: "
+        TEXT@9..21 "Fruit prices"
+        NEWLINE@21..22 "\n"
+      BLANK_LINE@22..24
+        BLOCK_QUOTE_MARKER@22..23 ">"
+        BLANK_LINE@23..24 "\n"
+      TABLE_SEPARATOR@24..48
+        BLOCK_QUOTE_MARKER@24..25 ">"
+        WHITESPACE@25..26 " "
+        TEXT@26..47 "---------------------"
+        NEWLINE@47..48 "\n"
+      TABLE_HEADER@48..68
+        BLOCK_QUOTE_MARKER@48..49 ">"
+        WHITESPACE@49..50 " "
+        TABLE_CELL@50..59
+          TEXT@50..59 "Fruit    "
+        WHITESPACE@59..60 " "
+        TABLE_CELL@60..67
+          TEXT@60..67 "  Price"
+        NEWLINE@67..68 "\n"
+      TABLE_SEPARATOR@68..92
+        BLOCK_QUOTE_MARKER@68..69 ">"
+        WHITESPACE@69..70 " "
+        TEXT@70..91 "--------- -----------"
+        NEWLINE@91..92 "\n"
+      TABLE_ROW@92..111
+        BLOCK_QUOTE_MARKER@92..93 ">"
+        WHITESPACE@93..94 " "
+        TABLE_CELL@94..103
+          TEXT@94..103 "Apple    "
+        WHITESPACE@103..104 " "
+        TABLE_CELL@104..110
+          TEXT@104..110 "  1.00"
+        NEWLINE@110..111 "\n"
+      BLANK_LINE@111..113
+        BLOCK_QUOTE_MARKER@111..112 ">"
+        BLANK_LINE@112..113 "\n"
+      TABLE_ROW@113..132
+        BLOCK_QUOTE_MARKER@113..114 ">"
+        WHITESPACE@114..115 " "
+        TABLE_CELL@115..124
+          TEXT@115..124 "Pear     "
+        WHITESPACE@124..125 " "
+        TABLE_CELL@125..131
+          TEXT@125..131 "  2.00"
+        NEWLINE@131..132 "\n"
+      TABLE_SEPARATOR@132..156
+        BLOCK_QUOTE_MARKER@132..133 ">"
+        WHITESPACE@133..134 " "
+        TEXT@134..155 "---------------------"
+        NEWLINE@155..156 "\n"

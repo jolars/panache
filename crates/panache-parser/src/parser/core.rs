@@ -3632,7 +3632,9 @@ fn footnote_first_line_term_lookahead(
         if let Some((marker, ..)) = definition_lists::try_parse_definition_marker(stripped) {
             // A `:` line that is actually a table caption shouldn't open a
             // definition list. Mirror the gate from
-            // `next_line_is_definition_marker`.
+            // `next_line_is_definition_marker`. This lookahead strips the
+            // footnote/list `content_col` indent (not a container prefix), so
+            // the raw-line caption gate is appropriate here.
             if marker == ':'
                 && table_captions_enabled
                 && super::blocks::tables::is_caption_followed_by_table(lines, check_pos)

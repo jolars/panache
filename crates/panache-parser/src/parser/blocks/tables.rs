@@ -311,33 +311,50 @@ pub(crate) fn is_caption_followed_by_table(
         pos += 1;
     }
 
-    // Check for table at next position
-    if pos < lines.line_count() {
-        let line = lines.line(pos);
+    // Check for a table grid at the next position.
+    table_grid_starts_at(lines, pos)
+}
 
-        // Check for grid table start (+---+---+ or +===+===+)
-        if is_grid_table_start(line) {
+/// Cheap lookahead: does any table kind's grid begin at absolute line `pos`?
+///
+/// This is the lightweight twin of the block dispatcher's `first_kind_at`,
+/// which answers the same "is there a table here?" question by attempting a
+/// full parse of each kind in turn. We deliberately do **not** call that from
+/// the caption lookahead: caption detection runs at every block start, and a
+/// full per-kind parse there would reintroduce the O(n²) blowup the bounded
+/// separator probe exists to avoid. To keep the two predicates in agreement,
+/// this calls the same primitive separator detectors the real parsers gate on
+/// (`is_grid_table_start` → `try_parse_grid_separator`, `is_multiline_table_start`
+/// → `try_parse_multiline_separator`/`is_column_separator`,
+/// `try_parse_table_separator`, `try_parse_pipe_separator`).
+fn table_grid_starts_at(lines: &(impl LineView + ?Sized), pos: usize) -> bool {
+    if pos >= lines.line_count() {
+        return false;
+    }
+    let line = lines.line(pos);
+
+    // Grid table start (`+---+---+` or `+===+===+`).
+    if is_grid_table_start(line) {
+        return true;
+    }
+
+    // Multiline table start (`----` or `---- ---- ----`).
+    if is_multiline_table_start(line) {
+        return true;
+    }
+
+    // Separator line (simple/pipe table, headerless).
+    if try_parse_table_separator(line).is_some() {
+        return true;
+    }
+
+    // Header line followed by a separator (simple/pipe table with header).
+    if pos + 1 < lines.line_count() && !line.trim().is_empty() {
+        let next_line = lines.line(pos + 1);
+        if try_parse_table_separator(next_line).is_some()
+            || try_parse_pipe_separator(next_line).is_some()
+        {
             return true;
-        }
-
-        // Check for multiline table start (---- or ---- ---- ----)
-        if is_multiline_table_start(line) {
-            return true;
-        }
-
-        // Could be a separator line (simple/pipe table, headerless)
-        if try_parse_table_separator(line).is_some() {
-            return true;
-        }
-
-        // Or could be a header line followed by separator (simple/pipe table with header)
-        if pos + 1 < lines.line_count() && !line.trim().is_empty() {
-            let next_line = lines.line(pos + 1);
-            if try_parse_table_separator(next_line).is_some()
-                || try_parse_pipe_separator(next_line).is_some()
-            {
-                return true;
-            }
         }
     }
 
@@ -540,9 +557,32 @@ fn emit_caption_line_text(
     }
 }
 
+/// Emit the blank (container-only) lines in the absolute range `[from, to)` as
+/// `BLANK_LINE` nodes. Re-emits each line's container prefix as tokens via the
+/// window, so a `>`-only blank line between a caption and its table inside a
+/// blockquote round-trips losslessly. Mirrors the interior blank-row emitter in
+/// `try_parse_multiline_table`. An empty range emits nothing.
+fn emit_caption_blank_lines(
+    builder: &mut GreenNodeBuilder<'static>,
+    window: &StrippedLines<'_, '_>,
+    from: usize,
+    to: usize,
+) {
+    for abs in from..to {
+        // `window.line` is the container-stripped view, so a `>`-only line reads
+        // as blank.
+        if window.line(abs).trim().is_empty() {
+            builder.start_node(SyntaxKind::BLANK_LINE.into());
+            let tail = window.emit_or_dispatch_tail(builder, abs);
+            builder.token(SyntaxKind::BLANK_LINE.into(), tail);
+            builder.finish_node();
+        }
+    }
+}
+
 fn emit_table_caption(
     builder: &mut GreenNodeBuilder<'static>,
-    lines: &[&str],
+    window: &StrippedLines<'_, '_>,
     start: usize,
     end: usize,
     config: &ParserOptions,
@@ -551,24 +591,33 @@ fn emit_table_caption(
 
     let last_idx = (end - start).saturating_sub(1);
 
-    for (i, line) in lines[start..end].iter().enumerate() {
+    for (i, abs) in (start..end).enumerate() {
         let lift_attrs = i == last_idx;
+
+        // Re-emit this caption line's container prefix (`>`/whitespace) as
+        // tokens — except the dispatch line, whose prefix the core already
+        // emitted — and operate on the stripped `tail`, so the caption prefix
+        // (`Table:`/`:`) is recognized inside a blockquote or list rather than
+        // swallowed into the caption text (which doubled the marker and broke
+        // losslessness).
+        let tail = window.emit_or_dispatch_tail(builder, abs);
+
         if i == 0 {
             // First line - parse and emit prefix separately
-            let trimmed = line.trim_start();
-            let leading_ws_len = line.len() - trimmed.len();
+            let trimmed = tail.trim_start();
+            let leading_ws_len = tail.len() - trimmed.len();
 
             // Emit leading whitespace if present
             if leading_ws_len > 0 {
-                builder.token(SyntaxKind::WHITESPACE.into(), &line[..leading_ws_len]);
+                builder.token(SyntaxKind::WHITESPACE.into(), &tail[..leading_ws_len]);
             }
 
             // Check for caption prefix and emit separately
             // Calculate where the prefix ends (after trimmed content)
-            let prefix_and_rest = if line.ends_with('\n') {
-                &line[leading_ws_len..line.len() - 1] // Exclude newline
+            let prefix_and_rest = if tail.ends_with('\n') {
+                &tail[leading_ws_len..tail.len() - 1] // Exclude newline
             } else {
-                &line[leading_ws_len..]
+                &tail[leading_ws_len..]
             };
 
             let (prefix_len, prefix_text) = if prefix_and_rest.starts_with("Table: ") {
@@ -588,16 +637,16 @@ fn emit_table_caption(
 
                 // Emit rest of line after prefix
                 let rest_start = leading_ws_len + prefix_len;
-                if rest_start < line.len() {
-                    emit_caption_line_text(builder, &line[rest_start..], config, lift_attrs);
+                if rest_start < tail.len() {
+                    emit_caption_line_text(builder, &tail[rest_start..], config, lift_attrs);
                 }
             } else {
                 // No recognized prefix, emit whole trimmed line
-                emit_caption_line_text(builder, &line[leading_ws_len..], config, lift_attrs);
+                emit_caption_line_text(builder, &tail[leading_ws_len..], config, lift_attrs);
             }
         } else {
             // Continuation lines - emit with inline parsing (attrs only on last line).
-            emit_caption_line_text(builder, line, config, lift_attrs);
+            emit_caption_line_text(builder, tail, config, lift_attrs);
         }
     }
 
@@ -751,18 +800,9 @@ pub(crate) fn try_parse_simple_table(
 
     // Emit caption before if present
     if let Some((cap_start, cap_end)) = caption_before {
-        emit_table_caption(builder, lines, cap_start, cap_end, config);
-
+        emit_table_caption(builder, window, cap_start, cap_end, config);
         // Emit blank line between caption and table if present
-        if cap_end < start_pos {
-            for line in lines.iter().take(start_pos).skip(cap_end) {
-                if line.trim().is_empty() {
-                    builder.start_node(SyntaxKind::BLANK_LINE.into());
-                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
-                    builder.finish_node();
-                }
-            }
-        }
+        emit_caption_blank_lines(builder, window, cap_end, start_pos);
     }
 
     // Emit header if present. On the dispatch line the core already emitted
@@ -801,16 +841,8 @@ pub(crate) fn try_parse_simple_table(
     // Emit caption after if present
     if let Some((cap_start, cap_end)) = caption_after {
         // Emit blank line before caption if needed
-        if cap_start > end_pos {
-            for line in lines.iter().take(cap_start).skip(end_pos) {
-                if line.trim().is_empty() {
-                    builder.start_node(SyntaxKind::BLANK_LINE.into());
-                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
-                    builder.finish_node();
-                }
-            }
-        }
-        emit_table_caption(builder, lines, cap_start, cap_end, config);
+        emit_caption_blank_lines(builder, window, end_pos, cap_start);
+        emit_table_caption(builder, window, cap_start, cap_end, config);
     }
 
     builder.finish_node(); // SimpleTable
@@ -1330,17 +1362,9 @@ pub(crate) fn try_parse_pipe_table(
 
     // Emit caption before if present
     if let Some((cap_start, cap_end)) = caption_before {
-        emit_table_caption(builder, lines, cap_start, cap_end, config);
+        emit_table_caption(builder, window, cap_start, cap_end, config);
         // Emit blank line between caption and table if present
-        if cap_end < actual_start {
-            for line in lines.iter().take(actual_start).skip(cap_end) {
-                if line.trim().is_empty() {
-                    builder.start_node(SyntaxKind::BLANK_LINE.into());
-                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
-                    builder.finish_node();
-                }
-            }
-        }
+        emit_caption_blank_lines(builder, window, cap_end, actual_start);
     }
 
     // Emit header row with inline-parsed cells. On the dispatch line the
@@ -1375,16 +1399,8 @@ pub(crate) fn try_parse_pipe_table(
     // Emit caption after if present
     if let Some((cap_start, cap_end)) = caption_after {
         // Emit blank line before caption if needed
-        if cap_start > end_pos {
-            for line in lines.iter().take(cap_start).skip(end_pos) {
-                if line.trim().is_empty() {
-                    builder.start_node(SyntaxKind::BLANK_LINE.into());
-                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
-                    builder.finish_node();
-                }
-            }
-        }
-        emit_table_caption(builder, lines, cap_start, cap_end, config);
+        emit_caption_blank_lines(builder, window, end_pos, cap_start);
+        emit_table_caption(builder, window, cap_start, cap_end, config);
     }
 
     builder.finish_node(); // PipeTable
@@ -1466,6 +1482,43 @@ mod tests {
         assert!(try_parse_caption_prefix(": My caption").is_some());
         assert!(try_parse_caption_prefix(":").is_none()); // Just colon, no content
         assert!(try_parse_caption_prefix("Not a caption").is_none());
+    }
+
+    #[test]
+    fn table_grid_starts_at_matches_each_kind() {
+        // Positives — one shape per table kind the real parsers accept.
+        assert!(table_grid_starts_at(&["+---+---+"][..], 0)); // grid
+        assert!(table_grid_starts_at(&["----------- -------"][..], 0)); // multiline
+        assert!(table_grid_starts_at(&["--- --- ---"][..], 0)); // simple, headerless
+        assert!(table_grid_starts_at(&["A | B", "| --- | --- |"][..], 0)); // pipe, header + sep
+        assert!(table_grid_starts_at(&["A    B", "--- ---"][..], 0)); // simple, header + sep
+        // A lone dash run is a multiline full-width separator under Pandoc (not a
+        // thematic break), so the lookahead intentionally accepts it; the full
+        // parser then rejects it if no rows follow.
+        assert!(table_grid_starts_at(&["-------"][..], 0));
+
+        // Negatives — shapes that must not read as a table start.
+        assert!(!table_grid_starts_at(&["just some prose"][..], 0));
+        assert!(!table_grid_starts_at(&["# Heading"][..], 0));
+        assert!(!table_grid_starts_at(&["```", "code", "```"][..], 0)); // code fence
+        assert!(!table_grid_starts_at(&["only one line"][..], 1)); // out of range
+    }
+
+    /// The cheap caption lookahead must agree with what the full parser does:
+    /// when it says a table follows the caption, a table node really forms; when
+    /// it says no table follows, none does. This guards against the lookahead
+    /// (`table_grid_starts_at`) drifting from the real per-kind parsers.
+    #[test]
+    fn caption_lookahead_agrees_with_real_parse() {
+        let with_table = ": Cap\n\n| A | B |\n|---|---|\n| 1 | 2 |\n";
+        let lines: Vec<&str> = with_table.lines().collect();
+        assert!(is_caption_followed_by_table(&lines[..], 0));
+        assert!(format!("{:#?}", crate::parse(with_table, None)).contains("PIPE_TABLE"));
+
+        let no_table = ": Cap\n\nplain paragraph\n";
+        let lines: Vec<&str> = no_table.lines().collect();
+        assert!(!is_caption_followed_by_table(&lines[..], 0));
+        assert!(!format!("{:#?}", crate::parse(no_table, None)).contains("TABLE"));
     }
 
     #[test]
@@ -2148,17 +2201,9 @@ pub(crate) fn try_parse_grid_table(
 
     // Emit caption before if present
     if let Some((cap_start, cap_end)) = caption_before {
-        emit_table_caption(builder, lines, cap_start, cap_end, config);
+        emit_table_caption(builder, window, cap_start, cap_end, config);
         // Emit blank line between caption and table if present
-        if cap_end < actual_start {
-            for line in lines.iter().take(actual_start).skip(cap_end) {
-                if line.trim().is_empty() {
-                    builder.start_node(SyntaxKind::BLANK_LINE.into());
-                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
-                    builder.finish_node();
-                }
-            }
-        }
+        emit_caption_blank_lines(builder, window, cap_end, actual_start);
     }
 
     // Track whether we've passed the header separator
@@ -2246,16 +2291,8 @@ pub(crate) fn try_parse_grid_table(
 
     // Emit caption after if present
     if let Some((cap_start, cap_end)) = caption_after {
-        if cap_start > end_pos {
-            for line in lines.iter().take(cap_start).skip(end_pos) {
-                if line.trim().is_empty() {
-                    builder.start_node(SyntaxKind::BLANK_LINE.into());
-                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
-                    builder.finish_node();
-                }
-            }
-        }
-        emit_table_caption(builder, lines, cap_start, cap_end, config);
+        emit_caption_blank_lines(builder, window, end_pos, cap_start);
+        emit_table_caption(builder, window, cap_start, cap_end, config);
     }
 
     builder.finish_node(); // GRID_TABLE
@@ -2672,18 +2709,9 @@ pub(crate) fn try_parse_multiline_table(
 
     // Emit caption before if present
     if let Some((cap_start, cap_end)) = caption_before {
-        emit_table_caption(builder, lines, cap_start, cap_end, config);
-
+        emit_table_caption(builder, window, cap_start, cap_end, config);
         // Emit blank line between caption and table if present
-        if cap_end < start_pos {
-            for line in lines.iter().take(start_pos).skip(cap_end) {
-                if line.trim().is_empty() {
-                    builder.start_node(SyntaxKind::BLANK_LINE.into());
-                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
-                    builder.finish_node();
-                }
-            }
-        }
+        emit_caption_blank_lines(builder, window, cap_end, start_pos);
     }
 
     // Emit opening separator. The dispatch line's prefix was already consumed
@@ -2804,16 +2832,8 @@ pub(crate) fn try_parse_multiline_table(
 
     // Emit caption after if present
     if let Some((cap_start, cap_end)) = caption_after {
-        if cap_start > end_pos {
-            for line in lines.iter().take(cap_start).skip(end_pos) {
-                if line.trim().is_empty() {
-                    builder.start_node(SyntaxKind::BLANK_LINE.into());
-                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
-                    builder.finish_node();
-                }
-            }
-        }
-        emit_table_caption(builder, lines, cap_start, cap_end, config);
+        emit_caption_blank_lines(builder, window, end_pos, cap_start);
+        emit_table_caption(builder, window, cap_start, cap_end, config);
     }
 
     builder.finish_node(); // MultilineTable

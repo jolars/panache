@@ -1,0 +1,51 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..53
+  BLOCK_QUOTE@0..53
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    PIPE_TABLE@2..53
+      TABLE_CAPTION@2..15
+        TABLE_CAPTION_PREFIX@2..4 ": "
+        TEXT@4..14 "My caption"
+        NEWLINE@14..15 "\n"
+      BLANK_LINE@15..17
+        BLOCK_QUOTE_MARKER@15..16 ">"
+        BLANK_LINE@16..17 "\n"
+      TABLE_HEADER@17..29
+        BLOCK_QUOTE_MARKER@17..18 ">"
+        WHITESPACE@18..19 " "
+        TEXT@19..20 "|"
+        WHITESPACE@20..21 " "
+        TABLE_CELL@21..22
+          TEXT@21..22 "A"
+        WHITESPACE@22..23 " "
+        TEXT@23..24 "|"
+        WHITESPACE@24..25 " "
+        TABLE_CELL@25..26
+          TEXT@25..26 "B"
+        WHITESPACE@26..27 " "
+        TEXT@27..28 "|"
+        NEWLINE@28..29 "\n"
+      TABLE_SEPARATOR@29..41
+        BLOCK_QUOTE_MARKER@29..30 ">"
+        WHITESPACE@30..31 " "
+        TEXT@31..40 "|---|---|"
+        NEWLINE@40..41 "\n"
+      TABLE_ROW@41..53
+        BLOCK_QUOTE_MARKER@41..42 ">"
+        WHITESPACE@42..43 " "
+        TEXT@43..44 "|"
+        WHITESPACE@44..45 " "
+        TABLE_CELL@45..46
+          TEXT@45..46 "C"
+        WHITESPACE@46..47 " "
+        TEXT@47..48 "|"
+        WHITESPACE@48..49 " "
+        TABLE_CELL@49..50
+          TEXT@49..50 "D"
+        WHITESPACE@50..51 " "
+        TEXT@51..52 "|"
+        NEWLINE@52..53 "\n"

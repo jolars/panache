@@ -1,0 +1,55 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..89
+  BLOCK_QUOTE@0..89
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    PIPE_TABLE@2..89
+      TABLE_CAPTION@2..51
+        TABLE_CAPTION_PREFIX@2..9 "Table: "
+        TEXT@9..28 "Here's the caption."
+        NEWLINE@28..29 "\n"
+        BLOCK_QUOTE_MARKER@29..30 ">"
+        WHITESPACE@30..31 " "
+        TEXT@31..50 "It spans two lines."
+        NEWLINE@50..51 "\n"
+      BLANK_LINE@51..53
+        BLOCK_QUOTE_MARKER@51..52 ">"
+        BLANK_LINE@52..53 "\n"
+      TABLE_HEADER@53..65
+        BLOCK_QUOTE_MARKER@53..54 ">"
+        WHITESPACE@54..55 " "
+        TEXT@55..56 "|"
+        WHITESPACE@56..57 " "
+        TABLE_CELL@57..58
+          TEXT@57..58 "A"
+        WHITESPACE@58..59 " "
+        TEXT@59..60 "|"
+        WHITESPACE@60..61 " "
+        TABLE_CELL@61..62
+          TEXT@61..62 "B"
+        WHITESPACE@62..63 " "
+        TEXT@63..64 "|"
+        NEWLINE@64..65 "\n"
+      TABLE_SEPARATOR@65..77
+        BLOCK_QUOTE_MARKER@65..66 ">"
+        WHITESPACE@66..67 " "
+        TEXT@67..76 "|---|---|"
+        NEWLINE@76..77 "\n"
+      TABLE_ROW@77..89
+        BLOCK_QUOTE_MARKER@77..78 ">"
+        WHITESPACE@78..79 " "
+        TEXT@79..80 "|"
+        WHITESPACE@80..81 " "
+        TABLE_CELL@81..82
+          TEXT@81..82 "C"
+        WHITESPACE@82..83 " "
+        TEXT@83..84 "|"
+        WHITESPACE@84..85 " "
+        TABLE_CELL@85..86
+          TEXT@85..86 "D"
+        WHITESPACE@86..87 " "
+        TEXT@87..88 "|"
+        NEWLINE@88..89 "\n"

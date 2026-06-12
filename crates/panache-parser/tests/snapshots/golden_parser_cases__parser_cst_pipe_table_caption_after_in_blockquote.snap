@@ -1,0 +1,51 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..53
+  BLOCK_QUOTE@0..53
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    PIPE_TABLE@2..53
+      TABLE_HEADER@2..12
+        TEXT@2..3 "|"
+        WHITESPACE@3..4 " "
+        TABLE_CELL@4..5
+          TEXT@4..5 "A"
+        WHITESPACE@5..6 " "
+        TEXT@6..7 "|"
+        WHITESPACE@7..8 " "
+        TABLE_CELL@8..9
+          TEXT@8..9 "B"
+        WHITESPACE@9..10 " "
+        TEXT@10..11 "|"
+        NEWLINE@11..12 "\n"
+      TABLE_SEPARATOR@12..24
+        BLOCK_QUOTE_MARKER@12..13 ">"
+        WHITESPACE@13..14 " "
+        TEXT@14..23 "|---|---|"
+        NEWLINE@23..24 "\n"
+      TABLE_ROW@24..36
+        BLOCK_QUOTE_MARKER@24..25 ">"
+        WHITESPACE@25..26 " "
+        TEXT@26..27 "|"
+        WHITESPACE@27..28 " "
+        TABLE_CELL@28..29
+          TEXT@28..29 "C"
+        WHITESPACE@29..30 " "
+        TEXT@30..31 "|"
+        WHITESPACE@31..32 " "
+        TABLE_CELL@32..33
+          TEXT@32..33 "D"
+        WHITESPACE@33..34 " "
+        TEXT@34..35 "|"
+        NEWLINE@35..36 "\n"
+      BLANK_LINE@36..38
+        BLOCK_QUOTE_MARKER@36..37 ">"
+        BLANK_LINE@37..38 "\n"
+      TABLE_CAPTION@38..53
+        BLOCK_QUOTE_MARKER@38..39 ">"
+        WHITESPACE@39..40 " "
+        TABLE_CAPTION_PREFIX@40..42 ": "
+        TEXT@42..52 "My caption"
+        NEWLINE@52..53 "\n"
