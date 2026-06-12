@@ -189,6 +189,31 @@ the load-bearing invariants.
     unwrapped, then revised so a hand-wrapped folded `description:` reflows
     cleanly instead of stranding orphan words.
 
+16. **Verbatim frontmatter fields.** A small allowlist of *top-level*
+    frontmatter keys hold code/directives that a downstream **non-YAML**
+    consumer reads line-by-line, so their block-scalar values are exempt from
+    rule 15's folded reflow (and from rule 6's plain wrap): the author's line
+    breaks pass through untouched. The allowlist (`VERBATIM_FRONTMATTER_FIELDS`
+    in `document.rs`) is deliberately narrow and content-agnostic --- it matches
+    on the key, not the value --- and only at depth 1 (a nested `vignette:`
+    under some unrelated map is not exempt).
+
+    Current members:
+    - `vignette`: R/knitr vignette magic (`%\VignetteIndexEntry{…}`,
+      `%\VignetteEngine{…}`, `%\VignetteEncoding{…}`). R's `tools::vignetteInfo`
+      greps the *raw* frontmatter lines, so folding two directives onto one line
+      hides the engine and trips `R CMD check` (issue #366). Folding is
+      loss-free as YAML, so there is no formatting upside to reflowing these ---
+      only the risk of breaking the consumer.
+
+    **Not a divergence from pretty_yaml's rules** --- it is an additional safety
+    exemption on top of rule 15. Because these values are folded scalars, the
+    cross-validation corpus already skips them for *parity* (still asserts
+    idempotency); behavioral coverage lives in
+    `crates/panache-formatter/tests/format/yaml_verbatim_fields.rs`. Add a field
+    only with a reproducing case --- candidates like Pandoc's `header-includes`
+    / `include-in-header` are deferred until one surfaces.
+
 ## Notes
 
 Rules 4, 9, and 12 are "preserve" rules: they don't add a new behavior, they

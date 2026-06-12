@@ -142,6 +142,11 @@ left in place. Literal block scalars (`|`) are left untouched --- their line
 breaks are significant content --- as are quoted scalars. Under
 `wrap = "preserve"`, nothing in the YAML is reflowed.
 
+A few top-level frontmatter keys are exempt even under a wrapping mode, because
+a downstream non-YAML tool reads their value line by line. Currently that is
+`vignette`: R's vignette engine scans the raw `%\VignetteEngine{...}` lines, so
+Panache keeps each directive on its own line rather than folding them together.
+
 Input
 
 :   ````markdown

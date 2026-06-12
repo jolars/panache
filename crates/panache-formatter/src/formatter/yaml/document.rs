@@ -764,6 +764,15 @@ fn apply_plain_scalar_wrap(buf: String, opts: &YamlFormatOptions) -> String {
         if value_has_decoration(&value_node) {
             continue;
         }
+        // Verbatim frontmatter fields (STYLE.md rule 16): a top-level key
+        // whose value a non-YAML consumer reads line-by-line. Reflow
+        // would be loss-free YAML but breaks that consumer, so skip the
+        // whole wrap pass for this value.
+        if top_level_key_name(&value_node)
+            .is_some_and(|key| VERBATIM_FRONTMATTER_FIELDS.contains(&key.as_str()))
+        {
+            continue;
+        }
         let Some(scalar) = value_node
             .children()
             .find(|n| n.kind() == SyntaxKind::YAML_SCALAR)
@@ -880,6 +889,40 @@ fn value_has_decoration(value_node: &SyntaxNode) -> bool {
                 if matches!(t.kind(), SyntaxKind::YAML_TAG | SyntaxKind::YAML_ANCHOR | SyntaxKind::YAML_ALIAS)
         )
     })
+}
+
+/// Top-level frontmatter keys whose block-scalar values hold verbatim
+/// code/directives that a downstream *non-YAML* consumer reads
+/// line-by-line. Reflowing/folding them is loss-free as YAML but breaks
+/// that consumer, so the wrap pass leaves these values untouched
+/// (STYLE.md rule 16). Start narrow — add a field only with a
+/// reproducing case.
+///
+/// - `vignette`: R/knitr vignette magic (`%\VignetteEngine{…}` etc.).
+///   `tools::vignetteInfo` greps the *raw* frontmatter lines, so folding
+///   two directives onto one line hides the engine and trips
+///   `R CMD check` (issue #366). We key on the field as an accurate proxy
+///   for where that text conventionally lives in an `.Rmd`.
+const VERBATIM_FRONTMATTER_FIELDS: &[&str] = &["vignette"];
+
+/// Key name of the top-level (`depth == 1`) block-map entry owning this
+/// value, if any. Returns `None` for nested values, so the verbatim-field
+/// exemption only matches frontmatter top-level keys (STYLE.md rule 16).
+fn top_level_key_name(value_node: &SyntaxNode) -> Option<String> {
+    if block_entry_depth(value_node) != 1 {
+        return None;
+    }
+    let entry = value_node.parent()?;
+    if entry.kind() != SyntaxKind::YAML_BLOCK_MAP_ENTRY {
+        return None;
+    }
+    let key = entry
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)?;
+    let scalar = key
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_SCALAR)?;
+    Some(scalar.text().to_string().trim().to_string())
 }
 
 fn block_entry_depth(value_node: &SyntaxNode) -> usize {

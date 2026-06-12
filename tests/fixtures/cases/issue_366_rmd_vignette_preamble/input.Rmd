@@ -1,0 +1,10 @@
+---
+title: "mappings"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{mappings}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Mappings
