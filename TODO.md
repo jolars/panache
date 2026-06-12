@@ -426,19 +426,42 @@ intentionally excluded.
   `first_kind_at`; `table_pos` cached on `TablePrepared`. The double-parse
   cost is still open (tracked under the table-IR Performance item).
 
-- [ ] Reconcile `is_caption_followed_by_table`'s raw-vs-stripped callers and its
-  duplicate table sniffing (`blocks/tables.rs`). It's a `pub(crate)` gate
-  consulted from the dispatcher, `definition_lists.rs`, `core.rs`, and the
-  detectors (via the new `LineView` trait). The dispatcher/deflists/core
-  pass *raw* lines while the detectors pass the container-stripped view ---
-  so a caption before a table *inside a blockquote* (`> Table: ...`) isn't
-  recognized at the dispatcher level (the raw line starts with `>`, failing
-  the caption-start check). Decide whether that's intended; if not, feed the
-  stripped window (now trivial via `LineView`) and land paired
-  pandoc-verified fixtures (commonmark + markdown). Separately, the function
-  re-implements grid/multiline/pipe/simple separator sniffing the detectors
-  also do --- two heuristics answering "is there a table here," a drift
-  risk.
+- [x] Reconcile `is_caption_followed_by_table`'s raw-vs-stripped callers and its
+  duplicate table sniffing (`blocks/tables.rs`). Not intended: pandoc
+  recognizes caption-before/after tables inside a blockquote, and panache
+  was *non-lossless* there (`> : cap` round-tripped to `> > : cap`) because
+  caption emission read raw lines. Fixed: `emit_table_caption` and the
+  caption blank-line emission now take the container-stripped window
+  (`emit_or_dispatch_tail`), and `resolve_table_pos` + the deflist
+  `detect_prepared` gate run caption detection on the stripped window (the
+  multiline path only recognizes a caption-led table when dispatched at the
+  border, so `resolve_table_pos` skipping the caption correctly inside a
+  blockquote is what keeps it from leaking into a paragraph). The
+  `next_line_is_definition_marker` / footnote lookahead gates intentionally
+  stay raw (their marker detection is raw/indent-based, so the caption gate
+  is top-level-only). The separator cascade is extracted into one named
+  predicate `table_grid_starts_at`, documented as the cheap lookahead twin
+  of `first_kind_at` (deliberately not a full parse, for perf) with an
+  agreement unit test. Paired pandoc-verified fixtures landed under
+  `crates/panache-parser/tests/fixtures/cases/` (pipe before/after, 2-line
+  caption, multiline, + a commonmark counterpart).
+
+- [ ] Formatter drops the blockquote prefix on a table inside a blockquote.
+  `> | a | b |\n> |---|---|\n> | 1 | 2 |` formats to `| a | b |` ... with no
+  `>` (the table is lifted out of the blockquote). Lossless and idempotent,
+  so it's a *formatter* policy bug, not a parser one --- surfaced while
+  fixing the caption raw-vs-stripped reconcile. Caption-bearing tables
+  inside blockquotes inherit the same drop.
+
+- [ ] Caption-before table as the *first line of a list item* (no blank line
+  before it) is parsed twice. `- > Table: cap\n  >\n  > <table>` emits the
+  caption both as a blockquote `PARAGRAPH` (the core claims the first list
+  line before `TableParser`'s `has_blank_before`/`at_document_start` gate
+  lets it fire) and again as the table's `TABLE_CAPTION` (backward
+  `find_caption_*`), breaking losslessness. Distinct from the
+  raw-vs-stripped fix; needs the table detector to be allowed to claim a
+  caption-led table as a list item's first line. (Plain-blockquote
+  caption-before now works; only the list-item-first-line case remains.)
 
 - [ ] Collapse the double `try_parse_definition_marker` call in
   `next_line_is_definition_marker` (`blocks/definition_lists.rs`). It parses
