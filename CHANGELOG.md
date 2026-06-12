@@ -730,9 +730,9 @@ and formatter, as well as new presets for external formatters (`ormolu`,
   ([`cf50ec5`](https://github.com/jolars/panache/commit/cf50ec5c7d5572bad8a6b5989c34e7b0c593a12a))
 - **parser:** add IR-driven dispatch for citations
   ([`9e826db`](https://github.com/jolars/panache/commit/9e826db3c488fecb821f42a22410a34297690b18))
-- **parser:** add IR-driven dispatch for [^id] footnote refs
+- **parser:** add IR-driven dispatch for `[^id]` footnote refs
   ([`614221e`](https://github.com/jolars/panache/commit/614221e5b9d0d2819b50abdd6d499fd87509c8c2))
-- **parser:** add IR-driven dispatch for^[note] and <span>
+- **parser:** add IR-driven dispatch for`^[note]` and `<span>`
   ([`1b9e618`](https://github.com/jolars/panache/commit/1b9e61876896c36964dba36ffdc60bcf489c7309))
 - **parser:** early-exit + scratch reuse
   ([`c2c0387`](https://github.com/jolars/panache/commit/c2c038771c2ff70cc3663185b8e64d862553cbdd))
@@ -1164,7 +1164,7 @@ and formatter, as well as new presets for external formatters (`ormolu`,
 
 ### Reverts
 
-- "chore(release): release 2.33.0 [skip ci]"
+- "chore(release): release 2.33.0 `[skip ci]`"
   ([01ac037](https://github.com/jolars/panache/commit/01ac037dc55b39ddcda83f5243e5e3a0192314fd))
 - "ci: update smoke test"
   ([93c2ae9](https://github.com/jolars/panache/commit/93c2ae99fd39efd253c1644f7037689f72e54847))
