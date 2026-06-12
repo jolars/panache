@@ -420,14 +420,6 @@ intentionally excluded.
   inline-parsed paragraphs (current approach parses inlines into a temp
   tree, then replays while inserting markers)
 
-- [ ] Reduce green-tree build cost on large docs. After the table-gate fix, the
-  residual \~118ms `built_in_lint_plan` is \~half rowan tree-build
-  (`NodeCache::token`, `Arc::drop_slow`, malloc/free) proportional to token
-  count. Coalescing per-line `TEXT`+`NEWLINE` pairs in raw/code/math blocks
-  into single tokens would cut it. Invasive --- verify CST snapshots and the
-  formatter round-trip before changing emitter shape (see the
-  rowan-internals note in the `perf-investigation` skill).
-
 ### YAML validation: consumer fidelity vs YAML 1.2 (needs design decision)
 
 Surfaced 2026-06-08 while fixing a real bug: pandoc rejected a user's
