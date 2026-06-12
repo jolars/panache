@@ -5,10 +5,10 @@
 //! When the `native_spans` extension is enabled, HTML `<span>` tags are
 //! treated as native Pandoc Span elements instead of raw HTML.
 
+use super::sink::InlineSink;
 use crate::options::{Dialect, ParserOptions};
 use crate::parser::utils::attributes::{emit_html_attrs_node, emit_html_span_attributes_node};
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 use super::core::parse_inline_text;
 
@@ -129,7 +129,7 @@ pub(crate) fn try_parse_native_span(text: &str) -> Option<(usize, &str, String)>
 /// `native_spans` extension explicitly enabled), the legacy `BRACKETED_SPAN`
 /// shape is preserved for backward compatibility.
 pub(crate) fn emit_native_span(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     raw: &str,
     content: &str,
     config: &ParserOptions,
@@ -180,7 +180,7 @@ pub(crate) fn emit_native_span(
 /// Bytes are byte-identical to the source — only the tokenization
 /// granularity changes so `AttributeNode::cast(HTML_ATTRS)` can read the
 /// attribute region structurally. Mirrors `emit_div_open_tag_tokens`.
-fn emit_span_open_tag_tokens(builder: &mut GreenNodeBuilder<'_>, open_tag: &str) {
+fn emit_span_open_tag_tokens(builder: &mut impl InlineSink, open_tag: &str) {
     let Some(rest) = open_tag.strip_prefix("<span") else {
         // Defensive — shouldn't happen since try_parse_native_span gates on
         // <span. Fall back to a single TEXT token to stay lossless.

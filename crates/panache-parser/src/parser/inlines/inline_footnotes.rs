@@ -3,8 +3,8 @@
 //! Syntax: `^[footnote text]` for inline footnotes
 //! Syntax: `[^id]` for reference footnotes
 
+use super::sink::InlineSink;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 use super::core::parse_inline_text;
 use crate::options::ParserOptions;
@@ -64,7 +64,7 @@ pub(crate) fn try_parse_inline_footnote(text: &str) -> Option<(usize, &str)> {
 /// drop their inner refs. At the top level the flag is `false` and `[^id]`
 /// inside `^[...]` resolves normally per pandoc-native.
 pub(crate) fn emit_inline_footnote(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     content: &str,
     config: &ParserOptions,
     suppress_footnote_refs: bool,
@@ -112,7 +112,7 @@ pub(crate) fn try_parse_footnote_reference(text: &str) -> Option<(usize, String)
 }
 
 /// Emit a footnote reference node to the builder.
-pub(crate) fn emit_footnote_reference(builder: &mut GreenNodeBuilder, id: &str) {
+pub(crate) fn emit_footnote_reference(builder: &mut impl InlineSink, id: &str) {
     builder.start_node(SyntaxKind::FOOTNOTE_REFERENCE.into());
     builder.token(SyntaxKind::FOOTNOTE_LABEL_START.into(), "[^");
     builder.token(SyntaxKind::FOOTNOTE_LABEL_ID.into(), id);

@@ -10,7 +10,9 @@
 //! - Key-value pairs: key=value or key="value" or key='value' (can have multiple)
 //! - Whitespace flexible between items
 
+use crate::parser::inlines::sink::InlineSink;
 use crate::syntax::SyntaxKind;
+#[cfg(test)]
 use rowan::GreenNodeBuilder;
 
 #[derive(Debug, PartialEq)]
@@ -528,18 +530,18 @@ fn html_attribute_spans(content: &str) -> Vec<HtmlAttrComponent> {
 /// components (names, `=`, quotes, whitespace, `/`) become gap tokens, so
 /// `node.text()` is exactly `attrs_text`. An unrecognized/empty body falls back
 /// to a single opaque `TEXT` token.
-pub fn emit_html_attrs_node(builder: &mut GreenNodeBuilder, attrs_text: &str) {
+pub fn emit_html_attrs_node(builder: &mut impl InlineSink, attrs_text: &str) {
     emit_html_attrs_with_kind(builder, SyntaxKind::HTML_ATTRS, attrs_text);
 }
 
 /// As [`emit_html_attrs_node`] but for the legacy native-span `SPAN_ATTRIBUTES`
 /// node, which carries HTML `class="..."` syntax (not Pandoc `{...}`).
-pub fn emit_html_span_attributes_node(builder: &mut GreenNodeBuilder, attrs_text: &str) {
+pub fn emit_html_span_attributes_node(builder: &mut impl InlineSink, attrs_text: &str) {
     emit_html_attrs_with_kind(builder, SyntaxKind::SPAN_ATTRIBUTES, attrs_text);
 }
 
 fn emit_html_attrs_with_kind(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     node_kind: SyntaxKind,
     attrs_text: &str,
 ) {
@@ -594,7 +596,7 @@ fn emit_html_attrs_with_kind(
 /// source slice. Non-`{...}`-shaped or unrecognized input (MMD `[#id]` header
 /// brackets, raw-inline `{=format}`, empty `{}`) falls back to a single opaque
 /// ATTRIBUTE token, preserving the prior shape.
-pub fn emit_attribute_node(builder: &mut GreenNodeBuilder, raw_attr_text: &str) {
+pub fn emit_attribute_node(builder: &mut impl InlineSink, raw_attr_text: &str) {
     emit_attribute_node_with_kinds(
         builder,
         SyntaxKind::ATTRIBUTE,
@@ -608,7 +610,7 @@ pub fn emit_attribute_node(builder: &mut GreenNodeBuilder, raw_attr_text: &str) 
 /// and malformed/empty bodies fall back to a single opaque `TEXT` token,
 /// preserving the prior `DIV_INFO { TEXT(...) }` shape (and the bare-word
 /// class semantics the projector reads via `parse_div_info`).
-pub fn emit_div_info_node(builder: &mut GreenNodeBuilder, raw_attr_text: &str) {
+pub fn emit_div_info_node(builder: &mut impl InlineSink, raw_attr_text: &str) {
     emit_attribute_node_with_kinds(
         builder,
         SyntaxKind::DIV_INFO,
@@ -621,7 +623,7 @@ pub fn emit_div_info_node(builder: &mut GreenNodeBuilder, raw_attr_text: &str) {
 /// body the same way [`emit_attribute_node`] does. Malformed/empty bodies fall
 /// back to a single opaque `TEXT` token, preserving the prior
 /// `SPAN_ATTRIBUTES { TEXT(...) }` shape.
-pub fn emit_span_attributes_node(builder: &mut GreenNodeBuilder, raw_attr_text: &str) {
+pub fn emit_span_attributes_node(builder: &mut impl InlineSink, raw_attr_text: &str) {
     emit_attribute_node_with_kinds(
         builder,
         SyntaxKind::SPAN_ATTRIBUTES,
@@ -635,7 +637,7 @@ pub fn emit_span_attributes_node(builder: &mut GreenNodeBuilder, raw_attr_text: 
 /// the non-`{...}`/unrecognized fallback emits (so each caller keeps its prior
 /// opaque shape). The structured `{...}` path is identical across callers.
 fn emit_attribute_node_with_kinds(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     node_kind: SyntaxKind,
     opaque_token_kind: SyntaxKind,
     raw_attr_text: &str,
@@ -692,7 +694,7 @@ fn emit_attribute_node_with_kinds(
 /// Emit the bytes between/around structured attribute components, splitting on
 /// newline boundaries: `\n`/`\r\n`/`\r` → NEWLINE, other whitespace runs →
 /// WHITESPACE, non-whitespace runs → TEXT. Every byte is preserved.
-fn emit_attribute_gap(builder: &mut GreenNodeBuilder, gap: &str) {
+fn emit_attribute_gap(builder: &mut impl InlineSink, gap: &str) {
     let bytes = gap.as_bytes();
     let mut i = 0;
     while i < bytes.len() {

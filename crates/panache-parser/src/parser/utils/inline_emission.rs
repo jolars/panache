@@ -10,7 +10,7 @@
 
 use crate::options::ParserOptions;
 use crate::parser::inlines::core;
-use rowan::GreenNodeBuilder;
+use crate::parser::inlines::sink::InlineSink;
 
 /// Emit inline elements from text content directly into the builder.
 ///
@@ -34,7 +34,7 @@ use rowan::GreenNodeBuilder;
 /// builder.finish_node();
 /// ```
 pub fn emit_inlines(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     text: &str,
     config: &ParserOptions,
     suppress_footnote_refs: bool,

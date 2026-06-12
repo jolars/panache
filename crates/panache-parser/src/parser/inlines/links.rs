@@ -12,9 +12,9 @@
 use super::code_spans::try_parse_code_span;
 use super::core::parse_inline_text;
 use super::inline_html::try_parse_inline_html;
+use super::sink::InlineSink;
 use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 // Import attribute parsing
 use crate::parser::utils::attributes::{emit_attribute_node, try_parse_trailing_attributes};
@@ -338,7 +338,7 @@ pub fn try_parse_inline_image(
 /// Emit an inline image node to the builder.
 /// Note: alt_text may contain inline elements and should be parsed recursively.
 pub fn emit_inline_image(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     _text: &str,
     alt_text: &str,
     dest: &str,
@@ -512,7 +512,7 @@ fn is_valid_email_label(label: &str) -> bool {
 }
 
 /// Emit an automatic link node to the builder.
-pub fn emit_autolink(builder: &mut GreenNodeBuilder, _text: &str, url: &str) {
+pub fn emit_autolink(builder: &mut impl InlineSink, _text: &str, url: &str) {
     builder.start_node(SyntaxKind::AUTO_LINK.into());
 
     // Opening <
@@ -826,7 +826,7 @@ fn is_link_ws_only(s: &str) -> bool {
 /// Emit an inline link node to the builder.
 /// Note: link_text may contain inline elements and should be parsed recursively.
 pub fn emit_inline_link(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     _text: &str,
     link_text: &str,
     dest: &str,
@@ -872,7 +872,7 @@ pub fn emit_inline_link(
     builder.finish_node();
 }
 
-pub fn emit_bare_uri_link(builder: &mut GreenNodeBuilder, uri: &str, _config: &ParserOptions) {
+pub fn emit_bare_uri_link(builder: &mut impl InlineSink, uri: &str, _config: &ParserOptions) {
     builder.start_node(SyntaxKind::LINK.into());
 
     builder.start_node(SyntaxKind::LINK_START.into());
@@ -1044,7 +1044,7 @@ pub fn try_parse_reference_link(
 /// `gap` carries any whitespace consumed between the link-text `]` and the
 /// label `[` under `spaced_reference_links`; empty otherwise.
 pub fn emit_reference_link(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     link_text: &str,
     label: &str,
     gap: &str,
@@ -1090,7 +1090,7 @@ pub fn emit_reference_link(
 
 /// Emit the whitespace gap between `]` and `[` of a spaced reference link,
 /// preserving exact bytes by splitting into WHITESPACE / NEWLINE tokens.
-fn emit_reference_link_gap(builder: &mut GreenNodeBuilder, gap: &str) {
+fn emit_reference_link_gap(builder: &mut impl InlineSink, gap: &str) {
     if gap.is_empty() {
         return;
     }
@@ -1232,7 +1232,7 @@ pub fn try_parse_reference_image(
 /// Emit a reference image node with registry lookup. `gap` carries whitespace
 /// consumed between `]` and `[` under `spaced_reference_links`; empty otherwise.
 pub fn emit_reference_image(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     alt_text: &str,
     label: &str,
     gap: &str,
@@ -1283,7 +1283,7 @@ pub fn emit_reference_image(
 /// (the bytes used for inline recursion). `label_suffix` carries the
 /// `[label]` / `[]` suffix bytes verbatim, or `None` for shortcut form.
 pub fn emit_unresolved_reference(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     is_image: bool,
     text_content: &str,
     label_suffix: Option<&str>,

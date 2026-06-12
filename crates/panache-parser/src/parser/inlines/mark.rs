@@ -10,9 +10,9 @@
 //! - Closers are matched greedily at the first valid `==`
 
 use super::core::parse_inline_text;
+use super::sink::InlineSink;
 use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// Try to parse mark/highlight (==text==).
 /// Returns: (total_len, inner_content)
@@ -57,7 +57,7 @@ pub fn try_parse_mark(text: &str) -> Option<(usize, &str)> {
 
 /// Emit a mark node with its content.
 pub fn emit_mark(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     inner_text: &str,
     config: &ParserOptions,
     suppress_footnote_refs: bool,

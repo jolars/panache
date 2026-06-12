@@ -124,6 +124,103 @@ fn multiline_strong_across_blockquote_markers() {
     assert_eq!(tree.text().to_string(), input);
 }
 
+/// Count tokens of `kind` anywhere within (and including) `node`.
+fn count_tokens_in(node: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> usize {
+    node.descendants_with_tokens()
+        .filter(|el| el.kind() == kind)
+        .count()
+}
+
+#[test]
+fn blockquote_marker_lands_inside_multiline_strong() {
+    // The marker after the newline falls *inside* the STRONG node (between the
+    // NEWLINE and the continuation TEXT), since the STRONG spans both lines.
+    let input = "> **bold\n> text**\n";
+    let tree = parse_blocks(input);
+
+    let strongs = find_nodes_of_type(&tree, SyntaxKind::STRONG);
+    assert_eq!(strongs.len(), 1);
+    let strong = &strongs[0];
+
+    // The second line's BLOCK_QUOTE_MARKER must live inside the STRONG.
+    assert_eq!(
+        count_tokens_in(strong, SyntaxKind::BLOCK_QUOTE_MARKER),
+        1,
+        "the continuation marker must be nested inside STRONG"
+    );
+
+    // The marker must come before the `text` continuation TEXT token. Collect the
+    // STRONG's descendant tokens in source order and check relative position.
+    let tokens: Vec<_> = strong
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .collect();
+    let marker_idx = tokens
+        .iter()
+        .position(|t| t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER)
+        .expect("marker present");
+    let text_idx = tokens
+        .iter()
+        .position(|t| t.kind() == SyntaxKind::TEXT && t.text() == "text")
+        .expect("continuation text present");
+    assert!(
+        marker_idx < text_idx,
+        "marker must precede continuation text"
+    );
+
+    // Lossless.
+    assert_eq!(tree.text().to_string(), input);
+}
+
+#[test]
+fn blockquote_marker_at_node_boundary_stays_outside() {
+    // Here the marker offset coincides with the START of the EMPHASIS node
+    // (`*b*` begins exactly at the line boundary). The marker must be emitted
+    // OUTSIDE the EMPHASIS, not nested as its first child.
+    let input = "> a\n> *b*";
+    let tree = parse_blocks(input);
+
+    let emphs = find_nodes_of_type(&tree, SyntaxKind::EMPHASIS);
+    assert_eq!(emphs.len(), 1);
+    assert_eq!(
+        count_tokens_in(&emphs[0], SyntaxKind::BLOCK_QUOTE_MARKER),
+        0,
+        "a boundary-coincident marker must not be nested inside EMPHASIS"
+    );
+
+    // The continuation marker is a direct child of the PARAGRAPH, appearing
+    // before the EMPHASIS node (i.e. outside it).
+    let paragraphs = find_nodes_of_type(&tree, SyntaxKind::PARAGRAPH);
+    assert_eq!(paragraphs.len(), 1);
+    let para = &paragraphs[0];
+    let positions: Vec<_> = para
+        .children_with_tokens()
+        .enumerate()
+        .filter_map(|(i, el)| match el {
+            crate::syntax::SyntaxElement::Token(t)
+                if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER =>
+            {
+                Some(i)
+            }
+            crate::syntax::SyntaxElement::Node(n) if n.kind() == SyntaxKind::EMPHASIS => Some(i),
+            _ => None,
+        })
+        .collect();
+    // Exactly two: the BLOCK_QUOTE_MARKER child then the EMPHASIS node, in order.
+    assert_eq!(
+        positions.len(),
+        2,
+        "marker and emphasis are paragraph children"
+    );
+    assert!(
+        positions[0] < positions[1],
+        "marker precedes (is outside) emphasis"
+    );
+
+    // Lossless.
+    assert_eq!(tree.text().to_string(), input);
+}
+
 #[test]
 fn blockquote_with_heading() {
     let input = "> # This is a heading in a blockquote\n>\n> And this is a paragraph.";

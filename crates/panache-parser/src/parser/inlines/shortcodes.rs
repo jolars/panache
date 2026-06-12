@@ -4,8 +4,8 @@
 //! - Normal: `{{< name args >}}`
 //! - Escaped: `{{{< name args >}}}` (displays as `{{< name args >}}` in output)
 
+use super::sink::InlineSink;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// Try to parse a shortcode starting from the current position.
 /// Returns (total_length, content, is_escaped) if successful.
@@ -71,7 +71,7 @@ pub(crate) fn try_parse_shortcode(text: &str) -> Option<(usize, String, bool)> {
 }
 
 /// Emit a shortcode node
-pub(crate) fn emit_shortcode(builder: &mut GreenNodeBuilder, content: &str, is_escaped: bool) {
+pub(crate) fn emit_shortcode(builder: &mut impl InlineSink, content: &str, is_escaped: bool) {
     builder.start_node(SyntaxKind::SHORTCODE.into());
 
     // Opening marker

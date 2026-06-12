@@ -9,8 +9,10 @@
 //! range into a CST subtree, but "what is this byte range?" is answered
 //! exclusively by the IR.
 
+use super::sink::InlineSink;
 use crate::options::{Dialect, ParserOptions};
 use crate::syntax::SyntaxKind;
+#[cfg(test)]
 use rowan::GreenNodeBuilder;
 
 use super::inline_ir::{
@@ -78,7 +80,7 @@ use super::superscript::{emit_superscript, try_parse_superscript};
 ///   the inline content lives inside a reference-style footnote definition
 ///   body, where pandoc silently drops nested footnote references.
 pub fn parse_inline_text_recursive(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     text: &str,
     config: &ParserOptions,
     suppress_footnote_refs: bool,
@@ -129,7 +131,7 @@ pub fn parse_inline_text_recursive(
 /// `Link`, and bracketed spans / native spans / inline footnotes /
 /// emphasis all allow nested links.
 pub fn parse_inline_text(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     text: &str,
     config: &ParserOptions,
     suppress_inner_links: bool,
@@ -177,7 +179,7 @@ pub fn parse_inline_text(
 /// fast path. `\n` and `\r` are always structural — multi-line inline
 /// content must still split into TEXT + NEWLINE tokens like the slow path.
 fn try_emit_plain_text_fast_path_with_mask(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     text: &str,
     mask: &[bool; 256],
 ) -> bool {
@@ -329,7 +331,7 @@ fn parse_inline_range_impl(
     start: usize,
     end: usize,
     config: &ParserOptions,
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     nested_in_link: bool,
     plan: &EmphasisPlan,
     bracket_plan: &BracketPlan,

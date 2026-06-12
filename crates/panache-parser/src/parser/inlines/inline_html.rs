@@ -15,9 +15,9 @@
 //! and the renderer must skip the standard text-token escaping for
 //! `INLINE_HTML` nodes.
 
+use super::sink::InlineSink;
 use crate::options::Dialect;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// Try to match an inline raw HTML span starting at `text[0]`.
 /// Returns the length in bytes consumed, or `None` if no match.
@@ -53,7 +53,7 @@ pub fn try_parse_inline_html(text: &str, dialect: Dialect) -> Option<usize> {
 }
 
 /// Emit a single `INLINE_HTML` node holding the verbatim span.
-pub fn emit_inline_html(builder: &mut GreenNodeBuilder, raw: &str) {
+pub fn emit_inline_html(builder: &mut impl InlineSink, raw: &str) {
     builder.start_node(SyntaxKind::INLINE_HTML.into());
     builder.token(SyntaxKind::INLINE_HTML_CONTENT.into(), raw);
     builder.finish_node();

@@ -9,9 +9,9 @@
 //!
 //! This is enabled by the raw_attribute extension.
 
+use super::sink::InlineSink;
 use crate::parser::utils::attributes::{AttributeBlock, emit_attribute_node};
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// Check if a code span with attributes is actually a raw inline span.
 /// Raw inline spans have attributes of the form {=format} (no other attributes).
@@ -41,7 +41,7 @@ pub fn is_raw_inline(attributes: &AttributeBlock) -> Option<&str> {
 /// wraps the original bytes losslessly instead of synthesizing them — any
 /// interior whitespace (`{ =html }`) round-trips byte-for-byte.
 pub fn emit_raw_inline(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     content: &str,
     backtick_count: usize,
     attr_raw: &str,

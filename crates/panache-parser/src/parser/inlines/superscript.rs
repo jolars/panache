@@ -10,9 +10,9 @@
 //! - Must not be confused with ^[...] (inline footnotes)
 
 use super::core::parse_inline_text;
+use super::sink::InlineSink;
 use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// Try to parse superscript (^text^)
 /// Returns: (total_len, inner_content)
@@ -94,7 +94,7 @@ fn contains_unescaped_whitespace(content: &str) -> bool {
 
 /// Emit a superscript node with its content
 pub fn emit_superscript(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     inner_text: &str,
     config: &ParserOptions,
     suppress_footnote_refs: bool,

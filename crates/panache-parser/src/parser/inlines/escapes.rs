@@ -1,3 +1,4 @@
+use super::sink::InlineSink;
 /// Parsing for backslash escape sequences
 ///
 /// Per Pandoc spec (all_symbols_escapable extension):
@@ -6,7 +7,6 @@
 /// - Backslash-escaped newline = hard line break
 /// - Does NOT work in verbatim contexts (code blocks, code spans)
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// Check if a character can be escaped according to Pandoc's all_symbols_escapable
 fn is_escapable(ch: char) -> bool {
@@ -51,7 +51,7 @@ pub enum EscapeType {
 }
 
 /// Emit an escape sequence to the builder.
-pub fn emit_escape(builder: &mut GreenNodeBuilder, ch: char, escape_type: EscapeType) {
+pub fn emit_escape(builder: &mut impl InlineSink, ch: char, escape_type: EscapeType) {
     match escape_type {
         EscapeType::NonbreakingSpace => {
             // Preserve source bytes for losslessness while still tagging the

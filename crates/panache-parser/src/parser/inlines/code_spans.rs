@@ -1,6 +1,6 @@
+use super::sink::InlineSink;
 /// Parsing for inline code spans (`code`)
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 // Import the attribute parsing from utils
 use crate::parser::utils::attributes::{
@@ -81,7 +81,7 @@ pub fn try_parse_code_span(
 
 /// Emit a code span node to the builder.
 pub fn emit_code_span(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     content: &str,
     backtick_count: usize,
     attr_text: Option<&str>,

@@ -3,10 +3,10 @@
 //! Syntax: `[inline content]{.class key="val"}`
 
 use super::core::parse_inline_text;
+use super::sink::InlineSink;
 use crate::options::ParserOptions;
 use crate::parser::utils::attributes::emit_span_attributes_node;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// Try to parse a bracketed span starting from the current position.
 /// Returns (total_length, content, attributes) if successful.
@@ -91,7 +91,7 @@ pub(crate) fn try_parse_bracketed_span(text: &str) -> Option<(usize, String, Str
 
 /// Emit a bracketed span node
 pub(crate) fn emit_bracketed_span(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     content: &str,
     attributes: &str,
     config: &ParserOptions,

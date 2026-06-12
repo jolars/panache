@@ -8,17 +8,17 @@
 //! The parsing functions return `Option<(usize, &str)>` tuples containing the length
 //! consumed and the math content, allowing calling contexts to emit appropriate nodes.
 
+use super::sink::InlineSink;
 use crate::parser::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
 use crate::parser::math::{MathParseOptions, parse_math_content};
 use crate::parser::utils::tree_copy::copy_green_node;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// Emit the math content as a structural, lossless `MATH_CONTENT` subtree
 /// (brace groups, environments, control sequences, alignment, …) rather than an
 /// opaque `TEXT` token, so the formatter and linter can act on its structure.
 /// See [`crate::parser::math`]. Lossless: the subtree's text equals `content`.
-fn emit_math_content(builder: &mut GreenNodeBuilder, content: &str, opts: MathParseOptions) {
+fn emit_math_content(builder: &mut impl InlineSink, content: &str, opts: MathParseOptions) {
     copy_green_node(builder, &parse_math_content(content, opts));
 }
 
@@ -352,7 +352,7 @@ pub fn try_parse_math_environment(text: &str) -> Option<(usize, &str, &str, &str
 }
 
 /// Emit an inline math node to the builder.
-pub fn emit_inline_math(builder: &mut GreenNodeBuilder, content: &str, opts: MathParseOptions) {
+pub fn emit_inline_math(builder: &mut impl InlineSink, content: &str, opts: MathParseOptions) {
     builder.start_node(SyntaxKind::INLINE_MATH.into());
 
     // Opening $
@@ -368,7 +368,7 @@ pub fn emit_inline_math(builder: &mut GreenNodeBuilder, content: &str, opts: Mat
 }
 
 /// Emit a GFM inline math node: $`...`$
-pub fn emit_gfm_inline_math(builder: &mut GreenNodeBuilder, content: &str, opts: MathParseOptions) {
+pub fn emit_gfm_inline_math(builder: &mut impl InlineSink, content: &str, opts: MathParseOptions) {
     builder.start_node(SyntaxKind::INLINE_MATH.into());
     builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), "$`");
     emit_math_content(builder, content, opts);
@@ -378,7 +378,7 @@ pub fn emit_gfm_inline_math(builder: &mut GreenNodeBuilder, content: &str, opts:
 
 /// Emit a single backslash inline math node: \(...\)
 pub fn emit_single_backslash_inline_math(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     content: &str,
     opts: MathParseOptions,
 ) {
@@ -393,7 +393,7 @@ pub fn emit_single_backslash_inline_math(
 
 /// Emit a double backslash inline math node: \\(...\\)
 pub fn emit_double_backslash_inline_math(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     content: &str,
     opts: MathParseOptions,
 ) {
@@ -408,7 +408,7 @@ pub fn emit_double_backslash_inline_math(
 
 /// Emit a display math node to the builder (when occurring inline in paragraph).
 pub fn emit_display_math(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     content: &str,
     dollar_count: usize,
     opts: MathParseOptions,
@@ -430,7 +430,7 @@ pub fn emit_display_math(
 
 /// Emit a display math environment node using raw \begin...\end... markers.
 pub fn emit_display_math_environment(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     begin_marker: &str,
     content: &str,
     end_marker: &str,
@@ -445,7 +445,7 @@ pub fn emit_display_math_environment(
 
 /// Emit a single backslash display math node: \[...\]
 pub fn emit_single_backslash_display_math(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     content: &str,
     opts: MathParseOptions,
 ) {
@@ -460,7 +460,7 @@ pub fn emit_single_backslash_display_math(
 
 /// Emit a double backslash display math node: \\[...\\]
 pub fn emit_double_backslash_display_math(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     content: &str,
     opts: MathParseOptions,
 ) {

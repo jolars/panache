@@ -9,9 +9,9 @@
 //! - Tildes cannot have whitespace immediately inside
 
 use super::core::parse_inline_text;
+use super::sink::InlineSink;
 use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// Try to parse strikeout (~~text~~)
 /// Returns: (total_len, inner_content)
@@ -69,7 +69,7 @@ pub fn try_parse_strikeout(text: &str) -> Option<(usize, &str)> {
 
 /// Emit a strikeout node with its content
 pub fn emit_strikeout(
-    builder: &mut GreenNodeBuilder,
+    builder: &mut impl InlineSink,
     inner_text: &str,
     config: &ParserOptions,
     suppress_footnote_refs: bool,

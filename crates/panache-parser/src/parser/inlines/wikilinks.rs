@@ -16,9 +16,9 @@
 //! everything inside `[[...]]` is opaque to emphasis / bracket / autolink
 //! resolution. The emitter walks the byte range and re-locates the pipe.
 
+use super::sink::InlineSink;
 use crate::ParserOptions;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// A successfully matched wikilink span.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -124,8 +124,8 @@ pub(crate) fn try_parse_wikilink(
 /// wikilink range. Pipe direction (URL/title order) is decided by
 /// `opts.extensions.wikilinks_title_after_pipe` vs
 /// `wikilinks_title_before_pipe`. After-pipe wins when both are on.
-pub(crate) fn emit_wikilink(
-    builder: &mut GreenNodeBuilder,
+pub(crate) fn emit_wikilink<S: InlineSink>(
+    builder: &mut S,
     text: &str,
     span: WikiLinkSpan,
     opts: &ParserOptions,
@@ -169,12 +169,12 @@ pub(crate) fn emit_wikilink(
         None => true,
     };
 
-    let emit_url = |b: &mut GreenNodeBuilder| {
+    let emit_url = |b: &mut S| {
         b.start_node(SyntaxKind::WIKI_LINK_URL.into());
         b.token(SyntaxKind::TEXT.into(), &text[url_range.clone()]);
         b.finish_node();
     };
-    let emit_pipe_and_title = |b: &mut GreenNodeBuilder| {
+    let emit_pipe_and_title = |b: &mut S| {
         if let Some((_p, ref tr)) = title_range {
             b.token(SyntaxKind::WIKI_LINK_PIPE.into(), "|");
             b.start_node(SyntaxKind::WIKI_LINK_TITLE.into());

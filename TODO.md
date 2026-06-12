@@ -416,9 +416,22 @@ intentionally excluded.
 
 ### Performance
 
-- [ ] Avoid temporary green tree when injecting `BLOCK_QUOTE_MARKER` tokens into
-  inline-parsed paragraphs (current approach parses inlines into a temp
-  tree, then replays while inserting markers)
+- [x] Avoid temporary green tree when injecting `BLOCK_QUOTE_MARKER` tokens into
+  inline-parsed paragraphs. Inline emission is now generic over an
+  `InlineSink` trait (`inlines/sink.rs`); the common path writes straight
+  into the `GreenNodeBuilder` (monomorphized, zero-cost) and blockquote
+  paragraphs swap in `MarkerInjectingSink`, which splices markers at byte
+  offsets during the single emission pass. No temp tree is built and
+  replayed.
+
+- [ ] Avoid temporary green tree in table detection.
+  `TableParser::detect_prepared` (`block_dispatcher.rs`) fully parses the
+  table into a throwaway `GreenNodeBuilder` just to validate the match
+  (`.is_some()`), then `parse_prepared` parses it again into the real
+  builder --- the table is parsed twice. Carry a reusable table IR
+  (rows/cells/alignments) in `TablePrepared` so emission renders from the IR
+  instead of re-parsing. Larger change than the blockquote-marker item
+  above; same "build temp CST then discard" anti-pattern.
 
 ### YAML validation: consumer fidelity vs YAML 1.2 (needs design decision)
 

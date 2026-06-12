@@ -42,6 +42,8 @@ pub mod raw_inline;
 pub mod refdef_map;
 #[path = "inlines/shortcodes.rs"]
 pub mod shortcodes;
+#[path = "inlines/sink.rs"]
+pub mod sink;
 #[path = "inlines/strikeout.rs"]
 pub mod strikeout;
 #[path = "inlines/subscript.rs"]

@@ -5,8 +5,8 @@
 //! Inline LaTeX commands: \cite{ref}, \textbf{text}, etc.
 //! Block LaTeX environments: \begin{tabular}...\end{tabular}
 
+use super::sink::InlineSink;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// Try to parse an inline LaTeX command starting at the given position.
 /// Returns the number of **bytes** consumed if successful, or None.
@@ -122,7 +122,7 @@ fn skip_braced_arg(text: &str, start: usize) -> Option<usize> {
 }
 
 /// Parse a LaTeX command and add it to the builder.
-pub(crate) fn parse_latex_command(builder: &mut GreenNodeBuilder, text: &str, len: usize) {
+pub(crate) fn parse_latex_command(builder: &mut impl InlineSink, text: &str, len: usize) {
     builder.start_node(SyntaxKind::LATEX_COMMAND.into());
     builder.token(SyntaxKind::TEXT.into(), &text[..len]);
     builder.finish_node();

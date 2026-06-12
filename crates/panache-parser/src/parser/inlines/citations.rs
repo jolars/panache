@@ -6,8 +6,8 @@
 //! - Suppress author: `[-@doe99]`
 //! - Author-in-text: `@doe99` (bare, without brackets)
 
+use super::sink::InlineSink;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// Try to parse a bracketed citation starting at the current position.
 /// Returns Some((length, content)) if successful, None otherwise.
@@ -194,7 +194,7 @@ pub fn has_bookdown_prefix(label: &str) -> bool {
     is_bookdown_label(prefix)
 }
 
-pub(crate) fn emit_crossref(builder: &mut GreenNodeBuilder, key: &str, has_suppress: bool) {
+pub(crate) fn emit_crossref(builder: &mut impl InlineSink, key: &str, has_suppress: bool) {
     builder.start_node(SyntaxKind::CROSSREF.into());
 
     if has_suppress {
@@ -214,7 +214,7 @@ pub(crate) fn emit_crossref(builder: &mut GreenNodeBuilder, key: &str, has_suppr
     builder.finish_node();
 }
 
-pub(crate) fn emit_bookdown_crossref(builder: &mut GreenNodeBuilder, key: &str) {
+pub(crate) fn emit_bookdown_crossref(builder: &mut impl InlineSink, key: &str) {
     builder.start_node(SyntaxKind::CROSSREF.into());
     builder.token(SyntaxKind::CROSSREF_BOOKDOWN_OPEN.into(), "\\@ref(");
     builder.token(SyntaxKind::CROSSREF_KEY.into(), key);
@@ -311,7 +311,7 @@ fn is_internal_punctuation(ch: char) -> bool {
 }
 
 /// Emit a bracketed citation node to the builder.
-pub(crate) fn emit_bracketed_citation(builder: &mut GreenNodeBuilder, content: &str) {
+pub(crate) fn emit_bracketed_citation(builder: &mut impl InlineSink, content: &str) {
     builder.start_node(SyntaxKind::CITATION.into());
 
     // Opening bracket
@@ -326,7 +326,7 @@ pub(crate) fn emit_bracketed_citation(builder: &mut GreenNodeBuilder, content: &
     builder.finish_node();
 }
 
-fn emit_bracketed_citation_content(builder: &mut GreenNodeBuilder, content: &str) {
+fn emit_bracketed_citation_content(builder: &mut impl InlineSink, content: &str) {
     let mut text_start = 0;
     let mut iter = content.char_indices().peekable();
 
@@ -405,7 +405,7 @@ fn emit_bracketed_citation_content(builder: &mut GreenNodeBuilder, content: &str
 }
 
 /// Emit a bare citation node to the builder.
-pub(crate) fn emit_bare_citation(builder: &mut GreenNodeBuilder, key: &str, has_suppress: bool) {
+pub(crate) fn emit_bare_citation(builder: &mut impl InlineSink, key: &str, has_suppress: bool) {
     builder.start_node(SyntaxKind::CITATION.into());
 
     // Emit marker (@ or -@)

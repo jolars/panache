@@ -1,5 +1,5 @@
+use super::sink::InlineSink;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 /// Try to parse a textual emoji alias like `:smile:`.
 ///
@@ -37,7 +37,7 @@ pub(crate) fn try_parse_emoji(text: &str) -> Option<(usize, &str)> {
     Some((end + 1, &text[1..end]))
 }
 
-pub(crate) fn emit_emoji(builder: &mut GreenNodeBuilder, raw: &str) {
+pub(crate) fn emit_emoji(builder: &mut impl InlineSink, raw: &str) {
     builder.start_node(SyntaxKind::EMOJI.into());
     builder.token(SyntaxKind::TEXT.into(), raw);
     builder.finish_node();

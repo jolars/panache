@@ -1,5 +1,5 @@
+use super::sink::InlineSink;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum InlineExecutableVariant {
@@ -87,10 +87,7 @@ fn parse_marker_and_code<'a>(
     Some((spacing_after_marker, code, variant))
 }
 
-pub(crate) fn emit_inline_executable(
-    builder: &mut GreenNodeBuilder,
-    m: &InlineExecutableMatch<'_>,
-) {
+pub(crate) fn emit_inline_executable(builder: &mut impl InlineSink, m: &InlineExecutableMatch<'_>) {
     builder.start_node(SyntaxKind::INLINE_EXEC.into());
     builder.token(
         SyntaxKind::INLINE_EXEC_MARKER.into(),
