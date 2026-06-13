@@ -1,6 +1,6 @@
 [package]
 name = "panache-formatter"
-version = "0.11.0"
+version = "0.12.0"
 edition.workspace = true
 include = [
     "/src/**/*",
@@ -18,7 +18,7 @@ keywords = ["quarto", "pandoc", "markdown", "formatter"]
 categories = ["text-processing"]
 
 [dependencies]
-panache-parser = { path = "../panache-parser", version = "0.16.0" }
+panache-parser = { path = "../panache-parser", version = "0.17.0" }
 log = { version = "0.4.31", features = ["release_max_level_debug"] }
 rowan = "0.16.1"
 unicode-width = "0.2"

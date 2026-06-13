@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.17.0](https://github.com/jolars/panache/compare/panache-parser-v0.16.0...panache-parser-v0.17.0) (2026-06-13)
+
+### Features
+- **parser:** tokenize math delimiters and punctuation ([`7249710`](https://github.com/jolars/panache/commit/7249710c2c983f651358488b991c15d095b256ba))
+
+### Bug Fixes
+- **parser:** claim caption-led table as list item's first line ([`ac1f18b`](https://github.com/jolars/panache/commit/ac1f18b2b0a9e89d453f2a2f02fa91170c54fcb8))
+- **parser:** keep table captions lossless inside containers ([`b04f65a`](https://github.com/jolars/panache/commit/b04f65aa33a365faf01bed3eff130e0f4760ba92))
+- **parser:** treat deep list marker as lazy continuation ([`3fe17e0`](https://github.com/jolars/panache/commit/3fe17e09cb9515f7734f57b1013dc16181985816))
+
+### Performance Improvements
+- **parser:** make giant-blockquote parsing O(n) not O(n²) ([`4ec2cc0`](https://github.com/jolars/panache/commit/4ec2cc0011116fdba2bab588416cd636bac8445f))
+
 ## [0.16.0](https://github.com/jolars/panache/compare/panache-parser-v0.15.0...panache-parser-v0.16.0) (2026-06-10)
 
 ### Features

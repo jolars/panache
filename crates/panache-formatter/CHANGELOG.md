@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.12.0](https://github.com/jolars/panache/compare/panache-formatter-v0.11.0...panache-formatter-v0.12.0) (2026-06-13)
+
+### Features
+- **formatter:** don't escape `|` in commonmark ([`0092e6c`](https://github.com/jolars/panache/commit/0092e6c342c4900dda952fdce8f31b37d2de5d60)), ref [#367](https://github.com/jolars/panache/issues/367)
+- **formatter:** treat `vignette` yaml field as verbatim ([`f9d7c5a`](https://github.com/jolars/panache/commit/f9d7c5adb92df1cc8d364aba14e7a24f2651237a)), closes [#366](https://github.com/jolars/panache/issues/366)
+- **formatter:** break math binary chains outside relations ([`dde4511`](https://github.com/jolars/panache/commit/dde4511dc9c58df82fd9fdf762c2e7b2fc35f8d4))
+- **formatter:** nest binary breaks under math relation chains ([`0128da4`](https://github.com/jolars/panache/commit/0128da426a5878518efe60533916d669272e34ef))
+- **formatter:** break over-width display math at relations ([`9d7c2e5`](https://github.com/jolars/panache/commit/9d7c2e5ba9f0c41ffc50add0c72ed47159e37138))
+- **parser:** tokenize math delimiters and punctuation ([`7249710`](https://github.com/jolars/panache/commit/7249710c2c983f651358488b991c15d095b256ba))
+- **formatter:** space math command operators ([`1e43f25`](https://github.com/jolars/panache/commit/1e43f251b3f691d1e38bb29f2a2aaa261fac07e9))
+- **formatter:** precedence-aware math operator spacing ([`adbebe0`](https://github.com/jolars/panache/commit/adbebe06f1f82fa89b9275dc9a13ff45e0eb8f0b))
+
+### Bug Fixes
+- **formatter:** keep blockquote prefix on quoted tables ([`b9f7d2a`](https://github.com/jolars/panache/commit/b9f7d2affe4d8a5bb453144d248163e2c7a0d8f3))
+- **formatter:** dedent indented code in list items ([`bf14ecc`](https://github.com/jolars/panache/commit/bf14eccf416453ace37947fefec2716791ad45b7))
+- **formatter:** wrap task-item text at content column ([`42ecf70`](https://github.com/jolars/panache/commit/42ecf705b185cbcdb1c02d191c08246f70c3740a))
+- **formatter:** nest task-list children at content column ([`d6fb32b`](https://github.com/jolars/panache/commit/d6fb32bd58f87b4bd5de5e5657776f20796cdece))
+- **formatter:** drop stray blank line after hashpipe block scalar ([`c56f60f`](https://github.com/jolars/panache/commit/c56f60f17821fa8db24045d33e06b98ed76d1ed5))
+
+### Dependencies
+- updated crates/panache-parser to v0.17.0
+
 ## [0.11.0](https://github.com/jolars/panache/compare/panache-formatter-v0.10.0...panache-formatter-v0.11.0) (2026-06-10)
 
 ### Features
