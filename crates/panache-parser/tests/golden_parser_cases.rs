@@ -496,6 +496,7 @@ golden_test_cases!(
     list_item_indented_code,
     list_item_indented_code_marker_line_partial_overflow,
     list_item_indented_code_tabs_commonmark,
+    list_item_pipe_table_caption_before,
     list_item_pipe_table_continuation_blank_pandoc,
     list_item_pipe_table_marker_line_no_separator_pandoc,
     list_item_pipe_table_marker_line_pandoc,

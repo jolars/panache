@@ -458,15 +458,26 @@ intentionally excluded.
   `BLOCK_QUOTE_MARKER` tokens. Goldens `blockquote_pipe_table`,
   `blockquote_pipe_table_caption`.
 
-- [ ] Caption-before table as the *first line of a list item* (no blank line
-  before it) is parsed twice. `- > Table: cap\n  >\n  > <table>` emits the
-  caption both as a blockquote `PARAGRAPH` (the core claims the first list
-  line before `TableParser`'s `has_blank_before`/`at_document_start` gate
-  lets it fire) and again as the table's `TABLE_CAPTION` (backward
-  `find_caption_*`), breaking losslessness. Distinct from the
-  raw-vs-stripped fix; needs the table detector to be allowed to claim a
-  caption-led table as a list item's first line. (Plain-blockquote
-  caption-before now works; only the list-item-first-line case remains.)
+- [x] Caption-before table as the *first line of a list item* (no blank line
+  before it) was parsed twice. `- Table: cap\n\n  <table>` emitted the
+  caption both as the item's `PLAIN` (the core claims the first list line
+  before `TableParser`'s `has_blank_before`/`at_document_start` gate lets it
+  fire) and again as the table's `TABLE_CAPTION` (backward
+  `find_caption_*`), breaking losslessness. Fixed by
+  `maybe_open_caption_table_in_new_list_item` in `parser/core.rs` ---
+  mirrors `maybe_open_fenced_code_in_new_list_item`: when a fresh list
+  item's buffered marker-line content is a caption that a table follows, it
+  clears the buffer and emits the whole caption-led table via the forward
+  caption path (Grid → Multiline → Pipe → Simple cascade). Fixture
+  `list_item_pipe_table_caption_before`.
+
+- [ ] Formatter drops the list marker when a list item's *sole/first child* is a
+  table (caption or not): `- | a | b |\n  …` and `1. Table: cap\n\n   …`
+  format to a bare, re-indented table with the `-`/`1.` gone, which also
+  breaks format idempotency (3-space → 2-space re-indent on the orphaned
+  table). Pre-existing and orthogonal to the parser losslessness fix above
+  --- the parse is now correct (table nested in the `LIST_ITEM`); the
+  formatter just fails to re-emit the marker for a table-first list item.
 
 - [ ] Formatter trims leading/trailing spaces *inside* inline-code spans. A span
   whose backticks wrap content with leading spaces (two spaces, then

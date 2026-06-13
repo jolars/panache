@@ -20,6 +20,7 @@ use super::blocks::line_blocks;
 use super::blocks::lists;
 use super::blocks::paragraphs;
 use super::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
+use super::blocks::tables;
 use super::diagnostics::{Diagnostics, SyntaxError};
 use super::utils::container_stack;
 use super::utils::helpers::{is_blank_line, split_lines_inclusive, strip_newline};
@@ -515,6 +516,89 @@ impl<'a> Parser<'a> {
             self.config.flavor,
         );
         Some(new_pos.saturating_sub(self.pos).saturating_sub(1))
+    }
+
+    /// When a new list item's marker-line content is a table caption that a
+    /// table follows (`- Table: cap\n\n  | a | b |\n  …`), emit the whole
+    /// caption-led table as the item's content instead of leaving the caption
+    /// line buffered as a paragraph.
+    ///
+    /// Without this, the caption line is buffered and emitted as a `PLAIN`, and
+    /// the table — dispatched later at its grid line — re-claims the same line
+    /// via its backward caption scan (`find_caption_before_table`), duplicating
+    /// the caption and breaking losslessness. The dispatcher's `TableParser`
+    /// never fires on the marker line because the list parser consumes it before
+    /// block dispatch runs, so we bridge that gap here, mirroring
+    /// `maybe_open_fenced_code_in_new_list_item`. Returns the number of source
+    /// lines consumed beyond the list-marker line.
+    fn maybe_open_caption_table_in_new_list_item(&mut self) -> Option<usize> {
+        if !self.config.extensions.table_captions {
+            return None;
+        }
+        if !(self.config.extensions.simple_tables
+            || self.config.extensions.multiline_tables
+            || self.config.extensions.grid_tables
+            || self.config.extensions.pipe_tables)
+        {
+            return None;
+        }
+
+        let Some(Container::ListItem {
+            content_col,
+            buffer,
+            ..
+        }) = self.containers.stack.last()
+        else {
+            return None;
+        };
+        // Only the marker line is buffered so far; a multi-segment buffer means
+        // more content already accumulated and this is not a fresh marker line.
+        if buffer.segment_count() != 1 || buffer.first_text().is_none() {
+            return None;
+        }
+        let content_col = *content_col;
+
+        // Confirm a caption-led table actually follows, reading the marker line
+        // and its lookahead through the list-content strip (`content_col`).
+        // Bail otherwise, leaving the line buffered for paragraph handling.
+        let bq_depth = self.current_blockquote_depth();
+        let prefix = ContainerPrefix::from_scalars(bq_depth, content_col, bq_depth > 0, 0, true);
+        let window = StrippedLines::new(&self.lines, self.pos, &prefix);
+        if !tables::is_caption_followed_by_table(&window, self.pos) {
+            return None;
+        }
+
+        // Parse the caption-led table directly at the marker line, trying each
+        // enabled kind (Grid → Multiline → Pipe → Simple). A `None` return
+        // leaves the builder untouched (every kind validates before its first
+        // `start_node`), so the cascade is safe. Mirrors `first_kind_at`.
+        //
+        // The cheap `is_caption_followed_by_table` probe can accept where the
+        // full parse rejects, so parse *before* clearing the buffer: on the
+        // miss path nothing was emitted and the caption line stays buffered for
+        // normal paragraph handling.
+        let mut consumed = None;
+        if self.config.extensions.grid_tables {
+            consumed = tables::try_parse_grid_table(&window, &mut self.builder, self.config);
+        }
+        if consumed.is_none() && self.config.extensions.multiline_tables {
+            consumed = tables::try_parse_multiline_table(&window, &mut self.builder, self.config);
+        }
+        if consumed.is_none() && self.config.extensions.pipe_tables {
+            consumed = tables::try_parse_pipe_table(&window, &mut self.builder, self.config);
+        }
+        if consumed.is_none() && self.config.extensions.simple_tables {
+            consumed = tables::try_parse_simple_table(&window, &mut self.builder, self.config);
+        }
+        let consumed = consumed?;
+
+        // Parse succeeded and the table (with its `TABLE_CAPTION`) is emitted;
+        // clear the buffered caption line so it isn't also emitted as a `PLAIN`
+        // when the list item closes.
+        if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+            buffer.clear();
+        }
+        Some(consumed.saturating_sub(1))
     }
 
     /// CommonMark §5.2 rule #2: when a list marker is followed by ≥ 5 columns
@@ -1115,6 +1199,9 @@ impl<'a> Parser<'a> {
                     if let Some(extras) = self.maybe_open_fenced_code_in_new_list_item() {
                         return extras;
                     }
+                    if let Some(extras) = self.maybe_open_caption_table_in_new_list_item() {
+                        return extras;
+                    }
                     self.maybe_open_indented_code_in_new_list_item();
                     return self.dispatch_bq_after_list_item(finish);
                 }
@@ -1131,6 +1218,9 @@ impl<'a> Parser<'a> {
                 self.config,
             );
             if let Some(extras) = self.maybe_open_fenced_code_in_new_list_item() {
+                return extras;
+            }
+            if let Some(extras) = self.maybe_open_caption_table_in_new_list_item() {
                 return extras;
             }
             self.maybe_open_indented_code_in_new_list_item();
@@ -1170,6 +1260,9 @@ impl<'a> Parser<'a> {
                 )
             };
             if let Some(extras) = self.maybe_open_fenced_code_in_new_list_item() {
+                return extras;
+            }
+            if let Some(extras) = self.maybe_open_caption_table_in_new_list_item() {
                 return extras;
             }
             self.maybe_open_indented_code_in_new_list_item();
@@ -1215,6 +1308,9 @@ impl<'a> Parser<'a> {
             )
         };
         if let Some(extras) = self.maybe_open_fenced_code_in_new_list_item() {
+            return extras;
+        }
+        if let Some(extras) = self.maybe_open_caption_table_in_new_list_item() {
             return extras;
         }
         self.maybe_open_indented_code_in_new_list_item();
@@ -2532,13 +2628,16 @@ impl<'a> Parser<'a> {
                         &list_item,
                         self.config,
                     );
-                    let extras =
-                        if let Some(extras) = self.maybe_open_fenced_code_in_new_list_item() {
-                            extras
-                        } else {
-                            self.maybe_open_indented_code_in_new_list_item();
-                            self.dispatch_bq_after_list_item(finish)
-                        };
+                    let extras = if let Some(extras) =
+                        self.maybe_open_fenced_code_in_new_list_item()
+                    {
+                        extras
+                    } else if let Some(extras) = self.maybe_open_caption_table_in_new_list_item() {
+                        extras
+                    } else {
+                        self.maybe_open_indented_code_in_new_list_item();
+                        self.dispatch_bq_after_list_item(finish)
+                    };
                     return LineDispatch::consumed(1 + extras);
                 }
             }
