@@ -395,18 +395,33 @@ fn format_table_caption(caption_text: &str, config: &Config, node: &SyntaxNode) 
 
 fn extract_table_caption_content(caption_node: &SyntaxNode) -> String {
     let mut caption_body = String::new();
+    // Captions inside a blockquote carry BLOCK_QUOTE_MARKER tokens for
+    // losslessness; the blockquote formatter re-adds the prefix dynamically, so
+    // drop the marker (and the whitespace that follows it) here.
+    let mut skip_next_whitespace = false;
 
     for caption_child in caption_node.children_with_tokens() {
         match caption_child {
+            rowan::NodeOrToken::Token(token) if token.kind() == SyntaxKind::BLOCK_QUOTE_MARKER => {
+                skip_next_whitespace = true;
+            }
+            rowan::NodeOrToken::Token(token)
+                if token.kind() == SyntaxKind::WHITESPACE && skip_next_whitespace =>
+            {
+                skip_next_whitespace = false;
+            }
             rowan::NodeOrToken::Token(token)
                 if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
             {
                 // Skip the original prefix
+                skip_next_whitespace = false;
             }
             rowan::NodeOrToken::Token(token) => {
+                skip_next_whitespace = false;
                 caption_body.push_str(token.text());
             }
             rowan::NodeOrToken::Node(node) => {
+                skip_next_whitespace = false;
                 caption_body.push_str(&node.text().to_string());
             }
         }

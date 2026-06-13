@@ -159,6 +159,8 @@ golden_test_cases!(
     blockquote_in_fenced_div_idempotency_310,
     blockquote_list_blanks,
     blockquote_list_blockquote,
+    blockquote_pipe_table,
+    blockquote_pipe_table_caption,
     blockquotes,
     bracketed_spans,
     bookdown,

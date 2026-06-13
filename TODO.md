@@ -446,12 +446,17 @@ intentionally excluded.
   `crates/panache-parser/tests/fixtures/cases/` (pipe before/after, 2-line
   caption, multiline, + a commonmark counterpart).
 
-- [ ] Formatter drops the blockquote prefix on a table inside a blockquote.
+- [x] Formatter drops the blockquote prefix on a table inside a blockquote.
   `> | a | b |\n> |---|---|\n> | 1 | 2 |` formats to `| a | b |` ... with no
   `>` (the table is lifted out of the blockquote). Lossless and idempotent,
   so it's a *formatter* policy bug, not a parser one --- surfaced while
   fixing the caption raw-vs-stripped reconcile. Caption-bearing tables
-  inside blockquotes inherit the same drop.
+  inside blockquotes inherit the same drop. *Fixed:* blockquote child
+  dispatch now handles `PIPE_TABLE`/`GRID_TABLE`/`SIMPLE_TABLE`/
+  `MULTILINE_TABLE` (temp-format, strip self-indent, re-prefix), and
+  `extract_table_caption_content` skips the losslessness
+  `BLOCK_QUOTE_MARKER` tokens. Goldens `blockquote_pipe_table`,
+  `blockquote_pipe_table_caption`.
 
 - [ ] Caption-before table as the *first line of a list item* (no blank line
   before it) is parsed twice. `- > Table: cap\n  >\n  > <table>` emits the

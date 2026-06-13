@@ -1396,6 +1396,48 @@ impl Formatter {
                                 None,
                             );
                         }
+                        SyntaxKind::PIPE_TABLE
+                        | SyntaxKind::GRID_TABLE
+                        | SyntaxKind::SIMPLE_TABLE
+                        | SyntaxKind::MULTILINE_TABLE => {
+                            // Format the table to a temp buffer, drop the
+                            // self-indent table types apply at the top level,
+                            // then re-emit each line behind the blockquote
+                            // prefix so the table stays inside the quote.
+                            let saved_output = self.output.clone();
+                            self.output.clear();
+                            self.format_node_sync(child, 0);
+                            let table_output = self.output.clone();
+                            self.output = saved_output;
+
+                            let min_indent = table_output
+                                .lines()
+                                .filter(|line| !line.trim().is_empty())
+                                .map(|line| line.len() - line.trim_start().len())
+                                .min()
+                                .unwrap_or(0);
+                            let dedented: String = table_output
+                                .lines()
+                                .map(|line| {
+                                    if line.trim().is_empty() {
+                                        String::new()
+                                    } else {
+                                        line[min_indent..].to_string()
+                                    }
+                                })
+                                .collect::<Vec<_>>()
+                                .join("\n");
+
+                            self.append_blockquote_prefixed_block(
+                                &dedented,
+                                &content_prefix,
+                                &blank_prefix,
+                                None,
+                            );
+                            if let Some(ctx) = self.blockquote_context.as_mut() {
+                                ctx.in_list_continuation = false;
+                            }
+                        }
                         _ => {
                             // Handle other content within block quotes
                             self.format_node_sync(child, indent);
