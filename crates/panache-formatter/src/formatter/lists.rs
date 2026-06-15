@@ -1,6 +1,7 @@
 use crate::config::WrapMode;
 use crate::formatter::indent_utils::{calculate_list_item_indent, is_alignable_marker};
 use crate::formatter::inline_layout::{self, WrapStrategy};
+use crate::formatter::tables;
 use crate::syntax::{AstNode, BlockQuote, FencedDiv, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
@@ -1185,6 +1186,83 @@ impl Formatter {
                         self.output.push('\n');
                     } else {
                         let content_indent = list_indent.hanging_indent(total_indent);
+                        self.format_node_sync(&child, content_indent);
+                    }
+                }
+                SyntaxKind::PIPE_TABLE | SyntaxKind::GRID_TABLE => {
+                    // A table can be a LIST_ITEM's sole/first child (the parser
+                    // nests it; e.g. `- | a | b |`). The wrapping pass above
+                    // emits nothing for an item with no PLAIN/PARAGRAPH
+                    // content_node, so re-emit the marker here — otherwise it is
+                    // dropped and the table floats out of the list (and the
+                    // ordered-list re-indent breaks idempotency). The first
+                    // table line sits on the marker line; a bare marker with the
+                    // table indented below would reparse the table as a
+                    // paragraph.
+                    //
+                    // Captioned tables are not handled here yet: a `: cap` line
+                    // after a table inside a list item currently reparses as a
+                    // definition list (parser limitation), so they fall back to
+                    // the existing path and keep the dropped-marker bug. See
+                    // TODO.md.
+                    let no_content_emitted = lines.is_empty()
+                        && preserve_lines.is_none()
+                        && sentence_lines.is_none()
+                        && content_node.is_none()
+                        && !has_only_empty_nested_list;
+                    let prev_kind = child.prev_sibling().map(|s| s.kind());
+                    let is_first_real_child = !matches!(
+                        prev_kind,
+                        Some(SyntaxKind::PLAIN)
+                            | Some(SyntaxKind::PARAGRAPH)
+                            | Some(SyntaxKind::HEADING)
+                            | Some(SyntaxKind::CODE_BLOCK)
+                            | Some(SyntaxKind::BLOCK_QUOTE)
+                            | Some(SyntaxKind::LIST)
+                            | Some(SyntaxKind::HORIZONTAL_RULE)
+                            | Some(SyntaxKind::HTML_BLOCK)
+                            | Some(SyntaxKind::HTML_BLOCK_DIV)
+                            | Some(SyntaxKind::PIPE_TABLE)
+                            | Some(SyntaxKind::GRID_TABLE)
+                    );
+                    let content_indent = list_indent.hanging_indent(total_indent);
+                    // The marker prefix occupies exactly `content_indent`
+                    // columns — except under `four_space_rule` (a flat tab
+                    // stop) or a task checkbox (which widens the marker line);
+                    // in those cases the splice would misalign, so fall back.
+                    let prefix_width = total_indent
+                        + list_indent.marker_padding
+                        + marker.len()
+                        + list_indent.spaces_after;
+                    let has_caption = child
+                        .children()
+                        .any(|c| c.kind() == SyntaxKind::TABLE_CAPTION);
+
+                    if no_content_emitted
+                        && is_first_real_child
+                        && checkbox.is_none()
+                        && prefix_width == content_indent
+                        && !has_caption
+                    {
+                        // First table line on the marker line. Both `prefix` and
+                        // the table's first line are exactly `content_indent`
+                        // ASCII spaces wide, so splicing is byte-safe.
+                        let prefix = format!(
+                            "{}{}{}{}",
+                            " ".repeat(total_indent),
+                            " ".repeat(list_indent.marker_padding),
+                            marker,
+                            " ".repeat(list_indent.spaces_after),
+                        );
+                        let table_str = match child.kind() {
+                            SyntaxKind::PIPE_TABLE => {
+                                tables::format_pipe_table(&child, &self.config, content_indent)
+                            }
+                            _ => tables::format_grid_table(&child, &self.config, content_indent),
+                        };
+                        self.output.push_str(&prefix);
+                        self.output.push_str(&table_str[content_indent..]);
+                    } else {
                         self.format_node_sync(&child, content_indent);
                     }
                 }

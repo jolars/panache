@@ -471,13 +471,27 @@ intentionally excluded.
   caption path (Grid → Multiline → Pipe → Simple cascade). Fixture
   `list_item_pipe_table_caption_before`.
 
-- [ ] Formatter drops the list marker when a list item's *sole/first child* is a
-  table (caption or not): `- | a | b |\n  …` and `1. Table: cap\n\n   …`
-  format to a bare, re-indented table with the `-`/`1.` gone, which also
-  breaks format idempotency (3-space → 2-space re-indent on the orphaned
-  table). Pre-existing and orthogonal to the parser losslessness fix above
-  --- the parse is now correct (table nested in the `LIST_ITEM`); the
-  formatter just fails to re-emit the marker for a table-first list item.
+- [ ] Formatter dropped the list marker when a list item's *sole/first child*
+  was a table. **No-caption case fixed**: `- | a | b |\n  …` now keeps the
+  marker by putting the first table line on the marker line --- `lists.rs`
+  `format_list_item` has a `PIPE_TABLE | GRID_TABLE` arm that splices the
+  marker prefix onto the table's first line (pipe + grid, bullet + ordered).
+  Goldens `list_item_table_first_bullet`, `list_item_table_first_grid`.
+  **Caption-led case still open** (`1. Table: cap\n\n   …`): the
+  round-trip-safe shape is the table on the marker line with the caption
+  *below* (`: cap`, matching house style and pandoc), but Panache's *parser*
+  turns a `: cap` line after a table inside a list item into a
+  `DEFINITION_LIST` (dragging the table to `PLAIN`). Pandoc-native confirms
+  `: cap` after a table --- including in a list --- is always the table's
+  Caption, never a definition list, so this is a parser bug. Root cause: not
+  a clean dispatcher guard --- the chokepoint is the **list-item buffering**
+  state machine, which breaks the buffer to start a definition list when
+  `: cap` is seen ahead (across the blank line), *before* the table is
+  flushed (so its `find_caption_after_table` lookahead never runs). The
+  captioned arm currently falls back to the old dropped-marker behavior.
+  Remaining: the parser fix (deferred), grid-table captions in lists, and
+  `SIMPLE_TABLE`/`MULTILINE_TABLE` as a list item's first child (their
+  formatters take no `indent`).
 
 - [ ] Formatter trims leading/trailing spaces *inside* inline-code spans. A span
   whose backticks wrap content with leading spaces (two spaces, then
