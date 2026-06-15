@@ -222,7 +222,7 @@ impl SyncPluginHandler<Configuration> for PanacheHandler {
             "collapse".to_string(),
             &mut diagnostics,
         );
-        let math_indent: u32 = get_value(&mut config, "mathIndent", 0, &mut diagnostics);
+        let math_indent: u32 = get_value(&mut config, "mathIndent", 2, &mut diagnostics);
         let math_delimiter_style: String = get_value(
             &mut config,
             "mathDelimiterStyle",

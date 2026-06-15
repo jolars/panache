@@ -3,23 +3,23 @@
 Testing content on same line as opening/closing markers.
 
 $$
-x = y + z
+  x = y + z
 $$
 
 And with closing content:
 
 $$
-a = b
+  a = b
 $$
 
 Both on same line:
 
 $$
-E = mc^2
+  E = mc^2
 $$
 
 Backslash variant:
 
 \[
-\alpha + \beta = \gamma
+  \alpha + \beta = \gamma
 \]

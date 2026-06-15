@@ -12,5 +12,5 @@ Complex: $\frac{n!}{k!(n-k)!}$
 
 Multiple dollars:
 $$
-\text{display math}
+  \text{display math}
 $$

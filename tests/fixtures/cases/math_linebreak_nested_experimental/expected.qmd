@@ -3,8 +3,8 @@
 Equation:
 
 $$
-A = aaaaaaaaaa
-    + bbbbbbbbbb
-  = cccccccccc
-    + dddddddddd
+  A = aaaaaaaaaa
+      + bbbbbbbbbb
+    = cccccccccc
+      + dddddddddd
 $$

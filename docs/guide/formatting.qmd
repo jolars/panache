@@ -837,7 +837,7 @@ Inline math is (currently) untouched.
 ### Display Math
 
 Display math is formatted on its own lines with leading indentation depending on
-the `math-indent` configuration option (default 0):
+the `math-indent` configuration option (default 2):
 
 Input
 
@@ -849,9 +849,11 @@ Output
 
 :   ```markdown
     $$
-    E = mc^2
+      E = mc^2
     $$
     ```
+
+Set `math-indent = 0` to keep the content flush against the left margin.
 
 ### Content-Aware Math Formatting (experimental)
 

@@ -5,5 +5,5 @@ $\alpha + \beta$. A unary minus stays tight: $-x$ and $f(-x)$. Command operators
 get spaced too: $a \cdot b$ and $x \leq y$.
 
 $$
-x = -y
+  x = -y
 $$

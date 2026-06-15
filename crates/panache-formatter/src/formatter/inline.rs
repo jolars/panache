@@ -536,8 +536,13 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 result.push_str(&math::format_math(&content, &opts));
                 result.push('\n');
             } else {
-                // Process content: trim overall, then strip common leading whitespace
-                let trimmed_content = content.trim();
+                // Process content: trim surrounding newlines (NOT leading spaces)
+                // and trailing whitespace, strip common leading whitespace, then
+                // re-indent every line by `math_indent`. Trimming only leading
+                // newlines keeps each line's true indent visible to `min_indent`,
+                // so the re-indent is idempotent: a later pass strips the pad as
+                // common indentation before re-applying it, rather than stacking.
+                let trimmed_content = content.trim_start_matches(['\n', '\r']).trim_end();
                 if !trimmed_content.is_empty() {
                     // Find minimum indentation across all non-empty lines
                     let min_indent = trimmed_content
@@ -547,12 +552,18 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         .min()
                         .unwrap_or(0);
 
-                    // Strip common indentation from each line
+                    let pad = " ".repeat(config.math_indent);
+                    // Strip common indentation, then re-indent each line.
                     for line in trimmed_content.lines() {
-                        if line.len() >= min_indent {
-                            result.push_str(&line[min_indent..]);
+                        let stripped = if line.len() >= min_indent {
+                            &line[min_indent..]
                         } else {
-                            result.push_str(line);
+                            line
+                        };
+                        // Skip padding blank lines to avoid trailing whitespace.
+                        if !stripped.is_empty() {
+                            result.push_str(&pad);
+                            result.push_str(stripped);
                         }
                         result.push('\n');
                     }

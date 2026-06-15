@@ -293,7 +293,7 @@ Formatting style preferences are organized under the `[format]` section:
 [format]
 wrap = "reflow"
 math-delimiter-style = "preserve"
-math-indent = 0
+math-indent = 2
 tab-stops = "normalize"
 tab-width = 4
 ```
@@ -368,7 +368,7 @@ Configure how math delimiters are formatted:
 ```toml
 [format]
 math-delimiter-style = "preserve"
-math-indent = 0
+math-indent = 2
 ```
 
 Math delimiter styles:
@@ -383,7 +383,7 @@ Math delimiter styles:
 :   Normalize to `\(...\)` and `\[...\]`
 
 The `math-indent` field specifies indentation (in spaces) for display math
-blocks. Default is 0.
+blocks. Default is 2; set it to 0 to keep content flush against the left margin.
 
 ### Tab Stops
 
@@ -1317,7 +1317,7 @@ line-width = 80
 [format]
 wrap = "reflow"
 math-delimiter-style = "preserve"
-math-indent = 0
+math-indent = 2
 
 [extensions]
 hard-line-breaks = false

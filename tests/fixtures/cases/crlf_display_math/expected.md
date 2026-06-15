@@ -1,11 +1,11 @@
 # Math
 
 $$
-x = y
+  x = y
 $$
 
 More text.
 
 $$
-a + b = c
+  a + b = c
 $$

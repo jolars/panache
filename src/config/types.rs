@@ -327,7 +327,7 @@ impl Default for StyleConfig {
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
             math_delimiter_style: MathDelimiterStyle::default(),
-            math_indent: 0,
+            math_indent: 2,
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
             built_in_greedy_wrap: true,
@@ -507,9 +507,12 @@ struct RawConfig {
     #[allow(dead_code)]
     code_blocks: Option<toml::Value>,
 
-    // DEPRECATED: Old top-level style fields (kept for backwards compatibility)
+    // DEPRECATED: Old top-level style fields (kept for backwards compatibility).
+    // `Option` distinguishes "unset" from an explicit value so an old-format
+    // config without this key still inherits the current default rather than
+    // the `usize` zero sentinel.
     #[serde(default)]
-    math_indent: usize,
+    math_indent: Option<usize>,
     #[serde(default)]
     math_delimiter_style: MathDelimiterStyle,
     #[serde(default)]
@@ -725,7 +728,7 @@ impl RawConfig {
 
         // Check for deprecated top-level style fields
         let has_deprecated_fields = self.wrap.is_some()
-            || self.math_indent != 0
+            || self.math_indent.is_some()
             || self.math_delimiter_style != MathDelimiterStyle::default()
             || self.blank_lines != default_blank_lines()
             || self.tab_stops != TabStopMode::Normalize
@@ -770,7 +773,9 @@ impl RawConfig {
                 wrap: self.wrap.or(Some(WrapMode::Reflow)),
                 blank_lines: self.blank_lines,
                 math_delimiter_style: self.math_delimiter_style,
-                math_indent: self.math_indent,
+                math_indent: self
+                    .math_indent
+                    .unwrap_or(StyleConfig::default().math_indent),
                 tab_stops: self.tab_stops,
                 tab_width: self.tab_width,
                 built_in_greedy_wrap: true,
@@ -1069,7 +1074,7 @@ impl Default for Config {
             formatter_extensions: FormatterExtensions::for_flavor(flavor),
             line_ending: Some(LineEnding::Auto),
             line_width: 80,
-            math_indent: 0,
+            math_indent: 2,
             math_delimiter_style: MathDelimiterStyle::default(),
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,

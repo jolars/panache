@@ -200,7 +200,7 @@ impl Default for Config {
             formatter_extensions: FormatterExtensions::for_flavor(flavor),
             line_ending: Some(LineEnding::Auto),
             line_width: 80,
-            math_indent: 0,
+            math_indent: 2,
             math_delimiter_style: MathDelimiterStyle::default(),
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,

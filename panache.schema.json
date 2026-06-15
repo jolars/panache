@@ -234,7 +234,7 @@
           "description": "Math delimiter style preference"
         },
         "math-indent": {
-          "default": 0,
+          "default": 2,
           "description": "Math indentation (spaces)",
           "format": "uint",
           "minimum": 0,
@@ -622,10 +622,13 @@
       "$ref": "#/$defs/MathDelimiterStyle"
     },
     "math-indent": {
-      "default": 0,
+      "default": null,
       "format": "uint",
       "minimum": 0,
-      "type": "integer"
+      "type": [
+        "integer",
+        "null"
+      ]
     },
     "pandoc-compat": {
       "anyOf": [

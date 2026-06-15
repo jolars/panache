@@ -16,10 +16,53 @@ fn math_config(format_math: bool) -> Config {
 
 #[test]
 fn experimental_format_math_defaults_off() {
-    // Regression lock: an alignment block is emitted verbatim by default.
+    // Regression lock: with the experimental formatter off, alignment columns
+    // are NOT reformatted (`x &= 1` stays `x &= 1`). The default two-space
+    // `math-indent` still applies, so content is indented but otherwise verbatim.
     let input = "$$\n\\begin{aligned}\nx &= 1 \\\\\ny &= 22\n\\end{aligned}\n$$\n";
+    let expected = "$$\n  \\begin{aligned}\n  x &= 1 \\\\\n  y &= 22\n  \\end{aligned}\n$$\n";
     let output = format(input, Some(math_config(false)), None);
-    similar_asserts::assert_eq!(output, input);
+    similar_asserts::assert_eq!(output, expected);
+}
+
+#[test]
+fn display_math_default_indent_is_two() {
+    // The default config indents `$$` content by two spaces.
+    let input = "$$\nx + y\n$$\n";
+    let expected = "$$\n  x + y\n$$\n";
+    let output = format(input, Some(math_config(false)), None);
+    similar_asserts::assert_eq!(output, expected);
+    // Idempotent across passes (no indent stacking).
+    let twice = format(&output, Some(math_config(false)), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn display_math_default_indent_multiline_idempotent() {
+    // Multiline content must re-indent idempotently: the second pass sees the
+    // two-space indent on every line, strips it as common indentation, and
+    // re-applies the same pad rather than stacking.
+    let input = "$$\n\\begin{aligned}\nx &= 1 \\\\\ny &= 22\n\\end{aligned}\n$$\n";
+    let expected = "$$\n  \\begin{aligned}\n  x &= 1 \\\\\n  y &= 22\n  \\end{aligned}\n$$\n";
+    let output = format(input, Some(math_config(false)), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(math_config(false)), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn display_math_indent_zero_stays_flush() {
+    // Explicit `math-indent = 0` keeps the old flush-left behavior.
+    let cfg = Config {
+        math_indent: 0,
+        ..math_config(false)
+    };
+    let input = "$$\n  x + y\n$$\n";
+    let expected = "$$\nx + y\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
 }
 
 #[test]
@@ -55,7 +98,12 @@ fn experimental_format_math_preserves_malformed() {
 
 #[test]
 fn math_no_wrap() {
-    let cfg = ConfigBuilder::default().line_width(10).build();
+    // Pin `math_indent` to 0 so this asserts only that math content is not
+    // wrapped (the default base indent is covered elsewhere).
+    let cfg = ConfigBuilder::default()
+        .line_width(10)
+        .math_indent(0)
+        .build();
     let input = "$$\n\\begin{matrix}\nA & B\\\\\nC & D\n\\end{matrix}\n$$\n";
     let output = format(input, Some(cfg), None);
 
@@ -64,10 +112,13 @@ fn math_no_wrap() {
 }
 
 /// Config like [`math_config`] but with an explicit `line-width` for the
-/// experimental display line-breaker.
+/// experimental display line-breaker. Pins `math_indent` to 0 so these
+/// line-break geometry assertions are isolated from the default base indent
+/// (covered separately by the `display_math_default_indent_*` tests).
 fn math_config_width(format_math: bool, width: usize) -> Config {
     Config {
         line_width: width,
+        math_indent: 0,
         ..math_config(format_math)
     }
 }
@@ -103,7 +154,11 @@ fn experimental_format_math_nests_binary_under_relations() {
 #[test]
 fn experimental_format_math_leaves_fitting_display_untouched() {
     // The same equation under the default 80-col width is not broken.
-    let cfg = math_config(true);
+    // Pin `math_indent` to 0 so "untouched" means byte-identical content.
+    let cfg = Config {
+        math_indent: 0,
+        ..math_config(true)
+    };
     let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd\n$$\n";
     let output = format(input, Some(cfg.clone()), None);
     similar_asserts::assert_eq!(output, input);

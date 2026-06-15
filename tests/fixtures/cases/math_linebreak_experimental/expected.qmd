@@ -3,12 +3,12 @@
 A short chain is left alone:
 
 $$
-a = b = c
+  a = b = c
 $$
 
 A long chain breaks here:
 
 $$
-A = aaaaaaaaaa + bbbbbbbbbb
-  = cccccccccc + dddddddddd
+  A = aaaaaaaaaa + bbbbbbbbbb
+    = cccccccccc + dddddddddd
 $$
