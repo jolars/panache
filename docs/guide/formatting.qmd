@@ -903,7 +903,9 @@ glyphs), and malformed math is left untouched.
 
 A display equation (`$$…$$`) wider than `line-width` is broken at its top-level
 relations, with continuations aligned under the first relation. If a relation
-segment is itself too wide, its binary terms break one level deeper:
+segment is itself too wide, its binary terms break one level deeper. Binary
+continuations are additionally nested by one `math-indent` step, so the `+ term`
+rows sit below (not flush with) the right-hand side they hang under:
 
 Input
 
@@ -917,10 +919,10 @@ Output
 
 :   ```markdown
     $$
-    A = aaaaaaaaaa
-        + bbbbbbbbbb
-      = cccccccccc
-        + dddddddddd
+      A = aaaaaaaaaa
+            + bbbbbbbbbb
+        = cccccccccc
+            + dddddddddd
     $$
     ```
 
@@ -930,11 +932,12 @@ which only break further when their segment still overflows; operators inside
 `(…)`, `\left…\right`, or a `{…}` group (including `\frac{…}{…}` arguments) are
 never broken at. A unary `+`/`-` is never a break point. An over-width row with
 a single relation breaks its binary right-hand side; one with no relation at all
-(a standalone binary chain) breaks with its head term flush-left and each
-following term on its own line. Only an equation with **no** top-level relation
-or binary operator (e.g. a single wide `\frac{…}{…}`) is left on one line when
-it overflows. The option is unstable and may change without a major release ---
-see [Experimental Features](configuration.qmd#experimental-features).
+(a standalone binary chain) breaks with its head term first and each following
+term nested one `math-indent` step below it. Only an equation with **no**
+top-level relation or binary operator (e.g. a single wide `\frac{…}{…}`) is left
+on one line when it overflows. The option is unstable and may change without a
+major release --- see [Experimental
+Features](configuration.qmd#experimental-features).
 
 ## Links
 

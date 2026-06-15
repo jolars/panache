@@ -52,6 +52,11 @@
 //! stays on one line, like an unbreakable long word in prose reflow. Inline and
 //! environment-body math are not line-broken.
 //!
+//! On top of that bare geometry, each binary continuation is nested one extra
+//! `math-indent` step (the `cont_indent` argument) so the `+ term` rows sit
+//! below — not flush with — the head/right-hand side they hang under. Relation
+//! continuations keep the bare alignment so relation operators stay in a column.
+//!
 //! ## Idempotency
 //!
 //! Indents are derived from the *logical* row (recomputed every pass), never
@@ -78,7 +83,17 @@ struct Break {
 /// Break one logical free-display row into physical content lines (no base
 /// math-indent, no trailing `\\` — the caller adds those). A row that fits, or
 /// that has no usable relation chain, is returned on one line unchanged.
-pub(super) fn break_free_row(elems: &[SyntaxElement], line_width: usize) -> Vec<String> {
+///
+/// `cont_indent` (the block's `math-indent`) is added to every *binary*
+/// continuation line so the broken `+ term` rows nest one indent step deeper
+/// than the head/right-hand side they hang under. Relation continuations are
+/// not shifted, so the relation operators stay column-aligned. With
+/// `cont_indent == 0` the layout is the bare alignment geometry.
+pub(super) fn break_free_row(
+    elems: &[SyntaxElement],
+    line_width: usize,
+    cont_indent: usize,
+) -> Vec<String> {
     // The unbroken, canonical single-line form — also the exact bytes the old
     // code emitted, so a row that fits is byte-identical to before.
     let single = render::render_inline(elems).trim().to_string();
@@ -94,13 +109,14 @@ pub(super) fn break_free_row(elems: &[SyntaxElement], line_width: usize) -> Vec<
         .collect();
 
     // Zero relations: a standalone binary chain. With no relation, the chain's
-    // first term *is* the head, so each `+ term` aligns flush under it (bin_indent
-    // 0) — the same rule the relation cases follow (a binary continuation aligns
-    // under the first term of its right-hand side). A row with no top-level binary
-    // op either (e.g. a lone wide `\frac`) falls through `break_binary_segment`'s
-    // empty-`bins` guard and stays on one (over-width) line.
+    // first term *is* the head, so each `+ term` aligns under it, nested by
+    // `cont_indent` (the block's math-indent; 0 ⇒ flush) — the same rule the
+    // relation cases follow (a binary continuation aligns under the first term of
+    // its right-hand side, plus the continuation indent). A row with no top-level
+    // binary op either (e.g. a lone wide `\frac`) falls through
+    // `break_binary_segment`'s empty-`bins` guard and stays on one (over-width) line.
     if rels.is_empty() {
-        return break_binary_segment(elems, 0, 0, line_width);
+        return break_binary_segment(elems, 0, cont_indent, line_width);
     }
 
     // Relation continuations align under the first relation's column; binary
@@ -114,7 +130,7 @@ pub(super) fn break_free_row(elems: &[SyntaxElement], line_width: usize) -> Vec<
     } else {
         prefix_width + 1
     };
-    let bin_indent = rel_indent + BINARY_NEST;
+    let bin_indent = rel_indent + BINARY_NEST + cont_indent;
 
     // One relation: the whole row is a single segment. It keeps the lone relation
     // on the opening line; an over-width binary RHS breaks before each `+`, each
@@ -311,8 +327,14 @@ mod tests {
         node.children_with_tokens().collect()
     }
 
+    /// Bare alignment geometry (no extra continuation indent).
     fn lines(content: &str, width: usize) -> Vec<String> {
-        break_free_row(&elems(content), width)
+        break_free_row(&elems(content), width, 0)
+    }
+
+    /// Layout with a continuation indent step (mirrors a non-zero `math-indent`).
+    fn lines_nested(content: &str, width: usize, cont_indent: usize) -> Vec<String> {
+        break_free_row(&elems(content), width, cont_indent)
     }
 
     fn rel_indices(content: &str) -> Vec<usize> {
@@ -420,6 +442,45 @@ mod tests {
         assert_eq!(
             lines("aaaa + bbbb + cccc + dddd", 12),
             vec!["aaaa", "+ bbbb", "+ cccc", "+ dddd"],
+        );
+    }
+
+    #[test]
+    fn continuation_indent_nests_binary_terms_no_relation() {
+        // A non-zero continuation indent nests each `+ term` one step under the
+        // head instead of flush.
+        assert_eq!(
+            lines_nested("aaaa + bbbb + cccc + dddd", 12, 2),
+            vec!["aaaa", "  + bbbb", "  + cccc", "  + dddd"],
+        );
+    }
+
+    #[test]
+    fn continuation_indent_nests_binary_terms_one_relation() {
+        // The `+ term` rows nest one step past the relation's right-hand side
+        // (bare `bin_indent` 4 + continuation indent 2 = 6).
+        assert_eq!(
+            lines_nested("A = aaaaaaaaaa + bbbbbbbbbb + cccccccccc", 20, 2),
+            vec!["A = aaaaaaaaaa", "      + bbbbbbbbbb", "      + cccccccccc"],
+        );
+    }
+
+    #[test]
+    fn continuation_indent_leaves_relation_columns_aligned() {
+        // Relation continuations stay aligned under the first `=`; only the
+        // binary terms pick up the extra continuation indent.
+        assert_eq!(
+            lines_nested(
+                "A = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd",
+                20,
+                2
+            ),
+            vec![
+                "A = aaaaaaaaaa",
+                "      + bbbbbbbbbb",
+                "  = cccccccccc",
+                "      + dddddddddd",
+            ],
         );
     }
 

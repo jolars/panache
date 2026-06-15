@@ -152,6 +152,55 @@ fn experimental_format_math_nests_binary_under_relations() {
 }
 
 #[test]
+fn experimental_binary_continuations_pick_up_math_indent_no_relation() {
+    // With the default two-space `math-indent`, a broken binary chain's
+    // continuation lines nest one `math-indent` deeper than the head instead of
+    // sitting flush under it.
+    let cfg = Config {
+        line_width: 20,
+        ..math_config(true)
+    };
+    let input = "$$\naaaaaaaa + bbbbbbbb + cccccccc + dddddddd\n$$\n";
+    let expected = "$$\n  aaaaaaaa\n    + bbbbbbbb\n    + cccccccc\n    + dddddddd\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn experimental_binary_continuations_pick_up_math_indent_one_relation() {
+    // The binary terms nest one `math-indent` past the relation right-hand side.
+    let cfg = Config {
+        line_width: 20,
+        ..math_config(true)
+    };
+    let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb + cccccccccc\n$$\n";
+    let expected = "$$\n  A = aaaaaaaaaa\n        + bbbbbbbbbb\n        + cccccccccc\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn experimental_relation_continuations_keep_alignment_with_math_indent() {
+    // Relation continuations still align under the first `=` (both at column 4);
+    // only the binary terms pick up the extra `math-indent`.
+    let cfg = Config {
+        line_width: 20,
+        ..math_config(true)
+    };
+    let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd\n$$\n";
+    let expected =
+        "$$\n  A = aaaaaaaaaa\n        + bbbbbbbbbb\n    = cccccccccc\n        + dddddddddd\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
 fn experimental_format_math_leaves_fitting_display_untouched() {
     // The same equation under the default 80-col width is not broken.
     // Pin `math_indent` to 0 so "untouched" means byte-identical content.

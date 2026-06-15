@@ -36,7 +36,13 @@ fn render_display(top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
 
     for el in top {
         if el.kind() == SyntaxKind::MATH_ENVIRONMENT {
-            flush_free_rows(&pending, &flat_indent, opts.line_width, &mut lines);
+            flush_free_rows(
+                &pending,
+                &flat_indent,
+                opts.line_width,
+                opts.math_indent,
+                &mut lines,
+            );
             pending.clear();
             if let Some(node) = el.as_node() {
                 lines.extend(render_environment_lines(node, 0, opts));
@@ -45,7 +51,13 @@ fn render_display(top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
             pending.push(el.clone());
         }
     }
-    flush_free_rows(&pending, &flat_indent, opts.line_width, &mut lines);
+    flush_free_rows(
+        &pending,
+        &flat_indent,
+        opts.line_width,
+        opts.math_indent,
+        &mut lines,
+    );
     lines.join("\n")
 }
 
@@ -61,13 +73,14 @@ fn flush_free_rows(
     elems: &[SyntaxElement],
     indent: &str,
     line_width: usize,
+    cont_indent: usize,
     lines: &mut Vec<String>,
 ) {
     for row in split_logical_rows(elems) {
         if row.is_blank() {
             continue;
         }
-        let physical = linebreak::break_free_row(&row.elems, line_width);
+        let physical = linebreak::break_free_row(&row.elems, line_width, cont_indent);
         let last = physical.len() - 1;
         for (i, content) in physical.into_iter().enumerate() {
             // The trailing `\\` (if any) rides the final physical line.

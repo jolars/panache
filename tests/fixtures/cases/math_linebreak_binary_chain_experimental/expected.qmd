@@ -4,15 +4,15 @@ No relation:
 
 $$
   aaaaaaaa
-  + bbbbbbbb
-  + cccccccc
-  + dddddddd
+    + bbbbbbbb
+    + cccccccc
+    + dddddddd
 $$
 
 One relation:
 
 $$
   A = aaaaaaaaaa
-      + bbbbbbbbbb
-      + cccccccccc
+        + bbbbbbbbbb
+        + cccccccccc
 $$
