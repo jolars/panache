@@ -108,6 +108,36 @@ fn test_clean_all_removes_all_buckets() {
 }
 
 #[test]
+fn test_cache_false_in_config_disables_cache() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    let cache_dir = temp_dir.path().join("custom-cache");
+    fs::create_dir_all(&workspace).unwrap();
+    // Top-level `cache = false` must disable reads and writes, even with an
+    // explicit cache directory override pointing somewhere writable.
+    fs::write(workspace.join("panache.toml"), "cache = false\n").unwrap();
+    fs::write(workspace.join("doc.qmd"), "# Heading\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(&workspace)
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "format",
+            "--check",
+            "doc.qmd",
+        ])
+        .assert()
+        .success();
+
+    let cache_file = cache_dir.join("cli-cache-v1.bin");
+    assert!(
+        !cache_file.exists(),
+        "cache = false must not write a cache file"
+    );
+}
+
+#[test]
 fn test_clean_uses_cache_dir_override() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");

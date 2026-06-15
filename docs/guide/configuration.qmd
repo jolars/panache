@@ -269,8 +269,15 @@ Panache can persist CLI lint/format cache entries between runs to speed up
 workspace re-runs when files and config are unchanged.
 
 ```toml
+cache = true
 cache-dir = "/absolute/path/to/cache-dir"
 ```
+
+`cache`
+:   Enable the on-disk lint/format cache (default: `true`). Set to `false` to
+    disable cache reads and writes for the project. `--no-cache` and
+    `PANACHE_NO_CACHE` force the cache off for a single invocation regardless of
+    this setting.
 
 `cache-dir`
 :   Optional cache directory override. Relative paths are resolved from the CLI

@@ -309,6 +309,14 @@
     "blank-lines": {
       "$ref": "#/$defs/BlankLines"
     },
+    "cache": {
+      "default": null,
+      "description": "Enable the on-disk lint/format cache (default: true). Set to `false` to\ndisable cache reads and writes for the project.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "cache-dir": {
       "default": null,
       "type": [

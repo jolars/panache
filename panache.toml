@@ -1,3 +1,8 @@
+# Disabled in-repo: the cache key's tool fingerprint is only `panache@<version>`,
+# so it does not invalidate when behavior changes under a fixed in-development
+# version, which serves stale results (e.g. the pre-commit `panache format` hook).
+cache = false
+
 extend-exclude = [
   "assets/*",
   "benches/**/*",

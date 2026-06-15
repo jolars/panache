@@ -106,10 +106,11 @@ invalidate on every code change. Symptoms: unit tests for the rule pass,
 `cargo build` succeeds, but `panache lint` keeps emitting the OLD diagnostic and
 `eprintln!` from your changed code never fires.
 
-Fix: `rm -rf ~/.cache/panache/` before re-running the CLI, or set
-`cache.enabled = false` in `panache.toml`. Always validate the rule via unit
-tests first; treat CLI diagnostics as a downstream sanity check, not the primary
-signal.
+Fix: `rm -rf ~/.cache/panache/` before re-running the CLI, set `cache = false`
+in `panache.toml`, or pass `--no-cache` (env `PANACHE_NO_CACHE=true`). The
+repo's own `panache.toml` already sets `cache = false` for this reason. Always
+validate the rule via unit tests first; treat CLI diagnostics as a downstream
+sanity check, not the primary signal.
 
 ## Core Architecture
 

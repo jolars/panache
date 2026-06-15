@@ -1015,7 +1015,7 @@ fn main() -> io::Result<()> {
                 force_exclude,
                 cli.flavor.is_some(),
             )?;
-            let mut cache = if cli.no_cache {
+            let mut cache = if cli.no_cache || !traversal_cfg.cache {
                 None
             } else {
                 open_cli_cache_best_effort(
@@ -1688,7 +1688,7 @@ fn main() -> io::Result<()> {
                 force_exclude,
                 cli.flavor.is_some(),
             )?;
-            let mut cache = if cli.no_cache {
+            let mut cache = if cli.no_cache || !traversal_cfg.cache {
                 None
             } else {
                 open_cli_cache_best_effort(

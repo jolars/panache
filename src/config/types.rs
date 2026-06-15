@@ -539,6 +539,10 @@ struct RawConfig {
     lint: Option<LintConfig>,
     #[serde(default)]
     cache_dir: Option<String>,
+    /// Enable the on-disk lint/format cache (default: true). Set to `false` to
+    /// disable cache reads and writes for the project.
+    #[serde(default)]
+    cache: Option<bool>,
     #[serde(default)]
     exclude: Option<Vec<String>>,
     #[serde(default)]
@@ -804,6 +808,7 @@ impl RawConfig {
             linters: self.linters,
             lint: self.lint.unwrap_or_default().normalize(),
             cache_dir: self.cache_dir,
+            cache: self.cache.unwrap_or(true),
             external_max_parallel: self
                 .external_max_parallel
                 .unwrap_or_else(default_external_max_parallel),
@@ -1028,6 +1033,8 @@ pub struct Config {
     pub lint: LintConfig,
     /// Optional cache directory override.
     pub cache_dir: Option<String>,
+    /// Whether the on-disk lint/format cache is enabled (default: true).
+    pub cache: bool,
     pub built_in_greedy_wrap: bool,
     /// Extra no-break abbreviations for sentence wrapping (see [`StyleConfig`]).
     pub no_break_abbreviations: Option<NoBreakAbbreviations>,
@@ -1086,6 +1093,7 @@ impl Default for Config {
             parser: PandocCompat::default(),
             lint: LintConfig::default(),
             cache_dir: None,
+            cache: true,
             built_in_greedy_wrap: true,
             no_break_abbreviations: None,
             lang: None,
