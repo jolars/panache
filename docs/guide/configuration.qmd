@@ -874,8 +874,14 @@ mark = false
 :   Suppress the soft-break-derived space when a newline sits between two East
     Asian wide characters. Useful for CJK documents where reflow would otherwise
     insert a stray ASCII space (e.g. `路\n名` becoming `路 名`). Default:
-    disabled, non-default extension. No effect when `wrap = "preserve"`, since
-    the newline is kept verbatim.
+    disabled, non-default extension. Under the default `wrap = "reflow"`,
+    Panache joins soft-wrapped lines regardless of this setting; the extension
+    only controls whether a join between two wide characters keeps a stray space
+    (off) or drops it (on). Enable it when you reflow CJK text and want the
+    result to read correctly. To instead keep your manual line breaks, set
+    `wrap = "preserve"`---turning this extension off will not preserve them,
+    since reflow still collapses the lines. The behavior matches Pandoc's
+    `east_asian_line_breaks` extension.
 
 `smart`
 :   Normalize smart/curly punctuation in formatter output (quotes/apostrophes
