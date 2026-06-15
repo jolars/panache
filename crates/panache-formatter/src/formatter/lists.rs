@@ -1200,11 +1200,13 @@ impl Formatter {
                     // table indented below would reparse the table as a
                     // paragraph.
                     //
-                    // Captioned tables are not handled here yet: a `: cap` line
-                    // after a table inside a list item currently reparses as a
-                    // definition list (parser limitation), so they fall back to
-                    // the existing path and keep the dropped-marker bug. See
-                    // TODO.md.
+                    // Captioned tables splice too: the parser now nests a
+                    // table-first item's trailing `: cap`/`Table: cap` as the
+                    // table's `TABLE_CAPTION` (matching pandoc), so the whole
+                    // table — caption rendered below by `format_pipe_table` /
+                    // `format_grid_table` at `content_indent` — goes on the
+                    // marker line. The splice strips only the first line's
+                    // indent, so the caption keeps its indentation.
                     let no_content_emitted = lines.is_empty()
                         && preserve_lines.is_none()
                         && sentence_lines.is_none()
@@ -1234,15 +1236,10 @@ impl Formatter {
                         + list_indent.marker_padding
                         + marker.len()
                         + list_indent.spaces_after;
-                    let has_caption = child
-                        .children()
-                        .any(|c| c.kind() == SyntaxKind::TABLE_CAPTION);
-
                     if no_content_emitted
                         && is_first_real_child
                         && checkbox.is_none()
                         && prefix_width == content_indent
-                        && !has_caption
                     {
                         // First table line on the marker line. Both `prefix` and
                         // the table's first line are exactly `content_indent`

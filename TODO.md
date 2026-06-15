@@ -471,27 +471,56 @@ intentionally excluded.
   caption path (Grid → Multiline → Pipe → Simple cascade). Fixture
   `list_item_pipe_table_caption_before`.
 
-- [ ] Formatter dropped the list marker when a list item's *sole/first child*
-  was a table. **No-caption case fixed**: `- | a | b |\n  …` now keeps the
-  marker by putting the first table line on the marker line --- `lists.rs`
+- [x] Formatter dropped the list marker when a list item's *sole/first child*
+  was a table. **No-caption case**: `- | a | b |\n  …` keeps the marker by
+  putting the first table line on the marker line --- `lists.rs`
   `format_list_item` has a `PIPE_TABLE | GRID_TABLE` arm that splices the
   marker prefix onto the table's first line (pipe + grid, bullet + ordered).
-  Goldens `list_item_table_first_bullet`, `list_item_table_first_grid`.
-  **Caption-led case still open** (`1. Table: cap\n\n   …`): the
-  round-trip-safe shape is the table on the marker line with the caption
-  *below* (`: cap`, matching house style and pandoc), but Panache's *parser*
-  turns a `: cap` line after a table inside a list item into a
-  `DEFINITION_LIST` (dragging the table to `PLAIN`). Pandoc-native confirms
-  `: cap` after a table --- including in a list --- is always the table's
-  Caption, never a definition list, so this is a parser bug. Root cause: not
-  a clean dispatcher guard --- the chokepoint is the **list-item buffering**
-  state machine, which breaks the buffer to start a definition list when
-  `: cap` is seen ahead (across the blank line), *before* the table is
-  flushed (so its `find_caption_after_table` lookahead never runs). The
-  captioned arm currently falls back to the old dropped-marker behavior.
-  Remaining: the parser fix (deferred), grid-table captions in lists, and
-  `SIMPLE_TABLE`/`MULTILINE_TABLE` as a list item's first child (their
-  formatters take no `indent`).
+  **Caption-led case** (`- | a | b |\n  …\n\n  : cap`, both `: cap` and
+  `Table:`/`table:` forms): fixed in the **parser** ---
+  `maybe_open_table_with_trailing_caption_in_new_list_item` (core.rs) parses
+  a marker-line table *with* its trailing caption at item open (via the
+  `try_parse_*` cascade, whose `find_caption_after_table` absorbs the
+  caption), so it never reaches the buffer-flush or the definition-list
+  dispatch that previously mangled it. The formatter arm then splices the
+  whole table (caption rendered below by
+  `format_pipe_table`/`format_grid_table`). Matches pandoc, which always
+  treats `: cap` after a table --- including in a list --- as the table's
+  Caption, never a definition list. Goldens
+  `list_item_table_first_{bullet,grid,caption_bullet,caption_ordered}`;
+  parser fixtures `list_item_{pipe,grid}_table_caption_after_pandoc`,
+  `list_item_pipe_table_caption_keyword_after_pandoc`. **Remaining edges**:
+  `SIMPLE_TABLE`/`MULTILINE_TABLE` as a list item's first child (the
+  open-time parse uses the full cascade, but the formatter arm and the
+  buffer-lift allowlist cover only pipe/grid --- their formatters take no
+  `indent`); and a table that sits *after a blank line* inside a list item
+  followed by `: cap`, which is a separate pre-existing issue (the
+  table-shaped lines parse as a `LINE_BLOCK`, not a table).
+
+- [ ] **Parser divergence from pandoc: ordered marker on a pipe/grid table's
+  header line.** For `1. | a | b |\n   | - | - |\n   …` (an *ordered* marker
+  with the table's first row on the same line), pandoc does **not** make a
+  list: it parses the whole thing as a top-level `Table`, absorbing the
+  marker as the first header cell (`Plain [Str "1."]`) and silently dropping
+  any overflow cells past the delimiter's column count (here `b` is lost).
+  Panache instead nests it as `OrderedList → [Table]`. The trigger is narrow
+  and confirmed against pandoc 3.9: it is **number-agnostic** (`5.` behaves
+  the same), needs the delimiter line (a lone `1. | a | b |` *is* a list in
+  pandoc), and does **not** affect bullets (`- | a | b |` →
+  `BulletList →   Table`, keeping both cells) or markers not on the table
+  line (`1.`⏎⏎table → `OrderedList → Table`). Pandoc's behavior looks like a
+  wart (bullet/ordered asymmetry + lossy cell drop), but pandoc is our
+  parser reference and panache must conform. This divergence predates the
+  table-first-caption fix above (the no-caption ordered case already
+  diverged); that fix only extended panache's existing list treatment to the
+  captioned ordered sub-case. **Conform the parser** so an ordered marker
+  immediately followed by a pipe/grid table row + delimiter becomes a
+  top-level table absorbing the marker, matching pandoc. When this lands,
+  the `list_item_table_first_caption_ordered` formatter golden (which
+  currently pins the divergent list output and the 3-space re-indent
+  idempotency) must be updated or removed, and a paired parser conformance
+  fixture added. Bullet/grid forms are already conformant and need no
+  change.
 
 - [ ] Formatter trims leading/trailing spaces *inside* inline-code spans. A span
   whose backticks wrap content with leading spaces (two spaces, then

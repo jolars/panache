@@ -601,6 +601,92 @@ impl<'a> Parser<'a> {
         Some(consumed.saturating_sub(1))
     }
 
+    /// When a new list item's marker line *begins a table* that is followed by a
+    /// trailing caption (`- | a | b |\n  | - | - |\n\n  : cap` or the
+    /// `Table:`/`table:` keyword form), parse the whole table-with-caption as the
+    /// item's content here, at the marker line.
+    ///
+    /// A marker-line table is normally buffered and recognized only at item
+    /// close via [`crate::parser::utils::list_item_buffer::ListItemBuffer`]'s
+    /// structural lift. That lift cannot see a *trailing* caption: the blank line
+    /// after the table flushes the buffer (`Table:` form), and a bare `: cap`
+    /// line is additionally claimed by the definition-list parser as a term/
+    /// definition (`: cap` form) — both before the caption ever reaches the
+    /// buffer. Parsing the table at the marker line instead lets the table
+    /// parser's own trailing-caption scan (`find_caption_after_table`) absorb the
+    /// caption, matching pandoc, which always treats `: cap` after a table as the
+    /// table's `Caption`, never a definition list.
+    ///
+    /// Gated on a caption actually being present so the *no-caption* marker-line
+    /// table keeps its existing buffer-lift CST untouched. Returns the number of
+    /// source lines consumed beyond the list-marker line.
+    fn maybe_open_table_with_trailing_caption_in_new_list_item(&mut self) -> Option<usize> {
+        if !self.config.extensions.table_captions {
+            return None;
+        }
+        if !(self.config.extensions.simple_tables
+            || self.config.extensions.multiline_tables
+            || self.config.extensions.grid_tables
+            || self.config.extensions.pipe_tables)
+        {
+            return None;
+        }
+
+        let Some(Container::ListItem {
+            content_col,
+            buffer,
+            ..
+        }) = self.containers.stack.last()
+        else {
+            return None;
+        };
+        // Only the marker line is buffered so far; a multi-segment buffer means
+        // more content already accumulated and this is not a fresh marker line.
+        if buffer.segment_count() != 1 {
+            return None;
+        }
+        // Cheap pre-filter: a table on the marker line begins with `|` or `+`.
+        let first = buffer.first_text()?;
+        if !matches!(
+            first.trim_start().as_bytes().first(),
+            Some(b'|') | Some(b'+')
+        ) {
+            return None;
+        }
+        let content_col = *content_col;
+
+        let bq_depth = self.current_blockquote_depth();
+        let prefix = ContainerPrefix::from_scalars(bq_depth, content_col, bq_depth > 0, 0, true);
+        let window = StrippedLines::new(&self.lines, self.pos, &prefix);
+
+        // A caption-led table (`- : cap` / `- Table: cap` then table) is the
+        // sibling function's job; never double-handle it here.
+        if tables::is_caption_followed_by_table(&window, self.pos) {
+            return None;
+        }
+
+        // Probe into a throwaway builder: only commit when the marker-line table
+        // actually pulls in a trailing caption. Otherwise leave the line buffered
+        // so the no-caption structural lift produces its established CST.
+        let mut probe = GreenNodeBuilder::new();
+        let _ = try_parse_any_table_kind(&window, &mut probe, self.config)?;
+        let probe_root = SyntaxNode::new_root(probe.finish());
+        let has_caption = probe_root
+            .children()
+            .any(|c| c.kind() == SyntaxKind::TABLE_CAPTION);
+        if !has_caption {
+            return None;
+        }
+
+        // Commit: emit the table (with its `TABLE_CAPTION`) as the list item's
+        // content and drop the buffered marker line so it isn't also emitted.
+        let consumed = try_parse_any_table_kind(&window, &mut self.builder, self.config)?;
+        if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+            buffer.clear();
+        }
+        Some(consumed.saturating_sub(1))
+    }
+
     /// CommonMark §5.2 rule #2: when a list marker is followed by ≥ 5 columns
     /// of whitespace and non-empty content, the content begins as an indented
     /// code block on the marker line. The marker parser collapses the post-
@@ -1202,6 +1288,11 @@ impl<'a> Parser<'a> {
                     if let Some(extras) = self.maybe_open_caption_table_in_new_list_item() {
                         return extras;
                     }
+                    if let Some(extras) =
+                        self.maybe_open_table_with_trailing_caption_in_new_list_item()
+                    {
+                        return extras;
+                    }
                     self.maybe_open_indented_code_in_new_list_item();
                     return self.dispatch_bq_after_list_item(finish);
                 }
@@ -1221,6 +1312,9 @@ impl<'a> Parser<'a> {
                 return extras;
             }
             if let Some(extras) = self.maybe_open_caption_table_in_new_list_item() {
+                return extras;
+            }
+            if let Some(extras) = self.maybe_open_table_with_trailing_caption_in_new_list_item() {
                 return extras;
             }
             self.maybe_open_indented_code_in_new_list_item();
@@ -1263,6 +1357,9 @@ impl<'a> Parser<'a> {
                 return extras;
             }
             if let Some(extras) = self.maybe_open_caption_table_in_new_list_item() {
+                return extras;
+            }
+            if let Some(extras) = self.maybe_open_table_with_trailing_caption_in_new_list_item() {
                 return extras;
             }
             self.maybe_open_indented_code_in_new_list_item();
@@ -1311,6 +1408,9 @@ impl<'a> Parser<'a> {
             return extras;
         }
         if let Some(extras) = self.maybe_open_caption_table_in_new_list_item() {
+            return extras;
+        }
+        if let Some(extras) = self.maybe_open_table_with_trailing_caption_in_new_list_item() {
             return extras;
         }
         self.maybe_open_indented_code_in_new_list_item();
@@ -2634,6 +2734,10 @@ impl<'a> Parser<'a> {
                         extras
                     } else if let Some(extras) = self.maybe_open_caption_table_in_new_list_item() {
                         extras
+                    } else if let Some(extras) =
+                        self.maybe_open_table_with_trailing_caption_in_new_list_item()
+                    {
+                        extras
                     } else {
                         self.maybe_open_indented_code_in_new_list_item();
                         self.dispatch_bq_after_list_item(finish)
@@ -3656,6 +3760,32 @@ impl<'a> Parser<'a> {
 /// Pandoc parses `Term\n: # Heading\n  Some text` as DefinitionList where the
 /// definition contains [Header, Plain]; the `# Heading` line is a real Header
 /// inside the definition, not text that happens to start with `#`.
+/// Try each enabled table kind in turn (Grid → Multiline → Pipe → Simple),
+/// emitting the first match into `builder` and returning the lines consumed.
+/// Every kind validates before its first `start_node`, so on a full miss the
+/// builder is left untouched and `None` is returned. Mirrors the dispatcher's
+/// `first_kind_at` cascade for the list-item marker-line table paths.
+fn try_parse_any_table_kind(
+    window: &StrippedLines,
+    builder: &mut GreenNodeBuilder<'static>,
+    config: &ParserOptions,
+) -> Option<usize> {
+    let mut consumed = None;
+    if config.extensions.grid_tables {
+        consumed = tables::try_parse_grid_table(window, builder, config);
+    }
+    if consumed.is_none() && config.extensions.multiline_tables {
+        consumed = tables::try_parse_multiline_table(window, builder, config);
+    }
+    if consumed.is_none() && config.extensions.pipe_tables {
+        consumed = tables::try_parse_pipe_table(window, builder, config);
+    }
+    if consumed.is_none() && config.extensions.simple_tables {
+        consumed = tables::try_parse_simple_table(window, builder, config);
+    }
+    consumed
+}
+
 fn emit_definition_plain_or_heading(
     builder: &mut GreenNodeBuilder<'static>,
     text: &str,

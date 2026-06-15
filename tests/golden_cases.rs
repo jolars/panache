@@ -237,6 +237,8 @@ golden_test_cases!(
     list_item_html_pre_multiline,
     list_item_html_section_multiline,
     list_item_table_first_bullet,
+    list_item_table_first_caption_bullet,
+    list_item_table_first_caption_ordered,
     list_item_table_first_grid,
     list_mixed_bullets_commonmark,
     headings,
