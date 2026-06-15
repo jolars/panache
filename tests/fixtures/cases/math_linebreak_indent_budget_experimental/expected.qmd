@@ -1,0 +1,8 @@
+# Indent budget
+
+Width-edge chain:
+
+$$
+  aa = bbbbbb
+     = ccccccc
+$$

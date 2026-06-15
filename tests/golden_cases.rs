@@ -297,6 +297,7 @@ golden_test_cases!(
     math_blockquote_experimental,
     math_linebreak_binary_chain_experimental,
     math_linebreak_experimental,
+    math_linebreak_indent_budget_experimental,
     math_linebreak_nested_experimental,
     math_operator_spacing_experimental,
     math_format_off_default,

@@ -139,6 +139,24 @@ fn experimental_format_math_breaks_overwidth_display_chain() {
 }
 
 #[test]
+fn experimental_line_break_budget_accounts_for_math_indent() {
+    // The flat `math-indent` is charged against `line-width`: the chain is 21
+    // chars wide, which fits in `line-width` 22 on its own, but the two-space
+    // `math-indent` would push it to 23. So it is broken at the second relation,
+    // keeping every emitted line within `line-width`.
+    let cfg = Config {
+        line_width: 22,
+        ..math_config(true) // default math_indent = 2
+    };
+    let input = "$$\naa = bbbbbb = ccccccc\n$$\n";
+    let expected = "$$\n  aa = bbbbbb\n     = ccccccc\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
 fn experimental_format_math_nests_binary_under_relations() {
     let cfg = math_config_width(true, 20);
     let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd\n$$\n";

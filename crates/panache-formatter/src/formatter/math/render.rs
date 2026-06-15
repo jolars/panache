@@ -80,7 +80,10 @@ fn flush_free_rows(
         if row.is_blank() {
             continue;
         }
-        let physical = linebreak::break_free_row(&row.elems, line_width, cont_indent);
+        // Charge the flat math-indent against the budget so packed (and single)
+        // lines genuinely stay within `line_width` once the indent is prepended.
+        let budget = line_width.saturating_sub(indent.chars().count());
+        let physical = linebreak::break_free_row(&row.elems, budget, cont_indent);
         let last = physical.len() - 1;
         for (i, content) in physical.into_iter().enumerate() {
             // The trailing `\\` (if any) rides the final physical line.

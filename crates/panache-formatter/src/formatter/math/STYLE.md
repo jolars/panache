@@ -104,9 +104,11 @@ Returned unchanged, never reflowed:
    every later relation starts a continuation **aligned under the first
    relation's column**. Then any relation segment that is still over-width
    splits before each top-level **binary** operator, with each `+ term` nested
-   one indent step (2 spaces) deeper, under the relation's right-hand side. It
-   is source-cosmetic only --- math ignores whitespace, so the rendered equation
-   is unchanged:
+   one indent step (2 spaces) deeper, under the relation's right-hand side. The
+   width budget charges the flat `math-indent` against `line-width`, so a broken
+   line plus its leading indent still stays within `line-width`. It is
+   source-cosmetic only --- math ignores whitespace, so the rendered equation is
+   unchanged:
 
    ```
    A = aaaaaaaaaa

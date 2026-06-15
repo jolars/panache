@@ -905,7 +905,9 @@ A display equation (`$$…$$`) wider than `line-width` is broken at its top-leve
 relations, with continuations aligned under the first relation. If a relation
 segment is itself too wide, its binary terms break one level deeper. Binary
 continuations are additionally nested by one `math-indent` step, so the `+ term`
-rows sit below (not flush with) the right-hand side they hang under:
+rows sit below (not flush with) the right-hand side they hang under. The width
+budget accounts for `math-indent`, so a broken line plus its leading indent
+stays within `line-width`:
 
 Input
 
