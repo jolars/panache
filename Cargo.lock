@@ -1151,7 +1151,7 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "panache"
-version = "2.54.0"
+version = "2.55.0"
 dependencies = [
  "annotate-snippets",
  "assert_cmd",
@@ -1194,7 +1194,7 @@ dependencies = [
 
 [[package]]
 name = "panache-formatter"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "insta",
  "log",
@@ -1209,7 +1209,7 @@ dependencies = [
 
 [[package]]
 name = "panache-parser"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "entities",
  "insta",

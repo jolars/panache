@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.0](https://github.com/jolars/panache/compare/dprint-plugin-panache-v0.2.0...dprint-plugin-panache-v0.3.0) (2026-06-15)
+
+### Features
+- **formatter:** default `math-indent` to 2 ([`3d0422b`](https://github.com/jolars/panache/commit/3d0422b8355e57b2d9e04b0ac86128da414b75b2))
+
 ## [0.2.0](https://github.com/jolars/panache/compare/dprint-plugin-panache-v0.1.0...dprint-plugin-panache-v0.2.0) (2026-05-26)
 
 ### Features
