@@ -33,6 +33,85 @@ fn expand_tabs_code_span(text: &str, tab_width: usize) -> String {
     out.trim().to_string()
 }
 
+/// Render a `CITATION` or `CROSSREF` node by concatenating its child tokens.
+///
+/// Both kinds share the same syntax (`[ ... @key ... ]`) and are emitted the
+/// same way: smart-normalize text tokens, skip the whitespace that follows a
+/// blockquote marker, then collapse any internal line break (a citation may be
+/// split across input lines) so the unit reflows like ordinary inline text
+/// instead of pinning a hard newline into the paragraph.
+fn format_citation_like(node: &SyntaxNode, config: &Config) -> String {
+    let mut result = String::new();
+    let mut skip_marker_whitespace = false;
+    for child in node.children_with_tokens() {
+        match child {
+            NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::BLOCK_QUOTE_MARKER => {
+                skip_marker_whitespace = true;
+            }
+            NodeOrToken::Token(tok)
+                if tok.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace =>
+            {
+                skip_marker_whitespace = false;
+            }
+            NodeOrToken::Token(tok) => {
+                skip_marker_whitespace = false;
+                result.push_str(
+                    normalize_smart_punctuation(
+                        tok.text(),
+                        config.formatter_extensions.smart,
+                        config.formatter_extensions.smart_quotes,
+                    )
+                    .as_ref(),
+                );
+            }
+            NodeOrToken::Node(n) => {
+                skip_marker_whitespace = false;
+                result.push_str(&n.text().to_string());
+            }
+        }
+    }
+    collapse_internal_newlines(&result).into_owned()
+}
+
+/// Collapse any whitespace run that contains a line break into a single space.
+///
+/// A citation or cross-reference split across input lines leaves a literal
+/// newline inside the assembled string. Emitting it verbatim makes the
+/// surrounding paragraph un-reflowable, so we normalize it the way the wrapper
+/// treats ordinary inter-word whitespace.
+fn collapse_internal_newlines(text: &str) -> std::borrow::Cow<'_, str> {
+    if !text.contains('\n') {
+        return std::borrow::Cow::Borrowed(text);
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch.is_whitespace() {
+            // Consume the whole whitespace run, tracking whether it contains a
+            // line break.
+            let mut has_newline = ch == '\n';
+            let mut run = String::from(ch);
+            while let Some(&next) = chars.peek() {
+                if next.is_whitespace() {
+                    has_newline |= next == '\n';
+                    run.push(next);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+            if has_newline {
+                out.push(' ');
+            } else {
+                out.push_str(&run);
+            }
+        } else {
+            out.push(ch);
+        }
+    }
+    std::borrow::Cow::Owned(out)
+}
+
 /// Format an inline node to normalized string (e.g., emphasis with asterisks)
 pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
     match node.kind() {
@@ -615,70 +694,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 .join(" ");
             format!("^[{}]", normalized)
         }
-        SyntaxKind::CITATION => {
-            let mut result = String::new();
-            let mut skip_marker_whitespace = false;
-            for child in node.children_with_tokens() {
-                match child {
-                    NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::BLOCK_QUOTE_MARKER => {
-                        skip_marker_whitespace = true;
-                    }
-                    NodeOrToken::Token(tok)
-                        if tok.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace =>
-                    {
-                        skip_marker_whitespace = false;
-                    }
-                    NodeOrToken::Token(tok) => {
-                        skip_marker_whitespace = false;
-                        result.push_str(
-                            normalize_smart_punctuation(
-                                tok.text(),
-                                config.formatter_extensions.smart,
-                                config.formatter_extensions.smart_quotes,
-                            )
-                            .as_ref(),
-                        );
-                    }
-                    NodeOrToken::Node(n) => {
-                        skip_marker_whitespace = false;
-                        result.push_str(&n.text().to_string());
-                    }
-                }
-            }
-            result
-        }
-        SyntaxKind::CROSSREF => {
-            let mut result = String::new();
-            let mut skip_marker_whitespace = false;
-            for child in node.children_with_tokens() {
-                match child {
-                    NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::BLOCK_QUOTE_MARKER => {
-                        skip_marker_whitespace = true;
-                    }
-                    NodeOrToken::Token(tok)
-                        if tok.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace =>
-                    {
-                        skip_marker_whitespace = false;
-                    }
-                    NodeOrToken::Token(tok) => {
-                        skip_marker_whitespace = false;
-                        result.push_str(
-                            normalize_smart_punctuation(
-                                tok.text(),
-                                config.formatter_extensions.smart,
-                                config.formatter_extensions.smart_quotes,
-                            )
-                            .as_ref(),
-                        );
-                    }
-                    NodeOrToken::Node(n) => {
-                        skip_marker_whitespace = false;
-                        result.push_str(&n.text().to_string());
-                    }
-                }
-            }
-            result
-        }
+        SyntaxKind::CITATION | SyntaxKind::CROSSREF => format_citation_like(node, config),
         _ => {
             // For other inline nodes, just return their text
             node.text().to_string()

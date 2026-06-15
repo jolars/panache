@@ -1,5 +1,6 @@
 mod bare_uris;
 mod bullet_standardization;
+mod citations;
 mod code_chunks;
 mod comments;
 mod definition_lists;
