@@ -31,7 +31,12 @@
     },
     "crates/panache-parser": {},
     "crates/panache-formatter": {},
-    "crates/panache-dprint": {},
+    // Paused: the dprint plugin publishes `panache.wasm` as a GitHub release
+    // asset (`dprint-plugin-panache-v*`), which shadows the CLI `v*` stream for
+    // the Zed extension's `latest_github_release(require_assets:true)` lookup.
+    // Re-enable once the dprint asset lives in a separate repo or the upstream
+    // zed tag-prefix filter ships. See publish-dprint-wasm.yml.
+    // "crates/panache-dprint": {},
     "editors/code": {
       "release-type": "node",
       "package-name": "panache-code",
