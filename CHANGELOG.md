@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.55.0](https://github.com/jolars/panache/compare/v2.54.0...v2.55.0) (2026-06-15)
+
+### Features
+- **formatter:** nest broken binary math continuations by `math-indent` ([`5948ca1`](https://github.com/jolars/panache/commit/5948ca15bb1fa1350e91dbf8fdfc5e11f0e40c32))
+- **formatter:** default `math-indent` to 2 ([`3d0422b`](https://github.com/jolars/panache/commit/3d0422b8355e57b2d9e04b0ac86128da414b75b2))
+
+### Bug Fixes
+- **editors:** revert to use `latest_github_release` ([`dabe00d`](https://github.com/jolars/panache/commit/dabe00dcad39c8493c4990be9a8dec7fdf2369b1))
+- **formatter:** fix(formatter): charge math-indent against display line-break budget ([`754faaa`](https://github.com/jolars/panache/commit/754faaa451ae418a681237f86bc5ad3d6096c92f))
+- **parser:** claim trailing caption for table-first list item ([`a09f066`](https://github.com/jolars/panache/commit/a09f066a9493f3f626b44691023c59c151caafb8))
+- **formatter:** re-emit list marker for table-first item ([`9633b86`](https://github.com/jolars/panache/commit/9633b8632a2f075df3d59852cf414933c9aaba44))
+
+### Dependencies
+- updated crates/panache-formatter to v0.13.0
+- updated crates/panache-parser to v0.17.1
+
 ## [2.54.0](https://github.com/jolars/panache/compare/v2.53.0...v2.54.0) (2026-06-13)
 
 ### Features

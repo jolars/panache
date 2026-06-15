@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.35.1](https://github.com/jolars/panache/compare/panache-zed-v2.35.0...panache-zed-v2.35.1) (2026-06-15)
+
+### Bug Fixes
+- **editors:** revert to use `latest_github_release` ([`dabe00d`](https://github.com/jolars/panache/commit/dabe00dcad39c8493c4990be9a8dec7fdf2369b1))
+
 ## [2.35.0](https://github.com/jolars/panache/compare/panache-zed-v2.34.1...panache-zed-v2.35.0) (2026-04-19)
 
 ### Features

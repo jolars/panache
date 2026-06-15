@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.17.1](https://github.com/jolars/panache/compare/panache-parser-v0.17.0...panache-parser-v0.17.1) (2026-06-15)
+
+### Bug Fixes
+- **parser:** claim trailing caption for table-first list item ([`a09f066`](https://github.com/jolars/panache/commit/a09f066a9493f3f626b44691023c59c151caafb8))
+
 ## [0.17.0](https://github.com/jolars/panache/compare/panache-parser-v0.16.0...panache-parser-v0.17.0) (2026-06-13)
 
 ### Features
