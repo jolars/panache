@@ -96,3 +96,8 @@ Examples:
 - `fix(lsp): correct utf16 range conversion for diagnostics`
 - `docs: clarify formatter idempotency checks`
 - `chore(ci): tighten clippy gate in workflow`
+
+**Release asset hygiene**: only the primary CLI release stream (`v*` tags) may
+upload GitHub release assets. Other tag streams must stay asset-free or they
+break the Zed extension's download resolution. See the "Release Management"
+section in `AGENTS.md`.

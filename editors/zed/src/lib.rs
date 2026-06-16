@@ -62,10 +62,12 @@ impl PanacheExtension {
         );
         let (platform, arch) = zed::current_platform();
 
-        // The CLI binaries are published only on the plain `v*` release stream.
-        // Sibling streams in the monorepo (`panache-parser-v*`, `panache-code-v*`,
-        // etc.) must not carry assets, otherwise `require_assets` could resolve to
-        // the wrong release.
+        // `require_assets` resolves to the newest release that carries assets and
+        // cannot filter by tag prefix. The invariant that keeps this correct: only
+        // the primary `v*` CLI stream may carry assets. Every sibling tag stream in
+        // the monorepo (`panache-parser-v*`, `panache-formatter-v*`,
+        // `panache-code-v*`, `panache-zed-v*`) must stay asset-free, or it would
+        // shadow the CLI release here. See AGENTS.md "Release Management".
         let release = zed::latest_github_release(
             "jolars/panache",
             zed::GithubReleaseOptions {

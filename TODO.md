@@ -913,28 +913,27 @@ for initial implementation.
 ## dprint Plugin
 
 A Wasm plugin so dprint users can install Panache via
-`dprint add jolars/panache`. The new `crates/panache-dprint` crate wraps
-`panache_formatter::format(..)` behind dprint's `SyncPluginHandler` protocol;
-released independently of the main Panache version.
+`dprint config add jolars/dprint-plugin-panache`. The plugin wraps
+`panache_formatter::format(..)` behind dprint's `SyncPluginHandler` protocol and
+is released independently of the main Panache version.
 
-- [x] Add `crates/panache-dprint` crate (excluded from workspace, builds for
-  `wasm32-unknown-unknown` only).
-- [x] CI workflow `publish-dprint-wasm.yml` triggered on
-  `dprint-plugin-panache-v*` tags; builds the `.wasm`, computes SHA256,
-  uploads to the GitHub release.
-- [x] Track in `versionary.jsonc` as its own package (independent versioning).
-- [x] Local end-to-end smoke test against `dprint fmt`: parity with the panache
-  CLI on `.md`/`.qmd`/`.Rmd` and idempotency confirmed.
+**Relocated to its own repo (`jolars/dprint-plugin-panache`).** The plugin used
+to live in `crates/panache-dprint` here, but its `panache.wasm` release asset
+shadowed the CLI `v*` stream for the Zed extension's
+`latest_github_release(require_assets: true)` lookup (see AGENTS.md "Release
+Management"). It now depends on the published `panache-formatter` crate from
+crates.io instead of a path dependency. The remaining open items below live in
+that repo:
+
 - [ ] Generate `schema.json` from the plugin's `Configuration` struct (add
   `schemars` derive + a build/CI step), upload alongside the `.wasm` so
   `config_schema_url` resolves.
-- [ ] Cut the first plugin release: land a `feat(dprint): ...` commit so
-  versionary tags `dprint-plugin-panache-vX.Y.Z`, and confirm the publish
-  workflow attaches `panache.wasm` + `schema.json` + `.sha256`.
+- [ ] Cut the first plugin release and confirm the publish workflow attaches
+  `panache.wasm` + `schema.json` + `.sha256`.
 - [ ] Open PR to `dprint/plugins` registry (separate repo from `dprint/dprint`):
-  add `jolars/panache` to `info.json` and wire up the `latest.json`
-  redirect. **Gating step** --- without this, `dprint add jolars/panache`
-  cannot resolve.
+  add `jolars/dprint-plugin-panache` to `info.json` and wire up the
+  `latest.json` redirect. **Gating step** --- without this,
+  `dprint config add jolars/dprint-plugin-panache` cannot resolve.
 - [ ] Open PR to `dprint/dprint` (docs only): add Panache to `README.md`'s
   third-party plugins list and `website/src/plugins.md`; add
   `website/src/plugins/panache.md` and

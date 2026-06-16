@@ -459,6 +459,26 @@ change genuinely spans the whole workspace.
 - Amend a published commit; create a new one.
 - (See "DON'T" above for `CHANGELOG.md` --- versionary owns it.)
 
+## Release Management
+
+**Asset hygiene invariant**: Only the primary CLI release stream (`v*` tags on
+`jolars/panache`) may carry GitHub release assets. Every other tag stream the
+monorepo produces --- `panache-parser-v*`, `panache-formatter-v*`,
+`panache-code-v*`, `panache-zed-v*` --- **must not** upload assets.
+
+The Zed extension resolves its binary download with
+`zed::latest_github_release("jolars/panache", { require_assets: true })`, which
+returns the newest release that *has assets* and cannot filter by tag prefix.
+Any extra asset-bearing release shadows the CLI stream, so the extension grabs
+the wrong release and fails to find a platform binary. See
+`editors/zed/src/lib.rs`.
+
+For this reason the dprint Wasm plugin no longer lives here: it was relocated to
+`jolars/dprint-plugin-panache`, where it uploads `panache.wasm` on its own
+release stream and depends on the published `panache-formatter` crate. Do not
+reintroduce an asset-uploading release workflow into this repo for anything but
+the CLI.
+
 ## Logging Infrastructure
 
 **Log levels:**
