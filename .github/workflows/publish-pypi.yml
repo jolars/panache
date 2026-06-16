@@ -59,10 +59,9 @@ jobs:
 
       - name: Install Rust (non-Linux)
         if: runner.os != 'Linux'
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.94.1
-          targets: ${{ matrix.target }}
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.target }}
 
       - name: Cache Rust artifacts
         if: runner.os != 'Linux'
@@ -78,7 +77,6 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
           args: --release --out dist --features cli
-          rust-toolchain: 1.94.1
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v7
