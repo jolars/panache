@@ -497,31 +497,6 @@ intentionally excluded.
   followed by `: cap`, which is a separate pre-existing issue (the
   table-shaped lines parse as a `LINE_BLOCK`, not a table).
 
-- [ ] **Parser divergence from pandoc: ordered marker on a pipe/grid table's
-  header line.** For `1. | a | b |\n   | - | - |\n   …` (an *ordered* marker
-  with the table's first row on the same line), pandoc does **not** make a
-  list: it parses the whole thing as a top-level `Table`, absorbing the
-  marker as the first header cell (`Plain [Str "1."]`) and silently dropping
-  any overflow cells past the delimiter's column count (here `b` is lost).
-  Panache instead nests it as `OrderedList → [Table]`. The trigger is narrow
-  and confirmed against pandoc 3.9: it is **number-agnostic** (`5.` behaves
-  the same), needs the delimiter line (a lone `1. | a | b |` *is* a list in
-  pandoc), and does **not** affect bullets (`- | a | b |` →
-  `BulletList →   Table`, keeping both cells) or markers not on the table
-  line (`1.`⏎⏎table → `OrderedList → Table`). Pandoc's behavior looks like a
-  wart (bullet/ordered asymmetry + lossy cell drop), but pandoc is our
-  parser reference and panache must conform. This divergence predates the
-  table-first-caption fix above (the no-caption ordered case already
-  diverged); that fix only extended panache's existing list treatment to the
-  captioned ordered sub-case. **Conform the parser** so an ordered marker
-  immediately followed by a pipe/grid table row + delimiter becomes a
-  top-level table absorbing the marker, matching pandoc. When this lands,
-  the `list_item_table_first_caption_ordered` formatter golden (which
-  currently pins the divergent list output and the 3-space re-indent
-  idempotency) must be updated or removed, and a paired parser conformance
-  fixture added. Bullet/grid forms are already conformant and need no
-  change.
-
 - [ ] Formatter trims leading/trailing spaces *inside* inline-code spans. A span
   whose backticks wrap content with leading spaces (two spaces, then
   `| a | b |`) is reformatted with those spaces removed, mutating the

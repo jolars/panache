@@ -503,6 +503,8 @@ golden_test_cases!(
     list_item_pipe_table_continuation_blank_pandoc,
     list_item_pipe_table_marker_line_no_separator_pandoc,
     list_item_pipe_table_marker_line_pandoc,
+    ordered_marker_pipe_table_line_pandoc,
+    ordered_marker_pipe_table_line_no_separator_pandoc,
     list_alpha_roman_continuation_pandoc,
     list_item_blockquote_inner_list,
     list_item_same_line_blockquote_marker_commonmark,

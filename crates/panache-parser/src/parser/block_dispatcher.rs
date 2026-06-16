@@ -746,6 +746,26 @@ impl BlockParser for ListParser {
             return None;
         }
 
+        // Pandoc parses `table` before `orderedList` (but `bulletList` before
+        // `table`) in its `block` choice (Markdown.hs). So an ordered marker
+        // whose line is the header of a valid pipe table is NOT a list: the
+        // whole construct is a top-level table that absorbs the marker as the
+        // first header cell. Mirror that asymmetry for ordered + pipe only —
+        // bullets and grid tables already match pandoc and keep their nesting.
+        // `in_list` continuations stay list items (pandoc parses item contents
+        // recursively, so `table` runs *inside* the already-open list there).
+        // Gated to a fresh block boundary, the same precondition the table
+        // parser requires, so declining always falls through to a real table.
+        if matches!(marker_match.marker, ListMarker::Ordered(_))
+            && !ctx.in_list
+            && (ctx.has_blank_before || ctx.at_document_start)
+        {
+            let mut probe = GreenNodeBuilder::new();
+            if try_parse_pipe_table(lines, &mut probe, ctx.config).is_some() {
+                return None;
+            }
+        }
+
         let nested_marker = is_content_nested_bullet_marker(
             content,
             marker_match.marker_len,

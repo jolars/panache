@@ -1521,6 +1521,67 @@ mod tests {
         assert!(!format!("{:#?}", crate::parse(no_table, None)).contains("TABLE"));
     }
 
+    /// Pandoc parses `table` before `orderedList` (but `bulletList` before
+    /// `table`) in its `block` choice. So an ordered marker whose line is the
+    /// header of a valid pipe table is NOT a list: the whole construct is a
+    /// top-level table absorbing the marker as the first header cell. Bullets
+    /// and a lone ordered marker (no delimiter) stay lists. Verified against
+    /// pandoc 3.9 (`-f markdown -t native`).
+    #[test]
+    fn ordered_marker_on_pipe_table_line_is_top_level_table() {
+        let input = "1. | a | b |\n   | - | - |\n   | 1 | 2 |\n";
+        let tree = crate::parse(input, None);
+        assert!(
+            tree.descendants()
+                .any(|n| n.kind() == SyntaxKind::PIPE_TABLE),
+            "ordered marker + pipe table on the marker line should be a top-level table"
+        );
+        assert!(
+            !tree.descendants().any(|n| n.kind() == SyntaxKind::LIST),
+            "it must not nest under a list"
+        );
+        // Lossless: the marker and the overflow cell survive in the CST.
+        let dump = format!("{tree:#?}");
+        assert!(
+            dump.contains("1."),
+            "marker text preserved as a header cell"
+        );
+        assert!(dump.contains('b'), "overflow cell `b` preserved (lossless)");
+    }
+
+    #[test]
+    fn lone_ordered_marker_pipe_line_is_a_list() {
+        // No delimiter row → pandoc's `table` fails, `orderedList` catches it.
+        let input = "1. | a | b |\n";
+        let tree = crate::parse(input, None);
+        assert!(
+            tree.descendants().any(|n| n.kind() == SyntaxKind::LIST),
+            "a lone ordered marker line stays a list"
+        );
+        assert!(
+            !tree
+                .descendants()
+                .any(|n| n.kind() == SyntaxKind::PIPE_TABLE),
+            "no table without a delimiter row"
+        );
+    }
+
+    #[test]
+    fn bullet_marker_on_pipe_table_line_stays_a_nested_table() {
+        // Bullets already match pandoc (`BulletList -> Table`): regression guard.
+        let input = "- | a | b |\n  | - | - |\n  | 1 | 2 |\n";
+        let tree = crate::parse(input, None);
+        assert!(
+            tree.descendants().any(|n| n.kind() == SyntaxKind::LIST),
+            "bullet marker keeps the list"
+        );
+        assert!(
+            tree.descendants()
+                .any(|n| n.kind() == SyntaxKind::PIPE_TABLE),
+            "with the table nested inside the list item"
+        );
+    }
+
     #[test]
     fn bare_colon_fenced_code_is_not_table_caption() {
         let input = "Term\n: ```\n  code\n  ```\n";
