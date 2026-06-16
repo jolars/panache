@@ -632,6 +632,90 @@ pub fn emit_span_attributes_node(builder: &mut impl InlineSink, raw_attr_text: &
     );
 }
 
+/// Structure a code-block info-string region containing a `{...}` attribute
+/// block into `ATTR_*` children wrapping the source bytes, the same way
+/// [`emit_attribute_node`] does — but with a language carve-out: when
+/// `carve_first_class_as_language` is set, the first `.class` component is
+/// emitted as `TEXT "."` + `CODE_LANGUAGE <lang>` (Pandoc's `{.python …}`
+/// language-first shape) instead of an `ATTR_CLASS`.
+///
+/// `text` is the full region that may surround the braces with gap bytes (e.g.
+/// `" {.numberLines}"` after a shortcut language). The `{`/`}` and any
+/// surrounding/interior gap bytes are emitted as gap tokens so `node.text()`
+/// reconstructs `text` exactly. Returns `true` when it structured the block, and
+/// `false` — having emitted **nothing** — when `text` has no `{...}` or its body
+/// is unrecognized (empty/whitespace-only), so callers fall back to a single
+/// opaque token and preserve the prior shape.
+///
+/// A leading `=format` raw marker is never carved as a language; the raw case is
+/// handled before this is reached, but the carve defensively skips `=`-prefixed
+/// components.
+pub fn emit_code_info_attrs(
+    builder: &mut impl InlineSink,
+    text: &str,
+    carve_first_class_as_language: bool,
+) -> bool {
+    let Some(open) = text.find('{') else {
+        return false;
+    };
+    let Some(close) = text.rfind('}') else {
+        return false;
+    };
+    if close < open {
+        return false;
+    }
+    let body = &text[open + 1..close];
+    let Some(spans) = attribute_content_spans(body) else {
+        return false;
+    };
+
+    // Leading gap before `{` (e.g. the space in `python {.x}`).
+    emit_attribute_gap(builder, &text[..open]);
+    builder.token(SyntaxKind::TEXT.into(), "{");
+
+    let mut carved = false;
+    let mut cursor = 0usize;
+    for comp in &spans.components {
+        let (start, end) = match comp {
+            AttrComponent::Id(r) | AttrComponent::Class(r) => (r.start, r.end),
+            AttrComponent::KeyValue { key, value, .. } => (key.start, value.end),
+        };
+        emit_attribute_gap(builder, &body[cursor..start]);
+        match comp {
+            AttrComponent::Id(r) => {
+                builder.token(SyntaxKind::ATTR_ID.into(), &body[r.clone()]);
+            }
+            AttrComponent::Class(r) => {
+                let is_dot_class = body.as_bytes().get(r.start) == Some(&b'.');
+                if carve_first_class_as_language && !carved && is_dot_class {
+                    // `.python` → `TEXT "."` + `CODE_LANGUAGE "python"`. Slice the
+                    // actual `.` byte rather than synthesizing it.
+                    builder.token(SyntaxKind::TEXT.into(), &body[r.start..r.start + 1]);
+                    builder.token(SyntaxKind::CODE_LANGUAGE.into(), &body[r.start + 1..r.end]);
+                    carved = true;
+                } else {
+                    builder.token(SyntaxKind::ATTR_CLASS.into(), &body[r.clone()]);
+                }
+            }
+            AttrComponent::KeyValue { key, eq, value } => {
+                builder.start_node(SyntaxKind::ATTR_KEY_VALUE.into());
+                builder.token(SyntaxKind::ATTR_KEY.into(), &body[key.clone()]);
+                builder.token(SyntaxKind::TEXT.into(), &body[*eq..*eq + 1]);
+                if value.end > value.start {
+                    builder.token(SyntaxKind::ATTR_VALUE.into(), &body[value.clone()]);
+                }
+                builder.finish_node();
+            }
+        }
+        cursor = end;
+    }
+    emit_attribute_gap(builder, &body[cursor..]);
+    builder.token(SyntaxKind::TEXT.into(), "}");
+    // Trailing gap after `}`.
+    emit_attribute_gap(builder, &text[close + 1..]);
+    true
+}
+
 /// Shared structuring core for attribute-bearing nodes. `node_kind` is the outer
 /// wrapper (`ATTRIBUTE`, `DIV_INFO`, …); `opaque_token_kind` is the single token
 /// the non-`{...}`/unrecognized fallback emits (so each caller keeps its prior

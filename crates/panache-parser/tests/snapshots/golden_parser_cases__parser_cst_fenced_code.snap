@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..809
@@ -38,10 +39,19 @@ DOCUMENT@0..809
       CODE_FENCE_MARKER@96..100 "~~~~"
       WHITESPACE@100..101 " "
       CODE_INFO@101..148
-        TEXT@101..110 "{#mycode "
+        TEXT@101..102 "{"
+        ATTR_ID@102..109 "#mycode"
+        WHITESPACE@109..110 " "
         TEXT@110..111 "."
         CODE_LANGUAGE@111..118 "haskell"
-        TEXT@118..148 " .numberLines startFr ..."
+        WHITESPACE@118..119 " "
+        ATTR_CLASS@119..131 ".numberLines"
+        WHITESPACE@131..132 " "
+        ATTR_KEY_VALUE@132..147
+          ATTR_KEY@132..141 "startFrom"
+          TEXT@141..142 "="
+          ATTR_VALUE@142..147 "\"100\""
+        TEXT@147..148 "}"
       NEWLINE@148..149 "\n"
     CODE_CONTENT@149..257
       TEXT@149..166 "qsort []     = []"
@@ -92,7 +102,10 @@ DOCUMENT@0..809
       CODE_FENCE_MARKER@372..375 "```"
       CODE_INFO@375..397
         CODE_LANGUAGE@375..382 "haskell"
-        TEXT@382..397 " {.numberLines}"
+        WHITESPACE@382..383 " "
+        TEXT@383..384 "{"
+        ATTR_CLASS@384..396 ".numberLines"
+        TEXT@396..397 "}"
       NEWLINE@397..398 "\n"
     CODE_CONTENT@398..412
       TEXT@398..411 "qsort [] = []"
@@ -110,7 +123,9 @@ DOCUMENT@0..809
         TEXT@421..422 "{"
         TEXT@422..423 "."
         CODE_LANGUAGE@423..430 "haskell"
-        TEXT@430..444 " .numberLines}"
+        WHITESPACE@430..431 " "
+        ATTR_CLASS@431..443 ".numberLines"
+        TEXT@443..444 "}"
       NEWLINE@444..445 "\n"
     CODE_CONTENT@445..459
       TEXT@445..458 "qsort [] = []"

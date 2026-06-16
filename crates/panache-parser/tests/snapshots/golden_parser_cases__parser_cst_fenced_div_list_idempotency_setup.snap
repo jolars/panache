@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..4373
@@ -225,7 +226,12 @@ DOCUMENT@0..4373
           TEXT@1383..1384 "{"
           TEXT@1384..1385 "."
           CODE_LANGUAGE@1385..1389 "bash"
-          TEXT@1389..1410 " filename=\"Terminal\"}"
+          WHITESPACE@1389..1390 " "
+          ATTR_KEY_VALUE@1390..1409
+            ATTR_KEY@1390..1398 "filename"
+            TEXT@1398..1399 "="
+            ATTR_VALUE@1399..1409 "\"Terminal\""
+          TEXT@1409..1410 "}"
         NEWLINE@1410..1411 "\n"
       CODE_CONTENT@1411..1461
         TEXT@1411..1460 "python3 -m pip instal ..."
@@ -373,7 +379,12 @@ DOCUMENT@0..4373
               TEXT@2493..2494 "{"
               TEXT@2494..2495 "."
               CODE_LANGUAGE@2495..2499 "bash"
-              TEXT@2499..2520 " filename=\"Terminal\"}"
+              WHITESPACE@2499..2500 " "
+              ATTR_KEY_VALUE@2500..2519
+                ATTR_KEY@2500..2508 "filename"
+                TEXT@2508..2509 "="
+                ATTR_VALUE@2509..2519 "\"Terminal\""
+              TEXT@2519..2520 "}"
             NEWLINE@2520..2521 "\n"
           CODE_CONTENT@2521..2577
             WHITESPACE@2521..2525 "    "
@@ -513,7 +524,12 @@ DOCUMENT@0..4373
               TEXT@3548..3549 "{"
               TEXT@3549..3550 "."
               CODE_LANGUAGE@3550..3554 "bash"
-              TEXT@3554..3575 " filename=\"Terminal\"}"
+              WHITESPACE@3554..3555 " "
+              ATTR_KEY_VALUE@3555..3574
+                ATTR_KEY@3555..3563 "filename"
+                TEXT@3563..3564 "="
+                ATTR_VALUE@3564..3574 "\"Terminal\""
+              TEXT@3574..3575 "}"
             NEWLINE@3575..3576 "\n"
           CODE_CONTENT@3576..3630
             WHITESPACE@3576..3580 "    "

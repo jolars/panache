@@ -181,6 +181,7 @@ golden_test_cases!(
     chunk_options_complex,
     code_blocks_executable,
     code_blocks_executable_with_classes,
+    code_blocks_explicit_structured,
     code_blocks_raw,
     code_fence_multiword_info_commonmark,
     code_fence_multiword_info_pandoc,

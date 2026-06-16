@@ -368,15 +368,21 @@ intentionally excluded.
   verified against pandoc-native + CommonMark (both must stay byte-identical
   or improve). Roadmap:
 
-  - [ ] **Attributes --- remaining node kinds.** Apply the same structuring to
-    the other attribute-bearing nodes so `parse_attr_block` /
-    `parse_html_attrs` can finally be deleted: `SPAN_ATTRIBUTES` (bracketed
-    spans) and `CODE_INFO` (code-block info strings, language-first
-    semantics) still feed `parse_attr_block`; `HTML_ATTRS` (HTML
-    `<div>`/`<span>`, distinct `class=""`/`id=""` syntax) feeds
-    `parse_html_attrs`; and raw-inline `{=format}` still synthesizes its
-    token (`raw_inline.rs`) rather than wrapping the source slice. Touch one
-    node kind at a time.
+  - [x] **Attributes --- remaining node kinds.** Structuring is done.
+    `SPAN_ATTRIBUTES` (bracketed spans), `HTML_ATTRS` (HTML
+    `<div>`/`<span>`; `parse_html_attrs` deleted), and raw-inline
+    `{=format}` (`raw_inline.rs` now wraps the source slice via
+    `emit_attribute_node`) all landed earlier. `CODE_INFO` DisplayExplicit
+    (`{.python #id key=val}`) and DisplayShortcut (`lang {.cls}`) now emit
+    `ATTR_*`/`CODE_LANGUAGE` children via `emit_code_info_attrs`, and
+    `code_block_attr` reads them instead of re-parsing. Note:
+    `parse_attr_block` is *not* deletable --- it is now the shared opaque
+    fallback the structured readers intentionally retain (MMD `[#id]`,
+    malformed bodies, bare-word divs, legacy table-caption scans, Plain/Raw
+    info strings). Deferred follow-up: structure-read the Executable
+    `CHUNK_OPTIONS` projection (Quarto/RMarkdown chunks), which still uses
+    the `parse_attr_block` text path; the CST is already structured, only
+    the projector lags.
 
   - [ ] **HTML opaque-block split.** Continue the HTML lift (Phase 6): lift the
     remaining *opaque* HTML splitting (comments, PI, verbatim, void /

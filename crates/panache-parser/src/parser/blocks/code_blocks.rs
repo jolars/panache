@@ -1,6 +1,7 @@
 //! Fenced code block parsing utilities.
 
 use crate::parser::diagnostics::{Diagnostics, SyntaxError, SyntaxErrorSource};
+use crate::parser::utils::attributes::emit_code_info_attrs;
 use crate::parser::utils::chunk_options::hashpipe_comment_prefix;
 use crate::syntax::SyntaxKind;
 use rowan::{GreenNodeBuilder, TextRange};
@@ -1028,9 +1029,13 @@ fn emit_code_info_node(builder: &mut GreenNodeBuilder<'static>, info_string: &st
             // Simple case: python or python {.class}
             builder.token(SyntaxKind::CODE_LANGUAGE.into(), language);
 
-            // If there's more after the language, emit it as TEXT
+            // Structure a trailing `{...}` attribute block (the language is
+            // already emitted, so no carve). Falls back to one opaque TEXT token
+            // for unrecognized remainders, preserving the prior shape.
             let after_lang = &info_string[language.len()..];
-            if !after_lang.is_empty() {
+            if !after_lang.is_empty()
+                && !emit_code_info_attrs(builder, after_lang, /* carve */ false)
+            {
                 builder.token(SyntaxKind::TEXT.into(), after_lang);
             }
         }
@@ -1046,36 +1051,13 @@ fn emit_code_info_node(builder: &mut GreenNodeBuilder<'static>, info_string: &st
                 emit_chunk_options(builder, rest);
             }
         }
-        CodeBlockType::DisplayExplicit { classes } => {
-            // Pandoc: {.python} or {#id .haskell .numberLines}
-            // We need to find the first class in the raw string and emit everything around it
-
-            if let Some(lang) = classes.first() {
-                // Find where ".lang" appears in the info string
-                let needle = format!(".{}", lang);
-                if let Some(lang_start) = info_string.find(&needle) {
-                    // Emit everything before the language
-                    if lang_start > 0 {
-                        builder.token(SyntaxKind::TEXT.into(), &info_string[..lang_start]);
-                    }
-
-                    // Emit the dot
-                    builder.token(SyntaxKind::TEXT.into(), ".");
-
-                    // Emit the language
-                    builder.token(SyntaxKind::CODE_LANGUAGE.into(), lang);
-
-                    // Emit everything after
-                    let after_lang_start = lang_start + 1 + lang.len();
-                    if after_lang_start < info_string.len() {
-                        builder.token(SyntaxKind::TEXT.into(), &info_string[after_lang_start..]);
-                    }
-                } else {
-                    // Couldn't find it, just emit as TEXT
-                    builder.token(SyntaxKind::TEXT.into(), info_string);
-                }
-            } else {
-                // No classes
+        CodeBlockType::DisplayExplicit { .. } => {
+            // Pandoc: `{.python}` or `{#id .haskell .numberLines startFrom="10"}`.
+            // Structure the `{...}` body into ATTR_* children, carving the first
+            // `.class` out as the CODE_LANGUAGE token (language-first semantics).
+            // Falls back to one opaque TEXT token when the body is unrecognized,
+            // preserving the prior shape.
+            if !emit_code_info_attrs(builder, info_string, /* carve */ true) {
                 builder.token(SyntaxKind::TEXT.into(), info_string);
             }
         }

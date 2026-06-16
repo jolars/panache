@@ -1,0 +1,102 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..374
+  PARAGRAPH@0..37
+    TEXT@0..36 "Explicit with id and  ..."
+    NEWLINE@36..37 "\n"
+  BLANK_LINE@37..38
+    BLANK_LINE@37..38 "\n"
+  CODE_BLOCK@38..79
+    CODE_FENCE_OPEN@38..61
+      CODE_FENCE_MARKER@38..41 "```"
+      WHITESPACE@41..42 " "
+      CODE_INFO@42..60
+        TEXT@42..43 "{"
+        TEXT@43..44 "."
+        CODE_LANGUAGE@44..51 "haskell"
+        WHITESPACE@51..52 " "
+        ATTR_ID@52..59 "#mycode"
+        TEXT@59..60 "}"
+      NEWLINE@60..61 "\n"
+    CODE_CONTENT@61..75
+      TEXT@61..74 "qsort [] = []"
+      NEWLINE@74..75 "\n"
+    CODE_FENCE_CLOSE@75..79
+      CODE_FENCE_MARKER@75..78 "```"
+      NEWLINE@78..79 "\n"
+  BLANK_LINE@79..80
+    BLANK_LINE@79..80 "\n"
+  PARAGRAPH@80..139
+    TEXT@80..138 "Explicit with languag ..."
+    NEWLINE@138..139 "\n"
+  BLANK_LINE@139..140
+    BLANK_LINE@139..140 "\n"
+  CODE_BLOCK@140..193
+    CODE_FENCE_OPEN@140..182
+      CODE_FENCE_MARKER@140..143 "```"
+      WHITESPACE@143..144 " "
+      CODE_INFO@144..181
+        TEXT@144..145 "{"
+        TEXT@145..146 "."
+        CODE_LANGUAGE@146..152 "python"
+        WHITESPACE@152..153 " "
+        ATTR_CLASS@153..165 ".numberLines"
+        WHITESPACE@165..166 " "
+        ATTR_KEY_VALUE@166..180
+          ATTR_KEY@166..175 "startFrom"
+          TEXT@175..176 "="
+          ATTR_VALUE@176..180 "\"10\""
+        TEXT@180..181 "}"
+      NEWLINE@181..182 "\n"
+    CODE_CONTENT@182..189
+      TEXT@182..188 "x = 42"
+      NEWLINE@188..189 "\n"
+    CODE_FENCE_CLOSE@189..193
+      CODE_FENCE_MARKER@189..192 "```"
+      NEWLINE@192..193 "\n"
+  BLANK_LINE@193..194
+    BLANK_LINE@193..194 "\n"
+  PARAGRAPH@194..237
+    TEXT@194..236 "Explicit attribute bl ..."
+    NEWLINE@236..237 "\n"
+  BLANK_LINE@237..238
+    BLANK_LINE@237..238 "\n"
+  CODE_BLOCK@238..277
+    CODE_FENCE_OPEN@238..262
+      CODE_FENCE_MARKER@238..241 "```"
+      WHITESPACE@241..242 " "
+      CODE_INFO@242..261
+        TEXT@242..261 "{#myid key=\"value\"}"
+      NEWLINE@261..262 "\n"
+    CODE_CONTENT@262..273
+      TEXT@262..272 "plain text"
+      NEWLINE@272..273 "\n"
+    CODE_FENCE_CLOSE@273..277
+      CODE_FENCE_MARKER@273..276 "```"
+      NEWLINE@276..277 "\n"
+  BLANK_LINE@277..278
+    BLANK_LINE@277..278 "\n"
+  PARAGRAPH@278..328
+    TEXT@278..327 "Shortcut language fol ..."
+    NEWLINE@327..328 "\n"
+  BLANK_LINE@328..329
+    BLANK_LINE@328..329 "\n"
+  CODE_BLOCK@329..374
+    CODE_FENCE_OPEN@329..355
+      CODE_FENCE_MARKER@329..332 "```"
+      CODE_INFO@332..354
+        CODE_LANGUAGE@332..339 "haskell"
+        WHITESPACE@339..340 " "
+        TEXT@340..341 "{"
+        ATTR_CLASS@341..353 ".numberLines"
+        TEXT@353..354 "}"
+      NEWLINE@354..355 "\n"
+    CODE_CONTENT@355..370
+      TEXT@355..369 "main = pure ()"
+      NEWLINE@369..370 "\n"
+    CODE_FENCE_CLOSE@370..374
+      CODE_FENCE_MARKER@370..373 "```"
+      NEWLINE@373..374 "\n"

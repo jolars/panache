@@ -938,6 +938,33 @@ fn code_block_attr(node: &SyntaxNode) -> Attr {
     let Some(info) = open.children().find(|c| c.kind() == SyntaxKind::CODE_INFO) else {
         return Attr::default();
     };
+    // Structured DisplayExplicit/DisplayShortcut: the parser emits bare `ATTR_*`
+    // children (plus a `CODE_LANGUAGE` token) for `{.python #id key=val}` and
+    // `lang {.cls}` forms. Read them directly. Executable chunks instead carry a
+    // `CHUNK_OPTIONS` node and stay on the text path below, as do opaque
+    // Plain/Raw info strings.
+    let has_bare_attrs = info.children_with_tokens().any(|el| {
+        matches!(
+            el.kind(),
+            SyntaxKind::ATTR_ID | SyntaxKind::ATTR_CLASS | SyntaxKind::ATTR_KEY_VALUE
+        )
+    });
+    let has_chunk_options = info
+        .children()
+        .any(|c| c.kind() == SyntaxKind::CHUNK_OPTIONS);
+    if has_bare_attrs && !has_chunk_options {
+        let mut attr = read_bare_attr_children(&info);
+        // Pandoc concatenates the language as the first class.
+        if let Some(lang) = info
+            .children_with_tokens()
+            .find(|el| el.kind() == SyntaxKind::CODE_LANGUAGE)
+            .and_then(|el| el.as_token().map(|t| t.text().to_string()))
+        {
+            attr.classes.insert(0, normalize_lang_id(&lang));
+        }
+        return attr;
+    }
+
     let raw = info.text().to_string();
     let trimmed = raw.trim();
     if let Some(inner) = trimmed.strip_prefix('{').and_then(|s| s.strip_suffix('}')) {
@@ -1921,8 +1948,18 @@ fn attr_from_attribute_node(attr_node: &SyntaxNode) -> Attr {
             .unwrap_or_default();
     }
 
+    read_bare_attr_children(attr_node)
+}
+
+/// Walk the bare `ATTR_ID` / `ATTR_CLASS` / `ATTR_KEY_VALUE` children of a node
+/// (as emitted by `emit_attribute_node` and `emit_code_info_attrs`) into an
+/// `Attr`, mirroring [`parse_attr_block`] semantics: `#id` strips its `#`; only
+/// `.`-prefixed ATTR_CLASS tokens are classes (`=format` pseudo-classes are
+/// dropped); ATTR_VALUE strips a `"` pair. Callers handle any `CODE_LANGUAGE`
+/// token separately.
+fn read_bare_attr_children(node: &SyntaxNode) -> Attr {
     let mut attr = Attr::default();
-    for el in attr_node.children_with_tokens() {
+    for el in node.children_with_tokens() {
         match el.kind() {
             SyntaxKind::ATTR_ID => {
                 if let Some(t) = el.as_token() {
