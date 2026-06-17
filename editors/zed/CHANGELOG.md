@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.36.0](https://github.com/jolars/panache/compare/panache-zed-v2.35.1...panache-zed-v2.36.0) (2026-06-17)
+
+### Features
+- break out dprint plugin into its own repo ([`014ab7c`](https://github.com/jolars/panache/commit/014ab7cc7135bb5ed0555b7c5bb6fe37326d7dd1))
+
 ## [2.35.1](https://github.com/jolars/panache/compare/panache-zed-v2.35.0...panache-zed-v2.35.1) (2026-06-15)
 
 ### Bug Fixes

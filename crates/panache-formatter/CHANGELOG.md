@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.0](https://github.com/jolars/panache/compare/panache-formatter-v0.13.0...panache-formatter-v0.14.0) (2026-06-17)
+
+### Features
+- **formatter:** expose config-enum JsonSchema behind schema feature ([`5062bb5`](https://github.com/jolars/panache/commit/5062bb52db346572748752210e2c6ec22b97e37d))
+- **formatter:** add `table-indent` config option ([`1365b80`](https://github.com/jolars/panache/commit/1365b801c48fbb8670ff8343884b20e5b427f1c7)), resolves [#344](https://github.com/jolars/panache/issues/344) and [#352](https://github.com/jolars/panache/issues/352)
+- **formatter:** hang math binary continuations flush under the RHS ([`0fae430`](https://github.com/jolars/panache/commit/0fae4303b8a758a7ac3a218170dfc9fb7a0c4409))
+- **formatter:** align assignment-led math chains under the RHS ([`e20d0d6`](https://github.com/jolars/panache/commit/e20d0d6c36b4fa7bae295ea41ddc27d770fa4755))
+
+### Bug Fixes
+- **formatter:** collapse line breaks inside split citations ([`148f69f`](https://github.com/jolars/panache/commit/148f69fb2d97ba5c42eb0b92645163cdc7ee4602))
+
+### Dependencies
+- updated crates/panache-parser to v0.17.2
+
 ## [0.13.0](https://github.com/jolars/panache/compare/panache-formatter-v0.12.0...panache-formatter-v0.13.0) (2026-06-15)
 
 ### Features

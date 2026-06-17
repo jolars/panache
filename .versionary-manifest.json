@@ -1,11 +1,11 @@
 {
   "manifest-version": 1,
-  "baseline-sha": "dabe00dcad39c8493c4990be9a8dec7fdf2369b1",
+  "baseline-sha": "5062bb52db346572748752210e2c6ec22b97e37d",
   "release-targets": [
     {
       "path": ".",
-      "version": "2.55.0",
-      "tag": "v2.55.0"
+      "version": "2.56.0",
+      "tag": "v2.56.0"
     },
     {
       "path": "crates/panache-dprint",
@@ -14,50 +14,50 @@
     },
     {
       "path": "crates/panache-formatter",
-      "version": "0.13.0",
-      "tag": "panache-formatter-v0.13.0"
+      "version": "0.14.0",
+      "tag": "panache-formatter-v0.14.0"
     },
     {
       "path": "crates/panache-parser",
-      "version": "0.17.1",
-      "tag": "panache-parser-v0.17.1"
+      "version": "0.17.2",
+      "tag": "panache-parser-v0.17.2"
     },
     {
       "path": "editors/code",
-      "version": "2.48.0",
-      "tag": "panache-code-v2.48.0"
+      "version": "2.49.0",
+      "tag": "panache-code-v2.49.0"
     },
     {
       "path": "editors/zed",
-      "version": "2.35.1",
-      "tag": "panache-zed-v2.35.1"
+      "version": "2.36.0",
+      "tag": "panache-zed-v2.36.0"
     }
   ],
   "pending-release-targets": [
     {
       "path": ".",
-      "version": "2.55.0",
-      "tag": "v2.55.0"
+      "version": "2.56.0",
+      "tag": "v2.56.0"
     },
     {
       "path": "crates/panache-formatter",
-      "version": "0.13.0",
-      "tag": "panache-formatter-v0.13.0"
+      "version": "0.14.0",
+      "tag": "panache-formatter-v0.14.0"
     },
     {
       "path": "crates/panache-parser",
-      "version": "0.17.1",
-      "tag": "panache-parser-v0.17.1"
+      "version": "0.17.2",
+      "tag": "panache-parser-v0.17.2"
     },
     {
       "path": "editors/code",
-      "version": "2.48.0",
-      "tag": "panache-code-v2.48.0"
+      "version": "2.49.0",
+      "tag": "panache-code-v2.49.0"
     },
     {
       "path": "editors/zed",
-      "version": "2.35.1",
-      "tag": "panache-zed-v2.35.1"
+      "version": "2.36.0",
+      "tag": "panache-zed-v2.36.0"
     }
   ]
 }
