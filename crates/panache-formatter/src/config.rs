@@ -15,6 +15,9 @@ fn default_external_max_parallel() -> usize {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum MathDelimiterStyle {
     /// Preserve original delimiter style (\(...\) stays \(...\), $...$ stays $...$)
     #[default]
@@ -29,6 +32,9 @@ pub enum MathDelimiterStyle {
 pub const DEFAULT_TABLE_INDENT: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum TabStopMode {
     /// Normalize tabs to spaces (4-column tab stop).
     #[default]
@@ -46,6 +52,9 @@ pub struct FormatterConfig {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum WrapMode {
     Preserve,
     Reflow,
@@ -56,6 +65,9 @@ pub enum WrapMode {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum LineEnding {
     Auto,
     Lf,
@@ -63,6 +75,9 @@ pub enum LineEnding {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum BlankLines {
     /// Preserve original blank lines (any number)
     Preserve,
@@ -285,5 +300,51 @@ impl ConfigBuilder {
 
     pub fn build(self) -> Config {
         self.config
+    }
+}
+
+#[cfg(all(test, feature = "schema"))]
+mod schema_tests {
+    use super::*;
+
+    /// Assert the emitted JSON Schema exposes exactly the expected lowercase
+    /// wire values (and no PascalCase variant names). Substring checks keep this
+    /// robust to schemars emitting a flat `enum` array vs. a `oneOf`-of-`const`
+    /// shape — the doc comments on some variants become per-value descriptions.
+    fn assert_wire_values<T: schemars::JsonSchema>(expected: &[&str]) {
+        let s = serde_json::to_string(&schemars::schema_for!(T)).unwrap();
+        for value in expected {
+            assert!(
+                s.contains(&format!("\"{value}\"")),
+                "expected lowercase wire value {value:?} in schema: {s}"
+            );
+        }
+    }
+
+    #[test]
+    fn math_delimiter_style_values_are_lowercase() {
+        assert_wire_values::<MathDelimiterStyle>(&["preserve", "dollars", "backslash"]);
+    }
+
+    #[test]
+    fn tab_stop_mode_values_are_lowercase() {
+        assert_wire_values::<TabStopMode>(&["normalize", "preserve"]);
+    }
+
+    #[test]
+    fn wrap_mode_values_are_lowercase() {
+        assert_wire_values::<WrapMode>(&["preserve", "reflow", "sentence", "semantic"]);
+        let s = serde_json::to_string(&schemars::schema_for!(WrapMode)).unwrap();
+        assert!(!s.contains("\"Reflow\""), "PascalCase variant leaked: {s}");
+    }
+
+    #[test]
+    fn line_ending_values_are_lowercase() {
+        assert_wire_values::<LineEnding>(&["auto", "lf", "crlf"]);
+    }
+
+    #[test]
+    fn blank_lines_values_are_lowercase() {
+        assert_wire_values::<BlankLines>(&["preserve", "collapse"]);
     }
 }

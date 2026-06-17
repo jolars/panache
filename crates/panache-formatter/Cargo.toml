@@ -21,9 +21,17 @@ categories = ["text-processing"]
 panache-parser = { path = "../panache-parser", version = "0.17.1" }
 log = { version = "0.4.31", features = ["release_max_level_debug"] }
 rowan = "0.16.1"
+serde = { version = "1.0", features = ["derive"], optional = true }
+schemars = { version = "1.0", optional = true }
 unicode-width = "0.2"
 
+[features]
+default = []
+serde = ["dep:serde", "panache-parser/serde"]
+schema = ["serde", "dep:schemars", "panache-parser/schema"]
+
 [dev-dependencies]
+serde_json = "1.0"
 insta = { version = "1.47.2", features = ["json"] }
 # TEMPORARY: cross-validation oracle only (tests/yaml_cross_validation.rs).
 # The in-tree formatter is the source of truth. Drop this dep (and re-base
