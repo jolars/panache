@@ -2,7 +2,7 @@ use crate::config::{Config, WrapMode};
 use crate::formatter::inline::format_inline_node;
 use crate::formatter::inline_layout::wrap_text_first_fit;
 use crate::formatter::sentence_wrap::{ResolvedProfile, resolve_profile, split_sentence_text};
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::NodeOrToken;
 use std::collections::{BTreeSet, HashMap};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
@@ -495,22 +495,53 @@ fn extract_row_cells(row_node: &SyntaxNode, config: &Config) -> Vec<String> {
 }
 
 /// Extract alignments from separator line (e.g., "|:---|---:|:---:|")
-fn extract_alignments(separator_text: &str) -> Vec<Alignment> {
-    let trimmed = separator_text.trim();
-    let cells: Vec<&str> = trimmed.split('|').collect();
+/// The separator-marker tokens (`TABLE_SEP_*`) of a `TABLE_SEPARATOR` node,
+/// in order. Skips the container prefix (`WHITESPACE` / blockquote markers)
+/// and the trailing `NEWLINE`.
+fn separator_marker_tokens(separator: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
+    separator
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|t| {
+            matches!(
+                t.kind(),
+                SyntaxKind::TABLE_SEP_DELIM
+                    | SyntaxKind::TABLE_SEP_DASHES
+                    | SyntaxKind::TABLE_SEP_EQUALS
+                    | SyntaxKind::TABLE_SEP_COLON
+                    | SyntaxKind::TABLE_SEP_WHITESPACE
+            )
+        })
+}
 
+/// Split a separator's marker tokens into delimiter-separated segments
+/// (`split('|')` / `split('+')` over the marker stream).
+fn separator_segments(separator: &SyntaxNode) -> Vec<Vec<SyntaxToken>> {
+    let mut segs: Vec<Vec<SyntaxToken>> = vec![Vec::new()];
+    for t in separator_marker_tokens(separator) {
+        if t.kind() == SyntaxKind::TABLE_SEP_DELIM {
+            segs.push(Vec::new());
+        } else {
+            segs.last_mut().unwrap().push(t);
+        }
+    }
+    segs
+}
+
+fn extract_alignments(separator: &SyntaxNode) -> Vec<Alignment> {
     let mut alignments = Vec::new();
 
-    for cell in cells {
-        let cell = cell.trim();
-
-        // Skip empty cells (from leading/trailing pipes)
-        if cell.is_empty() {
+    for seg in separator_segments(separator) {
+        // Skip empty cells (whitespace-only, incl. those from leading/trailing
+        // and doubled pipes) — matches the old trim + skip-empty behavior.
+        let non_ws = |t: &&SyntaxToken| t.kind() != SyntaxKind::TABLE_SEP_WHITESPACE;
+        let Some(first) = seg.iter().find(non_ws) else {
             continue;
-        }
+        };
+        let last = seg.iter().rev().find(non_ws).unwrap();
 
-        let starts_colon = cell.starts_with(':');
-        let ends_colon = cell.ends_with(':');
+        let starts_colon = first.kind() == SyntaxKind::TABLE_SEP_COLON;
+        let ends_colon = last.kind() == SyntaxKind::TABLE_SEP_COLON;
 
         let alignment = match (starts_colon, ends_colon) {
             (true, true) => Alignment::Center,
@@ -560,8 +591,7 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                 }
             }
             SyntaxKind::TABLE_SEPARATOR => {
-                let separator_text = child.text().to_string();
-                alignments = extract_alignments(&separator_text);
+                alignments = extract_alignments(&child);
             }
             SyntaxKind::TABLE_HEADER | SyntaxKind::TABLE_ROW => {
                 // Prefer the structured TABLE_CELL nodes: the parser already
@@ -745,26 +775,36 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config, indent: usize) -> S
 // ============================================================================
 
 /// Extract alignments from grid table separator line (e.g., "+:---+---:+:---:+")
-fn extract_grid_alignments(separator_text: &str) -> Vec<Alignment> {
-    let trimmed = separator_text.trim();
+/// Token segments strictly between consecutive `+` delimiters (the grid
+/// columns). Mirrors `split('+')` then `skip(1).take(len - 2)`.
+fn grid_inner_segments(separator: &SyntaxNode) -> Vec<Vec<SyntaxToken>> {
+    let mut segs: Vec<Vec<SyntaxToken>> = Vec::new();
+    let mut cur: Option<Vec<SyntaxToken>> = None;
+    for t in separator_marker_tokens(separator) {
+        if t.kind() == SyntaxKind::TABLE_SEP_DELIM {
+            if let Some(seg) = cur.take() {
+                segs.push(seg);
+            }
+            cur = Some(Vec::new());
+        } else if let Some(seg) = cur.as_mut() {
+            seg.push(t);
+        }
+    }
+    segs
+}
 
-    // Split by + to get column segments
-    let segments: Vec<&str> = trimmed.split('+').collect();
-
+fn extract_grid_alignments(separator: &SyntaxNode) -> Vec<Alignment> {
     let mut alignments = Vec::new();
 
-    // Parse each segment between + signs (skip first/last empty)
-    for segment in segments
-        .iter()
-        .skip(1)
-        .take(segments.len().saturating_sub(2))
-    {
+    for segment in grid_inner_segments(separator) {
+        // Grid segments carry no interior whitespace; match the old untrimmed
+        // first/last-char colon check, skipping empty (`++`) segments.
         if segment.is_empty() {
             continue;
         }
 
-        let starts_colon = segment.starts_with(':');
-        let ends_colon = segment.ends_with(':');
+        let starts_colon = segment.first().unwrap().kind() == SyntaxKind::TABLE_SEP_COLON;
+        let ends_colon = segment.last().unwrap().kind() == SyntaxKind::TABLE_SEP_COLON;
 
         let alignment = match (starts_colon, ends_colon) {
             (true, true) => Alignment::Center,
@@ -777,6 +817,21 @@ fn extract_grid_alignments(separator_text: &str) -> Vec<Alignment> {
     }
 
     alignments
+}
+
+/// Grid column widths (chars between `+`, minus 2) read from the separator's
+/// CST tokens. The raw spanning-grid path has no CST node and uses the
+/// string-based [`grid_separator_widths`] instead.
+fn grid_separator_widths_cst(separator: &SyntaxNode) -> Vec<usize> {
+    grid_inner_segments(separator)
+        .iter()
+        .map(|seg| {
+            seg.iter()
+                .map(|t| t.text().len())
+                .sum::<usize>()
+                .saturating_sub(2)
+        })
+        .collect()
 }
 
 /// Split a grid table row into cells (e.g., "| A | B |" -> ["A", "B"])
@@ -1061,12 +1116,10 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
                 }
             }
             SyntaxKind::TABLE_SEPARATOR => {
-                let separator_text = child.text().to_string();
-
                 // Grid column widths encode relative output widths (pandoc maps
                 // them to <col style="width:X%">), so take the per-column max
                 // across every separator to preserve the source widths later.
-                let widths = grid_separator_widths(&separator_text);
+                let widths = grid_separator_widths_cst(&child);
                 if separator_widths.len() < widths.len() {
                     separator_widths.resize(widths.len(), 0);
                 }
@@ -1078,7 +1131,7 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
                 // Grid tables have alignments in the first separator (headerless)
                 // or header separator (tables with headers)
                 // Priority: extract from any separator with colons, otherwise keep Default
-                let extracted = extract_grid_alignments(&separator_text);
+                let extracted = extract_grid_alignments(&child);
                 if !extracted.is_empty() && extracted.iter().any(|a| *a != Alignment::Default) {
                     // Found a separator with alignment info, use it
                     alignments = extracted;
@@ -1818,63 +1871,22 @@ struct SimpleColumn {
 
 /// Extract column positions from a simple table separator line.
 /// Returns column boundaries and default alignments.
-fn extract_simple_table_columns(separator_text: &str) -> Vec<SimpleColumn> {
-    let trimmed = separator_text.trim_start();
-    // Strip trailing newline if present
-    let trimmed = if let Some(stripped) = trimmed.strip_suffix("\r\n") {
-        stripped
-    } else if let Some(stripped) = trimmed.strip_suffix('\n') {
-        stripped
-    } else {
-        trimmed
-    };
-
-    let leading_spaces = separator_text.len()
-        - trimmed.len()
-        - if separator_text.ends_with("\r\n") {
-            2
-        } else if separator_text.ends_with('\n') {
-            1
-        } else {
-            0
-        };
-
-    let mut columns = Vec::new();
-    let mut in_dashes = false;
-    let mut col_start = 0;
-
-    for (i, ch) in trimmed.char_indices() {
-        match ch {
-            '-' => {
-                if !in_dashes {
-                    col_start = i + leading_spaces;
-                    in_dashes = true;
-                }
+fn extract_simple_table_columns(separator: &SyntaxNode) -> Vec<SimpleColumn> {
+    // One column per dash run, byte offsets relative to the node start (= line
+    // start, leading whitespace/prefix included) so they line up with the
+    // header line the alignment pass indexes into. End is exclusive.
+    let node_start = u32::from(separator.text_range().start());
+    separator_marker_tokens(separator)
+        .filter(|t| t.kind() == SyntaxKind::TABLE_SEP_DASHES)
+        .map(|t| {
+            let start = (u32::from(t.text_range().start()) - node_start) as usize;
+            SimpleColumn {
+                start,
+                end: start + t.text().len(),
+                alignment: Alignment::Default,
             }
-            ' ' => {
-                if in_dashes {
-                    columns.push(SimpleColumn {
-                        start: col_start,
-                        end: i + leading_spaces,
-                        alignment: Alignment::Default,
-                    });
-                    in_dashes = false;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    // Handle last column if line ends with dashes
-    if in_dashes {
-        columns.push(SimpleColumn {
-            start: col_start,
-            end: trimmed.len() + leading_spaces,
-            alignment: Alignment::Default,
-        });
-    }
-
-    columns
+        })
+        .collect()
 }
 
 /// Determine column alignments based on header text position relative to separator
@@ -1975,7 +1987,7 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                 separator_line = child.text().to_string();
 
                 // Extract column positions
-                columns = extract_simple_table_columns(&separator_line);
+                columns = extract_simple_table_columns(&child);
             }
             SyntaxKind::TABLE_HEADER => {
                 // Always preserve RAW text for alignment detection
@@ -2349,40 +2361,19 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
     indent_table_block(&output, config.table_indent)
 }
 
-/// Extract column information from multiline table separator line
-fn extract_multiline_columns(separator_line: &str) -> Vec<(usize, usize)> {
-    // DO NOT trim - we need to preserve leading spaces for column alignment
-    // Column positions must be relative to the original line positions
-    let line = separator_line.trim_end(); // Only remove trailing whitespace/newline
-
-    let mut columns = Vec::new();
-    let mut in_dashes = false;
-    let mut col_start = 0;
-
-    for (i, ch) in line.char_indices() {
-        match ch {
-            '-' => {
-                if !in_dashes {
-                    col_start = i;
-                    in_dashes = true;
-                }
-            }
-            ' ' => {
-                if in_dashes {
-                    columns.push((col_start, i));
-                    in_dashes = false;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    // Handle last column
-    if in_dashes {
-        columns.push((col_start, line.len()));
-    }
-
-    columns
+/// Extract column information from a multiline table separator. One
+/// `(start, end)` per dash run, byte offsets relative to the node start
+/// (leading whitespace preserved, as the old line-relative offsets were),
+/// end exclusive.
+fn extract_multiline_columns(separator: &SyntaxNode) -> Vec<(usize, usize)> {
+    let node_start = u32::from(separator.text_range().start());
+    separator_marker_tokens(separator)
+        .filter(|t| t.kind() == SyntaxKind::TABLE_SEP_DASHES)
+        .map(|t| {
+            let start = (u32::from(t.text_range().start()) - node_start) as usize;
+            (start, start + t.text().len())
+        })
+        .collect()
 }
 
 /// Determine alignment for a column based on header text position
@@ -2509,13 +2500,12 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
             }
             SyntaxKind::TABLE_SEPARATOR => {
                 separator_count += 1;
-                let sep_text = child.text().to_string();
 
                 // For headerless tables: first separator defines columns
                 // For tables with headers: second separator (after header) defines columns
                 // We extract from first separator and will overwrite if we see a second one
                 if separator_count == 1 || (separator_count == 2 && has_header) {
-                    column_positions = extract_multiline_columns(&sep_text);
+                    column_positions = extract_multiline_columns(&child);
                 }
             }
             SyntaxKind::TABLE_HEADER => {

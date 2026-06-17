@@ -29,7 +29,17 @@ DOCUMENT@0..676
       TABLE_CELL@249..249
       NEWLINE@249..250 "\n"
     TABLE_SEPARATOR@250..321
-      TEXT@250..320 "---  ------  -------- ..."
+      TABLE_SEP_DASHES@250..253 "---"
+      TABLE_SEP_WHITESPACE@253..255 "  "
+      TABLE_SEP_DASHES@255..261 "------"
+      TABLE_SEP_WHITESPACE@261..263 "  "
+      TABLE_SEP_DASHES@263..294 "--------------------- ..."
+      TABLE_SEP_WHITESPACE@294..296 "  "
+      TABLE_SEP_DASHES@296..310 "--------------"
+      TABLE_SEP_WHITESPACE@310..312 "  "
+      TABLE_SEP_DASHES@312..315 "---"
+      TABLE_SEP_WHITESPACE@315..317 "  "
+      TABLE_SEP_DASHES@317..320 "---"
       NEWLINE@320..321 "\n"
     TABLE_ROW@321..392
       WHITESPACE@321..328 "       "

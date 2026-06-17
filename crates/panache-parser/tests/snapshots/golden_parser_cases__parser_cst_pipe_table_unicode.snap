@@ -18,7 +18,11 @@ DOCUMENT@0..230
       TEXT@55..56 "|"
       NEWLINE@56..57 "\n"
     TABLE_SEPARATOR@57..114
-      TEXT@57..113 "|-------------------- ..."
+      TABLE_SEP_DELIM@57..58 "|"
+      TABLE_SEP_DASHES@58..80 "----------------------"
+      TABLE_SEP_DELIM@80..81 "|"
+      TABLE_SEP_DASHES@81..112 "--------------------- ..."
+      TABLE_SEP_DELIM@112..113 "|"
       NEWLINE@113..114 "\n"
     TABLE_ROW@114..172
       TEXT@114..115 "|"

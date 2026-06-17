@@ -19,7 +19,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 use crate::SyntaxNode;
-use crate::syntax::SyntaxKind;
+use crate::syntax::{SyntaxKind, SyntaxToken};
 use rowan::NodeOrToken;
 use serde_json::{Value, json};
 
@@ -2347,8 +2347,7 @@ fn pipe_table(node: &SyntaxNode) -> Option<TableData> {
                 header_cells = pipe_table_cells(&child);
             }
             SyntaxKind::TABLE_SEPARATOR => {
-                let raw = child.text().to_string();
-                aligns = pipe_separator_aligns(&raw);
+                aligns = pipe_separator_aligns(&child);
             }
             SyntaxKind::TABLE_ROW => {
                 body_rows.push(pipe_table_cells(&child));
@@ -2535,27 +2534,84 @@ fn pipe_table_caption(node: &SyntaxNode) -> (Vec<Inline>, Option<Attr>) {
     (coalesce_inlines(out), caption_attr)
 }
 
-fn pipe_separator_aligns(raw: &str) -> Vec<&'static str> {
-    // Strip surrounding whitespace before pipe-stripping so an indented
-    // pipe-table separator (e.g. fenced-div content at column ≥1) doesn't
-    // leave a leading whitespace segment that then counts as a phantom
-    // column.
-    let trimmed = raw.trim();
-    let inner = trimmed.trim_start_matches('|').trim_end_matches('|');
-    inner
-        .split('|')
-        .map(|seg| {
-            let s = seg.trim();
-            let left = s.starts_with(':');
-            let right = s.ends_with(':');
-            match (left, right) {
-                (true, true) => "AlignCenter",
-                (true, false) => "AlignLeft",
-                (false, true) => "AlignRight",
-                _ => "AlignDefault",
-            }
+/// The separator-marker tokens (`TABLE_SEP_*`) of a `TABLE_SEPARATOR` node,
+/// in order. Skips the container prefix (`WHITESPACE` / blockquote markers)
+/// and the trailing `NEWLINE` so callers see only the separator's own
+/// structure.
+fn separator_marker_tokens(separator: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
+    separator
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|t| {
+            matches!(
+                t.kind(),
+                SyntaxKind::TABLE_SEP_DELIM
+                    | SyntaxKind::TABLE_SEP_DASHES
+                    | SyntaxKind::TABLE_SEP_EQUALS
+                    | SyntaxKind::TABLE_SEP_COLON
+                    | SyntaxKind::TABLE_SEP_WHITESPACE
+            )
         })
-        .collect()
+}
+
+/// Alignment of one separator segment (a slice of marker tokens between
+/// delimiters). Mirrors the old `s.trim()` + leading/trailing-colon check:
+/// the segment is left/right aligned when its first/last non-whitespace
+/// marker is a colon.
+fn segment_align(seg: &[SyntaxToken]) -> &'static str {
+    let non_ws = |t: &&SyntaxToken| t.kind() != SyntaxKind::TABLE_SEP_WHITESPACE;
+    let left = seg
+        .iter()
+        .find(non_ws)
+        .is_some_and(|t| t.kind() == SyntaxKind::TABLE_SEP_COLON);
+    let right = seg
+        .iter()
+        .rev()
+        .find(non_ws)
+        .is_some_and(|t| t.kind() == SyntaxKind::TABLE_SEP_COLON);
+    match (left, right) {
+        (true, true) => "AlignCenter",
+        (true, false) => "AlignLeft",
+        (false, true) => "AlignRight",
+        (false, false) => "AlignDefault",
+    }
+}
+
+/// Whether a separator carries any alignment colon.
+fn separator_has_colon(separator: &SyntaxNode) -> bool {
+    separator_marker_tokens(separator).any(|t| t.kind() == SyntaxKind::TABLE_SEP_COLON)
+}
+
+fn pipe_separator_aligns(separator: &SyntaxNode) -> Vec<&'static str> {
+    // Reproduce the old `raw.trim().trim_start_matches('|').trim_end_matches('|').split('|')`:
+    // trim interior whitespace at the ends, drop the bounding delimiter runs,
+    // then one column per interior delimiter gap.
+    let toks: Vec<SyntaxToken> = separator_marker_tokens(separator).collect();
+    let is_ws = |t: &SyntaxToken| t.kind() == SyntaxKind::TABLE_SEP_WHITESPACE;
+    let is_delim = |t: &SyntaxToken| t.kind() == SyntaxKind::TABLE_SEP_DELIM;
+    // Trim leading/trailing interior whitespace (mirrors `raw.trim()`).
+    let lo = toks.iter().position(|t| !is_ws(t));
+    let hi = toks.iter().rposition(|t| !is_ws(t));
+    let inner = match (lo, hi) {
+        (Some(lo), Some(hi)) => &toks[lo..=hi],
+        _ => &[][..], // whitespace-only: empty inner → one default column below
+    };
+    // Drop bounding delimiter runs (`trim_start/end_matches('|')`).
+    let lead = inner.iter().take_while(|t| is_delim(t)).count();
+    let inner = &inner[lead..];
+    let trail = inner.iter().rev().take_while(|t| is_delim(t)).count();
+    let inner = &inner[..inner.len() - trail];
+    // One column per delimiter-separated segment (segments = interior delims + 1).
+    let mut aligns = Vec::new();
+    let mut seg_start = 0usize;
+    for (i, t) in inner.iter().enumerate() {
+        if is_delim(t) {
+            aligns.push(segment_align(&inner[seg_start..i]));
+            seg_start = i + 1;
+        }
+    }
+    aligns.push(segment_align(&inner[seg_start..]));
+    aligns
 }
 
 fn cells_to_plain_blocks(cells: Vec<Vec<Inline>>, cols: usize) -> Vec<GridCell> {
@@ -2685,23 +2741,18 @@ fn simple_table(node: &SyntaxNode) -> Option<TableData> {
 /// `TABLE_SEPARATOR` node, where columns are 0-based offsets within the
 /// separator's line.
 fn simple_table_dash_runs(separator: &SyntaxNode) -> Vec<(usize, usize)> {
-    let raw = separator.text().to_string();
-    let line = raw.trim_end_matches(['\n', '\r']);
-    let mut runs = Vec::new();
-    let mut start: Option<usize> = None;
-    for (i, ch) in line.char_indices() {
-        if ch == '-' {
-            if start.is_none() {
-                start = Some(i);
-            }
-        } else if let Some(s) = start.take() {
-            runs.push((s, i - 1));
-        }
-    }
-    if let Some(s) = start.take() {
-        runs.push((s, line.len() - 1));
-    }
-    runs
+    // One inclusive `(start, end)` per dash run, offsets relative to the node
+    // start (= line start, prefix included) so `simple_table_aligns` can match
+    // them against cell offsets. Markers are ASCII, so byte offsets equal the
+    // char indices the old char scan produced.
+    let node_start = u32::from(separator.text_range().start());
+    separator_marker_tokens(separator)
+        .filter(|t| t.kind() == SyntaxKind::TABLE_SEP_DASHES)
+        .map(|t| {
+            let s = (u32::from(t.text_range().start()) - node_start) as usize;
+            (s, s + t.text().len() - 1)
+        })
+        .collect()
 }
 
 fn simple_table_row_cells(row: &SyntaxNode) -> Vec<Vec<Inline>> {
@@ -2968,15 +3019,14 @@ fn grid_table(node: &SyntaxNode) -> Option<TableData> {
     let alignment_sep = node
         .children()
         .filter(|c| c.kind() == SyntaxKind::TABLE_SEPARATOR)
-        .find(|c| c.text().to_string().contains(':'))
+        .find(separator_has_colon)
         .or_else(|| {
             node.children()
                 .find(|c| c.kind() == SyntaxKind::TABLE_SEPARATOR)
         })?;
     let widths = grid_dash_widths(&alignment_sep);
-    let aligns_raw = alignment_sep.text().to_string();
-    let aligns = if aligns_raw.contains(':') {
-        grid_separator_aligns(&aligns_raw, ncols)
+    let aligns = if separator_has_colon(&alignment_sep) {
+        grid_separator_aligns(&alignment_sep, ncols)
     } else {
         vec!["AlignDefault"; ncols]
     };
@@ -3120,25 +3170,18 @@ fn parse_grid_cell_text(text: &str) -> Vec<Block> {
 /// width[i] = raw[i] / norm
 /// ```
 fn grid_dash_widths(separator: &SyntaxNode) -> Vec<f64> {
-    let raw_text = separator.text().to_string();
-    let line = raw_text.trim_end_matches(['\n', '\r']);
+    // Column raw width = chars between two consecutive `+`, plus 1. With
+    // tokens that's the summed byte length of the markers in each gap.
+    let toks: Vec<SyntaxToken> = separator_marker_tokens(separator).collect();
     let mut raw: Vec<usize> = Vec::new();
-    let mut count: usize = 0;
-    let mut in_col = false;
-    for ch in line.chars() {
-        match ch {
-            '+' => {
-                if in_col {
-                    raw.push(count + 1);
-                    count = 0;
-                }
-                in_col = true;
+    let mut seg_start: Option<usize> = None;
+    for (i, t) in toks.iter().enumerate() {
+        if t.kind() == SyntaxKind::TABLE_SEP_DELIM {
+            if let Some(s) = seg_start {
+                let width: usize = toks[s..i].iter().map(|t| t.text().len()).sum();
+                raw.push(width + 1);
             }
-            _ => {
-                if in_col {
-                    count += 1;
-                }
-            }
+            seg_start = Some(i + 1);
         }
     }
     if raw.is_empty() {
@@ -3150,17 +3193,17 @@ fn grid_dash_widths(separator: &SyntaxNode) -> Vec<f64> {
     raw.into_iter().map(|w| w as f64 / norm).collect()
 }
 
-fn grid_separator_aligns(raw: &str, cols: usize) -> Vec<&'static str> {
-    let line = raw.trim_end_matches(['\n', '\r']);
+fn grid_separator_aligns(separator: &SyntaxNode, cols: usize) -> Vec<&'static str> {
+    // One alignment per segment strictly between consecutive `+` delimiters.
+    let toks: Vec<SyntaxToken> = separator_marker_tokens(separator).collect();
     let mut aligns: Vec<&'static str> = Vec::with_capacity(cols);
-    let mut col_start: Option<usize> = None;
-    for (i, ch) in line.char_indices() {
-        if ch == '+' {
-            if let Some(s) = col_start.take() {
-                let seg = &line[s..i];
-                aligns.push(grid_segment_align(seg));
+    let mut seg_start: Option<usize> = None;
+    for (i, t) in toks.iter().enumerate() {
+        if t.kind() == SyntaxKind::TABLE_SEP_DELIM {
+            if let Some(s) = seg_start {
+                aligns.push(segment_align(&toks[s..i]));
             }
-            col_start = Some(i + 1);
+            seg_start = Some(i + 1);
         }
     }
     while aligns.len() < cols {
@@ -3168,18 +3211,6 @@ fn grid_separator_aligns(raw: &str, cols: usize) -> Vec<&'static str> {
     }
     aligns.truncate(cols);
     aligns
-}
-
-fn grid_segment_align(seg: &str) -> &'static str {
-    let bytes = seg.as_bytes();
-    let left = bytes.first() == Some(&b':');
-    let right = bytes.last() == Some(&b':');
-    match (left, right) {
-        (true, true) => "AlignCenter",
-        (true, false) => "AlignLeft",
-        (false, true) => "AlignRight",
-        _ => "AlignDefault",
-    }
 }
 
 // ----- multiline table ----------------------------------------------------

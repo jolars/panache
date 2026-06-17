@@ -28,7 +28,11 @@ DOCUMENT@0..42
             WHITESPACE@14..16 "  "
             BLOCK_QUOTE_MARKER@16..17 ">"
             WHITESPACE@17..18 " "
-            TEXT@18..27 "|---|---|"
+            TABLE_SEP_DELIM@18..19 "|"
+            TABLE_SEP_DASHES@19..22 "---"
+            TABLE_SEP_DELIM@22..23 "|"
+            TABLE_SEP_DASHES@23..26 "---"
+            TABLE_SEP_DELIM@26..27 "|"
             NEWLINE@27..28 "\n"
           TABLE_ROW@28..42
             WHITESPACE@28..30 "  "

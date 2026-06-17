@@ -8,7 +8,7 @@ use unicode_width::UnicodeWidthChar;
 use crate::parser::utils::attributes::{
     emit_attribute_node, try_parse_trailing_attributes_with_pos,
 };
-use crate::parser::utils::helpers::{emit_line_tokens, strip_newline};
+use crate::parser::utils::helpers::{emit_line_tokens, emit_separator_tokens, strip_newline};
 use crate::parser::utils::inline_emission;
 
 use super::container_prefix::StrippedLines;
@@ -823,7 +823,7 @@ pub(crate) fn try_parse_simple_table(
     // (`  > `) as WHITESPACE/BLOCK_QUOTE_MARKER tokens before the row text.
     builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
     let separator_tail = window.emit_or_dispatch_tail(builder, separator_pos);
-    emit_line_tokens(builder, separator_tail);
+    emit_separator_tokens(builder, separator_tail);
     builder.finish_node();
 
     // Emit data rows (always continuation lines)
@@ -1388,7 +1388,7 @@ pub(crate) fn try_parse_pipe_table(
     } else {
         window.emit_prefix_at(builder, sep_idx)
     };
-    emit_line_tokens(builder, separator_tail);
+    emit_separator_tokens(builder, separator_tail);
     builder.finish_node();
 
     // Emit data rows with inline-parsed cells (always continuation lines)
@@ -2301,7 +2301,7 @@ pub(crate) fn try_parse_grid_table(
                     // This is the header/body separator
                     builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
                     let tail = window.emit_or_dispatch_tail(builder, idx);
-                    emit_line_tokens(builder, tail);
+                    emit_separator_tokens(builder, tail);
                     builder.finish_node();
                     past_header_sep = true;
                 } else {
@@ -2311,14 +2311,14 @@ pub(crate) fn try_parse_grid_table(
                     }
                     builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
                     let tail = window.emit_or_dispatch_tail(builder, idx);
-                    emit_line_tokens(builder, tail);
+                    emit_separator_tokens(builder, tail);
                     builder.finish_node();
                 }
             } else {
                 // Regular separator (row boundary)
                 builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
                 let tail = window.emit_or_dispatch_tail(builder, idx);
-                emit_line_tokens(builder, tail);
+                emit_separator_tokens(builder, tail);
                 builder.finish_node();
             }
         } else if is_grid_content_row(line) {
@@ -2780,7 +2780,7 @@ pub(crate) fn try_parse_multiline_table(
     // re-emits its `  > ` prefix via `emit_prefix_at`.
     builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
     let tail = window.emit_or_dispatch_tail(builder, start_pos);
-    emit_line_tokens(builder, tail);
+    emit_separator_tokens(builder, tail);
     builder.finish_node();
 
     // Track state for emitting. Accumulate ABSOLUTE indices of the lines making
@@ -2808,7 +2808,7 @@ pub(crate) fn try_parse_multiline_table(
 
             builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
             let tail = window.emit_or_dispatch_tail(builder, i);
-            emit_line_tokens(builder, tail);
+            emit_separator_tokens(builder, tail);
             builder.finish_node();
             in_header = false;
             continue;
@@ -2836,7 +2836,7 @@ pub(crate) fn try_parse_multiline_table(
 
             builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
             let tail = window.emit_or_dispatch_tail(builder, i);
-            emit_line_tokens(builder, tail);
+            emit_separator_tokens(builder, tail);
             builder.finish_node();
             continue;
         }

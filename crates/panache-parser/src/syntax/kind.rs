@@ -279,6 +279,14 @@ pub enum SyntaxKind {
     TABLE_CELL,
     TABLE_CAPTION,
     TABLE_CAPTION_PREFIX, // "Table: ", "table: ", or ": "
+    // Separator-row markers (split out of the coalesced separator TEXT so
+    // alignment/width derivations read structure instead of re-scanning a
+    // string). One `TABLE_SEP_DELIM` covers both `|` and `+`.
+    TABLE_SEP_DELIM,      // single column delimiter: `|` (pipe) or `+` (grid)
+    TABLE_SEP_DASHES,     // a run of `-`
+    TABLE_SEP_EQUALS,     // a run of `=` (grid `+===+` header divider)
+    TABLE_SEP_COLON,      // single `:` alignment marker
+    TABLE_SEP_WHITESPACE, // interior spaces/tabs between dash runs
 
     // Code block parts
     CODE_FENCE_OPEN,

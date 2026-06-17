@@ -17,7 +17,7 @@ DOCUMENT@0..156
       TABLE_SEPARATOR@24..48
         BLOCK_QUOTE_MARKER@24..25 ">"
         WHITESPACE@25..26 " "
-        TEXT@26..47 "---------------------"
+        TABLE_SEP_DASHES@26..47 "---------------------"
         NEWLINE@47..48 "\n"
       TABLE_HEADER@48..68
         BLOCK_QUOTE_MARKER@48..49 ">"
@@ -31,7 +31,9 @@ DOCUMENT@0..156
       TABLE_SEPARATOR@68..92
         BLOCK_QUOTE_MARKER@68..69 ">"
         WHITESPACE@69..70 " "
-        TEXT@70..91 "--------- -----------"
+        TABLE_SEP_DASHES@70..79 "---------"
+        TABLE_SEP_WHITESPACE@79..80 " "
+        TABLE_SEP_DASHES@80..91 "-----------"
         NEWLINE@91..92 "\n"
       TABLE_ROW@92..111
         BLOCK_QUOTE_MARKER@92..93 ">"
@@ -57,5 +59,5 @@ DOCUMENT@0..156
       TABLE_SEPARATOR@132..156
         BLOCK_QUOTE_MARKER@132..133 ">"
         WHITESPACE@133..134 " "
-        TEXT@134..155 "---------------------"
+        TABLE_SEP_DASHES@134..155 "---------------------"
         NEWLINE@155..156 "\n"

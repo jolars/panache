@@ -390,7 +390,7 @@ intentionally excluded.
     recursive `parse_pandoc_blocks` become vestigial. Largest bucket;
     coordinate with the `html-conformance` skill.
 
-  - [ ] **Table separator tokenization.** The separator row is currently a
+  - [x] **Table separator tokenization.** The separator row is currently a
     coalesced `TEXT` blob (e.g. `TEXT "|:--|--:|"`), so
     `simple_table_aligns`, `grid_dash_widths`, and `pipe_separator_aligns`
     re-tokenize it. Split the markers (`|` / `+`, dash runs, colons) into

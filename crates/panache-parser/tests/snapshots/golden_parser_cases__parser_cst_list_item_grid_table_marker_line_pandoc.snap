@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
-assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..60
@@ -10,7 +9,11 @@ DOCUMENT@0..60
       WHITESPACE@1..2 " "
       GRID_TABLE@2..60
         TABLE_SEPARATOR@2..12
-          TEXT@2..11 "+---+---+"
+          TABLE_SEP_DELIM@2..3 "+"
+          TABLE_SEP_DASHES@3..6 "---"
+          TABLE_SEP_DELIM@6..7 "+"
+          TABLE_SEP_DASHES@7..10 "---"
+          TABLE_SEP_DELIM@10..11 "+"
           NEWLINE@11..12 "\n"
         TABLE_HEADER@12..24
           WHITESPACE@12..14 "  "
@@ -28,7 +31,11 @@ DOCUMENT@0..60
           NEWLINE@23..24 "\n"
         TABLE_SEPARATOR@24..36
           WHITESPACE@24..26 "  "
-          TEXT@26..35 "+===+===+"
+          TABLE_SEP_DELIM@26..27 "+"
+          TABLE_SEP_EQUALS@27..30 "==="
+          TABLE_SEP_DELIM@30..31 "+"
+          TABLE_SEP_EQUALS@31..34 "==="
+          TABLE_SEP_DELIM@34..35 "+"
           NEWLINE@35..36 "\n"
         TABLE_ROW@36..48
           WHITESPACE@36..38 "  "
@@ -46,5 +53,9 @@ DOCUMENT@0..60
           NEWLINE@47..48 "\n"
         TABLE_SEPARATOR@48..60
           WHITESPACE@48..50 "  "
-          TEXT@50..59 "+---+---+"
+          TABLE_SEP_DELIM@50..51 "+"
+          TABLE_SEP_DASHES@51..54 "---"
+          TABLE_SEP_DELIM@54..55 "+"
+          TABLE_SEP_DASHES@55..58 "---"
+          TABLE_SEP_DELIM@58..59 "+"
           NEWLINE@59..60 "\n"

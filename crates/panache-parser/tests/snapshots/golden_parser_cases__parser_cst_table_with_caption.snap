@@ -19,7 +19,13 @@ DOCUMENT@0..314
         TEXT@32..39 "Default"
       NEWLINE@39..40 "\n"
     TABLE_SEPARATOR@40..80
-      TEXT@40..79 "-------     ------ -- ..."
+      TABLE_SEP_DASHES@40..47 "-------"
+      TABLE_SEP_WHITESPACE@47..52 "     "
+      TABLE_SEP_DASHES@52..58 "------"
+      TABLE_SEP_WHITESPACE@58..59 " "
+      TABLE_SEP_DASHES@59..69 "----------"
+      TABLE_SEP_WHITESPACE@69..72 "   "
+      TABLE_SEP_DASHES@72..79 "-------"
       NEWLINE@79..80 "\n"
     TABLE_ROW@80..119
       WHITESPACE@80..85 "     "

@@ -5,7 +5,13 @@ expression: cst_output
 DOCUMENT@0..1852
   GRID_TABLE@0..231
     TABLE_SEPARATOR@0..33
-      TEXT@0..32 "+--------+----------+ ..."
+      TABLE_SEP_DELIM@0..1 "+"
+      TABLE_SEP_DASHES@1..9 "--------"
+      TABLE_SEP_DELIM@9..10 "+"
+      TABLE_SEP_DASHES@10..20 "----------"
+      TABLE_SEP_DELIM@20..21 "+"
+      TABLE_SEP_DASHES@21..31 "----------"
+      TABLE_SEP_DELIM@31..32 "+"
       NEWLINE@32..33 "\n"
     TABLE_HEADER@33..66
       TEXT@33..34 "|"
@@ -26,7 +32,13 @@ DOCUMENT@0..1852
       TEXT@64..65 "|"
       NEWLINE@65..66 "\n"
     TABLE_SEPARATOR@66..99
-      TEXT@66..98 "+========+==========+ ..."
+      TABLE_SEP_DELIM@66..67 "+"
+      TABLE_SEP_EQUALS@67..75 "========"
+      TABLE_SEP_DELIM@75..76 "+"
+      TABLE_SEP_EQUALS@76..86 "=========="
+      TABLE_SEP_DELIM@86..87 "+"
+      TABLE_SEP_EQUALS@87..97 "=========="
+      TABLE_SEP_DELIM@97..98 "+"
       NEWLINE@98..99 "\n"
     TABLE_ROW@99..132
       TEXT@99..100 "|"
@@ -47,7 +59,13 @@ DOCUMENT@0..1852
       TEXT@130..131 "|"
       NEWLINE@131..132 "\n"
     TABLE_SEPARATOR@132..165
-      TEXT@132..164 "+--------+----------+ ..."
+      TABLE_SEP_DELIM@132..133 "+"
+      TABLE_SEP_DASHES@133..141 "--------"
+      TABLE_SEP_DELIM@141..142 "+"
+      TABLE_SEP_DASHES@142..152 "----------"
+      TABLE_SEP_DELIM@152..153 "+"
+      TABLE_SEP_DASHES@153..163 "----------"
+      TABLE_SEP_DELIM@163..164 "+"
       NEWLINE@164..165 "\n"
     TABLE_ROW@165..198
       TEXT@165..166 "|"
@@ -68,7 +86,13 @@ DOCUMENT@0..1852
       TEXT@196..197 "|"
       NEWLINE@197..198 "\n"
     TABLE_SEPARATOR@198..231
-      TEXT@198..230 "+--------+----------+ ..."
+      TABLE_SEP_DELIM@198..199 "+"
+      TABLE_SEP_DASHES@199..207 "--------"
+      TABLE_SEP_DELIM@207..208 "+"
+      TABLE_SEP_DASHES@208..218 "----------"
+      TABLE_SEP_DELIM@218..219 "+"
+      TABLE_SEP_DASHES@219..229 "----------"
+      TABLE_SEP_DELIM@229..230 "+"
       NEWLINE@230..231 "\n"
   BLANK_LINE@231..232
     BLANK_LINE@231..232 "\n"
@@ -79,7 +103,13 @@ DOCUMENT@0..1852
     BLANK_LINE@255..256 "\n"
   GRID_TABLE@256..452
     TABLE_SEPARATOR@256..284
-      TEXT@256..283 "+-------+--------+--- ..."
+      TABLE_SEP_DELIM@256..257 "+"
+      TABLE_SEP_DASHES@257..264 "-------"
+      TABLE_SEP_DELIM@264..265 "+"
+      TABLE_SEP_DASHES@265..273 "--------"
+      TABLE_SEP_DELIM@273..274 "+"
+      TABLE_SEP_DASHES@274..282 "--------"
+      TABLE_SEP_DELIM@282..283 "+"
       NEWLINE@283..284 "\n"
     TABLE_HEADER@284..312
       TEXT@284..285 "|"
@@ -100,7 +130,17 @@ DOCUMENT@0..1852
       TEXT@310..311 "|"
       NEWLINE@311..312 "\n"
     TABLE_SEPARATOR@312..340
-      TEXT@312..339 "+:======+=======:+:== ..."
+      TABLE_SEP_DELIM@312..313 "+"
+      TABLE_SEP_COLON@313..314 ":"
+      TABLE_SEP_EQUALS@314..320 "======"
+      TABLE_SEP_DELIM@320..321 "+"
+      TABLE_SEP_EQUALS@321..328 "======="
+      TABLE_SEP_COLON@328..329 ":"
+      TABLE_SEP_DELIM@329..330 "+"
+      TABLE_SEP_COLON@330..331 ":"
+      TABLE_SEP_EQUALS@331..337 "======"
+      TABLE_SEP_COLON@337..338 ":"
+      TABLE_SEP_DELIM@338..339 "+"
       NEWLINE@339..340 "\n"
     TABLE_ROW@340..368
       TEXT@340..341 "|"
@@ -121,7 +161,13 @@ DOCUMENT@0..1852
       TEXT@366..367 "|"
       NEWLINE@367..368 "\n"
     TABLE_SEPARATOR@368..396
-      TEXT@368..395 "+-------+--------+--- ..."
+      TABLE_SEP_DELIM@368..369 "+"
+      TABLE_SEP_DASHES@369..376 "-------"
+      TABLE_SEP_DELIM@376..377 "+"
+      TABLE_SEP_DASHES@377..385 "--------"
+      TABLE_SEP_DELIM@385..386 "+"
+      TABLE_SEP_DASHES@386..394 "--------"
+      TABLE_SEP_DELIM@394..395 "+"
       NEWLINE@395..396 "\n"
     TABLE_ROW@396..424
       TEXT@396..397 "|"
@@ -142,7 +188,13 @@ DOCUMENT@0..1852
       TEXT@422..423 "|"
       NEWLINE@423..424 "\n"
     TABLE_SEPARATOR@424..452
-      TEXT@424..451 "+-------+--------+--- ..."
+      TABLE_SEP_DELIM@424..425 "+"
+      TABLE_SEP_DASHES@425..432 "-------"
+      TABLE_SEP_DELIM@432..433 "+"
+      TABLE_SEP_DASHES@433..441 "--------"
+      TABLE_SEP_DELIM@441..442 "+"
+      TABLE_SEP_DASHES@442..450 "--------"
+      TABLE_SEP_DELIM@450..451 "+"
       NEWLINE@451..452 "\n"
   BLANK_LINE@452..453
     BLANK_LINE@452..453 "\n"
@@ -163,7 +215,11 @@ DOCUMENT@0..1852
     BLANK_LINE@488..489 "\n"
   GRID_TABLE@489..599
     TABLE_SEPARATOR@489..511
-      TEXT@489..510 "+--------+----------+"
+      TABLE_SEP_DELIM@489..490 "+"
+      TABLE_SEP_DASHES@490..498 "--------"
+      TABLE_SEP_DELIM@498..499 "+"
+      TABLE_SEP_DASHES@499..509 "----------"
+      TABLE_SEP_DELIM@509..510 "+"
       NEWLINE@510..511 "\n"
     TABLE_HEADER@511..533
       TEXT@511..512 "|"
@@ -185,7 +241,11 @@ DOCUMENT@0..1852
       TEXT@531..532 "|"
       NEWLINE@532..533 "\n"
     TABLE_SEPARATOR@533..555
-      TEXT@533..554 "+========+==========+"
+      TABLE_SEP_DELIM@533..534 "+"
+      TABLE_SEP_EQUALS@534..542 "========"
+      TABLE_SEP_DELIM@542..543 "+"
+      TABLE_SEP_EQUALS@543..553 "=========="
+      TABLE_SEP_DELIM@553..554 "+"
       NEWLINE@554..555 "\n"
     TABLE_ROW@555..577
       TEXT@555..556 "|"
@@ -201,7 +261,11 @@ DOCUMENT@0..1852
       TEXT@575..576 "|"
       NEWLINE@576..577 "\n"
     TABLE_SEPARATOR@577..599
-      TEXT@577..598 "+--------+----------+"
+      TABLE_SEP_DELIM@577..578 "+"
+      TABLE_SEP_DASHES@578..586 "--------"
+      TABLE_SEP_DELIM@586..587 "+"
+      TABLE_SEP_DASHES@587..597 "----------"
+      TABLE_SEP_DELIM@597..598 "+"
       NEWLINE@598..599 "\n"
   BLANK_LINE@599..600
     BLANK_LINE@599..600 "\n"
@@ -212,7 +276,11 @@ DOCUMENT@0..1852
     BLANK_LINE@630..631 "\n"
   GRID_TABLE@631..1852
     TABLE_SEPARATOR@631..805
-      TEXT@631..804 "+-------------------- ..."
+      TABLE_SEP_DELIM@631..632 "+"
+      TABLE_SEP_DASHES@632..658 "--------------------- ..."
+      TABLE_SEP_DELIM@658..659 "+"
+      TABLE_SEP_DASHES@659..803 "--------------------- ..."
+      TABLE_SEP_DELIM@803..804 "+"
       NEWLINE@804..805 "\n"
     TABLE_HEADER@805..979
       TEXT@805..806 "|"
@@ -228,7 +296,11 @@ DOCUMENT@0..1852
       TEXT@977..978 "|"
       NEWLINE@978..979 "\n"
     TABLE_SEPARATOR@979..1153
-      TEXT@979..1152 "+==================== ..."
+      TABLE_SEP_DELIM@979..980 "+"
+      TABLE_SEP_EQUALS@980..1006 "===================== ..."
+      TABLE_SEP_DELIM@1006..1007 "+"
+      TABLE_SEP_EQUALS@1007..1151 "===================== ..."
+      TABLE_SEP_DELIM@1151..1152 "+"
       NEWLINE@1152..1153 "\n"
     TABLE_ROW@1153..1329
       TEXT@1153..1154 "|"
@@ -253,7 +325,11 @@ DOCUMENT@0..1852
       WHITESPACE@1326..1328 "  "
       NEWLINE@1328..1329 "\n"
     TABLE_SEPARATOR@1329..1503
-      TEXT@1329..1502 "+-------------------- ..."
+      TABLE_SEP_DELIM@1329..1330 "+"
+      TABLE_SEP_DASHES@1330..1356 "--------------------- ..."
+      TABLE_SEP_DELIM@1356..1357 "+"
+      TABLE_SEP_DASHES@1357..1501 "--------------------- ..."
+      TABLE_SEP_DELIM@1501..1502 "+"
       NEWLINE@1502..1503 "\n"
     TABLE_ROW@1503..1678
       TEXT@1503..1504 "|"
@@ -291,5 +367,9 @@ DOCUMENT@0..1852
       WHITESPACE@1676..1677 " "
       NEWLINE@1677..1678 "\n"
     TABLE_SEPARATOR@1678..1852
-      TEXT@1678..1851 "+-------------------- ..."
+      TABLE_SEP_DELIM@1678..1679 "+"
+      TABLE_SEP_DASHES@1679..1705 "--------------------- ..."
+      TABLE_SEP_DELIM@1705..1706 "+"
+      TABLE_SEP_DASHES@1706..1850 "--------------------- ..."
+      TABLE_SEP_DELIM@1850..1851 "+"
       NEWLINE@1851..1852 "\n"

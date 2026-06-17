@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
-assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..610
@@ -100,7 +99,19 @@ DOCUMENT@0..610
       TEXT@428..429 "|"
       NEWLINE@429..430 "\n"
     TABLE_SEPARATOR@430..450
-      TEXT@430..449 "| --- | --- | --- |"
+      TABLE_SEP_DELIM@430..431 "|"
+      TABLE_SEP_WHITESPACE@431..432 " "
+      TABLE_SEP_DASHES@432..435 "---"
+      TABLE_SEP_WHITESPACE@435..436 " "
+      TABLE_SEP_DELIM@436..437 "|"
+      TABLE_SEP_WHITESPACE@437..438 " "
+      TABLE_SEP_DASHES@438..441 "---"
+      TABLE_SEP_WHITESPACE@441..442 " "
+      TABLE_SEP_DELIM@442..443 "|"
+      TABLE_SEP_WHITESPACE@443..444 " "
+      TABLE_SEP_DASHES@444..447 "---"
+      TABLE_SEP_WHITESPACE@447..448 " "
+      TABLE_SEP_DELIM@448..449 "|"
       NEWLINE@449..450 "\n"
     TABLE_ROW@450..470
       TEXT@450..451 "|"

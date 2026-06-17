@@ -13,7 +13,7 @@ DOCUMENT@0..506
     BLANK_LINE@61..62
       BLANK_LINE@61..62 "\n"
     TABLE_SEPARATOR@62..124
-      TEXT@62..123 "--------------------- ..."
+      TABLE_SEP_DASHES@62..123 "--------------------- ..."
       NEWLINE@123..124 "\n"
     TABLE_HEADER@124..209
       TABLE_CELL@124..135
@@ -31,7 +31,13 @@ DOCUMENT@0..506
       TEXT@165..208 "  Header    Aligned   ..."
       NEWLINE@208..209 "\n"
     TABLE_SEPARATOR@209..271
-      TEXT@209..270 "----------- ------- - ..."
+      TABLE_SEP_DASHES@209..220 "-----------"
+      TABLE_SEP_WHITESPACE@220..221 " "
+      TABLE_SEP_DASHES@221..228 "-------"
+      TABLE_SEP_WHITESPACE@228..229 " "
+      TABLE_SEP_DASHES@229..244 "---------------"
+      TABLE_SEP_WHITESPACE@244..245 " "
+      TABLE_SEP_DASHES@245..270 "--------------------- ..."
       NEWLINE@270..271 "\n"
     TABLE_ROW@271..387
       TABLE_CELL@271..282
@@ -64,5 +70,5 @@ DOCUMENT@0..506
         TEXT@424..443 "Here's another one."
       NEWLINE@443..444 "\n"
     TABLE_SEPARATOR@444..506
-      TEXT@444..505 "--------------------- ..."
+      TABLE_SEP_DASHES@444..505 "--------------------- ..."
       NEWLINE@505..506 "\n"

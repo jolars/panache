@@ -21,7 +21,16 @@ DOCUMENT@0..39
       TEXT@11..12 "|"
       NEWLINE@12..13 "\n"
     TABLE_SEPARATOR@13..26
-      TEXT@13..25 "   | - | - |"
+      TABLE_SEP_WHITESPACE@13..16 "   "
+      TABLE_SEP_DELIM@16..17 "|"
+      TABLE_SEP_WHITESPACE@17..18 " "
+      TABLE_SEP_DASHES@18..19 "-"
+      TABLE_SEP_WHITESPACE@19..20 " "
+      TABLE_SEP_DELIM@20..21 "|"
+      TABLE_SEP_WHITESPACE@21..22 " "
+      TABLE_SEP_DASHES@22..23 "-"
+      TABLE_SEP_WHITESPACE@23..24 " "
+      TABLE_SEP_DELIM@24..25 "|"
       NEWLINE@25..26 "\n"
     TABLE_ROW@26..39
       WHITESPACE@26..29 "   "

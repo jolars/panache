@@ -32,7 +32,11 @@ DOCUMENT@0..53
       TABLE_SEPARATOR@29..41
         BLOCK_QUOTE_MARKER@29..30 ">"
         WHITESPACE@30..31 " "
-        TEXT@31..40 "|---|---|"
+        TABLE_SEP_DELIM@31..32 "|"
+        TABLE_SEP_DASHES@32..35 "---"
+        TABLE_SEP_DELIM@35..36 "|"
+        TABLE_SEP_DASHES@36..39 "---"
+        TABLE_SEP_DELIM@39..40 "|"
         NEWLINE@40..41 "\n"
       TABLE_ROW@41..53
         BLOCK_QUOTE_MARKER@41..42 ">"

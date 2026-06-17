@@ -608,6 +608,7 @@ golden_test_cases!(
     sentence_wrap_inline_code_question,
     sentence_wrap_table_caption,
     table_caption_close_fence_after,
+    table_separator_tokens,
     table_with_caption,
     tables_adjacent,
     tables_in_divs,

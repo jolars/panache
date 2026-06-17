@@ -19,6 +19,72 @@ pub(crate) fn emit_line_tokens(builder: &mut GreenNodeBuilder<'static>, line: &s
     }
 }
 
+/// Emit a table separator line as distinct marker tokens instead of one
+/// coalesced `TEXT`. Splits the column delimiters (`|` / `+`), dash runs,
+/// equals runs (grid `===` dividers), colons, and interior whitespace into
+/// separate CST tokens so downstream alignment/width derivations read
+/// structure rather than re-scanning a string. Any unexpected bytes fall back
+/// to a `TEXT` token so the emission stays lossless. The concatenation of all
+/// emitted token texts byte-equals `line`.
+///
+/// The caller has already emitted any container prefix (indentation,
+/// blockquote markers) as separate tokens; `line` is the separator tail.
+pub(crate) fn emit_separator_tokens(builder: &mut GreenNodeBuilder<'static>, line: &str) {
+    let (content, newline) = strip_newline(line);
+    let bytes = content.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        match b {
+            b'|' | b'+' => {
+                builder.token(SyntaxKind::TABLE_SEP_DELIM.into(), &content[i..i + 1]);
+                i += 1;
+            }
+            b':' => {
+                builder.token(SyntaxKind::TABLE_SEP_COLON.into(), &content[i..i + 1]);
+                i += 1;
+            }
+            b'-' => {
+                let start = i;
+                while i < bytes.len() && bytes[i] == b'-' {
+                    i += 1;
+                }
+                builder.token(SyntaxKind::TABLE_SEP_DASHES.into(), &content[start..i]);
+            }
+            b'=' => {
+                let start = i;
+                while i < bytes.len() && bytes[i] == b'=' {
+                    i += 1;
+                }
+                builder.token(SyntaxKind::TABLE_SEP_EQUALS.into(), &content[start..i]);
+            }
+            b' ' | b'\t' => {
+                let start = i;
+                while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b'\t') {
+                    i += 1;
+                }
+                builder.token(SyntaxKind::TABLE_SEP_WHITESPACE.into(), &content[start..i]);
+            }
+            _ => {
+                // Unexpected byte (the block detector validated this is a
+                // separator, but stay lossless and total): accumulate the run
+                // of unrecognized bytes and emit as TEXT. Advance by whole
+                // chars so we never split a multibyte sequence.
+                let start = i;
+                while i < bytes.len()
+                    && !matches!(bytes[i], b'|' | b'+' | b':' | b'-' | b'=' | b' ' | b'\t')
+                {
+                    i += 1;
+                }
+                builder.token(SyntaxKind::TEXT.into(), &content[start..i]);
+            }
+        }
+    }
+    if !newline.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline);
+    }
+}
+
 /// Strip up to N leading spaces from a line.
 /// This is the generalized version of the previous strip_leading_spaces (which stripped up to 3).
 pub(crate) fn strip_leading_spaces_n(line: &str, max_spaces: usize) -> &str {
@@ -183,6 +249,65 @@ mod tests {
         assert_eq!(trim_end_newlines("\n"), "");
         // Non-ASCII byte sequences stay intact.
         assert_eq!(trim_end_newlines("föö\n"), "föö");
+    }
+
+    fn separator_tokens(line: &str) -> Vec<(SyntaxKind, String)> {
+        let mut builder = GreenNodeBuilder::new();
+        builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
+        emit_separator_tokens(&mut builder, line);
+        builder.finish_node();
+        let node = crate::syntax::SyntaxNode::new_root(builder.finish());
+        node.children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .map(|t| (t.kind(), t.text().to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn test_emit_separator_tokens_reconstruction() {
+        // Concatenation of token texts must byte-equal the input.
+        for line in [
+            "|:--|--:|:-:|\n",
+            "+------+:----:+------+\n",
+            "+======+======+\r\n",
+            "------- ------ ----------\n",
+            ":--:",               // no bounding delims, no newline
+            "|:--|--:|?weird|\n", // unexpected byte falls back to TEXT
+        ] {
+            let reconstructed: String = separator_tokens(line)
+                .iter()
+                .map(|(_, t)| t.as_str())
+                .collect();
+            assert_eq!(reconstructed, line, "round-trip failed for {line:?}");
+        }
+    }
+
+    #[test]
+    fn test_emit_separator_tokens_kinds() {
+        use SyntaxKind::*;
+        assert_eq!(
+            separator_tokens("|:--|--:|\n"),
+            vec![
+                (TABLE_SEP_DELIM, "|".to_string()),
+                (TABLE_SEP_COLON, ":".to_string()),
+                (TABLE_SEP_DASHES, "--".to_string()),
+                (TABLE_SEP_DELIM, "|".to_string()),
+                (TABLE_SEP_DASHES, "--".to_string()),
+                (TABLE_SEP_COLON, ":".to_string()),
+                (TABLE_SEP_DELIM, "|".to_string()),
+                (NEWLINE, "\n".to_string()),
+            ],
+        );
+        // Grid `===` divider and interior whitespace in a simple separator.
+        assert_eq!(
+            separator_tokens("--- ---\n"),
+            vec![
+                (TABLE_SEP_DASHES, "---".to_string()),
+                (TABLE_SEP_WHITESPACE, " ".to_string()),
+                (TABLE_SEP_DASHES, "---".to_string()),
+                (NEWLINE, "\n".to_string()),
+            ],
+        );
     }
 
     #[test]

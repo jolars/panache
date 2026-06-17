@@ -5,7 +5,7 @@ expression: cst_output
 DOCUMENT@0..542
   MULTILINE_TABLE@0..542
     TABLE_SEPARATOR@0..70
-      TEXT@0..69 "--------------------- ..."
+      TABLE_SEP_DASHES@0..69 "--------------------- ..."
       NEWLINE@69..70 "\n"
     TABLE_HEADER@70..182
       TABLE_CELL@70..81
@@ -23,7 +23,13 @@ DOCUMENT@0..542
       TEXT@126..181 "  One       Two       ..."
       NEWLINE@181..182 "\n"
     TABLE_SEPARATOR@182..252
-      TEXT@182..251 "----------- --------- ..."
+      TABLE_SEP_DASHES@182..193 "-----------"
+      TABLE_SEP_WHITESPACE@193..194 " "
+      TABLE_SEP_DASHES@194..209 "---------------"
+      TABLE_SEP_WHITESPACE@209..210 " "
+      TABLE_SEP_DASHES@210..229 "-------------------"
+      TABLE_SEP_WHITESPACE@229..230 " "
+      TABLE_SEP_DASHES@230..251 "---------------------"
       NEWLINE@251..252 "\n"
     TABLE_ROW@252..348
       TABLE_CELL@252..263
@@ -86,5 +92,5 @@ DOCUMENT@0..542
       TEXT@408..471 "            row       ..."
       NEWLINE@471..472 "\n"
     TABLE_SEPARATOR@472..542
-      TEXT@472..541 "--------------------- ..."
+      TABLE_SEP_DASHES@472..541 "--------------------- ..."
       NEWLINE@541..542 "\n"

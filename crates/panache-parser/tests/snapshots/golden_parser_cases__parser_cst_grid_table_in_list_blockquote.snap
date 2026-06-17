@@ -12,7 +12,11 @@ DOCUMENT@0..70
         WHITESPACE@3..4 " "
         GRID_TABLE@4..70
           TABLE_SEPARATOR@4..14
-            TEXT@4..13 "+---+---+"
+            TABLE_SEP_DELIM@4..5 "+"
+            TABLE_SEP_DASHES@5..8 "---"
+            TABLE_SEP_DELIM@8..9 "+"
+            TABLE_SEP_DASHES@9..12 "---"
+            TABLE_SEP_DELIM@12..13 "+"
             NEWLINE@13..14 "\n"
           TABLE_HEADER@14..28
             WHITESPACE@14..16 "  "
@@ -34,7 +38,11 @@ DOCUMENT@0..70
             WHITESPACE@28..30 "  "
             BLOCK_QUOTE_MARKER@30..31 ">"
             WHITESPACE@31..32 " "
-            TEXT@32..41 "+===+===+"
+            TABLE_SEP_DELIM@32..33 "+"
+            TABLE_SEP_EQUALS@33..36 "==="
+            TABLE_SEP_DELIM@36..37 "+"
+            TABLE_SEP_EQUALS@37..40 "==="
+            TABLE_SEP_DELIM@40..41 "+"
             NEWLINE@41..42 "\n"
           TABLE_ROW@42..56
             WHITESPACE@42..44 "  "
@@ -56,5 +64,9 @@ DOCUMENT@0..70
             WHITESPACE@56..58 "  "
             BLOCK_QUOTE_MARKER@58..59 ">"
             WHITESPACE@59..60 " "
-            TEXT@60..69 "+---+---+"
+            TABLE_SEP_DELIM@60..61 "+"
+            TABLE_SEP_DASHES@61..64 "---"
+            TABLE_SEP_DELIM@64..65 "+"
+            TABLE_SEP_DASHES@65..68 "---"
+            TABLE_SEP_DELIM@68..69 "+"
             NEWLINE@69..70 "\n"

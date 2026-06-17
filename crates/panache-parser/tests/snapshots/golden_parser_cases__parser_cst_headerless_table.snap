@@ -5,7 +5,13 @@ expression: cst_output
 DOCUMENT@0..200
   SIMPLE_TABLE@0..200
     TABLE_SEPARATOR@0..40
-      TEXT@0..39 "-------     ------ -- ..."
+      TABLE_SEP_DASHES@0..7 "-------"
+      TABLE_SEP_WHITESPACE@7..12 "     "
+      TABLE_SEP_DASHES@12..18 "------"
+      TABLE_SEP_WHITESPACE@18..19 " "
+      TABLE_SEP_DASHES@19..29 "----------"
+      TABLE_SEP_WHITESPACE@29..32 "   "
+      TABLE_SEP_DASHES@32..39 "-------"
       NEWLINE@39..40 "\n"
     TABLE_ROW@40..80
       WHITESPACE@40..45 "     "
