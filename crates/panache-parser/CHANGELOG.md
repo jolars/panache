@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.17.2](https://github.com/jolars/panache/compare/panache-parser-v0.17.1...panache-parser-v0.17.2) (2026-06-17)
+
+### Bug Fixes
+- **parser:** conform ordered marker on pipe-table line to pandoc ([`bf02d16`](https://github.com/jolars/panache/commit/bf02d1626c3f7f10de07e9ca735dfdb2de3d2759))
+
 ## [0.17.1](https://github.com/jolars/panache/compare/panache-parser-v0.17.0...panache-parser-v0.17.1) (2026-06-15)
 
 ### Bug Fixes
