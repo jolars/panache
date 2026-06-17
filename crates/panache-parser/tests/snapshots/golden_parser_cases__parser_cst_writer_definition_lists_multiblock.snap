@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..393
-  HTML_BLOCK@0..55
+  HTML_BLOCK_RAW@0..55
     HTML_BLOCK_TAG@0..55
       TEXT@0..54 "<!-- Source: pandoc/t ..."
       NEWLINE@54..55 "\n"

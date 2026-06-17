@@ -743,6 +743,40 @@ pub(crate) fn count_tag_balance(line: &str, tag_name: &str) -> (usize, usize) {
 ///     ...                        // for multi-line `<!--\n…\n-->` shape
 /// <sibling blocks>               // recursive parse of trailing + lines[M+1..]
 /// ```
+/// The CST node kind to emit for an opaque single-construct HTML block.
+/// Under `Dialect::Pandoc`, comments, processing instructions, and
+/// verbatim raw-text elements (`<pre>`/`<script>`/`<style>`/`<textarea>`)
+/// each project to exactly one `RawBlock "html"`; tagging the wrapper
+/// `HTML_BLOCK_RAW` lets the pandoc-native projector route by kind instead
+/// of re-sniffing the leading bytes. This changes only the wrapper `u16` —
+/// the child tokens are emitted byte-for-byte identically, so the CST stays
+/// lossless (the `HTML_BLOCK_DIV` precedent). The behavioral `wrapper_kind`
+/// stays `HTML_BLOCK` everywhere else in `parse_html_block_with_wrapper`, so
+/// no lift gate changes. CommonMark dialect keeps the opaque `HTML_BLOCK`
+/// shape.
+fn html_block_node_kind(
+    wrapper_kind: SyntaxKind,
+    block_type: &HtmlBlockType,
+    dialect: crate::options::Dialect,
+) -> SyntaxKind {
+    if wrapper_kind == SyntaxKind::HTML_BLOCK
+        && dialect == crate::options::Dialect::Pandoc
+        && matches!(
+            block_type,
+            HtmlBlockType::Comment
+                | HtmlBlockType::ProcessingInstruction
+                | HtmlBlockType::BlockTag {
+                    is_verbatim: true,
+                    ..
+                }
+        )
+    {
+        SyntaxKind::HTML_BLOCK_RAW
+    } else {
+        wrapper_kind
+    }
+}
+
 fn try_parse_comment_pi_with_trailing_split(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
@@ -800,7 +834,7 @@ fn try_parse_comment_pi_with_trailing_split(
         return None;
     }
 
-    builder.start_node(wrapper_kind.into());
+    builder.start_node(html_block_node_kind(wrapper_kind, block_type, config.dialect).into());
 
     // Emit open `HTML_BLOCK_TAG` (the opening marker line(s)) and any
     // middle `HTML_BLOCK_CONTENT` lines between open and close. The
@@ -922,8 +956,11 @@ pub(crate) fn parse_html_block_with_wrapper(
         return consumed;
     }
 
-    // Start HTML block
-    builder.start_node(wrapper_kind.into());
+    // Start HTML block. The node kind may retag to `HTML_BLOCK_RAW` for
+    // single-construct opaque shapes (comment / PI / verbatim) under
+    // Pandoc; `wrapper_kind` itself stays the behavioral gate below so no
+    // lift logic changes and the child tokens stay byte-identical.
+    builder.start_node(html_block_node_kind(wrapper_kind, &block_type, config.dialect).into());
 
     let first_line = lines[start_pos];
     let blank_terminated = ends_at_blank_line(&block_type);

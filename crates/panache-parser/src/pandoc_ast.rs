@@ -758,7 +758,7 @@ fn block_from(node: &SyntaxNode) -> Option<Block> {
         // Pandoc title block (`% title\n% authors\n% date`) populates Meta
         // and produces no body block.
         SyntaxKind::PANDOC_TITLE_BLOCK => None,
-        SyntaxKind::HTML_BLOCK => Some(html_block(node)),
+        SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_RAW => Some(html_block(node)),
         SyntaxKind::HTML_BLOCK_DIV => Some(html_div_block(node)),
         SyntaxKind::PIPE_TABLE => pipe_table(node).map(Block::Table),
         SyntaxKind::SIMPLE_TABLE => simple_table(node).map(Block::Table),
@@ -1065,6 +1065,55 @@ fn html_block(node: &SyntaxNode) -> Block {
         content.pop();
     }
     Block::RawBlock("html".to_string(), content)
+}
+
+/// Project an `HTML_BLOCK_RAW` node — a single-construct opaque HTML
+/// block (comment, processing instruction, or verbatim raw-text element)
+/// — into exactly one `RawBlock "html"`. The parser tagged the wrapper
+/// at parse time (the `HTML_BLOCK_DIV` precedent), so the projector
+/// routes by CST kind instead of re-sniffing the leading bytes the way
+/// the legacy `emit_html_block` arm still does for unlifted CommonMark
+/// `HTML_BLOCK`s. Blockquote `> ` prefix markers and the list-item
+/// line-start indent are stripped via
+/// `collect_html_block_text_skip_bq_markers`.
+fn html_raw_block(node: &SyntaxNode, out: &mut Vec<Block>) {
+    let content = collect_html_block_text_skip_bq_markers(node);
+    out.push(Block::RawBlock(
+        "html".to_string(),
+        html_raw_block_text(&content),
+    ));
+}
+
+/// Trim an opaque single-construct HTML block's collected text to
+/// pandoc-native's `RawBlock` text: drop trailing ASCII whitespace
+/// (newlines, spaces, tabs) and strip 1-3 leading spaces of first-line
+/// indent (the HTML-block scanner accepts ≤ 3 leading spaces but pandoc
+/// doesn't round-trip them into the RawBlock). Interior whitespace and
+/// tab indents are preserved (e.g. `<pre>foo\n   </pre>` keeps the
+/// indented close). Mirrors the trailing-trim + leading-strip the
+/// legacy `emit_html_block` applies before its early `RawBlock` return.
+fn html_raw_block_text(content: &str) -> String {
+    let mut content = content.to_string();
+    while content
+        .as_bytes()
+        .last()
+        .is_some_and(|b| matches!(b, b'\n' | b'\r' | b' ' | b'\t'))
+    {
+        content.pop();
+    }
+    let leading_ws = content
+        .as_bytes()
+        .iter()
+        .position(|&b| b != b' ' && b != b'\t')
+        .unwrap_or(content.len());
+    let strip_first_line_indent = leading_ws > 0
+        && leading_ws <= 3
+        && content.as_bytes()[..leading_ws].iter().all(|&b| b == b' ');
+    if strip_first_line_indent {
+        content[leading_ws..].to_string()
+    } else {
+        content
+    }
 }
 
 /// Project an `HTML_BLOCK_DIV` node (a Pandoc-dialect-lifted
@@ -1822,11 +1871,19 @@ fn collect_block(node: &SyntaxNode, out: &mut Vec<Block>) {
         out.push(html_div_block(node));
         return;
     }
+    if node.kind() == SyntaxKind::HTML_BLOCK_RAW {
+        // Single-construct opaque HTML block the parser tagged at parse
+        // time — comment, PI, or verbatim (`<pre>`, `<style>`,
+        // `<script>`, `<textarea>`). Projects to exactly one RawBlock.
+        html_raw_block(node, out);
+        return;
+    }
     if node.kind() == SyntaxKind::HTML_BLOCK {
-        // Opaque HTML block — comments, PI, verbatim (`<pre>`, `<style>`,
-        // `<script>`, `<textarea>`), void inline-block tags, and any
-        // strict/inline-block tag the parser couldn't lift. The byte
-        // walker splits these into per-tag RawBlocks plus interior text.
+        // Opaque HTML block the parser left untagged — void inline-block
+        // tags and any strict/inline-block tag it couldn't lift, plus
+        // unlifted CommonMark comment/PI/verbatim. The byte walker (or
+        // the leading-byte-sniff early return) splits these into per-tag
+        // RawBlocks plus interior text.
         emit_html_block(node, out);
         return;
     }

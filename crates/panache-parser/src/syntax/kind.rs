@@ -236,6 +236,14 @@ pub enum SyntaxKind {
     HTML_BLOCK_CONTENT, // Content between tags
     // Pandoc-dialect lift: a matched <div ...>...</div> block.
     HTML_BLOCK_DIV,
+    // Pandoc-dialect lift: a single-construct opaque HTML block that
+    // projects to exactly one `RawBlock "html"` — an HTML comment
+    // (`<!-- -->`), a processing instruction (`<? ?>`), or a verbatim
+    // raw-text element (`<pre>`/`<script>`/`<style>`/`<textarea>`). The
+    // wrapper kind lets the pandoc-native projector route by CST kind
+    // instead of re-sniffing the leading bytes. CommonMark dialect keeps
+    // the opaque HTML_BLOCK shape.
+    HTML_BLOCK_RAW,
     // Structural region inside an HTML opening tag holding the
     // attribute-list bytes — i.e. everything between the tag name and
     // the closing `>`, exclusive. Recognized by `AttributeNode::cast`,

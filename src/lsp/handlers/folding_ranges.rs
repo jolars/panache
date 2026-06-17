@@ -68,7 +68,7 @@ fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
                     ranges.push(range);
                 }
             }
-            SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_DIV => {
+            SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_RAW | SyntaxKind::HTML_BLOCK_DIV => {
                 if let Some(range) = extract_html_block_range(&node, content) {
                     ranges.push(range);
                 }

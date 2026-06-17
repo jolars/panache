@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..342
@@ -17,7 +18,7 @@ DOCUMENT@0..342
     NEWLINE@58..59 "\n"
   BLANK_LINE@59..60
     BLANK_LINE@59..60 "\n"
-  HTML_BLOCK@60..82
+  HTML_BLOCK_RAW@60..82
     HTML_BLOCK_TAG@60..82
       TEXT@60..81 "<!-- HTML comment -->"
       NEWLINE@81..82 "\n"
@@ -51,7 +52,7 @@ DOCUMENT@0..342
     NEWLINE@180..181 "\n"
   BLANK_LINE@181..182
     BLANK_LINE@181..182 "\n"
-  HTML_BLOCK@182..238
+  HTML_BLOCK_RAW@182..238
     HTML_BLOCK_TAG@182..191
       TEXT@182..190 "<script>"
       NEWLINE@190..191 "\n"
@@ -70,7 +71,7 @@ DOCUMENT@0..342
     NEWLINE@255..256 "\n"
   BLANK_LINE@256..257
     BLANK_LINE@256..257 "\n"
-  HTML_BLOCK@257..299
+  HTML_BLOCK_RAW@257..299
     HTML_BLOCK_TAG@257..262
       TEXT@257..261 "<!--"
       NEWLINE@261..262 "\n"
@@ -84,7 +85,7 @@ DOCUMENT@0..342
       NEWLINE@298..299 "\n"
   BLANK_LINE@299..300
     BLANK_LINE@299..300 "\n"
-  HTML_BLOCK@300..342
+  HTML_BLOCK_RAW@300..342
     HTML_BLOCK_TAG@300..305
       TEXT@300..304 "<!--"
       NEWLINE@304..305 "\n"

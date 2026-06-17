@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..27
+  HTML_BLOCK@0..27
+    HTML_BLOCK_TAG@0..27
+      TEXT@0..26 "<!-- raw block commen ..."
+      NEWLINE@26..27 "\n"

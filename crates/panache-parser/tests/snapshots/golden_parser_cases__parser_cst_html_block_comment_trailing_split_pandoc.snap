@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..24
-  HTML_BLOCK@0..14
+  HTML_BLOCK_RAW@0..14
     HTML_BLOCK_TAG@0..14
       TEXT@0..14 "<!-- hello -->"
   PARAGRAPH@14..24

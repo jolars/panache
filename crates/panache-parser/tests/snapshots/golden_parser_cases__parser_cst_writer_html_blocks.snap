@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..839
-  HTML_BLOCK@0..55
+  HTML_BLOCK_RAW@0..55
     HTML_BLOCK_TAG@0..55
       TEXT@0..54 "<!-- Source: pandoc/t ..."
       NEWLINE@54..55 "\n"
@@ -144,7 +145,7 @@ DOCUMENT@0..839
     HTML_BLOCK_TAG@328..337
       TEXT@328..336 "</table>"
       NEWLINE@336..337 "\n"
-  HTML_BLOCK@337..441
+  HTML_BLOCK_RAW@337..441
     HTML_BLOCK_TAG@337..441
       TEXT@337..440 "<script type=\"text/ja ..."
       NEWLINE@440..441 "\n"
@@ -185,7 +186,7 @@ DOCUMENT@0..839
     NEWLINE@587..588 "\n"
   BLANK_LINE@588..589
     BLANK_LINE@588..589 "\n"
-  HTML_BLOCK@589..606
+  HTML_BLOCK_RAW@589..606
     HTML_BLOCK_TAG@589..606
       TEXT@589..605 "<!-- Comment -->"
       NEWLINE@605..606 "\n"
@@ -196,7 +197,7 @@ DOCUMENT@0..839
     NEWLINE@617..618 "\n"
   BLANK_LINE@618..619
     BLANK_LINE@618..619 "\n"
-  HTML_BLOCK@619..638
+  HTML_BLOCK_RAW@619..638
     HTML_BLOCK_TAG@619..624
       TEXT@619..623 "<!--"
       NEWLINE@623..624 "\n"
@@ -208,7 +209,7 @@ DOCUMENT@0..839
     HTML_BLOCK_TAG@634..638
       TEXT@634..637 "-->"
       NEWLINE@637..638 "\n"
-  HTML_BLOCK@638..676
+  HTML_BLOCK_RAW@638..676
     HTML_BLOCK_TAG@638..643
       TEXT@638..642 "<!--"
       NEWLINE@642..643 "\n"

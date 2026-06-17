@@ -516,7 +516,9 @@ impl Formatter {
                             }
                             return Some(n);
                         }
-                        SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_DIV => {
+                        SyntaxKind::HTML_BLOCK
+                        | SyntaxKind::HTML_BLOCK_RAW
+                        | SyntaxKind::HTML_BLOCK_DIV => {
                             seen_leading_html_block = true;
                         }
                         SyntaxKind::BLANK_LINE => {}
@@ -533,8 +535,10 @@ impl Formatter {
     pub(super) fn format_list_item(&mut self, node: &SyntaxNode, indent: usize) {
         // Pre-pass: Process any directive comments to update tracker state
         for child in node.children() {
-            if matches!(child.kind(), SyntaxKind::HTML_BLOCK | SyntaxKind::COMMENT)
-                && let Some(directive) = crate::directives::extract_directive_from_node(&child)
+            if matches!(
+                child.kind(),
+                SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_RAW | SyntaxKind::COMMENT
+            ) && let Some(directive) = crate::directives::extract_directive_from_node(&child)
             {
                 self.directive_tracker.process_directive(&directive);
             }
@@ -1142,7 +1146,9 @@ impl Formatter {
                         self.output.push('\n');
                     }
                 }
-                SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_DIV => {
+                SyntaxKind::HTML_BLOCK
+                | SyntaxKind::HTML_BLOCK_RAW
+                | SyntaxKind::HTML_BLOCK_DIV => {
                     // A lifted HTML block (same-line `<div>...</div>`, single-
                     // line comment, `<pre>foo</pre>`, etc.) can be the LIST_ITEM's
                     // sole content when the parser's emit-time structural lift
@@ -1168,6 +1174,7 @@ impl Formatter {
                             | Some(SyntaxKind::LIST)
                             | Some(SyntaxKind::HORIZONTAL_RULE)
                             | Some(SyntaxKind::HTML_BLOCK)
+                            | Some(SyntaxKind::HTML_BLOCK_RAW)
                             | Some(SyntaxKind::HTML_BLOCK_DIV)
                     );
                     if no_content_emitted && is_first_real_child {
@@ -1223,6 +1230,7 @@ impl Formatter {
                             | Some(SyntaxKind::LIST)
                             | Some(SyntaxKind::HORIZONTAL_RULE)
                             | Some(SyntaxKind::HTML_BLOCK)
+                            | Some(SyntaxKind::HTML_BLOCK_RAW)
                             | Some(SyntaxKind::HTML_BLOCK_DIV)
                             | Some(SyntaxKind::PIPE_TABLE)
                             | Some(SyntaxKind::GRID_TABLE)

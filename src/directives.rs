@@ -182,6 +182,7 @@ pub fn extract_directive_from_node(node: &SyntaxNode) -> Option<Directive> {
     // depending on context (block-level vs inline) and dialect.
     if node.kind() != SyntaxKind::COMMENT
         && node.kind() != SyntaxKind::HTML_BLOCK
+        && node.kind() != SyntaxKind::HTML_BLOCK_RAW
         && node.kind() != SyntaxKind::INLINE_HTML
     {
         return None;

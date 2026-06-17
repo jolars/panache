@@ -169,6 +169,7 @@ const EXCLUDED_ANCESTOR_KINDS: &[SyntaxKind] = &[
     SyntaxKind::CODE_CONTENT,
     SyntaxKind::INLINE_HTML,
     SyntaxKind::HTML_BLOCK,
+    SyntaxKind::HTML_BLOCK_RAW,
     SyntaxKind::HTML_BLOCK_TAG,
     SyntaxKind::HTML_BLOCK_CONTENT,
     SyntaxKind::TEX_BLOCK,

@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..773
@@ -17,7 +18,7 @@ DOCUMENT@0..773
     NEWLINE@91..92 "\n"
   BLANK_LINE@92..93
     BLANK_LINE@92..93 "\n"
-  HTML_BLOCK@93..130
+  HTML_BLOCK_RAW@93..130
     HTML_BLOCK_TAG@93..130
       TEXT@93..129 "<!-- panache-ignore-f ..."
       NEWLINE@129..130 "\n"
@@ -36,7 +37,7 @@ DOCUMENT@0..773
     NEWLINE@316..317 "\n"
   BLANK_LINE@317..318
     BLANK_LINE@317..318 "\n"
-  HTML_BLOCK@318..353
+  HTML_BLOCK_RAW@318..353
     HTML_BLOCK_TAG@318..353
       TEXT@318..352 "<!-- panache-ignore-l ..."
       NEWLINE@352..353 "\n"
@@ -47,13 +48,13 @@ DOCUMENT@0..773
     HEADING_CONTENT@358..397
       TEXT@358..397 "Heading level skip sh ..."
     NEWLINE@397..398 "\n"
-  HTML_BLOCK@398..431
+  HTML_BLOCK_RAW@398..431
     HTML_BLOCK_TAG@398..431
       TEXT@398..430 "<!-- panache-ignore-l ..."
       NEWLINE@430..431 "\n"
   BLANK_LINE@431..432
     BLANK_LINE@431..432 "\n"
-  HTML_BLOCK@432..462
+  HTML_BLOCK_RAW@432..462
     HTML_BLOCK_TAG@432..462
       TEXT@432..461 "<!-- panache-ignore-s ..."
       NEWLINE@461..462 "\n"

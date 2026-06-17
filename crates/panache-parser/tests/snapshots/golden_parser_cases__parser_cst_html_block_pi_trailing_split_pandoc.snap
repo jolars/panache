@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..22
-  HTML_BLOCK@0..12
+  HTML_BLOCK_RAW@0..12
     HTML_BLOCK_TAG@0..12
       TEXT@0..12 "<?php foo ?>"
   PARAGRAPH@12..22

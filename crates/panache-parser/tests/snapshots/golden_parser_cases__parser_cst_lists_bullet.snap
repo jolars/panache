@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..1147
@@ -148,7 +149,7 @@ DOCUMENT@0..1147
         NEWLINE@910..911 "\n"
   BLANK_LINE@911..912
     BLANK_LINE@911..912 "\n"
-  HTML_BLOCK@912..921
+  HTML_BLOCK_RAW@912..921
     HTML_BLOCK_TAG@912..921
       TEXT@912..920 "<!-- -->"
       NEWLINE@920..921 "\n"

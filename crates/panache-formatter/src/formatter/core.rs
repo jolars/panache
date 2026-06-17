@@ -596,6 +596,7 @@ impl Formatter {
             && node.kind() != SyntaxKind::DOCUMENT
             && node.kind() != SyntaxKind::COMMENT
             && node.kind() != SyntaxKind::HTML_BLOCK
+            && node.kind() != SyntaxKind::HTML_BLOCK_RAW
             && node.kind() != SyntaxKind::HTML_BLOCK_DIV
         {
             let text = node.text().to_string();
@@ -1008,7 +1009,7 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_DIV => {
+            SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_RAW | SyntaxKind::HTML_BLOCK_DIV => {
                 // Check if this is a directive comment
                 if let Some(directive) = extract_directive_from_node(node) {
                     // Process the directive to update tracker state
@@ -1360,7 +1361,9 @@ impl Formatter {
                                 ctx.in_list_continuation = false;
                             }
                         }
-                        SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_DIV => {
+                        SyntaxKind::HTML_BLOCK
+                        | SyntaxKind::HTML_BLOCK_RAW
+                        | SyntaxKind::HTML_BLOCK_DIV => {
                             // Format HTML block contents (BLOCK_QUOTE_MARKER tokens
                             // are stripped by the HTML_BLOCK handler) and re-emit
                             // the blockquote prefix per line so the output stays

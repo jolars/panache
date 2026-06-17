@@ -384,11 +384,17 @@ intentionally excluded.
     the `parse_attr_block` text path; the CST is already structured, only
     the projector lags.
 
-  - [ ] **HTML opaque-block split.** Continue the HTML lift (Phase 6): lift the
-    remaining *opaque* HTML splitting (comments, PI, verbatim, void /
-    unmatched tags) into the parser so `split_html_block_by_tags` and the
-    recursive `parse_pandoc_blocks` become vestigial. Largest bucket;
-    coordinate with the `html-conformance` skill.
+  - [ ] **HTML opaque-block split.** Continue the HTML lift. **Phase 7a done**
+    (2026-06-17): single-construct opaque shapes (comments, PI, verbatim
+    `<pre>`/`<script>`/`<style>`/`<textarea>`) now retag to `HTML_BLOCK_RAW`
+    at parse time, so the projector routes by kind and `emit_html_block`'s
+    byte-sniff arm is dead for Pandoc. **Remaining (7b-7e):** standalone
+    single-tag (close/void), single open + trailing, void sequences, and the
+    hard multi-tag interleave (D3) still flow through
+    `split_html_block_by_tags` / `parse_pandoc_blocks`. Note: D3's inter-tag
+    markdown reparse *relocates* into the parser rather than disappearing
+    --- the walker is not fully deletable. Largest bucket; coordinate with
+    the `html-conformance` skill.
 
   - [x] **Table separator tokenization.** The separator row is currently a
     coalesced `TEXT` blob (e.g. `TEXT "|:--|--:|"`), so

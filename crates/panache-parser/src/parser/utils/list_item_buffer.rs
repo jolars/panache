@@ -374,7 +374,7 @@ fn try_emit_html_block_lift(
     let first = &children[0];
     if !matches!(
         first.kind(),
-        SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_DIV
+        SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_RAW | SyntaxKind::HTML_BLOCK_DIV
     ) {
         return false;
     }
@@ -404,7 +404,7 @@ fn try_emit_html_block_lift(
     } else if children.len() == 2
         && matches!(
             first.kind(),
-            SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_DIV
+            SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_RAW | SyntaxKind::HTML_BLOCK_DIV
         )
         && children[1].kind() == SyntaxKind::PARAGRAPH
     {

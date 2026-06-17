@@ -7,7 +7,7 @@ DOCUMENT@0..33
   BLOCK_QUOTE@0..33
     BLOCK_QUOTE_MARKER@0..1 ">"
     WHITESPACE@1..2 " "
-    HTML_BLOCK@2..23
+    HTML_BLOCK_RAW@2..23
       HTML_BLOCK_TAG@2..13
         TEXT@2..12 "<!-- multi"
         NEWLINE@12..13 "\n"

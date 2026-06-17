@@ -256,6 +256,8 @@ golden_test_cases!(
     horizontal_rules,
     html_block,
     html_block_commonmark_type6_type7,
+    html_block_raw_comment,
+    html_block_raw_pre,
     html_block_comment_trailing_split,
     html_block_details_blockquote_child,
     html_block_div_blockquote_idempotent,

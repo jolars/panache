@@ -1,0 +1,16 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..35
+  HTML_BLOCK@0..35
+    HTML_BLOCK_TAG@0..6
+      TEXT@0..5 "<pre>"
+      NEWLINE@5..6 "\n"
+    HTML_BLOCK_CONTENT@6..28
+      TEXT@6..27 "code *not emphasized*"
+      NEWLINE@27..28 "\n"
+    HTML_BLOCK_TAG@28..35
+      TEXT@28..34 "</pre>"
+      NEWLINE@34..35 "\n"
