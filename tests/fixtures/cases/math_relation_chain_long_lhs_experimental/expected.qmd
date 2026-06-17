@@ -1,0 +1,10 @@
+# Relation chain with a wide leading relation
+
+A continuation `=` hangs under the head's right-hand side, not under the wide
+`\gets`:
+
+$$
+  \beta_0 \gets \beta_0 + \frac{4}{n} \sum_{i = 1}^n (y_i - p_i)
+                = \beta_0 - \frac{1}{L_0} \partial_0 F, \qquad L_0
+                = 1/4,
+$$

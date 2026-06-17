@@ -76,6 +76,7 @@
 \ll	Rel	relation
 \gg	Rel	relation
 \doteq	Rel	relation
+\coloneqq	Rel	relation
 # DIVERGENCE: AMS makes \asymp a relation (\mathrel); pulldown-latex emits it as
 # a binary op. We keep Rel (correct) and record the oracle quirk here so a
 # future pulldown bump that "fixes" it surfaces as a fixture review, not a

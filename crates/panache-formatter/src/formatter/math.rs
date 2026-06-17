@@ -357,7 +357,8 @@ mod tests {
             ..opts(MathContext::Display)
         };
         let input = "A = bbbbbbbbbb = cccccccccc";
-        // First `=` stays; the second starts a continuation aligned under it.
+        // First `=` stays; the second starts a continuation aligned under it
+        // (equality chain ⇒ relations stack under the first relation).
         let expected = "A = bbbbbbbbbb\n  = cccccccccc";
         assert_eq!(format_math(input, &narrow), expected);
         // Re-feeding the broken (multi-line) form recomputes the same layout.
@@ -383,8 +384,8 @@ mod tests {
             ..opts(MathContext::Display)
         };
         let input = "A = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd";
-        // Relations break first; each over-width segment nests its `+` term
-        // one indent level deeper, under the relation's right-hand side.
+        // Relations break first; each over-width segment nests its `+` term one
+        // indent level deeper, under the relation's right-hand side.
         let expected = "A = aaaaaaaaaa\n    + bbbbbbbbbb\n  = cccccccccc\n    + dddddddddd";
         assert_eq!(format_math(input, &narrow), expected);
         let once = format_math(input, &narrow);

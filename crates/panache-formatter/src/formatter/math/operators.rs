@@ -96,7 +96,7 @@ pub fn command_class(name: &str) -> Option<AtomClass> {
         | "notin" | "to" | "gets" | "mapsto" | "rightarrow" | "leftarrow" | "leftrightarrow"
         | "Rightarrow" | "Leftarrow" | "Leftrightarrow" | "implies" | "iff" | "perp"
         | "parallel" | "mid" | "models" | "vdash" | "dashv" | "prec" | "succ" | "preceq"
-        | "succeq" | "ll" | "gg" | "doteq" | "asymp" => AtomClass::Rel,
+        | "succeq" | "ll" | "gg" | "doteq" | "asymp" | "coloneqq" => AtomClass::Rel,
         // Binary operators.
         "cdot" | "times" | "div" | "pm" | "mp" | "ast" | "star" | "circ" | "bullet" | "oplus"
         | "ominus" | "otimes" | "oslash" | "odot" | "cap" | "cup" | "uplus" | "sqcap" | "sqcup"

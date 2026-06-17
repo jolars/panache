@@ -902,12 +902,13 @@ rewritten (no `\frac` canonicalization, no auto-`&` insertion). Alignment uses
 glyphs), and malformed math is left untouched.
 
 A display equation (`$$…$$`) wider than `line-width` is broken at its top-level
-relations, with continuations aligned under the first relation. If a relation
-segment is itself too wide, its binary terms break one level deeper. Binary
-continuations are additionally nested by one `math-indent` step, so the `+ term`
-rows sit below (not flush with) the right-hand side they hang under. The width
-budget accounts for `math-indent`, so a broken line plus its leading indent
-stays within `line-width`:
+relations, with each continuation aligned under the first relation (the classic
+stacked-`=` layout for an equality chain). If a relation segment is itself too
+wide, its binary terms break one level deeper. Binary continuations are
+additionally nested by one `math-indent` step, so the `+ term` rows sit below
+(not flush with) the right-hand side they hang under. The width budget accounts
+for `math-indent`, so a broken line plus its leading indent stays within
+`line-width`:
 
 Input
 
@@ -924,22 +925,41 @@ Output
       A = aaaaaaaaaa
             + bbbbbbbbbb
         = cccccccccc
-            + dddddddddd
+          + dddddddddd
+    $$
+    ```
+
+An **assignment** arrow (`\gets`, `\leftarrow`, `\mapsto`, `\coloneqq`, `:=`) is
+treated differently: it *defines* its left-hand side rather than equating it, so
+the equality continuations it introduces anchor under the assignment's
+right-hand side instead of under the arrow. This keeps a wide arrow from
+dragging
+
+the continuations far left:
+
+:   ```markdown
+    $$
+      \beta_0 \gets \beta_0 + \frac{4}{n} \sum_{i = 1}^n (y_i - p_i)
+                    = \beta_0 - \frac{1}{L_0} \partial_0 F, \qquad L_0
+                    = 1/4,
     $$
     ```
 
 The break is source-cosmetic --- math ignores whitespace, so the rendered
-equation is unchanged. Relations break before binary operators (`+`, `\cdot`),
-which only break further when their segment still overflows; operators inside
-`(…)`, `\left…\right`, or a `{…}` group (including `\frac{…}{…}` arguments) are
-never broken at. A unary `+`/`-` is never a break point. An over-width row with
-a single relation breaks its binary right-hand side; one with no relation at all
-(a standalone binary chain) breaks with its head term first and each following
-term nested one `math-indent` step below it. Only an equation with **no**
-top-level relation or binary operator (e.g. a single wide `\frac{…}{…}`) is left
-on one line when it overflows. The option is unstable and may change without a
-major release --- see [Experimental
-Features](configuration.qmd#experimental-features).
+equation is unchanged. The layout is fully deterministic: it depends only on the
+content, `line-width`, and `math-indent`, never on where the author placed line
+breaks. A relation chain split across forced `\\` breaks in a bare `$$` is
+aligned the same way, like an implicit `aligned` environment. Relations break
+before binary operators (`+`, `\cdot`), which only break further when their
+segment still overflows; operators inside `(…)`, `\left…\right`, or a `{…}`
+group (including `\frac{…}{…}` arguments) are never broken at. A unary `+`/`-`
+is never a break point. An over-width row with a single relation breaks its
+binary right-hand side; one with no relation at all (a standalone binary chain)
+breaks with its head term first and each following term nested one `math-indent`
+step below it. Only an equation with **no** top-level relation or binary
+operator (e.g. a single wide `\frac{…}{…}`) is left on one line when it
+overflows. The option is unstable and may change without a major release --- see
+[Experimental Features](configuration.qmd#experimental-features).
 
 ## Links
 

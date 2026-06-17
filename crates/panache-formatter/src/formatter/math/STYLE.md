@@ -101,14 +101,15 @@ Returned unchanged, never reflowed:
    wider than `line-width` is broken at its **top-level** operators in a
    two-level hierarchy keyed on `operators::break_priority` (**relations** >
    **binary** > everything else). The first relation stays on the opening line;
-   every later relation starts a continuation **aligned under the first
-   relation's column**. Then any relation segment that is still over-width
-   splits before each top-level **binary** operator, with each `+ term` nested
-   one indent step (2 spaces) deeper, under the relation's right-hand side. The
-   width budget charges the flat `math-indent` against `line-width`, so a broken
-   line plus its leading indent still stays within `line-width`. It is
-   source-cosmetic only --- math ignores whitespace, so the rendered equation is
-   unchanged:
+   every later relation starts a continuation aligned under the **first
+   relation** (`linebreak::relation_column`) --- the classic stacked-`=` layout
+   for an equality/comparison chain. Then any relation segment that is still
+   over-width splits before each top-level **binary** operator, with each
+   `+ term` nested one indent step (2 spaces) deeper, under that segment's own
+   right-hand side. The width budget charges the flat `math-indent` against
+   `line-width`, so a broken line plus its leading indent still stays within
+   `line-width`. It is source-cosmetic only --- math ignores whitespace, so the
+   rendered equation is unchanged:
 
    ```
    A = aaaaaaaaaa
@@ -119,6 +120,26 @@ Returned unchanged, never reflowed:
 
    (At a width where each relation segment fits, no binary breaking happens and
    only the relation split shows: `A = aaaa + bbbb` / `= cccc + dddd`.)
+
+   **Assignment exception.** When the leading relation is an *assignment* arrow
+   (`\gets`, `\leftarrow`, `\mapsto`, `\coloneqq`, or `:=`), the arrow defines
+   its LHS rather than equating it, so it is **not** part of the equality chain
+   it introduces. The equality continuations then anchor under the assignment's
+   *right-hand side* (`linebreak::rhs_start_column`) instead of under the arrow,
+   so a wide arrow (`\gets` is 5 cols) does not drag them left. The selector is
+   `linebreak::continuation_anchor` / `first_relation_is_assignment`. `\to` and
+   `\rightarrow` are intentionally *not* assignments (they are usually limits or
+   mappings).
+
+   ```
+   \beta_0 \gets \beta_0 + \frac{4}{n} …
+                 = \beta_0 - \frac{1}{L_0} …
+                 = 1/4
+   ```
+
+   This is **fully deterministic**: the layout is a pure function of the
+   content, `line-width`, and `math-indent` --- the author's own line breaks and
+   indentation are never preserved, only recomputed.
 
    - **Top-level only.** An operator at delimiter depth > 0 --- inside `(…)`,
      `[…]`, or `\left…\right` (tracked by an open/close counter, since those are
@@ -138,6 +159,17 @@ Returned unchanged, never reflowed:
      (Contrast environment-body rows, which keep soft-newline boundaries.) The
      exception: a soft newline terminating a `%` comment stays a boundary, or
      the next line is absorbed into the comment.
+   - **`\\` relation chains align like an implicit `aligned`.** A genuine hard
+     `\\` *does* split logical rows. When ≥ 2 such `\\`-joined rows form a
+     relation chain --- the head ends in `\\` and every following row
+     `begins_with_top_level_relation` (a continuation like `= b`) --- the
+     continuations hang at the head's `continuation_anchor` (under the first
+     relation, or the assignment's RHS), exactly as the within-row relation
+     breaks do, so a `\\`-broken chain in bare `$$` reads like an `aligned` even
+     without one (`relation_chain_alignment`). This fires regardless of width
+     (the `\\` are forced breaks). A group containing a top-level `&` is left to
+     the existing free-row path (a bare `&` is not a column separator), and `\\`
+     rows that are not a relation chain stay flush at the bare `math-indent`.
    - **Scope:** every over-width free row with a top-level relation **or**
      binary operator is broken. A **relation chain** (≥ 2 relations) splits at
      its relations, then nests binary terms inside each over-width segment (as

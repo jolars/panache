@@ -5,7 +5,9 @@
 //! top-level operators, with a two-level hierarchy mirroring the amsmath
 //! convention: **relations** (`=`, `\leq`, `\to`, …) first, then the **binary**
 //! operators (`+`, `\cdot`, …) inside each over-width relation segment, indented
-//! one level deeper so they nest under the relation's right-hand side:
+//! one level deeper so they nest under the relation's right-hand side.
+//! Continuation relations align under the first relation — the classic `=` stack
+//! for an equality/comparison chain:
 //!
 //! ```text
 //! A = aaaaaaaaaa
@@ -13,6 +15,12 @@
 //!   = cccccccccc
 //!     + dddddddddd
 //! ```
+//!
+//! The exception is an **assignment-led** chain (`\beta \gets X = Y = …`): the
+//! arrow *defines* its left-hand side rather than equating it, so the equality
+//! continuations anchor under the assignment's *right-hand side* X, not aligned
+//! with the arrow. [`continuation_anchor`] picks the column per the leading
+//! relation (via [`first_relation_is_assignment`]).
 //!
 //! ## What "top-level" means, and why groups are opaque
 //!
@@ -54,8 +62,12 @@
 //!
 //! On top of that bare geometry, each binary continuation is nested one extra
 //! `math-indent` step (the `cont_indent` argument) so the `+ term` rows sit
-//! below — not flush with — the head/right-hand side they hang under. Relation
-//! continuations keep the bare alignment so relation operators stay in a column.
+//! below — not flush with — the right-hand side they hang under.
+//!
+//! The same anchor aligns a relation chain split across `\\` hard breaks in a
+//! bare `$$` (an implicit `aligned`); that cross-row pass lives in
+//! [`super::render`]'s `relation_chain_alignment`, reusing [`continuation_anchor`]
+//! and [`begins_with_top_level_relation`].
 //!
 //! ## Idempotency
 //!
@@ -69,9 +81,6 @@ use super::operators::{self, AtomClass};
 use super::render;
 use crate::syntax::{SyntaxElement, SyntaxKind};
 
-/// One indent step for a nested binary continuation, relative to its relation.
-const BINARY_NEST: usize = 2;
-
 /// A top-level (depth-0), *spaced* operator break candidate.
 struct Break {
     /// Element index of the atom's first token (where a break lands before it).
@@ -80,15 +89,112 @@ struct Break {
     class: AtomClass,
 }
 
+/// Element index of the first top-level (depth-0) **relation** operator, if any.
+pub(super) fn first_top_level_relation_index(elems: &[SyntaxElement]) -> Option<usize> {
+    spaced_operator_breaks(elems)
+        .into_iter()
+        .find(|b| b.class == AtomClass::Rel)
+        .map(|b| b.index)
+}
+
+/// The column (relative to the row's own base, *excluding* the block math-indent)
+/// where the first line's right-hand side begins: just past the first top-level
+/// relation and its single separating space. This is the alignment anchor for
+/// relation continuations — both the over-width within-row breaks and the
+/// cross-`\\`-row implicit alignment hang continuations here. If the row has no
+/// top-level relation, the anchor is the full rendered width + 1 (where an `&`
+/// would sit), used only for a relation-led continuation whose head row lacks a
+/// relation; an empty row yields 0.
+pub(super) fn rhs_start_column(elems: &[SyntaxElement]) -> usize {
+    match first_top_level_relation_index(elems) {
+        // `..=r` renders LHS + the relation; `+ 1` is the normalized space before
+        // the RHS. Composite split relations (`<=`) anchor on their first char —
+        // a rare, harmless one-column coarseness that stays deterministic.
+        Some(r) => render::render_inline(&elems[..=r]).trim().chars().count() + 1,
+        None => {
+            let w = render::render_inline(elems).trim().chars().count();
+            if w == 0 { 0 } else { w + 1 }
+        }
+    }
+}
+
+/// The column of the first top-level relation itself (its left edge): the
+/// rendered width of everything before it, plus one for the separating space.
+/// This aligns continuation relations *under the first relation* — the classic
+/// chain layout for an equality/comparison chain (`x = a = b` ⇒ the `=` stack).
+fn relation_column(elems: &[SyntaxElement]) -> usize {
+    match first_top_level_relation_index(elems) {
+        Some(r) => {
+            let w = render::render_inline(&elems[..r]).trim().chars().count();
+            if w == 0 { 0 } else { w + 1 }
+        }
+        None => 0,
+    }
+}
+
+/// Whether the first top-level relation is an **assignment/definition** arrow
+/// (`\gets`, `:=`, …) rather than an equality/comparison. An assignment is a
+/// lead-in — its left-hand side is being *defined*, not equated — so the
+/// equality chain it introduces is anchored under the assignment's right-hand
+/// side, not aligned with the arrow itself.
+fn first_relation_is_assignment(elems: &[SyntaxElement]) -> bool {
+    let Some(r) = first_top_level_relation_index(elems) else {
+        return false;
+    };
+    let Some(tok) = elems[r].as_token() else {
+        return false;
+    };
+    match tok.kind() {
+        SyntaxKind::MATH_COMMAND => {
+            let name = tok.text().strip_prefix('\\').unwrap_or(tok.text());
+            // `\Leftarrow` (⇐, "is implied by") and `\to`/`\rightarrow` (limits,
+            // mappings) are intentionally *not* assignments.
+            matches!(name, "gets" | "leftarrow" | "mapsto" | "coloneqq")
+        }
+        // `:=` tokenizes as `:` then the relation `=`; the relation atom is the
+        // `=`, immediately preceded by the `:` (whatever kind it parses as).
+        SyntaxKind::MATH_OPERATOR => {
+            tok.text().starts_with('=')
+                && r > 0
+                && elems[r - 1].as_token().is_some_and(|p| p.text() == ":")
+        }
+        _ => false,
+    }
+}
+
+/// The column continuation relations hang under, given the leading relation's
+/// kind: under the first relation for an equality/comparison chain
+/// ([`relation_column`]), but under the assignment's right-hand side for an
+/// assignment-led chain (or a relationless head) ([`rhs_start_column`]).
+pub(super) fn continuation_anchor(elems: &[SyntaxElement]) -> usize {
+    match first_top_level_relation_index(elems) {
+        Some(_) if !first_relation_is_assignment(elems) => relation_column(elems),
+        _ => rhs_start_column(elems),
+    }
+}
+
+/// True when the row's first non-layout-whitespace element is a top-level
+/// relation operator (e.g. a continuation line `= b`). Used to detect a
+/// relation chain spread across `\\` hard breaks.
+pub(super) fn begins_with_top_level_relation(elems: &[SyntaxElement]) -> bool {
+    match spaced_operator_breaks(elems).first() {
+        Some(b) => {
+            b.class == AtomClass::Rel && elems[..b.index].iter().all(render::is_layout_whitespace)
+        }
+        None => false,
+    }
+}
+
 /// Break one logical free-display row into physical content lines (no base
 /// math-indent, no trailing `\\` — the caller adds those). A row that fits, or
 /// that has no usable relation chain, is returned on one line unchanged.
 ///
 /// `cont_indent` (the block's `math-indent`) is added to every *binary*
 /// continuation line so the broken `+ term` rows nest one indent step deeper
-/// than the head/right-hand side they hang under. Relation continuations are
-/// not shifted, so the relation operators stay column-aligned. With
-/// `cont_indent == 0` the layout is the bare alignment geometry.
+/// than the right-hand side they hang under. Relation continuations hang at
+/// [`continuation_anchor`] (under the first relation, or the assignment's RHS),
+/// independent of `cont_indent`. With `cont_indent == 0` the binary nesting is
+/// the bare alignment geometry.
 pub(super) fn break_free_row(
     elems: &[SyntaxElement],
     line_width: usize,
@@ -119,29 +225,22 @@ pub(super) fn break_free_row(
         return break_binary_segment(elems, 0, cont_indent, line_width);
     }
 
-    // Relation continuations align under the first relation's column; binary
-    // continuations nest one step deeper, under the relation's right-hand side.
-    let prefix_width = render::render_inline(&elems[..rels[0]])
-        .trim()
-        .chars()
-        .count();
-    let rel_indent = if prefix_width == 0 {
-        0
-    } else {
-        prefix_width + 1
-    };
-    let bin_indent = rel_indent + BINARY_NEST + cont_indent;
+    // Where continuation relations hang: under the first relation for an
+    // equality/comparison chain (the `=` stack), or under the assignment's RHS
+    // when the chain is led by an assignment arrow (`\gets`) — so the equality
+    // chain it introduces lines up with its right-hand side, not the arrow.
+    let rel_indent = continuation_anchor(elems);
 
     // One relation: the whole row is a single segment. It keeps the lone relation
     // on the opening line; an over-width binary RHS breaks before each `+`, each
-    // term nested at `bin_indent` (under the RHS for a single-char LHS).
+    // term nested one `cont_indent` step under the right-hand side.
     if rels.len() == 1 {
-        return break_binary_segment(elems, 0, bin_indent, line_width);
+        return break_binary_segment(elems, 0, cont_indent, line_width);
     }
 
     // ≥ 2 relations: a relation chain. The first relation stays on the opening
-    // line; every later one starts a continuation aligned under the first
-    // relation's column. Segment boundaries: [0, rels[1], rels[2], …, len].
+    // line; every later one starts a continuation aligned under the head row's
+    // RHS column. Segment boundaries: [0, rels[1], rels[2], …, len].
     let bounds: Vec<usize> = std::iter::once(0)
         .chain(rels[1..].iter().copied())
         .chain(std::iter::once(elems.len()))
@@ -152,19 +251,24 @@ pub(super) fn break_free_row(
         let seg = &elems[bounds[w]..bounds[w + 1]];
         let seg_indent = if w == 0 { 0 } else { rel_indent };
         out.extend(break_binary_segment(
-            seg, seg_indent, bin_indent, line_width,
+            seg,
+            seg_indent,
+            cont_indent,
+            line_width,
         ));
     }
     out
 }
 
 /// Lay out one relation segment: keep it on a single line at `base_indent` if it
-/// fits, otherwise split it before each top-level binary operator, putting each
-/// `+ term` on its own line at `bin_indent`.
+/// fits, otherwise split it before each top-level binary operator. Each `+ term`
+/// hangs under the first term of this segment's operand sequence — its own
+/// right-hand side (`base_indent + rhs_start_column(seg)`), or the chain start
+/// when the segment has no relation — nested one `cont_indent` step deeper.
 fn break_binary_segment(
     seg: &[SyntaxElement],
     base_indent: usize,
-    bin_indent: usize,
+    cont_indent: usize,
     line_width: usize,
 ) -> Vec<String> {
     let single = render::render_inline(seg).trim().to_string();
@@ -183,7 +287,13 @@ fn break_binary_segment(
         return vec![format!("{base_pad}{single}")];
     }
 
-    let bin_pad = " ".repeat(bin_indent);
+    // The operand sequence starts past this segment's own relation (if any); a
+    // relationless segment (a bare binary chain) starts at its head term.
+    let rhs_offset = match first_top_level_relation_index(seg) {
+        Some(r) => render::render_inline(&seg[..=r]).trim().chars().count() + 1,
+        None => 0,
+    };
+    let bin_pad = " ".repeat(base_indent + rhs_offset + cont_indent);
     let mut out: Vec<String> = Vec::new();
     // Head: everything before the first binary operator (keeps the leading
     // relation, e.g. `A = aaaa` or a continuation's `= cccc`).

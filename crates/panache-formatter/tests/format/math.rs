@@ -128,7 +128,7 @@ fn experimental_format_math_breaks_overwidth_display_chain() {
     let cfg = math_config_width(true, 30);
     let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd\n$$\n";
     // Breaks at the second (top-level) relation; the continuation aligns under
-    // the first `=`. The `+` sub-terms stay put (binary outranked by relations).
+    // the first `=` (equality chain). `+` sub-terms stay put (binary outranked).
     let expected = "$$\nA = aaaaaaaaaa + bbbbbbbbbb\n  = cccccccccc + dddddddddd\n$$\n";
     let output = format(input, Some(cfg.clone()), None);
     similar_asserts::assert_eq!(output, expected);
@@ -149,6 +149,8 @@ fn experimental_line_break_budget_accounts_for_math_indent() {
         ..math_config(true) // default math_indent = 2
     };
     let input = "$$\naa = bbbbbb = ccccccc\n$$\n";
+    // Continuation `=` aligns under the first `=` (column 3) + the two-space
+    // block indent ⇒ column 5.
     let expected = "$$\n  aa = bbbbbb\n     = ccccccc\n$$\n";
     let output = format(input, Some(cfg.clone()), None);
     similar_asserts::assert_eq!(output, expected);
@@ -160,8 +162,9 @@ fn experimental_line_break_budget_accounts_for_math_indent() {
 fn experimental_format_math_nests_binary_under_relations() {
     let cfg = math_config_width(true, 20);
     let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd\n$$\n";
-    // Narrow enough that each relation segment overflows ⇒ the `+` terms nest
-    // one level deeper under the relation right-hand side.
+    // Narrow enough that each relation segment overflows ⇒ relations align under
+    // the first `=` (col 2); each over-width segment nests its `+` one level
+    // deeper, under the relation's right-hand side (col 4).
     let expected = "$$\nA = aaaaaaaaaa\n    + bbbbbbbbbb\n  = cccccccccc\n    + dddddddddd\n$$\n";
     let output = format(input, Some(cfg.clone()), None);
     similar_asserts::assert_eq!(output, expected);
@@ -188,7 +191,8 @@ fn experimental_binary_continuations_pick_up_math_indent_no_relation() {
 
 #[test]
 fn experimental_binary_continuations_pick_up_math_indent_one_relation() {
-    // The binary terms nest one `math-indent` past the relation right-hand side.
+    // The binary terms hang under the RHS column (4) plus one `math-indent` step
+    // (2) ⇒ relative column 6, plus the two-space block indent ⇒ column 8.
     let cfg = Config {
         line_width: 20,
         ..math_config(true)
@@ -203,8 +207,8 @@ fn experimental_binary_continuations_pick_up_math_indent_one_relation() {
 
 #[test]
 fn experimental_relation_continuations_keep_alignment_with_math_indent() {
-    // Relation continuations still align under the first `=` (both at column 4);
-    // only the binary terms pick up the extra `math-indent`.
+    // Relation continuations align under the first `=` (col 2) + block indent
+    // ⇒ column 4; only the binary terms pick up the extra `math-indent` (to 8).
     let cfg = Config {
         line_width: 20,
         ..math_config(true)
@@ -261,11 +265,140 @@ fn experimental_format_math_breaks_standalone_binary_chain() {
 
 #[test]
 fn experimental_format_math_nests_binary_under_single_relation() {
-    // One relation with an over-width binary RHS: the `+` terms nest under the
-    // right-hand side (no second relation to start a continuation against).
+    // One relation with an over-width binary RHS: the `+` terms hang under the
+    // right-hand side (RHS column 4 + `cont_indent` 0 = 4; no second relation to
+    // start a continuation against).
     let cfg = math_config_width(true, 20);
     let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb + cccccccccc\n$$\n";
     let expected = "$$\nA = aaaaaaaaaa\n    + bbbbbbbbbb\n    + cccccccccc\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+// --- Relation-chain RHS-start alignment (rule "b") ------------------------
+
+#[test]
+fn relation_chain_long_lhs_anchors_under_rhs() {
+    // A wide leading relation (`\gets`, 5 cols) must not drag the continuation
+    // `=` under it. The continuations hang under the head's RHS column — here
+    // column 16 (RHS at relative 14 + the two-space block indent). Fully
+    // deterministic: the author's hand-indentation is recomputed, not preserved.
+    let cfg = math_config(true); // default line-width 80, math-indent 2
+    let input = "$$\n  \\beta_0 \\gets \\beta_0 + \\frac{4}{n} \\sum_{i = 1}^n (y_i - p_i)\n          = \\beta_0 - \\frac{1}{L_0} \\partial_0 F, \\qquad L_0\n          = 1/4,\n$$\n";
+    let expected = "$$\n  \\beta_0 \\gets \\beta_0 + \\frac{4}{n} \\sum_{i = 1}^n (y_i - p_i)\n                = \\beta_0 - \\frac{1}{L_0} \\partial_0 F, \\qquad L_0\n                = 1/4,\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn relation_chain_uniform_relations_align_under_first() {
+    // A uniform `=` chain (no assignment) aligns continuations under the first
+    // `=` (relative column 2) + block indent ⇒ column 4 — the classic `=` stack.
+    let cfg = Config {
+        line_width: 20,
+        ..math_config(true)
+    };
+    let input = "$$\nA = bbbbbbbbbb = cccccccccc\n$$\n";
+    let expected = "$$\n  A = bbbbbbbbbb\n    = cccccccccc\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn relation_chain_math_indent_zero_aligns_relations() {
+    // With math-indent 0 the block flushes and the continuation `=` aligns under
+    // the first `=` at column 2 — the anchor is relative to content, not absolute.
+    let cfg = math_config_width(true, 20); // math_indent 0
+    let input = "$$\nA = bbbbbbbbbb = cccccccccc\n$$\n";
+    let expected = "$$\nA = bbbbbbbbbb\n  = cccccccccc\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn hardbreak_equality_chain_aligns_relations() {
+    // An equality chain split across `\\` hard breaks aligns like an implicit
+    // `aligned`: continuations align under the first `=` (column 4), regardless
+    // of width. The `\\` are kept as genuine forced breaks.
+    let cfg = math_config(true);
+    let input = "$$\nx = a \\\\\n= b \\\\\n= c\n$$\n";
+    let expected = "$$\n  x = a \\\\\n    = b \\\\\n    = c\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn hardbreak_assignment_chain_anchors_under_rhs() {
+    // An assignment-led chain split across `\\` anchors the `=` continuations
+    // under the assignment's RHS (`a` at column 10), not aligned with `\gets`.
+    let cfg = math_config(true);
+    let input = "$$\nx \\gets a \\\\\n= b \\\\\n= c\n$$\n";
+    let expected = "$$\n  x \\gets a \\\\\n          = b \\\\\n          = c\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn hardbreak_non_chain_stays_flush() {
+    // `\\` rows with no leading relation are not a chain: each keeps the bare
+    // block indent, no implicit alignment.
+    let cfg = math_config(true);
+    let input = "$$\na \\\\\nb \\\\\nc\n$$\n";
+    let expected = "$$\n  a \\\\\n  b \\\\\n  c\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn hardbreak_ampersand_block_not_implicitly_aligned() {
+    // A free `\\` block containing `&` is left to the existing path; the implicit
+    // relation column is not applied (free `&` is not a column separator).
+    let cfg = math_config(true);
+    let input = "$$\nx &= a \\\\\n&= b\n$$\n";
+    let expected = "$$\n  x & = a \\\\\n  & = b\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn hardbreak_overwidth_continuation_nests_under_its_column() {
+    // A continuation row that is itself over-width still wraps, nesting its `+`
+    // terms under its own right-hand side (continuation `=` at col 4, `+` at 8).
+    let cfg = Config {
+        line_width: 24,
+        ..math_config(true)
+    };
+    let input = "$$\nx = a \\\\\n= bbbbbbbb + cccccccc + dddddddd\n$$\n";
+    let expected = "$$\n  x = a \\\\\n    = bbbbbbbb\n        + cccccccc\n        + dddddddd\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn hardbreak_relation_chain_gate_off_is_not_aligned() {
+    // Gate off: the relation column is never applied — every line just carries
+    // the block indent (verbatim math layout).
+    let cfg = math_config(false);
+    let input = "$$\nx = a \\\\\n= b \\\\\n= c\n$$\n";
+    let expected = "$$\n  x = a \\\\\n  = b \\\\\n  = c\n$$\n";
     let output = format(input, Some(cfg.clone()), None);
     similar_asserts::assert_eq!(output, expected);
     let twice = format(&output, Some(cfg), None);

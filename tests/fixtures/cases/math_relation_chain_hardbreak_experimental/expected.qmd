@@ -1,0 +1,27 @@
+# Relation chains across hard breaks
+
+An equality chain split with `\\` aligns its continuations under the first
+relation, like an implicit `aligned`:
+
+$$
+  x = a \\
+    = b \\
+    = c
+$$
+
+An assignment-led chain (`\gets`) instead anchors the equality continuations
+under the assignment's right-hand side:
+
+$$
+  \beta \gets f(x) \\
+              = g(x) \\
+              = h(x)
+$$
+
+A non-chain `\\` block is left flush:
+
+$$
+  a \\
+  b \\
+  c
+$$

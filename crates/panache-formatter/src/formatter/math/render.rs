@@ -76,13 +76,21 @@ fn flush_free_rows(
     cont_indent: usize,
     lines: &mut Vec<String>,
 ) {
-    for row in split_logical_rows(elems) {
+    let rows = split_logical_rows(elems);
+    // A relation chain spread across `\\` hard breaks is aligned like an implicit
+    // `aligned`: continuation rows hang under the head row's RHS column (rule
+    // "b"). `extra` is that per-row alignment offset (0 for heads / non-chains).
+    let extra = relation_chain_alignment(&rows);
+    for (idx, row) in rows.iter().enumerate() {
         if row.is_blank() {
             continue;
         }
-        // Charge the flat math-indent against the budget so packed (and single)
-        // lines genuinely stay within `line_width` once the indent is prepended.
-        let budget = line_width.saturating_sub(indent.chars().count());
+        let ei = extra[idx];
+        let pad = " ".repeat(ei);
+        // Charge the flat math-indent *and* the alignment offset against the
+        // budget so packed (and single) lines genuinely stay within `line_width`
+        // once the indent and pad are prepended.
+        let budget = line_width.saturating_sub(indent.chars().count() + ei);
         let physical = linebreak::break_free_row(&row.elems, budget, cont_indent);
         let last = physical.len() - 1;
         for (i, content) in physical.into_iter().enumerate() {
@@ -92,9 +100,51 @@ fn flush_free_rows(
             } else {
                 content
             };
-            lines.push(format!("{indent}{content}"));
+            lines.push(format!("{indent}{pad}{content}"));
         }
     }
+}
+
+/// Per-row alignment offset for relation chains split across `\\` hard breaks.
+///
+/// A *group* is a maximal run of `\\`-joined rows whose head ends in a hard break
+/// and whose every following row begins with a top-level relation operator (a
+/// continuation like `= b`). For a group of ≥ 2 rows, each continuation row is
+/// offset to the head row's [`linebreak::rhs_start_column`] so the continuation
+/// relations hang under the head's right-hand side. Heads, non-chain rows, and
+/// any group containing a top-level `&` (left to the existing free-row path) get
+/// offset 0. Recomputed from the (whitespace-trimmed) logical rows each pass, so
+/// the alignment is a deterministic fixed point.
+fn relation_chain_alignment(rows: &[Row]) -> Vec<usize> {
+    let mut extra = vec![0usize; rows.len()];
+    let mut i = 0;
+    while i < rows.len() {
+        if rows[i].has_break && !rows[i].is_blank() {
+            let mut k = i;
+            while rows[k].has_break
+                && k + 1 < rows.len()
+                && !rows[k + 1].is_blank()
+                && linebreak::begins_with_top_level_relation(&rows[k + 1].elems)
+            {
+                k += 1;
+            }
+            if k > i && !rows[i..=k].iter().any(|r| has_top_level_align(&r.elems)) {
+                let col = linebreak::continuation_anchor(&rows[i].elems);
+                for offset in extra.iter_mut().take(k + 1).skip(i + 1) {
+                    *offset = col;
+                }
+                i = k + 1;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    extra
+}
+
+/// True if any direct element of the row is a top-level `&` alignment tab.
+fn has_top_level_align(elems: &[SyntaxElement]) -> bool {
+    elems.iter().any(|el| el.kind() == SyntaxKind::MATH_ALIGN)
 }
 
 // ---------------------------------------------------------------------------
@@ -420,7 +470,7 @@ fn split_cells(elems: &[SyntaxElement]) -> Vec<Vec<SyntaxElement>> {
     cells
 }
 
-fn is_layout_whitespace(el: &SyntaxElement) -> bool {
+pub(super) fn is_layout_whitespace(el: &SyntaxElement) -> bool {
     matches!(el.kind(), SyntaxKind::MATH_SPACE | SyntaxKind::MATH_NEWLINE)
         && el.as_token().is_some()
 }
