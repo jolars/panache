@@ -4,7 +4,7 @@ Equation:
 
 $$
   A = aaaaaaaaaa
-        + bbbbbbbbbb
+      + bbbbbbbbbb
     = cccccccccc
-        + dddddddddd
+      + dddddddddd
 $$

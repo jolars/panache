@@ -173,16 +173,16 @@ fn experimental_format_math_nests_binary_under_relations() {
 }
 
 #[test]
-fn experimental_binary_continuations_pick_up_math_indent_no_relation() {
-    // With the default two-space `math-indent`, a broken binary chain's
-    // continuation lines nest one `math-indent` deeper than the head instead of
-    // sitting flush under it.
+fn experimental_binary_continuations_flush_under_operand_no_relation() {
+    // A broken binary chain's continuation `+` rows sit flush under the head
+    // term, not nested deeper. The two-space `math-indent` shifts the whole
+    // block right but never changes the internal operator/operand alignment.
     let cfg = Config {
         line_width: 20,
         ..math_config(true)
     };
     let input = "$$\naaaaaaaa + bbbbbbbb + cccccccc + dddddddd\n$$\n";
-    let expected = "$$\n  aaaaaaaa\n    + bbbbbbbb\n    + cccccccc\n    + dddddddd\n$$\n";
+    let expected = "$$\n  aaaaaaaa\n  + bbbbbbbb\n  + cccccccc\n  + dddddddd\n$$\n";
     let output = format(input, Some(cfg.clone()), None);
     similar_asserts::assert_eq!(output, expected);
     let twice = format(&output, Some(cfg), None);
@@ -190,15 +190,16 @@ fn experimental_binary_continuations_pick_up_math_indent_no_relation() {
 }
 
 #[test]
-fn experimental_binary_continuations_pick_up_math_indent_one_relation() {
-    // The binary terms hang under the RHS column (4) plus one `math-indent` step
-    // (2) ⇒ relative column 6, plus the two-space block indent ⇒ column 8.
+fn experimental_binary_continuations_flush_under_rhs_one_relation() {
+    // The binary terms hang flush under the RHS column (relative 4), plus the
+    // two-space block indent ⇒ column 6. The internal alignment is independent
+    // of `math-indent`.
     let cfg = Config {
         line_width: 20,
         ..math_config(true)
     };
     let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb + cccccccccc\n$$\n";
-    let expected = "$$\n  A = aaaaaaaaaa\n        + bbbbbbbbbb\n        + cccccccccc\n$$\n";
+    let expected = "$$\n  A = aaaaaaaaaa\n      + bbbbbbbbbb\n      + cccccccccc\n$$\n";
     let output = format(input, Some(cfg.clone()), None);
     similar_asserts::assert_eq!(output, expected);
     let twice = format(&output, Some(cfg), None);
@@ -208,14 +209,16 @@ fn experimental_binary_continuations_pick_up_math_indent_one_relation() {
 #[test]
 fn experimental_relation_continuations_keep_alignment_with_math_indent() {
     // Relation continuations align under the first `=` (col 2) + block indent
-    // ⇒ column 4; only the binary terms pick up the extra `math-indent` (to 8).
+    // ⇒ column 4; the binary terms sit flush under the RHS (col 4) + block
+    // indent ⇒ column 6. Neither offset depends on `math-indent` beyond the
+    // flat block shift.
     let cfg = Config {
         line_width: 20,
         ..math_config(true)
     };
     let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb = cccccccccc + dddddddddd\n$$\n";
     let expected =
-        "$$\n  A = aaaaaaaaaa\n        + bbbbbbbbbb\n    = cccccccccc\n        + dddddddddd\n$$\n";
+        "$$\n  A = aaaaaaaaaa\n      + bbbbbbbbbb\n    = cccccccccc\n      + dddddddddd\n$$\n";
     let output = format(input, Some(cfg.clone()), None);
     similar_asserts::assert_eq!(output, expected);
     let twice = format(&output, Some(cfg), None);
@@ -265,9 +268,9 @@ fn experimental_format_math_breaks_standalone_binary_chain() {
 
 #[test]
 fn experimental_format_math_nests_binary_under_single_relation() {
-    // One relation with an over-width binary RHS: the `+` terms hang under the
-    // right-hand side (RHS column 4 + `cont_indent` 0 = 4; no second relation to
-    // start a continuation against).
+    // One relation with an over-width binary RHS: the `+` terms hang flush under
+    // the right-hand side (RHS column 4; no second relation to start a
+    // continuation against).
     let cfg = math_config_width(true, 20);
     let input = "$$\nA = aaaaaaaaaa + bbbbbbbbbb + cccccccccc\n$$\n";
     let expected = "$$\nA = aaaaaaaaaa\n    + bbbbbbbbbb\n    + cccccccccc\n$$\n";
@@ -378,14 +381,14 @@ fn hardbreak_ampersand_block_not_implicitly_aligned() {
 
 #[test]
 fn hardbreak_overwidth_continuation_nests_under_its_column() {
-    // A continuation row that is itself over-width still wraps, nesting its `+`
-    // terms under its own right-hand side (continuation `=` at col 4, `+` at 8).
+    // A continuation row that is itself over-width still wraps, its `+` terms
+    // flush under its own right-hand side (continuation `=` at col 4, `+` at 6).
     let cfg = Config {
         line_width: 24,
         ..math_config(true)
     };
     let input = "$$\nx = a \\\\\n= bbbbbbbb + cccccccc + dddddddd\n$$\n";
-    let expected = "$$\n  x = a \\\\\n    = bbbbbbbb\n        + cccccccc\n        + dddddddd\n$$\n";
+    let expected = "$$\n  x = a \\\\\n    = bbbbbbbb\n      + cccccccc\n      + dddddddd\n$$\n";
     let output = format(input, Some(cfg.clone()), None);
     similar_asserts::assert_eq!(output, expected);
     let twice = format(&output, Some(cfg), None);

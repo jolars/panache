@@ -105,11 +105,12 @@ Returned unchanged, never reflowed:
    relation** (`linebreak::relation_column`) --- the classic stacked-`=` layout
    for an equality/comparison chain. Then any relation segment that is still
    over-width splits before each top-level **binary** operator, with each
-   `+ term` nested one indent step (2 spaces) deeper, under that segment's own
-   right-hand side. The width budget charges the flat `math-indent` against
-   `line-width`, so a broken line plus its leading indent still stays within
-   `line-width`. It is source-cosmetic only --- math ignores whitespace, so the
-   rendered equation is unchanged:
+   `+ term` sitting **flush** under that segment's own right-hand side. The
+   relation/RHS offset alone supplies the visual nesting; binary continuations
+   never pick up an extra step. The width budget charges the flat `math-indent`
+   against `line-width`, so a broken line plus its leading indent still stays
+   within `line-width`. It is source-cosmetic only --- math ignores whitespace,
+   so the rendered equation is unchanged:
 
    ```
    A = aaaaaaaaaa
@@ -174,12 +175,14 @@ Returned unchanged, never reflowed:
      binary operator is broken. A **relation chain** (≥ 2 relations) splits at
      its relations, then nests binary terms inside each over-width segment (as
      above). A **single-relation** row splits its over-width binary RHS, each
-     `+ term` nested under the right-hand side. A **standalone binary chain**
-     (no relation) splits with the first term as the head and each `+ term`
-     flush under it. The unifying rule: a binary continuation aligns under the
+     `+ term` flush under the right-hand side. A **standalone binary chain** (no
+     relation) splits with the first term as the head and each `+ term` flush
+     under it. The unifying rule: a binary continuation aligns flush under the
      **first term of its operand sequence** (for a relation segment that is its
-     RHS; for a bare chain it is the chain itself, so the `+` sits flush). A row
-     with **no** top-level relation or binary operator (e.g. a single wide
+     RHS; for a bare chain it is the chain itself). The relation/RHS offset is
+     the only nesting; `math-indent` shifts the whole block but never the
+     internal alignment, so the equation's shape is identical at any indent. A
+     row with **no** top-level relation or binary operator (e.g. a single wide
      `\frac{…}{…}`) is left on one over-width line --- like an unbreakable long
      word in prose reflow. Inline and environment-body math are not line-broken.
 

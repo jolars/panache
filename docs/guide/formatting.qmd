@@ -904,11 +904,12 @@ glyphs), and malformed math is left untouched.
 A display equation (`$$…$$`) wider than `line-width` is broken at its top-level
 relations, with each continuation aligned under the first relation (the classic
 stacked-`=` layout for an equality chain). If a relation segment is itself too
-wide, its binary terms break one level deeper. Binary continuations are
-additionally nested by one `math-indent` step, so the `+ term` rows sit below
-(not flush with) the right-hand side they hang under. The width budget accounts
-for `math-indent`, so a broken line plus its leading indent stays within
-`line-width`:
+wide, its binary terms break one level deeper, each `+ term` sitting flush under
+the right-hand side they hang under --- the relation/right-hand-side offset
+alone supplies the nesting. The `math-indent` shifts the whole block to the
+right but never changes this internal alignment, so the equation's shape is the
+same at any indent. The width budget accounts for `math-indent`, so a broken
+line plus its leading indent stays within `line-width`:
 
 Input
 
@@ -923,7 +924,7 @@ Output
 :   ```markdown
     $$
       A = aaaaaaaaaa
-            + bbbbbbbbbb
+          + bbbbbbbbbb
         = cccccccccc
           + dddddddddd
     $$
@@ -955,11 +956,11 @@ segment still overflows; operators inside `(…)`, `\left…\right`, or a `{…}
 group (including `\frac{…}{…}` arguments) are never broken at. A unary `+`/`-`
 is never a break point. An over-width row with a single relation breaks its
 binary right-hand side; one with no relation at all (a standalone binary chain)
-breaks with its head term first and each following term nested one `math-indent`
-step below it. Only an equation with **no** top-level relation or binary
-operator (e.g. a single wide `\frac{…}{…}`) is left on one line when it
-overflows. The option is unstable and may change without a major release --- see
-[Experimental Features](configuration.qmd#experimental-features).
+breaks with its head term first and each following term flush beneath it. Only
+an equation with **no** top-level relation or binary operator (e.g. a single
+wide `\frac{…}{…}`) is left on one line when it overflows. The option is
+unstable and may change without a major release --- see [Experimental
+Features](configuration.qmd#experimental-features).
 
 ## Links
 
