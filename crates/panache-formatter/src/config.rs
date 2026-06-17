@@ -25,6 +25,9 @@ pub enum MathDelimiterStyle {
     Backslash,
 }
 
+/// Default indentation (in columns) for top-level tables.
+pub const DEFAULT_TABLE_INDENT: usize = 2;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TabStopMode {
     /// Normalize tabs to spaces (4-column tab stop).
@@ -166,6 +169,11 @@ pub struct Config {
     pub line_width: usize,
     pub math_indent: usize,
     pub math_delimiter_style: MathDelimiterStyle,
+    /// Indentation (in columns) applied to top-level pipe, simple, and
+    /// multiline tables. Grid tables ignore this and stay flush at column 0,
+    /// since Pandoc only recognizes a grid table whose border starts at column
+    /// 0. Nested tables honor their container indent instead.
+    pub table_indent: usize,
     pub tab_stops: TabStopMode,
     pub tab_width: usize,
     pub wrap: Option<WrapMode>,
@@ -202,6 +210,7 @@ impl Default for Config {
             line_width: 80,
             math_indent: 2,
             math_delimiter_style: MathDelimiterStyle::default(),
+            table_indent: DEFAULT_TABLE_INDENT,
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
             wrap: Some(WrapMode::Reflow),
@@ -246,6 +255,11 @@ impl ConfigBuilder {
 
     pub fn tab_stops(mut self, mode: TabStopMode) -> Self {
         self.config.tab_stops = mode;
+        self
+    }
+
+    pub fn table_indent(mut self, indent: usize) -> Self {
+        self.config.table_indent = indent;
         self
     }
 

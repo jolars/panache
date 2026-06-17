@@ -69,6 +69,19 @@ fn apply_format_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Re
                 };
                 cfg.wrap = Some(mode);
             }
+            "table-indent" => {
+                let indent: usize = value.parse().map_err(|_| {
+                    format!(
+                        "invalid value for `table-indent`: `{value}` (expected an integer 0, 1, 2, or 3)"
+                    )
+                })?;
+                if indent > 3 {
+                    return Err(format!(
+                        "invalid value for `table-indent`: `{indent}` (expected 0, 1, 2, or 3)"
+                    ));
+                }
+                cfg.table_indent = indent;
+            }
             ext_key if ext_key.starts_with("extensions.") => {
                 let name = ext_key["extensions.".len()..].trim();
                 if name.is_empty() {
@@ -89,7 +102,7 @@ fn apply_format_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Re
             }
             other => {
                 return Err(format!(
-                    "unknown config key in --option: `{other}` (supported: line-width, wrap, extensions.<name>)"
+                    "unknown config key in --option: `{other}` (supported: line-width, wrap, table-indent, extensions.<name>)"
                 ));
             }
         }
@@ -2471,6 +2484,29 @@ mod tests {
             let mut c = cfg();
             let err = apply_format_overrides(&mut c, &["nope=1".to_string()]).unwrap_err();
             assert!(err.contains("unknown config key"), "{err}");
+        }
+
+        #[test]
+        fn table_indent_override_sets_value() {
+            let mut c = cfg();
+            assert_eq!(c.table_indent, 2);
+            apply_format_overrides(&mut c, &["table-indent=0".to_string()]).unwrap();
+            assert_eq!(c.table_indent, 0);
+        }
+
+        #[test]
+        fn table_indent_override_rejects_out_of_range_value() {
+            let mut c = cfg();
+            let err = apply_format_overrides(&mut c, &["table-indent=4".to_string()]).unwrap_err();
+            assert!(err.contains("invalid value for `table-indent`"), "{err}");
+        }
+
+        #[test]
+        fn table_indent_override_rejects_non_integer_value() {
+            let mut c = cfg();
+            let err =
+                apply_format_overrides(&mut c, &["table-indent=flush".to_string()]).unwrap_err();
+            assert!(err.contains("invalid value for `table-indent`"), "{err}");
         }
     }
 }

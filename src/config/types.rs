@@ -238,6 +238,26 @@ pub enum TabStopMode {
     Preserve,
 }
 
+/// Largest accepted value for `table-indent`.
+pub const MAX_TABLE_INDENT: usize = 3;
+
+/// Default value for `table-indent`.
+pub const DEFAULT_TABLE_INDENT: usize = 2;
+
+/// Deserialize `table-indent`, rejecting values outside `0..=3`.
+fn deserialize_table_indent<'de, D>(deserializer: D) -> Result<usize, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = usize::deserialize(deserializer)?;
+    if value > MAX_TABLE_INDENT {
+        return Err(serde::de::Error::custom(format!(
+            "table-indent must be 0, 1, 2, or 3 (got {value})"
+        )));
+    }
+    Ok(value)
+}
+
 /// User-supplied no-break abbreviations for sentence wrapping.
 ///
 /// Accepts either a flat list applied to every document, or a table keyed by
@@ -300,6 +320,11 @@ pub struct StyleConfig {
     pub math_delimiter_style: MathDelimiterStyle,
     /// Math indentation (spaces)
     pub math_indent: usize,
+    /// Indentation (columns) for top-level pipe, simple, and multiline tables.
+    /// Accepts 0--3; grid tables stay flush at column 0 regardless.
+    #[serde(deserialize_with = "deserialize_table_indent")]
+    #[schemars(range(min = 0, max = 3))]
+    pub table_indent: usize,
     /// Tab stop handling (normalize or preserve)
     pub tab_stops: TabStopMode,
     /// Tab width for expanding tabs when normalizing
@@ -328,6 +353,7 @@ impl Default for StyleConfig {
             blank_lines: BlankLines::Collapse,
             math_delimiter_style: MathDelimiterStyle::default(),
             math_indent: 2,
+            table_indent: DEFAULT_TABLE_INDENT,
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
             built_in_greedy_wrap: true,
@@ -780,6 +806,7 @@ impl RawConfig {
                 math_indent: self
                     .math_indent
                     .unwrap_or(StyleConfig::default().math_indent),
+                table_indent: DEFAULT_TABLE_INDENT,
                 tab_stops: self.tab_stops,
                 tab_width: self.tab_width,
                 built_in_greedy_wrap: true,
@@ -802,6 +829,7 @@ impl RawConfig {
             blank_lines: style.blank_lines,
             math_delimiter_style: style.math_delimiter_style,
             math_indent: style.math_indent,
+            table_indent: style.table_indent,
             tab_stops: style.tab_stops,
             tab_width: style.tab_width,
             formatters: resolve_formatters(self.formatters),
@@ -1018,6 +1046,8 @@ pub struct Config {
     pub line_width: usize,
     pub math_indent: usize,
     pub math_delimiter_style: MathDelimiterStyle,
+    /// Indentation (columns) for top-level pipe, simple, and multiline tables.
+    pub table_indent: usize,
     pub tab_stops: TabStopMode,
     pub tab_width: usize,
     pub wrap: Option<WrapMode>,
@@ -1083,6 +1113,7 @@ impl Default for Config {
             line_width: 80,
             math_indent: 2,
             math_delimiter_style: MathDelimiterStyle::default(),
+            table_indent: DEFAULT_TABLE_INDENT,
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
             wrap: Some(WrapMode::Reflow),

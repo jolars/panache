@@ -7,10 +7,12 @@ use rowan::NodeOrToken;
 use std::collections::{BTreeSet, HashMap};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-/// Default indent (in spaces) for table types that self-indent at the top level
-/// (pipe, simple, multiline). Grid tables instead honor the container indent
-/// threaded from the dispatcher so a top-level grid sits at column 0 -- pandoc
-/// rejects an indented `+---+` border. See `format_grid_table`.
+/// Indent (in columns) assumed for table types that self-indent at the top
+/// level (pipe, simple, multiline) when budgeting caption wrap width. The
+/// actual block indent is `config.table_indent` (default 2, range 0--3); grid
+/// tables instead honor the container indent threaded from the dispatcher so a
+/// top-level grid sits at column 0 -- pandoc rejects an indented `+---+`
+/// border. See `format_grid_table`.
 const TABLE_BLOCK_INDENT: usize = 2;
 
 fn indent_table_block(block: &str, indent: usize) -> String {
@@ -729,8 +731,10 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config, indent: usize) -> S
         output.push_str(&formatted_caption);
         output.push('\n');
     }
+    // A top-level pipe table self-indents by the configured `table-indent`
+    // (default 2). Nested tables always honor the container indent threaded in.
     let block_indent = if indent == 0 {
-        TABLE_BLOCK_INDENT
+        config.table_indent
     } else {
         indent
     };
@@ -2342,7 +2346,7 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    indent_table_block(&output, TABLE_BLOCK_INDENT)
+    indent_table_block(&output, config.table_indent)
 }
 
 /// Extract column information from multiline table separator line
@@ -2797,7 +2801,7 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    indent_table_block(&output, TABLE_BLOCK_INDENT)
+    indent_table_block(&output, config.table_indent)
 }
 
 #[cfg(test)]

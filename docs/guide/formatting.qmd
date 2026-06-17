@@ -600,6 +600,14 @@ blocks are indented by two spaces. Grid tables are left at the margin (column
 0): Pandoc only recognizes a grid table when its `+---+` border starts at column
 0, so an indented border would be parsed as a paragraph instead.
 
+The two-space indent is configurable via `table-indent` under `[format]`, which
+accepts an integer from 0 to 3 (default 2) and applies to pipe, simple, and
+multiline tables alike. Setting `table-indent = 0` keeps them flush at column 0.
+Grid tables always stay flush regardless, since Pandoc does not yet recognize an
+indented grid border. See [Table
+Indentation](configuration.qmd#table-indentation) for details. The examples
+below show the default indent of 2.
+
 ### Pipe Tables
 
 Pipe tables are normalized to have consistent spacing and alignment. The header

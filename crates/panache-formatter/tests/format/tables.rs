@@ -1,5 +1,5 @@
 use panache_formatter::config::WrapMode;
-use panache_formatter::{Config, format};
+use panache_formatter::{Config, ConfigBuilder, format};
 
 #[test]
 fn test_basic_pipe_table() {
@@ -431,6 +431,51 @@ fn test_simple_table_compresses_oversized_separator_columns() {
     let expected = "    Right     Left\n  -------     ----\n       12     12\n      123     123\n        1     1\n";
 
     let result = format(input, None, None);
+    assert_eq!(result, expected);
+}
+
+// `table-indent = 0` keeps a top-level pipe table flush at column 0.
+#[test]
+fn test_pipe_table_indent_zero_is_flush() {
+    let input = "| A | B |\n|---|---|\n| C | D |";
+    let expected = "| A   | B   |\n| --- | --- |\n| C   | D   |\n";
+
+    let config = ConfigBuilder::default().table_indent(0).build();
+    let result = format(input, Some(config.clone()), None);
+    assert_eq!(result, expected);
+    assert_eq!(format(&result, Some(config), None), result);
+}
+
+// The default indent of 2 keeps the historical two-column offset.
+#[test]
+fn test_pipe_table_default_indent_is_two() {
+    let input = "| A | B |\n|---|---|\n| C | D |";
+    let expected = "  | A   | B   |\n  | --- | --- |\n  | C   | D   |\n";
+
+    let result = format(input, None, None);
+    assert_eq!(result, expected);
+}
+
+// A non-default indent of 3 shifts a top-level pipe table three columns.
+#[test]
+fn test_pipe_table_indent_three() {
+    let input = "| A | B |\n|---|---|\n| C | D |";
+    let expected = "   | A   | B   |\n   | --- | --- |\n   | C   | D   |\n";
+
+    let config = ConfigBuilder::default().table_indent(3).build();
+    let result = format(input, Some(config), None);
+    assert_eq!(result, expected);
+}
+
+// `table-indent` governs simple tables too, not just pipe tables.
+#[test]
+fn test_simple_table_honors_table_indent() {
+    let input = "   Right     Left\n -------     --------------\n     12         12\n   123          123\n       1        1\n";
+    let expected =
+        "  Right     Left\n-------     ----\n     12     12\n    123     123\n      1     1\n";
+
+    let config = ConfigBuilder::default().table_indent(0).build();
+    let result = format(input, Some(config), None);
     assert_eq!(result, expected);
 }
 

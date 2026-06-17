@@ -86,6 +86,7 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
         line_width: config.line_width,
         math_indent: config.math_indent,
         math_delimiter_style,
+        table_indent: config.table_indent,
         tab_stops,
         tab_width: config.tab_width,
         wrap,

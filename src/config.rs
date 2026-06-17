@@ -1184,6 +1184,39 @@ mod tests {
     }
 
     #[test]
+    fn table_indent_defaults_to_two() {
+        let cfg = parse_config_str("", Path::new("panache.toml")).expect("empty config parses");
+        assert_eq!(cfg.table_indent, 2);
+    }
+
+    #[test]
+    fn table_indent_parses_from_format_section() {
+        let toml = "[format]\ntable-indent = 0\n";
+        let cfg =
+            parse_config_str(toml, Path::new("panache.toml")).expect("table-indent = 0 must parse");
+        assert_eq!(cfg.table_indent, 0);
+    }
+
+    #[test]
+    fn table_indent_accepts_max_of_three() {
+        let toml = "[format]\ntable-indent = 3\n";
+        let cfg =
+            parse_config_str(toml, Path::new("panache.toml")).expect("table-indent = 3 must parse");
+        assert_eq!(cfg.table_indent, 3);
+    }
+
+    #[test]
+    fn out_of_range_table_indent_value_is_rejected() {
+        let toml = "[format]\ntable-indent = 4\n";
+        let err = parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("table-indent > 3 must error");
+        assert!(
+            err.to_string().contains("table-indent"),
+            "error must name the offending key: {err}"
+        );
+    }
+
+    #[test]
     fn deprecated_code_blocks_table_still_parses() {
         // `[code-blocks]` is a no-op since the feature was removed, but older
         // configs still in the wild use it — the deprecation warning must keep
