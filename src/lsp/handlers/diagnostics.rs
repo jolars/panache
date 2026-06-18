@@ -32,9 +32,9 @@ pub(crate) type Publish = (Uri, Option<i32>, Vec<Diagnostic>);
 /// tracked input), not from an open document.
 ///
 /// Returns the publishes plus the set of manifest URIs that received a
-/// diagnostic. The all-docs settle pass merges these across documents and
-/// reconciles clears via `GlobalState::last_published_uris`, so the returned set
-/// is informational for callers that want it.
+/// diagnostic. The all-docs settle pass merges these across documents and the
+/// `DiagnosticCollection` reconciles clears from the complete set, so the
+/// returned URI set is informational for callers that want it.
 pub(crate) fn manifest_publishes(snap: &StateSnapshot, uri: &Uri) -> (Vec<Publish>, HashSet<Uri>) {
     let Some(doc_state) = snap.document_state(uri) else {
         return (Vec::new(), HashSet::new());
@@ -230,8 +230,19 @@ pub(crate) fn document_diagnostic(
     gs: &GlobalState,
     params: DocumentDiagnosticParams,
 ) -> DocumentDiagnosticReportResult {
+    // The collection is the unified store for both modes, but a push-only client
+    // is served by push: never surface stored diagnostics through a pull (keeps
+    // push and pull mutually exclusive — no double reporting).
+    if !gs.supports_pull_diagnostics {
+        return DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(
+            RelatedFullDocumentDiagnosticReport {
+                related_documents: None,
+                full_document_diagnostic_report: FullDocumentDiagnosticReport::default(),
+            },
+        ));
+    }
     let uri = params.text_document.uri;
-    let report = match gs.diagnostics_store.get(&uri) {
+    let report = match gs.diagnostics.get(&uri) {
         Some(stored) if params.previous_result_id.as_deref() == Some(stored.result_id.as_str()) => {
             DocumentDiagnosticReport::Unchanged(RelatedUnchangedDocumentDiagnosticReport {
                 related_documents: None,
@@ -264,6 +275,13 @@ pub(crate) fn workspace_diagnostic(
     gs: &GlobalState,
     params: WorkspaceDiagnosticParams,
 ) -> WorkspaceDiagnosticReportResult {
+    // Push-only clients are served by push; never surface the unified store via a
+    // pull (see `document_diagnostic`).
+    if !gs.supports_pull_diagnostics {
+        return WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport {
+            items: Vec::new(),
+        });
+    }
     let known: HashMap<&Uri, &str> = params
         .previous_result_ids
         .iter()
@@ -271,7 +289,7 @@ pub(crate) fn workspace_diagnostic(
         .collect();
 
     let items = gs
-        .diagnostics_store
+        .diagnostics
         .iter()
         .map(|(uri, stored)| {
             if known.get(uri).copied() == Some(stored.result_id.as_str()) {

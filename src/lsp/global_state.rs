@@ -45,6 +45,84 @@ pub(crate) struct StoredDiagnostics {
     pub(crate) result_id: String,
 }
 
+/// Single owner of the server's current diagnostic set, unifying push delivery,
+/// the pull store, and clear-on-fix bookkeeping (rust-analyzer's
+/// `DiagnosticCollection`). Each applied settle pass hands [`Self::apply`] the
+/// complete merged map — every URI across all open documents and project
+/// manifests — and it diffs that against the retained set to publish/store only
+/// what changed and clear what disappeared. The retained keys *are* the
+/// clear-tracker, so a shared manifest stays reported until no settle reports it.
+#[derive(Default)]
+pub(crate) struct DiagnosticCollection {
+    current: HashMap<Uri, StoredDiagnostics>,
+    result_seq: u64,
+}
+
+impl DiagnosticCollection {
+    /// Apply a complete settle result. Upserts each URI whose diagnostics changed
+    /// (bumping its `result_id`), leaves unchanged URIs untouched (so a re-pull
+    /// still answers `unchanged` and push clients see no redundant notification),
+    /// and clears every URI the previous set held but this one omits.
+    pub(crate) fn apply(
+        &mut self,
+        publishes: Vec<(Uri, Option<i32>, Vec<Diagnostic>)>,
+        sender: &ClientSender,
+        pull: bool,
+    ) {
+        let mut next: HashSet<Uri> = HashSet::with_capacity(publishes.len());
+        for (uri, version, items) in publishes {
+            next.insert(uri.clone());
+            let unchanged = self
+                .current
+                .get(&uri)
+                .is_some_and(|entry| entry.items == items);
+            if unchanged {
+                continue;
+            }
+            self.result_seq += 1;
+            let result_id = self.result_seq.to_string();
+            if !pull {
+                sender.publish_diagnostics(uri.clone(), items.clone(), version);
+            }
+            self.current.insert(
+                uri,
+                StoredDiagnostics {
+                    version,
+                    items,
+                    result_id,
+                },
+            );
+        }
+        let stale: Vec<Uri> = self
+            .current
+            .keys()
+            .filter(|uri| !next.contains(*uri))
+            .cloned()
+            .collect();
+        for uri in stale {
+            self.drop_uri(&uri, sender, pull);
+        }
+    }
+
+    /// Remove a single URI immediately (a closed document), clearing it on push
+    /// clients so a pull issued before the next settle no longer reports it.
+    pub(crate) fn drop_uri(&mut self, uri: &Uri, sender: &ClientSender, pull: bool) {
+        if self.current.remove(uri).is_some() && !pull {
+            sender.publish_diagnostics(uri.clone(), Vec::new(), None);
+        }
+    }
+
+    /// The stored diagnostics for `uri`, for a pull `textDocument/diagnostic`.
+    pub(crate) fn get(&self, uri: &Uri) -> Option<&StoredDiagnostics> {
+        self.current.get(uri)
+    }
+
+    /// Every stored `(uri, diagnostics)`, for a pull `workspace/diagnostic`.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&Uri, &StoredDiagnostics)> {
+        self.current.iter()
+    }
+}
+
 /// A clonable handle for sending messages back to the client.
 ///
 /// Replaces tower-lsp's `Client`: it is just a wrapped `crossbeam` sender, so
@@ -253,16 +331,15 @@ pub(crate) struct GlobalState {
     /// Whether the client advertised support for the pull diagnostics model at
     /// `initialize`. When `true` the server stops pushing
     /// `textDocument/publishDiagnostics` and serves diagnostics from
-    /// `diagnostics_store` on demand instead (mode-switch — no double reporting).
+    /// [`Self::diagnostics`] on demand instead (mode-switch — no double reporting).
     pub(crate) supports_pull_diagnostics: bool,
     /// Whether the client supports `workspace/diagnostic/refresh`. Lets the
     /// server nudge the client to re-pull when an async pass (save-time external
     /// linters, cross-file dependents) updates the store.
     pub(crate) supports_diagnostic_refresh: bool,
-    /// Latest diagnostics per URI, the source of truth for pull responses.
-    pub(crate) diagnostics_store: HashMap<Uri, StoredDiagnostics>,
-    /// Monotonic counter stamped into each stored `result_id`.
-    pub(crate) diagnostics_result_seq: u64,
+    /// The current diagnostic set: push delivery, the pull store, and clear-on-fix
+    /// bookkeeping unified behind one diff-based owner.
+    pub(crate) diagnostics: DiagnosticCollection,
 
     /// The master salsa handle, mutated only on the main thread.
     pub(crate) salsa: crate::salsa::SalsaDb,
@@ -297,12 +374,6 @@ pub(crate) struct GlobalState {
     /// externals run only for these. Retired in `on_task` once the pass that ran
     /// them completes, so a save queued after dispatch survives a cancellation.
     pub(crate) external_pending: HashSet<Uri>,
-    /// Every URI the last applied settle published to (documents + project
-    /// manifests). The authoritative clear-tracker: a URI present here but absent
-    /// from the next settle's complete set is cleared (published empty / dropped
-    /// from the pull store). Subsumes the old per-document manifest
-    /// reference-counting — the all-docs pass produces the complete set directly.
-    pub(crate) last_published_uris: HashSet<Uri>,
 }
 
 impl GlobalState {
@@ -317,8 +388,7 @@ impl GlobalState {
             runtime_settings: LspRuntimeSettings::default(),
             supports_pull_diagnostics: false,
             supports_diagnostic_refresh: false,
-            diagnostics_store: HashMap::new(),
-            diagnostics_result_seq: 0,
+            diagnostics: DiagnosticCollection::default(),
             salsa: crate::salsa::SalsaDb::default(),
             pool,
             fmt_pool,
@@ -330,7 +400,6 @@ impl GlobalState {
             settle_deadline: None,
             lint_generation: 0,
             external_pending: HashSet::new(),
-            last_published_uris: HashSet::new(),
         }
     }
 
@@ -395,61 +464,90 @@ impl GlobalState {
         self.arm_settle();
     }
 
-    /// Deliver a diagnostics payload for `uri`, routed by the active model:
-    /// publish a `textDocument/publishDiagnostics` notification (push), or update
-    /// the pull store (pull). The push path is byte-for-byte the previous
-    /// behavior; only pull-capable clients take the store branch.
-    ///
-    /// Callers batch a refresh via [`Self::send_diagnostic_refresh`] after a run
-    /// of deliveries — this method never sends one itself.
-    pub(crate) fn deliver_diagnostics(
-        &mut self,
-        uri: Uri,
-        version: Option<i32>,
-        diagnostics: Vec<Diagnostic>,
-    ) {
-        if self.supports_pull_diagnostics {
-            self.store_diagnostics(uri, version, diagnostics);
-        } else {
-            self.sender.publish_diagnostics(uri, diagnostics, version);
-        }
-    }
-
-    /// Clear a closed document's own diagnostics: publish an empty payload (push)
-    /// or drop its store entry (pull) so it stops appearing in workspace pulls.
-    pub(crate) fn drop_document_diagnostics(&mut self, uri: &Uri) {
-        if self.supports_pull_diagnostics {
-            self.diagnostics_store.remove(uri);
-        } else {
-            self.sender
-                .publish_diagnostics(uri.clone(), Vec::new(), None);
-        }
-    }
-
-    /// Upsert the stored diagnostics for `uri` with a fresh `result_id`.
-    pub(crate) fn store_diagnostics(
-        &mut self,
-        uri: Uri,
-        version: Option<i32>,
-        items: Vec<Diagnostic>,
-    ) {
-        self.diagnostics_result_seq += 1;
-        let result_id = self.diagnostics_result_seq.to_string();
-        self.diagnostics_store.insert(
-            uri,
-            StoredDiagnostics {
-                version,
-                items,
-                result_id,
-            },
-        );
-    }
-
     /// Ask the client to re-pull diagnostics, if it supports refresh. A no-op in
     /// push mode (the flag is only set when the client advertised refresh).
     pub(crate) fn send_diagnostic_refresh(&mut self) {
         if self.supports_diagnostic_refresh {
             self.send_request::<lsp_types::request::WorkspaceDiagnosticRefresh>(());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lsp_types::{Position, Range};
+
+    fn sender() -> ClientSender {
+        let (tx, _rx) = crossbeam_channel::unbounded();
+        ClientSender::new(tx)
+    }
+
+    fn uri(s: &str) -> Uri {
+        s.parse().expect("valid uri")
+    }
+
+    fn diag(line: u32) -> Diagnostic {
+        Diagnostic {
+            range: Range {
+                start: Position { line, character: 0 },
+                end: Position { line, character: 1 },
+            },
+            message: "x".to_owned(),
+            ..Default::default()
+        }
+    }
+
+    /// A settle that re-reports identical diagnostics for a URI must not bump its
+    /// `result_id` (so a re-pull still answers `unchanged`) — the no-op-settle
+    /// case the all-docs model creates for every unchanged document.
+    #[test]
+    fn unchanged_uri_keeps_result_id_across_settles() {
+        let sender = sender();
+        let mut dc = DiagnosticCollection::default();
+        let a = uri("file:///a.qmd");
+
+        dc.apply(vec![(a.clone(), None, vec![diag(2)])], &sender, true);
+        let first = dc.get(&a).expect("stored").result_id.clone();
+
+        // Identical items on the next settle.
+        dc.apply(vec![(a.clone(), None, vec![diag(2)])], &sender, true);
+        assert_eq!(
+            dc.get(&a).expect("still stored").result_id,
+            first,
+            "unchanged diagnostics must keep the same result_id"
+        );
+
+        // Changed items bump it.
+        dc.apply(vec![(a.clone(), None, vec![diag(5)])], &sender, true);
+        assert_ne!(
+            dc.get(&a).expect("still stored").result_id,
+            first,
+            "changed diagnostics must get a fresh result_id"
+        );
+    }
+
+    /// A URI present in one settle but omitted by the next is cleared from the
+    /// collection (clear-on-fix for fixed manifests, closed docs, resolved
+    /// cross-file diagnostics).
+    #[test]
+    fn omitted_uri_is_cleared() {
+        let sender = sender();
+        let mut dc = DiagnosticCollection::default();
+        let (a, x) = (uri("file:///a.qmd"), uri("file:///x.qmd"));
+
+        dc.apply(
+            vec![
+                (a.clone(), None, vec![diag(1)]),
+                (x.clone(), None, vec![diag(1)]),
+            ],
+            &sender,
+            true,
+        );
+        assert!(dc.get(&a).is_some() && dc.get(&x).is_some());
+
+        dc.apply(vec![(a.clone(), None, vec![diag(1)])], &sender, true);
+        assert!(dc.get(&a).is_some(), "still-reported uri retained");
+        assert!(dc.get(&x).is_none(), "omitted uri cleared");
     }
 }

@@ -309,8 +309,8 @@ pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams
     // manifests it contributed are reconciled by the settle armed below: the
     // all-docs pass re-lints the remaining documents and the clear-on-fix diff
     // clears a manifest once no open document still reports it.
-    gs.drop_document_diagnostics(&uri);
-    gs.last_published_uris.remove(&uri);
+    gs.diagnostics
+        .drop_uri(&uri, &gs.sender, gs.supports_pull_diagnostics);
 
     let states: Vec<DocumentState> = gs.document_map.values().cloned().collect();
     let mut retained = HashSet::new();

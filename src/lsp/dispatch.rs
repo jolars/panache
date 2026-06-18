@@ -414,28 +414,15 @@ impl GlobalState {
                 if generation != self.lint_generation {
                     return;
                 }
-                // Deliver the complete merged set, recording every URI touched.
-                let mut now_published: std::collections::HashSet<Uri> =
-                    std::collections::HashSet::with_capacity(publishes.len());
-                for (uri, version, diags) in publishes {
-                    now_published.insert(uri.clone());
-                    self.deliver_diagnostics(uri, version, diags);
-                }
-                // Clear-on-fix, uniformly: any URI the previous settle reported but
-                // this one does not (a fixed manifest, a closed document, a
-                // resolved cross-file diagnostic) is cleared — published empty
-                // (push) or dropped from the pull store. The all-docs pass yields
-                // the authoritative complete set, so a shared `_quarto.yml` stays
-                // flagged as long as any open doc still reports it.
-                let stale: Vec<Uri> = self
-                    .last_published_uris
-                    .difference(&now_published)
-                    .cloned()
-                    .collect();
-                for uri in stale {
-                    self.drop_document_diagnostics(&uri);
-                }
-                self.last_published_uris = now_published;
+                // Hand the complete merged set to the collection: it upserts the
+                // URIs whose diagnostics changed, leaves unchanged ones untouched
+                // (no redundant push, stable pull `result_id`), and clears every
+                // URI the previous settle held but this one omits — clear-on-fix
+                // for fixed manifests, closed docs, and resolved cross-file
+                // diagnostics alike. A shared `_quarto.yml` stays flagged as long
+                // as any open doc still reports it.
+                self.diagnostics
+                    .apply(publishes, &self.sender, self.supports_pull_diagnostics);
                 // Retire exactly the externals this pass ran (a save queued after
                 // dispatch stays pending for the next settle).
                 self.external_pending
@@ -687,22 +674,25 @@ mod tests {
         s.parse().expect("valid uri")
     }
 
-    /// A current-generation settle result is applied: every published URI is
-    /// recorded, a URI the previous settle reported but this one omits is cleared,
-    /// and exactly the externals this pass ran are retired — an external queued
-    /// after dispatch (here `b`) survives for the next settle.
+    /// A current-generation settle result is applied: the published URI is stored,
+    /// a URI the previous settle reported but this one omits is cleared, and
+    /// exactly the externals this pass ran are retired — an external queued after
+    /// dispatch (here `b`) survives for the next settle.
     #[test]
     fn settle_result_retires_external_and_clears_stale_uris() {
         let (tx, _client_rx) = crossbeam_channel::unbounded();
         let mut gs = GlobalState::new(ClientSender::new(tx));
+        gs.supports_pull_diagnostics = true;
         let (a, b, x) = (
             uri("file:///a.qmd"),
             uri("file:///b.qmd"),
             uri("file:///x.qmd"),
         );
+        // Seed the collection with `x` from a prior settle.
         gs.lint_generation = 5;
+        gs.diagnostics
+            .apply(vec![(x.clone(), None, Vec::new())], &gs.sender, true);
         gs.external_pending = [a.clone(), b.clone()].into_iter().collect();
-        gs.last_published_uris = [x.clone()].into_iter().collect();
 
         gs.on_task(Task::Diagnostics {
             generation: 5,
@@ -715,10 +705,10 @@ mod tests {
             gs.external_pending.contains(&b),
             "external queued after dispatch must survive"
         );
-        assert_eq!(
-            gs.last_published_uris,
-            [a].into_iter().collect(),
-            "published set replaced; stale `x` cleared"
+        assert!(gs.diagnostics.get(&a).is_some(), "published `a` stored");
+        assert!(
+            gs.diagnostics.get(&x).is_none(),
+            "omitted `x` cleared from the collection"
         );
     }
 
@@ -728,10 +718,12 @@ mod tests {
     fn stale_settle_result_is_dropped() {
         let (tx, _client_rx) = crossbeam_channel::unbounded();
         let mut gs = GlobalState::new(ClientSender::new(tx));
+        gs.supports_pull_diagnostics = true;
         let (a, x) = (uri("file:///a.qmd"), uri("file:///x.qmd"));
         gs.lint_generation = 9;
+        gs.diagnostics
+            .apply(vec![(x.clone(), None, Vec::new())], &gs.sender, true);
         gs.external_pending = [a.clone()].into_iter().collect();
-        gs.last_published_uris = [x.clone()].into_iter().collect();
 
         gs.on_task(Task::Diagnostics {
             generation: 7,
@@ -739,7 +731,8 @@ mod tests {
             external_ran: [a.clone()].into_iter().collect(),
         });
 
-        assert_eq!(gs.external_pending, [a].into_iter().collect());
-        assert_eq!(gs.last_published_uris, [x].into_iter().collect());
+        assert_eq!(gs.external_pending, [a.clone()].into_iter().collect());
+        assert!(gs.diagnostics.get(&a).is_none(), "stale pass not applied");
+        assert!(gs.diagnostics.get(&x).is_some(), "prior `x` untouched");
     }
 }
