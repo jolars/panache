@@ -62,9 +62,9 @@ spec-coverage audit (see `docs/guide/lsp.qmd` "LSP Specification Coverage").
 - [x] Pull diagnostics - `textDocument/diagnostic` + `workspace/diagnostic` as a
   companion/alternative to the current push model (mode-switch: pull clients
   get pull only, push suppressed; cache + `workspace/diagnostic/refresh`)
-  - [ ] Populate `related_documents` in the document report for clients with
-    `related_document_support` (currently `None`; cross-file diagnostics
-    reach the client only via `workspace/diagnostic`)
+  - [x] Populate `related_documents` in the document report for clients with
+    `related_document_support` (the pulled document's project-graph closure
+    carries its related files' cross-file diagnostics inline)
   - [ ] Streaming/partial results (`DocumentDiagnosticReportPartialResult`,
     `WorkspaceDiagnosticReportPartialResult`) for large workspaces; reports
     are returned whole today

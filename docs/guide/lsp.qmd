@@ -562,6 +562,14 @@ Pull
     focus). Repeated pulls are answered with an `unchanged` report when the
     document's diagnostics haven't changed since the client's last `result_id`.
 
+    Clients that additionally advertise `relatedDocumentSupport` receive cross-file
+    diagnostics inline: a `textDocument/diagnostic` pull for one document carries
+    the diagnostics of the other files in its project graph (includes, project
+    siblings, and manifests) under `relatedDocuments`, so a duplicate label defined
+    in an included file surfaces without waiting for a separate
+    `workspace/diagnostic` pull. Clients without that capability still receive the
+    same cross-file diagnostics through the workspace pull.
+
 ### Hover Information
 
 Hover over elements to see contextual information (implementation varies by

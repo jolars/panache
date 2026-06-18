@@ -255,3 +255,113 @@ fn workspace_pull_includes_manifest_diagnostics() {
         "manifest parse error should surface via workspace pull"
     );
 }
+
+fn has_duplicate_label(diags: &[Diagnostic]) -> bool {
+    diags.iter().any(|d| {
+        matches!(
+            d.code.as_ref(),
+            Some(NumberOrString::String(s)) if s == "duplicate-reference-labels"
+        )
+    })
+}
+
+/// The full `related`-capable report (panics on an unchanged/partial result).
+fn full_report(result: &DocumentDiagnosticReportResult) -> &RelatedFullDocumentDiagnosticReport {
+    match result {
+        DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(full)) => full,
+        other => panic!("expected a full document report, got: {other:?}"),
+    }
+}
+
+/// A two-document Quarto project where the parent `a.qmd` includes `b.qmd` and
+/// both define the same reference label. Because an included document's
+/// definitions are collected before the includer's own, the cross-doc duplicate
+/// is always attributed to the includer `a.qmd`, leaving `b.qmd`'s report clean.
+/// The `_quarto.yml` root makes the project graph symmetric, so `b.qmd`'s
+/// closure reaches the dirty `a.qmd`. Both documents are opened; returns
+/// `(dirty_uri, clean_uri)` = `(a_uri, b_uri)`.
+fn open_cross_file_duplicate_project(
+    server: &mut TestLspServer,
+    root: &std::path::Path,
+) -> (String, String) {
+    std::fs::write(root.join("_quarto.yml"), "project:\n  type: default\n").unwrap();
+    let a_path = root.join("a.qmd");
+    let b_path = root.join("b.qmd");
+    std::fs::write(
+        &a_path,
+        "{{< include b.qmd >}}\n\n# A\n\n[ref]: https://example.com/a\n",
+    )
+    .unwrap();
+    std::fs::write(&b_path, "# B\n\n[ref]: https://example.com/b\n").unwrap();
+
+    let a_uri = Uri::from_file_path(&a_path).unwrap().to_string();
+    let b_uri = Uri::from_file_path(&b_path).unwrap().to_string();
+    server.open_document(&a_uri, &std::fs::read_to_string(&a_path).unwrap(), "quarto");
+    server.pump(Duration::from_secs(2));
+    server.open_document(&b_uri, &std::fs::read_to_string(&b_path).unwrap(), "quarto");
+    server.save_document(&b_uri);
+    server.pump(Duration::from_secs(2));
+    (a_uri, b_uri)
+}
+
+/// A `related_document_support` client pulling a clean document receives the
+/// cross-file diagnostics of its project-graph closure under `related_documents`.
+#[test]
+fn document_pull_carries_related_cross_file_diagnostics() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let mut server = TestLspServer::new();
+    server.initialize_pull(&Uri::from_file_path(root).unwrap().to_string());
+
+    let (dirty_uri, clean_uri) = open_cross_file_duplicate_project(&mut server, root);
+
+    // Pull the clean document; its own report carries no duplicate, but the
+    // related (dirty) document's cross-file diagnostic rides along.
+    let report = server.document_diagnostic(&clean_uri, None);
+    let full = full_report(&report);
+    assert!(
+        !has_duplicate_label(&full.full_document_diagnostic_report.items),
+        "the pulled document's own report should be clean"
+    );
+
+    let related = full
+        .related_documents
+        .as_ref()
+        .expect("related_documents should be populated for a related-support client");
+    let dirty_uri_parsed: Uri = dirty_uri.parse().unwrap();
+    let entry = related
+        .get(&dirty_uri_parsed)
+        .expect("the related document carrying the duplicate should be present");
+    match entry {
+        DocumentDiagnosticReportKind::Full(full) => {
+            assert!(
+                has_duplicate_label(&full.items),
+                "the related document should carry the cross-file duplicate diagnostic"
+            );
+            assert!(
+                full.result_id.is_some(),
+                "the related report should carry a result_id"
+            );
+        }
+        other => panic!("expected a full related report, got: {other:?}"),
+    }
+}
+
+/// Without `related_document_support`, the same cross-file scenario leaves
+/// `related_documents` empty (the diagnostics still reach the client via
+/// `workspace/diagnostic`).
+#[test]
+fn document_pull_omits_related_documents_without_capability() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let mut server = TestLspServer::new();
+    server.initialize_pull_no_related(&Uri::from_file_path(root).unwrap().to_string());
+
+    let (_dirty_uri, clean_uri) = open_cross_file_duplicate_project(&mut server, root);
+
+    let report = server.document_diagnostic(&clean_uri, None);
+    assert!(
+        full_report(&report).related_documents.is_none(),
+        "related_documents must stay empty without related_document_support"
+    );
+}

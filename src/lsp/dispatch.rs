@@ -190,6 +190,15 @@ impl GlobalState {
             .and_then(|ws| ws.diagnostic.as_ref())
             .and_then(|d| d.refresh_support)
             .unwrap_or(false);
+        // Independent of pull support: lets `document_diagnostic` carry cross-file
+        // diagnostics for the pulled document's project-graph closure inline.
+        self.supports_related_documents = params
+            .capabilities
+            .text_document
+            .as_ref()
+            .and_then(|td| td.diagnostic.as_ref())
+            .and_then(|d| d.related_document_support)
+            .unwrap_or(false);
         log::debug!(
             "lsp pull diagnostics: supported={} refresh={}",
             self.supports_pull_diagnostics,

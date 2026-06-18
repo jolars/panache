@@ -337,6 +337,12 @@ pub(crate) struct GlobalState {
     /// server nudge the client to re-pull when an async pass (save-time external
     /// linters, cross-file dependents) updates the store.
     pub(crate) supports_diagnostic_refresh: bool,
+    /// Whether the client advertised `textDocument.diagnostic.relatedDocumentSupport`.
+    /// When `true`, `document_diagnostic` attaches the cross-file diagnostics of
+    /// the pulled document's project-graph closure under `related_documents`, so
+    /// they reach the client on a per-document pull rather than only via
+    /// `workspace/diagnostic`.
+    pub(crate) supports_related_documents: bool,
     /// The current diagnostic set: push delivery, the pull store, and clear-on-fix
     /// bookkeeping unified behind one diff-based owner.
     pub(crate) diagnostics: DiagnosticCollection,
@@ -388,6 +394,7 @@ impl GlobalState {
             runtime_settings: LspRuntimeSettings::default(),
             supports_pull_diagnostics: false,
             supports_diagnostic_refresh: false,
+            supports_related_documents: false,
             diagnostics: DiagnosticCollection::default(),
             salsa: crate::salsa::SalsaDb::default(),
             pool,

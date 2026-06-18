@@ -9,12 +9,12 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use lsp_types::{
-    Diagnostic, DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport,
-    RelatedUnchangedDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport, Uri,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
-    WorkspaceUnchangedDocumentDiagnosticReport,
+    Diagnostic, DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportKind,
+    DocumentDiagnosticReportResult, FullDocumentDiagnosticReport,
+    RelatedFullDocumentDiagnosticReport, RelatedUnchangedDocumentDiagnosticReport,
+    UnchangedDocumentDiagnosticReport, Uri, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
+    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
 };
 
 use super::super::conversions::convert_diagnostic;
@@ -223,9 +223,11 @@ pub(crate) fn compute_publishes(
 /// the client's `previous_result_id` still matches, else a full report. A missing
 /// entry yields an empty full report (clears any stale client-side state).
 ///
-/// `related_documents` is left empty: cross-file diagnostics reach the client via
-/// `workspace/diagnostic` (the server advertises `inter_file_dependencies` +
-/// `workspace_diagnostics`), so per-document related plumbing is unnecessary.
+/// For clients that advertise `related_document_support`, `related_documents` is
+/// populated with the cross-file diagnostics of the pulled document's
+/// project-graph closure (see [`related_documents`]); otherwise it is left empty
+/// and those diagnostics reach the client only via `workspace/diagnostic` (the
+/// server advertises `inter_file_dependencies` + `workspace_diagnostics`).
 pub(crate) fn document_diagnostic(
     gs: &GlobalState,
     params: DocumentDiagnosticParams,
@@ -242,28 +244,107 @@ pub(crate) fn document_diagnostic(
         ));
     }
     let uri = params.text_document.uri;
+    // Computed once for both arms: an unchanged main document can still have
+    // related documents whose diagnostics changed.
+    let related = related_documents(gs, &uri);
     let report = match gs.diagnostics.get(&uri) {
         Some(stored) if params.previous_result_id.as_deref() == Some(stored.result_id.as_str()) => {
             DocumentDiagnosticReport::Unchanged(RelatedUnchangedDocumentDiagnosticReport {
-                related_documents: None,
+                related_documents: related,
                 unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
                     result_id: stored.result_id.clone(),
                 },
             })
         }
         Some(stored) => DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
-            related_documents: None,
+            related_documents: related,
             full_document_diagnostic_report: FullDocumentDiagnosticReport {
                 result_id: Some(stored.result_id.clone()),
                 items: stored.items.clone(),
             },
         }),
         None => DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
-            related_documents: None,
+            related_documents: related,
             full_document_diagnostic_report: FullDocumentDiagnosticReport::default(),
         }),
     };
     DocumentDiagnosticReportResult::Report(report)
+}
+
+/// The cross-file diagnostics to attach under `related_documents` for a pull of
+/// `uri`, or `None` when the client lacks `related_document_support`, the
+/// document isn't an on-disk open file, or no related document currently carries
+/// diagnostics.
+///
+/// Relatedness is the document's project-graph closure (every file transitively
+/// reachable in either direction, plus the project manifests it links to), which
+/// is symmetric by construction — unlike per-document diagnostic *attribution*,
+/// where a cross-doc duplicate lands on whichever file salsa visits second. The
+/// closure decides *which* documents are related; their diagnostic *content* is
+/// read from the store, the single source of truth. A related document whose
+/// diagnostics were cleared has been dropped from the store and so simply falls
+/// out of the map (the authoritative clear path stays `workspace/diagnostic`).
+///
+/// Runs inline on the main thread: `snapshot` is an `Arc` bump and
+/// `project_structure` is a memoized, range-free query the settle already warms.
+fn related_documents(
+    gs: &GlobalState,
+    uri: &Uri,
+) -> Option<HashMap<Uri, DocumentDiagnosticReportKind>> {
+    if !gs.supports_related_documents {
+        return None;
+    }
+    let snap = gs.snapshot();
+    let doc_state = snap.document_state(uri)?;
+    // In-memory buffers have no path and no project graph; nothing to relate.
+    let root = uri.to_file_path()?.into_owned();
+    let graph =
+        crate::salsa::project_structure(snap.db(), doc_state.salsa_file, doc_state.salsa_config);
+
+    let mut map = HashMap::new();
+    for path in project_closure(graph, &root) {
+        let Some(target) = Uri::from_file_path(&path) else {
+            continue;
+        };
+        if target == *uri {
+            continue;
+        }
+        let Some(stored) = gs.diagnostics.get(&target) else {
+            continue;
+        };
+        if stored.items.is_empty() {
+            continue;
+        }
+        map.insert(
+            target,
+            DocumentDiagnosticReportKind::Full(FullDocumentDiagnosticReport {
+                result_id: Some(stored.result_id.clone()),
+                items: stored.items.clone(),
+            }),
+        );
+    }
+    (!map.is_empty()).then_some(map)
+}
+
+/// Every path transitively connected to `root` in `graph`, in either direction
+/// and across every edge kind (so project manifests, reached via `ProjectConfig`
+/// /`MetadataFile` edges, are included), excluding `root` itself.
+fn project_closure(graph: &crate::salsa::ProjectGraph, root: &PathBuf) -> HashSet<PathBuf> {
+    let mut visited: HashSet<PathBuf> = HashSet::new();
+    let mut stack = vec![root.clone()];
+    while let Some(path) = stack.pop() {
+        for next in graph
+            .dependencies(&path, None)
+            .into_iter()
+            .chain(graph.dependents(&path, None))
+        {
+            if visited.insert(next.clone()) {
+                stack.push(next);
+            }
+        }
+    }
+    visited.remove(root);
+    visited
 }
 
 /// Pull handler for `workspace/diagnostic`.

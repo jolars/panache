@@ -75,6 +75,37 @@ impl LspTester {
         self.gs.on_initialize(params);
     }
 
+    /// Like [`Self::initialize_pull`] but without advertising
+    /// `related_document_support`, so the server serves pull diagnostics while
+    /// leaving `related_documents` empty.
+    pub fn initialize_pull_no_related(&mut self, root_uri: &str) {
+        let folder = WorkspaceFolder {
+            uri: root_uri.parse().unwrap(),
+            name: "workspace".to_string(),
+        };
+        let params = InitializeParams {
+            workspace_folders: Some(vec![folder]),
+            capabilities: ClientCapabilities {
+                text_document: Some(TextDocumentClientCapabilities {
+                    diagnostic: Some(DiagnosticClientCapabilities {
+                        dynamic_registration: None,
+                        related_document_support: None,
+                    }),
+                    ..Default::default()
+                }),
+                workspace: Some(WorkspaceClientCapabilities {
+                    diagnostic: Some(DiagnosticWorkspaceClientCapabilities {
+                        refresh_support: Some(true),
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        self.gs.on_initialize(params);
+    }
+
     pub fn initialize_with_options(
         &mut self,
         root_uri: &str,
