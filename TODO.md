@@ -7,7 +7,7 @@ This document tracks implementation status for Panache's features.
 ### Code Actions
 
 - [ ] Convert between table styles (simple, pipe, grid)
-- [ ] Convert between inline/reference links
+- [x] Convert between inline/reference links
 
 ### Navigation & Symbols
 
@@ -15,7 +15,7 @@ This document tracks implementation status for Panache's features.
   - [x] Find references for citations - Find all `@cite` uses of a bibliography
     entry
   - [x] Find references for headings - Find all internal links to a heading
-  - [ ] Find references for reference links - Find all `[text][ref]` links
+  - [x] Find references for reference links - Find all `[text][ref]` links
 
 ### Completion
 
@@ -23,9 +23,9 @@ This document tracks implementation status for Panache's features.
 - [ ] Heading link completion
 - [ ] Attribute completion - Complete class names and attributes in
   `{.class #id}`
-- [ ] Shortcode completion - Complete Quarto shortcode names in `{{< name >}}`
-- [ ] Cross-reference completion - Complete `@fig-id` and `\@ref(fig-id)`
-  cross-refs
+- [x] Shortcode completion - Complete Quarto shortcode names in `{{< name >}}`
+- [x] Cross-reference completion - Complete `@fig-id` and `\@ref(fig-id)`
+  cross-refs (also: file/shortcode path completion is implemented)
 
 ### Inlay Hints (low priority)
 
@@ -51,6 +51,43 @@ support.
   - [ ] Files - Rename other linked files, shortcodes, etc.
 - [ ] Configuration via LSP - `workspace/didChangeConfiguration` to reload
   config
+
+### Spec coverage gaps
+
+Markdown-relevant LSP methods we don't yet implement, surfaced by the 2026-06-18
+spec-coverage audit (see `docs/guide/lsp.qmd` "LSP Specification Coverage").
+`onTypeFormatting`, `semanticTokens`, `inlayHint`, and
+`workspace/didChangeConfiguration` are tracked above and not repeated here.
+
+- [ ] Pull diagnostics - `textDocument/diagnostic` + `workspace/diagnostic` as a
+  companion/alternative to the current push model
+- [ ] `textDocument/documentHighlight` - highlight every occurrence of the
+  reference/citation/footnote/heading under the cursor
+- [ ] `textDocument/selectionRange` - structural smart-select expansion (word →
+  inline → block → section)
+- [ ] `textDocument/linkedEditingRange` - edit a reference label and its
+  definition simultaneously
+- [ ] `completionItem/resolve` - defer expensive completion detail (e.g.
+  citation previews) until an item is focused
+- [ ] `codeAction/resolve` + advertise `codeActionKinds` - compute edits lazily
+  and let clients filter actions by kind
+- [ ] `workspace/didChangeWorkspaceFolders` - advertised
+  (`change_notifications: true`) but currently unhandled
+- [ ] `workspace/configuration` - pull settings from the client instead of
+  relying only on discovered config files
+- [ ] `workspace/executeCommand` - server-side commands backing complex code
+  actions
+- [ ] File operations beyond `willRenameFiles`: `didRenameFiles`,
+  `willCreateFiles`/`didCreateFiles`, `willDeleteFiles`/`didDeleteFiles`
+- [ ] `textDocument/willSave` / `willSaveWaitUntil` - server-driven
+  format-before-write hook
+
+#### Out of scope for prose
+
+These spec methods target compiled-language tooling and have no useful Markdown
+analogue; do not re-audit them: call hierarchy, type hierarchy,
+`textDocument/implementation`, `typeDefinition`, `declaration`, `inlineValue`,
+`moniker`, document color, and code lens.
 
 ### Future Lint Rules
 

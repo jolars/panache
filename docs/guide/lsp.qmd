@@ -45,6 +45,15 @@ Document outline
     - Headings (H1-H6) with proper nesting
     - Tables (with captions when available)
     - Figures (images with alt text)
+    - YAML frontmatter (with a document-shape summary)
+
+Workspace symbols
+:   Search headings across all open documents and the project graph
+    (`workspace/symbol`)
+
+Document links
+:   Clickable links, images, autolinks, and `{{< include >}}` shortcode paths
+    (`textDocument/documentLink`, `documentLink/resolve`)
 
 Code folding
 
@@ -75,17 +84,22 @@ Code actions
 
 :   Quick fixes and refactorings (`textDocument/codeAction`)
 
-    - Auto-fix lint issues (e.g., heading hierarchy corrections)
-    - Convert list styles (loose ↔ compact)
+    - Auto-fix lint issues, individually or via "Fix all auto-fixable"
+    - Convert list spacing (loose ↔ compact)
+    - Convert list markers (bullet ↔ ordered ↔ task)
     - Convert footnote styles (inline ↔ reference)
     - Convert link styles (inline ↔ reference)
+    - Convert implicit heading references to explicit links
 
 Hover information
 
 :   Contextual information on hover (`textDocument/hover`)
 
     - Footnote definitions
-    - Citation previews
+    - Citation previews (formatted bibliography entry)
+    - Section previews for heading links, reference definitions, and crossrefs
+    - Equation previews for equation crossrefs
+    - Linked-document metadata (title and first paragraph)
 
 Auto-completion
 
@@ -99,11 +113,16 @@ Auto-completion
 
 Symbol renaming
 
-:   Rename references and their definitions together (`textDocument/rename`)
+:   Rename references and their definitions together (`textDocument/rename`,
+    `textDocument/prepareRename`)
 
     - Citation keys
     - Reference labels
+    - Footnote labels
     - Quarto crossref labels (including executable chunk `label` options)
+
+File rename
+:   Update links to a renamed Markdown file (`workspace/willRenameFiles`)
 
 Document tracking
 :   Incremental synchronization for efficiency (`textDocument/didOpen`,
@@ -410,7 +429,10 @@ Tables
 Figures
 :   Image links with alt text
 
-The outline appears in:
+YAML frontmatter
+:   Listed with a short summary of the document's metadata shape
+
+Tables and figures nest under their enclosing heading. The outline appears in:
 
 - **VSCode**: Outline view (sidebar) or breadcrumbs
 - **Neovim**: Telescope symbols (`:Telescope lsp_document_symbols`) or Aerial
@@ -424,13 +446,21 @@ The outline updates automatically as you edit.
 Quick fixes and refactorings available at the cursor position:
 
 Auto-fix lint issues
-:   Fix heading hierarchy violations automatically
+:   Fix lint violations (e.g. heading hierarchy) individually, or apply a single
+    "Fix all auto-fixable" action that batches every auto-fixable diagnostic in
+    the document.
 
-Convert list styles
+Convert list spacing
 :   Toggle between loose (blank lines) and compact list formatting
+
+Convert list markers
+:   Switch a list between bullet, ordered, and task-list markers
 
 Convert footnote styles
 :   Toggle between inline `^[text]` and reference `[^id]` footnotes
+
+Convert heading references
+:   Turn an implicit heading reference into an explicit `[text](#id)` link
 
 Convert link styles
 :   Toggle a single link between inline `[text](url)` and reference
@@ -541,7 +571,74 @@ label or definition and trigger rename (F2 in many editors).
 ### Find References
 
 Find all references to the symbol under cursor (`textDocument/references`),
-including Quarto crossrefs, executable chunk labels, and citation keys.
+including Quarto crossrefs, executable chunk labels, citation keys, footnote
+labels, and reference-link labels. The `includeDeclaration` flag is honored, so
+clients can choose whether the definition itself is part of the result set.
+
+### Workspace Symbols
+
+Search for headings by name across the whole project, not just the current file
+(`workspace/symbol`). The index spans every open document plus the documents
+reachable through the project graph, and results carry their container (the
+parent heading hierarchy) so identically named sections stay distinguishable.
+
+### Document Links
+
+The LSP exposes clickable links so editors can ctrl/cmd-click to follow them
+(`textDocument/documentLink`, resolved lazily via `documentLink/resolve`):
+
+- Inline links and images (`[text](url)`, `![alt](path)`)
+- Reference links and images (resolved to their `[ref]: url` definition)
+- Autolinks (`<https://example.com>`)
+- `{{< include path >}}` shortcode paths
+
+### File Rename
+
+When you rename a Markdown file in an LSP-aware editor, the server returns a
+workspace edit that rewrites links pointing at the old path
+(`workspace/willRenameFiles`), so cross-document links stay intact. Renaming
+other linked file types (images, data files) is not yet handled.
+
+## LSP Specification Coverage
+
+The table below summarizes Panache's coverage of the Language Server Protocol.
+Many spec methods target compiled-language tooling (call hierarchy, type
+definitions, and so on) and have no meaningful analogue for prose; those are
+marked *out of scope*.
+
+  | LSP method                                                                                                                  | Status | Notes                                               |
+  | --------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------- |
+  | `textDocument/didOpen`, `didChange`, `didSave`, `didClose`                                                                  | ✅     | Incremental sync                                    |
+  | `textDocument/formatting`                                                                                                   | ✅     | Honors `exclude` patterns                           |
+  | `textDocument/rangeFormatting`                                                                                              | ✅     | Bypasses excludes by design                         |
+  | `textDocument/definition`                                                                                                   | ✅     | Links, footnotes, citations, crossrefs, headings    |
+  | `textDocument/references`                                                                                                   | ✅     | Honors `includeDeclaration`                         |
+  | `textDocument/rename`, `prepareRename`                                                                                      | ✅     | Citations, refs, footnotes, crossrefs               |
+  | `textDocument/hover`                                                                                                        | ✅     | Footnotes, citations, section/equation previews     |
+  | `textDocument/completion`                                                                                                   | ✅     | Citations, crossrefs, file/shortcode paths          |
+  | `completionItem/resolve`                                                                                                    | ❌     | Planned: lazy completion detail                     |
+  | `textDocument/codeAction`                                                                                                   | ✅     | Lint fixes + list/footnote/link/heading conversions |
+  | `codeAction/resolve`                                                                                                        | ❌     | Planned: lazy edits + advertised action kinds       |
+  | `textDocument/documentSymbol`                                                                                               | ✅     | Headings, tables, figures, frontmatter              |
+  | `textDocument/foldingRange`                                                                                                 | ✅     | Headings, code, divs, HTML, frontmatter             |
+  | `textDocument/documentLink`, `documentLink/resolve`                                                                         | ✅     | Links, images, autolinks, includes                  |
+  | `textDocument/publishDiagnostics`                                                                                           | ✅     | Push model, debounced                               |
+  | `textDocument/diagnostic`, `workspace/diagnostic`                                                                           | ❌     | Planned: pull-model diagnostics                     |
+  | `textDocument/documentHighlight`                                                                                            | ❌     | Planned: highlight occurrences under cursor         |
+  | `textDocument/selectionRange`                                                                                               | ❌     | Planned: structural smart-select                    |
+  | `textDocument/linkedEditingRange`                                                                                           | ❌     | Planned: live label/definition co-editing           |
+  | `textDocument/onTypeFormatting`                                                                                             | ❌     | Under consideration                                 |
+  | `textDocument/semanticTokens`                                                                                               | ❌     | Under consideration                                 |
+  | `textDocument/inlayHint`                                                                                                    | ❌     | Under consideration                                 |
+  | `workspace/symbol`                                                                                                          | ✅     | Heading search across the project                   |
+  | `workspace/willRenameFiles`                                                                                                 | ✅     | Markdown files only                                 |
+  | `workspace/didChangeWatchedFiles`                                                                                           | ✅     | Bibliography, config, and document files            |
+  | `workspace/didChangeConfiguration`, `workspace/configuration`                                                               | ❌     | Planned: runtime config reload                      |
+  | `workspace/didChangeWorkspaceFolders`                                                                                       | ❌     | Advertised but not yet handled                      |
+  | `workspace/executeCommand`                                                                                                  | ❌     | Planned: commands backing complex actions           |
+  | Other file operations (`didRename`, create, delete)                                                                         | ❌     | Planned                                             |
+  | `willSave`, `willSaveWaitUntil`                                                                                             | ❌     | Format-on-save runs client-side instead             |
+  | Call/type hierarchy, `implementation`, `typeDefinition`, `declaration`, `inlineValue`, `moniker`, document color, code lens | ⛔     | Out of scope for prose                              |
 
 ## Troubleshooting
 
