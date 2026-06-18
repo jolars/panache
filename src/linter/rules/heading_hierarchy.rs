@@ -155,6 +155,14 @@ mod tests {
     }
 
     #[test]
+    fn test_setext_to_atx_no_false_skip() {
+        // Setext h1 + setext h2 + atx h3 is a valid hierarchy (issue #377).
+        let input = "Title\n=====\n\nSection\n-------\n\n### Subsection\n";
+        let diagnostics = parse_and_lint(input);
+        assert_eq!(diagnostics.len(), 0);
+    }
+
+    #[test]
     fn test_ignores_headings_inside_containers() {
         let input = "# H1\n\n- # Nested\n\n### H3\n";
         let diagnostics = parse_and_lint(input);

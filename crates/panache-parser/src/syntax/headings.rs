@@ -42,14 +42,18 @@ impl Heading {
             }
         }
 
-        // Check for setext underline
-        if let Some(underline) = support::token(&self.0, SyntaxKind::SETEXT_HEADING_UNDERLINE) {
+        // Check for setext underline. The underline is wrapped in a
+        // SETEXT_HEADING_UNDERLINE node containing a like-named token, so
+        // `support::token` (direct token children only) doesn't find it.
+        if let Some(text) = self
+            .0
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|t| t.kind() == SyntaxKind::SETEXT_HEADING_UNDERLINE)
+            .map(|t| t.text().to_string())
+        {
             // Setext headings: '=' is level 1, '-' is level 2
-            if underline.text().starts_with('=') {
-                1
-            } else {
-                2
-            }
+            if text.starts_with('=') { 1 } else { 2 }
         } else {
             1 // Default to level 1
         }
@@ -143,6 +147,18 @@ mod tests {
         let tree = crate::parse("# \n", None);
         let heading = tree.descendants().find_map(Heading::cast).expect("heading");
         assert_eq!(heading.title_or("(empty)"), "(empty)");
+    }
+
+    #[test]
+    fn setext_heading_levels_are_one_and_two() {
+        let input = "Level 1\n=======\n\nLevel 2\n-------\n";
+        let tree = crate::parse(input, None);
+        let levels: Vec<usize> = tree
+            .descendants()
+            .filter_map(Heading::cast)
+            .map(|h| h.level())
+            .collect();
+        assert_eq!(levels, vec![1, 2]);
     }
 
     #[test]
