@@ -150,6 +150,24 @@ analogue; do not re-audit them: call hierarchy, type hierarchy,
     proves noticeable.
   - Larger redesign still open: shared thread pool + priority queue + lint cap
     (see the `lsp-shared-priority-pool` handoff plan).
+- LSP diagnostics model divergence from rust-analyzer (investigate together):
+  - Adopt the "re-lint all open documents per quiescent settle" model.
+    rust-analyzer's `update_diagnostics()` recomputes diagnostics for every open
+    doc over one snapshot under a single generation; panache lints per-document
+    (changed doc + dependents) with per-doc generations. Re-linting unchanged
+    docs is mostly a `built_in_lint_plan` salsa memo hit, so the cost may be
+    negligible. If so, this retires the cancel→re-arm net (recovery becomes
+    automatic: the write that cancels a pass is the change that re-runs the next
+    settle) and collapses per-doc generations into one. External linters stay
+    the exception (run only for the explicitly-saved doc, not all docs each
+    settle). Prototype and measure before committing.
+  - Consolidate diagnostic state behind one `DiagnosticCollection`-style owner.
+    There are now three trackers --- the implicit push state, the pull
+    `diagnostics_store`, and `published_manifest_uris` clear-on-fix bookkeeping.
+    rust-analyzer unifies push/pull/clear behind one generation-keyed
+    collection. Natural to do alongside the all-docs-per-settle move; together
+    they retire most of the bespoke per-doc machinery the pull + race-fix work
+    added.
 
 ### External formatter presets backlog (conform.nvim parity)
 
