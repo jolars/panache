@@ -13,6 +13,15 @@ use crate::syntax::{
 use crate::utils::{implicit_heading_ids, normalize_anchor_label, normalize_label};
 use salsa::{Accumulator, Durability, Setter};
 
+// LRU cap shared by every lint-pipeline tracked query below (each `lru = 512`).
+// The LSP re-lints *all* open documents per quiescent settle (rust-analyzer's
+// model), so the cap must stay comfortably above any realistic open-doc count:
+// an edit in a session with more open docs than the cap forces re-validation of
+// LRU-evicted memos, turning each settle into a tens-to-hundreds-of-ms storm
+// (see the `lsp_relint` bench). 512 keeps every open doc's memo resident for
+// sessions far larger than observed in practice. salsa's `lru =` attribute
+// requires an integer literal, so the value is repeated rather than a const.
+
 /// Per-file text input. The value is `Option<Arc<str>>` so the writer can
 /// distinguish a file it has *referenced but not loaded* (`None` --- a missing
 /// include or unreadable bibliography) from a file that is *present but empty*
@@ -103,7 +112,7 @@ pub fn resolve_label(db: &dyn Db, label: InternedLabel<'_>) -> String {
 /// (order-independent), so a paragraph edit that doesn't change refdefs
 /// short-circuits at this query and downstream consumers don't see an
 /// invalidation pulse.
-#[salsa::tracked(returns(ref), lru = 64)]
+#[salsa::tracked(returns(ref), lru = 512)]
 pub fn refdef_set(db: &dyn Db, file: FileText, config: FileConfig) -> crate::parser::RefdefMap {
     let dialect = panache_parser::Dialect::for_flavor(config.config(db).flavor);
     crate::parser::collect_refdef_labels(file.content_or_empty(db), dialect)
@@ -135,7 +144,7 @@ pub struct ParsedDocument {
     pub errors: Vec<crate::parser::SyntaxError>,
 }
 
-#[salsa::tracked(returns(ref), lru = 64, no_eq, unsafe(non_update_types))]
+#[salsa::tracked(returns(ref), lru = 512, no_eq, unsafe(non_update_types))]
 pub fn parsed_document(db: &dyn Db, file: FileText, config: FileConfig) -> ParsedDocument {
     let refdefs = refdef_set(db, file, config).clone();
     let (tree, errors) = crate::parser::parse_with_refdefs_and_errors(
@@ -376,7 +385,7 @@ pub fn yaml_frontmatter_is_valid(db: &dyn Db, file: FileText, config: FileConfig
     doc_frontmatter_metadata_result(db, file, config).is_ok()
 }
 
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types), lru = 64)]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types), lru = 512)]
 pub fn built_in_lint_plan(db: &dyn Db, file: FileText, config: FileConfig) -> BuiltInLintPlan {
     let text = file.content_or_empty(db);
     let cfg = config.config(db).clone();
@@ -679,13 +688,13 @@ impl SymbolUsageIndex {
     }
 }
 
-#[salsa::tracked(returns(ref), lru = 64)]
+#[salsa::tracked(returns(ref), lru = 512)]
 pub fn symbol_usage_index(db: &dyn Db, file: FileText, config: FileConfig) -> SymbolUsageIndex {
     let tree = parsed_tree_root(db, file, config);
     symbol_usage_index_from_tree(db, &tree, &config.config(db).extensions)
 }
 
-#[salsa::tracked(returns(ref), lru = 64)]
+#[salsa::tracked(returns(ref), lru = 512)]
 pub fn heading_outline(
     db: &dyn Db,
     file: FileText,
@@ -1129,7 +1138,7 @@ impl CitationDefinitionIndex {
     }
 }
 
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types), lru = 64)]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types), lru = 512)]
 pub fn citation_definition_index(
     db: &dyn Db,
     file: FileText,
@@ -1204,7 +1213,7 @@ struct InternedDefinitionIndex<'db> {
     example_labels: HashMap<InternedLabel<'db>, DefinitionLocation>,
 }
 
-#[salsa::tracked(returns(ref), lru = 64)]
+#[salsa::tracked(returns(ref), lru = 512)]
 pub fn definition_index(db: &dyn Db, file: FileText, config: FileConfig) -> DefinitionIndex {
     // The definitions' source path is the document's own path, resolved from its
     // `FileText` identity (empty for an in-memory buffer) (audit §3.3 / G3).
@@ -1797,7 +1806,7 @@ pub struct GraphDiagnosticEntry {
 #[salsa::accumulator]
 pub struct GraphDiagnostic(pub GraphDiagnosticEntry);
 
-#[salsa::tracked(returns(ref), lru = 32)]
+#[salsa::tracked(returns(ref), lru = 512)]
 pub fn project_graph(db: &dyn Db, root_file: FileText, config: FileConfig) -> ProjectGraph {
     // Depend on the set of interned files so that the writer interning a
     // newly-referenced include/sibling (adding its id to the set) re-runs this
@@ -1969,7 +1978,7 @@ pub struct ProjectEdges {
     pub project_configs: Vec<PathBuf>,
 }
 
-#[salsa::tracked(returns(ref), lru = 64)]
+#[salsa::tracked(returns(ref), lru = 512)]
 pub fn project_edges(db: &dyn Db, file: FileText, config: FileConfig) -> ProjectEdges {
     // `collect_includes` probes the filesystem directly (a residual G3 read:
     // an include edge only forms when the target exists on disk), so depend on
@@ -2042,7 +2051,7 @@ pub fn file_is_present(db: &dyn Db, file: FileText) -> bool {
 /// the navigation/workspace-symbol handlers — reads this query. `project_graph`
 /// remains the source of the `GraphDiagnostic` accumulator (include + cross-doc
 /// duplicate diagnostics) because those carry byte ranges that must track edits.
-#[salsa::tracked(returns(ref), lru = 32)]
+#[salsa::tracked(returns(ref), lru = 512)]
 pub fn project_structure(db: &dyn Db, root_file: FileText, config: FileConfig) -> ProjectGraph {
     // Depend on the set of interned files so interning a newly-referenced
     // include/sibling re-runs this query (mirrors `project_graph`, audit §3.3).
