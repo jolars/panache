@@ -555,12 +555,12 @@ Pull
 
     The same lint pipeline backs both models, so pull diagnostics include the
     built-in rules, external linters, and unopened-manifest errors described above.
-    Because that pipeline is asynchronous (debounced edits, on-save external
-    linters, cross-file dependents), the server sends `workspace/diagnostic/refresh`
-    when results change so a pull client re-pulls; clients that don't support
-    refresh still pull on their own cadence (open, edit, focus). Repeated pulls are
-    answered with an `unchanged` report when the document's diagnostics haven't
-    changed since the client's last `result_id`.
+    Because that pipeline is asynchronous (debounced edits re-lint every open
+    document, on-save external linters, cross-file includes), the server sends
+    `workspace/diagnostic/refresh` when results change so a pull client re-pulls;
+    clients that don't support refresh still pull on their own cadence (open, edit,
+    focus). Repeated pulls are answered with an `unchanged` report when the
+    document's diagnostics haven't changed since the client's last `result_id`.
 
 ### Hover Information
 

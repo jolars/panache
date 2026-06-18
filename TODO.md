@@ -140,60 +140,11 @@ analogue; do not re-audit them: call hierarchy, type hierarchy,
 - Performance: incremental linting for LSP mode?
 - LSP: incremental parsing cache (tree reuse on didChange)
 - LSP lint dispatch follow-ups (from the cancellation-race fix):
-  - `didOpen` schedules with `with_dependents: false`, so opening a child that
-    an already-open parent includes won't refresh the parent's diagnostics until
-    the parent is next edited/saved. Decide whether open should re-lint
-    dependents.
-  - The cancel→re-arm net (built-in only) leaves external-linter diagnostics
-    stale when a save's pass is cancelled by a concurrent write; they refresh on
-    the next save. Consider preserving `run_external` across the re-arm if it
-    proves noticeable.
   - Larger redesign still open: shared thread pool + priority queue + lint cap
-    (see the `lsp-shared-priority-pool` handoff plan).
-- LSP diagnostics model divergence from rust-analyzer (investigate together):
-  - Adopt the "re-lint all open documents per quiescent settle" model.
-    rust-analyzer's `update_diagnostics()` recomputes diagnostics for every open
-    doc over one snapshot under a single generation; panache lints per-document
-    (changed doc + dependents) with per-doc generations. Re-linting unchanged
-    docs is mostly a `built_in_lint_plan` salsa memo hit, so the cost may be
-    negligible. If so, this retires the cancel→re-arm net (recovery becomes
-    automatic: the write that cancels a pass is the change that re-runs the next
-    settle) and collapses per-doc generations into one. External linters stay
-    the exception (run only for the explicitly-saved doc, not all docs each
-    settle).
-  - **Measured 2026-06-18** (`cargo bench --bench lsp_relint`, off-main-loop
-    pool cost, median µs). The apples-to-apples comparison is per-edit cost (one
-    doc changed): OLD = lint changed doc + dependents; NEW = lint every open
-    doc. The structural difference is shape, not just magnitude:
-    - **OLD per-edit cost is \~flat in open-doc count** --- it only touches the
-      changed doc and its dependents (\~5ms for a large doc whether 5 or 100
-      docs are open; \~0.35ms small).
-    - **NEW per-edit cost grows with open-doc count.** Below the salsa LRU the
-      growth is mild (unchanged docs are \~19µs memo hits): independent docs sit
-      at NEW/OLD ≈ 1--1.6× through open=64 (large NEW ≈5--9ms). Past 64 a cliff
-      appears (open=80 large → \~70ms, open=100 → \~137ms; NEW/OLD 15--27×).
-    - Confirmed the cliff IS the `built_in_lint_plan`/dependency `lru = 64`:
-      bumping every salsa `lru` to 4096 erases it (large open=100 NEW
-      137ms→7.5ms, NEW/OLD 1.65×; a revision bump otherwise forces re-validation
-      of memos whose deps were LRU-evicted).
-    - Shared-include docs show **no meaningful old/new difference** --- OLD
-      already re-lints all dependents on a shared-file edit, so both models do
-      nearly the same work. The divergence is purely for *independent* docs (OLD
-      skips unrelated docs; NEW lints them anyway).
-  - **Verdict: conditional GO.** Viable and recovery-simplifying for realistic
-    sessions (≤\~50 open docs), and the per-settle work is off the main loop.
-    PREREQUISITE before adopting: raise the salsa `lru` (≥ expected max open
-    docs, e.g. 256--512) --- otherwise one edit in a >64-doc session triggers
-    tens-to-hundreds-of-ms re-lint storms. Consider a docs-per-settle cap as a
-    backstop. The all-docs move then retires the cancel→re-arm net and collapses
-    per-doc generations as described above.
-  - Consolidate diagnostic state behind one `DiagnosticCollection`-style owner.
-    There are now three trackers --- the implicit push state, the pull
-    `diagnostics_store`, and `published_manifest_uris` clear-on-fix bookkeeping.
-    rust-analyzer unifies push/pull/clear behind one generation-keyed
-    collection. Natural to do alongside the all-docs-per-settle move; together
-    they retire most of the bespoke per-doc machinery the pull + race-fix work
-    added.
+    (see the `lsp-shared-priority-pool` handoff plan). The all-docs-per-settle
+    move left a `MAX_DOCS_PER_SETTLE` backstop hook in `dispatch_due_lints` for
+    the lint-cap piece (currently unused; the raised salsa `lru` removes the
+    cliff for realistic sessions).
 
 ### External formatter presets backlog (conform.nvim parity)
 
