@@ -62,6 +62,16 @@ spec-coverage audit (see `docs/guide/lsp.qmd` "LSP Specification Coverage").
 - [x] Pull diagnostics - `textDocument/diagnostic` + `workspace/diagnostic` as a
   companion/alternative to the current push model (mode-switch: pull clients
   get pull only, push suppressed; cache + `workspace/diagnostic/refresh`)
+  - [ ] Populate `related_documents` in the document report for clients with
+    `related_document_support` (currently `None`; cross-file diagnostics
+    reach the client only via `workspace/diagnostic`)
+  - [ ] Streaming/partial results (`DocumentDiagnosticReportPartialResult`,
+    `WorkspaceDiagnosticReportPartialResult`) for large workspaces; reports
+    are returned whole today
+  - [ ] `workspace/diagnostic` only reports open documents + reachable project
+    manifests, not every on-disk doc in the workspace (rust-analyzer pulls
+    all workspace files). Decide whether closed-but-on-disk docs should
+    surface.
 - [ ] `textDocument/documentHighlight` - highlight every occurrence of the
   reference/citation/footnote/heading under the cursor
 - [ ] `textDocument/selectionRange` - structural smart-select expansion (word →
@@ -129,6 +139,17 @@ analogue; do not re-audit them: call hierarchy, type hierarchy,
 - How to balance parser error recovery vs. strict linting?
 - Performance: incremental linting for LSP mode?
 - LSP: incremental parsing cache (tree reuse on didChange)
+- LSP lint dispatch follow-ups (from the cancellation-race fix):
+  - `didOpen` schedules with `with_dependents: false`, so opening a child that
+    an already-open parent includes won't refresh the parent's diagnostics until
+    the parent is next edited/saved. Decide whether open should re-lint
+    dependents.
+  - The cancel→re-arm net (built-in only) leaves external-linter diagnostics
+    stale when a save's pass is cancelled by a concurrent write; they refresh on
+    the next save. Consider preserving `run_external` across the re-arm if it
+    proves noticeable.
+  - Larger redesign still open: shared thread pool + priority queue + lint cap
+    (see the `lsp-shared-priority-pool` handoff plan).
 
 ### External formatter presets backlog (conform.nvim parity)
 
