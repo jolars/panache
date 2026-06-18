@@ -41,11 +41,11 @@ fn test_diagnostics_on_heading_hierarchy_issue() {
     assert!(fix.is_some(), "Should have heading hierarchy fix");
 }
 
-/// Opening several documents back-to-back issues a salsa write per open; each
-/// write can cancel the previous document's in-flight lint (a pooled read on a
-/// cloned handle). A cancelled lint must be retried, not dropped — otherwise the
-/// earlier documents never get diagnostics until their next edit. This drives the
-/// retry path (`Task::DiagnosticsCancelled` → re-armed lint).
+/// Opening several documents back-to-back issues a salsa write per open, each
+/// resetting the single workspace settle timer. When the burst quiesces, one
+/// settle pass re-lints every open document over a single snapshot, so every
+/// document gets diagnostics regardless of which writes cancelled which in-flight
+/// reads during the burst.
 #[test]
 fn test_back_to_back_opens_all_get_diagnostics() {
     let mut server = TestLspServer::new();

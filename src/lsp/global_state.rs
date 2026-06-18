@@ -34,17 +34,6 @@ pub(crate) type DocumentMap = HashMap<String, DocumentState>;
 /// triggers diagnostics, instead of every keystroke queuing a full lint.
 pub(crate) const DIAGNOSTICS_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(200);
 
-/// What a scheduled lint pass should compute. Multiple events can coalesce onto
-/// one debounced pass (e.g. a `didChange` then a `didSave`); the flags are OR-ed
-/// so the merged pass is the most thorough any requester asked for.
-#[derive(Clone, Copy)]
-pub(crate) struct LintRequest {
-    /// Also re-lint documents that include this one (built-in only).
-    pub(crate) with_dependents: bool,
-    /// Run external linters (the expensive on-save signal), not just built-ins.
-    pub(crate) run_external: bool,
-}
-
 /// The latest diagnostics computed for one URI, retained for the pull model
 /// (`textDocument/diagnostic` / `workspace/diagnostic`). The lint pipeline fills
 /// this store instead of pushing when the client supports pull diagnostics; the
@@ -234,22 +223,21 @@ impl StateSnapshot {
 pub(crate) enum Task {
     /// A request answer ready to forward to the client.
     Response(Response),
-    /// Diagnostics computed by a (debounced) lint pass. `generation` lets the
-    /// main loop drop results superseded by a newer edit.
+    /// Diagnostics from a quiescent settle pass that re-lints *every* open
+    /// document over one snapshot. `publishes` is the complete, merged set (one
+    /// entry per URI, across all documents and project manifests); the main loop
+    /// diffs it against the previous settle to clear URIs no longer reported.
+    /// `generation` lets the main loop drop a pass superseded by a newer settle.
+    /// `external_ran` is the set of URIs this pass ran external linters for, so
+    /// the main loop retires exactly those from `external_pending` (a save queued
+    /// after dispatch survives). A pass cancelled by a concurrent write returns
+    /// nothing and is simply dropped — the cancelling write already armed the
+    /// next settle, which re-lints everything.
     Diagnostics {
         generation: u64,
-        key: String,
         publishes: Vec<(Uri, Option<i32>, Vec<Diagnostic>)>,
-        /// Project-manifest URIs that received diagnostics this pass. The main
-        /// loop diffs these against the previous pass for `key` to clear (publish
-        /// empty) manifests whose error was fixed (clear-on-fix).
-        manifest_uris: HashSet<Uri>,
+        external_ran: HashSet<Uri>,
     },
-    /// A lint pass aborted because a concurrent salsa write (often to a
-    /// *different* document) cancelled its pooled read. The main loop re-arms the
-    /// lint if `generation` is still current, so the diagnostics aren't lost until
-    /// the next edit.
-    DiagnosticsCancelled { generation: u64, key: String },
 }
 
 /// The synchronous, single-threaded-mutation server state.
@@ -294,21 +282,27 @@ pub(crate) struct GlobalState {
     pub(crate) outgoing: HashMap<RequestId, &'static str>,
     pub(crate) next_outgoing_id: i32,
 
-    /// Debounced lint bookkeeping, keyed by URI string.
-    pub(crate) lint_deadlines: HashMap<String, Instant>,
-    /// Per-document lint generation counter. Bumped on `schedule_lint` and
-    /// again on `spawn_lint`; the result is tagged with the dispatch-time
-    /// value and dropped in `on_task` if a newer generation has been seen.
-    pub(crate) lint_generations: HashMap<String, u64>,
-    /// Merged lint request per debounced document, consumed by
-    /// `dispatch_due_lints` when the deadline fires.
-    pub(crate) pending_lints: HashMap<String, LintRequest>,
-    /// Project-manifest URIs each open document's last lint pass published
-    /// diagnostics to, keyed by the document's lint key. The authoritative
-    /// clear-tracker: a manifest URI is cleared (published empty) only once no
-    /// open document still reports it (clear-on-fix without flicker across
-    /// documents that share a project).
-    pub(crate) published_manifest_uris: HashMap<String, HashSet<Uri>>,
+    /// Single debounce timer for the whole workspace. `Some(t)` means a quiescent
+    /// re-lint of *all* open documents is due at `t`; each salsa-input write
+    /// pushes it out by [`DIAGNOSTICS_DEBOUNCE`]. The all-docs model needs no
+    /// per-document deadlines and no cancel→re-arm net: any write that cancels an
+    /// in-flight pass has, by construction, already armed the next settle.
+    pub(crate) settle_deadline: Option<Instant>,
+    /// One global lint generation, bumped per dispatched settle pass. The pass
+    /// result is tagged with it and dropped in `on_task` if a newer settle has
+    /// since been dispatched.
+    pub(crate) lint_generation: u64,
+    /// URIs whose next settle pass must also run external linters (the expensive
+    /// on-save/-open signal). Built-ins run for every open doc each settle;
+    /// externals run only for these. Retired in `on_task` once the pass that ran
+    /// them completes, so a save queued after dispatch survives a cancellation.
+    pub(crate) external_pending: HashSet<Uri>,
+    /// Every URI the last applied settle published to (documents + project
+    /// manifests). The authoritative clear-tracker: a URI present here but absent
+    /// from the next settle's complete set is cleared (published empty / dropped
+    /// from the pull store). Subsumes the old per-document manifest
+    /// reference-counting — the all-docs pass produces the complete set directly.
+    pub(crate) last_published_uris: HashSet<Uri>,
 }
 
 impl GlobalState {
@@ -333,10 +327,10 @@ impl GlobalState {
             cancelled: HashSet::new(),
             outgoing: HashMap::new(),
             next_outgoing_id: 1,
-            lint_deadlines: HashMap::new(),
-            lint_generations: HashMap::new(),
-            pending_lints: HashMap::new(),
-            published_manifest_uris: HashMap::new(),
+            settle_deadline: None,
+            lint_generation: 0,
+            external_pending: HashSet::new(),
+            last_published_uris: HashSet::new(),
         }
     }
 
@@ -384,43 +378,21 @@ impl GlobalState {
         }
     }
 
-    /// Schedule (or reset) a debounced lint for `uri`, merging `request` into any
-    /// pass already pending for it. All lint dispatch funnels through here so the
-    /// expensive read runs once, at a quiescent point after the edit burst's
-    /// writes have settled — rather than racing each write (rust-analyzer spawns
-    /// diagnostics the same way, after `process_changes`).
-    pub(crate) fn schedule_lint(&mut self, uri: &Uri, request: LintRequest) {
-        let key = uri.to_string();
-        self.lint_deadlines
-            .insert(key.clone(), Instant::now() + DIAGNOSTICS_DEBOUNCE);
-        *self.lint_generations.entry(key.clone()).or_default() += 1;
-        let merged = self.pending_lints.entry(key).or_insert(LintRequest {
-            with_dependents: false,
-            run_external: false,
-        });
-        merged.with_dependents |= request.with_dependents;
-        merged.run_external |= request.run_external;
+    /// Arm (or push out) the single workspace settle timer. All lint dispatch
+    /// funnels through here so the expensive all-docs re-lint runs once, at a
+    /// quiescent point after the edit burst's writes have settled (rust-analyzer
+    /// recomputes diagnostics the same way, after `process_changes`). Every
+    /// salsa-input write must call this — directly or via [`Self::arm_settle_external`]
+    /// — so a write that cancels an in-flight pass also schedules its recomputation.
+    pub(crate) fn arm_settle(&mut self) {
+        self.settle_deadline = Some(Instant::now() + DIAGNOSTICS_DEBOUNCE);
     }
 
-    /// Drop debounce bookkeeping for a closed document.
-    pub(crate) fn forget_lint(&mut self, uri: &Uri) {
-        let key = uri.to_string();
-        self.lint_deadlines.remove(&key);
-        self.lint_generations.remove(&key);
-        self.pending_lints.remove(&key);
-        // Clear any project-manifest diagnostics this document owned, unless
-        // another open document still reports the same manifest.
-        if let Some(owned) = self.published_manifest_uris.remove(&key) {
-            for manifest_uri in owned {
-                let still_referenced = self
-                    .published_manifest_uris
-                    .values()
-                    .any(|set| set.contains(&manifest_uri));
-                if !still_referenced {
-                    self.deliver_diagnostics(manifest_uri, None, Vec::new());
-                }
-            }
-        }
+    /// Arm the settle timer and mark `uri` as needing external linters on the
+    /// next pass (the on-open/-save/referenced-file-change signal).
+    pub(crate) fn arm_settle_external(&mut self, uri: Uri) {
+        self.external_pending.insert(uri);
+        self.arm_settle();
     }
 
     /// Deliver a diagnostics payload for `uri`, routed by the active model:

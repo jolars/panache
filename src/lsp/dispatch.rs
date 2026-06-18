@@ -15,7 +15,7 @@ use lsp_types::{InitializeParams, ServerCapabilities, Uri};
 use serde::Serialize;
 use serde_json::Value;
 
-use super::global_state::{GlobalState, LintRequest, StateSnapshot, Task};
+use super::global_state::{GlobalState, StateSnapshot, Task};
 use super::helpers::catch_cancelled;
 use super::uri_ext::UriExt;
 use super::{documents, handlers};
@@ -407,65 +407,42 @@ impl GlobalState {
             }
             Task::Diagnostics {
                 generation,
-                key,
                 publishes,
-                manifest_uris,
+                external_ran,
             } => {
-                // Drop results superseded by a newer edit.
-                if self.lint_generations.get(&key).copied() == Some(generation) {
-                    for (uri, version, diags) in publishes {
-                        self.deliver_diagnostics(uri, version, diags);
-                    }
-                    // Clear-on-fix: a manifest this pass no longer reports gets an
-                    // empty delivery — but only if no OTHER open document still
-                    // reports it (a shared `_quarto.yml` stays flagged until every
-                    // dependent is fixed/closed). The manifest URI differs from
-                    // `key`, so the generation guard alone never clears it.
-                    let previous = self
-                        .published_manifest_uris
-                        .get(&key)
-                        .cloned()
-                        .unwrap_or_default();
-                    for stale in previous.difference(&manifest_uris) {
-                        let still_referenced = self
-                            .published_manifest_uris
-                            .iter()
-                            .any(|(other_key, set)| other_key != &key && set.contains(stale));
-                        if !still_referenced {
-                            self.deliver_diagnostics(stale.clone(), None, Vec::new());
-                        }
-                    }
-                    if manifest_uris.is_empty() {
-                        self.published_manifest_uris.remove(&key);
-                    } else {
-                        self.published_manifest_uris.insert(key, manifest_uris);
-                    }
-                    // One coalesced nudge after the whole batch (pull + refresh
-                    // only; a no-op for push clients).
-                    self.send_diagnostic_refresh();
+                // Drop a pass superseded by a newer settle.
+                if generation != self.lint_generation {
+                    return;
                 }
-            }
-            Task::DiagnosticsCancelled { generation, key } => {
-                // Batched dispatch keeps sibling lints from cancelling each other,
-                // but a write that doesn't itself re-arm a lint — `didClose`, a
-                // file-watcher event, a config reload — can still cancel an
-                // in-flight pass. This is the recovery net: if no newer edit has
-                // superseded it (stale generation ⇒ a fresh lint is already
-                // queued), re-arm the debounce so the diagnostics recompute
-                // instead of being lost until the next edit. Built-in only; the
-                // next save refreshes external-linter diagnostics.
-                if self.lint_generations.get(&key).copied() == Some(generation)
-                    && let Ok(uri) = key.parse::<Uri>()
-                {
-                    log::debug!("lint for {key} cancelled by concurrent write; re-arming");
-                    self.schedule_lint(
-                        &uri,
-                        LintRequest {
-                            with_dependents: true,
-                            run_external: false,
-                        },
-                    );
+                // Deliver the complete merged set, recording every URI touched.
+                let mut now_published: std::collections::HashSet<Uri> =
+                    std::collections::HashSet::with_capacity(publishes.len());
+                for (uri, version, diags) in publishes {
+                    now_published.insert(uri.clone());
+                    self.deliver_diagnostics(uri, version, diags);
                 }
+                // Clear-on-fix, uniformly: any URI the previous settle reported but
+                // this one does not (a fixed manifest, a closed document, a
+                // resolved cross-file diagnostic) is cleared — published empty
+                // (push) or dropped from the pull store. The all-docs pass yields
+                // the authoritative complete set, so a shared `_quarto.yml` stays
+                // flagged as long as any open doc still reports it.
+                let stale: Vec<Uri> = self
+                    .last_published_uris
+                    .difference(&now_published)
+                    .cloned()
+                    .collect();
+                for uri in stale {
+                    self.drop_document_diagnostics(&uri);
+                }
+                self.last_published_uris = now_published;
+                // Retire exactly the externals this pass ran (a save queued after
+                // dispatch stays pending for the next settle).
+                self.external_pending
+                    .retain(|uri| !external_ran.contains(uri));
+                // One coalesced nudge after the whole batch (pull + refresh only; a
+                // no-op for push clients).
+                self.send_diagnostic_refresh();
             }
         }
     }
@@ -550,111 +527,124 @@ impl GlobalState {
         });
     }
 
-    /// Dispatch a lint pass to the pool. Bumps the lint generation and tags the
-    /// result with it, so a later edit (which bumps again) drops a stale result.
-    pub(crate) fn spawn_lint(&mut self, uri: Uri, with_dependents: bool, run_external: bool) {
-        let key = uri.to_string();
-        let generation = {
-            let g = self.lint_generations.entry(key.clone()).or_insert(0);
-            *g += 1;
-            *g
-        };
+    /// Spawn one settle pass that re-lints **every** open document over a single
+    /// snapshot, tagged with `generation`. `external` is the set of URIs to also
+    /// run external linters for (built-ins run for all docs regardless).
+    ///
+    /// One job, not a fan-out: a fan-out of N jobs would each clone a separate
+    /// salsa handle that does not share one revision atomically, so a write
+    /// landing mid-fan-out could cancel some jobs and not others — reintroducing
+    /// the split-generation problem this model deletes. One job makes a concurrent
+    /// write cancel the whole pass atomically; the partial work is discarded and
+    /// the cancelling write has already armed the next settle, so nothing needs
+    /// re-arming.
+    pub(crate) fn spawn_settle_pass(
+        &mut self,
+        generation: u64,
+        external: std::collections::HashSet<Uri>,
+    ) {
         let snap = self.snapshot();
         let sender = self.pool.result_sender();
+        let uris: Vec<Uri> = self
+            .document_map
+            .keys()
+            .filter_map(|key| key.parse::<Uri>().ok())
+            .collect();
         self.pool.spawn(move || {
             let result = catch_cancelled(|| {
-                let mut publishes = if with_dependents {
-                    handlers::diagnostics::compute_publishes_with_dependents(
-                        &snap,
-                        &uri,
-                        run_external,
-                    )
-                } else {
-                    handlers::diagnostics::compute_publishes(&snap, &uri, run_external)
-                };
-                // Project-manifest (`_quarto.yml` etc.) diagnostics, published on
-                // the manifest's own URI. Computed once for the primary document
-                // (the query already spans the whole project graph), so dependents
-                // don't recompute it.
-                let (manifest_pubs, manifest_uris) =
-                    handlers::diagnostics::manifest_publishes(&snap, &uri);
-                publishes.extend(manifest_pubs);
-                (publishes, manifest_uris)
+                // Merge every document's publishes by URI. A project-graph
+                // diagnostic for a shared path is accumulated once per project
+                // document, so the same `Diagnostic` value arrives from several
+                // passes; dedupe by value (a document's *own* built-in diagnostics
+                // are distinct and so survive). A manifest error reachable from
+                // several docs collapses the same way.
+                let mut merged: std::collections::HashMap<Uri, Vec<lsp_types::Diagnostic>> =
+                    std::collections::HashMap::new();
+                for uri in &uris {
+                    let run_external = external.contains(uri);
+                    let mut publishes =
+                        handlers::diagnostics::compute_publishes(&snap, uri, run_external);
+                    let (manifest_pubs, _manifest_uris) =
+                        handlers::diagnostics::manifest_publishes(&snap, uri);
+                    publishes.extend(manifest_pubs);
+                    for (target, _version, diags) in publishes {
+                        let slot = merged.entry(target).or_default();
+                        for diag in diags {
+                            if !slot.contains(&diag) {
+                                slot.push(diag);
+                            }
+                        }
+                    }
+                }
+                merged
+                    .into_iter()
+                    .map(|(uri, mut diags)| {
+                        diags.sort_by_key(|d| (d.range.start.line, d.range.start.character));
+                        (uri, None, diags)
+                    })
+                    .collect::<Vec<_>>()
             });
-            match result {
-                Some((publishes, manifest_uris)) => {
-                    let _ = sender.send(Task::Diagnostics {
-                        generation,
-                        key,
-                        publishes,
-                        manifest_uris,
-                    });
-                }
-                // A concurrent write cancelled the read. Signal the main loop so
-                // it can retry rather than silently losing these diagnostics.
-                None => {
-                    let _ = sender.send(Task::DiagnosticsCancelled { generation, key });
-                }
+            // A concurrent write cancels the pass (`result` is `None`); drop it.
+            // That write already armed the next settle, which re-lints everything.
+            if let Some(publishes) = result {
+                let _ = sender.send(Task::Diagnostics {
+                    generation,
+                    publishes,
+                    external_ran: external,
+                });
             }
         });
     }
 
-    /// Time until the nearest due lint deadline, for the main-loop `select!`.
+    /// Time until the workspace settle deadline, for the main-loop `select!`.
     pub(crate) fn next_lint_timeout(&self) -> Option<Duration> {
-        self.lint_deadlines
-            .values()
-            .min()
-            .map(|&deadline| deadline.saturating_duration_since(Instant::now()))
+        self.settle_deadline
+            .map(|deadline| deadline.saturating_duration_since(Instant::now()))
     }
 
-    /// Dispatch any debounced lints whose deadline has elapsed.
+    /// If the workspace settle deadline has elapsed, re-lint every open document.
     ///
-    /// Two phases on purpose: **first** apply every due document's writes (load
+    /// Two phases on purpose: **first** apply every open document's writes (load
     /// newly-referenced includes/bibliographies), **then** snapshot and spawn the
-    /// reads. Interleaving them — `load → spawn → load → spawn` — let one
-    /// document's write cancel the previous document's just-spawned lint (a
-    /// pooled salsa read on a cloned handle), so a burst of opens/edits would
-    /// drop diagnostics for all but the last. Batching the write phase ahead of
-    /// the read phase means every spawned lint reads a settled database.
+    /// single read pass. Loading after the snapshot would cancel the pass, so the
+    /// write phase is batched ahead of it — the pass reads a settled database.
+    //
+    // Backstop hook: for pathological sessions with more open docs than the salsa
+    // lru (512), a future `MAX_DOCS_PER_SETTLE` cap could lint a prioritized
+    // subset (saved + recently-changed) per settle and re-arm for the remainder.
+    // The raised lru removes the cliff for realistic sessions, so it is unused.
     pub(crate) fn dispatch_due_lints(&mut self) {
-        let now = Instant::now();
-        let due: Vec<String> = self
-            .lint_deadlines
-            .iter()
-            .filter(|(_, deadline)| **deadline <= now)
-            .map(|(key, _)| key.clone())
-            .collect();
-        if due.is_empty() {
+        let Some(deadline) = self.settle_deadline else {
+            return;
+        };
+        if deadline > Instant::now() {
             return;
         }
+        self.settle_deadline = None;
 
-        // Write phase: load every due document's referenced files first. A
+        // Write phase: load every open document's referenced files first. A
         // keystroke burst may have added an include/bibliography since the last
         // pass; `file_text` no longer lazy-loads (audit §3.2), so the writer loads
-        // them here, coalesced onto the debounce boundary.
-        for key in &due {
-            self.lint_deadlines.remove(key);
-            if let Some((salsa_file, salsa_config, Some(path))) = self
-                .document_map
-                .get(key)
-                .map(|doc| (doc.salsa_file, doc.salsa_config, doc.path.clone()))
-            {
-                documents::load_project_files(self, salsa_file, salsa_config, path);
-            }
+        // them here, coalesced onto the settle boundary.
+        let docs: Vec<(
+            crate::salsa::FileText,
+            crate::salsa::FileConfig,
+            std::path::PathBuf,
+        )> = self
+            .document_map
+            .values()
+            .filter_map(|doc| Some((doc.salsa_file, doc.salsa_config, doc.path.clone()?)))
+            .collect();
+        for (salsa_file, salsa_config, path) in docs {
+            documents::load_project_files(self, salsa_file, salsa_config, path);
         }
 
-        // Read phase: snapshot and spawn over the now-settled database. No salsa
-        // writes happen between these spawns, so no lint cancels a sibling.
-        for key in &due {
-            let Ok(uri) = key.parse::<Uri>() else {
-                continue;
-            };
-            let request = self.pending_lints.remove(key).unwrap_or(LintRequest {
-                with_dependents: true,
-                run_external: false,
-            });
-            self.spawn_lint(uri, request.with_dependents, request.run_external);
-        }
+        // Read phase: snapshot and spawn the single all-docs pass over the
+        // now-settled database under a fresh generation.
+        self.lint_generation += 1;
+        let generation = self.lint_generation;
+        let external = self.external_pending.clone();
+        self.spawn_settle_pass(generation, external);
     }
 }
 
@@ -693,47 +683,63 @@ mod tests {
         }
     }
 
-    fn new_state() -> GlobalState {
+    fn uri(s: &str) -> Uri {
+        s.parse().expect("valid uri")
+    }
+
+    /// A current-generation settle result is applied: every published URI is
+    /// recorded, a URI the previous settle reported but this one omits is cleared,
+    /// and exactly the externals this pass ran are retired — an external queued
+    /// after dispatch (here `b`) survives for the next settle.
+    #[test]
+    fn settle_result_retires_external_and_clears_stale_uris() {
         let (tx, _client_rx) = crossbeam_channel::unbounded();
-        GlobalState::new(ClientSender::new(tx))
-    }
+        let mut gs = GlobalState::new(ClientSender::new(tx));
+        let (a, b, x) = (
+            uri("file:///a.qmd"),
+            uri("file:///b.qmd"),
+            uri("file:///x.qmd"),
+        );
+        gs.lint_generation = 5;
+        gs.external_pending = [a.clone(), b.clone()].into_iter().collect();
+        gs.last_published_uris = [x.clone()].into_iter().collect();
 
-    /// A lint cancelled by a concurrent write (e.g. `didClose`) must be re-armed
-    /// so its diagnostics aren't lost — provided no newer edit superseded it.
-    #[test]
-    fn cancelled_lint_with_current_generation_is_rearmed() {
-        let mut gs = new_state();
-        let key = "file:///doc.qmd".to_string();
-        gs.lint_generations.insert(key.clone(), 7);
-
-        gs.on_task(Task::DiagnosticsCancelled {
-            generation: 7,
-            key: key.clone(),
+        gs.on_task(Task::Diagnostics {
+            generation: 5,
+            publishes: vec![(a.clone(), None, Vec::new())],
+            external_ran: [a.clone()].into_iter().collect(),
         });
 
+        assert!(!gs.external_pending.contains(&a), "ran external retired");
         assert!(
-            gs.lint_deadlines.contains_key(&key),
-            "a current-generation cancellation should re-arm the debounced lint"
+            gs.external_pending.contains(&b),
+            "external queued after dispatch must survive"
         );
-        assert!(gs.pending_lints.contains_key(&key));
+        assert_eq!(
+            gs.last_published_uris,
+            [a].into_iter().collect(),
+            "published set replaced; stale `x` cleared"
+        );
     }
 
-    /// A cancellation whose generation is stale means a newer lint is already
-    /// queued; re-arming again would be redundant, so it must be dropped.
+    /// A settle result tagged with a superseded generation is dropped wholesale:
+    /// no delivery, no clear, no external retirement.
     #[test]
-    fn cancelled_lint_with_stale_generation_is_dropped() {
-        let mut gs = new_state();
-        let key = "file:///doc.qmd".to_string();
-        gs.lint_generations.insert(key.clone(), 9);
+    fn stale_settle_result_is_dropped() {
+        let (tx, _client_rx) = crossbeam_channel::unbounded();
+        let mut gs = GlobalState::new(ClientSender::new(tx));
+        let (a, x) = (uri("file:///a.qmd"), uri("file:///x.qmd"));
+        gs.lint_generation = 9;
+        gs.external_pending = [a.clone()].into_iter().collect();
+        gs.last_published_uris = [x.clone()].into_iter().collect();
 
-        gs.on_task(Task::DiagnosticsCancelled {
+        gs.on_task(Task::Diagnostics {
             generation: 7,
-            key: key.clone(),
+            publishes: vec![(a.clone(), None, Vec::new())],
+            external_ran: [a.clone()].into_iter().collect(),
         });
 
-        assert!(
-            !gs.lint_deadlines.contains_key(&key),
-            "a stale-generation cancellation should not re-arm"
-        );
+        assert_eq!(gs.external_pending, [a].into_iter().collect());
+        assert_eq!(gs.last_published_uris, [x].into_iter().collect());
     }
 }

@@ -137,10 +137,19 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
             }
         }
 
-        // A referenced-file change is infrequent, so run the full pass (external
-        // linters included) for each affected document.
+        // A referenced-file change is infrequent, so run external linters for
+        // each affected document on the next settle. The settle re-lints every
+        // open document, so manifest parse errors re-publish on (or clear from)
+        // the manifest's own URI even for documents not flagged here.
         for uri in affected_documents {
-            gs.spawn_lint(uri, false, true);
+            gs.arm_settle_external(uri);
         }
+    }
+
+    // Any watched-file change can shift the database (FileSet interning, synced
+    // text); arm the settle so the all-docs pass re-lints over the fresh state
+    // even when no document was flagged for external linters above.
+    if !changed_paths.is_empty() {
+        gs.arm_settle();
     }
 }

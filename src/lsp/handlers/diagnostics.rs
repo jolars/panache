@@ -32,8 +32,9 @@ pub(crate) type Publish = (Uri, Option<i32>, Vec<Diagnostic>);
 /// tracked input), not from an open document.
 ///
 /// Returns the publishes plus the set of manifest URIs that received a
-/// diagnostic, so the main loop can clear them when the error is later fixed
-/// (see `GlobalState::published_manifest_uris`).
+/// diagnostic. The all-docs settle pass merges these across documents and
+/// reconciles clears via `GlobalState::last_published_uris`, so the returned set
+/// is informational for callers that want it.
 pub(crate) fn manifest_publishes(snap: &StateSnapshot, uri: &Uri) -> (Vec<Publish>, HashSet<Uri>) {
     let Some(doc_state) = snap.document_state(uri) else {
         return (Vec::new(), HashSet::new());
@@ -73,9 +74,11 @@ pub(crate) fn manifest_publishes(snap: &StateSnapshot, uri: &Uri) -> (Vec<Publis
 
 /// Compute diagnostics for `uri` and any documents that depend on it.
 ///
-/// Mirrors the old `relint_with_dependents` → `lint_and_publish` flow: the
-/// project graph's dependents are linted built-in-only (to bound cost), then the
-/// target document itself is linted (with external linters iff `run_external`).
+/// Bench-only baseline (`lsp_relint`): the live model re-lints every open
+/// document per settle, so it no longer walks dependents. Retained to measure the
+/// old "changed doc + dependents" per-edit cost against the all-docs cost. Lints
+/// the project graph's dependents built-in-only, then the target document itself
+/// (with external linters iff `run_external`).
 pub(crate) fn compute_publishes_with_dependents(
     snap: &StateSnapshot,
     uri: &Uri,

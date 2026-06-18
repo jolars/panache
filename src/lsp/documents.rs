@@ -3,9 +3,11 @@
 //! These run synchronously on the main-loop thread with `&mut GlobalState`: they
 //! are the sole writers of the salsa database and the document map. Parsing and
 //! state updates happen inline so interactive requests always see the latest
-//! tree; the expensive lint (project-graph recompute + diagnostics) is dispatched
-//! to the [`TaskPool`](crate::lsp::task_pool) — debounced for `didChange`,
-//! immediate for `didOpen`/`didSave`.
+//! tree; the expensive lint (project-graph recompute + diagnostics) is deferred
+//! to the debounced workspace settle, which re-lints every open document over one
+//! snapshot. Every salsa-input write here arms that settle (directly or via
+//! [`GlobalState::arm_settle_external`]) so a write that cancels an in-flight
+//! pass also schedules its recomputation.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -20,7 +22,7 @@ use salsa::{Durability, Setter};
 
 use super::config::load_config;
 use super::conversions::{apply_content_change, apply_content_change_with_edit_ranges};
-use super::global_state::{GlobalState, LintRequest};
+use super::global_state::GlobalState;
 use super::uri_ext::UriExt;
 use crate::lsp::DocumentState;
 use crate::parser::{parse_incremental_suffix_with_refdefs, parse_with_refdefs};
@@ -141,17 +143,12 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     gs.sender
         .log_message(MessageType::INFO, format!("Opened document: {uri_string}"));
 
-    // Debounce the lint instead of spawning it inline: a workspace-restore burst
-    // of opens each writes salsa, and an inline lint would be cancelled by the
-    // next open's write. Open runs external linters (like save) so their
-    // diagnostics surface without waiting for the first manual save.
-    gs.schedule_lint(
-        &uri,
-        LintRequest {
-            with_dependents: false,
-            run_external: true,
-        },
-    );
+    // Arm the workspace settle instead of spawning a lint inline: a
+    // workspace-restore burst of opens each writes salsa, and an inline lint
+    // would be cancelled by the next open's write. Open runs external linters
+    // (like save) so their diagnostics surface without waiting for the first
+    // manual save.
+    gs.arm_settle_external(uri);
     log::debug!("did_open complete in {:?}", start.elapsed());
 }
 
@@ -267,19 +264,13 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
         .with_durability(Durability::MEDIUM)
         .to(config.clone());
 
-    // Defer the expensive lint to a debounced pass so a burst of keystrokes
-    // collapses into one lint and a save's formatting request never queues
-    // behind per-keystroke work. Built-in only — external linters wait for save.
-    gs.schedule_lint(
-        &uri,
-        LintRequest {
-            with_dependents: true,
-            run_external: false,
-        },
-    );
+    // Defer the expensive re-lint to the debounced settle so a burst of
+    // keystrokes collapses into one pass and a save's formatting request never
+    // queues behind per-keystroke work. No external linters — they wait for save.
+    gs.arm_settle();
 
     log::debug!(
-        "did_change complete (parse+state) in {:?}; lint debounced",
+        "did_change complete (parse+state) in {:?}; settle armed",
         start.elapsed()
     );
 }
@@ -287,8 +278,8 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
 /// Handle `textDocument/didSave`.
 ///
 /// Save is the point at which heavier external linters run (skipped on every
-/// keystroke). Any pending debounced pass is superseded by the fresh generation
-/// that [`GlobalState::spawn_lint`] bumps.
+/// keystroke). The fresh settle re-lints every open document; only the saved
+/// document runs external linters.
 pub(crate) fn did_save(gs: &mut GlobalState, params: DidSaveTextDocumentParams) {
     let uri = params.text_document.uri;
     // A save may have introduced new includes/bibliography since the document
@@ -302,16 +293,9 @@ pub(crate) fn did_save(gs: &mut GlobalState, params: DidSaveTextDocumentParams) 
     {
         load_project_files(gs, salsa_file, salsa_config, path);
     }
-    // Save is the heavy pass: dependents + external linters. Debounced like every
-    // other lint so a save-all burst coalesces and the read isn't cancelled by a
-    // sibling save's write.
-    gs.schedule_lint(
-        &uri,
-        LintRequest {
-            with_dependents: true,
-            run_external: true,
-        },
-    );
+    // Save is the heavy pass: external linters for the saved document. Debounced
+    // like every other settle so a save-all burst coalesces into one pass.
+    gs.arm_settle_external(uri);
 }
 
 /// Handle `textDocument/didClose`.
@@ -319,7 +303,14 @@ pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams
     let uri = params.text_document.uri.clone();
     let uri_string = uri.to_string();
     gs.document_map_mut().remove(&uri_string);
-    gs.forget_lint(&uri);
+
+    // Drop the closed document's own diagnostics immediately so a pull issued
+    // before the next settle no longer reports it (push: empty publish). Any
+    // manifests it contributed are reconciled by the settle armed below: the
+    // all-docs pass re-lints the remaining documents and the clear-on-fix diff
+    // clears a manifest once no open document still reports it.
+    gs.drop_document_diagnostics(&uri);
+    gs.last_published_uris.remove(&uri);
 
     let states: Vec<DocumentState> = gs.document_map.values().cloned().collect();
     let mut retained = HashSet::new();
@@ -337,10 +328,11 @@ pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams
         let _ = gs.salsa.evict_file_text(&cached);
     }
 
-    gs.drop_document_diagnostics(&uri);
-    // `forget_lint` may also have cleared manifest entries; one coalesced nudge
-    // (pull + refresh only; a no-op for push clients).
-    gs.send_diagnostic_refresh();
+    // Closing a document changes the database for the remaining open docs (a
+    // closed include affects its parent), and the eviction above may cancel an
+    // in-flight pass. Arm the settle so the remaining docs are re-linted over the
+    // post-close snapshot.
+    gs.arm_settle();
 }
 
 #[cfg(test)]

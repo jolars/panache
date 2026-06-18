@@ -432,9 +432,9 @@ impl LspTester {
     /// `timeout` elapses. Used by tests to deterministically exercise the
     /// debounced publish path.
     pub fn pump(&mut self, timeout: Duration) {
-        let now = Instant::now();
-        for deadline in self.gs.lint_deadlines.values_mut() {
-            *deadline = now;
+        // Force any armed settle to be due immediately.
+        if self.gs.settle_deadline.is_some() {
+            self.gs.settle_deadline = Some(Instant::now());
         }
         self.gs.dispatch_due_lints();
 
@@ -451,7 +451,7 @@ impl LspTester {
             match receiver.recv_timeout(step) {
                 Ok(task) => self.gs.on_task(task),
                 Err(_) => {
-                    if self.gs.lint_deadlines.is_empty() {
+                    if self.gs.settle_deadline.is_none() {
                         break;
                     }
                     self.gs.dispatch_due_lints();
