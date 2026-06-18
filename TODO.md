@@ -160,7 +160,33 @@ analogue; do not re-audit them: call hierarchy, type hierarchy,
     automatic: the write that cancels a pass is the change that re-runs the next
     settle) and collapses per-doc generations into one. External linters stay
     the exception (run only for the explicitly-saved doc, not all docs each
-    settle). Prototype and measure before committing.
+    settle).
+  - **Measured 2026-06-18** (`cargo bench --bench lsp_relint`, off-main-loop
+    pool cost, median µs). The apples-to-apples comparison is per-edit cost (one
+    doc changed): OLD = lint changed doc + dependents; NEW = lint every open
+    doc. The structural difference is shape, not just magnitude:
+    - **OLD per-edit cost is \~flat in open-doc count** --- it only touches the
+      changed doc and its dependents (\~5ms for a large doc whether 5 or 100
+      docs are open; \~0.35ms small).
+    - **NEW per-edit cost grows with open-doc count.** Below the salsa LRU the
+      growth is mild (unchanged docs are \~19µs memo hits): independent docs sit
+      at NEW/OLD ≈ 1--1.6× through open=64 (large NEW ≈5--9ms). Past 64 a cliff
+      appears (open=80 large → \~70ms, open=100 → \~137ms; NEW/OLD 15--27×).
+    - Confirmed the cliff IS the `built_in_lint_plan`/dependency `lru = 64`:
+      bumping every salsa `lru` to 4096 erases it (large open=100 NEW
+      137ms→7.5ms, NEW/OLD 1.65×; a revision bump otherwise forces re-validation
+      of memos whose deps were LRU-evicted).
+    - Shared-include docs show **no meaningful old/new difference** --- OLD
+      already re-lints all dependents on a shared-file edit, so both models do
+      nearly the same work. The divergence is purely for *independent* docs (OLD
+      skips unrelated docs; NEW lints them anyway).
+  - **Verdict: conditional GO.** Viable and recovery-simplifying for realistic
+    sessions (≤\~50 open docs), and the per-settle work is off the main loop.
+    PREREQUISITE before adopting: raise the salsa `lru` (≥ expected max open
+    docs, e.g. 256--512) --- otherwise one edit in a >64-doc session triggers
+    tens-to-hundreds-of-ms re-lint storms. Consider a docs-per-settle cap as a
+    backstop. The all-docs move then retires the cancel→re-arm net and collapses
+    per-doc generations as described above.
   - Consolidate diagnostic state behind one `DiagnosticCollection`-style owner.
     There are now three trackers --- the implicit push state, the pull
     `diagnostics_store`, and `published_manifest_uris` clear-on-fix bookkeeping.

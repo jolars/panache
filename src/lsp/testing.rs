@@ -502,6 +502,35 @@ impl LspTester {
         Some(plan.diagnostics)
     }
 
+    /// Bench helper: re-lint **every open document** over a single snapshot
+    /// (built-in only), returning the total publish count so callers can
+    /// `black_box` it. This is the per-settle cost of the candidate "re-lint all
+    /// open documents per quiescent settle" model (`TODO.md` rust-analyzer
+    /// divergence). Unchanged docs should resolve to a `built_in_lint_plan` memo
+    /// hit; the residual cost is the un-memoized text clone + `convert_diagnostic`
+    /// in [`compute_publishes`](handlers::diagnostics::compute_publishes).
+    pub fn relint_all_open_documents(&self) -> usize {
+        let snap = self.snapshot();
+        let mut total = 0;
+        for key in self.gs.document_map.keys() {
+            if let Ok(uri) = key.parse::<Uri>() {
+                total += handlers::diagnostics::compute_publishes(&snap, &uri, false).len();
+            }
+        }
+        total
+    }
+
+    /// Bench helper: the work a single `didChange` does in the current per-doc
+    /// model — lint `uri` plus its project-graph dependents, built-in only.
+    /// Baseline against which [`Self::relint_all_open_documents`] is compared.
+    pub fn relint_with_dependents(&self, uri: &str) -> usize {
+        let snap = self.snapshot();
+        let Ok(uri) = uri.parse::<Uri>() else {
+            return 0;
+        };
+        handlers::diagnostics::compute_publishes_with_dependents(&snap, &uri, false).len()
+    }
+
     // --- pull diagnostics ---
 
     /// Whether the server is in pull-diagnostics mode (push suppressed).
