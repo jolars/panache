@@ -15,7 +15,7 @@ use lsp_types::{InitializeParams, ServerCapabilities, Uri};
 use serde::Serialize;
 use serde_json::Value;
 
-use super::global_state::{GlobalState, StateSnapshot, Task};
+use super::global_state::{GlobalState, LintRequest, StateSnapshot, Task};
 use super::helpers::catch_cancelled;
 use super::uri_ext::UriExt;
 use super::{documents, handlers};
@@ -445,6 +445,28 @@ impl GlobalState {
                     self.send_diagnostic_refresh();
                 }
             }
+            Task::DiagnosticsCancelled { generation, key } => {
+                // Batched dispatch keeps sibling lints from cancelling each other,
+                // but a write that doesn't itself re-arm a lint — `didClose`, a
+                // file-watcher event, a config reload — can still cancel an
+                // in-flight pass. This is the recovery net: if no newer edit has
+                // superseded it (stale generation ⇒ a fresh lint is already
+                // queued), re-arm the debounce so the diagnostics recompute
+                // instead of being lost until the next edit. Built-in only; the
+                // next save refreshes external-linter diagnostics.
+                if self.lint_generations.get(&key).copied() == Some(generation)
+                    && let Ok(uri) = key.parse::<Uri>()
+                {
+                    log::debug!("lint for {key} cancelled by concurrent write; re-arming");
+                    self.schedule_lint(
+                        &uri,
+                        LintRequest {
+                            with_dependents: true,
+                            run_external: false,
+                        },
+                    );
+                }
+            }
         }
     }
 
@@ -559,13 +581,20 @@ impl GlobalState {
                 publishes.extend(manifest_pubs);
                 (publishes, manifest_uris)
             });
-            if let Some((publishes, manifest_uris)) = result {
-                let _ = sender.send(Task::Diagnostics {
-                    generation,
-                    key,
-                    publishes,
-                    manifest_uris,
-                });
+            match result {
+                Some((publishes, manifest_uris)) => {
+                    let _ = sender.send(Task::Diagnostics {
+                        generation,
+                        key,
+                        publishes,
+                        manifest_uris,
+                    });
+                }
+                // A concurrent write cancelled the read. Signal the main loop so
+                // it can retry rather than silently losing these diagnostics.
+                None => {
+                    let _ = sender.send(Task::DiagnosticsCancelled { generation, key });
+                }
             }
         });
     }
@@ -579,6 +608,14 @@ impl GlobalState {
     }
 
     /// Dispatch any debounced lints whose deadline has elapsed.
+    ///
+    /// Two phases on purpose: **first** apply every due document's writes (load
+    /// newly-referenced includes/bibliographies), **then** snapshot and spawn the
+    /// reads. Interleaving them — `load → spawn → load → spawn` — let one
+    /// document's write cancel the previous document's just-spawned lint (a
+    /// pooled salsa read on a cloned handle), so a burst of opens/edits would
+    /// drop diagnostics for all but the last. Batching the write phase ahead of
+    /// the read phase means every spawned lint reads a settled database.
     pub(crate) fn dispatch_due_lints(&mut self) {
         let now = Instant::now();
         let due: Vec<String> = self
@@ -587,24 +624,36 @@ impl GlobalState {
             .filter(|(_, deadline)| **deadline <= now)
             .map(|(key, _)| key.clone())
             .collect();
-        for key in due {
-            self.lint_deadlines.remove(&key);
-            let Ok(uri) = key.parse::<Uri>() else {
-                continue;
-            };
-            // A keystroke burst may have added an include/bibliography since the
-            // last pass. `file_text` no longer lazy-loads (audit §3.2), so load
-            // any newly-referenced file on the writer here --- coalesced onto the
-            // debounce boundary --- before `spawn_lint` takes its snapshot.
+        if due.is_empty() {
+            return;
+        }
+
+        // Write phase: load every due document's referenced files first. A
+        // keystroke burst may have added an include/bibliography since the last
+        // pass; `file_text` no longer lazy-loads (audit §3.2), so the writer loads
+        // them here, coalesced onto the debounce boundary.
+        for key in &due {
+            self.lint_deadlines.remove(key);
             if let Some((salsa_file, salsa_config, Some(path))) = self
                 .document_map
-                .get(&key)
+                .get(key)
                 .map(|doc| (doc.salsa_file, doc.salsa_config, doc.path.clone()))
             {
                 documents::load_project_files(self, salsa_file, salsa_config, path);
             }
-            // Debounced (per-keystroke) pass: dependents, built-in only.
-            self.spawn_lint(uri, true, false);
+        }
+
+        // Read phase: snapshot and spawn over the now-settled database. No salsa
+        // writes happen between these spawns, so no lint cancels a sibling.
+        for key in &due {
+            let Ok(uri) = key.parse::<Uri>() else {
+                continue;
+            };
+            let request = self.pending_lints.remove(key).unwrap_or(LintRequest {
+                with_dependents: true,
+                run_external: false,
+            });
+            self.spawn_lint(uri, request.with_dependents, request.run_external);
         }
     }
 }
@@ -642,5 +691,49 @@ mod tests {
             }
             _ => panic!("expected a Task::Response"),
         }
+    }
+
+    fn new_state() -> GlobalState {
+        let (tx, _client_rx) = crossbeam_channel::unbounded();
+        GlobalState::new(ClientSender::new(tx))
+    }
+
+    /// A lint cancelled by a concurrent write (e.g. `didClose`) must be re-armed
+    /// so its diagnostics aren't lost — provided no newer edit superseded it.
+    #[test]
+    fn cancelled_lint_with_current_generation_is_rearmed() {
+        let mut gs = new_state();
+        let key = "file:///doc.qmd".to_string();
+        gs.lint_generations.insert(key.clone(), 7);
+
+        gs.on_task(Task::DiagnosticsCancelled {
+            generation: 7,
+            key: key.clone(),
+        });
+
+        assert!(
+            gs.lint_deadlines.contains_key(&key),
+            "a current-generation cancellation should re-arm the debounced lint"
+        );
+        assert!(gs.pending_lints.contains_key(&key));
+    }
+
+    /// A cancellation whose generation is stale means a newer lint is already
+    /// queued; re-arming again would be redundant, so it must be dropped.
+    #[test]
+    fn cancelled_lint_with_stale_generation_is_dropped() {
+        let mut gs = new_state();
+        let key = "file:///doc.qmd".to_string();
+        gs.lint_generations.insert(key.clone(), 9);
+
+        gs.on_task(Task::DiagnosticsCancelled {
+            generation: 7,
+            key: key.clone(),
+        });
+
+        assert!(
+            !gs.lint_deadlines.contains_key(&key),
+            "a stale-generation cancellation should not re-arm"
+        );
     }
 }

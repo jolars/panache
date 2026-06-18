@@ -20,7 +20,7 @@ use salsa::{Durability, Setter};
 
 use super::config::load_config;
 use super::conversions::{apply_content_change, apply_content_change_with_edit_ranges};
-use super::global_state::GlobalState;
+use super::global_state::{GlobalState, LintRequest};
 use super::uri_ext::UriExt;
 use crate::lsp::DocumentState;
 use crate::parser::{parse_incremental_suffix_with_refdefs, parse_with_refdefs};
@@ -141,9 +141,17 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     gs.sender
         .log_message(MessageType::INFO, format!("Opened document: {uri_string}"));
 
-    // Open is a one-time event: run external linters now so their diagnostics
-    // surface immediately rather than waiting for the first save.
-    gs.spawn_lint(uri, false, true);
+    // Debounce the lint instead of spawning it inline: a workspace-restore burst
+    // of opens each writes salsa, and an inline lint would be cancelled by the
+    // next open's write. Open runs external linters (like save) so their
+    // diagnostics surface without waiting for the first manual save.
+    gs.schedule_lint(
+        &uri,
+        LintRequest {
+            with_dependents: false,
+            run_external: true,
+        },
+    );
     log::debug!("did_open complete in {:?}", start.elapsed());
 }
 
@@ -261,8 +269,14 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
 
     // Defer the expensive lint to a debounced pass so a burst of keystrokes
     // collapses into one lint and a save's formatting request never queues
-    // behind per-keystroke work.
-    gs.schedule_lint(&uri);
+    // behind per-keystroke work. Built-in only — external linters wait for save.
+    gs.schedule_lint(
+        &uri,
+        LintRequest {
+            with_dependents: true,
+            run_external: false,
+        },
+    );
 
     log::debug!(
         "did_change complete (parse+state) in {:?}; lint debounced",
@@ -277,9 +291,10 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
 /// that [`GlobalState::spawn_lint`] bumps.
 pub(crate) fn did_save(gs: &mut GlobalState, params: DidSaveTextDocumentParams) {
     let uri = params.text_document.uri;
-    gs.lint_deadlines.remove(&uri.to_string());
     // A save may have introduced new includes/bibliography since the document
-    // was opened; load them on the writer before the lint snapshot is taken.
+    // was opened; load them on the writer so the debounced pass's snapshot sees
+    // them. (The dispatch write phase reloads too, but doing it here keeps
+    // interactive reads in the debounce window consistent.)
     if let Some((salsa_file, salsa_config, Some(path))) = gs
         .document_map
         .get(&uri.to_string())
@@ -287,12 +302,16 @@ pub(crate) fn did_save(gs: &mut GlobalState, params: DidSaveTextDocumentParams) 
     {
         load_project_files(gs, salsa_file, salsa_config, path);
     }
-    // A `did_change` arriving while this save's external-linter pass is in
-    // flight will bump the generation and discard its result; the next
-    // debounced pass then runs built-in-only, so external diagnostics stay
-    // stale until the next save. Accepted trade-off — keystroke debouncing
-    // matters more than freshness of an inherently slow signal.
-    gs.spawn_lint(uri, true, true);
+    // Save is the heavy pass: dependents + external linters. Debounced like every
+    // other lint so a save-all burst coalesces and the read isn't cancelled by a
+    // sibling save's write.
+    gs.schedule_lint(
+        &uri,
+        LintRequest {
+            with_dependents: true,
+            run_external: true,
+        },
+    );
 }
 
 /// Handle `textDocument/didClose`.

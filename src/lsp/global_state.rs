@@ -34,6 +34,17 @@ pub(crate) type DocumentMap = HashMap<String, DocumentState>;
 /// triggers diagnostics, instead of every keystroke queuing a full lint.
 pub(crate) const DIAGNOSTICS_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(200);
 
+/// What a scheduled lint pass should compute. Multiple events can coalesce onto
+/// one debounced pass (e.g. a `didChange` then a `didSave`); the flags are OR-ed
+/// so the merged pass is the most thorough any requester asked for.
+#[derive(Clone, Copy)]
+pub(crate) struct LintRequest {
+    /// Also re-lint documents that include this one (built-in only).
+    pub(crate) with_dependents: bool,
+    /// Run external linters (the expensive on-save signal), not just built-ins.
+    pub(crate) run_external: bool,
+}
+
 /// The latest diagnostics computed for one URI, retained for the pull model
 /// (`textDocument/diagnostic` / `workspace/diagnostic`). The lint pipeline fills
 /// this store instead of pushing when the client supports pull diagnostics; the
@@ -234,6 +245,11 @@ pub(crate) enum Task {
         /// empty) manifests whose error was fixed (clear-on-fix).
         manifest_uris: HashSet<Uri>,
     },
+    /// A lint pass aborted because a concurrent salsa write (often to a
+    /// *different* document) cancelled its pooled read. The main loop re-arms the
+    /// lint if `generation` is still current, so the diagnostics aren't lost until
+    /// the next edit.
+    DiagnosticsCancelled { generation: u64, key: String },
 }
 
 /// The synchronous, single-threaded-mutation server state.
@@ -284,6 +300,9 @@ pub(crate) struct GlobalState {
     /// again on `spawn_lint`; the result is tagged with the dispatch-time
     /// value and dropped in `on_task` if a newer generation has been seen.
     pub(crate) lint_generations: HashMap<String, u64>,
+    /// Merged lint request per debounced document, consumed by
+    /// `dispatch_due_lints` when the deadline fires.
+    pub(crate) pending_lints: HashMap<String, LintRequest>,
     /// Project-manifest URIs each open document's last lint pass published
     /// diagnostics to, keyed by the document's lint key. The authoritative
     /// clear-tracker: a manifest URI is cleared (published empty) only once no
@@ -316,6 +335,7 @@ impl GlobalState {
             next_outgoing_id: 1,
             lint_deadlines: HashMap::new(),
             lint_generations: HashMap::new(),
+            pending_lints: HashMap::new(),
             published_manifest_uris: HashMap::new(),
         }
     }
@@ -364,12 +384,22 @@ impl GlobalState {
         }
     }
 
-    /// Schedule (or reset) a debounced lint for `uri` after the next edit.
-    pub(crate) fn schedule_lint(&mut self, uri: &Uri) {
+    /// Schedule (or reset) a debounced lint for `uri`, merging `request` into any
+    /// pass already pending for it. All lint dispatch funnels through here so the
+    /// expensive read runs once, at a quiescent point after the edit burst's
+    /// writes have settled — rather than racing each write (rust-analyzer spawns
+    /// diagnostics the same way, after `process_changes`).
+    pub(crate) fn schedule_lint(&mut self, uri: &Uri, request: LintRequest) {
         let key = uri.to_string();
         self.lint_deadlines
             .insert(key.clone(), Instant::now() + DIAGNOSTICS_DEBOUNCE);
-        *self.lint_generations.entry(key).or_default() += 1;
+        *self.lint_generations.entry(key.clone()).or_default() += 1;
+        let merged = self.pending_lints.entry(key).or_insert(LintRequest {
+            with_dependents: false,
+            run_external: false,
+        });
+        merged.with_dependents |= request.with_dependents;
+        merged.run_external |= request.run_external;
     }
 
     /// Drop debounce bookkeeping for a closed document.
@@ -377,6 +407,7 @@ impl GlobalState {
         let key = uri.to_string();
         self.lint_deadlines.remove(&key);
         self.lint_generations.remove(&key);
+        self.pending_lints.remove(&key);
         // Clear any project-manifest diagnostics this document owned, unless
         // another open document still reports the same manifest.
         if let Some(owned) = self.published_manifest_uris.remove(&key) {

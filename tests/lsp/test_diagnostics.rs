@@ -41,6 +41,44 @@ fn test_diagnostics_on_heading_hierarchy_issue() {
     assert!(fix.is_some(), "Should have heading hierarchy fix");
 }
 
+/// Opening several documents back-to-back issues a salsa write per open; each
+/// write can cancel the previous document's in-flight lint (a pooled read on a
+/// cloned handle). A cancelled lint must be retried, not dropped — otherwise the
+/// earlier documents never get diagnostics until their next edit. This drives the
+/// retry path (`Task::DiagnosticsCancelled` → re-armed lint).
+#[test]
+fn test_back_to_back_opens_all_get_diagnostics() {
+    let mut server = TestLspServer::new();
+    server.initialize("file:///workspace");
+
+    // Open several violating docs without pumping in between, so later opens'
+    // salsa writes race the earlier opens' lints.
+    let uris: Vec<String> = (0..5)
+        .map(|i| format!("file:///workspace/doc{i}.qmd"))
+        .collect();
+    for uri in &uris {
+        server.open_document(uri, "# H1\n\n### H3 skip\n", "quarto");
+    }
+    server.pump(Duration::from_secs(5));
+
+    // Drain once: `drain_publish_diagnostics` consumes all client messages, so a
+    // per-URI loop would only see the first URI's publishes.
+    let all = server.drain_all_publish_diagnostics();
+    for uri in &uris {
+        let target: Uri = uri.parse().unwrap();
+        let publishes: Vec<_> = all.iter().filter(|p| p.uri == target).collect();
+        assert!(
+            publishes
+                .iter()
+                .any(|p| p.diagnostics.iter().any(|d| matches!(
+                    d.code.as_ref(),
+                    Some(NumberOrString::String(s)) if s == "heading-hierarchy"
+                ))),
+            "every back-to-back-opened document should receive diagnostics; {uri} did not"
+        );
+    }
+}
+
 #[test]
 fn test_did_change_publishes_diagnostics_to_client() {
     let mut server = TestLspServer::new();
