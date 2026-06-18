@@ -59,8 +59,9 @@ spec-coverage audit (see `docs/guide/lsp.qmd` "LSP Specification Coverage").
 `onTypeFormatting`, `semanticTokens`, `inlayHint`, and
 `workspace/didChangeConfiguration` are tracked above and not repeated here.
 
-- [ ] Pull diagnostics - `textDocument/diagnostic` + `workspace/diagnostic` as a
-  companion/alternative to the current push model
+- [x] Pull diagnostics - `textDocument/diagnostic` + `workspace/diagnostic` as a
+  companion/alternative to the current push model (mode-switch: pull clients
+  get pull only, push suppressed; cache + `workspace/diagnostic/refresh`)
 - [ ] `textDocument/documentHighlight` - highlight every occurrence of the
   reference/citation/footnote/heading under the cursor
 - [ ] `textDocument/selectionRange` - structural smart-select expansion (word →

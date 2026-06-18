@@ -28,6 +28,7 @@ mod lsp {
     pub(super) mod test_link_conversion;
     pub(super) mod test_navigation;
     pub(super) mod test_prepare_rename;
+    pub(super) mod test_pull_diagnostics;
     pub(super) mod test_references;
     pub(super) mod test_rename;
 }

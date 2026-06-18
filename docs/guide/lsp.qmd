@@ -80,6 +80,10 @@ Diagnostics
     spawn a subprocess per embedded code block --- so they run **on save** rather
     than on every keystroke. Save your file to refresh external-linter diagnostics.
 
+    Both the push (`textDocument/publishDiagnostics`) and pull
+    (`textDocument/diagnostic`, `workspace/diagnostic`) models are supported; the
+    server chooses per client (see [Push vs. pull diagnostics] below).
+
 Code actions
 
 :   Quick fixes and refactorings (`textDocument/codeAction`)
@@ -531,6 +535,33 @@ Diagnostics appear as:
 
 Quick fixes are available via code actions where applicable.
 
+#### Push vs. pull diagnostics
+
+Panache supports both LSP diagnostic delivery models and picks one per client at
+`initialize`:
+
+Push (default)
+:   The server sends `textDocument/publishDiagnostics` notifications as it
+    computes them. This is the model for clients that don't advertise pull
+    support.
+
+Pull
+
+:   Clients that advertise `textDocument.diagnostic` support are served via the
+    pull model instead (`textDocument/diagnostic` and `workspace/diagnostic`),
+    and push is suppressed for them so diagnostics aren't reported twice. The
+    server advertises `inter_file_dependencies` (an edit can change another
+    file's diagnostics) and `workspace_diagnostics` (whole-workspace pulls).
+
+    The same lint pipeline backs both models, so pull diagnostics include the
+    built-in rules, external linters, and unopened-manifest errors described above.
+    Because that pipeline is asynchronous (debounced edits, on-save external
+    linters, cross-file dependents), the server sends `workspace/diagnostic/refresh`
+    when results change so a pull client re-pulls; clients that don't support
+    refresh still pull on their own cadence (open, edit, focus). Repeated pulls are
+    answered with an `unchanged` report when the document's diagnostics haven't
+    changed since the client's last `result_id`.
+
 ### Hover Information
 
 Hover over elements to see contextual information (implementation varies by
@@ -623,7 +654,8 @@ marked *out of scope*.
   | `textDocument/foldingRange`                                                                                                 | ✅     | Headings, code, divs, HTML, frontmatter             |
   | `textDocument/documentLink`, `documentLink/resolve`                                                                         | ✅     | Links, images, autolinks, includes                  |
   | `textDocument/publishDiagnostics`                                                                                           | ✅     | Push model, debounced                               |
-  | `textDocument/diagnostic`, `workspace/diagnostic`                                                                           | ❌     | Planned: pull-model diagnostics                     |
+  | `textDocument/diagnostic`, `workspace/diagnostic`                                                                           | ✅     | Pull model; push suppressed for pull clients        |
+  | `workspace/diagnostic/refresh`                                                                                              | ✅     | Nudge pull clients to re-pull on async updates      |
   | `textDocument/documentHighlight`                                                                                            | ❌     | Planned: highlight occurrences under cursor         |
   | `textDocument/selectionRange`                                                                                               | ❌     | Planned: structural smart-select                    |
   | `textDocument/linkedEditingRange`                                                                                           | ❌     | Planned: live label/definition co-editing           |

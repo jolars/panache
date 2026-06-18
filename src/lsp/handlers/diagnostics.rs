@@ -8,10 +8,17 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-use lsp_types::{Diagnostic, Uri};
+use lsp_types::{
+    Diagnostic, DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
+    FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport,
+    RelatedUnchangedDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport, Uri,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceUnchangedDocumentDiagnosticReport,
+};
 
 use super::super::conversions::convert_diagnostic;
-use crate::lsp::global_state::StateSnapshot;
+use crate::lsp::global_state::{GlobalState, StateSnapshot};
 use crate::lsp::uri_ext::UriExt;
 
 /// A single `publishDiagnostics` payload: target URI, optional version, diags.
@@ -204,4 +211,88 @@ pub(crate) fn compute_publishes(
     }
 
     publishes
+}
+
+/// Pull handler for `textDocument/diagnostic`.
+///
+/// Reads the document's latest diagnostics from the pull store (filled by the
+/// same async lint pipeline that drives push). Returns an `unchanged` report when
+/// the client's `previous_result_id` still matches, else a full report. A missing
+/// entry yields an empty full report (clears any stale client-side state).
+///
+/// `related_documents` is left empty: cross-file diagnostics reach the client via
+/// `workspace/diagnostic` (the server advertises `inter_file_dependencies` +
+/// `workspace_diagnostics`), so per-document related plumbing is unnecessary.
+pub(crate) fn document_diagnostic(
+    gs: &GlobalState,
+    params: DocumentDiagnosticParams,
+) -> DocumentDiagnosticReportResult {
+    let uri = params.text_document.uri;
+    let report = match gs.diagnostics_store.get(&uri) {
+        Some(stored) if params.previous_result_id.as_deref() == Some(stored.result_id.as_str()) => {
+            DocumentDiagnosticReport::Unchanged(RelatedUnchangedDocumentDiagnosticReport {
+                related_documents: None,
+                unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
+                    result_id: stored.result_id.clone(),
+                },
+            })
+        }
+        Some(stored) => DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
+            related_documents: None,
+            full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                result_id: Some(stored.result_id.clone()),
+                items: stored.items.clone(),
+            },
+        }),
+        None => DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
+            related_documents: None,
+            full_document_diagnostic_report: FullDocumentDiagnosticReport::default(),
+        }),
+    };
+    DocumentDiagnosticReportResult::Report(report)
+}
+
+/// Pull handler for `workspace/diagnostic`.
+///
+/// Returns one report per URI in the pull store, emitting `unchanged` where the
+/// client already holds the current `result_id` (matched against
+/// `previous_result_ids`).
+pub(crate) fn workspace_diagnostic(
+    gs: &GlobalState,
+    params: WorkspaceDiagnosticParams,
+) -> WorkspaceDiagnosticReportResult {
+    let known: HashMap<&Uri, &str> = params
+        .previous_result_ids
+        .iter()
+        .map(|prev| (&prev.uri, prev.value.as_str()))
+        .collect();
+
+    let items = gs
+        .diagnostics_store
+        .iter()
+        .map(|(uri, stored)| {
+            if known.get(uri).copied() == Some(stored.result_id.as_str()) {
+                WorkspaceDocumentDiagnosticReport::Unchanged(
+                    WorkspaceUnchangedDocumentDiagnosticReport {
+                        uri: uri.clone(),
+                        version: stored.version.map(i64::from),
+                        unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
+                            result_id: stored.result_id.clone(),
+                        },
+                    },
+                )
+            } else {
+                WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
+                    uri: uri.clone(),
+                    version: stored.version.map(i64::from),
+                    full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                        result_id: Some(stored.result_id.clone()),
+                        items: stored.items.clone(),
+                    },
+                })
+            }
+        })
+        .collect();
+
+    WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items })
 }

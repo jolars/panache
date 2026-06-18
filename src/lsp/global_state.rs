@@ -34,6 +34,17 @@ pub(crate) type DocumentMap = HashMap<String, DocumentState>;
 /// triggers diagnostics, instead of every keystroke queuing a full lint.
 pub(crate) const DIAGNOSTICS_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(200);
 
+/// The latest diagnostics computed for one URI, retained for the pull model
+/// (`textDocument/diagnostic` / `workspace/diagnostic`). The lint pipeline fills
+/// this store instead of pushing when the client supports pull diagnostics; the
+/// `result_id` lets the server answer a re-pull with an `unchanged` report.
+#[derive(Clone)]
+pub(crate) struct StoredDiagnostics {
+    pub(crate) version: Option<i32>,
+    pub(crate) items: Vec<Diagnostic>,
+    pub(crate) result_id: String,
+}
+
 /// A clonable handle for sending messages back to the client.
 ///
 /// Replaces tower-lsp's `Client`: it is just a wrapped `crossbeam` sender, so
@@ -235,6 +246,20 @@ pub(crate) struct GlobalState {
     pub(crate) workspace_root: Option<PathBuf>,
     pub(crate) runtime_settings: LspRuntimeSettings,
 
+    /// Whether the client advertised support for the pull diagnostics model at
+    /// `initialize`. When `true` the server stops pushing
+    /// `textDocument/publishDiagnostics` and serves diagnostics from
+    /// `diagnostics_store` on demand instead (mode-switch — no double reporting).
+    pub(crate) supports_pull_diagnostics: bool,
+    /// Whether the client supports `workspace/diagnostic/refresh`. Lets the
+    /// server nudge the client to re-pull when an async pass (save-time external
+    /// linters, cross-file dependents) updates the store.
+    pub(crate) supports_diagnostic_refresh: bool,
+    /// Latest diagnostics per URI, the source of truth for pull responses.
+    pub(crate) diagnostics_store: HashMap<Uri, StoredDiagnostics>,
+    /// Monotonic counter stamped into each stored `result_id`.
+    pub(crate) diagnostics_result_seq: u64,
+
     /// The master salsa handle, mutated only on the main thread.
     pub(crate) salsa: crate::salsa::SalsaDb,
 
@@ -277,6 +302,10 @@ impl GlobalState {
             document_map: Arc::new(DocumentMap::new()),
             workspace_root: None,
             runtime_settings: LspRuntimeSettings::default(),
+            supports_pull_diagnostics: false,
+            supports_diagnostic_refresh: false,
+            diagnostics_store: HashMap::new(),
+            diagnostics_result_seq: 0,
             salsa: crate::salsa::SalsaDb::default(),
             pool,
             fmt_pool,
@@ -357,10 +386,67 @@ impl GlobalState {
                     .values()
                     .any(|set| set.contains(&manifest_uri));
                 if !still_referenced {
-                    self.sender
-                        .publish_diagnostics(manifest_uri, Vec::new(), None);
+                    self.deliver_diagnostics(manifest_uri, None, Vec::new());
                 }
             }
+        }
+    }
+
+    /// Deliver a diagnostics payload for `uri`, routed by the active model:
+    /// publish a `textDocument/publishDiagnostics` notification (push), or update
+    /// the pull store (pull). The push path is byte-for-byte the previous
+    /// behavior; only pull-capable clients take the store branch.
+    ///
+    /// Callers batch a refresh via [`Self::send_diagnostic_refresh`] after a run
+    /// of deliveries — this method never sends one itself.
+    pub(crate) fn deliver_diagnostics(
+        &mut self,
+        uri: Uri,
+        version: Option<i32>,
+        diagnostics: Vec<Diagnostic>,
+    ) {
+        if self.supports_pull_diagnostics {
+            self.store_diagnostics(uri, version, diagnostics);
+        } else {
+            self.sender.publish_diagnostics(uri, diagnostics, version);
+        }
+    }
+
+    /// Clear a closed document's own diagnostics: publish an empty payload (push)
+    /// or drop its store entry (pull) so it stops appearing in workspace pulls.
+    pub(crate) fn drop_document_diagnostics(&mut self, uri: &Uri) {
+        if self.supports_pull_diagnostics {
+            self.diagnostics_store.remove(uri);
+        } else {
+            self.sender
+                .publish_diagnostics(uri.clone(), Vec::new(), None);
+        }
+    }
+
+    /// Upsert the stored diagnostics for `uri` with a fresh `result_id`.
+    pub(crate) fn store_diagnostics(
+        &mut self,
+        uri: Uri,
+        version: Option<i32>,
+        items: Vec<Diagnostic>,
+    ) {
+        self.diagnostics_result_seq += 1;
+        let result_id = self.diagnostics_result_seq.to_string();
+        self.diagnostics_store.insert(
+            uri,
+            StoredDiagnostics {
+                version,
+                items,
+                result_id,
+            },
+        );
+    }
+
+    /// Ask the client to re-pull diagnostics, if it supports refresh. A no-op in
+    /// push mode (the flag is only set when the client advertised refresh).
+    pub(crate) fn send_diagnostic_refresh(&mut self) {
+        if self.supports_diagnostic_refresh {
+            self.send_request::<lsp_types::request::WorkspaceDiagnosticRefresh>(());
         }
     }
 }

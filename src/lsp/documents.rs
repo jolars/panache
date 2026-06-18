@@ -318,7 +318,10 @@ pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams
         let _ = gs.salsa.evict_file_text(&cached);
     }
 
-    gs.sender.publish_diagnostics(uri, vec![], None);
+    gs.drop_document_diagnostics(&uri);
+    // `forget_lint` may also have cleared manifest entries; one coalesced nudge
+    // (pull + refresh only; a no-op for push clients).
+    gs.send_diagnostic_refresh();
 }
 
 #[cfg(test)]

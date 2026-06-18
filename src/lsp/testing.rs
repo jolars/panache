@@ -45,6 +45,36 @@ impl LspTester {
         self.initialize_with_options(root_uri, None);
     }
 
+    /// Initialize advertising pull-diagnostics client support (and refresh), so
+    /// the server switches into pull mode (push suppressed).
+    pub fn initialize_pull(&mut self, root_uri: &str) {
+        let folder = WorkspaceFolder {
+            uri: root_uri.parse().unwrap(),
+            name: "workspace".to_string(),
+        };
+        let params = InitializeParams {
+            workspace_folders: Some(vec![folder]),
+            capabilities: ClientCapabilities {
+                text_document: Some(TextDocumentClientCapabilities {
+                    diagnostic: Some(DiagnosticClientCapabilities {
+                        dynamic_registration: None,
+                        related_document_support: Some(true),
+                    }),
+                    ..Default::default()
+                }),
+                workspace: Some(WorkspaceClientCapabilities {
+                    diagnostic: Some(DiagnosticWorkspaceClientCapabilities {
+                        refresh_support: Some(true),
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        self.gs.on_initialize(params);
+    }
+
     pub fn initialize_with_options(
         &mut self,
         root_uri: &str,
@@ -470,6 +500,66 @@ impl LspTester {
             crate::salsa::built_in_lint_plan(&self.gs.salsa, state.salsa_file, state.salsa_config)
                 .clone();
         Some(plan.diagnostics)
+    }
+
+    // --- pull diagnostics ---
+
+    /// Whether the server is in pull-diagnostics mode (push suppressed).
+    pub fn pull_diagnostics_enabled(&self) -> bool {
+        self.gs.supports_pull_diagnostics
+    }
+
+    /// Pull `textDocument/diagnostic` for `uri`, optionally with a prior
+    /// `result_id` (to exercise `unchanged` reports).
+    pub fn document_diagnostic(
+        &self,
+        uri: &str,
+        previous_result_id: Option<&str>,
+    ) -> DocumentDiagnosticReportResult {
+        let params = DocumentDiagnosticParams {
+            text_document: text_doc(uri),
+            identifier: None,
+            previous_result_id: previous_result_id.map(str::to_string),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        handlers::diagnostics::document_diagnostic(&self.gs, params)
+    }
+
+    /// Pull `workspace/diagnostic`, optionally with known `(uri, result_id)`
+    /// pairs (to exercise `unchanged` reports).
+    pub fn workspace_diagnostic(
+        &self,
+        previous_result_ids: Vec<(&str, &str)>,
+    ) -> WorkspaceDiagnosticReportResult {
+        let params = WorkspaceDiagnosticParams {
+            identifier: None,
+            previous_result_ids: previous_result_ids
+                .into_iter()
+                .map(|(uri, value)| PreviousResultId {
+                    uri: uri.parse().unwrap(),
+                    value: value.to_string(),
+                })
+                .collect(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        handlers::diagnostics::workspace_diagnostic(&self.gs, params)
+    }
+
+    /// Count `workspace/diagnostic/refresh` server→client requests since the last
+    /// drain.
+    pub fn drain_diagnostic_refresh(&self) -> usize {
+        self.drain_client_messages()
+            .into_iter()
+            .filter(|msg| {
+                matches!(
+                    msg,
+                    lsp_server::Message::Request(req)
+                        if req.method == request::WorkspaceDiagnosticRefresh::METHOD
+                )
+            })
+            .count()
     }
 }
 

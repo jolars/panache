@@ -70,6 +70,18 @@ pub(crate) fn server_capabilities() -> ServerCapabilities {
                 work_done_progress: None,
             },
         })),
+        // Pull diagnostics (LSP 3.17). Advertising is harmless for push-only
+        // clients (they ignore it); the server only switches off push for
+        // clients that advertise pull support (see `on_initialize`).
+        diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
+            identifier: Some("panache".to_string()),
+            // Editing an include/bibliography changes diagnostics in other files.
+            inter_file_dependencies: true,
+            workspace_diagnostics: true,
+            work_done_progress_options: WorkDoneProgressOptions {
+                work_done_progress: None,
+            },
+        })),
         workspace: Some(WorkspaceServerCapabilities {
             workspace_folders: Some(WorkspaceFoldersServerCapabilities {
                 supported: Some(true),
@@ -161,6 +173,34 @@ impl GlobalState {
         log::debug!(
             "lsp runtime setting experimental.incrementalParsing={experimental} (initialize options)"
         );
+
+        // Pull diagnostics mode-switch: a client that advertises
+        // `textDocument.diagnostic` is served via pull only (push is suppressed).
+        // `workspace.diagnostic.refresh_support` lets us nudge it to re-pull when
+        // an async pass updates the store.
+        self.supports_pull_diagnostics = params
+            .capabilities
+            .text_document
+            .as_ref()
+            .is_some_and(|td| td.diagnostic.is_some());
+        self.supports_diagnostic_refresh = params
+            .capabilities
+            .workspace
+            .as_ref()
+            .and_then(|ws| ws.diagnostic.as_ref())
+            .and_then(|d| d.refresh_support)
+            .unwrap_or(false);
+        log::debug!(
+            "lsp pull diagnostics: supported={} refresh={}",
+            self.supports_pull_diagnostics,
+            self.supports_diagnostic_refresh
+        );
+        if self.supports_pull_diagnostics && !self.supports_diagnostic_refresh {
+            log::debug!(
+                "client supports pull diagnostics but not refresh; async results \
+                 (save-time external linters, cross-file) reach it only on its next pull"
+            );
+        }
     }
 
     /// Post-`initialized` side effects: log + register file watchers.
@@ -228,6 +268,34 @@ impl GlobalState {
                 };
             };
         }
+
+        // Answer a request inline on the main thread. Used by the pull
+        // diagnostics handlers, which read `GlobalState`'s store directly (a
+        // cheap map lookup) rather than a pooled `StateSnapshot`.
+        macro_rules! inline {
+            ($R:ty, $handler:expr) => {
+                req = match req.extract::<<$R as r::Request>::Params>(<$R>::METHOD) {
+                    Ok((id, params)) => {
+                        let result = $handler(self, params);
+                        return self.respond(Response::new_ok(id, result));
+                    }
+                    Err(ExtractError::MethodMismatch(req)) => req,
+                    Err(ExtractError::JsonError { method, error }) => {
+                        log::error!("invalid params for {method}: {error}");
+                        return;
+                    }
+                };
+            };
+        }
+
+        inline!(
+            r::DocumentDiagnosticRequest,
+            handlers::diagnostics::document_diagnostic
+        );
+        inline!(
+            r::WorkspaceDiagnosticRequest,
+            handlers::diagnostics::workspace_diagnostic
+        );
 
         pool!(
             r::Formatting,
@@ -346,10 +414,10 @@ impl GlobalState {
                 // Drop results superseded by a newer edit.
                 if self.lint_generations.get(&key).copied() == Some(generation) {
                     for (uri, version, diags) in publishes {
-                        self.sender.publish_diagnostics(uri, diags, version);
+                        self.deliver_diagnostics(uri, version, diags);
                     }
                     // Clear-on-fix: a manifest this pass no longer reports gets an
-                    // empty publish — but only if no OTHER open document still
+                    // empty delivery — but only if no OTHER open document still
                     // reports it (a shared `_quarto.yml` stays flagged until every
                     // dependent is fixed/closed). The manifest URI differs from
                     // `key`, so the generation guard alone never clears it.
@@ -364,8 +432,7 @@ impl GlobalState {
                             .iter()
                             .any(|(other_key, set)| other_key != &key && set.contains(stale));
                         if !still_referenced {
-                            self.sender
-                                .publish_diagnostics(stale.clone(), Vec::new(), None);
+                            self.deliver_diagnostics(stale.clone(), None, Vec::new());
                         }
                     }
                     if manifest_uris.is_empty() {
@@ -373,6 +440,9 @@ impl GlobalState {
                     } else {
                         self.published_manifest_uris.insert(key, manifest_uris);
                     }
+                    // One coalesced nudge after the whole batch (pull + refresh
+                    // only; a no-op for push clients).
+                    self.send_diagnostic_refresh();
                 }
             }
         }
