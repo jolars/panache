@@ -17,6 +17,7 @@ pub use config::WrapMode;
 pub use formatter::ExternalCodeBlock;
 pub use formatter::FormattedCodeMap;
 pub use formatter::collect_code_blocks;
+pub use formatter::continuation_indent_at;
 pub use formatter::format_tree;
 pub use formatter::format_tree_with_formatted_code;
 pub use syntax::SyntaxNode;

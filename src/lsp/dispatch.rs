@@ -47,6 +47,12 @@ pub(crate) fn server_capabilities() -> ServerCapabilities {
         )),
         document_formatting_provider: Some(OneOf::Left(true)),
         document_range_formatting_provider: Some(OneOf::Left(true)),
+        // Newline trigger: continuation indentation inside list items. The
+        // client must opt in to firing the request (Neovim core does not).
+        document_on_type_formatting_provider: Some(DocumentOnTypeFormattingOptions {
+            first_trigger_character: "\n".to_string(),
+            more_trigger_character: None,
+        }),
         code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
         document_link_provider: Some(DocumentLinkOptions {
@@ -342,6 +348,11 @@ impl GlobalState {
         pool!(
             r::RangeFormatting,
             handlers::formatting::format_range,
+            spawn_format_request
+        );
+        pool!(
+            r::OnTypeFormatting,
+            handlers::formatting::format_on_type,
             spawn_format_request
         );
         pool!(r::CodeActionRequest, handlers::code_actions::code_action);

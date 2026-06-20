@@ -255,6 +255,21 @@ impl LspTester {
         handlers::formatting::format_range(&self.snapshot(), params)
     }
 
+    pub fn on_type_formatting(
+        &self,
+        uri: &str,
+        line: u32,
+        character: u32,
+        ch: &str,
+    ) -> Option<Vec<TextEdit>> {
+        let params = DocumentOnTypeFormattingParams {
+            text_document_position: pos_params(uri, line, character),
+            ch: ch.to_owned(),
+            options: fmt_options(),
+        };
+        handlers::formatting::format_on_type(&self.snapshot(), params)
+    }
+
     pub fn get_symbols(&self, uri: &str) -> Option<DocumentSymbolResponse> {
         let params = DocumentSymbolParams {
             text_document: text_doc(uri),

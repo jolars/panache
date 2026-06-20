@@ -39,8 +39,12 @@ support.
 
 ### Advanced
 
-- [ ] On-type formatting - `textDocument/onTypeFormatting` for auto-formatting
-  triggers (not sure about this, low priority)
+- [x] On-type formatting - `textDocument/onTypeFormatting` triggers continuation
+  indentation after Enter inside list items (whitespace only; never inserts
+  markers; `\n` trigger; `src/lsp/handlers/formatting.rs`,
+  `panache_formatter::continuation_indent_at`). The client must opt in to
+  firing the request (Neovim core does not). Deferred: blockquote `>`
+  continuation, code-block indent, live table alignment
 - [x] Semantic tokens - Syntax highlighting via LSP (`semanticTokens/full`,
   additive + flavor-gated, custom legend;
   `src/lsp/handlers/semantic_tokens.rs`). Follow-ups: multi-line tokens

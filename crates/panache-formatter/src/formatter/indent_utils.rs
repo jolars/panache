@@ -3,6 +3,50 @@
 //! This module centralizes the logic for determining how list items should be indented,
 //! including marker alignment, spacing, and checkbox handling.
 
+use crate::syntax::{SyntaxKind, SyntaxNode};
+
+/// Column a lazy continuation line should start at to stay aligned with the
+/// list item containing `offset`.
+///
+/// Returns `None` when `offset` is not inside a `LIST_ITEM`. The column is the
+/// item's marker column plus [`ListItemIndent::text_continuation_offset`] — the
+/// *same* column the formatter places continuation paragraphs at — so on-type
+/// indentation and a later format pass never disagree.
+///
+/// This is the query behind the LSP `textDocument/onTypeFormatting` handler.
+/// It reads the marker geometry straight from the CST, so nested items work for
+/// free: an indented item's marker column already encodes its depth.
+pub fn continuation_indent_at(root: &SyntaxNode, text: &str, offset: usize) -> Option<usize> {
+    let text_size = rowan::TextSize::try_from(offset).ok()?;
+    // Left-biased: read the line the newline was typed *after*, not the new
+    // (empty) line to its right.
+    let token = root.token_at_offset(text_size).left_biased()?;
+
+    // Innermost enclosing list item.
+    let item = token
+        .parent_ancestors()
+        .find(|node| node.kind() == SyntaxKind::LIST_ITEM)?;
+
+    // The item's own marker is the first `LIST_MARKER` in document order within
+    // it; markers of nested lists belong to deeper `LIST_ITEM`s and appear only
+    // after this item's first-line content.
+    let marker = item
+        .descendants_with_tokens()
+        .filter_map(|element| element.into_token())
+        .find(|tok| tok.kind() == SyntaxKind::LIST_MARKER)?;
+
+    let marker_start = usize::from(marker.text_range().start());
+    let line_start = text[..marker_start].rfind('\n').map_or(0, |i| i + 1);
+    let marker_column = text[line_start..marker_start].chars().count();
+
+    // `has_checkbox` is irrelevant here: `text_continuation_offset` excludes the
+    // checkbox by design (continuation aligns under the marker content, not past
+    // the checkbox), so pass `false`. `four_space_rule`/`tab_width` are likewise
+    // inert for `text_continuation_offset`.
+    let indent = calculate_list_item_indent(marker.text(), 0, false, false, 4);
+    Some(marker_column + indent.text_continuation_offset())
+}
+
 /// Detailed indentation information for a list item.
 ///
 /// This struct encapsulates all the spacing components needed to properly indent
@@ -262,5 +306,58 @@ mod tests {
         let indent = calculate_list_item_indent("i.", 4, false, false, 4);
         assert_eq!(indent.hanging_indent(0), 5); // No base indent
         assert_eq!(indent.hanging_indent(2), 7); // With base indent of 2
+    }
+
+    /// Continuation indent at the byte offset of `word` in `src`, parsed with
+    /// Pandoc options so fancy (alphabetic/roman) ordered lists are recognized.
+    fn continuation_at_word(src: &str, word: &str) -> Option<usize> {
+        use crate::config::{Config, Flavor, ParserExtensions};
+        let config = Config {
+            flavor: Flavor::Pandoc,
+            parser_extensions: ParserExtensions::for_flavor(Flavor::Pandoc),
+            ..Config::default()
+        };
+        let tree = crate::parser::parse(src, Some(config.parser_options()));
+        let offset = src.find(word).expect("word present in source");
+        continuation_indent_at(&tree, src, offset)
+    }
+
+    #[test]
+    fn continuation_bullet_item() {
+        assert_eq!(continuation_at_word("- item\n", "item"), Some(2));
+    }
+
+    #[test]
+    fn continuation_ordered_item() {
+        assert_eq!(continuation_at_word("1. item\n", "item"), Some(3));
+    }
+
+    #[test]
+    fn continuation_uppercase_letter_item() {
+        // Pandoc requires two spaces after a single uppercase-letter marker (so
+        // "B. Russell" isn't a list); continuation lands two past the marker, col 4.
+        assert_eq!(continuation_at_word("A.  item\n", "item"), Some(4));
+    }
+
+    #[test]
+    fn continuation_nested_item_uses_marker_column() {
+        // Inner marker sits at column 2, so its content column is 4.
+        let src = "- outer\n  - inner\n";
+        assert_eq!(continuation_at_word(src, "inner"), Some(4));
+    }
+
+    #[test]
+    fn continuation_task_item_excludes_checkbox() {
+        // Aligns under the marker content (col 2), not past the checkbox (col 6),
+        // matching the formatter and avoiding the 4-space code-block trap.
+        assert_eq!(continuation_at_word("- [ ] task\n", "task"), Some(2));
+    }
+
+    #[test]
+    fn continuation_outside_list_is_none() {
+        assert_eq!(
+            continuation_at_word("just a paragraph\n", "paragraph"),
+            None
+        );
     }
 }

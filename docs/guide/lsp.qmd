@@ -21,6 +21,10 @@ Document formatting
 :   Format entire documents or selected ranges (`textDocument/formatting`,
     `textDocument/rangeFormatting`)
 
+On-type indentation
+:   Indent the new line to the list item's content column after you press Enter
+    inside a list (`textDocument/onTypeFormatting`)
+
 Go to definition
 
 :   Jump from references to definitions (`textDocument/definition`)
@@ -414,6 +418,27 @@ invoke "format selection", so it's treated as the LSP equivalent of the CLI's
 "explicit file target bypasses excludes" rule. If you need to format an excluded
 file in its entirety, select the whole buffer first or temporarily remove the
 exclude pattern.
+
+### On-Type Indentation
+
+When you press Enter inside a list item, the server can indent the new line to
+that item's content column via `textDocument/onTypeFormatting` (trigger
+character `\n`). This uses Panache's parsed model of the list, so nested,
+ordered, and fancy (alphabetic/roman) lists align correctly where regex-based
+editor heuristics often guess wrong.
+
+The handler is deliberately narrow: it only adjusts leading whitespace. It never
+inserts a list marker and never tries to decide whether you meant to start a new
+item or leave the list --- so typing your own marker afterward stays entirely up
+to you. The indentation it produces matches where the formatter would place a
+continuation line, so on-type help and a later format pass never fight.
+
+The request is only useful if your editor fires it. VS Code, Zed, and several
+others trigger `onTypeFormatting` out of the box; Neovim's built-in LSP client
+does **not**, so you will need an editor-side autocmd or plugin to send it.
+
+Deferred for now: blockquote continuation, code-block indentation, and live
+table alignment.
 
 ### Go to Definition
 

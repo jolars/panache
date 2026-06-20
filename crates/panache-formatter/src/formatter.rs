@@ -34,6 +34,7 @@ pub use code_blocks::ExternalCodeBlock;
 pub use code_blocks::FormattedCodeMap;
 pub use code_blocks::collect_code_blocks;
 pub use core::Formatter;
+pub use indent_utils::continuation_indent_at;
 
 // Public API functions
 pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usize)>) -> String {

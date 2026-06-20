@@ -5,7 +5,8 @@
 //! which routes through the synchronous external-formatter path.
 
 use lsp_types::{
-    DocumentFormattingParams, DocumentRangeFormattingParams, Position, Range, TextEdit,
+    DocumentFormattingParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
+    Position, Range, TextEdit,
 };
 
 use super::super::conversions::{offset_to_position, position_to_offset};
@@ -57,6 +58,53 @@ pub(crate) fn format_document(
         range,
         new_text: formatted,
     }])
+}
+
+/// Handle `textDocument/onTypeFormatting`.
+///
+/// Scoped narrowly to continuation indentation after Enter inside a list item:
+/// when the trigger is a newline, align the new line to the enclosing list
+/// item's continuation column (the same column the formatter would use, so
+/// on-type help and a later format pass never disagree). Whitespace only — it
+/// never inserts a list marker and never guesses new-item-vs-exit intent.
+pub(crate) fn format_on_type(
+    snap: &StateSnapshot,
+    params: DocumentOnTypeFormattingParams,
+) -> Option<Vec<TextEdit>> {
+    // Newline is the only trigger we register, but guard defensively.
+    if params.ch != "\n" {
+        return None;
+    }
+
+    let uri = params.text_document_position.text_document.uri;
+    let position = params.text_document_position.position;
+    log::debug!("format_on_type uri={} pos={:?}", uri.as_str(), position);
+
+    let text = snap.document_content(&uri)?;
+    // Salsa-cached tree; already reflects the just-typed newline. Probing the
+    // *previous* line's marker (below) keeps us off the unstable new line.
+    let tree = snap.parsed_tree(&uri)?;
+
+    let cursor = position_to_offset(&text, position)?;
+    let line_start = text[..cursor].rfind('\n').map_or(0, |i| i + 1);
+    // An offset on the line the newline was typed after.
+    let probe = line_start.saturating_sub(1);
+
+    let want = panache_formatter::continuation_indent_at(&tree, &text, probe)?;
+
+    // Replace only the new line's existing leading whitespace.
+    let line = &text[line_start..cursor];
+    let ws_len = line.len() - line.trim_start_matches([' ', '\t']).len();
+    let new_text = " ".repeat(want);
+    if line[..ws_len] == new_text {
+        return None;
+    }
+
+    let range = Range {
+        start: offset_to_position(&text, line_start),
+        end: offset_to_position(&text, line_start + ws_len),
+    };
+    Some(vec![TextEdit { range, new_text }])
 }
 
 /// Handle `textDocument/rangeFormatting`.
