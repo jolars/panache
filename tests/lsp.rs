@@ -31,4 +31,5 @@ mod lsp {
     pub(super) mod test_pull_diagnostics;
     pub(super) mod test_references;
     pub(super) mod test_rename;
+    pub(super) mod test_semantic_tokens;
 }

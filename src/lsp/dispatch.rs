@@ -63,6 +63,20 @@ pub(crate) fn server_capabilities() -> ServerCapabilities {
             ..Default::default()
         }),
         references_provider: Some(OneOf::Left(true)),
+        // Additive, flavor-gated highlighting for pandoc/quarto-specific
+        // constructs the editor's base grammar misses. Custom legend types
+        // no-op until themed, so advertising on by default is harmless. See
+        // `handlers::semantic_tokens`.
+        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+            SemanticTokensOptions {
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: None,
+                },
+                legend: handlers::semantic_tokens::legend(),
+                range: Some(false),
+                full: Some(SemanticTokensFullOptions::Bool(true)),
+            },
+        )),
         workspace_symbol_provider: Some(OneOf::Left(true)),
         rename_provider: Some(OneOf::Right(RenameOptions {
             prepare_provider: Some(true),
@@ -332,6 +346,10 @@ impl GlobalState {
         pool!(
             r::FoldingRangeRequest,
             handlers::folding_ranges::folding_range
+        );
+        pool!(
+            r::SemanticTokensFullRequest,
+            handlers::semantic_tokens::semantic_tokens_full
         );
         pool!(
             r::GotoDefinition,

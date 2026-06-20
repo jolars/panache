@@ -64,6 +64,18 @@ Code folding
     - Fenced divs
     - YAML frontmatter
 
+Semantic tokens
+
+:   Additive, flavor-gated highlighting for Pandoc/Quarto-specific syntax the
+    editor's base grammar misses (`textDocument/semanticTokens/full`)
+
+    - Citations and Quarto cross-references
+    - Shortcodes, fenced-div info strings, and bracketed-span attributes
+    - Math delimiters and footnote references
+
+    Layered on top of your editor's highlighting via a custom legend; opt in by
+    mapping the token types to colors (see [Semantic Tokens] below).
+
 Diagnostics
 
 :   Real-time linting as you type (`textDocument/publishDiagnostics`)
@@ -638,6 +650,69 @@ workspace edit that rewrites links pointing at the old path
 (`workspace/willRenameFiles`), so cross-document links stay intact. Renaming
 other linked file types (images, data files) is not yet handled.
 
+### Semantic Tokens
+
+The LSP provides semantic tokens (`textDocument/semanticTokens/full`) for syntax
+highlighting. This is deliberately **additive**, not a replacement for your
+editor's built-in highlighter: editors already highlight Markdown with
+CommonMark/GFM grammars (tree-sitter, TextMate) that are not flavor-aware and
+miss Pandoc/Quarto-specific syntax. Panache only emits tokens for the constructs
+those grammars get wrong, layering on top of the base highlighting:
+
+- Citation keys (`@key`, `[@key]`)
+- Cross-reference keys (`@fig-1`, `\@ref(...)` --- Quarto/RMarkdown only)
+- Quarto shortcodes (`{{< name args >}}`)
+- Fenced-div info strings (`{.callout-note}`)
+- Math delimiters (`$`, `$$`)
+- Footnote references (`[^id]`)
+- Bracketed-span attributes (`[text]{.smallcaps}`)
+
+Base constructs (headings, emphasis, links, code) are left to your editor so
+Panache never recolors highlighting you were happy with.
+
+**Flavor-gated:** documents in CommonMark or GFM flavor receive no tokens ---
+Panache's parse and the editor's base grammar agree there, so there is nothing
+to add.
+
+**Custom legend, opt-in colors.** The token types are custom (`citation`,
+`crossref`, `shortcode`, `div`, `math`, `footnote`, `attribute`), so they have
+no color in any theme until you map them. This is why advertising the feature by
+default is harmless: unmapped types render as ordinary text. To see them, map
+the types to highlight groups.
+
+In VS Code (`settings.json`):
+
+```json
+"editor.semanticTokenColorCustomizations": {
+  "enabled": true,
+  "rules": {
+    "citation": "#c586c0",
+    "crossref": "#4ec9b0",
+    "shortcode": "#dcdcaa",
+    "div": "#569cd6",
+    "math": "#ce9178",
+    "footnote": "#9cdcfe",
+    "attribute": "#b5cea8"
+  }
+}
+```
+
+In Neovim, link the LSP semantic-token groups to your colorscheme:
+
+```lua
+for token, group in pairs({
+  citation = "@markup.link",
+  crossref = "@markup.link.label",
+  shortcode = "@function.macro",
+  div = "@keyword.directive",
+  math = "@markup.math",
+  footnote = "@markup.link.label",
+  attribute = "@attribute",
+}) do
+  vim.api.nvim_set_hl(0, "@lsp.type." .. token, { link = group })
+end
+```
+
 ## LSP Specification Coverage
 
 The table below summarizes Panache's coverage of the Language Server Protocol.
@@ -668,7 +743,7 @@ marked *out of scope*.
   | `textDocument/selectionRange`                                                                                               | ❌     | Planned: structural smart-select                    |
   | `textDocument/linkedEditingRange`                                                                                           | ❌     | Planned: live label/definition co-editing           |
   | `textDocument/onTypeFormatting`                                                                                             | ❌     | Under consideration                                 |
-  | `textDocument/semanticTokens`                                                                                               | ❌     | Under consideration                                 |
+  | `textDocument/semanticTokens/full`                                                                                          | ✅     | Additive, flavor-gated; custom legend (see above)   |
   | `textDocument/inlayHint`                                                                                                    | ❌     | Under consideration                                 |
   | `workspace/symbol`                                                                                                          | ✅     | Heading search across the project                   |
   | `workspace/willRenameFiles`                                                                                                 | ✅     | Markdown files only                                 |

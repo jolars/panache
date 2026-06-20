@@ -41,7 +41,14 @@ support.
 
 - [ ] On-type formatting - `textDocument/onTypeFormatting` for auto-formatting
   triggers (not sure about this, low priority)
-- [ ] Semantic tokens - Syntax highlighting via LSP
+- [x] Semantic tokens - Syntax highlighting via LSP (`semanticTokens/full`,
+  additive + flavor-gated, custom legend;
+  `src/lsp/handlers/semantic_tokens.rs`). Follow-ups: multi-line tokens
+  (math/div bodies, per-line split); `full/delta`
+  - `result_id`; `range` requests; widen the legend (emphasis/strong/links/
+    headings --- only if we decide to contest the base grammar, which flips it
+    to opt-in); raw-inline format tags (parser folds `{=fmt}` into a generic
+    `ATTRIBUTE`, so a dedicated token kind is needed first).
 - [ ] Rename
   - [x] Citations - Rename `@cite` keys and update bibliography
   - [x] Reference links - Rename `[ref]` labels and update definitions

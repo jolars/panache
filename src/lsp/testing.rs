@@ -309,6 +309,15 @@ impl LspTester {
         handlers::folding_ranges::folding_range(&self.snapshot(), params)
     }
 
+    pub fn semantic_tokens_full(&self, uri: &str) -> Option<SemanticTokensResult> {
+        let params = SemanticTokensParams {
+            text_document: text_doc(uri),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        handlers::semantic_tokens::semantic_tokens_full(&self.snapshot(), params)
+    }
+
     pub fn goto_definition(
         &self,
         uri: &str,

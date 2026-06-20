@@ -16,5 +16,6 @@ pub(crate) mod list_conversion;
 pub(crate) mod prepare_rename;
 pub(crate) mod references;
 pub(crate) mod rename;
+pub(crate) mod semantic_tokens;
 pub(crate) mod shortcode_args;
 pub(crate) mod workspace_symbols;
