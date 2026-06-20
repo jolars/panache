@@ -64,6 +64,7 @@ use super::utils::attributes::{emit_div_info_node, parse_html_tag_attributes};
 use super::utils::container_stack::{byte_index_at_column, leading_indent};
 use super::utils::helpers::{strip_newline, trim_end_newlines};
 use super::utils::marker_utils::parse_blockquote_marker_info;
+use super::utils::tree_copy::copy_green_node;
 
 /// Information about list indentation context.
 ///
@@ -1250,12 +1251,14 @@ enum TableKind {
     Simple,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct TablePrepared {
-    kind: TableKind,
-    /// Line index where the table grid begins: past a leading caption when one
-    /// applies, else equal to the dispatch line.
-    table_pos: usize,
+    /// The table subtree built during detection. Emission replays this verbatim
+    /// (`copy_green_node`) instead of re-parsing — losslessness is guaranteed by
+    /// construction since the exact bytes detection validated are what we emit.
+    green: rowan::GreenNode,
+    /// Lines the table spans, returned to the dispatcher by emission.
+    consumed: usize,
 }
 
 /// Line index where the table grid begins: past a leading caption (its
@@ -1347,6 +1350,30 @@ fn first_kind_at(
     None
 }
 
+/// Parse a known `kind` into `builder` using emission's position policy: the
+/// dispatch line first (so a leading caption is included), then the resolved
+/// grid position. Shared by detection's caption-capture path and the (rare)
+/// payload-missing fallback's per-kind needs.
+fn emit_table_kind(
+    ctx: &BlockContext,
+    kind: TableKind,
+    raw: &[&str],
+    line_pos: usize,
+    table_pos: usize,
+    prefix: &ContainerPrefix,
+    builder: &mut GreenNodeBuilder<'static>,
+) -> Option<usize> {
+    if let Some(n) = try_parse_kind(ctx, kind, raw, line_pos, line_pos, prefix, builder) {
+        return Some(n);
+    }
+    if table_pos != line_pos
+        && let Some(n) = try_parse_kind(ctx, kind, raw, table_pos, line_pos, prefix, builder)
+    {
+        return Some(n);
+    }
+    None
+}
+
 impl BlockParser for TableParser {
     fn effect(&self) -> BlockEffect {
         BlockEffect::None
@@ -1374,10 +1401,6 @@ impl BlockParser for TableParser {
 
         // Correctness first: only claim a match if a real parse would succeed.
         // (Otherwise we can steal list items/paragraphs and drop content.)
-        // The throwaway builder is discarded; emission re-parses into the real
-        // tree using the cached kind and position.
-        let mut tmp = GreenNodeBuilder::new();
-
         let detection = if ctx.has_blank_before || ctx.at_document_start {
             BlockDetectionResult::Yes
         } else {
@@ -1388,8 +1411,28 @@ impl BlockParser for TableParser {
         // caption (`table_pos`), but parse from the caption line so the caption
         // is included and consumed. `resolve_table_pos` owns that routing.
         let table_pos = resolve_table_pos(ctx, lines, line_pos, prefix);
-        let (kind, _) = first_kind_at(ctx, lines, table_pos, line_pos, prefix, &mut tmp)?;
-        Some((detection, Some(Box::new(TablePrepared { kind, table_pos }))))
+
+        // Selection policy unchanged: cascade at the grid position to pick the
+        // kind. We keep the resulting subtree so emission replays it instead of
+        // re-parsing (the table was parsed twice before). In the common
+        // no-caption case the cascade parses at `line_pos == table_pos`, which
+        // *is* emission's first attempt, so the tree is exactly what emission
+        // would build — reuse it directly. With a leading caption the cascade
+        // parses at the post-caption grid line (omitting the caption), so
+        // re-capture via the emission position policy to include it.
+        let mut probe = GreenNodeBuilder::new();
+        let (kind, probe_consumed) =
+            first_kind_at(ctx, lines, table_pos, line_pos, prefix, &mut probe)?;
+
+        let (green, consumed) = if table_pos == line_pos {
+            (probe.finish(), probe_consumed)
+        } else {
+            let mut b = GreenNodeBuilder::new();
+            let consumed = emit_table_kind(ctx, kind, lines, line_pos, table_pos, prefix, &mut b)?;
+            (b.finish(), consumed)
+        };
+
+        Some((detection, Some(Box::new(TablePrepared { green, consumed }))))
     }
 
     fn parse_prepared(
@@ -1399,34 +1442,21 @@ impl BlockParser for TableParser {
         lines: &StrippedLines<'_, '_>,
         payload: Option<&dyn Any>,
     ) -> usize {
+        // Happy path: replay the subtree detection already built and validated.
+        // No re-parse — `copy_green_node` copies its tokens verbatim, so the
+        // emitted bytes match detection exactly (lossless by construction).
+        if let Some(p) = payload.and_then(|p| p.downcast_ref::<TablePrepared>()) {
+            copy_green_node(builder, &p.green);
+            return p.consumed;
+        }
+
         let line_pos = lines.pos();
         let prefix = lines.prefix();
         let lines = lines.raw();
-        let prepared = payload.and_then(|p| p.downcast_ref::<TablePrepared>().copied());
-        // Detection cached the table position; recompute only on the rare
-        // payload-missing path.
-        let table_pos = prepared.map_or_else(
-            || resolve_table_pos(ctx, lines, line_pos, prefix),
-            |p| p.table_pos,
-        );
+        let table_pos = resolve_table_pos(ctx, lines, line_pos, prefix);
 
-        // Happy path: use the cached kind. Try the caption line first (a bare
-        // table parses here), then the post-caption position.
-        if let Some(p) = prepared {
-            if let Some(n) = try_parse_kind(ctx, p.kind, lines, line_pos, line_pos, prefix, builder)
-            {
-                return n;
-            }
-            if table_pos != line_pos
-                && let Some(n) =
-                    try_parse_kind(ctx, p.kind, lines, table_pos, line_pos, prefix, builder)
-            {
-                return n;
-            }
-        }
-
-        // Fallback (rare): payload missing, or the cached kind failed to
-        // re-parse. Re-run the cascade at the caption line, then post-caption.
+        // Fallback (defensive): payload missing. Re-run the cascade at the
+        // caption line, then post-caption.
         if let Some((_, n)) = first_kind_at(ctx, lines, line_pos, line_pos, prefix, builder) {
             return n;
         }

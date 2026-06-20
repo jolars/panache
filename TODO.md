@@ -605,14 +605,15 @@ intentionally excluded.
   offsets during the single emission pass. No temp tree is built and
   replayed.
 
-- [ ] Avoid temporary green tree in table detection.
+- [x] Avoid temporary green tree in table detection.
   `TableParser::detect_prepared` (`block_dispatcher.rs`) fully parses the
   table into a throwaway `GreenNodeBuilder` just to validate the match
   (`.is_some()`), then `parse_prepared` parses it again into the real
-  builder --- the table is parsed twice. Carry a reusable table IR
-  (rows/cells/alignments) in `TablePrepared` so emission renders from the IR
-  instead of re-parsing. Larger change than the blockquote-marker item
-  above; same "build temp CST then discard" anti-pattern.
+  builder --- the table is parsed twice. Done via capture & replay rather
+  than a bespoke IR: detection keeps the `GreenNode` it already builds in
+  `TablePrepared`, and emission replays it with `copy_green_node` instead of
+  re-parsing. Kills the double inline-parse; lossless by construction (CST
+  snapshots byte-identical). \~1.21x faster on a table-heavy doc.
 
 - [x] Use `memchr` for the refdef-map newline scan. `memchr_newline`
   (`inlines/refdef_map.rs`) is a scalar `iter().position(|&b| b == b'\n')`
