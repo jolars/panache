@@ -158,6 +158,119 @@ fn test_will_rename_files_updates_include_shortcode_path() {
 }
 
 #[test]
+fn test_will_rename_files_updates_embed_shortcode_path() {
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+    fs::write(root.join("notebook.ipynb"), "{}\n").unwrap();
+    let doc_path = root.join("doc.qmd");
+    fs::write(&doc_path, "{{< embed notebook.ipynb#cell-1 >}}\n").unwrap();
+
+    let root_uri = Uri::from_file_path(root).unwrap();
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
+
+    let old_uri = Uri::from_file_path(root.join("notebook.ipynb")).unwrap();
+    let new_uri = Uri::from_file_path(root.join("nb.ipynb")).unwrap();
+    let edit = server
+        .will_rename_files(vec![(
+            old_uri.as_str().to_string(),
+            new_uri.as_str().to_string(),
+        )])
+        .expect("expected workspace edit");
+    let changes = edit.changes.expect("changes");
+    let edits = changes.get(&doc_uri).expect("doc edits");
+    assert!(
+        edits.iter().any(|e| e.new_text == "nb.ipynb#cell-1"),
+        "expected embed shortcode path rewrite preserving cell fragment"
+    );
+}
+
+#[test]
+fn test_will_rename_files_updates_video_shortcode_and_ignores_url() {
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+    fs::write(root.join("clip.mp4"), "binary\n").unwrap();
+    let doc_path = root.join("doc.qmd");
+    fs::write(
+        &doc_path,
+        "{{< video clip.mp4 >}}\n\n{{< video https://youtube.com/watch?v=clip.mp4 >}}\n",
+    )
+    .unwrap();
+
+    let root_uri = Uri::from_file_path(root).unwrap();
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
+
+    let old_uri = Uri::from_file_path(root.join("clip.mp4")).unwrap();
+    let new_uri = Uri::from_file_path(root.join("movie.mp4")).unwrap();
+    let edit = server
+        .will_rename_files(vec![(
+            old_uri.as_str().to_string(),
+            new_uri.as_str().to_string(),
+        )])
+        .expect("expected workspace edit");
+    let changes = edit.changes.expect("changes");
+    let edits = changes.get(&doc_uri).expect("doc edits");
+    assert!(
+        edits.iter().any(|e| e.new_text == "movie.mp4"),
+        "expected local video shortcode path rewrite"
+    );
+    assert!(
+        !edits.iter().any(|e| e.new_text.contains("youtube.com")),
+        "external video URL should not be rewritten"
+    );
+}
+
+#[test]
+fn test_will_rename_files_updates_placeholder_shortcode_path() {
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+    fs::write(root.join("fig.png"), "binary\n").unwrap();
+    let doc_path = root.join("doc.qmd");
+    fs::write(&doc_path, "{{< placeholder fig.png >}}\n").unwrap();
+
+    let root_uri = Uri::from_file_path(root).unwrap();
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
+
+    let old_uri = Uri::from_file_path(root.join("fig.png")).unwrap();
+    let new_uri = Uri::from_file_path(root.join("image.png")).unwrap();
+    let edit = server
+        .will_rename_files(vec![(
+            old_uri.as_str().to_string(),
+            new_uri.as_str().to_string(),
+        )])
+        .expect("expected workspace edit");
+    let changes = edit.changes.expect("changes");
+    let edits = changes.get(&doc_uri).expect("doc edits");
+    assert!(
+        edits.iter().any(|e| e.new_text == "image.png"),
+        "expected placeholder shortcode path rewrite"
+    );
+}
+
+#[test]
 fn test_will_rename_files_ignores_escaped_shortcode() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();
@@ -460,5 +573,104 @@ fn test_will_rename_files_updates_quarto_bibliography_list_entry() {
     assert!(
         edits.iter().any(|e| e.new_text == "refs.bib"),
         "expected bibliography list entry rewrite"
+    );
+}
+
+/// Opens `doc.qmd` with the given frontmatter body, renames `old` to `new`,
+/// and returns the rewrite texts produced for the document.
+fn frontmatter_rename_edits(frontmatter: &str, old: &str, new: &str) -> Vec<String> {
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+    fs::write(root.join(old), "content\n").unwrap();
+    let doc_path = root.join("doc.qmd");
+    fs::write(&doc_path, frontmatter).unwrap();
+
+    let root_uri = Uri::from_file_path(root).unwrap();
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(
+        doc_uri.as_str(),
+        &fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
+
+    let old_uri = Uri::from_file_path(root.join(old)).unwrap();
+    let new_uri = Uri::from_file_path(root.join(new)).unwrap();
+    let Some(edit) = server.will_rename_files(vec![(
+        old_uri.as_str().to_string(),
+        new_uri.as_str().to_string(),
+    )]) else {
+        return Vec::new();
+    };
+    edit.changes
+        .and_then(|mut changes| changes.remove(&doc_uri))
+        .map(|edits| edits.into_iter().map(|e| e.new_text).collect())
+        .unwrap_or_default()
+}
+
+#[test]
+fn test_will_rename_files_updates_frontmatter_bibliography_scalar() {
+    let edits = frontmatter_rename_edits(
+        "---\nbibliography: references.bib\n---\n\n# Doc\n",
+        "references.bib",
+        "refs.bib",
+    );
+    assert!(
+        edits.iter().any(|t| t == "refs.bib"),
+        "expected frontmatter bibliography scalar rewrite, got {edits:?}"
+    );
+}
+
+#[test]
+fn test_will_rename_files_updates_frontmatter_bibliography_list() {
+    let edits = frontmatter_rename_edits(
+        "---\nbibliography:\n  - references.bib\n  - extra.bib\n---\n\n# Doc\n",
+        "references.bib",
+        "refs.bib",
+    );
+    assert!(
+        edits.iter().any(|t| t == "refs.bib"),
+        "expected frontmatter bibliography list entry rewrite, got {edits:?}"
+    );
+}
+
+#[test]
+fn test_will_rename_files_updates_frontmatter_csl() {
+    let edits = frontmatter_rename_edits(
+        "---\ncsl: apa.csl\n---\n\n# Doc\n",
+        "apa.csl",
+        "chicago.csl",
+    );
+    assert!(
+        edits.iter().any(|t| t == "chicago.csl"),
+        "expected frontmatter csl rewrite, got {edits:?}"
+    );
+}
+
+#[test]
+fn test_will_rename_files_updates_frontmatter_css() {
+    let edits = frontmatter_rename_edits(
+        "---\ncss: theme.css\n---\n\n# Doc\n",
+        "theme.css",
+        "styles.css",
+    );
+    assert!(
+        edits.iter().any(|t| t == "styles.css"),
+        "expected frontmatter css rewrite, got {edits:?}"
+    );
+}
+
+#[test]
+fn test_will_rename_files_ignores_unrelated_frontmatter_scalar() {
+    let edits = frontmatter_rename_edits(
+        "---\nbibliography: references.bib\n---\n\n# Doc\n",
+        "other.bib",
+        "renamed.bib",
+    );
+    assert!(
+        edits.is_empty(),
+        "frontmatter path that isn't the renamed file should be untouched, got {edits:?}"
     );
 }

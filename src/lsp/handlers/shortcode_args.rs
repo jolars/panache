@@ -85,3 +85,28 @@ pub(crate) fn token_is_named(content: &str, token: (usize, usize)) -> bool {
         .map(|raw| raw.contains('='))
         .unwrap_or(false)
 }
+
+/// A Quarto shortcode whose first positional argument is a file path.
+///
+/// Single source of truth for which shortcodes carry a renameable/completable
+/// path: shared by completion (path suggestions) and file rename (path
+/// rewrites).
+#[derive(Clone, Copy)]
+pub(crate) enum ShortcodeKind {
+    Include,
+    Embed,
+    Video,
+    Placeholder,
+}
+
+impl ShortcodeKind {
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "include" => Some(Self::Include),
+            "embed" => Some(Self::Embed),
+            "video" => Some(Self::Video),
+            "placeholder" => Some(Self::Placeholder),
+            _ => None,
+        }
+    }
+}

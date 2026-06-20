@@ -10,7 +10,7 @@ use crate::lsp::global_state::StateSnapshot;
 use crate::syntax::{AstNode, ImageLink, Link, Shortcode, SyntaxKind};
 
 use super::document_links::{extract_first_destination_token, resolve_link_target};
-use super::shortcode_args::{shortcode_token_value_span, shortcode_tokens};
+use super::shortcode_args::{ShortcodeKind, shortcode_token_value_span, shortcode_tokens};
 
 pub(crate) fn will_rename_files(
     snap: &StateSnapshot,
@@ -180,6 +180,9 @@ fn rename_candidates_for_pair(
         } else {
             let tree = crate::parse(&doc.text, None);
             out.extend(rename_candidates_for_links(doc, &tree, old_uri, new_uri));
+            out.extend(rename_candidates_for_frontmatter(
+                doc, &tree, old_uri, new_uri,
+            ));
         }
     }
     out.sort_by(|a, b| {
@@ -267,6 +270,124 @@ fn rename_candidates_for_links(
     out
 }
 
+/// Rewrites file paths declared in a document's own YAML frontmatter
+/// (`bibliography`, `csl`, `css`) when the referenced file is renamed.
+///
+/// Only top-level keys are handled; nested paths (e.g. `format.html.css`) are a
+/// deferred edge. Reuses the same scalar/list-item span helpers as the
+/// `_quarto.yml` config path, restricted to the frontmatter byte range.
+fn rename_candidates_for_frontmatter(
+    doc: &DocInput,
+    tree: &crate::syntax::SyntaxNode,
+    old_uri: &Uri,
+    new_uri: &Uri,
+) -> Vec<CandidateEdit> {
+    let mut out = Vec::new();
+    let Some(content_node) = tree
+        .descendants()
+        .find(|node| node.kind() == SyntaxKind::YAML_METADATA)
+        .and_then(|meta| {
+            meta.children()
+                .find(|child| child.kind() == SyntaxKind::YAML_METADATA_CONTENT)
+        })
+    else {
+        return out;
+    };
+
+    let block_start: usize = content_node.text_range().start().into();
+    let block_text = content_node.text().to_string();
+
+    // Tracks the indent of a top-level path key (`bibliography:`/`css:`) whose
+    // value continues as a block list on following lines.
+    let mut list_indent: Option<usize> = None;
+    let mut offset = block_start;
+
+    for raw_line in block_text.split_inclusive('\n') {
+        let line = raw_line.strip_suffix('\n').unwrap_or(raw_line);
+        let line_indent = line
+            .chars()
+            .take_while(|ch| *ch == ' ' || *ch == '\t')
+            .count();
+        let trimmed = line.trim_start();
+
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            offset += raw_line.len();
+            continue;
+        }
+
+        if let Some(level) = list_indent
+            && line_indent <= level
+        {
+            list_indent = None;
+        }
+
+        if let Some((key, value_start)) = yaml_key_value(trimmed) {
+            if matches!(key, "bibliography" | "csl" | "css") {
+                if let Some((line_start, line_end)) = yaml_scalar_value_span(trimmed, value_start) {
+                    let leading = line.len() - trimmed.len();
+                    push_frontmatter_edit(
+                        &mut out,
+                        doc,
+                        old_uri,
+                        new_uri,
+                        offset + leading + line_start,
+                        offset + leading + line_end,
+                    );
+                } else if matches!(key, "bibliography" | "css") {
+                    // Scalar value absent → expect a block list on following lines.
+                    list_indent = Some(line_indent);
+                }
+            }
+        } else if list_indent.is_some_and(|level| line_indent > level)
+            && let Some(after_dash) = trimmed.strip_prefix("- ")
+            && let Some((rel_start, rel_end)) = yaml_scalar_value_span(after_dash, 0)
+        {
+            let value = &after_dash[rel_start..rel_end];
+            if !(value.contains(':')
+                || matches!(value, "true" | "false" | "null" | "~")
+                || value.ends_with(':'))
+            {
+                let leading = line.len() - trimmed.len();
+                push_frontmatter_edit(
+                    &mut out,
+                    doc,
+                    old_uri,
+                    new_uri,
+                    offset + leading + 2 + rel_start,
+                    offset + leading + 2 + rel_end,
+                );
+            }
+        }
+
+        offset += raw_line.len();
+    }
+
+    out
+}
+
+fn push_frontmatter_edit(
+    out: &mut Vec<CandidateEdit>,
+    doc: &DocInput,
+    old_uri: &Uri,
+    new_uri: &Uri,
+    absolute_start: usize,
+    absolute_end: usize,
+) {
+    let range = rowan::TextRange::new(
+        TextSize::from(absolute_start as u32),
+        TextSize::from(absolute_end as u32),
+    );
+    let raw = &doc.text[absolute_start..absolute_end];
+    if let Some(edit) =
+        candidate_edit_for_destination(&doc.path, &doc.text, old_uri, new_uri, range, raw)
+    {
+        out.push(CandidateEdit {
+            uri: doc.uri.clone(),
+            edit,
+        });
+    }
+}
+
 fn candidate_edit_for_shortcode_path(
     doc: &DocInput,
     shortcode: &Shortcode,
@@ -276,9 +397,8 @@ fn candidate_edit_for_shortcode_path(
     if shortcode.is_escaped() {
         return None;
     }
-    if shortcode.name().as_deref() != Some("include") {
-        return None;
-    }
+    let name = shortcode.name()?;
+    ShortcodeKind::from_name(&name)?;
 
     let content_node = shortcode
         .syntax()
@@ -579,9 +699,7 @@ fn extract_shortcode_path_argument_span(content: &str) -> Option<(usize, usize)>
     let tokens = shortcode_tokens(content);
     let first = tokens.first()?;
     let name = content.get(first.0..first.1)?.trim();
-    if !name.eq_ignore_ascii_case("include") {
-        return None;
-    }
+    ShortcodeKind::from_name(name)?;
 
     // Preferred: `{{< include path.qmd >}}` (second positional argument).
     if let Some(token) = tokens
@@ -828,6 +946,27 @@ mod tests {
             &r#" include file="chapters/part 1.qmd" "#[span.0..span.1],
             "chapters/part 1.qmd"
         );
+    }
+
+    #[test]
+    fn extracts_embed_video_placeholder_shortcode_paths() {
+        for content in [
+            " embed notebook.ipynb#cell ",
+            " video clip.mp4 ",
+            " placeholder fig.png ",
+            " embed file=notebook.ipynb ",
+        ] {
+            let span = extract_shortcode_path_argument_span(content).expect("expected a path span");
+            assert!(
+                !content[span.0..span.1].is_empty(),
+                "non-empty path span for {content:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn ignores_non_path_shortcode_name() {
+        assert!(extract_shortcode_path_argument_span(" kbd Shift+Ctrl ").is_none());
     }
 
     #[test]

@@ -55,7 +55,11 @@ support.
   - [x] Headings - Rename heading text and update internal links
   - [x] Footnotes - Rename footnote labels and update definitions/links
   - [x] Files - Rename linked markdown files and update links
-  - [ ] Files - Rename other linked files, shortcodes, etc.
+  - [x] Files - Rename other linked files, shortcodes, etc. Covers `embed`,
+    `video`, and `placeholder` shortcode paths plus in-document frontmatter
+    file paths (`bibliography`, `csl`, `css`). Deferred: raw HTML
+    `src`/`href` and raw LaTeX `\input`/`\includegraphics` references;
+    nested frontmatter paths such as `format.html.css`.
 - [ ] Configuration via LSP - `workspace/didChangeConfiguration` to reload
   config
 

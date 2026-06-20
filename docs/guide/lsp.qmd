@@ -138,7 +138,8 @@ Symbol renaming
     - Quarto crossref labels (including executable chunk `label` options)
 
 File rename
-:   Update links to a renamed Markdown file (`workspace/willRenameFiles`)
+:   Update links, shortcode paths, and frontmatter/config file paths pointing at
+    a renamed file (`workspace/willRenameFiles`)
 
 Document tracking
 :   Incremental synchronization for efficiency (`textDocument/didOpen`,
@@ -645,10 +646,22 @@ The LSP exposes clickable links so editors can ctrl/cmd-click to follow them
 
 ### File Rename
 
-When you rename a Markdown file in an LSP-aware editor, the server returns a
-workspace edit that rewrites links pointing at the old path
-(`workspace/willRenameFiles`), so cross-document links stay intact. Renaming
-other linked file types (images, data files) is not yet handled.
+When you rename a file in an LSP-aware editor, the server returns a workspace
+edit that rewrites references pointing at the old path
+(`workspace/willRenameFiles`), so cross-document references stay intact. The
+server rewrites:
+
+- Inline and reference links and images (`[text](path)`, `![alt](path)`)
+- Path-bearing Quarto shortcodes: `{{< include >}}`, `{{< embed >}}`,
+  `{{< video >}}`, `{{< placeholder >}}` (fragments like `notebook.ipynb#cell`
+  are preserved; external URLs are left untouched)
+- Document frontmatter file paths: `bibliography`, `csl`, and `css` (scalar or
+  block-list values)
+- `_quarto.yml` config paths: `bibliography`, navbar `href`, and book `part`
+  entries
+
+Nested config paths inside frontmatter (e.g. `format.html.css`) are not yet
+handled.
 
 ### Semantic Tokens
 
@@ -746,7 +759,7 @@ marked *out of scope*.
   | `textDocument/semanticTokens/full`                                                                                          | ✅     | Additive, flavor-gated; custom legend (see above)   |
   | `textDocument/inlayHint`                                                                                                    | ❌     | Under consideration                                 |
   | `workspace/symbol`                                                                                                          | ✅     | Heading search across the project                   |
-  | `workspace/willRenameFiles`                                                                                                 | ✅     | Markdown files only                                 |
+  | `workspace/willRenameFiles`                                                                                                 | ✅     | Links, shortcodes, frontmatter/config file paths    |
   | `workspace/didChangeWatchedFiles`                                                                                           | ✅     | Bibliography, config, and document files            |
   | `workspace/didChangeConfiguration`, `workspace/configuration`                                                               | ❌     | Planned: runtime config reload                      |
   | `workspace/didChangeWorkspaceFolders`                                                                                       | ❌     | Advertised but not yet handled                      |

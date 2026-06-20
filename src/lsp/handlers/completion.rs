@@ -9,7 +9,9 @@ use crate::utils::normalize_anchor_label;
 
 use super::super::conversions::offset_to_position;
 use super::super::helpers;
-use super::shortcode_args::{shortcode_token_value_span, shortcode_tokens, token_is_named};
+use super::shortcode_args::{
+    ShortcodeKind, shortcode_token_value_span, shortcode_tokens, token_is_named,
+};
 use crate::metadata::inline_reference_map;
 
 /// Common still-image extensions accepted by Pandoc/Quarto image syntax
@@ -262,25 +264,7 @@ struct ShortcodeArgContext {
     prefix: String,
 }
 
-#[derive(Clone, Copy)]
-enum ShortcodeKind {
-    Include,
-    Embed,
-    Video,
-    Placeholder,
-}
-
 impl ShortcodeKind {
-    fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "include" => Some(Self::Include),
-            "embed" => Some(Self::Embed),
-            "video" => Some(Self::Video),
-            "placeholder" => Some(Self::Placeholder),
-            _ => None,
-        }
-    }
-
     fn accepts(self, file_name: &str) -> bool {
         let exts: &[&str] = match self {
             Self::Include => INCLUDE_EXTENSIONS,
