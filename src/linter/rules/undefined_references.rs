@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{
     AstNode, Crossref, FootnoteReference, Link, SyntaxKind, SyntaxNode, UnresolvedReference,
 };
@@ -14,6 +14,21 @@ pub struct UndefinedReferencesRule;
 impl Rule for UndefinedReferencesRule {
     fn name(&self) -> &str {
         "undefined-references"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "undefined-references",
+            default_on: true,
+            requires: Requirement::Always,
+            auto_fix: false,
+            codes: const {
+                &[
+                    DiagnosticCode::warning("undefined-reference-label"),
+                    DiagnosticCode::warning("undefined-footnote-id"),
+                ]
+            },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

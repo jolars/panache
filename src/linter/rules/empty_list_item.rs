@@ -1,5 +1,5 @@
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
@@ -8,6 +8,16 @@ pub struct EmptyListItemRule;
 impl Rule for EmptyListItemRule {
     fn name(&self) -> &str {
         "empty-list-item"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "empty-list-item",
+            default_on: true,
+            requires: Requirement::Always,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning("empty-list-item")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

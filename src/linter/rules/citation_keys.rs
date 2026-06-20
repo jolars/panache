@@ -1,5 +1,5 @@
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::metadata::{
     bibliography_range_map, format_bibliography_load_error, inline_bib_conflicts,
     inline_reference_contains, inline_reference_duplicates,
@@ -10,6 +10,24 @@ pub struct CitationKeysRule;
 impl Rule for CitationKeysRule {
     fn name(&self) -> &str {
         "citation-keys"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "citation-keys",
+            default_on: true,
+            requires: Requirement::Citations,
+            auto_fix: false,
+            codes: const {
+                &[
+                    DiagnosticCode::error("bibliography-load-error"),
+                    DiagnosticCode::error("bibliography-parse-error"),
+                    DiagnosticCode::warning("missing-bibliography-key"),
+                    DiagnosticCode::warning("duplicate-bibliography-key"),
+                    DiagnosticCode::warning("duplicate-inline-reference-id"),
+                ]
+            },
+        }
     }
 
     fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {

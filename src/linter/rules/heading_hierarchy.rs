@@ -1,5 +1,5 @@
 use crate::linter::diagnostics::{Diagnostic, Edit, Fix, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{Heading, SyntaxNode};
 use rowan::ast::AstNode;
 
@@ -8,6 +8,16 @@ pub struct HeadingHierarchyRule;
 impl Rule for HeadingHierarchyRule {
     fn name(&self) -> &str {
         "heading-hierarchy"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "heading-hierarchy",
+            default_on: true,
+            requires: Requirement::Always,
+            auto_fix: true,
+            codes: const { &[DiagnosticCode::warning("heading-hierarchy")] },
+        }
     }
 
     fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {

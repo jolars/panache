@@ -1,7 +1,7 @@
 use rowan::TextRange;
 
 use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::SyntaxKind;
 
 pub struct FootnoteRefInFootnoteDefRule;
@@ -9,6 +9,16 @@ pub struct FootnoteRefInFootnoteDefRule;
 impl Rule for FootnoteRefInFootnoteDefRule {
     fn name(&self) -> &str {
         "footnote-ref-in-footnote-def"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "footnote-ref-in-footnote-def",
+            default_on: true,
+            requires: Requirement::Footnotes,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning("footnote-ref-in-footnote-def")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

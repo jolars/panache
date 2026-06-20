@@ -1,5 +1,5 @@
 use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{AttributeNode, Heading, InlineHtml, SyntaxKind};
 use rowan::ast::AstNode;
 
@@ -8,6 +8,16 @@ pub struct HeadingStripCommentsResidueRule;
 impl Rule for HeadingStripCommentsResidueRule {
     fn name(&self) -> &str {
         "heading-strip-comments-residue"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "heading-strip-comments-residue",
+            default_on: false,
+            requires: Requirement::HeaderAttributes,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning("heading-strip-comments-residue")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

@@ -1,6 +1,6 @@
 use crate::config::Flavor;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{AstNode, ChunkOptionEntry, CodeBlock, Crossref, SyntaxKind, SyntaxNode};
 use crate::utils::{crossref_resolution_labels, normalize_anchor_label, normalize_label};
 use std::collections::HashMap;
@@ -10,6 +10,16 @@ pub struct FigureCrossrefCaptionsRule;
 impl Rule for FigureCrossrefCaptionsRule {
     fn name(&self) -> &str {
         "figure-crossref-captions"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "figure-crossref-captions",
+            default_on: true,
+            requires: Requirement::ChunkFlavor,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning("figure-crossref-captions")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

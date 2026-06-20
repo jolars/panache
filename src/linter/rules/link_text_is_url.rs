@@ -1,7 +1,7 @@
 use rowan::ast::AstNode;
 
 use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Edit, Fix, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{Link, SyntaxKind};
 
 pub struct LinkTextIsUrlRule;
@@ -9,6 +9,16 @@ pub struct LinkTextIsUrlRule;
 impl Rule for LinkTextIsUrlRule {
     fn name(&self) -> &str {
         "link-text-is-url"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "link-text-is-url",
+            default_on: true,
+            requires: Requirement::Always,
+            auto_fix: true,
+            codes: const { &[DiagnosticCode::warning("link-text-is-url")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

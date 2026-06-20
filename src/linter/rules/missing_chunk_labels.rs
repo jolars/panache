@@ -1,6 +1,6 @@
 use crate::config::Flavor;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{AstNode, CodeBlock, SyntaxKind};
 
 pub struct MissingChunkLabelsRule;
@@ -8,6 +8,16 @@ pub struct MissingChunkLabelsRule;
 impl Rule for MissingChunkLabelsRule {
     fn name(&self) -> &str {
         "missing-chunk-labels"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "missing-chunk-labels",
+            default_on: true,
+            requires: Requirement::ChunkFlavor,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning("missing-chunk-labels")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

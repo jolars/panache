@@ -1,7 +1,7 @@
 use rowan::TextRange;
 
 use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::SyntaxKind;
 
 pub struct StrayFencedDivMarkersRule;
@@ -9,6 +9,16 @@ pub struct StrayFencedDivMarkersRule;
 impl Rule for StrayFencedDivMarkersRule {
     fn name(&self) -> &str {
         "stray-fenced-div-markers"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "stray-fenced-div-markers",
+            default_on: true,
+            requires: Requirement::FencedDivs,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning("stray-fenced-div-markers")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

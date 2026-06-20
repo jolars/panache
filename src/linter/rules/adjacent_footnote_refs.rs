@@ -1,7 +1,7 @@
 use rowan::{NodeOrToken, TextRange};
 
 use crate::linter::diagnostics::{Diagnostic, Edit, Fix, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::SyntaxKind;
 
 pub struct AdjacentFootnoteRefsRule;
@@ -9,6 +9,16 @@ pub struct AdjacentFootnoteRefsRule;
 impl Rule for AdjacentFootnoteRefsRule {
     fn name(&self) -> &str {
         "adjacent-footnote-refs"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "adjacent-footnote-refs",
+            default_on: true,
+            requires: Requirement::Footnotes,
+            auto_fix: true,
+            codes: const { &[DiagnosticCode::warning("adjacent-footnote-refs")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

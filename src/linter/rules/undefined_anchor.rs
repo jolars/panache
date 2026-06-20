@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{AttributeNode, Citation, Link, SyntaxKind, SyntaxNode};
 use crate::utils::implicit_heading_ids;
 use rowan::ast::AstNode;
@@ -11,6 +11,16 @@ pub struct UndefinedAnchorRule;
 impl Rule for UndefinedAnchorRule {
     fn name(&self) -> &str {
         "undefined-anchor"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "undefined-anchor",
+            default_on: true,
+            requires: Requirement::Always,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning("undefined-anchor")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

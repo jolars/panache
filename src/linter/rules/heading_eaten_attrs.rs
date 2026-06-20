@@ -1,5 +1,5 @@
 use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{Heading, InlineHtml, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
@@ -9,6 +9,16 @@ pub struct HeadingEatenAttrsRule;
 impl Rule for HeadingEatenAttrsRule {
     fn name(&self) -> &str {
         "heading-eaten-attrs"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "heading-eaten-attrs",
+            default_on: true,
+            requires: Requirement::HeaderAttributes,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning("heading-eaten-attrs")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

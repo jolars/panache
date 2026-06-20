@@ -573,6 +573,10 @@ Severity
 Auto-fix
 :   No
 
+Requirements
+:   `extensions.fenced-code-attributes = true` (the default for Quarto and R
+    Markdown flavors).
+
 Diagnostic codes
 :   [`chunk-label-spaces`](#chunk-label-spaces)
 
@@ -592,6 +596,9 @@ Severity
 Auto-fix
 :   No
 
+Requirements
+:   A flavor with executable chunks (Quarto or R Markdown).
+
 Diagnostic codes
 :   [`missing-chunk-labels`](#missing-chunk-labels)
 
@@ -609,6 +616,9 @@ Severity
 
 Auto-fix
 :   No
+
+Requirements
+:   A flavor with executable chunks (Quarto or R Markdown).
 
 Diagnostic codes
 :   [`figure-crossref-captions`](#figure-crossref-captions)

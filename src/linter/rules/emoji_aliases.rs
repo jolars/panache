@@ -1,5 +1,5 @@
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::SyntaxKind;
 
 pub struct EmojiAliasesRule;
@@ -7,6 +7,16 @@ pub struct EmojiAliasesRule;
 impl Rule for EmojiAliasesRule {
     fn name(&self) -> &str {
         "unknown-emoji-alias"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "unknown-emoji-alias",
+            default_on: true,
+            requires: Requirement::Emoji,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning("unknown-emoji-alias")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

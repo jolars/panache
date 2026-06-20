@@ -22,7 +22,7 @@
 use rowan::TextRange;
 
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
 
 pub struct MathContentRule;
@@ -30,6 +30,24 @@ pub struct MathContentRule;
 impl Rule for MathContentRule {
     fn name(&self) -> &str {
         "math-syntax"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "math-syntax",
+            default_on: true,
+            requires: Requirement::TexMath,
+            auto_fix: false,
+            codes: const {
+                &[
+                    DiagnosticCode::error("math-unclosed-group"),
+                    DiagnosticCode::error("math-unexpected-close-brace"),
+                    DiagnosticCode::error("math-unclosed-environment"),
+                    DiagnosticCode::error("math-mismatched-environment"),
+                    DiagnosticCode::error("math-unexpected-end"),
+                ]
+            },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

@@ -1,5 +1,5 @@
 use crate::linter::diagnostics::{Diagnostic, Edit, Fix, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{ImageLink, Link, LinkDest, SyntaxKind};
 use rowan::ast::AstNode;
 use rowan::{TextRange, TextSize};
@@ -9,6 +9,16 @@ pub struct CrossrefAsLinkTargetRule;
 impl Rule for CrossrefAsLinkTargetRule {
     fn name(&self) -> &str {
         "crossref-as-link-target"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "crossref-as-link-target",
+            default_on: true,
+            requires: Requirement::Citations,
+            auto_fix: true,
+            codes: const { &[DiagnosticCode::warning("crossref-as-link-target")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

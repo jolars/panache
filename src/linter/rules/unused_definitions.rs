@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{
     AstNode, FootnoteReference, ImageLink, Link, SyntaxKind, SyntaxNode, UnresolvedReference,
 };
@@ -14,6 +14,21 @@ pub struct UnusedDefinitionsRule;
 impl Rule for UnusedDefinitionsRule {
     fn name(&self) -> &str {
         "unused-definitions"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "unused-definitions",
+            default_on: true,
+            requires: Requirement::Always,
+            auto_fix: false,
+            codes: const {
+                &[
+                    DiagnosticCode::warning("unused-definition-label"),
+                    DiagnosticCode::warning("unused-footnote-id"),
+                ]
+            },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 use rowan::TextRange;
 
 use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::SyntaxKind;
 
 use panache_parser::entities::ENTITIES;
@@ -14,6 +14,16 @@ pub struct HtmlEntitiesRule;
 impl Rule for HtmlEntitiesRule {
     fn name(&self) -> &str {
         "html-entities"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "html-entities",
+            default_on: true,
+            requires: Requirement::Always,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning("html-entities")] },
+        }
     }
 
     fn wants_text_tokens(&self) -> bool {

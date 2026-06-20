@@ -1,5 +1,5 @@
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{AstNode, ChunkInfoItem, ChunkLabel, ChunkLabelSource, CodeBlock, SyntaxKind};
 
 pub struct ChunkLabelSpacesRule;
@@ -7,6 +7,16 @@ pub struct ChunkLabelSpacesRule;
 impl Rule for ChunkLabelSpacesRule {
     fn name(&self) -> &str {
         "chunk-label-spaces"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "chunk-label-spaces",
+            default_on: true,
+            requires: Requirement::FencedCodeAttributes,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning("chunk-label-spaces")] },
+        }
     }
 
     fn node_interests(&self) -> &'static [SyntaxKind] {

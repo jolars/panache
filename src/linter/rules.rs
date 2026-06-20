@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::config::Config;
-use crate::linter::diagnostics::Diagnostic;
+use crate::linter::diagnostics::{Diagnostic, Severity};
 use crate::linter::index::LintIndex;
 use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 
@@ -26,8 +26,122 @@ pub mod undefined_anchor;
 pub mod undefined_references;
 pub mod unused_definitions;
 
+/// Config precondition for a rule's diagnostics to be able to fire.
+///
+/// This is the single source of truth for both registration gating (see
+/// `default_registry`) and the "Requirements" field documented in
+/// `docs/reference/linter-rules.qmd`. A rule whose preconditions are not met is
+/// never registered, so its diagnostics cannot fire.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Requirement {
+    /// Eligible on every flavor (subject only to the rule being enabled).
+    Always,
+    /// Needs `extensions.header-attributes`.
+    HeaderAttributes,
+    /// Needs `extensions.footnotes`.
+    Footnotes,
+    /// Needs `extensions.citations`.
+    Citations,
+    /// Needs `extensions.fenced-code-attributes`.
+    FencedCodeAttributes,
+    /// Needs `extensions.fenced-divs`.
+    FencedDivs,
+    /// Needs `extensions.emoji`.
+    Emoji,
+    /// Needs any `tex-math-*` extension (dollars, gfm, single/double backslash).
+    TexMath,
+    /// Needs a flavor with executable chunks (Quarto or R Markdown).
+    ChunkFlavor,
+}
+
+impl Requirement {
+    /// Whether `config` satisfies this requirement.
+    pub fn is_satisfied(self, config: &Config) -> bool {
+        use crate::config::Flavor;
+        let ext = &config.extensions;
+        match self {
+            Requirement::Always => true,
+            Requirement::HeaderAttributes => ext.header_attributes,
+            Requirement::Footnotes => ext.footnotes,
+            Requirement::Citations => ext.citations,
+            Requirement::FencedCodeAttributes => ext.fenced_code_attributes,
+            Requirement::FencedDivs => ext.fenced_divs,
+            Requirement::Emoji => ext.emoji,
+            Requirement::TexMath => {
+                ext.tex_math_dollars
+                    || ext.tex_math_gfm
+                    || ext.tex_math_single_backslash
+                    || ext.tex_math_double_backslash
+            }
+            Requirement::ChunkFlavor => {
+                matches!(config.flavor, Flavor::Quarto | Flavor::RMarkdown)
+            }
+        }
+    }
+}
+
+/// One diagnostic code a rule may emit, paired with the severity it rides at.
+/// A single rule can emit several distinct codes at different severities (e.g.
+/// `citation-keys`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DiagnosticCode {
+    pub code: &'static str,
+    pub severity: Severity,
+}
+
+impl DiagnosticCode {
+    pub const fn warning(code: &'static str) -> Self {
+        Self {
+            code,
+            severity: Severity::Warning,
+        }
+    }
+
+    pub const fn error(code: &'static str) -> Self {
+        Self {
+            code,
+            severity: Severity::Error,
+        }
+    }
+
+    pub const fn info(code: &'static str) -> Self {
+        Self {
+            code,
+            severity: Severity::Info,
+        }
+    }
+}
+
+/// Declarative, machine-readable facts about a built-in rule.
+///
+/// This is the source of truth that the reference docs are checked against (see
+/// `tests/linter_rules_docs.rs`): every fact here must be reflected in
+/// `docs/reference/linter-rules.qmd`, and the docs may not list a rule or code
+/// that does not appear here.
+#[derive(Debug, Clone)]
+pub struct RuleMeta {
+    /// Rule name, as used in `[lint.rules]` and the docs' `### \`name\`` heading.
+    pub name: &'static str,
+    /// `true` when the rule runs unless explicitly disabled; `false` when it is
+    /// opt-in (must be explicitly enabled). Documented as "Default: Off" when
+    /// `false`.
+    pub default_on: bool,
+    /// Config precondition for the rule's diagnostics; also gates registration.
+    pub requires: Requirement,
+    /// Whether the rule offers any auto-fix.
+    pub auto_fix: bool,
+    /// Every diagnostic code the rule may emit, with each code's severity.
+    pub codes: &'static [DiagnosticCode],
+}
+
 pub trait Rule {
     fn name(&self) -> &str;
+
+    /// Declarative metadata describing the rule's gating, severity, auto-fix
+    /// support, and the set of diagnostic codes it can emit. Keep this in sync
+    /// with the rule body; `tests/linter_rules_docs.rs` checks the reference
+    /// docs against it.
+    fn metadata(&self) -> RuleMeta;
 
     /// Node kinds this rule wants collected for it by the shared walk. The
     /// runner builds one [`LintIndex`] over the union of every registered

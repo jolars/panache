@@ -1,5 +1,5 @@
 use crate::linter::diagnostics::{Diagnostic, Location};
-use crate::linter::rules::{LintContext, Rule};
+use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::SyntaxNode;
 
 pub struct DuplicateReferencesRule;
@@ -7,6 +7,16 @@ pub struct DuplicateReferencesRule;
 impl Rule for DuplicateReferencesRule {
     fn name(&self) -> &str {
         "duplicate-reference-labels"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "duplicate-reference-labels",
+            default_on: true,
+            requires: Requirement::Always,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning("duplicate-reference-labels")] },
+        }
     }
 
     fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
