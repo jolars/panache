@@ -102,8 +102,6 @@ spec-coverage audit (see `docs/guide/lsp.qmd` "LSP Specification Coverage").
 - [x] File operations beyond `willRenameFiles`: `didRenameFiles`,
   `didCreateFiles`, `didDeleteFiles` (hygiene-only;
   `willCreate`/`willDelete` intentionally omitted)
-- [ ] `textDocument/willSave` / `willSaveWaitUntil` - server-driven
-  format-before-write hook
 
 #### Out of scope for prose
 
