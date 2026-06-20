@@ -25,6 +25,7 @@ serde = { version = "1.0.228", features = ["derive"], optional = true }
 serde_json = "1.0"
 schemars = { version = "1.0", optional = true }
 log = { version = "0.4.31", features = ["release_max_level_debug"] }
+memchr = "2"
 smallvec = "1"
 unicode-width = "0.2"
 

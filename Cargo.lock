@@ -1217,6 +1217,7 @@ dependencies = [
  "entities",
  "insta",
  "log",
+ "memchr",
  "rowan",
  "schemars",
  "serde",

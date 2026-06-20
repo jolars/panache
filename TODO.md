@@ -614,11 +614,13 @@ intentionally excluded.
   instead of re-parsing. Larger change than the blockquote-marker item
   above; same "build temp CST then discard" anti-pattern.
 
-- [ ] Use `memchr` for the refdef-map newline scan. `memchr_newline`
+- [x] Use `memchr` for the refdef-map newline scan. `memchr_newline`
   (`inlines/refdef_map.rs`) is a scalar `iter().position(|&b| b == b'\n')`
   despite its name; `collect_refdef_labels` calls it once per line over the
   whole document. Swap in the `memchr` crate (SIMD) for a free per-parse
-  speedup --- and the name stops lying.
+  speedup --- and the name stops lying. Done: \~45% faster prepass
+  (`collect_refdef_labels` 134µs → 73µs on the 296 KB pandoc manual), \~0.8%
+  off end-to-end parse.
 
 ### YAML validation: consumer fidelity vs YAML 1.2 (needs design decision)
 

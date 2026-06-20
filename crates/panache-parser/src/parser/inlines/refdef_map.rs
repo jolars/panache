@@ -145,7 +145,7 @@ pub fn collect_refdef_labels(input: &str, dialect: Dialect) -> RefdefMap {
 }
 
 fn memchr_newline(bytes: &[u8]) -> Option<usize> {
-    bytes.iter().position(|&b| b == b'\n')
+    memchr::memchr(b'\n', bytes)
 }
 
 /// `true` if the line starting at `text[0]` begins with a blockquote
