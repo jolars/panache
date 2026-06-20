@@ -49,3 +49,4 @@ crates/panache-dprint/Cargo.lock
 /out.md
 /out.native
 pnpm-lock.yaml
+/test.bib
