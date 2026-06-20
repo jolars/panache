@@ -123,7 +123,15 @@ impl Rule for CitationKeysRule {
             return diagnostics;
         }
 
+        // `citations.keys` holds one entry per occurrence, so the same key can
+        // appear multiple times. Skip duplicates: `citation_references` already
+        // returns every occurrence's range, so reporting per unique key gives
+        // exactly one diagnostic per occurrence.
+        let mut seen_keys = std::collections::HashSet::new();
         for key_text in &metadata.citations.keys {
+            if !seen_keys.insert(key_text.as_str()) {
+                continue;
+            }
             if symbol_index.crossref_usages(key_text).is_some() {
                 continue;
             }
@@ -278,6 +286,41 @@ mod tests {
         assert_eq!(diagnostics[0].location.range.start(), range.start());
         assert_eq!(diagnostics[0].location.range.end(), range.end());
         assert!(diagnostics[0].message.ends_with("File not found"));
+    }
+
+    #[test]
+    fn repeated_missing_key_reports_each_occurrence_once() {
+        // A missing key cited twice should yield exactly one diagnostic per
+        // occurrence (two total), not one per (occurrence x duplicate key).
+        let input = "Text [@missing] and again [@missing].";
+        let metadata = crate::metadata::DocumentMetadata {
+            source_path: std::path::PathBuf::from("test.qmd"),
+            bibliography: None,
+            metadata_files: Vec::new(),
+            bibliography_parse: Some(crate::metadata::BibliographyParse {
+                index: crate::bib::BibIndex {
+                    entries: std::collections::HashMap::new(),
+                    duplicates: Vec::new(),
+                    errors: Vec::new(),
+                    load_errors: Vec::new(),
+                },
+                parse_errors: Vec::new(),
+            }),
+            inline_references: Vec::new(),
+            citations: crate::metadata::CitationInfo {
+                keys: vec!["missing".to_string(), "missing".to_string()],
+            },
+            title: None,
+            raw_yaml: String::new(),
+        };
+
+        let diagnostics = parse_and_lint(input, Some(metadata));
+        assert_eq!(diagnostics.len(), 2);
+        assert!(
+            diagnostics
+                .iter()
+                .all(|d| d.code == "missing-bibliography-key")
+        );
     }
 
     #[test]
