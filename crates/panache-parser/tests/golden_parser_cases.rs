@@ -201,6 +201,7 @@ golden_test_cases!(
     crlf_raw_blocks,
     crlf_yaml_metadata,
     citations,
+    citation_code_span_link,
     citation_prefix_paren_escape_278,
     definition_list,
     definition_list_blockquote_continuation,

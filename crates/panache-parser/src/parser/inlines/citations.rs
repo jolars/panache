@@ -34,6 +34,13 @@ pub(crate) fn try_parse_bracketed_citation(text: &str) -> Option<(usize, &str)> 
                 pos += 2;
                 continue;
             }
+            b'`' => {
+                // Skip verbatim code spans; markers inside don't count.
+                match code_span_end(bytes, pos) {
+                    Some(end) => pos = end,
+                    None => pos += 1,
+                }
+            }
             b'[' => {
                 bracket_depth += 1;
                 pos += 1;
@@ -71,6 +78,13 @@ pub(crate) fn try_parse_bracketed_citation(text: &str) -> Option<(usize, &str)> 
                 // Skip escaped character
                 pos += 2;
                 continue;
+            }
+            b'`' => {
+                // Skip verbatim code spans; brackets inside don't close.
+                match code_span_end(bytes, pos) {
+                    Some(end) => pos = end,
+                    None => pos += 1,
+                }
             }
             b'[' => {
                 bracket_depth += 1;
@@ -302,6 +316,38 @@ fn parse_citation_key(text: &str) -> Option<usize> {
     }
 }
 
+/// If `bytes[pos]` begins a backtick code-span opener, return the index just
+/// past the matching closing run. Returns `None` when there is no closing run
+/// of equal length, in which case the backticks are literal text.
+///
+/// Code spans are verbatim, so citation markers (`@`), separators (`;`), and
+/// brackets (`]`) inside them must not influence citation detection — this
+/// matches pandoc, which parses `` [`@foo`] `` as a link, not a citation.
+fn code_span_end(bytes: &[u8], pos: usize) -> Option<usize> {
+    let mut open_end = pos;
+    while open_end < bytes.len() && bytes[open_end] == b'`' {
+        open_end += 1;
+    }
+    let run = open_end - pos;
+
+    let mut i = open_end;
+    while i < bytes.len() {
+        if bytes[i] == b'`' {
+            let close_start = i;
+            while i < bytes.len() && bytes[i] == b'`' {
+                i += 1;
+            }
+            if i - close_start == run {
+                return Some(i);
+            }
+        } else {
+            i += 1;
+        }
+    }
+
+    None
+}
+
 /// Check if a character is valid internal punctuation in citation keys.
 fn is_internal_punctuation(ch: char) -> bool {
     matches!(
@@ -336,6 +382,17 @@ fn emit_bracketed_citation_content(builder: &mut impl InlineSink, content: &str)
         // treats the escape as a literal in the citation prefix/suffix.
         if ch == '\\' {
             iter.next();
+            continue;
+        }
+
+        if ch == '`'
+            && let Some(end) = code_span_end(content.as_bytes(), idx)
+        {
+            // Verbatim code span: leave its bytes in the pending
+            // CITATION_CONTENT run and skip markers/separators inside it.
+            while matches!(iter.peek(), Some((next_idx, _)) if *next_idx < end) {
+                iter.next();
+            }
             continue;
         }
 
@@ -567,6 +624,41 @@ mod tests {
         // they must not abort citation detection.
         let result = try_parse_bracketed_citation("[see (Smith 1999) and @doe99]");
         assert_eq!(result, Some((29, "see (Smith 1999) and @doe99")));
+    }
+
+    #[test]
+    fn test_bracketed_citation_ignores_at_in_code_span() {
+        // `@foo` inside a code span is verbatim, so [`@foo`] is a link label,
+        // not a citation (matches pandoc).
+        assert_eq!(try_parse_bracketed_citation("[`@foo`]"), None);
+    }
+
+    #[test]
+    fn test_bracketed_citation_code_span_in_prefix() {
+        // A code span may appear in the citation prefix; @ inside it is verbatim
+        // and the real @key follows.
+        assert_eq!(
+            try_parse_bracketed_citation("[`x@y` @doe99]"),
+            Some((14, "`x@y` @doe99"))
+        );
+    }
+
+    #[test]
+    fn test_bracketed_citation_bracket_in_code_span() {
+        // A `]` inside a code span does not terminate the bracket.
+        assert_eq!(
+            try_parse_bracketed_citation("[`a]b` @doe99]"),
+            Some((14, "`a]b` @doe99"))
+        );
+    }
+
+    #[test]
+    fn test_bracketed_citation_unterminated_backtick() {
+        // An unterminated backtick run is literal, so @foo is still a citation.
+        assert_eq!(
+            try_parse_bracketed_citation("[`@foo bar]"),
+            Some((11, "`@foo bar"))
+        );
     }
 
     #[test]

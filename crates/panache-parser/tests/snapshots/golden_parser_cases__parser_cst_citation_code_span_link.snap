@@ -1,0 +1,47 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..117
+  PARAGRAPH@0..65
+    LINK@0..64
+      LINK_START@0..1
+        LINK_START@0..1 "["
+      LINK_TEXT@1..17
+        INLINE_CODE@1..17
+          INLINE_CODE_MARKER@1..2 "`"
+          INLINE_CODE_CONTENT@2..16 "@jolars/eunoia"
+          INLINE_CODE_MARKER@16..17 "`"
+      LINK_TEXT_END@17..18 "]"
+      LINK_DEST_START@18..19 "("
+      LINK_DEST@19..63
+        TEXT@19..63 "https://www.npmjs.com ..."
+      LINK_DEST_END@63..64 ")"
+    NEWLINE@64..65 "\n"
+  BLANK_LINE@65..66
+    BLANK_LINE@65..66 "\n"
+  PARAGRAPH@66..117
+    CITATION@66..80
+      LINK_START@66..67 "["
+      CITATION_CONTENT@67..73 "`x@y` "
+      CITATION_MARKER@73..74 "@"
+      CITATION_KEY@74..79 "doe99"
+      LINK_DEST@79..80 "]"
+    TEXT@80..85 " and "
+    CITATION@85..99
+      LINK_START@85..86 "["
+      CITATION_CONTENT@86..92 "`a]b` "
+      CITATION_MARKER@92..93 "@"
+      CITATION_KEY@93..98 "smith"
+      LINK_DEST@98..99 "]"
+    TEXT@99..104 " and "
+    CITATION@104..115
+      LINK_START@104..105 "["
+      CITATION_CONTENT@105..106 "`"
+      CITATION_MARKER@106..107 "@"
+      CITATION_KEY@107..110 "foo"
+      CITATION_CONTENT@110..114 " bar"
+      LINK_DEST@114..115 "]"
+    TEXT@115..116 "."
+    NEWLINE@116..117 "\n"
