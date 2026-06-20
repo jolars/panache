@@ -141,6 +141,10 @@ File rename
 :   Update links, shortcode paths, and frontmatter/config file paths pointing at
     a renamed file (`workspace/willRenameFiles`)
 
+File operations
+:   Refresh cross-document diagnostics after a file is created, renamed, or
+    deleted (`workspace/didCreateFiles`, `didRenameFiles`, `didDeleteFiles`)
+
 Document tracking
 :   Incremental synchronization for efficiency (`textDocument/didOpen`,
     `textDocument/didChange`, `textDocument/didClose`)
@@ -663,6 +667,20 @@ server rewrites:
 Nested config paths inside frontmatter (e.g. `format.html.css`) are not yet
 handled.
 
+### File Operations
+
+After a file is created, renamed, or deleted in the editor
+(`workspace/didCreateFiles`, `didRenameFiles`, `didDeleteFiles`), the server
+refreshes its project graph so cross-document diagnostics stay accurate: a newly
+created include target clears the dependent's `include-not-found`, and deleting
+or renaming a referenced file surfaces broken references where they remain. A
+deleted file's own diagnostics are cleared immediately.
+
+These notifications are hygiene-only. Creating a file inserts no scaffolding,
+and deleting one never rewrites references---unlike rename, which returns a
+workspace edit (see above), create and delete only update server state and let
+stale references show up as diagnostics.
+
 ### Semantic Tokens
 
 The LSP provides semantic tokens (`textDocument/semanticTokens/full`) for syntax
@@ -761,10 +779,11 @@ marked *out of scope*.
   | `workspace/symbol`                                                                                                          | ✅     | Heading search across the project                   |
   | `workspace/willRenameFiles`                                                                                                 | ✅     | Links, shortcodes, frontmatter/config file paths    |
   | `workspace/didChangeWatchedFiles`                                                                                           | ✅     | Bibliography, config, and document files            |
+  | `workspace/didCreateFiles`, `didRenameFiles`, `didDeleteFiles`                                                              | ✅     | Hygiene-only: refresh cross-document diagnostics    |
   | `workspace/didChangeConfiguration`, `workspace/configuration`                                                               | ❌     | Planned: runtime config reload                      |
   | `workspace/didChangeWorkspaceFolders`                                                                                       | ❌     | Advertised but not yet handled                      |
   | `workspace/executeCommand`                                                                                                  | ❌     | Planned: commands backing complex actions           |
-  | Other file operations (`didRename`, create, delete)                                                                         | ❌     | Planned                                             |
+  | `workspace/willCreateFiles`, `willDeleteFiles`                                                                              | ⛔     | Intentionally omitted: no scaffolding/auto-deletion |
   | `willSave`, `willSaveWaitUntil`                                                                                             | ❌     | Format-on-save runs client-side instead             |
   | Call/type hierarchy, `implementation`, `typeDefinition`, `declaration`, `inlineValue`, `moniker`, document color, code lens | ⛔     | Out of scope for prose                              |
 

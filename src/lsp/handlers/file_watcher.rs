@@ -32,14 +32,7 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
     // Reloading the open documents' referenced files on the writer then loads any
     // newly-created file (flipping its `None`->`Some` text input) before the
     // cached-text sync and re-lint below, so both observe fresh content.
-    let open_docs: Vec<(crate::salsa::FileText, crate::salsa::FileConfig, PathBuf)> = gs
-        .document_map
-        .values()
-        .filter_map(|state| Some((state.salsa_file, state.salsa_config, state.path.clone()?)))
-        .collect();
-    for (salsa_file, salsa_config, path) in open_docs {
-        crate::lsp::documents::load_project_files(gs, salsa_file, salsa_config, path);
-    }
+    crate::lsp::documents::reload_open_documents_referenced_files(gs);
 
     for change in params.changes {
         let Some(path) = change.uri.to_file_path().map(|p| p.into_owned()) else {

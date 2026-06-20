@@ -19,6 +19,7 @@ mod lsp {
     pub(super) mod test_diagnostics;
     pub(super) mod test_document_lifecycle;
     pub(super) mod test_document_links;
+    pub(super) mod test_file_operations;
     pub(super) mod test_file_rename;
     pub(super) mod test_file_watcher;
     pub(super) mod test_formatting;

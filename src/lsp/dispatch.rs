@@ -102,7 +102,21 @@ pub(crate) fn server_capabilities() -> ServerCapabilities {
                 change_notifications: Some(OneOf::Left(true)),
             }),
             file_operations: Some(WorkspaceFileOperationsServerCapabilities {
+                // `willRename` returns a `WorkspaceEdit` rewriting cross-document
+                // references; the `did*` notifications are hygiene-only (re-intern
+                // + re-lint, see `handlers::file_operations`). `willCreate`/
+                // `willDelete` stay unregistered: no scaffolding on create, no
+                // destructive auto-edit on delete.
                 will_rename: Some(FileOperationRegistrationOptions {
+                    filters: file_operation_filters(),
+                }),
+                did_rename: Some(FileOperationRegistrationOptions {
+                    filters: file_operation_filters(),
+                }),
+                did_create: Some(FileOperationRegistrationOptions {
+                    filters: file_operation_filters(),
+                }),
+                did_delete: Some(FileOperationRegistrationOptions {
                     filters: file_operation_filters(),
                 }),
                 ..Default::default()
@@ -401,6 +415,18 @@ impl GlobalState {
             n::DidChangeWatchedFiles,
             handlers::file_watcher::did_change_watched_files
         );
+        handle!(
+            n::DidCreateFiles,
+            handlers::file_operations::did_create_files
+        );
+        handle!(
+            n::DidRenameFiles,
+            handlers::file_operations::did_rename_files
+        );
+        handle!(
+            n::DidDeleteFiles,
+            handlers::file_operations::did_delete_files
+        );
         handle!(n::Cancel, GlobalState::on_cancel);
 
         log::debug!("ignoring notification: {}", not.method);
@@ -640,18 +666,7 @@ impl GlobalState {
         // keystroke burst may have added an include/bibliography since the last
         // pass; `file_text` no longer lazy-loads (audit §3.2), so the writer loads
         // them here, coalesced onto the settle boundary.
-        let docs: Vec<(
-            crate::salsa::FileText,
-            crate::salsa::FileConfig,
-            std::path::PathBuf,
-        )> = self
-            .document_map
-            .values()
-            .filter_map(|doc| Some((doc.salsa_file, doc.salsa_config, doc.path.clone()?)))
-            .collect();
-        for (salsa_file, salsa_config, path) in docs {
-            documents::load_project_files(self, salsa_file, salsa_config, path);
-        }
+        documents::reload_open_documents_referenced_files(self);
 
         // Read phase: snapshot and spawn the single all-docs pass over the
         // now-settled database under a fresh generation.

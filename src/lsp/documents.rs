@@ -91,6 +91,22 @@ pub(crate) fn load_project_files(
         .load_referenced_files(salsa_file, salsa_config, root_path)
 }
 
+/// Reload every open document's project-referenced files on the writer.
+///
+/// A filesystem change (watcher event, file operation) may have flipped a
+/// referenced include/bibliography's `None`->`Some` text input (or vice versa);
+/// loading here before the next snapshot lets the re-lint observe fresh content.
+pub(crate) fn reload_open_documents_referenced_files(gs: &mut GlobalState) {
+    let open_docs: Vec<(crate::salsa::FileText, crate::salsa::FileConfig, PathBuf)> = gs
+        .document_map
+        .values()
+        .filter_map(|state| Some((state.salsa_file, state.salsa_config, state.path.clone()?)))
+        .collect();
+    for (salsa_file, salsa_config, path) in open_docs {
+        load_project_files(gs, salsa_file, salsa_config, path);
+    }
+}
+
 /// Handle `textDocument/didOpen`.
 pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) {
     let uri = params.text_document.uri.clone();

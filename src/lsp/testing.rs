@@ -193,6 +193,40 @@ impl LspTester {
         handlers::file_watcher::did_change_watched_files(&mut self.gs, params);
     }
 
+    pub fn did_create_files(&mut self, created: Vec<&str>) {
+        let params = CreateFilesParams {
+            files: created
+                .into_iter()
+                .map(|uri| FileCreate {
+                    uri: uri.to_string(),
+                })
+                .collect(),
+        };
+        handlers::file_operations::did_create_files(&mut self.gs, params);
+    }
+
+    pub fn did_delete_files(&mut self, deleted: Vec<&str>) {
+        let params = DeleteFilesParams {
+            files: deleted
+                .into_iter()
+                .map(|uri| FileDelete {
+                    uri: uri.to_string(),
+                })
+                .collect(),
+        };
+        handlers::file_operations::did_delete_files(&mut self.gs, params);
+    }
+
+    pub fn did_rename_files(&mut self, renames: Vec<(String, String)>) {
+        let params = RenameFilesParams {
+            files: renames
+                .into_iter()
+                .map(|(old_uri, new_uri)| FileRename { old_uri, new_uri })
+                .collect(),
+        };
+        handlers::file_operations::did_rename_files(&mut self.gs, params);
+    }
+
     // --- requests ---
 
     pub fn format_document(&self, uri: &str) -> Option<Vec<TextEdit>> {
