@@ -381,7 +381,7 @@ fn canonical_indent_depth(root: &SyntaxNode, offset: usize) -> Option<usize> {
             .parent()
             .filter(|p| p.kind() == SyntaxKind::YAML_SCALAR)
     {
-        // Multi-line scalar continuation. The scanner splits a multi-line
+        // Scalar value on its own line. The scanner splits a multi-line
         // scalar into per-line `YAML_SCALAR_TEXT` fragments interleaved
         // with `NEWLINE`, so the multi-line check, the scalar's start
         // offset, and the `|`/`>` block-indicator probe all read the
@@ -389,47 +389,47 @@ fn canonical_indent_depth(root: &SyntaxNode, offset: usize) -> Option<usize> {
         // Block scalars (`|`/`>`) bake their interior indent into the
         // source — proper canonicalization needs a real block-scalar
         // renderer, so preserve verbatim. Plain / single- / double-quoted
-        // multi-line scalars have their continuation lines canonicalized
-        // to the parent value's content column (depth * 2 spaces — one
-        // level deeper than rule 1's default formula, matching
-        // pretty_yaml's output for multi-line values). The first line of
-        // the scalar doesn't hit this carve-out: when the scalar is a
-        // value, the line's first non-WS byte is the key
-        // (offset < scalar_start); when the scalar opens the line,
-        // offset == scalar_start.
+        // scalars are canonicalized to the parent value's content column
+        // (depth * 2 spaces — one level deeper than rule 1's default
+        // formula, matching pretty_yaml) whenever the value sits below
+        // its key, whether that's a multi-line scalar's continuation
+        // lines or a single-line scalar that opens its own line
+        // (`key:\n  "value"`). A value sharing the key's line
+        // (`key: value`) doesn't hit this carve-out: the line's first
+        // non-WS byte is the key, so `offset < scalar_start`.
         let scalar_text = scalar.text().to_string();
-        if scalar_text.contains('\n') {
-            let scalar_start = usize::from(scalar.text_range().start());
-            if scalar_text.starts_with('|') || scalar_text.starts_with('>') {
-                // Block scalars (`|`/`>`) bake their interior indent into
-                // the source — preserve continuation lines verbatim until a
-                // real block-scalar renderer exists. The indicator line
-                // (offset == scalar_start) falls through to rule 1's formula.
-                if offset > scalar_start {
-                    return None;
-                }
-            } else if offset >= scalar_start {
-                // Plain / single- / double-quoted multi-line scalar. Both the
-                // first line — when the value opens its own line below the key
-                // (offset == scalar_start) — and the continuation lines
-                // (offset > scalar_start) canonicalize to the value's content
-                // column (depth * 2 spaces). Anchoring the first line here too
-                // keeps a value-on-its-own-line scalar aligned with its
-                // continuation; treating it as a default-depth line instead
-                // de-indents only the first line and splits the scalar.
-                let mut entry_item_ancestors = 0usize;
-                let mut node = scalar.parent();
-                while let Some(n) = node {
-                    if matches!(
-                        n.kind(),
-                        SyntaxKind::YAML_BLOCK_MAP_ENTRY | SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
-                    ) {
-                        entry_item_ancestors += 1;
-                    }
-                    node = n.parent();
-                }
-                return Some(entry_item_ancestors);
+        let scalar_start = usize::from(scalar.text_range().start());
+        let is_block_scalar = scalar_text.starts_with('|') || scalar_text.starts_with('>');
+        if scalar_text.contains('\n') && is_block_scalar {
+            // Block scalars (`|`/`>`) bake their interior indent into
+            // the source — preserve continuation lines verbatim until a
+            // real block-scalar renderer exists. The indicator line
+            // (offset == scalar_start) falls through to rule 1's formula.
+            if offset > scalar_start {
+                return None;
             }
+        } else if offset >= scalar_start
+            && (scalar_text.contains('\n') || scalar_value_opens_own_line(&scalar, scalar_start))
+        {
+            // Plain / single- / double-quoted value scalar that opens its
+            // own line. Both the first line (offset == scalar_start) and
+            // any continuation lines (offset > scalar_start) canonicalize
+            // to the value's content column (depth * 2 spaces). Anchoring
+            // the first line here keeps the scalar aligned with its key;
+            // the default formula would de-indent it to the key's column,
+            // splitting the entry into invalid YAML (`key:\n"value"`).
+            let mut entry_item_ancestors = 0usize;
+            let mut node = scalar.parent();
+            while let Some(n) = node {
+                if matches!(
+                    n.kind(),
+                    SyntaxKind::YAML_BLOCK_MAP_ENTRY | SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
+                ) {
+                    entry_item_ancestors += 1;
+                }
+                node = n.parent();
+            }
+            return Some(entry_item_ancestors);
         }
     }
 
@@ -469,6 +469,24 @@ fn canonical_indent_depth(root: &SyntaxNode, offset: usize) -> Option<usize> {
         node = n.parent();
     }
     Some(entry_item_ancestors.saturating_sub(1))
+}
+
+/// Whether a block-map value scalar begins on its own line below its key
+/// (`key:\n  value`) rather than sharing the key's line (`key: value`).
+/// Detected by a newline between the enclosing `YAML_BLOCK_MAP_VALUE`'s
+/// start and the scalar. A single-line value on its own line still needs
+/// the value-content-column indent (rule 1 + 1), so it shares the
+/// multi-line scalar carve-out in [`canonical_indent_depth`]; without
+/// this, the default formula de-indents it to the key's column and
+/// splits the entry into invalid YAML.
+fn scalar_value_opens_own_line(scalar: &SyntaxNode, scalar_start: usize) -> bool {
+    scalar
+        .parent()
+        .filter(|p| p.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
+        .is_some_and(|value| {
+            let value_start = usize::from(value.text_range().start());
+            value.text().to_string()[..scalar_start - value_start].contains('\n')
+        })
 }
 
 /// STYLE.md rule 10: strip trailing ASCII space + tab from every
