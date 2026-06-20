@@ -29,6 +29,11 @@ tests/fixtures/bibtex_samples/*.cst eol=lf
 # Generated schema must use LF — test compares against bytes produced with `\n`
 panache.schema.json eol=lf
 
+# `tests/linter_rules_docs.rs` `include_str!`s this doc and searches for
+# LF-anchored substrings (`\n## Rules\n`, etc.), so it must check out with LF
+# on every platform (Windows would otherwise get CRLF and the test panics).
+docs/reference/linter-rules.qmd eol=lf
+
 # Vendored IANA URI scheme registry — kept byte-for-byte as fetched (CRLF) so
 # scripts/update-uri-schemes.sh reproduces it exactly with no processing.
 crates/panache-parser/src/parser/inlines/uri-schemes.csv -text linguist-vendored
