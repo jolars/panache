@@ -64,7 +64,7 @@ support.
     file paths (`bibliography`, `csl`, `css`). Deferred: raw HTML
     `src`/`href` and raw LaTeX `\input`/`\includegraphics` references;
     nested frontmatter paths such as `format.html.css`.
-- [ ] Configuration via LSP - `workspace/didChangeConfiguration` to reload
+- [x] Configuration via LSP - `workspace/didChangeConfiguration` to reload
   config
 
 ### Spec coverage gaps

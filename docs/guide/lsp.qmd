@@ -156,6 +156,12 @@ Document tracking
 Configuration discovery
 :   Automatic detection from workspace root
 
+Live configuration reload
+:   Re-read `panache.toml`/`.panache.toml` and apply client settings without a
+    restart when the editor sends `workspace/didChangeConfiguration` or when a
+    config file changes on disk (`workspace/didChangeWatchedFiles`). All open
+    documents are re-linted with the new configuration.
+
 ## Editor Configuration {#editor-configuration}
 
 If you want to start the language server manually (for debugging), then you can

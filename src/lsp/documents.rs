@@ -107,6 +107,31 @@ pub(crate) fn reload_open_documents_referenced_files(gs: &mut GlobalState) {
     }
 }
 
+/// Re-read on-disk config for every open document and refresh its `FileConfig`
+/// salsa input.
+///
+/// Config is normally re-read on each `did_open`/`did_change`, so an idle open
+/// document keeps stale config when `panache.toml` changes underneath it. This
+/// refreshes those documents on demand (config-file watcher event or a
+/// `workspace/didChangeConfiguration` notification). The set mirrors the
+/// unconditional `did_change` write (salsa only bumps the revision when the
+/// value actually differs); the caller arms the settle so the all-docs re-lint
+/// re-publishes diagnostics.
+pub(crate) fn reload_open_documents_config(gs: &mut GlobalState) {
+    let entries: Vec<(lsp_types::Uri, crate::salsa::FileConfig)> = gs
+        .document_map
+        .iter()
+        .filter_map(|(uri_str, state)| Some((uri_str.parse().ok()?, state.salsa_config)))
+        .collect();
+    for (uri, salsa_config) in entries {
+        let new_config = load_config(&gs.workspace_root, Some(&uri));
+        salsa_config
+            .set_config(&mut gs.salsa)
+            .with_durability(Durability::MEDIUM)
+            .to(new_config);
+    }
+}
+
 /// Handle `textDocument/didOpen`.
 pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) {
     let uri = params.text_document.uri.clone();

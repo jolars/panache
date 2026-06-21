@@ -255,6 +255,12 @@ async function startClient(
     ],
     outputChannel,
     traceOutputChannel: outputChannel,
+    // Push `panache.*` changes to the server via
+    // `workspace/didChangeConfiguration` so runtime settings reload live
+    // (no restart). `initializationOptions` still seeds the first load.
+    synchronize: {
+      configurationSection: "panache",
+    },
     initializationOptions: {
       settings: {
         panache: {

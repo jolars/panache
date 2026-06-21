@@ -193,6 +193,11 @@ impl LspTester {
         handlers::file_watcher::did_change_watched_files(&mut self.gs, params);
     }
 
+    pub fn did_change_configuration(&mut self, settings: serde_json::Value) {
+        let params = DidChangeConfigurationParams { settings };
+        handlers::configuration::did_change_configuration(&mut self.gs, params);
+    }
+
     pub fn did_create_files(&mut self, created: Vec<&str>) {
         let params = CreateFilesParams {
             files: created

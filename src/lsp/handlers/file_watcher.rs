@@ -29,6 +29,20 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
         gs.salsa.intern_file(Some(path.clone()));
     }
 
+    // A `panache.toml`/`.panache.toml` edit changes config for open documents
+    // that don't get re-read until their next keystroke; refresh them all now.
+    // Matched by file name because the `.toml` extension can't distinguish a
+    // config file from any other TOML. The trailing `arm_settle` re-lints.
+    let config_changed = changed_paths.iter().any(|path| {
+        matches!(
+            path.file_name().and_then(|name| name.to_str()),
+            Some("panache.toml") | Some(".panache.toml")
+        )
+    });
+    if config_changed {
+        crate::lsp::documents::reload_open_documents_config(gs);
+    }
+
     // Reloading the open documents' referenced files on the writer then loads any
     // newly-created file (flipping its `None`->`Some` text input) before the
     // cached-text sync and re-lint below, so both observe fresh content.

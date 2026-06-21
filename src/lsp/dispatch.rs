@@ -166,7 +166,12 @@ fn legacy_root_uri(params: &InitializeParams) -> Option<Uri> {
         .and_then(|root_uri| serde_json::from_value(root_uri).ok())
 }
 
-fn experimental_incremental_parsing_from_initialize(params: &InitializeParams) -> bool {
+/// Read the experimental incremental-parsing flag from a settings/options JSON
+/// value, tolerating the `settings.panache.*`, `panache.*`, and bare `*` nesting
+/// that different clients use for both `initializationOptions` and
+/// `workspace/didChangeConfiguration`. Returns `None` when the key is absent so
+/// callers can distinguish "unset" from "explicitly false".
+pub(crate) fn runtime_incremental_parsing_from_value(value: &Value) -> Option<bool> {
     fn get_bool(value: &Value, path: &[&str]) -> Option<bool> {
         let mut current = value;
         for key in path {
@@ -175,17 +180,20 @@ fn experimental_incremental_parsing_from_initialize(params: &InitializeParams) -
         current.as_bool()
     }
 
-    let Some(options) = params.initialization_options.as_ref() else {
-        return false;
-    };
-
     get_bool(
-        options,
+        value,
         &["settings", "panache", "experimental", "incrementalParsing"],
     )
-    .or_else(|| get_bool(options, &["panache", "experimental", "incrementalParsing"]))
-    .or_else(|| get_bool(options, &["experimental", "incrementalParsing"]))
-    .unwrap_or(false)
+    .or_else(|| get_bool(value, &["panache", "experimental", "incrementalParsing"]))
+    .or_else(|| get_bool(value, &["experimental", "incrementalParsing"]))
+}
+
+fn experimental_incremental_parsing_from_initialize(params: &InitializeParams) -> bool {
+    params
+        .initialization_options
+        .as_ref()
+        .and_then(runtime_incremental_parsing_from_value)
+        .unwrap_or(false)
 }
 
 impl GlobalState {
@@ -272,6 +280,17 @@ impl GlobalState {
             },
             FileSystemWatcher {
                 glob_pattern: GlobPattern::String("**/*.ris".to_string()),
+                kind: Some(WatchKind::all()),
+            },
+            // Config files so edits reload config for open documents (the
+            // file-name-matched branch in `file_watcher`). Both spellings are
+            // discovered by `config::load`.
+            FileSystemWatcher {
+                glob_pattern: GlobPattern::String("**/panache.toml".to_string()),
+                kind: Some(WatchKind::all()),
+            },
+            FileSystemWatcher {
+                glob_pattern: GlobPattern::String("**/.panache.toml".to_string()),
                 kind: Some(WatchKind::all()),
             },
         ];
@@ -422,6 +441,10 @@ impl GlobalState {
         handle!(n::DidChangeTextDocument, documents::did_change);
         handle!(n::DidSaveTextDocument, documents::did_save);
         handle!(n::DidCloseTextDocument, documents::did_close);
+        handle!(
+            n::DidChangeConfiguration,
+            handlers::configuration::did_change_configuration
+        );
         handle!(
             n::DidChangeWatchedFiles,
             handlers::file_watcher::did_change_watched_files
