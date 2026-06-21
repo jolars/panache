@@ -1,0 +1,80 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..141
+  SIMPLE_TABLE@0..74
+    TABLE_HEADER@0..17
+      WHITESPACE@0..2 "  "
+      TABLE_CELL@2..7
+        TEXT@2..7 "Right"
+      WHITESPACE@7..12 "     "
+      TABLE_CELL@12..16
+        TEXT@12..16 "Left"
+      NEWLINE@16..17 "\n"
+    TABLE_SEPARATOR@17..36
+      TABLE_SEP_WHITESPACE@17..19 "  "
+      TABLE_SEP_DASHES@19..26 "-------"
+      TABLE_SEP_WHITESPACE@26..29 "   "
+      TABLE_SEP_DASHES@29..35 "------"
+      NEWLINE@35..36 "\n"
+    TABLE_ROW@36..51
+      WHITESPACE@36..38 "  "
+      TABLE_CELL@38..40
+        TEXT@38..40 "12"
+      WHITESPACE@40..48 "        "
+      TABLE_CELL@48..50
+        TEXT@48..50 "12"
+      NEWLINE@50..51 "\n"
+    BLANK_LINE@51..52
+      BLANK_LINE@51..52 "\n"
+    TABLE_CAPTION@52..74
+      TABLE_CAPTION_PREFIX@52..54 ": "
+      TEXT@54..73 "First table caption"
+      NEWLINE@73..74 "\n"
+  BLANK_LINE@74..75
+    BLANK_LINE@74..75 "\n"
+  PIPE_TABLE@75..141
+    TABLE_HEADER@75..89
+      TEXT@75..76 "|"
+      WHITESPACE@76..77 " "
+      TABLE_CELL@77..78
+        TEXT@77..78 "A"
+      WHITESPACE@78..81 "   "
+      TEXT@81..82 "|"
+      WHITESPACE@82..83 " "
+      TABLE_CELL@83..84
+        TEXT@83..84 "B"
+      WHITESPACE@84..87 "   "
+      TEXT@87..88 "|"
+      NEWLINE@88..89 "\n"
+    TABLE_SEPARATOR@89..103
+      TABLE_SEP_DELIM@89..90 "|"
+      TABLE_SEP_WHITESPACE@90..91 " "
+      TABLE_SEP_DASHES@91..94 "---"
+      TABLE_SEP_WHITESPACE@94..95 " "
+      TABLE_SEP_DELIM@95..96 "|"
+      TABLE_SEP_WHITESPACE@96..97 " "
+      TABLE_SEP_DASHES@97..100 "---"
+      TABLE_SEP_WHITESPACE@100..101 " "
+      TABLE_SEP_DELIM@101..102 "|"
+      NEWLINE@102..103 "\n"
+    TABLE_ROW@103..117
+      TEXT@103..104 "|"
+      WHITESPACE@104..105 " "
+      TABLE_CELL@105..106
+        TEXT@105..106 "1"
+      WHITESPACE@106..109 "   "
+      TEXT@109..110 "|"
+      WHITESPACE@110..111 " "
+      TABLE_CELL@111..112
+        TEXT@111..112 "2"
+      WHITESPACE@112..115 "   "
+      TEXT@115..116 "|"
+      NEWLINE@116..117 "\n"
+    BLANK_LINE@117..118
+      BLANK_LINE@117..118 "\n"
+    TABLE_CAPTION@118..141
+      TABLE_CAPTION_PREFIX@118..120 ": "
+      TEXT@120..140 "Second table caption"
+      NEWLINE@140..141 "\n"

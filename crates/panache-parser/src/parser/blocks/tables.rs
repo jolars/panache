@@ -447,14 +447,26 @@ fn previous_nonblank_looks_like_table(lines: &(impl LineView + ?Sized), pos: usi
     if pos == 0 {
         return false;
     }
+    // Skip the blank gap directly above the caption candidate.
     let mut i = pos;
+    while i > 0 && lines.line(i - 1).trim().is_empty() {
+        i -= 1;
+    }
+    // Scan the contiguous non-blank block above for any table shape. A
+    // simple/multiline table's dashed separator sits *above* its data rows
+    // (which are plain text and don't look like table syntax on their own), so
+    // we must walk the whole block, not just the nearest line, to recognize
+    // that this caption is the caption-after of a preceding table rather than a
+    // caption-before of the following one. Stop at the next blank line or a
+    // fenced-div fence.
     while i > 0 {
         i -= 1;
-        let line = lines.line(i).trim();
-        if line.is_empty() {
-            continue;
+        if lines.line(i).trim().is_empty() || line_is_fenced_div_fence(lines.line(i)) {
+            break;
         }
-        return line_looks_like_table_syntax(line);
+        if line_looks_like_table_syntax(lines.line(i).trim()) {
+            return true;
+        }
     }
     false
 }

@@ -410,16 +410,6 @@ intentionally excluded.
 
 ### Tables
 
-- [ ] Idempotency bug: two adjacent captioned tables swap/duplicate captions.
-  Given a captioned simple table immediately followed (after a blank line)
-  by a captioned pipe table, `format(format(x)) != format(x)` --- the second
-  table's caption gets replaced by the first's. Reproduce with two
-  back-to-back captioned tables and
-  `panache debug format --checks idempotency`; the diff shows the pipe
-  table's caption line being overwritten. Pre-existing (predates the table
-  replay refactor); likely caption association in the formatter's caption
-  routing (`find_caption_before_table`/`find_caption_after_table`) picking
-  up an adjacent table's caption across the blank-line boundary.
 - [x] Grid tables
   - [ ] Row-spanning grids (a `|` content row containing `+`, e.g.
     `grid_table_planets`) still use the older
