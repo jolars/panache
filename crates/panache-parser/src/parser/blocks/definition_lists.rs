@@ -115,16 +115,13 @@ pub(in crate::parser) fn next_line_is_definition_marker(
             check_pos += 1;
             continue;
         }
-        if try_parse_definition_marker(line).is_some() {
+        if let Some((marker, ..)) = try_parse_definition_marker(line) {
             // Raw lines throughout: the marker detection above is itself raw, so
             // this only fires outside container prefixes (at top level raw ==
             // stripped). Inside a blockquote the raw `> :` never matches the
             // marker, so this caption gate is unreachable there — the
             // container-aware gate lives in `DefinitionListParser::detect_prepared`.
-            if let Some((marker, ..)) = try_parse_definition_marker(line)
-                && marker == ':'
-                && is_caption_followed_by_table(lines, check_pos)
-            {
+            if marker == ':' && is_caption_followed_by_table(lines, check_pos) {
                 return None;
             }
             return Some(blank_count);

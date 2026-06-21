@@ -590,12 +590,6 @@ intentionally excluded.
   Surfaced when the pre-commit `panache format` hook rewrote a backtick span
   in this file.
 
-- [ ] Collapse the double `try_parse_definition_marker` call in
-  `next_line_is_definition_marker` (`blocks/definition_lists.rs`). It parses
-  the line once for `.is_some()` and again to destructure `marker`; a single
-  `if let Some((marker, ..)) = ...` covers both. Runs in a per-block
-  lookahead.
-
 ### Performance
 
 - [x] Avoid temporary green tree when injecting `BLOCK_QUOTE_MARKER` tokens into
