@@ -80,9 +80,10 @@ spec-coverage audit (see `docs/guide/lsp.qmd` "LSP Specification Coverage").
   - [x] Populate `related_documents` in the document report for clients with
     `related_document_support` (the pulled document's project-graph closure
     carries its related files' cross-file diagnostics inline)
-  - [ ] Streaming/partial results (`DocumentDiagnosticReportPartialResult`,
-    `WorkspaceDiagnosticReportPartialResult`) for large workspaces; reports
-    are returned whole today
+  - [x] Streaming/partial results (`DocumentDiagnosticReportPartialResult`,
+    `WorkspaceDiagnosticReportPartialResult`): a `partialResultToken`
+    streams the report's tail as `$/progress` chunks (response carries the
+    first chunk). No token still returns the whole report
   - [ ] `workspace/diagnostic` only reports open documents + reachable project
     manifests, not every on-disk doc in the workspace (rust-analyzer pulls
     all workspace files). Decide whether closed-but-on-disk docs should

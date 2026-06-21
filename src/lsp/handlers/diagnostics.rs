@@ -10,12 +10,14 @@ use std::path::PathBuf;
 
 use lsp_types::{
     Diagnostic, DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportKind,
-    DocumentDiagnosticReportResult, FullDocumentDiagnosticReport,
-    RelatedFullDocumentDiagnosticReport, RelatedUnchangedDocumentDiagnosticReport,
-    UnchangedDocumentDiagnosticReport, Uri, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
+    DocumentDiagnosticReportPartialResult, DocumentDiagnosticReportResult,
+    FullDocumentDiagnosticReport, ProgressToken, RelatedFullDocumentDiagnosticReport,
+    RelatedUnchangedDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport, Uri,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportPartialResult,
     WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
     WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
 };
+use serde::Serialize;
 
 use super::super::conversions::convert_diagnostic;
 use crate::lsp::global_state::{GlobalState, StateSnapshot};
@@ -23,6 +25,47 @@ use crate::lsp::uri_ext::UriExt;
 
 /// A single `publishDiagnostics` payload: target URI, optional version, diags.
 pub(crate) type Publish = (Uri, Option<i32>, Vec<Diagnostic>);
+
+/// How many per-document reports ride in a single `workspace/diagnostic` chunk
+/// when the client requests partial results.
+const WORKSPACE_REPORT_CHUNK_SIZE: usize = 64;
+
+/// How many `relatedDocuments` entries ride in a single `textDocument/diagnostic`
+/// chunk when the client requests partial results.
+const RELATED_REPORT_CHUNK_SIZE: usize = 64;
+
+/// A pull-diagnostics handler result split for the dispatcher: the `response`
+/// carries the request's first chunk, and `progress` carries the remaining
+/// chunks as pre-built `$/progress` notifications (sent after the response, in
+/// order). When the client didn't supply a `partialResultToken`, `progress` is
+/// empty and `response` is the whole report — behavior identical to before
+/// streaming existed.
+pub(crate) struct Streamed<R> {
+    pub(crate) response: R,
+    pub(crate) progress: Vec<lsp_server::Notification>,
+}
+
+impl<R> Streamed<R> {
+    /// A whole, un-streamed report (no `$/progress` chunks).
+    fn whole(response: R) -> Self {
+        Self {
+            response,
+            progress: Vec::new(),
+        }
+    }
+}
+
+/// Build one `$/progress` notification carrying a partial-result `value` keyed by
+/// the client's `token`. `lsp_types::ProgressParamsValue` only models work-done
+/// progress, so the envelope is assembled directly.
+fn progress_notification(token: &ProgressToken, value: impl Serialize) -> lsp_server::Notification {
+    #[derive(Serialize)]
+    struct Envelope<'a, T> {
+        token: &'a ProgressToken,
+        value: T,
+    }
+    lsp_server::Notification::new("$/progress".to_owned(), Envelope { token, value })
+}
 
 /// YAML parse-error diagnostics for the project-manifest files (`_quarto.yml`,
 /// `_metadata.yml`, `_bookdown.yml`/`_output.yml`, and `metadata-files:`
@@ -231,22 +274,26 @@ pub(crate) fn compute_publishes(
 pub(crate) fn document_diagnostic(
     gs: &GlobalState,
     params: DocumentDiagnosticParams,
-) -> DocumentDiagnosticReportResult {
+) -> Streamed<DocumentDiagnosticReportResult> {
     // The collection is the unified store for both modes, but a push-only client
     // is served by push: never surface stored diagnostics through a pull (keeps
     // push and pull mutually exclusive — no double reporting).
     if !gs.supports_pull_diagnostics {
-        return DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(
-            RelatedFullDocumentDiagnosticReport {
+        return Streamed::whole(DocumentDiagnosticReportResult::Report(
+            DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
                 related_documents: None,
                 full_document_diagnostic_report: FullDocumentDiagnosticReport::default(),
-            },
+            }),
         ));
     }
+    let token = params.partial_result_params.partial_result_token;
     let uri = params.text_document.uri;
     // Computed once for both arms: an unchanged main document can still have
-    // related documents whose diagnostics changed.
+    // related documents whose diagnostics changed. When the client asked for
+    // partial results, the first chunk rides in the response and the rest stream
+    // as `$/progress` notifications (see `split_related`).
     let related = related_documents(gs, &uri);
+    let (related, progress) = split_related(token.as_ref(), related);
     let report = match gs.diagnostics.get(&uri) {
         Some(stored) if params.previous_result_id.as_deref() == Some(stored.result_id.as_str()) => {
             DocumentDiagnosticReport::Unchanged(RelatedUnchangedDocumentDiagnosticReport {
@@ -268,7 +315,52 @@ pub(crate) fn document_diagnostic(
             full_document_diagnostic_report: FullDocumentDiagnosticReport::default(),
         }),
     };
-    DocumentDiagnosticReportResult::Report(report)
+    Streamed {
+        response: DocumentDiagnosticReportResult::Report(report),
+        progress,
+    }
+}
+
+/// Split a `relatedDocuments` map into the entries kept in the response and the
+/// `$/progress` chunks that stream the remainder.
+///
+/// With no `token` (or a map that fits in one chunk) the whole map stays in the
+/// response and no progress is emitted, so a non-streaming client sees today's
+/// behavior unchanged. The map's iteration order is irrelevant: every entry is
+/// keyed by its own URI and the client merges across response + chunks.
+fn split_related(
+    token: Option<&ProgressToken>,
+    related: Option<HashMap<Uri, DocumentDiagnosticReportKind>>,
+) -> (
+    Option<HashMap<Uri, DocumentDiagnosticReportKind>>,
+    Vec<lsp_server::Notification>,
+) {
+    let Some(token) = token else {
+        return (related, Vec::new());
+    };
+    let Some(map) = related else {
+        return (None, Vec::new());
+    };
+    if map.len() <= RELATED_REPORT_CHUNK_SIZE {
+        return ((!map.is_empty()).then_some(map), Vec::new());
+    }
+    let mut entries: Vec<(Uri, DocumentDiagnosticReportKind)> = map.into_iter().collect();
+    let rest = entries.split_off(RELATED_REPORT_CHUNK_SIZE);
+    let response_map: HashMap<Uri, DocumentDiagnosticReportKind> = entries.into_iter().collect();
+    let progress = rest
+        .chunks(RELATED_REPORT_CHUNK_SIZE)
+        .map(|chunk| {
+            let chunk_map: HashMap<Uri, DocumentDiagnosticReportKind> =
+                chunk.iter().cloned().collect();
+            progress_notification(
+                token,
+                DocumentDiagnosticReportPartialResult {
+                    related_documents: Some(chunk_map),
+                },
+            )
+        })
+        .collect();
+    (Some(response_map), progress)
 }
 
 /// The cross-file diagnostics to attach under `related_documents` for a pull of
@@ -355,13 +447,13 @@ fn project_closure(graph: &crate::salsa::ProjectGraph, root: &PathBuf) -> HashSe
 pub(crate) fn workspace_diagnostic(
     gs: &GlobalState,
     params: WorkspaceDiagnosticParams,
-) -> WorkspaceDiagnosticReportResult {
+) -> Streamed<WorkspaceDiagnosticReportResult> {
     // Push-only clients are served by push; never surface the unified store via a
     // pull (see `document_diagnostic`).
     if !gs.supports_pull_diagnostics {
-        return WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport {
-            items: Vec::new(),
-        });
+        return Streamed::whole(WorkspaceDiagnosticReportResult::Report(
+            WorkspaceDiagnosticReport { items: Vec::new() },
+        ));
     }
     let known: HashMap<&Uri, &str> = params
         .previous_result_ids
@@ -369,7 +461,7 @@ pub(crate) fn workspace_diagnostic(
         .map(|prev| (&prev.uri, prev.value.as_str()))
         .collect();
 
-    let items = gs
+    let items: Vec<WorkspaceDocumentDiagnosticReport> = gs
         .diagnostics
         .iter()
         .map(|(uri, stored)| {
@@ -396,5 +488,209 @@ pub(crate) fn workspace_diagnostic(
         })
         .collect();
 
-    WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items })
+    // With a `partialResultToken` the first batch rides in the response and the
+    // rest stream as `$/progress` notifications; otherwise the whole report is
+    // returned as before.
+    let token = params.partial_result_params.partial_result_token;
+    let (items, progress) = split_workspace_items(token.as_ref(), items);
+    Streamed {
+        response: WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items }),
+        progress,
+    }
+}
+
+/// Split the per-document workspace reports into the batch kept in the response
+/// and the `$/progress` chunks streaming the remainder. With no `token` the whole
+/// list stays in the response (today's behavior).
+fn split_workspace_items(
+    token: Option<&ProgressToken>,
+    items: Vec<WorkspaceDocumentDiagnosticReport>,
+) -> (
+    Vec<WorkspaceDocumentDiagnosticReport>,
+    Vec<lsp_server::Notification>,
+) {
+    let Some(token) = token else {
+        return (items, Vec::new());
+    };
+    let mut chunks = items.chunks(WORKSPACE_REPORT_CHUNK_SIZE);
+    let first = chunks.next().map(<[_]>::to_vec).unwrap_or_default();
+    let progress = chunks
+        .map(|chunk| {
+            progress_notification(
+                token,
+                WorkspaceDiagnosticReportPartialResult {
+                    items: chunk.to_vec(),
+                },
+            )
+        })
+        .collect();
+    (first, progress)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn token() -> ProgressToken {
+        ProgressToken::Number(1)
+    }
+
+    fn workspace_item(i: usize) -> WorkspaceDocumentDiagnosticReport {
+        let uri: Uri = format!("file:///doc{i}.qmd").parse().unwrap();
+        WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
+            uri,
+            version: None,
+            full_document_diagnostic_report: FullDocumentDiagnosticReport::default(),
+        })
+    }
+
+    fn workspace_uris(items: &[WorkspaceDocumentDiagnosticReport]) -> Vec<String> {
+        items
+            .iter()
+            .map(|item| match item {
+                WorkspaceDocumentDiagnosticReport::Full(full) => full.uri.as_str().to_owned(),
+                WorkspaceDocumentDiagnosticReport::Unchanged(unchanged) => {
+                    unchanged.uri.as_str().to_owned()
+                }
+            })
+            .collect()
+    }
+
+    fn related_map(n: usize) -> HashMap<Uri, DocumentDiagnosticReportKind> {
+        (0..n)
+            .map(|i| {
+                let uri: Uri = format!("file:///rel{i}.qmd").parse().unwrap();
+                (
+                    uri,
+                    DocumentDiagnosticReportKind::Full(FullDocumentDiagnosticReport::default()),
+                )
+            })
+            .collect()
+    }
+
+    /// The workspace items a progress notification carries.
+    fn workspace_chunk_items(
+        note: &lsp_server::Notification,
+    ) -> Vec<WorkspaceDocumentDiagnosticReport> {
+        assert_eq!(note.method, "$/progress");
+        let value = note.params.get("value").unwrap().clone();
+        serde_json::from_value::<WorkspaceDiagnosticReportPartialResult>(value)
+            .unwrap()
+            .items
+    }
+
+    /// The related-document keys a progress notification carries.
+    fn related_chunk_keys(note: &lsp_server::Notification) -> Vec<String> {
+        assert_eq!(note.method, "$/progress");
+        let value = note.params.get("value").unwrap().clone();
+        serde_json::from_value::<DocumentDiagnosticReportPartialResult>(value)
+            .unwrap()
+            .related_documents
+            .unwrap()
+            .keys()
+            .map(|u| u.as_str().to_owned())
+            .collect()
+    }
+
+    #[test]
+    fn workspace_no_token_keeps_everything_in_response() {
+        let items: Vec<_> = (0..WORKSPACE_REPORT_CHUNK_SIZE + 5)
+            .map(workspace_item)
+            .collect();
+        let expected = workspace_uris(&items);
+        let (first, progress) = split_workspace_items(None, items);
+        assert!(progress.is_empty(), "no token => no streaming");
+        assert_eq!(workspace_uris(&first), expected);
+    }
+
+    #[test]
+    fn workspace_single_chunk_emits_no_progress() {
+        let items: Vec<_> = (0..WORKSPACE_REPORT_CHUNK_SIZE)
+            .map(workspace_item)
+            .collect();
+        let expected = workspace_uris(&items);
+        let (first, progress) = split_workspace_items(Some(&token()), items);
+        assert!(
+            progress.is_empty(),
+            "exactly one chunk fits in the response"
+        );
+        assert_eq!(workspace_uris(&first), expected);
+    }
+
+    #[test]
+    fn workspace_multi_chunk_preserves_every_report() {
+        let total = WORKSPACE_REPORT_CHUNK_SIZE * 2 + 3;
+        let items: Vec<_> = (0..total).map(workspace_item).collect();
+        let expected = workspace_uris(&items);
+        let (first, progress) = split_workspace_items(Some(&token()), items);
+
+        assert_eq!(
+            first.len(),
+            WORKSPACE_REPORT_CHUNK_SIZE,
+            "first chunk is full"
+        );
+        assert_eq!(progress.len(), 2, "two streamed chunks for 2*N+3 items");
+
+        let mut seen = workspace_uris(&first);
+        for note in &progress {
+            let chunk = workspace_chunk_items(note);
+            assert!(
+                chunk.len() <= WORKSPACE_REPORT_CHUNK_SIZE,
+                "no chunk exceeds the chunk size"
+            );
+            seen.extend(workspace_uris(&chunk));
+        }
+        assert_eq!(seen, expected, "union of response + chunks == whole report");
+    }
+
+    #[test]
+    fn related_no_token_keeps_whole_map() {
+        let map = related_map(RELATED_REPORT_CHUNK_SIZE + 5);
+        let expected = map.len();
+        let (response, progress) = split_related(None, Some(map));
+        assert!(progress.is_empty());
+        assert_eq!(response.unwrap().len(), expected);
+    }
+
+    #[test]
+    fn related_none_stays_none() {
+        let (response, progress) = split_related(Some(&token()), None);
+        assert!(response.is_none());
+        assert!(progress.is_empty());
+    }
+
+    #[test]
+    fn related_single_chunk_emits_no_progress() {
+        let map = related_map(RELATED_REPORT_CHUNK_SIZE);
+        let (response, progress) = split_related(Some(&token()), Some(map));
+        assert_eq!(response.unwrap().len(), RELATED_REPORT_CHUNK_SIZE);
+        assert!(progress.is_empty());
+    }
+
+    #[test]
+    fn related_multi_chunk_preserves_every_entry() {
+        let total = RELATED_REPORT_CHUNK_SIZE * 2 + 3;
+        let map = related_map(total);
+        let expected: HashSet<String> = map.keys().map(|u| u.as_str().to_owned()).collect();
+        let (response, progress) = split_related(Some(&token()), Some(map));
+
+        let response = response.expect("first chunk rides in the response");
+        assert_eq!(
+            response.len(),
+            RELATED_REPORT_CHUNK_SIZE,
+            "first chunk is full"
+        );
+        assert_eq!(progress.len(), 2, "two streamed chunks for 2*N+3 entries");
+
+        let mut seen: HashSet<String> = response.keys().map(|u| u.as_str().to_owned()).collect();
+        for note in &progress {
+            let keys = related_chunk_keys(note);
+            assert!(
+                keys.len() <= RELATED_REPORT_CHUNK_SIZE,
+                "no chunk exceeds the size"
+            );
+            seen.extend(keys);
+        }
+        assert_eq!(seen, expected, "union of response + chunks == whole map");
+    }
 }

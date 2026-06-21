@@ -334,15 +334,25 @@ impl GlobalState {
             };
         }
 
-        // Answer a request inline on the main thread. Used by the pull
+        // Answer a request inline on the main thread, the handler returning a
+        // `Streamed { response, progress }`: the response is sent first, then
+        // each pre-built `$/progress` notification in order. Used by the pull
         // diagnostics handlers, which read `GlobalState`'s store directly (a
-        // cheap map lookup) rather than a pooled `StateSnapshot`.
-        macro_rules! inline {
+        // cheap map lookup) rather than a pooled `StateSnapshot`, and stream the
+        // remainder when the client supplies a `partialResultToken` (an absent
+        // token leaves `progress` empty, so the whole report rides in the
+        // response).
+        macro_rules! inline_streaming {
             ($R:ty, $handler:expr) => {
                 req = match req.extract::<<$R as r::Request>::Params>(<$R>::METHOD) {
                     Ok((id, params)) => {
-                        let result = $handler(self, params);
-                        return self.respond(Response::new_ok(id, result));
+                        let handlers::diagnostics::Streamed { response, progress } =
+                            $handler(self, params);
+                        self.respond(Response::new_ok(id, response));
+                        for note in progress {
+                            self.sender.send(lsp_server::Message::Notification(note));
+                        }
+                        return;
                     }
                     Err(ExtractError::MethodMismatch(req)) => req,
                     Err(ExtractError::JsonError { method, error }) => {
@@ -353,11 +363,11 @@ impl GlobalState {
             };
         }
 
-        inline!(
+        inline_streaming!(
             r::DocumentDiagnosticRequest,
             handlers::diagnostics::document_diagnostic
         );
-        inline!(
+        inline_streaming!(
             r::WorkspaceDiagnosticRequest,
             handlers::diagnostics::workspace_diagnostic
         );

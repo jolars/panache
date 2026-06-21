@@ -16,6 +16,28 @@ use super::global_state::{ClientSender, GlobalState};
 use super::{documents, handlers};
 use crate::salsa::Db;
 
+/// Decode the `value` of each streamed `$/progress` notification, asserting every
+/// one carries the `$/progress` method and the expected partial-result `token`.
+fn decode_progress<T: serde::de::DeserializeOwned>(
+    notifications: Vec<lsp_server::Notification>,
+    token: i32,
+) -> Vec<T> {
+    notifications
+        .into_iter()
+        .map(|note| {
+            assert_eq!(note.method, "$/progress", "expected a $/progress chunk");
+            let envelope: serde_json::Value = note.params;
+            assert_eq!(
+                envelope.get("token"),
+                Some(&serde_json::json!(token)),
+                "progress chunk carried the wrong token"
+            );
+            serde_json::from_value(envelope.get("value").expect("progress value").clone())
+                .expect("partial-result value deserializes")
+        })
+        .collect()
+}
+
 /// A synchronous, in-memory driver for the LSP handlers.
 pub struct LspTester {
     gs: GlobalState,
@@ -659,7 +681,34 @@ impl LspTester {
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
         };
-        handlers::diagnostics::document_diagnostic(&self.gs, params)
+        handlers::diagnostics::document_diagnostic(&self.gs, params).response
+    }
+
+    /// Pull `textDocument/diagnostic` with a `partialResultToken`. Returns the
+    /// response (first chunk) plus the deserialized `value` of each `$/progress`
+    /// notification the handler streamed, asserting each carries `$/progress` and
+    /// the matching token.
+    pub fn document_diagnostic_streaming(
+        &self,
+        uri: &str,
+        token: i32,
+        previous_result_id: Option<&str>,
+    ) -> (
+        DocumentDiagnosticReportResult,
+        Vec<DocumentDiagnosticReportPartialResult>,
+    ) {
+        let params = DocumentDiagnosticParams {
+            text_document: text_doc(uri),
+            identifier: None,
+            previous_result_id: previous_result_id.map(str::to_string),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams {
+                partial_result_token: Some(ProgressToken::Number(token)),
+            },
+        };
+        let streamed = handlers::diagnostics::document_diagnostic(&self.gs, params);
+        let progress = decode_progress(streamed.progress, token);
+        (streamed.response, progress)
     }
 
     /// Pull `workspace/diagnostic`, optionally with known `(uri, result_id)`
@@ -680,7 +729,37 @@ impl LspTester {
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
         };
-        handlers::diagnostics::workspace_diagnostic(&self.gs, params)
+        handlers::diagnostics::workspace_diagnostic(&self.gs, params).response
+    }
+
+    /// Pull `workspace/diagnostic` with a `partialResultToken`. Returns the
+    /// response (first chunk) plus the deserialized `value` of each `$/progress`
+    /// notification the handler streamed.
+    pub fn workspace_diagnostic_streaming(
+        &self,
+        token: i32,
+        previous_result_ids: Vec<(&str, &str)>,
+    ) -> (
+        WorkspaceDiagnosticReportResult,
+        Vec<WorkspaceDiagnosticReportPartialResult>,
+    ) {
+        let params = WorkspaceDiagnosticParams {
+            identifier: None,
+            previous_result_ids: previous_result_ids
+                .into_iter()
+                .map(|(uri, value)| PreviousResultId {
+                    uri: uri.parse().unwrap(),
+                    value: value.to_string(),
+                })
+                .collect(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams {
+                partial_result_token: Some(ProgressToken::Number(token)),
+            },
+        };
+        let streamed = handlers::diagnostics::workspace_diagnostic(&self.gs, params);
+        let progress = decode_progress(streamed.progress, token);
+        (streamed.response, progress)
     }
 
     /// Count `workspace/diagnostic/refresh` server→client requests since the last

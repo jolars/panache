@@ -365,3 +365,120 @@ fn document_pull_omits_related_documents_without_capability() {
         "related_documents must stay empty without related_document_support"
     );
 }
+
+// --- partial result streaming (`partialResultToken`) ---
+
+/// Every per-document report URI in a workspace result (full or unchanged).
+fn workspace_result_uris(
+    result: &WorkspaceDiagnosticReportResult,
+) -> std::collections::HashSet<String> {
+    let WorkspaceDiagnosticReportResult::Report(report) = result else {
+        panic!("expected a full workspace report");
+    };
+    report.items.iter().map(workspace_item_uri).collect()
+}
+
+fn workspace_item_uri(item: &WorkspaceDocumentDiagnosticReport) -> String {
+    match item {
+        WorkspaceDocumentDiagnosticReport::Full(full) => full.uri.as_str().to_owned(),
+        WorkspaceDocumentDiagnosticReport::Unchanged(unchanged) => {
+            unchanged.uri.as_str().to_owned()
+        }
+    }
+}
+
+/// A small workspace pulled with a `partialResultToken` fits in one chunk: the
+/// whole report rides in the response and no `$/progress` is streamed.
+#[test]
+fn workspace_streaming_single_chunk_emits_no_progress() {
+    let mut server = TestLspServer::new();
+    server.initialize_pull("file:///workspace");
+    let a = "file:///workspace/a.qmd";
+    let b = "file:///workspace/b.qmd";
+
+    server.open_document(a, "# H1\n\n### H3 skip\n", "quarto");
+    server.pump(Duration::from_secs(2));
+    server.open_document(b, "# H1\n\n## H2\n", "quarto");
+    server.pump(Duration::from_secs(2));
+
+    let (response, progress) = server.workspace_diagnostic_streaming(7, vec![]);
+    assert!(
+        progress.is_empty(),
+        "a workspace smaller than one chunk should stream no progress"
+    );
+    let uris = workspace_result_uris(&response);
+    assert!(uris.contains(a) && uris.contains(b));
+}
+
+/// A workspace larger than one chunk streams the remainder as `$/progress`: the
+/// union of the response and every chunk equals the whole (non-streaming) report.
+#[test]
+fn workspace_streaming_splits_large_report() {
+    let mut server = TestLspServer::new();
+    server.initialize_pull("file:///workspace");
+
+    // Just over `WORKSPACE_REPORT_CHUNK_SIZE` (64) so the report spans two chunks.
+    // Pump after each open so the settle lints the document before the next open's
+    // salsa write could cancel the in-flight pass (same pattern as the other
+    // workspace-pull tests).
+    let count = 66;
+    for i in 0..count {
+        let uri = format!("file:///workspace/doc{i}.qmd");
+        server.open_document(&uri, "# H1\n\n### H3 skip\n", "quarto");
+        server.pump(Duration::from_secs(2));
+    }
+
+    let whole = workspace_result_uris(&server.workspace_diagnostic(vec![]));
+    assert_eq!(
+        whole.len(),
+        count,
+        "every opened document should be reported"
+    );
+
+    let (response, progress) = server.workspace_diagnostic_streaming(11, vec![]);
+    assert!(
+        !progress.is_empty(),
+        "a {count}-document workspace should stream at least one progress chunk"
+    );
+
+    let mut streamed = workspace_result_uris(&response);
+    for chunk in &progress {
+        for item in &chunk.items {
+            assert!(
+                streamed.insert(workspace_item_uri(item)),
+                "no document should appear twice across response + chunks"
+            );
+        }
+    }
+    assert_eq!(
+        streamed, whole,
+        "union of response + progress chunks must equal the whole report"
+    );
+}
+
+/// A document whose related closure fits in one chunk streams no `$/progress`:
+/// `related_documents` rides whole in the response even with a token.
+#[test]
+fn document_streaming_single_related_chunk_emits_no_progress() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let mut server = TestLspServer::new();
+    server.initialize_pull(&Uri::from_file_path(root).unwrap().to_string());
+
+    let (dirty_uri, clean_uri) = open_cross_file_duplicate_project(&mut server, root);
+
+    let (response, progress) = server.document_diagnostic_streaming(&clean_uri, 3, None);
+    assert!(
+        progress.is_empty(),
+        "a single related document fits in one chunk; nothing to stream"
+    );
+    let dirty: Uri = dirty_uri.parse().unwrap();
+    assert!(
+        full_report(&response)
+            .related_documents
+            .as_ref()
+            .expect("related_documents present")
+            .contains_key(&dirty),
+        "the related document should ride in the response"
+    );
+}

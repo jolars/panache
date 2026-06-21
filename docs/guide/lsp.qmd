@@ -630,6 +630,14 @@ Pull
     `workspace/diagnostic` pull. Clients without that capability still receive the
     same cross-file diagnostics through the workspace pull.
 
+    A client that supplies a `partialResultToken` on either pull receives the report
+    incrementally: the response delivers the first chunk and the remainder streams
+    as `$/progress` notifications keyed by that token (`workspace/diagnostic` chunks
+    the per-document reports; `textDocument/diagnostic` chunks the
+    `relatedDocuments` map). Each report is keyed by its own URI, so the client
+    merges the response and chunks regardless of arrival order. Without a token the
+    whole report is returned in the response, unchanged.
+
 ### Hover Information
 
 Hover over elements to see contextual information (implementation varies by
@@ -808,41 +816,41 @@ Many spec methods target compiled-language tooling (call hierarchy, type
 definitions, and so on) and have no meaningful analogue for prose; those are
 marked *out of scope*.
 
-  | LSP method                                                                                                                  | Status | Notes                                               |
-  | --------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------- |
-  | `textDocument/didOpen`, `didChange`, `didSave`, `didClose`                                                                  | ✅     | Incremental sync                                    |
-  | `textDocument/formatting`                                                                                                   | ✅     | Honors `exclude` patterns                           |
-  | `textDocument/rangeFormatting`                                                                                              | ✅     | Bypasses excludes by design                         |
-  | `textDocument/definition`                                                                                                   | ✅     | Links, footnotes, citations, crossrefs, headings    |
-  | `textDocument/references`                                                                                                   | ✅     | Honors `includeDeclaration`                         |
-  | `textDocument/rename`, `prepareRename`                                                                                      | ✅     | Citations, refs, footnotes, crossrefs               |
-  | `textDocument/hover`                                                                                                        | ✅     | Footnotes, citations, section/equation previews     |
-  | `textDocument/completion`                                                                                                   | ✅     | Citations, crossrefs, file/shortcode paths          |
-  | `completionItem/resolve`                                                                                                    | ❌     | Planned: lazy completion detail                     |
-  | `textDocument/codeAction`                                                                                                   | ✅     | Lint fixes + list/footnote/link/heading conversions |
-  | `codeAction/resolve`                                                                                                        | ❌     | Planned: lazy edits + advertised action kinds       |
-  | `textDocument/documentSymbol`                                                                                               | ✅     | Headings, tables, figures, frontmatter              |
-  | `textDocument/foldingRange`                                                                                                 | ✅     | Headings, code, divs, HTML, frontmatter             |
-  | `textDocument/documentLink`, `documentLink/resolve`                                                                         | ✅     | Links, images, autolinks, includes                  |
-  | `textDocument/publishDiagnostics`                                                                                           | ✅     | Push model, debounced                               |
-  | `textDocument/diagnostic`, `workspace/diagnostic`                                                                           | ✅     | Pull model; push suppressed for pull clients        |
-  | `workspace/diagnostic/refresh`                                                                                              | ✅     | Nudge pull clients to re-pull on async updates      |
-  | `textDocument/documentHighlight`                                                                                            | ❌     | Planned: highlight occurrences under cursor         |
-  | `textDocument/selectionRange`                                                                                               | ❌     | Planned: structural smart-select                    |
-  | `textDocument/linkedEditingRange`                                                                                           | ✅     | Live co-editing; current document, identical text   |
-  | `textDocument/onTypeFormatting`                                                                                             | ❌     | Under consideration                                 |
-  | `textDocument/semanticTokens/full`                                                                                          | ✅     | Additive, flavor-gated; custom legend (see above)   |
-  | `textDocument/inlayHint`                                                                                                    | ❌     | Under consideration                                 |
-  | `workspace/symbol`                                                                                                          | ✅     | Heading search across the project                   |
-  | `workspace/willRenameFiles`                                                                                                 | ✅     | Links, shortcodes, frontmatter/config file paths    |
-  | `workspace/didChangeWatchedFiles`                                                                                           | ✅     | Bibliography, config, and document files            |
-  | `workspace/didCreateFiles`, `didRenameFiles`, `didDeleteFiles`                                                              | ✅     | Hygiene-only: refresh cross-document diagnostics    |
-  | `workspace/didChangeConfiguration`, `workspace/configuration`                                                               | ❌     | Planned: runtime config reload                      |
-  | `workspace/didChangeWorkspaceFolders`                                                                                       | ❌     | Advertised but not yet handled                      |
-  | `workspace/executeCommand`                                                                                                  | ❌     | Planned: commands backing complex actions           |
-  | `workspace/willCreateFiles`, `willDeleteFiles`                                                                              | ⛔     | Intentionally omitted: no scaffolding/auto-deletion |
-  | `willSave`, `willSaveWaitUntil`                                                                                             | ❌     | Format-on-save runs client-side instead             |
-  | Call/type hierarchy, `implementation`, `typeDefinition`, `declaration`, `inlineValue`, `moniker`, document color, code lens | ⛔     | Out of scope for prose                              |
+  | LSP method                                                                                                                  | Status | Notes                                                       |
+  | --------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------- |
+  | `textDocument/didOpen`, `didChange`, `didSave`, `didClose`                                                                  | ✅     | Incremental sync                                            |
+  | `textDocument/formatting`                                                                                                   | ✅     | Honors `exclude` patterns                                   |
+  | `textDocument/rangeFormatting`                                                                                              | ✅     | Bypasses excludes by design                                 |
+  | `textDocument/definition`                                                                                                   | ✅     | Links, footnotes, citations, crossrefs, headings            |
+  | `textDocument/references`                                                                                                   | ✅     | Honors `includeDeclaration`                                 |
+  | `textDocument/rename`, `prepareRename`                                                                                      | ✅     | Citations, refs, footnotes, crossrefs                       |
+  | `textDocument/hover`                                                                                                        | ✅     | Footnotes, citations, section/equation previews             |
+  | `textDocument/completion`                                                                                                   | ✅     | Citations, crossrefs, file/shortcode paths                  |
+  | `completionItem/resolve`                                                                                                    | ❌     | Planned: lazy completion detail                             |
+  | `textDocument/codeAction`                                                                                                   | ✅     | Lint fixes + list/footnote/link/heading conversions         |
+  | `codeAction/resolve`                                                                                                        | ❌     | Planned: lazy edits + advertised action kinds               |
+  | `textDocument/documentSymbol`                                                                                               | ✅     | Headings, tables, figures, frontmatter                      |
+  | `textDocument/foldingRange`                                                                                                 | ✅     | Headings, code, divs, HTML, frontmatter                     |
+  | `textDocument/documentLink`, `documentLink/resolve`                                                                         | ✅     | Links, images, autolinks, includes                          |
+  | `textDocument/publishDiagnostics`                                                                                           | ✅     | Push model, debounced                                       |
+  | `textDocument/diagnostic`, `workspace/diagnostic`                                                                           | ✅     | Pull model; push suppressed; `partialResultToken` streaming |
+  | `workspace/diagnostic/refresh`                                                                                              | ✅     | Nudge pull clients to re-pull on async updates              |
+  | `textDocument/documentHighlight`                                                                                            | ❌     | Planned: highlight occurrences under cursor                 |
+  | `textDocument/selectionRange`                                                                                               | ❌     | Planned: structural smart-select                            |
+  | `textDocument/linkedEditingRange`                                                                                           | ✅     | Live co-editing; current document, identical text           |
+  | `textDocument/onTypeFormatting`                                                                                             | ❌     | Under consideration                                         |
+  | `textDocument/semanticTokens/full`                                                                                          | ✅     | Additive, flavor-gated; custom legend (see above)           |
+  | `textDocument/inlayHint`                                                                                                    | ❌     | Under consideration                                         |
+  | `workspace/symbol`                                                                                                          | ✅     | Heading search across the project                           |
+  | `workspace/willRenameFiles`                                                                                                 | ✅     | Links, shortcodes, frontmatter/config file paths            |
+  | `workspace/didChangeWatchedFiles`                                                                                           | ✅     | Bibliography, config, and document files                    |
+  | `workspace/didCreateFiles`, `didRenameFiles`, `didDeleteFiles`                                                              | ✅     | Hygiene-only: refresh cross-document diagnostics            |
+  | `workspace/didChangeConfiguration`, `workspace/configuration`                                                               | ❌     | Planned: runtime config reload                              |
+  | `workspace/didChangeWorkspaceFolders`                                                                                       | ❌     | Advertised but not yet handled                              |
+  | `workspace/executeCommand`                                                                                                  | ❌     | Planned: commands backing complex actions                   |
+  | `workspace/willCreateFiles`, `willDeleteFiles`                                                                              | ⛔     | Intentionally omitted: no scaffolding/auto-deletion         |
+  | `willSave`, `willSaveWaitUntil`                                                                                             | ❌     | Format-on-save runs client-side instead                     |
+  | Call/type hierarchy, `implementation`, `typeDefinition`, `declaration`, `inlineValue`, `moniker`, document color, code lens | ⛔     | Out of scope for prose                                      |
 
 ## Troubleshooting
 
