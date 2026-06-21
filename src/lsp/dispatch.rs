@@ -90,6 +90,9 @@ pub(crate) fn server_capabilities() -> ServerCapabilities {
                 work_done_progress: None,
             },
         })),
+        // Live, type-to-rename of a symbol and its linked occurrences within the
+        // current document (LSP 3.17). See `handlers::linked_editing_range`.
+        linked_editing_range_provider: Some(LinkedEditingRangeServerCapabilities::Simple(true)),
         // Pull diagnostics (LSP 3.17). Advertising is harmless for push-only
         // clients (they ignore it); the server only switches off push for
         // clients that advertise pull support (see `on_initialize`).
@@ -407,6 +410,10 @@ impl GlobalState {
             handlers::prepare_rename::prepare_rename
         );
         pool!(r::References, handlers::references::references);
+        pool!(
+            r::LinkedEditingRange,
+            handlers::linked_editing_range::linked_editing_range
+        );
         pool!(
             r::WorkspaceSymbolRequest,
             handlers::workspace_symbols::workspace_symbol

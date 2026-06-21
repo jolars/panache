@@ -28,6 +28,7 @@ mod lsp {
     pub(super) mod test_hover;
     pub(super) mod test_incremental_edits;
     pub(super) mod test_link_conversion;
+    pub(super) mod test_linked_editing_range;
     pub(super) mod test_navigation;
     pub(super) mod test_on_type_formatting;
     pub(super) mod test_prepare_rename;

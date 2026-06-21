@@ -14,6 +14,7 @@ pub(crate) mod goto_definition;
 pub(crate) mod heading_link_conversion;
 pub(crate) mod hover;
 pub(crate) mod link_conversion;
+pub(crate) mod linked_editing_range;
 pub(crate) mod list_conversion;
 pub(crate) mod prepare_rename;
 pub(crate) mod references;

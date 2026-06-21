@@ -141,6 +141,18 @@ Symbol renaming
     - Footnote labels
     - Quarto crossref labels (including executable chunk `label` options)
 
+Linked editing
+
+:   Edit a symbol and its linked occurrences in the current document together as
+    you type (`textDocument/linkedEditingRange`). Editors that support it (e.g.
+    VS Code's "Editor: Linked Editing") update every linked span live, without
+    invoking a rename.
+
+    - Reference labels and their definitions (`[text][label]` ↔ `[label]: …`)
+    - Footnote labels (`[^id]` ↔ `[^id]: …`)
+    - Citation keys, Quarto crossrefs, and chunk labels
+    - Heading ids and the explicit links that point at them
+
 File rename
 :   Update links, shortcode paths, and frontmatter/config file paths pointing at
     a renamed file (`workspace/willRenameFiles`)
@@ -655,6 +667,20 @@ Smart completions for Markdown syntax (implementation varies by context):
 Rename references and their definitions together. Place cursor on a reference
 label or definition and trigger rename (F2 in many editors).
 
+### Linked Editing
+
+Edit a symbol and its linked occurrences in the current document at the same
+time (`textDocument/linkedEditingRange`). When your cursor enters a reference
+label, footnote id, citation key, crossref, chunk label, or heading id, a
+supporting editor highlights every linked span and applies your keystrokes to
+all of them live---a lightweight, in-document alternative to a full rename.
+Linked editing is intra-document only (by protocol) and only links spans whose
+source text is identical, so differently cased or spaced occurrences are left
+untouched.
+
+Enable it in VS Code with the "Editor: Linked Editing" setting; in Neovim, call
+`vim.lsp.linked_editing.enable()` (or use a plugin that drives the request).
+
 ### Find References
 
 Find all references to the symbol under cursor (`textDocument/references`),
@@ -803,7 +829,7 @@ marked *out of scope*.
   | `workspace/diagnostic/refresh`                                                                                              | ✅     | Nudge pull clients to re-pull on async updates      |
   | `textDocument/documentHighlight`                                                                                            | ❌     | Planned: highlight occurrences under cursor         |
   | `textDocument/selectionRange`                                                                                               | ❌     | Planned: structural smart-select                    |
-  | `textDocument/linkedEditingRange`                                                                                           | ❌     | Planned: live label/definition co-editing           |
+  | `textDocument/linkedEditingRange`                                                                                           | ✅     | Live co-editing; current document, identical text   |
   | `textDocument/onTypeFormatting`                                                                                             | ❌     | Under consideration                                 |
   | `textDocument/semanticTokens/full`                                                                                          | ✅     | Additive, flavor-gated; custom legend (see above)   |
   | `textDocument/inlayHint`                                                                                                    | ❌     | Under consideration                                 |

@@ -91,7 +91,7 @@ spec-coverage audit (see `docs/guide/lsp.qmd` "LSP Specification Coverage").
   reference/citation/footnote/heading under the cursor
 - [ ] `textDocument/selectionRange` - structural smart-select expansion (word →
   inline → block → section)
-- [ ] `textDocument/linkedEditingRange` - edit a reference label and its
+- [x] `textDocument/linkedEditingRange` - edit a reference label and its
   definition simultaneously
 - [ ] `completionItem/resolve` - defer expensive completion detail (e.g.
   citation previews) until an item is focused
