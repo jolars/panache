@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.18.0](https://github.com/jolars/panache/compare/panache-parser-v0.17.2...panache-parser-v0.18.0) (2026-06-21)
+
+### Features
+- **parser:** retag comment/PI/verbatim as `HTML_BLOCK_RAW` ([`447d537`](https://github.com/jolars/panache/commit/447d537dcbd6bdff6f55d95cb04b17cd9fd17574))
+- **parser:** tokenize table separator rows in the CST ([`3de91a6`](https://github.com/jolars/panache/commit/3de91a623762282b07ede9d249cf3872a5634a5f))
+
+### Bug Fixes
+- **parser:** stop caption theft across simple/multiline tables ([`89610d4`](https://github.com/jolars/panache/commit/89610d4c8230f4894bfe8552322403c54a7ed120))
+- **parser:** skip code spans in citation detection ([`859a3db`](https://github.com/jolars/panache/commit/859a3dbbbb6a37b190c87187d85ab790e397f539))
+- **parser:** detect setext heading level via underline node ([`ff43f66`](https://github.com/jolars/panache/commit/ff43f664bdb80af8b1452c286650609a250d865e)), closes [#377](https://github.com/jolars/panache/issues/377)
+
+### Performance Improvements
+- **parser:** replay table subtree instead of re-parsing ([`4a050dc`](https://github.com/jolars/panache/commit/4a050dccd45954b9b79ef0245dd82785988e976a))
+- **parser:** use `memchr` for refdef newline scan ([`0e64ba7`](https://github.com/jolars/panache/commit/0e64ba700a3a2afbda06ae8755ab41e81cc0f171))
+
 ## [0.17.2](https://github.com/jolars/panache/compare/panache-parser-v0.17.1...panache-parser-v0.17.2) (2026-06-17)
 
 ### Bug Fixes

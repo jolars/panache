@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.0](https://github.com/jolars/panache/compare/panache-formatter-v0.14.0...panache-formatter-v0.15.0) (2026-06-21)
+
+### Features
+- **lsp:** on-type continuation indent for lists ([`3c9bc3a`](https://github.com/jolars/panache/commit/3c9bc3a827ee9dd0aad8b3dc63fc3f3e0263d41b))
+- **parser:** retag comment/PI/verbatim as `HTML_BLOCK_RAW` ([`447d537`](https://github.com/jolars/panache/commit/447d537dcbd6bdff6f55d95cb04b17cd9fd17574))
+- **parser:** tokenize table separator rows in the CST ([`3de91a6`](https://github.com/jolars/panache/commit/3de91a623762282b07ede9d249cf3872a5634a5f))
+
+### Bug Fixes
+- **formatter:** keep indent on YAML value below its key ([`52d578a`](https://github.com/jolars/panache/commit/52d578a34e5b53b37e94e34a5effd979e2424c03))
+
+### Dependencies
+- updated crates/panache-parser to v0.18.0
+
 ## [0.14.0](https://github.com/jolars/panache/compare/panache-formatter-v0.13.0...panache-formatter-v0.14.0) (2026-06-17)
 
 ### Features

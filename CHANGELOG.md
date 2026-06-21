@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.57.0](https://github.com/jolars/panache/compare/v2.56.0...v2.57.0) (2026-06-21)
+
+### Features
+- **lsp:** on-type continuation indent for lists ([`3c9bc3a`](https://github.com/jolars/panache/commit/3c9bc3a827ee9dd0aad8b3dc63fc3f3e0263d41b))
+- **linter:** make rule metadata the source of truth ([`f0c1c74`](https://github.com/jolars/panache/commit/f0c1c74daaf3e7999919d975c2dfabac9f94bcfc))
+- **lsp:** add did-create/rename/delete file operations ([`e1b1648`](https://github.com/jolars/panache/commit/e1b164885e0676913e52fb621f266acf3146ebb7))
+- **lsp:** extend file rename to more shortcodes and frontmatter ([`255978e`](https://github.com/jolars/panache/commit/255978ecdba458214502f3f6c37803b0db58e82b))
+- **lsp:** add `semanticTokens/full` highlighting ([`0c7d247`](https://github.com/jolars/panache/commit/0c7d2474ab7d3e0984701de5cdd2b4c213450cf8))
+- **lsp:** populate diagnostic `related_documents` ([`33b743d`](https://github.com/jolars/panache/commit/33b743d9eb8db5b8e03955512e2c31461ef812c3))
+- **lsp:** add pull diagnostics with push mode-switch ([`822a2ed`](https://github.com/jolars/panache/commit/822a2ed2c0aabc3e67a4f49b76e731dd2e2f8693))
+- **parser:** retag comment/PI/verbatim as `HTML_BLOCK_RAW` ([`447d537`](https://github.com/jolars/panache/commit/447d537dcbd6bdff6f55d95cb04b17cd9fd17574))
+- **parser:** tokenize table separator rows in the CST ([`3de91a6`](https://github.com/jolars/panache/commit/3de91a623762282b07ede9d249cf3872a5634a5f))
+
+### Bug Fixes
+- **parser:** stop caption theft across simple/multiline tables ([`89610d4`](https://github.com/jolars/panache/commit/89610d4c8230f4894bfe8552322403c54a7ed120))
+- **linter:** dedup citation keys before reporting ([`8ce3a15`](https://github.com/jolars/panache/commit/8ce3a15ba1cb8fb6ee866d6878c9588bf37efaba))
+- **lsp:** stop losing diagnostics to lint cancellation races ([`f72fd78`](https://github.com/jolars/panache/commit/f72fd78a6335e17c2db540435e12ebafb9c7ece1))
+- **parser:** detect setext heading level via underline node ([`ff43f66`](https://github.com/jolars/panache/commit/ff43f664bdb80af8b1452c286650609a250d865e)), closes [#377](https://github.com/jolars/panache/issues/377)
+- **formatter:** keep indent on YAML value below its key ([`52d578a`](https://github.com/jolars/panache/commit/52d578a34e5b53b37e94e34a5effd979e2424c03))
+- **parser:** skip code spans in citation detection ([`859a3db`](https://github.com/jolars/panache/commit/859a3dbbbb6a37b190c87187d85ab790e397f539))
+
+### Performance Improvements
+- **parser:** replay table subtree instead of re-parsing ([`4a050dc`](https://github.com/jolars/panache/commit/4a050dccd45954b9b79ef0245dd82785988e976a))
+- **parser:** use `memchr` for refdef newline scan ([`0e64ba7`](https://github.com/jolars/panache/commit/0e64ba700a3a2afbda06ae8755ab41e81cc0f171))
+- **salsa:** raise lint-query lru to 512 ([`4f1615f`](https://github.com/jolars/panache/commit/4f1615fc6824a46063e874eb73e67ae97642ca7c))
+
+### Dependencies
+- updated crates/panache-formatter to v0.15.0
+- updated crates/panache-parser to v0.18.0
+
 ## [2.56.0](https://github.com/jolars/panache/compare/v2.55.0...v2.56.0) (2026-06-17)
 
 ### Features
