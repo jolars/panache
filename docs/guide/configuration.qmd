@@ -952,8 +952,8 @@ quarto-shortcodes = true
     Quarto flavor)
 
 `quarto-shortcodes`
-:   Quarto shortcodes `{{< name args >}}` (default: disabled, enabled for Quarto
-    flavor)
+:   Quarto shortcodes `{{{< name args >}}}` (default: disabled, enabled for
+    Quarto flavor)
 
 ### Bookdown Extensions
 

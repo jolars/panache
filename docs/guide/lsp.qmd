@@ -56,7 +56,7 @@ Workspace symbols
     (`workspace/symbol`)
 
 Document links
-:   Clickable links, images, autolinks, and `{{< include >}}` shortcode paths
+:   Clickable links, images, autolinks, and `{{{< include >}}}` shortcode paths
     (`textDocument/documentLink`, `documentLink/resolve`)
 
 Code folding
@@ -671,7 +671,7 @@ The LSP exposes clickable links so editors can ctrl/cmd-click to follow them
 - Inline links and images (`[text](url)`, `![alt](path)`)
 - Reference links and images (resolved to their `[ref]: url` definition)
 - Autolinks (`<https://example.com>`)
-- `{{< include path >}}` shortcode paths
+- `{{{< include path >}}}` shortcode paths
 
 ### File Rename
 
@@ -681,9 +681,9 @@ edit that rewrites references pointing at the old path
 server rewrites:
 
 - Inline and reference links and images (`[text](path)`, `![alt](path)`)
-- Path-bearing Quarto shortcodes: `{{< include >}}`, `{{< embed >}}`,
-  `{{< video >}}`, `{{< placeholder >}}` (fragments like `notebook.ipynb#cell`
-  are preserved; external URLs are left untouched)
+- Path-bearing Quarto shortcodes: `{{{< include >}}}`, `{{{< embed >}}}`,
+  `{{{< video >}}}`, `{{{< placeholder >}}}` (fragments like
+  `notebook.ipynb#cell` are preserved; external URLs are left untouched)
 - Document frontmatter file paths: `bibliography`, `csl`, and `css` (scalar or
   block-list values)
 - `_quarto.yml` config paths: `bibliography`, navbar `href`, and book `part`
@@ -717,7 +717,7 @@ those grammars get wrong, layering on top of the base highlighting:
 
 - Citation keys (`@key`, `[@key]`)
 - Cross-reference keys (`@fig-1`, `\@ref(...)` --- Quarto/RMarkdown only)
-- Quarto shortcodes (`{{< name args >}}`)
+- Quarto shortcodes (`{{{< name args >}}}`)
 - Fenced-div info strings (`{.callout-note}`)
 - Math delimiters (`$`, `$$`)
 - Footnote references (`[^id]`)
