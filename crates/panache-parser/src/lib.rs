@@ -22,6 +22,7 @@
 //! - [`syntax`]: Typed syntax wrappers and syntax kinds.
 //! - [`parser`]: Lower-level parser modules and incremental helpers.
 //!
+pub mod grid_layout;
 mod options;
 pub mod pandoc_ast;
 pub mod parser;
@@ -33,6 +34,7 @@ pub mod syntax;
 /// the single source of truth for HTML entity data.
 pub use entities;
 
+pub use grid_layout::{GridCellRect, GridLayout, analyze_grid};
 pub use options::Dialect;
 pub use options::Extensions;
 pub use options::Flavor;

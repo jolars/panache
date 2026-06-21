@@ -411,13 +411,14 @@ intentionally excluded.
 ### Tables
 
 - [x] Grid tables
-  - [ ] Row-spanning grids (a `|` content row containing `+`, e.g.
-    `grid_table_planets`) still use the older
-    `format_spanning_grid_table_raw` passthrough, which re-pads but carries
-    data-specific hacks (`col_count == 12` alignment guesses for the planets
-    fixture) rather than modeling the rowspan structure. Fold this into the
-    same span-aware engine so the special-cases go away; coordinate the
-    colspan + rowspan geometry in one layout pass.
+  - [x] Row-spanning grids now go through one unified span-aware engine
+    (`format_unified_spanning_grid_table`) shared with the colspan path. The
+    `col_count == 12` planets hacks and the numeric/`idx == 0` alignment
+    guessing are gone: alignment is read from the source separator colons,
+    and cell geometry comes from the shared `panache_parser::analyze_grid`
+    pass (also used by the pandoc-native projector). The engine preserves
+    the source marker skeleton and recomputes widths/padding/dash-runs, so
+    colspan and rowspan geometry are coordinated in one layout pass.
 
 ## Parser
 

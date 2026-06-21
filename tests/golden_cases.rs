@@ -311,6 +311,8 @@ golden_test_cases!(
     grid_table_nordics,
     grid_table_reflow,
     grid_table_planets,
+    grid_table_rowspan_aligned,
+    grid_table_rowspan_colspan_2d,
     latex_environment,
     lazy_continuation_deep,
     leading_blanklines,

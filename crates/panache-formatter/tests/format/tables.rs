@@ -277,10 +277,27 @@ fn test_grid_table_with_spanning_style_rows_stays_idempotent() {
 
 #[test]
 fn test_grid_table_with_spanning_style_caption_before_normalizes_after() {
+    // Headerless, no alignment colons: the unified span-aware engine reads
+    // alignment from the source (none -> left) instead of inventing a centered
+    // column 0, and preserves the source border widths. The rowspan cell text
+    // sitting on a sub-row separator (`| Temperature +---+---+`) is preserved.
     let input = ": My caption\n\n+-------------+-------+----------+\n|             | min   | -89.2 °C |\n| Temperature +-------+----------+\n| 1961-1990   | mean  | 14 °C    |\n|             +-------+----------+\n|             | min   | 56.7 °C  |\n+-------------+-------+----------+\n";
-    let expected = "+-------------+-------+----------+\n|             | min   | -89.2 °C |\n| Temperature +-------+----------+\n|  1961-1990  | mean  | 14 °C    |\n|             +-------+----------+\n|             | min   | 56.7 °C  |\n+-------------+-------+----------+\n\n: My caption\n";
+    let expected = "+-------------+-------+----------+\n|             | min   | -89.2 °C |\n| Temperature +-------+----------+\n| 1961-1990   | mean  | 14 °C    |\n|             +-------+----------+\n|             | min   | 56.7 °C  |\n+-------------+-------+----------+\n\n: My caption\n";
     let result = format(input, None, None);
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_grid_table_rowspan_reads_alignment_from_colons() {
+    // A rowspan cell (`group/spans/rows` in column 0) with a numeric column
+    // whose alignment is right per the separator colons (`=======:`). The
+    // unified engine reads alignment from the source, not by guessing from the
+    // numeric content, so the values are right-aligned and column 0 centered.
+    let input = "+--------+--------+\n| Name   | Value  |\n+:======:+=======:+\n| group  | 1.5    |\n| spans  +--------+\n| rows   | 22.0   |\n+--------+--------+\n";
+    let expected = "+--------+--------+\n|  Name  |  Value |\n+:======:+=======:+\n| group  |    1.5 |\n| spans  +--------+\n|  rows  |   22.0 |\n+--------+--------+\n";
+    let result = format(input, None, None);
+    assert_eq!(result, expected);
+    assert_eq!(format(&result, None, None), result, "must be idempotent");
 }
 
 #[test]
@@ -484,17 +501,21 @@ fn test_simple_table_honors_table_indent() {
 #[test]
 fn test_grid_colspan_preserves_all_cells_and_reflows() {
     // A header cell spanning both body columns must keep its span and the body
-    // cells must not be truncated/padded away. See #359.
+    // cells must not be truncated/padded away. Column widths floor to the source
+    // border widths (col 1's `:===:` interior 3 is kept, not shrunk). See #359,
+    // #323.
     let input = "+---------+\n|a        |\n+:=:+:===:+\n| aa|  ab |\n+---+-----+\n";
-    let expected = "+---------+\n|    a    |\n+:==:+:==:+\n| aa | ab |\n+----+----+\n";
+    let expected = "+----------+\n|    a     |\n+:==:+:===:+\n| aa | ab  |\n+----+-----+\n";
     assert_eq!(format(input, None, None), expected);
 }
 
 #[test]
 fn test_grid_colspan_headerless_span_top_separator_alignment() {
+    // The wide second column (`----------`, interior 10) is preserved, not shrunk
+    // to the content width.
     let input =
         "+:-----------:+\n|           a |\n+--+----------+\n|aa|ab        |\n+--+----------+\n";
-    let expected = "+:-------:+\n|    a    |\n+----+----+\n| aa | ab |\n+----+----+\n";
+    let expected = "+:-------------:+\n|       a       |\n+----+----------+\n| aa |    ab    |\n+----+----------+\n";
     assert_eq!(format(input, None, None), expected);
 }
 

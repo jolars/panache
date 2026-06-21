@@ -2942,58 +2942,12 @@ fn grid_table(node: &SyntaxNode) -> Option<TableData> {
         return None;
     }
 
-    // Pad lines into a 2D char grid.
-    let max_width = tagged
-        .iter()
-        .map(|(_, l)| l.chars().count())
-        .max()
-        .unwrap_or(0);
-    let grid: Vec<Vec<char>> = tagged
-        .iter()
-        .map(|(_, l)| {
-            let mut chars: Vec<char> = l.chars().collect();
-            chars.resize(max_width, ' ');
-            chars
-        })
-        .collect();
-    let nlines = grid.len();
-
-    // A line is "sep-style" if it contains at least one `+` and no chars
-    // outside `+`/`-`/`=`/`:`/`|`/` `. Partial separators (lines mixing
-    // `|` and `+`) qualify; content lines do not.
-    let is_sep_line: Vec<bool> = grid
-        .iter()
-        .map(|row| {
-            row.contains(&'+')
-                && row
-                    .iter()
-                    .all(|&c| matches!(c, '+' | '-' | '=' | ':' | '|' | ' '))
-        })
-        .collect();
-
-    // Canonical column boundaries: union of `+` columns across all sep-style lines.
-    let mut col_set: std::collections::BTreeSet<usize> = std::collections::BTreeSet::new();
-    for (i, row) in grid.iter().enumerate() {
-        if !is_sep_line[i] {
-            continue;
-        }
-        for (j, &c) in row.iter().enumerate() {
-            if c == '+' {
-                col_set.insert(j);
-            }
-        }
-    }
-    let cols_pos: Vec<usize> = col_set.into_iter().collect();
-    if cols_pos.len() < 2 {
-        return None;
-    }
-    let ncols = cols_pos.len() - 1;
-
-    // Canonical row boundaries: line indices of sep-style lines.
-    let row_seps: Vec<usize> = (0..nlines).filter(|&i| is_sep_line[i]).collect();
-    if row_seps.len() < 2 {
-        return None;
-    }
+    // Recover the canonical column/row grid and cell tiling via the shared
+    // 2D geometry pass (also used by the formatter's spanning-grid engine).
+    let lines: Vec<&str> = tagged.iter().map(|(_, l)| l.as_str()).collect();
+    let layout = crate::grid_layout::analyze_grid(&lines)?;
+    let row_seps = &layout.row_seps;
+    let ncols = layout.cols_pos.len() - 1;
     let nrows = row_seps.len() - 1;
 
     // Block kind per row block: head if any non-sep line in the block came
@@ -3011,55 +2965,25 @@ fn grid_table(node: &SyntaxNode) -> Option<TableData> {
         }
     }
 
-    // Detect cells.
-    let mut occupied = vec![vec![false; ncols]; nrows];
-    // (start_row, start_col, row_span, col_span, content_text)
-    let mut cells: Vec<(usize, usize, u32, u32, String)> = Vec::new();
-    for sr in 0..nrows {
-        for sc in 0..ncols {
-            if occupied[sr][sc] {
-                continue;
-            }
-            let i = row_seps[sr];
-            let j = cols_pos[sc];
-            if grid[i][j] != '+' {
-                // No corner here — the canonical column is missing on this
-                // sep line, meaning the cell that owns this position must
-                // have been emitted earlier and `occupied` should already be
-                // set. If not, the table is malformed; skip.
-                continue;
-            }
-            let Some((er, ec, content)) = find_grid_cell(&grid, i, j, sr, sc, &cols_pos, &row_seps)
-            else {
-                continue;
-            };
-            let row_span = (er - sr) as u32;
-            let col_span = (ec - sc) as u32;
-            for r in sr..er {
-                for c in sc..ec {
-                    occupied[r][c] = true;
-                }
-            }
-            cells.push((sr, sc, row_span, col_span, content));
-        }
-    }
-
     // Group cells by row block and convert to GridCells. Within each block,
     // emit cells in canonical column order.
     let mut head_rows: Vec<Vec<GridCell>> = Vec::new();
     let mut body_rows: Vec<Vec<GridCell>> = Vec::new();
     let mut foot_rows: Vec<Vec<GridCell>> = Vec::new();
     for r in 0..nrows {
-        let mut row_cells: Vec<&(usize, usize, u32, u32, String)> =
-            cells.iter().filter(|(sr, _, _, _, _)| *sr == r).collect();
-        row_cells.sort_by_key(|(_, sc, _, _, _)| *sc);
+        let mut row_cells: Vec<&crate::grid_layout::GridCellRect> = layout
+            .cells
+            .iter()
+            .filter(|cell| cell.start_row == r)
+            .collect();
+        row_cells.sort_by_key(|cell| cell.start_col);
         let row: Vec<GridCell> = row_cells
             .into_iter()
-            .map(|(_, _, rs, cs, text)| {
-                let blocks = parse_grid_cell_text(text);
+            .map(|cell| {
+                let blocks = parse_grid_cell_text(&cell.content);
                 GridCell {
-                    row_span: *rs,
-                    col_span: *cs,
+                    row_span: cell.row_span as u32,
+                    col_span: cell.col_span as u32,
                     blocks,
                 }
             })
@@ -3101,92 +3025,6 @@ fn grid_table(node: &SyntaxNode) -> Option<TableData> {
         body_rows,
         foot_rows,
     })
-}
-
-/// Find the smallest valid grid-table cell with its top-left `+` at
-/// `(i, j)` in the char grid, where `(sr, sc)` are the canonical row /
-/// column indices of that corner.
-///
-/// Returns `(end_row_idx, end_col_idx, content_text)` where the cell
-/// occupies canonical rows `sr..end_row_idx` and canonical columns
-/// `sc..end_col_idx`. Content is the text inside the cell, with one
-/// leading-space pad stripped per line and trailing whitespace trimmed,
-/// joined with `\n`.
-#[allow(clippy::needless_range_loop)]
-fn find_grid_cell(
-    grid: &[Vec<char>],
-    i: usize,
-    j: usize,
-    sr: usize,
-    sc: usize,
-    cols_pos: &[usize],
-    row_seps: &[usize],
-) -> Option<(usize, usize, String)> {
-    let nrows = row_seps.len() - 1;
-    let ncols = cols_pos.len() - 1;
-
-    for ec in (sc + 1)..=ncols {
-        let k = cols_pos[ec];
-        // Top edge (i, j+1..k) must be all sep chars (intermediate `+`s OK).
-        let top_ok = (j + 1..k).all(|c| matches!(grid[i][c], '-' | '=' | ':' | '+'));
-        if !top_ok {
-            // Hit a `|` or ` `; can't extend further right.
-            break;
-        }
-        for er in (sr + 1)..=nrows {
-            let l = row_seps[er];
-            // Left edge col j from i+1..l: chars in {|, +}.
-            let left_ok = (i + 1..l).all(|r| matches!(grid[r][j], '|' | '+'));
-            if !left_ok {
-                break;
-            }
-            // Right edge col k from i+1..l: chars in {|, +}.
-            let right_ok = (i + 1..l).all(|r| matches!(grid[r][k], '|' | '+'));
-            if !right_ok {
-                continue;
-            }
-            // Bottom edge (l, j+1..k): chars in {-, =, :, +}.
-            let bot_ok = (j + 1..k).all(|c| matches!(grid[l][c], '-' | '=' | ':' | '+'));
-            if !bot_ok {
-                continue;
-            }
-            if grid[l][j] != '+' || grid[l][k] != '+' {
-                continue;
-            }
-            // No interior partial separator that fully spans this cell.
-            // A line m strictly between i and l splits the cell if it has
-            // `+` at both col j and col k AND all chars between are sep
-            // chars (i.e., the partial sep extends across the whole cell
-            // horizontally).
-            let interior_split = (i + 1..l).any(|m| {
-                grid[m][j] == '+'
-                    && grid[m][k] == '+'
-                    && (j + 1..k).all(|c| matches!(grid[m][c], '-' | '=' | ':' | '+'))
-            });
-            if interior_split {
-                continue;
-            }
-
-            // Extract content text. For each interior line, take chars
-            // [j+1..k], strip one leading space (cell padding), trim
-            // trailing whitespace.
-            let mut content_lines: Vec<String> = Vec::new();
-            for r in (i + 1)..l {
-                let slice: String = grid[r][j + 1..k].iter().collect();
-                let stripped = slice.strip_prefix(' ').unwrap_or(&slice).to_string();
-                content_lines.push(stripped.trim_end().to_string());
-            }
-            // Drop leading/trailing empty lines.
-            let first = content_lines.iter().position(|s| !s.is_empty());
-            let last = content_lines.iter().rposition(|s| !s.is_empty());
-            let content = match (first, last) {
-                (Some(f), Some(l)) => content_lines[f..=l].join("\n"),
-                _ => String::new(),
-            };
-            return Some((er, ec, content));
-        }
-    }
-    None
 }
 
 /// Parse a grid-table cell's extracted text as block-level markdown via

@@ -696,9 +696,9 @@ Output
 A grid table cell may span several columns by omitting the interior `|`/`+`
 markers at the boundaries it crosses (a Pandoc colspan). Such cells are
 **preserved**: every spanned column is kept and the spanning cell is re-laid out
-across them, so no content is dropped. Here the columns are sized to fit their
-content (rather than held at the source border widths), and the spanning header
-keeps its span:
+across them, so no content is dropped. As with all grid tables the source border
+widths are preserved (only grown to fit content), and the spanning header keeps
+its span:
 
 Input
 
@@ -713,16 +713,49 @@ Input
 Output
 
 :   ```markdown
-    +---------+
-    |    a    |
-    +:==:+:==:+
-    | aa | ab |
-    +----+----+
+    +----------+
+    |    a     |
+    +:==:+:===:+
+    | aa | ab  |
+    +----+-----+
     ```
 
 If a row's `|` markers don't line up with any column boundary the separators
 define, the table can't be placed on a single grid; it is then left untouched so
 nothing is lost.
+
+#### Row-spanning cells
+
+A cell may span several rows: a content row carries an interior `+---+`
+separator that closes the neighboring cells while the spanning cell continues
+past it. Row spans and column spans are laid out together in a single pass.
+Column **alignment is taken from the separator colons** (`:---`, `---:`,
+`:--:`), never guessed from the cell contents, and the source border widths are
+preserved:
+
+Input
+
+:   ```markdown
+    +--------+--------+
+    | Name   | Value  |
+    +:======:+=======:+
+    | group  | 1.5    |
+    | spans  +--------+
+    | rows   | 22.0   |
+    +--------+--------+
+    ```
+
+Output
+
+:   ```markdown
+    +--------+--------+
+    |  Name  |  Value |
+    +:======:+=======:+
+    | group  |    1.5 |
+    | spans  +--------+
+    |  rows  |   22.0 |
+    +--------+--------+
+    ```
 
 ### Simple Tables
 
