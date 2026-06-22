@@ -41,3 +41,6 @@ python = "ruff"
 sh = "shellcheck"
 js = "eslint"
 go = "staticcheck"
+
+[experimental]
+format-math = true

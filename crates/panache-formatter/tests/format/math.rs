@@ -431,6 +431,42 @@ moment generating function is well known.
 }
 
 #[test]
+fn experimental_format_math_tightens_scripts() {
+    // Spaces around `_`/`^` are insignificant in TeX; the script markers are
+    // tightened on both sides, and the math-mode group interiors are trimmed.
+    let input = "$$\n  H _{ 00}^{-1 }\n$$\n";
+    let expected = "$$\n  H_{00}^{-1}\n$$\n";
+    let output = format(input, Some(math_config(true)), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(math_config(true)), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn experimental_format_math_trims_math_group_interiors() {
+    // Leading/trailing whitespace just inside a math-mode `{…}` is trimmed,
+    // including nested groups.
+    let input = "Inline $x_{ a }$ and ${ { a } }$ end.\n";
+    let output = format(input, Some(math_config(true)), None);
+    assert!(output.contains("$x_{a}$"), "got: {output}");
+    assert!(output.contains("${{a}}$"), "got: {output}");
+    let twice = format(&output, Some(math_config(true)), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn experimental_format_math_preserves_text_group_interiors() {
+    // `\text{ … }` is text mode: interior spaces are significant and must
+    // survive, including for groups nested inside the text argument.
+    let input = "Inline $\\text{ a }$ and $\\text{a {b} c}$ end.\n";
+    let output = format(input, Some(math_config(true)), None);
+    assert!(output.contains("$\\text{ a }$"), "got: {output}");
+    assert!(output.contains("$\\text{a {b} c}$"), "got: {output}");
+    let twice = format(&output, Some(math_config(true)), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
 fn display_math_block_inside_paragraph_stays_idempotent_in_rmarkdown() {
     let flavor = Flavor::RMarkdown;
     let config = Config {

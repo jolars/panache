@@ -900,8 +900,9 @@ Set `math-indent = 0` to keep the content flush against the left margin.
 
 By default the *content* between math delimiters is emitted verbatim. Enabling
 the experimental [`format-math`](configuration.qmd#format-math) option turns on
-structural reformatting of that content --- inline whitespace collapse,
-environment-body indentation, `\\` normalization, and `&`-column alignment:
+structural reformatting of that content --- inline whitespace collapse, tight
+sub/superscripts, math-mode group-interior trimming, environment-body
+indentation, `\\` normalization, and `&`-column alignment:
 
 ```toml
 [experimental]
@@ -941,6 +942,11 @@ plus stays tight (`x = -y`, `f(-x)`). Command operators are spaced the same way
 rewritten (no `\frac` canonicalization, no auto-`&` insertion). Alignment uses
 **source character widths** (it tidies the source, it does not align rendered
 glyphs), and malformed math is left untouched.
+
+Whitespace that TeX ignores is normalized away: sub/superscript markers (`_`,
+`^`) are tightened (`H _{ 00}^{-1 }` → `H_{00}^{-1}`), and the leading/trailing
+interior whitespace of a math-mode brace group is trimmed (`{ 00 }` → `{00}`).
+Text-mode arguments are exempt, so `\text{ a }` keeps its spaces.
 
 A display equation (`$$…$$`) wider than `line-width` is broken at its top-level
 relations, with each continuation aligned under the first relation (the classic

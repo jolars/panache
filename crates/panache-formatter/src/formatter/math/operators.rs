@@ -113,6 +113,32 @@ pub fn command_class(name: &str) -> Option<AtomClass> {
     Some(class)
 }
 
+/// Whether a command (name **without** the leading backslash) switches its
+/// mandatory `{…}` argument into *text mode*, where whitespace is significant
+/// and must be preserved verbatim. The curated set is the single-argument
+/// text-switching family; math-mode font commands (`\mathrm`, `\mathbf`) are
+/// **excluded** because spaces are already insignificant inside them, and
+/// multi-argument commands (`\textcolor`) are excluded because their text
+/// argument is not the first group.
+pub fn is_text_mode_command(name: &str) -> bool {
+    matches!(
+        name,
+        "text"
+            | "textrm"
+            | "textbf"
+            | "textit"
+            | "texttt"
+            | "textsf"
+            | "textsc"
+            | "textnormal"
+            | "textup"
+            | "textsl"
+            | "textmd"
+            | "mbox"
+            | "hbox"
+    )
+}
+
 /// Atom class of a delimiter/punctuation **token kind**. The parser tokenizes
 /// the unambiguous delimiters into dedicated kinds (`( [` → `MATH_OPEN`,
 /// `) ]` → `MATH_CLOSE`, `, ;` → `MATH_PUNCT`) because their TeX mathcode class
@@ -211,6 +237,21 @@ mod tests {
         assert_eq!(command_class("alpha"), None);
         assert_eq!(command_class("frac"), None);
         assert_eq!(command_class("text"), None);
+    }
+
+    #[test]
+    fn text_mode_command_set() {
+        // Text-switching commands → true (interior whitespace is significant).
+        assert!(is_text_mode_command("text"));
+        assert!(is_text_mode_command("textbf"));
+        assert!(is_text_mode_command("mbox"));
+        // Math-mode font commands and ordinary commands → false.
+        assert!(!is_text_mode_command("mathrm"));
+        assert!(!is_text_mode_command("mathbf"));
+        assert!(!is_text_mode_command("frac"));
+        assert!(!is_text_mode_command("alpha"));
+        // Multi-argument `\textcolor` is intentionally excluded.
+        assert!(!is_text_mode_command("textcolor"));
     }
 
     #[test]

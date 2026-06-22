@@ -186,6 +186,27 @@ Returned unchanged, never reflowed:
      `\frac{…}{…}`) is left on one over-width line --- like an unbreakable long
      word in prose reflow. Inline and environment-body math are not line-broken.
 
+8. **Tight scripts and group interiors.** Whitespace that TeX ignores is
+   removed:
+   - **Sub/superscript markers** (`_`, `^`) bind tightly, so author whitespace
+     on either side is stripped: `H _{ 00}` → `H_{00}`, `x ^ 2` → `x^2`,
+     `{a} _ b` → `{a}_b`. The marker still presents an opening class, so a
+     directly following `+`/`-` coerces to unary (`x^{-1}` keeps its minus
+     tight).
+   - **Math-mode brace groups** have their *leading and trailing* interior
+     whitespace trimmed (`{ 00 }` → `{00}`, `{-1 }` → `{-1}`), since math mode
+     ignores it. The space *before* `{` and *after* `}` (between atoms) is left
+     alone (`{x} y` stays `{x} y`), and inter-atom spaces inside the group keep
+     the Rule 1/6 collapse, not removal. **Text-mode groups are exempt:** the
+     argument of a text-switching command (`\text`, `\mbox`, the `\text*` family
+     --- see `operators::is_text_mode_command`) keeps its interior spaces
+     verbatim (`\text{ a }` survives), and the exemption nests, so a group
+     inside a text argument (`\text{a {b} c}`) is also preserved. Whether a
+     group is text mode is tracked with a brace-mode stack in
+     `render::space_operators`. Math-mode font commands (`\mathrm`, `\mathbf`)
+     are **not** text mode --- spaces are already insignificant inside them ---
+     so their interiors are trimmed like any other math group.
+
 ## Idempotency
 
 `format(format(x)) == format(x)` for every well-formed input. The alignment
@@ -207,6 +228,11 @@ engine guarantees it by construction:
   token stream --- which round-trips --- so pass 2 makes the identical decision.
   Inserting at most one space per gap (then `collapse_spaces` + cell trim) and
   stripping spaces only beside *tight* runs both converge in one pass.
+- **Tight scripts and trimmed group interiors are fixed points.** Once a script
+  is tight (`H_{00}`) or a math-mode group interior is trimmed (`{00}`), the
+  re-parse has no adjacent whitespace to strip, so pass 2 emits the same bytes.
+  The text-mode exemption keys on the command name, which round-trips, so the
+  same groups are spared each pass.
 - **Line-breaking is a fixed point.** The breaker emits continuations on soft
   newlines with leading alignment spaces. On pass 2 those soft newlines and
   spaces are insignificant whitespace that re-joins into the single logical row

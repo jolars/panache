@@ -534,6 +534,11 @@ fn space_operators(toks: &[(SyntaxKind, String)], seed: Option<AtomClass>) -> St
     let mut prev_class: Option<AtomClass> = seed;
     let mut prev_demand = Demand::Start;
     let mut pending_space = false;
+    // Brace-group mode stack (`true` = text mode, where interior whitespace is
+    // significant) and whether the last significant token was a text-mode
+    // command (so its `{…}` argument opens a text-mode group).
+    let mut group_stack: Vec<bool> = Vec::new();
+    let mut prev_sig_is_text_cmd = false;
 
     let mut i = 0;
     while i < toks.len() {
@@ -565,6 +570,7 @@ fn space_operators(toks: &[(SyntaxKind, String)], seed: Option<AtomClass>) -> St
                     prev_demand = demand;
                     prev_class = Some(class);
                 }
+                prev_sig_is_text_cmd = false;
             }
             SyntaxKind::MATH_COMMAND => {
                 let name = text.strip_prefix('\\').unwrap_or(text);
@@ -592,6 +598,7 @@ fn space_operators(toks: &[(SyntaxKind, String)], seed: Option<AtomClass>) -> St
                 emit_atom(&mut out, prev_demand, demand, pending_space, text);
                 pending_space = false;
                 prev_demand = demand;
+                prev_sig_is_text_cmd = operators::is_text_mode_command(name);
                 i += 1;
             }
             SyntaxKind::MATH_COMMENT => {
@@ -600,6 +607,53 @@ fn space_operators(toks: &[(SyntaxKind, String)], seed: Option<AtomClass>) -> St
                 emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, text);
                 pending_space = false;
                 prev_demand = Demand::Plain;
+                prev_sig_is_text_cmd = false;
+                i += 1;
+            }
+            SyntaxKind::MATH_SCRIPT => {
+                // `_`/`^` bind tightly: strip author whitespace on both sides
+                // (it is insignificant in TeX). Still present an `Open` class so
+                // a directly following `+`/`-` coerces to unary (`x^{-1}`).
+                emit_atom(&mut out, prev_demand, Demand::TightOp, pending_space, text);
+                pending_space = false;
+                prev_demand = Demand::TightOp;
+                prev_class = Some(AtomClass::Open);
+                prev_sig_is_text_cmd = false;
+                i += 1;
+            }
+            SyntaxKind::MATH_GROUP_OPEN => {
+                // A group is text mode if its `{` is a text-command argument or
+                // its parent group is already text mode (`\text{a {b} c}`).
+                let parent_text = group_stack.last().copied().unwrap_or(false);
+                let is_text = prev_sig_is_text_cmd || parent_text;
+                group_stack.push(is_text);
+                // Exterior (left) gap is preserved; the interior-leading space is
+                // stripped for a math-mode group (`{ 00}` → `{00}`), kept for text.
+                emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, text);
+                pending_space = false;
+                prev_demand = if is_text {
+                    Demand::Plain
+                } else {
+                    Demand::TightOp
+                };
+                prev_class = Some(AtomClass::Open);
+                prev_sig_is_text_cmd = false;
+                i += 1;
+            }
+            SyntaxKind::MATH_GROUP_CLOSE => {
+                let is_text = group_stack.pop().unwrap_or(false);
+                // Interior-trailing space is stripped for a math-mode group
+                // (`{-1 }` → `{-1}`); the exterior space after `}` is preserved.
+                let cur = if is_text {
+                    Demand::Plain
+                } else {
+                    Demand::TightOp
+                };
+                emit_atom(&mut out, prev_demand, cur, pending_space, text);
+                pending_space = false;
+                prev_demand = Demand::Plain;
+                prev_class = Some(AtomClass::Close);
+                prev_sig_is_text_cmd = false;
                 i += 1;
             }
             _ => {
@@ -607,6 +661,7 @@ fn space_operators(toks: &[(SyntaxKind, String)], seed: Option<AtomClass>) -> St
                 pending_space = false;
                 prev_demand = Demand::Plain;
                 prev_class = atom_prev_class(*kind, text);
+                prev_sig_is_text_cmd = false;
                 i += 1;
             }
         }
