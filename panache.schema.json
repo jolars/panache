@@ -332,6 +332,14 @@
         "null"
       ]
     },
+    "crossref-prefixes": {
+      "default": [],
+      "description": "Extra cross-reference key prefixes for crossref-injecting extensions\n(e.g. pseudocode's `@algo-`). Keys with these prefixes parse as\ncross-references rather than citations.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "exclude": {
       "default": null,
       "items": {

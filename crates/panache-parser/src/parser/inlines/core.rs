@@ -452,7 +452,7 @@ fn parse_inline_range_impl(
                         && pos + len == dispo_end
                     {
                         let is_crossref = config.extensions.quarto_crossrefs
-                            && super::citations::is_quarto_crossref_key(key);
+                            && super::citations::is_crossref_key(key, &config.crossref_prefixes);
                         if is_crossref || config.extensions.citations {
                             if pos > text_start {
                                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
@@ -1380,8 +1380,8 @@ fn parse_inline_range_impl(
             && (config.extensions.citations || config.extensions.quarto_crossrefs)
             && let Some((len, key, has_suppress)) = try_parse_bare_citation(&text[pos..])
         {
-            let is_crossref =
-                config.extensions.quarto_crossrefs && super::citations::is_quarto_crossref_key(key);
+            let is_crossref = config.extensions.quarto_crossrefs
+                && super::citations::is_crossref_key(key, &config.crossref_prefixes);
             if is_crossref || config.extensions.citations {
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
@@ -1410,8 +1410,8 @@ fn parse_inline_range_impl(
             && (config.extensions.citations || config.extensions.quarto_crossrefs)
             && let Some((len, key, has_suppress)) = try_parse_bare_citation(&text[pos..])
         {
-            let is_crossref =
-                config.extensions.quarto_crossrefs && super::citations::is_quarto_crossref_key(key);
+            let is_crossref = config.extensions.quarto_crossrefs
+                && super::citations::is_crossref_key(key, &config.crossref_prefixes);
             if is_crossref || config.extensions.citations {
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);

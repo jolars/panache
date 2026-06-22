@@ -2915,6 +2915,7 @@ mod tests {
             dialect: crate::options::Dialect::for_flavor(flavor),
             extensions: crate::options::Extensions::for_flavor(flavor),
             pandoc_compat: crate::options::PandocCompat::default(),
+            crossref_prefixes: Vec::new(),
             refdef_labels: None,
         }
     }
@@ -3132,6 +3133,7 @@ mod tests {
             dialect: crate::options::Dialect::for_flavor(flavor),
             extensions: crate::options::Extensions::for_flavor(flavor),
             pandoc_compat: crate::options::PandocCompat::default(),
+            crossref_prefixes: Vec::new(),
             refdef_labels: None,
         }
     }

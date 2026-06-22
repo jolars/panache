@@ -357,6 +357,80 @@ mod tests {
     }
 
     #[test]
+    fn custom_crossref_prefix_does_not_emit_warning() {
+        // A crossref-injecting extension (e.g. pseudocode's `@algo-`) declares
+        // its prefix via the top-level `crossref-prefixes` config. The parser
+        // then emits `@algo-cd` as a crossref, so the missing-bibliography-key
+        // rule must not flag it as a citation.
+        let input = "See @algo-cd for details.";
+        let mut config = Config::default();
+        config.extensions.quarto_crossrefs = true;
+        config.crossref_prefixes = vec!["algo".to_string()];
+
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = CitationKeysRule;
+        let metadata = crate::metadata::DocumentMetadata {
+            source_path: std::path::PathBuf::from("test.qmd"),
+            bibliography: None,
+            metadata_files: Vec::new(),
+            bibliography_parse: Some(crate::metadata::BibliographyParse {
+                index: crate::bib::BibIndex {
+                    entries: std::collections::HashMap::new(),
+                    duplicates: Vec::new(),
+                    errors: Vec::new(),
+                    load_errors: Vec::new(),
+                },
+                parse_errors: Vec::new(),
+            }),
+            inline_references: Vec::new(),
+            citations: crate::metadata::CitationInfo {
+                keys: vec!["algo-cd".to_string()],
+            },
+            title: None,
+            raw_yaml: String::new(),
+        };
+
+        let diagnostics = rule.check_tree(&tree, input, &config, Some(&metadata));
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn custom_crossref_prefix_unset_still_warns() {
+        // Without the prefix configured, `@algo-cd` is an ordinary citation and
+        // a missing key should still be reported (no silent suppression).
+        let input = "See @algo-cd for details.";
+        let mut config = Config::default();
+        config.extensions.quarto_crossrefs = true;
+
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = CitationKeysRule;
+        let metadata = crate::metadata::DocumentMetadata {
+            source_path: std::path::PathBuf::from("test.qmd"),
+            bibliography: None,
+            metadata_files: Vec::new(),
+            bibliography_parse: Some(crate::metadata::BibliographyParse {
+                index: crate::bib::BibIndex {
+                    entries: std::collections::HashMap::new(),
+                    duplicates: Vec::new(),
+                    errors: Vec::new(),
+                    load_errors: Vec::new(),
+                },
+                parse_errors: Vec::new(),
+            }),
+            inline_references: Vec::new(),
+            citations: crate::metadata::CitationInfo {
+                keys: vec!["algo-cd".to_string()],
+            },
+            title: None,
+            raw_yaml: String::new(),
+        };
+
+        let diagnostics = rule.check_tree(&tree, input, &config, Some(&metadata));
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "missing-bibliography-key");
+    }
+
+    #[test]
     fn bracketed_crossref_keys_do_not_emit_warning() {
         let input = "See [@fig-missing].";
         let mut config = Config::default();

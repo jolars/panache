@@ -583,6 +583,12 @@ struct RawConfig {
     /// Opt-in experimental features (`[experimental]`). Unstable surface.
     #[serde(default)]
     experimental: Option<ExperimentalConfig>,
+
+    /// Extra cross-reference key prefixes for crossref-injecting extensions
+    /// (e.g. pseudocode's `@algo-`). Keys with these prefixes parse as
+    /// cross-references rather than citations.
+    #[serde(default)]
+    crossref_prefixes: Vec<String>,
 }
 
 fn default_line_width() -> usize {
@@ -850,6 +856,7 @@ impl RawConfig {
             extend_include: self.extend_include,
             flavor_overrides: self.flavor_overrides,
             experimental: self.experimental.unwrap_or_default(),
+            crossref_prefixes: self.crossref_prefixes,
         }
     }
 }
@@ -1059,6 +1066,10 @@ pub struct Config {
     pub external_max_parallel: usize,
     /// Compatibility target for ambiguous Pandoc behavior.
     pub parser: PandocCompat,
+    /// Extra cross-reference key prefixes (top-level `crossref-prefixes`) for
+    /// crossref-injecting extensions (e.g. pseudocode's `@algo-`). Keys with
+    /// these prefixes parse as cross-references rather than citations.
+    pub crossref_prefixes: Vec<String>,
     /// Linter rule toggles.
     pub lint: LintConfig,
     /// Optional cache directory override.
@@ -1122,6 +1133,7 @@ impl Default for Config {
             linters: HashMap::new(),    // Opt-in: empty by default
             external_max_parallel: default_external_max_parallel(),
             parser: PandocCompat::default(),
+            crossref_prefixes: Vec::new(),
             lint: LintConfig::default(),
             cache_dir: None,
             cache: true,
@@ -1145,6 +1157,7 @@ impl Config {
             dialect: panache_parser::Dialect::for_flavor(self.flavor),
             extensions: self.extensions.clone(),
             pandoc_compat: self.parser,
+            crossref_prefixes: self.crossref_prefixes.clone(),
             refdef_labels: None,
         }
     }

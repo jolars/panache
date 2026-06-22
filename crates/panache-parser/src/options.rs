@@ -881,6 +881,14 @@ pub struct ParserOptions {
     pub extensions: Extensions,
     /// Compatibility target for ambiguous Pandoc behavior.
     pub pandoc_compat: PandocCompat,
+    /// Additional cross-reference key prefixes (beyond the Quarto built-ins
+    /// recognized by [`crate::parser::inlines::citations::is_quarto_crossref_key`])
+    /// that should parse as cross-references rather than citations. Populated
+    /// from the top-level `crossref-prefixes` config key so documents relying on
+    /// crossref-injecting extensions (e.g. pseudocode's `@algo-`) don't have
+    /// those references misclassified as citations.
+    #[cfg_attr(feature = "serde", serde(default, alias = "crossref_prefixes"))]
+    pub crossref_prefixes: Vec<String>,
     /// Document-level reference link label set, populated by the
     /// top-level `parse()` function when running CommonMark dialect and
     /// consulted by inline parsing's bracket resolution pass. `None`
@@ -903,6 +911,7 @@ impl Default for ParserOptions {
             dialect: Dialect::for_flavor(flavor),
             extensions: Extensions::for_flavor(flavor),
             pandoc_compat: PandocCompat::default(),
+            crossref_prefixes: Vec::new(),
             refdef_labels: None,
         }
     }

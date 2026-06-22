@@ -136,6 +136,18 @@ impl Rule for UndefinedReferencesRule {
                     continue;
                 }
 
+                // Custom (extension-injected) crossref prefixes are managed by
+                // an extension panache can't model — e.g. pseudocode's `@algo-`,
+                // whose `#| label:` lives in a non-executable fence we don't
+                // parse as a chunk option. Treat the reference as a crossref but
+                // don't try to validate its target, which we'd never resolve.
+                if crate::parser::inlines::citations::has_custom_crossref_prefix(
+                    &label,
+                    &config.crossref_prefixes,
+                ) {
+                    continue;
+                }
+
                 let candidates =
                     crossref_resolution_labels(&normalized, config.extensions.bookdown_references);
                 if candidates
@@ -422,6 +434,26 @@ mod tests {
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "undefined-reference-label");
         assert!(diagnostics[0].message.contains("@fig-missing"));
+    }
+
+    #[test]
+    fn custom_crossref_prefix_target_not_validated() {
+        // An extension-injected crossref prefix (`@algo-`) is recognized as a
+        // crossref, but its target lives in a mechanism panache can't model
+        // (a pseudocode fence's `#| label:`), so the rule must not flag it as
+        // an undefined reference.
+        let input = "See @algo-cd.\n";
+        let mut config = Config {
+            flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
+            ..Default::default()
+        };
+        config.extensions.quarto_crossrefs = true;
+        config.crossref_prefixes = vec!["algo".to_string()];
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = UndefinedReferencesRule;
+        let diagnostics = rule.check_tree(&tree, input, &config, None);
+        assert!(diagnostics.is_empty());
     }
 
     #[test]

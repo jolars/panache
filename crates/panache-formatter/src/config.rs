@@ -252,6 +252,10 @@ impl Config {
             dialect: self.dialect(),
             extensions: self.parser_extensions.clone(),
             pandoc_compat: self.parser,
+            // The formatter re-parses only for internal checks (idempotency,
+            // code-block handling) where citation-vs-crossref classification
+            // doesn't affect output, so the built-in prefix set suffices here.
+            crossref_prefixes: Vec::new(),
             refdef_labels: None,
         }
     }

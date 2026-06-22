@@ -189,6 +189,36 @@ pub fn is_quarto_crossref_key(key: &str) -> bool {
     )
 }
 
+/// Like [`is_quarto_crossref_key`], but also accepts any key whose prefix
+/// appears in `custom_prefixes`. Used to recognize cross-reference prefixes
+/// injected by Quarto extensions (e.g. pseudocode's `@algo-`) that aren't
+/// built in. Matching is case-insensitive on the prefix, consistent with the
+/// built-in check.
+pub fn is_crossref_key(key: &str, custom_prefixes: &[String]) -> bool {
+    is_quarto_crossref_key(key) || has_custom_crossref_prefix(key, custom_prefixes)
+}
+
+/// Whether `key`'s prefix (the segment before the first `-`) appears in
+/// `custom_prefixes`. Unlike [`is_quarto_crossref_key`], this matches *only*
+/// the configured extension prefixes, so callers can tell an extension-injected
+/// cross-reference (whose target panache can't resolve) apart from a built-in
+/// one (whose target it can and should validate).
+pub fn has_custom_crossref_prefix(key: &str, custom_prefixes: &[String]) -> bool {
+    if custom_prefixes.is_empty() {
+        return false;
+    }
+    let lower = key.to_ascii_lowercase();
+    let mut parts = lower.splitn(2, '-');
+    let prefix = parts.next().unwrap_or("");
+    let rest = parts.next().unwrap_or("");
+    if rest.is_empty() {
+        return false;
+    }
+    custom_prefixes
+        .iter()
+        .any(|candidate| candidate.eq_ignore_ascii_case(prefix))
+}
+
 pub const BOOKDOWN_LABEL_PREFIXES: &[&str] = &[
     "eq", "fig", "tab", "thm", "lem", "cor", "prp", "cnj", "def", "exm", "exr", "sol", "rem",
     "alg", "sec", "hyp",
@@ -529,6 +559,26 @@ mod tests {
     #[test]
     fn test_parse_citation_key_stops_at_space() {
         assert_eq!(parse_citation_key("key rest"), Some(3));
+    }
+
+    #[test]
+    fn is_crossref_key_accepts_builtin_without_custom() {
+        assert!(is_crossref_key("fig-plot", &[]));
+        assert!(!is_crossref_key("algo-cd", &[]));
+    }
+
+    #[test]
+    fn is_crossref_key_accepts_custom_prefix() {
+        let custom = vec!["algo".to_string()];
+        assert!(is_crossref_key("algo-cd", &custom));
+        // Case-insensitive on the prefix, consistent with the built-in check.
+        assert!(is_crossref_key("ALGO-cd", &custom));
+        // Built-ins still match alongside the custom set.
+        assert!(is_crossref_key("tbl-x", &custom));
+        // A bare prefix with no `-suffix` is not a crossref.
+        assert!(!is_crossref_key("algo", &custom));
+        // Unrelated prefixes remain citations.
+        assert!(!is_crossref_key("doe99", &custom));
     }
 
     // Bare citation parsing tests
