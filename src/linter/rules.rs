@@ -21,6 +21,7 @@ pub mod html_entities;
 pub mod link_text_is_url;
 pub mod math_content;
 pub mod missing_chunk_labels;
+pub mod quarto_schema;
 pub mod stray_fenced_div_markers;
 pub mod undefined_anchor;
 pub mod undefined_references;
@@ -52,6 +53,8 @@ pub enum Requirement {
     TexMath,
     /// Needs a flavor with executable chunks (Quarto or R Markdown).
     ChunkFlavor,
+    /// Needs the Quarto flavor specifically (e.g. Quarto schema validation).
+    Quarto,
 }
 
 impl Requirement {
@@ -76,6 +79,7 @@ impl Requirement {
             Requirement::ChunkFlavor => {
                 matches!(config.flavor, Flavor::Quarto | Flavor::RMarkdown)
             }
+            Requirement::Quarto => matches!(config.flavor, Flavor::Quarto),
         }
     }
 }

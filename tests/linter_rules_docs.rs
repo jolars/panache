@@ -94,6 +94,7 @@ fn requirement_token(req: Requirement) -> Option<&'static str> {
         Requirement::Emoji => Some("emoji"),
         Requirement::TexMath => Some("tex-math"),
         Requirement::ChunkFlavor => Some("chunk"),
+        Requirement::Quarto => Some("quarto"),
     }
 }
 

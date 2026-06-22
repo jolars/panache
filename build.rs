@@ -456,10 +456,33 @@ fn generate_man_pages() -> Result<()> {
     Ok(())
 }
 
+/// Gzip-compress the vendored Quarto schema into `OUT_DIR` so the binary (and
+/// the wasm bundle) embeds the ~40 KB compressed blob instead of the ~2 MB
+/// pretty-printed JSON. The reviewable pretty source stays committed; the
+/// linter decompresses it once on first use (see `src/linter/quarto_schema.rs`).
+fn compress_quarto_schema(outdir: &std::ffi::OsString) -> Result<()> {
+    use std::io::Write;
+
+    use flate2::Compression;
+    use flate2::write::GzEncoder;
+
+    let src = PathBuf::from("assets/quarto-schema/schema.json");
+    let json = fs::read(&src)?;
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::best());
+    encoder.write_all(&json)?;
+    let compressed = encoder.finish()?;
+    fs::write(
+        PathBuf::from(outdir).join("quarto-schema.json.gz"),
+        compressed,
+    )?;
+    Ok(())
+}
+
 fn main() -> Result<()> {
     // Generate shell completions
     if let Some(outdir) = env::var_os("OUT_DIR") {
         generate_completions(&outdir)?;
+        compress_quarto_schema(&outdir)?;
     }
 
     // Generate man pages
@@ -473,6 +496,7 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=src/cli.rs");
     println!("cargo:rerun-if-changed=src/config/formatter_presets.rs");
     println!("cargo:rerun-if-changed=src/linter/external_linters.rs");
+    println!("cargo:rerun-if-changed=assets/quarto-schema/schema.json");
     println!("cargo:rerun-if-changed=build.rs");
 
     Ok(())

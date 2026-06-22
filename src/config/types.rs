@@ -390,6 +390,12 @@ pub struct ExperimentalConfig {
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
 pub struct LintConfig {
     pub rules: HashMap<String, bool>,
+    /// Quarto release whose vendored schema the `quarto-schema` rule validates
+    /// against (e.g. `"1.9"`). Currently one version is bundled, so this is an
+    /// advisory pin; it reserves the key for selecting among bundled versions
+    /// later. Set via `[lint] quarto-version = "1.9"`.
+    #[serde(rename = "quarto-version", skip_serializing_if = "Option::is_none")]
+    pub quarto_version: Option<String>,
 }
 
 impl LintConfig {
@@ -441,6 +447,11 @@ impl JsonSchema for LintConfig {
                                     Preferred over the legacy flat `[lint]` shape.",
                     "additionalProperties": { "type": "boolean" },
                 },
+                "quarto-version": {
+                    "type": "string",
+                    "description": "Quarto release whose vendored schema the \
+                                    `quarto-schema` rule validates against.",
+                },
             },
             "additionalProperties": { "type": "boolean" },
         })
@@ -460,6 +471,19 @@ impl<'de> Deserialize<'de> for LintConfig {
             .as_table()
             .cloned()
             .ok_or_else(|| serde::de::Error::custom("expected [lint] table"))?;
+
+        // Typed (non-bool) settings must be pulled out before the legacy
+        // bool-key loop below, which rejects any remaining non-bool value.
+        let quarto_version = match table.remove("quarto-version") {
+            Some(v) => Some(
+                v.as_str()
+                    .ok_or_else(|| {
+                        serde::de::Error::custom("[lint] quarto-version must be a string")
+                    })?
+                    .to_string(),
+            ),
+            None => None,
+        };
 
         // New shape: [lint.rules]
         if let Some(rules_value) = table.remove("rules") {
@@ -495,7 +519,11 @@ impl<'de> Deserialize<'de> for LintConfig {
             );
         }
 
-        Ok(Self { rules }.normalize())
+        Ok(Self {
+            rules,
+            quarto_version,
+        }
+        .normalize())
     }
 }
 

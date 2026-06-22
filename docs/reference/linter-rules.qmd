@@ -1034,6 +1034,86 @@ Emitted when a `\begin{a}` is closed by `\end{b}` with a different name.
 
 Emitted when an `\end` appears with no open `\begin`.
 
+### `quarto-schema` {#quarto-schema}
+
+Validates document YAML frontmatter, code-cell options, and project config files
+(`_quarto.yml`, `_metadata.yml`) against Quarto's machine-readable schema,
+flagging unknown/misspelled keys and type mismatches.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Diagnostic codes
+:   [`quarto-schema-unknown-key`](#quarto-schema),
+    [`quarto-schema-type-mismatch`](#quarto-schema),
+    [`quarto-schema-invalid-enum`](#quarto-schema)
+
+Requirements
+:   Quarto flavor (`flavor = "quarto"`). Pandoc has no metadata schema, so the
+    rule does not run for other flavors.
+
+Description
+
+:   Unlike pandoc---where metadata is an arbitrary mapping---Quarto ships a
+    schema and validates against it. This rule reproduces the high-value parts
+    of that check using a distilled copy of Quarto's schema (vendored per
+    quarto-cli release; see `assets/quarto-schema/.panache-source`). It covers
+    document **frontmatter** (`--- ... ---`), **code-cell options** (`#| ...`,
+    validated against the cell's engine schema---knitr for R cells, jupyter
+    otherwise), and **project config files**---`_quarto.yml` (against the
+    project-config schema) and `_metadata.yml` (directory metadata, against the
+    frontmatter schema):
+
+    - **Unknown keys.** On *closed* schema objects (e.g. a specific format's
+      option block) any undeclared key is flagged. On the *open* top level
+      (which must allow pandoc passthrough and custom metadata) only a near-miss
+      typo of a known key is flagged, with a "did you mean" suggestion.
+    - **Type mismatches.** A scalar whose resolved YAML 1.2 type does not match
+      the schema (e.g. a boolean field set to a non-boolean) is flagged. String
+      fields accept any scalar, since Quarto coerces.
+    - **Invalid enum values.** A scalar outside a field's allowed set is
+      flagged.
+
+    The Quarto schema version the rule validates against can be pinned with
+    `[lint] quarto-version = "1.9"`. One version is currently bundled, so this is
+    advisory.
+
+**Example violation:**
+
+```yaml
+---
+forrmat: html
+toc: maybe
+---
+```
+
+**Diagnostic:**
+
+```
+warning[quarto-schema-unknown-key]: unknown key `forrmat`; did you mean `format`?
+ --> document.qmd:2:1
+  |
+2 | forrmat: html
+  | ^^^^^^^
+warning[quarto-schema-type-mismatch]: value should be a boolean
+ --> document.qmd:3:6
+  |
+3 | toc: maybe
+  |      ^^^^^
+```
+
+Project config files are validated wherever the linter encounters them: the CLI
+checks an explicit `panache lint _quarto.yml` (or `_metadata.yml`) target, and
+the LSP validates the manifests reachable from an open project document,
+publishing diagnostics on each manifest's own file.
+
+**Limitations:** Format-gated keys are accepted regardless of the active output
+format, and deeply nested options reached through a permissive `anyOf` branch
+may not be checked.
+
 ## YAML diagnostics
 
 Panache emits YAML diagnostics when embedded YAML content is invalid. These

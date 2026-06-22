@@ -694,6 +694,15 @@ fn resolve_formatter_extensions_for_flavor(
 
 fn detect_flavor(input_file: Option<&Path>, anchor: Option<&Path>, cfg: &Config) -> Option<Flavor> {
     let input_path = input_file?;
+
+    // Quarto project manifests are `.yml`, but the filename is itself a Quarto
+    // marker (Quarto is their only consumer), so they detect as Quarto the same
+    // way `.qmd` does — an explicit `--flavor`/`flavor-overrides` still wins
+    // upstream. See `linter::quarto_schema::manifest_schema_root`.
+    if is_quarto_manifest_filename(input_path) {
+        return Some(Flavor::Quarto);
+    }
+
     let ext = input_path.extension().and_then(|e| e.to_str())?;
     let ext_lower = ext.to_lowercase();
 
@@ -706,6 +715,17 @@ fn detect_flavor(input_file: Option<&Path>, anchor: Option<&Path>, cfg: &Config)
         }
         _ => None,
     }
+}
+
+/// Whether `path`'s file name is a Quarto project manifest (`_quarto.yml` or
+/// `_metadata.yml`). Kept in lockstep with
+/// `linter::quarto_schema::manifest_schema_root`, which maps the same names to
+/// their schema roots.
+fn is_quarto_manifest_filename(path: &Path) -> bool {
+    matches!(
+        path.file_name().and_then(|n| n.to_str()),
+        Some("_quarto.yml" | "_metadata.yml")
+    )
 }
 
 fn detect_flavor_override(
@@ -890,6 +910,36 @@ mod tests {
         let cfg = Config::default();
         let detected = detect_flavor(Some(Path::new("doc.Rmarkdown")), None, &cfg);
         assert_eq!(detected, Some(Flavor::RMarkdown));
+    }
+
+    #[test]
+    fn detect_flavor_maps_quarto_manifest_filenames() {
+        let cfg = Config::default();
+        assert_eq!(
+            detect_flavor(Some(Path::new("/p/_quarto.yml")), None, &cfg),
+            Some(Flavor::Quarto)
+        );
+        assert_eq!(
+            detect_flavor(Some(Path::new("/p/sub/_metadata.yml")), None, &cfg),
+            Some(Flavor::Quarto)
+        );
+        // A plain `.yml` is not a manifest marker.
+        assert_eq!(
+            detect_flavor(Some(Path::new("/p/config.yml")), None, &cfg),
+            None
+        );
+    }
+
+    #[test]
+    fn flavor_override_beats_manifest_filename() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let manifest = tmp.path().join("_quarto.yml");
+        std::fs::write(&manifest, "").unwrap();
+
+        // Explicit `--flavor pandoc` wins over the manifest's Quarto marker,
+        // exactly as it does for a `.qmd` document.
+        let (cfg, _) = load(None, tmp.path(), Some(&manifest), Some(Flavor::Pandoc)).expect("load");
+        assert_eq!(cfg.flavor, Flavor::Pandoc);
     }
 
     #[test]
@@ -1157,6 +1207,26 @@ mod tests {
         let toml = "blank-lines = \"collapse\"\n";
         parse_config_str(toml, Path::new("panache.toml"))
             .expect("top-level blank-lines key must still parse");
+    }
+
+    #[test]
+    fn lint_quarto_version_parses_alongside_rule_toggles() {
+        let toml = "[lint]\nquarto-version = \"1.9\"\n[lint.rules]\nquarto-schema = false\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("quarto-version + rule toggle must parse");
+        assert_eq!(cfg.lint.quarto_version.as_deref(), Some("1.9"));
+        assert!(!cfg.lint.is_rule_enabled("quarto-schema"));
+    }
+
+    #[test]
+    fn lint_quarto_version_must_be_string() {
+        let toml = "[lint]\nquarto-version = true\n";
+        let err = parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("non-string quarto-version must error");
+        assert!(
+            err.to_string().contains("quarto-version"),
+            "error must name the key: {err}"
+        );
     }
 
     #[test]

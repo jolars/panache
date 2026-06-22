@@ -9,6 +9,9 @@ authors = ["Johan Larsson <johan@jolars.co>"]
 name = "panache"
 version = "2.57.0"
 edition.workspace = true
+# `distill_quarto_schema` is a dev-only vendoring bin (src/bin/); keep bare
+# `cargo run` resolving to the CLI for tooling like the pre-commit format hook.
+default-run = "panache"
 readme = "README.md"
 description = "An LSP, formatter, and linter for Markdown, Quarto, and R Markdown"
 license.workspace = true
@@ -55,6 +58,7 @@ clap = { version = "4.6.1", features = ["derive", "env"], optional = true }
 dirs = "6.0.0"
 env_logger = "0.11.10"
 emojis = "0.8.0"
+flate2 = "1.0"
 crossbeam-channel = { version = "0.5.15", optional = true }
 globset = "0.4"
 ignore = { version = "0.4", optional = true }
@@ -103,6 +107,7 @@ clap = { version = "4.6.1", features = ["derive", "env"] }
 clap_complete = "4.6.0"
 clap_mangen = "0.3.0"
 clap-markdown = "0.1.5"
+flate2 = "1.0"
 
 [package.metadata.deb]
 maintainer = "Johan Larsson <johan@jolars.co>"

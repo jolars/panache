@@ -329,6 +329,64 @@ pub fn project_manifest_diagnostics(
     diagnostics
 }
 
+/// `quarto-schema` diagnostics for the project-manifest files reachable from this
+/// document's project: each `_quarto.yml` (validated against `project-config`)
+/// and `_metadata.yml` (validated against `front-matter`). Each entry pairs the
+/// manifest's path with its schema diagnostics so the LSP can publish them on the
+/// manifest's own URI alongside any parse error.
+///
+/// Gated on the triggering document's flavor being Quarto and the
+/// `quarto-schema` rule being enabled — returns empty otherwise. A `.qmd`
+/// document detects as Quarto unless explicitly overridden, so this is the same
+/// "Quarto unless overridden" gate the CLI applies to an explicit manifest
+/// target (see `lint_quarto_manifest`); the two paths agree on when manifests
+/// are validated. Bookdown manifests have no Quarto schema and are skipped (no
+/// root). Manifest text is read through `db.file_text`, so editing a manifest
+/// re-runs this query.
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+pub fn project_manifest_schema_diagnostics(
+    db: &dyn Db,
+    file: FileText,
+    config: FileConfig,
+) -> Vec<(PathBuf, Vec<Diagnostic>)> {
+    let cfg = config.config(db);
+    if cfg.flavor != crate::config::Flavor::Quarto || !cfg.lint.is_rule_enabled("quarto-schema") {
+        return Vec::new();
+    }
+
+    let graph = project_structure(db, file, config);
+    let mut manifests: Vec<PathBuf> = Vec::new();
+    let mut seen = HashSet::new();
+    for document in graph.documents() {
+        for kind in [EdgeKind::ProjectConfig, EdgeKind::MetadataFile] {
+            for path in graph.dependencies(document, Some(kind)) {
+                if seen.insert(path.clone()) {
+                    manifests.push(path);
+                }
+            }
+        }
+    }
+
+    let mut diagnostics = Vec::new();
+    for path in manifests {
+        db.unwind_if_revision_cancelled();
+        let Some(root) = crate::linter::quarto_schema::manifest_schema_root(&path) else {
+            continue;
+        };
+        let Some(file_text) = db.file_text(path.clone()) else {
+            continue;
+        };
+        let Some(text) = file_text.text(db).as_deref() else {
+            continue;
+        };
+        let diags = crate::linter::quarto_schema::validate_standalone_yaml(text, root);
+        if !diags.is_empty() {
+            diagnostics.push((path, diags));
+        }
+    }
+    diagnostics
+}
+
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
 pub fn yaml_regions_for_file(db: &dyn Db, file: FileText, config: FileConfig) -> Vec<YamlRegion> {
     parsed_yaml_regions_for_file(db, file, config)
@@ -3197,6 +3255,73 @@ mod tests {
         assert!(
             diags.is_empty(),
             "valid manifest should produce no diagnostics, got {diags:?}"
+        );
+    }
+
+    #[test]
+    fn project_manifest_schema_diagnostics_flags_quarto_yml_typo() {
+        let temp_dir = tempfile::TempDir::new().expect("temp dir");
+        let root = temp_dir.path();
+        let doc_path = root.join("doc.qmd");
+        let quarto_path = root.join("_quarto.yml");
+        // Valid YAML but a frontmatter-key typo the schema can decide.
+        std::fs::write(&quarto_path, "forrmat: html\n").expect("project config");
+
+        let mut db = SalsaDb::default();
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+
+        let _quarto_file = db.update_file_text(quarto_path.clone(), "forrmat: html\n".to_string());
+        let file = db.update_file_text(doc_path.clone(), "# Doc\n".to_string());
+
+        let diags = project_manifest_schema_diagnostics(&db, file, config).clone();
+        assert_eq!(diags.len(), 1, "expected one manifest with schema diags");
+        assert_eq!(diags[0].0, quarto_path);
+        assert!(
+            diags[0]
+                .1
+                .iter()
+                .any(|d| d.code == "quarto-schema-unknown-key"),
+            "expected unknown-key diagnostic, got {:?}",
+            diags[0].1
+        );
+
+        // Fixing the manifest clears the diagnostic.
+        let _ = db.update_file_text(quarto_path.clone(), "format: html\n".to_string());
+        let diags = project_manifest_schema_diagnostics(&db, file, config).clone();
+        assert!(
+            diags.is_empty(),
+            "valid manifest should be clean, got {diags:?}"
+        );
+    }
+
+    #[test]
+    fn project_manifest_schema_diagnostics_off_under_pandoc() {
+        let temp_dir = tempfile::TempDir::new().expect("temp dir");
+        let root = temp_dir.path();
+        let doc_path = root.join("doc.qmd");
+        let quarto_path = root.join("_quarto.yml");
+        std::fs::write(&quarto_path, "forrmat: html\n").expect("project config");
+
+        let mut db = SalsaDb::default();
+        // Non-Quarto flavor: the rule (and this query) must stay silent.
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Pandoc,
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+
+        let _quarto_file = db.update_file_text(quarto_path.clone(), "forrmat: html\n".to_string());
+        let file = db.update_file_text(doc_path.clone(), "# Doc\n".to_string());
+
+        let diags = project_manifest_schema_diagnostics(&db, file, config).clone();
+        assert!(
+            diags.is_empty(),
+            "schema query must be Quarto-only, got {diags:?}"
         );
     }
 
