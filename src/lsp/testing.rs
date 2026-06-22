@@ -580,7 +580,14 @@ impl LspTester {
             match receiver.recv_timeout(step) {
                 Ok(task) => self.gs.on_task(task),
                 Err(_) => {
-                    if self.gs.settle_deadline.is_none() {
+                    // Quiescent only when nothing is due AND every dispatched
+                    // settle has landed. A pass dispatched into the pool clears
+                    // `settle_deadline` but its result is still in flight; exiting
+                    // here would abandon it and lose the batch's diagnostics (a
+                    // burst `did_open` over many docs outruns the poll step).
+                    let settle_in_flight =
+                        self.gs.last_applied_lint_generation != self.gs.lint_generation;
+                    if self.gs.settle_deadline.is_none() && !settle_in_flight {
                         break;
                     }
                     self.gs.dispatch_due_lints();

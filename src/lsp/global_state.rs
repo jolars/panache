@@ -375,6 +375,12 @@ pub(crate) struct GlobalState {
     /// result is tagged with it and dropped in `on_task` if a newer settle has
     /// since been dispatched.
     pub(crate) lint_generation: u64,
+    /// The highest lint generation whose settle result has actually been applied
+    /// to the store. Lags `lint_generation` while a dispatched pass is still in
+    /// flight; equal to it once that pass lands. The test harness's `pump` uses
+    /// the gap to know a settle is still pending (production's main loop blocks on
+    /// the task channel instead and never needs it).
+    pub(crate) last_applied_lint_generation: u64,
     /// URIs whose next settle pass must also run external linters (the expensive
     /// on-save/-open signal). Built-ins run for every open doc each settle;
     /// externals run only for these. Retired in `on_task` once the pass that ran
@@ -406,6 +412,7 @@ impl GlobalState {
             next_outgoing_id: 1,
             settle_deadline: None,
             lint_generation: 0,
+            last_applied_lint_generation: 0,
             external_pending: HashSet::new(),
         }
     }

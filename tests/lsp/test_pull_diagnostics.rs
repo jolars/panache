@@ -189,6 +189,66 @@ fn workspace_pull_reports_all_open_documents() {
     );
 }
 
+/// A burst of `did_open`s (a client opening a whole workspace) arms a single
+/// settle over every document. `pump` must wait for that in-flight pass to be
+/// applied before reporting quiescence — otherwise the whole batch's diagnostics
+/// never reach the store and `workspace/diagnostic` comes back empty.
+///
+/// Regression: `pump` used to break on the first lull whenever `settle_deadline`
+/// was clear, abandoning a settle pass still running on the pool once the pass
+/// outran the poll step. The fix tracks the last-applied lint generation so
+/// `pump` blocks until the dispatched pass lands.
+#[test]
+fn workspace_pull_reports_a_burst_open_after_one_pump() {
+    let mut server = TestLspServer::new();
+    server.initialize_pull("file:///workspace");
+
+    // Open many heavyweight documents WITHOUT pumping between them, so a single
+    // settle covers the whole batch and the pass is large enough to outrun the
+    // poll step. Each doc carries a heading-hierarchy violation plus filler so
+    // the pass does real parse+lint work.
+    let mut filler = String::new();
+    for i in 0..1_000 {
+        filler.push_str(&format!(
+            "Paragraph {i:04} alpha beta gamma delta epsilon.\n"
+        ));
+    }
+    let body = format!("# H1\n\n### H3 skip\n\n{filler}");
+
+    let count = 40;
+    let uris: Vec<String> = (0..count)
+        .map(|i| format!("file:///workspace/doc{i:03}.qmd"))
+        .collect();
+    for uri in &uris {
+        server.open_document(uri, &body, "quarto");
+    }
+
+    // One pump for the whole burst.
+    server.pump(Duration::from_secs(10));
+
+    let report = server.workspace_diagnostic(vec![]);
+    let reported = workspace_full_reports(&report);
+    let reported_uris: std::collections::HashSet<&str> =
+        reported.iter().map(|(uri, _)| uri.as_str()).collect();
+
+    for uri in &uris {
+        assert!(
+            reported_uris.contains(uri.as_str()),
+            "workspace report dropped {uri}: only {}/{count} of the burst reported",
+            reported_uris.len()
+        );
+        let items = reported
+            .iter()
+            .find(|(u, _)| u == uri)
+            .map(|(_, items)| *items)
+            .unwrap_or(&[]);
+        assert!(
+            has_heading_hierarchy(items),
+            "expected heading-hierarchy diagnostic for {uri}"
+        );
+    }
+}
+
 /// Closing a document drops it from the pull store so it stops appearing in
 /// workspace pulls.
 #[test]

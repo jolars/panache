@@ -518,6 +518,10 @@ impl GlobalState {
                 if generation != self.lint_generation {
                     return;
                 }
+                // Record that this generation's pass has landed, so a waiter
+                // (the test harness's `pump`) can tell the settle is no longer in
+                // flight.
+                self.last_applied_lint_generation = generation;
                 // Hand the complete merged set to the collection: it upserts the
                 // URIs whose diagnostics changed, leaves unchanged ones untouched
                 // (no redundant push, stable pull `result_id`), and clears every
