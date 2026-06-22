@@ -1,0 +1,16 @@
+---
+title: Schema test
+forrmat: html
+toc: maybe
+my-custom-field: 42
+---
+
+# Body
+
+```{python}
+#| echo: maybe
+#| eccho: false
+1 + 1
+```
+
+Some text.

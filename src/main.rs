@@ -1602,8 +1602,17 @@ fn main() -> io::Result<()> {
                     std::process::exit(1);
                 }
             };
+            // Quarto project manifests (`_quarto.yml` / `_metadata.yml`) are
+            // standalone YAML, not markdown documents. Pull explicit manifest
+            // targets out of the normal document pipeline and validate them
+            // against the Quarto schema directly. The filename detects as Quarto
+            // (see `detect_flavor`), so schema validation applies unless an
+            // explicit `--flavor` overrides it — matching how a `.qmd` behaves.
+            let (manifest_files, files): (Vec<PathBuf>, Vec<PathBuf>) = files
+                .into_iter()
+                .partition(|p| panache::linter::quarto_schema::manifest_schema_root(p).is_some());
             // Handle stdin case
-            if files.is_empty() {
+            if files.is_empty() && manifest_files.is_empty() {
                 let start_dir = start_dir_for(cli.stdin_filename.as_deref())?;
                 let (cfg, cfg_source) = load_config_for_cli(
                     cli.config.as_deref(),
@@ -1711,7 +1720,7 @@ fn main() -> io::Result<()> {
                 )
             };
 
-            if expanded_files.is_empty() {
+            if expanded_files.is_empty() && manifest_files.is_empty() {
                 if force_exclude {
                     return Ok(());
                 }
@@ -1927,15 +1936,52 @@ fn main() -> io::Result<()> {
                 cache_ref.save_if_dirty()?;
             }
 
+            // Validate explicit Quarto manifest targets against the schema. These
+            // bypass the document pipeline (and its cache); there are typically
+            // only a handful per invocation, so a simple sequential pass is fine.
+            for manifest_path in &manifest_files {
+                let manifest_doc = match lint_quarto_manifest(
+                    manifest_path,
+                    cli.config.as_deref(),
+                    cli.isolated,
+                    cli.cache_dir.as_deref(),
+                    cli.flavor.map(Flavor::from),
+                ) {
+                    Ok(doc) => doc,
+                    Err(err) => {
+                        eprintln!("Error: {}: {}", manifest_path.display(), err);
+                        std::process::exit(1);
+                    }
+                };
+                if manifest_doc.diagnostics.is_empty() {
+                    continue;
+                }
+                any_issues = true;
+                total_issues += manifest_doc.diagnostics.len();
+                if !cli.quiet {
+                    // Manifest diagnostics carry no auto-fixes; print them as-is
+                    // even under `--fix`.
+                    print_diagnostics(
+                        &manifest_doc.diagnostics,
+                        Some(manifest_path.as_path()),
+                        Some(&manifest_doc.input),
+                        use_color,
+                        message_format,
+                        true,
+                    );
+                }
+            }
+
+            let total_files = expanded_files.len() + manifest_files.len();
+
             if !any_issues && !check && !cli.quiet {
-                println!("No issues found in {} file(s)", expanded_files.len());
+                println!("No issues found in {} file(s)", total_files);
             }
 
             if check && any_issues {
                 eprintln!(
                     "\nFound {} issue(s) across {} file(s)",
-                    total_issues,
-                    expanded_files.len()
+                    total_issues, total_files
                 );
                 std::process::exit(1);
             }
@@ -1950,6 +1996,36 @@ struct LintedDocument {
     path: PathBuf,
     input: String,
     diagnostics: Vec<panache::linter::Diagnostic>,
+}
+
+/// Lint a standalone Quarto project manifest (`_quarto.yml` / `_metadata.yml`)
+/// against the Quarto schema. The schema half honors the `quarto-schema` rule
+/// toggle (resolved from config near the manifest); YAML parse errors are always
+/// reported. The caller guarantees `path` is a recognized manifest.
+fn lint_quarto_manifest(
+    path: &Path,
+    config: Option<&Path>,
+    isolated: bool,
+    cache_dir: Option<&Path>,
+    flavor: Option<Flavor>,
+) -> io::Result<LintedDocument> {
+    let input = fs::read_to_string(path)?;
+    let root = panache::linter::quarto_schema::manifest_schema_root(path)
+        .expect("caller only passes recognized manifest paths");
+    let start_dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
+    let (cfg, _cfg_source) =
+        load_config_for_cli(config, isolated, cache_dir, &start_dir, Some(path), flavor)?;
+    // The manifest filename detects as Quarto, so `cfg.flavor` is Quarto unless
+    // an explicit `--flavor` overrode it; gate the schema half on that (and the
+    // rule toggle) so the CLI and LSP agree on when manifests are validated.
+    let schema_enabled = cfg.flavor == Flavor::Quarto && cfg.lint.is_rule_enabled("quarto-schema");
+    let diagnostics =
+        panache::linter::quarto_schema::lint_manifest_text(&input, root, schema_enabled);
+    Ok(LintedDocument {
+        path: path.to_path_buf(),
+        input,
+        diagnostics,
+    })
 }
 
 fn lint_documents_with_includes(

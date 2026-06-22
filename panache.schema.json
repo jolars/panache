@@ -144,6 +144,10 @@
       },
       "description": "Linter configuration.",
       "properties": {
+        "quarto-version": {
+          "description": "Quarto release whose vendored schema the `quarto-schema` rule validates against.",
+          "type": "string"
+        },
         "rules": {
           "additionalProperties": {
             "type": "boolean"

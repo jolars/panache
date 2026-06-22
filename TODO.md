@@ -132,6 +132,65 @@ analogue; do not re-audit them: call hierarchy, type hierarchy,
 - [ ] Hard-wrapped text in code blocks
 - [ ] Use blanklines around horizontal rules
 
+#### YAML frontmatter semantics (yamllint gaps, #385)
+
+Surveyed yamllint's 23 rules against what panache already does. The bulk are
+**style** (`braces`/`brackets`/`colons`/`commas`/`hyphens` spacing,
+`indentation`, `line-length`, `quoted-strings`, `trailing-spaces`,
+`empty-lines`, comment formatting, `key-ordering`, `new-lines`, EOF newline) ---
+those belong to the YAML formatter and `panache format --check`, **not** the
+linter. Syntax validity and `key-duplicates` are already covered by
+`yaml-parse-error` (consumer-aware). The genuine *linter* gaps are the
+semantic-value footguns below; none are caught today (verified clean under both
+default and `--flavor quarto`):
+
+- [ ] **Consumer-divergence rule (covers yamllint `truthy` + `octal-values` +
+  `float-values`).** Don't port yamllint's version-agnostic "don't write
+  `no`" style nag. Panache already validates frontmatter against multiple
+  YAML versions per consumer (libyaml 1.1 + js-yaml 1.2 for Quarto) via the
+  two-pool validator. The high-value rule is flagging values whose *resolved
+  type/value differs across the active consumers* --- a real ambiguity bug,
+  not a style opinion. Examples: `country: no` (1.1 boolean `false` vs 1.2
+  string `"no"`, the "Norway problem"); `mode: 0755` (1.1 octal `493` vs 1.2
+  string); `010`, `.inf`, `.nan`, scientific notation. Leverages existing
+  `YamlValidationContext` infrastructure; won't false-positive where the
+  value is unambiguous for the doc's consumers.
+
+- [ ] **Undeclared alias (yamllint `anchors`, undeclared case).**
+  `ref: *missing` with no matching `&missing` emits nothing today, but an
+  undefined alias is a *hard error* in libyaml/js-yaml/PyYAML. This is
+  arguably a **validator gap** (belongs in `yaml-parse-error`, not a new
+  lint rule) --- requires resolving anchors/aliases during validation.
+
+- [ ] **Empty values (yamllint `empty-values`).** `title:` → implicit null;
+  often a forgotten value, but frequently intentional (`tags:`). Lower
+  priority; if added, make it opt-in.
+
+- [ ] **Duplicate/unused anchors (yamllint `anchors`, remaining cases).**
+  Softer, lint-flavored; duplicate anchors (last-wins) and unused anchors.
+  Lowest priority.
+
+- [x] **Quarto schema validation (bigger feature, Quarto-only) --- frontmatter,
+  cell options, and project config landed.** The `quarto-schema` lint rule
+  (#385) validates document **frontmatter**, **code-cell options**
+  (`#| ...`, against the `engine-knitr`/`engine-jupyter` root by cell
+  language), and **project config files** (`_quarto.yml` against
+  `project-config`, `_metadata.yml` against `front-matter`) against Quarto's
+  machine-readable schema: unknown/misspelled keys (`forrmat:` →
+  did-you-mean `format`), type mismatches, and invalid enum values. Quarto's
+  compiled `all-schema-definitions.json` is distilled at vendor time into a
+  compact, reviewable artifact (`assets/quarto-schema/schema.json`, pinned
+  via `.panache-source`; refresh with `scripts/update-quarto-schema.sh`) and
+  interpreted by `src/linter/quarto_schema/`. Open objects only flag
+  near-miss typos; closed subtrees reject unknown keys. Manifests are
+  validated on the CLI (explicit `panache lint _quarto.yml`) and in the LSP
+  (manifests reachable from an open project document, published on the
+  manifest's own URI). Target version pinned with `[lint] quarto-version`.
+
+  Remaining:
+  - Format-gated keys (`tags.formats`) are ignored; deeply nested options behind
+    a permissive `anyOf` branch may go unchecked.
+
 ### Configuration
 
 - [ ] Severity levels (error, warning, info)

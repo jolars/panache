@@ -1088,3 +1088,72 @@ fn test_lint_explicit_config_exclude_anchors_at_config_dir() {
         .success()
         .stdout(predicate::str::contains("No issues found in 1 file(s)"));
 }
+
+#[test]
+fn test_lint_quarto_yml_schema_violation() {
+    let temp_dir = TempDir::new().unwrap();
+    let manifest = temp_dir.path().join("_quarto.yml");
+    fs::write(&manifest, "project:\n  type: website\nforrmat: html\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", manifest.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("quarto-schema-unknown-key"))
+        .stdout(predicate::str::contains("forrmat"));
+}
+
+#[test]
+fn test_lint_quarto_yml_clean() {
+    let temp_dir = TempDir::new().unwrap();
+    let manifest = temp_dir.path().join("_quarto.yml");
+    fs::write(&manifest, "project:\n  type: website\nformat: html\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", manifest.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No issues found"));
+}
+
+#[test]
+fn test_lint_quarto_yml_check_mode_fails() {
+    let temp_dir = TempDir::new().unwrap();
+    let manifest = temp_dir.path().join("_quarto.yml");
+    fs::write(&manifest, "forrmat: html\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--check", manifest.to_str().unwrap()])
+        .assert()
+        .failure();
+}
+
+#[test]
+fn test_lint_quarto_yml_schema_skipped_under_explicit_pandoc_flavor() {
+    // The manifest filename detects as Quarto, but an explicit `--flavor pandoc`
+    // overrides that (as it would for a `.qmd`), so the schema half is skipped.
+    let temp_dir = TempDir::new().unwrap();
+    let manifest = temp_dir.path().join("_quarto.yml");
+    fs::write(&manifest, "forrmat: html\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--flavor", "pandoc", manifest.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No issues found"));
+}
+
+#[test]
+fn test_lint_metadata_yml_validates_against_front_matter() {
+    let temp_dir = TempDir::new().unwrap();
+    let manifest = temp_dir.path().join("_metadata.yml");
+    // `toc` is a boolean in the front-matter schema; `_metadata.yml` is directory
+    // metadata, so it validates against `front-matter`, not `project-config`.
+    fs::write(&manifest, "toc: maybe\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", manifest.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("quarto-schema-type-mismatch"));
+}

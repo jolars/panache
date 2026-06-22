@@ -1,0 +1,6 @@
+repo=https://github.com/quarto-dev/quarto-cli
+tag=v1.9.38
+commit=6ebb5db80eb542ac76189c3d7c33ae6f654b93d2
+source=git-tag
+artifact=src/resources/editor/tools/yaml/all-schema-definitions.json
+generated=2026-06-22

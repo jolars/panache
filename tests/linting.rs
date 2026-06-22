@@ -865,3 +865,53 @@ fn test_stray_fenced_div_markers() {
         "message should mention the marker"
     );
 }
+
+#[test]
+fn test_quarto_schema_frontmatter_and_cells() {
+    let diagnostics = lint_file_with_config("quarto_schema.qmd", "flavor = \"quarto\"");
+    let schema_diags: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code.starts_with("quarto-schema-"))
+        .collect();
+
+    // Frontmatter: `forrmat` (typo) + `toc: maybe` (type). Cell: `echo: maybe`
+    // (type) + `eccho` (typo). `title` and the custom `my-custom-field` are not
+    // flagged.
+    assert_eq!(schema_diags.len(), 4, "got: {schema_diags:?}");
+    assert!(
+        schema_diags
+            .iter()
+            .any(|d| d.code == "quarto-schema-unknown-key"
+                && d.message.contains("forrmat")
+                && d.message.contains("format")),
+        "expected unknown-key suggestion for forrmat"
+    );
+    assert!(
+        schema_diags
+            .iter()
+            .any(|d| d.code == "quarto-schema-unknown-key"
+                && d.message.contains("eccho")
+                && d.message.contains("echo")),
+        "expected unknown-key suggestion for the cell option eccho"
+    );
+    assert_eq!(
+        schema_diags
+            .iter()
+            .filter(|d| d.code == "quarto-schema-type-mismatch")
+            .count(),
+        2,
+        "expected two type mismatches (frontmatter toc, cell echo)"
+    );
+}
+
+#[test]
+fn test_quarto_schema_does_not_run_for_pandoc() {
+    // Default flavor is Pandoc; the rule must not fire.
+    let diagnostics = lint_file("quarto_schema.qmd");
+    assert!(
+        diagnostics
+            .iter()
+            .all(|d| !d.code.starts_with("quarto-schema-")),
+        "quarto-schema must not run under Pandoc"
+    );
+}

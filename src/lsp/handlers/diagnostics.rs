@@ -5,7 +5,7 @@
 //! publishes, and the main loop turns them into `textDocument/publishDiagnostics`
 //! notifications (dropping stale ones via the lint generation counter).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 
 use lsp_types::{
@@ -82,15 +82,48 @@ pub(crate) fn manifest_publishes(snap: &StateSnapshot, uri: &Uri) -> (Vec<Publis
     let Some(doc_state) = snap.document_state(uri) else {
         return (Vec::new(), HashSet::new());
     };
-    let mut publishes = Vec::new();
-    let mut manifest_uris = HashSet::new();
-    let manifest_diags = crate::salsa::project_manifest_diagnostics(
+    // Collect linter diagnostics per manifest path so parse errors and
+    // `quarto-schema` diagnostics for the same file land in ONE publish — the
+    // LSP replaces the full diagnostic set per URI, so two publishes for the
+    // same URI would clobber each other.
+    let mut by_path: BTreeMap<PathBuf, Vec<crate::linter::diagnostics::Diagnostic>> =
+        BTreeMap::new();
+
+    let parse_diags = crate::salsa::project_manifest_diagnostics(
         snap.db(),
         doc_state.salsa_file,
         doc_state.salsa_config,
     );
-    for (path, yaml_error) in manifest_diags {
-        let Some(target_uri) = Uri::from_file_path(path) else {
+    for (path, yaml_error) in parse_diags {
+        let Some(file_text) = snap.db().file_text(path.clone()) else {
+            continue;
+        };
+        let Some(manifest_text) = file_text.text(snap.db()).as_deref() else {
+            continue;
+        };
+        if let Some(diag) =
+            crate::linter::metadata_diagnostics::yaml_error_diagnostic(yaml_error, manifest_text)
+        {
+            by_path.entry(path.clone()).or_default().push(diag);
+        }
+    }
+
+    let schema_diags = crate::salsa::project_manifest_schema_diagnostics(
+        snap.db(),
+        doc_state.salsa_file,
+        doc_state.salsa_config,
+    );
+    for (path, diags) in schema_diags {
+        by_path
+            .entry(path.clone())
+            .or_default()
+            .extend(diags.iter().cloned());
+    }
+
+    let mut publishes = Vec::new();
+    let mut manifest_uris = HashSet::new();
+    for (path, diags) in by_path {
+        let Some(target_uri) = Uri::from_file_path(&path) else {
             continue;
         };
         // The manifest is typically NOT an open document, so read its text from
@@ -101,16 +134,12 @@ pub(crate) fn manifest_publishes(snap: &StateSnapshot, uri: &Uri) -> (Vec<Publis
         let Some(manifest_text) = file_text.text(snap.db()).as_deref() else {
             continue;
         };
-        if let Some(diag) =
-            crate::linter::metadata_diagnostics::yaml_error_diagnostic(yaml_error, manifest_text)
-        {
-            publishes.push((
-                target_uri.clone(),
-                None,
-                vec![convert_diagnostic(&diag, manifest_text)],
-            ));
-            manifest_uris.insert(target_uri);
-        }
+        let converted = diags
+            .iter()
+            .map(|d| convert_diagnostic(d, manifest_text))
+            .collect();
+        publishes.push((target_uri.clone(), None, converted));
+        manifest_uris.insert(target_uri);
     }
     (publishes, manifest_uris)
 }

@@ -6,11 +6,16 @@ use tempfile::TempDir;
 
 /// Whether any publish for `uri` in `publishes` carries a `yaml-parse-error`.
 fn has_yaml_parse_error(publishes: &[lsp_types::PublishDiagnosticsParams], uri: &Uri) -> bool {
+    has_code(publishes, uri, "yaml-parse-error")
+}
+
+/// Whether any publish for `uri` in `publishes` carries a diagnostic with `code`.
+fn has_code(publishes: &[lsp_types::PublishDiagnosticsParams], uri: &Uri, code: &str) -> bool {
     publishes
         .iter()
         .filter(|p| &p.uri == uri)
         .flat_map(|p| &p.diagnostics)
-        .any(|d| matches!(d.code.as_ref(), Some(NumberOrString::String(s)) if s == "yaml-parse-error"))
+        .any(|d| matches!(d.code.as_ref(), Some(NumberOrString::String(s)) if s == code))
 }
 
 #[test]
@@ -194,6 +199,53 @@ fn test_manifest_diagnostic_clears_when_quarto_yml_fixed() {
     assert!(
         last.diagnostics.is_empty(),
         "manifest diagnostic should be cleared after the fix, got {:?}",
+        last.diagnostics
+    );
+}
+
+#[test]
+fn test_quarto_yml_schema_diagnostic_published_and_clears() {
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let doc_path = root.join("doc.qmd");
+    let quarto_path = root.join("_quarto.yml");
+    // Valid YAML, but a frontmatter-key typo the Quarto schema can decide.
+    fs::write(&quarto_path, "forrmat: html\n").unwrap();
+    fs::write(&doc_path, "# Heading\n").unwrap();
+
+    let mut server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).unwrap().to_string();
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap();
+    let quarto_uri = Uri::from_file_path(&quarto_path).unwrap();
+    server.initialize(&root_uri);
+    server.open_document(&doc_uri.to_string(), "# Heading\n", "quarto");
+    server.pump(Duration::from_secs(2));
+
+    let initial = server.drain_all_publish_diagnostics();
+    assert!(
+        has_code(&initial, &quarto_uri, "quarto-schema-unknown-key"),
+        "expected a quarto-schema diagnostic on _quarto.yml; got {initial:?}"
+    );
+    assert!(
+        !has_code(&initial, &doc_uri, "quarto-schema-unknown-key"),
+        "manifest schema diagnostic must NOT land on the document"
+    );
+
+    // Fix the manifest on disk and notify via the watcher.
+    fs::write(&quarto_path, "format: html\n").unwrap();
+    server.did_change_watched_files(vec![FileEvent {
+        uri: quarto_uri.clone(),
+        typ: FileChangeType::CHANGED,
+    }]);
+    server.pump(Duration::from_secs(2));
+
+    let after = server.drain_publish_diagnostics(&quarto_uri.to_string());
+    let last = after
+        .last()
+        .expect("expected a clearing publish on _quarto.yml after the fix");
+    assert!(
+        last.diagnostics.is_empty(),
+        "schema diagnostic should clear after the fix, got {:?}",
         last.diagnostics
     );
 }

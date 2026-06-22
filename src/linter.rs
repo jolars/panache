@@ -7,6 +7,7 @@ pub mod external_linters_sync;
 pub mod index;
 pub mod metadata_diagnostics;
 pub(crate) mod offsets;
+pub mod quarto_schema;
 pub mod rules;
 pub mod runner;
 
@@ -79,6 +80,7 @@ fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(rules::crossref_as_link_target::CrossrefAsLinkTargetRule),
         Box::new(rules::chunk_label_spaces::ChunkLabelSpacesRule),
         Box::new(rules::missing_chunk_labels::MissingChunkLabelsRule),
+        Box::new(rules::quarto_schema::QuartoSchemaRule),
         Box::new(rules::figure_crossref_captions::FigureCrossrefCaptionsRule),
         Box::new(rules::emoji_aliases::EmojiAliasesRule),
         Box::new(rules::html_entities::HtmlEntitiesRule),
