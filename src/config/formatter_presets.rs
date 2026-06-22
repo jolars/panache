@@ -33,6 +33,15 @@ const PRESETS: &[FormatterPresetMetadata] = &[
         supported_languages: &["r"],
     },
     FormatterPresetMetadata {
+        name: "arity",
+        url: "https://github.com/jolars/arity",
+        description: "Formatter for the R programming language.",
+        cmd: "arity",
+        args: &["format"],
+        stdin: true,
+        supported_languages: &["r"],
+    },
+    FormatterPresetMetadata {
         name: "alejandra",
         url: "https://kamadorueda.com/alejandra/",
         description: "Uncompromising Nix formatter.",
@@ -67,6 +76,15 @@ const PRESETS: &[FormatterPresetMetadata] = &[
         args: &["--stdin"],
         stdin: true,
         supported_languages: &["text", "txt", "markdown", "md"],
+    },
+    FormatterPresetMetadata {
+        name: "badness",
+        url: "https://github.com/jolars/badness",
+        description: "Formatter for LaTeX and BibTeX built on a lossless syntax tree.",
+        cmd: "badness",
+        args: &["format", "--stdin-filepath", "{}"],
+        stdin: true,
+        supported_languages: &["tex", "latex", "bib", "bibtex"],
     },
     FormatterPresetMetadata {
         name: "bean-format",
@@ -647,10 +665,12 @@ pub fn formatter_preset_supported_languages(name: &str) -> Option<&'static [&'st
 pub fn formatter_preset_names() -> &'static [&'static str] {
     &[
         "air",
+        "arity",
         "alejandra",
         "asmfmt",
         "astyle",
         "autocorrect",
+        "badness",
         "bean-format",
         "bibtex-tidy",
         "beautysh",
@@ -801,6 +821,26 @@ mod tests {
             assert!(
                 presets.iter().any(|preset| preset.name == "csharpier"),
                 "Expected csharpier preset to support {language}"
+            );
+        }
+    }
+
+    #[test]
+    fn arity_is_available_for_r() {
+        let presets = formatter_presets_for_language("r");
+        assert!(
+            presets.iter().any(|preset| preset.name == "arity"),
+            "Expected arity preset to support r"
+        );
+    }
+
+    #[test]
+    fn badness_is_available_for_latex_and_bibtex() {
+        for language in ["tex", "latex", "bib", "bibtex"] {
+            let presets = formatter_presets_for_language(language);
+            assert!(
+                presets.iter().any(|preset| preset.name == "badness"),
+                "Expected badness preset to support {language}"
             );
         }
     }

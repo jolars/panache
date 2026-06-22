@@ -37,6 +37,25 @@ Command
 Type
 :   Stdin
 
+## `arity`
+
+Formatter for the R programming language.
+
+Homepage
+:   <https://github.com/jolars/arity>
+
+Supported Languages
+:   `r`
+
+Command
+:   `arity`
+
+`args`
+:   `[format]`
+
+Type
+:   Stdin
+
 ## `asmfmt`
 
 Go assembler formatter.
@@ -90,6 +109,25 @@ Command
 
 `args`
 :   `[--stdin]`
+
+Type
+:   Stdin
+
+## `badness`
+
+Formatter for LaTeX and BibTeX built on a lossless syntax tree.
+
+Homepage
+:   <https://github.com/jolars/badness>
+
+Supported Languages
+:   `tex`, `latex`, `bib`, `bibtex`
+
+Command
+:   `badness`
+
+`args`
+:   `[format, --stdin-filepath, {}]`
 
 Type
 :   Stdin
