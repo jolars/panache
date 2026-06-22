@@ -1,0 +1,4 @@
+[advisories]
+# proc-macro-error2 is unmaintained but only reachable via jiff's optional
+# `defmt` feature, which is never enabled; it is never compiled into panache.
+ignore = ["RUSTSEC-2026-0173"]
