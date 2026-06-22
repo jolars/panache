@@ -1,0 +1,6 @@
+So our total degrees of freedom is:
+$$
+  \begin{split}
+  a & = b
+  \end{split}
+$$

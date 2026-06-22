@@ -1,0 +1,7 @@
+The negative log-likelihood is
+
+\[ 
+  \theta_1 = \frac{\mu}{\sigma^2},
+\]
+
+which gives the result.

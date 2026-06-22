@@ -407,6 +407,8 @@ golden_test_cases!(
     issue_179_hashpipe_one_space_list_idempotency,
     issue_hashpipe_nested_list_indent,
     issue_176_display_math_colon_idempotency,
+    issue_381_display_math_marker_trailing_space,
+    issue_383_backslash_display_math_marker_trailing_space,
     issue_187_list_plus_wrap_idempotency,
     issue_181_hashpipe_fig_subcap_idempotency,
     issue_189_hashpipe_figcap_idempotency,

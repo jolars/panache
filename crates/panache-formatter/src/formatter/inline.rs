@@ -615,13 +615,25 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 result.push_str(&math::format_math(&content, &opts));
                 result.push('\n');
             } else {
-                // Process content: trim surrounding newlines (NOT leading spaces)
-                // and trailing whitespace, strip common leading whitespace, then
-                // re-indent every line by `math_indent`. Trimming only leading
-                // newlines keeps each line's true indent visible to `min_indent`,
-                // so the re-indent is idempotent: a later pass strips the pad as
-                // common indentation before re-applying it, rather than stacking.
-                let trimmed_content = content.trim_start_matches(['\n', '\r']).trim_end();
+                // Process content: drop leading blank (whitespace-only) lines and
+                // trailing whitespace, strip common leading indentation, then
+                // re-indent every line by `math_indent`. Leading whitespace-only
+                // lines must be dropped rather than emitted: a blank line directly
+                // after the opening `$$` reparses as a paragraph break that splits
+                // the display math (pandoc ends `$$…$$` on any blank line), so
+                // emitting one is not lossless across passes. The opening marker's
+                // own trailing whitespace (`$$ `) surfaces here as exactly such a
+                // leading line. Stripping only full blank lines (not leading spaces
+                // of a content line) keeps each real line's indent visible to
+                // `min_indent`, so the re-indent stays idempotent.
+                let mut trimmed_content = content.trim_end();
+                while let Some((first, rest)) = trimmed_content.split_once('\n') {
+                    if first.trim().is_empty() {
+                        trimmed_content = rest;
+                    } else {
+                        break;
+                    }
+                }
                 if !trimmed_content.is_empty() {
                     // Find minimum indentation across all non-empty lines
                     let min_indent = trimmed_content
