@@ -1592,6 +1592,7 @@ fn main() -> io::Result<()> {
             files,
             check,
             fix,
+            unsafe_fixes,
             message_format,
             force_exclude,
         } => {
@@ -1663,8 +1664,16 @@ fn main() -> io::Result<()> {
                 }
 
                 if fix {
-                    let fixed_output = apply_fixes(&input, &diagnostics);
+                    let fixed_output = apply_fixes(&input, &diagnostics, unsafe_fixes);
                     print!("{}", fixed_output);
+                    let unsafe_skipped = if unsafe_fixes {
+                        0
+                    } else {
+                        count_unsafe_fixes(&diagnostics)
+                    };
+                    if unsafe_skipped > 0 && !cli.quiet {
+                        eprintln!("{}", unsafe_fixes_hint(unsafe_skipped));
+                    }
                 } else if !cli.quiet {
                     print_diagnostics(
                         &diagnostics,
@@ -1875,16 +1884,33 @@ fn main() -> io::Result<()> {
                         let fixable = root_doc
                             .diagnostics
                             .iter()
-                            .filter(|d| d.fix.is_some())
+                            .filter(|d| fix_will_apply(d, unsafe_fixes))
                             .count();
+                        // Diagnostics left unfixed: no applicable fix, plus
+                        // unsafe fixes skipped because --unsafe-fixes wasn't
+                        // passed. These are still reported to the user.
                         let remaining: Vec<_> = root_doc
                             .diagnostics
                             .iter()
-                            .filter(|d| d.fix.is_none())
+                            .filter(|d| !fix_will_apply(d, unsafe_fixes))
                             .cloned()
                             .collect();
+                        // The summary's "no auto-fix available" count is only
+                        // the genuinely unfixable diagnostics; an available-but-
+                        // skipped unsafe fix is surfaced by the hint instead.
+                        let no_fix_count = root_doc
+                            .diagnostics
+                            .iter()
+                            .filter(|d| d.fix.is_none())
+                            .count();
+                        let unsafe_skipped = if unsafe_fixes {
+                            0
+                        } else {
+                            count_unsafe_fixes(&root_doc.diagnostics)
+                        };
                         if fixable > 0 {
-                            let fixed_output = apply_fixes(&root_doc.input, &root_doc.diagnostics);
+                            let fixed_output =
+                                apply_fixes(&root_doc.input, &root_doc.diagnostics, unsafe_fixes);
                             fs::write(&file_path, fixed_output)?;
                         }
                         if !remaining.is_empty() && !cli.quiet {
@@ -1898,7 +1924,10 @@ fn main() -> io::Result<()> {
                             );
                         }
                         if !cli.quiet {
-                            print_fix_summary(fixable, remaining.len(), &file_path);
+                            print_fix_summary(fixable, no_fix_count, &file_path);
+                            if unsafe_skipped > 0 {
+                                println!("{}", unsafe_fixes_hint(unsafe_skipped));
+                            }
                         }
                     } else if !cli.quiet {
                         print_diagnostics(
@@ -2206,12 +2235,45 @@ fn print_fix_summary(fixed: usize, remaining: usize, file: &Path) {
     }
 }
 
-fn apply_fixes(input: &str, diagnostics: &[panache::linter::Diagnostic]) -> String {
+/// Whether a diagnostic's fix would be applied under the current safety mode:
+/// it must carry a fix that is either safe or, with `allow_unsafe`, any fix.
+fn fix_will_apply(diag: &panache::linter::Diagnostic, allow_unsafe: bool) -> bool {
+    use panache::linter::FixSafety;
+    diag.fix
+        .as_ref()
+        .is_some_and(|f| allow_unsafe || f.safety == FixSafety::Safe)
+}
+
+/// Number of diagnostics carrying an unsafe fix (regardless of whether it will
+/// be applied), used to surface the `--unsafe-fixes` hint.
+fn count_unsafe_fixes(diagnostics: &[panache::linter::Diagnostic]) -> usize {
+    use panache::linter::FixSafety;
+    diagnostics
+        .iter()
+        .filter(|d| {
+            d.fix
+                .as_ref()
+                .is_some_and(|f| f.safety == FixSafety::Unsafe)
+        })
+        .count()
+}
+
+fn unsafe_fixes_hint(count: usize) -> String {
+    format!("{count} unsafe fix(es) available; run with --unsafe-fixes to apply.")
+}
+
+fn apply_fixes(
+    input: &str,
+    diagnostics: &[panache::linter::Diagnostic],
+    allow_unsafe: bool,
+) -> String {
+    use panache::linter::FixSafety;
     use panache::linter::diagnostics::Edit;
 
     let mut edits: Vec<&Edit> = diagnostics
         .iter()
         .filter_map(|d| d.fix.as_ref())
+        .filter(|f| allow_unsafe || f.safety == FixSafety::Safe)
         .flat_map(|f| &f.edits)
         .collect();
 
@@ -2344,6 +2406,10 @@ fn cached_diagnostic_from_runtime(diag: &panache::linter::Diagnostic) -> cache::
                 replacement: edit.replacement.clone(),
             })
             .collect(),
+        safety: match fix.safety {
+            panache::linter::FixSafety::Safe => cache::CachedFixSafety::Safe,
+            panache::linter::FixSafety::Unsafe => cache::CachedFixSafety::Unsafe,
+        },
     });
 
     CachedDiagnostic {
@@ -2395,6 +2461,10 @@ fn runtime_diagnostic_from_cached(diag: &cache::CachedDiagnostic) -> panache::li
                 replacement: edit.replacement.clone(),
             })
             .collect(),
+        safety: match fix.safety {
+            cache::CachedFixSafety::Safe => panache::linter::FixSafety::Safe,
+            cache::CachedFixSafety::Unsafe => panache::linter::FixSafety::Unsafe,
+        },
     });
 
     panache::linter::Diagnostic {

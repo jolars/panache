@@ -60,6 +60,27 @@ Panache uses three severity levels:
 `info`
 :   Informational messages (currently unused, reserved for future use)
 
+## Fix safety
+
+Auto-fixes carry a safety level that controls when `panache lint --fix` applies
+them:
+
+`safe`
+:   The fix preserves the document's meaning---it only tidies syntax. Safe fixes
+    are applied by a plain `--fix`.
+
+`unsafe`
+:   The fix may change the document's meaning (for example, deleting a key).
+    Unsafe fixes are skipped by a plain `--fix`; pass `--unsafe-fixes` alongside
+    `--fix` to apply them too. When a run leaves unsafe fixes unapplied, the CLI
+    prints how many are available.
+
+In the editor (LSP), unsafe fixes are still offered as individual quick fixes
+(labeled `(unsafe)`), but they are excluded from the aggregate "Fix all
+auto-fixable lint issues" action, mirroring the safe-by-default CLI behavior.
+
+The "Auto-fix" field of each rule below notes when its fix is unsafe.
+
 ## Rules
 
 ### `heading-hierarchy` {#heading-hierarchy}
@@ -160,7 +181,9 @@ Severity
 :   Warning
 
 Auto-fix
-:   No
+:   Yes (unsafe). Deletes the empty key's whole line. Marked
+    [unsafe](#fix-safety) because dropping a key changes the document's data, so
+    it is applied only with `--unsafe-fixes`.
 
 Diagnostic codes
 :   [`empty-values`](#empty-values)
@@ -197,8 +220,9 @@ warning[empty-values]: Key `title` has an empty value (implicit null)
 ```
 
 **Resolution:** Supply a value, delete the key, or write an explicit `null` if
-the empty value is intentional. No auto-fix is provided because that choice is
-an author-intent decision.
+the empty value is intentional. The auto-fix takes the "delete the key" path,
+but because that discards data it is [unsafe](#fix-safety) and runs only under
+`--unsafe-fixes`.
 
 ### `heading-eaten-attrs` {#heading-eaten-attrs}
 

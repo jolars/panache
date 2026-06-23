@@ -12,7 +12,8 @@ pub mod rules;
 pub mod runner;
 
 pub use diagnostics::{
-    Diagnostic, DiagnosticNote, DiagnosticNoteKind, DiagnosticOrigin, Fix, Location, Severity,
+    Diagnostic, DiagnosticNote, DiagnosticNoteKind, DiagnosticOrigin, Fix, FixSafety, Location,
+    Severity,
 };
 pub use rules::{DiagnosticCode, Requirement, Rule, RuleMeta, RuleRegistry};
 pub use runner::LintRunner;

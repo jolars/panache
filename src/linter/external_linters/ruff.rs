@@ -118,10 +118,7 @@ impl ExternalLinterParser for RuffParser {
                 if edits.is_empty() {
                     None
                 } else {
-                    Some(Fix {
-                        message: fix.message.clone(),
-                        edits,
-                    })
+                    Some(Fix::safe(fix.message.clone(), edits))
                 }
             } else {
                 None

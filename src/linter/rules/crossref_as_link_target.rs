@@ -78,13 +78,13 @@ fn push_if_at_target(dest: &LinkDest, input: &str, diagnostics: &mut Vec<Diagnos
         "Link target starts with '@'; cross-references and citation keys must \
          stand alone, not appear as a link destination",
     )
-    .with_fix(Fix {
-        message: "Replace '@' with '#' to link to an anchor".to_string(),
-        edits: vec![Edit {
+    .with_fix(Fix::safe(
+        "Replace '@' with '#' to link to an anchor",
+        vec![Edit {
             range: at_range,
             replacement: "#".to_string(),
         }],
-    });
+    ));
 
     diagnostics.push(diagnostic);
 }

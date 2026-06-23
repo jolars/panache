@@ -43,13 +43,13 @@ impl Rule for AdjacentFootnoteRefsRule {
 
             let insert_at = node.text_range().start();
             let location = Location::from_range(node.text_range(), input);
-            let fix = Fix {
-                message: "Insert a space between the footnote references".to_string(),
-                edits: vec![Edit {
+            let fix = Fix::safe(
+                "Insert a space between the footnote references",
+                vec![Edit {
                     range: TextRange::new(insert_at, insert_at),
                     replacement: " ".to_string(),
                 }],
-            };
+            );
             diagnostics.push(
                 Diagnostic::warning(
                     location,

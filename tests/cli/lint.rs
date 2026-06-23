@@ -135,6 +135,74 @@ fn test_lint_fix_reports_remaining_when_some_fixed() {
 }
 
 #[test]
+fn test_lint_fix_skips_unsafe_fixes_and_hints() {
+    // `empty-values` only offers an unsafe fix; a bare --fix must not apply it
+    // (the key stays) and should surface the --unsafe-fixes hint.
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    let original = "---\ntitle:\nauthor: Jane\n---\n\n# Doc\n\nBody.\n";
+    fs::write(&test_file, original).unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--fix", test_file.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("empty-values"))
+        .stdout(predicate::str::contains("--unsafe-fixes"));
+
+    let after = fs::read_to_string(&test_file).unwrap();
+    assert_eq!(
+        after, original,
+        "unsafe fix must not apply under bare --fix"
+    );
+}
+
+#[test]
+fn test_lint_unsafe_fixes_removes_empty_key() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(
+        &test_file,
+        "---\ntitle:\nauthor: Jane\n---\n\n# Doc\n\nBody.\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "lint",
+            "--fix",
+            "--unsafe-fixes",
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Fixed"));
+
+    let after = fs::read_to_string(&test_file).unwrap();
+    assert!(
+        !after.contains("title:"),
+        "empty key should be removed: {after:?}"
+    );
+    assert!(
+        after.contains("author: Jane"),
+        "other keys preserved: {after:?}"
+    );
+}
+
+#[test]
+fn test_lint_unsafe_fixes_requires_fix() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(&test_file, "---\ntitle:\n---\n\n# Doc\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--unsafe-fixes", test_file.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--fix"));
+}
+
+#[test]
 fn test_lint_multiple_files() {
     let temp_dir = TempDir::new().unwrap();
     let file1 = temp_dir.path().join("test1.qmd");

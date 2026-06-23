@@ -7,12 +7,15 @@
 //! alike, since both embed the same YAML CST; an *explicit* null (`title: null`
 //! or `title: ~`) is a real scalar and is never flagged.
 //!
-//! No auto-fix: the right resolution (supply a value, delete the key, or write
-//! an explicit `null`) is an author-intent decision the rule can't make.
+//! The auto-fix deletes the empty key's whole line. It is marked **unsafe**
+//! (applied only under `--unsafe-fixes`) because dropping a key changes the
+//! document's data: the right resolution—supply a value, delete the key, or
+//! write an explicit `null`—is an author-intent decision the rule can't make.
 
-use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Location};
+use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Edit, Fix, Location};
 use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{AstNode, SyntaxKind, SyntaxNode, YamlBlockMapEntry};
+use rowan::{TextRange, TextSize};
 
 pub struct EmptyValuesRule;
 
@@ -26,7 +29,7 @@ impl Rule for EmptyValuesRule {
             name: "empty-values",
             default_on: true,
             requires: Requirement::Always,
-            auto_fix: false,
+            auto_fix: true,
             codes: const { &[DiagnosticCode::warning("empty-values")] },
         }
     }
@@ -70,11 +73,53 @@ fn classify(node: &SyntaxNode, input: &str) -> Option<Diagnostic> {
         None => "Mapping key has an empty value (implicit null)".to_string(),
     };
 
+    let fix_message = match entry.key_text() {
+        Some(key_text) => format!("Remove the empty key `{key_text}`"),
+        None => "Remove the empty key".to_string(),
+    };
+    let fix = Fix::unsafe_fix(
+        fix_message,
+        vec![Edit {
+            range: line_deletion_range(node, input),
+            replacement: String::new(),
+        }],
+    );
+
     Some(
-        Diagnostic::warning(location, "empty-values", message).with_note(
-            DiagnosticNoteKind::Help,
-            "Provide a value, remove the key, or write an explicit `null` if the empty value is intentional",
-        ),
+        Diagnostic::warning(location, "empty-values", message)
+            .with_note(
+                DiagnosticNoteKind::Help,
+                "Provide a value, remove the key, or write an explicit `null` if the empty value is intentional",
+            )
+            .with_fix(fix),
+    )
+}
+
+/// The byte range of the empty key's whole line, from the start of its leading
+/// indentation through the trailing newline (inclusive). Deleting this range
+/// removes the key cleanly; starting at the entry node would leave the line's
+/// indentation dangling, merging the next line into the orphaned whitespace.
+///
+/// The end is taken from the first newline after the line start, not from the
+/// entry node's own end: an implicit-null entry's range already swallows its
+/// trailing newline, so searching forward from it would over-delete the
+/// following line. An empty key is always a single physical line, so the line's
+/// own newline is the correct terminator.
+fn line_deletion_range(node: &SyntaxNode, input: &str) -> TextRange {
+    let entry_start: usize = node.text_range().start().into();
+
+    // Back up over the leading indentation to the start of the line.
+    let line_start = input[..entry_start].rfind('\n').map_or(0, |nl| nl + 1);
+
+    // Extend forward through the newline that terminates the line, if any.
+    let line_end = match input[line_start..].find('\n') {
+        Some(offset) => line_start + offset + 1,
+        None => input.len(),
+    };
+
+    TextRange::new(
+        TextSize::new(line_start as u32),
+        TextSize::new(line_end as u32),
     )
 }
 
@@ -96,6 +141,24 @@ mod tests {
         &input[start..end]
     }
 
+    /// Apply a single diagnostic's fix to `input`.
+    fn apply_fix(d: &Diagnostic, input: &str) -> String {
+        let fix = d.fix.as_ref().expect("diagnostic should carry a fix");
+        let mut edits: Vec<&Edit> = fix.edits.iter().collect();
+        edits.sort_by_key(|e| e.range.start());
+        let mut out = String::new();
+        let mut last = 0;
+        for edit in edits {
+            let start: usize = edit.range.start().into();
+            let end: usize = edit.range.end().into();
+            out.push_str(&input[last..start]);
+            out.push_str(&edit.replacement);
+            last = end;
+        }
+        out.push_str(&input[last..]);
+        out
+    }
+
     #[test]
     fn flags_empty_frontmatter_value() {
         let input = "---\ntitle:\n---\n";
@@ -105,6 +168,30 @@ mod tests {
         assert!(diags[0].message.contains("title"));
         // Caret points at the key name, not the whole entry.
         assert_eq!(span(&diags[0], input), "title");
+    }
+
+    #[test]
+    fn offers_unsafe_removal_fix() {
+        let input = "---\ntitle:\n---\n";
+        let diags = lint(input);
+        assert_eq!(diags.len(), 1, "got: {diags:?}");
+        let fix = diags[0].fix.as_ref().expect("fix should be present");
+        assert_eq!(fix.safety, crate::linter::FixSafety::Unsafe);
+        assert_eq!(fix.edits.len(), 1);
+        assert!(fix.edits[0].replacement.is_empty());
+        // The whole `title:\n` line is removed, leaving valid frontmatter.
+        assert_eq!(apply_fix(&diags[0], input), "---\n---\n");
+    }
+
+    #[test]
+    fn fix_removes_indented_key_with_its_indentation() {
+        // The deletion must include the leading `  ` of `  echo:`, or the
+        // indentation would be orphaned onto the next line.
+        let input = "---\nexecute:\n  echo:\n---\n";
+        let diags = lint(input);
+        assert_eq!(diags.len(), 1, "got: {diags:?}");
+        assert!(diags[0].message.contains("echo"));
+        assert_eq!(apply_fix(&diags[0], input), "---\nexecute:\n---\n");
     }
 
     #[test]

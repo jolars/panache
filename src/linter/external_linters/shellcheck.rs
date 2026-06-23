@@ -142,10 +142,10 @@ impl ExternalLinterParser for ShellcheckParser {
                     None
                 } else {
                     edits.sort_by_key(|(start, _)| *start);
-                    Some(Fix {
-                        message: format!("Apply ShellCheck fix for SC{}", sc_diag.code),
-                        edits: edits.into_iter().map(|(_, e)| e).collect(),
-                    })
+                    Some(Fix::safe(
+                        format!("Apply ShellCheck fix for SC{}", sc_diag.code),
+                        edits.into_iter().map(|(_, e)| e).collect(),
+                    ))
                 }
             } else {
                 None

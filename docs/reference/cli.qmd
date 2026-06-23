@@ -159,6 +159,9 @@ Configure rules in panache.toml with [lint] section.
 
 * `--check` — Exit with code 1 if violations found (CI mode)
 * `--fix` — Automatically fix violations where possible
+* `--unsafe-fixes` — Apply auto-fixes marked unsafe in addition to safe ones. 
+
+   A fix is unsafe when applying it may change the document's meaning rather than merely tidy its syntax (for example, the `empty-values` rule's fix deletes the empty key). Unsafe fixes are skipped by a bare --fix; this flag opts into them. Requires --fix.
 * `--message-format <MESSAGE_FORMAT>` — Diagnostic rendering format
 
   Default value: `human`

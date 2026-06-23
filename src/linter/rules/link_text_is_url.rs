@@ -84,10 +84,10 @@ impl Rule for LinkTextIsUrlRule {
                 DiagnosticNoteKind::Help,
                 format!("rewrite as `{}`", replacement),
             )
-            .with_fix(Fix {
-                message: "Convert to autolink".to_string(),
-                edits: vec![Edit { range, replacement }],
-            });
+            .with_fix(Fix::safe(
+                "Convert to autolink",
+                vec![Edit { range, replacement }],
+            ));
             diagnostics.push(diag);
         }
 

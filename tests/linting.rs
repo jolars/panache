@@ -929,5 +929,10 @@ fn test_empty_values() {
     assert_eq!(empty.len(), 2, "got: {empty:?}");
     assert!(empty.iter().any(|d| d.message.contains("title")));
     assert!(empty.iter().any(|d| d.message.contains("tags")));
-    assert!(empty.iter().all(|d| d.fix.is_none()));
+    // Each flagged key offers an unsafe removal fix.
+    assert!(empty.iter().all(|d| {
+        d.fix
+            .as_ref()
+            .is_some_and(|f| f.safety == panache::linter::FixSafety::Unsafe)
+    }));
 }

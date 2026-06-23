@@ -91,16 +91,16 @@ impl ExternalLinterParser for EslintParser {
                             mappings,
                         );
                         if let (Some(fix_start), Some(fix_end)) = (fix_start, fix_end) {
-                            Some(Fix {
-                                message: "Apply ESLint fix".to_string(),
-                                edits: vec![Edit {
+                            Some(Fix::safe(
+                                "Apply ESLint fix",
+                                vec![Edit {
                                     range: TextRange::new(
                                         (fix_start as u32).into(),
                                         (fix_end as u32).into(),
                                     ),
                                     replacement: eslint_fix.text,
                                 }],
-                            })
+                            ))
                         } else {
                             None
                         }

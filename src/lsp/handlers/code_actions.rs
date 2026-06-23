@@ -111,6 +111,10 @@ pub(crate) fn code_action(
             if !should_offer_quickfix(request_range, lsp_diag.range) {
                 continue;
             }
+            // Unsafe fixes may change the document's meaning, so they are still
+            // offered individually (labeled) but excluded from the aggregate
+            // "fix all" action, matching the CLI's safe-by-default `--fix`.
+            let is_unsafe = fix.safety == linter::FixSafety::Unsafe;
             let mut changes = HashMap::new();
             let text_edits: Vec<TextEdit> = fix
                 .edits
@@ -120,7 +124,9 @@ pub(crate) fn code_action(
                     let end_offset: usize = edit.range.end().into();
                     let start = offset_to_position(&text, start_offset);
                     let end = offset_to_position(&text, end_offset);
-                    fix_all_edits.push((start_offset, end_offset, edit.replacement.clone()));
+                    if !is_unsafe {
+                        fix_all_edits.push((start_offset, end_offset, edit.replacement.clone()));
+                    }
                     TextEdit {
                         range: Range { start, end },
                         new_text: edit.replacement.clone(),
@@ -130,8 +136,13 @@ pub(crate) fn code_action(
 
             changes.insert(uri.clone(), text_edits);
 
+            let title = if is_unsafe {
+                format!("{} (unsafe)", fix.message)
+            } else {
+                fix.message.clone()
+            };
             let action = CodeAction {
-                title: fix.message.clone(),
+                title,
                 kind: Some(CodeActionKind::QUICKFIX),
                 diagnostics: Some(vec![lsp_diag]),
                 edit: Some(WorkspaceEdit {

@@ -46,10 +46,7 @@ impl Rule for HeadingHierarchyRule {
                     if let Some(node) = heading_node_at_range(tree, range) {
                         create_fix(&node, level, expected_level)
                     } else {
-                        Fix {
-                            message: "Could not create fix".to_string(),
-                            edits: vec![],
-                        }
+                        Fix::safe("Could not create fix", vec![])
                     }
                 });
 
@@ -85,19 +82,16 @@ fn create_fix(heading: &SyntaxNode, current_level: usize, expected_level: usize)
         && let Some(range) = heading.atx_marker_range()
     {
         let replacement = "#".repeat(expected_level);
-        return Fix {
-            message: format!(
+        return Fix::safe(
+            format!(
                 "Change heading level from {} to {}",
                 current_level, expected_level
             ),
-            edits: vec![Edit { range, replacement }],
-        };
+            vec![Edit { range, replacement }],
+        );
     }
 
-    Fix {
-        message: "Could not create fix".to_string(),
-        edits: vec![],
-    }
+    Fix::safe("Could not create fix", vec![])
 }
 
 #[cfg(test)]

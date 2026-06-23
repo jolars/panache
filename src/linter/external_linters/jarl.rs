@@ -87,16 +87,16 @@ impl ExternalLinterParser for JarlParser {
                             mappings,
                         ),
                     ) {
-                        Some(Fix {
-                            message: format!("Apply suggested fix: {}", jarl_diag.fix.content),
-                            edits: vec![Edit {
+                        Some(Fix::safe(
+                            format!("Apply suggested fix: {}", jarl_diag.fix.content),
+                            vec![Edit {
                                 range: TextRange::new(
                                     (fix_start as u32).into(),
                                     (fix_end as u32).into(),
                                 ),
                                 replacement: jarl_diag.fix.content.clone(),
                             }],
-                        })
+                        ))
                     } else {
                         None
                     }

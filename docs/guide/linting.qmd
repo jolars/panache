@@ -82,6 +82,22 @@ Auto-fix modifies files in place. Always commit your changes first or use
 version control.
 :::
 
+#### Safe and unsafe fixes
+
+Fixes come in two safety levels. A plain `--fix` applies only **safe** fixes,
+which tidy syntax without changing what the document means. Fixes that could
+change meaning---such as the `empty-values` fix, which deletes the empty key---
+are **unsafe** and skipped by default. When unsafe fixes are available but were
+not applied, the CLI reports how many; pass `--unsafe-fixes` to apply them too:
+
+```bash
+panache lint --fix --unsafe-fixes document.qmd
+```
+
+`--unsafe-fixes` only takes effect alongside `--fix`. See [Fix
+safety](../reference/linter-rules.qmd#fix-safety) for details, including how
+unsafe fixes behave in the editor.
+
 ### CI Mode
 
 If you want to enforce linting in a CI/CD pipeline, use the `--check` flag. This

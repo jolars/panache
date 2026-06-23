@@ -165,7 +165,8 @@ default and `--flavor quarto`):
 - [x] **Empty values (yamllint `empty-values`).** `title:` → implicit null;
   often a forgotten value, but frequently intentional (`tags:`). Shipped as
   the `empty-values` rule, on by default; explicit `null`/`~` is never
-  flagged. No auto-fix (author-intent decision).
+  flagged. Ships an *unsafe* auto-fix that deletes the empty key's line
+  (applied only under `--unsafe-fixes`).
 
 - [ ] **Duplicate/unused anchors (yamllint `anchors`, remaining cases).**
   Softer, lint-flavored; duplicate anchors (last-wins) and unused anchors.

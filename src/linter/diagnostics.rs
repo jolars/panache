@@ -26,10 +26,43 @@ pub struct Edit {
     pub replacement: String,
 }
 
+/// Whether applying a fix is guaranteed to preserve the document's meaning.
+///
+/// `Safe` fixes are applied by a bare `--fix`. `Unsafe` fixes may change the
+/// document's semantics (e.g. deleting a key), so they are only applied when the
+/// user opts in with `--unsafe-fixes`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FixSafety {
+    Safe,
+    Unsafe,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Fix {
     pub message: String,
     pub edits: Vec<Edit>,
+    pub safety: FixSafety,
+}
+
+impl Fix {
+    /// A fix whose edits preserve the document's meaning; applied by `--fix`.
+    pub fn safe(message: impl Into<String>, edits: Vec<Edit>) -> Self {
+        Self {
+            message: message.into(),
+            edits,
+            safety: FixSafety::Safe,
+        }
+    }
+
+    /// A fix that may change the document's meaning; only applied under
+    /// `--unsafe-fixes`. Named `unsafe_fix` because `unsafe` is a keyword.
+    pub fn unsafe_fix(message: impl Into<String>, edits: Vec<Edit>) -> Self {
+        Self {
+            message: message.into(),
+            edits,
+            safety: FixSafety::Unsafe,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -189,11 +222,8 @@ mod tests {
         assert!(diag.notes.is_empty());
         assert!(diag.fix.is_none());
 
-        let diag_with_fix =
-            Diagnostic::warning(location, "test-warning", "Test warning").with_fix(Fix {
-                message: "Fix message".to_string(),
-                edits: vec![],
-            });
+        let diag_with_fix = Diagnostic::warning(location, "test-warning", "Test warning")
+            .with_fix(Fix::safe("Fix message", vec![]));
         assert_eq!(diag_with_fix.severity, Severity::Warning);
         assert_eq!(diag_with_fix.origin, DiagnosticOrigin::BuiltIn);
         assert!(diag_with_fix.notes.is_empty());

@@ -365,6 +365,18 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
         #[arg(help = "Automatically fix violations where possible")]
         fix: bool,
 
+        /// Also apply unsafe auto-fixes
+        #[arg(long, requires = "fix")]
+        #[arg(help = "Also apply unsafe auto-fixes (may change document meaning)")]
+        #[arg(
+            long_help = "Apply auto-fixes marked unsafe in addition to safe ones. \
+            \n\nA fix is unsafe when applying it may change the document's meaning rather \
+            than merely tidy its syntax (for example, the `empty-values` rule's fix deletes \
+            the empty key). Unsafe fixes are skipped by a bare --fix; this flag opts into \
+            them. Requires --fix."
+        )]
+        unsafe_fixes: bool,
+
         /// Diagnostic rendering format
         #[arg(long, value_enum, default_value = "human")]
         #[arg(help = "Diagnostic rendering format")]

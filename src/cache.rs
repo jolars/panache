@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use wincode::{SchemaRead, SchemaWrite};
 
-const CACHE_SCHEMA_VERSION: u32 = 1;
+const CACHE_SCHEMA_VERSION: u32 = 2;
 const CACHE_FILE_NAME: &str = "cli-cache-v1.bin";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,9 +67,16 @@ pub struct CachedEdit {
 }
 
 #[derive(Debug, Clone, SchemaWrite, SchemaRead, PartialEq, Eq)]
+pub enum CachedFixSafety {
+    Safe,
+    Unsafe,
+}
+
+#[derive(Debug, Clone, SchemaWrite, SchemaRead, PartialEq, Eq)]
 pub struct CachedFix {
     pub message: String,
     pub edits: Vec<CachedEdit>,
+    pub safety: CachedFixSafety,
 }
 
 #[derive(Debug, Clone, SchemaWrite, SchemaRead, PartialEq, Eq)]
