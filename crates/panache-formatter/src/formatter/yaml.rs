@@ -587,12 +587,20 @@ mod tests {
 
     #[test]
     fn rule_6_plain_scalar_wrap_skips_non_plain_and_short() {
-        // Quoted scalars never wrap (carry semantic intent + escape behavior).
-        // Block scalars (`|`/`>`) never wrap (carry semantics). Short
-        // values stay single-line.
+        // A long *double*-quoted scalar folds into `>-` so it can wrap
+        // (rule 17). A single-quoted scalar that rule 3 preserves (because
+        // its content holds an apostrophe) is left untouched — rule 17
+        // only matches `"`. (A *simple* single-quoted scalar is first
+        // rewritten to double-quoted by rule 3 and then folds; that
+        // cascade is covered in the integration tests.) Literal (`|`)
+        // block scalars never wrap (newlines are content); short values
+        // stay single-line.
         let opts = YamlFormatOptions::default();
-        let quoted = "tbl-cap: \"This is a long quoted caption that should not wrap because quoted scalars are preserved verbatim by the YAML formatter\"\n";
-        assert_eq!(format_yaml(quoted, &opts), quoted);
+        let double = "tbl-cap: \"This is a long quoted caption that should not wrap because quoted scalars are preserved verbatim by the YAML formatter\"\n";
+        let double_folded = "tbl-cap: >-\n  This is a long quoted caption that should not wrap because quoted scalars are\n  preserved verbatim by the YAML formatter\n";
+        assert_eq!(format_yaml(double, &opts), double_folded);
+        let single = "tbl-cap: 'A long single-quoted caption that won''t fold because it keeps its single quotes for the apostrophe and is plenty long'\n";
+        assert_eq!(format_yaml(single, &opts), single);
         let literal =
             "tbl-cap: |\n  literal text that should not wrap regardless of line width hard stop\n";
         assert_eq!(format_yaml(literal, &opts), literal);

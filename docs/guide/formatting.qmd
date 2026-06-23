@@ -139,8 +139,26 @@ line breaks fold to spaces, so this never changes the value:
 
 Blank lines and more-indented lines inside a folded scalar are significant and
 left in place. Literal block scalars (`|`) are left untouched --- their line
-breaks are significant content --- as are quoted scalars. Under
-`wrap = "preserve"`, nothing in the YAML is reflowed.
+breaks are significant content. Under `wrap = "preserve"`, nothing in the YAML
+is reflowed.
+
+A long **double-quoted** scalar that overflows `line-width` is converted to a
+folded `>-` block scalar so it can wrap, for example a long `description:` or
+`title:`:
+
+```yaml
+description: >-
+  This is a very long description that happens to exceed the line-length cap by
+  a fair bit, and gets folded so it wraps.
+```
+
+This happens only when it is completely value-preserving. A scalar is left
+quoted (and may stay over the limit) if its value contains escape sequences
+(`\n`, `\t`, a unicode escape, ...), leading or trailing whitespace, or control
+characters, or if it already spans multiple lines. A single-quoted scalar with
+simple content is normalized to double quotes first and then folds the same way;
+one that keeps its single quotes (because it contains an apostrophe) is left
+untouched.
 
 A few top-level frontmatter keys are exempt even under a wrapping mode, because
 a downstream non-YAML tool reads their value line by line. Currently that is

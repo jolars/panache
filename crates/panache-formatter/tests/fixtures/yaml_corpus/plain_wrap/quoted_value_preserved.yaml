@@ -1,1 +1,1 @@
-tbl-cap: "This is a long quoted caption that should not wrap because quoted scalars are preserved verbatim by the YAML formatter"
+tbl-cap: "A short quoted caption that fits and stays quoted verbatim"

@@ -69,13 +69,15 @@ fn pretty_yaml_opts(in_tree: &YamlFormatOptions) -> FormatOptions {
 }
 
 /// Folded (`>`) block scalars are a deliberate divergence from
-/// pretty_yaml: under STYLE.md rule 15 panache reflows their prose,
-/// while pretty_yaml preserves every block scalar verbatim. Such cases
-/// are exempt from the pretty_yaml *parity* check (idempotency is still
-/// asserted). Detected by a value whose block-scalar header is a folded
-/// indicator (`>`, `>-`, `>+`).
-fn contains_folded_scalar(input: &str) -> bool {
-    input.lines().any(|line| {
+/// pretty_yaml, which preserves every block scalar verbatim. Two rules
+/// produce them: STYLE.md rule 15 reflows an existing folded scalar's
+/// prose, and rule 17 folds a long, losslessly-foldable double-quoted
+/// scalar into `>-`. Either way the *output* carries a folded header, so
+/// detecting it on the formatted text exempts both from the pretty_yaml
+/// *parity* check (idempotency is still asserted). Detected by a value
+/// whose block-scalar header is a folded indicator (`>`, `>-`, `>+`).
+fn contains_folded_scalar(text: &str) -> bool {
+    text.lines().any(|line| {
         let trimmed = line.trim_end();
         trimmed.ends_with('>') || trimmed.ends_with(">-") || trimmed.ends_with(">+")
     })
@@ -111,9 +113,11 @@ fn corpus_cross_validates_against_pretty_yaml() {
 
         let in_tree = format_yaml(&input, &opts);
 
-        // Folded scalars deliberately diverge (rule 15); skip parity but
-        // still assert idempotency below.
-        if !contains_folded_scalar(&input) {
+        // Folded scalars deliberately diverge (rules 15 and 17); skip
+        // parity but still assert idempotency below. Checking the
+        // *output* covers both the input-was-folded (rule 15) and
+        // double-quoted-folded-to-`>-` (rule 17) cases.
+        if !contains_folded_scalar(&in_tree) {
             let pretty = match pretty_yaml::format_text(&input, &pretty_opts) {
                 Ok(s) => s,
                 Err(e) => {

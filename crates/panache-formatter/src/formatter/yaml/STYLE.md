@@ -87,22 +87,24 @@ the load-bearing invariants.
    `line_width`, greedy word-wrap onto continuation lines indented at
    `entry/item depth * 2` (the value column, matching rule 1's multi-line scalar
    continuation indent so wrap output round-trips). Quoted (`'…'`, `"…"`) and
-   block (`|`/`>`) scalars never wrap. Already-multi-line scalars are left to
-   rule 1's continuation rule. Scalars decorated with tags (`!!str`), anchors
-   (`&name`), aliases (`*name`), or trailed by inline comments are skipped (the
-   rare-shape escape valve; matches pretty_yaml on the cases that appear in the
-   corpus). Plain scalars inside block sequences are also skipped: pretty_yaml's
-   wrap-continuation column there (`parent_content_col + 2`) disagrees with rule
-   1's multi-line continuation column (`depth * 2`), so pretty_yaml itself isn't
-   idempotent on that shape --- deferred until the parser/formatter can pick one
-   column without losing pass-2 stability. Multi-space runs that are NOT the
-   chosen break point are preserved verbatim mid-value; a multi-space run that
-   IS the break point is consumed entirely by `\n` + continuation indent
-   (pretty_yaml leaves the leading char as a trailing space to preserve YAML's
-   plain-scalar fold semantics, but rule 10 strips it anyway, so consuming the
-   run keeps pass-2 byte-stable --- one of the deliberate trades against
-   pretty_yaml's semantic preservation, in the same family as rule 10's "no
-   trailing whitespace anywhere" stance).
+   block (`|`/`>`) scalars are never reflowed *as plain scalars* (a long
+   double-quoted one may instead convert to a folded scalar --- rule 17).
+   Already-multi-line scalars are left to rule 1's continuation rule. Scalars
+   decorated with tags (`!!str`), anchors (`&name`), aliases (`*name`), or
+   trailed by inline comments are skipped (the rare-shape escape valve; matches
+   pretty_yaml on the cases that appear in the corpus). Plain scalars inside
+   block sequences are also skipped: pretty_yaml's wrap-continuation column
+   there (`parent_content_col + 2`) disagrees with rule 1's multi-line
+   continuation column (`depth * 2`), so pretty_yaml itself isn't idempotent on
+   that shape --- deferred until the parser/formatter can pick one column
+   without losing pass-2 stability. Line breaks are taken only at *single*-space
+   separators (a fold restores exactly one space there, so the break
+   round-trips); a run of >=2 spaces is glued into its chunk and never split, so
+   it is preserved verbatim --- the cost is that a chunk wider than `line_width`
+   overflows its line, like a long URL. (This corrects an earlier behavior that
+   consumed a run sitting at the break point, which silently dropped the run's
+   spaces on the fold; preserving them is value-correct and shared with the rule
+   15 / rule 17 folded paths.)
 
 7. **Blank lines:** runs of multiple interior blank lines collapse to one max.
    Leading blank lines (before the first content line) are stripped entirely ---
@@ -174,7 +176,9 @@ the load-bearing invariants.
     same way as the document body. Bails (leaves verbatim) on an explicit
     indentation indicator (`>2`), a header trailing comment, or an empty body.
     **Literal (`|`) block scalars never wrap** --- their newlines are
-    significant content; **quoted scalars never wrap** either.
+    significant content. A quoted scalar is never *reflowed in place*, but a
+    long double-quoted one may be *converted* to a folded scalar first and then
+    reflowed (rule 17); single-quoted scalars are left untouched.
 
     **Deliberate divergence from pretty_yaml**, which preserves every block
     scalar verbatim: rule 15 is the sanctioned point where the in-tree formatter
@@ -213,6 +217,41 @@ the load-bearing invariants.
     `crates/panache-formatter/tests/format/yaml_verbatim_fields.rs`. Add a field
     only with a reproducing case --- candidates like Pandoc's `header-includes`
     / `include-in-header` are deferred until one surfaces.
+
+17. **Folding long double-quoted scalars.** When a wrap mode is active (not
+    `preserve`), a single-line **double-quoted** scalar whose key/value line
+    overflows `line_width` is rewritten as a folded `>-` block scalar so its
+    prose reflows under rule 15. Strip chomping (`-`) is used because a quoted
+    scalar carries no trailing newline. The conversion fires only when it is
+    **completely value-preserving**; otherwise the scalar stays quoted (and may
+    overflow). Guards (leave quoted on any):
+    - the scalar spans multiple lines (a multi-line `"…"`);
+    - it contains any backslash escape other than `\\` or `\"` (`\n`, `\t`,
+      `\uXXXX`, the `\<newline>` continuation, ... --- all introduce
+      newlines/tabs/control chars/whitespace folding can't reproduce);
+    - the decoded value has leading or trailing whitespace (folding strips it; a
+      leading space also makes the line more-indented = literal);
+    - the decoded value contains a control character (`cp < 0x20`, incl. TAB, or
+      `0x7F`).
+
+    Runs of >=2 spaces are **not** a guard: they round-trip because
+    `wrap_plain_scalar_text` only breaks at a *single*-space separator and keeps
+    longer runs verbatim mid-line (a fold collapses only the break). The
+    conversion reuses rule 15's machinery: it builds a one-line `>-` candidate
+    from the decoded value and runs it through `reflow_folded_scalar`, so it is
+    idempotent by construction (pass 2 re-runs that same path) and applies only
+    when reflow actually splits the value (>=2 body lines). The rule keys off
+    the `"` prefix, so it does not match single-quoted scalars directly --- but
+    a *simple* single-quoted scalar is first rewritten to double-quoted by rule
+    3 and then folds here; a single-quoted scalar rule 3 *preserves* (its
+    content holds a `'`) is left untouched.
+
+    **Deliberate divergence from pretty_yaml**, which preserves the
+    double-quoted scalar verbatim --- the same sanctioned-divergence class as
+    rule 15. The cross-validation corpus detects the folded *output* and skips
+    it for *parity* (idempotency still asserted); behavioral coverage lives in
+    `crates/panache-formatter/tests/format/yaml_double_to_folded.rs`. Added for
+    issue #388 (long `description:`/`title:` frontmatter overflowing the cap).
 
 ## Notes
 

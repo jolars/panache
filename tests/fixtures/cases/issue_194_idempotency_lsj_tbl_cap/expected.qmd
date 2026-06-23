@@ -1,7 +1,7 @@
 ```{r}
 #| label: tbl-tab14-1
-#| tbl-cap: Group means for drug and therapy groups in the *clinicaltrial.csv*
-#|   data
+#| tbl-cap: Group means for drug and therapy groups in the
+#|   *clinicaltrial.csv*  data
 
 # huxtabs[[14]][[1]] |>
 #   set_number_format(value=2)

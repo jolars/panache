@@ -145,6 +145,51 @@ fn try_convert_single_to_double(text: &str) -> Option<String> {
     Some(format!("\"{content}\""))
 }
 
+/// Decode a single-line double-quoted scalar to its actual string value,
+/// but only for the escapes a folded block scalar can reproduce
+/// (STYLE.md rule 17). Returns `None` (leave quoted) for any backslash
+/// escape other than `\\` and `\"`: every other escape (`\n`, `\t`,
+/// `\uXXXX`, the `\<newline>` line-continuation, …) introduces a
+/// newline, tab, control char, or whitespace that folding can't
+/// represent. Brackets/commas inside flow containers never start with
+/// `"`, so the prefix check filters them out.
+fn decode_double_quoted(text: &str) -> Option<String> {
+    if text.len() < 2 || !text.starts_with('"') || !text.ends_with('"') {
+        return None;
+    }
+    let inner = &text[1..text.len() - 1];
+    let mut out = String::with_capacity(inner.len());
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next()? {
+                '\\' => out.push('\\'),
+                '"' => out.push('"'),
+                _ => return None,
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    Some(out)
+}
+
+/// Whether a decoded scalar value can be losslessly represented as a
+/// folded (`>-`) block-scalar body (STYLE.md rule 17). Rejects leading
+/// or trailing whitespace (folding strips it; a leading space also makes
+/// the line "more-indented" = literal) and any control character
+/// (`cp < 0x20`, which catches TAB and LF, or `0x7F`). Multi-space runs
+/// are *not* rejected — `wrap_plain_scalar_text` keeps them verbatim.
+fn is_foldable_value(value: &str) -> bool {
+    if value != value.trim() {
+        return false;
+    }
+    !value.chars().any(|c| {
+        let cp = c as u32;
+        cp < 0x20 || cp == 0x7F
+    })
+}
+
 /// STYLE.md rule 14: a `WHITESPACE` token sitting immediately between
 /// a block structural indicator (`YAML_COLON` after a block-map key,
 /// `YAML_BLOCK_SEQ_ENTRY` after a block-sequence `-`) and its inline
@@ -813,7 +858,31 @@ fn apply_plain_scalar_wrap(buf: String, opts: &YamlFormatOptions) -> String {
             }
             continue;
         }
-        if text.starts_with('\'') || text.starts_with('"') || text.starts_with('|') {
+        // A long, single-line double-quoted scalar is folded into a `>-`
+        // block scalar so its prose can wrap (STYLE.md rule 17), but only
+        // when the value is losslessly foldable. Build a one-line folded
+        // candidate from the decoded value and run it through the same
+        // reflow path; pass 2 re-runs that path on the result, so the
+        // conversion is idempotent by construction. Apply only when
+        // reflow actually splits the value (>=2 body lines), otherwise
+        // leave the short value quoted.
+        if text.starts_with('"') {
+            let depth = block_entry_depth(&value_node);
+            if depth > 0
+                && !text.contains('\n')
+                && let Some(value) = decode_double_quoted(&text)
+                && is_foldable_value(&value)
+            {
+                let candidate = format!(">-\n{}{value}", " ".repeat(depth * 2));
+                if let Some(folded) = reflow_folded_scalar(&candidate, opts, profile)
+                    && folded.matches('\n').count() >= 2
+                {
+                    edits.push((scalar_start, scalar_end, folded));
+                }
+            }
+            continue;
+        }
+        if text.starts_with('\'') || text.starts_with('|') {
             continue;
         }
         // Multi-line plain scalars are left to the continuation-indent
@@ -960,19 +1029,26 @@ fn block_entry_depth(value_node: &SyntaxNode) -> usize {
 
 /// Greedy word-wrap of a plain scalar's text. `start_col` is the column
 /// where the scalar's first character sits on its starting line;
-/// `indent` is the canonical continuation column. Multi-space runs that
-/// are not break points are preserved verbatim (so `x  milk` mid-value
-/// keeps its double space). A multi-space run that IS the break point is
-/// consumed entirely by the `\n` + continuation indent — pretty_yaml
-/// keeps the leading character of the run as a trailing space, but
-/// rule 10 would strip it anyway, and consuming the run here keeps
-/// pass-2 output byte-stable.
+/// `indent` is the canonical continuation column.
+///
+/// A line break is only ever taken at a *single*-space separator —
+/// folding restores exactly one space there, so the break round-trips. A
+/// whitespace run of >=2 is glued *into* its chunk and never split, so it
+/// survives the fold (which would otherwise collapse a break to a single
+/// space and lose the run). The text is therefore tokenized into chunks
+/// delimited by single-space separators (any internal >=2 run stays in
+/// the chunk), and chunks are greedily packed. A chunk wider than `width`
+/// overflows its line, like a long URL.
 fn wrap_plain_scalar_text(text: &str, start_col: usize, indent: usize, width: usize) -> String {
-    let mut out = String::new();
-    let mut col = start_col;
-    let indent_str = " ".repeat(indent);
+    // Build (separator, chunk) units. The separator is the single-space
+    // (or other single-whitespace) break point preceding the chunk, kept
+    // so a non-break emits the author's exact byte; the first unit's
+    // separator is the text's leading whitespace. A >=2 whitespace run
+    // glues its word onto the previous chunk rather than starting a new
+    // (breakable) unit.
+    let mut units: Vec<(String, String)> = Vec::new();
     let mut rest = text;
-    let mut first_word = true;
+    let mut first = true;
     while !rest.is_empty() {
         let ws_end = rest
             .find(|c: char| !c.is_whitespace())
@@ -985,22 +1061,31 @@ fn wrap_plain_scalar_text(text: &str, start_col: usize, indent: usize, width: us
         if word.is_empty() {
             break;
         }
-        let ws_len = ws.chars().count();
-        let word_len = word.chars().count();
-        if first_word {
-            out.push_str(ws);
-            out.push_str(word);
-            col += ws_len + word_len;
-            first_word = false;
-        } else if col + ws_len + word_len > width {
+        if !first && ws.chars().count() >= 2 {
+            let (_, last) = units.last_mut().expect("non-first unit exists");
+            last.push_str(ws);
+            last.push_str(word);
+        } else {
+            units.push((ws.to_string(), word.to_string()));
+            first = false;
+        }
+    }
+
+    let indent_str = " ".repeat(indent);
+    let mut out = String::new();
+    let mut col = start_col;
+    for (i, (sep, chunk)) in units.iter().enumerate() {
+        let sep_len = sep.chars().count();
+        let chunk_len = chunk.chars().count();
+        if i != 0 && col + sep_len + chunk_len > width {
             out.push('\n');
             out.push_str(&indent_str);
-            out.push_str(word);
-            col = indent + word_len;
+            out.push_str(chunk);
+            col = indent + chunk_len;
         } else {
-            out.push_str(ws);
-            out.push_str(word);
-            col += ws_len + word_len;
+            out.push_str(sep);
+            out.push_str(chunk);
+            col += sep_len + chunk_len;
         }
     }
     out
