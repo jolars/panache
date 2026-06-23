@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.16.0](https://github.com/jolars/panache/compare/panache-formatter-v0.15.0...panache-formatter-v0.16.0) (2026-06-23)
+
+### Features
+- add `crossref-prefixes` for extension crossrefs ([`0b190cc`](https://github.com/jolars/panache/commit/0b190cc1ad00e1ca146c758226a325b0c7a16017))
+- **formatter:** tighten spacing around scripts and groups ([`d0075c3`](https://github.com/jolars/panache/commit/d0075c39ebaa794c0b60e409e78277361b884773))
+
+### Bug Fixes
+- **formatter:** drop leading blank line in display math ([`6700a54`](https://github.com/jolars/panache/commit/6700a54b489619040c4cea78e79e917105c9a403)), closes [#381](https://github.com/jolars/panache/issues/381), [#382](https://github.com/jolars/panache/issues/382), and [#383](https://github.com/jolars/panache/issues/383)
+
+### Dependencies
+- updated crates/panache-parser to v0.19.0
+
 ## [0.15.0](https://github.com/jolars/panache/compare/panache-formatter-v0.14.0...panache-formatter-v0.15.0) (2026-06-21)
 
 ### Features

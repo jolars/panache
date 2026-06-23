@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.51.0](https://github.com/jolars/panache/compare/panache-code-v2.50.0...panache-code-v2.51.0) (2026-06-23)
+
+### Features
+- **lsp:** reload config on `didChangeConfiguration` ([`c1595be`](https://github.com/jolars/panache/commit/c1595be10b33cb079a6ed4f7be36cfd382998ce3))
+
+### Dependencies
+- updated panache to v2.58.0
+
 ## [2.50.0](https://github.com/jolars/panache/compare/panache-code-v2.49.0...panache-code-v2.50.0) (2026-06-21)
 
 ### Dependencies
