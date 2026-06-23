@@ -666,22 +666,55 @@ fn find_yaml_value_range(
     Some((start_offset, end_offset))
 }
 
+/// Offset of the first content byte of `input` relative to its own start,
+/// i.e. the byte just past the opening `---` delimiter line. Used to map ranges
+/// found in the delimiter-stripped YAML body back onto the full document.
 fn text_start_offset(input: &str) -> rowan::TextSize {
-    let mut offset = rowan::TextSize::from(0);
-    let mut lines = input.lines();
-    let Some(first) = lines.next() else {
-        return offset;
+    let Some(first) = input.lines().next() else {
+        return rowan::TextSize::from(0);
     };
     if first.trim() != "---" {
-        return offset;
+        return rowan::TextSize::from(0);
     }
-    offset += rowan::TextSize::from(first.len() as u32 + 1);
-    for line in lines {
-        let trimmed = line.trim();
-        if trimmed == "---" || trimmed == "..." {
-            break;
-        }
-        offset += rowan::TextSize::from(line.len() as u32 + 1);
+    rowan::TextSize::from(first.len() as u32 + 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parse;
+
+    #[test]
+    fn text_start_offset_points_past_opening_delimiter() {
+        // The body's first byte sits right after the opening `---\n`, regardless
+        // of how many content lines follow.
+        assert_eq!(
+            text_start_offset("---\nbibliography: references.bib\n---\n"),
+            rowan::TextSize::from(4)
+        );
+        assert_eq!(
+            text_start_offset("---\ntitle: x\nbibliography: refs.bib\n---"),
+            rowan::TextSize::from(4)
+        );
     }
-    offset
+
+    #[test]
+    fn text_start_offset_without_delimiter_is_zero() {
+        assert_eq!(
+            text_start_offset("bibliography: refs.bib"),
+            rowan::TextSize::from(0)
+        );
+    }
+
+    #[test]
+    fn bibliography_source_range_covers_the_value() {
+        let input = "---\nbibliography: references.bib\n---\n";
+        let tree = parse(input, None);
+        let metadata =
+            extract_project_metadata_without_bibliography_parse(&tree, Path::new("doc.qmd"))
+                .unwrap();
+        let bib = metadata.bibliography.expect("bibliography");
+        let range = bib.source_ranges[0];
+        assert_eq!(&input[range], "references.bib");
+    }
 }
