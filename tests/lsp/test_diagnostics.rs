@@ -114,6 +114,184 @@ fn test_did_change_publishes_diagnostics_to_client() {
 }
 
 #[test]
+fn test_bibliography_load_error_span_updates_after_ranged_edit() {
+    let mut server = TestLspServer::new();
+    server.initialize_with_options(
+        "file:///workspace",
+        Some(serde_json::json!({
+            "panache": { "experimental": { "incrementalParsing": true } }
+        })),
+    );
+    assert!(
+        server.experimental_incremental_parsing_enabled(),
+        "incremental parsing should be enabled for this test"
+    );
+    let uri = "file:///workspace/doc.qmd";
+
+    let with_r = "---\nbibliography: references.bib\n---\n\nSee [@known].\n";
+    let without_r = "---\nbibliography: eferences.bib\n---\n\nSee [@known].\n";
+
+    let load_error_span = |params: &PublishDiagnosticsParams, text: &str| -> Option<String> {
+        let diag = params.diagnostics.iter().find(|d| {
+            matches!(&d.code, Some(NumberOrString::String(s)) if s == "bibliography-load-error")
+        })?;
+        let line = text.lines().nth(diag.range.start.line as usize)?;
+        let start = diag.range.start.character as usize;
+        let end = diag.range.end.character as usize;
+        Some(line.get(start..end)?.to_string())
+    };
+
+    // The leading `r` of `references` sits at character 14 of line 1
+    // (`bibliography: ` is 14 chars).
+    let delete_r = TextDocumentContentChangeEvent {
+        range: Some(Range {
+            start: Position {
+                line: 1,
+                character: 14,
+            },
+            end: Position {
+                line: 1,
+                character: 15,
+            },
+        }),
+        range_length: None,
+        text: String::new(),
+    };
+    let insert_r = TextDocumentContentChangeEvent {
+        range: Some(Range {
+            start: Position {
+                line: 1,
+                character: 14,
+            },
+            end: Position {
+                line: 1,
+                character: 14,
+            },
+        }),
+        range_length: None,
+        text: "r".to_string(),
+    };
+
+    server.open_document(uri, with_r, "quarto");
+    server.pump(Duration::from_secs(2));
+    let publishes = server.drain_publish_diagnostics(uri);
+    assert_eq!(
+        publishes.last().and_then(|p| load_error_span(p, with_r)),
+        Some("references.bib".to_string()),
+    );
+
+    server.edit_document(uri, vec![delete_r]);
+    server.pump(Duration::from_secs(2));
+    let publishes = server.drain_publish_diagnostics(uri);
+    assert_eq!(
+        publishes.last().and_then(|p| load_error_span(p, without_r)),
+        Some("eferences.bib".to_string()),
+    );
+
+    server.edit_document(uri, vec![insert_r]);
+    server.pump(Duration::from_secs(2));
+    let publishes = server.drain_publish_diagnostics(uri);
+    assert_eq!(
+        publishes.last().and_then(|p| load_error_span(p, with_r)),
+        Some("references.bib".to_string()),
+        "span must update back to the full value after restoring the path via a ranged edit"
+    );
+}
+
+#[test]
+fn test_bibliography_load_error_clears_after_restoring_existing_path() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+    fs::create_dir_all(root.join(".git")).unwrap();
+    // The bibliography exists on disk, so a valid path produces NO load error.
+    fs::write(
+        root.join("references.bib"),
+        "@article{known,\n  title = {K}\n}\n",
+    )
+    .unwrap();
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = lsp_types::Uri::from_file_path(&doc_path).expect("doc uri");
+    let root_uri = lsp_types::Uri::from_file_path(root).expect("root uri");
+
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    let uri = doc_uri.as_str();
+
+    let with_r = "---\nbibliography: references.bib\n---\n\nSee [@known].\n";
+
+    let has_load_error = |params: &PublishDiagnosticsParams| -> bool {
+        params.diagnostics.iter().any(|d| {
+            matches!(&d.code, Some(NumberOrString::String(s)) if s == "bibliography-load-error")
+        })
+    };
+
+    let delete_r = TextDocumentContentChangeEvent {
+        range: Some(Range {
+            start: Position {
+                line: 1,
+                character: 14,
+            },
+            end: Position {
+                line: 1,
+                character: 15,
+            },
+        }),
+        range_length: None,
+        text: String::new(),
+    };
+    let insert_r = TextDocumentContentChangeEvent {
+        range: Some(Range {
+            start: Position {
+                line: 1,
+                character: 14,
+            },
+            end: Position {
+                line: 1,
+                character: 14,
+            },
+        }),
+        range_length: None,
+        text: "r".to_string(),
+    };
+
+    server.open_document(uri, with_r, "quarto");
+    server.pump(Duration::from_secs(2));
+    let publishes = server.drain_publish_diagnostics(uri);
+    assert!(
+        !publishes.last().is_some_and(has_load_error),
+        "existing bibliography must not produce a load error, got: {:?}",
+        publishes.last().map(|p| &p.diagnostics)
+    );
+
+    // Erase the leading `r` -> eferences.bib (missing) -> load error appears.
+    server.edit_document(uri, vec![delete_r]);
+    server.pump(Duration::from_secs(2));
+    let publishes = server.drain_publish_diagnostics(uri);
+    assert!(
+        publishes.last().is_some_and(has_load_error),
+        "missing bibliography must produce a load error"
+    );
+
+    // Restore the `r` -> references.bib (exists again) -> load error must clear.
+    server.edit_document(uri, vec![insert_r]);
+    server.pump(Duration::from_secs(2));
+    let publishes = server.drain_publish_diagnostics(uri);
+    assert!(
+        publishes.last().is_some(),
+        "restoring the path must trigger a fresh publish that clears the error"
+    );
+    assert!(
+        !publishes.last().is_some_and(has_load_error),
+        "load error must clear after restoring an existing bibliography path, got: {:?}",
+        publishes.last().map(|p| &p.diagnostics)
+    );
+}
+
+#[test]
 fn test_code_actions_filter_quickfixes_to_requested_range() {
     let mut server = TestLspServer::new();
     let content = "# Heading 1\n\n### Heading 3\n\nContent.\n";

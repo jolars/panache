@@ -3218,6 +3218,67 @@ mod tests {
     }
 
     #[test]
+    fn bibliography_load_error_range_updates_after_path_edit() {
+        let temp_dir = tempfile::TempDir::new().expect("temp dir");
+        let root = temp_dir.path();
+        let doc_path = root.join("doc.qmd");
+        // references.bib intentionally missing on disk -> always a load error.
+
+        let mut db = SalsaDb::default();
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+
+        // Mirror the LSP write phase (`reload_open_documents_referenced_files`)
+        // followed by the read phase (`built_in_lint_plan`), returning the text
+        // covered by the bibliography-load-error span.
+        fn load_error_span(db: &SalsaDb, file: FileText, config: FileConfig, text: &str) -> String {
+            let plan = built_in_lint_plan(db, file, config).clone();
+            let diag = plan
+                .diagnostics
+                .iter()
+                .find(|d| d.code == "bibliography-load-error")
+                .expect("bibliography-load-error diagnostic");
+            let start: usize = diag.location.range.start().into();
+            let end: usize = diag.location.range.end().into();
+            text[start..end].to_string()
+        }
+
+        let with_r = "---\nbibliography: references.bib\n---\n\nSee [@known].\n";
+        let without_r = "---\nbibliography: eferences.bib\n---\n\nSee [@known].\n";
+
+        // Initial open.
+        let file = db.update_file_text(doc_path.clone(), with_r.to_string());
+        db.load_referenced_files(file, config, doc_path.clone());
+        assert_eq!(
+            load_error_span(&db, file, config, with_r),
+            "references.bib",
+            "initial span must cover the full value"
+        );
+
+        // Edit: delete the leading `r` -> `eferences.bib`.
+        let file = db.update_file_text(doc_path.clone(), without_r.to_string());
+        db.load_referenced_files(file, config, doc_path.clone());
+        assert_eq!(
+            load_error_span(&db, file, config, without_r),
+            "eferences.bib",
+            "span must follow the edited (shorter) value"
+        );
+
+        // Restore: bring the `r` back -> `references.bib`.
+        let file = db.update_file_text(doc_path.clone(), with_r.to_string());
+        db.load_referenced_files(file, config, doc_path.clone());
+        assert_eq!(
+            load_error_span(&db, file, config, with_r),
+            "references.bib",
+            "span must update back to the full value after restoring the path"
+        );
+    }
+
+    #[test]
     fn project_manifest_diagnostics_reports_and_clears_broken_quarto_yml() {
         let temp_dir = tempfile::TempDir::new().expect("temp dir");
         let root = temp_dir.path();

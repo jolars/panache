@@ -542,3 +542,85 @@ fn document_streaming_single_related_chunk_emits_no_progress() {
         "the related document should ride in the response"
     );
 }
+
+/// In PULL mode a `textDocument/diagnostic` pull is computed on demand, so it is
+/// current *immediately* after an edit — without waiting for the debounced settle
+/// and without depending on the client re-pulling on
+/// `workspace/diagnostic/refresh`. This is the regression guard for the
+/// one-edit-behind bug: previously the pull served the debounced store, so a pull
+/// issued right after `didChange` returned the previous edit's diagnostics.
+#[test]
+fn pull_bibliography_load_error_is_current_without_waiting_for_settle() {
+    let mut server = TestLspServer::new();
+    server.initialize_pull("file:///workspace");
+    assert!(server.pull_diagnostics_enabled());
+    let uri = "file:///workspace/doc.qmd";
+
+    let with_r = "---\nbibliography: references.bib\n---\n\nSee [@known].\n";
+
+    let load_error_path = |result: &DocumentDiagnosticReportResult| -> Option<String> {
+        full_items(result)
+            .iter()
+            .find(|d| matches!(&d.code, Some(NumberOrString::String(s)) if s == "bibliography-load-error"))
+            .map(|d| d.message.clone())
+    };
+
+    let delete_r = TextDocumentContentChangeEvent {
+        range: Some(Range {
+            start: Position {
+                line: 1,
+                character: 14,
+            },
+            end: Position {
+                line: 1,
+                character: 15,
+            },
+        }),
+        range_length: None,
+        text: String::new(),
+    };
+    let insert_r = TextDocumentContentChangeEvent {
+        range: Some(Range {
+            start: Position {
+                line: 1,
+                character: 14,
+            },
+            end: Position {
+                line: 1,
+                character: 14,
+            },
+        }),
+        range_length: None,
+        text: "r".to_string(),
+    };
+
+    server.open_document(uri, with_r, "quarto");
+    server.pump(Duration::from_secs(2));
+    let first = server.document_diagnostic(uri, None);
+    assert!(
+        load_error_path(&first).is_some_and(|m| m.contains("references.bib")),
+        "initial pull must report references.bib, got: {:?}",
+        load_error_path(&first)
+    );
+
+    // Edit to eferences and pull WITHOUT pumping the settle: on-demand compute
+    // makes it current immediately (this is the fix — previously one-behind).
+    server.edit_document(uri, vec![delete_r]);
+    server.drain_client_messages();
+    let fresh = server.document_diagnostic(uri, None);
+    assert!(
+        load_error_path(&fresh).is_some_and(|m| m.contains("/eferences.bib")),
+        "pull right after the edit must already report eferences.bib, got: {:?}",
+        load_error_path(&fresh)
+    );
+
+    // Restore references.bib and pull again without pumping: still current.
+    server.edit_document(uri, vec![insert_r]);
+    server.drain_client_messages();
+    let restored = server.document_diagnostic(uri, None);
+    let msg = load_error_path(&restored);
+    assert!(
+        msg.as_ref().is_some_and(|m| m.contains("/references.bib")),
+        "pull right after restoring must report references.bib, got: {msg:?}"
+    );
+}

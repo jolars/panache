@@ -330,12 +330,38 @@ pub(crate) fn compute_publishes(
     publishes
 }
 
+/// A stable, content-addressed `result_id` for a pulled document's diagnostics.
+///
+/// On-demand pulls (see [`document_diagnostic`]) don't go through the store's
+/// sequential `result_id` allocator, so the id must be derivable from the items
+/// alone: re-pulling unchanged diagnostics yields the same id (→ an `unchanged`
+/// report) and any change yields a different one. `Diagnostic` isn't `Hash`, so
+/// hash its stable JSON encoding.
+fn result_id_for(items: &[Diagnostic]) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    serde_json::to_vec(items)
+        .unwrap_or_default()
+        .hash(&mut hasher);
+    hasher.finish().to_string()
+}
+
 /// Pull handler for `textDocument/diagnostic`.
 ///
-/// Reads the document's latest diagnostics from the pull store (filled by the
-/// same async lint pipeline that drives push). Returns an `unchanged` report when
-/// the client's `previous_result_id` still matches, else a full report. A missing
-/// entry yields an empty full report (clears any stale client-side state).
+/// Computes the pulled document's diagnostics **on demand** from a fresh snapshot
+/// rather than reading the debounced settle store. A client (e.g. neovim) pulls
+/// right after a `didChange`, before the 200 ms settle has re-linted; serving the
+/// store there returns the *previous* edit's diagnostics (a persistent
+/// one-edit-behind lag, since the client doesn't reliably re-pull on the
+/// post-settle `workspace/diagnostic/refresh`). Recomputing here makes every pull
+/// reflect the current buffer — rust-analyzer's model. The compute is read-only
+/// (no salsa input writes), so it never cancels an in-flight settle pass; the
+/// settle still owns push delivery, cross-file/manifest diagnostics, and loading
+/// newly-referenced includes/bibliographies. The store remains the source for
+/// `related_documents` (refreshed by the settle) and for push clients.
+///
+/// Returns an `unchanged` report when the client's `previous_result_id` still
+/// matches the recomputed [`result_id_for`] the items, else a full report.
 ///
 /// For clients that advertise `related_document_support`, `related_documents` is
 /// populated with the cross-file diagnostics of the pulled document's
@@ -346,9 +372,8 @@ pub(crate) fn document_diagnostic(
     gs: &GlobalState,
     params: DocumentDiagnosticParams,
 ) -> Streamed<DocumentDiagnosticReportResult> {
-    // The collection is the unified store for both modes, but a push-only client
-    // is served by push: never surface stored diagnostics through a pull (keeps
-    // push and pull mutually exclusive — no double reporting).
+    // A push-only client is served by push: never surface diagnostics through a
+    // pull (keeps push and pull mutually exclusive — no double reporting).
     if !gs.supports_pull_diagnostics {
         return Streamed::whole(DocumentDiagnosticReportResult::Report(
             DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
@@ -359,32 +384,38 @@ pub(crate) fn document_diagnostic(
     }
     let token = params.partial_result_params.partial_result_token;
     let uri = params.text_document.uri;
-    // Computed once for both arms: an unchanged main document can still have
-    // related documents whose diagnostics changed. When the client asked for
-    // partial results, the first chunk rides in the response and the rest stream
-    // as `$/progress` notifications (see `split_related`).
+
+    // Compute this document's diagnostics on demand over a fresh snapshot.
+    // `compute_publishes` returns one entry per affected URI; the requested URI's
+    // own entry carries its built-in + own cross-file diagnostics. External
+    // linters are intentionally skipped on a pull (they run on the settle).
+    let snap = gs.snapshot();
+    let items = compute_publishes(&snap, &uri, false)
+        .into_iter()
+        .find(|(target, _, _)| *target == uri)
+        .map(|(_, _, items)| items)
+        .unwrap_or_default();
+    let result_id = result_id_for(&items);
+
+    // Computed for both arms: an unchanged main document can still have related
+    // documents whose diagnostics changed. When the client asked for partial
+    // results, the first chunk rides in the response and the rest stream as
+    // `$/progress` notifications (see `split_related`).
     let related = related_documents(gs, &uri);
     let (related, progress) = split_related(token.as_ref(), related);
-    let report = match gs.diagnostics.get(&uri) {
-        Some(stored) if params.previous_result_id.as_deref() == Some(stored.result_id.as_str()) => {
-            DocumentDiagnosticReport::Unchanged(RelatedUnchangedDocumentDiagnosticReport {
-                related_documents: related,
-                unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
-                    result_id: stored.result_id.clone(),
-                },
-            })
-        }
-        Some(stored) => DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
+    let report = if params.previous_result_id.as_deref() == Some(result_id.as_str()) {
+        DocumentDiagnosticReport::Unchanged(RelatedUnchangedDocumentDiagnosticReport {
+            related_documents: related,
+            unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport { result_id },
+        })
+    } else {
+        DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
             related_documents: related,
             full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                result_id: Some(stored.result_id.clone()),
-                items: stored.items.clone(),
+                result_id: Some(result_id),
+                items,
             },
-        }),
-        None => DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
-            related_documents: related,
-            full_document_diagnostic_report: FullDocumentDiagnosticReport::default(),
-        }),
+        })
     };
     Streamed {
         response: DocumentDiagnosticReportResult::Report(report),
