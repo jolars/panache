@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.0](https://github.com/jolars/panache/compare/panache-parser-v0.18.0...panache-parser-v0.19.0) (2026-06-23)
+
+### Features
+- add `crossref-prefixes` for extension crossrefs ([`0b190cc`](https://github.com/jolars/panache/commit/0b190cc1ad00e1ca146c758226a325b0c7a16017))
+
+### Performance Improvements
+- **parser:** de-duplicate definition marker parsing ([`91a1f10`](https://github.com/jolars/panache/commit/91a1f10bc53d92294082a2acfc3442487f49ad2d))
+
 ## [0.18.0](https://github.com/jolars/panache/compare/panache-parser-v0.17.2...panache-parser-v0.18.0) (2026-06-21)
 
 ### Features

@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.58.0](https://github.com/jolars/panache/compare/v2.57.0...v2.58.0) (2026-06-23)
+
+### Features
+- **linter:** add `consumer-divergence` rule ([`39c799f`](https://github.com/jolars/panache/commit/39c799fdeac2adb4087a7a50de3c447269958986))
+- **linter:** add opt-in unsafe auto-fixes ([`0267d9d`](https://github.com/jolars/panache/commit/0267d9d47fd88d41ed4a092ccb34036f21bf524f))
+- **linter:** add `empty-values` rule ([`aac9a11`](https://github.com/jolars/panache/commit/aac9a112d09ebd0176f1f1ae30d1dea144833921))
+- **config:** add `[compat]` section for quarto, pandoc ([`3d16467`](https://github.com/jolars/panache/commit/3d164679b7f3cfd8326a6de8e7cb10ffc6ce8279))
+- **linter:** validate Quarto YAML schema options ([`7b3d363`](https://github.com/jolars/panache/commit/7b3d36353fcc1db8a9318f867c024c3dcd81fa44)), closes [#385](https://github.com/jolars/panache/issues/385)
+- add `crossref-prefixes` for extension crossrefs ([`0b190cc`](https://github.com/jolars/panache/commit/0b190cc1ad00e1ca146c758226a325b0c7a16017))
+- **formatter:** tighten spacing around scripts and groups ([`d0075c3`](https://github.com/jolars/panache/commit/d0075c39ebaa794c0b60e409e78277361b884773))
+- **formatter:** add presets for badness and arity ([`6a57811`](https://github.com/jolars/panache/commit/6a57811886b65fc47eb2dcaca987c6d3f1edf415))
+- **lsp:** stream partial pull diagnostics ([`1983a7d`](https://github.com/jolars/panache/commit/1983a7df1cf954531f86a18e204025b5cd1d364d))
+- **lsp:** add `textDocument/linkedEditingRange` ([`1a9d07b`](https://github.com/jolars/panache/commit/1a9d07b1e75a5ce1f70bcbb23b099d20a1731be7))
+- **lsp:** reload config on `didChangeConfiguration` ([`c1595be`](https://github.com/jolars/panache/commit/c1595be10b33cb079a6ed4f7be36cfd382998ce3))
+
+### Bug Fixes
+- **formatter:** drop leading blank line in display math ([`6700a54`](https://github.com/jolars/panache/commit/6700a54b489619040c4cea78e79e917105c9a403)), closes [#381](https://github.com/jolars/panache/issues/381), [#382](https://github.com/jolars/panache/issues/382), and [#383](https://github.com/jolars/panache/issues/383)
+
+### Performance Improvements
+- **parser:** de-duplicate definition marker parsing ([`91a1f10`](https://github.com/jolars/panache/commit/91a1f10bc53d92294082a2acfc3442487f49ad2d))
+
+### Dependencies
+- updated crates/panache-formatter to v0.16.0
+- updated crates/panache-parser to v0.19.0
+
 ## [2.57.0](https://github.com/jolars/panache/compare/v2.56.0...v2.57.0) (2026-06-21)
 
 ### Features

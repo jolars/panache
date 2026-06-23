@@ -1182,7 +1182,7 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "panache"
-version = "2.57.0"
+version = "2.58.0"
 dependencies = [
  "annotate-snippets",
  "assert_cmd",
@@ -1226,7 +1226,7 @@ dependencies = [
 
 [[package]]
 name = "panache-formatter"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "insta",
  "log",
@@ -1244,7 +1244,7 @@ dependencies = [
 
 [[package]]
 name = "panache-parser"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "entities",
  "insta",
@@ -1434,9 +1434,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.45"
+version = "1.0.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41f2619966050689382d2b44f664f4bc593e129785a36d6ee376ddf37259b924"
+checksum = "dfbc457d0c7a0759a614551b11a6409e5951f6c7537be1f1b7682b9ae9230368"
 dependencies = [
  "proc-macro2",
 ]
