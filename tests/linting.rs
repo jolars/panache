@@ -915,3 +915,19 @@ fn test_quarto_schema_does_not_run_for_pandoc() {
         "quarto-schema must not run under Pandoc"
     );
 }
+
+#[test]
+fn test_empty_values() {
+    let diagnostics = lint_file("empty_values.md");
+    let empty: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "empty-values")
+        .collect();
+
+    // `title:` and `tags:` are implicit nulls; `author` has a value and
+    // `date: null` is an explicit null, so neither is flagged.
+    assert_eq!(empty.len(), 2, "got: {empty:?}");
+    assert!(empty.iter().any(|d| d.message.contains("title")));
+    assert!(empty.iter().any(|d| d.message.contains("tags")));
+    assert!(empty.iter().all(|d| d.fix.is_none()));
+}

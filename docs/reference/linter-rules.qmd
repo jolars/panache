@@ -151,6 +151,55 @@ warning[empty-list-item]: List item has no content
 is provided because the right choice (placeholder vs. removal) is an
 author-intent decision.
 
+### `empty-values` {#empty-values}
+
+Flags YAML block-mapping keys whose value is an implicit null --- a key with
+nothing after the colon.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Diagnostic codes
+:   [`empty-values`](#empty-values)
+
+Description
+
+:   Modeled on yamllint's `empty-values`. A key with no value (`title:` followed
+    by a newline) parses as YAML null. That is occasionally intentional, but far
+    more often a value the author forgot to fill in. The rule walks document
+    frontmatter and hashpipe cell options alike (both embed the same YAML CST).
+
+    An *explicit* null is a deliberate value and is never flagged, so write
+    `title: null` (or `title: ~`) when the empty value is on purpose. The rule
+    covers block mappings only; flow mappings (`{a: }`) and block sequences are not
+    flagged.
+
+**Example violation:**
+
+```markdown
+---
+title:
+author: Jane Roe
+---
+```
+
+**Diagnostic:**
+
+```
+warning[empty-values]: Key `title` has an empty value (implicit null)
+ --> document.md:2:1
+  |
+2 | title:
+  | ^^^^^
+```
+
+**Resolution:** Supply a value, delete the key, or write an explicit `null` if
+the empty value is intentional. No auto-fix is provided because that choice is
+an author-intent decision.
+
 ### `heading-eaten-attrs` {#heading-eaten-attrs}
 
 Detects HTML comments that cause pandoc to silently drop a heading's `{...}`

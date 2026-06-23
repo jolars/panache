@@ -162,9 +162,10 @@ default and `--flavor quarto`):
   arguably a **validator gap** (belongs in `yaml-parse-error`, not a new
   lint rule) --- requires resolving anchors/aliases during validation.
 
-- [ ] **Empty values (yamllint `empty-values`).** `title:` → implicit null;
-  often a forgotten value, but frequently intentional (`tags:`). Lower
-  priority; if added, make it opt-in.
+- [x] **Empty values (yamllint `empty-values`).** `title:` → implicit null;
+  often a forgotten value, but frequently intentional (`tags:`). Shipped as
+  the `empty-values` rule, on by default; explicit `null`/`~` is never
+  flagged. No auto-fix (author-intent decision).
 
 - [ ] **Duplicate/unused anchors (yamllint `anchors`, remaining cases).**
   Softer, lint-flavored; duplicate anchors (last-wins) and unused anchors.
@@ -189,31 +190,7 @@ default and `--flavor quarto`):
 
   Remaining:
   - Format-gated keys (`tags.formats`) are ignored; deeply nested options behind
-    a permissive `anyOf` branch may go unchecked. =======
-
-- [ ] **Empty values (yamllint `empty-values`).** `title:` → implicit null;
-  often a forgotten value, but frequently intentional (`tags:`). Lower
-  priority; if added, make it opt-in.
-
-- [ ] **Duplicate/unused anchors (yamllint `anchors`, remaining cases).**
-  Softer, lint-flavored; duplicate anchors (last-wins) and unused anchors.
-  Lowest priority.
-
-- [ ] **Quarto frontmatter schema validation (bigger feature, Quarto-only).**
-  Unlike pandoc (no schema --- metadata is an arbitrary mapping, so
-  `yaml-parse-error` is the ceiling), Quarto ships a machine-readable schema
-  and validates `_quarto.yml`/document frontmatter against it. Source
-  schemas live in `quarto-cli/src/resources/schema/` (`document-*.yml`,
-  `definitions.yml`), front-matter entry
-  `src/core/lib/yaml-schema/front-matter.ts`, compiled into
-  `all-schema-definitions.json` (what the VS Code extension consumes). A
-  Quarto- flavored lint could catch unknown/misspelled keys (`forrmat:`) and
-  type mismatches (string where an object is expected) --- the actual ask in
-  #385. Caveats: the schema is a large, evolving JSON artifact that must be
-  vendored/version-tracked against a quarto-cli release, and many subtrees
-  are *open* schemas (unknown keys are legal), so only the closed subtrees
-  are validatable. Distinctly larger than the semantic-footgun rules above.
-  >>>>>>> 54b00f77 (docs: note some yaml linting todos)
+    a permissive `anyOf` branch may go unchecked.
 
 ### Configuration
 

@@ -67,6 +67,7 @@ fn all_rules() -> Vec<Box<dyn Rule>> {
     vec![
         Box::new(rules::heading_hierarchy::HeadingHierarchyRule),
         Box::new(rules::empty_list_item::EmptyListItemRule),
+        Box::new(rules::empty_values::EmptyValuesRule),
         Box::new(rules::math_content::MathContentRule),
         Box::new(rules::heading_eaten_attrs::HeadingEatenAttrsRule),
         Box::new(rules::heading_strip_comments_residue::HeadingStripCommentsResidueRule),
