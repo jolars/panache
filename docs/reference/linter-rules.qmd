@@ -224,6 +224,77 @@ the empty value is intentional. The auto-fix takes the "delete the key" path,
 but because that discards data it is [unsafe](#fix-safety) and runs only under
 `--unsafe-fixes`.
 
+### `consumer-divergence` {#consumer-divergence}
+
+Flags a plain YAML scalar whose resolved type or value differs across the
+document's active YAML consumers --- a real cross-toolchain ambiguity, not a
+style opinion.
+
+Severity
+:   Warning
+
+Auto-fix
+:   Yes (unsafe). Single-quotes the value, forcing a string under every
+    consumer. Marked [unsafe](#fix-safety) because if the author meant the
+    boolean or integer, quoting changes the value for the YAML 1.1 stage, so it
+    is applied only with `--unsafe-fixes`.
+
+Diagnostic codes
+:   [`consumer-divergence`](#consumer-divergence)
+
+Requirements
+:   Quarto flavor (`flavor = "quarto"`). Only Quarto frontmatter is read under
+    two different YAML versions; every other context has a single consumer and
+    cannot diverge.
+
+Description
+
+:   A Quarto document's frontmatter is parsed twice: by Quarto's js-yaml (YAML
+    1.2 core) and by pandoc's libyaml (≈ YAML 1.1). The two versions resolve
+    some plain scalars to different values. This rule flags only those genuine
+    divergences --- unlike yamllint's `truthy`/`octal-values`, it stays silent
+    when the value is unambiguous for the document's consumers.
+
+    Detected divergences:
+
+    - **Booleans (the "Norway problem").** YAML 1.1 reads `y`, `n`, `yes`, `no`,
+      `on`, `off` (and case variants) as booleans; YAML 1.2 core reads only
+      `true`/`false`. So `country: no` is the boolean `false` to pandoc but the
+      string `"no"` to Quarto.
+    - **Leading-zero integers.** YAML 1.1 reads `0755`/`010` as octal; js-yaml
+      reads them as strings (it accepts only `0o…` octal). So the two stages
+      disagree on `mode: 0755` (integer `493` vs string).
+
+    Quoted, literal, and folded scalars are never flagged (their string tag is
+    pinned), and neither are unambiguous values such as `true`, `42`, `3.14`,
+    `.inf`, or plain words. The rule covers block mappings only; flow mappings and
+    sequence items are not yet inspected.
+
+**Example violation:**
+
+```yaml
+---
+country: no
+mode: 0755
+---
+```
+
+**Diagnostic:**
+
+```
+warning[consumer-divergence]: Key `country`: value `no` is the boolean `false` to pandoc (YAML 1.1) but the string "no" to Quarto's js-yaml (1.2)
+ --> document.qmd:2:10
+  |
+2 | country: no
+  |          ^^
+```
+
+**Resolution:** Quote the value to force a string under every consumer
+(`country: 'no'`), or write the explicit `true`/`false` (or canonical integer)
+you mean. The auto-fix takes the quoting path, but because that changes the
+value for the YAML 1.1 stage it is [unsafe](#fix-safety) and runs only under
+`--unsafe-fixes`.
+
 ### `heading-eaten-attrs` {#heading-eaten-attrs}
 
 Detects HTML comments that cause pandoc to silently drop a heading's `{...}`

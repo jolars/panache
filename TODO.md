@@ -138,18 +138,6 @@ linter. Syntax validity and `key-duplicates` are already covered by
 semantic-value footguns below; none are caught today (verified clean under both
 default and `--flavor quarto`):
 
-- [ ] **Consumer-divergence rule (covers yamllint `truthy` + `octal-values` +
-  `float-values`).** Don't port yamllint's version-agnostic "don't write
-  `no`" style nag. Panache already validates frontmatter against multiple
-  YAML versions per consumer (libyaml 1.1 + js-yaml 1.2 for Quarto) via the
-  two-pool validator. The high-value rule is flagging values whose *resolved
-  type/value differs across the active consumers* --- a real ambiguity bug,
-  not a style opinion. Examples: `country: no` (1.1 boolean `false` vs 1.2
-  string `"no"`, the "Norway problem"); `mode: 0755` (1.1 octal `493` vs 1.2
-  string); `010`, `.inf`, `.nan`, scientific notation. Leverages existing
-  `YamlValidationContext` infrastructure; won't false-positive where the
-  value is unambiguous for the doc's consumers.
-
 - [ ] **Undeclared alias (yamllint `anchors`, undeclared case).**
   `ref: *missing` with no matching `&missing` emits nothing today, but an
   undefined alias is a *hard error* in libyaml/js-yaml/PyYAML. This is

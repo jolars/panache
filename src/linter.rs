@@ -10,6 +10,7 @@ pub(crate) mod offsets;
 pub mod quarto_schema;
 pub mod rules;
 pub mod runner;
+pub(crate) mod yaml_resolve;
 
 pub use diagnostics::{
     Diagnostic, DiagnosticNote, DiagnosticNoteKind, DiagnosticOrigin, Fix, FixSafety, Location,
@@ -69,6 +70,7 @@ fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(rules::heading_hierarchy::HeadingHierarchyRule),
         Box::new(rules::empty_list_item::EmptyListItemRule),
         Box::new(rules::empty_values::EmptyValuesRule),
+        Box::new(rules::consumer_divergence::ConsumerDivergenceRule),
         Box::new(rules::math_content::MathContentRule),
         Box::new(rules::heading_eaten_attrs::HeadingEatenAttrsRule),
         Box::new(rules::heading_strip_comments_residue::HeadingStripCommentsResidueRule),

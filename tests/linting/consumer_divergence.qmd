@@ -1,0 +1,15 @@
+---
+title: Consumer divergence
+country: no
+shipped: yes
+mode: 0755
+draft: false
+retries: 3
+ratio: 3.14
+label: "no"
+region: Norway
+---
+
+# Body
+
+Some text.

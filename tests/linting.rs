@@ -917,6 +917,46 @@ fn test_quarto_schema_does_not_run_for_pandoc() {
 }
 
 #[test]
+fn test_consumer_divergence() {
+    let diagnostics = lint_file_with_config(
+        "consumer_divergence.qmd",
+        r#"
+flavor = "quarto"
+"#,
+    );
+    let divergent: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "consumer-divergence")
+        .collect();
+
+    // `country: no`, `shipped: yes`, and `mode: 0755` resolve differently under
+    // pandoc (1.1) and js-yaml (1.2). `draft: false`, `retries: 3`,
+    // `ratio: 3.14`, the quoted `label: "no"`, and the plain string
+    // `region: Norway` are all unambiguous.
+    assert_eq!(divergent.len(), 3, "got: {divergent:?}");
+    assert!(divergent.iter().any(|d| d.message.contains("country")));
+    assert!(divergent.iter().any(|d| d.message.contains("shipped")));
+    assert!(divergent.iter().any(|d| d.message.contains("mode")));
+    // Each carries an unsafe quoting fix.
+    assert!(divergent.iter().all(|d| {
+        d.fix
+            .as_ref()
+            .is_some_and(|f| f.safety == panache::linter::FixSafety::Unsafe)
+    }));
+}
+
+#[test]
+fn test_consumer_divergence_does_not_run_for_pandoc() {
+    // Default flavor is Pandoc; frontmatter is libyaml-only, so there is no
+    // cross-consumer divergence to flag.
+    let diagnostics = lint_file("consumer_divergence.qmd");
+    assert!(
+        diagnostics.iter().all(|d| d.code != "consumer-divergence"),
+        "consumer-divergence must not run under Pandoc"
+    );
+}
+
+#[test]
 fn test_empty_values() {
     let diagnostics = lint_file("empty_values.md");
     let empty: Vec<_> = diagnostics
