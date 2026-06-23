@@ -156,12 +156,6 @@ default and `--flavor quarto`):
   arguably a **validator gap** (belongs in `yaml-parse-error`, not a new
   lint rule) --- requires resolving anchors/aliases during validation.
 
-- [x] **Empty values (yamllint `empty-values`).** `title:` → implicit null;
-  often a forgotten value, but frequently intentional (`tags:`). Shipped as
-  the `empty-values` rule, on by default; explicit `null`/`~` is never
-  flagged. Ships an *unsafe* auto-fix that deletes the empty key's line
-  (applied only under `--unsafe-fixes`).
-
 - [ ] **Duplicate/unused anchors (yamllint `anchors`, remaining cases).**
   Softer, lint-flavored; duplicate anchors (last-wins) and unused anchors.
   Lowest priority.
