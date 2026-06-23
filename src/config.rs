@@ -1210,22 +1210,62 @@ mod tests {
     }
 
     #[test]
-    fn lint_quarto_version_parses_alongside_rule_toggles() {
-        let toml = "[lint]\nquarto-version = \"1.9\"\n[lint.rules]\nquarto-schema = false\n";
+    fn compat_quarto_resolves_into_lint_config() {
+        let toml = "[compat]\nquarto = \"1.9\"\n[lint.rules]\nquarto-schema = false\n";
         let cfg = parse_config_str(toml, Path::new("panache.toml"))
-            .expect("quarto-version + rule toggle must parse");
+            .expect("[compat] quarto + rule toggle must parse");
         assert_eq!(cfg.lint.quarto_version.as_deref(), Some("1.9"));
         assert!(!cfg.lint.is_rule_enabled("quarto-schema"));
     }
 
     #[test]
-    fn lint_quarto_version_must_be_string() {
-        let toml = "[lint]\nquarto-version = true\n";
+    fn compat_quarto_must_be_string() {
+        let toml = "[compat]\nquarto = true\n";
         let err = parse_config_str(toml, Path::new("panache.toml"))
-            .expect_err("non-string quarto-version must error");
+            .expect_err("non-string [compat] quarto must error");
         assert!(
-            err.to_string().contains("quarto-version"),
+            err.to_string().contains("quarto"),
             "error must name the key: {err}"
+        );
+    }
+
+    #[test]
+    fn lint_quarto_version_is_rejected_with_migration_hint() {
+        // The key moved to `[compat] quarto`; the old spelling must point there.
+        let toml = "[lint]\nquarto-version = \"1.9\"\n";
+        let err = parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("[lint] quarto-version must error after the move");
+        assert!(
+            err.to_string().contains("[compat] quarto"),
+            "error must point to the new key: {err}"
+        );
+    }
+
+    #[test]
+    fn compat_pandoc_sets_parser_target() {
+        let toml = "[compat]\npandoc = \"3.7\"\n";
+        let cfg =
+            parse_config_str(toml, Path::new("panache.toml")).expect("[compat] pandoc must parse");
+        assert_eq!(cfg.parser, PandocCompat::V3_7);
+    }
+
+    #[test]
+    fn deprecated_top_level_pandoc_compat_still_applies() {
+        let toml = "pandoc-compat = \"3.7\"\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("deprecated top-level pandoc-compat must still parse");
+        assert_eq!(cfg.parser, PandocCompat::V3_7);
+    }
+
+    #[test]
+    fn compat_pandoc_wins_over_deprecated_top_level_alias() {
+        let toml = "pandoc-compat = \"3.7\"\n[compat]\npandoc = \"3.9\"\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("both pandoc-compat keys must parse");
+        assert_eq!(
+            cfg.parser,
+            PandocCompat::V3_9,
+            "[compat] pandoc takes precedence over the deprecated alias"
         );
     }
 

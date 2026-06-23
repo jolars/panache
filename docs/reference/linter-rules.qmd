@@ -1078,7 +1078,7 @@ Description
       flagged.
 
     The Quarto schema version the rule validates against can be pinned with
-    `[lint] quarto-version = "1.9"`. One version is currently bundled, so this is
+    `[compat] quarto = "1.9"`. One version is currently bundled, so this is
     advisory.
 
 **Example violation:**

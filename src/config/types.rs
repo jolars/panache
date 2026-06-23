@@ -390,10 +390,11 @@ pub struct ExperimentalConfig {
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
 pub struct LintConfig {
     pub rules: HashMap<String, bool>,
-    /// Quarto release whose vendored schema the `quarto-schema` rule validates
-    /// against (e.g. `"1.9"`). Currently one version is bundled, so this is an
-    /// advisory pin; it reserves the key for selecting among bundled versions
-    /// later. Set via `[lint] quarto-version = "1.9"`.
+    /// Resolved Quarto compatibility target for the `quarto-schema` rule.
+    ///
+    /// This is populated from `[compat] quarto` during config finalization, not
+    /// parsed from `[lint]`. Kept here because the `quarto-schema` rule is its
+    /// only consumer. See [`CompatConfig::quarto`].
     #[serde(rename = "quarto-version", skip_serializing_if = "Option::is_none")]
     pub quarto_version: Option<String>,
 }
@@ -447,11 +448,6 @@ impl JsonSchema for LintConfig {
                                     Preferred over the legacy flat `[lint]` shape.",
                     "additionalProperties": { "type": "boolean" },
                 },
-                "quarto-version": {
-                    "type": "string",
-                    "description": "Quarto release whose vendored schema the \
-                                    `quarto-schema` rule validates against.",
-                },
             },
             "additionalProperties": { "type": "boolean" },
         })
@@ -472,18 +468,15 @@ impl<'de> Deserialize<'de> for LintConfig {
             .cloned()
             .ok_or_else(|| serde::de::Error::custom("expected [lint] table"))?;
 
-        // Typed (non-bool) settings must be pulled out before the legacy
-        // bool-key loop below, which rejects any remaining non-bool value.
-        let quarto_version = match table.remove("quarto-version") {
-            Some(v) => Some(
-                v.as_str()
-                    .ok_or_else(|| {
-                        serde::de::Error::custom("[lint] quarto-version must be a string")
-                    })?
-                    .to_string(),
-            ),
-            None => None,
-        };
+        // `quarto-version` moved to `[compat] quarto`. Catch the old key with a
+        // pointed migration error rather than the generic "use [lint.rules]"
+        // message the legacy bool loop would otherwise emit.
+        if table.contains_key("quarto-version") {
+            return Err(serde::de::Error::custom(
+                "[lint] quarto-version moved to [compat] quarto; \
+                 set `[compat]\\nquarto = \"...\"` instead",
+            ));
+        }
 
         // New shape: [lint.rules]
         if let Some(rules_value) = table.remove("rules") {
@@ -521,10 +514,37 @@ impl<'de> Deserialize<'de> for LintConfig {
 
         Ok(Self {
             rules,
-            quarto_version,
+            // Populated later from `[compat] quarto` during finalization.
+            quarto_version: None,
         }
         .normalize())
     }
+}
+
+/// Compatibility targets for the upstream toolchain you author for.
+///
+/// Co-locates the "which version of the upstream tool do I target" knobs.
+/// `pandoc` drives how the parser disambiguates ambiguous syntax; `quarto`
+/// selects the vendored schema the `quarto-schema` lint rule validates against.
+/// Configured via the `[compat]` section:
+///
+/// ```toml
+/// [compat]
+/// pandoc = "3.9"
+/// quarto = "1.9"
+/// ```
+#[derive(Debug, Clone, Deserialize, JsonSchema, PartialEq, Default)]
+#[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
+pub struct CompatConfig {
+    /// Pandoc release whose ambiguous-syntax behavior the parser emulates
+    /// (`latest`, `3.7`, `3.9`). Supersedes the deprecated top-level
+    /// `pandoc-compat` key.
+    pub pandoc: Option<PandocCompat>,
+    /// Quarto release whose vendored schema the `quarto-schema` rule validates
+    /// against (e.g. `"1.9"`). Currently one version is bundled, so this is an
+    /// advisory pin; it reserves the key for selecting among bundled versions
+    /// later.
+    pub quarto: Option<String>,
 }
 
 /// Internal deserialization struct that allows for optional fields
@@ -540,8 +560,13 @@ struct RawConfig {
     line_ending: Option<LineEnding>,
     #[serde(default = "default_line_width")]
     line_width: usize,
+    /// DEPRECATED: use `[compat] pandoc` instead. Still read as an alias.
     #[serde(default)]
     pandoc_compat: Option<PandocCompat>,
+
+    /// Compatibility targets (`[compat]`): `pandoc` and `quarto` versions.
+    #[serde(default)]
+    compat: Option<CompatConfig>,
 
     // New preferred formatting section
     #[serde(default)]
@@ -788,7 +813,16 @@ fn resolve_language_formatters(
 impl RawConfig {
     /// Finalize into Config, applying flavor-based defaults where needed
     fn finalize(self) -> Config {
-        let resolved_pandoc_compat = self.pandoc_compat.unwrap_or_default();
+        let compat = self.compat.unwrap_or_default();
+
+        if self.pandoc_compat.is_some() {
+            eprintln!(
+                "Warning: top-level `pandoc-compat` is deprecated; \
+                 use `[compat] pandoc` instead."
+            );
+        }
+        // `[compat] pandoc` wins over the deprecated top-level alias.
+        let resolved_pandoc_compat = compat.pandoc.or(self.pandoc_compat).unwrap_or_default();
 
         // Check for deprecated top-level style fields
         let has_deprecated_fields = self.wrap.is_some()
@@ -868,7 +902,11 @@ impl RawConfig {
             tab_width: style.tab_width,
             formatters: resolve_formatters(self.formatters),
             linters: self.linters,
-            lint: self.lint.unwrap_or_default().normalize(),
+            lint: {
+                let mut lint = self.lint.unwrap_or_default().normalize();
+                lint.quarto_version = compat.quarto;
+                lint
+            },
             cache_dir: self.cache_dir,
             cache: self.cache.unwrap_or(true),
             external_max_parallel: self

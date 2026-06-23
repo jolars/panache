@@ -14,6 +14,33 @@
         }
       ]
     },
+    "CompatConfig": {
+      "additionalProperties": false,
+      "description": "Compatibility targets for the upstream toolchain you author for.\n\nCo-locates the \"which version of the upstream tool do I target\" knobs.\n`pandoc` drives how the parser disambiguates ambiguous syntax; `quarto`\nselects the vendored schema the `quarto-schema` lint rule validates against.\nConfigured via the `[compat]` section:\n\n```toml\n[compat]\npandoc = \"3.9\"\nquarto = \"1.9\"\n```",
+      "properties": {
+        "pandoc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PandocCompat"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pandoc release whose ambiguous-syntax behavior the parser emulates\n(`latest`, `3.7`, `3.9`). Supersedes the deprecated top-level\n`pandoc-compat` key."
+        },
+        "quarto": {
+          "default": null,
+          "description": "Quarto release whose vendored schema the `quarto-schema` rule validates\nagainst (e.g. `\"1.9\"`). Currently one version is bundled, so this is an\nadvisory pin; it reserves the key for selecting among bundled versions\nlater.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "ExperimentalConfig": {
       "additionalProperties": false,
       "description": "Experimental, opt-in features.\n\nEverything under `[experimental]` is unstable: behavior and the option\nsurface itself may change (or be removed) **without a major release**. Do not\ndepend on it for stable output.",
@@ -144,10 +171,6 @@
       },
       "description": "Linter configuration.",
       "properties": {
-        "quarto-version": {
-          "description": "Quarto release whose vendored schema the `quarto-schema` rule validates against.",
-          "type": "string"
-        },
         "rules": {
           "additionalProperties": {
             "type": "boolean"
@@ -335,6 +358,17 @@
         "string",
         "null"
       ]
+    },
+    "compat": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CompatConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Compatibility targets (`[compat]`): `pandoc` and `quarto` versions."
     },
     "crossref-prefixes": {
       "default": [],
@@ -667,7 +701,8 @@
           "type": "null"
         }
       ],
-      "default": null
+      "default": null,
+      "description": "DEPRECATED: use `[compat] pandoc` instead. Still read as an alias."
     },
     "style": {
       "anyOf": [
