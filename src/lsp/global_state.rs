@@ -19,10 +19,9 @@ use lsp_types::{Diagnostic, MessageType, Uri};
 
 use super::DocumentState;
 use super::LspRuntimeSettings;
-use super::config::{load_config, load_config_with_source};
+use super::config::load_config;
 use super::task_pool::{TaskPool, default_pool_size};
 use crate::Config;
-use crate::config::ConfigSource;
 use crate::syntax::{ParsedYamlRegionSnapshot, SyntaxNode};
 
 /// The owning map of open documents, keyed by URI string (the URI itself is used
@@ -162,6 +161,15 @@ impl ClientSender {
         });
     }
 
+    /// Send a `window/showMessage` notification (a client-surfaced toast, unlike
+    /// the log-only [`Self::log_message`]).
+    pub(crate) fn show_message(&self, typ: MessageType, message: impl Into<String>) {
+        self.notify::<lsp_types::notification::ShowMessage>(lsp_types::ShowMessageParams {
+            typ,
+            message: message.into(),
+        });
+    }
+
     /// Send a typed notification to the client.
     pub(crate) fn notify<N: lsp_types::notification::Notification>(&self, params: N::Params) {
         self.send(Message::Notification(Notification::new(
@@ -245,17 +253,6 @@ impl StateSnapshot {
     pub(crate) fn document_and_config(&self, uri: &Uri) -> Option<(String, Config)> {
         let content = self.document_content(uri)?;
         Some((content, self.config(uri)))
-    }
-
-    /// Document text + config + [`ConfigSource`] + workspace root, for callers
-    /// that resolve `exclude`/`extend_exclude` patterns.
-    pub(crate) fn document_config_and_source(
-        &self,
-        uri: &Uri,
-    ) -> Option<(String, Config, ConfigSource, Option<PathBuf>)> {
-        let content = self.document_content(uri)?;
-        let (config, source) = load_config_with_source(&self.workspace_root, Some(uri));
-        Some((content, config, source, self.workspace_root.clone()))
     }
 
     /// Build a definition index for `uri` merged with all `include`d documents.
@@ -386,6 +383,13 @@ pub(crate) struct GlobalState {
     /// externals run only for these. Retired in `on_task` once the pass that ran
     /// them completes, so a save queued after dispatch survives a cancellation.
     pub(crate) external_pending: HashSet<Uri>,
+
+    /// The last config parse error toasted per config-file path, so a broken
+    /// `panache.toml` raises a `window/showMessage` once (not on every keystroke
+    /// that reloads config). Cleared when the file parses again, so a later
+    /// breakage re-notifies. The persistent surface is the diagnostic published
+    /// on the config file itself; this is the one-shot heads-up.
+    pub(crate) config_error_reports: HashMap<PathBuf, String>,
 }
 
 impl GlobalState {
@@ -414,6 +418,35 @@ impl GlobalState {
             lint_generation: 0,
             last_applied_lint_generation: 0,
             external_pending: HashSet::new(),
+            config_error_reports: HashMap::new(),
+        }
+    }
+
+    /// Load config for `uri` on the main loop, toasting once when a discovered
+    /// `panache.toml` fails to parse and falling back to the flavor-detected
+    /// default so the document still parses and lints.
+    ///
+    /// The persistent surface is the diagnostic the settle pass publishes on the
+    /// config file (see [`crate::lsp::handlers::diagnostics::config_publishes`]);
+    /// this adds a one-shot `window/showMessage` and clears the dedup record when
+    /// the file parses again, so a later breakage re-notifies.
+    pub(crate) fn load_config_notifying(&mut self, uri: &Uri) -> crate::Config {
+        match crate::lsp::config::try_load_config(&self.workspace_root, Some(uri)) {
+            Ok((config, source)) => {
+                if let Some(path) = source.path() {
+                    self.config_error_reports.remove(path);
+                }
+                config
+            }
+            Err(err) => {
+                if self.config_error_reports.get(&err.path) != Some(&err.message) {
+                    self.sender
+                        .show_message(MessageType::ERROR, format!("panache: {err}"));
+                    self.config_error_reports
+                        .insert(err.path.clone(), err.message.clone());
+                }
+                crate::lsp::config::default_config_for_uri(Some(uri))
+            }
         }
     }
 

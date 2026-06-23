@@ -16,6 +16,7 @@ mod lsp {
     pub(super) mod test_cancellation;
     pub(super) mod test_completion;
     pub(super) mod test_config_discovery;
+    pub(super) mod test_config_errors;
     pub(super) mod test_config_reload;
     pub(super) mod test_diagnostics;
     pub(super) mod test_document_lifecycle;

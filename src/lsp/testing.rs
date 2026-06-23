@@ -769,6 +769,22 @@ impl LspTester {
         (streamed.response, progress)
     }
 
+    /// Drain `window/showMessage` notifications (client-surfaced toasts) since
+    /// the last drain.
+    pub fn drain_show_messages(&self) -> Vec<ShowMessageParams> {
+        self.drain_client_messages()
+            .into_iter()
+            .filter_map(|msg| match msg {
+                lsp_server::Message::Notification(n)
+                    if n.method == notification::ShowMessage::METHOD =>
+                {
+                    serde_json::from_value::<ShowMessageParams>(n.params).ok()
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Count `workspace/diagnostic/refresh` server→client requests since the last
     /// drain.
     pub fn drain_diagnostic_refresh(&self) -> usize {

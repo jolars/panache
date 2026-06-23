@@ -9,17 +9,18 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 
 use lsp_types::{
-    Diagnostic, DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportKind,
-    DocumentDiagnosticReportPartialResult, DocumentDiagnosticReportResult,
-    FullDocumentDiagnosticReport, ProgressToken, RelatedFullDocumentDiagnosticReport,
-    RelatedUnchangedDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport, Uri,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportPartialResult,
-    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
-    WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
+    Diagnostic, DiagnosticSeverity, DocumentDiagnosticParams, DocumentDiagnosticReport,
+    DocumentDiagnosticReportKind, DocumentDiagnosticReportPartialResult,
+    DocumentDiagnosticReportResult, FullDocumentDiagnosticReport, ProgressToken, Range,
+    RelatedFullDocumentDiagnosticReport, RelatedUnchangedDocumentDiagnosticReport,
+    UnchangedDocumentDiagnosticReport, Uri, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
+    WorkspaceDiagnosticReportPartialResult, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceUnchangedDocumentDiagnosticReport,
 };
 use serde::Serialize;
 
-use super::super::conversions::convert_diagnostic;
+use super::super::conversions::{convert_diagnostic, offset_to_position};
 use crate::lsp::global_state::{GlobalState, StateSnapshot};
 use crate::lsp::uri_ext::UriExt;
 
@@ -142,6 +143,47 @@ pub(crate) fn manifest_publishes(snap: &StateSnapshot, uri: &Uri) -> (Vec<Publis
         manifest_uris.insert(target_uri);
     }
     (publishes, manifest_uris)
+}
+
+/// A `panache.toml` parse-error diagnostic published against the config file's
+/// OWN URI — the rust-analyzer `Cargo.toml` model, mirroring
+/// [`manifest_publishes`] — so a broken *discovered* config surfaces even when
+/// the file isn't open in the editor.
+///
+/// The document itself still parses and lints under the default config (see
+/// [`crate::lsp::config::load_config_with_source`]); this diagnostic is the
+/// *why your settings aren't being applied* signal. Returns an empty vec when
+/// the config parses, so the settle pass omits the URI and
+/// [`DiagnosticCollection`](crate::lsp::global_state::DiagnosticCollection)
+/// clears any prior error (clear-on-fix).
+pub(crate) fn config_publishes(snap: &StateSnapshot, uri: &Uri) -> Vec<Publish> {
+    let Err(err) = crate::lsp::config::try_load_config(&snap.workspace_root, Some(uri)) else {
+        return Vec::new();
+    };
+    let Some(target_uri) = Uri::from_file_path(&err.path) else {
+        return Vec::new();
+    };
+    // The config file is typically not an open document, so read its text from
+    // disk to map the byte span to a range.
+    let Ok(text) = std::fs::read_to_string(&err.path) else {
+        return Vec::new();
+    };
+    let range = match err.span {
+        Some(span) => Range {
+            start: offset_to_position(&text, span.start),
+            end: offset_to_position(&text, span.end.min(text.len())),
+        },
+        // No span: anchor at the file's start so the diagnostic still lands.
+        None => Range::default(),
+    };
+    let diagnostic = Diagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::ERROR),
+        source: Some("panache".to_owned()),
+        message: err.message,
+        ..Diagnostic::default()
+    };
+    vec![(target_uri, None, vec![diagnostic])]
 }
 
 /// Compute diagnostics for `uri` and any documents that depend on it.

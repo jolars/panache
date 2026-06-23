@@ -153,6 +153,15 @@ default and `--flavor quarto`):
 - [ ] Severity levels (error, warning, info)
 - [ ] Auto-fix capability per rule (infrastructure exists, rules need
   implementation)
+- [ ] Unwrap the CLI's top-level error print. `main() -> io::Result<()>` renders
+  a returned error via `Debug`, so a config (or any other) error surfaces as
+  `Error: Custom { kind: InvalidData, error: ... }`. The inner message is
+  now readable (`ConfigError`'s `Debug` mirrors `Display`), but the
+  `Custom { kind }` wrapper is noise. Fixing it properly means handling
+  errors at the \~13 `load_config_for_cli(...)?` call sites (or switching
+  `main` to a custom error type with a `Display`-based `Termination`) so the
+  user sees just `Error: invalid config <path>: ...`. Affects all
+  `io::Error`s, not only config.
 
 ### Shared utilities
 

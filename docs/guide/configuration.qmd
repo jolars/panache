@@ -61,6 +61,21 @@ Error: invalid config /path/panache.toml: unknown extension
 `quato-crossrefs` in [extensions]; did you mean `quarto-crossrefs`?
 ```
 
+This is true regardless of how the config was found: a typo in a *discovered*
+`panache.toml` fails the run just like a broken `--config` path, rather than
+being silently ignored in favor of the user config or built-in defaults.
+
+In the [language server](lsp.qmd) the same parse failure is surfaced rather than
+swallowed:
+
+- a diagnostic is published on the offending `panache.toml`, anchored at the bad
+  key (so it shows even when the config file isn't open), and
+- a one-time notification pops up, and
+- formatting is **refused** until the config parses again --- Panache will not
+  silently format with default settings while your config is broken.
+
+All three clear automatically once the config parses, and formatting resumes.
+
 Keys that were valid in older releases and have since been deprecated still
 parse, but Panache prints a warning. The current crop is:
 

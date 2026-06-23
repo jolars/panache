@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::env;
+use std::fmt;
 use std::fs;
 use std::io;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 mod formatter_presets;
@@ -243,27 +245,80 @@ fn check_deprecated_blank_lines(s: &str, path: &Path) {
     }
 }
 
+/// A config file that was found but could not be parsed.
+///
+/// Unlike a plain [`io::Error`] string, this preserves the structured pieces a
+/// rich consumer needs: the offending file's `path`, the optional byte `span`
+/// of the error within that file (from `toml`'s parser, used by the LSP to
+/// anchor a diagnostic), and the underlying `message`. It is embedded as the
+/// source of the [`io::Error`] that [`load`] returns, so CLI callers print it
+/// as before while the LSP can recover the span via
+/// [`io::Error::get_ref`] + `downcast_ref::<ConfigError>()`.
+#[derive(Clone)]
+pub struct ConfigError {
+    /// The config file that failed to parse.
+    pub path: PathBuf,
+    /// Byte range of the error within the file, when the parser reports one.
+    pub span: Option<Range<usize>>,
+    /// The underlying parser/validation message (without the `invalid config
+    /// <path>:` prefix that [`fmt::Display`] adds).
+    pub message: String,
+}
+
+// `main() -> io::Result<()>` prints a returned error via `Debug`, so mirror
+// `Display` here to keep the CLI's `Error: invalid config ...: ...` message
+// readable instead of dumping the struct fields.
+impl fmt::Debug for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "invalid config {}: {}",
+            self.path.display(),
+            self.message
+        )
+    }
+}
+
+impl std::error::Error for ConfigError {}
+
+impl From<ConfigError> for io::Error {
+    fn from(err: ConfigError) -> Self {
+        io::Error::new(io::ErrorKind::InvalidData, err)
+    }
+}
+
 fn parse_config_str(s: &str, path: &Path) -> io::Result<Config> {
+    parse_config_detailed(s, path).map_err(io::Error::from)
+}
+
+/// Parse a config file's contents, preserving the structured [`ConfigError`] on
+/// failure. [`parse_config_str`] wraps the error into an [`io::Error`] for the
+/// existing `io::Result` callers.
+fn parse_config_detailed(s: &str, path: &Path) -> Result<Config, ConfigError> {
     check_deprecated_extension_names(s, path);
     check_deprecated_formatter_names(s, path);
     check_deprecated_code_block_style_options(s, path);
     check_deprecated_blank_lines(s, path);
 
     if let Err(msg) = validate_extension_names(s) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("invalid config {}: {msg}", path.display()),
-        ));
+        return Err(ConfigError {
+            path: path.to_path_buf(),
+            span: None,
+            message: msg,
+        });
     }
 
-    let config: Config = toml::from_str(s).map_err(|e| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("invalid config {}: {e}", path.display()),
-        )
-    })?;
-
-    Ok(config)
+    toml::from_str(s).map_err(|e| ConfigError {
+        path: path.to_path_buf(),
+        span: e.span(),
+        message: e.to_string(),
+    })
 }
 
 /// True if `name` is a known extension at either the parser or formatter
@@ -517,9 +572,12 @@ pub fn load(
     let (mut cfg, source) = if let Some(path) = explicit {
         let cfg = read_config(path)?;
         (cfg, ConfigSource::Explicit(path.to_path_buf()))
-    } else if let Some(p) = find_in_tree(start_dir, boundary.as_deref())
-        && let Ok(cfg) = read_config(&p)
-    {
+    } else if let Some(p) = find_in_tree(start_dir, boundary.as_deref()) {
+        // A discovered config that fails to parse is fatal: it is the config
+        // that *would* apply, so silently falling through to the global/default
+        // config (the old `&& let Ok(cfg)` behavior) let a typo'd project
+        // `panache.toml` be ignored by both the CLI and the LSP.
+        let cfg = read_config(&p)?;
         (cfg, ConfigSource::Discovered(p))
     } else if let Some(p) = xdg_config_path()
         && let Ok(cfg) = read_config(&p)
@@ -1279,6 +1337,55 @@ mod tests {
         assert!(
             msg.contains("lin-width") && msg.contains("unknown field"),
             "error must name the offending key: {msg}"
+        );
+    }
+
+    #[test]
+    fn parse_config_detailed_reports_span_for_unknown_key() {
+        // The LSP anchors a diagnostic on the offending key; the structured
+        // error must carry a byte span pointing at it.
+        let toml = "lin-width = 100\n";
+        let err = parse_config_detailed(toml, Path::new("panache.toml"))
+            .expect_err("typo'd key must error");
+        let span = err.span.expect("toml parse error must carry a span");
+        assert_eq!(
+            &toml[span], "lin-width",
+            "span must cover the offending key"
+        );
+    }
+
+    #[test]
+    fn config_error_survives_io_error_round_trip() {
+        // `load` returns `io::Result`; the LSP recovers the structured error by
+        // downcasting the io::Error's source.
+        let toml = "lin-width = 100\n";
+        let io_err =
+            parse_config_str(toml, Path::new("panache.toml")).expect_err("typo'd key must error");
+        let cfg_err = io_err
+            .get_ref()
+            .and_then(|e| e.downcast_ref::<ConfigError>())
+            .expect("io::Error must carry a ConfigError source");
+        assert!(cfg_err.span.is_some(), "recovered error keeps its span");
+        assert_eq!(cfg_err.path, Path::new("panache.toml"));
+    }
+
+    #[test]
+    fn discovered_broken_config_errors_instead_of_falling_back() {
+        // A typo'd discovered `panache.toml` must fail loudly, not silently
+        // fall through to the global/default config.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let dir = tmp.path();
+        std::fs::write(dir.join("panache.toml"), "lin-width = 100\n").unwrap();
+
+        let err = load(None, dir, None, None)
+            .expect_err("broken discovered config must surface as an error");
+        let cfg_err = err
+            .get_ref()
+            .and_then(|e| e.downcast_ref::<ConfigError>())
+            .expect("load error must carry a ConfigError source");
+        assert!(
+            cfg_err.message.contains("unknown field"),
+            "error must name the parse failure: {cfg_err}"
         );
     }
 

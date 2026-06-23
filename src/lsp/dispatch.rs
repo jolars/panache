@@ -662,6 +662,9 @@ impl GlobalState {
                     let (manifest_pubs, _manifest_uris) =
                         handlers::diagnostics::manifest_publishes(&snap, uri);
                     publishes.extend(manifest_pubs);
+                    // A broken discovered `panache.toml` surfaces as a diagnostic
+                    // on its own file (clear-on-fix via the omitted-URI diff).
+                    publishes.extend(handlers::diagnostics::config_publishes(&snap, uri));
                     for (target, _version, diags) in publishes {
                         let slot = merged.entry(target).or_default();
                         for diag in diags {
