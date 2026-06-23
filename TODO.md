@@ -39,12 +39,6 @@ support.
 
 ### Advanced
 
-- [x] On-type formatting - `textDocument/onTypeFormatting` triggers continuation
-  indentation after Enter inside list items (whitespace only; never inserts
-  markers; `\n` trigger; `src/lsp/handlers/formatting.rs`,
-  `panache_formatter::continuation_indent_at`). The client must opt in to
-  firing the request (Neovim core does not). Deferred: blockquote `>`
-  continuation, code-block indent, live table alignment
 - [x] Semantic tokens - Syntax highlighting via LSP (`semanticTokens/full`,
   additive + flavor-gated, custom legend;
   `src/lsp/handlers/semantic_tokens.rs`). Follow-ups: multi-line tokens
@@ -171,27 +165,6 @@ default and `--flavor quarto`):
 - [ ] **Duplicate/unused anchors (yamllint `anchors`, remaining cases).**
   Softer, lint-flavored; duplicate anchors (last-wins) and unused anchors.
   Lowest priority.
-
-- [x] **Quarto schema validation (bigger feature, Quarto-only) --- frontmatter,
-  cell options, and project config landed.** The `quarto-schema` lint rule
-  (#385) validates document **frontmatter**, **code-cell options**
-  (`#| ...`, against the `engine-knitr`/`engine-jupyter` root by cell
-  language), and **project config files** (`_quarto.yml` against
-  `project-config`, `_metadata.yml` against `front-matter`) against Quarto's
-  machine-readable schema: unknown/misspelled keys (`forrmat:` →
-  did-you-mean `format`), type mismatches, and invalid enum values. Quarto's
-  compiled `all-schema-definitions.json` is distilled at vendor time into a
-  compact, reviewable artifact (`assets/quarto-schema/schema.json`, pinned
-  via `.panache-source`; refresh with `scripts/update-quarto-schema.sh`) and
-  interpreted by `src/linter/quarto_schema/`. Open objects only flag
-  near-miss typos; closed subtrees reject unknown keys. Manifests are
-  validated on the CLI (explicit `panache lint _quarto.yml`) and in the LSP
-  (manifests reachable from an open project document, published on the
-  manifest's own URI). Target version pinned with `[lint] quarto-version`.
-
-  Remaining:
-  - Format-gated keys (`tags.formats`) are ignored; deeply nested options behind
-    a permissive `anyOf` branch may go unchecked.
 
 ### Configuration
 
@@ -472,16 +445,6 @@ intentionally excluded.
 
 ### Tables
 
-- [x] Grid tables
-  - [x] Row-spanning grids now go through one unified span-aware engine
-    (`format_unified_spanning_grid_table`) shared with the colspan path. The
-    `col_count == 12` planets hacks and the numeric/`idx == 0` alignment
-    guessing are gone: alignment is read from the source separator colons,
-    and cell geometry comes from the shared `panache_parser::analyze_grid`
-    pass (also used by the pandoc-native projector). The engine preserves
-    the source marker skeleton and recomputes widths/padding/dash-runs, so
-    colspan and rowspan geometry are coordinated in one layout pass.
-
 ## Parser
 
 ### Architecture
@@ -499,22 +462,6 @@ intentionally excluded.
   verified against pandoc-native + CommonMark (both must stay byte-identical
   or improve). Roadmap:
 
-  - [x] **Attributes --- remaining node kinds.** Structuring is done.
-    `SPAN_ATTRIBUTES` (bracketed spans), `HTML_ATTRS` (HTML
-    `<div>`/`<span>`; `parse_html_attrs` deleted), and raw-inline
-    `{=format}` (`raw_inline.rs` now wraps the source slice via
-    `emit_attribute_node`) all landed earlier. `CODE_INFO` DisplayExplicit
-    (`{.python #id key=val}`) and DisplayShortcut (`lang {.cls}`) now emit
-    `ATTR_*`/`CODE_LANGUAGE` children via `emit_code_info_attrs`, and
-    `code_block_attr` reads them instead of re-parsing. Note:
-    `parse_attr_block` is *not* deletable --- it is now the shared opaque
-    fallback the structured readers intentionally retain (MMD `[#id]`,
-    malformed bodies, bare-word divs, legacy table-caption scans, Plain/Raw
-    info strings). Deferred follow-up: structure-read the Executable
-    `CHUNK_OPTIONS` projection (Quarto/RMarkdown chunks), which still uses
-    the `parse_attr_block` text path; the CST is already structured, only
-    the projector lags.
-
   - [ ] **HTML opaque-block split.** Continue the HTML lift. **Phase 7a done**
     (2026-06-17): single-construct opaque shapes (comments, PI, verbatim
     `<pre>`/`<script>`/`<style>`/`<textarea>`) now retag to `HTML_BLOCK_RAW`
@@ -526,119 +473,6 @@ intentionally excluded.
     markdown reparse *relocates* into the parser rather than disappearing
     --- the walker is not fully deletable. Largest bucket; coordinate with
     the `html-conformance` skill.
-
-  - [x] **Table separator tokenization.** The separator row is currently a
-    coalesced `TEXT` blob (e.g. `TEXT "|:--|--:|"`), so
-    `simple_table_aligns`, `grid_dash_widths`, and `pipe_separator_aligns`
-    re-tokenize it. Split the markers (`|` / `+`, dash runs, colons) into
-    distinct CST tokens so those derivations read structure instead of
-    re-scanning a string. Note: this only structures the *syntax* --- the
-    derived geometry (widths, alignment values) does NOT move into the CST;
-    see below.
-
-  - Legitimately stays in the projector (derived values with no source-byte
-    form, not unencoded syntax): column **widths** (a normalized fraction of
-    dash counts --- there is no byte that spells `0.33`); table **alignment**
-    (the `AlignLeft`/... enum is computed --- from colons for pipe/grid tables,
-    from content-vs-dash flushness for simple/multiline --- so even though its
-    *evidence* is in the source, the value isn't a substring); implicit
-    heading-id slugification (needs whole-document dedup); and smart-typography
-    substitution (an output transform). Storing any of these as tokens would
-    require synthetic tokens and break CST losslessness.
-
-- [x] Centralize position advancement. `parse_line`, `parse_inner_content`, and
-  the dispatch helpers (`dispatch_bq_after_list_item`,
-  `maybe_open_fenced_code_in_new_list_item`, the three `handle_*_effect`
-  handlers, and `try_fold_list_item_buffer_into_setext`) now return a
-  `LineDispatch` (or `usize` extras for effect handlers). The outer
-  `parse_document_stack` is the sole site that mutates `self.pos`. The
-  `self.pos -= 1` compensation hack inside `dispatch_bq_after_list_item` and
-  two analogous `self.pos = new_pos - 1` hacks
-  (`maybe_open_fenced_code_in_new_list_item`,
-  `handle_definition_list_effect::Definition`) are gone.
-
-- [x] De-duplicate table caption routing between `detect_prepared` and
-  `parse_prepared` (`block_dispatcher.rs`). The
-  `is_caption_followed_by_table` check, the `table_pos` computation (skip
-  caption continuation lines + one blank), and the try-each-table-kind
-  cascade are spelled out twice. Beyond the double-parse cost (see the
-  table-IR item under Performance), the two copies can drift --- a fix to
-  one (e.g. the raw-vs-stripped caption issue below) silently won't reach
-  the other. Fold into one shared helper; pairs naturally with the table-IR
-  change. Done: routing lives in `resolve_table_pos` / `try_parse_kind` /
-  `first_kind_at`; `table_pos` cached on `TablePrepared`. The double-parse
-  cost is still open (tracked under the table-IR Performance item).
-
-- [x] Reconcile `is_caption_followed_by_table`'s raw-vs-stripped callers and its
-  duplicate table sniffing (`blocks/tables.rs`). Not intended: pandoc
-  recognizes caption-before/after tables inside a blockquote, and panache
-  was *non-lossless* there (`> : cap` round-tripped to `> > : cap`) because
-  caption emission read raw lines. Fixed: `emit_table_caption` and the
-  caption blank-line emission now take the container-stripped window
-  (`emit_or_dispatch_tail`), and `resolve_table_pos` + the deflist
-  `detect_prepared` gate run caption detection on the stripped window (the
-  multiline path only recognizes a caption-led table when dispatched at the
-  border, so `resolve_table_pos` skipping the caption correctly inside a
-  blockquote is what keeps it from leaking into a paragraph). The
-  `next_line_is_definition_marker` / footnote lookahead gates intentionally
-  stay raw (their marker detection is raw/indent-based, so the caption gate
-  is top-level-only). The separator cascade is extracted into one named
-  predicate `table_grid_starts_at`, documented as the cheap lookahead twin
-  of `first_kind_at` (deliberately not a full parse, for perf) with an
-  agreement unit test. Paired pandoc-verified fixtures landed under
-  `crates/panache-parser/tests/fixtures/cases/` (pipe before/after, 2-line
-  caption, multiline, + a commonmark counterpart).
-
-- [x] Formatter drops the blockquote prefix on a table inside a blockquote.
-  `> | a | b |\n> |---|---|\n> | 1 | 2 |` formats to `| a | b |` ... with no
-  `>` (the table is lifted out of the blockquote). Lossless and idempotent,
-  so it's a *formatter* policy bug, not a parser one --- surfaced while
-  fixing the caption raw-vs-stripped reconcile. Caption-bearing tables
-  inside blockquotes inherit the same drop. *Fixed:* blockquote child
-  dispatch now handles `PIPE_TABLE`/`GRID_TABLE`/`SIMPLE_TABLE`/
-  `MULTILINE_TABLE` (temp-format, strip self-indent, re-prefix), and
-  `extract_table_caption_content` skips the losslessness
-  `BLOCK_QUOTE_MARKER` tokens. Goldens `blockquote_pipe_table`,
-  `blockquote_pipe_table_caption`.
-
-- [x] Caption-before table as the *first line of a list item* (no blank line
-  before it) was parsed twice. `- Table: cap\n\n  <table>` emitted the
-  caption both as the item's `PLAIN` (the core claims the first list line
-  before `TableParser`'s `has_blank_before`/`at_document_start` gate lets it
-  fire) and again as the table's `TABLE_CAPTION` (backward
-  `find_caption_*`), breaking losslessness. Fixed by
-  `maybe_open_caption_table_in_new_list_item` in `parser/core.rs` ---
-  mirrors `maybe_open_fenced_code_in_new_list_item`: when a fresh list
-  item's buffered marker-line content is a caption that a table follows, it
-  clears the buffer and emits the whole caption-led table via the forward
-  caption path (Grid → Multiline → Pipe → Simple cascade). Fixture
-  `list_item_pipe_table_caption_before`.
-
-- [x] Formatter dropped the list marker when a list item's *sole/first child*
-  was a table. **No-caption case**: `- | a | b |\n  …` keeps the marker by
-  putting the first table line on the marker line --- `lists.rs`
-  `format_list_item` has a `PIPE_TABLE | GRID_TABLE` arm that splices the
-  marker prefix onto the table's first line (pipe + grid, bullet + ordered).
-  **Caption-led case** (`- | a | b |\n  …\n\n  : cap`, both `: cap` and
-  `Table:`/`table:` forms): fixed in the **parser** ---
-  `maybe_open_table_with_trailing_caption_in_new_list_item` (core.rs) parses
-  a marker-line table *with* its trailing caption at item open (via the
-  `try_parse_*` cascade, whose `find_caption_after_table` absorbs the
-  caption), so it never reaches the buffer-flush or the definition-list
-  dispatch that previously mangled it. The formatter arm then splices the
-  whole table (caption rendered below by
-  `format_pipe_table`/`format_grid_table`). Matches pandoc, which always
-  treats `: cap` after a table --- including in a list --- as the table's
-  Caption, never a definition list. Goldens
-  `list_item_table_first_{bullet,grid,caption_bullet,caption_ordered}`;
-  parser fixtures `list_item_{pipe,grid}_table_caption_after_pandoc`,
-  `list_item_pipe_table_caption_keyword_after_pandoc`. **Remaining edges**:
-  `SIMPLE_TABLE`/`MULTILINE_TABLE` as a list item's first child (the
-  open-time parse uses the full cascade, but the formatter arm and the
-  buffer-lift allowlist cover only pipe/grid --- their formatters take no
-  `indent`); and a table that sits *after a blank line* inside a list item
-  followed by `: cap`, which is a separate pre-existing issue (the
-  table-shaped lines parse as a `LINE_BLOCK`, not a table).
 
 - [ ] Formatter trims leading/trailing spaces *inside* inline-code spans. A span
   whose backticks wrap content with leading spaces (two spaces, then
@@ -653,32 +487,6 @@ intentionally excluded.
   in this file.
 
 ### Performance
-
-- [x] Avoid temporary green tree when injecting `BLOCK_QUOTE_MARKER` tokens into
-  inline-parsed paragraphs. Inline emission is now generic over an
-  `InlineSink` trait (`inlines/sink.rs`); the common path writes straight
-  into the `GreenNodeBuilder` (monomorphized, zero-cost) and blockquote
-  paragraphs swap in `MarkerInjectingSink`, which splices markers at byte
-  offsets during the single emission pass. No temp tree is built and
-  replayed.
-
-- [x] Avoid temporary green tree in table detection.
-  `TableParser::detect_prepared` (`block_dispatcher.rs`) fully parses the
-  table into a throwaway `GreenNodeBuilder` just to validate the match
-  (`.is_some()`), then `parse_prepared` parses it again into the real
-  builder --- the table is parsed twice. Done via capture & replay rather
-  than a bespoke IR: detection keeps the `GreenNode` it already builds in
-  `TablePrepared`, and emission replays it with `copy_green_node` instead of
-  re-parsing. Kills the double inline-parse; lossless by construction (CST
-  snapshots byte-identical). \~1.21x faster on a table-heavy doc.
-
-- [x] Use `memchr` for the refdef-map newline scan. `memchr_newline`
-  (`inlines/refdef_map.rs`) is a scalar `iter().position(|&b| b == b'\n')`
-  despite its name; `collect_refdef_labels` calls it once per line over the
-  whole document. Swap in the `memchr` crate (SIMD) for a free per-parse
-  speedup --- and the name stops lying. Done: \~45% faster prepass
-  (`collect_refdef_labels` 134µs → 73µs on the 296 KB pandoc manual), \~0.8%
-  off end-to-end parse.
 
 ### YAML validation: consumer fidelity vs YAML 1.2 (needs design decision)
 
