@@ -75,9 +75,15 @@ impl Rule for CitationKeysRule {
             }
 
             for duplicate in &parse.index.duplicates {
-                let range = range_by_path
-                    .get(&duplicate.first.file)
-                    .or_else(|| range_by_path.get(&duplicate.duplicate.file))
+                // Prefer a declaration that actually has a span in *this*
+                // document. A bibliography pulled in from a project manifest
+                // (`_quarto.yml`) resolves to a path but its value isn't in the
+                // document YAML, so its range is the empty default `0..0` —
+                // reporting that would underline byte 0 (the opening `---`).
+                let range = [&duplicate.first.file, &duplicate.duplicate.file]
+                    .into_iter()
+                    .filter_map(|path| range_by_path.get(path))
+                    .find(|range| !range.is_empty())
                     .copied()
                     .unwrap_or_else(|| tree.text_range());
                 let location = Location::from_range(range, input);
@@ -286,6 +292,67 @@ mod tests {
         assert_eq!(diagnostics[0].location.range.start(), range.start());
         assert_eq!(diagnostics[0].location.range.end(), range.end());
         assert!(diagnostics[0].message.ends_with("File not found"));
+    }
+
+    #[test]
+    fn duplicate_key_prefers_a_declaration_with_a_real_range() {
+        // The project `_quarto.yml` declares `assets/bibliography.bib` and the
+        // document declares `references.bib`; `larsson2018` lives in both. The
+        // project bib's value isn't in the document YAML, so its source range is
+        // the empty default `0..0`. Reporting that range underlines byte 0 (the
+        // `-` of the opening `---`). The diagnostic must instead anchor to the
+        // document's own `bibliography: references.bib` declaration.
+        let input = "---\nbibliography: references.bib\n---\n\nText [@larsson2018].\n";
+        let refs_start = input.find("references.bib").unwrap();
+        let refs_end = refs_start + "references.bib".len();
+        let refs_range = TextRange::new(
+            TextSize::from(refs_start as u32),
+            TextSize::from(refs_end as u32),
+        );
+        let project_bib = std::path::PathBuf::from("/proj/assets/bibliography.bib");
+        let doc_bib = std::path::PathBuf::from("/proj/blog/basin/references.bib");
+
+        let metadata = crate::metadata::DocumentMetadata {
+            source_path: std::path::PathBuf::from("/proj/blog/basin/index.qmd"),
+            bibliography: Some(crate::metadata::BibliographyInfo {
+                paths: vec![project_bib.clone(), doc_bib.clone()],
+                // Project bib has no range in this document's YAML.
+                source_ranges: vec![TextRange::default(), refs_range],
+            }),
+            metadata_files: Vec::new(),
+            bibliography_parse: Some(crate::metadata::BibliographyParse {
+                index: crate::bib::BibIndex {
+                    entries: std::collections::HashMap::new(),
+                    duplicates: vec![crate::bib::BibDuplicate {
+                        key: "larsson2018".to_string(),
+                        first: crate::bib::BibEntryLocation {
+                            key: "larsson2018".to_string(),
+                            file: project_bib,
+                            span: crate::bib::Span { start: 0, end: 0 },
+                        },
+                        duplicate: crate::bib::BibEntryLocation {
+                            key: "larsson2018".to_string(),
+                            file: doc_bib,
+                            span: crate::bib::Span { start: 0, end: 0 },
+                        },
+                    }],
+                    errors: Vec::new(),
+                    load_errors: Vec::new(),
+                },
+                parse_errors: Vec::new(),
+            }),
+            inline_references: Vec::new(),
+            citations: crate::metadata::CitationInfo { keys: Vec::new() },
+            title: None,
+            raw_yaml: String::new(),
+        };
+
+        let diagnostics = parse_and_lint(input, Some(metadata));
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "duplicate-bibliography-key");
+        // Anchored to the document's `references.bib` value, not byte 0.
+        assert_eq!(diagnostics[0].location.range.start(), refs_range.start());
+        assert_eq!(diagnostics[0].location.range.end(), refs_range.end());
     }
 
     #[test]
