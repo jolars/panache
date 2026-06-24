@@ -111,24 +111,29 @@ mod tests {
     use super::*;
     use crate::config::Flavor;
 
-    fn config_for(path: &str) -> crate::Config {
-        let uri = Uri::from_file_path(path).expect("uri");
+    /// Build an absolute path for `file_name` that is valid on the host OS, so
+    /// `Uri::from_file_path` succeeds on Windows (which rejects Unix-style
+    /// `/tmp/...` paths) as well as Unix.
+    fn config_for(file_name: &str) -> crate::Config {
+        let mut path = std::env::temp_dir();
+        path.push(file_name);
+        let uri = Uri::from_file_path(&path).expect("uri");
         default_config_for_uri(Some(&uri))
     }
 
     #[test]
     fn default_config_detects_quarto() {
-        assert_eq!(config_for("/tmp/doc.qmd").flavor, Flavor::Quarto);
+        assert_eq!(config_for("doc.qmd").flavor, Flavor::Quarto);
     }
 
     #[test]
     fn default_config_detects_rmarkdown() {
-        assert_eq!(config_for("/tmp/doc.Rmd").flavor, Flavor::RMarkdown);
+        assert_eq!(config_for("doc.Rmd").flavor, Flavor::RMarkdown);
     }
 
     #[test]
     fn default_config_detects_mdsvex_svx() {
-        let config = config_for("/tmp/doc.svx");
+        let config = config_for("doc.svx");
         assert_eq!(config.flavor, Flavor::Mdsvex);
         // The mdsvex flavor must carry its `svelte-template` extension so the
         // no-config LSP path actually parses Svelte spans.
@@ -137,13 +142,13 @@ mod tests {
 
     #[test]
     fn default_config_detects_mdsvex_compound_svelte_md() {
-        let config = config_for("/tmp/page.svelte.md");
+        let config = config_for("page.svelte.md");
         assert_eq!(config.flavor, Flavor::Mdsvex);
         assert!(config.extensions.svelte_template);
     }
 
     #[test]
     fn default_config_leaves_plain_markdown_as_default() {
-        assert_eq!(config_for("/tmp/doc.md").flavor, Flavor::default());
+        assert_eq!(config_for("doc.md").flavor, Flavor::default());
     }
 }
