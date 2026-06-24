@@ -899,6 +899,11 @@ Description
     by a trailing slash) are skipped even though they look "almost" duplicated. Use
     the LSP code action to convert those manually if intended.
 
+    Bare URIs (under the `autolink-bare-uris` extension, e.g. a plain
+    `https://example.com` in GFM) are never flagged: they carry no brackets, are
+    already the shortest form, and parse as autolinks rather than `[text](url)`
+    links.
+
 **Example violation:**
 
 ```markdown
