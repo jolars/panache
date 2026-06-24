@@ -54,7 +54,7 @@ pub struct Cli {
     #[arg(
         long_help = "Synthetic filename to associate with stdin input. This is useful for editor \
         integrations that pipe content via stdin but still need Panache to infer flavor/extensions \
-        from file extension (for example: --stdin-filename doc.qmd)."
+        from file extension (for example: `--stdin-filename doc.qmd`)."
     )]
     pub stdin_filename: Option<PathBuf>,
 
@@ -212,7 +212,7 @@ pub enum Commands {
             long_help = "Format only the specified line range. Lines are 1-indexed and inclusive. \
             The range will be expanded to complete block boundaries to ensure well-formed output. \
             For example, if you select part of a list, the entire list will be formatted. \
-            Format: --range START:END (e.g., --range 5:10 formats lines 5 through 10). \
+            Format: `--range START:END` (e.g., --range 5:10 formats lines 5 through 10). \
             \n\nNote: This feature is experimental. Range filtering may not work correctly in all cases."
         )]
         range: Option<String>,
@@ -257,8 +257,8 @@ pub enum Commands {
             `wrap` (one of: reflow, sentence, semantic, preserve); and \
             `extensions.<name>=<bool>` to toggle any extension (booleans accept \
             true/false/1/0/yes/no/on/off). \
-            \n\nExample: --option line-width=100 -o wrap=sentence \
-            -o extensions.east-asian-line-breaks=true. \
+            \n\nExample: `--option line-width=100 -o wrap=sentence \
+            -o extensions.east-asian-line-breaks=true`. \
             \n\nNote: this is an escape hatch for ad-hoc invocations. Prefer panache.toml so \
             that everyone formatting the repository gets the same result."
         )]
