@@ -5,8 +5,8 @@ A language server for Markdown, Quarto, and R Markdown.
 ## Quick start
 
 1. Install the **Panache** extension.
-2. Open a regular Markdown (`.md`, Pandoc-style), Quarto (`.qmd`), or R Markdown
-   (`.Rmd`, `.rmd`) file.
+2. Open a regular Markdown (`.md`, Pandoc-style), Quarto (`.qmd`), R Markdown
+   (`.Rmd`, `.rmd`), or mdsvex (`.svx`, `.svelte.md`) file.
 3. The extension starts `panache lsp` automatically.
 
 By default, the extension downloads a platform-specific `panache` binary from
@@ -19,8 +19,8 @@ GitHub releases on first use.
   such as fenced divs, tables, math, citations, and attributes.
 - Surfaces Panache diagnostics and code actions in the editor (including
   auto-fixable lint rules such as heading hierarchy).
-- Works for regular Markdown (`.md`, Pandoc-style), Quarto (`.qmd`), and R
-  Markdown (`.Rmd`, `.rmd`).
+- Works for regular Markdown (`.md`, Pandoc-style), Quarto (`.qmd`), R Markdown
+  (`.Rmd`, `.rmd`), and mdsvex (`.svx`, `.svelte.md`).
 
 ## Commands
 
@@ -107,9 +107,10 @@ Use `panache.releaseTag` only if you need an exact tag override:
   (`panache.version` / `panache.releaseTag`) require GitHub connectivity.
 - If a download fall-through fails, the extension shows a warning and falls back
   to looking up `panache` on the system `PATH`.
-- The extension contributes `quarto` (`.qmd`) and `rmarkdown` (`.Rmd`, `.rmd`)
-  language registrations, so it works even without installing a separate Quarto
-  extension. If Quarto is also installed, both can coexist.
+- The extension contributes `quarto` (`.qmd`), `rmarkdown` (`.Rmd`, `.rmd`), and
+  `mdsvex` (`.svx`, `.svelte.md`) language registrations, so it works even
+  without installing a separate Quarto extension. If Quarto is also installed,
+  both can coexist.
 
 ## Settings
 

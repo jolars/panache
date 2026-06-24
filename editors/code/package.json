@@ -29,15 +29,21 @@
     "rmarkdown",
     "r markdown",
     "qmd",
-    "rmd"
+    "rmd",
+    "mdsvex",
+    "svelte",
+    "svx"
   ],
   "activationEvents": [
     "onLanguage:markdown",
     "onLanguage:rmarkdown",
     "onLanguage:quarto",
+    "onLanguage:mdsvex",
     "workspaceContains:**/*.qmd",
     "workspaceContains:**/*.Rmd",
-    "workspaceContains:**/*.rmd"
+    "workspaceContains:**/*.rmd",
+    "workspaceContains:**/*.svx",
+    "workspaceContains:**/*.svelte.md"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -61,6 +67,19 @@
         "extensions": [
           ".Rmd",
           ".rmd"
+        ]
+      },
+      {
+        "id": "mdsvex",
+        "aliases": [
+          "mdsvex",
+          "Svelte Markdown"
+        ],
+        "extensions": [
+          ".svx"
+        ],
+        "filenamePatterns": [
+          "*.svelte.md"
         ]
       }
     ],

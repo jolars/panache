@@ -90,22 +90,60 @@ pub(crate) fn try_load_config(
 
 /// The default config to use when no config file applies, with the flavor
 /// inferred from the document's file extension (`.qmd` → Quarto,
-/// `.Rmd`/`.Rmarkdown` → RMarkdown).
+/// `.Rmd`/`.Rmarkdown` → RMarkdown, `.svx`/`.svelte.md` → Mdsvex). Detection is
+/// delegated to [`crate::config::detect_flavor_from_path`] so the recognized
+/// extension set stays in lockstep with the config-file path; a reduced
+/// hand-rolled match here previously dropped mdsvex on the floor.
 pub(crate) fn default_config_for_uri(document_uri: Option<&Uri>) -> crate::Config {
     let mut config = crate::Config::default();
     let Some(file_path) = document_uri.and_then(|uri| uri.to_file_path()) else {
         return config;
     };
-    if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
-        let detected_flavor = match ext.to_lowercase().as_str() {
-            "qmd" => Some(crate::config::Flavor::Quarto),
-            "rmd" | "rmarkdown" => Some(crate::config::Flavor::RMarkdown),
-            _ => None,
-        };
-        if let Some(flavor) = detected_flavor {
-            config.flavor = flavor;
-            config.extensions = crate::config::Extensions::for_flavor(flavor);
-        }
+    if let Some(flavor) = crate::config::detect_flavor_from_path(&file_path, &config) {
+        config.flavor = flavor;
+        config.extensions = crate::config::Extensions::for_flavor(flavor);
     }
     config
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Flavor;
+
+    fn config_for(path: &str) -> crate::Config {
+        let uri = Uri::from_file_path(path).expect("uri");
+        default_config_for_uri(Some(&uri))
+    }
+
+    #[test]
+    fn default_config_detects_quarto() {
+        assert_eq!(config_for("/tmp/doc.qmd").flavor, Flavor::Quarto);
+    }
+
+    #[test]
+    fn default_config_detects_rmarkdown() {
+        assert_eq!(config_for("/tmp/doc.Rmd").flavor, Flavor::RMarkdown);
+    }
+
+    #[test]
+    fn default_config_detects_mdsvex_svx() {
+        let config = config_for("/tmp/doc.svx");
+        assert_eq!(config.flavor, Flavor::Mdsvex);
+        // The mdsvex flavor must carry its `svelte-template` extension so the
+        // no-config LSP path actually parses Svelte spans.
+        assert!(config.extensions.svelte_template);
+    }
+
+    #[test]
+    fn default_config_detects_mdsvex_compound_svelte_md() {
+        let config = config_for("/tmp/page.svelte.md");
+        assert_eq!(config.flavor, Flavor::Mdsvex);
+        assert!(config.extensions.svelte_template);
+    }
+
+    #[test]
+    fn default_config_leaves_plain_markdown_as_default() {
+        assert_eq!(config_for("/tmp/doc.md").flavor, Flavor::default());
+    }
 }

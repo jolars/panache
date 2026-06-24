@@ -221,9 +221,10 @@ Panache applies flavor in this order:
 1. The `--flavor` CLI flag, if supplied, overrides everything below
 2. `.qmd` files always use `quarto`
 3. `.Rmd` files always use `rmarkdown`
-4. Markdown-family files use the most specific matching `flavor-overrides`
+4. `.svx` and `.svelte.md` files always use `mdsvex`
+5. Markdown-family files use the most specific matching `flavor-overrides`
    pattern
-5. Otherwise, Panache falls back to top-level `flavor`
+6. Otherwise, Panache falls back to top-level `flavor`
 
 ### File Selection (Directory Traversal)
 

@@ -127,6 +127,9 @@ const SUPPORTED_EXTENSIONS: &[&str] = &[
     "markdown",
     "mdown",
     "mkd",
+    // mdsvex: bare `.svx`. The compound `.svelte.md` ends in `.md`, so it is
+    // already accepted by the `md` entry above.
+    "svx",
 ];
 
 fn init_logger(debug_log: Option<&Path>) {
@@ -523,17 +526,11 @@ fn load_config_for_cli(
         panache::config::load(config_path, start_dir, input_path, flavor_override)?
     } else {
         let mut cfg = panache::Config::default();
-        let isolated_flavor = flavor_override.or_else(|| {
-            input_path
-                .and_then(|p| p.extension())
-                .and_then(|e| e.to_str())
-                .and_then(|ext| match ext.to_lowercase().as_str() {
-                    "qmd" => Some(panache::config::Flavor::Quarto),
-                    "rmd" | "rmarkdown" => Some(panache::config::Flavor::RMarkdown),
-                    "md" => Some(cfg.flavor),
-                    _ => None,
-                })
-        });
+        // Delegate to the canonical extension→flavor map so `--isolated` stays
+        // in lockstep with the config-file path (notably mdsvex's `.svx` and the
+        // compound `.svelte.md`); a reduced match here previously omitted them.
+        let isolated_flavor = flavor_override
+            .or_else(|| input_path.and_then(|p| panache::config::detect_flavor_from_path(p, &cfg)));
 
         if let Some(flavor) = isolated_flavor {
             cfg.flavor = flavor;

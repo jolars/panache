@@ -79,6 +79,9 @@ pub const DEFAULT_INCLUDE_PATTERNS: &[&str] = &[
     "**/*.markdown",
     "**/*.mdown",
     "**/*.mkd",
+    // `.svelte.md` is already covered by the `**/*.md` glob above; only the bare
+    // `.svx` extension needs its own pattern.
+    "**/*.svx",
 ];
 
 const CANDIDATE_NAMES: &[&str] = &[".panache.toml", "panache.toml"];
@@ -750,6 +753,16 @@ fn resolve_formatter_extensions_for_flavor(
 
     global_overrides.extend(flavor_overrides);
     FormatterExtensions::merge_with_flavor(global_overrides, flavor)
+}
+
+/// Extension-based flavor detection for fallback callers that don't run the
+/// full config walk: the LSP no-config default (`default_config_for_uri`) and
+/// the CLI `--isolated` path. Both previously hand-rolled a reduced match that
+/// silently omitted mdsvex; delegating here keeps the recognized extension set
+/// (including the compound `.svelte.md`) in lockstep with the canonical
+/// [`detect_flavor`].
+pub fn detect_flavor_from_path(input_file: &Path, cfg: &Config) -> Option<Flavor> {
+    detect_flavor(Some(input_file), None, cfg)
 }
 
 fn detect_flavor(input_file: Option<&Path>, anchor: Option<&Path>, cfg: &Config) -> Option<Flavor> {
