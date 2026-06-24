@@ -26,7 +26,7 @@
 //! style from the leading byte and cooks via the shared
 //! [`crate::parser::yaml::cook`] primitives.
 
-use rowan::TextRange;
+use rowan::{TextRange, TextSize};
 
 use super::ast::{AstChildren, AstNode, support};
 use super::{PanacheLanguage, SyntaxKind, SyntaxNode, SyntaxToken};
@@ -125,6 +125,19 @@ fn token_of(parent: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
         .children_with_tokens()
         .filter_map(|el| el.into_token())
         .find(|t| t.kind() == kind)
+}
+
+/// A composite node's `text_range()` includes the trailing newline rowan
+/// attaches after its last child, so using it as a diagnostic span ends at
+/// column 1 of the following sibling line. This returns the range trimmed of
+/// trailing whitespace — ending at the last content byte. `text_range()` itself
+/// stays lossless; this is the semantic projection, mirroring the inline
+/// `content_range()` accessors.
+fn content_text_range(node: &SyntaxNode) -> TextRange {
+    let range = node.text_range();
+    let content_len = node.text().to_string().trim_end().len();
+    let end = range.start() + TextSize::from(content_len as u32);
+    TextRange::new(range.start(), end)
 }
 
 /// Projections shared by value / item / document body wrappers. Implemented as
@@ -253,6 +266,11 @@ impl YamlBlockMap {
         support::children(&self.0)
     }
 
+    /// The node's range trimmed of trailing trivia (see [`content_text_range`]).
+    pub fn content_range(&self) -> TextRange {
+        content_text_range(&self.0)
+    }
+
     /// The first entry whose (cooked) key text equals `key`.
     pub fn entry(&self, key: &str) -> Option<YamlBlockMapEntry> {
         self.entries()
@@ -317,6 +335,11 @@ impl YamlBlockSequence {
     pub fn items(&self) -> AstChildren<YamlBlockSequenceItem> {
         support::children(&self.0)
     }
+
+    /// The node's range trimmed of trailing trivia (see [`content_text_range`]).
+    pub fn content_range(&self) -> TextRange {
+        content_text_range(&self.0)
+    }
 }
 
 ast_node!(
@@ -338,6 +361,11 @@ impl YamlFlowSequence {
     pub fn items(&self) -> AstChildren<YamlFlowSequenceItem> {
         support::children(&self.0)
     }
+
+    /// The node's range trimmed of trailing trivia (see [`content_text_range`]).
+    pub fn content_range(&self) -> TextRange {
+        content_text_range(&self.0)
+    }
 }
 
 ast_node!(
@@ -357,6 +385,11 @@ ast_node!(
 impl YamlFlowMap {
     pub fn entries(&self) -> AstChildren<YamlFlowMapEntry> {
         support::children(&self.0)
+    }
+
+    /// The node's range trimmed of trailing trivia (see [`content_text_range`]).
+    pub fn content_range(&self) -> TextRange {
+        content_text_range(&self.0)
     }
 
     pub fn entry(&self, key: &str) -> Option<YamlFlowMapEntry> {
@@ -502,6 +535,23 @@ mod tests {
         let doc = parse_yaml_document("title: x\n").expect("document");
         let map = doc.block_map().expect("block map");
         assert_eq!(map.entries().count(), 1);
+    }
+
+    #[test]
+    fn content_range_excludes_trailing_trivia() {
+        // A nested block map's `text_range()` runs up to the next sibling key
+        // (it owns the trailing newline); `content_range()` ends at the last
+        // content byte so a diagnostic does not bleed onto the sibling line.
+        let input = "outer:\n  a: 1\n  b: 2\nsibling: x\n";
+        let doc = parse_yaml_document(input).expect("document");
+        let inner = doc.block_map().unwrap().value_of("outer").unwrap();
+        let map = inner.as_block_map().unwrap();
+        let slice = |r: TextRange| &input[usize::from(r.start())..usize::from(r.end())];
+        assert!(
+            slice(map.syntax().text_range()).ends_with('\n'),
+            "text_range keeps the trailing newline (lossless)"
+        );
+        assert_eq!(slice(map.content_range()), "a: 1\n  b: 2");
     }
 
     #[test]

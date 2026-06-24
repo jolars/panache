@@ -223,6 +223,28 @@ mod tests {
     }
 
     #[test]
+    fn type_mismatch_span_excludes_sibling_key() {
+        // A block-map value flagged as the wrong type must underline only the
+        // value, not bleed through the trailing newline into the next key.
+        let input = "---\nbibliography:\n  a: x.bib\n  b: y.bib\ncsl: z.csl\n---\n";
+        let diags = lint(input, Flavor::Quarto);
+        let type_mismatch: Vec<_> = diags.iter().filter(|d| d.code == TYPE_MISMATCH).collect();
+        assert_eq!(type_mismatch.len(), 1, "got: {diags:?}");
+        let span_text = input_at(&type_mismatch[0].location.range, input);
+        // The trailing newline must not be in the span: its end offset would
+        // otherwise land at column 1 of the `csl` line, and the renderer would
+        // underline that sibling line too.
+        assert!(
+            !span_text.ends_with(['\n', ' ']),
+            "span includes trailing whitespace and bleeds into the next line: {span_text:?}"
+        );
+        assert!(
+            span_text.contains("a: x.bib") && span_text.contains("b: y.bib"),
+            "span should cover the map value: {span_text:?}"
+        );
+    }
+
+    #[test]
     fn accepts_valid_frontmatter() {
         let diags = lint(
             "---\ntitle: Hello\nauthor: Jane\nformat: html\ntoc: true\n---\n",

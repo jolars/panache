@@ -63,15 +63,15 @@ fn bridge_node(node: YamlNode, base: TextSize) -> SchemaValue {
     match node {
         YamlNode::Scalar(s) => bridge_scalar(&s, base),
         YamlNode::BlockMap(m) => SchemaValue {
-            span: shift(m.syntax().text_range(), base),
+            span: shift(m.content_range(), base),
             kind: ValueKind::Map(bridge_block_entries(m.entries(), base)),
         },
         YamlNode::FlowMap(m) => SchemaValue {
-            span: shift(m.syntax().text_range(), base),
+            span: shift(m.content_range(), base),
             kind: ValueKind::Map(bridge_flow_entries(m.entries(), base)),
         },
         YamlNode::BlockSequence(s) => SchemaValue {
-            span: shift(s.syntax().text_range(), base),
+            span: shift(s.content_range(), base),
             kind: ValueKind::Seq(
                 s.items()
                     .map(|item| bridge_node_or_empty(item.as_node(), item_span(&item, base), base))
@@ -79,7 +79,7 @@ fn bridge_node(node: YamlNode, base: TextSize) -> SchemaValue {
             ),
         },
         YamlNode::FlowSequence(s) => SchemaValue {
-            span: shift(s.syntax().text_range(), base),
+            span: shift(s.content_range(), base),
             kind: ValueKind::Seq(
                 s.items()
                     .map(|item| bridge_node_or_empty(item.as_node(), item_span(&item, base), base))
