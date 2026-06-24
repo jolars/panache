@@ -2149,6 +2149,46 @@ fn extract_multiline_columns(separator: &SyntaxNode) -> Vec<(usize, usize)> {
         .collect()
 }
 
+/// Column geometry for a multiline table, derived from the separator dash runs.
+///
+/// Pandoc spans a column from the start of its dash run to the start of the
+/// *next* run (the inter-run gap belongs to the left column); the last column
+/// runs to end-of-line. We therefore slice cell content on the wider `slice`
+/// span (so gap text is never truncated) but render each non-last column one
+/// space narrower than its span, reserving a single-space gutter so the
+/// re-emitted separator and rows keep columns separated. Keeping every column
+/// *start* fixed preserves the relative widths pandoc derives from the dash
+/// geometry, so the table renders identically.
+struct MultilineColumns {
+    /// `(start, exclusive end)` used to slice cell text. The last column's end
+    /// is `usize::MAX` so it captures everything to end-of-line.
+    slice: Vec<(usize, usize)>,
+    /// `(start, exclusive end)` used for rendering: dash runs, padding, reflow.
+    render: Vec<(usize, usize)>,
+}
+
+/// Derive slice/render geometry from raw `(start, dash_end)` dash runs.
+fn multiline_columns(raw: &[(usize, usize)]) -> MultilineColumns {
+    let n = raw.len();
+    let mut slice = Vec::with_capacity(n);
+    let mut render = Vec::with_capacity(n);
+    for (i, &(start, dash_end)) in raw.iter().enumerate() {
+        if i + 1 < n {
+            let next = raw[i + 1].0;
+            slice.push((start, next));
+            // Reserve a single-space gutter before the next column's start.
+            let width = next.saturating_sub(start).saturating_sub(1);
+            render.push((start, start + width));
+        } else {
+            // Last column: slice to end-of-line; render keeps its dash run
+            // (callers widen this to fit content if needed).
+            slice.push((start, usize::MAX));
+            render.push((start, dash_end));
+        }
+    }
+    MultilineColumns { slice, render }
+}
+
 /// Determine alignment for a column based on header text position
 fn determine_multiline_alignment(header_text: &str, col_start: usize, col_end: usize) -> Alignment {
     if header_text.is_empty() {
@@ -2256,7 +2296,7 @@ fn extract_cells_from_table_cell_nodes(
 /// Extract structured data from multiline table AST node
 fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> MultilineTableData {
     let mut rows: Vec<Vec<Vec<String>>> = Vec::new();
-    let mut column_positions: Vec<(usize, usize)> = Vec::new();
+    let mut raw_columns: Vec<(usize, usize)> = Vec::new();
     let mut alignments = Vec::new();
     let mut caption = None;
     let mut has_header = false;
@@ -2278,7 +2318,7 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
                 // For tables with headers: second separator (after header) defines columns
                 // We extract from first separator and will overwrite if we see a second one
                 if separator_count == 1 || (separator_count == 2 && has_header) {
-                    column_positions = extract_multiline_columns(&child);
+                    raw_columns = extract_multiline_columns(&child);
                 }
             }
             SyntaxKind::TABLE_HEADER => {
@@ -2287,15 +2327,17 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
                 header_text = child.text().to_string();
             }
             SyntaxKind::TABLE_ROW => {
+                // Slice cells on the pandoc column spans (gap text belongs to
+                // the left column) so wide cells are never truncated.
+                let slice = multiline_columns(&raw_columns).slice;
                 // Check if row has TABLE_CELL nodes (Phase 7.1)
                 if child.children().any(|c| c.kind() == SyntaxKind::TABLE_CELL) {
-                    let cells =
-                        extract_cells_from_table_cell_nodes(&child, config, &column_positions);
+                    let cells = extract_cells_from_table_cell_nodes(&child, config, &slice);
                     rows.push(cells);
                 } else {
                     // Old style: format cell content and split into cells
                     let row_content = format_cell_content(&child, config);
-                    let cells = extract_multiline_cells(&row_content, &column_positions);
+                    let cells = extract_multiline_cells(&row_content, &slice);
                     rows.push(cells);
                 }
             }
@@ -2303,8 +2345,10 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
         }
     }
 
+    let slice = multiline_columns(&raw_columns).slice;
+
     // Add header as first row if present
-    if has_header && !column_positions.is_empty() {
+    if has_header && !raw_columns.is_empty() {
         let header_node = node
             .children()
             .find(|c| c.kind() == SyntaxKind::TABLE_HEADER);
@@ -2312,21 +2356,42 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
         let header_cells = if let Some(hdr) = header_node {
             if hdr.children().any(|c| c.kind() == SyntaxKind::TABLE_CELL) {
                 // New style: extract from TABLE_CELL nodes + continuation text
-                extract_cells_from_table_cell_nodes(&hdr, config, &column_positions)
+                extract_cells_from_table_cell_nodes(&hdr, config, &slice)
             } else {
                 // Old style: extract from text
-                extract_multiline_cells(&header_text, &column_positions)
+                extract_multiline_cells(&header_text, &slice)
             }
         } else {
-            extract_multiline_cells(&header_text, &column_positions)
+            extract_multiline_cells(&header_text, &slice)
         };
 
         rows.insert(0, header_cells);
+    }
 
-        // Determine alignments from header
+    // Render geometry: keep column starts fixed, widen the last column to fit
+    // its content (its dash run may be shorter than the text it holds).
+    let mut column_positions = multiline_columns(&raw_columns).render;
+    if let Some(&(last_start, last_end)) = column_positions.last() {
+        let last_idx = column_positions.len() - 1;
+        let content_width = rows
+            .iter()
+            .filter_map(|row| row.get(last_idx))
+            .flat_map(|cell| cell.iter())
+            .map(|line| line.trim_end().width())
+            .max()
+            .unwrap_or(0);
+        let width = (last_end - last_start).max(content_width);
+        column_positions[last_idx] = (last_start, last_start + width);
+    }
+
+    // Determine alignments from header, else from the first body row.
+    if has_header && !column_positions.is_empty() {
         for &(col_start, col_end) in &column_positions {
-            let alignment = determine_multiline_alignment(&header_text, col_start, col_end);
-            alignments.push(alignment);
+            alignments.push(determine_multiline_alignment(
+                &header_text,
+                col_start,
+                col_end,
+            ));
         }
     } else if !rows.is_empty() && !column_positions.is_empty() {
         // No header - determine alignment from first body row (per Pandoc spec)
@@ -2337,8 +2402,11 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
         // Use raw text to preserve original spacing for alignment detection
         let first_row_text = first_row_node.text().to_string();
         for &(col_start, col_end) in &column_positions {
-            let alignment = determine_multiline_alignment(&first_row_text, col_start, col_end);
-            alignments.push(alignment);
+            alignments.push(determine_multiline_alignment(
+                &first_row_text,
+                col_start,
+                col_end,
+            ));
         }
     } else {
         // Fallback - use default alignment

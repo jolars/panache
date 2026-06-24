@@ -843,9 +843,39 @@ Body cell text is **reflowed** to fit the existing column width and any blank
 padding lines inside a cell are dropped, following the global `wrap` setting:
 under `reflow` (the default) a cell whose lines could pack more tightly is
 re-wrapped within its column, while `preserve` keeps the existing line breaks
-untouched. As with grid tables, column widths themselves are **never** resized,
-since Pandoc derives relative output widths from them. The header row is left
-as-is, because its layout determines each column's alignment.
+untouched. As with grid tables, the relative column widths themselves are
+**never** changed, since Pandoc derives relative output widths from them. The
+header row is left as-is, because its layout determines each column's alignment.
+
+A multiline table column spans from the start of its dashes to the start of the
+next column's dashes (the gap belongs to the left column; the last column runs
+to the end of the line), matching how Pandoc reads the separator. The variable
+runs of spaces a source file may leave between the dash runs are **normalized to
+a single space**, with the dash runs extended to keep every column start fixed.
+The relative widths are unchanged, so the table renders identically while the
+separator becomes regular. Because the column boundary is the next column's
+start (not the end of its own dashes), cell text that extends past a short dash
+run into the gap is **kept** rather than truncated.
+
+Input
+
+:   ```markdown
+    -----  ----            ------
+    Cell   spanning runs   here
+
+    Next   more     text     end
+    -----  ----            ------
+    ```
+
+Output
+
+:   ```markdown
+    ------ --------------- ------
+    Cell   spanning runs   here
+
+    Next   more text       end
+    ------ --------------- ------
+    ```
 
 ### Table Captions
 

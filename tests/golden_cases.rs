@@ -338,6 +338,7 @@ golden_test_cases!(
     lists_wrapping_nested,
     lists_wrapping_simple,
     multiline_table_basic,
+    multiline_table_column_spacing,
     multiline_table_caption,
     multiline_table_caption_after,
     multiline_table_headerless,
