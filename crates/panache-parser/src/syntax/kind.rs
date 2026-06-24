@@ -156,6 +156,16 @@ pub enum SyntaxKind {
     SHORTCODE_MARKER_CLOSE, // >}} or >}}}
     SHORTCODE_CONTENT,      // content between markers
 
+    // Svelte template syntax (mdsvex). Opaque, lossless spans: the content
+    // between the braces is preserved verbatim. The parent kind records the
+    // category (block logic / tag / expression) by leading sigil.
+    SVELTE_BLOCK_LOGIC,  // {#if}, {:else}, {/each}, ...
+    SVELTE_TAG,          // {@html ...}, {@const ...}, {@debug ...}
+    SVELTE_EXPRESSION,   // {expr}
+    SVELTE_MARKER_OPEN,  // {
+    SVELTE_MARKER_CLOSE, // }
+    SVELTE_CONTENT,      // verbatim content between the braces
+
     // Code
     INLINE_CODE,
     INLINE_CODE_MARKER,  // ` or `` or ```

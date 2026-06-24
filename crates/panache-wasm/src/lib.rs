@@ -12,6 +12,7 @@ fn parse_flavor(value: &str) -> Option<Flavor> {
         "gfm" => Some(Flavor::Gfm),
         "commonmark" | "common-mark" => Some(Flavor::CommonMark),
         "multimarkdown" | "multi-markdown" => Some(Flavor::MultiMarkdown),
+        "mdsvex" => Some(Flavor::Mdsvex),
         _ => None,
     }
 }

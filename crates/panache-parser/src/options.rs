@@ -23,6 +23,9 @@ pub enum Flavor {
     /// MultiMarkdown
     #[cfg_attr(feature = "serde", serde(rename = "multimarkdown"))]
     MultiMarkdown,
+    /// mdsvex (Svelte-flavored Markdown: CommonMark + Svelte template syntax)
+    #[cfg_attr(feature = "serde", serde(rename = "mdsvex"))]
+    Mdsvex,
 }
 
 /// Pandoc/Markdown extensions configuration.
@@ -274,6 +277,13 @@ pub struct Extensions {
     pub bookdown_references: bool,
     /// Bookdown equation references in LaTeX math blocks (\#eq:label)
     pub bookdown_equation_references: bool,
+
+    // ===== mdsvex-specific extensions =====
+    /// [NON-DEFAULT] Svelte template syntax: `{#if}`/`{:else}`/`{/each}` block
+    /// logic, `{@html ...}`/`{@const ...}` tags, and `{expr}` interpolation.
+    /// Parsed as opaque, lossless spans (content preserved verbatim).
+    #[cfg_attr(feature = "serde", serde(alias = "svelte_template"))]
+    pub svelte_template: bool,
 }
 
 impl Default for Extensions {
@@ -348,6 +358,7 @@ impl Extensions {
             strikeout: false,
             subscript: false,
             superscript: false,
+            svelte_template: false,
             table_captions: false,
             task_lists: false,
             tex_math_dollars: false,
@@ -370,6 +381,7 @@ impl Extensions {
             Flavor::Gfm => Self::gfm_defaults(),
             Flavor::CommonMark => Self::commonmark_defaults(),
             Flavor::MultiMarkdown => Self::multimarkdown_defaults(),
+            Flavor::Mdsvex => Self::mdsvex_defaults(),
         }
     }
 
@@ -487,6 +499,9 @@ impl Extensions {
 
             // Spaced reference links (opt-in)
             spaced_reference_links: false,
+
+            // mdsvex (opt-in, mdsvex flavor only)
+            svelte_template: false,
         }
     }
 
@@ -591,6 +606,35 @@ impl Extensions {
         ext.superscript = true;
         ext.tex_math_dollars = true;
         ext.tex_math_double_backslash = true;
+
+        ext
+    }
+
+    fn mdsvex_defaults() -> Self {
+        // mdsvex (≤0.12.x) builds on `remark-parse@8`, the pre-micromark parser
+        // whose options default to `gfm: true`. So tables, strikethrough, bare
+        // autolinks, and task lists work out of the box with **no** plugins —
+        // confirmed by the official "Svex up your markdown" getting-started
+        // (which uses a pipe table) and by real plugin-free `svelte.config.js`
+        // setups. `remark-gfm` is only needed on *modern* remark, which mdsvex
+        // does not use. A CommonMark-only default would wrongly reflow those
+        // tables as prose.
+        //
+        // We therefore start from the GFM extension set (still the CommonMark
+        // *dialect* per `Dialect::for_flavor`, and still with every Pandoc
+        // attribute extension off, so `{` stays free for Svelte), then trim the
+        // extras that remark-parse@8's `gfm: true` does NOT include: footnotes
+        // (a separate, default-off option), math (needs remark-math), emoji
+        // (needs remark-gemoji), and GitHub alerts (postdates this remark).
+        let mut ext = Self::gfm_defaults();
+
+        ext.footnotes = false;
+        ext.tex_math_dollars = false;
+        ext.tex_math_gfm = false;
+        ext.emoji = false;
+        ext.alerts = false;
+
+        ext.svelte_template = true;
 
         ext
     }
@@ -736,11 +780,12 @@ known_extensions! {
     "wikilinks-title-after-pipe" => wikilinks_title_after_pipe,
     "wikilinks-title-before-pipe" => wikilinks_title_before_pipe,
     "spaced-reference-links" => spaced_reference_links,
+    "svelte-template" => svelte_template,
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Extensions, Flavor};
+    use super::{Dialect, Extensions, Flavor};
     use std::collections::HashMap;
 
     #[test]
@@ -783,12 +828,61 @@ mod tests {
             Flavor::Gfm,
             Flavor::CommonMark,
             Flavor::MultiMarkdown,
+            Flavor::Mdsvex,
         ] {
             assert!(
                 !Extensions::for_flavor(flavor).four_space_rule,
                 "four_space_rule should be off by default for {flavor:?}"
             );
         }
+    }
+
+    #[test]
+    fn svelte_template_defaults_off_for_non_mdsvex_flavors() {
+        for flavor in [
+            Flavor::Pandoc,
+            Flavor::Quarto,
+            Flavor::RMarkdown,
+            Flavor::Gfm,
+            Flavor::CommonMark,
+            Flavor::MultiMarkdown,
+        ] {
+            assert!(
+                !Extensions::for_flavor(flavor).svelte_template,
+                "svelte_template should be off by default for {flavor:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn mdsvex_defaults_match_remark_parse_8_gfm() {
+        let ext = Extensions::for_flavor(Flavor::Mdsvex);
+
+        // The Svelte template layer is on; raw HTML and frontmatter pass through.
+        assert!(ext.svelte_template);
+        assert!(ext.raw_html);
+        assert!(ext.yaml_metadata_block);
+
+        // remark-parse@8 defaults to `gfm: true`, so these work with no plugins.
+        assert!(ext.pipe_tables);
+        assert!(ext.strikeout);
+        assert!(ext.task_lists);
+        assert!(ext.autolink_bare_uris);
+
+        // Extras that remark-parse@8's gfm does NOT include stay off.
+        assert!(!ext.footnotes);
+        assert!(!ext.tex_math_dollars);
+        assert!(!ext.emoji);
+        assert!(!ext.alerts);
+
+        // CommonMark dialect, so the Pandoc `{...}` attribute constructs are off
+        // — this is what frees `{` for Svelte template syntax.
+        assert_eq!(Dialect::for_flavor(Flavor::Mdsvex), Dialect::CommonMark);
+        assert!(!ext.header_attributes);
+        assert!(!ext.bracketed_spans);
+        assert!(!ext.fenced_divs);
+        assert!(!ext.raw_attribute);
+        assert!(!ext.inline_code_attributes);
     }
 
     #[test]
@@ -863,7 +957,7 @@ impl Dialect {
     /// Default dialect for a given user-facing flavor.
     pub fn for_flavor(flavor: Flavor) -> Self {
         match flavor {
-            Flavor::CommonMark | Flavor::Gfm => Dialect::CommonMark,
+            Flavor::CommonMark | Flavor::Gfm | Flavor::Mdsvex => Dialect::CommonMark,
             Flavor::Pandoc | Flavor::Quarto | Flavor::RMarkdown | Flavor::MultiMarkdown => {
                 Dialect::Pandoc
             }
@@ -943,7 +1037,8 @@ impl schemars::JsonSchema for Flavor {
                 "gfm",
                 "common-mark",
                 "commonmark",
-                "multimarkdown"
+                "multimarkdown",
+                "mdsvex"
             ]
         })
     }

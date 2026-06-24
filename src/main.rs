@@ -29,6 +29,7 @@ impl From<CliFlavor> for Flavor {
             CliFlavor::Gfm => Flavor::Gfm,
             CliFlavor::CommonMark => Flavor::CommonMark,
             CliFlavor::MultiMarkdown => Flavor::MultiMarkdown,
+            CliFlavor::Mdsvex => Flavor::Mdsvex,
         }
     }
 }

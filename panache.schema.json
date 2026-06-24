@@ -62,7 +62,8 @@
         "gfm",
         "common-mark",
         "commonmark",
-        "multimarkdown"
+        "multimarkdown",
+        "mdsvex"
       ],
       "type": "string"
     },
@@ -491,6 +492,7 @@
                 "strikeout",
                 "subscript",
                 "superscript",
+                "svelte-template",
                 "table-captions",
                 "task-lists",
                 "tex-math-dollars",
@@ -553,6 +555,7 @@
           "lists-without-preceding-blankline",
           "mark",
           "markdown-in-html-blocks",
+          "mdsvex",
           "mmd-header-identifiers",
           "mmd-link-attributes",
           "mmd-title-block",
@@ -585,6 +588,7 @@
           "strikeout",
           "subscript",
           "superscript",
+          "svelte-template",
           "table-captions",
           "task-lists",
           "tex-math-dollars",

@@ -352,6 +352,7 @@ const KNOWN_FLAVOR_KEYS: &[&str] = &[
     "common-mark",
     "multimarkdown",
     "multi-markdown",
+    "mdsvex",
 ];
 
 /// Suggest the closest valid name from `candidates` for an unknown `input`
@@ -630,6 +631,7 @@ fn parse_flavor_key(s: &str) -> Option<Flavor> {
         "gfm" => Some(Flavor::Gfm),
         "common-mark" | "commonmark" => Some(Flavor::CommonMark),
         "multimarkdown" | "multi-markdown" => Some(Flavor::MultiMarkdown),
+        "mdsvex" => Some(Flavor::Mdsvex),
         _ => None,
     }
 }
@@ -761,12 +763,23 @@ fn detect_flavor(input_file: Option<&Path>, anchor: Option<&Path>, cfg: &Config)
         return Some(Flavor::Quarto);
     }
 
+    // mdsvex uses both `.svx` and the compound `.svelte.md`. The latter ends in
+    // `.md`, so check the full file name before the single-extension match below
+    // routes it into the Markdown family. Plain `.svelte` is a code component,
+    // not Markdown, so it is intentionally left unmapped.
+    if let Some(name) = input_path.file_name().and_then(|n| n.to_str())
+        && name.to_lowercase().ends_with(".svelte.md")
+    {
+        return Some(Flavor::Mdsvex);
+    }
+
     let ext = input_path.extension().and_then(|e| e.to_str())?;
     let ext_lower = ext.to_lowercase();
 
     match ext_lower.as_str() {
         "qmd" => Some(Flavor::Quarto),
         "rmd" | "rmarkdown" => Some(Flavor::RMarkdown),
+        "svx" => Some(Flavor::Mdsvex),
         _ if MARKDOWN_FAMILY_EXTENSIONS.contains(&ext_lower.as_str()) => {
             let override_flavor = detect_flavor_override(input_path, anchor, &cfg.flavor_overrides);
             Some(override_flavor.unwrap_or(cfg.flavor))
@@ -968,6 +981,38 @@ mod tests {
         let cfg = Config::default();
         let detected = detect_flavor(Some(Path::new("doc.Rmarkdown")), None, &cfg);
         assert_eq!(detected, Some(Flavor::RMarkdown));
+    }
+
+    #[test]
+    fn detect_flavor_maps_svx_extension() {
+        let cfg = Config::default();
+        assert_eq!(
+            detect_flavor(Some(Path::new("doc.svx")), None, &cfg),
+            Some(Flavor::Mdsvex)
+        );
+        assert_eq!(
+            detect_flavor(Some(Path::new("doc.SVX")), None, &cfg),
+            Some(Flavor::Mdsvex)
+        );
+    }
+
+    #[test]
+    fn detect_flavor_maps_compound_svelte_md_extension() {
+        let cfg = Config::default();
+        assert_eq!(
+            detect_flavor(Some(Path::new("page.svelte.md")), None, &cfg),
+            Some(Flavor::Mdsvex)
+        );
+    }
+
+    #[test]
+    fn detect_flavor_does_not_map_plain_svelte_extension() {
+        // A `.svelte` file is a code component, not Markdown.
+        let cfg = Config::default();
+        assert_eq!(
+            detect_flavor(Some(Path::new("App.svelte")), None, &cfg),
+            None
+        );
     }
 
     #[test]

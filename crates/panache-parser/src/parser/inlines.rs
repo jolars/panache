@@ -50,6 +50,8 @@ pub mod strikeout;
 pub mod subscript;
 #[path = "inlines/superscript.rs"]
 pub mod superscript;
+#[path = "inlines/svelte.rs"]
+pub mod svelte;
 #[path = "inlines/wikilinks.rs"]
 pub mod wikilinks;
 

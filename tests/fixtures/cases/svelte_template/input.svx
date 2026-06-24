@@ -1,0 +1,30 @@
+---
+title: Demo
+---
+
+<script>
+  let count = 0;
+</script>
+
+Inline interpolation {count} with a component <Counter /> and an opaque span
+{#each items  as  item} kept verbatim even when the surrounding prose is long
+enough that the formatter would otherwise reflow this paragraph at the default
+width.
+
+{#if count > 0}
+
+Shown when **count** is positive.
+
+{:else}
+
+Hidden.
+
+{/if}
+
+A tag {@html rendered} and a nested object {{ a: 1 }} expression.
+
+Normal GFM works too (remark-parse@8 `gfm: true`): some ~~struck~~ text.
+
+| like | this |
+|--|--|
+| table | here |

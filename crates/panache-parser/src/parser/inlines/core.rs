@@ -60,6 +60,7 @@ use super::shortcodes::{emit_shortcode, try_parse_shortcode};
 use super::strikeout::{emit_strikeout, try_parse_strikeout};
 use super::subscript::{emit_subscript, try_parse_subscript};
 use super::superscript::{emit_superscript, try_parse_superscript};
+use super::svelte::{emit_svelte_template, try_parse_svelte_template};
 
 /// Parse inline text into the CST builder.
 ///
@@ -905,6 +906,24 @@ fn parse_inline_range_impl(
                 text_start = pos;
                 continue;
             }
+        }
+
+        // Try Svelte template spans (mdsvex): {#if}, {@html}, {expr}, ...
+        // Opaque, lossless. Gated on the extension, so `{` keeps its normal
+        // meaning in every other flavor. Tried before the shortcode probe;
+        // the parser leaves `{{<` to the shortcode path.
+        if byte == b'{'
+            && config.extensions.svelte_template
+            && let Some((len, kind, content)) = try_parse_svelte_template(&text[pos..])
+        {
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            }
+            log::trace!("Matched Svelte template span at pos {}: {:?}", pos, kind);
+            emit_svelte_template(builder, kind, &content);
+            pos += len;
+            text_start = pos;
+            continue;
         }
 
         // Try Quarto shortcodes: {{< shortcode >}}

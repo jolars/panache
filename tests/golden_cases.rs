@@ -19,7 +19,7 @@ use std::{
 
 /// Find a file with given base name and any supported extension.
 fn find_file_with_extension(dir: &Path, base: &str) -> Option<PathBuf> {
-    for ext in &["md", "qmd", "Rmd"] {
+    for ext in &["md", "qmd", "Rmd", "svx"] {
         let path = dir.join(format!("{}.{}", base, ext));
         if path.exists() {
             return Some(path);
@@ -48,6 +48,7 @@ fn detect_fixture_flavor(input_path: &Path, fallback: Flavor) -> Flavor {
     match ext.as_deref() {
         Some("qmd") => Flavor::Quarto,
         Some("rmd") | Some("rmarkdown") => Flavor::RMarkdown,
+        Some("svx") => Flavor::Mdsvex,
         _ => fallback,
     }
 }
@@ -375,6 +376,7 @@ golden_test_cases!(
     simple_table,
     simple_table_wide_cell,
     standardize_bullets,
+    svelte_template,
     sentence_wrap_basic,
     sentence_wrap_abbreviations,
     sentence_wrap_contextual_abbrev,

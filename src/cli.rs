@@ -518,4 +518,7 @@ pub enum CliFlavor {
     /// MultiMarkdown (Fletcher Penney's extended Markdown dialect)
     #[value(name = "multimarkdown")]
     MultiMarkdown,
+    /// mdsvex (Svelte-flavored Markdown: CommonMark + Svelte template syntax)
+    #[value(name = "mdsvex")]
+    Mdsvex,
 }

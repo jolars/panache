@@ -1,0 +1,35 @@
+---
+title: Demo
+---
+
+<script>
+  let count = 0;
+</script>
+
+Inline interpolation {count} and a component <Counter />.
+
+{#each items  as  item}
+
+- {item.name}
+
+{/each}
+
+{#if count > 0}
+
+Shown when **count** is positive.
+
+{:else}
+
+Hidden.
+
+{/if}
+
+A tag: {@html rendered} and a nested object {{ a: 1 }} expression.
+
+An unbalanced brace { stays literal.
+
+GFM tables work by default (no remark-gfm):
+
+| like | this |
+|--|--|
+| table | here |

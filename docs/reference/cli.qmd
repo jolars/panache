@@ -46,6 +46,8 @@ Homepage and downloads (including .deb and .rpm packages): <https://panache.bz>
     CommonMark (the strict, standardized base dialect)
   - `multimarkdown`:
     MultiMarkdown (Fletcher Penney's extended Markdown dialect)
+  - `mdsvex`:
+    mdsvex (Svelte-flavored Markdown: CommonMark + Svelte template syntax)
 
 * `--color <WHEN>` — Control when colored output is used
 

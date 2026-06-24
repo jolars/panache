@@ -19,7 +19,7 @@ use std::{
 
 /// Find a file with given base name and any supported extension.
 fn find_file_with_extension(dir: &Path, base: &str) -> Option<PathBuf> {
-    for ext in &["md", "qmd", "Rmd"] {
+    for ext in &["md", "qmd", "Rmd", "svx"] {
         let path = dir.join(format!("{}.{}", base, ext));
         if path.exists() {
             return Some(path);
@@ -48,6 +48,7 @@ fn load_test_parser_options(dir: &Path) -> Option<ParserOptions> {
             "gfm" => Flavor::Gfm,
             "commonmark" => Flavor::CommonMark,
             "multimarkdown" => Flavor::MultiMarkdown,
+            "mdsvex" => Flavor::Mdsvex,
             _ => Flavor::default(),
         };
         options.flavor = flavor;
@@ -604,6 +605,7 @@ golden_test_cases!(
     simple_table_in_list_blockquote,
     simple_table_wide_cell,
     standardize_bullets,
+    svelte_template,
     subscript_unclosed_double_tilde_pandoc,
     sentence_wrap_basic,
     sentence_wrap_abbreviations,

@@ -845,6 +845,44 @@ for initial implementation.
 
 ### Known Differences from Pandoc
 
+## mdsvex / Svelte-flavored Markdown
+
+MVP support for [mdsvex](https://mdsvex.pngwn.io) (`.svx`, `.svelte.md`). mdsvex
+(≤0.12.x) builds on `remark-parse@8`, whose options default to `gfm: true`, so
+tables, strikethrough, bare autolinks, and task lists work with **no plugins**
+(confirmed by the getting-started example and real plugin-free
+`svelte.config.js` setups; `remark-gfm` is only for modern remark). So
+`Flavor::Mdsvex` is a CommonMark-*dialect* flavor with the GFM extension set +
+`raw_html` + `yaml_metadata_block` + `svelte-template`, minus the extras mdsvex
+does not enable by default (footnotes, math, emoji, alerts). The `{...}`
+attribute "collision" with Pandoc syntax evaporates because the CommonMark
+dialect leaves every attribute extension (`header_attributes`,
+`bracketed_spans`, `fenced_divs`, `raw_attribute`) off, so `{` is free for
+Svelte. `svelte-template` is off for every other flavor (zero behavior change
+elsewhere).
+
+- [x] MVP: `Flavor::Mdsvex` + `svelte-template` extension; `.svx`/`.svelte.md`
+  detection; CLI/WASM/schema surfaces.
+- [x] Opaque, sigil-distinguished inline spans (`SVELTE_BLOCK_LOGIC` for
+  `{#…}`/`{:…}`/`{/…}`, `SVELTE_TAG` for `{@…}`, `SVELTE_EXPRESSION` for
+  `{expr}`), content preserved verbatim. Balanced-brace scan reused from the
+  shortcode parser. Parser golden + formatter golden + unit tests landed.
+- [ ] **Tier 2: block-level `{#if}`/`{#each}` pairing.** Treat standalone
+  block-logic lines as opaque *blocks* that act as block boundaries. Today a
+  block-logic line that is a lone-node paragraph immediately followed by a
+  *tight* list (no blank line) gets joined onto one line by the formatter
+  and its inner whitespace collapsed---a **pre-existing formatter quirk
+  shared with Quarto shortcodes**, idempotent and parser-lossless, but it
+  mangles opaque content. The idiomatic blank-line-separated form is
+  preserved verbatim.
+- [ ] **Tier 3: format the JS/Svelte inside spans** (prettier-plugin-svelte
+  territory). Likely out of scope.
+- [ ] String-literal-aware brace matching: a `}` inside a JS string (`{ "}" }`)
+  can terminate a span early (depth-counting only). Lossless fallback
+  (literal `{`), but a real Svelte tokenizer would fix it.
+- [ ] AST wrappers (`syntax/svelte.rs`), LSP semantic tokens, and lint rules for
+  Svelte constructs.
+
 ## Architecture
 
 - [ ] Separate additional functionality into dedicated crates (long-term).
