@@ -881,11 +881,6 @@ that repo:
 - [ ] Decide whether to expand the curated config surface (currently 9 keys)
   once the plugin has real usage feedback. Defer until requested.
 
-## Caching
-
-- [ ] Investigate caching strategies for improved performance, particularly for
-  CLI linting.
-
 ## Math Parser and Formatter
 
 Multi-session effort --- see the `math-parser-formatter` skill
