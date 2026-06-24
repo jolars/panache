@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.1](https://github.com/jolars/panache/compare/panache-parser-v0.19.0...panache-parser-v0.19.1) (2026-06-24)
+
+### Bug Fixes
+- **parser:** emit bare URIs as lossless `AUTO_LINK` ([`52226d5`](https://github.com/jolars/panache/commit/52226d59067843251c71620dec29f25ffc9bcb07))
+- **linter:** trim trailing newline from schema value spans ([`d1fedb9`](https://github.com/jolars/panache/commit/d1fedb9ef2dc3d88f99dc710422cc8f6076b9721))
+- **parser:** stop truncating wide simple-table cells ([`f97694a`](https://github.com/jolars/panache/commit/f97694aeedeaf9913d31853c51025a27565ae68a))
+- **parser:** consume top border of single-row multiline tables ([`0872624`](https://github.com/jolars/panache/commit/0872624d745fa56e11aa493ba41dc452b72818da))
+
 ## [0.19.0](https://github.com/jolars/panache/compare/panache-parser-v0.18.0...panache-parser-v0.19.0) (2026-06-23)
 
 ### Features
