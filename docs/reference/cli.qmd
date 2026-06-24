@@ -30,7 +30,7 @@ Homepage and downloads (including .deb and .rpm packages): <https://panache.bz>
 ###### **Options:**
 
 * `--config <CONFIG>` — Path to a custom configuration file. If not specified, Panache will search for .panache.toml or panache.toml in the current directory and its parents, then fall back to ~/.config/panache/config.toml.
-* `--stdin-filename <PATH>` — Synthetic filename to associate with stdin input. This is useful for editor integrations that pipe content via stdin but still need Panache to infer flavor/extensions from file extension (for example: --stdin-filename doc.qmd).
+* `--stdin-filename <PATH>` — Synthetic filename to associate with stdin input. This is useful for editor integrations that pipe content via stdin but still need Panache to infer flavor/extensions from file extension (for example: `--stdin-filename doc.qmd`).
 * `--flavor <FLAVOR>` — Override the markdown flavor for this invocation. Takes the highest precedence: it overrides any value in panache.toml, the [flavor-overrides] glob table, and the flavor inferred from the file extension. Extension overrides from [extensions] in panache.toml still merge on top of the flavor's defaults. Useful when the file extension is unknown (e.g. a .txt file containing markdown) or when you want to force a one-off interpretation.
 
   Possible values:
@@ -78,7 +78,7 @@ Format a Quarto, Pandoc, or R Markdown document according to Panache's formattin
 ###### **Options:**
 
 * `--check` — Check if the file is already formatted according to Panache's rules without making any changes. If the file is not formatted, displays a diff and exits with code 1. If formatted, exits with code 0. Useful for CI/CD pipelines.
-* `--range <START:END>` — Format only the specified line range. Lines are 1-indexed and inclusive. The range will be expanded to complete block boundaries to ensure well-formed output. For example, if you select part of a list, the entire list will be formatted. Format: --range START:END (e.g., --range 5:10 formats lines 5 through 10). 
+* `--range <START:END>` — Format only the specified line range. Lines are 1-indexed and inclusive. The range will be expanded to complete block boundaries to ensure well-formed output. For example, if you select part of a list, the entire list will be formatted. Format: `--range START:END` (e.g., --range 5:10 formats lines 5 through 10). 
 
    Note: This feature is experimental. Range filtering may not work correctly in all cases.
 * `--verify` — Run smoke-check invariants: (1) parser losslessness (input == parsed CST text) and (2) formatter idempotency (format(format(x)) == format(x)). When formatting files by path (including directories), --verify does not write any changes to disk. Exits with code 1 when verification fails. 
@@ -93,7 +93,7 @@ Format a Quarto, Pandoc, or R Markdown document according to Panache's formattin
 
    Supported keys: `line-width` (positive integer); `wrap` (one of: reflow, sentence, semantic, preserve); and `extensions.<name>=<bool>` to toggle any extension (booleans accept true/false/1/0/yes/no/on/off). 
 
-   Example: --option line-width=100 -o wrap=sentence -o extensions.east-asian-line-breaks=true. 
+   Example: `--option line-width=100 -o wrap=sentence -o extensions.east-asian-line-breaks=true`. 
 
    Note: this is an escape hatch for ad-hoc invocations. Prefer panache.toml so that everyone formatting the repository gets the same result.
 
