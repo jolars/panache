@@ -1182,7 +1182,9 @@ Emitted when an `\end` appears with no open `\begin`.
 
 Validates document YAML frontmatter, code-cell options, and project config files
 (`_quarto.yml`, `_metadata.yml`) against Quarto's machine-readable schema,
-flagging unknown/misspelled keys and type mismatches.
+flagging type mismatches and invalid enum values. (Unknown/misspelled keys are
+handled by the separate, opt-in
+[`quarto-schema-unknown-key`](#quarto-schema-unknown-key) rule.)
 
 Severity
 :   Warning
@@ -1191,8 +1193,7 @@ Auto-fix
 :   No
 
 Diagnostic codes
-:   [`quarto-schema-unknown-key`](#quarto-schema),
-    [`quarto-schema-type-mismatch`](#quarto-schema),
+:   [`quarto-schema-type-mismatch`](#quarto-schema),
     [`quarto-schema-invalid-enum`](#quarto-schema)
 
 Requirements
@@ -1211,10 +1212,6 @@ Description
     project-config schema) and `_metadata.yml` (directory metadata, against the
     frontmatter schema):
 
-    - **Unknown keys.** On *closed* schema objects (e.g. a specific format's
-      option block) any undeclared key is flagged. On the *open* top level
-      (which must allow pandoc passthrough and custom metadata) only a near-miss
-      typo of a known key is flagged, with a "did you mean" suggestion.
     - **Type mismatches.** A scalar whose resolved YAML 1.2 type does not match
       the schema (e.g. a boolean field set to a non-boolean) is flagged. String
       fields accept any scalar, since Quarto coerces.
@@ -1229,7 +1226,6 @@ Description
 
 ```yaml
 ---
-forrmat: html
 toc: maybe
 ---
 ```
@@ -1237,15 +1233,10 @@ toc: maybe
 **Diagnostic:**
 
 ```
-warning[quarto-schema-unknown-key]: unknown key `forrmat`; did you mean `format`?
- --> document.qmd:2:1
-  |
-2 | forrmat: html
-  | ^^^^^^^
 warning[quarto-schema-type-mismatch]: value should be a boolean
- --> document.qmd:3:6
+ --> document.qmd:2:6
   |
-3 | toc: maybe
+2 | toc: maybe
   |      ^^^^^
 ```
 
@@ -1257,6 +1248,59 @@ publishing diagnostics on each manifest's own file.
 **Limitations:** Format-gated keys are accepted regardless of the active output
 format, and deeply nested options reached through a permissive `anyOf` branch
 may not be checked.
+
+### `quarto-schema-unknown-key` {#quarto-schema-unknown-key}
+
+Flags unknown or misspelled keys in document frontmatter, code-cell options, and
+project config files, validated against Quarto's machine-readable schema.
+
+Severity
+:   Warning
+
+Default
+:   Off --- opt in via `[lint.rules] quarto-schema-unknown-key = true`.
+
+Auto-fix
+:   No
+
+Diagnostic codes
+:   [`quarto-schema-unknown-key`](#quarto-schema-unknown-key)
+
+Requirements
+:   Quarto flavor (`flavor = "quarto"`). Pandoc has no metadata schema, so the
+    rule does not run for other flavors.
+
+Description
+
+:   This rule is **off by default** because Quarto itself tolerates unknown keys
+    at render time---its schema objects are open so that pandoc passthrough and
+    custom template metadata keep working---so flagging them is stricter than
+    `quarto render`. It is still useful for catching silent-failure typos (a
+    misspelled `format` block simply does nothing, and Quarto will not warn), so
+    it is offered as an opt-in.
+
+    When enabled, on *closed* schema objects (e.g. a specific format's option block)
+    any undeclared key is flagged. On the *open* top level (which must allow pandoc
+    passthrough and custom metadata) only a near-miss typo of a known key is
+    flagged, with a "did you mean" suggestion.
+
+**Example violation** (with the rule enabled):
+
+```yaml
+---
+forrmat: html
+---
+```
+
+**Diagnostic:**
+
+```
+warning[quarto-schema-unknown-key]: unknown key `forrmat`; did you mean `format`?
+ --> document.qmd:2:1
+  |
+2 | forrmat: html
+  | ^^^^^^^
+```
 
 ## YAML diagnostics
 

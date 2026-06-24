@@ -2046,10 +2046,21 @@ fn lint_quarto_manifest(
         load_config_for_cli(config, isolated, cache_dir, &start_dir, Some(path), flavor)?;
     // The manifest filename detects as Quarto, so `cfg.flavor` is Quarto unless
     // an explicit `--flavor` overrode it; gate the schema half on that (and the
-    // rule toggle) so the CLI and LSP agree on when manifests are validated.
-    let schema_enabled = cfg.flavor == Flavor::Quarto && cfg.lint.is_rule_enabled("quarto-schema");
-    let diagnostics =
-        panache::linter::quarto_schema::lint_manifest_text(&input, root, schema_enabled);
+    // rule toggles) so the CLI and LSP agree on when manifests are validated.
+    // Type/enum ride the on-by-default `quarto-schema` rule; unknown-key is the
+    // opt-in `quarto-schema-unknown-key` rule.
+    let quarto = cfg.flavor == Flavor::Quarto;
+    let type_enum_enabled = quarto && cfg.lint.is_rule_enabled("quarto-schema");
+    let unknown_key_enabled = quarto
+        && cfg
+            .lint
+            .is_rule_explicitly_enabled("quarto-schema-unknown-key");
+    let diagnostics = panache::linter::quarto_schema::lint_manifest_text(
+        &input,
+        root,
+        type_enum_enabled,
+        unknown_key_enabled,
+    );
     Ok(LintedDocument {
         path: path.to_path_buf(),
         input,

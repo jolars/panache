@@ -60,6 +60,26 @@ fn schema_diagnostics_for_tree(tree: &SyntaxNode, text: &str, root_id: &str) -> 
         .collect()
 }
 
+/// Drop schema diagnostics whose code is disabled. The type-mismatch and
+/// invalid-enum codes ride the on-by-default `quarto-schema` rule (they mirror
+/// Quarto's hard render errors); `quarto-schema-unknown-key` is opt-in, since
+/// Quarto itself tolerates unknown keys. Shared by the manifest entry points so
+/// CLI and LSP gate identically.
+pub fn retain_enabled_codes(
+    mut diags: Vec<Diagnostic>,
+    type_enum_enabled: bool,
+    unknown_key_enabled: bool,
+) -> Vec<Diagnostic> {
+    diags.retain(|d| {
+        if d.code == UNKNOWN_KEY {
+            unknown_key_enabled
+        } else {
+            type_enum_enabled
+        }
+    });
+    diags
+}
+
 /// Validate a **standalone** YAML document (a project manifest such as
 /// `_quarto.yml` or `_metadata.yml`) against the schema definition `root_id`.
 ///
@@ -83,13 +103,19 @@ pub fn validate_standalone_yaml(text: &str, root_id: &str) -> Vec<Diagnostic> {
 /// targets. (The LSP composes the same two halves from separate salsa queries —
 /// `project_manifest_diagnostics` for the parse error,
 /// `project_manifest_schema_diagnostics` for the schema part — so the parse
-/// error stays flavor-agnostic there.) Parse errors are always reported; only
-/// the schema half is gated, matching the rule's enablement.
+/// error stays flavor-agnostic there.) Parse errors are always reported; the
+/// schema half is gated per code: `type_enum_enabled` covers the on-by-default
+/// type/enum checks, `unknown_key_enabled` the opt-in unknown-key check.
 ///
 /// A single `parse_yaml_report` carries both the parse-error diagnostic and the
 /// tree, so the manifest is parsed once: `validate_yaml` and `parse_yaml_tree`
 /// each re-run that same pass, and calling both would parse the file twice.
-pub fn lint_manifest_text(text: &str, root_id: &str, schema_enabled: bool) -> Vec<Diagnostic> {
+pub fn lint_manifest_text(
+    text: &str,
+    root_id: &str,
+    type_enum_enabled: bool,
+    unknown_key_enabled: bool,
+) -> Vec<Diagnostic> {
     let report = crate::parser::yaml::parse_yaml_report(text);
     if let Some(diag) = report.diagnostics.first() {
         let (line, column) =
@@ -104,13 +130,14 @@ pub fn lint_manifest_text(text: &str, root_id: &str, schema_enabled: bool) -> Ve
             .into_iter()
             .collect();
     }
-    if !schema_enabled {
+    if !type_enum_enabled && !unknown_key_enabled {
         return Vec::new();
     }
-    match report.tree.as_ref() {
+    let diags = match report.tree.as_ref() {
         Some(tree) => schema_diagnostics_for_tree(tree, text, root_id),
         None => Vec::new(),
-    }
+    };
+    retain_enabled_codes(diags, type_enum_enabled, unknown_key_enabled)
 }
 
 /// The schema root a Quarto project manifest validates against, keyed by file
@@ -191,25 +218,38 @@ mod tests {
 
     #[test]
     fn lint_manifest_reports_parse_error_for_malformed_yaml() {
-        let diags = lint_manifest_text("title: [\n", "project-config", true);
+        let diags = lint_manifest_text("title: [\n", "project-config", true, true);
         assert_eq!(diags.len(), 1, "got: {diags:?}");
         assert_eq!(diags[0].code, "yaml-parse-error");
     }
 
     #[test]
-    fn lint_manifest_reports_schema_diagnostics_when_enabled() {
-        let diags = lint_manifest_text("forrmat: html\n", "project-config", true);
+    fn lint_manifest_reports_type_enum_when_enabled() {
+        // Type/enum codes ride the on-by-default `quarto-schema` gate, even when
+        // the opt-in unknown-key gate is off.
+        let diags = lint_manifest_text("toc: maybe\n", "front-matter", true, false);
         assert_eq!(diags.len(), 1, "got: {diags:?}");
-        assert_eq!(diags[0].code, UNKNOWN_KEY);
+        assert_eq!(diags[0].code, TYPE_MISMATCH);
+    }
+
+    #[test]
+    fn lint_manifest_gates_unknown_key_independently() {
+        // Unknown-key is suppressed unless its own gate is on...
+        let off = lint_manifest_text("forrmat: html\n", "project-config", true, false);
+        assert!(off.is_empty(), "unknown-key must be opt-in: {off:?}");
+        // ...and surfaces when it is, regardless of the type/enum gate.
+        let on = lint_manifest_text("forrmat: html\n", "project-config", false, true);
+        assert_eq!(on.len(), 1, "got: {on:?}");
+        assert_eq!(on[0].code, UNKNOWN_KEY);
     }
 
     #[test]
     fn lint_manifest_skips_schema_when_disabled_but_keeps_parse_errors() {
-        // Rule disabled: a valid-but-wrong manifest is clean...
-        let clean = lint_manifest_text("forrmat: html\n", "project-config", false);
+        // Both gates off: a valid-but-wrong manifest is clean...
+        let clean = lint_manifest_text("forrmat: html\n", "project-config", false, false);
         assert!(clean.is_empty(), "schema must be gated: {clean:?}");
         // ...but a parse error still surfaces.
-        let broken = lint_manifest_text("title: [\n", "project-config", false);
+        let broken = lint_manifest_text("title: [\n", "project-config", false, false);
         assert_eq!(broken.len(), 1, "got: {broken:?}");
         assert_eq!(broken[0].code, "yaml-parse-error");
     }

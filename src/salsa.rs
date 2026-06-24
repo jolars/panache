@@ -350,7 +350,16 @@ pub fn project_manifest_schema_diagnostics(
     config: FileConfig,
 ) -> Vec<(PathBuf, Vec<Diagnostic>)> {
     let cfg = config.config(db);
-    if cfg.flavor != crate::config::Flavor::Quarto || !cfg.lint.is_rule_enabled("quarto-schema") {
+    // Type/enum ride the on-by-default `quarto-schema` rule; unknown-key is the
+    // opt-in `quarto-schema-unknown-key` rule. Validate when either is on, then
+    // filter per code so CLI and LSP gate identically.
+    let quarto = cfg.flavor == crate::config::Flavor::Quarto;
+    let type_enum_enabled = quarto && cfg.lint.is_rule_enabled("quarto-schema");
+    let unknown_key_enabled = quarto
+        && cfg
+            .lint
+            .is_rule_explicitly_enabled("quarto-schema-unknown-key");
+    if !type_enum_enabled && !unknown_key_enabled {
         return Vec::new();
     }
 
@@ -379,7 +388,11 @@ pub fn project_manifest_schema_diagnostics(
         let Some(text) = file_text.text(db).as_deref() else {
             continue;
         };
-        let diags = crate::linter::quarto_schema::validate_standalone_yaml(text, root);
+        let diags = crate::linter::quarto_schema::retain_enabled_codes(
+            crate::linter::quarto_schema::validate_standalone_yaml(text, root),
+            type_enum_enabled,
+            unknown_key_enabled,
+        );
         if !diags.is_empty() {
             diagnostics.push((path, diags));
         }
@@ -3329,11 +3342,15 @@ mod tests {
         std::fs::write(&quarto_path, "forrmat: html\n").expect("project config");
 
         let mut db = SalsaDb::default();
-        let cfg = crate::Config {
+        let mut cfg = crate::Config {
             flavor: crate::config::Flavor::Quarto,
             extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
+        // unknown-key is opt-in; enable it so the manifest path surfaces the typo.
+        cfg.lint
+            .rules
+            .insert("quarto-schema-unknown-key".to_string(), true);
         let config = FileConfig::new(&db, cfg);
 
         let _quarto_file = db.update_file_text(quarto_path.clone(), "forrmat: html\n".to_string());

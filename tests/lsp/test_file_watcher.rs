@@ -209,8 +209,9 @@ fn test_quarto_yml_schema_diagnostic_published_and_clears() {
     let root = temp_dir.path();
     let doc_path = root.join("doc.qmd");
     let quarto_path = root.join("_quarto.yml");
-    // Valid YAML, but a frontmatter-key typo the Quarto schema can decide.
-    fs::write(&quarto_path, "forrmat: html\n").unwrap();
+    // Valid YAML, but a type mismatch the Quarto schema can decide (`render` is
+    // an array). Type/enum checks are on by default; unknown-key is opt-in.
+    fs::write(&quarto_path, "project:\n  render: true\n").unwrap();
     fs::write(&doc_path, "# Heading\n").unwrap();
 
     let mut server = TestLspServer::new();
@@ -223,16 +224,16 @@ fn test_quarto_yml_schema_diagnostic_published_and_clears() {
 
     let initial = server.drain_all_publish_diagnostics();
     assert!(
-        has_code(&initial, &quarto_uri, "quarto-schema-unknown-key"),
+        has_code(&initial, &quarto_uri, "quarto-schema-type-mismatch"),
         "expected a quarto-schema diagnostic on _quarto.yml; got {initial:?}"
     );
     assert!(
-        !has_code(&initial, &doc_uri, "quarto-schema-unknown-key"),
+        !has_code(&initial, &doc_uri, "quarto-schema-type-mismatch"),
         "manifest schema diagnostic must NOT land on the document"
     );
 
     // Fix the manifest on disk and notify via the watcher.
-    fs::write(&quarto_path, "format: html\n").unwrap();
+    fs::write(&quarto_path, "project:\n  render: [index.qmd]\n").unwrap();
     server.did_change_watched_files(vec![FileEvent {
         uri: quarto_uri.clone(),
         typ: FileChangeType::CHANGED,

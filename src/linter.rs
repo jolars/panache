@@ -85,6 +85,7 @@ fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(rules::chunk_label_spaces::ChunkLabelSpacesRule),
         Box::new(rules::missing_chunk_labels::MissingChunkLabelsRule),
         Box::new(rules::quarto_schema::QuartoSchemaRule),
+        Box::new(rules::quarto_schema::QuartoSchemaUnknownKeyRule),
         Box::new(rules::figure_crossref_captions::FigureCrossrefCaptionsRule),
         Box::new(rules::emoji_aliases::EmojiAliasesRule),
         Box::new(rules::html_entities::HtmlEntitiesRule),

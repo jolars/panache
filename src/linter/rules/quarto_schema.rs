@@ -27,7 +27,20 @@ use crate::linter::quarto_schema::value::bridge_yaml_content;
 use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{AstNode, CodeBlock, SyntaxKind};
 
+/// Schema validation split across two rules so each carries its own
+/// default-on state (the docs/metadata model declares `default_on` per rule):
+///
+/// - [`QuartoSchemaRule`] (`quarto-schema`, on by default) reports type
+///   mismatches and invalid enum values. These mirror Quarto's *hard* render
+///   errors — `quarto render` fails YAML validation on them — so they are
+///   high-signal.
+/// - [`QuartoSchemaUnknownKeyRule`] (`quarto-schema-unknown-key`, opt-in)
+///   reports unknown/misspelled keys. Quarto itself tolerates unknown keys at
+///   render time (its schema objects are open for pandoc passthrough and custom
+///   template metadata), so flagging them is stricter than the reference tool
+///   and is left off by default.
 pub struct QuartoSchemaRule;
+pub struct QuartoSchemaUnknownKeyRule;
 
 impl Rule for QuartoSchemaRule {
     fn name(&self) -> &str {
@@ -42,7 +55,6 @@ impl Rule for QuartoSchemaRule {
             auto_fix: false,
             codes: const {
                 &[
-                    DiagnosticCode::warning(UNKNOWN_KEY),
                     DiagnosticCode::warning(TYPE_MISMATCH),
                     DiagnosticCode::warning(INVALID_ENUM),
                 ]
@@ -51,38 +63,72 @@ impl Rule for QuartoSchemaRule {
     }
 
     fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
-        // Registration already gates on `Requirement::Quarto`; this also guards
-        // the `check_tree` test entry point, which bypasses the registry.
-        if !matches!(cx.config.flavor, Flavor::Quarto) {
-            return Vec::new();
-        }
-        let schema = schema();
-        let mut diagnostics = Vec::new();
-        // Walk the embedded YAML content nodes directly: frontmatter and each
-        // cell's hashpipe options. Working from the in-tree CST keeps spans in
-        // host coordinates (the `#|` prefix is trivia), so no offset shifting.
-        for node in cx.tree.descendants() {
-            let root = match node.kind() {
-                SyntaxKind::YAML_METADATA_CONTENT => Some(schema.roots.frontmatter.as_str()),
-                SyntaxKind::HASHPIPE_YAML_CONTENT => node
-                    .ancestors()
-                    .find_map(CodeBlock::cast)
-                    .and_then(|block| cell_root(&block, schema)),
-                _ => continue,
-            };
-            let Some(root) = root else {
-                continue;
-            };
-            // `None` means malformed YAML (opaque tokens) — already reported.
-            let Some(value) = bridge_yaml_content(&node) else {
-                continue;
-            };
-            for err in validate(schema, root, &value) {
-                diagnostics.push(to_diagnostic(err, cx.input));
-            }
-        }
-        diagnostics
+        schema_diagnostics(cx)
+            .into_iter()
+            .filter(|d| d.code != UNKNOWN_KEY)
+            .collect()
     }
+}
+
+impl Rule for QuartoSchemaUnknownKeyRule {
+    fn name(&self) -> &str {
+        "quarto-schema-unknown-key"
+    }
+
+    fn metadata(&self) -> RuleMeta {
+        RuleMeta {
+            name: "quarto-schema-unknown-key",
+            default_on: false,
+            requires: Requirement::Quarto,
+            auto_fix: false,
+            codes: const { &[DiagnosticCode::warning(UNKNOWN_KEY)] },
+        }
+    }
+
+    fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
+        schema_diagnostics(cx)
+            .into_iter()
+            .filter(|d| d.code == UNKNOWN_KEY)
+            .collect()
+    }
+}
+
+/// Validate every embedded YAML node (frontmatter and each cell's hashpipe
+/// options) against the schema, returning all diagnostics regardless of code.
+/// The two rules above filter this by code. Each rule runs its own walk; the
+/// unknown-key rule is opt-in, so in the common case only one walk runs.
+fn schema_diagnostics(cx: &LintContext) -> Vec<Diagnostic> {
+    // Registration already gates on `Requirement::Quarto`; this also guards
+    // the `check_tree` test entry point, which bypasses the registry.
+    if !matches!(cx.config.flavor, Flavor::Quarto) {
+        return Vec::new();
+    }
+    let schema = schema();
+    let mut diagnostics = Vec::new();
+    // Walk the embedded YAML content nodes directly: frontmatter and each
+    // cell's hashpipe options. Working from the in-tree CST keeps spans in
+    // host coordinates (the `#|` prefix is trivia), so no offset shifting.
+    for node in cx.tree.descendants() {
+        let root = match node.kind() {
+            SyntaxKind::YAML_METADATA_CONTENT => Some(schema.roots.frontmatter.as_str()),
+            SyntaxKind::HASHPIPE_YAML_CONTENT => node
+                .ancestors()
+                .find_map(CodeBlock::cast)
+                .and_then(|block| cell_root(&block, schema)),
+            _ => continue,
+        };
+        let Some(root) = root else {
+            continue;
+        };
+        // `None` means malformed YAML (opaque tokens) — already reported.
+        let Some(value) = bridge_yaml_content(&node) else {
+            continue;
+        };
+        for err in validate(schema, root, &value) {
+            diagnostics.push(to_diagnostic(err, cx.input));
+        }
+    }
+    diagnostics
 }
 
 /// The cell-options engine root for an executable code cell: `engine-knitr` for
@@ -107,21 +153,33 @@ mod tests {
     use crate::config::{Config, Extensions, Flavor};
     use crate::linter::diagnostics::Severity;
 
-    fn lint(input: &str, flavor: Flavor) -> Vec<Diagnostic> {
+    fn config_for(flavor: Flavor) -> Config {
         // Mirror real config loading, which applies flavor-default extensions —
         // executable chunks (and thus hashpipe options) need them parsed.
-        let config = Config {
+        Config {
             flavor,
             extensions: Extensions::for_flavor(flavor),
             ..Config::default()
-        };
+        }
+    }
+
+    /// Type-mismatch / invalid-enum diagnostics (the on-by-default rule).
+    fn lint(input: &str, flavor: Flavor) -> Vec<Diagnostic> {
+        let config = config_for(flavor);
         let tree = crate::parser::parse(input, Some(config.clone()));
         QuartoSchemaRule.check_tree(&tree, input, &config, None)
     }
 
+    /// Unknown-key diagnostics (the opt-in rule).
+    fn lint_unknown(input: &str, flavor: Flavor) -> Vec<Diagnostic> {
+        let config = config_for(flavor);
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        QuartoSchemaUnknownKeyRule.check_tree(&tree, input, &config, None)
+    }
+
     #[test]
     fn flags_unknown_frontmatter_key_with_suggestion() {
-        let diags = lint("---\nforrmat: html\ntitle: Hi\n---\n", Flavor::Quarto);
+        let diags = lint_unknown("---\nforrmat: html\ntitle: Hi\n---\n", Flavor::Quarto);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, UNKNOWN_KEY);
         assert_eq!(diags[0].severity, Severity::Warning);
@@ -160,7 +218,9 @@ mod tests {
 
     #[test]
     fn ignores_custom_passthrough_keys() {
-        let diags = lint(
+        // Custom top-level metadata with no near-miss of a known key is allowed
+        // even by the opt-in unknown-key rule (open frontmatter object).
+        let diags = lint_unknown(
             "---\nmy-custom-field: 42\nx-extra: [1, 2, 3]\n---\n",
             Flavor::Quarto,
         );
@@ -169,8 +229,8 @@ mod tests {
 
     #[test]
     fn does_not_run_under_pandoc() {
-        let diags = lint("---\nforrmat: html\n---\n", Flavor::Pandoc);
-        assert!(diags.is_empty());
+        assert!(lint("---\ntoc: maybe\n---\n", Flavor::Pandoc).is_empty());
+        assert!(lint_unknown("---\nforrmat: html\n---\n", Flavor::Pandoc).is_empty());
     }
 
     #[test]
@@ -194,7 +254,7 @@ mod tests {
 
     #[test]
     fn flags_cell_option_typo() {
-        let diags = lint("```{python}\n#| eccho: false\n1\n```\n", Flavor::Quarto);
+        let diags = lint_unknown("```{python}\n#| eccho: false\n1\n```\n", Flavor::Quarto);
         assert_eq!(diags.len(), 1, "got: {diags:?}");
         assert_eq!(diags[0].code, UNKNOWN_KEY);
         assert!(diags[0].message.contains("eccho"));
@@ -223,11 +283,18 @@ mod tests {
         // A map with multiple issues must report each one, not collapse to a
         // single "expected null" via the frontmatter's `anyOf[null, ...]`.
         let input = "---\nforrmat: html\ntoc: maybe\ntitle: My Doc\n---\n\n# Hello\n";
-        let diags = lint(input, Flavor::Quarto);
-        assert_eq!(diags.len(), 2, "got: {diags:?}");
-        assert!(diags.iter().any(|d| d.code == UNKNOWN_KEY));
-        assert!(diags.iter().any(|d| d.code == TYPE_MISMATCH));
+        let type_enum = lint(input, Flavor::Quarto);
+        let unknown = lint_unknown(input, Flavor::Quarto);
+        assert_eq!(type_enum.len(), 1, "got: {type_enum:?}");
+        assert_eq!(type_enum[0].code, TYPE_MISMATCH);
+        assert_eq!(unknown.len(), 1, "got: {unknown:?}");
+        assert_eq!(unknown[0].code, UNKNOWN_KEY);
         // None of the diagnostics should span the whole block.
-        assert!(diags.iter().all(|d| d.message != "value should be null"));
+        assert!(
+            type_enum
+                .iter()
+                .chain(&unknown)
+                .all(|d| d.message != "value should be null")
+        );
     }
 }

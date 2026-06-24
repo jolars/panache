@@ -1161,10 +1161,40 @@ fn test_lint_explicit_config_exclude_anchors_at_config_dir() {
 fn test_lint_quarto_yml_schema_violation() {
     let temp_dir = TempDir::new().unwrap();
     let manifest = temp_dir.path().join("_quarto.yml");
-    fs::write(&manifest, "project:\n  type: website\nforrmat: html\n").unwrap();
+    // `render` is an array in project-config; a boolean is a type mismatch, which
+    // rides the on-by-default `quarto-schema` rule.
+    fs::write(&manifest, "project:\n  type: website\n  render: true\n").unwrap();
 
     cargo_bin_cmd!("panache")
         .args(["lint", manifest.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("quarto-schema-type-mismatch"));
+}
+
+#[test]
+fn test_lint_quarto_yml_unknown_key_is_opt_in() {
+    let temp_dir = TempDir::new().unwrap();
+    let manifest = temp_dir.path().join("_quarto.yml");
+    fs::write(&manifest, "forrmat: html\n").unwrap();
+
+    // Off by default: a key typo Quarto itself tolerates is not flagged.
+    cargo_bin_cmd!("panache")
+        .args(["lint", manifest.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No issues found"));
+
+    // Opt in via config: the typo is now reported.
+    let config = temp_dir.path().join("panache.toml");
+    fs::write(&config, "[lint.rules]\nquarto-schema-unknown-key = true\n").unwrap();
+    cargo_bin_cmd!("panache")
+        .args([
+            "lint",
+            "--config",
+            config.to_str().unwrap(),
+            manifest.to_str().unwrap(),
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("quarto-schema-unknown-key"))
@@ -1188,7 +1218,9 @@ fn test_lint_quarto_yml_clean() {
 fn test_lint_quarto_yml_check_mode_fails() {
     let temp_dir = TempDir::new().unwrap();
     let manifest = temp_dir.path().join("_quarto.yml");
-    fs::write(&manifest, "forrmat: html\n").unwrap();
+    // A type mismatch (on by default) so `--check` fails without opting into
+    // the unknown-key rule.
+    fs::write(&manifest, "project:\n  render: true\n").unwrap();
 
     cargo_bin_cmd!("panache")
         .args(["lint", "--check", manifest.to_str().unwrap()])

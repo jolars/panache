@@ -868,7 +868,11 @@ fn test_stray_fenced_div_markers() {
 
 #[test]
 fn test_quarto_schema_frontmatter_and_cells() {
-    let diagnostics = lint_file_with_config("quarto_schema.qmd", "flavor = \"quarto\"");
+    // unknown-key is opt-in; enable it so this exercises both code families.
+    let diagnostics = lint_file_with_config(
+        "quarto_schema.qmd",
+        "flavor = \"quarto\"\n[lint.rules]\nquarto-schema-unknown-key = true\n",
+    );
     let schema_diags: Vec<_> = diagnostics
         .iter()
         .filter(|d| d.code.starts_with("quarto-schema-"))
@@ -901,6 +905,32 @@ fn test_quarto_schema_frontmatter_and_cells() {
             .count(),
         2,
         "expected two type mismatches (frontmatter toc, cell echo)"
+    );
+}
+
+#[test]
+fn test_quarto_schema_unknown_key_off_by_default() {
+    // With only the flavor set, type/enum checks fire but unknown-key does not:
+    // Quarto itself tolerates unknown keys, so the rule is opt-in.
+    let diagnostics = lint_file_with_config("quarto_schema.qmd", "flavor = \"quarto\"");
+    let schema_diags: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code.starts_with("quarto-schema-"))
+        .collect();
+
+    assert!(
+        schema_diags
+            .iter()
+            .all(|d| d.code != "quarto-schema-unknown-key"),
+        "unknown-key must be off by default, got: {schema_diags:?}"
+    );
+    assert_eq!(
+        schema_diags
+            .iter()
+            .filter(|d| d.code == "quarto-schema-type-mismatch")
+            .count(),
+        2,
+        "type mismatches still fire by default: {schema_diags:?}"
     );
 }
 
