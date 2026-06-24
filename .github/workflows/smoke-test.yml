@@ -60,7 +60,7 @@ jobs:
         ThinkR-open/engineering-shiny-book
         wch/rgcookbook
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install Rust
         run: rustup toolchain install

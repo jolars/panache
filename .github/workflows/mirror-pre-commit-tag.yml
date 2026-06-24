@@ -36,7 +36,7 @@ jobs:
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout panache-pre-commit
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: jolars/panache-pre-commit
           token: ${{ secrets.PANACHE_PRE_COMMIT_TOKEN }}
