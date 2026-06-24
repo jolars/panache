@@ -159,6 +159,7 @@ golden_test_cases!(
     atx_interrupts_paragraph_pandoc,
     autolink_strict_validation_commonmark,
     autolink_strict_validation_pandoc,
+    bare_uri_autolink_gfm,
     blankline_concatenation,
     blockquote_depth_change,
     blockquote_fenced_html_blocks_commonmark,

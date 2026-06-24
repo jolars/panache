@@ -1,0 +1,12 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 97
+expression: cst_output
+---
+DOCUMENT@0..43
+  PARAGRAPH@0..43
+    TEXT@0..13 "Install from "
+    AUTO_LINK@13..37
+      TEXT@13..37 "https://example.com/path"
+    TEXT@37..42 " now."
+    NEWLINE@42..43 "\n"

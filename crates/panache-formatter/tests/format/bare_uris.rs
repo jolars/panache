@@ -6,14 +6,13 @@ fn format_with_bare_uris(input: &str) -> String {
     format(input, Some(config), None)
 }
 
+// A bare URI carries no markers in the source, so it must round-trip to itself:
+// the formatter emits it losslessly, never as a fabricated `[url](url)` link.
 #[test]
 fn autolink_bare_uri_basic() {
     let input = "http://google.com is a search engine.\n";
     let output = format_with_bare_uris(input);
-    similar_asserts::assert_eq!(
-        output,
-        "[http://google.com](http://google.com) is a search engine.\n"
-    );
+    similar_asserts::assert_eq!(output, "http://google.com is a search engine.\n");
 }
 
 #[test]
@@ -22,7 +21,7 @@ fn autolink_bare_uri_with_query() {
     let output = format_with_bare_uris(input);
     similar_asserts::assert_eq!(
         output,
-        "Try this query:\n[http://google.com?search=fish&time=hour](http://google.com?search=fish&time=hour).\n"
+        "Try this query: http://google.com?search=fish&time=hour.\n"
     );
 }
 
@@ -30,25 +29,22 @@ fn autolink_bare_uri_with_query() {
 fn autolink_bare_uri_in_parens() {
     let input = "(http://google.com).\n";
     let output = format_with_bare_uris(input);
-    similar_asserts::assert_eq!(output, "([http://google.com](http://google.com)).\n");
+    similar_asserts::assert_eq!(output, "(http://google.com).\n");
 }
 
 #[test]
 fn autolink_bare_uri_uppercase() {
     let input = "HTTPS://GOOGLE.COM,\n";
     let output = format_with_bare_uris(input);
-    similar_asserts::assert_eq!(output, "[HTTPS://GOOGLE.COM](HTTPS://GOOGLE.COM),\n");
+    similar_asserts::assert_eq!(output, "HTTPS://GOOGLE.COM,\n");
 }
 
 #[test]
 fn autolink_bare_uri_less_common_schemes() {
-    similar_asserts::assert_eq!(
-        format_with_bare_uris("ssh://host\n"),
-        "[ssh://host](ssh://host)\n"
-    );
+    similar_asserts::assert_eq!(format_with_bare_uris("ssh://host\n"), "ssh://host\n");
     similar_asserts::assert_eq!(
         format_with_bare_uris("mongodb://localhost/db\n"),
-        "[mongodb://localhost/db](mongodb://localhost/db)\n"
+        "mongodb://localhost/db\n"
     );
 }
 
@@ -71,10 +67,13 @@ fn emphasis_ending_in_colon_is_not_autolinked() {
     similar_asserts::assert_eq!(format_with_bare_uris(&output), output);
 }
 
-// Guard: a real scheme still autolinks under the bare-URI extension.
+// Guard: a real scheme is still recognized as a bare-URI autolink, but emitted
+// verbatim (lossless) rather than expanded into a `[url](url)` link.
 #[test]
 fn real_bare_url_still_autolinks() {
     let input = "https://example.com\n";
     let output = format_with_bare_uris(input);
-    similar_asserts::assert_eq!(output, "[https://example.com](https://example.com)\n");
+    similar_asserts::assert_eq!(output, "https://example.com\n");
+    // Idempotent: re-formatting the bare URI is a no-op.
+    similar_asserts::assert_eq!(format_with_bare_uris(&output), output);
 }

@@ -1869,6 +1869,38 @@ mod tests {
     }
 
     #[test]
+    fn test_autolink_bare_uri_is_lossless_without_synthetic_brackets() {
+        // Regression: bare URIs were emitted as a `LINK` node spelling
+        // `[url](url)`, duplicating the URL and fabricating brackets absent from
+        // the source. That broke losslessness and desynced every downstream
+        // byte offset (e.g. linter diagnostic spans landed on the wrong lines).
+        let text = "https://example.com/path";
+        let mut config = ParserOptions::default();
+        config.extensions.autolink_bare_uris = true;
+        let mut builder = GreenNodeBuilder::new();
+
+        builder.start_node(SyntaxKind::PARAGRAPH.into());
+        parse_inline_text_recursive(&mut builder, text, &config, false);
+        builder.finish_node();
+
+        let green: GreenNode = builder.finish();
+        let node = SyntaxNode::new_root(green);
+
+        // Lossless: reconstructed bytes equal the source exactly.
+        assert_eq!(node.text().to_string(), text);
+        // Represented as a marker-less AUTO_LINK, not a bracketed LINK.
+        assert!(
+            node.descendants()
+                .any(|n| n.kind() == SyntaxKind::AUTO_LINK),
+            "bare URI should be an AUTO_LINK node"
+        );
+        assert!(
+            !node.descendants().any(|n| n.kind() == SyntaxKind::LINK),
+            "bare URI must not become a bracketed LINK node"
+        );
+    }
+
+    #[test]
     fn test_parse_emphasis_unicode_content_no_panic() {
         let text = "*§*";
         let config = ParserOptions::default();

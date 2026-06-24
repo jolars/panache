@@ -872,26 +872,23 @@ pub fn emit_inline_link(
     builder.finish_node();
 }
 
+/// Emit a bare-URI autolink (pandoc's `autolink_bare_uris`).
+///
+/// A bare URI like `https://example.com` carries no syntactic markers in the
+/// source, so the CST must contain exactly its bytes — nothing else. We emit it
+/// as a marker-less [`AUTO_LINK`](SyntaxKind::AUTO_LINK) holding a single `TEXT`
+/// token: lossless, and a faithful structural sibling of the angle-bracket
+/// autolink (`<url>`), which the same node represents with `AUTO_LINK_MARKER`
+/// tokens around the text. Downstream (formatter, pandoc AST, HTML renderer)
+/// derives the destination from the `TEXT` token and re-emits markers verbatim,
+/// so a bare URI round-trips to `url` while `<url>` round-trips to `<url>`.
+///
+/// Emitting a `LINK` with fabricated `[`/`]`/`(`/`)` tokens (the previous
+/// approach) duplicated the URL and inflated the node's text range, breaking
+/// losslessness and desyncing every byte offset after the URI.
 pub fn emit_bare_uri_link(builder: &mut impl InlineSink, uri: &str, _config: &ParserOptions) {
-    builder.start_node(SyntaxKind::LINK.into());
-
-    builder.start_node(SyntaxKind::LINK_START.into());
-    builder.token(SyntaxKind::LINK_START.into(), "[");
-    builder.finish_node();
-
-    builder.start_node(SyntaxKind::LINK_TEXT.into());
+    builder.start_node(SyntaxKind::AUTO_LINK.into());
     builder.token(SyntaxKind::TEXT.into(), uri);
-    builder.finish_node();
-
-    builder.token(SyntaxKind::LINK_TEXT_END.into(), "]");
-    builder.token(SyntaxKind::LINK_DEST_START.into(), "(");
-
-    builder.start_node(SyntaxKind::LINK_DEST.into());
-    builder.token(SyntaxKind::TEXT.into(), uri);
-    builder.finish_node();
-
-    builder.token(SyntaxKind::LINK_DEST_END.into(), ")");
-
     builder.finish_node();
 }
 
