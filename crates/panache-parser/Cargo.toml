@@ -1,6 +1,6 @@
 [package]
 name = "panache-parser"
-version = "0.19.0"
+version = "0.19.1"
 edition.workspace = true
 readme = "README.md"
 include = [

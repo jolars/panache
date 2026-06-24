@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.17.0](https://github.com/jolars/panache/compare/panache-formatter-v0.16.0...panache-formatter-v0.17.0) (2026-06-24)
+
+### Features
+- **formatter:** normalize simple table column spacing ([`ff3be98`](https://github.com/jolars/panache/commit/ff3be98f74687f37b80d91a3eb372dbd4d24301a))
+- **formatter:** normalize multiline table column spacing ([`bb255a9`](https://github.com/jolars/panache/commit/bb255a9e2f0c85cc07f6d28539771561d74f7b28)), closes [#389](https://github.com/jolars/panache/issues/389)
+- **formatter:** fold long double-quoted YAML scalars ([`ad68db1`](https://github.com/jolars/panache/commit/ad68db1d263705c24b344231c2eb68343c9e51cc)), closes [#388](https://github.com/jolars/panache/issues/388)
+
+### Bug Fixes
+- **parser:** emit bare URIs as lossless `AUTO_LINK` ([`52226d5`](https://github.com/jolars/panache/commit/52226d59067843251c71620dec29f25ffc9bcb07))
+- **formatter:** align headerless simple tables from first row ([`ecdd482`](https://github.com/jolars/panache/commit/ecdd482201cefa800a0553b11ae30b056c4f2765))
+- **parser:** stop truncating wide simple-table cells ([`f97694a`](https://github.com/jolars/panache/commit/f97694aeedeaf9913d31853c51025a27565ae68a))
+- **parser:** consume top border of single-row multiline tables ([`0872624`](https://github.com/jolars/panache/commit/0872624d745fa56e11aa493ba41dc452b72818da))
+
+### Dependencies
+- updated crates/panache-parser to v0.19.1
+
 ## [0.16.0](https://github.com/jolars/panache/compare/panache-formatter-v0.15.0...panache-formatter-v0.16.0) (2026-06-23)
 
 ### Features

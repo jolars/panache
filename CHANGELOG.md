@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.59.0](https://github.com/jolars/panache/compare/v2.58.0...v2.59.0) (2026-06-24)
+
+### Features
+- **lsp:** add hover detail to citation previews ([`3ac7d67`](https://github.com/jolars/panache/commit/3ac7d675a6046f42d21da00dc657f3d75c4c3745))
+- **linter:** make quarto-schema unknown-key opt-in ([`730d300`](https://github.com/jolars/panache/commit/730d3004fcb645ea426f159805d25d4f82fffd3b))
+- **formatter:** normalize simple table column spacing ([`ff3be98`](https://github.com/jolars/panache/commit/ff3be98f74687f37b80d91a3eb372dbd4d24301a))
+- **formatter:** normalize multiline table column spacing ([`bb255a9`](https://github.com/jolars/panache/commit/bb255a9e2f0c85cc07f6d28539771561d74f7b28)), closes [#389](https://github.com/jolars/panache/issues/389)
+- **formatter:** fold long double-quoted YAML scalars ([`ad68db1`](https://github.com/jolars/panache/commit/ad68db1d263705c24b344231c2eb68343c9e51cc)), closes [#388](https://github.com/jolars/panache/issues/388)
+- surface broken config instead of silently defaulting ([`0a99a56`](https://github.com/jolars/panache/commit/0a99a5625e0eca592277289d63377f3c8712cc6d))
+
+### Bug Fixes
+- **linter:** anchor duplicate-bib key to a real declaration ([`3e73405`](https://github.com/jolars/panache/commit/3e734053b2a9a094ba60c2451b4673db4b96c1c4))
+- **linter:** trim trailing newline from schema value spans ([`d1fedb9`](https://github.com/jolars/panache/commit/d1fedb9ef2dc3d88f99dc710422cc8f6076b9721))
+- **linter:** honor `validate-yaml: false` opt-out ([`9ee7185`](https://github.com/jolars/panache/commit/9ee71856688413cf4b8a14d99bd3b76bd8d0be54))
+- **linter:** enforce edit-distance cap in key suggestions ([`3592f13`](https://github.com/jolars/panache/commit/3592f139379858adfa2282b056b03dbdd2700aff))
+- **build:** include quarto schema in `include` ([`b4a97d0`](https://github.com/jolars/panache/commit/b4a97d0658883b1049cd72e7c6698d98d0a18ba1)), closes [#390](https://github.com/jolars/panache/issues/390)
+- **formatter:** align headerless simple tables from first row ([`ecdd482`](https://github.com/jolars/panache/commit/ecdd482201cefa800a0553b11ae30b056c4f2765))
+- **parser:** stop truncating wide simple-table cells ([`f97694a`](https://github.com/jolars/panache/commit/f97694aeedeaf9913d31853c51025a27565ae68a))
+- **parser:** consume top border of single-row multiline tables ([`0872624`](https://github.com/jolars/panache/commit/0872624d745fa56e11aa493ba41dc452b72818da))
+- **lsp:** compute pull diagnostics on demand ([`9993d69`](https://github.com/jolars/panache/commit/9993d69d0495eb191cb33c4cec7addddab5eb8c9))
+- **linter:** point bibliography span at the value ([`3a70be2`](https://github.com/jolars/panache/commit/3a70be2a5fff08a48cbcb2420d8df680b41acb13))
+- **parser:** emit bare URIs as lossless `AUTO_LINK` ([`52226d5`](https://github.com/jolars/panache/commit/52226d59067843251c71620dec29f25ffc9bcb07))
+
+### Dependencies
+- updated crates/panache-formatter to v0.17.0
+- updated crates/panache-parser to v0.19.1
+
 ## [2.58.0](https://github.com/jolars/panache/compare/v2.57.0...v2.58.0) (2026-06-23)
 
 ### Features

@@ -7,7 +7,7 @@ authors = ["Johan Larsson <johan@jolars.co>"]
 
 [package]
 name = "panache"
-version = "2.58.0"
+version = "2.59.0"
 edition.workspace = true
 # `distill_quarto_schema` is a dev-only vendoring bin (src/bin/); keep bare
 # `cargo run` resolving to the CLI for tooling like the pre-commit format hook.
@@ -52,8 +52,8 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [dependencies]
-panache-formatter = { path = "crates/panache-formatter", version = "0.16.0" }
-panache-parser = { path = "crates/panache-parser", version = "0.19.0", features = [
+panache-formatter = { path = "crates/panache-formatter", version = "0.17.0" }
+panache-parser = { path = "crates/panache-parser", version = "0.19.1", features = [
     "serde",
     "schema",
 ] }
