@@ -778,7 +778,10 @@ Output
 ### Simple Tables
 
 We normalize simple tables so that cell contents align with the alignment
-specified in the header row, and spacing within cells is normalized.
+specified in the header row, and the column spacing is recomputed from the
+content: each column's dash run is the width of its widest cell plus two, and
+columns are separated by a single space. The output is therefore independent of
+the incoming spacing and dash lengths.
 
 Input
 
@@ -795,11 +798,11 @@ Input
 Output
 
 :   ```markdown
-        Right     Left     Center     Default
-      -------     ------ ----------   -------
-           12     12         12       12
-          123     123       123       123
-            1     1          1        1
+        Right Left    Center  Default
+      ------- ------ -------- ---------
+           12 12        12    12
+          123 123      123    123
+            1 1         1     1
 
       : A caption
     ```

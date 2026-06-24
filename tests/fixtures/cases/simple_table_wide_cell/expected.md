@@ -1,3 +1,3 @@
-  Fruit            Price
-  -------------    -----
-  boysenberries    9
+  Fruit           Price
+  --------------- -------
+  boysenberries   9

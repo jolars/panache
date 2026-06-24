@@ -442,12 +442,10 @@ pub enum Alignment {
 }
 
 struct TableData {
-    rows: Vec<Vec<String>>,                        // All rows including header
-    alignments: Vec<Alignment>,                    // Column alignments
-    caption: Option<String>,                       // Optional caption text
-    column_widths: Option<Vec<usize>>, // For simple tables: preserve separator dash lengths
-    column_positions: Option<Vec<(usize, usize)>>, // For simple tables: preserve (start, end) positions
-    has_header: bool,                              // True if table has a header row
+    rows: Vec<Vec<String>>,     // All rows including header
+    alignments: Vec<Alignment>, // Column alignments
+    caption: Option<String>,    // Optional caption text
+    has_header: bool,           // True if table has a header row
 }
 
 /// Format cell content, handling both TEXT tokens and inline elements
@@ -616,8 +614,6 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
         rows,
         alignments,
         caption,
-        column_widths: None,
-        column_positions: None,
         has_header: true, // Pipe tables always have headers
     }
 }
@@ -1836,297 +1832,104 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
 
     let alignments = columns.iter().map(|c| c.alignment).collect();
 
-    // For simple tables, preserve both separator dash lengths AND column positions
-    let column_widths: Vec<usize> = columns.iter().map(|c| c.end - c.start).collect();
-    let base_offset = columns.first().map(|c| c.start).unwrap_or(0);
-    let column_positions: Vec<(usize, usize)> = columns
-        .iter()
-        .map(|c| (c.start - base_offset, c.end - base_offset))
-        .collect();
-
+    // Output geometry is recomputed from content in `format_simple_table`
+    // (pandoc-style), so we don't carry separator-derived widths/positions.
     TableData {
         rows,
         alignments,
         caption,
-        column_widths: Some(column_widths),
-        column_positions: Some(column_positions),
         has_header, // Simple tables may or may not have headers
     }
 }
 
-/// Format a simple table with consistent alignment and padding
+/// Pad a single simple-table cell to `width` according to its alignment.
+fn pad_simple_cell(cell: &str, width: usize, alignment: Alignment) -> String {
+    let total_padding = width.saturating_sub(cell.width());
+    match alignment {
+        Alignment::Left | Alignment::Default => format!("{cell}{}", " ".repeat(total_padding)),
+        Alignment::Right => format!("{}{cell}", " ".repeat(total_padding)),
+        Alignment::Center => {
+            let left = total_padding / 2;
+            let right = total_padding - left;
+            format!("{}{cell}{}", " ".repeat(left), " ".repeat(right))
+        }
+    }
+}
+
+/// Format a simple table the way pandoc normalizes them.
+///
+/// Output geometry is recomputed purely from cell content: each column's dash
+/// run (and field width) is `max-content-width + 2`, columns are separated by a
+/// single space, and cell text is aligned within its field. This makes the
+/// result independent of the incoming column spacing, so two documents that
+/// parse to the same table format identically and the output is idempotent.
 pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
     if !node.text().to_string().is_ascii() {
         return node.text().to_string();
     }
 
     let table_data = extract_simple_table_data(node, config);
-    let mut output = String::new();
 
     // Early return if no rows
     if table_data.rows.is_empty() {
         return node.text().to_string();
     }
 
-    let content_widths = calculate_column_widths(&table_data.rows);
     let has_header = table_data.has_header;
+    let alignments = &table_data.alignments;
 
-    // For simple tables, preserve separator-derived geometry unless it's clearly oversized
-    // compared to content; then shrink width while preserving column starts.
-    let widths = if let Some(ref widths) = table_data.column_widths {
-        widths.clone()
-    } else {
-        content_widths.clone()
-    };
-
-    let normalized_positions = if let Some(ref positions) = table_data.column_positions {
-        let mut out = Vec::with_capacity(positions.len());
-        for (col_idx, &(start, end)) in positions.iter().enumerate() {
-            let original_width = end.saturating_sub(start);
-            if has_header {
-                let content_width = content_widths.get(col_idx).copied().unwrap_or(3);
-                let alignment = table_data
-                    .alignments
-                    .get(col_idx)
-                    .copied()
-                    .unwrap_or(Alignment::Default);
-                let preferred_width = content_width
-                    + match alignment {
-                        Alignment::Center => 4,
-                        Alignment::Left | Alignment::Right => 2,
-                        Alignment::Default => 0,
-                    };
-                let clamped_width = original_width.min(preferred_width).max(content_width);
-                out.push((start, start + clamped_width));
-            } else {
-                out.push((start, end));
-            }
+    // True per-column content widths (no minimum), then pandoc's `+2` padding.
+    let num_cols = table_data.rows.iter().map(|r| r.len()).max().unwrap_or(0);
+    let mut content_widths = vec![0usize; num_cols];
+    for row in &table_data.rows {
+        for (col_idx, cell) in row.iter().enumerate() {
+            content_widths[col_idx] = content_widths[col_idx].max(cell.width());
         }
-        Some(out)
-    } else {
-        None
-    };
-
-    // For headerless simple tables, emit opening separator first
-    if !has_header
-        && normalized_positions.is_some()
-        && let Some(ref positions) = normalized_positions
-    {
-        let last_col_end = positions.last().map(|(_, end)| *end).unwrap_or(0);
-        let mut sep_chars: Vec<char> = vec![' '; last_col_end];
-        for &(col_start, col_end) in positions.iter() {
-            for i in col_start..col_end {
-                if i < sep_chars.len() {
-                    sep_chars[i] = '-';
-                }
-            }
-        }
-        output.push_str(&sep_chars.iter().collect::<String>());
-        output.push('\n');
     }
+    let field_widths: Vec<usize> = content_widths.iter().map(|w| w + 2).collect();
 
-    // Format header row if present
+    let push_separator = |output: &mut String| {
+        for (col_idx, width) in field_widths.iter().enumerate() {
+            if col_idx > 0 {
+                output.push(' ');
+            }
+            output.push_str(&"-".repeat(*width));
+        }
+        output.push('\n');
+    };
+
+    let push_row = |output: &mut String, cells: &[String]| {
+        let mut line = String::new();
+        for (col_idx, width) in field_widths.iter().enumerate() {
+            if col_idx > 0 {
+                line.push(' ');
+            }
+            let cell = cells.get(col_idx).map(String::as_str).unwrap_or("");
+            let alignment = alignments
+                .get(col_idx)
+                .copied()
+                .unwrap_or(Alignment::Default);
+            line.push_str(&pad_simple_cell(cell, *width, alignment));
+        }
+        output.push_str(line.trim_end());
+        output.push('\n');
+    };
+
+    let mut output = String::new();
+
     if has_header {
-        // For simple tables with column positions, use absolute positioning
-        if let Some(ref positions) = normalized_positions {
-            // Build header line using character buffer
-            let last_col_end = positions.last().map(|(_, end)| *end).unwrap_or(0);
-            let mut line_chars: Vec<char> = vec![' '; last_col_end];
-
-            for (col_idx, cell) in table_data.rows[0].iter().enumerate() {
-                if let Some(&(col_start, col_end)) = positions.get(col_idx) {
-                    let alignment = table_data
-                        .alignments
-                        .get(col_idx)
-                        .copied()
-                        .unwrap_or(Alignment::Default);
-
-                    let col_width = col_end - col_start;
-                    let cell_chars: Vec<char> = cell.chars().collect();
-                    let cell_width = cell.width();
-                    let total_padding = col_width.saturating_sub(cell_width);
-
-                    // Calculate where to place text within column based on alignment
-                    let text_start_in_col = match alignment {
-                        Alignment::Left | Alignment::Default => 0,
-                        Alignment::Right => total_padding,
-                        Alignment::Center => total_padding / 2,
-                    };
-
-                    // Place cell characters at the correct position
-                    let mut char_pos = 0;
-                    for &ch in &cell_chars {
-                        let target_pos = col_start + text_start_in_col + char_pos;
-                        if target_pos < line_chars.len() {
-                            line_chars[target_pos] = ch;
-                            char_pos += 1;
-                        }
-                    }
-                }
-            }
-
-            output.push_str(line_chars.iter().collect::<String>().trim_end());
-            output.push('\n');
-
-            // Emit separator line at the same positions
-            let mut sep_chars: Vec<char> = vec![' '; last_col_end];
-            for &(col_start, col_end) in positions {
-                for i in col_start..col_end {
-                    if i < sep_chars.len() {
-                        sep_chars[i] = '-';
-                    }
-                }
-            }
-            output.push_str(&sep_chars.iter().collect::<String>());
-            output.push('\n');
-        } else {
-            // Fallback: use widths with single-space separation
-            for (col_idx, cell) in table_data.rows[0].iter().enumerate() {
-                let width = widths.get(col_idx).copied().unwrap_or(3);
-                let alignment = table_data
-                    .alignments
-                    .get(col_idx)
-                    .copied()
-                    .unwrap_or(Alignment::Default);
-
-                let cell_width = cell.width();
-                let total_padding = width.saturating_sub(cell_width);
-
-                let padded_cell = match alignment {
-                    Alignment::Left | Alignment::Default => {
-                        format!("{}{}", cell, " ".repeat(total_padding))
-                    }
-                    Alignment::Right => {
-                        format!("{}{}", " ".repeat(total_padding), cell)
-                    }
-                    Alignment::Center => {
-                        let left_padding = total_padding / 2;
-                        let right_padding = total_padding - left_padding;
-                        format!(
-                            "{}{}{}",
-                            " ".repeat(left_padding),
-                            cell,
-                            " ".repeat(right_padding)
-                        )
-                    }
-                };
-
-                output.push_str(&padded_cell);
-                if col_idx < table_data.rows[0].len() - 1 {
-                    output.push(' ');
-                }
-            }
-            output.push('\n');
-
-            // Emit separator line
-            for (col_idx, width) in widths.iter().enumerate() {
-                output.push_str(&"-".repeat(*width));
-                if col_idx < widths.len() - 1 {
-                    output.push(' ');
-                }
-            }
-            output.push('\n');
+        push_row(&mut output, &table_data.rows[0]);
+        push_separator(&mut output);
+        for row in table_data.rows.iter().skip(1) {
+            push_row(&mut output, row);
         }
-    }
-
-    // Format data rows
-    for row in table_data.rows.iter().skip(if has_header { 1 } else { 0 }) {
-        if let Some(ref positions) = normalized_positions {
-            // Build row using character buffer
-            let last_col_end = positions.last().map(|(_, end)| *end).unwrap_or(0);
-            let mut line_chars: Vec<char> = vec![' '; last_col_end];
-
-            for (col_idx, cell) in row.iter().enumerate() {
-                if let Some(&(col_start, col_end)) = positions.get(col_idx) {
-                    let alignment = table_data
-                        .alignments
-                        .get(col_idx)
-                        .copied()
-                        .unwrap_or(Alignment::Default);
-
-                    let col_width = col_end - col_start;
-                    let cell_chars: Vec<char> = cell.chars().collect();
-                    let cell_width = cell.width();
-                    let total_padding = col_width.saturating_sub(cell_width);
-
-                    // Calculate where to place text within column based on alignment
-                    let text_start_in_col = match alignment {
-                        Alignment::Left | Alignment::Default => 0,
-                        Alignment::Right => total_padding,
-                        Alignment::Center => total_padding / 2,
-                    };
-
-                    // Place cell characters at the correct position
-                    let mut char_pos = 0;
-                    for &ch in &cell_chars {
-                        let target_pos = col_start + text_start_in_col + char_pos;
-                        if target_pos < line_chars.len() {
-                            line_chars[target_pos] = ch;
-                            char_pos += 1;
-                        }
-                    }
-                }
-            }
-
-            output.push_str(line_chars.iter().collect::<String>().trim_end());
-            output.push('\n');
-        } else {
-            // Fallback: use widths with single-space separation
-            for (col_idx, cell) in row.iter().enumerate() {
-                let width = widths.get(col_idx).copied().unwrap_or(3);
-                let alignment = table_data
-                    .alignments
-                    .get(col_idx)
-                    .copied()
-                    .unwrap_or(Alignment::Default);
-
-                let cell_width = cell.width();
-                let total_padding = width.saturating_sub(cell_width);
-
-                let padded_cell = match alignment {
-                    Alignment::Left | Alignment::Default => {
-                        format!("{}{}", cell, " ".repeat(total_padding))
-                    }
-                    Alignment::Right => {
-                        format!("{}{}", " ".repeat(total_padding), cell)
-                    }
-                    Alignment::Center => {
-                        let left_padding = total_padding / 2;
-                        let right_padding = total_padding - left_padding;
-                        format!(
-                            "{}{}{}",
-                            " ".repeat(left_padding),
-                            cell,
-                            " ".repeat(right_padding)
-                        )
-                    }
-                };
-
-                output.push_str(&padded_cell);
-                if col_idx < row.len() - 1 {
-                    output.push(' ');
-                }
-            }
-            output.push('\n');
+    } else {
+        // Headerless simple tables are delimited by a separator above and below.
+        push_separator(&mut output);
+        for row in &table_data.rows {
+            push_row(&mut output, row);
         }
-    }
-
-    // For headerless simple tables, emit closing separator
-    if !has_header
-        && normalized_positions.is_some()
-        && let Some(ref positions) = normalized_positions
-    {
-        let last_col_end = positions.last().map(|(_, end)| *end).unwrap_or(0);
-        let mut sep_chars: Vec<char> = vec![' '; last_col_end];
-        for &(col_start, col_end) in positions.iter() {
-            for i in col_start..col_end {
-                if i < sep_chars.len() {
-                    sep_chars[i] = '-';
-                }
-            }
-        }
-        output.push_str(&sep_chars.iter().collect::<String>());
-        output.push('\n');
+        push_separator(&mut output);
     }
 
     if let Some(ref caption_text) = table_data.caption {

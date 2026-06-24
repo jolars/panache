@@ -1,6 +1,6 @@
-  Right     Left
-  -------   ----
-  12        12
+  Right   Left
+  ------- ------
+  12      12
 
   : First table caption
 

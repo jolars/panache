@@ -442,10 +442,12 @@ fn test_multiline_table_with_wide_chars_stays_idempotent() {
     assert_eq!(first, second);
 }
 
+// Output geometry is recomputed from content (pandoc-style: dash run =
+// max-content-width + 2), so oversized source separators are normalized away.
 #[test]
-fn test_simple_table_compresses_oversized_separator_columns() {
+fn test_simple_table_normalizes_oversized_separator_columns() {
     let input = "   Right     Left\n -------     --------------\n     12         12\n   123          123\n       1        1\n";
-    let expected = "    Right     Left\n  -------     ----\n       12     12\n      123     123\n        1     1\n";
+    let expected = "    Right Left\n  ------- ------\n       12 12\n      123 123\n        1 1\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -488,8 +490,7 @@ fn test_pipe_table_indent_three() {
 #[test]
 fn test_simple_table_honors_table_indent() {
     let input = "   Right     Left\n -------     --------------\n     12         12\n   123          123\n       1        1\n";
-    let expected =
-        "  Right     Left\n-------     ----\n     12     12\n    123     123\n      1     1\n";
+    let expected = "  Right Left\n------- ------\n     12 12\n    123 123\n      1 1\n";
 
     let config = ConfigBuilder::default().table_indent(0).build();
     let result = format(input, Some(config), None);
@@ -570,4 +571,32 @@ fn test_simple_table_cell_wider_than_dash_run_is_not_truncated() {
         "wide cell must be preserved, got:\n{result}"
     );
     assert_eq!(format(&result, None, None), result, "must be idempotent");
+}
+
+// Simple-table output is normalized purely from content, so the incoming dash
+// widths and inter-column padding do not affect the result: each column's dash
+// run is `max-content-width + 2`, columns separated by one space. (The source
+// column *start* positions still define which text belongs to which cell, so
+// both inputs below must keep `Price`/`9` past the `boysenberries` column.)
+#[test]
+fn test_simple_table_spacing_is_normalized_independent_of_source() {
+    let a = "Fruit            Price\n-------------    -----\nboysenberries    9\n";
+    let b = "Fruit           Price\n--------------- -------\nboysenberries   9\n";
+    let expected = "  Fruit           Price\n  --------------- -------\n  boysenberries   9\n";
+
+    assert_eq!(format(a, None, None), expected);
+    assert_eq!(format(b, None, None), expected);
+}
+
+// Dash-run width equals the widest cell in the column plus two, regardless of
+// which row (header or body) is widest.
+#[test]
+fn test_simple_table_dash_run_is_content_width_plus_two() {
+    let config = ConfigBuilder::default().table_indent(0).build();
+    // col1 widest = "boysenberries" (13) -> 15 dashes; col2 widest = "Price" (5)
+    // -> 7 dashes.
+    let input = "Fruit           Price\n--------------- -------\nboysenberries   9\n";
+    let result = format(input, Some(config), None);
+    let sep = result.lines().nth(1).unwrap();
+    assert_eq!(sep, "--------------- -------", "got:\n{result}");
 }
