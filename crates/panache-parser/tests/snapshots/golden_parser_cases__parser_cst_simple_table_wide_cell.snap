@@ -1,0 +1,25 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..65
+  SIMPLE_TABLE@0..65
+    TABLE_HEADER@0..23
+      TABLE_CELL@0..5
+        TEXT@0..5 "Fruit"
+      WHITESPACE@5..17 "            "
+      TABLE_CELL@17..22
+        TEXT@17..22 "Price"
+      NEWLINE@22..23 "\n"
+    TABLE_SEPARATOR@23..46
+      TABLE_SEP_DASHES@23..28 "-----"
+      TABLE_SEP_WHITESPACE@28..40 "            "
+      TABLE_SEP_DASHES@40..45 "-----"
+      NEWLINE@45..46 "\n"
+    TABLE_ROW@46..65
+      TABLE_CELL@46..59
+        TEXT@46..59 "boysenberries"
+      WHITESPACE@59..63 "    "
+      TABLE_CELL@63..64
+        TEXT@63..64 "9"
+      NEWLINE@64..65 "\n"

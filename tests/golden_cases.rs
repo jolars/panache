@@ -373,6 +373,7 @@ golden_test_cases!(
     unresolved_reference_intraword_underscore_pandoc,
     rmarkdown_math,
     simple_table,
+    simple_table_wide_cell,
     standardize_bullets,
     sentence_wrap_basic,
     sentence_wrap_abbreviations,

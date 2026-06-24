@@ -1725,11 +1725,15 @@ fn split_simple_table_row(row_text: &str, columns: &[SimpleColumn]) -> Vec<Strin
         row_text
     };
 
-    for col in columns {
-        let cell_text = if col.end <= row.len() {
-            row[col.start..col.end].trim()
-        } else if col.start < row.len() {
-            row[col.start..].trim()
+    for (i, col) in columns.iter().enumerate() {
+        // A column spans to the start of the next column (the gap belongs to
+        // the left column); the last column runs to end-of-line. Ending at the
+        // dash-run end instead would truncate cell text wider than its dashes.
+        let end = columns
+            .get(i + 1)
+            .map_or(row.len(), |next| next.start.min(row.len()));
+        let cell_text = if col.start < end {
+            row[col.start..end].trim()
         } else {
             ""
         };

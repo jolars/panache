@@ -951,7 +951,7 @@ fn emit_table_row(
     let mut current_pos = 0;
 
     // Extract and emit cells based on column boundaries
-    for col in columns.iter() {
+    for (i, col) in columns.iter().enumerate() {
         // Calculate actual positions in the trimmed line (accounting for leading whitespace)
         let cell_start = if col.start >= leading_ws_len {
             column_offset_to_byte_index(trimmed, col.start - leading_ws_len)
@@ -959,8 +959,16 @@ fn emit_table_row(
             0
         };
 
-        let cell_end = if col.end >= leading_ws_len {
-            column_offset_to_byte_index(trimmed, col.end - leading_ws_len)
+        // A column spans from its own start to the start of the next column
+        // (the inter-column gap belongs to the left column); the last column
+        // runs to end-of-line. Ending the slice at the dash-run end instead
+        // would split cell text that overruns a short dash run into the cell
+        // plus a bogus WHITESPACE token.
+        let end_offset = columns.get(i + 1).map_or(usize::MAX, |next| next.start);
+        let cell_end = if end_offset == usize::MAX {
+            trimmed.len()
+        } else if end_offset >= leading_ws_len {
+            column_offset_to_byte_index(trimmed, end_offset - leading_ws_len)
         } else {
             0
         };

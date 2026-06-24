@@ -23,9 +23,9 @@ DOCUMENT@0..676
       WHITESPACE@197..226 "                      ..."
       TABLE_CELL@226..239
         TEXT@226..239 "Weekend gross"
-      WHITESPACE@239..244 "     "
-      TABLE_CELL@244..244
-      WHITESPACE@244..249 "     "
+      WHITESPACE@239..246 "       "
+      TABLE_CELL@246..246
+      WHITESPACE@246..249 "   "
       TABLE_CELL@249..249
       NEWLINE@249..250 "\n"
     TABLE_SEPARATOR@250..321
@@ -53,9 +53,9 @@ DOCUMENT@0..676
       TABLE_CELL@370..381
         TEXT@370..371 "$"
         TEXT@371..381 "71,565,498"
-      WHITESPACE@381..386 "     "
-      TABLE_CELL@386..386
-      WHITESPACE@386..391 "     "
+      WHITESPACE@381..388 "       "
+      TABLE_CELL@388..388
+      WHITESPACE@388..391 "   "
       TABLE_CELL@391..391
       NEWLINE@391..392 "\n"
     TABLE_ROW@392..463
@@ -70,9 +70,9 @@ DOCUMENT@0..676
       TABLE_CELL@441..452
         TEXT@441..442 "$"
         TEXT@442..452 "36,169,328"
-      WHITESPACE@452..457 "     "
-      TABLE_CELL@457..457
-      WHITESPACE@457..462 "     "
+      WHITESPACE@452..459 "       "
+      TABLE_CELL@459..459
+      WHITESPACE@459..462 "   "
       TABLE_CELL@462..462
       NEWLINE@462..463 "\n"
     TABLE_ROW@463..534
@@ -87,9 +87,9 @@ DOCUMENT@0..676
       TABLE_CELL@512..523
         TEXT@512..513 "$"
         TEXT@513..523 "19,928,525"
-      WHITESPACE@523..528 "     "
-      TABLE_CELL@528..528
-      WHITESPACE@528..533 "     "
+      WHITESPACE@523..530 "       "
+      TABLE_CELL@530..530
+      WHITESPACE@530..533 "   "
       TABLE_CELL@533..533
       NEWLINE@533..534 "\n"
     TABLE_ROW@534..605
@@ -104,9 +104,9 @@ DOCUMENT@0..676
       TABLE_CELL@584..594
         TEXT@584..585 "$"
         TEXT@585..594 "8,805,843"
-      WHITESPACE@594..599 "     "
-      TABLE_CELL@599..599
-      WHITESPACE@599..604 "     "
+      WHITESPACE@594..601 "       "
+      TABLE_CELL@601..601
+      WHITESPACE@601..604 "   "
       TABLE_CELL@604..604
       NEWLINE@604..605 "\n"
     TABLE_ROW@605..676
@@ -121,8 +121,8 @@ DOCUMENT@0..676
       TABLE_CELL@655..665
         TEXT@655..656 "$"
         TEXT@656..665 "7,316,746"
-      WHITESPACE@665..670 "     "
-      TABLE_CELL@670..670
-      WHITESPACE@670..675 "     "
+      WHITESPACE@665..672 "       "
+      TABLE_CELL@672..672
+      WHITESPACE@672..675 "   "
       TABLE_CELL@675..675
       NEWLINE@675..676 "\n"

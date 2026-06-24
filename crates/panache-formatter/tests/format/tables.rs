@@ -556,3 +556,18 @@ fn test_grid_colspan_misaligned_pipe_is_preserved_losslessly() {
     assert!(result.contains("| a very wide spanning header |"));
     assert_eq!(format(&result, None, None), result, "must be idempotent");
 }
+
+#[test]
+fn test_simple_table_cell_wider_than_dash_run_is_not_truncated() {
+    // A pandoc simple-table column spans to the start of the next column, so a
+    // cell whose content overruns its (short) dash run still belongs to that
+    // column. Slicing at the dash-run end used to truncate it
+    // ("boysenberries" -> "boyse").
+    let input = "Fruit            Price\n-----            -----\nboysenberries    9\n";
+    let result = format(input, None, None);
+    assert!(
+        result.contains("boysenberries"),
+        "wide cell must be preserved, got:\n{result}"
+    );
+    assert_eq!(format(&result, None, None), result, "must be idempotent");
+}
