@@ -9,8 +9,7 @@ VSX](https://img.shields.io/open-vsx/v/jolars/panache?logo=vsix)](https://open-v
 Code](https://vsmarketplacebadges.dev/version-short/jolars.panache.svg?logo=vsix)](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
 [![PyPI
 version](https://badge.fury.io/py/panache-cli.svg?icon=si%3Apython)](https://badge.fury.io/py/panache-cli)
-[![npm
-version](https://badge.fury.io/js/@panache-cli%2Fpanache.svg?icon=si%3Anpm)](https://badge.fury.io/js/@panache-cli%2Fpanache)
+[![npm version](https://badge.fury.io/js/@panache-cli%2Fpanache.svg?icon=si%3Anpm)](https://badge.fury.io/js/@panache-cli%2Fpanache)
 [![codecov](https://codecov.io/gh/jolars/panache/graph/badge.svg?token=uaBVOBfILv)](https://codecov.io/gh/jolars/panache)
 
 A language server, formatter, and linter for Markdown, Quarto, and R Markdown,
