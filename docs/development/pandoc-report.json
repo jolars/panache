@@ -3,7 +3,7 @@
   "failing": 1,
   "pandoc_version": "3.9.0.2",
   "pass_pct": 99.8,
-  "passing": 454,
+  "passing": 455,
   "passing_ids": [
     1,
     2,
@@ -458,13 +458,14 @@
     452,
     453,
     454,
-    455
+    455,
+    456
   ],
   "sections": [
     {
       "fail": 0,
       "name": "block",
-      "pass": 17
+      "pass": 18
     },
     {
       "fail": 0,
@@ -487,5 +488,5 @@
       "pass": 15
     }
   ],
-  "total_cases": 455
+  "total_cases": 456
 }

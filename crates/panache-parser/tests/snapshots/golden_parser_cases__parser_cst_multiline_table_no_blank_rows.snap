@@ -1,0 +1,47 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..223
+  MULTILINE_TABLE@0..223
+    TABLE_SEPARATOR@0..45
+      TABLE_SEP_DASHES@0..44 "--------------------- ..."
+      NEWLINE@44..45 "\n"
+    TABLE_HEADER@45..88
+      TABLE_CELL@45..50
+        TEXT@45..50 "Lorem"
+      WHITESPACE@50..51 " "
+      TABLE_CELL@51..64
+        TEXT@51..64 "Ipsum        "
+      WHITESPACE@64..70 "      "
+      TABLE_CELL@70..77
+        TEXT@70..77 "Dolor  "
+      WHITESPACE@77..84 "       "
+      TABLE_CELL@84..87
+        TEXT@84..87 "Sit"
+      NEWLINE@87..88 "\n"
+    TABLE_SEPARATOR@88..133
+      TABLE_SEP_DASHES@88..93 "-----"
+      TABLE_SEP_WHITESPACE@93..94 " "
+      TABLE_SEP_DASHES@94..107 "-------------"
+      TABLE_SEP_WHITESPACE@107..113 "      "
+      TABLE_SEP_DASHES@113..120 "-------"
+      TABLE_SEP_WHITESPACE@120..127 "       "
+      TABLE_SEP_DASHES@127..132 "-----"
+      NEWLINE@132..133 "\n"
+    TABLE_ROW@133..178
+      TABLE_CELL@133..138
+        TEXT@133..138 "amet,"
+      WHITESPACE@138..139 " "
+      TABLE_CELL@139..152
+        TEXT@139..152 "consectetur  "
+      WHITESPACE@152..158 "      "
+      TABLE_CELL@158..165
+        TEXT@158..165 "adipisc"
+      WHITESPACE@165..172 "ing    "
+      TABLE_CELL@172..177
+        TEXT@172..177 "elit,"
+      NEWLINE@177..178 "\n"
+    TABLE_SEPARATOR@178..223
+      TABLE_SEP_DASHES@178..222 "--------------------- ..."
+      NEWLINE@222..223 "\n"

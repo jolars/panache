@@ -2740,11 +2740,15 @@ pub(crate) fn try_parse_multiline_table(
         return None;
     }
 
-    // Must have had at least one blank line between rows (distinguishes from simple tables)
-    if !found_blank_line {
-        if !is_column_sep_start {
-            return None;
-        }
+    // A blank line between rows is one way to tell a multiline table from a
+    // simple one, but not the only one. A full-width top border (the
+    // `is_full_width_start` case) already distinguishes a multiline table from
+    // a simple table, so pandoc accepts it even when every row is a single line
+    // with no interior blanks; the required column separator and closing border
+    // (checked above and below) keep a bare thematic break from matching. Only
+    // the headerless, column-separator-started shape still needs the
+    // single-row guard.
+    if !found_blank_line && is_column_sep_start {
         let columns = headerless_columns.as_deref()?;
         if !is_headerless_single_row_without_blank(window, start_pos + 1, pos - 1, columns) {
             return None;

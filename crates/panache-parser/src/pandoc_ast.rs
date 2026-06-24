@@ -3213,9 +3213,13 @@ fn multiline_row_cells_blocks(row: &SyntaxNode, cols: &[(usize, usize)]) -> Vec<
             line_start_offset += line.len();
             continue;
         }
-        for (i, &(cs, ce)) in cols.iter().enumerate() {
-            // Slice [cs..=ce] in chars from the line. Lines may be shorter.
-            let slice = char_slice(line_no_nl, cs, ce + 1);
+        for (i, &(cs, _ce)) in cols.iter().enumerate() {
+            // A column spans from the start of its dashes to the start of the
+            // next column's dashes (the gap belongs to the left column); the
+            // last column runs to end-of-line. Slicing at the dash-run end
+            // instead would drop cell text that overruns a short dash run.
+            let end = cols.get(i + 1).map_or(usize::MAX, |(next_cs, _)| *next_cs);
+            let slice = char_slice(line_no_nl, cs, end);
             let trimmed = slice.trim();
             if !trimmed.is_empty() {
                 col_lines[i].push(trimmed.to_string());
