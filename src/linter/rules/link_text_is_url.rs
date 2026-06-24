@@ -201,4 +201,18 @@ mod tests {
         let diagnostics = parse_and_lint(input);
         assert!(diagnostics.is_empty());
     }
+
+    #[test]
+    fn does_not_fire_on_bare_uri_autolink() {
+        // Regression: under GFM (autolink_bare_uris), a bare URL is already the
+        // shortest form. It must parse as an AUTO_LINK, not a `[url](url)` LINK,
+        // so this rule should never see it.
+        let mut config = Config::default();
+        config.flavor = crate::config::Flavor::Gfm;
+        config.extensions = panache_parser::Extensions::for_flavor(config.flavor);
+        let input = "See https://example.com/path for details.\n";
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let diagnostics = LinkTextIsUrlRule.check_tree(&tree, input, &config, None);
+        assert!(diagnostics.is_empty());
+    }
 }
