@@ -11,7 +11,7 @@ use std::path::Path;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::syntax::SyntaxNode;
 
-use super::interp::{ErrorKind, SchemaError, validate};
+use super::interp::{ErrorKind, ScalarType, SchemaError, SchemaValue, ValueKind, validate};
 use super::schema;
 use super::value::bridge_yaml_content;
 
@@ -54,10 +54,32 @@ fn schema_diagnostics_for_tree(tree: &SyntaxNode, text: &str, root_id: &str) -> 
     let Some(value) = bridge_yaml_content(tree) else {
         return Vec::new();
     };
+    if validation_disabled(&value) {
+        return Vec::new();
+    }
     validate(schema(), root_id, &value)
         .into_iter()
         .map(|err| to_diagnostic(err, text))
         .collect()
+}
+
+/// Whether a bridged top-level YAML value opts out of schema validation via
+/// `validate-yaml: false`. Quarto honors this key to disable its own YAML
+/// schema validation, so panache mirrors it: when set, the document or manifest
+/// is not schema-checked. (A malformed-YAML *parse* error is reported
+/// separately and is not suppressed by this opt-out.)
+pub fn validation_disabled(value: &SchemaValue) -> bool {
+    let ValueKind::Map(entries) = &value.kind else {
+        return false;
+    };
+    entries.iter().any(|e| {
+        e.key == "validate-yaml"
+            && matches!(
+                &e.value.kind,
+                ValueKind::Scalar { ty: ScalarType::Bool, literal }
+                    if literal.eq_ignore_ascii_case("false")
+            )
+    })
 }
 
 /// Drop schema diagnostics whose code is disabled. The type-mismatch and
@@ -241,6 +263,31 @@ mod tests {
         let on = lint_manifest_text("forrmat: html\n", "project-config", false, true);
         assert_eq!(on.len(), 1, "got: {on:?}");
         assert_eq!(on[0].code, UNKNOWN_KEY);
+    }
+
+    #[test]
+    fn lint_manifest_honors_validate_yaml_false() {
+        // `validate-yaml: false` opts the manifest out of schema validation, so
+        // even a real type mismatch and a key typo go unreported.
+        let opted_out = lint_manifest_text(
+            "validate-yaml: false\nforrmat: html\ntoc: maybe\n",
+            "front-matter",
+            true,
+            true,
+        );
+        assert!(
+            opted_out.is_empty(),
+            "schema must be skipped: {opted_out:?}"
+        );
+        // ...but a YAML *parse* error still surfaces despite the opt-out.
+        let broken = lint_manifest_text(
+            "validate-yaml: false\ntitle: [\n",
+            "front-matter",
+            true,
+            true,
+        );
+        assert_eq!(broken.len(), 1, "got: {broken:?}");
+        assert_eq!(broken[0].code, "yaml-parse-error");
     }
 
     #[test]

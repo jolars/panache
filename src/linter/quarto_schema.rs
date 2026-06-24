@@ -18,7 +18,7 @@ pub mod value;
 
 pub use report::{
     INVALID_ENUM, TYPE_MISMATCH, UNKNOWN_KEY, lint_manifest_text, manifest_schema_root,
-    retain_enabled_codes, to_diagnostic, validate_standalone_yaml,
+    retain_enabled_codes, to_diagnostic, validate_standalone_yaml, validation_disabled,
 };
 
 use std::sync::OnceLock;

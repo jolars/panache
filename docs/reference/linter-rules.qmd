@@ -1245,6 +1245,12 @@ checks an explicit `panache lint _quarto.yml` (or `_metadata.yml`) target, and
 the LSP validates the manifests reachable from an open project document,
 publishing diagnostics on each manifest's own file.
 
+**Opt-out:** Like Quarto itself, this rule (and `quarto-schema-unknown-key`)
+honors `validate-yaml: false`. When a document's frontmatter or a manifest sets
+it, no schema validation runs for that file---useful for filter-driven patterns
+the core schema rejects, such as a `bibliography:` map for `multibib`. A
+malformed-YAML *parse* error is still reported.
+
 **Limitations:** Format-gated keys are accepted regardless of the active output
 format, and deeply nested options reached through a permissive `anyOf` branch
 may not be checked.

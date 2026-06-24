@@ -20,12 +20,12 @@ use crate::linter::diagnostics::Diagnostic;
 use crate::linter::quarto_schema::interp::validate;
 use crate::linter::quarto_schema::model::QuartoSchema;
 use crate::linter::quarto_schema::report::{
-    INVALID_ENUM, TYPE_MISMATCH, UNKNOWN_KEY, to_diagnostic,
+    INVALID_ENUM, TYPE_MISMATCH, UNKNOWN_KEY, to_diagnostic, validation_disabled,
 };
 use crate::linter::quarto_schema::schema;
 use crate::linter::quarto_schema::value::bridge_yaml_content;
 use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
-use crate::syntax::{AstNode, CodeBlock, SyntaxKind};
+use crate::syntax::{AstNode, CodeBlock, SyntaxKind, SyntaxNode};
 
 /// Schema validation split across two rules so each carries its own
 /// default-on state (the docs/metadata model declares `default_on` per rule):
@@ -103,6 +103,12 @@ fn schema_diagnostics(cx: &LintContext) -> Vec<Diagnostic> {
     if !matches!(cx.config.flavor, Flavor::Quarto) {
         return Vec::new();
     }
+    // Honor `validate-yaml: false` in the document's frontmatter: Quarto then
+    // performs no schema validation for the document, so neither do we (this
+    // covers the frontmatter and every cell's options).
+    if frontmatter_opts_out(cx.tree) {
+        return Vec::new();
+    }
     let schema = schema();
     let mut diagnostics = Vec::new();
     // Walk the embedded YAML content nodes directly: frontmatter and each
@@ -129,6 +135,15 @@ fn schema_diagnostics(cx: &LintContext) -> Vec<Diagnostic> {
         }
     }
     diagnostics
+}
+
+/// Whether the document's frontmatter sets `validate-yaml: false`, Quarto's
+/// opt-out from YAML schema validation.
+fn frontmatter_opts_out(tree: &SyntaxNode) -> bool {
+    tree.descendants()
+        .find(|n| n.kind() == SyntaxKind::YAML_METADATA_CONTENT)
+        .and_then(|n| bridge_yaml_content(&n))
+        .is_some_and(|v| validation_disabled(&v))
 }
 
 /// The cell-options engine root for an executable code cell: `engine-knitr` for
@@ -225,6 +240,27 @@ mod tests {
             Flavor::Quarto,
         );
         assert!(diags.is_empty(), "unexpected: {diags:?}");
+    }
+
+    #[test]
+    fn validate_yaml_false_disables_schema() {
+        // `validate-yaml: false` is Quarto's opt-out; it skips schema validation
+        // for the whole document — frontmatter and cell options alike.
+        let doc =
+            "---\nvalidate-yaml: false\ntoc: maybe\n---\n\n```{python}\n#| echo: maybe\n1\n```\n";
+        assert!(
+            lint(doc, Flavor::Quarto).is_empty(),
+            "type/enum must be suppressed: {:?}",
+            lint(doc, Flavor::Quarto)
+        );
+        let key = "---\nvalidate-yaml: false\nforrmat: html\n---\n";
+        assert!(
+            lint_unknown(key, Flavor::Quarto).is_empty(),
+            "unknown-key must be suppressed: {:?}",
+            lint_unknown(key, Flavor::Quarto)
+        );
+        // Sanity: without the opt-out the type mismatch still fires.
+        assert!(!lint("---\ntoc: maybe\n---\n", Flavor::Quarto).is_empty());
     }
 
     #[test]
