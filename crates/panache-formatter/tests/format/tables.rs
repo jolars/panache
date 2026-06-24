@@ -588,6 +588,32 @@ fn test_simple_table_spacing_is_normalized_independent_of_source() {
     assert_eq!(format(b, None, None), expected);
 }
 
+// Headerless simple tables carry no header row, so pandoc derives each
+// column's alignment from the *first data row's* position relative to the dash
+// runs (verified with `pandoc -f markdown -t native`). col0 is flush-right,
+// col1 flush-left, col2 centered, col3 flush-right.
+#[test]
+fn test_headerless_simple_table_alignment_from_first_data_row() {
+    let config = ConfigBuilder::default().table_indent(0).build();
+    let input = concat!(
+        "-------     ------ ----------   -------\n",
+        "     12     12        12             12\n",
+        "    123     123       123           123\n",
+        "      1     1          1              1\n",
+        "-------     ------ ----------   -------\n",
+    );
+    let expected = concat!(
+        "----- ----- ----- -----\n",
+        "   12 12     12      12\n",
+        "  123 123    123    123\n",
+        "    1 1       1       1\n",
+        "----- ----- ----- -----\n",
+    );
+    let result = format(input, Some(config.clone()), None);
+    assert_eq!(result, expected, "got:\n{result}");
+    assert_eq!(format(&result, Some(config), None), result, "idempotent");
+}
+
 // Dash-run width equals the widest cell in the column plus two, regardless of
 // which row (header or body) is widest.
 #[test]

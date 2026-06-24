@@ -1658,7 +1658,10 @@ fn extract_simple_table_columns(separator: &SyntaxNode) -> Vec<SimpleColumn> {
         .collect()
 }
 
-/// Determine column alignments based on header text position relative to separator
+/// Determine column alignments from a reference line's text position relative
+/// to the separator dash runs. The reference line is the header when present,
+/// or (for headerless tables) the first data row — both sit against the dash
+/// runs, so the same flushness rule applies.
 fn determine_simple_alignments(
     columns: &mut [SimpleColumn],
     _separator_line: &str,
@@ -1747,6 +1750,10 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     let mut separator_line = String::new();
     let mut header_line: Option<String> = None;
     let mut header_cells: Option<Vec<String>> = None;
+    // Raw text of the first non-separator data row. Headerless simple tables
+    // carry no header, so pandoc derives column alignment from this row's
+    // position relative to the dash runs (see `determine_simple_alignments`).
+    let mut first_data_row_line: Option<String> = None;
 
     for child in node.children() {
         match child.kind() {
@@ -1778,6 +1785,18 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
             SyntaxKind::TABLE_ROW => {
                 // Data rows come after separator
                 if !columns.is_empty() {
+                    // Remember the first real data row's raw text for headerless
+                    // alignment detection. Skip the closing dash separator that a
+                    // headerless table emits as an all-dashes TABLE_ROW.
+                    let raw_row = child.text().to_string();
+                    let row_is_separator = raw_row
+                        .trim()
+                        .chars()
+                        .all(|c| c == '-' || c.is_whitespace());
+                    if !row_is_separator && first_data_row_line.is_none() {
+                        first_data_row_line = Some(raw_row);
+                    }
+
                     // Try to extract from TABLE_CELL nodes first
                     let cells = extract_row_cells(&child, config);
 
@@ -1812,9 +1831,12 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
         }
     }
 
-    // Determine alignments based on header
+    // Determine alignments from the header if present, else (headerless) from
+    // the first data row — pandoc reads alignment off whichever line sits
+    // against the dash runs.
     if !columns.is_empty() {
-        determine_simple_alignments(&mut columns, &separator_line, header_line.as_deref());
+        let alignment_line = header_line.as_deref().or(first_data_row_line.as_deref());
+        determine_simple_alignments(&mut columns, &separator_line, alignment_line);
     }
 
     // Track if we have a header before potentially consuming header_line

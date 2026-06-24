@@ -783,6 +783,10 @@ content: each column's dash run is the width of its widest cell plus two, and
 columns are separated by a single space. The output is therefore independent of
 the incoming spacing and dash lengths.
 
+Headerless simple tables (delimited by a dash run above and below the data) have
+no header row, so each column's alignment is read from the **first data row's**
+position relative to the dash runs, matching how Pandoc parses them.
+
 Input
 
 :   ```markdown
