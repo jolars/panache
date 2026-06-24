@@ -544,7 +544,11 @@ fn levenshtein(a: &str, b: &str, max: usize) -> usize {
         }
         std::mem::swap(&mut prev, &mut curr);
     }
-    prev[b.len()]
+    // The per-row bail above only fires when an *entire* row exceeds `max`; the
+    // diagonal can keep one cell within budget while the true distance still
+    // ends up over it. Clamp here so the cap is actually enforced.
+    let dist = prev[b.len()];
+    if dist > max { usize::MAX } else { dist }
 }
 
 /// Suggest the closest known key to `key`, if one is a plausible typo.
@@ -860,5 +864,21 @@ mod tests {
         assert_eq!(levenshtein("format", "format", 2), 0);
         assert_eq!(levenshtein("forrmat", "format", 2), 1);
         assert_eq!(levenshtein("abcdefg", "xyz", 2), usize::MAX);
+        // A true distance of 2 must report as over-budget when the cap is 1,
+        // even though no single DP row ever fully exceeds the cap. Otherwise
+        // the cap is unenforced and open objects nag legitimate custom keys
+        // (e.g. `cran` is distance 2 from `brand`).
+        assert_eq!(levenshtein("cran", "brand", 1), usize::MAX);
+    }
+
+    #[test]
+    fn did_you_mean_honors_budget() {
+        // Distance-2 candidate must not be suggested under a budget of 1.
+        assert_eq!(did_you_mean("cran", ["brand"].into_iter(), 1), None);
+        // Distance-1 candidate is still suggested.
+        assert_eq!(
+            did_you_mean("pdf", ["pdfa"].into_iter(), 1),
+            Some("pdfa".to_string())
+        );
     }
 }
