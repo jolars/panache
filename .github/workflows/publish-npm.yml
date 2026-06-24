@@ -63,7 +63,7 @@ jobs:
             npm_name: win32-arm64
             binary: panache.exe
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install Rust
         run: |
@@ -181,7 +181,7 @@ jobs:
             cpu: arm64
             binary: panache.exe
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
         with:
@@ -263,7 +263,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
         with:
