@@ -119,10 +119,6 @@ website:
           contents:
             - href: development/lsp.qmd
               text: Language Server
-            - href: development/architecture/lsp-salsa-rowan-audit.qmd
-              text: "Architecture audit: LSP / salsa / rowan"
-            - href: development/commonmark-conformance.qmd
-              text: CommonMark conformance
             - href: development/contributing.qmd
               text: Contributing
 
