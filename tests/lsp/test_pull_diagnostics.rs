@@ -562,7 +562,10 @@ fn pull_bibliography_load_error_is_current_without_waiting_for_settle() {
         full_items(result)
             .iter()
             .find(|d| matches!(&d.code, Some(NumberOrString::String(s)) if s == "bibliography-load-error"))
-            .map(|d| d.message.clone())
+            // Normalize the path separator so the slash-prefixed assertions below
+            // (which disambiguate `eferences.bib` from `references.bib`) hold on
+            // Windows, where the path uses `\`.
+            .map(|d| d.message.replace('\\', "/"))
     };
 
     let delete_r = TextDocumentContentChangeEvent {
