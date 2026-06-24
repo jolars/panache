@@ -125,7 +125,8 @@ Auto-completion
 
 :   Smart completions for Markdown syntax (`textDocument/completion`)
 
-    - Citation keys
+    - Citation keys, with a formatted bibliography preview attached lazily via
+      `completionItem/resolve` when an item is focused
     - Reference labels
     - File paths inside `[](...)` and `![](...)` destinations
     - File paths inside Quarto shortcodes (`include`, `embed`, `video`,
@@ -657,7 +658,10 @@ element type).
 Smart completions for Markdown syntax (implementation varies by context):
 
 - **Citations and crossrefs** inside `[@...]` --- bibliography keys, inline
-  reference IDs, Quarto/bookdown crossref labels (e.g. `fig-plot`).
+  reference IDs, Quarto/bookdown crossref labels (e.g. `fig-plot`). Bibliography
+  keys carry a formatted preview (author, year, title, journal) that is computed
+  lazily through `completionItem/resolve` when the item is focused, so large
+  `.bib` files don't pay the formatting cost up front.
 - **File paths** inside link and image destinations --- typing inside
   `[text](...)` or `![alt](...)` suggests files and directories relative to the
   current document. Image destinations are filtered to extensions pandoc/quarto
@@ -835,7 +839,7 @@ marked *out of scope*.
   | `textDocument/rename`, `prepareRename`                                                                                      | ✅     | Citations, refs, footnotes, crossrefs                       |
   | `textDocument/hover`                                                                                                        | ✅     | Footnotes, citations, section/equation previews             |
   | `textDocument/completion`                                                                                                   | ✅     | Citations, crossrefs, file/shortcode paths                  |
-  | `completionItem/resolve`                                                                                                    | ❌     | Planned: lazy completion detail                             |
+  | `completionItem/resolve`                                                                                                    | ✅     | Lazy citation previews (bibliography entry)                 |
   | `textDocument/codeAction`                                                                                                   | ✅     | Lint fixes + list/footnote/link/heading conversions         |
   | `codeAction/resolve`                                                                                                        | ❌     | Planned: lazy edits + advertised action kinds               |
   | `textDocument/documentSymbol`                                                                                               | ✅     | Headings, tables, figures, frontmatter                      |

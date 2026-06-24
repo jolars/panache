@@ -457,6 +457,10 @@ impl LspTester {
         handlers::completion::completion(&self.snapshot(), params)
     }
 
+    pub fn resolve_completion_item(&self, item: CompletionItem) -> CompletionItem {
+        handlers::completion::completion_item_resolve(&self.snapshot(), item)
+    }
+
     pub fn rename(
         &self,
         uri: &str,

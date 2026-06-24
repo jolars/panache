@@ -88,7 +88,7 @@ spec-coverage audit (see `docs/guide/lsp.qmd` "LSP Specification Coverage").
   inline → block → section)
 - [x] `textDocument/linkedEditingRange` - edit a reference label and its
   definition simultaneously
-- [ ] `completionItem/resolve` - defer expensive completion detail (e.g.
+- [x] `completionItem/resolve` - defer expensive completion detail (e.g.
   citation previews) until an item is focused
 - [ ] `codeAction/resolve` + advertise `codeActionKinds` - compute edits lazily
   and let clients filter actions by kind

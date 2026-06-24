@@ -172,7 +172,7 @@ pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> 
                 if let Some(ref parse) = metadata.bibliography_parse
                     && let Some(entry) = parse.index.get(&key)
                 {
-                    let summary = format_bibliography_entry(entry);
+                    let summary = crate::bib::format_entry_preview(entry);
                     if !summary.is_empty() {
                         return Some(Hover {
                             contents: HoverContents::Markup(MarkupContent {
@@ -575,108 +575,6 @@ fn linked_doc_preview_markdown(target_text: &str, target_path: &Path) -> Option<
     Some(out)
 }
 
-/// Format a bibliography entry for hover display.
-///
-/// Works with any bibliography format (BibTeX, CSL-JSON, CSL-YAML, RIS).
-fn format_bibliography_entry(entry: &crate::bib::BibEntry) -> String {
-    let author = entry
-        .fields
-        .get("author")
-        .or_else(|| entry.fields.get("editor"))
-        .map(|s| s.as_str())
-        .unwrap_or_default();
-
-    let year = entry
-        .fields
-        .get("year")
-        .or_else(|| entry.fields.get("date"))
-        .or_else(|| entry.fields.get("issued"))
-        .map(|s| s.as_str())
-        .unwrap_or_default();
-
-    let title = entry
-        .fields
-        .get("title")
-        .or_else(|| entry.fields.get("booktitle"))
-        .map(|s| s.as_str())
-        .unwrap_or_default();
-
-    let container = entry
-        .fields
-        .get("journal")
-        .or_else(|| entry.fields.get("journaltitle"))
-        .or_else(|| entry.fields.get("container-title"))
-        .or_else(|| entry.fields.get("publisher"))
-        .map(|s| s.as_str())
-        .unwrap_or_default();
-
-    let locator = build_locator_unified(entry);
-
-    let mut summary = String::new();
-    if !author.is_empty() {
-        summary.push_str(author);
-    }
-    if !year.is_empty() {
-        if !summary.is_empty() {
-            summary.push_str(" (");
-            summary.push_str(year);
-            summary.push(')');
-        } else {
-            summary.push_str(year);
-        }
-    }
-    if !title.is_empty() {
-        if !summary.is_empty() {
-            summary.push_str(". ");
-        }
-        summary.push_str(&format!("*{}*", title));
-    }
-    if !container.is_empty() {
-        summary.push_str(". ");
-        summary.push_str(container);
-    }
-    if !locator.is_empty() {
-        summary.push_str(", ");
-        summary.push_str(&locator);
-    }
-
-    summary.trim().to_string()
-}
-
-fn build_locator_unified(entry: &crate::bib::BibEntry) -> String {
-    let volume = entry
-        .fields
-        .get("volume")
-        .map(|s| s.as_str())
-        .unwrap_or_default();
-    let number = entry
-        .fields
-        .get("number")
-        .or_else(|| entry.fields.get("issue"))
-        .map(|s| s.as_str())
-        .unwrap_or_default();
-    let pages = entry
-        .fields
-        .get("pages")
-        .or_else(|| entry.fields.get("page"))
-        .map(|s| s.as_str())
-        .unwrap_or_default();
-
-    let mut parts = Vec::new();
-    if !volume.is_empty() {
-        if !number.is_empty() {
-            parts.push(format!("{}({})", volume, number));
-        } else {
-            parts.push(volume.to_string());
-        }
-    } else if !number.is_empty() {
-        parts.push(number.to_string());
-    }
-    if !pages.is_empty() {
-        parts.push(pages.to_string());
-    }
-    parts.join(", ")
-}
 #[cfg(test)]
 mod tests {
     use super::*;

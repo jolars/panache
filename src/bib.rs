@@ -14,6 +14,7 @@ mod bibtex;
 mod csl_json;
 mod csl_yaml;
 mod index;
+mod preview;
 mod ris;
 
 pub use bibtex::{BibtexEntry, parse_bibtex, parse_bibtex_full};
@@ -23,6 +24,7 @@ pub use index::{
     BibDuplicate, BibEntry, BibEntryLocation, BibFormat, BibIndex, BibLoadError, load_bibliography,
     load_bibliography_from_text,
 };
+pub use preview::format_entry_preview;
 pub use ris::{parse_ris_entries, parse_ris_full, validate_ris};
 
 /// Parsed entry data: (id, entry_type, fields, span).

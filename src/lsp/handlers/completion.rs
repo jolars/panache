@@ -137,6 +137,14 @@ pub(crate) fn completion(
                 kind: Some(CompletionItemKind::REFERENCE),
                 insert_text: Some(entry.key.clone()),
                 insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                // Defer the (potentially large) bibliography preview to
+                // `completionItem/resolve`; carry only what's needed to
+                // re-find the entry when the item is focused.
+                data: Some(serde_json::json!({
+                    "kind": "citation",
+                    "uri": uri.as_str(),
+                    "key": entry.key,
+                })),
                 ..Default::default()
             });
         }
@@ -185,6 +193,64 @@ pub(crate) fn completion(
     }
 
     Some(CompletionResponse::Array(items))
+}
+
+/// Resolve a deferred citation completion item by attaching its bibliography
+/// preview as markdown documentation.
+///
+/// Citation items emitted by [`completion`] carry a `data` payload
+/// (`{kind, uri, key}`) instead of an eagerly-computed preview. When the client
+/// focuses such an item it sends `completionItem/resolve`; we look the entry up
+/// in the (salsa-cached) bibliography for its document and fill in
+/// `documentation`/`detail`. Non-citation items, or items we can no longer
+/// resolve (document closed, key removed), are returned unchanged.
+pub(crate) fn completion_item_resolve(
+    snap: &StateSnapshot,
+    mut item: CompletionItem,
+) -> CompletionItem {
+    if item.documentation.is_some() {
+        return item;
+    }
+
+    let Some(data) = &item.data else {
+        return item;
+    };
+    if data.get("kind").and_then(|v| v.as_str()) != Some("citation") {
+        return item;
+    }
+    let (Some(uri_str), Some(key)) = (
+        data.get("uri").and_then(|v| v.as_str()),
+        data.get("key").and_then(|v| v.as_str()),
+    ) else {
+        return item;
+    };
+    let Ok(uri) = uri_str.parse::<Uri>() else {
+        return item;
+    };
+
+    let Some(state) = snap.document_state(&uri) else {
+        return item;
+    };
+    let metadata = crate::salsa::metadata(snap.db(), state.salsa_file, state.salsa_config);
+    let Some(parse) = metadata.bibliography_parse.as_ref() else {
+        return item;
+    };
+    let Some(entry) = parse.index.get(key) else {
+        return item;
+    };
+
+    if item.detail.is_none() {
+        item.detail = entry.entry_type.clone();
+    }
+    let summary = crate::bib::format_entry_preview(entry);
+    if !summary.is_empty() {
+        item.documentation = Some(Documentation::MarkupContent(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: summary,
+        }));
+    }
+
+    item
 }
 
 fn citation_query_prefix(text: &str, offset: usize) -> Option<String> {

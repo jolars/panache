@@ -66,6 +66,7 @@ pub(crate) fn server_capabilities() -> ServerCapabilities {
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         completion_provider: Some(CompletionOptions {
             trigger_characters: Some(vec!["(".into(), "/".into(), "<".into()]),
+            resolve_provider: Some(true),
             ..Default::default()
         }),
         references_provider: Some(OneOf::Left(true)),
@@ -414,6 +415,10 @@ impl GlobalState {
         );
         pool!(r::HoverRequest, handlers::hover::hover);
         pool!(r::Completion, handlers::completion::completion);
+        pool!(
+            r::ResolveCompletionItem,
+            handlers::completion::completion_item_resolve
+        );
         pool!(r::Rename, handlers::rename::rename);
         pool!(
             r::PrepareRenameRequest,

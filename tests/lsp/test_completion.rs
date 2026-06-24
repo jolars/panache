@@ -1,7 +1,7 @@
 //! Tests for completion (citation completion).
 
 use super::helpers::*;
-use lsp_types::{CompletionItemKind, CompletionResponse, Uri};
+use lsp_types::{CompletionItem, CompletionItemKind, CompletionResponse, Documentation, Uri};
 use std::fs;
 use tempfile::TempDir;
 
@@ -712,4 +712,171 @@ fn test_shortcode_completion_skipped_on_named_arg() {
         result.is_none(),
         "named args should not trigger path completion"
     );
+}
+
+/// Pull the markdown string out of a resolved item's documentation field.
+fn documentation_markdown(item: &CompletionItem) -> Option<String> {
+    match item.documentation.as_ref()? {
+        Documentation::MarkupContent(markup) => Some(markup.value.clone()),
+        Documentation::String(value) => Some(value.clone()),
+    }
+}
+
+/// Find the citation completion item with the given label.
+fn citation_item(items: &[CompletionItem], label: &str) -> CompletionItem {
+    items
+        .iter()
+        .find(|item| item.label == label)
+        .cloned()
+        .unwrap_or_else(|| panic!("expected completion item `{label}`"))
+}
+
+#[test]
+fn test_completion_citation_item_defers_preview() {
+    let mut server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+
+    std::fs::write(root.join("_quarto.yml"), "bibliography: refs.bib\n").unwrap();
+    std::fs::write(
+        root.join("refs.bib"),
+        "@article{known, author={Smith, J.}, year={2020}, title={On Things}}\n",
+    )
+    .unwrap();
+
+    let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
+    server.initialize(root_uri.as_str());
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.open_document(doc_uri.as_str(), "Text [@] citation.", "quarto");
+
+    let Some(CompletionResponse::Array(items)) = server.completion(doc_uri.as_str(), 0, 7) else {
+        panic!("Expected completion items");
+    };
+    let item = citation_item(&items, "known");
+
+    // Preview is deferred: no documentation eagerly attached.
+    assert!(
+        item.documentation.is_none(),
+        "citation preview should be deferred to resolve"
+    );
+
+    let data = item.data.as_ref().expect("citation item should carry data");
+    assert_eq!(data.get("kind").and_then(|v| v.as_str()), Some("citation"));
+    assert_eq!(data.get("key").and_then(|v| v.as_str()), Some("known"));
+    assert_eq!(
+        data.get("uri").and_then(|v| v.as_str()),
+        Some(doc_uri.as_str())
+    );
+}
+
+#[test]
+fn test_resolve_completion_item_attaches_bibtex_preview() {
+    let mut server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+
+    std::fs::write(root.join("_quarto.yml"), "bibliography: refs.bib\n").unwrap();
+    std::fs::write(
+        root.join("refs.bib"),
+        "@article{known, author={Smith, J.}, year={2020}, title={On Things}, journal={J. Things}}\n",
+    )
+    .unwrap();
+
+    let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
+    server.initialize(root_uri.as_str());
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.open_document(doc_uri.as_str(), "Text [@] citation.", "quarto");
+
+    let Some(CompletionResponse::Array(items)) = server.completion(doc_uri.as_str(), 0, 7) else {
+        panic!("Expected completion items");
+    };
+    let resolved = server.resolve_completion_item(citation_item(&items, "known"));
+
+    let markdown = documentation_markdown(&resolved).expect("resolved item should have a preview");
+    assert_eq!(markdown, "Smith, J. (2020). *On Things*. J. Things");
+    assert_eq!(resolved.detail.as_deref(), Some("article"));
+}
+
+#[test]
+fn test_resolve_completion_item_csl_yaml_preview() {
+    let mut server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+
+    std::fs::write(
+        root.join("refs.yaml"),
+        "- id: cslkey\n  author:\n    - family: Doe\n  issued: 2021\n  title: Sample\n",
+    )
+    .unwrap();
+
+    let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
+    server.initialize(root_uri.as_str());
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    let content = "---\nbibliography: refs.yaml\n---\n\nText [@] citation.";
+    server.open_document(doc_uri.as_str(), content, "quarto");
+
+    let Some(CompletionResponse::Array(items)) = server.completion(doc_uri.as_str(), 4, 7) else {
+        panic!("Expected completion items");
+    };
+    let resolved = server.resolve_completion_item(citation_item(&items, "cslkey"));
+
+    let markdown = documentation_markdown(&resolved).expect("resolved item should have a preview");
+    assert!(
+        markdown.contains("*Sample*"),
+        "expected title in preview, got: {markdown}"
+    );
+}
+
+#[test]
+fn test_resolve_completion_item_unknown_key_is_unchanged() {
+    let mut server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+
+    std::fs::write(root.join("_quarto.yml"), "bibliography: refs.bib\n").unwrap();
+    std::fs::write(root.join("refs.bib"), "@book{known,}\n").unwrap();
+
+    let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
+    server.initialize(root_uri.as_str());
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.open_document(doc_uri.as_str(), "Text [@] citation.", "quarto");
+
+    // Fabricate an item whose key no longer exists in the bibliography.
+    let stale = CompletionItem {
+        label: "gone".to_string(),
+        data: Some(serde_json::json!({
+            "kind": "citation",
+            "uri": doc_uri.as_str(),
+            "key": "gone",
+        })),
+        ..Default::default()
+    };
+    let resolved = server.resolve_completion_item(stale);
+
+    assert!(
+        resolved.documentation.is_none(),
+        "resolving an unknown key should not attach documentation"
+    );
+}
+
+#[test]
+fn test_resolve_completion_item_ignores_non_citation_items() {
+    let server = TestLspServer::new();
+
+    let plain = CompletionItem {
+        label: "plain".to_string(),
+        ..Default::default()
+    };
+    let resolved = server.resolve_completion_item(plain.clone());
+
+    assert_eq!(resolved.documentation, None);
+    assert_eq!(resolved.label, plain.label);
 }
