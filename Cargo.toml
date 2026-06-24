@@ -22,6 +22,10 @@ include = [
     "/build.rs",
     "/README.md",
     "/LICENSE",
+    # Read by build.rs (`compress_quarto_schema`) and embedded via
+    # `include_bytes!`; must be packaged or `cargo install` fails in the
+    # build script with `NotFound`.
+    "/assets/quarto-schema/schema.json",
 ]
 keywords = ["quarto", "pandoc", "markdown", "formatter", "language-server"]
 categories = [
