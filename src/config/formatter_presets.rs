@@ -116,7 +116,7 @@ const PRESETS: &[FormatterPresetMetadata] = &[
     FormatterPresetMetadata {
         name: "biome",
         url: "https://biomejs.dev/",
-        description: "Formatter for JavaScript, Observable JS, TypeScript, JSON, and CSS.",
+        description: "Formatter for JavaScript, Observable JS, TypeScript, JSON, CSS, and HTML (HTML needs `--html-formatter-enabled`).",
         cmd: "biome",
         args: &["format", "--stdin-file-path", "{}"],
         stdin: true,
@@ -131,6 +131,7 @@ const PRESETS: &[FormatterPresetMetadata] = &[
             "json",
             "jsonc",
             "css",
+            "html",
             "graphql",
             "gql",
         ],
@@ -747,7 +748,7 @@ mod tests {
 
     #[test]
     fn biome_is_available_for_web_languages() {
-        for language in ["javascript", "ojs", "typescript", "json", "css"] {
+        for language in ["javascript", "ojs", "typescript", "json", "css", "html"] {
             let presets = formatter_presets_for_language(language);
             assert!(
                 presets.iter().any(|preset| preset.name == "biome"),

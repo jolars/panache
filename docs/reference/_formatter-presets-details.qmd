@@ -191,13 +191,13 @@ Type
 
 ## `biome`
 
-Formatter for JavaScript, Observable JS, TypeScript, JSON, and CSS.
+Formatter for JavaScript, Observable JS, TypeScript, JSON, CSS, and HTML (HTML needs `--html-formatter-enabled`).
 
 Homepage
 :   <https://biomejs.dev/>
 
 Supported Languages
-:   `javascript`, `js`, `ojs`, `typescript`, `ts`, `jsx`, `tsx`, `json`, `jsonc`, `css`, `graphql`, `gql`
+:   `javascript`, `js`, `ojs`, `typescript`, `ts`, `jsx`, `tsx`, `json`, `jsonc`, `css`, `html`, `graphql`, `gql`
 
 Command
 :   `biome`

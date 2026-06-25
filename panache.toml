@@ -28,6 +28,9 @@ python = "ruff"
 lua = "stylua"
 ojs = "biome"
 
+[formatters.biome]
+append-args = ["--html-formatter-enabled=true"]
+
 [formatters.air]
 stdin = true
 args = ["format", "--stdin-file-path", "{}"]
