@@ -304,6 +304,24 @@ fn structural_byte_mask(config: &ParserOptions) -> [bool; 256] {
     mask
 }
 
+/// Whether a bare-URI autolink may start at `pos`.
+///
+/// Pandoc only recognizes a bare URI (`autolink_bare_uris`) at a left word
+/// boundary: a scheme immediately preceded by an alphanumeric (`squa` in
+/// `squares:`) or an intraword `.` (`x.res:`, `e.g.foo:`) stays literal. The
+/// dispatcher probes every alphabetic byte for a scheme, so without this guard
+/// a scheme embedded mid-word matches and can swallow following markers (e.g.
+/// the `**` closing a strong span in `**…squares:**`).
+fn bare_uri_has_left_boundary(text: &str, pos: usize) -> bool {
+    if pos == 0 {
+        return true;
+    }
+    match text[..pos].chars().next_back() {
+        Some(prev) => !(prev.is_alphanumeric() || prev == '.'),
+        None => true,
+    }
+}
+
 fn is_emoji_boundary(text: &str, pos: usize) -> bool {
     if pos > 0 {
         let prev = text.as_bytes()[pos - 1] as char;
@@ -1271,6 +1289,7 @@ fn parse_inline_range_impl(
 
         if !nested_in_link
             && config.extensions.autolink_bare_uris
+            && bare_uri_has_left_boundary(text, pos)
             && let Some((len, url)) = try_parse_bare_uri(&text[pos..])
         {
             if pos > text_start {
@@ -1916,6 +1935,59 @@ mod tests {
         assert!(
             !node.descendants().any(|n| n.kind() == SyntaxKind::LINK),
             "bare URI must not become a bracketed LINK node"
+        );
+    }
+
+    #[test]
+    fn test_bare_uri_requires_left_word_boundary() {
+        // Regression: a bare URI scheme embedded mid-word (e.g. `res:` inside
+        // `squares:`) was matched and swallowed the trailing `**` strong
+        // closing delimiter, corrupting `**...squares:**` into a stray
+        // `AUTO_LINK` and breaking idempotency. Pandoc only recognizes a bare
+        // URI at a left word boundary, so a scheme preceded by an alphanumeric
+        // (or an intraword `.`) must stay literal.
+        let text = "**Nonlinear least squares:** Gauss-Newton";
+        let mut config = ParserOptions::default();
+        config.extensions.autolink_bare_uris = true;
+        let mut builder = GreenNodeBuilder::new();
+
+        builder.start_node(SyntaxKind::PARAGRAPH.into());
+        parse_inline_text_recursive(&mut builder, text, &config, false);
+        builder.finish_node();
+
+        let green: GreenNode = builder.finish();
+        let node = SyntaxNode::new_root(green);
+
+        assert_eq!(node.text().to_string(), text);
+        assert!(
+            !node
+                .descendants()
+                .any(|n| n.kind() == SyntaxKind::AUTO_LINK),
+            "mid-word `res:` must not become an AUTO_LINK"
+        );
+    }
+
+    #[test]
+    fn test_bare_uri_still_matches_at_word_boundary() {
+        // The left-boundary guard must not regress a legitimate standalone
+        // bare URI: preceded by whitespace, `res:foo` is still an AUTO_LINK.
+        let text = "see res:foo here";
+        let mut config = ParserOptions::default();
+        config.extensions.autolink_bare_uris = true;
+        let mut builder = GreenNodeBuilder::new();
+
+        builder.start_node(SyntaxKind::PARAGRAPH.into());
+        parse_inline_text_recursive(&mut builder, text, &config, false);
+        builder.finish_node();
+
+        let green: GreenNode = builder.finish();
+        let node = SyntaxNode::new_root(green);
+
+        assert_eq!(node.text().to_string(), text);
+        assert!(
+            node.descendants()
+                .any(|n| n.kind() == SyntaxKind::AUTO_LINK),
+            "standalone bare URI should still be an AUTO_LINK"
         );
     }
 
