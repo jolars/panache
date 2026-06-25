@@ -191,13 +191,13 @@ Type
 
 ## `biome`
 
-Formatter for JavaScript, TypeScript, JSON, and CSS.
+Formatter for JavaScript, Observable JS, TypeScript, JSON, and CSS.
 
 Homepage
 :   <https://biomejs.dev/>
 
 Supported Languages
-:   `javascript`, `js`, `typescript`, `ts`, `jsx`, `tsx`, `json`, `jsonc`, `css`, `graphql`, `gql`
+:   `javascript`, `js`, `ojs`, `typescript`, `ts`, `jsx`, `tsx`, `json`, `jsonc`, `css`, `graphql`, `gql`
 
 Command
 :   `biome`
@@ -786,7 +786,7 @@ Homepage
 :   <https://prettier.io/>
 
 Supported Languages
-:   `javascript`, `js`, `typescript`, `ts`, `jsx`, `tsx`, `json`, `jsonc`, `yaml`, `yml`, `markdown`, `md`, `css`, `scss`, `less`, `html`, `vue`, `svelte`, `graphql`, `gql`
+:   `javascript`, `js`, `ojs`, `typescript`, `ts`, `jsx`, `tsx`, `json`, `jsonc`, `yaml`, `yml`, `markdown`, `md`, `css`, `scss`, `less`, `html`, `vue`, `svelte`, `graphql`, `gql`
 
 Command
 :   `prettier`

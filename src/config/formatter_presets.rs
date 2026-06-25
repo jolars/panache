@@ -116,13 +116,14 @@ const PRESETS: &[FormatterPresetMetadata] = &[
     FormatterPresetMetadata {
         name: "biome",
         url: "https://biomejs.dev/",
-        description: "Formatter for JavaScript, TypeScript, JSON, and CSS.",
+        description: "Formatter for JavaScript, Observable JS, TypeScript, JSON, and CSS.",
         cmd: "biome",
         args: &["format", "--stdin-file-path", "{}"],
         stdin: true,
         supported_languages: &[
             "javascript",
             "js",
+            "ojs",
             "typescript",
             "ts",
             "jsx",
@@ -429,6 +430,7 @@ const PRESETS: &[FormatterPresetMetadata] = &[
         supported_languages: &[
             "javascript",
             "js",
+            "ojs",
             "typescript",
             "ts",
             "jsx",
@@ -745,13 +747,22 @@ mod tests {
 
     #[test]
     fn biome_is_available_for_web_languages() {
-        for language in ["javascript", "typescript", "json", "css"] {
+        for language in ["javascript", "ojs", "typescript", "json", "css"] {
             let presets = formatter_presets_for_language(language);
             assert!(
                 presets.iter().any(|preset| preset.name == "biome"),
                 "Expected biome preset to support {language}"
             );
         }
+    }
+
+    #[test]
+    fn prettier_is_available_for_ojs() {
+        let presets = formatter_presets_for_language("ojs");
+        assert!(
+            presets.iter().any(|preset| preset.name == "prettier"),
+            "Expected prettier preset to support ojs"
+        );
     }
 
     #[test]

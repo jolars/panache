@@ -230,7 +230,7 @@ pub fn log_formatter_success(
 
 pub(crate) fn temp_file_extension_for_language(language: &str) -> &'static str {
     match normalized_language(language).as_str() {
-        "javascript" | "js" => "js",
+        "javascript" | "js" | "ojs" => "js",
         "typescript" | "ts" => "ts",
         "jsx" => "jsx",
         "tsx" => "tsx",
@@ -383,6 +383,7 @@ mod tests {
     fn temp_file_extension_is_language_aware() {
         assert_eq!(temp_file_extension_for_language("r"), "r");
         assert_eq!(temp_file_extension_for_language("TypeScript"), "ts");
+        assert_eq!(temp_file_extension_for_language("ojs"), "js");
         assert_eq!(temp_file_extension_for_language("unknownlang"), "txt");
 
         // Expanded mappings.

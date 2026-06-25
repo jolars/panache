@@ -26,6 +26,7 @@ bash = "shfmt"
 sh = "shfmt"
 python = "ruff"
 lua = "stylua"
+ojs = "biome"
 
 [formatters.air]
 stdin = true
