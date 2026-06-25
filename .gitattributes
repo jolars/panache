@@ -5,9 +5,11 @@
 tests/fixtures/cases/*/*.md eol=lf
 tests/fixtures/cases/*/*.qmd eol=lf
 tests/fixtures/cases/*/*.Rmd eol=lf
+tests/fixtures/cases/*/*.svx eol=lf
 crates/panache-parser/tests/fixtures/cases/*/*.md eol=lf
 crates/panache-parser/tests/fixtures/cases/*/*.qmd eol=lf
 crates/panache-parser/tests/fixtures/cases/*/*.Rmd eol=lf
+crates/panache-parser/tests/fixtures/cases/*/*.svx eol=lf
 tests/fixtures/bibtex_samples/*.bib eol=lf
 crates/panache-parser/tests/fixtures/yaml-test-suite/**/in.yaml eol=lf
 crates/panache-parser/tests/fixtures/pandoc-conformance/corpus/*/input.md eol=lf
