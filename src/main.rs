@@ -1999,6 +1999,58 @@ fn main() -> io::Result<()> {
                 }
             }
 
+            // Project-level bibliography defects: when a directory (project) was
+            // scanned, check the manifests that contribute to the scanned
+            // documents for duplicate keys in their declared bibliographies. A
+            // duplicate inside a project-level bibliography is reported once
+            // here, against `_quarto.yml`, instead of once per inheriting
+            // document. A single-file lint stays quiet about the ambient
+            // manifest (no directory in scope); explicit manifest targets are
+            // already handled by the loop above.
+            if files.iter().any(|p| p.is_dir()) {
+                let explicit: std::collections::HashSet<PathBuf> =
+                    manifest_files.iter().cloned().collect();
+                let mut discovered: std::collections::BTreeSet<PathBuf> =
+                    std::collections::BTreeSet::new();
+                for doc in &expanded_files {
+                    for manifest in panache::metadata::project_manifests_for(doc) {
+                        if !explicit.contains(&manifest) {
+                            discovered.insert(manifest);
+                        }
+                    }
+                }
+                for manifest_path in discovered {
+                    let manifest_doc = match lint_manifest_bibliography(
+                        &manifest_path,
+                        cli.config.as_deref(),
+                        cli.isolated,
+                        cli.cache_dir.as_deref(),
+                        cli.flavor.map(Flavor::from),
+                    ) {
+                        Ok(doc) => doc,
+                        Err(err) => {
+                            eprintln!("Error: {}: {}", manifest_path.display(), err);
+                            std::process::exit(1);
+                        }
+                    };
+                    if manifest_doc.diagnostics.is_empty() {
+                        continue;
+                    }
+                    any_issues = true;
+                    total_issues += manifest_doc.diagnostics.len();
+                    if !cli.quiet {
+                        print_diagnostics(
+                            &manifest_doc.diagnostics,
+                            Some(manifest_path.as_path()),
+                            Some(&manifest_doc.input),
+                            use_color,
+                            message_format,
+                            true,
+                        );
+                    }
+                }
+            }
+
             let total_files = expanded_files.len() + manifest_files.len();
 
             if !any_issues && !check && !cli.quiet {
@@ -2053,12 +2105,47 @@ fn lint_quarto_manifest(
         && cfg
             .lint
             .is_rule_explicitly_enabled("quarto-schema-unknown-key");
-    let diagnostics = panache::linter::quarto_schema::lint_manifest_text(
+    let mut diagnostics = panache::linter::quarto_schema::lint_manifest_text(
         &input,
         root,
         type_enum_enabled,
         unknown_key_enabled,
     );
+    // A manifest can declare a `bibliography`; check those bibs for duplicate
+    // keys here so an explicitly-targeted `_quarto.yml` reports them on itself.
+    if cfg.extensions.citations && cfg.lint.is_rule_enabled("citation-keys") {
+        diagnostics.extend(
+            panache::linter::metadata_diagnostics::manifest_bibliography_diagnostics(path, &input),
+        );
+        diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
+    }
+    Ok(LintedDocument {
+        path: path.to_path_buf(),
+        input,
+        diagnostics,
+    })
+}
+
+/// Lint a project manifest (`_quarto.yml`/`_metadata.yml`) for duplicate keys in
+/// the bibliographies it declares, anchored to its own `bibliography:` value(s).
+/// Used for manifests discovered during a project (directory) lint, where the
+/// manifest itself is not an explicit target.
+fn lint_manifest_bibliography(
+    path: &Path,
+    config: Option<&Path>,
+    isolated: bool,
+    cache_dir: Option<&Path>,
+    flavor: Option<Flavor>,
+) -> io::Result<LintedDocument> {
+    let input = fs::read_to_string(path)?;
+    let start_dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
+    let (cfg, _cfg_source) =
+        load_config_for_cli(config, isolated, cache_dir, &start_dir, Some(path), flavor)?;
+    let diagnostics = if cfg.extensions.citations && cfg.lint.is_rule_enabled("citation-keys") {
+        panache::linter::metadata_diagnostics::manifest_bibliography_diagnostics(path, &input)
+    } else {
+        Vec::new()
+    };
     Ok(LintedDocument {
         path: path.to_path_buf(),
         input,

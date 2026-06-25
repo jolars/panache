@@ -244,7 +244,11 @@ fn parse_metadata_text(yaml_text: &str) -> Result<MergeMetadata, YamlError> {
     let parsed = parse_yaml_metadata_fields(yaml_text)?;
     Ok(MergeMetadata {
         title: parsed.title,
-        bibliography: parsed.bibliography,
+        bibliography: parsed
+            .bibliography
+            .into_iter()
+            .map(|item| item.value)
+            .collect(),
         metadata_files: parsed.metadata_files,
         references: parsed
             .references
@@ -286,7 +290,7 @@ struct MetadataScalar {
 #[derive(Debug, Clone, Default)]
 struct ParsedMetadataFields {
     title: Option<String>,
-    bibliography: Vec<String>,
+    bibliography: Vec<MetadataScalar>,
     metadata_files: Vec<String>,
     references: Vec<MetadataScalar>,
 }
@@ -311,10 +315,7 @@ fn parse_yaml_metadata_fields(yaml_text: &str) -> Result<ParsedMetadataFields, Y
     let bibliography = map
         .value_of("bibliography")
         .map(|value| block_map_value_to_scalar_list(&value))
-        .unwrap_or_default()
-        .into_iter()
-        .map(|entry| entry.value)
-        .collect();
+        .unwrap_or_default();
     let metadata_files = map
         .value_of("metadata-files")
         .map(|value| block_map_value_to_scalar_list(&value))
@@ -647,6 +648,39 @@ fn extract_bibliography_from_sources(
     })
 }
 
+/// A bibliography file declared directly in a project manifest, paired with the
+/// byte range of its path value within the manifest text. The range anchors
+/// diagnostics back onto the manifest (e.g. an internal duplicate in a
+/// project-level bibliography is reported against `_quarto.yml`, not against
+/// every document that inherits it).
+#[derive(Debug, Clone)]
+pub struct ManifestBibliography {
+    /// Bibliography path resolved relative to the manifest's directory.
+    pub resolved_path: PathBuf,
+    /// Byte range of the path value within the manifest text.
+    pub value_range: std::ops::Range<usize>,
+}
+
+/// Bibliographies declared directly in a project manifest (`_quarto.yml`,
+/// `_metadata.yml`, …), each paired with the byte range of its value in
+/// `manifest_text`. Paths resolve relative to the manifest's directory. Returns
+/// an empty list when the manifest declares no `bibliography`.
+pub fn manifest_declared_bibliographies(
+    manifest_path: &Path,
+    manifest_text: &str,
+) -> Result<Vec<ManifestBibliography>, YamlError> {
+    let base_dir = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+    let parsed = parse_yaml_metadata_fields(manifest_text)?;
+    Ok(parsed
+        .bibliography
+        .into_iter()
+        .map(|scalar| ManifestBibliography {
+            resolved_path: base_dir.join(&scalar.value),
+            value_range: scalar.range,
+        })
+        .collect())
+}
+
 fn collect_metadata_files(doc_path: &Path, metadata_files: &[String]) -> Vec<PathBuf> {
     let doc_dir = doc_path.parent().unwrap_or_else(|| Path::new("."));
     metadata_files
@@ -716,5 +750,31 @@ mod tests {
         let bib = metadata.bibliography.expect("bibliography");
         let range = bib.source_ranges[0];
         assert_eq!(&input[range], "references.bib");
+    }
+
+    #[test]
+    fn manifest_bibliographies_resolve_paths_and_ranges() {
+        // A manifest's `bibliography` value resolves relative to the manifest
+        // directory, and its byte range points back at the value in the text.
+        let manifest = "project:\n  type: website\nbibliography: assets/bibliography.bib\n";
+        let bibs = manifest_declared_bibliographies(Path::new("/proj/_quarto.yml"), manifest)
+            .expect("parse");
+        assert_eq!(bibs.len(), 1);
+        assert_eq!(
+            bibs[0].resolved_path,
+            PathBuf::from("/proj/assets/bibliography.bib")
+        );
+        assert_eq!(
+            &manifest[bibs[0].value_range.clone()],
+            "assets/bibliography.bib"
+        );
+    }
+
+    #[test]
+    fn manifest_without_bibliography_is_empty() {
+        let manifest = "project:\n  type: website\n";
+        let bibs =
+            manifest_declared_bibliographies(Path::new("/proj/_quarto.yml"), manifest).expect("ok");
+        assert!(bibs.is_empty());
     }
 }

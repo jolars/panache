@@ -39,6 +39,7 @@ pub use bibliography::{
     BibliographyInfo, BibliographyParse, bibliography_range_map, format_bibliography_load_error,
 };
 pub use citations::{CitationInfo, extract_citations};
+pub use project::{ManifestBibliography, manifest_declared_bibliographies};
 pub use references::{
     InlineBibConflict, InlineReference, InlineReferenceDuplicate, ReferenceEntry,
     inline_bib_conflicts, inline_reference_contains, inline_reference_duplicates,
@@ -116,6 +117,14 @@ pub fn extract_project_metadata_without_bibliography_parse(
     doc_path: &Path,
 ) -> Result<DocumentMetadata, YamlError> {
     project::extract_project_metadata_without_bibliography_parse(tree, doc_path)
+}
+
+/// Project manifest files (`_quarto.yml`, `_metadata.yml`, or the bookdown
+/// equivalents) that contribute metadata to `doc_path`, in resolution order.
+/// Only existing files are returned. Used to discover, for a project-scoped lint
+/// run, which manifests to check for bibliography defects.
+pub fn project_manifests_for(doc_path: &Path) -> Vec<std::path::PathBuf> {
+    project::project_config_paths(doc_path)
 }
 
 /// Find the first YamlMetadata node in the syntax tree.

@@ -656,8 +656,12 @@ so they are treated as cross-references rather than citations.
 Emitted when the same key appears more than once across loaded bibliography
 files. The diagnostic anchors to a `bibliography` declaration in the document's
 own YAML frontmatter. A duplicate confined to a project-level bibliography
-(declared in `_quarto.yml` rather than the document) is a defect of that shared
-file, not of any one document, so it is not reported per document.
+(declared in `_quarto.yml`/`_metadata.yml` rather than the document) is a defect
+of that shared file, not of any one document: instead of being repeated for
+every inheriting document, it is reported once, anchored to the manifest's own
+`bibliography:` value. This manifest check runs when a project directory is
+linted or when the manifest is targeted explicitly; a single-document lint stays
+quiet about the ambient manifest.
 
 #### `duplicate-inline-reference-id` {#duplicate-inline-reference-id}
 

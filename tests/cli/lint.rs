@@ -508,6 +508,56 @@ fn test_lint_bibliography_integration() {
 }
 
 #[test]
+fn test_lint_project_manifest_bibliography_duplicate() {
+    // A bibliography declared in `_quarto.yml` (not in any document) with an
+    // internal duplicate key is reported once, anchored to the manifest's own
+    // `bibliography:` value, when the project directory is linted.
+    let temp_dir = TempDir::new().unwrap();
+    let project = temp_dir.path();
+    fs::create_dir(project.join("assets")).unwrap();
+    fs::write(
+        project.join("assets/bibliography.bib"),
+        "@article{dup,\n  title = {One},\n  year = {2020}\n}\n\
+         @article{dup,\n  title = {Two},\n  year = {2021}\n}\n",
+    )
+    .unwrap();
+    fs::write(
+        project.join("_quarto.yml"),
+        "project:\n  type: website\nbibliography: assets/bibliography.bib\n",
+    )
+    .unwrap();
+    let doc_path = project.join("index.qmd");
+    fs::write(&doc_path, "---\ntitle: Home\n---\n\nText.\n").unwrap();
+
+    // Linting the directory reports the duplicate, anchored to `_quarto.yml`.
+    cargo_bin_cmd!("panache")
+        .args(["--no-cache", "lint", project.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("duplicate-bibliography-key"))
+        .stdout(predicate::str::contains("'dup'"))
+        .stdout(predicate::str::contains("_quarto.yml"));
+
+    // Linting a single document stays quiet about the ambient project manifest.
+    cargo_bin_cmd!("panache")
+        .args(["--no-cache", "lint", doc_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("duplicate-bibliography-key").not());
+
+    // Targeting the manifest explicitly also reports it.
+    cargo_bin_cmd!("panache")
+        .args([
+            "--no-cache",
+            "lint",
+            project.join("_quarto.yml").to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("duplicate-bibliography-key"));
+}
+
+#[test]
 fn test_lint_inline_references_in_metadata() {
     let temp_dir = TempDir::new().unwrap();
     let bib_path = temp_dir.path().join("refs.bib");

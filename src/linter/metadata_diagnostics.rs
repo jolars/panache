@@ -57,6 +57,64 @@ pub fn metadata_diagnostics(metadata: &DocumentMetadata, text: &str) -> Vec<Diag
     diagnostics
 }
 
+/// Duplicate-bibliography-key diagnostics for the bibliographies a project
+/// manifest declares, anchored to the manifest's own `bibliography:` value(s) in
+/// `manifest_text`.
+///
+/// A duplicate confined to a project-level bibliography (declared in
+/// `_quarto.yml`, inherited by every document) is a defect of that shared file,
+/// not of any one document. The document-level `citation-keys` rule deliberately
+/// skips it; this reports it once, against the manifest, so it is still caught.
+pub fn manifest_bibliography_diagnostics(
+    manifest_path: &std::path::Path,
+    manifest_text: &str,
+) -> Vec<Diagnostic> {
+    let bibs = match crate::metadata::manifest_declared_bibliographies(manifest_path, manifest_text)
+    {
+        Ok(bibs) => bibs,
+        // YAML parse errors are surfaced by the manifest's own schema/parse pass.
+        Err(_) => return Vec::new(),
+    };
+    if bibs.is_empty() {
+        return Vec::new();
+    }
+
+    let paths: Vec<std::path::PathBuf> = bibs.iter().map(|b| b.resolved_path.clone()).collect();
+    let index = crate::bib::load_bibliography(&paths);
+
+    let mut diagnostics = Vec::new();
+    for duplicate in &index.duplicates {
+        // Anchor at the manifest declaration of the file the duplicate entry
+        // lives in, falling back to the first occurrence's file. Both point at
+        // the same `assets/bibliography.bib` value for a self-duplicate.
+        let Some(anchor) = bibs
+            .iter()
+            .find(|b| b.resolved_path == duplicate.duplicate.file)
+            .or_else(|| {
+                bibs.iter()
+                    .find(|b| b.resolved_path == duplicate.first.file)
+            })
+        else {
+            continue;
+        };
+        let range = TextRange::new(
+            (anchor.value_range.start as u32).into(),
+            (anchor.value_range.end as u32).into(),
+        );
+        diagnostics.push(Diagnostic::warning(
+            Location::from_range(range, manifest_text),
+            "duplicate-bibliography-key",
+            format!(
+                "Duplicate bibliography key '{}' in {} and {}",
+                duplicate.key,
+                duplicate.first.file.display(),
+                duplicate.duplicate.file.display()
+            ),
+        ));
+    }
+    diagnostics
+}
+
 fn check_bibliography_parse(metadata: &DocumentMetadata, text: &str) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     let Some(parse) = metadata.bibliography_parse.as_ref() else {
@@ -209,6 +267,40 @@ mod tests {
             diag.message,
             "Failed to load bibliography /tmp/test.bib: File not found"
         );
+    }
+
+    #[test]
+    fn manifest_bibliography_diagnostic_anchors_to_manifest_value() {
+        // A self-duplicate inside a manifest-declared bibliography is reported
+        // once, anchored to the `bibliography:` value in the manifest text.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("assets")).unwrap();
+        std::fs::write(
+            dir.path().join("assets/bibliography.bib"),
+            "@article{dup,\n  title = {One},\n  year = {2020}\n}\n\
+             @article{dup,\n  title = {Two},\n  year = {2021}\n}\n",
+        )
+        .unwrap();
+        let manifest_path = dir.path().join("_quarto.yml");
+        let manifest_text = "project:\n  type: website\nbibliography: assets/bibliography.bib\n";
+
+        let diagnostics = manifest_bibliography_diagnostics(&manifest_path, manifest_text);
+        assert_eq!(diagnostics.len(), 1);
+        let diag = &diagnostics[0];
+        assert_eq!(diag.code, "duplicate-bibliography-key");
+        assert!(diag.message.contains("'dup'"));
+        // Anchored to the `assets/bibliography.bib` value in the manifest.
+        let start: usize = diag.location.range.start().into();
+        let end: usize = diag.location.range.end().into();
+        assert_eq!(&manifest_text[start..end], "assets/bibliography.bib");
+    }
+
+    #[test]
+    fn manifest_without_bibliography_yields_no_diagnostics() {
+        let dir = tempfile::tempdir().unwrap();
+        let manifest_path = dir.path().join("_quarto.yml");
+        let manifest_text = "project:\n  type: website\n";
+        assert!(manifest_bibliography_diagnostics(&manifest_path, manifest_text).is_empty());
     }
 
     #[test]
