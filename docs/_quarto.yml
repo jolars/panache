@@ -6,6 +6,7 @@ project:
   post-render:
     - scripts/fix-sitemap.sh
     - scripts/fix-logo-alt.sh
+    - scripts/fix-tool-aria.sh
 
 website:
   title: "Panache"
@@ -140,7 +141,7 @@ format:
   html:
     toc: true
     theme:
-      light: cosmo
+      light: [cosmo, theme-light.scss]
       dark: [cosmo, theme-dark.scss]
     html-math-method: katex
     canonical-url: true

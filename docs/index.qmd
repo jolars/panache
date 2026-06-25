@@ -28,7 +28,7 @@ format:
 ---
 
 <img src="images/logo.svg" alt="Panache logo" class="float-end ms-3"
-style="max-width: 20%; height: auto;">
+width="330" height="375" style="max-width: 20%; height: auto;">
 
 Panache is a language server, formatter, and linter for Markdown, Quarto, and R
 Markdown. It is built for fast, reliable formatting, linting, and language

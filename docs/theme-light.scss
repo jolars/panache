@@ -1,0 +1,16 @@
+/*-- scss:rules --*/
+
+// The `breeze` highlight style colors the Extension (`.ex`) and CommentVar
+// (`.cv`) tokens `#0095ff`, which only reaches a 2.79:1 contrast ratio against
+// the light code-block background (`#f1f3f5`) and fails WCAG AA. Darken to
+// `#0067b8` (5.2:1) while keeping the same blue hue. The theme bundle loads
+// after `quarto-syntax-highlighting.css`, so this override wins the cascade.
+:root {
+  --quarto-hl-ex-color: #0067b8;
+  --quarto-hl-cv-color: #0067b8;
+}
+
+code span.ex,
+code span.cv {
+  color: #0067b8;
+}
