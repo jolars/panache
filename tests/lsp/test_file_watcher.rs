@@ -1,4 +1,4 @@
-use super::helpers::{TestLspServer, UriExt};
+use super::helpers::{TestLspServer, UriExt, full_document_change};
 use lsp_types::{CompletionResponse, FileChangeType, FileEvent, NumberOrString, Uri};
 use std::fs;
 use std::time::Duration;
@@ -126,6 +126,112 @@ fn test_bibliography_completion_updates_after_watcher_change() {
     };
     assert!(items.iter().any(|i| i.label == "newkey"));
     assert!(!items.iter().any(|i| i.label == "oldkey"));
+}
+
+/// Whether the document's built-in diagnostics include a `missing-bibliography-key`.
+fn has_missing_bib_key(server: &TestLspServer, uri: &str) -> bool {
+    server
+        .get_built_in_diagnostics(uri)
+        .into_iter()
+        .flatten()
+        .any(|d| d.code == "missing-bibliography-key")
+}
+
+#[test]
+fn test_missing_bib_key_clears_after_watcher_adds_entry() {
+    // Editing a bibliography to add a previously-missing key must clear the
+    // `missing-bibliography-key` lint for documents that cite it. The
+    // bibliography is loaded into salsa at one durability but the watcher
+    // updates its text at another; a durability mismatch leaves the
+    // `bibliography_index` memo stale, so the lint never clears (regression).
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let bib_path = root.join("refs.bib");
+    let doc_path = root.join("doc.qmd");
+
+    // Bibliography lacks `missing`; the document cites it.
+    fs::write(&bib_path, "@article{present, title={Present}}\n").unwrap();
+    fs::write(
+        &doc_path,
+        "---\nbibliography: refs.bib\n---\n\nText [@missing].\n",
+    )
+    .unwrap();
+
+    let mut server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).unwrap().to_string();
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap().to_string();
+    server.initialize(&root_uri);
+    server.open_document(&doc_uri, &fs::read_to_string(&doc_path).unwrap(), "quarto");
+
+    assert!(
+        has_missing_bib_key(&server, &doc_uri),
+        "citing a key absent from the bibliography should warn"
+    );
+
+    // Add the missing key to the bibliography and notify via the watcher.
+    fs::write(
+        &bib_path,
+        "@article{present, title={Present}}\n@article{missing, title={Now Present}}\n",
+    )
+    .unwrap();
+    server.did_change_watched_files(vec![FileEvent {
+        uri: Uri::from_file_path(&bib_path).unwrap(),
+        typ: FileChangeType::CHANGED,
+    }]);
+
+    assert!(
+        !has_missing_bib_key(&server, &doc_uri),
+        "adding the key to the bibliography must clear the missing-bibliography-key lint"
+    );
+}
+
+#[test]
+fn test_bib_change_without_watcher_event_is_picked_up_on_activity() {
+    // Real-world failure: some clients (e.g. nvim file-watching) never deliver
+    // `didChangeWatchedFiles`. If the bibliography changes out-of-band, working
+    // in the document (a keystroke -> settle) must still pick up the new content
+    // -- otherwise the stale lint persists until the buffer is reloaded.
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let bib_path = root.join("refs.bib");
+    let doc_path = root.join("doc.qmd");
+
+    fs::write(&bib_path, "@article{present, title={Present}}\n").unwrap();
+    fs::write(
+        &doc_path,
+        "---\nbibliography: refs.bib\n---\n\nText [@missing].\n",
+    )
+    .unwrap();
+
+    let mut server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).unwrap().to_string();
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap().to_string();
+    server.initialize(&root_uri);
+    server.open_document(&doc_uri, &fs::read_to_string(&doc_path).unwrap(), "quarto");
+
+    assert!(has_missing_bib_key(&server, &doc_uri));
+
+    // Bibliography gains the key on disk, but NO watcher event is delivered.
+    fs::write(
+        &bib_path,
+        "@article{present, title={Present}}\n@article{missing, title={Now Present}}\n",
+    )
+    .unwrap();
+
+    // The user keeps editing the document; the resulting settle should refresh
+    // referenced files from disk.
+    server.edit_document(
+        &doc_uri,
+        vec![full_document_change(
+            "---\nbibliography: refs.bib\n---\n\nText [@missing]!\n",
+        )],
+    );
+    server.pump(Duration::from_secs(2));
+
+    assert!(
+        !has_missing_bib_key(&server, &doc_uri),
+        "an out-of-band bibliography change must be picked up on document activity"
+    );
 }
 
 #[test]

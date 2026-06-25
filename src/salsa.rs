@@ -2475,6 +2475,40 @@ impl SalsaDb {
         true
     }
 
+    /// Re-read `path` from disk and refresh its cached text input, but only if
+    /// the file is already cached and its on-disk content differs from the
+    /// cached value. Returns `true` when the input was actually updated.
+    ///
+    /// This is the self-heal path for clients that don't deliver
+    /// `didChangeWatchedFiles` for every referenced-file change. Neovim, for
+    /// example, emits no watch event for a bibliography that is open in a buffer
+    /// (it routes `didChange`/`didSave` only to LSPs that own that file type),
+    /// so without this an out-of-band edit stays frozen in salsa until the
+    /// document is reloaded. Called from the settle write-phase over each open
+    /// document's referenced set so the change is picked up on the next document
+    /// activity.
+    ///
+    /// Skips uncached paths (a brand-new file is loaded by
+    /// [`SalsaDb::load_file_from_disk`], not here), unreadable paths (a missing
+    /// file keeps its last-known content rather than being wiped), and unchanged
+    /// content (compare-then-skip, so an unchanged file causes no revision bump
+    /// and no downstream invalidation). Writer-only.
+    pub fn resync_cached_file_from_disk(&mut self, path: &Path, durability: Durability) -> bool {
+        let Some(file) = self.vfs.input_for_path(path) else {
+            return false;
+        };
+        let Ok(contents) = std::fs::read_to_string(path) else {
+            return false;
+        };
+        if file.text(self).as_deref() == Some(contents.as_str()) {
+            return false;
+        }
+        file.set_text(self)
+            .with_durability(durability)
+            .to(Some(Arc::from(contents)));
+        true
+    }
+
     pub fn ensure_file_text_cached(&mut self, path: PathBuf) -> bool {
         self.ensure_file_text_cached_with_durability(path, Durability::HIGH)
     }

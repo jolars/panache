@@ -101,8 +101,36 @@ pub(crate) fn reload_open_documents_referenced_files(gs: &mut GlobalState) {
         .values()
         .filter_map(|state| Some((state.salsa_file, state.salsa_config, state.path.clone()?)))
         .collect();
+    // A path open as a document has buffer-authoritative content; it must never
+    // be re-read from disk below or an unsaved edit would be clobbered.
+    let open_paths: HashSet<PathBuf> = gs
+        .document_map
+        .values()
+        .filter_map(|state| state.path.clone())
+        .collect();
+    let mut referenced: HashSet<PathBuf> = HashSet::new();
     for (salsa_file, salsa_config, path) in open_docs {
-        load_project_files(gs, salsa_file, salsa_config, path);
+        referenced.extend(load_project_files(gs, salsa_file, salsa_config, path));
+    }
+    // Self-heal: refresh referenced files whose on-disk content changed since
+    // they were cached. Not every client delivers `didChangeWatchedFiles` for
+    // every referenced-file edit --- nvim emits no watch event for a
+    // bibliography open in a buffer --- so without this an out-of-band change
+    // stays frozen in salsa until the document is reloaded. Runs on the writer
+    // over the deduplicated referenced set (open documents excluded); the
+    // compare-then-skip inside `resync_cached_file_from_disk` means an unchanged
+    // file triggers no revision bump or downstream re-lint.
+    //
+    // TODO: this compensates for clients whose file-watching is incomplete. If
+    // editor watch delivery becomes reliable (or we drive referenced-file
+    // updates entirely through the watcher), revisit whether this disk re-read
+    // can be dropped in favor of the pure `didChangeWatchedFiles` path.
+    for path in referenced {
+        if open_paths.contains(&path) {
+            continue;
+        }
+        gs.salsa
+            .resync_cached_file_from_disk(&path, Durability::MEDIUM);
     }
 }
 
