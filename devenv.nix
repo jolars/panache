@@ -6,6 +6,7 @@
 {
   packages = [
     pkgs.bashInteractive
+    pkgs.google-lighthouse
     pkgs.perf
     pkgs.cargo-flamegraph
     pkgs.cargo-llvm-cov

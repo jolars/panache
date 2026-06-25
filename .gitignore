@@ -39,6 +39,9 @@ docs/playground/pkg/
 crates/panache-dprint/target/
 crates/panache-dprint/Cargo.lock
 
+# Lighthouse audit reports
+docs/lighthouse/
+
 # Pre-commit / node wrapper
 /node_modules
 /package-lock.json

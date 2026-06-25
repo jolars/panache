@@ -48,6 +48,28 @@ tasks:
     cmds:
       - cd docs && quarto preview --no-browser
 
+  lighthouse:
+    desc: Render docs and run a Lighthouse audit against the local site
+    vars:
+      PORT: '{{.PORT | default "4210"}}'
+    cmds:
+      - quarto render docs
+      - |
+        set -e
+        export CHROME_PATH="${CHROME_PATH:-$(command -v chromium || command -v chromium-browser || command -v google-chrome || command -v google-chrome-stable)}"
+        python3 -m http.server {{.PORT}} --directory docs/_site --bind 127.0.0.1 >/dev/null 2>&1 &
+        SRV=$!
+        trap 'kill $SRV 2>/dev/null' EXIT
+        for i in $(seq 1 20); do curl -sf "http://127.0.0.1:{{.PORT}}/" >/dev/null && break; sleep 0.3; done
+        mkdir -p docs/lighthouse
+        lighthouse "http://127.0.0.1:{{.PORT}}/" \
+          --quiet \
+          --chrome-flags="--headless=new --no-sandbox --disable-gpu" \
+          --output=html --output=json \
+          --output-path=docs/lighthouse/report \
+          --only-categories=performance,accessibility,best-practices,seo
+        echo "Report: docs/lighthouse/report.report.html"
+
   benchmarks:
     desc: Run multi-formatter benchmark and write JSON consumed by docs/guide/performance.qmd
     cmds:
