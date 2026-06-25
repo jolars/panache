@@ -1,0 +1,28 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 98
+expression: cst_output
+---
+DOCUMENT@0..154
+  ADMONITION@0..119
+    ADMONITION_MARKER@0..3 "!!!"
+    WHITESPACE@3..4 " "
+    ADMONITION_TYPE@4..8 "note"
+    WHITESPACE@8..9 " "
+    ADMONITION_TITLE@9..19 "\"Heads up\""
+    NEWLINE@19..20 "\n"
+    BLANK_LINE@20..21
+      BLANK_LINE@20..21 "\n"
+    PARAGRAPH@21..82
+      TEXT@21..81 "    Lorem ipsum dolor ..."
+      NEWLINE@81..82 "\n"
+    BLANK_LINE@82..83
+      BLANK_LINE@82..83 "\n"
+    PARAGRAPH@83..119
+      TEXT@83..118 "    A second paragrap ..."
+      NEWLINE@118..119 "\n"
+  BLANK_LINE@119..120
+    BLANK_LINE@119..120 "\n"
+  PARAGRAPH@120..154
+    TEXT@120..153 "A paragraph after the ..."
+    NEWLINE@153..154 "\n"

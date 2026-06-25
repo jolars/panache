@@ -3,6 +3,8 @@
 //! This module contains parsers for all block-level constructs like headings,
 //! paragraphs, code blocks, tables, lists, blockquotes, etc.
 
+#[path = "blocks/admonitions.rs"]
+pub mod admonitions;
 #[path = "blocks/blockquotes.rs"]
 pub mod blockquotes;
 #[path = "blocks/code_blocks.rs"]

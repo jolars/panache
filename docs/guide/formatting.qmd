@@ -1158,6 +1158,47 @@ Output
     :::
     ```
 
+## Admonitions
+
+When the [`python-markdown-admonitions`](configuration.qmd#admonitions)
+extension is enabled, Panache recognizes [python-markdown
+admonitions](https://python-markdown.github.io/extensions/admonition/)
+(`!!! type "title"` followed by 4-space-indented content). The companion
+[`pymdownx-details`](configuration.qmd#admonitions) extension adds the
+collapsible `???` (collapsed) and `???+` (expanded) variants. Both are disabled
+by default for every flavor, since the indented body would otherwise parse as an
+indented code block.
+
+The marker line is kept on a single line (never wrapped or sentence-split), with
+the type, any extra classes, and the optional quoted title normalized to single
+spaces. The body is re-indented by four spaces and reflowed like ordinary
+content; blank lines at the body boundaries are stripped (matching fenced divs).
+
+Input
+
+:   ```markdown
+    !!! note "Heads up"
+
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla et euismod nulla.
+
+    ???+ tip
+
+        - first
+        - second
+    ```
+
+Output
+
+:   ```markdown
+    !!! note "Heads up"
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla et
+        euismod nulla.
+
+    ???+ tip
+        - first
+        - second
+    ```
+
 ## Footnotes
 
 ### Reference Footnotes

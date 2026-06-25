@@ -249,6 +249,13 @@ pub struct Extensions {
     pub mmd_link_attributes: bool,
     /// [NON-DEFAULT] GitHub/CommonMark alerts in blockquotes (`> [!NOTE]`)
     pub alerts: bool,
+    /// [NON-DEFAULT] python-markdown admonitions (`!!! note`) with 4-space
+    /// indented content
+    #[cfg_attr(feature = "serde", serde(alias = "python_markdown_admonitions"))]
+    pub python_markdown_admonitions: bool,
+    /// [NON-DEFAULT] pymdownx details: collapsible admonitions (`???`/`???+`)
+    #[cfg_attr(feature = "serde", serde(alias = "pymdownx_details"))]
+    pub pymdownx_details: bool,
     /// [NON-DEFAULT] :emoji: syntax
     pub emoji: bool,
     /// [NON-DEFAULT] Highlighted ==text==
@@ -345,6 +352,8 @@ impl Extensions {
             native_spans: false,
             pandoc_title_block: false,
             pipe_tables: false,
+            python_markdown_admonitions: false,
+            pymdownx_details: false,
             quarto_callouts: false,
             quarto_crossrefs: false,
             quarto_shortcodes: false,
@@ -477,6 +486,8 @@ impl Extensions {
 
             // Non-default
             alerts: false,
+            python_markdown_admonitions: false,
+            pymdownx_details: false,
             autolink_bare_uris: false,
             east_asian_line_breaks: false,
             emoji: false,
@@ -770,6 +781,8 @@ known_extensions! {
     "mmd-header-identifiers" => mmd_header_identifiers,
     "mmd-link-attributes" => mmd_link_attributes,
     "alerts" => alerts,
+    "python-markdown-admonitions" => python_markdown_admonitions,
+    "pymdownx-details" => pymdownx_details,
     "emoji" => emoji,
     "mark" => mark,
     "quarto-callouts" => quarto_callouts,

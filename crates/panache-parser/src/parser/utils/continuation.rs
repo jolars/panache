@@ -109,6 +109,14 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                         keep_level = i + 1;
                     }
                 }
+                crate::parser::utils::container_stack::Container::Admonition { content_col } => {
+                    // A blank line keeps the admonition open only while the
+                    // next content stays indented to its content column.
+                    content_indent_so_far += *content_col;
+                    if raw_indent_cols >= *content_col {
+                        keep_level = i + 1;
+                    }
+                }
                 crate::parser::utils::container_stack::Container::Definition {
                     content_col,
                     ..

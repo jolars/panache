@@ -2161,6 +2161,7 @@ impl<'a> Parser<'a> {
                     }
                     Some(Container::List { .. })
                     | Some(Container::FootnoteDefinition { .. })
+                    | Some(Container::Admonition { .. })
                     | Some(Container::Alert { .. })
                     | Some(Container::Paragraph { .. })
                     | Some(Container::Definition { .. })
@@ -2954,6 +2955,61 @@ impl<'a> Parser<'a> {
         self.parse_inner_content(line, None)
     }
 
+    /// Close open admonition containers that the current (non-blank) line is
+    /// no longer indented into. python-markdown / pymdownx end an admonition
+    /// at the first non-indented line; footnotes (lazy continuation) don't, so
+    /// this is admonition-specific.
+    ///
+    /// Conservative: skipped when a `ListItem` is on the stack, since
+    /// list-item indentation isn't a content-container strip and would make
+    /// the cumulative threshold below incorrect.
+    fn close_dedented_admonitions(&mut self, content: &str) {
+        if !self
+            .containers
+            .stack
+            .iter()
+            .any(|c| matches!(c, Container::Admonition { .. }))
+        {
+            return;
+        }
+        if self
+            .containers
+            .stack
+            .iter()
+            .any(|c| matches!(c, Container::ListItem { .. }))
+        {
+            return;
+        }
+
+        let (without_newline, _) = strip_newline(content);
+        if without_newline.trim().is_empty() {
+            return;
+        }
+        let (indent_cols, _) = leading_indent(without_newline);
+
+        let mut acc = 0usize;
+        let mut close_to: Option<usize> = None;
+        for (idx, c) in self.containers.stack.iter().enumerate() {
+            match c {
+                Container::FootnoteDefinition { content_col, .. }
+                | Container::Definition { content_col, .. } => {
+                    acc += *content_col;
+                }
+                Container::Admonition { content_col } => {
+                    acc += *content_col;
+                    if indent_cols < acc {
+                        close_to = Some(idx);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if let Some(idx) = close_to {
+            self.close_containers_to(idx);
+        }
+    }
+
     /// Get the total indentation to strip from content containers (footnotes + definitions).
     fn content_container_indent_to_strip(&self) -> usize {
         self.containers
@@ -2962,6 +3018,7 @@ impl<'a> Parser<'a> {
             .filter_map(|c| match c {
                 Container::FootnoteDefinition { content_col, .. } => Some(*content_col),
                 Container::Definition { content_col, .. } => Some(*content_col),
+                Container::Admonition { content_col } => Some(*content_col),
                 _ => None,
             })
             .sum()
@@ -2997,6 +3054,11 @@ impl<'a> Parser<'a> {
             self.containers.last(),
             content.trim_end()
         );
+        // Admonitions end at the first non-indented line (unlike footnotes,
+        // which allow lazy continuation). Close any open admonition whose
+        // content indent the current line no longer meets, before stripping.
+        self.close_dedented_admonitions(content);
+
         // Calculate how much indentation should be stripped for content containers
         // (definitions, footnotes) FIRST, so we can check for block markers correctly.
         // Shared helper mirrors `ContainerPrefix::strip` (post-bq path) so the
@@ -3398,6 +3460,11 @@ impl<'a> Parser<'a> {
                         self.close_fenced_div();
                         0
                     }
+                    BlockEffect::OpenAdmonition => {
+                        self.containers
+                            .push(Container::Admonition { content_col: 4 });
+                        0
+                    }
                     BlockEffect::OpenFootnoteDefinition => {
                         self.handle_footnote_open_effect(block_match, content)
                     }
@@ -3613,6 +3680,11 @@ impl<'a> Parser<'a> {
                     }
                     BlockEffect::CloseFencedDiv => {
                         self.close_fenced_div();
+                        0
+                    }
+                    BlockEffect::OpenAdmonition => {
+                        self.containers
+                            .push(Container::Admonition { content_col: 4 });
                         0
                     }
                     BlockEffect::OpenFootnoteDefinition => {

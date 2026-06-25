@@ -1,0 +1,4 @@
+flavor = "pandoc"
+
+[extensions]
+pymdownx-details = true

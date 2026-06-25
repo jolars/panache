@@ -572,6 +572,8 @@ golden_test_cases!(
     pipe_table_in_list_blockquote,
     pipe_table_unicode,
     plain_continuation_edge_cases,
+    pymdownx_details,
+    python_markdown_admonitions,
     quarto_code_blocks,
     quarto_hashpipe,
     quarto_hashpipe_list_item,

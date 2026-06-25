@@ -1,0 +1,28 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 98
+expression: cst_output
+---
+DOCUMENT@0..101
+  ADMONITION@0..52
+    ADMONITION_MARKER@0..4 "???+"
+    WHITESPACE@4..5 " "
+    ADMONITION_TYPE@5..9 "note"
+    WHITESPACE@9..10 " "
+    ADMONITION_TITLE@10..20 "\"Expanded\""
+    NEWLINE@20..21 "\n"
+    BLANK_LINE@21..22
+      BLANK_LINE@21..22 "\n"
+    PARAGRAPH@22..52
+      TEXT@22..51 "    Collapsible body  ..."
+      NEWLINE@51..52 "\n"
+  BLANK_LINE@52..53
+    BLANK_LINE@52..53 "\n"
+  ADMONITION@53..101
+    ADMONITION_MARKER@53..56 "???"
+    WHITESPACE@56..57 " "
+    ADMONITION_TYPE@57..64 "warning"
+    NEWLINE@64..65 "\n"
+    PARAGRAPH@65..101
+      TEXT@65..100 "    Collapsed without ..."
+      NEWLINE@100..101 "\n"

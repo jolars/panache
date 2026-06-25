@@ -113,7 +113,8 @@ impl ContainerPrefix {
                     ops.push(StripOp::BlockQuoteMarker);
                 }
                 Container::FootnoteDefinition { content_col, .. }
-                | Container::Definition { content_col, .. } => {
+                | Container::Definition { content_col, .. }
+                | Container::Admonition { content_col } => {
                     if let Some(la) = pending_list_advance.take() {
                         ops.push(StripOp::ListAdvance(la));
                     }

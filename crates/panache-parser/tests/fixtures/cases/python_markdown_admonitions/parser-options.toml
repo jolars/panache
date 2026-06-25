@@ -1,0 +1,4 @@
+flavor = "pandoc"
+
+[extensions]
+python-markdown-admonitions = true

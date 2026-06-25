@@ -14,6 +14,12 @@ pub(crate) enum Container {
     FencedDiv {
         // No special tracking needed - closed by fence marker
     },
+    /// python-markdown admonition / pymdownx details container. Content is
+    /// indented by `content_col` (4) columns; closes on dedent like a
+    /// footnote definition.
+    Admonition {
+        content_col: usize,
+    },
     List {
         marker: ListMarker,
         base_indent_cols: usize,

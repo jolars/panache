@@ -361,6 +361,7 @@ golden_test_cases!(
     pipe_table,
     pipe_table_unicode,
     plain_continuation_edge_cases,
+    python_markdown_admonitions,
     quarto_code_blocks,
     quarto_executable_class_attrs,
     quarto_hashpipe,

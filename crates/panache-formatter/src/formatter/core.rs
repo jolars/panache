@@ -768,6 +768,116 @@ impl Formatter {
                 }
             }
 
+            SyntaxKind::ADMONITION => {
+                // python-markdown admonition / pymdownx details. Emit the
+                // marker line directly (so it is never wrapped or
+                // sentence-split), then format the body indented 4 spaces.
+                let mut marker = String::new();
+                let mut type_str = String::new();
+                let mut title_str = String::new();
+                let mut body = Vec::new();
+
+                for element in node.children_with_tokens() {
+                    match element {
+                        NodeOrToken::Token(token) => match token.kind() {
+                            SyntaxKind::ADMONITION_MARKER => marker.push_str(token.text()),
+                            SyntaxKind::ADMONITION_TYPE => type_str.push_str(token.text()),
+                            SyntaxKind::ADMONITION_TITLE => title_str.push_str(token.text()),
+                            _ => {}
+                        },
+                        NodeOrToken::Node(child) => body.push(child),
+                    }
+                }
+
+                self.output.push_str(&" ".repeat(indent));
+                self.output.push_str(marker.trim());
+                let normalized_type = type_str.split_whitespace().collect::<Vec<_>>().join(" ");
+                if !normalized_type.is_empty() {
+                    self.output.push(' ');
+                    self.output.push_str(&normalized_type);
+                }
+                if !title_str.trim().is_empty() {
+                    self.output.push(' ');
+                    self.output.push_str(title_str.trim());
+                }
+                self.output.push('\n');
+
+                let child_indent = indent + 4;
+                let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
+
+                // Strip leading/trailing blank lines in the body and collapse
+                // interior blank runs to a single separator (canonical compact
+                // form, matching fenced divs).
+                let leading = body
+                    .iter()
+                    .take_while(|c| c.kind() == SyntaxKind::BLANK_LINE)
+                    .count();
+                let trailing = body
+                    .iter()
+                    .rev()
+                    .take_while(|c| c.kind() == SyntaxKind::BLANK_LINE)
+                    .count();
+                let end = body.len().saturating_sub(trailing).max(leading);
+
+                let mut prev_blank = false;
+                for child in &body[leading..end] {
+                    match child.kind() {
+                        SyntaxKind::BLANK_LINE => {
+                            if !prev_blank {
+                                self.output.push('\n');
+                                prev_blank = true;
+                            }
+                            continue;
+                        }
+                        SyntaxKind::PARAGRAPH => {
+                            // Reflow against the indent-adjusted width.
+                            // `format_node_sync` wraps to the full line width
+                            // and only then prepends indent, so it would
+                            // overflow here; reflow manually like footnotes.
+                            let available_width =
+                                self.config.line_width.saturating_sub(child_indent);
+                            let lines = match wrap_mode {
+                                WrapMode::Preserve => child
+                                    .text()
+                                    .to_string()
+                                    .lines()
+                                    .map(|line| {
+                                        normalize_smart_punctuation(
+                                            line.trim_start_matches([' ', '\t']),
+                                            self.config.formatter_extensions.smart,
+                                            self.config.formatter_extensions.smart_quotes,
+                                        )
+                                        .to_string()
+                                    })
+                                    .collect(),
+                                WrapMode::Reflow => {
+                                    self.wrapped_lines_for_paragraph(child, available_width)
+                                }
+                                WrapMode::Sentence => self.sentence_lines_for_paragraph(child),
+                                WrapMode::Semantic => self.semantic_lines_for_paragraph(child),
+                            };
+                            for line in lines {
+                                self.output.push_str(&" ".repeat(child_indent));
+                                self.output.push_str(line.trim_start_matches([' ', '\t']));
+                                self.output.push('\n');
+                            }
+                        }
+                        SyntaxKind::CODE_BLOCK => {
+                            self.format_indented_code_block(child, child_indent);
+                        }
+                        _ => {
+                            self.format_node_sync(child, child_indent);
+                        }
+                    }
+                    prev_blank = false;
+                }
+
+                if !self.output.ends_with('\n') {
+                    self.output.push('\n');
+                }
+                self.consecutive_blank_lines = 0;
+            }
+
             SyntaxKind::FOOTNOTE_DEFINITION => {
                 // Format footnote definition with proper indentation
                 // Extract marker and children first

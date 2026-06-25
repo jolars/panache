@@ -749,6 +749,26 @@ line-blocks = true
 `line-blocks`
 :   Line blocks for poetry with `|` prefix (default: enabled)
 
+#### Admonitions
+
+```toml
+[extensions]
+python-markdown-admonitions = true
+pymdownx-details = true
+```
+
+`python-markdown-admonitions`
+:   [python-markdown
+    admonitions](https://python-markdown.github.io/extensions/admonition/) ---
+    `!!! type "title"` with 4-space-indented content (default: disabled for all
+    flavors). Required because the indented body would otherwise parse as an
+    indented code block.
+
+`pymdownx-details`
+:   Collapsible admonitions from `pymdownx.details` --- `???` (collapsed) and
+    `???+` (expanded) (default: disabled for all flavors). Independent of
+    `python-markdown-admonitions`.
+
 ### Inline Extensions
 
 #### Emphasis

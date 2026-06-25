@@ -15,6 +15,7 @@ use std::any::Any;
 
 use super::diagnostics::Diagnostics;
 
+use super::blocks::admonitions::{AdmonitionOpen, try_parse_admonition_open};
 use super::blocks::blockquotes::{
     can_start_blockquote, count_blockquote_markers, emit_one_blockquote_marker,
     strip_n_blockquote_markers,
@@ -187,6 +188,7 @@ pub(crate) enum BlockEffect {
     None,
     OpenFencedDiv,
     CloseFencedDiv,
+    OpenAdmonition,
     OpenFootnoteDefinition,
     OpenList,
     OpenDefinitionList,
@@ -2486,6 +2488,113 @@ impl BlockParser for FencedDivCloseParser {
 }
 
 // ============================================================================
+// Admonition Parser (must precede Indented Code Block — position #6b)
+// ============================================================================
+
+/// Opener for python-markdown admonitions (`!!! type "title"`) and
+/// pymdownx.details (`???`/`???+`). Opens an `ADMONITION` container whose
+/// 4-space-indented body is parsed recursively (closed on dedent like a
+/// footnote definition). Registered before [`IndentedCodeBlockParser`] so
+/// the indented body is not captured as a code block.
+pub(crate) struct AdmonitionOpenParser;
+
+impl BlockParser for AdmonitionOpenParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::OpenAdmonition
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &StrippedLines<'_, '_>,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        let adm = try_parse_admonition_open(lines.first(), &ctx.config.extensions)?;
+        // python-markdown / pymdownx split a block at a marker line, so an
+        // admonition may interrupt a paragraph.
+        Some((BlockDetectionResult::YesCanInterrupt, Some(Box::new(adm))))
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &StrippedLines<'_, '_>,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        use crate::syntax::SyntaxKind;
+
+        let first = lines.first();
+        let Some(adm) = payload
+            .and_then(|p| p.downcast_ref::<AdmonitionOpen>())
+            .cloned()
+            .or_else(|| try_parse_admonition_open(first, &ctx.config.extensions))
+        else {
+            return 1;
+        };
+
+        if let Some(indent_str) = ctx.indent_to_emit {
+            builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+        }
+
+        // The ADMONITION node is left open; the container machinery closes it
+        // on dedent (see `Container::Admonition`).
+        builder.start_node(SyntaxKind::ADMONITION.into());
+        emit_admonition_marker_line(builder, first, &adm);
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "admonition"
+    }
+}
+
+/// Emit the admonition opener line losslessly: every byte of `first` becomes
+/// a marker/type/title token or interleaved/trailing `WHITESPACE`, plus the
+/// trailing `NEWLINE`.
+fn emit_admonition_marker_line(
+    builder: &mut GreenNodeBuilder<'static>,
+    first: &str,
+    adm: &AdmonitionOpen,
+) {
+    use crate::syntax::SyntaxKind;
+
+    let (line, newline) = strip_newline(first);
+
+    if adm.indent_len > 0 {
+        builder.token(SyntaxKind::WHITESPACE.into(), &line[..adm.indent_len]);
+    }
+    let marker_end = adm.indent_len + adm.marker_len;
+    builder.token(
+        SyntaxKind::ADMONITION_MARKER.into(),
+        &line[adm.indent_len..marker_end],
+    );
+    let mut cur = marker_end;
+
+    if let Some((start, end)) = adm.type_range {
+        if start > cur {
+            builder.token(SyntaxKind::WHITESPACE.into(), &line[cur..start]);
+        }
+        builder.token(SyntaxKind::ADMONITION_TYPE.into(), &line[start..end]);
+        cur = end;
+    }
+
+    if let Some((start, end)) = adm.title_range {
+        if start > cur {
+            builder.token(SyntaxKind::WHITESPACE.into(), &line[cur..start]);
+        }
+        builder.token(SyntaxKind::ADMONITION_TITLE.into(), &line[start..end]);
+        cur = end;
+    }
+
+    if cur < line.len() {
+        builder.token(SyntaxKind::WHITESPACE.into(), &line[cur..]);
+    }
+    if !newline.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline);
+    }
+}
+
+// ============================================================================
 // Indented Code Block Parser (position #11)
 // ============================================================================
 
@@ -2842,6 +2951,9 @@ impl BlockParserRegistry {
             Box::new(HtmlBlockParser),
             // (10) Tables
             Box::new(TableParser),
+            // (10b) Admonitions (`!!!`/`???`) — MUST precede indented code so
+            // the 4-space-indented body isn't captured as a code block.
+            Box::new(AdmonitionOpenParser),
             // (11) Indented code blocks (AFTER fenced!)
             Box::new(IndentedCodeBlockParser),
             // (12) LaTeX environment blocks

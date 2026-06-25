@@ -223,6 +223,10 @@ pub enum SyntaxKind {
     PANDOC_TITLE_BLOCK,
     MMD_TITLE_BLOCK,
     FENCED_DIV,
+    // python-markdown admonition (`!!! note`) and pymdownx details
+    // (`???`/`???+`) container block. Content is 4-space indented and
+    // parsed recursively; closes on dedent (like a footnote definition).
+    ADMONITION,
     PARAGRAPH,
     PLAIN, // Inline content without paragraph break (tight lists, definition lists, table cells)
     BLOCK_QUOTE,
@@ -330,6 +334,12 @@ pub enum SyntaxKind {
     DIV_FENCE_CLOSE,
     DIV_INFO,
     DIV_CONTENT,
+
+    // Admonition parts (`!!! type "title"` / `???`/`???+`)
+    ADMONITION_MARKER, // `!!!`, `???`, or `???+`
+    ADMONITION_TYPE,   // type/class words (e.g. `note`, `danger highlight`)
+    ADMONITION_TITLE,  // optional quoted title (e.g. `"Heads up"`)
+
     EMOJI, // :alias:
 
     // Bracket-shape pattern that did not resolve as a link/image.

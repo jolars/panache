@@ -1,3 +1,4 @@
+mod admonitions;
 mod bare_uris;
 mod bullet_standardization;
 mod citations;
