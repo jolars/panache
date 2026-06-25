@@ -75,17 +75,23 @@ impl Rule for CitationKeysRule {
             }
 
             for duplicate in &parse.index.duplicates {
-                // Prefer a declaration that actually has a span in *this*
-                // document. A bibliography pulled in from a project manifest
-                // (`_quarto.yml`) resolves to a path but its value isn't in the
-                // document YAML, so its range is the empty default `0..0` —
-                // reporting that would underline byte 0 (the opening `---`).
-                let range = [&duplicate.first.file, &duplicate.duplicate.file]
+                // Only report a duplicate when one of the involved
+                // bibliographies is declared in *this* document's YAML, giving
+                // us a precise span to anchor to. A bibliography pulled in from
+                // a project manifest (`_quarto.yml`) resolves to a path but its
+                // value isn't in the document YAML, so its range is the empty
+                // default `0..0`. A duplicate confined to such a shared bib is a
+                // defect of that file, not of any one document — reporting it
+                // would re-fire for every document in the project and, lacking a
+                // real range, underline the entire frontmatter.
+                let Some(range) = [&duplicate.first.file, &duplicate.duplicate.file]
                     .into_iter()
                     .filter_map(|path| range_by_path.get(path))
                     .find(|range| !range.is_empty())
                     .copied()
-                    .unwrap_or_else(|| tree.text_range());
+                else {
+                    continue;
+                };
                 let location = Location::from_range(range, input);
                 diagnostics.push(Diagnostic::warning(
                     location,
@@ -353,6 +359,64 @@ mod tests {
         // Anchored to the document's `references.bib` value, not byte 0.
         assert_eq!(diagnostics[0].location.range.start(), refs_range.start());
         assert_eq!(diagnostics[0].location.range.end(), refs_range.end());
+    }
+
+    #[test]
+    fn duplicate_in_undeclared_project_bib_is_not_reported() {
+        // A duplicate confined to a project-level bibliography (declared in
+        // `_quarto.yml`, absent from the document YAML) has no span in this
+        // document. The old behavior fell back to `tree.text_range()`, which
+        // underlined the whole frontmatter and re-fired for *every* document in
+        // the project. Such a self-duplicate is a defect of the shared bib, not
+        // of any one document, so the document-level rule must skip it.
+        let input = "---\ntitle: Example\n---\n\nText [@larsson2026].\n";
+        let project_bib = std::path::PathBuf::from("/proj/assets/bibliography.bib");
+
+        let metadata = crate::metadata::DocumentMetadata {
+            source_path: std::path::PathBuf::from("/proj/index.qmd"),
+            // No `bibliography` declared in this document's YAML.
+            bibliography: Some(crate::metadata::BibliographyInfo {
+                paths: vec![project_bib.clone()],
+                source_ranges: vec![TextRange::default()],
+            }),
+            metadata_files: Vec::new(),
+            bibliography_parse: Some(crate::metadata::BibliographyParse {
+                index: crate::bib::BibIndex {
+                    entries: std::collections::HashMap::new(),
+                    duplicates: vec![crate::bib::BibDuplicate {
+                        key: "larsson2026".to_string(),
+                        first: crate::bib::BibEntryLocation {
+                            key: "larsson2026".to_string(),
+                            file: project_bib.clone(),
+                            span: crate::bib::Span { start: 0, end: 0 },
+                        },
+                        duplicate: crate::bib::BibEntryLocation {
+                            key: "larsson2026".to_string(),
+                            file: project_bib,
+                            span: crate::bib::Span { start: 0, end: 0 },
+                        },
+                    }],
+                    errors: Vec::new(),
+                    load_errors: Vec::new(),
+                },
+                parse_errors: Vec::new(),
+            }),
+            inline_references: Vec::new(),
+            citations: crate::metadata::CitationInfo {
+                keys: vec!["larsson2026".to_string()],
+            },
+            title: None,
+            raw_yaml: String::new(),
+        };
+
+        let diagnostics = parse_and_lint(input, Some(metadata));
+        assert!(
+            diagnostics
+                .iter()
+                .all(|d| d.code != "duplicate-bibliography-key"),
+            "self-duplicate in an undeclared project bib must not be reported, got: {:?}",
+            diagnostics
+        );
     }
 
     #[test]
