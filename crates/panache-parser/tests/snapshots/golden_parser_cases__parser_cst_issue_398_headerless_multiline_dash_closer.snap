@@ -1,0 +1,60 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 98
+expression: cst_output
+---
+DOCUMENT@0..226
+  MULTILINE_TABLE@0..226
+    TABLE_SEPARATOR@0..36
+      TABLE_SEP_DASHES@0..6 "------"
+      TABLE_SEP_WHITESPACE@6..8 "  "
+      TABLE_SEP_DASHES@8..35 "--------------------- ..."
+      NEWLINE@35..36 "\n"
+    TABLE_ROW@36..72
+      TABLE_CELL@36..42
+        TEXT@36..42 "2981  "
+      WHITESPACE@42..44 "  "
+      TABLE_CELL@44..71
+        TEXT@44..71 "國有財產署，免 ..."
+      NEWLINE@71..72 "\n"
+    BLANK_LINE@72..73
+      BLANK_LINE@72..73 "\n"
+    TABLE_ROW@73..109
+      TABLE_CELL@73..79
+        TEXT@73..79 "2976  "
+      WHITESPACE@79..81 "  "
+      TABLE_CELL@81..108
+        TEXT@81..108 "MMM無償提供對造 ..."
+      NEWLINE@108..109 "\n"
+    BLANK_LINE@109..110
+      BLANK_LINE@109..110 "\n"
+    TABLE_ROW@110..131
+      TABLE_CELL@110..116
+        TEXT@110..116 "2974  "
+      WHITESPACE@116..118 "  "
+      TABLE_CELL@118..130
+        TEXT@118..130 "申請測量"
+      NEWLINE@130..131 "\n"
+    BLANK_LINE@131..132
+      BLANK_LINE@131..132 "\n"
+    TABLE_ROW@132..153
+      TABLE_CELL@132..138
+        TEXT@132..138 "2975  "
+      WHITESPACE@138..140 "  "
+      TABLE_CELL@140..152
+        TEXT@140..152 "申請測量"
+      NEWLINE@152..153 "\n"
+    BLANK_LINE@153..154
+      BLANK_LINE@153..154 "\n"
+    TABLE_ROW@154..190
+      TABLE_CELL@154..160
+        TEXT@154..160 "3254-1"
+      WHITESPACE@160..162 "  "
+      TABLE_CELL@162..189
+        TEXT@162..189 "ZZZ無償提供對造 ..."
+      NEWLINE@189..190 "\n"
+    BLANK_LINE@190..191
+      BLANK_LINE@190..191 "\n"
+    TABLE_SEPARATOR@191..226
+      TABLE_SEP_DASHES@191..225 "--------------------- ..."
+      NEWLINE@225..226 "\n"

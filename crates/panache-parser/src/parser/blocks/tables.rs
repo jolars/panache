@@ -2681,6 +2681,16 @@ pub(crate) fn try_parse_multiline_table(
         None
     };
 
+    // A headerless opening with at least one multi-dash column run is a genuine
+    // table border (`------  ------`), as opposed to a spaced thematic break
+    // whose "columns" are all single dashes (`- - - - -`). Only a genuine border
+    // may close on a bare continuous dash run (the closer broadening below);
+    // otherwise `- - - - -` would swallow following blocks up to the next
+    // thematic break. A column-separator closer still works for either shape.
+    let opening_has_wide_column = headerless_columns
+        .as_deref()
+        .is_some_and(|cols| cols.iter().any(|col| col.end - col.start >= 2));
+
     // Look ahead to find the structure
     let mut pos = start_pos + 1;
     let mut found_column_sep = is_column_sep_start; // Already found if headerless
@@ -2713,7 +2723,16 @@ pub(crate) fn try_parse_multiline_table(
                 let is_valid_closer = if is_full_width_start {
                     try_parse_multiline_separator(next).is_some()
                 } else {
+                    // A headerless table may close with a column separator
+                    // (`---- ----`) or a single continuous dash run (`--------`).
+                    // The latter is rejected by `is_column_separator` (one dash
+                    // group reads as a thematic rule), so accept it via the
+                    // multiline-separator check too — but only for a genuine
+                    // border (see `opening_has_wide_column`). Matches pandoc,
+                    // which ends the table on either shape.
                     is_column_separator(next)
+                        || (opening_has_wide_column
+                            && try_parse_multiline_separator(next).is_some())
                 };
                 if is_valid_closer {
                     found_closing_sep = true;

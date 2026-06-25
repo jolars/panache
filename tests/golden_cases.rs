@@ -455,6 +455,7 @@ golden_test_cases!(
     issue_286_fenced_div_collapse_blanks,
     issue_332_space_after_inline_code_in_strong,
     issue_344_table_indent_zero,
+    issue_398_headerless_multiline_dash_closer,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

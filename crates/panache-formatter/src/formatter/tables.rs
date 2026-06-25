@@ -2253,6 +2253,13 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
 
 /// Format a multiline table preserving column widths and structure
 pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
+    // TODO: #398 follow-up; non-ASCII tables are preserved verbatim to avoid
+    // misaligning wide (CJK) cells, but that also leaves the original borders
+    // untouched — so a table whose top border is column-shaped
+    // (`------  ------`) and whose bottom border is a single dash run
+    // (`------------`) keeps both, mismatched. When we teach the reflow path to
+    // measure display width (`unicode_width` is already a dep), it should also
+    // normalize the top and bottom borders to a single consistent shape.
     if !node.text().to_string().is_ascii() {
         return node.text().to_string();
     }
