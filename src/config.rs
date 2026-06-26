@@ -1465,6 +1465,63 @@ mod tests {
     }
 
     #[test]
+    fn line_width_parses_from_format_section() {
+        let toml = "[format]\nline-width = 100\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("[format] line-width must parse");
+        assert_eq!(cfg.line_width, 100);
+    }
+
+    #[test]
+    fn line_ending_parses_from_format_section() {
+        let toml = "[format]\nline-ending = \"lf\"\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("[format] line-ending must parse");
+        assert_eq!(cfg.line_ending, Some(LineEnding::Lf));
+    }
+
+    #[test]
+    fn deprecated_top_level_line_width_still_applies() {
+        // Back-compat: top-level `line-width` (no `[format]` key) is honored.
+        let toml = "line-width = 100\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("top-level line-width must still parse");
+        assert_eq!(cfg.line_width, 100);
+    }
+
+    #[test]
+    fn deprecated_top_level_line_ending_still_applies() {
+        let toml = "line-ending = \"crlf\"\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("top-level line-ending must still parse");
+        assert_eq!(cfg.line_ending, Some(LineEnding::Crlf));
+    }
+
+    #[test]
+    fn format_line_width_wins_over_top_level() {
+        // When both are set, the canonical `[format]` value takes precedence.
+        let toml = "line-width = 40\n[format]\nline-width = 100\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("both line-width keys must parse");
+        assert_eq!(cfg.line_width, 100);
+    }
+
+    #[test]
+    fn format_line_ending_wins_over_top_level() {
+        let toml = "line-ending = \"lf\"\n[format]\nline-ending = \"crlf\"\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("both line-ending keys must parse");
+        assert_eq!(cfg.line_ending, Some(LineEnding::Crlf));
+    }
+
+    #[test]
+    fn line_width_defaults_to_eighty() {
+        let cfg = parse_config_str("", Path::new("panache.toml")).expect("empty config parses");
+        assert_eq!(cfg.line_width, 80);
+        assert_eq!(cfg.line_ending, Some(LineEnding::Auto));
+    }
+
+    #[test]
     fn table_indent_parses_from_format_section() {
         let toml = "[format]\ntable-indent = 0\n";
         let cfg =

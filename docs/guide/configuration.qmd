@@ -86,6 +86,8 @@ parse, but Panache prints a warning. The current crop is:
 - the top-level, `[format]`, or `[style]` `code-blocks` table (now a no-op)
 - the top-level, `[format]`, or `[style]` `blank-lines` key (now a no-op)
 - the top-level `[style]` section itself (use `[format]`)
+- top-level `line-width` and `line-ending` (use `[format] line-width` and
+  `[format] line-ending`)
 
 ## Editor Support {#editor-support}
 
@@ -179,9 +181,10 @@ the selected flavor's defaults.
 
 ### Line Width
 
-Set the maximum line width for text wrapping:
+Set the maximum line width for text wrapping under `[format]`:
 
 ```toml
+[format]
 line-width = 80
 ```
 
@@ -189,6 +192,25 @@ The `-o`/`--option` flag on `panache format` can override this setting for a
 single invocation, e.g. `panache format -o line-width=100`. This is an escape
 hatch for ad-hoc runs; prefer `panache.toml` so that everyone formatting the
 repository gets the same result.
+
+::: callout-note
+A top-level `line-width` (outside `[format]`) is still accepted as a deprecated
+alias and prints a warning. The `[format]` value wins when both are set.
+:::
+
+### Line Endings
+
+Control the line ending written to formatted output under `[format]`:
+
+```toml
+[format]
+line-ending = "auto"
+```
+
+`auto` (the default) preserves the document's existing convention, `lf` forces
+Unix line endings, and `crlf` forces Windows line endings. As with `line-width`,
+a top-level `line-ending` is still accepted as a deprecated alias and `[format]`
+wins when both are set.
 
 ### Flavor Overrides
 
@@ -1431,9 +1453,9 @@ Complete example with some common options:
 
 ```toml
 flavor = "quarto"
-line-width = 80
 
 [format]
+line-width = 80
 wrap = "reflow"
 math-delimiter-style = "preserve"
 math-indent = 2

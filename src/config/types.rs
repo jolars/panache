@@ -312,6 +312,12 @@ impl JsonSchema for NoBreakAbbreviations {
 #[derive(Debug, Clone, Deserialize, JsonSchema, PartialEq)]
 #[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
 pub struct StyleConfig {
+    /// Maximum line width before wrapping. `None` falls back to the deprecated
+    /// top-level `line-width`, then the built-in default (80).
+    pub line_width: Option<usize>,
+    /// Line ending style. `None` falls back to the deprecated top-level
+    /// `line-ending`, then `auto`.
+    pub line_ending: Option<LineEnding>,
     /// Text wrapping mode
     pub wrap: Option<WrapMode>,
     /// Blank line handling between blocks
@@ -349,6 +355,8 @@ pub struct StyleConfig {
 impl Default for StyleConfig {
     fn default() -> Self {
         Self {
+            line_width: None,
+            line_ending: None,
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
             math_delimiter_style: MathDelimiterStyle::default(),
@@ -556,10 +564,14 @@ struct RawConfig {
     #[serde(default)]
     #[schemars(schema_with = "schema_helpers::extensions_schema")]
     extensions: Option<toml::Value>,
+    /// DEPRECATED top-level alias: use `[format] line-ending` instead. Still
+    /// read as a fallback when `[format]` omits it.
     #[serde(default)]
     line_ending: Option<LineEnding>,
-    #[serde(default = "default_line_width")]
-    line_width: usize,
+    /// DEPRECATED top-level alias: use `[format] line-width` instead. Still
+    /// read as a fallback when `[format]` omits it.
+    #[serde(default)]
+    line_width: Option<usize>,
     /// DEPRECATED: use `[compat] pandoc` instead. Still read as an alias.
     #[serde(default)]
     pandoc_compat: Option<PandocCompat>,
@@ -866,8 +878,13 @@ impl RawConfig {
             }
             style_config
         } else {
-            // Old format - construct StyleConfig from top-level fields
+            // Old format - construct StyleConfig from top-level fields.
+            // `line-width`/`line-ending` are resolved separately below (they
+            // fall back to the deprecated top-level keys), so leave them unset
+            // here.
             StyleConfig {
+                line_width: None,
+                line_ending: None,
                 wrap: self.wrap.or(Some(WrapMode::Reflow)),
                 blank_lines: self.blank_lines,
                 math_delimiter_style: self.math_delimiter_style,
@@ -884,15 +901,39 @@ impl RawConfig {
             }
         };
 
+        // `line-width`/`line-ending` now live under `[format]`; the top-level
+        // keys are deprecated aliases. The `[format]` value wins when both are
+        // set; otherwise fall back to the top-level alias, then the default.
+        if self.line_width.is_some() {
+            eprintln!(
+                "Warning: top-level `line-width` is deprecated; \
+                 use `[format] line-width` instead."
+            );
+        }
+        if self.line_ending.is_some() {
+            eprintln!(
+                "Warning: top-level `line-ending` is deprecated; \
+                 use `[format] line-ending` instead."
+            );
+        }
+        let line_width = style
+            .line_width
+            .or(self.line_width)
+            .unwrap_or_else(default_line_width);
+        let line_ending = style
+            .line_ending
+            .or(self.line_ending)
+            .or(Some(LineEnding::Auto));
+
         Config {
             extensions: super::resolve_extensions_for_flavor(self.extensions.as_ref(), self.flavor),
             formatter_extensions: super::resolve_formatter_extensions_for_flavor(
                 self.extensions.as_ref(),
                 self.flavor,
             ),
-            line_ending: self.line_ending.or(Some(LineEnding::Auto)),
+            line_ending,
             flavor: self.flavor,
-            line_width: self.line_width,
+            line_width,
             wrap: style.wrap,
             blank_lines: style.blank_lines,
             math_delimiter_style: style.math_delimiter_style,

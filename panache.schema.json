@@ -257,6 +257,27 @@
             "null"
           ]
         },
+        "line-ending": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LineEnding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Line ending style. `None` falls back to the deprecated top-level\n`line-ending`, then `auto`."
+        },
+        "line-width": {
+          "default": null,
+          "description": "Maximum line width before wrapping. `None` falls back to the deprecated\ntop-level `line-width`, then the built-in default (80).",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "math-delimiter-style": {
           "$ref": "#/$defs/MathDelimiterStyle",
           "description": "Math delimiter style preference"
@@ -662,13 +683,18 @@
         {
           "type": "null"
         }
-      ]
+      ],
+      "description": "DEPRECATED top-level alias: use `[format] line-ending` instead. Still\nread as a fallback when `[format]` omits it."
     },
     "line-width": {
-      "default": 80,
+      "default": null,
+      "description": "DEPRECATED top-level alias: use `[format] line-width` instead. Still\nread as a fallback when `[format]` omits it.",
       "format": "uint",
       "minimum": 0,
-      "type": "integer"
+      "type": [
+        "integer",
+        "null"
+      ]
     },
     "lint": {
       "anyOf": [
