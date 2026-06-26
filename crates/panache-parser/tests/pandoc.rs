@@ -11,8 +11,8 @@
 //! Two main test functions:
 //! - `pandoc_allowlist`: panics if any allowlisted case regresses.
 //! - `pandoc_full_report` (ignored by default): runs every case and writes a
-//!   triage summary to `tests/pandoc/report.txt` and structured sidecar
-//!   `docs/development/pandoc-report.json`.
+//!   triage summary to `tests/pandoc/report.txt` and a structured sidecar
+//!   `tests/pandoc/report.json`.
 
 #[path = "pandoc/corpus_loader.rs"]
 mod corpus_loader;
@@ -30,9 +30,8 @@ const SOURCE_REL: &str = "tests/fixtures/pandoc-conformance/.panache-source";
 const ALLOWLIST_REL: &str = "tests/pandoc/allowlist.txt";
 const BLOCKED_REL: &str = "tests/pandoc/blocked.txt";
 const REPORT_REL: &str = "tests/pandoc/report.txt";
-/// Structured sidecar consumed by future Quarto pandoc-conformance dashboard.
-/// Path is resolved relative to the workspace root, not `CARGO_MANIFEST_DIR`.
-const REPORT_JSON_DOCS_REL: &str = "../../docs/development/pandoc-report.json";
+/// Structured sidecar written beside `report.txt` for conformance tooling.
+const REPORT_JSON_REL: &str = "tests/pandoc/report.json";
 
 fn manifest_path(rel: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(rel)
@@ -264,7 +263,7 @@ fn pandoc_full_report() {
         "sections": sections,
         "passing_ids": passing,
     });
-    let json_path = manifest_path(REPORT_JSON_DOCS_REL);
+    let json_path = manifest_path(REPORT_JSON_REL);
     fs::write(&json_path, format!("{:#}\n", json))
         .unwrap_or_else(|e| panic!("failed to write {}: {e}", json_path.display()));
 

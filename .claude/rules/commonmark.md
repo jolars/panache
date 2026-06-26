@@ -4,8 +4,6 @@ paths:
   - "crates/panache-parser/tests/commonmark/**"
   - "crates/panache-parser/tests/fixtures/commonmark-spec/**"
   - "crates/panache-parser/scripts/update-commonmark-spec-fixtures.sh"
-  - "docs/development/commonmark-conformance.qmd"
-  - "docs/development/commonmark-report.json"
 ---
 
 CommonMark conformance harness changes must stay fixture-driven and
@@ -70,6 +68,6 @@ flavor-gated.
   it as a side effect of other work.
 - The `commonmark-hs/` checkout in the workspace root is read-only reference
   context. Do not vendor it as a dependency or alter its files.
-- `report.txt` and `docs/development/commonmark-report.json` are generated
-  artifacts. Regenerate them by running `commonmark_full_report`; do not
-  hand-edit either file.
+- `tests/commonmark/report.txt` and `tests/commonmark/report.json` are
+  generated artifacts. Regenerate them by running `commonmark_full_report`; do
+  not hand-edit either file.

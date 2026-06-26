@@ -469,7 +469,7 @@ test report.
   Phase 7. The dispatcher's `parse_inline_range_impl` still
   consumes Pandoc bracket constructs through it during Phases 1-6.
 - **Don't** edit conformance `report.txt` /
-  `docs/development/commonmark-report.json` by hand; they're
+  `tests/commonmark/report.json` by hand; they're
   derived. Re-run `commonmark_full_report` to refresh.
 
 ## Report-back format

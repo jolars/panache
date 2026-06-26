@@ -29,9 +29,8 @@ const SPEC_FIXTURE_REL: &str = "tests/fixtures/commonmark-spec/spec.txt";
 const ALLOWLIST_REL: &str = "tests/commonmark/allowlist.txt";
 const BLOCKED_REL: &str = "tests/commonmark/blocked.txt";
 const REPORT_REL: &str = "tests/commonmark/report.txt";
-/// Structured sidecar consumed by `docs/development/commonmark-conformance.qmd`.
-/// Path is resolved relative to the workspace root, not `CARGO_MANIFEST_DIR`.
-const REPORT_JSON_DOCS_REL: &str = "../../docs/development/commonmark-report.json";
+/// Structured sidecar written beside `report.txt` for the conformance skill.
+const REPORT_JSON_REL: &str = "tests/commonmark/report.json";
 const SPEC_VERSION: &str = "0.31.2";
 
 fn manifest_path(rel: &str) -> PathBuf {
@@ -210,7 +209,7 @@ fn commonmark_full_report() {
     fs::write(&report_path, &report)
         .unwrap_or_else(|e| panic!("failed to write {}: {e}", report_path.display()));
 
-    // Structured sidecar consumed by docs/development/commonmark-conformance.qmd.
+    // Structured sidecar written beside report.txt for the conformance skill.
     let pass_pct = (pass as f64 / total as f64) * 100.0;
     let sections: Vec<serde_json::Value> = all_sections
         .iter()
@@ -230,7 +229,7 @@ fn commonmark_full_report() {
         "sections": sections,
         "passing_numbers": passing,
     });
-    let json_path = manifest_path(REPORT_JSON_DOCS_REL);
+    let json_path = manifest_path(REPORT_JSON_REL);
     fs::write(&json_path, format!("{:#}\n", json))
         .unwrap_or_else(|e| panic!("failed to write {}: {e}", json_path.display()));
 

@@ -3,7 +3,6 @@ paths:
   - "crates/panache-parser/tests/commonmark.rs"
   - "crates/panache-parser/tests/commonmark/**"
   - "crates/panache-parser/tests/fixtures/commonmark-spec/**"
-  - "docs/development/commonmark-report.json"
 ---
 
 CommonMark conformance work — failure-bucket triage and workflow. Pair
@@ -29,7 +28,7 @@ work must not break.
     `tests/commonmark/allowlist.txt`.
   - `commonmark_full_report` (`#[ignore]`) — runs all 652 examples,
     writes `tests/commonmark/report.txt` and
-    `docs/development/commonmark-report.json`.
+    `tests/commonmark/report.json`.
 - `crates/panache-parser/tests/commonmark/spec_parser.rs` — parses
   `spec.txt` into `SpecExample { number, section, markdown,
   expected_html }`. Rarely needs changes.
@@ -256,7 +255,7 @@ to keep panache aligned.
    - `cargo clippy -p panache-parser --all-targets -- -D warnings`
    - `cargo fmt -p panache-parser -- --check`
    - Re-run `commonmark_full_report` so `report.txt` and
-     `docs/development/commonmark-report.json` reflect the new state.
+     `tests/commonmark/report.json` reflect the new state.
 
 ## Historical session knowledge
 

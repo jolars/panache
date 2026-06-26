@@ -16,5 +16,3 @@ Panache or learning about the inner workings of the project.
   rowan](./architecture/lsp-salsa-rowan-audit.qmd) compares panache's
   incremental + language-server architecture against rust-analyzer and salsa,
   and records the gaps worth adopting.
-- [CommonMark conformance](./commonmark-conformance.qmd) describes the spec
-  conformance harness and how to grow it.

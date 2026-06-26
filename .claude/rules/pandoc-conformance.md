@@ -5,7 +5,6 @@ paths:
   - "crates/panache-parser/tests/fixtures/pandoc-conformance/**"
   - "crates/panache-parser/src/pandoc_ast.rs"
   - "crates/panache-parser/scripts/update-pandoc-conformance-corpus.sh"
-  - "docs/development/pandoc-report.json"
 ---
 
 Pandoc-native conformance work — failure-bucket triage and workflow.
@@ -40,7 +39,7 @@ reference for everything in this rule.
     `tests/pandoc/allowlist.txt`.
   - `pandoc_full_report` (`#[ignore]`) — runs every corpus case,
     writes `tests/pandoc/report.txt` and
-    `docs/development/pandoc-report.json`.
+    `tests/pandoc/report.json`.
 - `crates/panache-parser/tests/pandoc/corpus_loader.rs` — reads the
   corpus directory into `Vec<PandocCase { id, slug, section,
   markdown, expected_native }>`. Section is derived from the slug
@@ -277,7 +276,7 @@ before fixing the projector.
    - `cargo clippy -p panache-parser --all-targets -- -D warnings`
    - `cargo fmt -p panache-parser -- --check`
    - Re-run `pandoc_full_report` so `report.txt` and
-     `docs/development/pandoc-report.json` reflect the new state.
+     `tests/pandoc/report.json` reflect the new state.
 
 ## Dos and don'ts
 
@@ -303,7 +302,7 @@ before fixing the projector.
   pinned pandoc output. Either regenerate via the script
   (intentional version bump) or fix the parser/projector to match.
 - **Don't** edit `report.txt` or
-  `docs/development/pandoc-report.json` by hand. They are derived.
+  `tests/pandoc/report.json` by hand. They are derived.
 - **Don't** bump the pinned pandoc version as a side effect of a
   conformance session — that's its own intentional change.
 

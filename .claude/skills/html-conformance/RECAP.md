@@ -512,7 +512,7 @@ interleave), `parse_pandoc_blocks` (inter-tag text reparse via
 ## Latest session — 2026-06-17 (Phase 7a — single-construct opaque lift)
 
 Conformance: **flat** — html 259 / 1 fail (the fail is pre-existing
-blocked 0390); `report.txt` + `pandoc-report.json` byte-identical, as
+blocked 0390); `report.txt` + `report.json` byte-identical, as
 expected for a CST-fidelity refactor. Workspace 0 → 0 failures.
 
 ### What landed

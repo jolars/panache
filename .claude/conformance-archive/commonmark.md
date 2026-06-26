@@ -11,7 +11,7 @@
 
 The full triage data lives in
 `crates/panache-parser/tests/commonmark/report.txt` and
-`docs/development/commonmark-report.json`; this file is for the
+`crates/panache-parser/tests/commonmark/report.json`; this file is for the
 *judgment calls* a fresh session can't reconstruct from those
 artifacts (why a target was picked, what was deliberately skipped,
 which fix unlocked which group).
