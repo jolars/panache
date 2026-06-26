@@ -1,7 +1,8 @@
 ---
 title: CLI Reference
-description: >-
-  Comprehensive reference for the Panache CLI, including all commands, options, and usage examples.
+description: >
+  Comprehensive reference for the Panache CLI, including all commands, options,
+and usage examples.
 ---
 
 # Command-Line Help for `panache`
