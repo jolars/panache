@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.20.0](https://github.com/jolars/panache/compare/panache-parser-v0.19.1...panache-parser-v0.20.0) (2026-06-26)
+
+### Features
+- add python-markdown admonitions and pymdownx details ([`b37a5cc`](https://github.com/jolars/panache/commit/b37a5cc2887029953eeb44b673a2fed39f3550be)), fixes [#396](https://github.com/jolars/panache/issues/396)
+- add mdsvex flavor with opaque Svelte template spans ([`983632a`](https://github.com/jolars/panache/commit/983632ac09ff66c469f74d834452773f59f8a960))
+
+### Bug Fixes
+- **parser:** parse headerless multiline tables with a dash-run closer ([`ab7e7d3`](https://github.com/jolars/panache/commit/ab7e7d315433e6e11d220c2735d2e7d4d884c10a)), fixes [#398](https://github.com/jolars/panache/issues/398)
+- **parser:** require left word boundary for bare URIs ([`f7b6334`](https://github.com/jolars/panache/commit/f7b6334c45902592955e5a8bb24b9545f2ba7223))
+
 ## [0.19.1](https://github.com/jolars/panache/compare/panache-parser-v0.19.0...panache-parser-v0.19.1) (2026-06-24)
 
 ### Bug Fixes

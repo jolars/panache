@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.18.0](https://github.com/jolars/panache/compare/panache-formatter-v0.17.0...panache-formatter-v0.18.0) (2026-06-26)
+
+### Features
+- add python-markdown admonitions and pymdownx details ([`b37a5cc`](https://github.com/jolars/panache/commit/b37a5cc2887029953eeb44b673a2fed39f3550be)), fixes [#396](https://github.com/jolars/panache/issues/396)
+
+### Bug Fixes
+- **parser:** parse headerless multiline tables with a dash-run closer ([`ab7e7d3`](https://github.com/jolars/panache/commit/ab7e7d315433e6e11d220c2735d2e7d4d884c10a)), fixes [#398](https://github.com/jolars/panache/issues/398)
+
+### Dependencies
+- updated crates/panache-parser to v0.20.0
+
 ## [0.17.0](https://github.com/jolars/panache/compare/panache-formatter-v0.16.0...panache-formatter-v0.17.0) (2026-06-24)
 
 ### Features

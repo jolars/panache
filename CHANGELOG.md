@@ -1,12 +1,32 @@
 # Changelog
 
-## Unreleased
+## [2.60.0](https://github.com/jolars/panache/compare/v2.59.0...v2.60.0) (2026-06-26)
 
 Panache now supports [mdsvex](https://mdsvex.com/), a Svelte-based Markdown
 preprocessor. This means that Panache can now parse and format `.svx` files,
 which are Markdown files that can contain Svelte components. The parser and
 formatter will treat Svelte components as opaque blocks, preserving their
 content and formatting them according to the surrounding Markdown context.
+
+### Features
+- **config:** move `line-width`/`line-ending` under `[format]` ([`382ee5d`](https://github.com/jolars/panache/commit/382ee5d09ddf253d3ca30454a2956feb3dad4261))
+- **formatters:** add html to biome ([`bdd09a4`](https://github.com/jolars/panache/commit/bdd09a44a390b6c31b7cf4af3416531a9eb11341))
+- **formatters:** add ojs to prettier and biome ([`1d6d2d6`](https://github.com/jolars/panache/commit/1d6d2d67d1b3ab55d7781a5279b61d27d12ce97e))
+- **linter:** report bib-key duplicates against project manifest ([`074912a`](https://github.com/jolars/panache/commit/074912a5583395eb1da6bca0821da2b938e9b83d))
+- add python-markdown admonitions and pymdownx details ([`b37a5cc`](https://github.com/jolars/panache/commit/b37a5cc2887029953eeb44b673a2fed39f3550be)), fixes [#396](https://github.com/jolars/panache/issues/396)
+- wire mdsvex flavor through LSP, CLI, and editor ([`89e1e79`](https://github.com/jolars/panache/commit/89e1e792162217af7ad268ce743d8f01117c6080))
+- add mdsvex flavor with opaque Svelte template spans ([`983632a`](https://github.com/jolars/panache/commit/983632ac09ff66c469f74d834452773f59f8a960))
+
+### Bug Fixes
+- **linter:** tailor chunk-label prefix to language ([`fd66a98`](https://github.com/jolars/panache/commit/fd66a98995f0ab4ad44c43a51368c6b9caebf449))
+- **parser:** parse headerless multiline tables with a dash-run closer ([`ab7e7d3`](https://github.com/jolars/panache/commit/ab7e7d315433e6e11d220c2735d2e7d4d884c10a)), fixes [#398](https://github.com/jolars/panache/issues/398)
+- **lsp:** self-heal referenced files without watch events ([`286ae13`](https://github.com/jolars/panache/commit/286ae138dc735608b07c54054cb2c560986a7860))
+- **linter:** scope `duplicate-bibliography-key` to declaring docs ([`38a0437`](https://github.com/jolars/panache/commit/38a0437e9157cd02bf87774612e460ebe898b256))
+- **parser:** require left word boundary for bare URIs ([`f7b6334`](https://github.com/jolars/panache/commit/f7b6334c45902592955e5a8bb24b9545f2ba7223))
+
+### Dependencies
+- updated crates/panache-formatter to v0.18.0
+- updated crates/panache-parser to v0.20.0
 
 ## [2.59.0](https://github.com/jolars/panache/compare/v2.58.0...v2.59.0) (2026-06-24)
 
