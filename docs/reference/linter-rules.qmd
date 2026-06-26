@@ -1,7 +1,7 @@
 ---
 title: Lint Rules
 description: >
-  Reference catalogue of every built-in Panache lint rule, the diagnostic codes
+  Reference catalog of every built-in Panache lint rule, the diagnostic codes
   each rule emits, severity, auto-fix availability, and configuration
   requirements.
 ---
@@ -123,8 +123,7 @@ warning[heading-hierarchy]: Heading level skipped from h1 to h3; expected h2
 
 ### `empty-list-item` {#empty-list-item}
 
-Detects list items whose content is empty --- a bare marker with nothing after
-it.
+Detects list items whose content is empty---a bare marker with nothing after it.
 
 Severity
 :   Warning
@@ -174,7 +173,7 @@ author-intent decision.
 
 ### `empty-values` {#empty-values}
 
-Flags YAML block-mapping keys whose value is an implicit null --- a key with
+Flags YAML block-mapping keys whose value is an implicit null---a key with
 nothing after the colon.
 
 Severity
@@ -227,8 +226,8 @@ but because that discards data it is [unsafe](#fix-safety) and runs only under
 ### `consumer-divergence` {#consumer-divergence}
 
 Flags a plain YAML scalar whose resolved type or value differs across the
-document's active YAML consumers --- a real cross-toolchain ambiguity, not a
-style opinion.
+document's active YAML consumers---a real cross-toolchain ambiguity, not a style
+opinion.
 
 Severity
 :   Warning
@@ -252,7 +251,7 @@ Description
 :   A Quarto document's frontmatter is parsed twice: by Quarto's js-yaml (YAML
     1.2 core) and by pandoc's libyaml (≈ YAML 1.1). The two versions resolve
     some plain scalars to different values. This rule flags only those genuine
-    divergences --- unlike yamllint's `truthy`/`octal-values`, it stays silent
+    divergences---unlike yamllint's `truthy`/`octal-values`, it stays silent
     when the value is unambiguous for the document's consumers.
 
     Detected divergences:
@@ -352,7 +351,7 @@ Severity
 :   Warning
 
 Default
-:   Off --- opt in via `[lint.rules] heading-strip-comments-residue = true`.
+:   Off---opt in via `[lint.rules] heading-strip-comments-residue = true`.
 
 Auto-fix
 :   No
@@ -432,9 +431,9 @@ Diagnostic codes
     [`undefined-footnote-id`](#undefined-footnote-id)
 
 Description
-:   Flags unresolved reference-style links (including shortcut/collapsed forms)
-    and unresolved footnote references. This helps catch broken cross-references
-    early in editing and CI.
+:   Flags unresolved reference-style links (including shortcut and collapsed
+    forms) and unresolved footnote references. This helps catch broken
+    cross-references early in editing and CI.
 
 **Example violation:**
 
@@ -500,7 +499,7 @@ Description
     (Pandoc renders bibliography entries with `id="ref-<citekey>"`), so they resolve
     as long as `@citekey` appears somewhere in the document.
 
-    Anchors declared via raw HTML `<a id="x">` / `<a name="x">` are not currently
+    Anchors declared via raw HTML `<a id="x">` or `<a name="x">` are not currently
     inspected, so links to them may be flagged as undefined. `<div id="x">` blocks
     are recognized.
 
@@ -579,8 +578,8 @@ Validates citation keys against loaded bibliographies and detects conflicts in
 inline bibliography entries.
 
 Severity
-:   Error for bibliography load/parse failures, Warning for undefined keys and
-    duplicates
+:   Error for bibliography load or parse failures, Warning for undefined keys
+    and duplicates
 
 Auto-fix
 :   No
@@ -671,7 +670,7 @@ with a key from a loaded bibliography file.
 ### `crossref-as-link-target` {#crossref-as-link-target}
 
 Detects link destinations that begin with `@`, which is almost always a typo for
-`#` (anchor) or a misplaced cross-reference / citation key.
+`#` (anchor) or a misplaced cross-reference or citation key.
 
 Severity
 :   Warning
@@ -875,8 +874,8 @@ warning[html-entities]: HTML entity '&numero' is missing a trailing ';'
 ### `link-text-is-url` {#link-text-is-url}
 
 Detects inline links whose visible text is identical to the destination URL
-(e.g. `[https://example.com/](https://example.com/)`) --- typically an artifact
-of HTML→Markdown conversion --- and offers to rewrite them as an autolink.
+(e.g. `[https://example.com/](https://example.com/)`)---typically an artifact of
+HTML→Markdown conversion---and offers to rewrite them as an autolink.
 
 Severity
 :   Warning
@@ -892,7 +891,7 @@ Description
 :   The rule fires only when **all** of the following hold:
 
     - the link is inline (`[text](url)`), not reference-style;
-    - the link text is plain --- no nested emphasis, code, or other inline
+    - the link text is plain---no nested emphasis, code, or other inline
       structure;
     - the rendered link text is byte-identical to the destination URL, including
       any trailing slash;
@@ -989,10 +988,10 @@ Diagnostic codes
 Description
 
 :   Pandoc footnotes do not nest. Inside a `[^x]: ...` definition body, any
-    `[^id]` reference is silently parsed as a literal `Str` --- the would-be
-    link disappears from the output with no warning. The same applies to
-    references nested arbitrarily deep inside that body (inside emphasis,
-    strong, strikeout, links, blockquotes, lists, or inline footnotes).
+    `[^id]` reference is silently parsed as a literal `Str`---the would-be link
+    disappears from the output with no warning. The same applies to references
+    nested arbitrarily deep inside that body (inside emphasis, strong,
+    strikeout, links, blockquotes, lists, or inline footnotes).
 
     This rule surfaces the silent drop at lint time so the user notices before the
     document is rendered. After the parser fix that aligns panache with pandoc on
@@ -1002,7 +1001,7 @@ Description
     CST-distinct constructs.
 
     References at the top level (outside any definition body) and inside a top-level
-    inline footnote `^[...]` are not flagged --- pandoc resolves those normally.
+    inline footnote `^[...]` are not flagged---pandoc resolves those normally.
 
 **Example violation:**
 
@@ -1136,7 +1135,7 @@ Description
 
 :   The math parser captures math content losslessly even when it is malformed,
     so a stray brace or unterminated environment never breaks parsing or
-    formatting --- but it is build-breaking downstream: `quarto render` to PDF
+    formatting---but it is build-breaking downstream: `quarto render` to PDF
     hard-fails on an unclosed brace or mismatched environment, and MathJax/KaTeX
     silently drop the equation. That is why these ride at `error` severity. This
     rule surfaces the structural problems the parser already detected, with the
@@ -1144,7 +1143,7 @@ Description
     or the mismatched `\end`).
 
     The check is purely syntactic: TeX is a macro language, so the rule does not
-    validate command names, argument arity, or semantics --- only brace and
+    validate command names, argument arity, or semantics---only brace and
     environment nesting. Because a macro can expand to braces or an environment the
     structural parser cannot see, valid TeX can occasionally look unbalanced; in
     that rare case disable the rule with `[lint.rules] math-syntax     = false` or
@@ -1194,8 +1193,8 @@ Emitted when an `\end` appears with no open `\begin`.
 
 Validates document YAML frontmatter, code-cell options, and project config files
 (`_quarto.yml`, `_metadata.yml`) against Quarto's machine-readable schema,
-flagging type mismatches and invalid enum values. (Unknown/misspelled keys are
-handled by the separate, opt-in
+flagging type mismatches and invalid enum values. (Unknown or misspelled keys
+are handled by the separate, opt-in
 [`quarto-schema-unknown-key`](#quarto-schema-unknown-key) rule.)
 
 Severity
@@ -1276,7 +1275,7 @@ Severity
 :   Warning
 
 Default
-:   Off --- opt in via `[lint.rules] quarto-schema-unknown-key = true`.
+:   Off---opt in via `[lint.rules] quarto-schema-unknown-key = true`.
 
 Auto-fix
 :   No
@@ -1335,7 +1334,7 @@ Auto-fix
 :   No
 
 Description
-:   The YAML lexer/parser could not interpret the content (malformed flow
+:   The YAML lexer or parser could not interpret the content (malformed flow
     sequences, unterminated strings, etc.).
 
 **Example (hashpipe):**

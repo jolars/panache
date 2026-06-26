@@ -19,12 +19,12 @@ Panache searches for a configuration file in the following order:
    `~/.config/panache/config.toml`)
 
 For the project-config step, discovery walks up from the file being processed
-and uses the **nearest** `panache.toml` / `.panache.toml` /
+and uses the **nearest** `panache.toml`, `.panache.toml`, or
 `.config/panache.toml`. In a monorepo, a config closer to the file wins over one
-at the project root. Within a single directory, a bare `panache.toml` /
+at the project root. Within a single directory, a bare `panache.toml` or
 `.panache.toml` wins over `.config/panache.toml`. The walk stops at the nearest
-`.git` ancestor (project root) so unrelated configs above the project --- e.g. a
-stray `panache.toml` in your home directory --- are not inherited. The same rule
+`.git` ancestor (project root) so unrelated configs above the project---e.g. a
+stray `panache.toml` in your home directory---are not inherited. The same rule
 applies to both the CLI and the LSP. If no `.git` ancestor exists (e.g. an
 untracked scratch file), the walk falls back to today's filesystem-root
 behavior.
@@ -32,9 +32,9 @@ behavior.
 Putting the file in `.config/` (the [dot-config](https://dot-config.github.io)
 convention) keeps the project root tidy. A `.config/panache.toml` behaves
 exactly like a `panache.toml` in the directory that contains `.config/`: the
-`.config/` wrapper is purely cosmetic. In particular, **path-based** settings
---- `exclude` / `include` and `flavor-overrides` glob keys --- anchor at that
-parent directory (the project root), so a pattern like `vendor/**` matches
+`.config/` wrapper is purely cosmetic. In particular, **path-based**
+settings---`exclude`, `include`, and `flavor-overrides` glob keys---anchor at
+that parent directory (the project root), so a pattern like `vendor/**` matches
 `vendor/` next to `.config/`, with no `../` prefix needed (see [Path matching
 base](#file-selection-directory-traversal)).
 
@@ -71,7 +71,7 @@ swallowed:
 - a diagnostic is published on the offending `panache.toml`, anchored at the bad
   key (so it shows even when the config file isn't open), and
 - a one-time notification pops up, and
-- formatting is **refused** until the config parses again --- Panache will not
+- formatting is **refused** until the config parses again---Panache will not
   silently format with default settings while your config is broken.
 
 All three clear automatically once the config parses, and formatting resumes.
@@ -83,8 +83,8 @@ parse, but Panache prints a warning. The current crop is:
   `quarto-crossrefs`)
 - snake_case fields under `[formatters.*]` (e.g. `prepend_args` →
   `prepend-args`)
-- the top-level / `[format]` / `[style]` `code-blocks` table (now a no-op)
-- the top-level / `[format]` / `[style]` `blank-lines` key (now a no-op)
+- the top-level, `[format]`, or `[style]` `code-blocks` table (now a no-op)
+- the top-level, `[format]`, or `[style]` `blank-lines` key (now a no-op)
 - the top-level `[style]` section itself (use `[format]`)
 
 ## Editor Support {#editor-support}
@@ -229,7 +229,7 @@ Panache applies flavor in this order:
 ### File Selection (Directory Traversal)
 
 When you run commands on directories (`panache format .`, `panache lint .`,
-`panache debug format .`), Panache supports include/exclude selectors:
+`panache debug format .`), Panache supports include and exclude selectors:
 
 ```toml
 exclude = [".git/", "build/"]
@@ -254,7 +254,7 @@ extend-include = ["*.Rmd"]
 
 Path matching base:
 
-- Relative `include` / `exclude` globs (and `flavor-overrides` glob keys)
+- Relative `include` and `exclude` globs (and `flavor-overrides` glob keys)
   resolve against the directory of the config file that declared them. A
   `.config/panache.toml` is unwrapped to the project root, so it behaves exactly
   like a `panache.toml` in the directory above `.config/`. The same rule applies
@@ -316,7 +316,7 @@ and still works as an alias. The former `[lint] quarto-version` key moved to
 Quarto recognizes a fixed set of cross-reference prefixes (`@fig-`, `@tbl-`,
 `@eq-`, `@sec-`, `@thm-`, and so on), and Panache treats keys with those
 prefixes as cross-references rather than citations. Some Quarto extensions
-inject *additional* prefixes that Panache cannot discover on its own --- for
+inject *additional* prefixes that Panache cannot discover on its own---for
 example the [pseudocode](https://github.com/leovan/quarto-pseudocode) extension
 makes `@algo-` a cross-reference. Without help, Panache parses `@algo-cd` as a
 citation and the linter reports it as a [missing bibliography
@@ -340,7 +340,7 @@ crossref-prefixes = ["algo"]
 
 ### CLI Cache
 
-Panache can persist CLI lint/format cache entries between runs to speed up
+Panache can persist CLI lint and format cache entries between runs to speed up
 workspace re-runs when files and config are unchanged.
 
 ```toml
@@ -349,8 +349,8 @@ cache-dir = "/absolute/path/to/cache-dir"
 ```
 
 `cache`
-:   Enable the on-disk lint/format cache (default: `true`). Set to `false` to
-    disable cache reads and writes for the project. `--no-cache` and
+:   Enable the on-disk lint and format cache (default: `true`). Set to `false`
+    to disable cache reads and writes for the project. `--no-cache` and
     `PANACHE_NO_CACHE` force the cache off for a single invocation regardless of
     this setting.
 
@@ -362,8 +362,8 @@ cache-dir = "/absolute/path/to/cache-dir"
 Cache validity currently includes file content, effective config, and Panache
 version. When any of these change, Panache recomputes and refreshes entries. Use
 `--cache-dir <CACHE_DIR>` (or `PANACHE_CACHE_DIR`) to override `cache-dir` for
-one invocation. Use `--no-cache` (or `PANACHE_NO_CACHE`) to bypass cache
-reads/writes for a single CLI invocation. Use `panache clean` to remove the
+one invocation. Use `--no-cache` (or `PANACHE_NO_CACHE`) to bypass cache reads
+and writes for a single CLI invocation. Use `panache clean` to remove the
 current workspace bucket, or `panache clean --all` to clear all global Panache
 cache buckets.
 
@@ -514,7 +514,7 @@ tab-width = 4
 ## Experimental Features
 
 The `[experimental]` table gates features that are **opt-in and unstable**.
-Their behavior --- and the option surface itself --- may change, or be removed,
+Their behavior---and the option surface itself---may change, or be removed,
 **without a major release**. Do not depend on them for stable output.
 
 ```toml
@@ -525,25 +525,25 @@ format-math = false
 ### `format-math`
 
 When enabled, Panache reformats the **content** of math spans (`$...$`,
-`$$...$$`, and `\(...\)` / `\[...\]`) structurally:
+`$$...$$`, and `\(...\)` or `\[...\]`) structurally:
 
 - inline whitespace runs collapse to a single space;
 - environment bodies (`\begin{aligned}…\end{aligned}` and friends) are indented
   two spaces and laid out one row per line;
 - `\\` line breaks are normalized to a trailing `\\`;
 - `&` columns in alignment environments are aligned;
-- operators are spaced precedence-aware --- a binary or relational operator gets
+- operators are spaced precedence-aware---a binary or relational operator gets
   one space on each side (`a+b` → `a + b`, `a<=b` → `a <= b`), while a unary
-  minus/plus stays tight (`x = -y`, `f(-x)`).
+  minus or plus stays tight (`x = -y`, `f(-x)`).
 
-Macros are not rewritten --- no `\frac`/`\dfrac` canonicalization and no
-inserting alignment `&`. Column alignment uses **source character widths**, so
-it tidies the source rather than aligning rendered glyphs (`\alpha` counts as
-six columns). Malformed math (unbalanced braces or environments) and content
-with a lone unescaped `$` is left verbatim.
+Macros are not rewritten---no `\frac`/`\dfrac` canonicalization and no inserting
+alignment `&`. Column alignment uses **source character widths**, so it tidies
+the source rather than aligning rendered glyphs (`\alpha` counts as six
+columns). Malformed math (unbalanced braces or environments) and content with a
+lone unescaped `$` is left verbatim.
 
 Standalone TeX blocks (a bare `\begin{env}…\end{env}` that is not wrapped in
-math delimiters) are not affected --- they are kept opaque by the parser.
+math delimiters) are not affected---they are kept opaque by the parser.
 
 Default is `false` (math content is emitted verbatim).
 
@@ -655,10 +655,10 @@ four-space-rule = false
     require four-space (one tab-width) indentation rather than lining up with
     the first character after the marker (default: disabled, non-default
     extension). Enable this to produce output that strict Markdown parsers such
-    as [Python-Markdown](https://python-markdown.github.io/) accept --- they
-    treat two-space-indented continuations as escaping the list. When enabled,
-    the formatter indents nested and continuation content a flat four columns
-    per level (`- a` / `- a1`); markers keep their normal trailing space.
+    as [Python-Markdown](https://python-markdown.github.io/) accept---they treat
+    two-space-indented continuations as escaping the list. When enabled, the
+    formatter indents nested and continuation content a flat four columns per
+    level (`- a` with nested `- a1`); markers keep their normal trailing space.
 
 #### Code Blocks
 
@@ -765,7 +765,7 @@ pymdownx-details = true
     indented code block.
 
 `pymdownx-details`
-:   Collapsible admonitions from `pymdownx.details` --- `???` (collapsed) and
+:   Collapsible admonitions from `pymdownx.details`---`???` (collapsed) and
     `???+` (expanded) (default: disabled for all flavors). Independent of
     `python-markdown-admonitions`.
 
@@ -814,7 +814,7 @@ autolinks = true
 :   Shortcut reference links `[ref]` (default: enabled)
 
 `spaced-reference-links`
-:   Allow whitespace --- spaces, tabs, or a single newline --- between the two
+:   Allow whitespace---spaces, tabs, or a single newline---between the two
     bracket pairs of a reference link or image: `[foo] [bar]`, `![alt] [bar]`,
     `[foo] []`. Without the extension, `[foo] [bar]` parses as a shortcut
     `[foo]` followed by literal text. Also applies to reference images (default:
@@ -844,8 +844,8 @@ wikilinks-title-before-pipe = false
 ```
 
 `wikilinks-title-after-pipe`
-:   Wikilink syntax `[[url]]` and `[[url|title]]` --- URL first, optional title
-    after the pipe. Image variant `![[url]]` / `![[url|title]]` is also
+:   Wikilink syntax `[[url]]` and `[[url|title]]`---URL first, optional title
+    after the pipe. Image variant `![[url]]` or `![[url|title]]` is also
     recognized. Single-line shape, non-greedy on the first `]]`, empty bodies
     (`[[]]`) are treated as literal text. Title content is *not* recursively
     parsed for inline markup, mirroring pandoc behavior (default: disabled, no
@@ -1250,8 +1250,8 @@ before the formatter is invoked:
 
 `{ext}`
 :   The conventional file extension for the language, e.g. `py`, `js`, `sh`.
-    Panache maintains a built-in language --- extension table covering the
-    common languages; unknown languages fall back to `txt`.
+    Panache maintains a built-in language-to-extension table covering the common
+    languages; unknown languages fall back to `txt`.
 
 This makes it practical to delegate every code block to a monolithic formatter
 that dispatches by extension internally, e.g. `dprint`:
@@ -1287,7 +1287,7 @@ This matches only truly untagged blocks:
 ```
 ````
 
-A block tagged with an explicit language --- including ```` ```plain ```` --- is
+A block tagged with an explicit language---including ```` ```plain ````---is
 **not** matched by `[formatters.""]`. If you also want to format
 ```` ```plain ```` blocks, register a separate `[formatters.plain]` entry.
 
@@ -1311,7 +1311,7 @@ Result caching
     instead of one per block. In a long-lived process (the LSP) results are also
     reused across edits, so reformatting after changing one block does not
     re-spawn the formatter for the untouched blocks. The cache keys on the
-    formatter command, arguments, language, and block content --- but **not** on
+    formatter command, arguments, language, and block content---but **not** on
     the formatter's own config files (see *Config files* below).
 
 Error handling
@@ -1326,7 +1326,7 @@ Language compatibility
 Preset metadata
 :   Built-in presets include metadata (name, source URL, description, and
     supported languages) in Panache internals, which is used for validation now
-    and can power future formatter lookup/help commands.
+    and can power future formatter lookup and help commands.
 
 Timeout
 :   30 seconds per formatter (not per chain)

@@ -1,24 +1,24 @@
 ---
 title: "Comparison with Other Tools"
 description: >
-  This page compares Panache to other tools that overlap with parts of its scope
-  -- formatting, linting, and language-server features for Markdown, Pandoc, and
-  Quarto. The goal is to clarify what each tool is built for, so you can pick
-  the right one (or combine them) for your project.
+  This page compares Panache to other tools that overlap with parts of its
+  scope---formatting, linting, and language-server features for Markdown,
+  Pandoc, and Quarto. The goal is to clarify what each tool is built for, so you
+  can pick the right one (or combine them) for your project.
 ---
 
 ## At a Glance
 
 Panache aims to cover the formatter, linter, and language-server roles for
-Pandoc-flavoured Markdown from a single, lossless concrete syntax tree. Most
+Pandoc-flavored Markdown from a single, lossless concrete syntax tree. Most
 other tools in this space focus on one of those roles, and most do not parse
 Pandoc/Quarto-specific constructs (fenced divs, bracketed spans, block
 attributes, raw blocks, definition lists, line blocks, table captions, citation
 keys, math environments).
 
 The tables below cover the same set of programs as the
-[Performance](performance.qmd) page, plus marksman -- a Markdown language server
-that does not appear in the benchmarks but is the closest neighbour to Panache's
+[Performance](performance.qmd) page, plus marksman---a Markdown language server
+that does not appear in the benchmarks but is the closest neighbor to Panache's
 LSP role.
 
 ### Roles
@@ -29,7 +29,7 @@ LSP role.
   | mado              | ○         | ●      | ○   | Rust           |
   | markdownlint      | ○         | ●      | ○   | Ruby           |
   | markdownlint-cli2 | ◐[^1]     | ●      | ○   | JavaScript     |
-  | marksman          | ○         | ◐[^2]  | ●   | F# / .NET      |
+  | marksman          | ○         | ◐[^2]  | ●   | F# (.NET)      |
   | mdformat          | ●         | ○      | ○   | Python         |
   | Pandoc            | ◐[^3]     | ○      | ○   | Haskell        |
   | Prettier          | ●         | ○      | ○   | JavaScript     |
@@ -45,7 +45,7 @@ LSP role.
     handful of structural issues, but it is not a general style linter.
 
 [^3]: Pandoc is a document converter; `pandoc -f markdown -t markdown`
-    round-trips through Pandoc's AST, which normalises but is not designed as a
+    round-trips through Pandoc's AST, which normalizes but is not designed as a
     formatter and is not in general lossless.
 
 [^4]: `rumdl fmt` reuses the lint engine to apply auto-fixes; it is not a
@@ -78,7 +78,7 @@ longer accepts.
     than a specific spec; rules apply equally to CommonMark and GFM input but
     the tool does not parse to either spec.
 
-[^7]: marksman recognises YAML frontmatter and code fences but does not parse
+[^7]: marksman recognizes YAML frontmatter and code fences but does not parse
     Pandoc-specific block constructs (fenced divs, bracketed spans, attribute
     syntax, definition lists, table captions, etc.).
 
@@ -96,18 +96,18 @@ longer accepts.
 
 [^12]: rumdl will lint `.qmd` and `.Rmd` files and skip YAML frontmatter, but it
     does not parse Quarto/R Markdown executable code blocks, shortcodes, or
-    cross-reference syntax -- those are treated as plain Markdown.
+    cross-reference syntax---those are treated as plain Markdown.
 
-[^13]: `rumdl --flavor pandoc` recognises fenced divs, bracketed spans,
+[^13]: `rumdl --flavor pandoc` recognizes fenced divs, bracketed spans,
     inline/block attributes, citations (`@key`/`[@key]`), inline footnotes,
     definition lists, line blocks, grid and multi-line tables, pipe-table
-    captions, example lists/references, sub/superscript, and Pandoc YAML
+    captions, example lists and references, sub/superscript, and Pandoc YAML
     metadata, and uses them to suppress false positives and resolve Pandoc
     constructs. It does not build a lossless Pandoc CST, so those constructs are
     linted but not reformatted.
 
 For raw speed numbers, see [Performance](performance.qmd). This page focuses on
-*scope* and *behaviour* differences, not benchmarks.
+*scope* and *behavior* differences, not benchmarks.
 
 ## mado
 
@@ -135,9 +135,9 @@ inspired by the `markdownlint` rule numbering, built on
 
 ## markdownlint (Ruby)
 
-[markdownlint](https://github.com/markdownlint/markdownlint) -- installed as the
-`mdl` gem -- is the original Ruby Markdown style checker by Mark Harrison and
-the ancestor of the `markdownlint` rule numbering used elsewhere in this family.
+[markdownlint](https://github.com/markdownlint/markdownlint)---installed as the
+`mdl` gem---is the original Ruby Markdown style checker by Mark Harrison and the
+ancestor of the `markdownlint` rule numbering used elsewhere in this family.
 
 **What it does well**
 
@@ -150,7 +150,7 @@ the ancestor of the `markdownlint` rule numbering used elsewhere in this family.
 - *Linter only.* No formatter or `--fix` mode; `mdl` reports violations and
   leaves files unchanged.
 - *No specific Markdown flavor target.* Rules apply to generic Markdown;
-  Pandoc/Quarto extensions are not modelled.
+  Pandoc/Quarto extensions are not modeled.
 - *No language server.*
 - *Ruby runtime.* Per-invocation startup is dominated by the Ruby interpreter.
 
@@ -201,12 +201,12 @@ vaults) where the document graph matters as much as any individual file.
 **Where it differs from panache**
 
 - *Not a formatter.* marksman has no `format` command and no formatting code
-  actions; you still need a separate tool to normalise whitespace, wrap
+  actions; you still need a separate tool to normalize whitespace, wrap
   paragraphs, or align tables.
 - *Not a style linter.* It catches structural problems (broken refs, duplicate
   anchors), but it will not warn about, say, skipped heading levels or mixed
   list markers.
-- *Markdown-flavoured, not Pandoc-flavoured.* Pandoc-only constructs such as
+- *Markdown-flavored, not Pandoc-flavored.* Pandoc-only constructs such as
   `::: callout-note` fenced divs, `[text]{.class}` bracketed spans,
   `{#id .class}` block attributes, definition lists, line blocks, and
   `Table: caption` syntax are treated as plain text. Quarto shortcodes and
@@ -234,21 +234,21 @@ canonical form for any CommonMark input.
   supported set.
 - *Escape-on-unknown-syntax.* Constructs outside CommonMark (or whatever plugins
   are loaded) are typically backslash-escaped to keep rendered output stable,
-  which can mangle Pandoc-flavoured input.
+  which can mangle Pandoc-flavored input.
 - *Python runtime.* Adds interpreter startup overhead per invocation.
 
 ## Pandoc
 
 [Pandoc](https://pandoc.org) is a document converter that translates between
 dozens of markup formats. It is not a formatter or linter in the dedicated
-sense, but `pandoc -f markdown -t markdown` is sometimes used as a normalisation
+sense, but `pandoc -f markdown -t markdown` is sometimes used as a normalization
 step, which is why it appears on the [Performance](performance.qmd) page.
 
 **What it does well**
 
 - Reads many Markdown dialects directly: `markdown` (Pandoc), `commonmark`,
   `commonmark_x`, `gfm`, `markdown_mmd`, `markdown_phpextra`, `markdown_strict`.
-- Comprehensive coverage of Pandoc-specific syntax -- fenced divs, bracketed
+- Comprehensive coverage of Pandoc-specific syntax---fenced divs, bracketed
   spans, block attributes, definition lists, line blocks, table captions, math,
   citations.
 - `--wrap=auto|none|preserve` and `--columns` control line wrapping in the
@@ -256,7 +256,7 @@ step, which is why it appears on the [Performance](performance.qmd) page.
 
 **Where it differs from panache**
 
-- *Converter, not a formatter.* The Markdown writer normalises output, but this
+- *Converter, not a formatter.* The Markdown writer normalizes output, but this
   is a side effect of round-tripping through Pandoc's AST. Pandoc's manual notes
   that round-tripping is not in general lossless: comments, raw HTML, attribute
   placement, and similar details can move or disappear.
@@ -278,7 +278,7 @@ Markdown formatter in the JavaScript ecosystem.
 - Mature, opinionated formatting with very few knobs to turn.
 - Strong CommonMark and GFM support, including tables, task lists, and
   strikethrough.
-- Frontmatter (YAML/TOML) is recognised and preserved.
+- Frontmatter (YAML/TOML) is recognized and preserved.
 - Wide ecosystem of editor integrations and pre-commit hooks.
 
 **Where it differs from panache**
@@ -288,14 +288,14 @@ Markdown formatter in the JavaScript ecosystem.
 - *No Pandoc/Quarto extensions.* Fenced divs, bracketed spans, block attributes,
   raw blocks, definition lists, line blocks, math blocks beyond inline `$...$`,
   and Pandoc-style table captions are not part of Prettier's Markdown grammar.
-  The default behaviour is to either pass them through verbatim or to rewrap
-  them in ways that can change semantics for Pandoc.
+  The default behavior is to either pass them through verbatim or to rewrap them
+  in ways that can change semantics for Pandoc.
 - *Node.js startup overhead.* For one-off CLI invocations, the Node.js runtime
   dominates the wall-clock time. See [Performance](performance.qmd) for numbers;
   the gap shrinks for long-running processes (editor integrations, the Prettier
   daemon) but may not close entirely.
 - *Opinionated wrapping only.* Prettier has a single `proseWrap` setting
-  (`always` / `never` / `preserve`); panache adds `sentence`-wrapping for
+  (`always`, `never`, or `preserve`); panache adds `sentence`-wrapping for
   diff-friendly prose, plus configurable line width per file or directory.
 
 ## rumdl
@@ -307,7 +307,7 @@ heavily inspired by `markdownlint` and ports many of its rules.
 
 **What it does well**
 
-- Large catalogue of style rules (heading style, list indentation, line length,
+- Large catalog of style rules (heading style, list indentation, line length,
   trailing whitespace, blank lines, etc.) compatible with the `markdownlint`
   rule numbering.
 - Native compilation gives it fast startup and per-file throughput.
@@ -322,7 +322,7 @@ heavily inspired by `markdownlint` and ports many of its rules.
   goes through the lint engine and applies whichever fixes the enabled rules
   produce; rules that do not produce fixes leave their target untouched.
 - *Pandoc-aware linting, not lossless Pandoc parsing.* `rumdl --flavor pandoc`
-  recognises fenced divs, bracketed spans, inline/block attributes, citations,
+  recognizes fenced divs, bracketed spans, inline/block attributes, citations,
   inline footnotes, definition lists, line blocks, grid and multi-line tables,
   pipe-table captions, example lists, sub/superscript, and Pandoc YAML metadata,
   and uses that knowledge to suppress false positives (e.g. resolving anchors

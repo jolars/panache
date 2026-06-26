@@ -12,7 +12,7 @@ handles style consistency, the linter catches semantic problems like syntax
 errors, heading hierarchy issues, broken references, and citation problems.
 
 ::: {.callout-tip}
-For the full catalogue of built-in lint rules, the diagnostic codes each rule
+For the full catalog of built-in lint rules, the diagnostic codes each rule
 emits, severity, and auto-fix support, see the [Lint Rules
 reference](../reference/linter-rules.qmd).
 :::
@@ -126,7 +126,7 @@ panache lint --message-format short document.qmd # GNU-style one-line diagnostic
 
 Panache includes several built-in lint rules that analyze document structure and
 content. See the [Lint Rules reference](../reference/linter-rules.qmd) for the
-complete catalogue, including each rule's diagnostic codes, severity, auto-fix
+complete catalog, including each rule's diagnostic codes, severity, auto-fix
 status, and configuration requirements.
 
 ## External Linters

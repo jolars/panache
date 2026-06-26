@@ -12,7 +12,7 @@ Panache or learning about the inner workings of the project.
   Guide](contributing.html).
 - [Language Server](./lsp.qmd) covers the architecture and implementation of the
   Panache Language Server.
-- [Architecture audit: LSP / salsa /
+- [Architecture audit: LSP, salsa, and
   rowan](./architecture/lsp-salsa-rowan-audit.qmd) compares panache's
   incremental + language-server architecture against rust-analyzer and salsa,
   and records the gaps worth adopting.

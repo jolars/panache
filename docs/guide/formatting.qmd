@@ -44,7 +44,7 @@ If `wrap` is set to `semantic`, Panache enforces [semantic line
 breaks](https://sembr.org/): it keeps the line breaks you already placed (for
 example after a comma or clause) *and* adds a break at every sentence boundary
 you missed. Unlike `sentence`, it never reflows away an existing break, and like
-`sentence` it ignores `line-width` --- a long sentence with no internal break is
+`sentence` it ignores `line-width`---a long sentence with no internal break is
 left on a single line. This makes it the non-destructive companion to
 `sentence`: use `sentence` to normalize an arbitrarily-wrapped document into
 one-sentence-per-line, and `semantic` to augment a document you are already
@@ -58,7 +58,7 @@ The abbreviation list follows the document language. When metadata provides
 `lang` (as in Quarto and Pandoc frontmatter), Panache selects a built-in profile
 for it; profiles ship for English, Czech, German, Spanish, and French, and
 unknown languages fall back to English. You can also set a project-wide fallback
-language and extend the list with your own tokens --- see [Sentence-Wrapping
+language and extend the list with your own tokens---see [Sentence-Wrapping
 Abbreviations](configuration.qmd#no-break-abbreviations) in the configuration
 guide.
 
@@ -126,8 +126,8 @@ Output
 ### YAML frontmatter and chunk options
 
 Under a wrapping mode (`reflow`, `sentence`, or `semantic`), Panache also wraps
-prose held in YAML --- both document frontmatter and Quarto/R&nbsp;Markdown
-hashpipe (`#|`) chunk options --- following the same wrap mode as the document
+prose held in YAML---both document frontmatter and Quarto/R&nbsp;Markdown
+hashpipe (`#|`) chunk options---following the same wrap mode as the document
 body. *Folded* block scalars (those introduced with `>`, including the `>-` and
 `>+` chomping variants) and plain scalars are reflowed; a folded scalar's single
 line breaks fold to spaces, so this never changes the value:
@@ -138,7 +138,7 @@ line breaks fold to spaces, so this never changes the value:
   breaks and adds breaks at sentence boundaries.
 
 Blank lines and more-indented lines inside a folded scalar are significant and
-left in place. Literal block scalars (`|`) are left untouched --- their line
+left in place. Literal block scalars (`|`) are left untouched---their line
 breaks are significant content. Under `wrap = "preserve"`, nothing in the YAML
 is reflowed.
 
@@ -376,7 +376,7 @@ Output
 
 For a bare (unbraced) info string only the first word is the language class, but
 the rest of the info string is preserved verbatim rather than dropped. This
-keeps tool-specific metadata intact --- for example Documenter.jl's
+keeps tool-specific metadata intact---for example Documenter.jl's
 `@example foo`, `jldoctest; setup = :(...)`, or `@repl bar`:
 
 ::: callout-note
@@ -553,7 +553,7 @@ With the [`four-space-rule`](configuration.qmd#lists) extension enabled, nested
 lists and continuation paragraphs (blocks that follow a blank line) are indented
 a flat four columns (one tab stop) per nesting level instead of lining up with
 the marker. Markers keep their normal trailing space, and a wrapped paragraph's
-own continuation lines still align with its first-line content --- only nesting
+own continuation lines still align with its first-line content---only nesting
 and new blocks move to the tab stop. This produces output that strict Markdown
 parsers like Python-Markdown accept (they treat two-space-indented nesting as
 flat sibling items).
@@ -578,9 +578,9 @@ Output
 
 The four-space nesting is preserved (the default style would collapse it to two
 spaces). Note the extension assumes four-space-indented *input*: under it,
-two-space-indented content is read as a sibling rather than a child --- matching
-the strict-Markdown reading --- so it normalizes existing four-space documents
-but does not re-nest two-space ones.
+two-space-indented content is read as a sibling rather than a child---matching
+the strict-Markdown reading---so it normalizes existing four-space documents but
+does not re-nest two-space ones.
 
 ## Block Quotes
 
@@ -955,7 +955,7 @@ Set `math-indent = 0` to keep the content flush against the left margin.
 
 By default the *content* between math delimiters is emitted verbatim. Enabling
 the experimental [`format-math`](configuration.qmd#format-math) option turns on
-structural reformatting of that content --- inline whitespace collapse, tight
+structural reformatting of that content---inline whitespace collapse, tight
 sub/superscripts, math-mode group-interior trimming, environment-body
 indentation, `\\` normalization, and `&`-column alignment:
 
@@ -1007,11 +1007,11 @@ A display equation (`$$…$$`) wider than `line-width` is broken at its top-leve
 relations, with each continuation aligned under the first relation (the classic
 stacked-`=` layout for an equality chain). If a relation segment is itself too
 wide, its binary terms break one level deeper, each `+ term` sitting flush under
-the right-hand side they hang under --- the relation/right-hand-side offset
-alone supplies the nesting. The `math-indent` shifts the whole block to the
-right but never changes this internal alignment, so the equation's shape is the
-same at any indent. The width budget accounts for `math-indent`, so a broken
-line plus its leading indent stays within `line-width`:
+the right-hand side they hang under---the relation/right-hand-side offset alone
+supplies the nesting. The `math-indent` shifts the whole block to the right but
+never changes this internal alignment, so the equation's shape is the same at
+any indent. The width budget accounts for `math-indent`, so a broken line plus
+its leading indent stays within `line-width`:
 
 Input
 
@@ -1048,20 +1048,20 @@ the continuations far left:
     $$
     ```
 
-The break is source-cosmetic --- math ignores whitespace, so the rendered
-equation is unchanged. The layout is fully deterministic: it depends only on the
-content, `line-width`, and `math-indent`, never on where the author placed line
-breaks. A relation chain split across forced `\\` breaks in a bare `$$` is
-aligned the same way, like an implicit `aligned` environment. Relations break
-before binary operators (`+`, `\cdot`), which only break further when their
-segment still overflows; operators inside `(…)`, `\left…\right`, or a `{…}`
-group (including `\frac{…}{…}` arguments) are never broken at. A unary `+`/`-`
-is never a break point. An over-width row with a single relation breaks its
-binary right-hand side; one with no relation at all (a standalone binary chain)
-breaks with its head term first and each following term flush beneath it. Only
-an equation with **no** top-level relation or binary operator (e.g. a single
-wide `\frac{…}{…}`) is left on one line when it overflows. The option is
-unstable and may change without a major release --- see [Experimental
+The break is source-cosmetic---math ignores whitespace, so the rendered equation
+is unchanged. The layout is fully deterministic: it depends only on the content,
+`line-width`, and `math-indent`, never on where the author placed line breaks. A
+relation chain split across forced `\\` breaks in a bare `$$` is aligned the
+same way, like an implicit `aligned` environment. Relations break before binary
+operators (`+`, `\cdot`), which only break further when their segment still
+overflows; operators inside `(…)`, `\left…\right`, or a `{…}` group (including
+`\frac{…}{…}` arguments) are never broken at. A unary `+`/`-` is never a break
+point. An over-width row with a single relation breaks its binary right-hand
+side; one with no relation at all (a standalone binary chain) breaks with its
+head term first and each following term flush beneath it. Only an equation with
+**no** top-level relation or binary operator (e.g. a single wide `\frac{…}{…}`)
+is left on one line when it overflows. The option is unstable and may change
+without a major release---see [Experimental
 Features](configuration.qmd#experimental-features).
 
 ## Links
