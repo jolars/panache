@@ -66,7 +66,7 @@ Auto-fixes carry a safety level that controls when `panache lint --fix` applies
 them:
 
 `safe`
-:   The fix preserves the document's meaning---it only tidies syntax. Safe fixes
+:   The fix preserves the document's meaning and only tidies syntax. Safe fixes
     are applied by a plain `--fix`.
 
 `unsafe`
@@ -123,7 +123,7 @@ warning[heading-hierarchy]: Heading level skipped from h1 to h3; expected h2
 
 ### `empty-list-item` {#empty-list-item}
 
-Detects list items whose content is empty---a bare marker with nothing after it.
+Detects list items whose content is empty: a bare marker with nothing after it.
 
 Severity
 :   Warning
@@ -173,7 +173,7 @@ author-intent decision.
 
 ### `empty-values` {#empty-values}
 
-Flags YAML block-mapping keys whose value is an implicit null---a key with
+Flags YAML block-mapping keys whose value is an implicit null: a key with
 nothing after the colon.
 
 Severity
@@ -251,8 +251,8 @@ Description
 :   A Quarto document's frontmatter is parsed twice: by Quarto's js-yaml (YAML
     1.2 core) and by pandoc's libyaml (≈ YAML 1.1). The two versions resolve
     some plain scalars to different values. This rule flags only those genuine
-    divergences---unlike yamllint's `truthy`/`octal-values`, it stays silent
-    when the value is unambiguous for the document's consumers.
+    divergences. Unlike yamllint's `truthy`/`octal-values`, it stays silent when
+    the value is unambiguous for the document's consumers.
 
     Detected divergences:
 
@@ -351,7 +351,7 @@ Severity
 :   Warning
 
 Default
-:   Off---opt in via `[lint.rules] heading-strip-comments-residue = true`.
+:   Off. Opt in via `[lint.rules] heading-strip-comments-residue = true`.
 
 Auto-fix
 :   No
@@ -393,7 +393,7 @@ Diagnostic codes
 
 Description
 :   Each reference label and footnote ID must be unique within a document.
-    Duplicate definitions cause ambiguity---only the first definition is used,
+    Duplicate definitions cause ambiguity. Only the first definition is used,
     making the others ineffective.
 
 **Example violation:**
@@ -874,8 +874,9 @@ warning[html-entities]: HTML entity '&numero' is missing a trailing ';'
 ### `link-text-is-url` {#link-text-is-url}
 
 Detects inline links whose visible text is identical to the destination URL
-(e.g. `[https://example.com/](https://example.com/)`)---typically an artifact of
-HTML→Markdown conversion---and offers to rewrite them as an autolink.
+(e.g. `[https://example.com/](https://example.com/)`), which is typically an
+artifact of HTML to Markdown conversion, and offers to rewrite them as an
+autolink.
 
 Severity
 :   Warning
@@ -891,7 +892,7 @@ Description
 :   The rule fires only when **all** of the following hold:
 
     - the link is inline (`[text](url)`), not reference-style;
-    - the link text is plain---no nested emphasis, code, or other inline
+    - the link text is plain: no nested emphasis, code, or other inline
       structure;
     - the rendered link text is byte-identical to the destination URL, including
       any trailing slash;
@@ -988,10 +989,10 @@ Diagnostic codes
 Description
 
 :   Pandoc footnotes do not nest. Inside a `[^x]: ...` definition body, any
-    `[^id]` reference is silently parsed as a literal `Str`---the would-be link
-    disappears from the output with no warning. The same applies to references
-    nested arbitrarily deep inside that body (inside emphasis, strong,
-    strikeout, links, blockquotes, lists, or inline footnotes).
+    `[^id]` reference is silently parsed as a literal `Str` and the would-be
+    link disappears from the output with no warning. The same applies to
+    references nested arbitrarily deep inside that body (inside emphasis,
+    strong, strikeout, links, blockquotes, lists, or inline footnotes).
 
     This rule surfaces the silent drop at lint time so the user notices before the
     document is rendered. After the parser fix that aligns panache with pandoc on
@@ -1290,8 +1291,8 @@ Requirements
 Description
 
 :   This rule is **off by default** because Quarto itself tolerates unknown keys
-    at render time---its schema objects are open so that pandoc passthrough and
-    custom template metadata keep working---so flagging them is stricter than
+    at render time. Its schema objects are open so that pandoc passthrough and
+    custom template metadata keep working. So flagging them is stricter than
     `quarto render`. It is still useful for catching silent-failure typos (a
     misspelled `format` block simply does nothing, and Quarto will not warn), so
     it is offered as an opt-in.
