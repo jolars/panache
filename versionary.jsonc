@@ -25,6 +25,11 @@
           "type": "json",
           "path": "npm/panache-cli/package.json",
           "jsonpath": "$.optionalDependencies.*"
+        },
+        {
+          "type": "regex",
+          "path": "flake.nix",
+          "pattern": "version = \"(?<version>\\d+\\.\\d+\\.\\d+)\""
         }
       ]
     },
