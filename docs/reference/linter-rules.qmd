@@ -759,8 +759,10 @@ Diagnostic codes
 :   [`missing-chunk-labels`](#missing-chunk-labels)
 
 Description
-:   Labels facilitate debugging. Add a label with either `#| label: my-chunk` or
-    inline `label=my-chunk`.
+:   Labels facilitate debugging. Add a label with either a hashpipe option or
+    inline `label=my-chunk`. The suggested hashpipe comment prefix matches the
+    chunk language (`#|` for R or Python, `//|` for C++ or Rust, `--|` for SQL,
+    and so on).
 
 ### `figure-crossref-captions` {#figure-crossref-captions}
 

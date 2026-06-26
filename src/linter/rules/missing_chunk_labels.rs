@@ -1,6 +1,7 @@
 use crate::config::Flavor;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
+use crate::parser::utils::chunk_options::hashpipe_comment_prefix;
 use crate::syntax::{AstNode, CodeBlock, SyntaxKind};
 
 pub struct MissingChunkLabelsRule;
@@ -49,10 +50,16 @@ impl Rule for MissingChunkLabelsRule {
                 continue;
             }
 
+            let prefix = code_block
+                .language()
+                .as_deref()
+                .and_then(hashpipe_comment_prefix)
+                .unwrap_or("#|");
+
             diagnostics.push(Diagnostic::warning(
                 Location::from_node(&info_node, input),
                 "missing-chunk-labels",
-                "Executable code chunk has no label; add `#| label: ...`".to_string(),
+                format!("Executable code chunk has no label; add `{prefix} label: ...`"),
             ));
         }
 
@@ -99,5 +106,27 @@ mod tests {
     fn ignores_display_blocks() {
         let diagnostics = parse_and_lint("```r\n1 + 1\n```\n");
         assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn suggests_language_specific_comment_prefix() {
+        let diagnostics = parse_and_lint("```{cpp}\nint x = 1;\n```\n");
+        assert_eq!(diagnostics.len(), 1);
+        assert!(
+            diagnostics[0].message.contains("`//| label: ...`"),
+            "expected C++ suggestion to use `//|`, got: {}",
+            diagnostics[0].message
+        );
+    }
+
+    #[test]
+    fn suggests_hashpipe_prefix_for_r() {
+        let diagnostics = parse_and_lint("```{r}\n1 + 1\n```\n");
+        assert_eq!(diagnostics.len(), 1);
+        assert!(
+            diagnostics[0].message.contains("`#| label: ...`"),
+            "expected R suggestion to use `#|`, got: {}",
+            diagnostics[0].message
+        );
     }
 }
