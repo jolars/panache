@@ -2,24 +2,24 @@
 title: "Comparison with Other Tools"
 description: >
   This page compares Panache to other tools that overlap with parts of its
-  scope---formatting, linting, and language-server features for Markdown,
-  Pandoc, and Quarto. The goal is to clarify what each tool is built for, so you
-  can pick the right one (or combine them) for your project.
+  scope: formatting, linting, and language-server features for Markdown, Pandoc,
+  and Quarto. The goal is to clarify what each tool is built for, so you can
+  pick the right one (or combine them) for your project.
 ---
 
 ## At a Glance
 
 Panache aims to cover the formatter, linter, and language-server roles for
-Pandoc-flavored Markdown from a single, lossless concrete syntax tree. Most
-other tools in this space focus on one of those roles, and most do not parse
-Pandoc/Quarto-specific constructs (fenced divs, bracketed spans, block
-attributes, raw blocks, definition lists, line blocks, table captions, citation
-keys, math environments).
+Markdown from a single, lossless concrete syntax tree. Most other tools in this
+space focus on one of those roles, and most do not parse Pandoc and
+Quarto-specific constructs (fenced divs, bracketed spans, block attributes, raw
+blocks, definition lists, line blocks, table captions, citation keys, math
+environments).
 
 The tables below cover the same set of programs as the
 [Performance](performance.qmd) page, plus marksman---a Markdown language server
 that does not appear in the benchmarks but is the closest neighbor to Panache's
-LSP role.
+language server role.
 
 ### Roles
 

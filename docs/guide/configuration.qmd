@@ -169,20 +169,7 @@ The available flavors are:
     set)
 
 `mdsvex`
-:   [mdsvex](https://mdsvex.pngwn.io) (Svelte-flavored Markdown). mdsvex builds
-    on `remark-parse@8`, whose options default to `gfm: true`, so tables,
-    strikethrough, bare autolinks, and task lists work out of the box (no
-    `remark-gfm` plugin needed---that is only for modern remark). This flavor
-    matches that: a CommonMark dialect with the GFM extension set, plus raw HTML
-    and YAML frontmatter, minus the things mdsvex does *not* enable by default
-    (footnotes, math, emoji, GitHub alerts). On top of that sits the
-    `svelte-template` extension: block logic (`{#if}`/`{:else}`/`{/each}`), tags
-    (`{@html}`, `{@const}`), and `{expr}` interpolation are parsed as opaque,
-    lossless spans and preserved verbatim (their contents are never
-    reformatted), while `<script>`/`<style>` blocks and components ride the
-    raw-HTML path. Files ending in `.svx` or `.svelte.md` are detected
-    automatically. If you add a remark plugin (e.g. remark-math), enable the
-    matching extension via `[extensions]`.
+:   [mdsvex](https://mdsvex.pngwn.io) (Svelte-flavored Markdown).
 
 The `--flavor` CLI flag (see the [CLI reference](../reference/cli.qmd))
 overrides this setting for a single invocation. It also overrides
