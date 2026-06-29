@@ -1,0 +1,11 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..11
+  HTML_BLOCK@0..11
+    HTML_BLOCK_TAG@0..4
+      TEXT@0..4 "</p>"
+    HTML_BLOCK_TAG@4..10
+      TEXT@4..10 "</div>"
+    NEWLINE@10..11 "\n"

@@ -917,6 +917,150 @@ fn try_parse_comment_pi_with_trailing_split(
     Some(close_line_idx + 1)
 }
 
+/// One source-order piece of a standalone-tag line: either a complete
+/// HTML tag or a run of inter-tag/leading/trailing whitespace.
+enum StandaloneTagSegment<'a> {
+    Whitespace(&'a str),
+    Tag(&'a str),
+}
+
+/// Extract the tag name from an open-tag slice (`<name ...>`), or `None`
+/// if `tag` is not a well-formed open tag start.
+fn open_tag_name(tag: &str) -> Option<&str> {
+    let bytes = tag.as_bytes();
+    if bytes.first() != Some(&b'<') {
+        return None;
+    }
+    let start = 1;
+    let mut i = start;
+    while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'-') {
+        i += 1;
+    }
+    if i == start {
+        return None;
+    }
+    Some(&tag[start..i])
+}
+
+/// Recognize a line consisting entirely of two or more complete
+/// standalone block-level HTML tags — closing tags (`</p>`, `</div>`)
+/// and void block tags (`<embed>`, `<source>`, …) — separated by
+/// optional inter-tag whitespace, with optional leading indent and
+/// trailing whitespace. Returns the source-order segments (tags +
+/// whitespace) when the whole line is consumed by ≥ 2 such tags;
+/// `None` otherwise (markdown text, strict/inline-block opens, or a
+/// single tag — those stay on the legacy emission path).
+fn split_line_into_standalone_tags(line: &str) -> Option<Vec<StandaloneTagSegment<'_>>> {
+    let bytes = line.as_bytes();
+    let mut i = 0;
+    let mut segments = Vec::new();
+    let mut tag_count = 0usize;
+    let take_ws = |line: &str, from: usize| -> usize {
+        let bytes = line.as_bytes();
+        let mut j = from;
+        while j < bytes.len() && (bytes[j] == b' ' || bytes[j] == b'\t') {
+            j += 1;
+        }
+        j
+    };
+    let ws_end = take_ws(line, i);
+    if ws_end > i {
+        segments.push(StandaloneTagSegment::Whitespace(&line[i..ws_end]));
+        i = ws_end;
+    }
+    while i < bytes.len() {
+        let rest = &line[i..];
+        // Any closing tag is an unconditional block splitter. For open
+        // tags, only void block tags (`<embed>`, `<source>`, …) split
+        // unconditionally at a fresh-block position — strict-block and
+        // inline-block opens start a region (matched-pair lift /
+        // `inline_pending` context), so leave those to the legacy byte
+        // walker.
+        let len = parse_close_tag(rest).or_else(|| {
+            parse_open_tag(rest).filter(|&len| {
+                open_tag_name(&rest[..len]).is_some_and(is_pandoc_void_block_tag_name)
+            })
+        })?;
+        segments.push(StandaloneTagSegment::Tag(&line[i..i + len]));
+        tag_count += 1;
+        i += len;
+        let ws_end = take_ws(line, i);
+        if ws_end > i {
+            segments.push(StandaloneTagSegment::Whitespace(&line[i..ws_end]));
+            i = ws_end;
+        }
+    }
+    (tag_count >= 2).then_some(segments)
+}
+
+/// Pandoc-dialect Phase 7b lift: a single-line opaque HTML block whose
+/// content is two or more complete standalone block-level tags (void
+/// tags and/or closing tags) — e.g. `</p></div>`, `<embed><embed>`.
+/// Pandoc's `markdown_in_html_blocks` splits these into one `RawBlock`
+/// per tag. The legacy emission bakes them into a single
+/// `HTML_BLOCK_TAG` TEXT token, forcing the projector to re-tokenize
+/// the bytes; this lift emits one `HTML_BLOCK_TAG` per tag so the CST
+/// structurally encodes the split and the projector can route by kind.
+///
+/// Single-tag blocks (`</p>`, `<embed>`) stay on the legacy path —
+/// their CST is already faithful (one tag, one `HTML_BLOCK_TAG`) and
+/// changing it would churn snapshots with no fidelity gain. Blockquote
+/// context (`bq_depth > 0`) also stays on the legacy path. Returns the
+/// number of lines consumed (always 1) on success.
+fn try_parse_standalone_block_tags_split(
+    builder: &mut GreenNodeBuilder<'static>,
+    lines: &[&str],
+    start_pos: usize,
+    block_type: &HtmlBlockType,
+    wrapper_kind: SyntaxKind,
+    prefix: &ContainerPrefix,
+    config: &ParserOptions,
+) -> Option<usize> {
+    if config.dialect != crate::options::Dialect::Pandoc {
+        return None;
+    }
+    // Void/close forms keep the opaque `HTML_BLOCK` wrapper; `<div>`
+    // and lifted strict/inline-block tags carry their own wrappers.
+    if wrapper_kind != SyntaxKind::HTML_BLOCK {
+        return None;
+    }
+    if !matches!(
+        block_type,
+        HtmlBlockType::BlockTag {
+            closes_at_open_tag: true,
+            ..
+        }
+    ) {
+        return None;
+    }
+    if prefix.bq_depth() != 0 {
+        return None;
+    }
+    let first_inner = prefix.strip_line_0_for_emission(lines[start_pos]);
+    let (line, nl) = strip_newline(first_inner);
+    let segments = split_line_into_standalone_tags(line)?;
+
+    builder.start_node(SyntaxKind::HTML_BLOCK.into());
+    for segment in segments {
+        match segment {
+            StandaloneTagSegment::Whitespace(ws) => {
+                builder.token(SyntaxKind::WHITESPACE.into(), ws);
+            }
+            StandaloneTagSegment::Tag(tag) => {
+                builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
+                builder.token(SyntaxKind::TEXT.into(), tag);
+                builder.finish_node();
+            }
+        }
+    }
+    if !nl.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), nl);
+    }
+    builder.finish_node(); // HTML_BLOCK
+
+    Some(start_pos + 1)
+}
+
 /// Parse an HTML block, allowing the caller to pick the wrapper SyntaxKind
 /// (`HTML_BLOCK` for opaque preservation, `HTML_BLOCK_DIV` for the
 /// Pandoc-dialect `<div>` lift). Children are emitted byte-for-byte
@@ -953,6 +1097,23 @@ pub(crate) fn parse_html_block_with_wrapper(
             config,
         )
     {
+        return consumed;
+    }
+
+    // Pandoc-dialect Phase 7b standalone-tag split. A single line of two
+    // or more complete standalone block-level tags (`</p></div>`,
+    // `<embed><embed>`) projects to one `RawBlock` per tag; emit one
+    // `HTML_BLOCK_TAG` per tag so the CST encodes the split structurally
+    // instead of leaving the projector to re-tokenize a baked TEXT token.
+    if let Some(consumed) = try_parse_standalone_block_tags_split(
+        builder,
+        lines,
+        start_pos,
+        &block_type,
+        wrapper_kind,
+        prefix,
+        config,
+    ) {
         return consumed;
     }
 

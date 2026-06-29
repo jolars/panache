@@ -1350,6 +1350,14 @@ fn emit_html_block(node: &SyntaxNode, out: &mut Vec<Block>) {
         emit_html_block_structural(node, out);
         return;
     }
+    // Phase 7b standalone-tag split: the parser emits one HTML_BLOCK_TAG
+    // per tag for a single line of ≥ 2 standalone block-level tags
+    // (`</p></div>`, `<embed><embed>`). Each tag projects to its own
+    // RawBlock — the same structural walk as the matched-pair lift.
+    if html_block_is_standalone_tag_sequence(node) {
+        emit_html_block_structural(node, out);
+        return;
+    }
     // Strip BLOCK_QUOTE_MARKER + WHITESPACE prefix tokens so the
     // byte-level walkers below see clean HTML — the parser keeps bq
     // markers as structural tokens inside HTML_BLOCK for verbatim-tag
@@ -1433,6 +1441,27 @@ fn html_block_has_structural_lift(node: &SyntaxNode) -> bool {
     !node
         .children()
         .any(|c| c.kind() == SyntaxKind::HTML_BLOCK_CONTENT)
+}
+
+/// True when an opaque `HTML_BLOCK` carries the Phase 7b standalone-tag
+/// split shape: two or more `HTML_BLOCK_TAG` node children, no
+/// `HTML_BLOCK_CONTENT`, and no other block children. The parser emits
+/// this only for a single line that is entirely consecutive standalone
+/// block-level tags (closing tags + void block tags), so each
+/// `HTML_BLOCK_TAG` wraps exactly one tag and projecting one `RawBlock`
+/// per tag via `emit_html_block_structural` is faithful. A baked
+/// multi-tag TEXT (the legacy CommonMark / blockquote shape) is a single
+/// `HTML_BLOCK_TAG` and does NOT match — it stays on the byte walker.
+fn html_block_is_standalone_tag_sequence(node: &SyntaxNode) -> bool {
+    let mut tag_count = 0usize;
+    for child in node.children() {
+        match child.kind() {
+            SyntaxKind::HTML_BLOCK_TAG => tag_count += 1,
+            SyntaxKind::BLANK_LINE => {}
+            _ => return false,
+        }
+    }
+    tag_count >= 2
 }
 
 /// Emit an `HTML_BLOCK` whose body has been structurally lifted: walk

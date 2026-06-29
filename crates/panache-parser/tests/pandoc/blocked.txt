@@ -16,25 +16,3 @@
 # carrying across siblings (CST shape change) or projector-side fusion
 # of adjacent Para children. Deferred.
 390
-
-# Phase 6 — bq-in-listitem stacked container, HTML block on first line.
-# `- > <div>foo</div>` and `- > <div>\n  > hello\n  > </div>` should
-# project as `BulletList[BlockQuote[Div[...]]]` (matched pandoc-native).
-# The parser instead produces `Paragraph` with `INLINE_HTML` for `<div>`,
-# losing the structural lift. Root cause: `lists.rs::finish_list_item_
-# with_optional_nested` eagerly starts a paragraph for the bq-internal
-# content of line 0 (the `if !trimmed.is_empty() { start_paragraph; ... }`
-# branch around line 1499). The block dispatcher never sees `<div>` as a
-# block start. When `<div>` appears on a LATER line of the bq-in-listitem
-# (`- > hello\n  > <div>...`), the parser handles it correctly — proving
-# the bug is localized to the first-line eager-paragraph path. Fix
-# requires either (a) refactoring the bq-in-list path to dispatch line
-# 0's content via `parse_inner_content` (needs Parser-method access from
-# free functions, plus `lines_consumed` plumbing through
-# `handle_list_open_effect` so the caller doesn't double-advance pos),
-# or (b) threading a `first_line_prefix_offset` parameter through
-# `parse_html_block_with_wrapper` so it can skip the list marker bytes
-# on line 0 while reading lines 1+ normally. Architectural scope —
-# deferred.
-452
-453

@@ -1,0 +1,3 @@
+[ RawBlock (Format "html") "<embed src=\"a\">"
+, RawBlock (Format "html") "<embed src=\"b\">"
+]
