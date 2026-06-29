@@ -49,6 +49,7 @@ pub fn all_document_extensions() -> &'static [&'static str] {
         "mdown",
         "mkd",
         "mkdn",
+        "svx",
     ]
 }
 

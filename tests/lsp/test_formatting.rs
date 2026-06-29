@@ -106,6 +106,68 @@ fn lsp_format_document_formats_non_excluded_siblings() {
     );
 }
 
+/// mdsvex documents reach the formatter through the same flavor-by-extension
+/// detection as `.qmd`/`.Rmd`; a `.svx` buffer must format like any other.
+#[test]
+fn test_format_svx_document() {
+    let mut server = TestLspServer::new();
+
+    let content = "#   Messy Heading\n\nA line that is way too long and should definitely be reflowed by the formatter because eighty columns.\n\n*  item one\n*  item two\n";
+    server.open_document("file:///test.svx", content, "mdsvex");
+
+    let edits = server.format_document("file:///test.svx");
+    assert!(edits.is_some(), "mdsvex .svx document should be formatted");
+    assert!(!edits.unwrap().is_empty());
+}
+
+/// With a workspace root and a discovered `panache.toml`, formatting routes
+/// through `config::load` rather than the no-config default; mdsvex flavor
+/// detection must still kick in so `.svx` formats.
+#[test]
+fn test_format_svx_in_workspace_with_config() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("panache.toml"), "line-width = 80\n").unwrap();
+    let file = dir.path().join("page.svx");
+    let content = "#   Messy Heading\n\nA line that is way too long and should definitely be reflowed by the formatter because eighty columns.\n\n*  item one\n";
+    fs::write(&file, content).unwrap();
+
+    let root_uri = Uri::from_file_path(dir.path()).unwrap();
+    let doc_uri = Uri::from_file_path(&file).unwrap();
+
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(doc_uri.as_str(), content, "mdsvex");
+
+    let edits = server.format_document(doc_uri.as_str());
+    assert!(
+        edits.is_some_and(|e| !e.is_empty()),
+        ".svx in a workspace with panache.toml should be formatted"
+    );
+}
+
+/// The compound `.svelte.md` extension also detects as mdsvex and must format.
+#[test]
+fn test_format_compound_svelte_md_in_workspace() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("panache.toml"), "line-width = 80\n").unwrap();
+    let file = dir.path().join("page.svelte.md");
+    let content = "#   Messy Heading\n\nA line that is way too long and should definitely be reflowed by the formatter because eighty columns.\n\n*  item one\n";
+    fs::write(&file, content).unwrap();
+
+    let root_uri = Uri::from_file_path(dir.path()).unwrap();
+    let doc_uri = Uri::from_file_path(&file).unwrap();
+
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(doc_uri.as_str(), content, "mdsvex");
+
+    let edits = server.format_document(doc_uri.as_str());
+    assert!(
+        edits.is_some_and(|e| !e.is_empty()),
+        ".svelte.md in a workspace with panache.toml should be formatted"
+    );
+}
+
 #[test]
 fn test_format_simple_document() {
     let mut server = TestLspServer::new();

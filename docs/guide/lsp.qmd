@@ -204,6 +204,17 @@ instructions below.
 
 ### Neovim
 
+Neovim does not recognize the mdsvex extensions (`.svx`, `.svelte.md`) out of
+the box, so map them to a filetype first (skip this if you only edit
+`.qmd`/`.md`/`.rmd`):
+
+```lua
+vim.filetype.add({
+  extension = { svx = "mdsvex" },
+  pattern = { [".*%.svelte%.md"] = "mdsvex" },
+})
+```
+
 In Neovim +0.11, you can use the built-in LSP client:
 
 ```lua
@@ -211,8 +222,8 @@ In Neovim +0.11, you can use the built-in LSP client:
 
 return {
   cmd = { "panache", "lsp" },
-  filetypes = { "quarto", "markdown", "rmarkdown" },
-    root_markers = { ".panache.toml", "panache.toml", ".git" },
+  filetypes = { "quarto", "markdown", "rmarkdown", "mdsvex" },
+  root_markers = { ".panache.toml", "panache.toml", ".git" },
   settings = {},
 }
 
@@ -232,7 +243,7 @@ if not configs.panache then
   configs.panache = {
     default_config = {
       cmd = { "panache", "lsp" },
-      filetypes = { "quarto", "markdown", "rmarkdown" },
+      filetypes = { "quarto", "markdown", "rmarkdown", "mdsvex" },
       root_dir = lspconfig.util.root_pattern(
         ".panache.toml",
         "panache.toml",
@@ -254,7 +265,7 @@ To format on save, add an autocmd:
 
 ```lua
 vim.api.nvim_create_autocmd("BufWritePre", {
-  pattern = { "*.qmd", "*.md", "*.rmd" },
+  pattern = { "*.qmd", "*.md", "*.rmd", "*.svx", "*.svelte.md" },
   callback = function()
     vim.lsp.buf.format({ async = false })
   end,
