@@ -508,6 +508,22 @@ pub fn validate_yaml_text(input: &str) -> Result<(), YamlParseError> {
     }
 }
 
+/// Like [`validate_yaml_text`], but validates against the real consumers of a
+/// given (flavor, location) rather than the abstract YAML 1.2 substrate. Use
+/// this for in-document frontmatter / hashpipe regions so the verdict matches
+/// the parser's own context-aware syntax-error channel (e.g. pandoc accepts a
+/// tab as indentation that the 1.2 substrate rejects). See
+/// `tests/yaml/consumer-matrix.md`.
+pub fn validate_yaml_text_with_context(
+    input: &str,
+    ctx: crate::parser::yaml::YamlValidationContext,
+) -> Result<(), YamlParseError> {
+    match crate::parser::yaml::locate_yaml_diagnostic_ctx(input, "", ctx) {
+        Some((diag, _start, _end)) => Err(YamlParseError::from_diagnostic(&diag)),
+        None => Ok(()),
+    }
+}
+
 pub fn collect_embedded_yaml_cst(tree: &SyntaxNode) -> Vec<YamlEmbeddedCst> {
     let parsed_regions = collect_parsed_yaml_regions(tree);
     let frontmatter_node = tree.descendants().find_map(YamlMetadata::cast);

@@ -10,6 +10,26 @@ pub(crate) fn validate_yaml(_input: &str) -> Result<(), YamlParseError> {
     Ok(())
 }
 
+/// Validate an in-document YAML region against its real consumers, derived from
+/// `ctx` (flavor, location), instead of the 1.2 substrate. Keeps the host-side
+/// metadata-extraction gate in agreement with the parser's context-aware
+/// syntax-error channel — e.g. a pandoc-accepted tab is not re-reported here.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn validate_yaml_with_context(
+    input: &str,
+    ctx: crate::parser::yaml::YamlValidationContext,
+) -> Result<(), YamlParseError> {
+    crate::syntax::validate_yaml_text_with_context(input, ctx)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn validate_yaml_with_context(
+    _input: &str,
+    _ctx: crate::parser::yaml::YamlValidationContext,
+) -> Result<(), YamlParseError> {
+    Ok(())
+}
+
 /// Format frontmatter YAML. The caller passes the already-bridged
 /// formatter [`Config`](panache_formatter::Config); wrap-mode and
 /// language resolution live in

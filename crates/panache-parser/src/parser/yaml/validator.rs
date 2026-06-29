@@ -154,10 +154,12 @@ pub(crate) fn validate_yaml(input: &str) -> Option<YamlDiagnostic> {
 /// Two pools run in order:
 ///
 /// 1. **Substrate (YAML 1.2) checks** — the `check_*` clusters below, in
-///    per-cluster priority order (directive-level before structural). These
-///    fire in every context today; a future per-consumer *suppression* hook
-///    (for the context-dependent tab leniency documented in
-///    `tests/yaml/consumer-matrix.md`) would gate individual checks here.
+///    per-cluster priority order (directive-level before structural). Most fire
+///    in every context, but the two tab-as-indentation checks
+///    (`check_multiline_quoted_indent`, `check_block_indent_anomalies`) take
+///    `ctx` and *suppress* their tab diagnostic when no active consumer rejects
+///    the tab — the substrate always emits, so suite verdicts are unchanged.
+///    See `tests/yaml/consumer-matrix.md` and `tab_indent_emits`.
 /// 2. **Consumer-only checks** — valid YAML 1.2 that a real consumer rejects
 ///    (implicit empty keys, duplicate keys). These never run on the substrate
 ///    path, which is exactly what keeps the yaml-test-suite verdicts unchanged.
@@ -191,10 +193,10 @@ pub(crate) fn validate_yaml_with_context(
     if let Some(diag) = check_flow_context_anomalies(&tree) {
         return Some(diag);
     }
-    if let Some(diag) = check_multiline_quoted_indent(&tree, input) {
+    if let Some(diag) = check_multiline_quoted_indent(&tree, input, ctx) {
         return Some(diag);
     }
-    if let Some(diag) = check_block_indent_anomalies(&tree) {
+    if let Some(diag) = check_block_indent_anomalies(&tree, ctx) {
         return Some(diag);
     }
     if let Some(diag) = check_block_scalar_header(&tree) {
@@ -1225,7 +1227,11 @@ fn check_flow_map_value_extra_colon(value: &SyntaxNode) -> Option<YamlDiagnostic
 ///
 /// Covers fixture QB6E (block-map value) and JKF3 (nested block-seq
 /// item where the continuation drops to column 0).
-fn check_multiline_quoted_indent(tree: &SyntaxNode, input: &str) -> Option<YamlDiagnostic> {
+fn check_multiline_quoted_indent(
+    tree: &SyntaxNode,
+    input: &str,
+    ctx: YamlValidationContext,
+) -> Option<YamlDiagnostic> {
     for value in tree
         .descendants()
         .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
@@ -1241,7 +1247,7 @@ fn check_multiline_quoted_indent(tree: &SyntaxNode, input: &str) -> Option<YamlD
         }
         let block_map_start: usize = block_map.text_range().start().into();
         let parent_indent = column_of(input, block_map_start);
-        if let Some(diag) = check_quoted_scalar_continuation(&value, input, parent_indent) {
+        if let Some(diag) = check_quoted_scalar_continuation(&value, input, parent_indent, ctx) {
             return Some(diag);
         }
     }
@@ -1257,7 +1263,7 @@ fn check_multiline_quoted_indent(tree: &SyntaxNode, input: &str) -> Option<YamlD
         }
         let block_seq_start: usize = block_seq.text_range().start().into();
         let parent_indent = column_of(input, block_seq_start);
-        if let Some(diag) = check_quoted_scalar_continuation(&item, input, parent_indent) {
+        if let Some(diag) = check_quoted_scalar_continuation(&item, input, parent_indent, ctx) {
             return Some(diag);
         }
     }
@@ -1272,6 +1278,7 @@ fn check_quoted_scalar_continuation(
     container: &SyntaxNode,
     input: &str,
     parent_indent: usize,
+    ctx: YamlValidationContext,
 ) -> Option<YamlDiagnostic> {
     for child in container.children() {
         if child.kind() != SyntaxKind::YAML_SCALAR {
@@ -1314,10 +1321,13 @@ fn check_quoted_scalar_continuation(
             // multi-line quoted scalar continuation is illegal (DK95/01).
             // Spaces past `parent_indent` provide the required indentation;
             // any tab after enough leading spaces is content (4ZYM), not
-            // indentation, and must not be flagged.
+            // indentation, and must not be flagged. No real consumer rejects
+            // this tab (pandoc, js-yaml, and R yaml all accept the
+            // continuation), so it survives only on the substrate path.
             let leading_spaces = line_text_in_src.bytes().take_while(|b| *b == b' ').count();
             if leading_spaces <= parent_indent
                 && line_text_in_src.as_bytes().get(leading_spaces) == Some(&b'\t')
+                && tab_indent_emits(ctx, ConsumerSet::empty())
             {
                 let tab_byte = line_start_in_src + leading_spaces;
                 return Some(diag_at_range(
@@ -1362,8 +1372,11 @@ fn check_quoted_scalar_continuation(
 ///   scalar into two pieces. Top-level scalars carry the same
 ///   "comment-inside-plain-scalar" failure mode as value-level ones;
 ///   the only difference is the absence of an enclosing block-map.
-fn check_block_indent_anomalies(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
-    if let Some(diag) = check_tab_as_indent(tree) {
+fn check_block_indent_anomalies(
+    tree: &SyntaxNode,
+    ctx: YamlValidationContext,
+) -> Option<YamlDiagnostic> {
+    if let Some(diag) = check_tab_as_indent(tree, ctx) {
         return Some(diag);
     }
     if let Some(diag) = check_inline_block_seq_in_value(tree) {
@@ -1610,28 +1623,51 @@ fn block_map_entry_key_is_explicit(value: &SyntaxNode) -> bool {
         })
 }
 
-/// Tab characters are never legal indentation (§6.1 — "indentation is
-/// restricted to space characters"). Three shapes share that root cause:
+/// Whether a tab-as-indentation diagnostic should be emitted under `ctx` for a
+/// shape whose `rejecting` consumers reject the tab. The 1.2 substrate always
+/// rejects tabs as indentation (§6.1), so it emits unconditionally; a
+/// production context emits only when an active consumer actually rejects the
+/// tab. pandoc/libyaml never appears in `rejecting`: its markdown reader
+/// expands tabs before YAML parsing, so it accepts every tab shape (its
+/// Y79Y/006-009 failures are the separate non-string-key metadata rule, which
+/// fails with spaces too). See `tests/yaml/consumer-matrix.md`.
+fn tab_indent_emits(ctx: YamlValidationContext, rejecting: ConsumerSet) -> bool {
+    ctx.is_substrate() || ctx.any_rejects(rejecting)
+}
+
+/// Tab characters are never legal indentation in abstract YAML 1.2 (§6.1 —
+/// "indentation is restricted to space characters"). Three shapes share that
+/// root cause, but real consumers diverge on which they reject — so each
+/// emission is gated through [`tab_indent_emits`] on the shape's rejecting set:
 ///
 /// - **NEWLINE → tab-bearing WHITESPACE → content** in any block or flow
 ///   container. A tab-only line that is followed immediately by another
 ///   NEWLINE (or by EOF) is whitespace-only and isn't load-bearing
 ///   indentation, so we skip it (covers Y79Y/002's `[NEWLINE, "\t",
-///   NEWLINE]` inside a flow sequence).
+///   NEWLINE]` inside a flow sequence). In a **nested-flow** container no
+///   consumer rejects the tab (Y79Y/003); in a **block** container js-yaml
+///   and R yaml reject it.
 /// - **block scalar (`|` / `>`) ending with `\n` → tab-bearing
 ///   WHITESPACE**. The scalar token absorbs everything it can fit into
 ///   its body; if the next byte after the trailing newline is a tab, the
 ///   tab is sitting in the scalar's body-line indentation slot (Y79Y/000).
+///   Only R yaml rejects this one; js-yaml accepts it.
 /// - **block indicator (`-` / `?` / `:`) → tab-bearing WHITESPACE →
 ///   nested block collection**. After `s-separate-in-line` the spec
 ///   wants `s-indent(n+m)` for the inner collection, which is defined as
 ///   spaces only; a tab in this separator slot makes the inner block's
-///   indentation column ambiguous (Y79Y/004-009).
+///   indentation column ambiguous (Y79Y/004-009). js-yaml and R yaml reject
+///   it (pandoc accepts the tab — 006-009 fail it for the non-string-key
+///   rule instead).
 ///
 /// Tabs in WHITESPACE that *don't* sit in an indentation slot — e.g.
 /// `-\tscalar`, where `s-separate-in-line` legitimately accepts a tab
 /// between the indicator and a plain scalar — are not flagged.
-fn check_tab_as_indent(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
+fn check_tab_as_indent(tree: &SyntaxNode, ctx: YamlValidationContext) -> Option<YamlDiagnostic> {
+    // js-yaml and R yaml reject a tab used as block indentation; R yaml also
+    // rejects it in a block-scalar body. pandoc never rejects a tab.
+    let block_indent_rejectors = ConsumerSet::of(YamlConsumer::Jsyaml).with(YamlConsumer::RYaml);
+    let block_scalar_rejectors = ConsumerSet::of(YamlConsumer::RYaml);
     fn tab_diag(t: &crate::syntax::SyntaxToken) -> YamlDiagnostic {
         diag_at_range(
             t.text_range().start().into(),
@@ -1667,6 +1703,18 @@ fn check_tab_as_indent(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
         ) && flow_has_block_ancestor(n);
         is_block || is_nested_flow
     }) {
+        // In a nested-flow container no consumer rejects a tab in the
+        // continuation indent slot (Y79Y/003); in a block container js-yaml and
+        // R yaml do.
+        let node_in_flow = matches!(
+            node.kind(),
+            SyntaxKind::YAML_FLOW_SEQUENCE | SyntaxKind::YAML_FLOW_MAP
+        );
+        let newline_indent_rejectors = if node_in_flow {
+            ConsumerSet::empty()
+        } else {
+            block_indent_rejectors
+        };
         let children: Vec<_> = node.children_with_tokens().collect();
         for (i, child) in children.iter().enumerate() {
             let NodeOrToken::Token(t) = child else {
@@ -1702,7 +1750,12 @@ fn check_tab_as_indent(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
             // only lines (next is NEWLINE or EOF) are line-folding
             // fodder, not indentation (Y79Y/002).
             let prev_is_newline_token = matches!(&prev_kind, Some((SyntaxKind::NEWLINE, _)));
-            if prev_is_newline_token && starts_with_tab && !next_is_newline && !at_eof {
+            if prev_is_newline_token
+                && starts_with_tab
+                && !next_is_newline
+                && !at_eof
+                && tab_indent_emits(ctx, newline_indent_rejectors)
+            {
                 return Some(tab_diag(t));
             }
 
@@ -1714,7 +1767,10 @@ fn check_tab_as_indent(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
             // newline (Y79Y/000).
             let prev_is_block_scalar_with_trailing_newline = matches!(&prev_kind, Some((SyntaxKind::YAML_SCALAR, text))
                     if (text.starts_with('|') || text.starts_with('>')) && text.ends_with('\n'));
-            if prev_is_block_scalar_with_trailing_newline && starts_with_tab {
+            if prev_is_block_scalar_with_trailing_newline
+                && starts_with_tab
+                && tab_indent_emits(ctx, block_scalar_rejectors)
+            {
                 return Some(tab_diag(t));
             }
 
@@ -1745,7 +1801,10 @@ fn check_tab_as_indent(tree: &SyntaxNode) -> Option<YamlDiagnostic> {
                         SyntaxKind::YAML_BLOCK_SEQUENCE | SyntaxKind::YAML_BLOCK_MAP
                     )
             );
-            if (prev_is_block_indicator || leads_block_map_value) && next_is_block_collection {
+            if (prev_is_block_indicator || leads_block_map_value)
+                && next_is_block_collection
+                && tab_indent_emits(ctx, block_indent_rejectors)
+            {
                 return Some(tab_diag(t));
             }
         }
@@ -2825,6 +2884,130 @@ mod tests {
         // path must accept them (Pool-2 is gated off), keeping suite parity.
         assert!(validate_yaml(": a\n").is_none());
         assert!(validate_yaml("a: 1\na: 2\n").is_none());
+    }
+
+    /// Consumer-aware tabs-as-indentation. The 1.2 substrate rejects every tab
+    /// shape below, but real consumers diverge — and crucially pandoc/libyaml
+    /// never rejects a tab as indentation (its markdown reader expands tabs
+    /// before YAML parsing; its Y79Y/006-009 failures are the separate
+    /// non-string-key metadata rule, which also fails with spaces). Verdicts
+    /// measured via `scripts/yaml-oracle/`; see `tests/yaml/consumer-matrix.md`.
+    mod consumer_tabs {
+        use super::*;
+        use crate::options::Flavor;
+
+        const QUOTED_CONT: &str = "foo: \"bar\n\tbaz\"\n"; // DK95/01 — none reject
+        const FLOW_IN_BLOCK: &str = "- [\n\tfoo,\n foo\n ]\n"; // Y79Y/003 — none reject
+        const BLOCK_SCALAR: &str = "foo: |\n\t\nbar: 1\n"; // Y79Y/000 — only R rejects
+        const SEQ_DASH: &str = "-\t-\n"; // Y79Y/004 — js + R reject
+        const SEQ_DASH_SPACE: &str = "- \t-\n"; // Y79Y/005 — js + R reject
+        const EXPL_KEY_SEQ: &str = "?\t-\n"; // Y79Y/006 — js + R reject
+        const EXPL_VAL_SEQ: &str = "? -\n:\t-\n"; // Y79Y/007 — js + R reject
+        const EXPL_KEY_MAP: &str = "?\tkey:\n"; // Y79Y/008 — js + R reject
+        const EXPL_VAL_MAP: &str = "? key:\n:\tkey:\n"; // Y79Y/009 — js + R reject
+
+        const ALL: &[&str] = &[
+            QUOTED_CONT,
+            FLOW_IN_BLOCK,
+            BLOCK_SCALAR,
+            SEQ_DASH,
+            SEQ_DASH_SPACE,
+            EXPL_KEY_SEQ,
+            EXPL_VAL_SEQ,
+            EXPL_KEY_MAP,
+            EXPL_VAL_MAP,
+        ];
+
+        // Tabs that js-yaml accepts (so Quarto accepts): flow content,
+        // block-scalar bodies, and quoted-scalar continuations.
+        const JS_ACCEPTS: &[&str] = &[QUOTED_CONT, FLOW_IN_BLOCK, BLOCK_SCALAR];
+        // Tabs every block-context consumer rejects.
+        const BLOCK_INDENT: &[&str] = &[
+            SEQ_DASH,
+            SEQ_DASH_SPACE,
+            EXPL_KEY_SEQ,
+            EXPL_VAL_SEQ,
+            EXPL_KEY_MAP,
+            EXPL_VAL_MAP,
+        ];
+
+        fn code(input: &str, ctx: YamlValidationContext) -> Option<&'static str> {
+            validate_yaml_with_context(input, ctx).map(|d| d.code)
+        }
+
+        #[test]
+        fn substrate_still_flags_every_tab_shape() {
+            for input in ALL {
+                assert_eq!(
+                    code(input, YamlValidationContext::substrate()),
+                    Some(diagnostic_codes::PARSE_UNEXPECTED_INDENT),
+                    "substrate must still reject the tab in {input:?}",
+                );
+            }
+        }
+
+        #[test]
+        fn pandoc_frontmatter_accepts_every_tab() {
+            let ctx = YamlValidationContext::frontmatter(Flavor::Pandoc);
+            for input in ALL {
+                assert_eq!(
+                    code(input, ctx),
+                    None,
+                    "pandoc never rejects a tab as indentation: {input:?}",
+                );
+            }
+        }
+
+        #[test]
+        fn no_consumer_flavor_accepts_every_tab() {
+            let ctx = YamlValidationContext::frontmatter(Flavor::CommonMark);
+            for input in ALL {
+                assert_eq!(
+                    code(input, ctx),
+                    None,
+                    "no asserted consumer ⇒ lenient: {input:?}"
+                );
+            }
+        }
+
+        #[test]
+        fn quarto_frontmatter_rejects_only_block_indent_tabs() {
+            let ctx = YamlValidationContext::frontmatter(Flavor::Quarto);
+            for input in JS_ACCEPTS {
+                assert_eq!(
+                    code(input, ctx),
+                    None,
+                    "js-yaml accepts the tab in {input:?}"
+                );
+            }
+            for input in BLOCK_INDENT {
+                assert_eq!(
+                    code(input, ctx),
+                    Some(diagnostic_codes::PARSE_UNEXPECTED_INDENT),
+                    "js-yaml rejects the block-indent tab in {input:?}",
+                );
+            }
+        }
+
+        #[test]
+        fn rmarkdown_frontmatter_also_rejects_block_scalar_tab() {
+            let ctx = YamlValidationContext::frontmatter(Flavor::RMarkdown);
+            for input in [QUOTED_CONT, FLOW_IN_BLOCK] {
+                assert_eq!(
+                    code(input, ctx),
+                    None,
+                    "R yaml accepts the tab in {input:?}"
+                );
+            }
+            // R's yaml additionally rejects the block-scalar-body tab (Y79Y/000).
+            for input in std::iter::once(&BLOCK_SCALAR).chain(BLOCK_INDENT) {
+                assert_eq!(
+                    code(input, ctx),
+                    Some(diagnostic_codes::PARSE_UNEXPECTED_INDENT),
+                    "R yaml rejects the block-indent tab in {input:?}",
+                );
+            }
+        }
     }
 
     #[test]

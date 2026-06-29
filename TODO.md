@@ -530,16 +530,18 @@ from an empirical audit of every suite case through libyaml (Ruby Psych),
 pandoc, and js-yaml --- see `scripts/yaml-oracle/` and the full classification
 in `crates/panache-parser/tests/yaml/consumer-matrix.md`.
 
-- [ ] **Tabs as indentation --- DEFERRED (needs parser surgery).** The audit
-  disproved the blanket "pandoc accepts tabs" assumption: pandoc accepts
-  tabs in scalar content / flow / after a block-seq dash but **rejects**
-  them in explicit-key context (Y79Y/006--009). The panache check that fires
-  (`PARSE_UNEXPECTED_INDENT`) is overloaded across 12 cases with mixed
-  pandoc verdicts, so it cannot be suppressed at check granularity. Acting
-  on it requires emitting a tab-context-specific diagnostic so the accepted
-  contexts can be gated per-consumer. The (flavor, location) plumbing landed
-  here is the prerequisite; a Pool-1 `suppressed_for` hook is the intended
-  extension point (documented in `validate_yaml_with_context`).
+- [x] **Tabs as indentation --- DONE.** A space-vs-tab oracle audit corrected
+  the premise: pandoc **never** rejects a tab as indentation (its
+  Y79Y/006--009 failures are the separate non-string-key metadata rule,
+  which fails with spaces too; pandoc's markdown reader expands tabs before
+  YAML parsing). The tab checks (`check_tab_as_indent`,
+  `check_quoted_scalar_continuation`) now gate per-consumer via
+  `tab_indent_emits(ctx, rejecting)` with per-shape rejecting sets (`{}`,
+  `{ryaml}`, `{jsyaml, ryaml}`); the substrate always emits, so
+  yaml-test-suite verdicts are unchanged. The host metadata gate
+  (`validate_doc_frontmatter`) was made context-aware too, so `panache lint`
+  agrees with the parser and never double-reports. See
+  `tests/yaml/consumer-matrix.md`.
 - [ ] **pandoc metadata-must-be-a-mapping --- OUT OF SCOPE.** 11 frontmatter
   cases (e.g. `LX3P` `[flow]: block`, top-level sequences) where pandoc
   rejects but libyaml accepts. This is a frontmatter-shape rule, not YAML

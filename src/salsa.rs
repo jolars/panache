@@ -267,7 +267,8 @@ pub fn doc_frontmatter_metadata_result(
     config: FileConfig,
 ) -> Result<(), crate::metadata::YamlError> {
     let tree = parsed_tree_root(db, file, config);
-    crate::metadata::project::validate_doc_frontmatter(&tree)
+    let ctx = crate::parser::yaml::YamlValidationContext::frontmatter(config.config(db).flavor);
+    crate::metadata::project::validate_doc_frontmatter(&tree, ctx)
 }
 
 /// Per-file YAML parse errors in the project-manifest files reachable from this
@@ -3484,6 +3485,43 @@ mod tests {
                 .iter()
                 .any(|diagnostic| diagnostic.code == "yaml-parse-error"),
             "expected yaml parse diagnostic from invalid frontmatter YAML"
+        );
+    }
+
+    #[test]
+    fn frontmatter_tab_is_consumer_aware_and_not_double_reported() {
+        // A tab indenting a mapping value: pandoc/libyaml accepts it (its
+        // markdown reader expands tabs), js-yaml/R yaml reject it. The lint must
+        // mirror the active consumer — and never double-report (the parser
+        // channel + the metadata-extraction gate must agree).
+        let doc = "---\nfoo:\n\tbar: 1\n---\n\n# Hi\n";
+
+        let count_yaml_errors = |flavor: crate::config::Flavor| {
+            let mut db = SalsaDb::default();
+            let cfg = crate::Config {
+                flavor,
+                extensions: crate::config::Extensions::for_flavor(flavor),
+                ..Default::default()
+            };
+            let config = FileConfig::new(&db, cfg);
+            let path = PathBuf::from("/tmp/frontmatter_tab.md");
+            let file = db.update_file_text(path, doc.to_string());
+            built_in_lint_plan(&db, file, config)
+                .diagnostics
+                .iter()
+                .filter(|d| d.code == "yaml-parse-error")
+                .count()
+        };
+
+        assert_eq!(
+            count_yaml_errors(crate::config::Flavor::Pandoc),
+            0,
+            "pandoc accepts a tab as indentation; lint must not flag it",
+        );
+        assert_eq!(
+            count_yaml_errors(crate::config::Flavor::Quarto),
+            1,
+            "js-yaml rejects the tab; lint must flag it exactly once (no double-report)",
         );
     }
 

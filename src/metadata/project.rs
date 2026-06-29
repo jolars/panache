@@ -183,13 +183,30 @@ fn extract_project_metadata_impl(
 /// reads. The LSP uses this so that project-manifest (`_quarto.yml` etc.) parse
 /// errors stay off the document's own diagnostics — those are surfaced on the
 /// manifest file's own URI instead (see `project_manifest_diagnostics`).
-pub(crate) fn validate_doc_frontmatter(tree: &SyntaxNode) -> Result<(), YamlError> {
+pub(crate) fn validate_doc_frontmatter(
+    tree: &SyntaxNode,
+    ctx: crate::parser::yaml::YamlValidationContext,
+) -> Result<(), YamlError> {
     let Some(yaml_text) = super::find_yaml_metadata_node(tree).map(|node| node.text().to_string())
     else {
         return Ok(());
     };
     let doc_yaml = strip_yaml_delimiters(&yaml_text);
-    parse_metadata_text(&doc_yaml).map(|_| ())
+    // Validate against the document's real YAML consumers (per flavor), in
+    // agreement with the parser's context-aware syntax-error channel — not the
+    // 1.2 substrate. Otherwise a pandoc-accepted tab would be re-reported here
+    // as a frontmatter parse error. Field extraction (below, in
+    // `parse_metadata_text`) is infallible once the YAML validates, so this gate
+    // is the only error source.
+    crate::yaml_engine::validate_yaml_with_context(&doc_yaml, ctx).map_err(|err| {
+        let (line, column) = byte_offset_to_line_col_1based(&doc_yaml, err.offset());
+        YamlError::ParseError {
+            message: err.message().to_string(),
+            line: line as u64,
+            column: column as u64,
+            byte_offset: Some(err.offset()),
+        }
+    })
 }
 
 /// The project-manifest config files that contribute metadata to `doc_path`:

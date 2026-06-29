@@ -42,14 +42,12 @@ full suite conformity (every allowlisted case parses iff 1.2-valid), so
    work.** These are real silent failures today — Panache accepts YAML the
    pipeline rejects, so the user only finds out at render time (the exact bug
    that prompted this).
-2. **The SUPPRESS direction (making Panache more lenient) is low-value and
-   context-dependent.** Every candidate is an exotic edge case, and the headline
-   "pandoc accepts tabs as indentation" is *false as a blanket rule*: pandoc
-   accepts tabs in scalar content / flow / after a block-seq dash but **rejects**
-   tabs in explicit-key context (Y79Y/006–009). The panache check that fires
-   (`PARSE_UNEXPECTED_INDENT`) is overloaded across 12 cases with mixed pandoc
-   verdicts (6 accept, 6 reject), so it **cannot** be safely suppressed at check
-   granularity. Deferred — see below.
+2. **The SUPPRESS direction (making Panache more lenient) is implemented for
+   tabs.** A later space-vs-tab oracle audit (2026-06-29) corrected the earlier
+   reading: pandoc **never** rejects a tab as indentation. Its Y79Y/006–009
+   failures persist with spaces — they are the separate "non-string key"
+   metadata rule, not the tab (pandoc's markdown reader expands tabs before YAML
+   parsing). The tab checks now gate per-consumer; see the tab story below.
 
 ## Pool-2 consumer-only checks to ADD (substrate accepts, a consumer rejects)
 
@@ -107,32 +105,36 @@ only if *every* case firing it is accepted by that consumer):
 | --- | --- | --- | --- | --- |
 | `LEX_COMMENT_NOT_PRECEDED_BY_SPACE` | 1 (`SU5Z`) | yes | yes | safe-but-trivial; defer (1 case, low confidence) |
 | `PARSE_INVALID_PLAIN_SCALAR_IN_FLOW` | 1 (`YJV2` `[-]`) | yes | no | pandoc-only; defer (1 case) |
-| `PARSE_UNEXPECTED_INDENT` (tabs etc.) | 12 | **no** (6/12) | no (4/12) | NOT safe; needs tab-context sub-check split — defer |
+| `PARSE_UNEXPECTED_INDENT` (tabs) | per-shape | yes (per shape) | yes (per shape) | IMPLEMENTED — gated per-consumer, see below |
 | all other reject codes | — | no | no | genuine, keep |
 
-### The tab story (the TODO's "tabs as indentation")
+### The tab story (the TODO's "tabs as indentation") — IMPLEMENTED
 
-Tab cases under `PARSE_UNEXPECTED_INDENT`, with the pandoc/js split:
+A space-vs-tab oracle audit (2026-06-29) isolated the *tab's* effect from
+co-occurring structural rejections. The corrected verdicts (pandoc / jsyaml /
+ryaml columns are for the **tab alone**):
 
-| case | shape | pandoc | jsyaml |
-| --- | --- | --- | --- |
-| `DK95/01` | tab in dq-scalar continuation | ok | ok |
-| `Y79Y/000` | tab as block-scalar content | ok | ok |
-| `Y79Y/003` | tab indent in flow seq | ok | ok |
-| `Y79Y/004` | `-<TAB>-` | ok | err |
-| `Y79Y/005` | `- <TAB>-` | ok | err |
-| `Y79Y/006` | `?<TAB>-` | **err** | err |
-| `Y79Y/007` | `? -`⏎`:<TAB>-` | **err** | err |
-| `Y79Y/008` | `?<TAB>key:` | **err** | err |
-| `Y79Y/009` | `? key:`⏎`:<TAB>key:` | **err** | err |
+| case | shape | pandoc | jsyaml | ryaml | tab-rejecting set |
+| --- | --- | --- | --- | --- | --- |
+| `DK95/01` | tab in dq-scalar continuation | ok | ok | ok | `{}` |
+| `Y79Y/003` | tab indent in nested flow seq | ok | ok | ok | `{}` |
+| `Y79Y/000` | tab in block-scalar body | ok | ok | err | `{ryaml}` |
+| `Y79Y/004` | `-<TAB>-` (block-seq dash) | ok | err | err | `{jsyaml, ryaml}` |
+| `Y79Y/005` | `- <TAB>-` (block-seq dash) | ok | err | err | `{jsyaml, ryaml}` |
+| `Y79Y/006`–`009` | tab in mapping-indicator slot | ok\* | err | err | `{jsyaml, ryaml}` |
 
-Conclusion: there is no single "tabs" verdict. Acting on this requires the
-parser to emit a tab-context-specific diagnostic (separable from generic indent
-errors) so the accepted contexts can be gated per-consumer. Tracked as future
-work; the (flavor, location) plumbing landed here is the prerequisite. When it
-lands, the rejecting set for tabs is `{jsyaml, ryaml}` (R-yaml rejects all 11
-substrate-valid tab cases pandoc accepts), so RMarkdown joins Quarto in
-rejecting them.
+\* pandoc rejects Y79Y/006–009 **even with spaces** — that is the "non-string
+key" metadata rule (see OUT OF SCOPE below), not the tab. pandoc's markdown
+reader expands tabs before YAML parsing, so **pandoc never rejects a tab as
+indentation**. `libyaml` is therefore never in any tab-rejecting set.
+
+Implemented in `validator::check_tab_as_indent` /
+`check_quoted_scalar_continuation` via `tab_indent_emits(ctx, rejecting)`: the
+1.2 substrate always emits (suite verdicts unchanged), a production context
+emits only when an active consumer is in the shape's rejecting set. The
+host-side metadata-extraction gate (`validate_doc_frontmatter`) was made
+context-aware too, so `panache lint` agrees with the parser and never
+double-reports.
 
 ## pandoc-only frontmatter rejections (metadata shape) — OUT OF SCOPE
 
