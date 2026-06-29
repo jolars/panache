@@ -166,8 +166,6 @@ default and `--flavor quarto`):
 ### Open Questions
 
 - How to balance parser error recovery vs. strict linting?
-- Performance: incremental linting for LSP mode?
-- LSP: incremental parsing cache (tree reuse on didChange)
 - LSP lint dispatch follow-ups (from the cancellation-race fix):
   - Larger redesign still open: shared thread pool + priority queue + lint cap
     (see the `lsp-shared-priority-pool` handoff plan). The all-docs-per-settle
