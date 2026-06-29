@@ -1,8 +1,10 @@
 //! Math parsing for both inline and display math.
 //!
 //! This module handles all math-related parsing:
-//! - **Inline math**: `$...$`, `$`...`$`, `\(...\)`, `\\(...\\)` - may span a
-//!   single newline within a paragraph (pandoc), but a blank line ends it
+//! - **Inline math**: `$...$`, `$`...`$`, `\(...\)`, `\\(...\\)`. Under the
+//!   Pandoc dialect these may span a single newline within a paragraph (a blank
+//!   line ends the span); under the CommonMark dialect (GFM, etc.) they are
+//!   single line only. Callers pass `allow_multiline` from `dialect == Pandoc`.
 //! - **Display math**: `$$...$$`, `\[...\]`, `\\[...\\]` - can span multiple lines
 //!
 //! Display math can appear both inline (within paragraphs) and as block-level elements.
@@ -33,13 +35,17 @@ pub fn math_opts(config: &crate::options::ParserOptions) -> MathParseOptions {
 
 /// Whether a newline reached inside an inline math span ends the math.
 ///
-/// Inline math (`$...$`, `$`...`$`, `\(...\)`, `\\(...\\)`) may span a single
-/// newline within a paragraph (pandoc), but a blank line — a newline followed
-/// by only whitespace and then another line break or end of input — terminates
-/// it. `after_nl` is the text immediately following the newline. By the time
-/// inline parsing runs the block parser has already split paragraphs at blank
-/// lines, so this is a defensive guard.
-fn newline_ends_inline_math(after_nl: &str) -> bool {
+/// When `allow_multiline` is false (CommonMark dialect — GFM, etc.) any newline
+/// ends the span: inline math is single line only. When true (Pandoc dialect)
+/// the span may fold a single newline within a paragraph and only a blank line
+/// — a newline followed by only whitespace and then another line break or end
+/// of input — terminates it. `after_nl` is the text immediately following the
+/// newline. By the time inline parsing runs the block parser has already split
+/// paragraphs at blank lines, so the blank-line arm is a defensive guard.
+fn newline_ends_inline_math(after_nl: &str, allow_multiline: bool) -> bool {
+    if !allow_multiline {
+        return true;
+    }
     let next = after_nl.trim_start_matches([' ', '\t']);
     next.is_empty() || next.starts_with('\n') || next.starts_with('\r')
 }
@@ -51,7 +57,7 @@ fn newline_ends_inline_math(after_nl: &str) -> bool {
 /// - Opening $ must have non-space character immediately to its right
 /// - Closing $ must have non-space character immediately to its left
 /// - Closing $ must not be followed immediately by a digit
-pub fn try_parse_inline_math(text: &str) -> Option<(usize, &str)> {
+pub fn try_parse_inline_math(text: &str, allow_multiline: bool) -> Option<(usize, &str)> {
     // Must start with exactly one $
     if !text.starts_with('$') || text.starts_with("$$") {
         return None;
@@ -99,7 +105,7 @@ pub fn try_parse_inline_math(text: &str) -> Option<(usize, &str)> {
             return Some((total_len, math_content));
         }
 
-        if ch == '\n' && newline_ends_inline_math(&rest[pos + 1..]) {
+        if ch == '\n' && newline_ends_inline_math(&rest[pos + 1..], allow_multiline) {
             return None;
         }
 
@@ -112,7 +118,7 @@ pub fn try_parse_inline_math(text: &str) -> Option<(usize, &str)> {
 
 /// Try to parse GFM inline math: $`...`$
 /// Extension: tex_math_gfm
-pub fn try_parse_gfm_inline_math(text: &str) -> Option<(usize, &str)> {
+pub fn try_parse_gfm_inline_math(text: &str, allow_multiline: bool) -> Option<(usize, &str)> {
     if !text.starts_with("$`") {
         return None;
     }
@@ -125,7 +131,7 @@ pub fn try_parse_gfm_inline_math(text: &str) -> Option<(usize, &str)> {
     let mut pos = 0;
     while pos < rest.len() {
         let ch = rest[pos..].chars().next()?;
-        if ch == '\n' && newline_ends_inline_math(&rest[pos + 1..]) {
+        if ch == '\n' && newline_ends_inline_math(&rest[pos + 1..], allow_multiline) {
             return None;
         }
         if rest[pos..].starts_with("`$") {
@@ -144,7 +150,10 @@ pub fn try_parse_gfm_inline_math(text: &str) -> Option<(usize, &str)> {
 
 /// Try to parse single backslash inline math: \(...\)
 /// Extension: tex_math_single_backslash
-pub fn try_parse_single_backslash_inline_math(text: &str) -> Option<(usize, &str)> {
+pub fn try_parse_single_backslash_inline_math(
+    text: &str,
+    allow_multiline: bool,
+) -> Option<(usize, &str)> {
     if !text.starts_with(r"\(") {
         return None;
     }
@@ -163,7 +172,7 @@ pub fn try_parse_single_backslash_inline_math(text: &str) -> Option<(usize, &str
             return Some((total_len, math_content));
         }
 
-        if ch == '\n' && newline_ends_inline_math(&rest[pos + 1..]) {
+        if ch == '\n' && newline_ends_inline_math(&rest[pos + 1..], allow_multiline) {
             return None;
         }
 
@@ -175,7 +184,10 @@ pub fn try_parse_single_backslash_inline_math(text: &str) -> Option<(usize, &str
 
 /// Try to parse double backslash inline math: \\(...\\)
 /// Extension: tex_math_double_backslash
-pub fn try_parse_double_backslash_inline_math(text: &str) -> Option<(usize, &str)> {
+pub fn try_parse_double_backslash_inline_math(
+    text: &str,
+    allow_multiline: bool,
+) -> Option<(usize, &str)> {
     if !text.starts_with(r"\\(") {
         return None;
     }
@@ -194,7 +206,7 @@ pub fn try_parse_double_backslash_inline_math(text: &str) -> Option<(usize, &str
             return Some((total_len, math_content));
         }
 
-        if ch == '\n' && newline_ends_inline_math(&rest[pos + 1..]) {
+        if ch == '\n' && newline_ends_inline_math(&rest[pos + 1..], allow_multiline) {
             return None;
         }
 
@@ -490,102 +502,109 @@ mod tests {
 
     #[test]
     fn test_parse_simple_inline_math() {
-        let result = try_parse_inline_math("$x = y$");
+        let result = try_parse_inline_math("$x = y$", true);
         assert_eq!(result, Some((7, "x = y")));
     }
 
     #[test]
     fn test_parse_inline_math_with_spaces_inside() {
         // Spaces inside math are OK, just not immediately after opening or before closing
-        let result = try_parse_inline_math("$a + b$");
+        let result = try_parse_inline_math("$a + b$", true);
         assert_eq!(result, Some((7, "a + b")));
     }
 
     #[test]
     fn test_parse_inline_math_complex() {
-        let result = try_parse_inline_math(r"$\frac{1}{2}$");
+        let result = try_parse_inline_math(r"$\frac{1}{2}$", true);
         assert_eq!(result, Some((13, r"\frac{1}{2}")));
     }
 
     #[test]
     fn test_not_inline_math_display() {
         // $$ is display math, not inline
-        let result = try_parse_inline_math("$$x = y$$");
+        let result = try_parse_inline_math("$$x = y$$", true);
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_inline_math_no_close() {
-        let result = try_parse_inline_math("$no close");
+        let result = try_parse_inline_math("$no close", true);
         assert_eq!(result, None);
     }
 
     #[test]
-    fn test_inline_math_spans_single_newline() {
-        // pandoc treats `$...$` spanning a single newline within a paragraph
-        // as math (`tex_math_dollars`).
-        let result = try_parse_inline_math("$x =\ny$");
+    fn test_inline_math_spans_single_newline_pandoc() {
+        // Pandoc dialect treats `$...$` spanning a single newline within a
+        // paragraph as math (`tex_math_dollars`).
+        let result = try_parse_inline_math("$x =\ny$", true);
         assert_eq!(result, Some((7, "x =\ny")));
     }
 
     #[test]
+    fn test_inline_math_single_line_only_commonmark() {
+        // CommonMark dialect (GFM, etc.): inline math never spans a newline.
+        let result = try_parse_inline_math("$x =\ny$", false);
+        assert_eq!(result, None);
+    }
+
+    #[test]
     fn test_inline_math_stops_at_blank_line() {
-        // A blank line is a paragraph break and ends the math.
-        let result = try_parse_inline_math("$x =\n\ny$");
+        // A blank line is a paragraph break and ends the math even in Pandoc.
+        let result = try_parse_inline_math("$x =\n\ny$", true);
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_not_inline_math() {
-        let result = try_parse_inline_math("no dollar");
+        let result = try_parse_inline_math("no dollar", true);
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_inline_math_with_trailing_text() {
-        let result = try_parse_inline_math("$x$ and more");
+        let result = try_parse_inline_math("$x$ and more", true);
         assert_eq!(result, Some((3, "x")));
     }
 
     #[test]
     fn test_spec_opening_must_have_non_space_right() {
         // Per Pandoc spec: opening $ must have non-space immediately to right
-        let result = try_parse_inline_math("$ x$");
+        let result = try_parse_inline_math("$ x$", true);
         assert_eq!(result, None, "Opening $ with space should not parse");
     }
 
     #[test]
     fn test_spec_closing_must_have_non_space_left() {
         // Per Pandoc spec: closing $ must have non-space immediately to left
-        let result = try_parse_inline_math("$x $");
+        let result = try_parse_inline_math("$x $", true);
         assert_eq!(result, None, "Closing $ with space should not parse");
     }
 
     #[test]
     fn test_spec_closing_not_followed_by_digit() {
         // Per Pandoc spec: closing $ must not be followed by digit
-        let result = try_parse_inline_math("$x$5");
+        let result = try_parse_inline_math("$x$5", true);
         assert_eq!(result, None, "Closing $ followed by digit should not parse");
     }
 
     #[test]
     fn test_spec_dollar_amounts() {
         // $20,000 should not parse as math
-        let result = try_parse_inline_math("$20,000");
+        let result = try_parse_inline_math("$20,000", true);
         assert_eq!(result, None, "Dollar amounts should not parse as math");
     }
 
     #[test]
     fn test_valid_math_after_spec_checks() {
         // $x$ alone should still parse
-        let result = try_parse_inline_math("$x$");
+        let result = try_parse_inline_math("$x$", true);
         assert_eq!(result, Some((3, "x")), "Valid math should parse");
     }
 
     #[test]
     fn test_math_followed_by_non_digit() {
         // $x$a should parse (not followed by digit)
-        let result = try_parse_inline_math("$x$a");
+        let result = try_parse_inline_math("$x$a", true);
         assert_eq!(
             result,
             Some((3, "x")),
@@ -633,30 +652,33 @@ mod tests {
     // Single backslash math tests
     #[test]
     fn test_single_backslash_inline_math() {
-        let result = try_parse_single_backslash_inline_math(r"\(x^2\)");
+        let result = try_parse_single_backslash_inline_math(r"\(x^2\)", true);
         assert_eq!(result, Some((7, "x^2")));
     }
 
     #[test]
     fn test_single_backslash_inline_math_complex() {
-        let result = try_parse_single_backslash_inline_math(r"\(\frac{a}{b}\)");
+        let result = try_parse_single_backslash_inline_math(r"\(\frac{a}{b}\)", true);
         assert_eq!(result, Some((15, r"\frac{a}{b}")));
     }
 
     #[test]
     fn test_single_backslash_inline_math_no_close() {
-        let result = try_parse_single_backslash_inline_math(r"\(no close");
+        let result = try_parse_single_backslash_inline_math(r"\(no close", true);
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_single_backslash_inline_math_spans_single_newline() {
         // Matches pandoc with `tex_math_single_backslash`: a single newline
-        // is allowed, a blank line ends the math.
-        let result = try_parse_single_backslash_inline_math("\\(x =\ny\\)");
+        // is allowed, a blank line ends the math. Under CommonMark it never
+        // spans a newline.
+        let result = try_parse_single_backslash_inline_math("\\(x =\ny\\)", true);
         assert_eq!(result, Some((9, "x =\ny")));
-        let blank = try_parse_single_backslash_inline_math("\\(x =\n\ny\\)");
+        let blank = try_parse_single_backslash_inline_math("\\(x =\n\ny\\)", true);
         assert_eq!(blank, None);
+        let cm = try_parse_single_backslash_inline_math("\\(x =\ny\\)", false);
+        assert_eq!(cm, None);
     }
 
     #[test]
@@ -680,30 +702,33 @@ mod tests {
     // Double backslash math tests
     #[test]
     fn test_double_backslash_inline_math() {
-        let result = try_parse_double_backslash_inline_math(r"\\(x^2\\)");
+        let result = try_parse_double_backslash_inline_math(r"\\(x^2\\)", true);
         assert_eq!(result, Some((9, "x^2")));
     }
 
     #[test]
     fn test_double_backslash_inline_math_complex() {
-        let result = try_parse_double_backslash_inline_math(r"\\(\alpha + \beta\\)");
+        let result = try_parse_double_backslash_inline_math(r"\\(\alpha + \beta\\)", true);
         assert_eq!(result, Some((20, r"\alpha + \beta")));
     }
 
     #[test]
     fn test_double_backslash_inline_math_no_close() {
-        let result = try_parse_double_backslash_inline_math(r"\\(no close");
+        let result = try_parse_double_backslash_inline_math(r"\\(no close", true);
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_double_backslash_inline_math_spans_single_newline() {
         // Matches pandoc with `tex_math_double_backslash`: a single newline is
-        // allowed, a blank line ends the math.
-        let result = try_parse_double_backslash_inline_math("\\\\(x =\ny\\\\)");
+        // allowed, a blank line ends the math. Under CommonMark it never spans
+        // a newline.
+        let result = try_parse_double_backslash_inline_math("\\\\(x =\ny\\\\)", true);
         assert_eq!(result, Some((11, "x =\ny")));
-        let blank = try_parse_double_backslash_inline_math("\\\\(x =\n\ny\\\\)");
+        let blank = try_parse_double_backslash_inline_math("\\\\(x =\n\ny\\\\)", true);
         assert_eq!(blank, None);
+        let cm = try_parse_double_backslash_inline_math("\\\\(x =\ny\\\\)", false);
+        assert_eq!(cm, None);
     }
 
     #[test]

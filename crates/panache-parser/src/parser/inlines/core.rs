@@ -793,7 +793,10 @@ fn parse_inline_range_impl(
                 }
 
                 // Try double backslash inline math: \\(...\\)
-                if let Some((len, content)) = try_parse_double_backslash_inline_math(&text[pos..]) {
+                if let Some((len, content)) = try_parse_double_backslash_inline_math(
+                    &text[pos..],
+                    config.dialect == Dialect::Pandoc,
+                ) {
                     if pos > text_start {
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
@@ -820,7 +823,10 @@ fn parse_inline_range_impl(
                 }
 
                 // Try single backslash inline math: \(...\)
-                if let Some((len, content)) = try_parse_single_backslash_inline_math(&text[pos..]) {
+                if let Some((len, content)) = try_parse_single_backslash_inline_math(
+                    &text[pos..],
+                    config.dialect == Dialect::Pandoc,
+                ) {
                     if pos > text_start {
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
@@ -1166,7 +1172,8 @@ fn parse_inline_range_impl(
         // Try GFM inline math: $`...`$
         if byte == b'$'
             && config.extensions.tex_math_gfm
-            && let Some((len, content)) = try_parse_gfm_inline_math(&text[pos..])
+            && let Some((len, content)) =
+                try_parse_gfm_inline_math(&text[pos..], config.dialect == Dialect::Pandoc)
         {
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
@@ -1245,7 +1252,9 @@ fn parse_inline_range_impl(
             }
 
             // Try inline math ($...$)
-            if let Some((len, content)) = try_parse_inline_math(&text[pos..]) {
+            if let Some((len, content)) =
+                try_parse_inline_math(&text[pos..], config.dialect == Dialect::Pandoc)
+            {
                 // Emit accumulated text
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);

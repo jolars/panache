@@ -985,6 +985,8 @@ fn try_pandoc_math_opaque(
     let bytes = text.as_bytes();
     let exts = &config.extensions;
     let b = bytes[pos];
+    // Inline math folds a single newline only under the Pandoc dialect.
+    let multiline = config.dialect == crate::options::Dialect::Pandoc;
 
     if exts.tex_math_dollars && b == b'$' {
         if let Some((len, _)) = try_parse_display_math(&text[pos..])
@@ -992,7 +994,7 @@ fn try_pandoc_math_opaque(
         {
             return Some(len);
         }
-        if let Some((len, _)) = try_parse_inline_math(&text[pos..])
+        if let Some((len, _)) = try_parse_inline_math(&text[pos..], multiline)
             && pos + len <= end
         {
             return Some(len);
@@ -1000,7 +1002,7 @@ fn try_pandoc_math_opaque(
     }
     if exts.tex_math_gfm
         && b == b'$'
-        && let Some((len, _)) = try_parse_gfm_inline_math(&text[pos..])
+        && let Some((len, _)) = try_parse_gfm_inline_math(&text[pos..], multiline)
         && pos + len <= end
     {
         return Some(len);
@@ -1011,7 +1013,7 @@ fn try_pandoc_math_opaque(
         {
             return Some(len);
         }
-        if let Some((len, _)) = try_parse_double_backslash_inline_math(&text[pos..])
+        if let Some((len, _)) = try_parse_double_backslash_inline_math(&text[pos..], multiline)
             && pos + len <= end
         {
             return Some(len);
@@ -1023,7 +1025,7 @@ fn try_pandoc_math_opaque(
         {
             return Some(len);
         }
-        if let Some((len, _)) = try_parse_single_backslash_inline_math(&text[pos..])
+        if let Some((len, _)) = try_parse_single_backslash_inline_math(&text[pos..], multiline)
             && pos + len <= end
         {
             return Some(len);
