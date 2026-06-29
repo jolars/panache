@@ -54,6 +54,8 @@ use super::math::{
     try_parse_math_environment, try_parse_single_backslash_display_math,
     try_parse_single_backslash_inline_math,
 };
+use super::myst_roles::{emit_role, try_parse_role};
+use super::myst_substitutions::{emit_substitution, try_parse_substitution};
 use super::native_spans::{emit_native_span, try_parse_native_span};
 use super::raw_inline::is_raw_inline;
 use super::shortcodes::{emit_shortcode, try_parse_shortcode};
@@ -945,6 +947,38 @@ fn parse_inline_range_impl(
             }
             log::trace!("Matched Svelte template span at pos {}: {:?}", pos, kind);
             emit_svelte_template(builder, kind, &content);
+            pos += len;
+            text_start = pos;
+            continue;
+        }
+
+        // Try MyST inline roles: {name}`content`. The leading `{` is followed
+        // by a name char (not `{`), so this never shadows the `{{<` shortcode
+        // probe below. Gated on the extension, so `{` keeps its normal meaning
+        // elsewhere.
+        if byte == b'{'
+            && config.extensions.myst_roles
+            && let Some(role) = try_parse_role(&text[pos..])
+        {
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            }
+            emit_role(builder, &text[pos..pos + role.total_len], role);
+            pos += role.total_len;
+            text_start = pos;
+            continue;
+        }
+
+        // Try MyST substitutions: {{ name }}. Excludes the `{{<` shortcode
+        // opener (handled inside try_parse_substitution). Gated on the extension.
+        if byte == b'{'
+            && config.extensions.myst_substitutions
+            && let Some((len, inner_len)) = try_parse_substitution(&text[pos..])
+        {
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            }
+            emit_substitution(builder, &text[pos..pos + len], inner_len);
             pos += len;
             text_start = pos;
             continue;

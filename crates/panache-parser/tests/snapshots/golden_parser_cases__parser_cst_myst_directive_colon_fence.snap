@@ -1,0 +1,21 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..51
+  MYST_DIRECTIVE@0..51
+    MYST_DIRECTIVE_OPEN@0..13
+      MYST_DIRECTIVE_FENCE@0..3 ":::"
+      MYST_DIRECTIVE_NAME@3..12 "{warning}"
+      NEWLINE@12..13 "\n"
+    PARAGRAPH@13..47
+      TEXT@13..29 "Be careful with "
+      STRONG@29..38
+        STRONG_MARKER@29..31 "**"
+        TEXT@31..36 "colon"
+        STRONG_MARKER@36..38 "**"
+      TEXT@38..46 " fences."
+      NEWLINE@46..47 "\n"
+    MYST_DIRECTIVE_CLOSE@47..51
+      MYST_DIRECTIVE_FENCE@47..50 ":::"
+      NEWLINE@50..51 "\n"

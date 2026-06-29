@@ -1,0 +1,22 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..48
+  PARAGRAPH@0..48
+    TEXT@0..4 "See "
+    MYST_ROLE@4..21
+      MYST_ROLE_NAME@4..10 "{math}"
+      MYST_ROLE_MARKER@10..11 "`"
+      MYST_ROLE_CONTENT@11..20
+        TEXT@11..20 "a^2 + b^2"
+      MYST_ROLE_MARKER@20..21 "`"
+    TEXT@21..26 " and "
+    MYST_ROLE@26..46
+      MYST_ROLE_NAME@26..31 "{ref}"
+      MYST_ROLE_MARKER@31..32 "`"
+      MYST_ROLE_CONTENT@32..45
+        TEXT@32..45 "Intro <intro>"
+      MYST_ROLE_MARKER@45..46 "`"
+    TEXT@46..47 "."
+    NEWLINE@47..48 "\n"

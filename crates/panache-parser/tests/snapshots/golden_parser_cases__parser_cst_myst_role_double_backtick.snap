@@ -1,0 +1,15 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..21
+  PARAGRAPH@0..21
+    TEXT@0..4 "Use "
+    MYST_ROLE@4..14
+      MYST_ROLE_NAME@4..7 "{x}"
+      MYST_ROLE_MARKER@7..9 "``"
+      MYST_ROLE_CONTENT@9..12
+        TEXT@9..12 "a`b"
+      MYST_ROLE_MARKER@12..14 "``"
+    TEXT@14..20 " here."
+    NEWLINE@20..21 "\n"

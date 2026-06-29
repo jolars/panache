@@ -227,6 +227,11 @@ pub enum SyntaxKind {
     // (`???`/`???+`) container block. Content is 4-space indented and
     // parsed recursively; closes on dedent (like a footnote definition).
     ADMONITION,
+    // MyST directive container (```` ```{name} ```` or, with `colon_fence`,
+    // `:::{name}`). Fence-delimited like a fenced div, but its body is parsed
+    // recursively as markdown and the closer must match the opener's fence
+    // character and count.
+    MYST_DIRECTIVE,
     PARAGRAPH,
     PLAIN, // Inline content without paragraph break (tight lists, definition lists, table cells)
     BLOCK_QUOTE,
@@ -339,6 +344,26 @@ pub enum SyntaxKind {
     ADMONITION_MARKER, // `!!!`, `???`, or `???+`
     ADMONITION_TYPE,   // type/class words (e.g. `note`, `danger highlight`)
     ADMONITION_TITLE,  // optional quoted title (e.g. `"Heads up"`)
+
+    // MyST directive parts
+    MYST_DIRECTIVE_OPEN,  // opener line node (fence + name + optional argument)
+    MYST_DIRECTIVE_CLOSE, // closer line node (matching fence)
+    MYST_DIRECTIVE_FENCE, // the fence run itself (```` ``` ````, `~~~`, or `:::`)
+    MYST_DIRECTIVE_NAME,  // the `{name}` token, braces included (lossless)
+    MYST_DIRECTIVE_ARG,   // argument text after `{name}` on the opener line
+
+    // MyST inline role parts (`` {name}`content` ``)
+    MYST_ROLE,         // the whole role
+    MYST_ROLE_NAME,    // the `{name}` token, braces included
+    MYST_ROLE_MARKER,  // the backtick run delimiting the content
+    MYST_ROLE_CONTENT, // the literal content between the backticks
+
+    // MyST target / comment / substitution parts
+    MYST_TARGET,            // a `(label)=` target line
+    MYST_TARGET_LABEL,      // the label between `(` and `)=`
+    MYST_COMMENT,           // a `% ...` line comment
+    MYST_SUBSTITUTION,      // an inline `{{ name }}` substitution
+    MYST_SUBSTITUTION_NAME, // the substitution key between `{{` and `}}`
 
     EMOJI, // :alias:
 

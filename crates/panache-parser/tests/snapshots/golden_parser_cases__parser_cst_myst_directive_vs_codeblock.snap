@@ -1,0 +1,44 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..75
+  MYST_DIRECTIVE@0..27
+    MYST_DIRECTIVE_OPEN@0..10
+      MYST_DIRECTIVE_FENCE@0..3 "```"
+      MYST_DIRECTIVE_NAME@3..9 "{note}"
+      NEWLINE@9..10 "\n"
+    PARAGRAPH@10..23
+      TEXT@10..22 "A directive."
+      NEWLINE@22..23 "\n"
+    MYST_DIRECTIVE_CLOSE@23..27
+      MYST_DIRECTIVE_FENCE@23..26 "```"
+      NEWLINE@26..27 "\n"
+  BLANK_LINE@27..28
+    BLANK_LINE@27..28 "\n"
+  CODE_BLOCK@28..48
+    CODE_FENCE_OPEN@28..38
+      CODE_FENCE_MARKER@28..31 "```"
+      CODE_INFO@31..37
+        CODE_LANGUAGE@31..37 "python"
+      NEWLINE@37..38 "\n"
+    CODE_CONTENT@38..44
+      TEXT@38..43 "x = 1"
+      NEWLINE@43..44 "\n"
+    CODE_FENCE_CLOSE@44..48
+      CODE_FENCE_MARKER@44..47 "```"
+      NEWLINE@47..48 "\n"
+  BLANK_LINE@48..49
+    BLANK_LINE@48..49 "\n"
+  CODE_BLOCK@49..75
+    CODE_FENCE_OPEN@49..60
+      CODE_FENCE_MARKER@49..52 "```"
+      CODE_INFO@52..59
+        CODE_LANGUAGE@52..59 "{=html}"
+      NEWLINE@59..60 "\n"
+    CODE_CONTENT@60..71
+      TEXT@60..70 "<p>raw</p>"
+      NEWLINE@70..71 "\n"
+    CODE_FENCE_CLOSE@71..75
+      CODE_FENCE_MARKER@71..74 "```"
+      NEWLINE@74..75 "\n"

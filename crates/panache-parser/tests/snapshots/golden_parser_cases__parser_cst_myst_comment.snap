@@ -1,0 +1,13 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..35
+  MYST_COMMENT@0..23
+    TEXT@0..22 "% a standalone comment"
+    NEWLINE@22..23 "\n"
+  BLANK_LINE@23..24
+    BLANK_LINE@23..24 "\n"
+  PARAGRAPH@24..35
+    TEXT@24..34 "Real text."
+    NEWLINE@34..35 "\n"

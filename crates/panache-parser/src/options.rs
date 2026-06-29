@@ -26,6 +26,9 @@ pub enum Flavor {
     /// mdsvex (Svelte-flavored Markdown: CommonMark + Svelte template syntax)
     #[cfg_attr(feature = "serde", serde(rename = "mdsvex"))]
     Mdsvex,
+    /// MyST (CommonMark + Sphinx/MyST directives, roles, and targets)
+    #[cfg_attr(feature = "serde", serde(rename = "myst"))]
+    Myst,
 }
 
 /// Pandoc/Markdown extensions configuration.
@@ -291,6 +294,29 @@ pub struct Extensions {
     /// Parsed as opaque, lossless spans (content preserved verbatim).
     #[cfg_attr(feature = "serde", serde(alias = "svelte_template"))]
     pub svelte_template: bool,
+
+    // ===== MyST-specific extensions =====
+    /// [NON-DEFAULT] MyST directives: ```` ```{name} ```` (and, with
+    /// `myst_colon_fence`, `:::{name}`) blocks carrying `:key: value` options
+    /// and a markdown body.
+    #[cfg_attr(feature = "serde", serde(alias = "myst_directives"))]
+    pub myst_directives: bool,
+    /// [NON-DEFAULT] MyST inline roles: `` {name}`content` ``.
+    #[cfg_attr(feature = "serde", serde(alias = "myst_roles"))]
+    pub myst_roles: bool,
+    /// [NON-DEFAULT] MyST targets `(label)=` preceding a block.
+    #[cfg_attr(feature = "serde", serde(alias = "myst_targets"))]
+    pub myst_targets: bool,
+    /// [NON-DEFAULT] MyST inline substitutions `{{ name }}`.
+    #[cfg_attr(feature = "serde", serde(alias = "myst_substitutions"))]
+    pub myst_substitutions: bool,
+    /// [NON-DEFAULT] MyST line comments beginning with `%`.
+    #[cfg_attr(feature = "serde", serde(alias = "myst_comments"))]
+    pub myst_comments: bool,
+    /// [NON-DEFAULT] MyST colon-fence directive form `:::{name}` (off by default
+    /// even in MyST, matching `myst-parser`'s opt-in `colon_fence` extension).
+    #[cfg_attr(feature = "serde", serde(alias = "myst_colon_fence"))]
+    pub myst_colon_fence: bool,
 }
 
 impl Default for Extensions {
@@ -368,6 +394,12 @@ impl Extensions {
             subscript: false,
             superscript: false,
             svelte_template: false,
+            myst_directives: false,
+            myst_roles: false,
+            myst_targets: false,
+            myst_substitutions: false,
+            myst_comments: false,
+            myst_colon_fence: false,
             table_captions: false,
             task_lists: false,
             tex_math_dollars: false,
@@ -391,6 +423,7 @@ impl Extensions {
             Flavor::CommonMark => Self::commonmark_defaults(),
             Flavor::MultiMarkdown => Self::multimarkdown_defaults(),
             Flavor::Mdsvex => Self::mdsvex_defaults(),
+            Flavor::Myst => Self::myst_defaults(),
         }
     }
 
@@ -513,6 +546,14 @@ impl Extensions {
 
             // mdsvex (opt-in, mdsvex flavor only)
             svelte_template: false,
+
+            // MyST (opt-in, myst flavor only)
+            myst_directives: false,
+            myst_roles: false,
+            myst_targets: false,
+            myst_substitutions: false,
+            myst_comments: false,
+            myst_colon_fence: false,
         }
     }
 
@@ -646,6 +687,42 @@ impl Extensions {
         ext.alerts = false;
 
         ext.svelte_template = true;
+
+        ext
+    }
+
+    fn myst_defaults() -> Self {
+        // MyST is a CommonMark superset (markdown-it based), so we start from
+        // the CommonMark extension set and layer MyST's always-on constructs on
+        // top. Per the project decision, only MyST's *core* constructs are on by
+        // default — directives, roles, targets, and comments. Every MyST markup
+        // extension (`dollarmath`, `amsmath`, `colon_fence`, `deflist`,
+        // `fieldlist`, `tasklist`, `substitution`, `attrs_*`, `linkify`,
+        // `strikethrough`, `smartquotes`) is opt-in, matching a bare
+        // `myst-parser` install. Users enable them individually via config.
+        let mut ext = Self::commonmark_defaults();
+
+        ext.myst_directives = true;
+        ext.myst_roles = true;
+        ext.myst_targets = true;
+        ext.myst_comments = true;
+
+        // MyST is GFM-flavored, not bare CommonMark: `myst-parser` builds its
+        // markdown-it parser with `.enable("table")` and the footnote plugin on
+        // by default. The plugin is loaded as `footnote_plugin, inline=False`,
+        // so reference footnotes (`[^ref]`) are on but inline footnotes
+        // (`^[...]`) stay off, matching a bare `myst-parser` install. (The
+        // remaining markup extensions below stay opt-in.)
+        ext.pipe_tables = true;
+        ext.footnotes = true;
+        ext.inline_footnotes = false;
+
+        // Opt-in MyST extensions (off here, overridable via [extensions]):
+        // colon_fence, substitution, and the markup extensions that map onto
+        // existing flags (tex_math_dollars, definition_lists, task_lists,
+        // strikeout, footnotes, ...).
+        ext.myst_substitutions = false;
+        ext.myst_colon_fence = false;
 
         ext
     }
@@ -794,6 +871,12 @@ known_extensions! {
     "wikilinks-title-before-pipe" => wikilinks_title_before_pipe,
     "spaced-reference-links" => spaced_reference_links,
     "svelte-template" => svelte_template,
+    "myst-directives" => myst_directives,
+    "myst-roles" => myst_roles,
+    "myst-targets" => myst_targets,
+    "myst-substitutions" => myst_substitutions,
+    "myst-comments" => myst_comments,
+    "myst-colon-fence" => myst_colon_fence,
 }
 
 #[cfg(test)]
@@ -842,6 +925,7 @@ mod tests {
             Flavor::CommonMark,
             Flavor::MultiMarkdown,
             Flavor::Mdsvex,
+            Flavor::Myst,
         ] {
             assert!(
                 !Extensions::for_flavor(flavor).four_space_rule,
@@ -859,10 +943,71 @@ mod tests {
             Flavor::Gfm,
             Flavor::CommonMark,
             Flavor::MultiMarkdown,
+            Flavor::Myst,
         ] {
             assert!(
                 !Extensions::for_flavor(flavor).svelte_template,
                 "svelte_template should be off by default for {flavor:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn myst_uses_commonmark_dialect() {
+        assert_eq!(Dialect::for_flavor(Flavor::Myst), Dialect::CommonMark);
+    }
+
+    #[test]
+    fn myst_defaults_enable_core_constructs_only() {
+        let ext = Extensions::for_flavor(Flavor::Myst);
+
+        // MyST core constructs are on by default.
+        assert!(ext.myst_directives);
+        assert!(ext.myst_roles);
+        assert!(ext.myst_targets);
+        assert!(ext.myst_comments);
+
+        // MyST is a GFM-flavored superset, not bare CommonMark: markdown-it's
+        // `table` and footnote rules are on by default in `myst-parser`. The
+        // footnote plugin is loaded with `inline=False`, so reference footnotes
+        // are on but inline footnotes (`^[...]`) stay off.
+        assert!(ext.pipe_tables);
+        assert!(ext.footnotes);
+        assert!(!ext.inline_footnotes);
+
+        // MyST markup extensions are opt-in (off by default), matching a bare
+        // `myst-parser` install.
+        assert!(!ext.myst_colon_fence);
+        assert!(!ext.myst_substitutions);
+        assert!(!ext.tex_math_dollars);
+        assert!(!ext.definition_lists);
+        assert!(!ext.task_lists);
+        assert!(!ext.strikeout);
+
+        // CommonMark superset: CommonMark core on, Pandoc `{...}` constructs off
+        // so braces are free for directives/roles.
+        assert!(ext.inline_links);
+        assert!(ext.backtick_code_blocks);
+        assert!(!ext.fenced_divs);
+        assert!(!ext.bracketed_spans);
+        assert!(!ext.header_attributes);
+    }
+
+    #[test]
+    fn myst_core_constructs_off_for_other_flavors() {
+        for flavor in [
+            Flavor::Pandoc,
+            Flavor::Quarto,
+            Flavor::RMarkdown,
+            Flavor::Gfm,
+            Flavor::CommonMark,
+            Flavor::MultiMarkdown,
+            Flavor::Mdsvex,
+        ] {
+            let ext = Extensions::for_flavor(flavor);
+            assert!(
+                !ext.myst_directives && !ext.myst_roles && !ext.myst_targets && !ext.myst_comments,
+                "MyST core constructs should be off by default for {flavor:?}"
             );
         }
     }
@@ -970,7 +1115,7 @@ impl Dialect {
     /// Default dialect for a given user-facing flavor.
     pub fn for_flavor(flavor: Flavor) -> Self {
         match flavor {
-            Flavor::CommonMark | Flavor::Gfm | Flavor::Mdsvex => Dialect::CommonMark,
+            Flavor::CommonMark | Flavor::Gfm | Flavor::Mdsvex | Flavor::Myst => Dialect::CommonMark,
             Flavor::Pandoc | Flavor::Quarto | Flavor::RMarkdown | Flavor::MultiMarkdown => {
                 Dialect::Pandoc
             }
@@ -1051,7 +1196,8 @@ impl schemars::JsonSchema for Flavor {
                 "common-mark",
                 "commonmark",
                 "multimarkdown",
-                "mdsvex"
+                "mdsvex",
+                "myst"
             ]
         })
     }

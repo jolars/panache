@@ -173,6 +173,15 @@ The available flavors are:
 `mdsvex`
 :   [mdsvex](https://mdsvex.pngwn.io) (Svelte-flavored Markdown).
 
+`myst`
+:   [MyST](https://mystmd.org) (CommonMark superset used by Sphinx
+    `myst-parser`/`myst-nb`). Enables MyST directives, roles, targets, and
+    comments by default; MyST markup extensions (`colon_fence`, `attrs`,
+    `dollarmath`, etc.) are opt-in via `[extensions]`. MyST files use the plain
+    `.md` extension, so this flavor is opt-in only (set `flavor = "myst"`, use
+    `--flavor myst`, or a [`[flavor-overrides]`](#flavor-overrides) glob); it is
+    never auto-detected from the file extension.
+
 The `--flavor` CLI flag (see the [CLI reference](../reference/cli.qmd))
 overrides this setting for a single invocation. It also overrides
 [`[flavor-overrides]`](#flavor-overrides) and the flavor inferred from the file

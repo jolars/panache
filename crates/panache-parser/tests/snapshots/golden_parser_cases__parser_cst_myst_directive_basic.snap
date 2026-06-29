@@ -1,0 +1,26 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..54
+  MYST_DIRECTIVE@0..54
+    MYST_DIRECTIVE_OPEN@0..10
+      MYST_DIRECTIVE_FENCE@0..3 "```"
+      MYST_DIRECTIVE_NAME@3..9 "{note}"
+      NEWLINE@9..10 "\n"
+    PARAGRAPH@10..31
+      TEXT@10..18 "This is "
+      EMPHASIS@18..24
+        EMPHASIS_MARKER@18..19 "*"
+        TEXT@19..23 "body"
+        EMPHASIS_MARKER@23..24 "*"
+      TEXT@24..30 " text."
+      NEWLINE@30..31 "\n"
+    BLANK_LINE@31..32
+      BLANK_LINE@31..32 "\n"
+    PARAGRAPH@32..50
+      TEXT@32..49 "Second paragraph."
+      NEWLINE@49..50 "\n"
+    MYST_DIRECTIVE_CLOSE@50..54
+      MYST_DIRECTIVE_FENCE@50..53 "```"
+      NEWLINE@53..54 "\n"

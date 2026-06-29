@@ -1977,6 +1977,7 @@ impl<'a> Parser<'a> {
                 has_blank_before_strict: has_blank_before,
                 at_document_start: self.pos == 0,
                 in_fenced_div: self.in_fenced_div(),
+                myst_directive_closer: self.innermost_myst_directive_closer(),
                 blockquote_depth: current_bq_depth,
                 config: self.config,
                 diags: self.diagnostics.clone(),
@@ -3106,6 +3107,7 @@ impl<'a> Parser<'a> {
                             || is_blank_line(self.lines[self.pos - 1]),
                         at_document_start: self.pos == 0 && self.current_blockquote_depth() == 0,
                         in_fenced_div: self.in_fenced_div(),
+                        myst_directive_closer: self.innermost_myst_directive_closer(),
                         blockquote_depth: self.current_blockquote_depth(),
                         config: self.config,
                         diags: self.diagnostics.clone(),
@@ -3290,6 +3292,7 @@ impl<'a> Parser<'a> {
             has_blank_before_strict: false, // filled in later
             at_document_start: false,       // filled in later
             in_fenced_div: self.in_fenced_div(),
+            myst_directive_closer: self.innermost_myst_directive_closer(),
             blockquote_depth: current_bq_depth,
             config: self.config,
             diags: self.diagnostics.clone(),
@@ -3429,6 +3432,10 @@ impl<'a> Parser<'a> {
                     self.close_containers_to_fenced_div();
                 }
 
+                if matches!(block_match.effect, BlockEffect::CloseMystDirective) {
+                    self.close_containers_to_myst_directive();
+                }
+
                 if matches!(block_match.effect, BlockEffect::OpenFootnoteDefinition) {
                     self.close_open_footnote_definition();
                 }
@@ -3458,6 +3465,14 @@ impl<'a> Parser<'a> {
                     }
                     BlockEffect::CloseFencedDiv => {
                         self.close_fenced_div();
+                        0
+                    }
+                    BlockEffect::OpenMystDirective => {
+                        self.push_myst_directive_container(block_match);
+                        0
+                    }
+                    BlockEffect::CloseMystDirective => {
+                        self.close_myst_directive();
                         0
                     }
                     BlockEffect::OpenAdmonition => {
@@ -3658,6 +3673,10 @@ impl<'a> Parser<'a> {
                     self.close_containers_to_fenced_div();
                 }
 
+                if matches!(block_match.effect, BlockEffect::CloseMystDirective) {
+                    self.close_containers_to_myst_directive();
+                }
+
                 if matches!(block_match.effect, BlockEffect::OpenFootnoteDefinition) {
                     self.close_open_footnote_definition();
                 }
@@ -3680,6 +3699,14 @@ impl<'a> Parser<'a> {
                     }
                     BlockEffect::CloseFencedDiv => {
                         self.close_fenced_div();
+                        0
+                    }
+                    BlockEffect::OpenMystDirective => {
+                        self.push_myst_directive_container(block_match);
+                        0
+                    }
+                    BlockEffect::CloseMystDirective => {
+                        self.close_myst_directive();
                         0
                     }
                     BlockEffect::OpenAdmonition => {
@@ -3809,6 +3836,57 @@ impl<'a> Parser<'a> {
             .stack
             .iter()
             .any(|c| matches!(c, Container::FencedDiv { .. }))
+    }
+
+    fn myst_directive_container_index(&self) -> Option<usize> {
+        self.containers
+            .stack
+            .iter()
+            .rposition(|c| matches!(c, Container::MystDirective { .. }))
+    }
+
+    /// Close any containers nested inside the innermost MyST directive, leaving
+    /// the directive itself open so its closing fence is emitted as its child.
+    fn close_containers_to_myst_directive(&mut self) {
+        if let Some(index) = self.myst_directive_container_index() {
+            self.close_containers_to(index + 1);
+        }
+    }
+
+    /// Close (pop) the innermost MyST directive container, finishing its node.
+    fn close_myst_directive(&mut self) {
+        if let Some(index) = self.myst_directive_container_index() {
+            self.close_containers_to(index);
+        }
+    }
+
+    /// Push a `Container::MystDirective`, recovering the opener's fence
+    /// character and count from the prepared payload so the matching closer can
+    /// be recognized.
+    fn push_myst_directive_container(&mut self, block_match: &PreparedBlockMatch) {
+        use crate::parser::blocks::myst_directives::DirectiveOpen;
+        let (fence_char, fence_count) = block_match
+            .payload
+            .as_ref()
+            .and_then(|p| p.downcast_ref::<DirectiveOpen>())
+            .map(|open| (open.fence_char, open.fence_count))
+            .unwrap_or((b'`', 3));
+        self.containers.push(Container::MystDirective {
+            fence_char,
+            fence_count,
+        });
+    }
+
+    /// The `(fence_char, min_count)` closer of the innermost open MyST
+    /// directive, consulted by `MystDirectiveCloseParser`.
+    fn innermost_myst_directive_closer(&self) -> Option<(u8, usize)> {
+        self.containers.stack.iter().rev().find_map(|c| match c {
+            Container::MystDirective {
+                fence_char,
+                fence_count,
+            } => Some((*fence_char, *fence_count)),
+            _ => None,
+        })
     }
 
     /// Whether the active container stack has any `FootnoteDefinition`

@@ -2854,12 +2854,127 @@ impl Formatter {
                 self.output.push('~');
             }
 
+            SyntaxKind::MYST_DIRECTIVE => {
+                // Emit the fence lines (opener with name/argument, and the
+                // closer) verbatim — normalizing the fence run would break
+                // nesting. The body is formatted recursively as markdown, with
+                // one exception: paragraphs that are entirely MyST option lines
+                // (`:key: value`) pass through verbatim so reflow never merges
+                // them. (Structured option parsing is deferred.)
+                let mut open_text: Option<String> = None;
+                let mut close_text: Option<String> = None;
+                let mut body = Vec::new();
+                for element in node.children_with_tokens() {
+                    if let NodeOrToken::Node(child) = element {
+                        match child.kind() {
+                            SyntaxKind::MYST_DIRECTIVE_OPEN => {
+                                open_text = Some(child.text().to_string());
+                            }
+                            SyntaxKind::MYST_DIRECTIVE_CLOSE => {
+                                close_text = Some(child.text().to_string());
+                            }
+                            _ => body.push(child),
+                        }
+                    }
+                }
+
+                if let Some(open) = &open_text {
+                    self.output.push_str(open.trim_end_matches('\n'));
+                    self.output.push('\n');
+                }
+
+                // Strip leading/trailing blank lines; collapse interior runs to
+                // a single separator (canonical compact form, like fenced divs).
+                let leading = body
+                    .iter()
+                    .take_while(|c| c.kind() == SyntaxKind::BLANK_LINE)
+                    .count();
+                let trailing = body
+                    .iter()
+                    .rev()
+                    .take_while(|c| c.kind() == SyntaxKind::BLANK_LINE)
+                    .count();
+                let end = body.len().saturating_sub(trailing).max(leading);
+
+                let mut prev_blank = false;
+                for child in &body[leading..end] {
+                    if child.kind() == SyntaxKind::BLANK_LINE {
+                        if !prev_blank {
+                            self.output.push('\n');
+                            prev_blank = true;
+                        }
+                        continue;
+                    }
+                    if is_myst_option_paragraph(child) {
+                        self.output
+                            .push_str(child.text().to_string().trim_end_matches('\n'));
+                        self.output.push('\n');
+                    } else {
+                        self.format_node_sync(child, indent);
+                        if !self.output.ends_with('\n') {
+                            self.output.push('\n');
+                        }
+                    }
+                    prev_blank = false;
+                }
+
+                if let Some(close) = &close_text {
+                    if !self.output.ends_with('\n') {
+                        self.output.push('\n');
+                    }
+                    self.output.push_str(close.trim_end_matches('\n'));
+                    self.output.push('\n');
+                }
+                self.consecutive_blank_lines = 0;
+            }
+
+            SyntaxKind::MYST_TARGET | SyntaxKind::MYST_COMMENT => {
+                // Single-line leaf blocks: emit verbatim with a trailing newline.
+                self.output
+                    .push_str(node.text().to_string().trim_end_matches('\n'));
+                self.output.push('\n');
+                self.consecutive_blank_lines = 0;
+            }
+
             _ => {
                 // Fallback: append node text (should be rare with children_with_tokens above)
                 self.output.push_str(&node.text().to_string());
             }
         }
     }
+}
+
+/// Whether `node` is a `PARAGRAPH` whose every non-empty line is a MyST
+/// directive option line (`:key: value` or bare `:key:`). Such paragraphs are
+/// emitted verbatim inside directive bodies so reflow never merges them.
+fn is_myst_option_paragraph(node: &SyntaxNode) -> bool {
+    if node.kind() != SyntaxKind::PARAGRAPH {
+        return false;
+    }
+    let text = node.text().to_string();
+    let mut saw_line = false;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        saw_line = true;
+        let Some(rest) = line.strip_prefix(':') else {
+            return false;
+        };
+        let Some(key_end) = rest.find(':') else {
+            return false;
+        };
+        let key = &rest[..key_end];
+        if key.is_empty()
+            || !key
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        {
+            return false;
+        }
+    }
+    saw_line
 }
 
 pub(super) fn normalize_attribute_text(attr_text: &str) -> String {

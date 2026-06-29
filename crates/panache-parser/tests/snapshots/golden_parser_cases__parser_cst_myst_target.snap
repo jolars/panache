@@ -1,0 +1,19 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..32
+  MYST_TARGET@0..13
+    TEXT@0..1 "("
+    MYST_TARGET_LABEL@1..10 "my-target"
+    TEXT@10..12 ")="
+    NEWLINE@12..13 "\n"
+  BLANK_LINE@13..14
+    BLANK_LINE@13..14 "\n"
+  HEADING@14..32
+    ATX_HEADING_MARKER@14..15
+      ATX_HEADING_MARKER@14..15 "#"
+    WHITESPACE@15..16 " "
+    HEADING_CONTENT@16..31
+      TEXT@16..31 "Labeled Heading"
+    NEWLINE@31..32 "\n"

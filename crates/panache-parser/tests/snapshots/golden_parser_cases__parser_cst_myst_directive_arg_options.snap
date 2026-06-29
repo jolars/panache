@@ -1,0 +1,39 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..96
+  MYST_DIRECTIVE@0..96
+    MYST_DIRECTIVE_OPEN@0..21
+      MYST_DIRECTIVE_FENCE@0..4 "````"
+      MYST_DIRECTIVE_NAME@4..12 "{figure}"
+      WHITESPACE@12..13 " "
+      MYST_DIRECTIVE_ARG@13..20 "img.png"
+      NEWLINE@20..21 "\n"
+    PARAGRAPH@21..50
+      TEXT@21..35 ":alt: An image"
+      NEWLINE@35..36 "\n"
+      TEXT@36..49 ":width: 200px"
+      NEWLINE@49..50 "\n"
+    BLANK_LINE@50..51
+      BLANK_LINE@50..51 "\n"
+    PARAGRAPH@51..70
+      TEXT@51..69 "Caption with code:"
+      NEWLINE@69..70 "\n"
+    BLANK_LINE@70..71
+      BLANK_LINE@70..71 "\n"
+    CODE_BLOCK@71..91
+      CODE_FENCE_OPEN@71..81
+        CODE_FENCE_MARKER@71..74 "```"
+        CODE_INFO@74..80
+          CODE_LANGUAGE@74..80 "python"
+        NEWLINE@80..81 "\n"
+      CODE_CONTENT@81..87
+        TEXT@81..86 "x = 1"
+        NEWLINE@86..87 "\n"
+      CODE_FENCE_CLOSE@87..91
+        CODE_FENCE_MARKER@87..90 "```"
+        NEWLINE@90..91 "\n"
+    MYST_DIRECTIVE_CLOSE@91..96
+      MYST_DIRECTIVE_FENCE@91..95 "````"
+      NEWLINE@95..96 "\n"
