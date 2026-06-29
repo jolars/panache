@@ -1,0 +1,4 @@
+flavor = "myst"
+
+[extensions]
+myst-roles = false

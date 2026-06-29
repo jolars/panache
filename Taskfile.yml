@@ -110,6 +110,11 @@ tasks:
     cmds:
       - ./crates/panache-parser/scripts/update-commonmark-spec-fixtures.sh 0.31.2
 
+  update-myst-fixtures:
+    desc: Download and refresh MyST smoke corpus fixtures (default v0.0.5)
+    cmds:
+      - ./crates/panache-parser/scripts/update-myst-spec-fixtures.sh v0.0.5
+
   coverage:
     desc: Generate code coverage report
     cmds:

@@ -50,6 +50,10 @@ use super::blocks::metadata::{
     emit_yaml_block, find_yaml_block_closing_pos, try_parse_mmd_title_block,
     try_parse_pandoc_title_block, try_parse_yaml_block,
 };
+use super::blocks::myst_directives::{
+    DirectiveOpen, is_directive_closing_fence, try_parse_directive_open,
+};
+use super::blocks::myst_targets::{Target, is_comment_line, try_parse_target};
 use super::blocks::raw_blocks;
 use super::blocks::raw_blocks::extract_environment_name;
 use super::blocks::reference_links::{
@@ -90,6 +94,11 @@ pub(crate) struct BlockContext<'a> {
 
     /// Whether we're currently inside a fenced div (container-owned state)
     pub in_fenced_div: bool,
+
+    /// Expected closer of the innermost open MyST directive, as
+    /// `(fence_char, min_count)`. `None` when not inside a directive. Lets
+    /// `MystDirectiveCloseParser` match a closing fence against the opener.
+    pub myst_directive_closer: Option<(u8, usize)>,
 
     /// Whether we're at document start (pos == 0)
     pub at_document_start: bool,
@@ -188,6 +197,8 @@ pub(crate) enum BlockEffect {
     None,
     OpenFencedDiv,
     CloseFencedDiv,
+    OpenMystDirective,
+    CloseMystDirective,
     OpenAdmonition,
     OpenFootnoteDefinition,
     OpenList,
@@ -2497,6 +2508,290 @@ impl BlockParser for FencedDivCloseParser {
 }
 
 // ============================================================================
+// MyST Directive Parsers (must precede FencedCodeBlockParser)
+// ============================================================================
+
+/// Opener for MyST directives (```` ```{name} ```` / `~~~{name}` / colon
+/// `:::{name}`). Opens a `MYST_DIRECTIVE` container whose body is parsed
+/// recursively as markdown and closed by a matching fence. Registered before
+/// [`FencedCodeBlockParser`] so the brace-tagged opener wins over the generic
+/// code-fence path; a non-directive fence falls through to it.
+pub(crate) struct MystDirectiveOpenParser;
+
+impl BlockParser for MystDirectiveOpenParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::OpenMystDirective
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &StrippedLines<'_, '_>,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        let open = try_parse_directive_open(lines.first(), &ctx.config.extensions)?;
+        // Directives are fences and interrupt paragraphs like a fenced code
+        // block with an info string (CommonMark §4.5).
+        Some((BlockDetectionResult::YesCanInterrupt, Some(Box::new(open))))
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &StrippedLines<'_, '_>,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        use crate::syntax::SyntaxKind;
+
+        let line = lines.first();
+        let open = payload
+            .and_then(|p| p.downcast_ref::<DirectiveOpen>())
+            .cloned()
+            .or_else(|| try_parse_directive_open(line, &ctx.config.extensions))
+            .expect("directive opener should exist");
+
+        // Start the container node (finished on close, via the container stack).
+        builder.start_node(SyntaxKind::MYST_DIRECTIVE.into());
+        builder.start_node(SyntaxKind::MYST_DIRECTIVE_OPEN.into());
+
+        let (content, newline) = strip_newline(line);
+
+        let mut cursor = 0;
+        if open.indent_len > 0 {
+            builder.token(SyntaxKind::WHITESPACE.into(), &content[..open.indent_len]);
+            cursor = open.indent_len;
+        }
+
+        let fence_end = cursor + open.fence_count;
+        builder.token(
+            SyntaxKind::MYST_DIRECTIVE_FENCE.into(),
+            &content[cursor..fence_end],
+        );
+
+        let name_end = fence_end + open.name_len;
+        builder.token(
+            SyntaxKind::MYST_DIRECTIVE_NAME.into(),
+            &content[fence_end..name_end],
+        );
+
+        // Whatever follows the `{name}` token on the opener line is the
+        // directive argument (with surrounding whitespace preserved verbatim).
+        let rest = &content[name_end..];
+        if !rest.is_empty() {
+            let trimmed = rest.trim_start();
+            let lead_ws = rest.len() - trimmed.len();
+            if lead_ws > 0 {
+                builder.token(SyntaxKind::WHITESPACE.into(), &rest[..lead_ws]);
+            }
+            let arg = trimmed.trim_end();
+            if arg.is_empty() {
+                if !trimmed.is_empty() {
+                    builder.token(SyntaxKind::WHITESPACE.into(), trimmed);
+                }
+            } else {
+                builder.token(SyntaxKind::MYST_DIRECTIVE_ARG.into(), arg);
+                let trail = &trimmed[arg.len()..];
+                if !trail.is_empty() {
+                    builder.token(SyntaxKind::WHITESPACE.into(), trail);
+                }
+            }
+        }
+
+        if !newline.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline);
+        }
+
+        builder.finish_node(); // MYST_DIRECTIVE_OPEN
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "myst_directive_open"
+    }
+}
+
+/// Closer for MyST directives. Active only when inside a directive (the
+/// expected fence is threaded through [`BlockContext::myst_directive_closer`]).
+/// Registered before [`FencedCodeBlockParser`] so a bare ```` ``` ```` closes
+/// the directive rather than opening an empty code block.
+pub(crate) struct MystDirectiveCloseParser;
+
+impl BlockParser for MystDirectiveCloseParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::CloseMystDirective
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &StrippedLines<'_, '_>,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        let (fence_char, open_count) = ctx.myst_directive_closer?;
+        if is_directive_closing_fence(lines.first(), fence_char, open_count) {
+            Some((BlockDetectionResult::YesCanInterrupt, None))
+        } else {
+            None
+        }
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &StrippedLines<'_, '_>,
+        _payload: Option<&dyn Any>,
+    ) -> usize {
+        use crate::syntax::SyntaxKind;
+
+        let fence_char = ctx.myst_directive_closer.map(|(c, _)| c).unwrap_or(b'`');
+        let line = lines.first();
+        let (content, newline) = strip_newline(line);
+
+        builder.start_node(SyntaxKind::MYST_DIRECTIVE_CLOSE.into());
+
+        // Up to 3 leading spaces, then the fence run, then trailing whitespace.
+        let lead_ws = content.bytes().take(3).take_while(|&b| b == b' ').count();
+        if lead_ws > 0 {
+            builder.token(SyntaxKind::WHITESPACE.into(), &content[..lead_ws]);
+        }
+        let after = &content[lead_ws..];
+        let fence_len = after.bytes().take_while(|&b| b == fence_char).count();
+        builder.token(SyntaxKind::MYST_DIRECTIVE_FENCE.into(), &after[..fence_len]);
+        let trail = &after[fence_len..];
+        if !trail.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), trail);
+        }
+        if !newline.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline);
+        }
+
+        builder.finish_node(); // MYST_DIRECTIVE_CLOSE
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "myst_directive_close"
+    }
+}
+
+/// Parser for MyST `(label)=` target lines.
+pub(crate) struct MystTargetParser;
+
+impl BlockParser for MystTargetParser {
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &StrippedLines<'_, '_>,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.myst_targets {
+            return None;
+        }
+        let target = try_parse_target(lines.first())?;
+        Some((
+            BlockDetectionResult::YesCanInterrupt,
+            Some(Box::new(target)),
+        ))
+    }
+
+    fn parse_prepared(
+        &self,
+        _ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &StrippedLines<'_, '_>,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        use crate::syntax::SyntaxKind;
+
+        let line = lines.first();
+        let target = payload
+            .and_then(|p| p.downcast_ref::<Target>())
+            .copied()
+            .or_else(|| try_parse_target(line))
+            .expect("target should exist");
+        let (content, newline) = strip_newline(line);
+
+        builder.start_node(SyntaxKind::MYST_TARGET.into());
+        if target.indent_len > 0 {
+            builder.token(SyntaxKind::WHITESPACE.into(), &content[..target.indent_len]);
+        }
+        builder.token(
+            SyntaxKind::TEXT.into(),
+            &content[target.indent_len..target.label.0],
+        );
+        builder.token(
+            SyntaxKind::MYST_TARGET_LABEL.into(),
+            &content[target.label.0..target.label.1],
+        );
+        builder.token(
+            SyntaxKind::TEXT.into(),
+            &content[target.label.1..target.marker_end],
+        );
+        let trailing = &content[target.marker_end..];
+        if !trailing.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), trailing);
+        }
+        if !newline.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline);
+        }
+        builder.finish_node(); // MYST_TARGET
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "myst_target"
+    }
+}
+
+/// Parser for MyST `% ...` line comments.
+pub(crate) struct MystCommentParser;
+
+impl BlockParser for MystCommentParser {
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &StrippedLines<'_, '_>,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.myst_comments {
+            return None;
+        }
+        if is_comment_line(lines.first()) {
+            Some((BlockDetectionResult::YesCanInterrupt, None))
+        } else {
+            None
+        }
+    }
+
+    fn parse_prepared(
+        &self,
+        _ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &StrippedLines<'_, '_>,
+        _payload: Option<&dyn Any>,
+    ) -> usize {
+        use crate::syntax::SyntaxKind;
+
+        let line = lines.first();
+        let (content, newline) = strip_newline(line);
+        let indent_len = content.bytes().take(3).take_while(|&b| b == b' ').count();
+
+        builder.start_node(SyntaxKind::MYST_COMMENT.into());
+        if indent_len > 0 {
+            builder.token(SyntaxKind::WHITESPACE.into(), &content[..indent_len]);
+        }
+        builder.token(SyntaxKind::TEXT.into(), &content[indent_len..]);
+        if !newline.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline);
+        }
+        builder.finish_node(); // MYST_COMMENT
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "myst_comment"
+    }
+}
+
+// ============================================================================
 // Admonition Parser (must precede Indented Code Block — position #6b)
 // ============================================================================
 
@@ -2942,6 +3237,11 @@ impl BlockParserRegistry {
             // (0b) MultiMarkdown title block (must be at document start).
             // Pandoc title block remains first for precedence.
             Box::new(MmdTitleBlockParser),
+            // (1b) MyST directives — MUST precede fenced code so a brace-tagged
+            // opener (```` ```{name} ````) and a directive closer win over the
+            // generic code-fence path. Close before open, like fenced divs.
+            Box::new(MystDirectiveCloseParser),
+            Box::new(MystDirectiveOpenParser),
             // (2) Fenced code blocks - can interrupt paragraphs!
             Box::new(FencedCodeBlockParser),
             // (3) YAML metadata - before headers and hrules!
@@ -2951,6 +3251,9 @@ impl BlockParserRegistry {
             // (6) Fenced divs ::: (open/close)
             Box::new(FencedDivCloseParser),
             Box::new(FencedDivOpenParser),
+            // (6b) MyST target lines `(label)=` and `%` comments (leaf blocks).
+            Box::new(MystTargetParser),
+            Box::new(MystCommentParser),
             // (7) Setext headings (part of Pandoc's "header" parser)
             // Must come before ATX to properly handle `---` disambiguation
             Box::new(SetextHeadingParser),

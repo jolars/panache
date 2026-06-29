@@ -49,6 +49,8 @@ Homepage and downloads (including .deb and .rpm packages): <https://panache.bz>
     MultiMarkdown (Fletcher Penney's extended Markdown dialect)
   - `mdsvex`:
     mdsvex (Svelte-flavored Markdown: CommonMark + Svelte template syntax)
+  - `myst`:
+    MyST (CommonMark + Sphinx/MyST directives, roles, and targets)
 
 * `--color <WHEN>` — Control when colored output is used
 

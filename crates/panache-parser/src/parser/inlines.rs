@@ -34,6 +34,10 @@ pub mod links; // Public for try_parse_inline_image used by blocks/figures
 pub mod mark;
 #[path = "inlines/math.rs"]
 pub mod math;
+#[path = "inlines/myst_roles.rs"]
+pub mod myst_roles;
+#[path = "inlines/myst_substitutions.rs"]
+pub mod myst_substitutions;
 #[path = "inlines/native_spans.rs"]
 pub mod native_spans;
 #[path = "inlines/raw_inline.rs"]

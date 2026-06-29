@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..67
+  CODE_BLOCK@0..67
+    CODE_FENCE_OPEN@0..10
+      CODE_FENCE_MARKER@0..3 "```"
+      CODE_INFO@3..9
+        CODE_LANGUAGE@3..9 "{note}"
+      NEWLINE@9..10 "\n"
+    CODE_CONTENT@10..63
+      TEXT@10..62 "With directives disab ..."
+      NEWLINE@62..63 "\n"
+    CODE_FENCE_CLOSE@63..67
+      CODE_FENCE_MARKER@63..66 "```"
+      NEWLINE@66..67 "\n"

@@ -872,6 +872,43 @@ elsewhere).
 - [ ] AST wrappers (`syntax/svelte.rs`), LSP semantic tokens, and lint rules for
   Svelte constructs.
 
+## MyST
+
+MyST (`mystmd.org`, `myst-parser`) support, modeled the same way as mdsvex: a
+CommonMark-*dialect* flavor whose `myst_defaults` enables MyST-specific
+extensions (`myst-directives`, `myst-roles`, `myst-targets`, `myst-comments`)
+plus the GFM-superset rules `myst-parser` turns on (`pipe-tables`, `footnotes`).
+Behavior is gated on those extension flags, never on `Flavor::Myst` directly, so
+other flavors can borrow the same shapes. Markup extras (`myst-colon-fence`,
+`myst-substitutions`, dollar-math, deflists, ...) stay opt-in.
+
+- [x] Core constructs: directive parsing (backtick/colon fences, options,
+  nesting), inline roles, targets `(label)=`, `%` comments, substitutions
+  `{{ name }}`; directive-body formatting. Parser + formatter golden cases.
+- [x] GFM-superset defaults: `pipe-tables` + `footnotes` on for `Flavor::Myst`
+  (standalone tables and `[^ref]` footnotes were mangled without them).
+  `inline-footnotes` stays off: `myst-parser` loads the footnote plugin with
+  `inline=False`.
+- [x] Smoke corpus vendored from `jupyter-book/myst-spec` with a losslessness +
+  idempotency harness and a non-gating output-divergence triage report
+  (`cargo test --test myst_corpus -- --ignored --nocapture`).
+- [ ] **Structural directive-option parsing.** `:key: value` option lines are
+  only recognized when a blank line separates them from the body; without
+  one they merge into the body paragraph and get reflowed (e.g.
+  `:number-lines: 1 def five(): return 5`). The parser should parse the
+  leading option block into structured option nodes, terminated by the first
+  non-option line per MyST semantics, not by a blank line. Surfaced as the
+  STRUCTURAL bucket in the `myst_corpus` triage report (directives.code,
+  directives.figure, directives.math, references.equations cases).
+- [ ] **Verbatim-bodied directives.** `{code}`, `{code-block}`, and `{math}`
+  bodies are markdown-reflowed, joining lines and dropping indentation,
+  which destroys code. These directives need a notion of a verbatim body
+  that the formatter passes through unchanged. Same triage bucket.
+- [ ] Audit remaining `myst-parser` default-on rules beyond tables/footnotes
+  (e.g. whether any other markdown-it core rule should default on for MyST).
+- [ ] AST wrappers (`syntax/myst.rs`), LSP semantic tokens, and lint rules for
+  MyST constructs.
+
 ## Architecture
 
 - [ ] Separate additional functionality into dedicated crates (long-term).

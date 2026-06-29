@@ -1,0 +1,5 @@
+repo=https://github.com/jupyter-book/myst-spec
+ref=v0.0.5
+commit=b63a28cb53e000cf91ffce9532860bc7660336e6
+source=git-tag
+layout=docs-examples-yml

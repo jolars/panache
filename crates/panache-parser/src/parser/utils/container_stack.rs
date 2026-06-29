@@ -14,6 +14,15 @@ pub(crate) enum Container {
     FencedDiv {
         // No special tracking needed - closed by fence marker
     },
+    /// MyST directive container. Closed by a fence line matching the opener's
+    /// `fence_char` with at least `fence_count` repeats. The fence info is
+    /// tracked here (unlike `FencedDiv`, whose closer is always bare `:::`)
+    /// because backtick directives must distinguish their closer from nested
+    /// code fences of a shorter run.
+    MystDirective {
+        fence_char: u8,
+        fence_count: usize,
+    },
     /// python-markdown admonition / pymdownx details container. Content is
     /// indented by `content_col` (4) columns; closes on dedent like a
     /// footnote definition.

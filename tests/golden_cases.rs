@@ -155,6 +155,7 @@ golden_test_cases!(
     adjacent_simple_then_pipe_table_captions,
     alerts,
     alerts_disabled,
+    myst_directive,
     blankline_concatenation,
     blockquote_depth_change,
     blockquote_html_block,

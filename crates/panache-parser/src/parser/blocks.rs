@@ -31,6 +31,10 @@ pub mod line_blocks;
 pub mod lists;
 #[path = "blocks/metadata.rs"]
 pub mod metadata;
+#[path = "blocks/myst_directives.rs"]
+pub mod myst_directives;
+#[path = "blocks/myst_targets.rs"]
+pub mod myst_targets;
 #[path = "blocks/paragraphs.rs"]
 pub mod paragraphs;
 #[path = "blocks/raw_blocks.rs"]

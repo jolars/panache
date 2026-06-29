@@ -1,0 +1,18 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..38
+  PARAGRAPH@0..38
+    TEXT@0..9 "Released "
+    MYST_SUBSTITUTION@9..22
+      TEXT@9..11 "{{"
+      MYST_SUBSTITUTION_NAME@11..20 " version "
+      TEXT@20..22 "}}"
+    TEXT@22..26 " on "
+    MYST_SUBSTITUTION@26..36
+      TEXT@26..28 "{{"
+      MYST_SUBSTITUTION_NAME@28..34 " date "
+      TEXT@34..36 "}}"
+    TEXT@36..37 "."
+    NEWLINE@37..38 "\n"

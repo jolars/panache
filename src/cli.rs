@@ -521,4 +521,7 @@ pub enum CliFlavor {
     /// mdsvex (Svelte-flavored Markdown: CommonMark + Svelte template syntax)
     #[value(name = "mdsvex")]
     Mdsvex,
+    /// MyST (CommonMark + Sphinx/MyST directives, roles, and targets)
+    #[value(name = "myst")]
+    Myst,
 }

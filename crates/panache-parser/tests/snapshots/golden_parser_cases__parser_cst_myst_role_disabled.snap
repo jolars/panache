@@ -1,0 +1,13 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..39
+  PARAGRAPH@0..39
+    TEXT@0..12 "Plain {math}"
+    INLINE_CODE@12..17
+      INLINE_CODE_MARKER@12..13 "`"
+      INLINE_CODE_CONTENT@13..16 "a^2"
+      INLINE_CODE_MARKER@16..17 "`"
+    TEXT@17..38 " stays text and code."
+    NEWLINE@38..39 "\n"

@@ -166,7 +166,9 @@ impl YamlValidationContext {
 ///   pandoc (libyaml), so both must accept.
 /// - RMarkdown: `rmarkdown::yaml_front_matter` (R `yaml`) reads it, then the doc
 ///   renders through pandoc (libyaml), so both must accept.
-/// - GFM/CommonMark/MultiMarkdown: no asserted YAML metadata consumer — lenient.
+/// - GFM/CommonMark/MultiMarkdown/Mdsvex/MyST: no asserted YAML metadata
+///   consumer — lenient. (MyST frontmatter is real YAML read by PyYAML, but the
+///   parse-first MyST flavor stays lenient until its loader is modeled.)
 ///
 /// See `tests/yaml/consumer-matrix.md`.
 fn frontmatter_consumers(flavor: Flavor) -> ConsumerSet {
@@ -174,9 +176,11 @@ fn frontmatter_consumers(flavor: Flavor) -> ConsumerSet {
         Flavor::Pandoc => ConsumerSet::of(YamlConsumer::Libyaml),
         Flavor::Quarto => ConsumerSet::of(YamlConsumer::Libyaml).with(YamlConsumer::Jsyaml),
         Flavor::RMarkdown => ConsumerSet::of(YamlConsumer::Libyaml).with(YamlConsumer::RYaml),
-        Flavor::Gfm | Flavor::CommonMark | Flavor::MultiMarkdown | Flavor::Mdsvex => {
-            ConsumerSet::empty()
-        }
+        Flavor::Gfm
+        | Flavor::CommonMark
+        | Flavor::MultiMarkdown
+        | Flavor::Mdsvex
+        | Flavor::Myst => ConsumerSet::empty(),
     }
 }
 
@@ -191,7 +195,8 @@ fn hashpipe_consumers(flavor: Flavor) -> ConsumerSet {
         | Flavor::Gfm
         | Flavor::CommonMark
         | Flavor::MultiMarkdown
-        | Flavor::Mdsvex => ConsumerSet::empty(),
+        | Flavor::Mdsvex
+        | Flavor::Myst => ConsumerSet::empty(),
     }
 }
 
