@@ -1,0 +1,33 @@
+[ Para
+    [ Str "Inline"
+    , Space
+    , Str "math"
+    , Space
+    , Str "over"
+    , Space
+    , Str "a"
+    , Space
+    , Str "line:"
+    , Space
+    , Math InlineMath "a +\nb"
+    , Space
+    , Str "done."
+    ]
+, Para
+    [ Str "A"
+    , Space
+    , Str "blank"
+    , Space
+    , Str "line"
+    , Space
+    , Str "ends"
+    , Space
+    , Str "it:"
+    , Space
+    , Str "$a"
+    , Space
+    , Str "+"
+    ]
+, Para
+    [ Str "b$" , Space , Str "stays" , Space , Str "text." ]
+]

@@ -1,0 +1,33 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 98
+expression: cst_output
+---
+DOCUMENT@0..68
+  PARAGRAPH@0..32
+    TEXT@0..18 "Math over a line: "
+    INLINE_MATH@18..25
+      INLINE_MATH_MARKER@18..19 "$"
+      MATH_CONTENT@19..24
+        MATH_TEXT@19..20 "a"
+        MATH_SPACE@20..21 " "
+        MATH_OPERATOR@21..22 "+"
+        MATH_NEWLINE@22..23 "\n"
+        MATH_TEXT@23..24 "b"
+      INLINE_MATH_MARKER@24..25 "$"
+    TEXT@25..31 " done."
+    NEWLINE@31..32 "\n"
+  BLANK_LINE@32..33
+    BLANK_LINE@32..33 "\n"
+  PARAGRAPH@33..58
+    TEXT@33..53 "Blank line ends it: "
+    TEXT@53..54 "$"
+    TEXT@54..57 "a +"
+    NEWLINE@57..58 "\n"
+  BLANK_LINE@58..59
+    BLANK_LINE@58..59 "\n"
+  PARAGRAPH@59..68
+    TEXT@59..60 "b"
+    TEXT@60..61 "$"
+    TEXT@61..67 " text."
+    NEWLINE@67..68 "\n"
