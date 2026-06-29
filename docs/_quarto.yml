@@ -23,6 +23,8 @@ website:
 
   search: true
 
+  llms-txt: true
+
   image: images/og.png
   image-alt: "Panache logo"
 
