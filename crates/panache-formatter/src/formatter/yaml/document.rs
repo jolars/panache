@@ -877,7 +877,17 @@ fn apply_plain_scalar_wrap(buf: String, opts: &YamlFormatOptions) -> String {
                 if let Some(folded) = reflow_folded_scalar(&candidate, opts, profile)
                     && folded.matches('\n').count() >= 2
                 {
-                    edits.push((scalar_start, scalar_end, folded));
+                    // Hoist the `>-` indicator onto the key line. The
+                    // value-node span between the colon and the scalar is
+                    // pure whitespace/newline trivia (guards above reject
+                    // comments/decorations), so collapsing it to a single
+                    // space and emitting ` >-` there yields the same shape
+                    // for both same-line and next-line sources. A `>-` left
+                    // on its own indented line is not a fixpoint of the
+                    // indent pass, which would relocate it on a second
+                    // format (issue #400).
+                    let gap_start = usize::from(value_node.text_range().start());
+                    edits.push((gap_start, scalar_end, format!(" {folded}")));
                 }
             }
             continue;

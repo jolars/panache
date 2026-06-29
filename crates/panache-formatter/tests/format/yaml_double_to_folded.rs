@@ -77,6 +77,33 @@ fn long_double_quoted_becomes_folded() {
 }
 
 #[test]
+fn next_line_double_quoted_folds_onto_key_line() {
+    // A double-quoted value written on its *own* line (indented under the
+    // key) must fold to the same shape as the same-line case: the `>-`
+    // indicator hoisted onto the key line. Emitting `>-` on its own
+    // indented line is not a fixpoint of the indent pass (it relocates the
+    // indicator on a second format), so it breaks idempotency (issue
+    // #400).
+    let input = format!("---\ndescription:\n  \"{LONG}\"\n---\n\n# Test\n");
+    let out = format(&input, Some(reflow80()), None);
+
+    assert!(
+        out.contains("\ndescription: >-\n"),
+        "expected `>-` hoisted onto the key line:\n{out}"
+    );
+    assert!(
+        !out.contains("description:\n  >-") && !out.contains("description:\n>-"),
+        "indicator must not stay on its own line:\n{out}"
+    );
+    assert_eq!(
+        fold_body(&out, "description"),
+        LONG,
+        "value changed:\n{out}"
+    );
+    assert_eq!(format(&out, Some(reflow80()), None), out, "not idempotent");
+}
+
+#[test]
 fn multi_space_run_is_preserved_when_folded() {
     // A run of >=2 spaces must never sit at a line break (a fold would
     // collapse it to one space). It stays verbatim mid-line.

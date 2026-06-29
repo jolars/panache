@@ -234,6 +234,13 @@ the load-bearing invariants.
     - the decoded value contains a control character (`cp < 0x20`, incl. TAB, or
       `0x7F`).
 
+    The `>-` indicator is always hoisted onto the key line (`description: >-`),
+    whether the source double-quoted scalar sat on the key line or on its own
+    indented continuation line. An indicator left on its own indented line is
+    not a fixpoint of the indentation pass (rule 1 relocates it to column 0 on a
+    second format), so hoisting is what makes the conversion idempotent for the
+    next-line shape (issue #400).
+
     Runs of >=2 spaces are **not** a guard: they round-trip because
     `wrap_plain_scalar_text` only breaks at a *single*-space separator and keeps
     longer runs verbatim mid-line (a fold collapses only the break). The
