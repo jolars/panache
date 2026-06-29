@@ -8,7 +8,7 @@ use rowan::{GreenNodeBuilder, TextRange};
 
 use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
 use super::container_prefix::{StrippedLines, advance_columns};
-use crate::options::Flavor;
+use crate::options::{Dialect, Flavor};
 use crate::parser::utils::container_stack::byte_index_at_column;
 use crate::parser::utils::tree_copy::copy_green_children;
 use crate::parser::yaml::{
@@ -52,13 +52,38 @@ pub struct InfoString {
 
 impl InfoString {
     /// Parse an info string into structured attributes.
+    ///
+    /// Brace-delimited info strings (`{...}`) carry Pandoc attribute semantics
+    /// (executable chunks, raw blocks, attribute lists). In the CommonMark
+    /// dialect they have no special meaning — the info string is opaque and the
+    /// first word is just the language class — so callers in that dialect should
+    /// use [`InfoString::parse_with_dialect`]. Plain [`parse`](Self::parse)
+    /// retains the Pandoc interpretation for backward compatibility.
     pub fn parse(raw: &str) -> Self {
+        Self::parse_with_dialect(raw, crate::options::Dialect::Pandoc)
+    }
+
+    /// Parse an info string, honoring dialect-specific brace semantics.
+    pub fn parse_with_dialect(raw: &str, dialect: crate::options::Dialect) -> Self {
         let trimmed = raw.trim();
 
         if trimmed.is_empty() {
             return InfoString {
                 raw: raw.to_string(),
                 block_type: CodeBlockType::Plain,
+                attributes: Vec::new(),
+            };
+        }
+
+        // In the CommonMark dialect braces are not attributes: the entire info
+        // string is opaque and the first word is the language class.
+        if dialect != crate::options::Dialect::Pandoc {
+            let language = trimmed.split_whitespace().next().unwrap_or(trimmed);
+            return InfoString {
+                raw: raw.to_string(),
+                block_type: CodeBlockType::DisplayShortcut {
+                    language: language.to_string(),
+                },
                 attributes: Vec::new(),
             };
         }
@@ -1019,10 +1044,14 @@ fn emit_chunk_options(builder: &mut GreenNodeBuilder<'static>, content: &str) {
 
 /// Helper to parse info string and emit CodeInfo node with parsed components.
 /// This breaks down the info string into its logical parts while preserving all bytes.
-fn emit_code_info_node(builder: &mut GreenNodeBuilder<'static>, info_string: &str) {
+fn emit_code_info_node(
+    builder: &mut GreenNodeBuilder<'static>,
+    info_string: &str,
+    dialect: crate::options::Dialect,
+) {
     builder.start_node(SyntaxKind::CODE_INFO.into());
 
-    let info = InfoString::parse(info_string);
+    let info = InfoString::parse_with_dialect(info_string, dialect);
 
     match &info.block_type {
         CodeBlockType::DisplayShortcut { language } => {
@@ -1124,11 +1153,11 @@ pub(crate) fn parse_fenced_code_block(
         builder.token(SyntaxKind::WHITESPACE.into(), " ");
         // Parse and emit the info string as a structured node
         if !fence.info_string.is_empty() {
-            emit_code_info_node(builder, &fence.info_string);
+            emit_code_info_node(builder, &fence.info_string, Dialect::for_flavor(flavor));
         }
     } else if !fence.info_string.is_empty() {
         // No space - parse and emit info_string as a structured node
-        emit_code_info_node(builder, &fence.info_string);
+        emit_code_info_node(builder, &fence.info_string, Dialect::for_flavor(flavor));
     }
 
     // Extract and emit the actual newline from the opening fence line

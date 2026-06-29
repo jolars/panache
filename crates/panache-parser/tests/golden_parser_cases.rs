@@ -186,6 +186,8 @@ golden_test_cases!(
     code_blocks_executable_with_classes,
     code_blocks_explicit_structured,
     code_blocks_raw,
+    code_fence_brace_info_commonmark,
+    code_fence_brace_info_pandoc,
     code_fence_multiword_info_commonmark,
     code_fence_multiword_info_pandoc,
     code_spans,

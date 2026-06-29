@@ -1667,23 +1667,32 @@ impl BlockParser for FencedCodeBlockParser {
             return None;
         }
 
-        let trimmed_info = fence.info_string.trim();
-        if trimmed_info.starts_with('{') && trimmed_info.ends_with('}') {
-            if trimmed_info.starts_with("{=") {
-                if !ctx.config.extensions.raw_attribute {
+        // Brace-delimited info strings (`{...}`) carry Pandoc attribute
+        // semantics — executable chunks, raw blocks, and attribute lists — each
+        // gated behind its extension. In the CommonMark dialect braces have no
+        // special meaning: the info string is opaque and the fence still opens a
+        // plain code block, so none of these rejections apply (matches pandoc's
+        // `commonmark`/`gfm` readers, which treat ```` ```{code-cell} ```` as a
+        // code block with class `{code-cell}`).
+        if ctx.config.dialect == crate::options::Dialect::Pandoc {
+            let trimmed_info = fence.info_string.trim();
+            if trimmed_info.starts_with('{') && trimmed_info.ends_with('}') {
+                if trimmed_info.starts_with("{=") {
+                    if !ctx.config.extensions.raw_attribute {
+                        return None;
+                    }
+                } else if !ctx.config.extensions.fenced_code_attributes {
                     return None;
                 }
-            } else if !ctx.config.extensions.fenced_code_attributes {
+            }
+
+            // Parse info string to determine block type (expensive, but now cached via fence)
+            let info = InfoString::parse(&fence.info_string);
+
+            let is_executable = matches!(info.block_type, CodeBlockType::Executable { .. });
+            if is_executable && !ctx.config.extensions.executable_code {
                 return None;
             }
-        }
-
-        // Parse info string to determine block type (expensive, but now cached via fence)
-        let info = InfoString::parse(&fence.info_string);
-
-        let is_executable = matches!(info.block_type, CodeBlockType::Executable { .. });
-        if is_executable && !ctx.config.extensions.executable_code {
-            return None;
         }
 
         // Fenced code blocks can interrupt paragraphs if they have an info string.

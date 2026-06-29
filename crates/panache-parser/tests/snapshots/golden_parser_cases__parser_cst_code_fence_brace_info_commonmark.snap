@@ -1,0 +1,35 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..53
+  CODE_BLOCK@0..25
+    CODE_FENCE_OPEN@0..15
+      CODE_FENCE_MARKER@0..3 "```"
+      CODE_INFO@3..14
+        CODE_LANGUAGE@3..14 "{code-cell}"
+      NEWLINE@14..15 "\n"
+    CODE_CONTENT@15..21
+      TEXT@15..20 "x = 1"
+      NEWLINE@20..21 "\n"
+    CODE_FENCE_CLOSE@21..25
+      CODE_FENCE_MARKER@21..24 "```"
+      NEWLINE@24..25 "\n"
+  BLANK_LINE@25..26
+    BLANK_LINE@25..26 "\n"
+  HEADING@26..37
+    ATX_HEADING_MARKER@26..28
+      ATX_HEADING_MARKER@26..28 "##"
+    WHITESPACE@28..29 " "
+    HEADING_CONTENT@29..36
+      TEXT@29..36 "Section"
+    NEWLINE@36..37 "\n"
+  BLANK_LINE@37..38
+    BLANK_LINE@37..38 "\n"
+  HEADING@38..53
+    ATX_HEADING_MARKER@38..41
+      ATX_HEADING_MARKER@38..41 "###"
+    WHITESPACE@41..42 " "
+    HEADING_CONTENT@42..52
+      TEXT@42..52 "Subsection"
+    NEWLINE@52..53 "\n"
