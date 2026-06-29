@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use rowan::TextRange;
 
 use super::model::{PatternProp, QuartoSchema, SchemaNode};
+use crate::linter::fuzzy::nearest_match;
 
 /// Resolved scalar type per the YAML 1.2 core schema (what js-yaml—and thus
 /// Quarto—infers for a plain scalar).
@@ -521,36 +522,6 @@ fn render_json_scalar(v: &serde_json::Value) -> String {
     }
 }
 
-/// A small Damerau-free Levenshtein distance, capped: returns `usize::MAX` once
-/// the distance provably exceeds `max`.
-fn levenshtein(a: &str, b: &str, max: usize) -> usize {
-    let a: Vec<char> = a.chars().collect();
-    let b: Vec<char> = b.chars().collect();
-    if a.len().abs_diff(b.len()) > max {
-        return usize::MAX;
-    }
-    let mut prev: Vec<usize> = (0..=b.len()).collect();
-    let mut curr = vec![0usize; b.len() + 1];
-    for (i, ca) in a.iter().enumerate() {
-        curr[0] = i + 1;
-        let mut row_min = curr[0];
-        for (j, cb) in b.iter().enumerate() {
-            let cost = usize::from(ca != cb);
-            curr[j + 1] = (prev[j] + cost).min(prev[j + 1] + 1).min(curr[j] + 1);
-            row_min = row_min.min(curr[j + 1]);
-        }
-        if row_min > max {
-            return usize::MAX;
-        }
-        std::mem::swap(&mut prev, &mut curr);
-    }
-    // The per-row bail above only fires when an *entire* row exceeds `max`; the
-    // diagonal can keep one cell within budget while the true distance still
-    // ends up over it. Clamp here so the cap is actually enforced.
-    let dist = prev[b.len()];
-    if dist > max { usize::MAX } else { dist }
-}
-
 /// Suggest the closest known key to `key`, if one is a plausible typo.
 ///
 /// Conservative on purpose: only short edit distances on reasonably long keys,
@@ -564,20 +535,7 @@ fn did_you_mean<'a>(
         return None;
     }
     let max = budget.min(if key.len() <= 5 { 1 } else { 2 });
-    let mut best: Option<(usize, &str)> = None;
-    for cand in candidates {
-        if cand.len() < 3 {
-            continue;
-        }
-        let d = levenshtein(key, cand, max);
-        if d == usize::MAX || d == 0 {
-            continue;
-        }
-        if best.is_none_or(|(bd, _)| d < bd) {
-            best = Some((d, cand));
-        }
-    }
-    best.map(|(_, c)| c.to_string())
+    nearest_match(key, candidates.filter(|c| c.len() >= 3), max).map(str::to_string)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -857,18 +815,6 @@ mod tests {
         // Must not stack-overflow.
         let v = map(vec![entry("x", scalar(ScalarType::String))]);
         assert!(validate(&s, "root", &v).is_empty());
-    }
-
-    #[test]
-    fn levenshtein_caps() {
-        assert_eq!(levenshtein("format", "format", 2), 0);
-        assert_eq!(levenshtein("forrmat", "format", 2), 1);
-        assert_eq!(levenshtein("abcdefg", "xyz", 2), usize::MAX);
-        // A true distance of 2 must report as over-budget when the cap is 1,
-        // even though no single DP row ever fully exceeds the cap. Otherwise
-        // the cap is unenforced and open objects nag legitimate custom keys
-        // (e.g. `cran` is distance 2 from `brand`).
-        assert_eq!(levenshtein("cran", "brand", 1), usize::MAX);
     }
 
     #[test]

@@ -4,6 +4,7 @@ use std::sync::OnceLock;
 use rowan::TextRange;
 
 use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, Location};
+use crate::linter::fuzzy::nearest_match;
 use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::SyntaxKind;
 
@@ -251,67 +252,16 @@ fn looks_like_entity_typo(name: &str) -> bool {
     if name.len() < 4 {
         return false;
     }
-    for candidate in entity_sets().0.iter() {
-        if candidate.len().abs_diff(name.len()) > 1 {
-            continue;
-        }
-        if levenshtein(name, candidate) == 1 {
-            return true;
-        }
-    }
-    false
+    // A known entity exactly one edit away → this is almost certainly a typo.
+    nearest_match(name, entity_sets().0.iter().copied(), 1).is_some()
 }
 
 fn nearest_named_entity(name: &str) -> Option<&'static str> {
     if name.is_empty() {
         return None;
     }
-    let target = name;
     let max_distance = if name.len() <= 4 { 1 } else { 2 };
-    let mut best: Option<(usize, &'static str)> = None;
-    for candidate in entity_sets().0.iter() {
-        if candidate.len().abs_diff(target.len()) > max_distance {
-            continue;
-        }
-        let d = levenshtein(target, candidate);
-        if d == 0 || d > max_distance {
-            continue;
-        }
-        match best {
-            Some((bd, _)) if d > bd => {}
-            Some((bd, bc)) if d == bd && *candidate >= bc => {}
-            _ => best = Some((d, candidate)),
-        }
-    }
-    best.map(|(_, c)| c)
-}
-
-fn levenshtein(a: &str, b: &str) -> usize {
-    let a_bytes = a.as_bytes();
-    let b_bytes = b.as_bytes();
-    let n = a_bytes.len();
-    let m = b_bytes.len();
-    if n == 0 {
-        return m;
-    }
-    if m == 0 {
-        return n;
-    }
-    let mut prev: Vec<usize> = (0..=m).collect();
-    let mut curr = vec![0usize; m + 1];
-    for i in 1..=n {
-        curr[0] = i;
-        for j in 1..=m {
-            let cost = if a_bytes[i - 1] == b_bytes[j - 1] {
-                0
-            } else {
-                1
-            };
-            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
-        }
-        std::mem::swap(&mut prev, &mut curr);
-    }
-    prev[m]
+    nearest_match(name, entity_sets().0.iter().copied(), max_distance)
 }
 
 #[cfg(test)]
