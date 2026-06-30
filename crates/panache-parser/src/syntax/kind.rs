@@ -364,11 +364,14 @@ pub enum SyntaxKind {
     MYST_ROLE_CONTENT, // the literal content between the backticks
 
     // MyST target / comment / substitution parts
-    MYST_TARGET,            // a `(label)=` target line
-    MYST_TARGET_LABEL,      // the label between `(` and `)=`
-    MYST_COMMENT,           // a `% ...` line comment
-    MYST_SUBSTITUTION,      // an inline `{{ name }}` substitution
-    MYST_SUBSTITUTION_NAME, // the substitution key between `{{` and `}}`
+    MYST_TARGET,             // a `(label)=` target line
+    MYST_TARGET_LABEL,       // the label between `(` and `)=`
+    MYST_COMMENT,            // a `% ...` line comment
+    MYST_BLOCK_BREAK,        // a `+++` block break line
+    MYST_BLOCK_BREAK_MARKER, // the `+++` marker run
+    MYST_BLOCK_BREAK_META,   // optional trailing cell metadata after `+++`
+    MYST_SUBSTITUTION,       // an inline `{{ name }}` substitution
+    MYST_SUBSTITUTION_NAME,  // the substitution key between `{{` and `}}`
 
     EMOJI, // :alias:
 

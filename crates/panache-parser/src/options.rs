@@ -317,6 +317,11 @@ pub struct Extensions {
     /// even in MyST, matching `myst-parser`'s opt-in `colon_fence` extension).
     #[cfg_attr(feature = "serde", serde(alias = "myst_colon_fence"))]
     pub myst_colon_fence: bool,
+    /// [NON-DEFAULT] MyST block breaks: a line of 3+ `+` markers (`+++`),
+    /// optionally carrying trailing cell metadata. `myst-parser` loads these via
+    /// `myst_block_plugin`, so they are on by default for `Flavor::Myst`.
+    #[cfg_attr(feature = "serde", serde(alias = "myst_block_breaks"))]
+    pub myst_block_breaks: bool,
 }
 
 impl Default for Extensions {
@@ -400,6 +405,7 @@ impl Extensions {
             myst_substitutions: false,
             myst_comments: false,
             myst_colon_fence: false,
+            myst_block_breaks: false,
             table_captions: false,
             task_lists: false,
             tex_math_dollars: false,
@@ -554,6 +560,7 @@ impl Extensions {
             myst_substitutions: false,
             myst_comments: false,
             myst_colon_fence: false,
+            myst_block_breaks: false,
         }
     }
 
@@ -706,6 +713,7 @@ impl Extensions {
         ext.myst_roles = true;
         ext.myst_targets = true;
         ext.myst_comments = true;
+        ext.myst_block_breaks = true;
 
         // MyST is GFM-flavored, not bare CommonMark: `myst-parser` builds its
         // markdown-it parser with `.enable("table")` and the footnote plugin on
@@ -716,6 +724,13 @@ impl Extensions {
         ext.pipe_tables = true;
         ext.footnotes = true;
         ext.inline_footnotes = false;
+
+        // `myst-parser`'s default parser loads `front_matter_plugin`, which
+        // treats a leading `---`-delimited block as YAML front matter. Without
+        // this, panache mis-parses it as a setext heading plus a thematic
+        // break. The plugin only fires at the document start; panache's
+        // `yaml_metadata_block` covers that leading case.
+        ext.yaml_metadata_block = true;
 
         // Opt-in MyST extensions (off here, overridable via [extensions]):
         // colon_fence, substitution, and the markup extensions that map onto
@@ -877,6 +892,7 @@ known_extensions! {
     "myst-substitutions" => myst_substitutions,
     "myst-comments" => myst_comments,
     "myst-colon-fence" => myst_colon_fence,
+    "myst-block-breaks" => myst_block_breaks,
 }
 
 #[cfg(test)]
@@ -966,6 +982,7 @@ mod tests {
         assert!(ext.myst_roles);
         assert!(ext.myst_targets);
         assert!(ext.myst_comments);
+        assert!(ext.myst_block_breaks);
 
         // MyST is a GFM-flavored superset, not bare CommonMark: markdown-it's
         // `table` and footnote rules are on by default in `myst-parser`. The
@@ -974,6 +991,10 @@ mod tests {
         assert!(ext.pipe_tables);
         assert!(ext.footnotes);
         assert!(!ext.inline_footnotes);
+
+        // `myst-parser` loads `front_matter_plugin` by default, so a leading
+        // `---` YAML block is metadata, not a setext heading + thematic break.
+        assert!(ext.yaml_metadata_block);
 
         // MyST markup extensions are opt-in (off by default), matching a bare
         // `myst-parser` install.
@@ -1006,7 +1027,11 @@ mod tests {
         ] {
             let ext = Extensions::for_flavor(flavor);
             assert!(
-                !ext.myst_directives && !ext.myst_roles && !ext.myst_targets && !ext.myst_comments,
+                !ext.myst_directives
+                    && !ext.myst_roles
+                    && !ext.myst_targets
+                    && !ext.myst_comments
+                    && !ext.myst_block_breaks,
                 "MyST core constructs should be off by default for {flavor:?}"
             );
         }

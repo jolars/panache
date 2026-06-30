@@ -56,7 +56,9 @@ use super::blocks::myst_directives::{
     DirectiveOpen, DirectiveOption, is_directive_closing_fence, try_parse_directive_open,
     try_parse_directive_option,
 };
-use super::blocks::myst_targets::{Target, is_comment_line, try_parse_target};
+use super::blocks::myst_targets::{
+    BlockBreak, Target, is_comment_line, try_parse_block_break, try_parse_target,
+};
 use super::blocks::raw_blocks;
 use super::blocks::raw_blocks::extract_environment_name;
 use super::blocks::reference_links::{
@@ -2979,6 +2981,83 @@ impl BlockParser for MystCommentParser {
     }
 }
 
+/// Parser for MyST `+++` block break lines.
+pub(crate) struct MystBlockBreakParser;
+
+impl BlockParser for MystBlockBreakParser {
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &StrippedLines<'_, '_>,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.myst_block_breaks {
+            return None;
+        }
+        let block_break = try_parse_block_break(lines.first())?;
+        Some((
+            BlockDetectionResult::YesCanInterrupt,
+            Some(Box::new(block_break)),
+        ))
+    }
+
+    fn parse_prepared(
+        &self,
+        _ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &StrippedLines<'_, '_>,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        use crate::syntax::SyntaxKind;
+
+        let line = lines.first();
+        let bb = payload
+            .and_then(|p| p.downcast_ref::<BlockBreak>())
+            .copied()
+            .or_else(|| try_parse_block_break(line))
+            .expect("block break should exist");
+        let (content, newline) = strip_newline(line);
+
+        builder.start_node(SyntaxKind::MYST_BLOCK_BREAK.into());
+        if bb.indent_len > 0 {
+            builder.token(SyntaxKind::WHITESPACE.into(), &content[..bb.indent_len]);
+        }
+        builder.token(
+            SyntaxKind::MYST_BLOCK_BREAK_MARKER.into(),
+            &content[bb.indent_len..bb.marker_end],
+        );
+        let (meta_start, meta_end) = bb.metadata;
+        if meta_end > meta_start {
+            // Whitespace between the marker run and the metadata.
+            if meta_start > bb.marker_end {
+                builder.token(
+                    SyntaxKind::WHITESPACE.into(),
+                    &content[bb.marker_end..meta_start],
+                );
+            }
+            builder.token(
+                SyntaxKind::MYST_BLOCK_BREAK_META.into(),
+                &content[meta_start..meta_end],
+            );
+            // Any trailing whitespace after the metadata.
+            if meta_end < content.len() {
+                builder.token(SyntaxKind::WHITESPACE.into(), &content[meta_end..]);
+            }
+        } else if bb.marker_end < content.len() {
+            // No metadata: the remainder is trailing whitespace.
+            builder.token(SyntaxKind::WHITESPACE.into(), &content[bb.marker_end..]);
+        }
+        if !newline.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline);
+        }
+        builder.finish_node(); // MYST_BLOCK_BREAK
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "myst_block_break"
+    }
+}
+
 // ============================================================================
 // Admonition Parser (must precede Indented Code Block — position #6b)
 // ============================================================================
@@ -3434,6 +3513,10 @@ impl BlockParserRegistry {
             Box::new(FencedCodeBlockParser),
             // (3) YAML metadata - before headers and hrules!
             Box::new(YamlMetadataParser),
+            // (3b) MyST `+++` block break — MUST precede lists so the spaced
+            // marker form (`+ + +`) is a block break, not a bullet list, matching
+            // markdown-it's `myst_block_break` (registered before `hr`/`list`).
+            Box::new(MystBlockBreakParser),
             // (4) Lists
             Box::new(ListParser),
             // (6) Fenced divs ::: (open/close)

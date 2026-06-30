@@ -175,12 +175,14 @@ The available flavors are:
 
 `myst`
 :   [MyST](https://mystmd.org) (CommonMark superset used by Sphinx
-    `myst-parser`/`myst-nb`). Enables MyST directives, roles, targets, and
-    comments by default; MyST markup extensions (`colon_fence`, `attrs`,
-    `dollarmath`, etc.) are opt-in via `[extensions]`. MyST files use the plain
-    `.md` extension, so this flavor is opt-in only (set `flavor = "myst"`, use
-    `--flavor myst`, or a [`[flavor-overrides]`](#flavor-overrides) glob); it is
-    never auto-detected from the file extension.
+    `myst-parser`/`myst-nb`). Enables MyST directives, roles, targets, comments,
+    and `+++` block breaks by default, plus the GFM-superset rules `myst-parser`
+    turns on (pipe tables, reference footnotes, leading `---` YAML front
+    matter); MyST markup extensions (`colon_fence`, `attrs`, `dollarmath`, etc.)
+    are opt-in via `[extensions]`. MyST files use the plain `.md` extension, so
+    this flavor is opt-in only (set `flavor = "myst"`, use `--flavor myst`, or a
+    [`[flavor-overrides]`](#flavor-overrides) glob); it is never auto-detected
+    from the file extension.
 
 The `--flavor` CLI flag (see the [CLI reference](../reference/cli.qmd))
 overrides this setting for a single invocation. It also overrides

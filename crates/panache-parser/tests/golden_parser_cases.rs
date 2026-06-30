@@ -562,6 +562,8 @@ golden_test_cases!(
     myst_role_disabled,
     myst_target,
     myst_comment,
+    myst_block_break,
+    myst_frontmatter,
     myst_substitution,
     ordered_marker_max_digits_commonmark,
     ordered_marker_max_digits_pandoc,

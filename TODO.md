@@ -890,11 +890,12 @@ elsewhere).
 
 MyST (`mystmd.org`, `myst-parser`) support, modeled the same way as mdsvex: a
 CommonMark-*dialect* flavor whose `myst_defaults` enables MyST-specific
-extensions (`myst-directives`, `myst-roles`, `myst-targets`, `myst-comments`)
-plus the GFM-superset rules `myst-parser` turns on (`pipe-tables`, `footnotes`).
-Behavior is gated on those extension flags, never on `Flavor::Myst` directly, so
-other flavors can borrow the same shapes. Markup extras (`myst-colon-fence`,
-`myst-substitutions`, dollar-math, deflists, ...) stay opt-in.
+extensions (`myst-directives`, `myst-roles`, `myst-targets`, `myst-comments`,
+`myst-block-breaks`) plus the GFM-superset rules `myst-parser` turns on
+(`pipe-tables`, `footnotes`, `yaml-metadata-block`). Behavior is gated on those
+extension flags, never on `Flavor::Myst` directly, so other flavors can borrow
+the same shapes. Markup extras (`myst-colon-fence`, `myst-substitutions`,
+dollar-math, deflists, ...) stay opt-in.
 
 - [x] Core constructs: directive parsing (backtick/colon fences, options,
   nesting), inline roles, targets `(label)=`, `%` comments, substitutions
@@ -943,8 +944,29 @@ other flavors can borrow the same shapes. Markup extras (`myst-colon-fence`,
     parser already keeps in the body. The "longer *outer* fence" rule
     governs directive *nesting*, not raw body fence runs. Pinned by the
     `myst_directive_verbatim_inner_fence` parser golden case.
-- [ ] Audit remaining `myst-parser` default-on rules beyond tables/footnotes
-  (e.g. whether any other markdown-it core rule should default on for MyST).
+- [x] Audit remaining `myst-parser` default-on rules beyond tables/footnotes.
+  Diffed the default `create_md_parser` branch
+  (`myst_parser/parsers/mdit.py`, v5.0.0) against a bare
+  `MarkdownIt("commonmark")`. The complete default-on delta is: `table`
+  (covered by `pipe-tables`), `footnote_def`/`footnote_ref` with
+  `inline=False` (covered by `footnotes`/`!inline-footnotes`), `myst_role`
+  (`myst-roles`), `myst_target` (`myst-targets`), `myst_line_comment`
+  (`myst-comments`), plus the `myst_block_plugin` `+++` block break and
+  `front_matter_plugin`. `table` is the *only* extra markdown-it core rule;
+  everything else is a plugin. The two gaps found are now fixed:
+  - **Front matter.** `myst_defaults` now sets `yaml-metadata-block = true`; a
+    leading `---` block was previously mis-parsed as setext heading + thematic
+    break. The plugin only fires at document start, matching panache's
+    leading-YAML case (parser golden `myst_frontmatter`).
+  - **`+++` block breaks.** New always-on `myst-block-breaks` extension with a
+    `MYST_BLOCK_BREAK` leaf (`MYST_BLOCK_BREAK_MARKER`/`_META` tokens). Runs
+    before lists so the spaced form (`+ + +`) is a block break, not a bullet,
+    matching markdown-it. Formatter emits it verbatim like targets/comments.
+    Golden cases: parser `myst_block_break`, formatter `myst_block_break`.
+    Confirmed correctly opt-in (off in both): strikethrough, linkify,
+    smartquotes, replacements, dollarmath, amsmath, colon_fence, deflist,
+    fieldlist, tasklist, substitution, attrs\_\*. `wordcount` is render-only
+    (irrelevant to a formatter).
 - [ ] AST wrappers (`syntax/myst.rs`), LSP semantic tokens, and lint rules for
   MyST constructs.
 

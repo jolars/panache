@@ -1,0 +1,20 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..48
+  PARAGRAPH@0..11
+    TEXT@0..10 "First cell"
+    NEWLINE@10..11 "\n"
+  BLANK_LINE@11..12
+    BLANK_LINE@11..12 "\n"
+  MYST_BLOCK_BREAK@12..35
+    MYST_BLOCK_BREAK_MARKER@12..15 "+++"
+    WHITESPACE@15..16 " "
+    MYST_BLOCK_BREAK_META@16..34 "{\"tags\": [\"hide\"]}"
+    NEWLINE@34..35 "\n"
+  BLANK_LINE@35..36
+    BLANK_LINE@35..36 "\n"
+  PARAGRAPH@36..48
+    TEXT@36..47 "Second cell"
+    NEWLINE@47..48 "\n"

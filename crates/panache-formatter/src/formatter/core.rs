@@ -2964,7 +2964,7 @@ impl Formatter {
                 self.consecutive_blank_lines = 0;
             }
 
-            SyntaxKind::MYST_TARGET | SyntaxKind::MYST_COMMENT => {
+            SyntaxKind::MYST_TARGET | SyntaxKind::MYST_COMMENT | SyntaxKind::MYST_BLOCK_BREAK => {
                 // Single-line leaf blocks: emit verbatim with a trailing newline.
                 self.output
                     .push_str(node.text().to_string().trim_end_matches('\n'));
