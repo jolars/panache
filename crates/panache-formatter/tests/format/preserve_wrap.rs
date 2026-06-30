@@ -115,3 +115,38 @@ fn list_item_sentence_wraps_per_sentence() {
     assert_eq!(out, out2);
     assert_eq!(out, expected);
 }
+
+#[test]
+fn sentence_keeps_inline_enumeration_in_one_paragraph() {
+    let input =
+        "You must hear from us within 60 days. 1. Tell us your name. 2. Describe the error.\n";
+    let expected =
+        "You must hear from us within 60 days. 1.\nTell us your name. 2.\nDescribe the error.\n";
+
+    let out = format(input, Some(cfg_sentence()), None);
+    let out2 = format(&out, Some(cfg_sentence()), None);
+    assert_eq!(out, out2);
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn sentence_keeps_inline_heading_marker_off_line_start() {
+    let input = "Some intro text here. # Not a heading at all. More words come after it.\n";
+    let expected = "Some intro text here. # Not a heading at all.\nMore words come after it.\n";
+
+    let out = format(input, Some(cfg_sentence()), None);
+    let out2 = format(&out, Some(cfg_sentence()), None);
+    assert_eq!(out, out2);
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn sentence_keeps_inline_blockquote_marker_off_line_start() {
+    let input = "Look at this remark. > Not a blockquote. Trailing words appear here too.\n";
+    let expected = "Look at this remark. > Not a blockquote.\nTrailing words appear here too.\n";
+
+    let out = format(input, Some(cfg_sentence()), None);
+    let out2 = format(&out, Some(cfg_sentence()), None);
+    assert_eq!(out, out2);
+    assert_eq!(out, expected);
+}

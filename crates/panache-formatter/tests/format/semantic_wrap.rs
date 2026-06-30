@@ -62,3 +62,12 @@ fn abbreviations_do_not_trigger_breaks() {
     let expected = "We use tools, e.g. the parser,\nand more.\nEnd.\n";
     assert_eq!(run(input), expected);
 }
+
+#[test]
+fn sentence_break_keeps_inline_list_markers_off_line_start() {
+    // A sentence break before `1.`/`2.` would reparse the prose as an ordered
+    // list, so the markers stay inline and the text stays one paragraph.
+    let input = "Hear from us in 60 days. 1. Tell us your name. 2. Describe the error.\n";
+    let expected = "Hear from us in 60 days. 1.\nTell us your name. 2.\nDescribe the error.\n";
+    assert_eq!(run(input), expected);
+}
