@@ -82,7 +82,7 @@ spec-coverage audit (see `docs/guide/lsp.qmd` "LSP Specification Coverage").
     manifests, not every on-disk doc in the workspace (rust-analyzer pulls
     all workspace files). Decide whether closed-but-on-disk docs should
     surface.
-- [ ] `textDocument/documentHighlight` - highlight every occurrence of the
+- [x] `textDocument/documentHighlight` - highlight every occurrence of the
   reference/citation/footnote/heading under the cursor
 - [ ] `textDocument/selectionRange` - structural smart-select expansion (word →
   inline → block → section)

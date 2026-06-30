@@ -42,6 +42,11 @@ Find references
     - Quarto crossrefs and chunk labels
     - Citation keys (with optional bibliography/inline-reference declarations)
 
+Document highlight
+
+:   Highlight every occurrence of the symbol under the cursor
+    (`textDocument/documentHighlight`)
+
 Document outline
 
 :   Hierarchical view of document structure (`textDocument/documentSymbol`)
@@ -730,6 +735,17 @@ including Quarto crossrefs, executable chunk labels, citation keys, footnote
 labels, and reference-link labels. The `includeDeclaration` flag is honored, so
 clients can choose whether the definition itself is part of the result set.
 
+### Document Highlight
+
+Highlight every occurrence of the symbol under the cursor within the current
+document (`textDocument/documentHighlight`). Place the cursor on a reference
+label, citation key, footnote, heading id, crossref, or chunk label and all of
+its other occurrences---including the definition---are marked. Unlike [Linked
+Editing](#linked-editing), highlighting does not require the spans to share
+identical source text, so a differently-cased definition (`[foo]:` for a `[Foo]`
+usage) is still highlighted. Most editors trigger this automatically as the
+cursor moves.
+
 ### Workspace Symbols
 
 Search for headings by name across the whole project, not just the current file
@@ -869,7 +885,7 @@ marked *out of scope*.
   | `textDocument/publishDiagnostics`                                                                                           | ✅     | Push model, debounced                                       |
   | `textDocument/diagnostic`, `workspace/diagnostic`                                                                           | ✅     | Pull model; push suppressed; `partialResultToken` streaming |
   | `workspace/diagnostic/refresh`                                                                                              | ✅     | Nudge pull clients to re-pull on async updates              |
-  | `textDocument/documentHighlight`                                                                                            | ❌     | Planned: highlight occurrences under cursor                 |
+  | `textDocument/documentHighlight`                                                                                            | ✅     | Occurrences of the symbol under the cursor                  |
   | `textDocument/selectionRange`                                                                                               | ❌     | Planned: structural smart-select                            |
   | `textDocument/linkedEditingRange`                                                                                           | ✅     | Live co-editing; current document, identical text           |
   | `textDocument/onTypeFormatting`                                                                                             | ❌     | Under consideration                                         |

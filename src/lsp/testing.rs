@@ -439,6 +439,20 @@ impl LspTester {
         handlers::linked_editing_range::linked_editing_range(&self.snapshot(), params)
     }
 
+    pub fn document_highlight(
+        &self,
+        uri: &str,
+        line: u32,
+        character: u32,
+    ) -> Option<Vec<DocumentHighlight>> {
+        let params = DocumentHighlightParams {
+            text_document_position_params: pos_params(uri, line, character),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        handlers::document_highlight::document_highlight(&self.snapshot(), params)
+    }
+
     pub fn hover(&self, uri: &str, line: u32, character: u32) -> Option<Hover> {
         let params = HoverParams {
             text_document_position_params: pos_params(uri, line, character),

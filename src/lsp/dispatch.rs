@@ -70,6 +70,9 @@ pub(crate) fn server_capabilities() -> ServerCapabilities {
             ..Default::default()
         }),
         references_provider: Some(OneOf::Left(true)),
+        // Highlight every occurrence of the symbol under the cursor within the
+        // current document. See `handlers::document_highlight`.
+        document_highlight_provider: Some(OneOf::Left(true)),
         // Additive, flavor-gated highlighting for pandoc/quarto-specific
         // constructs the editor's base grammar misses. Custom legend types
         // no-op until themed, so advertising on by default is harmless. See
@@ -425,6 +428,10 @@ impl GlobalState {
             handlers::prepare_rename::prepare_rename
         );
         pool!(r::References, handlers::references::references);
+        pool!(
+            r::DocumentHighlightRequest,
+            handlers::document_highlight::document_highlight
+        );
         pool!(
             r::LinkedEditingRange,
             handlers::linked_editing_range::linked_editing_range
