@@ -54,6 +54,18 @@ In `sentence` and `semantic` modes, Panache applies conservative no-break rules
 for common abbreviations (for example `i.e.` and `e.g.`), so these do not
 trigger sentence splits by themselves.
 
+A sentence break is also suppressed when it would push the next token to the
+start of a line where the parser would read it as the opening of a block---an
+ordered or unordered list marker (`1.`, `-`, `+`, `1)`), an ATX heading (`#`), a
+blockquote (`>`), or a setext/thematic rule (`---`, `===`). For example, prose
+that embeds an inline enumeration stays one paragraph:
+`Hear from us. 1. Tell us your name. 2. Describe it.` keeps each marker inline
+rather than promoting the text into a list. This guarantees wrapping never
+changes how the document parses, which in turn keeps `sentence`/`semantic`
+formatting idempotent (`panache format` followed by `panache format --check`
+always succeeds). Genuine, well-formed lists are unaffected and continue to wrap
+normally.
+
 The abbreviation list follows the document language. When metadata provides
 `lang` (as in Quarto and Pandoc frontmatter), Panache selects a built-in profile
 for it; profiles ship for English, Czech, German, Spanish, and French, and

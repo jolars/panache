@@ -240,6 +240,10 @@ pub(super) struct NodeWrapOptions<'a> {
     pub strip_standalone_blockquote_markers: bool,
     pub avoid_unsafe_line_start: bool,
     pub avoid_blockquote_line_start: bool,
+    /// Avoid starting a wrapped line with an ATX heading (`#`) or setext/thematic
+    /// (`---`/`===`) marker. Set by the sentence/semantic modes; left off for
+    /// reflow, whose width-driven breaks rarely land on such a marker.
+    pub avoid_heading_line_start: bool,
     /// Force a line break at every existing soft break (`NEWLINE`) in addition
     /// to the breaks `mode` produces. Set by the `Semantic` wrap mode, which
     /// layers sembr break-preservation on top of the sentence-break path.
@@ -255,18 +259,23 @@ impl<'a> NodeWrapOptions<'a> {
             strip_standalone_blockquote_markers: false,
             avoid_unsafe_line_start: false,
             avoid_blockquote_line_start: false,
+            avoid_heading_line_start: false,
             preserve_newlines: false,
         }
     }
 
     pub(super) fn sentence() -> Self {
+        // Unlike reflow's flavor-gated guards, sentence/semantic breaks are
+        // structural and could land before a marker, so guard every block-start
+        // token unconditionally; keeping the marker inline is always parse-safe.
         Self {
             widths: &[],
             mode: NodeWrapMode::Sentence,
             atomic_links_root: true,
             strip_standalone_blockquote_markers: false,
-            avoid_unsafe_line_start: false,
-            avoid_blockquote_line_start: false,
+            avoid_unsafe_line_start: true,
+            avoid_blockquote_line_start: true,
+            avoid_heading_line_start: true,
             preserve_newlines: false,
         }
     }
@@ -305,16 +314,14 @@ impl WrapStrategy {
                 avoid_blockquote_line_start: avoid_blockquote_start,
                 ..NodeWrapOptions::reflow(widths)
             },
+            // `sentence()` already guards every block-start token, so list items
+            // only add blockquote-marker stripping when nested in a blockquote.
             Self::ListSentence { in_blockquote } => NodeWrapOptions {
                 strip_standalone_blockquote_markers: in_blockquote,
-                avoid_unsafe_line_start: true,
-                avoid_blockquote_line_start: avoid_blockquote_start,
                 ..NodeWrapOptions::sentence()
             },
             Self::ListSemantic { in_blockquote } => NodeWrapOptions {
                 strip_standalone_blockquote_markers: in_blockquote,
-                avoid_unsafe_line_start: true,
-                avoid_blockquote_line_start: avoid_blockquote_start,
                 ..NodeWrapOptions::semantic()
             },
         }
@@ -437,6 +444,18 @@ fn is_unsafe_list_line_start_piece(piece: &str) -> bool {
         || is_bullet_list_marker_piece(piece)
 }
 
+// A standalone 1--6 `#` run opens an ATX heading at a line start (7+ `#`, or a
+// glued `#word`, does not).
+fn is_atx_heading_marker_piece(piece: &str) -> bool {
+    !piece.is_empty() && piece.len() <= 6 && piece.bytes().all(|b| b == b'#')
+}
+
+// A pure `=`/`-` run is a setext underline or thematic break at a line start.
+// `*`/`_` rules can't reach here: the inline escaper backslash-escapes them.
+fn is_setext_or_thematic_marker_piece(piece: &str) -> bool {
+    !piece.is_empty() && (piece.bytes().all(|b| b == b'=') || piece.bytes().all(|b| b == b'-'))
+}
+
 struct StreamingCoreSink<'a> {
     default_line_width: usize,
     line_widths: &'a [usize],
@@ -452,9 +471,11 @@ struct StreamingCoreSink<'a> {
     profile: ResolvedProfile<'a>,
     avoid_unsafe_line_start: bool,
     avoid_blockquote_line_start: bool,
+    avoid_heading_line_start: bool,
 }
 
 impl<'a> StreamingCoreSink<'a> {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         line_widths: &'a [usize],
         sentence_mode: bool,
@@ -463,6 +484,7 @@ impl<'a> StreamingCoreSink<'a> {
         profile: ResolvedProfile<'a>,
         avoid_unsafe_line_start: bool,
         avoid_blockquote_line_start: bool,
+        avoid_heading_line_start: bool,
     ) -> Self {
         Self {
             default_line_width: line_widths.last().copied().unwrap_or(0),
@@ -479,7 +501,20 @@ impl<'a> StreamingCoreSink<'a> {
             profile,
             avoid_unsafe_line_start,
             avoid_blockquote_line_start,
+            avoid_heading_line_start,
         }
+    }
+
+    /// Whether `text` at the start of a line would open a block-level construct
+    /// (list item, blockquote, heading, rule, or definition) and split the
+    /// paragraph. Each category is gated by its `avoid_*` flag; `:` is always
+    /// unsafe.
+    fn piece_would_start_unsafe_line(&self, text: &str) -> bool {
+        is_definition_marker_piece(text)
+            || (self.avoid_blockquote_line_start && is_unsafe_block_line_start_piece(text))
+            || (self.avoid_unsafe_line_start && is_unsafe_list_line_start_piece(text))
+            || (self.avoid_heading_line_start
+                && (is_atx_heading_marker_piece(text) || is_setext_or_thematic_marker_piece(text)))
     }
 
     fn consume(
@@ -496,12 +531,8 @@ impl<'a> StreamingCoreSink<'a> {
                 .copied()
                 .unwrap_or(self.default_line_width);
             let spacer_width = usize::from(self.line_has_piece && self.prev_ws_after);
-            let would_start_line_with_unsafe_piece = self.prev_ws_after
-                && (is_definition_marker_piece(segment.text.as_str())
-                    || (self.avoid_blockquote_line_start
-                        && is_unsafe_block_line_start_piece(segment.text.as_str()))
-                    || (self.avoid_unsafe_line_start
-                        && is_unsafe_list_line_start_piece(segment.text.as_str())));
+            let would_start_line_with_unsafe_piece =
+                self.prev_ws_after && self.piece_would_start_unsafe_line(segment.text.as_str());
             if self.line_has_piece
                 && self.line_width + spacer_width + piece_width > width_limit
                 && !would_start_line_with_unsafe_piece
@@ -521,8 +552,12 @@ impl<'a> StreamingCoreSink<'a> {
         self.line_has_piece = true;
         self.prev_ws_after = segment.has_whitespace_after;
 
+        // Break after a sentence boundary -- but not when it would push the next
+        // piece to a line start where it opens a block; keeping it inline leaves
+        // the paragraph's parse (and so idempotency) intact.
         if self.sentence_mode
             && is_sentence_boundary_segment(&segment, next_segment, is_last, self.profile)
+            && !next_segment.is_some_and(|next| self.piece_would_start_unsafe_line(&next.text))
         {
             self.out.push(std::mem::take(&mut self.line));
             self.line_width = 0;
@@ -604,6 +639,7 @@ pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> 
         false,
         false,
         ResolvedProfile::builtin_only(SentenceLanguage::English),
+        false,
         false,
         false,
     );
@@ -758,6 +794,7 @@ struct TraversalBuilder<'a> {
 }
 
 impl<'a> TraversalBuilder<'a> {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         line_widths: &'a [usize],
         sentence_mode: bool,
@@ -765,6 +802,7 @@ impl<'a> TraversalBuilder<'a> {
         profile: ResolvedProfile<'a>,
         avoid_unsafe_line_start: bool,
         avoid_blockquote_line_start: bool,
+        avoid_heading_line_start: bool,
         preserve_newlines: bool,
     ) -> Self {
         Self {
@@ -776,6 +814,7 @@ impl<'a> TraversalBuilder<'a> {
                 profile,
                 avoid_unsafe_line_start,
                 avoid_blockquote_line_start,
+                avoid_heading_line_start,
             ),
             current_piece: None,
             current_piece_boundary_class: SentenceBoundaryClass::Normal,
@@ -1424,6 +1463,7 @@ pub(super) fn wrapped_lines_for_node(
         profile,
         options.avoid_unsafe_line_start,
         options.avoid_blockquote_line_start,
+        options.avoid_heading_line_start,
         options.preserve_newlines,
     );
     process_node_recursive(
@@ -1534,10 +1574,12 @@ fn looks_like_div_fence_line(content: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        WrapStrategy, is_bullet_list_marker_piece, is_decimal_ordered_list_marker_piece,
-        is_definition_marker_piece, is_example_list_marker_piece, is_fancy_alpha_marker_piece,
+        WrapStrategy, is_atx_heading_marker_piece, is_bullet_list_marker_piece,
+        is_decimal_ordered_list_marker_piece, is_definition_marker_piece,
+        is_example_list_marker_piece, is_fancy_alpha_marker_piece,
         is_fancy_paren_alpha_or_roman_marker_piece, is_fancy_paren_decimal_marker_piece,
-        is_fancy_roman_marker_piece, is_unsafe_list_line_start_piece, wrap_text_first_fit,
+        is_fancy_roman_marker_piece, is_setext_or_thematic_marker_piece,
+        is_unsafe_list_line_start_piece, wrap_text_first_fit,
     };
 
     #[test]
@@ -1578,6 +1620,29 @@ mod tests {
         assert!(!is_bullet_list_marker_piece("+foo"));
         assert!(!is_decimal_ordered_list_marker_piece("v2.0"));
         assert!(!is_decimal_ordered_list_marker_piece("2024.05"));
+    }
+
+    #[test]
+    fn atx_heading_marker_rule_matches_hash_runs() {
+        assert!(is_atx_heading_marker_piece("#"));
+        assert!(is_atx_heading_marker_piece("######"));
+        // Seven or more hashes is not a heading.
+        assert!(!is_atx_heading_marker_piece("#######"));
+        // A glued `#word` piece (no following space) is not a heading marker.
+        assert!(!is_atx_heading_marker_piece("#foo"));
+        assert!(!is_atx_heading_marker_piece(""));
+    }
+
+    #[test]
+    fn setext_thematic_marker_rule_matches_dash_and_equals_runs() {
+        assert!(is_setext_or_thematic_marker_piece("="));
+        assert!(is_setext_or_thematic_marker_piece("==="));
+        assert!(is_setext_or_thematic_marker_piece("-"));
+        assert!(is_setext_or_thematic_marker_piece("---"));
+        // Mixed or non-rule pieces are left alone.
+        assert!(!is_setext_or_thematic_marker_piece("=-="));
+        assert!(!is_setext_or_thematic_marker_piece("--x"));
+        assert!(!is_setext_or_thematic_marker_piece(""));
     }
 
     #[test]
