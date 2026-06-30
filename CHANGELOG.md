@@ -2,11 +2,20 @@
 
 ## Unreleased
 
-Panache now supports [mdsvex](https://mdsvex.com/), a Svelte-based Markdown
-preprocessor. This means that Panache can now parse and format `.svx` files,
-which are Markdown files that can contain Svelte components. The parser and
-formatter will treat Svelte components as opaque blocks, preserving their
-content and formatting them according to the surrounding Markdown context.
+### Highlights
+
+This release introduces experimental support for two new flavors: 
+
+- [mdsvex](https://mdsvex.com/), a Svelte-based Markdown
+  preprocessor. This means that Panache can now parse and format `.svx` files,
+  which are Markdown files that can contain Svelte components. The parser and
+  formatter will treat Svelte components as opaque blocks, preserving their
+  content and formatting them according to the surrounding Markdown context.
+
+- [myst](https://mystmd.org/), a flavor of Markdown designed for
+  scientific and technical writing. Myst is built on top of CommonMark (which
+  Panache is compliant with), but adds Quarto/R Markdown-style extensions for
+  citations, cross-references, and directives.
 
 ## [2.59.0](https://github.com/jolars/panache/compare/v2.58.0...v2.59.0) (2026-06-24)
 
