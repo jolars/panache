@@ -970,10 +970,6 @@ dollar-math, deflists, ...) stay opt-in.
 - [ ] AST wrappers (`syntax/myst.rs`), LSP semantic tokens, and lint rules for
   MyST constructs.
 
-## Architecture
-
-- [ ] Separate additional functionality into dedicated crates (long-term).
-
 ## Math Parser and Formatter
 
 Multi-session effort --- see the `math-parser-formatter` skill
