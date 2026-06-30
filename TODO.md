@@ -903,10 +903,28 @@ other flavors can borrow the same shapes. Markup extras (`myst-colon-fence`,
   require a well-formed `:name:` key rather than `myst-parser`'s looser
   "line starts with `:`", which avoids swallowing colon-fence closers and
   nested openers.
-- [ ] **Verbatim-bodied directives.** `{code}`, `{code-block}`, and `{math}`
-  bodies are markdown-reflowed, joining lines and dropping indentation,
-  which destroys code. These directives need a notion of a verbatim body
-  that the formatter passes through unchanged. Same triage bucket.
+- [x] **Verbatim-bodied directives.** `{code}`, `{code-block}`, `{code-cell}`,
+  and `{math}` now capture their body as a raw `MYST_DIRECTIVE_BODY` node at
+  parse time (mirroring fenced code blocks), so the formatter passes it
+  through byte-for-byte instead of markdown-reflowing it. Gated on the
+  directive name in `try_parse_directive_open`; the opener parser consumes
+  the whole verbatim directive single-pass and skips the markdown-body
+  container.
+  - [ ] **External formatters/linters for verbatim directive bodies.** A
+    `{code-block} python` body is now a real code body but is invisible to
+    the `[formatters.*]`/`[linters.*]` external-tool path:
+    `collect_code_blocks`
+    (`crates/panache-formatter/src/formatter/code_blocks.rs`) only walks
+    `CODE_BLOCK` nodes, so black/flake8 et al. never see it. Route
+    `MYST_DIRECTIVE_BODY` through the same path, keyed by the directive
+    argument (`MYST_DIRECTIVE_ARG`) as the language, like a fenced code
+    block.
+  - [ ] **Premature closer on a longer inner fence.** A body line whose fence
+    run is at least the opener's count (e.g. a 4-backtick fence inside a
+    3-backtick `{code-block}`) is treated as the closer. This matches the
+    container path's behavior and is rare (MyST expects a longer *outer*
+    fence), but a robust fix would track the opener width and only close on
+    an exact or shorter-or-equal match per MyST semantics.
 - [ ] Audit remaining `myst-parser` default-on rules beyond tables/footnotes
   (e.g. whether any other markdown-it core rule should default on for MyST).
 - [ ] AST wrappers (`syntax/myst.rs`), LSP semantic tokens, and lint rules for

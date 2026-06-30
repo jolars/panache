@@ -1158,6 +1158,48 @@ Output
     :::
     ```
 
+## MyST Directives
+
+Under the MyST flavor, Panache recognizes [MyST
+directives](https://mystmd.org/guide/directives) (```` ```{name} ````,
+`~~~{name}`, or `:::{name}`). The opening fence is kept verbatim, the leading
+`:key: value` option block is emitted canonically (one option per line, a single
+space after the closing colon), and a single blank line separates the options
+from the body.
+
+Directives whose body is literal content---`{code}`, `{code-block}`,
+`{code-cell}`, and `{math}`---are treated as **verbatim**: their body is passed
+through unchanged, so indentation and line breaks are never reflowed.
+
+Input
+
+:   ````markdown
+    ```{{code-block}} python
+    :caption:   Fibonacci
+
+    def fib(n):
+        if n < 2:
+            return n
+        return fib(n - 1) + fib(n - 2)
+    ```
+    ````
+
+Output
+
+:   ````markdown
+    ```{{code-block}} python
+    :caption: Fibonacci
+
+    def fib(n):
+        if n < 2:
+            return n
+        return fib(n - 1) + fib(n - 2)
+    ```
+    ````
+
+Other directives (`{note}`, `{figure}`, ...) keep markdown bodies, which are
+formatted recursively like ordinary content.
+
 ## Admonitions
 
 When the [`python-markdown-admonitions`](configuration.qmd#admonitions)

@@ -554,6 +554,8 @@ golden_test_cases!(
     myst_directive_nested,
     myst_directive_vs_codeblock,
     myst_directive_disabled,
+    myst_directive_code_verbatim,
+    myst_directive_math_verbatim,
     myst_role_basic,
     myst_role_double_backtick,
     myst_role_disabled,

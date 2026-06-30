@@ -1,0 +1,28 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..70
+  MYST_DIRECTIVE@0..70
+    MYST_DIRECTIVE_OPEN@0..10
+      MYST_DIRECTIVE_FENCE@0..3 "```"
+      MYST_DIRECTIVE_NAME@3..9 "{math}"
+      NEWLINE@9..10 "\n"
+    MYST_DIRECTIVE_OPTION@10..25
+      MYST_DIRECTIVE_OPTION_MARKER@10..11 ":"
+      MYST_DIRECTIVE_OPTION_NAME@11..16 "label"
+      MYST_DIRECTIVE_OPTION_MARKER@16..17 ":"
+      WHITESPACE@17..18 " "
+      MYST_DIRECTIVE_OPTION_VALUE@18..24 "matrix"
+      NEWLINE@24..25 "\n"
+    MYST_DIRECTIVE_BODY@25..66
+      NEWLINE@25..26 "\n"
+      TEXT@26..41 "\\begin{aligned}"
+      NEWLINE@41..42 "\n"
+      TEXT@42..51 "  Ax &= b"
+      NEWLINE@51..52 "\n"
+      TEXT@52..65 "\\end{aligned}"
+      NEWLINE@65..66 "\n"
+    MYST_DIRECTIVE_CLOSE@66..70
+      MYST_DIRECTIVE_FENCE@66..69 "```"
+      NEWLINE@69..70 "\n"

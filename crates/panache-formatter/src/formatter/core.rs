@@ -2864,6 +2864,7 @@ impl Formatter {
                 let mut close_text: Option<String> = None;
                 let mut options = Vec::new();
                 let mut body = Vec::new();
+                let mut verbatim_body: Option<SyntaxNode> = None;
                 for element in node.children_with_tokens() {
                     if let NodeOrToken::Node(child) = element {
                         match child.kind() {
@@ -2874,6 +2875,7 @@ impl Formatter {
                                 close_text = Some(child.text().to_string());
                             }
                             SyntaxKind::MYST_DIRECTIVE_OPTION => options.push(child),
+                            SyntaxKind::MYST_DIRECTIVE_BODY => verbatim_body = Some(child),
                             _ => body.push(child),
                         }
                     }
@@ -2887,6 +2889,25 @@ impl Formatter {
                 for option in &options {
                     self.output.push_str(&format_directive_option(option));
                     self.output.push('\n');
+                }
+
+                // Verbatim-bodied directives (`{code}`, `{code-block}`,
+                // `{code-cell}`, `{math}`): the body is literal code/math, parsed
+                // as a single raw `MYST_DIRECTIVE_BODY` node. Emit it byte-for-byte
+                // -- never reflow -- so indentation and line breaks survive. The
+                // option block is still canonicalized above. No separator is
+                // injected: any blank line between the options and the body is
+                // already captured inside the body node.
+                if let Some(body_node) = verbatim_body {
+                    self.output
+                        .push_str(body_node.text().to_string().trim_end_matches('\n'));
+                    self.output.push('\n');
+                    if let Some(close) = &close_text {
+                        self.output.push_str(close.trim_end_matches('\n'));
+                        self.output.push('\n');
+                    }
+                    self.consecutive_blank_lines = 0;
+                    return;
                 }
 
                 // Strip leading/trailing blank lines; collapse interior runs to

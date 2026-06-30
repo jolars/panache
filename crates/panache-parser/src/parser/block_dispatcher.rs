@@ -24,7 +24,9 @@ use super::blocks::code_blocks::{
     CodeBlockType, FenceInfo, InfoString, is_closing_fence, is_gfm_math_fence,
     parse_fenced_code_block, parse_fenced_math_block, try_parse_fence_open,
 };
-use super::blocks::container_prefix::{ContainerPrefix, StrippedLines};
+use super::blocks::container_prefix::{
+    ContainerPrefix, StrippedLines, bq_outer_of_list, strip_list_indent,
+};
 use super::blocks::definition_lists::{
     next_line_is_definition_marker, try_parse_definition_marker,
 };
@@ -2629,12 +2631,100 @@ impl BlockParser for MystDirectiveOpenParser {
             consumed += 1;
         }
 
-        1 + consumed
+        if !open.is_verbatim {
+            // Non-verbatim directive: leave the container open so the body is
+            // parsed recursively as markdown (handled by the container stack).
+            return 1 + consumed;
+        }
+
+        // Verbatim directive (`{code}`, `{code-block}`, `{code-cell}`,
+        // `{math}`): consume the literal body and the closer here, mirroring
+        // `parse_fenced_code_block`, and finish the `MYST_DIRECTIVE` node so no
+        // markdown-body container is opened. The body is preserved byte-for-byte
+        // as a `MYST_DIRECTIVE_BODY` node.
+        let total = emit_verbatim_directive_body(builder, lines, &open, 1 + consumed);
+        builder.finish_node(); // MYST_DIRECTIVE
+        total
     }
 
     fn name(&self) -> &'static str {
         "myst_directive_open"
     }
+}
+
+/// Emit a verbatim directive body (raw `TEXT`/`NEWLINE` tokens under a
+/// `MYST_DIRECTIVE_BODY` node) and its closing fence, starting `body_rel` lines
+/// past the opener. Returns the total number of lines consumed from the opener
+/// onward (opener + options + body + closer), for the dispatcher to commit.
+///
+/// The forward scan mirrors [`parse_fenced_code_block`]: it stops at the first
+/// line that closes the directive's fence, or when an enclosing blockquote ends,
+/// or at end of input. Each body line is emitted via
+/// [`StrippedLines::emit_prefix_at`] so container prefixes survive when a
+/// directive is nested.
+fn emit_verbatim_directive_body(
+    builder: &mut GreenNodeBuilder<'static>,
+    lines: &StrippedLines<'_, '_>,
+    open: &DirectiveOpen,
+    body_rel: usize,
+) -> usize {
+    use crate::syntax::SyntaxKind;
+
+    let raw = lines.raw();
+    let start = lines.pos();
+    let body_start = start + body_rel;
+
+    let prefix = lines.prefix();
+    let bq_depth = prefix.bq_depth();
+    let list_content_col = prefix.list_content_col();
+    let bq_outer = bq_outer_of_list(prefix);
+
+    // Forward-scan for the closing fence.
+    let mut scan = body_start;
+    let mut found_closer = false;
+    while scan < raw.len() {
+        // Leaving the enclosing blockquote ends the directive (matches the
+        // fenced-code-block forward scan); never triggers at top level.
+        let probe = if bq_outer {
+            raw[scan]
+        } else {
+            strip_list_indent(raw[scan], list_content_col)
+        };
+        let (line_bq_depth, _) = count_blockquote_markers(probe);
+        if line_bq_depth < bq_depth {
+            break;
+        }
+        if is_directive_closing_fence(lines.strip_at(scan), open.fence_char, open.fence_count) {
+            found_closer = true;
+            break;
+        }
+        scan += 1;
+    }
+
+    // Emit the verbatim body (everything between the options and the closer).
+    if scan > body_start {
+        builder.start_node(SyntaxKind::MYST_DIRECTIVE_BODY.into());
+        for i in body_start..scan {
+            let tail = lines.emit_prefix_at(builder, i);
+            let (text, newline) = strip_newline(tail);
+            if !text.is_empty() {
+                builder.token(SyntaxKind::TEXT.into(), text);
+            }
+            if !newline.is_empty() {
+                builder.token(SyntaxKind::NEWLINE.into(), newline);
+            }
+        }
+        builder.finish_node(); // MYST_DIRECTIVE_BODY
+    }
+
+    // Emit the closing fence as a `MYST_DIRECTIVE_CLOSE` node, if present.
+    if found_closer {
+        let tail = lines.emit_prefix_at(builder, scan);
+        emit_directive_close(builder, tail, open.fence_char);
+        scan += 1;
+    }
+
+    scan - start
 }
 
 /// Emit one MyST directive option line (`:key: value`) as a
@@ -2733,37 +2823,43 @@ impl BlockParser for MystDirectiveCloseParser {
         lines: &StrippedLines<'_, '_>,
         _payload: Option<&dyn Any>,
     ) -> usize {
-        use crate::syntax::SyntaxKind;
-
         let fence_char = ctx.myst_directive_closer.map(|(c, _)| c).unwrap_or(b'`');
-        let line = lines.first();
-        let (content, newline) = strip_newline(line);
-
-        builder.start_node(SyntaxKind::MYST_DIRECTIVE_CLOSE.into());
-
-        // Up to 3 leading spaces, then the fence run, then trailing whitespace.
-        let lead_ws = content.bytes().take(3).take_while(|&b| b == b' ').count();
-        if lead_ws > 0 {
-            builder.token(SyntaxKind::WHITESPACE.into(), &content[..lead_ws]);
-        }
-        let after = &content[lead_ws..];
-        let fence_len = after.bytes().take_while(|&b| b == fence_char).count();
-        builder.token(SyntaxKind::MYST_DIRECTIVE_FENCE.into(), &after[..fence_len]);
-        let trail = &after[fence_len..];
-        if !trail.is_empty() {
-            builder.token(SyntaxKind::WHITESPACE.into(), trail);
-        }
-        if !newline.is_empty() {
-            builder.token(SyntaxKind::NEWLINE.into(), newline);
-        }
-
-        builder.finish_node(); // MYST_DIRECTIVE_CLOSE
+        emit_directive_close(builder, lines.first(), fence_char);
         1
     }
 
     fn name(&self) -> &'static str {
         "myst_directive_close"
     }
+}
+
+/// Emit a `MYST_DIRECTIVE_CLOSE` node for an already-prefix-stripped closer
+/// `line`: up to 3 leading spaces, the fence run of `fence_char`, then trailing
+/// whitespace and the newline. Shared by [`MystDirectiveCloseParser`] (container
+/// path) and the verbatim-body path in [`MystDirectiveOpenParser`].
+fn emit_directive_close(builder: &mut GreenNodeBuilder<'static>, line: &str, fence_char: u8) {
+    use crate::syntax::SyntaxKind;
+
+    let (content, newline) = strip_newline(line);
+
+    builder.start_node(SyntaxKind::MYST_DIRECTIVE_CLOSE.into());
+
+    let lead_ws = content.bytes().take(3).take_while(|&b| b == b' ').count();
+    if lead_ws > 0 {
+        builder.token(SyntaxKind::WHITESPACE.into(), &content[..lead_ws]);
+    }
+    let after = &content[lead_ws..];
+    let fence_len = after.bytes().take_while(|&b| b == fence_char).count();
+    builder.token(SyntaxKind::MYST_DIRECTIVE_FENCE.into(), &after[..fence_len]);
+    let trail = &after[fence_len..];
+    if !trail.is_empty() {
+        builder.token(SyntaxKind::WHITESPACE.into(), trail);
+    }
+    if !newline.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline);
+    }
+
+    builder.finish_node(); // MYST_DIRECTIVE_CLOSE
 }
 
 /// Parser for MyST `(label)=` target lines.

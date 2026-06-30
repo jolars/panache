@@ -3865,10 +3865,17 @@ impl<'a> Parser<'a> {
     /// be recognized.
     fn push_myst_directive_container(&mut self, block_match: &PreparedBlockMatch) {
         use crate::parser::blocks::myst_directives::DirectiveOpen;
-        let (fence_char, fence_count) = block_match
+        let open = block_match
             .payload
             .as_ref()
-            .and_then(|p| p.downcast_ref::<DirectiveOpen>())
+            .and_then(|p| p.downcast_ref::<DirectiveOpen>());
+        // Verbatim directives (`{code}`, `{math}`, ...) consume their whole body
+        // and closer in `parse_prepared` and finish the `MYST_DIRECTIVE` node
+        // there, so there is no open container to push.
+        if open.is_some_and(|open| open.is_verbatim) {
+            return;
+        }
+        let (fence_char, fence_count) = open
             .map(|open| (open.fence_char, open.fence_count))
             .unwrap_or((b'`', 3));
         self.containers.push(Container::MystDirective {

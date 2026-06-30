@@ -37,6 +37,21 @@ pub(crate) struct DirectiveOpen {
     pub indent_len: usize,
     /// Byte length of the `{name}` token, braces included.
     pub name_len: usize,
+    /// Whether the directive's body is verbatim (literal code/math) rather than
+    /// recursively-parsed markdown. True for `{code}`, `{code-block}`,
+    /// `{code-cell}`, and `{math}`, whose bodies must survive formatting
+    /// byte-for-byte. See [`is_verbatim_directive`].
+    pub is_verbatim: bool,
+}
+
+/// Whether a directive `name` (without braces) has a verbatim body that must be
+/// passed through formatting unchanged.
+///
+/// These mirror `myst-parser`/MyST-NB directives that capture a literal source
+/// `value` (code or math) rather than nested markdown: reflowing them joins
+/// lines and drops the indentation that the content depends on.
+fn is_verbatim_directive(name: &str) -> bool {
+    matches!(name, "code" | "code-block" | "code-cell" | "math")
 }
 
 fn is_name_char(c: char) -> bool {
@@ -94,6 +109,7 @@ pub(crate) fn try_parse_directive_open(content: &str, ext: &Extensions) -> Optio
         fence_count,
         indent_len,
         name_len: close_brace + 1,
+        is_verbatim: is_verbatim_directive(name_inner),
     })
 }
 
@@ -191,6 +207,27 @@ mod tests {
         assert_eq!(d.fence_count, 3);
         assert_eq!(d.indent_len, 0);
         assert_eq!(d.name_len, "{note}".len());
+    }
+
+    #[test]
+    fn verbatim_directive_names() {
+        for name in ["code", "code-block", "code-cell", "math"] {
+            let line = format!("```{{{name}}}\n");
+            let d = try_parse_directive_open(&line, &ext_backtick()).unwrap();
+            assert!(d.is_verbatim, "{name} should have a verbatim body");
+        }
+        // Argument and option-bearing openers keep the flag.
+        let d = try_parse_directive_open("```{code-block} python\n", &ext_backtick()).unwrap();
+        assert!(d.is_verbatim);
+    }
+
+    #[test]
+    fn prose_directive_names_are_not_verbatim() {
+        for name in ["note", "figure", "warning", "admonition"] {
+            let line = format!("```{{{name}}}\n");
+            let d = try_parse_directive_open(&line, &ext_backtick()).unwrap();
+            assert!(!d.is_verbatim, "{name} body is markdown, not verbatim");
+        }
     }
 
     #[test]

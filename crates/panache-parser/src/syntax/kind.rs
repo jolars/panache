@@ -355,6 +355,7 @@ pub enum SyntaxKind {
     MYST_DIRECTIVE_OPTION_MARKER, // a `:` delimiter (leading and closing colon)
     MYST_DIRECTIVE_OPTION_NAME, // the option key (e.g. `alt`)
     MYST_DIRECTIVE_OPTION_VALUE, // the option value (e.g. `An image`)
+    MYST_DIRECTIVE_BODY,   // verbatim body of a code/math directive (raw, not reflowed)
 
     // MyST inline role parts (`` {name}`content` ``)
     MYST_ROLE,         // the whole role

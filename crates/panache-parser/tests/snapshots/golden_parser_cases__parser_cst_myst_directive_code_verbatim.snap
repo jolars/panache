@@ -1,0 +1,27 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..61
+  MYST_DIRECTIVE@0..61
+    MYST_DIRECTIVE_OPEN@0..17
+      MYST_DIRECTIVE_FENCE@0..3 "```"
+      MYST_DIRECTIVE_NAME@3..9 "{code}"
+      WHITESPACE@9..10 " "
+      MYST_DIRECTIVE_ARG@10..16 "python"
+      NEWLINE@16..17 "\n"
+    MYST_DIRECTIVE_OPTION@17..34
+      MYST_DIRECTIVE_OPTION_MARKER@17..18 ":"
+      MYST_DIRECTIVE_OPTION_NAME@18..30 "number-lines"
+      MYST_DIRECTIVE_OPTION_MARKER@30..31 ":"
+      WHITESPACE@31..32 " "
+      MYST_DIRECTIVE_OPTION_VALUE@32..33 "1"
+      NEWLINE@33..34 "\n"
+    MYST_DIRECTIVE_BODY@34..57
+      TEXT@34..45 "def five():"
+      NEWLINE@45..46 "\n"
+      TEXT@46..56 "  return 5"
+      NEWLINE@56..57 "\n"
+    MYST_DIRECTIVE_CLOSE@57..61
+      MYST_DIRECTIVE_FENCE@57..60 "```"
+      NEWLINE@60..61 "\n"
