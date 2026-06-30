@@ -846,9 +846,9 @@ for initial implementation.
 - [x] LSP diagnostics for malformed shortcodes
 - [x] Completion for built-in shortcode names
 
-### Known Differences from Pandoc
+## Additional Markdown flavors
 
-## mdsvex / Svelte-flavored Markdown
+### mdsvex / Svelte-flavored Markdown
 
 MVP support for [mdsvex](https://mdsvex.pngwn.io) (`.svx`, `.svelte.md`). mdsvex
 (≤0.12.x) builds on `remark-parse@8`, whose options default to `gfm: true`, so
@@ -886,7 +886,7 @@ elsewhere).
 - [ ] AST wrappers (`syntax/svelte.rs`), LSP semantic tokens, and lint rules for
   Svelte constructs.
 
-## MyST
+### MyST
 
 MyST (`mystmd.org`, `myst-parser`) support, modeled the same way as mdsvex: a
 CommonMark-*dialect* flavor whose `myst_defaults` enables MyST-specific
