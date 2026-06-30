@@ -172,6 +172,11 @@ pub(crate) fn try_parse_directive_option(content: &str) -> Option<DirectiveOptio
 ///
 /// A closer is a line of at least `open_count` repeats of `fence_char` (after
 /// up to 3 leading spaces) followed only by trailing whitespace.
+///
+/// Closing on a *longer* fence run is intentional and matches the markdown-it
+/// fence rule used by both `myst-parser` and `mystmd`: a 4-backtick line closes
+/// a 3-backtick directive. To embed a longer fence run in a verbatim body, open
+/// with a still-longer fence (the outer fence must be the longest).
 pub(crate) fn is_directive_closing_fence(content: &str, fence_char: u8, open_count: usize) -> bool {
     let trimmed = strip_leading_spaces(content);
     let count = trimmed.bytes().take_while(|&b| b == fence_char).count();

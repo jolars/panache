@@ -1,0 +1,37 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..83
+  MYST_DIRECTIVE@0..34
+    MYST_DIRECTIVE_OPEN@0..23
+      MYST_DIRECTIVE_FENCE@0..3 "```"
+      MYST_DIRECTIVE_NAME@3..15 "{code-block}"
+      WHITESPACE@15..16 " "
+      MYST_DIRECTIVE_ARG@16..22 "python"
+      NEWLINE@22..23 "\n"
+    MYST_DIRECTIVE_BODY@23..29
+      TEXT@23..28 "x = 1"
+      NEWLINE@28..29 "\n"
+    MYST_DIRECTIVE_CLOSE@29..34
+      MYST_DIRECTIVE_FENCE@29..33 "````"
+      NEWLINE@33..34 "\n"
+  BLANK_LINE@34..35
+    BLANK_LINE@34..35 "\n"
+  MYST_DIRECTIVE@35..83
+    MYST_DIRECTIVE_OPEN@35..60
+      MYST_DIRECTIVE_FENCE@35..40 "`````"
+      MYST_DIRECTIVE_NAME@40..52 "{code-block}"
+      WHITESPACE@52..53 " "
+      MYST_DIRECTIVE_ARG@53..59 "python"
+      NEWLINE@59..60 "\n"
+    MYST_DIRECTIVE_BODY@60..77
+      TEXT@60..65 "x = 1"
+      NEWLINE@65..66 "\n"
+      TEXT@66..70 "````"
+      NEWLINE@70..71 "\n"
+      TEXT@71..76 "y = 2"
+      NEWLINE@76..77 "\n"
+    MYST_DIRECTIVE_CLOSE@77..83
+      MYST_DIRECTIVE_FENCE@77..82 "`````"
+      NEWLINE@82..83 "\n"

@@ -556,6 +556,7 @@ golden_test_cases!(
     myst_directive_disabled,
     myst_directive_code_verbatim,
     myst_directive_math_verbatim,
+    myst_directive_verbatim_inner_fence,
     myst_role_basic,
     myst_role_double_backtick,
     myst_role_disabled,

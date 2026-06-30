@@ -933,12 +933,16 @@ other flavors can borrow the same shapes. Markup extras (`myst-colon-fence`,
     `MYST_DIRECTIVE_BODY` through the same path, keyed by the directive
     argument (`MYST_DIRECTIVE_ARG`) as the language, like a fenced code
     block.
-  - [ ] **Premature closer on a longer inner fence.** A body line whose fence
-    run is at least the opener's count (e.g. a 4-backtick fence inside a
-    3-backtick `{code-block}`) is treated as the closer. This matches the
-    container path's behavior and is rare (MyST expects a longer *outer*
-    fence), but a robust fix would track the opener width and only close on
-    an exact or shorter-or-equal match per MyST semantics.
+  - [x] **Closer on a longer inner fence (working as intended).** A body line
+    whose fence run is at least the opener's count (e.g. a 4-backtick line
+    inside a 3-backtick `{code-block}`) closes the directive. This was
+    suspected to be a bug, but both oracles (`myst-parser` and `mystmd`)
+    follow the markdown-it fence rule and close on a fence of
+    equal-or-longer run, so the current `>=` behavior is correct: to embed a
+    4-backtick line you open with a longer (5-backtick) fence, which the
+    parser already keeps in the body. The "longer *outer* fence" rule
+    governs directive *nesting*, not raw body fence runs. Pinned by the
+    `myst_directive_verbatim_inner_fence` parser golden case.
 - [ ] Audit remaining `myst-parser` default-on rules beyond tables/footnotes
   (e.g. whether any other markdown-it core rule should default on for MyST).
 - [ ] AST wrappers (`syntax/myst.rs`), LSP semantic tokens, and lint rules for
