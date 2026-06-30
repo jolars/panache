@@ -51,7 +51,8 @@ use super::blocks::metadata::{
     try_parse_pandoc_title_block, try_parse_yaml_block,
 };
 use super::blocks::myst_directives::{
-    DirectiveOpen, is_directive_closing_fence, try_parse_directive_open,
+    DirectiveOpen, DirectiveOption, is_directive_closing_fence, try_parse_directive_open,
+    try_parse_directive_option,
 };
 use super::blocks::myst_targets::{Target, is_comment_line, try_parse_target};
 use super::blocks::raw_blocks;
@@ -2602,12 +2603,103 @@ impl BlockParser for MystDirectiveOpenParser {
         }
 
         builder.finish_node(); // MYST_DIRECTIVE_OPEN
-        1
+
+        // Consume the leading option block (`:key: value` lines). Per MyST
+        // semantics the block is the maximal run of option lines directly
+        // following the opener, terminated by the first non-option line
+        // (including a blank line) -- no blank line is required between the
+        // options and the body. The nodes nest under the still-open
+        // MYST_DIRECTIVE container.
+        let mut consumed = 0;
+        loop {
+            let idx = 1 + consumed;
+            if idx >= lines.remaining() {
+                break;
+            }
+            let opt_line = lines.get(idx);
+            // For a colon-fenced directive (`:::{note}`) the closer also starts
+            // with `:`; never let the option scan swallow it.
+            if is_directive_closing_fence(opt_line, open.fence_char, open.fence_count) {
+                break;
+            }
+            let Some(opt) = try_parse_directive_option(opt_line) else {
+                break;
+            };
+            emit_directive_option(builder, opt_line, &opt);
+            consumed += 1;
+        }
+
+        1 + consumed
     }
 
     fn name(&self) -> &'static str {
         "myst_directive_open"
     }
+}
+
+/// Emit one MyST directive option line (`:key: value`) as a
+/// `MYST_DIRECTIVE_OPTION` node, preserving every byte.
+fn emit_directive_option(
+    builder: &mut GreenNodeBuilder<'static>,
+    line: &str,
+    opt: &DirectiveOption,
+) {
+    use crate::syntax::SyntaxKind;
+
+    let (content, newline) = strip_newline(line);
+
+    builder.start_node(SyntaxKind::MYST_DIRECTIVE_OPTION.into());
+
+    let mut cursor = 0;
+    if opt.indent_len > 0 {
+        builder.token(SyntaxKind::WHITESPACE.into(), &content[..opt.indent_len]);
+        cursor = opt.indent_len;
+    }
+
+    // Leading colon, key, closing colon.
+    builder.token(
+        SyntaxKind::MYST_DIRECTIVE_OPTION_MARKER.into(),
+        &content[cursor..cursor + 1],
+    );
+    cursor += 1;
+    let name_end = cursor + opt.name_len;
+    builder.token(
+        SyntaxKind::MYST_DIRECTIVE_OPTION_NAME.into(),
+        &content[cursor..name_end],
+    );
+    builder.token(
+        SyntaxKind::MYST_DIRECTIVE_OPTION_MARKER.into(),
+        &content[name_end..name_end + 1],
+    );
+
+    // Whatever follows the closing colon is the value, with surrounding
+    // whitespace preserved verbatim.
+    let rest = &content[name_end + 1..];
+    if !rest.is_empty() {
+        let trimmed = rest.trim_start();
+        let lead_ws = rest.len() - trimmed.len();
+        if lead_ws > 0 {
+            builder.token(SyntaxKind::WHITESPACE.into(), &rest[..lead_ws]);
+        }
+        let value = trimmed.trim_end();
+        if value.is_empty() {
+            if !trimmed.is_empty() {
+                builder.token(SyntaxKind::WHITESPACE.into(), trimmed);
+            }
+        } else {
+            builder.token(SyntaxKind::MYST_DIRECTIVE_OPTION_VALUE.into(), value);
+            let trail = &trimmed[value.len()..];
+            if !trail.is_empty() {
+                builder.token(SyntaxKind::WHITESPACE.into(), trail);
+            }
+        }
+    }
+
+    if !newline.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline);
+    }
+
+    builder.finish_node(); // MYST_DIRECTIVE_OPTION
 }
 
 /// Closer for MyST directives. Active only when inside a directive (the

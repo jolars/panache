@@ -1,5 +1,6 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 99
 expression: cst_output
 ---
 DOCUMENT@0..96
@@ -10,10 +11,19 @@ DOCUMENT@0..96
       WHITESPACE@12..13 " "
       MYST_DIRECTIVE_ARG@13..20 "img.png"
       NEWLINE@20..21 "\n"
-    PARAGRAPH@21..50
-      TEXT@21..35 ":alt: An image"
+    MYST_DIRECTIVE_OPTION@21..36
+      MYST_DIRECTIVE_OPTION_MARKER@21..22 ":"
+      MYST_DIRECTIVE_OPTION_NAME@22..25 "alt"
+      MYST_DIRECTIVE_OPTION_MARKER@25..26 ":"
+      WHITESPACE@26..27 " "
+      MYST_DIRECTIVE_OPTION_VALUE@27..35 "An image"
       NEWLINE@35..36 "\n"
-      TEXT@36..49 ":width: 200px"
+    MYST_DIRECTIVE_OPTION@36..50
+      MYST_DIRECTIVE_OPTION_MARKER@36..37 ":"
+      MYST_DIRECTIVE_OPTION_NAME@37..42 "width"
+      MYST_DIRECTIVE_OPTION_MARKER@42..43 ":"
+      WHITESPACE@43..44 " "
+      MYST_DIRECTIVE_OPTION_VALUE@44..49 "200px"
       NEWLINE@49..50 "\n"
     BLANK_LINE@50..51
       BLANK_LINE@50..51 "\n"

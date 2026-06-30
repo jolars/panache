@@ -2857,12 +2857,12 @@ impl Formatter {
             SyntaxKind::MYST_DIRECTIVE => {
                 // Emit the fence lines (opener with name/argument, and the
                 // closer) verbatim — normalizing the fence run would break
-                // nesting. The body is formatted recursively as markdown, with
-                // one exception: paragraphs that are entirely MyST option lines
-                // (`:key: value`) pass through verbatim so reflow never merges
-                // them. (Structured option parsing is deferred.)
+                // nesting. The leading option block (`:key: value` lines) is
+                // emitted in canonical form right after the opener; the body is
+                // formatted recursively as markdown.
                 let mut open_text: Option<String> = None;
                 let mut close_text: Option<String> = None;
+                let mut options = Vec::new();
                 let mut body = Vec::new();
                 for element in node.children_with_tokens() {
                     if let NodeOrToken::Node(child) = element {
@@ -2873,6 +2873,7 @@ impl Formatter {
                             SyntaxKind::MYST_DIRECTIVE_CLOSE => {
                                 close_text = Some(child.text().to_string());
                             }
+                            SyntaxKind::MYST_DIRECTIVE_OPTION => options.push(child),
                             _ => body.push(child),
                         }
                     }
@@ -2880,6 +2881,11 @@ impl Formatter {
 
                 if let Some(open) = &open_text {
                     self.output.push_str(open.trim_end_matches('\n'));
+                    self.output.push('\n');
+                }
+
+                for option in &options {
+                    self.output.push_str(&format_directive_option(option));
                     self.output.push('\n');
                 }
 
@@ -2896,6 +2902,13 @@ impl Formatter {
                     .count();
                 let end = body.len().saturating_sub(trailing).max(leading);
 
+                // Separate the option block from the body with exactly one blank
+                // line. Both the blank-separated and adjacent inputs converge
+                // here, keeping the result idempotent and readable.
+                if !options.is_empty() && leading < end {
+                    self.output.push('\n');
+                }
+
                 let mut prev_blank = false;
                 for child in &body[leading..end] {
                     if child.kind() == SyntaxKind::BLANK_LINE {
@@ -2905,15 +2918,9 @@ impl Formatter {
                         }
                         continue;
                     }
-                    if is_myst_option_paragraph(child) {
-                        self.output
-                            .push_str(child.text().to_string().trim_end_matches('\n'));
+                    self.format_node_sync(child, indent);
+                    if !self.output.ends_with('\n') {
                         self.output.push('\n');
-                    } else {
-                        self.format_node_sync(child, indent);
-                        if !self.output.ends_with('\n') {
-                            self.output.push('\n');
-                        }
                     }
                     prev_blank = false;
                 }
@@ -2944,37 +2951,26 @@ impl Formatter {
     }
 }
 
-/// Whether `node` is a `PARAGRAPH` whose every non-empty line is a MyST
-/// directive option line (`:key: value` or bare `:key:`). Such paragraphs are
-/// emitted verbatim inside directive bodies so reflow never merges them.
-fn is_myst_option_paragraph(node: &SyntaxNode) -> bool {
-    if node.kind() != SyntaxKind::PARAGRAPH {
-        return false;
-    }
-    let text = node.text().to_string();
-    let mut saw_line = false;
-    for line in text.lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-        saw_line = true;
-        let Some(rest) = line.strip_prefix(':') else {
-            return false;
-        };
-        let Some(key_end) = rest.find(':') else {
-            return false;
-        };
-        let key = &rest[..key_end];
-        if key.is_empty()
-            || !key
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-        {
-            return false;
+/// Render a `MYST_DIRECTIVE_OPTION` node in canonical form: `:name: value`, or
+/// `:name:` when the option has no value. A single space follows the closing
+/// colon so the output re-parses to the same option CST (idempotency).
+fn format_directive_option(node: &SyntaxNode) -> String {
+    let mut name = String::new();
+    let mut value = String::new();
+    for element in node.children_with_tokens() {
+        if let NodeOrToken::Token(token) = element {
+            match token.kind() {
+                SyntaxKind::MYST_DIRECTIVE_OPTION_NAME => name = token.text().to_string(),
+                SyntaxKind::MYST_DIRECTIVE_OPTION_VALUE => value = token.text().to_string(),
+                _ => {}
+            }
         }
     }
-    saw_line
+    if value.is_empty() {
+        format!(":{name}:")
+    } else {
+        format!(":{name}: {value}")
+    }
 }
 
 pub(super) fn normalize_attribute_text(attr_text: &str) -> String {

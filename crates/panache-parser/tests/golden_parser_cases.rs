@@ -549,6 +549,7 @@ golden_test_cases!(
     lists_wrapping_simple,
     myst_directive_basic,
     myst_directive_arg_options,
+    myst_directive_options_no_blank,
     myst_directive_colon_fence,
     myst_directive_nested,
     myst_directive_vs_codeblock,

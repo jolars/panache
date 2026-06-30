@@ -97,6 +97,60 @@ pub(crate) fn try_parse_directive_open(content: &str, ext: &Extensions) -> Optio
     })
 }
 
+/// A detected MyST directive option line (`:key: value` or bare `:key:`).
+///
+/// The line is laid out as `[indent]:[name]:([ws][value])?[newline]`, so
+/// emission can slice the colons, name, and value directly from these lengths.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DirectiveOption {
+    /// Byte length of leading whitespace before the first colon (0..=3).
+    pub indent_len: usize,
+    /// Byte length of the option key between the two colons (>= 1).
+    pub name_len: usize,
+}
+
+fn is_option_name_char(c: char) -> bool {
+    // MyST directive option keys are simple identifiers (`alt`, `width`,
+    // `number-lines`, `class`). Unlike directive names they are never
+    // domain-qualified, so `:` is excluded here to anchor the closing colon.
+    c.is_alphanumeric() || matches!(c, '_' | '-')
+}
+
+/// Try to detect a MyST directive option line.
+///
+/// Returns `None` when the line is not a well-formed `:key:` option. We require
+/// a non-empty identifier key terminated by a closing colon, which is slightly
+/// stricter than `myst-parser`'s "lstripped line starts with `:`" rule but
+/// avoids mis-capturing colon-fence closers (`:::`), nested directive openers
+/// (`:::{note}` has an empty key), and stray colon text as options. Leading
+/// indent is capped at 3 spaces to match the opener and closer.
+pub(crate) fn try_parse_directive_option(content: &str) -> Option<DirectiveOption> {
+    let (line, _newline) = strip_newline(content);
+
+    let indent_len = line.bytes().take_while(|&b| b == b' ').count();
+    if indent_len > 3 {
+        return None;
+    }
+    let rest = &line[indent_len..];
+    if !rest.starts_with(':') {
+        return None;
+    }
+    let after_colon = &rest[1..];
+    let name_len = after_colon
+        .chars()
+        .take_while(|&c| is_option_name_char(c))
+        .map(char::len_utf8)
+        .sum();
+    if name_len == 0 || !after_colon[name_len..].starts_with(':') {
+        return None;
+    }
+
+    Some(DirectiveOption {
+        indent_len,
+        name_len,
+    })
+}
+
 /// Whether `content` closes a MyST directive opened with `fence_char` repeated
 /// `open_count` times.
 ///
@@ -175,6 +229,47 @@ mod tests {
         assert!(try_parse_directive_open("    ```{note}\n", &ext_backtick()).is_none());
         let d = try_parse_directive_open("   ```{note}\n", &ext_backtick()).unwrap();
         assert_eq!(d.indent_len, 3);
+    }
+
+    #[test]
+    fn basic_option() {
+        let o = try_parse_directive_option(":alt: An image\n").unwrap();
+        assert_eq!(o.indent_len, 0);
+        assert_eq!(o.name_len, "alt".len());
+    }
+
+    #[test]
+    fn valueless_option() {
+        let o = try_parse_directive_option(":nofigs:\n").unwrap();
+        assert_eq!(o.name_len, "nofigs".len());
+    }
+
+    #[test]
+    fn hyphenated_option_key() {
+        let o = try_parse_directive_option(":number-lines: 1\n").unwrap();
+        assert_eq!(o.name_len, "number-lines".len());
+    }
+
+    #[test]
+    fn indented_option() {
+        let o = try_parse_directive_option("  :width: 200px\n").unwrap();
+        assert_eq!(o.indent_len, 2);
+        assert_eq!(o.name_len, "width".len());
+        // Four-plus leading spaces is indented code, not an option.
+        assert!(try_parse_directive_option("    :width: 200px\n").is_none());
+    }
+
+    #[test]
+    fn not_an_option_no_closing_colon() {
+        assert!(try_parse_directive_option(":not an option just text\n").is_none());
+        assert!(try_parse_directive_option("def five(): return 5\n").is_none());
+    }
+
+    #[test]
+    fn colon_fence_is_not_option() {
+        // Empty key (`:::` -> key between first two colons is empty).
+        assert!(try_parse_directive_option(":::\n").is_none());
+        assert!(try_parse_directive_option(":::{note}\n").is_none());
     }
 
     #[test]

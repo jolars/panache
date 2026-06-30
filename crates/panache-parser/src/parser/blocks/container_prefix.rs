@@ -496,6 +496,11 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
         }
     }
 
+    /// Number of lines available from `base` onward (line 0 plus lookahead).
+    pub fn remaining(&self) -> usize {
+        self.raw.len().saturating_sub(self.base)
+    }
+
     /// Line 0 with emission-safe strip semantics (matches the legacy
     /// `ctx.content` byte boundary for the common container stacks).
     pub fn first(&self) -> &'a str {

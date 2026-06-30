@@ -1,0 +1,33 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 99
+expression: cst_output
+---
+DOCUMENT@0..82
+  MYST_DIRECTIVE@0..82
+    MYST_DIRECTIVE_OPEN@0..20
+      MYST_DIRECTIVE_FENCE@0..3 "```"
+      MYST_DIRECTIVE_NAME@3..11 "{figure}"
+      WHITESPACE@11..12 " "
+      MYST_DIRECTIVE_ARG@12..19 "img.png"
+      NEWLINE@19..20 "\n"
+    MYST_DIRECTIVE_OPTION@20..35
+      MYST_DIRECTIVE_OPTION_MARKER@20..21 ":"
+      MYST_DIRECTIVE_OPTION_NAME@21..24 "alt"
+      MYST_DIRECTIVE_OPTION_MARKER@24..25 ":"
+      WHITESPACE@25..26 " "
+      MYST_DIRECTIVE_OPTION_VALUE@26..34 "An image"
+      NEWLINE@34..35 "\n"
+    MYST_DIRECTIVE_OPTION@35..49
+      MYST_DIRECTIVE_OPTION_MARKER@35..36 ":"
+      MYST_DIRECTIVE_OPTION_NAME@36..41 "width"
+      MYST_DIRECTIVE_OPTION_MARKER@41..42 ":"
+      WHITESPACE@42..43 " "
+      MYST_DIRECTIVE_OPTION_VALUE@43..48 "200px"
+      NEWLINE@48..49 "\n"
+    PARAGRAPH@49..78
+      TEXT@49..77 "Caption right after o ..."
+      NEWLINE@77..78 "\n"
+    MYST_DIRECTIVE_CLOSE@78..82
+      MYST_DIRECTIVE_FENCE@78..81 "```"
+      NEWLINE@81..82 "\n"

@@ -346,11 +346,15 @@ pub enum SyntaxKind {
     ADMONITION_TITLE,  // optional quoted title (e.g. `"Heads up"`)
 
     // MyST directive parts
-    MYST_DIRECTIVE_OPEN,  // opener line node (fence + name + optional argument)
-    MYST_DIRECTIVE_CLOSE, // closer line node (matching fence)
-    MYST_DIRECTIVE_FENCE, // the fence run itself (```` ``` ````, `~~~`, or `:::`)
-    MYST_DIRECTIVE_NAME,  // the `{name}` token, braces included (lossless)
-    MYST_DIRECTIVE_ARG,   // argument text after `{name}` on the opener line
+    MYST_DIRECTIVE_OPEN,   // opener line node (fence + name + optional argument)
+    MYST_DIRECTIVE_CLOSE,  // closer line node (matching fence)
+    MYST_DIRECTIVE_FENCE,  // the fence run itself (```` ``` ````, `~~~`, or `:::`)
+    MYST_DIRECTIVE_NAME,   // the `{name}` token, braces included (lossless)
+    MYST_DIRECTIVE_ARG,    // argument text after `{name}` on the opener line
+    MYST_DIRECTIVE_OPTION, // one `:key: value` option line node
+    MYST_DIRECTIVE_OPTION_MARKER, // a `:` delimiter (leading and closing colon)
+    MYST_DIRECTIVE_OPTION_NAME, // the option key (e.g. `alt`)
+    MYST_DIRECTIVE_OPTION_VALUE, // the option value (e.g. `An image`)
 
     // MyST inline role parts (`` {name}`content` ``)
     MYST_ROLE,         // the whole role

@@ -892,14 +892,17 @@ other flavors can borrow the same shapes. Markup extras (`myst-colon-fence`,
 - [x] Smoke corpus vendored from `jupyter-book/myst-spec` with a losslessness +
   idempotency harness and a non-gating output-divergence triage report
   (`cargo test --test myst_corpus -- --ignored --nocapture`).
-- [ ] **Structural directive-option parsing.** `:key: value` option lines are
-  only recognized when a blank line separates them from the body; without
-  one they merge into the body paragraph and get reflowed (e.g.
-  `:number-lines: 1 def five(): return 5`). The parser should parse the
-  leading option block into structured option nodes, terminated by the first
-  non-option line per MyST semantics, not by a blank line. Surfaced as the
-  STRUCTURAL bucket in the `myst_corpus` triage report (directives.code,
-  directives.figure, directives.math, references.equations cases).
+- [x] **Structural directive-option parsing.** The leading `:key: value` option
+  block is parsed into structured `MYST_DIRECTIVE_OPTION` nodes
+  (`name`/`value` tokens, colon markers), consumed in the directive opener
+  and terminated by the first non-option line per MyST semantics, so a blank
+  line is no longer required to keep them off the body (e.g.
+  `:number-lines: 1` followed directly by `def five(): return 5` no longer
+  merges). The formatter emits them canonically (`:name: value`, one blank
+  line before the body), retiring the `is_myst_option_paragraph` stopgap. We
+  require a well-formed `:name:` key rather than `myst-parser`'s looser
+  "line starts with `:`", which avoids swallowing colon-fence closers and
+  nested openers.
 - [ ] **Verbatim-bodied directives.** `{code}`, `{code-block}`, and `{math}`
   bodies are markdown-reflowed, joining lines and dropping indentation,
   which destroys code. These directives need a notion of a verbatim body
