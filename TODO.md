@@ -464,6 +464,20 @@ intentionally excluded.
   Surfaced when the pre-commit `panache format` hook rewrote a backtick span
   in this file.
 
+- [ ] Reflow wrap doesn't guard heading/setext/thematic markers at the start of
+  a wrapped line. Sentence/semantic modes set `avoid_heading_line_start`
+  (suppress a break before a `#`/`===`/`---` run so it can't open a block),
+  but `WrapStrategy::ParagraphReflow` leaves it off, so a width-driven break
+  could push a lone `#` or `===` to column 1 and promote prose into a
+  heading or rule, breaking idempotency. Only theoretical so far --- width
+  breaks rarely land exactly on such a marker, and reflow's other line-start
+  guards (`avoid_unsafe_line_start`, `avoid_blockquote_line_start`) are
+  flavor-gated --- but it is the one block-opener reflow does not defend
+  (the sentence/ semantic guards landed in PR #402, reflow was left as-is).
+  A fix threads the guard into the reflow strategies' `options()` in
+  `crates/panache-formatter/src/formatter/inline_layout.rs`; start with a
+  reproducing golden fixture per TDD.
+
 ### Performance
 
 ### YAML validation: consumer fidelity vs YAML 1.2 (needs design decision)
