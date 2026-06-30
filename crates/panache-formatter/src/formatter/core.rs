@@ -2899,8 +2899,16 @@ impl Formatter {
                 // injected: any blank line between the options and the body is
                 // already captured inside the body node.
                 if let Some(body_node) = verbatim_body {
-                    self.output
-                        .push_str(body_node.text().to_string().trim_end_matches('\n'));
+                    // Substitute external-formatter output for the body when
+                    // available, keyed by (directive argument, body text) -- the
+                    // same key the collector used. The substituted text is
+                    // emitted verbatim (no reflow), like the unformatted body.
+                    let body_text = code_blocks::extract_myst_directive_parts(node)
+                        .and_then(|(language, body)| {
+                            self.formatted_code.get(&(language, body)).cloned()
+                        })
+                        .unwrap_or_else(|| body_node.text().to_string());
+                    self.output.push_str(body_text.trim_end_matches('\n'));
                     self.output.push('\n');
                     if let Some(close) = &close_text {
                         self.output.push_str(close.trim_end_matches('\n'));

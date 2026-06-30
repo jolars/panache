@@ -126,6 +126,49 @@ hello world
 }
 
 #[test]
+fn myst_directive_body_with_external_formatter() {
+    // A verbatim MyST `{code-block}` body should be routed to the external
+    // formatter keyed by the directive argument (the language), like a fenced
+    // code block. Use `tr` to uppercase as a deterministic mock formatter.
+    let mut formatters = HashMap::new();
+    formatters.insert(
+        "test".to_string(),
+        vec![panache::config::FormatterConfig {
+            cmd: "tr".to_string(),
+            args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
+            enabled: true,
+            stdin: true,
+        }],
+    );
+
+    let config = Config {
+        flavor: Flavor::Myst,
+        extensions: Extensions::for_flavor(Flavor::Myst),
+        formatters,
+        ..Default::default()
+    };
+
+    let input = "```{code-block} test\n:linenos:\nhello world\n```\n";
+
+    let output = format(input, Some(config.clone()), None);
+
+    // The body is uppercased, fences/argument/options are preserved.
+    assert!(
+        output.contains("HELLO WORLD"),
+        "body should be formatted:\n{output}"
+    );
+    assert!(
+        output.contains("```{code-block} test"),
+        "opener preserved:\n{output}"
+    );
+    assert!(output.contains(":linenos:"), "option preserved:\n{output}");
+
+    // Idempotency: formatting the result again is a no-op.
+    let output2 = format(&output, Some(config), None);
+    assert_eq!(output, output2, "formatting must be idempotent");
+}
+
+#[test]
 fn formatter_args_substitute_lang_placeholder() {
     // `sed s/{lang}/REPL/g` should rewrite the language literal in the code
     // body, proving the {lang} placeholder is substituted at dispatch time.

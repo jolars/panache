@@ -40,9 +40,12 @@ pub fn collect_code_blocks(tree: &SyntaxNode, input: &str) -> HashMap<String, Ve
     let mut blocks: HashMap<String, Vec<CodeBlock>> = HashMap::new();
 
     for node in tree.descendants() {
-        if node.kind() == SyntaxKind::CODE_BLOCK
-            && let Some(block) = extract_code_block(&node, input)
-        {
+        let block = match node.kind() {
+            SyntaxKind::CODE_BLOCK => extract_code_block(&node, input),
+            SyntaxKind::MYST_DIRECTIVE => extract_myst_directive_block(&node, input),
+            _ => None,
+        };
+        if let Some(block) = block {
             blocks
                 .entry(block.language.clone())
                 .or_default()
@@ -51,6 +54,52 @@ pub fn collect_code_blocks(tree: &SyntaxNode, input: &str) -> HashMap<String, Ve
     }
 
     blocks
+}
+
+/// Extract a verbatim MyST directive body as a lintable code block, keyed by the
+/// directive argument (e.g. `python` in `` ```{code-block} python ``). Returns
+/// `None` for non-verbatim directives (no `MYST_DIRECTIVE_BODY` child) or when
+/// the language or body is empty. The body's byte range is preserved so external
+/// diagnostics map back onto the original source.
+fn extract_myst_directive_block(node: &SyntaxNode, input: &str) -> Option<CodeBlock> {
+    let mut language = None;
+    let mut body_node = None;
+
+    for child in node.children() {
+        match child.kind() {
+            SyntaxKind::MYST_DIRECTIVE_OPEN => {
+                for token in child.children_with_tokens() {
+                    if let NodeOrToken::Token(t) = token
+                        && t.kind() == SyntaxKind::MYST_DIRECTIVE_ARG
+                    {
+                        let raw = t.text();
+                        language = Some(raw.strip_prefix('.').unwrap_or(raw).to_string());
+                    }
+                }
+            }
+            SyntaxKind::MYST_DIRECTIVE_BODY => body_node = Some(child),
+            _ => {}
+        }
+    }
+
+    let language = language?;
+    let body_node = body_node?;
+    let content = body_node.text().to_string();
+
+    if language.is_empty() || content.is_empty() {
+        return None;
+    }
+
+    let range = body_node.text_range();
+    let start: usize = range.start().into();
+    let end: usize = range.end().into();
+
+    Some(CodeBlock {
+        language,
+        content,
+        start_line: offset_to_line(input, start),
+        original_range: start..end,
+    })
 }
 
 fn extract_code_block(node: &SyntaxNode, input: &str) -> Option<CodeBlock> {

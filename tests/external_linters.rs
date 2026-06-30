@@ -93,6 +93,37 @@ any(is.na(y))
     }
 
     #[test]
+    fn test_myst_directive_body_linted() {
+        // A verbatim MyST `{code-block}` body should be routed to the external
+        // linter keyed by the directive argument, with diagnostics mapped back
+        // onto the body's source line.
+        if which::which("ruff").is_err() {
+            println!("Skipping ruff test - ruff not installed");
+            return;
+        }
+
+        use panache::config::{Extensions, Flavor};
+
+        let input = "# Test\n\n```{code-block} python\nimport os\n```\n";
+
+        let mut config = Config {
+            flavor: Flavor::Myst,
+            extensions: Extensions::for_flavor(Flavor::Myst),
+            ..Default::default()
+        };
+        let mut linters = HashMap::new();
+        linters.insert("python".to_string(), "ruff".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
+
+        let ruff_diags: Vec<_> = diagnostics.iter().filter(|d| d.code == "F401").collect();
+        assert_eq!(ruff_diags.len(), 1, "Expected 1 Ruff F401 diagnostic");
+        assert_eq!(ruff_diags[0].location.line, 4); // `import os` is on line 4
+    }
+
+    #[test]
     fn test_no_external_linters_configured() {
         let input = r#"```r
 x = 1

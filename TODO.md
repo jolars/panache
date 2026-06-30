@@ -910,7 +910,7 @@ other flavors can borrow the same shapes. Markup extras (`myst-colon-fence`,
   directive name in `try_parse_directive_open`; the opener parser consumes
   the whole verbatim directive single-pass and skips the markdown-body
   container.
-  - [ ] **External formatters/linters for verbatim directive bodies.** A
+  - [x] **External formatters/linters for verbatim directive bodies.** A
     `{code-block} python` body is now a real code body but is invisible to
     the `[formatters.*]`/`[linters.*]` external-tool path:
     `collect_code_blocks`

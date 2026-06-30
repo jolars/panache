@@ -1099,6 +1099,15 @@ YAML](https://github.com/g-plane/pretty_yaml). External YAML formatters apply
 *only* to fenced code blocks (with YAML language).
 :::
 
+::: {.callout-note}
+### MyST directive bodies
+
+Verbatim MyST directive bodies (`{code}`, `{code-block}`, `{code-cell}`) are
+routed to external formatters too, keyed by the directive argument as the
+language. For example, the body of ```` ```{code-block} python ```` is formatted
+with the `python` formatter, just like a fenced ```` ```python ```` block.
+:::
+
 ### Basic Usage
 
 To enable formatting for a language, map the language key to a formatter preset
@@ -1367,6 +1376,11 @@ presets available in Panache.
 
 Panache can invoke external linters for code blocks. Linters are opt-in---you
 choose which languages to lint.
+
+Verbatim MyST directive bodies (`{code}`, `{code-block}`, `{code-cell}`) are
+linted as well, keyed by the directive argument as the language---the body of
+```` ```{code-block} python ```` is linted with the `python` linter, like a
+fenced ```` ```python ```` block.
 
 ### Quick Start
 

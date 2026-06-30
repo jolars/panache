@@ -745,6 +745,33 @@ fn format_attributes(attrs: &[(String, Option<String>)], preserve_unquoted: bool
         .join(separator)
 }
 
+/// Extract the language (directive argument) and verbatim body text from a
+/// `MYST_DIRECTIVE` node. Returns `None` when the directive has no
+/// `MYST_DIRECTIVE_BODY` child (i.e. it is a non-verbatim directive whose body
+/// is parsed recursively as markdown). The body text is taken byte-for-byte so
+/// it matches the lookup key used when substituting formatted output.
+pub(crate) fn extract_myst_directive_parts(node: &SyntaxNode) -> Option<(String, String)> {
+    let mut language = String::new();
+    let mut body = None;
+    for child in node.children() {
+        match child.kind() {
+            SyntaxKind::MYST_DIRECTIVE_OPEN => {
+                for token in child.children_with_tokens() {
+                    if let NodeOrToken::Token(t) = token
+                        && t.kind() == SyntaxKind::MYST_DIRECTIVE_ARG
+                    {
+                        let raw = t.text();
+                        language = raw.strip_prefix('.').unwrap_or(raw).to_string();
+                    }
+                }
+            }
+            SyntaxKind::MYST_DIRECTIVE_BODY => body = Some(child.text().to_string()),
+            _ => {}
+        }
+    }
+    body.map(|body| (language, body))
+}
+
 /// Collect all code blocks and their info strings from the syntax tree.
 /// Collect all code blocks from the syntax tree for external formatting.
 /// Returns a flat list of (language, content) pairs.
@@ -755,6 +782,24 @@ pub fn collect_code_blocks(
 ) -> Vec<ExternalCodeBlock> {
     let mut result = Vec::new();
     for node in tree.descendants() {
+        if node.kind() == SyntaxKind::MYST_DIRECTIVE {
+            if let Some((language, content)) = extract_myst_directive_parts(&node) {
+                if content.is_empty() {
+                    continue;
+                }
+                if language.is_empty() && !config.formatters.contains_key("") {
+                    continue;
+                }
+                result.push(ExternalCodeBlock {
+                    language,
+                    original: content.clone(),
+                    formatter_input: content,
+                    hashpipe_prefix: None,
+                });
+            }
+            continue;
+        }
+
         if node.kind() != SyntaxKind::CODE_BLOCK {
             continue;
         }
