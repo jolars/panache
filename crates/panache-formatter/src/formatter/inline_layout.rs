@@ -1683,4 +1683,31 @@ mod tests {
         let options = WrapStrategy::ParagraphReflow.options(&config, &[80]);
         assert!(options.avoid_unsafe_line_start);
     }
+
+    #[test]
+    fn paragraph_sentence_guards_are_unconditional() {
+        // Unlike reflow, sentence/semantic suppress breaks before every
+        // block-opener regardless of flavor extensions: keeping a marker inline
+        // is always parse-safe, so the guards are not gated by
+        // `blank_before_blockquote` (or any other extension) the way reflow's
+        // are.
+        let flavor = crate::config::Flavor::Pandoc;
+        let mut ext = crate::config::ParserExtensions::for_flavor(flavor);
+        // `>` at a line start would be "safe" to break before under this
+        // extension, yet sentence mode still guards it.
+        ext.blank_before_blockquote = true;
+        let config = crate::config::Config {
+            parser_extensions: ext,
+            ..crate::config::Config::default()
+        };
+        for strategy in [
+            WrapStrategy::ParagraphSentence,
+            WrapStrategy::ParagraphSemantic,
+        ] {
+            let options = strategy.options(&config, &[]);
+            assert!(options.avoid_unsafe_line_start);
+            assert!(options.avoid_blockquote_line_start);
+            assert!(options.avoid_heading_line_start);
+        }
+    }
 }
