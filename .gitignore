@@ -53,3 +53,6 @@ docs/lighthouse/
 /out.native
 pnpm-lock.yaml
 /test.bib
+
+# MyST build outputs
+_build

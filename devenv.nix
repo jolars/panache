@@ -25,6 +25,7 @@
     pkgs.air-formatter
     pkgs.cargo-show-asm
     pkgs.samply
+    pkgs.mystmd
     pkgs.ruff
     pkgs.shfmt
     pkgs.wasm-pack
@@ -78,6 +79,7 @@
 
       package = pkgs.python3.withPackages (ps: [
         ps.markdown
+        ps.myst-parser
       ]);
     };
   };
