@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.20.0](https://github.com/jolars/panache/compare/panache-parser-v0.19.1...panache-parser-v0.20.0) (2026-07-01)
+
+### Features
+- **parser:** add MyST AST wrappers ([`e5d7ba8`](https://github.com/jolars/panache/commit/e5d7ba838d4afda1cc6ede8b20b5274dbb50f622))
+- **parser:** treat standalone Svelte spans as opaque blocks ([`414d441`](https://github.com/jolars/panache/commit/414d441f8990f8874a604b63fd13b50fa5ce0564))
+- **parser:** align myst defaults with myst-parser ([`4232185`](https://github.com/jolars/panache/commit/4232185235ffb74b898c0332e9e8400bd98f88a9))
+- **parser:** parse myst verbatim-bodies ([`2d8a516`](https://github.com/jolars/panache/commit/2d8a51622766163b5963626ea4fe38d299179d47))
+- **parser:** parse MyST directive option blocks ([`17990eb`](https://github.com/jolars/panache/commit/17990eb07e397762f28e2365c95c064dc590cba1))
+- **parser:** add MyST flavor scaffolding ([`b4bdd84`](https://github.com/jolars/panache/commit/b4bdd84f56d8957583b1eb2ca4527d0d4952c1a5))
+- **parser:** split standalone block-tag sequences in CST ([`9bf0005`](https://github.com/jolars/panache/commit/9bf00052b23f594281b9ef0f0025556ea1ae58b4))
+- **parser:** gate YAML tab-indent diagnostics per consumer ([`dffefc8`](https://github.com/jolars/panache/commit/dffefc8d391888f08fbcbafb3200c0034e4bbe9d))
+- add python-markdown admonitions and pymdownx details ([`b37a5cc`](https://github.com/jolars/panache/commit/b37a5cc2887029953eeb44b673a2fed39f3550be)), fixes [#396](https://github.com/jolars/panache/issues/396)
+- add mdsvex flavor with opaque Svelte template spans ([`983632a`](https://github.com/jolars/panache/commit/983632ac09ff66c469f74d834452773f59f8a960))
+
+### Bug Fixes
+- **parser:** treat `{toctree}` body as verbatim ([`1ad3e87`](https://github.com/jolars/panache/commit/1ad3e878d63b967db18a083e8c622f00039a6132))
+- **parser:** open brace-info code fences in CommonMark ([`179cb1c`](https://github.com/jolars/panache/commit/179cb1c6f4b876708d48cda827594b0282ff4b90))
+- **parser:** span inline math across a newline (Pandoc only) ([`9b7905e`](https://github.com/jolars/panache/commit/9b7905eba103ff61d0ecbcf624e00e8032e036d2))
+- **parser:** span inline math across a single newline ([`ace2ab4`](https://github.com/jolars/panache/commit/ace2ab429ddc017e235247a9bd077d6cdf8b199d))
+- **parser:** parse headerless multiline tables with a dash-run closer ([`ab7e7d3`](https://github.com/jolars/panache/commit/ab7e7d315433e6e11d220c2735d2e7d4d884c10a)), fixes [#398](https://github.com/jolars/panache/issues/398)
+- **parser:** require left word boundary for bare URIs ([`f7b6334`](https://github.com/jolars/panache/commit/f7b6334c45902592955e5a8bb24b9545f2ba7223))
+
 ## [0.19.1](https://github.com/jolars/panache/compare/panache-parser-v0.19.0...panache-parser-v0.19.1) (2026-06-24)
 
 ### Bug Fixes
