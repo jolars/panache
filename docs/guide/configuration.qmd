@@ -38,6 +38,44 @@ that parent directory (the project root), so a pattern like `vendor/**` matches
 `vendor/` next to `.config/`, with no `../` prefix needed (see [Path matching
 base](#file-selection-directory-traversal)).
 
+## Extending Another Config {#extend}
+
+A config file can inherit from another with the `extend` key, then override just
+the parts it needs---the same mechanism as Ruff's `extend`:
+
+```toml
+# Inherit everything from the shared config in the parent directory...
+extend = "../panache.toml"
+
+# ...but use a wider line for this subproject.
+[format]
+line-width = 100
+```
+
+`extend` takes a single path to another config file. It is resolved **relative
+to the file that declares it** (not the current working directory); a leading
+`~` expands to your home directory, and absolute paths are used as-is.
+
+Merge semantics:
+
+- **The extending file wins.** Any scalar it sets (like `line-width` above)
+  overrides the base. Keys it leaves out are inherited.
+- **Sections merge key by key.** Setting one `[format]` key does not discard the
+  base's other `[format]` keys.
+- **`extend-exclude` and `extend-include` accumulate** across the whole chain
+  (parent patterns then child patterns), whereas a plain `exclude` or `include`
+  replaces the inherited list. This mirrors the additive naming used elsewhere
+  (see [File Selection](#file-selection-directory-traversal)).
+
+Chaining is transitive---`a` may extend `b` which extends `c`---and the values
+flow down the whole chain. A cycle (`a` extends `b` extends `a`) or a missing
+base file is a hard error that names the offending file.
+
+Unlike discovery, `extend` is explicit and is **not** capped by the `.git`
+project boundary: a shared base config may live above the project root or in a
+sibling tree. The LSP watches every file in the chain, so editing a base config
+reloads the open documents that inherit from it.
+
 ## Validation
 
 Panache validates every config it loads. Unknown keys are a hard error rather

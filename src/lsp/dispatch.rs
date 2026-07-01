@@ -305,6 +305,15 @@ impl GlobalState {
                 glob_pattern: GlobPattern::String("**/.panache.toml".to_string()),
                 kind: Some(WatchKind::all()),
             },
+            // A config may `extend` a base with any name (`base.toml`,
+            // `shared/style.toml`); watch every `.toml` so edits to such a base
+            // reload dependent documents. The `file_watcher` handler filters
+            // these against the tracked extend-chain set, so unrelated TOML
+            // (e.g. `Cargo.toml`) is interned but triggers no config reload.
+            FileSystemWatcher {
+                glob_pattern: GlobPattern::String("**/*.toml".to_string()),
+                kind: Some(WatchKind::all()),
+            },
         ];
         watchers.extend(watched_document_glob());
 

@@ -559,6 +559,16 @@ pub struct CompatConfig {
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 struct RawConfig {
+    /// Path to another config file to inherit from and override (Ruff-style).
+    /// Resolved relative to the file that declares it; a leading `~` expands to
+    /// the home directory. Chains transitively (`a` extends `b` extends `c`).
+    /// This key is consumed during the raw-TOML merge in the loader, so by the
+    /// time a `RawConfig` is deserialized it is already inert; the field exists
+    /// only so the key is accepted under `deny_unknown_fields` and appears in
+    /// the schema.
+    #[serde(default)]
+    #[allow(dead_code)]
+    extend: Option<String>,
     #[serde(default)]
     flavor: Flavor,
     #[serde(default)]

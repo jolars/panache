@@ -31,13 +31,18 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
 
     // A `panache.toml`/`.panache.toml` edit changes config for open documents
     // that don't get re-read until their next keystroke; refresh them all now.
-    // Matched by file name because the `.toml` extension can't distinguish a
-    // config file from any other TOML. The trailing `arm_settle` re-lints.
+    // Config files are matched by name because the `.toml` extension can't
+    // distinguish a config file from any other TOML; a base reached via `extend`
+    // can have any name, so it is matched instead against the tracked chain set
+    // (canonicalized to compare with the client's possibly non-canonical path).
+    // The trailing `arm_settle` re-lints.
     let config_changed = changed_paths.iter().any(|path| {
         matches!(
             path.file_name().and_then(|name| name.to_str()),
             Some("panache.toml") | Some(".panache.toml")
-        )
+        ) || gs
+            .watched_config_files
+            .contains(&path.canonicalize().unwrap_or_else(|_| path.clone()))
     });
     if config_changed {
         crate::lsp::documents::reload_open_documents_config(gs);

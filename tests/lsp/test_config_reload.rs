@@ -102,3 +102,42 @@ fn panache_toml_watcher_reloads_disk_config() {
         "a panache.toml watcher event should reload disk config"
     );
 }
+
+/// A watcher event for a differently-named base config reached via `extend`
+/// reloads open documents. The config-name globs only match `panache.toml`, so
+/// this exercises the extend-chain tracking that watches arbitrary base files.
+#[test]
+fn extended_base_config_watcher_reloads_disk_config() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+    fs::create_dir_all(root.join(".git")).unwrap();
+    let base_path = root.join("base.toml");
+    fs::write(&base_path, "[lint.rules]\nheading-hierarchy = false\n").unwrap();
+    // The discovered config extends the base and adds nothing of its own.
+    let config_path = root.join("panache.toml");
+    fs::write(&config_path, "extend = \"base.toml\"\n").unwrap();
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    let root_uri = Uri::from_file_path(root).expect("root uri");
+
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(doc_uri.as_str(), "# H1\n\n### H3 skip\n", "quarto");
+    assert!(
+        !has_heading_hierarchy(&server, doc_uri.as_str()),
+        "rule disabled by the extended base config"
+    );
+
+    // Flip the rule on in the *base* file (not panache.toml) and notify.
+    fs::write(&base_path, "[lint.rules]\nheading-hierarchy = true\n").unwrap();
+    server.did_change_watched_files(vec![FileEvent {
+        uri: Uri::from_file_path(&base_path).unwrap(),
+        typ: FileChangeType::CHANGED,
+    }]);
+
+    assert!(
+        has_heading_hierarchy(&server, doc_uri.as_str()),
+        "editing an `extend`ed base config should reload dependent documents"
+    );
+}

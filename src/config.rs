@@ -296,6 +296,7 @@ impl From<ConfigError> for io::Error {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn parse_config_str(s: &str, path: &Path) -> io::Result<Config> {
     parse_config_detailed(s, path).map_err(io::Error::from)
 }
@@ -453,12 +454,184 @@ fn unknown_flavor_subtable_error(name: &str) -> String {
     msg
 }
 
-fn read_config(path: &Path) -> io::Result<Config> {
+/// Read `path`, resolving any Ruff-style `extend` chain, and return the
+/// finalized [`Config`], the merged raw `[extensions]` value (so
+/// [`apply_flavor`] can re-resolve extensions against the chosen flavor without
+/// re-reading disk), and the canonical paths of every file that contributed
+/// (leaf first, roots last) so the LSP can watch them.
+///
+/// The common no-`extend` case takes a fast path that deserializes straight from
+/// the original string, preserving byte-accurate error spans. Only configs that
+/// actually declare `extend` pay for the raw-table merge (which loses spans,
+/// since a merged table has no single source file to point into).
+fn read_config_with_chain(
+    path: &Path,
+) -> Result<(Config, Option<toml::Value>, Vec<PathBuf>), ConfigError> {
     log::debug!("Reading config from: {}", path.display());
-    let s = fs::read_to_string(path)?;
-    let config = parse_config_str(&s, path)?;
-    log::debug!("Loaded config from: {}", path.display());
-    Ok(config)
+    let s = fs::read_to_string(path).map_err(|e| ConfigError {
+        path: path.to_path_buf(),
+        span: None,
+        message: e.to_string(),
+    })?;
+
+    let table = toml::from_str::<toml::Table>(&s).ok();
+    let has_extend = table.as_ref().is_some_and(|t| t.contains_key("extend"));
+
+    if !has_extend {
+        let config = parse_config_detailed(&s, path)?;
+        let extensions = table.and_then(|t| t.get("extensions").cloned());
+        log::debug!("Loaded config from: {}", path.display());
+        return Ok((config, extensions, vec![canonical(path)]));
+    }
+
+    let mut chain = Vec::new();
+    let merged = load_merged_toml(path, &mut chain)?;
+    let config = finalize_merged_table(&merged, path)?;
+    let extensions = merged.get("extensions").cloned();
+    log::debug!(
+        "Loaded config from: {} (extends {} file(s))",
+        path.display(),
+        chain.len().saturating_sub(1)
+    );
+    Ok((config, extensions, chain))
+}
+
+/// Canonicalize for stable identity comparisons, falling back to the path as
+/// given when the file can't be resolved (already-reported errors handle the
+/// truly-missing case).
+fn canonical(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// Read `path` and recursively fold in its `extend` chain, returning the
+/// deep-merged raw TOML table (child keys override parents). Appends each
+/// visited file's canonical path to `chain` (leaf first). Errors on cycles and
+/// on missing/unreadable extended files.
+fn load_merged_toml(path: &Path, chain: &mut Vec<PathBuf>) -> Result<toml::Table, ConfigError> {
+    let canon = canonical(path);
+    if chain.contains(&canon) {
+        let names: Vec<String> = chain
+            .iter()
+            .chain(std::iter::once(&canon))
+            .map(|p| p.display().to_string())
+            .collect();
+        return Err(ConfigError {
+            path: path.to_path_buf(),
+            span: None,
+            message: format!(
+                "Circular configuration detected: {}",
+                names.join(" extends ")
+            ),
+        });
+    }
+    chain.push(canon);
+
+    let s = fs::read_to_string(path).map_err(|e| ConfigError {
+        path: path.to_path_buf(),
+        span: None,
+        message: format!("failed to read extended config: {e}"),
+    })?;
+
+    // Per-file deprecation/validation checks so warnings carry this file's path.
+    check_deprecated_extension_names(&s, path);
+    check_deprecated_formatter_names(&s, path);
+    check_deprecated_code_block_style_options(&s, path);
+    check_deprecated_blank_lines(&s, path);
+    if let Err(msg) = validate_extension_names(&s) {
+        return Err(ConfigError {
+            path: path.to_path_buf(),
+            span: None,
+            message: msg,
+        });
+    }
+
+    let mut table = toml::from_str::<toml::Table>(&s).map_err(|e| ConfigError {
+        path: path.to_path_buf(),
+        span: e.span(),
+        message: e.to_string(),
+    })?;
+
+    if let Some(extend_val) = table.get("extend") {
+        let extend_str = extend_val.as_str().ok_or_else(|| ConfigError {
+            path: path.to_path_buf(),
+            span: None,
+            message: "`extend` must be a string path to another config file".to_string(),
+        })?;
+        let base_path = resolve_extend_path(extend_str, path);
+        // The base is merged first; the current file's keys then override it.
+        let mut base = load_merged_toml(&base_path, chain)?;
+        merge_toml_tables(&mut base, table);
+        table = base;
+    }
+
+    Ok(table)
+}
+
+/// Resolve an `extend` value against the directory of the file that declares it
+/// (not CWD), expanding a leading `~`. Absolute paths are used as-is.
+fn resolve_extend_path(extend: &str, from_file: &Path) -> PathBuf {
+    let expanded = expand_tilde(extend);
+    if expanded.is_absolute() {
+        return expanded;
+    }
+    from_file
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join(expanded)
+}
+
+fn expand_tilde(path: &str) -> PathBuf {
+    if path == "~"
+        && let Ok(home) = env::var("HOME")
+    {
+        return PathBuf::from(home);
+    }
+    if let Some(rest) = path.strip_prefix("~/")
+        && let Ok(home) = env::var("HOME")
+    {
+        return Path::new(&home).join(rest);
+    }
+    PathBuf::from(path)
+}
+
+/// Deep-merge `over` onto `base`, with `over` (the extending, more-derived
+/// config) winning. Sub-tables recurse so a partial override (e.g. one
+/// `[format]` key) keeps the base's sibling keys. The additive `extend-exclude`
+/// / `extend-include` arrays concatenate across the chain; every other value
+/// (scalars, plain `exclude`/`include` arrays) is replaced.
+fn merge_toml_tables(base: &mut toml::Table, over: toml::Table) {
+    for (key, over_val) in over {
+        if !base.contains_key(&key) {
+            base.insert(key, over_val);
+            continue;
+        }
+        let additive = key == "extend-exclude" || key == "extend-include";
+        let base_val = base.get_mut(&key).expect("key present");
+        match over_val {
+            toml::Value::Array(over_arr) if additive && base_val.is_array() => {
+                base_val
+                    .as_array_mut()
+                    .expect("checked is_array")
+                    .extend(over_arr);
+            }
+            toml::Value::Table(over_tbl) if base_val.is_table() => {
+                merge_toml_tables(base_val.as_table_mut().expect("checked is_table"), over_tbl);
+            }
+            other => *base_val = other,
+        }
+    }
+}
+
+/// Deserialize a merged raw table into a finalized [`Config`]. Spans are lost
+/// (the merge has no single source file), so errors point at the leaf file.
+fn finalize_merged_table(table: &toml::Table, leaf: &Path) -> Result<Config, ConfigError> {
+    toml::Value::Table(table.clone())
+        .try_into::<Config>()
+        .map_err(|e| ConfigError {
+            path: leaf.to_path_buf(),
+            span: None,
+            message: e.to_string(),
+        })
 }
 
 /// Walk up from `start_dir` looking for a `panache.toml` / `.panache.toml`.
@@ -573,24 +746,38 @@ pub fn load(
     input_file: Option<&Path>,
     flavor_override: Option<Flavor>,
 ) -> io::Result<(Config, ConfigSource)> {
+    let (cfg, source, _chain) = load_with_chain(explicit, start_dir, input_file, flavor_override)?;
+    Ok((cfg, source))
+}
+
+/// Like [`load`], but also returns the canonical paths of every config file
+/// that contributed (the resolved file plus its transitive `extend` chain).
+/// The LSP uses this to watch base configs so open documents reload when an
+/// extended file changes; CLI callers ignore it via [`load`].
+pub fn load_with_chain(
+    explicit: Option<&Path>,
+    start_dir: &Path,
+    input_file: Option<&Path>,
+    flavor_override: Option<Flavor>,
+) -> io::Result<(Config, ConfigSource, Vec<PathBuf>)> {
     let boundary = project_boundary(start_dir);
-    let (mut cfg, source) = if let Some(path) = explicit {
-        let cfg = read_config(path)?;
-        (cfg, ConfigSource::Explicit(path.to_path_buf()))
+    let (mut cfg, source, extensions, chain) = if let Some(path) = explicit {
+        let (cfg, ext, chain) = read_config_with_chain(path).map_err(io::Error::from)?;
+        (cfg, ConfigSource::Explicit(path.to_path_buf()), ext, chain)
     } else if let Some(p) = find_in_tree(start_dir, boundary.as_deref()) {
         // A discovered config that fails to parse is fatal: it is the config
         // that *would* apply, so silently falling through to the global/default
         // config (the old `&& let Ok(cfg)` behavior) let a typo'd project
         // `panache.toml` be ignored by both the CLI and the LSP.
-        let cfg = read_config(&p)?;
-        (cfg, ConfigSource::Discovered(p))
+        let (cfg, ext, chain) = read_config_with_chain(&p).map_err(io::Error::from)?;
+        (cfg, ConfigSource::Discovered(p), ext, chain)
     } else if let Some(p) = xdg_config_path()
-        && let Ok(cfg) = read_config(&p)
+        && let Ok((cfg, ext, chain)) = read_config_with_chain(&p)
     {
-        (cfg, ConfigSource::Global(p))
+        (cfg, ConfigSource::Global(p), ext, chain)
     } else {
         log::debug!("No config file found, using defaults");
-        (Config::default(), ConfigSource::None)
+        (Config::default(), ConfigSource::None, None, Vec::new())
     };
 
     let anchor = source.project_anchor();
@@ -598,33 +785,20 @@ pub fn load(
         flavor_override.or_else(|| detect_flavor(input_file, anchor.as_deref(), &cfg));
 
     if let Some(flavor) = resolved_flavor {
-        // `apply_flavor` re-reads the config file, so it needs the actual path,
-        // not the (possibly `.config/`-unwrapped) anchor directory.
-        apply_flavor(&mut cfg, flavor, source.path());
+        apply_flavor(&mut cfg, flavor, extensions.as_ref());
     }
 
-    Ok((cfg, source))
+    Ok((cfg, source, chain))
 }
 
-fn apply_flavor(cfg: &mut Config, flavor: Flavor, cfg_path: Option<&Path>) {
+/// Re-resolve flavor-dependent extensions from the already-merged raw
+/// `[extensions]` value. Passing the merged value (rather than re-reading the
+/// config file) keeps `extend`ed base extensions in play and avoids a second
+/// disk read. `None` means no `[extensions]` table, so flavor defaults apply.
+fn apply_flavor(cfg: &mut Config, flavor: Flavor, extensions: Option<&toml::Value>) {
     cfg.flavor = flavor;
-    if let Some(path) = cfg_path {
-        fs::read_to_string(path)
-            .ok()
-            .and_then(|s| toml::from_str::<toml::Value>(&s).ok())
-            .map(|root| {
-                cfg.extensions = resolve_extensions_for_flavor(root.get("extensions"), flavor);
-                cfg.formatter_extensions =
-                    resolve_formatter_extensions_for_flavor(root.get("extensions"), flavor);
-            })
-            .unwrap_or_else(|| {
-                cfg.extensions = Extensions::for_flavor(flavor);
-                cfg.formatter_extensions = FormatterExtensions::for_flavor(flavor);
-            });
-    } else {
-        cfg.extensions = Extensions::for_flavor(flavor);
-        cfg.formatter_extensions = FormatterExtensions::for_flavor(flavor);
-    }
+    cfg.extensions = resolve_extensions_for_flavor(extensions, flavor);
+    cfg.formatter_extensions = resolve_formatter_extensions_for_flavor(extensions, flavor);
 }
 
 fn parse_flavor_key(s: &str) -> Option<Flavor> {
@@ -1308,6 +1482,195 @@ mod tests {
         );
         // Sanity check: defaults are used, not line-width=7 from the stray file.
         assert_ne!(cfg.line_width, 7);
+    }
+
+    // --- `extend` (Ruff-style config inheritance) ------------------------------
+
+    #[test]
+    fn extend_child_overrides_scalar_and_inherits_rest() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            tmp.path().join("base.toml"),
+            "[format]\nline-width = 80\nwrap = \"preserve\"\n",
+        )
+        .unwrap();
+        let child = tmp.path().join("panache.toml");
+        std::fs::write(
+            &child,
+            "extend = \"base.toml\"\n[format]\nline-width = 100\n",
+        )
+        .unwrap();
+
+        let (cfg, _src) = load(Some(&child), tmp.path(), None, None).expect("load");
+        assert_eq!(cfg.line_width, 100, "child overrides the base scalar");
+        assert_eq!(
+            cfg.wrap,
+            Some(WrapMode::Preserve),
+            "a base `[format]` key the child omits is inherited (nested-table merge)"
+        );
+    }
+
+    #[test]
+    fn extend_inherits_base_extensions_and_merges_with_flavor() {
+        // Guards the `apply_flavor` refactor: extensions contributed by a base
+        // must survive and still merge onto flavor defaults.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            tmp.path().join("base.toml"),
+            "flavor = \"quarto\"\n\n[extensions]\nfenced-divs = false\n",
+        )
+        .unwrap();
+        let child = tmp.path().join("panache.toml");
+        std::fs::write(&child, "extend = \"base.toml\"\n").unwrap();
+
+        let (cfg, _src) = load(Some(&child), tmp.path(), None, None).expect("load");
+        assert_eq!(cfg.flavor, Flavor::Quarto, "base flavor inherited");
+        assert!(
+            !cfg.extensions.fenced_divs,
+            "base's extension override survives the merge and flavor resolution"
+        );
+    }
+
+    #[test]
+    fn extend_exclude_accumulates_but_exclude_replaces() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            tmp.path().join("base.toml"),
+            "exclude = [\"base-only/**\"]\nextend-exclude = [\"from-base/**\"]\n",
+        )
+        .unwrap();
+        let child = tmp.path().join("panache.toml");
+        std::fs::write(
+            &child,
+            "extend = \"base.toml\"\nexclude = [\"child-only/**\"]\nextend-exclude = [\"from-child/**\"]\n",
+        )
+        .unwrap();
+
+        let (cfg, _src) = load(Some(&child), tmp.path(), None, None).expect("load");
+        assert_eq!(
+            cfg.exclude.as_deref(),
+            Some(["child-only/**".to_string()].as_slice()),
+            "plain `exclude` replaces the base value"
+        );
+        assert_eq!(
+            cfg.extend_exclude,
+            vec!["from-base/**".to_string(), "from-child/**".to_string()],
+            "`extend-exclude` concatenates parent then child across the chain"
+        );
+    }
+
+    #[test]
+    fn extend_chains_transitively() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join("c.toml"), "[format]\nline-width = 30\n").unwrap();
+        std::fs::write(
+            tmp.path().join("b.toml"),
+            "extend = \"c.toml\"\n[format]\ntab-width = 3\n",
+        )
+        .unwrap();
+        let a = tmp.path().join("a.toml");
+        std::fs::write(&a, "extend = \"b.toml\"\n").unwrap();
+
+        let (cfg, _src) = load(Some(&a), tmp.path(), None, None).expect("load");
+        assert_eq!(
+            cfg.line_width, 30,
+            "grandparent value flows through the chain"
+        );
+        assert_eq!(cfg.tab_width, 3, "parent value flows through the chain");
+    }
+
+    #[test]
+    fn extend_resolves_relative_to_declaring_file() {
+        // The `extend` path is relative to the child file's own directory, not
+        // the CWD or the walk's start dir.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join("base.toml"), "[format]\nline-width = 42\n").unwrap();
+        let sub = tmp.path().join("sub");
+        std::fs::create_dir_all(&sub).unwrap();
+        let child = sub.join("panache.toml");
+        std::fs::write(&child, "extend = \"../base.toml\"\n").unwrap();
+
+        let (cfg, _src) = load(Some(&child), &sub, None, None).expect("load");
+        assert_eq!(cfg.line_width, 42);
+    }
+
+    #[test]
+    fn extend_may_cross_git_boundary() {
+        // Unlike discovery, an explicit `extend` is user-intentional (like
+        // `--config`) and is not capped by the `.git` project boundary.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join("base.toml"), "[format]\nline-width = 55\n").unwrap();
+        let repo = tmp.path().join("repo");
+        std::fs::create_dir_all(repo.join(".git")).unwrap();
+        let child = repo.join("panache.toml");
+        std::fs::write(&child, "extend = \"../base.toml\"\n").unwrap();
+
+        let (cfg, _src) = load(Some(&child), &repo, None, None).expect("load");
+        assert_eq!(
+            cfg.line_width, 55,
+            "an extended base above the .git root is still loaded"
+        );
+    }
+
+    #[test]
+    fn extend_cycle_is_a_clean_error() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join("a.toml"), "extend = \"b.toml\"\n").unwrap();
+        std::fs::write(tmp.path().join("b.toml"), "extend = \"a.toml\"\n").unwrap();
+        let a = tmp.path().join("a.toml");
+
+        let err = load(Some(&a), tmp.path(), None, None).expect_err("cycle must error");
+        assert!(
+            err.to_string().contains("Circular configuration detected"),
+            "expected a circular-config error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn extend_missing_base_is_an_error() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let child = tmp.path().join("panache.toml");
+        std::fs::write(&child, "extend = \"does-not-exist.toml\"\n").unwrap();
+
+        let err = load(Some(&child), tmp.path(), None, None).expect_err("missing base must error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("does-not-exist.toml"),
+            "error must name the missing base, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn extend_chain_reports_every_contributing_file() {
+        // The chain returned by `load_with_chain` (used by the LSP to watch base
+        // configs) lists the leaf plus its transitive bases.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join("base.toml"), "[format]\nline-width = 20\n").unwrap();
+        let child = tmp.path().join("panache.toml");
+        std::fs::write(&child, "extend = \"base.toml\"\n").unwrap();
+
+        let (_cfg, _src, chain) =
+            load_with_chain(Some(&child), tmp.path(), None, None).expect("load");
+        assert_eq!(chain.len(), 2, "chain covers leaf + base");
+        assert!(
+            chain.contains(&canonical(&child)),
+            "chain includes the leaf"
+        );
+        assert!(
+            chain.contains(&canonical(&tmp.path().join("base.toml"))),
+            "chain includes the extended base"
+        );
+    }
+
+    #[test]
+    fn no_extend_returns_single_element_chain() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let child = tmp.path().join("panache.toml");
+        std::fs::write(&child, "[format]\nline-width = 20\n").unwrap();
+
+        let (_cfg, _src, chain) =
+            load_with_chain(Some(&child), tmp.path(), None, None).expect("load");
+        assert_eq!(chain, vec![canonical(&child)]);
     }
 
     #[test]

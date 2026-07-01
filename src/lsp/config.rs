@@ -71,6 +71,19 @@ pub(crate) fn try_load_config(
     workspace_folders: &[PathBuf],
     document_uri: Option<&Uri>,
 ) -> Result<(crate::Config, ConfigSource), ConfigError> {
+    try_load_config_with_chain(workspace_folders, document_uri)
+        .map(|(config, source, _chain)| (config, source))
+}
+
+/// Like [`try_load_config`], but also returns the canonical paths of every
+/// config file that contributed (the resolved file plus its transitive `extend`
+/// chain). The main loop records these so the file watcher reloads open
+/// documents when an extended base config changes, even when the base has a
+/// name the config-name globs don't match. Empty for the no-config default.
+pub(crate) fn try_load_config_with_chain(
+    workspace_folders: &[PathBuf],
+    document_uri: Option<&Uri>,
+) -> Result<(crate::Config, ConfigSource, Vec<PathBuf>), ConfigError> {
     // Convert URI to file path for flavor detection
     let input_file: Option<PathBuf> =
         document_uri.and_then(|uri| uri.to_file_path().map(|p| p.into_owned()));
@@ -89,12 +102,12 @@ pub(crate) fn try_load_config(
             .filter(|p| p.starts_with(root))
             .map(Path::to_path_buf)
             .unwrap_or_else(|| root.clone());
-        match crate::config::load(None, &start_dir, input_file.as_deref(), None) {
-            Ok((config, source)) => {
+        match crate::config::load_with_chain(None, &start_dir, input_file.as_deref(), None) {
+            Ok((config, source, chain)) => {
                 if let Some(p) = source.path() {
                     log::info!("Loaded config from {}", p.display());
                 }
-                return Ok((config, source));
+                return Ok((config, source, chain));
             }
             Err(e) => {
                 // A config file was found but failed to parse: recover the
@@ -112,7 +125,11 @@ pub(crate) fn try_load_config(
         }
     }
 
-    Ok((default_config_for_uri(document_uri), ConfigSource::None))
+    Ok((
+        default_config_for_uri(document_uri),
+        ConfigSource::None,
+        Vec::new(),
+    ))
 }
 
 /// The default config to use when no config file applies, with the flavor

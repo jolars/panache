@@ -396,6 +396,14 @@ pub(crate) struct GlobalState {
     /// breakage re-notifies. The persistent surface is the diagnostic published
     /// on the config file itself; this is the one-shot heads-up.
     pub(crate) config_error_reports: HashMap<PathBuf, String>,
+
+    /// Canonical paths of config files reached via `extend` by some open
+    /// document's config. The config-name globs only match `panache.toml` /
+    /// `.panache.toml`, so a differently-named base (`base.toml`) would go
+    /// unwatched; the file watcher consults this set to reload open documents
+    /// when such a base changes. Accumulated as documents load their config;
+    /// stale entries only cost an occasional harmless (idempotent) reload.
+    pub(crate) watched_config_files: HashSet<PathBuf>,
 }
 
 impl GlobalState {
@@ -425,6 +433,7 @@ impl GlobalState {
             last_applied_lint_generation: 0,
             external_pending: HashSet::new(),
             config_error_reports: HashMap::new(),
+            watched_config_files: HashSet::new(),
         }
     }
 
@@ -437,11 +446,14 @@ impl GlobalState {
     /// this adds a one-shot `window/showMessage` and clears the dedup record when
     /// the file parses again, so a later breakage re-notifies.
     pub(crate) fn load_config_notifying(&mut self, uri: &Uri) -> crate::Config {
-        match crate::lsp::config::try_load_config(&self.workspace_folders, Some(uri)) {
-            Ok((config, source)) => {
+        match crate::lsp::config::try_load_config_with_chain(&self.workspace_folders, Some(uri)) {
+            Ok((config, source, chain)) => {
                 if let Some(path) = source.path() {
                     self.config_error_reports.remove(path);
                 }
+                // Track every file in the extend chain so the watcher reloads
+                // this document when a base config (any name/location) changes.
+                self.watched_config_files.extend(chain);
                 config
             }
             Err(err) => {

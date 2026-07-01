@@ -422,6 +422,14 @@
       ],
       "description": "Opt-in experimental features (`[experimental]`). Unstable surface."
     },
+    "extend": {
+      "default": null,
+      "description": "Path to another config file to inherit from and override (Ruff-style).\nResolved relative to the file that declares it; a leading `~` expands to\nthe home directory. Chains transitively (`a` extends `b` extends `c`).\nThis key is consumed during the raw-TOML merge in the loader, so by the\ntime a `RawConfig` is deserialized it is already inert; the field exists\nonly so the key is accepted under `deny_unknown_fields` and appears in\nthe schema.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "extend-exclude": {
       "default": [],
       "items": {
