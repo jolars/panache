@@ -1,0 +1,81 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 99
+expression: cst_output
+---
+DOCUMENT@0..154
+  SVELTE_BLOCK@0..22
+    SVELTE_BLOCK_LOGIC@0..21
+      SVELTE_MARKER_OPEN@0..1 "{"
+      SVELTE_CONTENT@1..20
+        TEXT@1..20 "#each items as item"
+      SVELTE_MARKER_CLOSE@20..21 "}"
+    NEWLINE@21..22 "\n"
+  LIST@22..34
+    LIST_ITEM@22..28
+      LIST_MARKER@22..23 "-"
+      WHITESPACE@23..24 " "
+      PLAIN@24..28
+        TEXT@24..27 "one"
+        NEWLINE@27..28 "\n"
+    LIST_ITEM@28..34
+      LIST_MARKER@28..29 "-"
+      WHITESPACE@29..30 " "
+      PLAIN@30..34
+        TEXT@30..33 "two"
+        NEWLINE@33..34 "\n"
+  SVELTE_BLOCK@34..42
+    SVELTE_BLOCK_LOGIC@34..41
+      SVELTE_MARKER_OPEN@34..35 "{"
+      SVELTE_CONTENT@35..40
+        TEXT@35..40 "/each"
+      SVELTE_MARKER_CLOSE@40..41 "}"
+    NEWLINE@41..42 "\n"
+  BLANK_LINE@42..43
+    BLANK_LINE@42..43 "\n"
+  SVELTE_BLOCK@43..59
+    SVELTE_BLOCK_LOGIC@43..58
+      SVELTE_MARKER_OPEN@43..44 "{"
+      SVELTE_CONTENT@44..57
+        TEXT@44..57 "#if count > 0"
+      SVELTE_MARKER_CLOSE@57..58 "}"
+    NEWLINE@58..59 "\n"
+  PARAGRAPH@59..89
+    TEXT@59..88 "Shown when count is p ..."
+    NEWLINE@88..89 "\n"
+  SVELTE_BLOCK@89..95
+    SVELTE_BLOCK_LOGIC@89..94
+      SVELTE_MARKER_OPEN@89..90 "{"
+      SVELTE_CONTENT@90..93
+        TEXT@90..93 "/if"
+      SVELTE_MARKER_CLOSE@93..94 "}"
+    NEWLINE@94..95 "\n"
+  BLANK_LINE@95..96
+    BLANK_LINE@95..96 "\n"
+  SVELTE_BLOCK@96..113
+    SVELTE_TAG@96..112
+      SVELTE_MARKER_OPEN@96..97 "{"
+      SVELTE_CONTENT@97..111
+        TEXT@97..111 "@html rendered"
+      SVELTE_MARKER_CLOSE@111..112 "}"
+    NEWLINE@112..113 "\n"
+  BLANK_LINE@113..114
+    BLANK_LINE@113..114 "\n"
+  SVELTE_BLOCK@114..122
+    SVELTE_EXPRESSION@114..121
+      SVELTE_MARKER_OPEN@114..115 "{"
+      SVELTE_CONTENT@115..120
+        TEXT@115..120 "count"
+      SVELTE_MARKER_CLOSE@120..121 "}"
+    NEWLINE@121..122 "\n"
+  BLANK_LINE@122..123
+    BLANK_LINE@122..123 "\n"
+  PARAGRAPH@123..154
+    TEXT@123..139 "Inline value is "
+    SVELTE_EXPRESSION@139..146
+      SVELTE_MARKER_OPEN@139..140 "{"
+      SVELTE_CONTENT@140..145
+        TEXT@140..145 "count"
+      SVELTE_MARKER_CLOSE@145..146 "}"
+    TEXT@146..153 " today."
+    NEWLINE@153..154 "\n"

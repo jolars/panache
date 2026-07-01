@@ -381,6 +381,7 @@ golden_test_cases!(
     simple_table,
     simple_table_wide_cell,
     standardize_bullets,
+    svelte_block,
     svelte_template,
     sentence_wrap_basic,
     sentence_wrap_abbreviations,

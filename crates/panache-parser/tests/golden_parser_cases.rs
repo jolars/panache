@@ -634,6 +634,7 @@ golden_test_cases!(
     simple_table_in_list_blockquote,
     simple_table_wide_cell,
     standardize_bullets,
+    svelte_block,
     svelte_template,
     subscript_unclosed_double_tilde_pandoc,
     sentence_wrap_basic,

@@ -70,6 +70,7 @@ use super::blocks::tables::{
     try_parse_pipe_table, try_parse_simple_table,
 };
 use super::inlines::links::{LinkScanContext, try_parse_inline_image};
+use super::inlines::svelte::{SvelteKind, emit_svelte_template, try_parse_svelte_template};
 use super::utils::attributes::{emit_div_info_node, parse_html_tag_attributes};
 use super::utils::container_stack::{byte_index_at_column, leading_indent};
 use super::utils::helpers::{strip_newline, trim_end_newlines};
@@ -2981,6 +2982,115 @@ impl BlockParser for MystCommentParser {
     }
 }
 
+/// A standalone Svelte span line, detected for [`SvelteBlockParser`].
+struct SvelteBlockInfo {
+    /// Leading-space count (≤3) before the opening `{`.
+    indent_len: usize,
+    /// Byte length of the balanced `{...}` span.
+    span_len: usize,
+    /// Span category (block logic / tag / expression).
+    kind: SvelteKind,
+    /// Verbatim content between the outer braces.
+    content: String,
+}
+
+/// Parser for standalone Svelte template lines (mdsvex).
+///
+/// A line whose entire content is a single balanced Svelte span
+/// (`{#if}`/`{:else}`/`{/each}`, `{@html}`, or `{expr}`) is emitted as an
+/// opaque [`SyntaxKind::SVELTE_BLOCK`] leaf block rather than a paragraph. As a
+/// leaf block it is not an open text paragraph, so an immediately following
+/// tight list opens as a real `LIST` instead of being absorbed as paragraph
+/// continuation and reflowed onto one line. Gated on `svelte_template`, so it is
+/// inert for every non-mdsvex flavor. The inner span subtree is built by the
+/// shared inline emitter, keeping the CST identical to the inline form.
+pub(crate) struct SvelteBlockParser;
+
+impl SvelteBlockParser {
+    /// Detect a whole-line Svelte span in `line` (newline already ignored).
+    fn detect_line(line: &str) -> Option<SvelteBlockInfo> {
+        let (content, _) = strip_newline(line);
+
+        // Up to 3 leading spaces; a 4th would be indented code.
+        let indent_len = content.bytes().take_while(|&b| b == b' ').count();
+        if indent_len > 3 {
+            return None;
+        }
+        let rest = &content[indent_len..];
+
+        let (span_len, kind, span_content) = try_parse_svelte_template(rest)?;
+
+        // The span must consume the whole line (only trailing whitespace may
+        // follow); `{expr} text` is not a standalone block.
+        if !rest[span_len..].trim().is_empty() {
+            return None;
+        }
+
+        Some(SvelteBlockInfo {
+            indent_len,
+            span_len,
+            kind,
+            content: span_content,
+        })
+    }
+}
+
+impl BlockParser for SvelteBlockParser {
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &StrippedLines<'_, '_>,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.svelte_template {
+            return None;
+        }
+        let info = Self::detect_line(lines.first())?;
+        Some((BlockDetectionResult::YesCanInterrupt, Some(Box::new(info))))
+    }
+
+    fn parse_prepared(
+        &self,
+        _ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &StrippedLines<'_, '_>,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        use crate::syntax::SyntaxKind;
+
+        let line = lines.first();
+        let (content, newline) = strip_newline(line);
+        let info = payload
+            .and_then(|p| p.downcast_ref::<SvelteBlockInfo>())
+            .map(|info| SvelteBlockInfo {
+                indent_len: info.indent_len,
+                span_len: info.span_len,
+                kind: info.kind,
+                content: info.content.clone(),
+            })
+            .or_else(|| Self::detect_line(line))
+            .expect("svelte block should exist");
+
+        builder.start_node(SyntaxKind::SVELTE_BLOCK.into());
+        if info.indent_len > 0 {
+            builder.token(SyntaxKind::WHITESPACE.into(), &content[..info.indent_len]);
+        }
+        emit_svelte_template(builder, info.kind, &info.content);
+        let trailing = &content[info.indent_len + info.span_len..];
+        if !trailing.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), trailing);
+        }
+        if !newline.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline);
+        }
+        builder.finish_node(); // SVELTE_BLOCK
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "svelte_block"
+    }
+}
+
 /// Parser for MyST `+++` block break lines.
 pub(crate) struct MystBlockBreakParser;
 
@@ -3532,6 +3642,9 @@ impl BlockParserRegistry {
             Box::new(AtxHeadingParser),
             // (9) HTML blocks
             Box::new(HtmlBlockParser),
+            // (9b) Standalone Svelte spans (mdsvex) - opaque line-level blocks,
+            // gated on `svelte_template` so inert for every other flavor.
+            Box::new(SvelteBlockParser),
             // (10) Tables
             Box::new(TableParser),
             // (10b) Admonitions (`!!!`/`???`) — MUST precede indented code so
@@ -3596,5 +3709,66 @@ impl BlockParserRegistry {
         let parser = &self.parsers[block_match.parser_index];
         log::trace!("Block parsed by: {}", parser.name());
         parser.parse_prepared(ctx, builder, lines, block_match.payload.as_deref())
+    }
+}
+
+#[cfg(test)]
+mod svelte_block_tests {
+    use super::{SvelteBlockParser, SvelteKind};
+
+    #[test]
+    fn detects_block_logic_line() {
+        let info = SvelteBlockParser::detect_line("{#each items as item}\n").unwrap();
+        assert_eq!(info.kind, SvelteKind::BlockLogic);
+        assert_eq!(info.indent_len, 0);
+        assert_eq!(info.content, "#each items as item");
+    }
+
+    #[test]
+    fn detects_tag_and_expression_lines() {
+        assert_eq!(
+            SvelteBlockParser::detect_line("{@html body}\n")
+                .unwrap()
+                .kind,
+            SvelteKind::Tag
+        );
+        assert_eq!(
+            SvelteBlockParser::detect_line("{count}\n").unwrap().kind,
+            SvelteKind::Expression
+        );
+    }
+
+    #[test]
+    fn accepts_up_to_three_leading_spaces() {
+        let info = SvelteBlockParser::detect_line("   {/if}\n").unwrap();
+        assert_eq!(info.indent_len, 3);
+    }
+
+    #[test]
+    fn rejects_four_leading_spaces() {
+        // Four leading spaces is indented code, not a standalone span.
+        assert!(SvelteBlockParser::detect_line("    {/if}\n").is_none());
+    }
+
+    #[test]
+    fn accepts_trailing_whitespace_after_span() {
+        assert!(SvelteBlockParser::detect_line("{/if}   \n").is_some());
+    }
+
+    #[test]
+    fn rejects_trailing_text_after_span() {
+        // A span followed by prose is inline, not a standalone block.
+        assert!(SvelteBlockParser::detect_line("{count} today\n").is_none());
+    }
+
+    #[test]
+    fn rejects_unbalanced_span() {
+        assert!(SvelteBlockParser::detect_line("{#if x\n").is_none());
+    }
+
+    #[test]
+    fn rejects_shortcode_opener() {
+        // `{{< ... >}}` is left to the Quarto shortcode probe.
+        assert!(SvelteBlockParser::detect_line("{{< meta x >}}\n").is_none());
     }
 }

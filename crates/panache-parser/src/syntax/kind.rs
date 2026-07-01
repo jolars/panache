@@ -165,6 +165,7 @@ pub enum SyntaxKind {
     SVELTE_MARKER_OPEN,  // {
     SVELTE_MARKER_CLOSE, // }
     SVELTE_CONTENT,      // verbatim content between the braces
+    SVELTE_BLOCK,        // a standalone Svelte span occupying a whole line
 
     // Code
     INLINE_CODE,

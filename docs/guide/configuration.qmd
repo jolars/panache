@@ -171,7 +171,12 @@ The available flavors are:
     set)
 
 `mdsvex`
-:   [mdsvex](https://mdsvex.pngwn.io) (Svelte-flavored Markdown).
+:   [mdsvex](https://mdsvex.pngwn.io) (Svelte-flavored Markdown). Svelte
+    template constructs are treated as opaque, lossless spans preserved
+    verbatim: block logic (`{#if}`/`{:else}`/`{/each}`), tags (`{@html ...}`),
+    and expressions (`{expr}`). A span that occupies a whole line on its own
+    becomes a block-level construct, so an immediately following list or
+    paragraph stays a separate block instead of being folded onto one line.
 
 `myst`
 :   [MyST](https://mystmd.org) (CommonMark superset used by Sphinx

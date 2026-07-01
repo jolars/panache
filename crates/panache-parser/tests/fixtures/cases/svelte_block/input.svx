@@ -1,0 +1,14 @@
+{#each items as item}
+- one
+- two
+{/each}
+
+{#if count > 0}
+Shown when count is positive.
+{/if}
+
+{@html rendered}
+
+{count}
+
+Inline value is {count} today.

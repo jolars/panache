@@ -871,14 +871,15 @@ elsewhere).
   `{#…}`/`{:…}`/`{/…}`, `SVELTE_TAG` for `{@…}`, `SVELTE_EXPRESSION` for
   `{expr}`), content preserved verbatim. Balanced-brace scan reused from the
   shortcode parser. Parser golden + formatter golden + unit tests landed.
-- [ ] **Tier 2: block-level `{#if}`/`{#each}` pairing.** Treat standalone
-  block-logic lines as opaque *blocks* that act as block boundaries. Today a
-  block-logic line that is a lone-node paragraph immediately followed by a
-  *tight* list (no blank line) gets joined onto one line by the formatter
-  and its inner whitespace collapsed---a **pre-existing formatter quirk
-  shared with Quarto shortcodes**, idempotent and parser-lossless, but it
-  mangles opaque content. The idiomatic blank-line-separated form is
-  preserved verbatim.
+- [x] **Tier 2: block-level `{#if}`/`{#each}` pairing.** Standalone Svelte spans
+  (block logic `{#if}`/`{:else}`/`{/each}`, tags `{@html}`, and expressions
+  `{expr}`) that occupy a whole line are now emitted as an opaque
+  `SVELTE_BLOCK` leaf block (mirroring the MyST leaf-block pattern) that
+  acts as a block boundary. This fixes the prior quirk where a lone-span
+  paragraph adjacent to a *tight* list (no blank line) got joined onto one
+  line and its inner whitespace collapsed. The equivalent quirk for Quarto
+  shortcode lines (`{{< ... >}}`) is still a separate pre-existing issue and
+  is not addressed here.
 - [ ] **Tier 3: format the JS/Svelte inside spans** (prettier-plugin-svelte
   territory). Likely out of scope.
 - [ ] String-literal-aware brace matching: a `}` inside a JS string (`{ "}" }`)
