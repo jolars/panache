@@ -899,78 +899,27 @@ extension flags, never on `Flavor::Myst` directly, so other flavors can borrow
 the same shapes. Markup extras (`myst-colon-fence`, `myst-substitutions`,
 dollar-math, deflists, ...) stay opt-in.
 
-- [x] Core constructs: directive parsing (backtick/colon fences, options,
-  nesting), inline roles, targets `(label)=`, `%` comments, substitutions
-  `{{ name }}`; directive-body formatting. Parser + formatter golden cases.
-- [x] GFM-superset defaults: `pipe-tables` + `footnotes` on for `Flavor::Myst`
-  (standalone tables and `[^ref]` footnotes were mangled without them).
-  `inline-footnotes` stays off: `myst-parser` loads the footnote plugin with
-  `inline=False`.
-- [x] Smoke corpus vendored from `jupyter-book/myst-spec` with a losslessness +
-  idempotency harness and a non-gating output-divergence triage report
-  (`cargo test --test myst_corpus -- --ignored --nocapture`).
-- [x] **Structural directive-option parsing.** The leading `:key: value` option
-  block is parsed into structured `MYST_DIRECTIVE_OPTION` nodes
-  (`name`/`value` tokens, colon markers), consumed in the directive opener
-  and terminated by the first non-option line per MyST semantics, so a blank
-  line is no longer required to keep them off the body (e.g.
-  `:number-lines: 1` followed directly by `def five(): return 5` no longer
-  merges). The formatter emits them canonically (`:name: value`, one blank
-  line before the body), retiring the `is_myst_option_paragraph` stopgap. We
-  require a well-formed `:name:` key rather than `myst-parser`'s looser
-  "line starts with `:`", which avoids swallowing colon-fence closers and
-  nested openers.
-- [x] **Verbatim-bodied directives.** `{code}`, `{code-block}`, `{code-cell}`,
-  and `{math}` now capture their body as a raw `MYST_DIRECTIVE_BODY` node at
-  parse time (mirroring fenced code blocks), so the formatter passes it
-  through byte-for-byte instead of markdown-reflowing it. Gated on the
-  directive name in `try_parse_directive_open`; the opener parser consumes
-  the whole verbatim directive single-pass and skips the markdown-body
-  container.
-  - [x] **External formatters/linters for verbatim directive bodies.** A
-    `{code-block} python` body is now a real code body but is invisible to
-    the `[formatters.*]`/`[linters.*]` external-tool path:
-    `collect_code_blocks`
-    (`crates/panache-formatter/src/formatter/code_blocks.rs`) only walks
-    `CODE_BLOCK` nodes, so black/flake8 et al. never see it. Route
-    `MYST_DIRECTIVE_BODY` through the same path, keyed by the directive
-    argument (`MYST_DIRECTIVE_ARG`) as the language, like a fenced code
-    block.
-  - [x] **Closer on a longer inner fence (working as intended).** A body line
-    whose fence run is at least the opener's count (e.g. a 4-backtick line
-    inside a 3-backtick `{code-block}`) closes the directive. This was
-    suspected to be a bug, but both oracles (`myst-parser` and `mystmd`)
-    follow the markdown-it fence rule and close on a fence of
-    equal-or-longer run, so the current `>=` behavior is correct: to embed a
-    4-backtick line you open with a longer (5-backtick) fence, which the
-    parser already keeps in the body. The "longer *outer* fence" rule
-    governs directive *nesting*, not raw body fence runs. Pinned by the
-    `myst_directive_verbatim_inner_fence` parser golden case.
-- [x] Audit remaining `myst-parser` default-on rules beyond tables/footnotes.
-  Diffed the default `create_md_parser` branch
-  (`myst_parser/parsers/mdit.py`, v5.0.0) against a bare
-  `MarkdownIt("commonmark")`. The complete default-on delta is: `table`
-  (covered by `pipe-tables`), `footnote_def`/`footnote_ref` with
-  `inline=False` (covered by `footnotes`/`!inline-footnotes`), `myst_role`
-  (`myst-roles`), `myst_target` (`myst-targets`), `myst_line_comment`
-  (`myst-comments`), plus the `myst_block_plugin` `+++` block break and
-  `front_matter_plugin`. `table` is the *only* extra markdown-it core rule;
-  everything else is a plugin. The two gaps found are now fixed:
-  - **Front matter.** `myst_defaults` now sets `yaml-metadata-block = true`; a
-    leading `---` block was previously mis-parsed as setext heading + thematic
-    break. The plugin only fires at document start, matching panache's
-    leading-YAML case (parser golden `myst_frontmatter`).
-  - **`+++` block breaks.** New always-on `myst-block-breaks` extension with a
-    `MYST_BLOCK_BREAK` leaf (`MYST_BLOCK_BREAK_MARKER`/`_META` tokens). Runs
-    before lists so the spaced form (`+ + +`) is a block break, not a bullet,
-    matching markdown-it. Formatter emits it verbatim like targets/comments.
-    Golden cases: parser `myst_block_break`, formatter `myst_block_break`.
-    Confirmed correctly opt-in (off in both): strikethrough, linkify,
-    smartquotes, replacements, dollarmath, amsmath, colon_fence, deflist,
-    fieldlist, tasklist, substitution, attrs\_\*. `wordcount` is render-only
-    (irrelevant to a formatter).
-- [ ] AST wrappers (`syntax/myst.rs`), LSP semantic tokens, and lint rules for
-  MyST constructs.
+- [x] **AST wrappers (`syntax/myst.rs`).** Typed wrappers over the existing
+  `MYST_*` CST kinds, wired through `syntax.rs`, each with cast-from-`parse`
+  unit tests (follow the `syntax/shortcodes.rs` pattern). Landed:
+  - `MystTarget` (`label()`) --- the anchor side of MyST's cross-reference
+    graph; keystone for goto-def/rename/undefined-target lint.
+  - `MystRole` (`name()` brace-stripped, `content()`) --- the reference side
+    (`` {ref}`label` ``); pairs with `MystTarget` for reference resolution.
+  - `MystDirective` (`name()`, `argument()`, `options()` over
+    `MystDirectiveOption` `name()`/`value()`, `body()`) --- richest construct;
+    unlocks the most lint rules.
+  - `MystSubstitution` (`name()`, trimmed) --- enables the "key not defined in
+    frontmatter `substitutions:`" lint.
+  - Skipped `MystComment`/`MystBlockBreak` wrappers (no name/label semantics to
+    expose yet); add when a rule needs them.
+- [ ] **LSP semantic tokens for MyST.** Wrapper-driven classification of
+  directive/role names, target labels, and substitution names. Depends on
+  the AST wrappers.
+- [ ] **Lint rules for MyST constructs.** Gate on the `myst-*` extension flags
+  (never `Flavor::Myst` directly), via the `add-lint-rule` skill. Start with
+  `undefined-references` (role target resolves to a `MystTarget`) and an
+  unknown-directive/role check. Depends on the AST wrappers.
 
 ## Math Parser and Formatter
 
