@@ -201,6 +201,11 @@ const EXCLUDED_ANCESTOR_KINDS: &[SyntaxKind] = &[
     SyntaxKind::CHUNK_OPTION_KEY,
     SyntaxKind::CHUNK_OPTION_VALUE,
     SyntaxKind::CODE_INFO,
+    // Verbatim MyST directive bodies (`{code}`, `{code-block}`, `{code-cell}`,
+    // `{math}`) are literal code/math, not prose. Non-verbatim directives parse
+    // their body as markdown under ordinary block nodes, so only the verbatim
+    // ones ever wear this kind.
+    SyntaxKind::MYST_DIRECTIVE_BODY,
     SyntaxKind::COMMENT,
     SyntaxKind::YAML_METADATA,
     SyntaxKind::YAML_METADATA_CONTENT,
@@ -276,6 +281,15 @@ mod tests {
         rule.check_tree(&tree, input, &config, None)
     }
 
+    fn parse_and_lint_flavor(input: &str, flavor: crate::config::Flavor) -> Vec<Diagnostic> {
+        let mut config = Config::default();
+        config.flavor = flavor;
+        config.extensions = crate::config::Extensions::for_flavor(flavor);
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = HtmlEntitiesRule;
+        rule.check_tree(&tree, input, &config, None)
+    }
+
     #[test]
     fn flags_unknown_named_entity() {
         let diagnostics = parse_and_lint("This is &ellips; wrong.");
@@ -321,6 +335,19 @@ mod tests {
         let input = "```\n&ellips;\n```\n";
         let diagnostics = parse_and_lint(input);
         assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn does_not_flag_inside_myst_code_cell_directive() {
+        // A verbatim MyST directive (`{code-cell}`) body is literal code, not
+        // prose: `&beta` in a Python dict key must not be read as an entity.
+        let input = "```{code-cell}\nfit = eu.euler({\"alpha&beta\": 3})\n```\n";
+        let diagnostics = parse_and_lint_flavor(input, crate::config::Flavor::Myst);
+        assert!(
+            diagnostics.is_empty(),
+            "expected no diagnostics in a verbatim code-cell body, got: {:?}",
+            diagnostics
+        );
     }
 
     #[test]

@@ -851,7 +851,9 @@ Description
 
     The rule deliberately ignores numeric character references (`&#123;`,
     `&#xABCD;`) for now and does not scan code spans, code blocks, raw HTML,
-    inline/display math, link destinations, attributes, YAML metadata, or comments.
+    inline/display math, link destinations, attributes, YAML metadata, comments, or
+    the verbatim bodies of MyST code and math directives (`{code-cell}`,
+    `{code-block}`, `{code}`, `{math}`).
 
 **Example violations:**
 
