@@ -438,6 +438,15 @@ The LSP determines the workspace root by looking for:
 - `.git` directory
 - Project-specific files (`.quarto.yml`, `_quarto.yml`, etc.)
 
+### Multi-Root Workspaces
+
+The LSP supports workspaces with multiple root folders. Each document resolves
+its configuration against the folder that contains it (the closest-matching
+workspace folder), so two folders with different `panache.toml` files each get
+their own settings. Adding or removing folders at runtime
+(`workspace/didChangeWorkspaceFolders`) re-resolves the configuration of every
+open document live, without a restart.
+
 ## Capabilities
 
 ### Document Formatting

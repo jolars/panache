@@ -6,6 +6,7 @@
 //! client messages. The salsa-cancellation safety net lives here: a pooled read
 //! that unwinds with [`salsa::Cancelled`] becomes a `ContentModified` response.
 
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use lsp_server::{ErrorCode, ExtractError, Notification, Request, RequestId, Response};
@@ -206,16 +207,20 @@ fn experimental_incremental_parsing_from_initialize(params: &InitializeParams) -
 impl GlobalState {
     /// Apply `initialize` params: workspace root + runtime settings.
     pub(crate) fn on_initialize(&mut self, params: InitializeParams) {
-        if let Some(folders) = params.workspace_folders.as_ref()
-            && let Some(folder) = folders.first()
-            && let Some(path) = folder.uri.to_file_path()
-        {
-            self.workspace_root = Some(path.into_owned());
-        } else if let Some(root_uri) = legacy_root_uri(&params)
+        let mut folders: Vec<PathBuf> = params
+            .workspace_folders
+            .as_ref()
+            .into_iter()
+            .flatten()
+            .filter_map(|folder| folder.uri.to_file_path().map(|p| p.into_owned()))
+            .collect();
+        if folders.is_empty()
+            && let Some(root_uri) = legacy_root_uri(&params)
             && let Some(path) = root_uri.to_file_path()
         {
-            self.workspace_root = Some(path.into_owned());
+            folders.push(path.into_owned());
         }
+        self.workspace_folders = folders;
 
         let experimental = experimental_incremental_parsing_from_initialize(&params);
         self.runtime_settings.experimental_incremental_parsing = experimental;
@@ -477,6 +482,10 @@ impl GlobalState {
         handle!(
             n::DidChangeWatchedFiles,
             handlers::file_watcher::did_change_watched_files
+        );
+        handle!(
+            n::DidChangeWorkspaceFolders,
+            handlers::workspace_folders::did_change_workspace_folders
         );
         handle!(
             n::DidCreateFiles,

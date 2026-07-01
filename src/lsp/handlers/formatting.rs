@@ -27,14 +27,14 @@ pub(crate) fn format_document(
     // applying default formatting. The error is surfaced as a diagnostic on the
     // config file (settle pass) and a one-shot toast (main-loop config reload).
     let (config, source) =
-        match crate::lsp::config::try_load_config(&snap.workspace_root, Some(&uri)) {
+        match crate::lsp::config::try_load_config(&snap.workspace_folders, Some(&uri)) {
             Ok(loaded) => loaded,
             Err(err) => {
                 log::warn!("Refusing to format {}: {err}", uri.as_str());
                 return None;
             }
         };
-    let workspace_root = snap.workspace_root.clone();
+    let workspace_root = snap.workspace_root_for(&uri);
 
     if is_uri_excluded(&uri, &config, &source, workspace_root.as_deref()) {
         log::info!(
@@ -139,7 +139,7 @@ pub(crate) fn format_range(
 
     let text = snap.document_content(&uri)?;
     // Refuse to range-format under a broken config (see `format_document`).
-    let config = match crate::lsp::config::try_load_config(&snap.workspace_root, Some(&uri)) {
+    let config = match crate::lsp::config::try_load_config(&snap.workspace_folders, Some(&uri)) {
         Ok((config, _source)) => config,
         Err(err) => {
             log::warn!("Refusing to range-format {}: {err}", uri.as_str());

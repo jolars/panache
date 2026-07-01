@@ -38,4 +38,5 @@ mod lsp {
     pub(super) mod test_references;
     pub(super) mod test_rename;
     pub(super) mod test_semantic_tokens;
+    pub(super) mod test_workspace_folders;
 }

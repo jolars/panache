@@ -201,7 +201,7 @@ impl ClientSender {
 pub(crate) struct StateSnapshot {
     analysis: crate::salsa::Analysis,
     pub(crate) document_map: Arc<DocumentMap>,
-    pub(crate) workspace_root: Option<PathBuf>,
+    pub(crate) workspace_folders: Vec<PathBuf>,
 }
 
 impl StateSnapshot {
@@ -244,9 +244,15 @@ impl StateSnapshot {
         ))
     }
 
+    /// The workspace folder that best contains `uri` (longest-prefix match),
+    /// falling back to the first folder. Drives multi-root config resolution.
+    pub(crate) fn workspace_root_for(&self, uri: &Uri) -> Option<PathBuf> {
+        crate::lsp::config::select_workspace_root(&self.workspace_folders, Some(uri))
+    }
+
     /// Load config with URI-based flavor detection.
     pub(crate) fn config(&self, uri: &Uri) -> Config {
-        load_config(&self.workspace_root, Some(uri))
+        load_config(&self.workspace_folders, Some(uri))
     }
 
     /// Document text + config in one call.
@@ -322,7 +328,7 @@ pub(crate) struct GlobalState {
     /// Open documents. `Arc` so snapshots clone it in O(1); writers use
     /// [`Arc::make_mut`] for copy-on-write single-writer semantics.
     pub(crate) document_map: Arc<DocumentMap>,
-    pub(crate) workspace_root: Option<PathBuf>,
+    pub(crate) workspace_folders: Vec<PathBuf>,
     pub(crate) runtime_settings: LspRuntimeSettings,
 
     /// Whether the client advertised support for the pull diagnostics model at
@@ -400,7 +406,7 @@ impl GlobalState {
         Self {
             sender,
             document_map: Arc::new(DocumentMap::new()),
-            workspace_root: None,
+            workspace_folders: Vec::new(),
             runtime_settings: LspRuntimeSettings::default(),
             supports_pull_diagnostics: false,
             supports_diagnostic_refresh: false,
@@ -431,7 +437,7 @@ impl GlobalState {
     /// this adds a one-shot `window/showMessage` and clears the dedup record when
     /// the file parses again, so a later breakage re-notifies.
     pub(crate) fn load_config_notifying(&mut self, uri: &Uri) -> crate::Config {
-        match crate::lsp::config::try_load_config(&self.workspace_root, Some(uri)) {
+        match crate::lsp::config::try_load_config(&self.workspace_folders, Some(uri)) {
             Ok((config, source)) => {
                 if let Some(path) = source.path() {
                     self.config_error_reports.remove(path);
@@ -455,7 +461,7 @@ impl GlobalState {
         StateSnapshot {
             analysis: crate::salsa::Analysis::new(self.salsa.clone()),
             document_map: Arc::clone(&self.document_map),
-            workspace_root: self.workspace_root.clone(),
+            workspace_folders: self.workspace_folders.clone(),
         }
     }
 

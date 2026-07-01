@@ -157,7 +157,7 @@ pub(crate) fn manifest_publishes(snap: &StateSnapshot, uri: &Uri) -> (Vec<Publis
 /// [`DiagnosticCollection`](crate::lsp::global_state::DiagnosticCollection)
 /// clears any prior error (clear-on-fix).
 pub(crate) fn config_publishes(snap: &StateSnapshot, uri: &Uri) -> Vec<Publish> {
-    let Err(err) = crate::lsp::config::try_load_config(&snap.workspace_root, Some(uri)) else {
+    let Err(err) = crate::lsp::config::try_load_config(&snap.workspace_folders, Some(uri)) else {
         return Vec::new();
     };
     let Some(target_uri) = Uri::from_file_path(&err.path) else {

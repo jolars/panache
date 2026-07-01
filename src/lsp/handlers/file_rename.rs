@@ -80,7 +80,9 @@ struct CandidateEdit {
 
 fn candidate_documents_for_scan(snap: &StateSnapshot) -> Vec<DocInput> {
     let mut by_path: HashMap<PathBuf, DocInput> = HashMap::new();
-    if let Some(root) = snap.workspace_root.as_ref() {
+    // Scan every workspace folder; a rename can touch documents in any of them.
+    // The `by_path` map dedupes documents reachable from more than one folder.
+    for root in &snap.workspace_folders {
         let has_quarto = root.join("_quarto.yml").exists();
         let has_bookdown = root.join("_bookdown.yml").exists();
 

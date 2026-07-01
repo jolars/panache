@@ -92,8 +92,9 @@ spec-coverage audit (see `docs/guide/lsp.qmd` "LSP Specification Coverage").
   citation previews) until an item is focused
 - [ ] `codeAction/resolve` + advertise `codeActionKinds` - compute edits lazily
   and let clients filter actions by kind
-- [ ] `workspace/didChangeWorkspaceFolders` - advertised
-  (`change_notifications: true`) but currently unhandled
+- [x] `workspace/didChangeWorkspaceFolders` - multi-root workspaces; config
+  resolves per-document against the containing folder, and add/remove
+  re-resolves open documents live
 - [ ] `workspace/configuration` - pull settings from the client instead of
   relying only on discovered config files
 - [ ] `workspace/executeCommand` - server-side commands backing complex code

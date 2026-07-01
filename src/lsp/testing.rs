@@ -145,6 +145,23 @@ impl LspTester {
         self.gs.on_initialize(params);
     }
 
+    /// Initialize with multiple workspace folders (multi-root), exercising
+    /// `workspace/didChangeWorkspaceFolders` and per-document config resolution.
+    pub fn initialize_with_folders(&mut self, root_uris: &[&str]) {
+        let workspace_folders = root_uris
+            .iter()
+            .map(|uri| WorkspaceFolder {
+                uri: uri.parse().unwrap(),
+                name: "workspace".to_string(),
+            })
+            .collect();
+        let params = InitializeParams {
+            workspace_folders: Some(workspace_folders),
+            ..Default::default()
+        };
+        self.gs.on_initialize(params);
+    }
+
     pub fn initialize_result(&mut self, root_uri: &str) -> InitializeResult {
         self.initialize_result_with_options(root_uri, None)
     }
@@ -213,6 +230,24 @@ impl LspTester {
     pub fn did_change_watched_files(&mut self, files: Vec<FileEvent>) {
         let params = DidChangeWatchedFilesParams { changes: files };
         handlers::file_watcher::did_change_watched_files(&mut self.gs, params);
+    }
+
+    pub fn did_change_workspace_folders(&mut self, added: &[&str], removed: &[&str]) {
+        let to_folders = |uris: &[&str]| {
+            uris.iter()
+                .map(|uri| WorkspaceFolder {
+                    uri: uri.parse().unwrap(),
+                    name: "workspace".to_string(),
+                })
+                .collect()
+        };
+        let params = DidChangeWorkspaceFoldersParams {
+            event: WorkspaceFoldersChangeEvent {
+                added: to_folders(added),
+                removed: to_folders(removed),
+            },
+        };
+        handlers::workspace_folders::did_change_workspace_folders(&mut self.gs, params);
     }
 
     pub fn did_change_configuration(&mut self, settings: serde_json::Value) {

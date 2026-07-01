@@ -71,7 +71,7 @@ pub(crate) fn completion(
     // or inside a path-bearing Quarto shortcode argument.
     if link_ctx_opt.is_some() || shortcode_ctx_opt.is_some() {
         let doc_path = snap.document_state(uri).and_then(|s| s.path);
-        let ws_root = snap.workspace_root.clone();
+        let ws_root = snap.workspace_root_for(uri);
 
         let request = if let Some(ctx) = link_ctx_opt {
             link_dest_path_request(&ctx, doc_path.as_deref())

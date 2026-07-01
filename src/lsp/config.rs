@@ -10,10 +10,34 @@ use crate::lsp::uri_ext::UriExt;
 /// If `document_uri` is provided, the file extension will be used to auto-detect
 /// the flavor (.qmd → Quarto, .Rmd/.Rmarkdown → RMarkdown)
 pub(crate) fn load_config(
-    workspace_root: &Option<PathBuf>,
+    workspace_folders: &[PathBuf],
     document_uri: Option<&Uri>,
 ) -> crate::Config {
-    load_config_with_source(workspace_root, document_uri).0
+    load_config_with_source(workspace_folders, document_uri).0
+}
+
+/// Pick the workspace folder that best contains `document_uri`: the longest
+/// folder path that is a prefix of the document's path. Falls back to the first
+/// folder when nothing matches (or the uri has no file path), and `None` when
+/// the list is empty. This is what makes config resolution multi-root aware —
+/// a document in a second folder resolves against that folder's `panache.toml`,
+/// not the first folder's.
+pub(crate) fn select_workspace_root(
+    folders: &[PathBuf],
+    document_uri: Option<&Uri>,
+) -> Option<PathBuf> {
+    let doc_path: Option<PathBuf> =
+        document_uri.and_then(|uri| uri.to_file_path().map(|p| p.into_owned()));
+    if let Some(path) = doc_path.as_deref() {
+        let best = folders
+            .iter()
+            .filter(|folder| path.starts_with(folder))
+            .max_by_key(|folder| folder.as_os_str().len());
+        if let Some(folder) = best {
+            return Some(folder.clone());
+        }
+    }
+    folders.first().cloned()
 }
 
 /// Like [`load_config`] but also returns the [`ConfigSource`] so callers can
@@ -24,10 +48,10 @@ pub(crate) fn load_config(
 /// error — refuse to format, publish a diagnostic, toast — use
 /// [`try_load_config`] instead.
 pub(crate) fn load_config_with_source(
-    workspace_root: &Option<PathBuf>,
+    workspace_folders: &[PathBuf],
     document_uri: Option<&Uri>,
 ) -> (crate::Config, ConfigSource) {
-    match try_load_config(workspace_root, document_uri) {
+    match try_load_config(workspace_folders, document_uri) {
         Ok(loaded) => loaded,
         Err(e) => {
             log::warn!("Failed to load config: {e}");
@@ -44,13 +68,16 @@ pub(crate) fn load_config_with_source(
 /// genuine parse/validation failure of a config file yields `Err`. A non-parse
 /// I/O error (e.g. unreadable file) is logged and treated as "no config".
 pub(crate) fn try_load_config(
-    workspace_root: &Option<PathBuf>,
+    workspace_folders: &[PathBuf],
     document_uri: Option<&Uri>,
 ) -> Result<(crate::Config, ConfigSource), ConfigError> {
     // Convert URI to file path for flavor detection
     let input_file: Option<PathBuf> =
         document_uri.and_then(|uri| uri.to_file_path().map(|p| p.into_owned()));
 
+    // Multi-root: resolve against the folder that best contains the document,
+    // so a document in a second workspace folder uses that folder's config.
+    let workspace_root = select_workspace_root(workspace_folders, document_uri);
     if let Some(root) = workspace_root.as_ref() {
         // Start the config walk at the file's directory (so a `panache.toml`
         // closer to the file shadows one at the workspace root). Project-root
@@ -150,5 +177,58 @@ mod tests {
     #[test]
     fn default_config_leaves_plain_markdown_as_default() {
         assert_eq!(config_for("doc.md").flavor, Flavor::default());
+    }
+
+    /// Build an absolute URI for a file path rooted at the OS temp dir, so
+    /// `Uri::from_file_path` succeeds on every host.
+    fn uri_under(components: &[&str]) -> Uri {
+        let mut path = std::env::temp_dir();
+        for c in components {
+            path.push(c);
+        }
+        Uri::from_file_path(&path).expect("uri")
+    }
+
+    fn dir_under(components: &[&str]) -> PathBuf {
+        let mut path = std::env::temp_dir();
+        for c in components {
+            path.push(c);
+        }
+        path
+    }
+
+    #[test]
+    fn select_workspace_root_picks_longest_prefix() {
+        let folders = vec![dir_under(&["ws"]), dir_under(&["ws", "nested"])];
+        let uri = uri_under(&["ws", "nested", "doc.md"]);
+        assert_eq!(
+            select_workspace_root(&folders, Some(&uri)),
+            Some(dir_under(&["ws", "nested"]))
+        );
+    }
+
+    #[test]
+    fn select_workspace_root_falls_back_to_first_when_no_match() {
+        let folders = vec![dir_under(&["alpha"]), dir_under(&["beta"])];
+        let uri = uri_under(&["gamma", "doc.md"]);
+        assert_eq!(
+            select_workspace_root(&folders, Some(&uri)),
+            Some(dir_under(&["alpha"]))
+        );
+    }
+
+    #[test]
+    fn select_workspace_root_none_on_empty() {
+        let uri = uri_under(&["ws", "doc.md"]);
+        assert_eq!(select_workspace_root(&[], Some(&uri)), None);
+    }
+
+    #[test]
+    fn select_workspace_root_first_when_no_uri() {
+        let folders = vec![dir_under(&["alpha"]), dir_under(&["beta"])];
+        assert_eq!(
+            select_workspace_root(&folders, None),
+            Some(dir_under(&["alpha"]))
+        );
     }
 }
