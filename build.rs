@@ -80,7 +80,7 @@ fn generate_cli_markdown() -> Result<()> {
     let mut document = String::new();
     document.push_str("---\n");
     document.push_str("title: CLI Reference\n");
-    document.push_str("description: >\n  Comprehensive reference for the Panache CLI, including all commands, options,\nand usage examples.\n");
+    document.push_str("description: >\n  Comprehensive reference for the Panache CLI, including all commands, options,\n  and usage examples.\n");
     document.push_str("---\n\n");
     document.push_str(&markdown);
 
