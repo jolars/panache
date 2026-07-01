@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.53.0](https://github.com/jolars/panache/compare/panache-code-v2.52.0...panache-code-v2.53.0) (2026-07-01)
+
+### Features
+- wire mdsvex flavor through LSP, CLI, and editor ([`89e1e79`](https://github.com/jolars/panache/commit/89e1e792162217af7ad268ce743d8f01117c6080))
+
+### Dependencies
+- updated panache to v2.60.0
+
 ## [2.52.0](https://github.com/jolars/panache/compare/panache-code-v2.51.0...panache-code-v2.52.0) (2026-06-24)
 
 ### Dependencies

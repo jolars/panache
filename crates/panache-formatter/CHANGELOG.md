@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.18.0](https://github.com/jolars/panache/compare/panache-formatter-v0.17.0...panache-formatter-v0.18.0) (2026-07-01)
+
+### Features
+- **parser:** treat standalone Svelte spans as opaque blocks ([`414d441`](https://github.com/jolars/panache/commit/414d441f8990f8874a604b63fd13b50fa5ce0564))
+- **parser:** align myst defaults with myst-parser ([`4232185`](https://github.com/jolars/panache/commit/4232185235ffb74b898c0332e9e8400bd98f88a9))
+- **formatter:** route myst directive bodies to external tools ([`81c19f6`](https://github.com/jolars/panache/commit/81c19f659b95fdaaa335dec14e11a1c978f24f48))
+- **parser:** parse myst verbatim-bodies ([`2d8a516`](https://github.com/jolars/panache/commit/2d8a51622766163b5963626ea4fe38d299179d47))
+- **parser:** parse MyST directive option blocks ([`17990eb`](https://github.com/jolars/panache/commit/17990eb07e397762f28e2365c95c064dc590cba1))
+- **parser:** add MyST flavor scaffolding ([`b4bdd84`](https://github.com/jolars/panache/commit/b4bdd84f56d8957583b1eb2ca4527d0d4952c1a5))
+- add python-markdown admonitions and pymdownx details ([`b37a5cc`](https://github.com/jolars/panache/commit/b37a5cc2887029953eeb44b673a2fed39f3550be)), fixes [#396](https://github.com/jolars/panache/issues/396)
+
+### Bug Fixes
+- **formatter:** keep block markers inline in sentence wrap ([`3d8717d`](https://github.com/jolars/panache/commit/3d8717d2d3bbfb69dac24fef7715329d54588df0))
+- **formatter:** hoist folded `>-` onto key line ([`0744175`](https://github.com/jolars/panache/commit/07441752bd5ea74e4d2325001112d3f4db4217e1)), fixes [#400](https://github.com/jolars/panache/issues/400)
+- **parser:** parse headerless multiline tables with a dash-run closer ([`ab7e7d3`](https://github.com/jolars/panache/commit/ab7e7d315433e6e11d220c2735d2e7d4d884c10a)), fixes [#398](https://github.com/jolars/panache/issues/398)
+
+### Dependencies
+- updated crates/panache-parser to v0.20.0
+
 ## [0.17.0](https://github.com/jolars/panache/compare/panache-formatter-v0.16.0...panache-formatter-v0.17.0) (2026-06-24)
 
 ### Features

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [2.60.0](https://github.com/jolars/panache/compare/v2.59.0...v2.60.0) (2026-07-01)
 
 ### Highlights
 
@@ -16,6 +16,46 @@ This release introduces experimental support for two new flavors:
   scientific and technical writing. Myst is built on top of CommonMark (which
   Panache is compliant with), but adds Quarto/R Markdown-style extensions for
   citations, cross-references, and directives.
+
+### Features
+- **parser:** add MyST AST wrappers ([`e5d7ba8`](https://github.com/jolars/panache/commit/e5d7ba838d4afda1cc6ede8b20b5274dbb50f622))
+- **config:** add Ruff-style `extend` for config inheritance ([`3202d5e`](https://github.com/jolars/panache/commit/3202d5eed89d7a59ff866aee53c99129b8989474))
+- **parser:** treat standalone Svelte spans as opaque blocks ([`414d441`](https://github.com/jolars/panache/commit/414d441f8990f8874a604b63fd13b50fa5ce0564))
+- **lsp:** add multi-root workspaces ([`3ce0f93`](https://github.com/jolars/panache/commit/3ce0f93a5ac87163721634991f343a43e4c67603))
+- **lsp:** support `textDocument/documentHighlight` ([`1436780`](https://github.com/jolars/panache/commit/14367800d3fa4c9cf5f8b155d49df632679a3c44))
+- **parser:** align myst defaults with myst-parser ([`4232185`](https://github.com/jolars/panache/commit/4232185235ffb74b898c0332e9e8400bd98f88a9))
+- **formatter:** route myst directive bodies to external tools ([`81c19f6`](https://github.com/jolars/panache/commit/81c19f659b95fdaaa335dec14e11a1c978f24f48))
+- **parser:** parse myst verbatim-bodies ([`2d8a516`](https://github.com/jolars/panache/commit/2d8a51622766163b5963626ea4fe38d299179d47))
+- **parser:** parse MyST directive option blocks ([`17990eb`](https://github.com/jolars/panache/commit/17990eb07e397762f28e2365c95c064dc590cba1))
+- **parser:** add MyST flavor scaffolding ([`b4bdd84`](https://github.com/jolars/panache/commit/b4bdd84f56d8957583b1eb2ca4527d0d4952c1a5))
+- **parser:** split standalone block-tag sequences in CST ([`9bf0005`](https://github.com/jolars/panache/commit/9bf00052b23f594281b9ef0f0025556ea1ae58b4))
+- add `llms.txt` ([`bb1630a`](https://github.com/jolars/panache/commit/bb1630aac64fbbe3591b916419de93946dcc9abf))
+- **parser:** gate YAML tab-indent diagnostics per consumer ([`dffefc8`](https://github.com/jolars/panache/commit/dffefc8d391888f08fbcbafb3200c0034e4bbe9d))
+- **config:** move `line-width`/`line-ending` under `[format]` ([`382ee5d`](https://github.com/jolars/panache/commit/382ee5d09ddf253d3ca30454a2956feb3dad4261))
+- **formatters:** add html to biome ([`bdd09a4`](https://github.com/jolars/panache/commit/bdd09a44a390b6c31b7cf4af3416531a9eb11341))
+- **formatters:** add ojs to prettier and biome ([`1d6d2d6`](https://github.com/jolars/panache/commit/1d6d2d67d1b3ab55d7781a5279b61d27d12ce97e))
+- **linter:** report bib-key duplicates against project manifest ([`074912a`](https://github.com/jolars/panache/commit/074912a5583395eb1da6bca0821da2b938e9b83d))
+- add python-markdown admonitions and pymdownx details ([`b37a5cc`](https://github.com/jolars/panache/commit/b37a5cc2887029953eeb44b673a2fed39f3550be)), fixes [#396](https://github.com/jolars/panache/issues/396)
+- wire mdsvex flavor through LSP, CLI, and editor ([`89e1e79`](https://github.com/jolars/panache/commit/89e1e792162217af7ad268ce743d8f01117c6080))
+- add mdsvex flavor with opaque Svelte template spans ([`983632a`](https://github.com/jolars/panache/commit/983632ac09ff66c469f74d834452773f59f8a960))
+
+### Bug Fixes
+- **parser:** treat `{toctree}` body as verbatim ([`1ad3e87`](https://github.com/jolars/panache/commit/1ad3e878d63b967db18a083e8c622f00039a6132))
+- **linter:** skip verbatim MyST bodies in `html-entities` ([`fa41d83`](https://github.com/jolars/panache/commit/fa41d831cc21c68fd27e9dfd0a7a7aea2f892e1e))
+- **formatter:** keep block markers inline in sentence wrap ([`3d8717d`](https://github.com/jolars/panache/commit/3d8717d2d3bbfb69dac24fef7715329d54588df0))
+- **linter:** tailor chunk-label prefix to language ([`fd66a98`](https://github.com/jolars/panache/commit/fd66a98995f0ab4ad44c43a51368c6b9caebf449))
+- **parser:** parse headerless multiline tables with a dash-run closer ([`ab7e7d3`](https://github.com/jolars/panache/commit/ab7e7d315433e6e11d220c2735d2e7d4d884c10a)), fixes [#398](https://github.com/jolars/panache/issues/398)
+- **lsp:** self-heal referenced files without watch events ([`286ae13`](https://github.com/jolars/panache/commit/286ae138dc735608b07c54054cb2c560986a7860))
+- **linter:** scope `duplicate-bibliography-key` to declaring docs ([`38a0437`](https://github.com/jolars/panache/commit/38a0437e9157cd02bf87774612e460ebe898b256))
+- **formatter:** hoist folded `>-` onto key line ([`0744175`](https://github.com/jolars/panache/commit/07441752bd5ea74e4d2325001112d3f4db4217e1)), fixes [#400](https://github.com/jolars/panache/issues/400)
+- **parser:** open brace-info code fences in CommonMark ([`179cb1c`](https://github.com/jolars/panache/commit/179cb1c6f4b876708d48cda827594b0282ff4b90))
+- **parser:** span inline math across a newline (Pandoc only) ([`9b7905e`](https://github.com/jolars/panache/commit/9b7905eba103ff61d0ecbcf624e00e8032e036d2))
+- **parser:** span inline math across a single newline ([`ace2ab4`](https://github.com/jolars/panache/commit/ace2ab429ddc017e235247a9bd077d6cdf8b199d))
+- **parser:** require left word boundary for bare URIs ([`f7b6334`](https://github.com/jolars/panache/commit/f7b6334c45902592955e5a8bb24b9545f2ba7223))
+
+### Dependencies
+- updated crates/panache-formatter to v0.18.0
+- updated crates/panache-parser to v0.20.0
 
 ## [2.59.0](https://github.com/jolars/panache/compare/v2.58.0...v2.59.0) (2026-06-24)
 
