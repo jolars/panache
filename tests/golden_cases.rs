@@ -156,6 +156,7 @@ golden_test_cases!(
     alerts,
     alerts_disabled,
     myst_directive,
+    myst_toctree,
     myst_block_break,
     myst_code_block_body,
     blankline_concatenation,

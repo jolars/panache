@@ -37,21 +37,31 @@ pub(crate) struct DirectiveOpen {
     pub indent_len: usize,
     /// Byte length of the `{name}` token, braces included.
     pub name_len: usize,
-    /// Whether the directive's body is verbatim (literal code/math) rather than
-    /// recursively-parsed markdown. True for `{code}`, `{code-block}`,
-    /// `{code-cell}`, and `{math}`, whose bodies must survive formatting
-    /// byte-for-byte. See [`is_verbatim_directive`].
+    /// Whether the directive's body is verbatim (preserved byte-for-byte)
+    /// rather than recursively-parsed markdown. See [`is_verbatim_directive`]
+    /// for which directives qualify and why.
     pub is_verbatim: bool,
 }
 
 /// Whether a directive `name` (without braces) has a verbatim body that must be
-/// passed through formatting unchanged.
+/// passed through formatting unchanged rather than reflowed as prose.
 ///
-/// These mirror `myst-parser`/MyST-NB directives that capture a literal source
-/// `value` (code or math) rather than nested markdown: reflowing them joins
-/// lines and drops the indentation that the content depends on.
+/// Two kinds of directive qualify:
+///
+/// - **Literal source** (`code`, `code-block`, `code-cell`, `math`): mirror
+///   `myst-parser`/MyST-NB directives that capture a literal source `value`
+///   (code or math) rather than nested markdown. Reflowing them joins lines and
+///   drops the indentation the content depends on.
+/// - **Line-oriented entry lists** (`toctree`): the body is a newline-delimited
+///   list of entries (document references, optionally `Title <target>`), not
+///   prose. Parsing it as a paragraph and reflowing collapses each entry onto
+///   one line, which fuses five separate toc entries into a single malformed
+///   one. Preserving the body verbatim keeps one entry per line.
 fn is_verbatim_directive(name: &str) -> bool {
-    matches!(name, "code" | "code-block" | "code-cell" | "math")
+    matches!(
+        name,
+        "code" | "code-block" | "code-cell" | "math" | "toctree"
+    )
 }
 
 fn is_name_char(c: char) -> bool {
@@ -224,6 +234,14 @@ mod tests {
         // Argument and option-bearing openers keep the flag.
         let d = try_parse_directive_open("```{code-block} python\n", &ext_backtick()).unwrap();
         assert!(d.is_verbatim);
+    }
+
+    #[test]
+    fn toctree_body_is_verbatim() {
+        // `toctree` entries are line-oriented (one document reference per
+        // line); the body must be preserved verbatim, not reflowed as prose.
+        let d = try_parse_directive_open("```{toctree}\n", &ext_backtick()).unwrap();
+        assert!(d.is_verbatim, "toctree body is a line-oriented entry list");
     }
 
     #[test]

@@ -1181,7 +1181,10 @@ from the body.
 
 Directives whose body is literal content---`{code}`, `{code-block}`,
 `{code-cell}`, and `{math}`---are treated as **verbatim**: their body is passed
-through unchanged, so indentation and line breaks are never reflowed.
+through unchanged, so indentation and line breaks are never reflowed. The
+`{toctree}` directive is also verbatim, since its body is a line-oriented list
+of entries (one document reference per line) rather than prose; reflowing it
+would fuse the entries onto a single line and break the table of contents.
 
 Input
 

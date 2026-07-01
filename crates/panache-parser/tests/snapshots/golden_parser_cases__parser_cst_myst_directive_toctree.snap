@@ -1,0 +1,44 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..104
+  MYST_DIRECTIVE@0..104
+    MYST_DIRECTIVE_OPEN@0..13
+      MYST_DIRECTIVE_FENCE@0..3 "```"
+      MYST_DIRECTIVE_NAME@3..12 "{toctree}"
+      NEWLINE@12..13 "\n"
+    MYST_DIRECTIVE_OPTION@13..26
+      MYST_DIRECTIVE_OPTION_MARKER@13..14 ":"
+      MYST_DIRECTIVE_OPTION_NAME@14..22 "maxdepth"
+      MYST_DIRECTIVE_OPTION_MARKER@22..23 ":"
+      WHITESPACE@23..24 " "
+      MYST_DIRECTIVE_OPTION_VALUE@24..25 "2"
+      NEWLINE@25..26 "\n"
+    MYST_DIRECTIVE_OPTION@26..35
+      MYST_DIRECTIVE_OPTION_MARKER@26..27 ":"
+      MYST_DIRECTIVE_OPTION_NAME@27..33 "hidden"
+      MYST_DIRECTIVE_OPTION_MARKER@33..34 ":"
+      NEWLINE@34..35 "\n"
+    MYST_DIRECTIVE_OPTION@35..54
+      MYST_DIRECTIVE_OPTION_MARKER@35..36 ":"
+      MYST_DIRECTIVE_OPTION_NAME@36..43 "caption"
+      MYST_DIRECTIVE_OPTION_MARKER@43..44 ":"
+      WHITESPACE@44..45 " "
+      MYST_DIRECTIVE_OPTION_VALUE@45..53 "Contents"
+      NEWLINE@53..54 "\n"
+    MYST_DIRECTIVE_BODY@54..100
+      NEWLINE@54..55 "\n"
+      TEXT@55..65 "Home<self>"
+      NEWLINE@65..66 "\n"
+      TEXT@66..76 "quickstart"
+      NEWLINE@76..77 "\n"
+      TEXT@77..84 "gallery"
+      NEWLINE@84..85 "\n"
+      TEXT@85..95 "comparison"
+      NEWLINE@95..96 "\n"
+      TEXT@96..99 "api"
+      NEWLINE@99..100 "\n"
+    MYST_DIRECTIVE_CLOSE@100..104
+      MYST_DIRECTIVE_FENCE@100..103 "```"
+      NEWLINE@103..104 "\n"
