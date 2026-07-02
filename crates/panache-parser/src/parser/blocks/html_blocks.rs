@@ -1836,6 +1836,17 @@ pub(crate) fn parse_html_block_with_wrapper(
     let mut content_lines: Vec<&str> = Vec::new();
     let mut found_closing = false;
 
+    // Pandoc: an unclosed fenced div (`::: x`) opened inside the body
+    // greedily consumes the following `</div>` line as a `RawBlock`, so it
+    // does NOT close the outer HTML `<div>`. Track body-level fence nesting
+    // and suspend the depth-aware close match while a fence is open. Gated
+    // to Pandoc + the `fenced_divs` extension so CommonMark (where `:::` is
+    // ordinary text and `<div>` stays opaque) is unaffected.
+    let fence_suspends_close = config.dialect == crate::options::Dialect::Pandoc
+        && config.extensions.fenced_divs
+        && depth_aware_tag.is_some();
+    let mut body_fence_depth: usize = 0;
+
     // Parse content until we find the closing marker
     while current_pos < lines.len() {
         let line = lines[current_pos];
@@ -1852,15 +1863,37 @@ pub(crate) fn parse_html_block_with_wrapper(
             break;
         }
 
+        // Track body-level fenced-div nesting before the close check so an
+        // open fence suspends the outer `</div>` match (see the note at the
+        // fence tracker above).
+        if fence_suspends_close {
+            if crate::parser::blocks::fenced_divs::try_parse_div_fence_open(inner).is_some() {
+                body_fence_depth += 1;
+            } else if body_fence_depth > 0
+                && crate::parser::blocks::fenced_divs::is_div_closing_fence(inner)
+            {
+                body_fence_depth -= 1;
+            }
+        }
+
         // Check for closing marker. Under depth-aware mode (Pandoc dialect)
         // count opens/closes of the same tag name and only close when depth
         // returns to 0; otherwise fall back to substring-match on the line.
         let line_closes = match &depth_aware_tag {
             Some(tag_name) => {
-                let (opens, closes) = count_tag_balance(inner, tag_name);
-                depth += opens as i64;
-                depth -= closes as i64;
-                depth <= 0
+                if fence_suspends_close && body_fence_depth > 0 {
+                    // Inside an open fenced div: the `</div>` line is body
+                    // content the fence swallows, not the outer close. Do
+                    // not advance `depth` or close here — the whole body
+                    // (including `</div>`) lifts on the no-close path with
+                    // an implicit EOF close, matching pandoc-native.
+                    false
+                } else {
+                    let (opens, closes) = count_tag_balance(inner, tag_name);
+                    depth += opens as i64;
+                    depth -= closes as i64;
+                    depth <= 0
+                }
             }
             None => is_closing_marker(inner, &block_type),
         };

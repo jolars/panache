@@ -261,6 +261,7 @@ golden_test_cases!(
     headerless_table,
     horizontal_rules,
     html_block,
+    html_block_div_fenced_div_body,
     html_block_commonmark_type6_type7,
     html_block_raw_comment,
     html_block_raw_pre,

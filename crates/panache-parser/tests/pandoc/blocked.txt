@@ -23,8 +23,23 @@
 # suppresses the same-line strict-block lift when the after-close
 # trailing holds inter-tag TEXT before another matched-pair tag, keeping
 # the line opaque for `split_html_block_by_tags`. See allowlist 472/475/
-# 476/477. The `<div>` inter-tag variant (`<div>x</div> y <div>z</div>`
-# -> `Div`/`Plain`/`Div`) is NOT yet handled — it would need the splitter
-# to emit `Div` per tag (or a depth-safe structural lift) rather than
-# `RawBlock`, and risks the projector's `HTML_BLOCK_DIV`-without-
-# structural-inner panic. Not in corpus; deferred.
+# 476/477. Three `<div>`-family variants remain divergent (verified
+# 2026-07-02, not in corpus):
+#   (1) inter-tag text: `<div>x</div> y <div>z</div>` and the no-ws form
+#       `<div>foo</div>bar<div>baz</div>` -> pandoc `Div`/`Plain`/`Div`;
+#       panache lifts the first div then inlines the rest into one `Para`
+#       (RawInline `<div>`). Needs multi-div-per-line structural lift, OR
+#       the splitter to emit `Div` per pair (risks the HTML_BLOCK_DIV-
+#       without-structural-inner panic; discouraged per the skill).
+#   (2) paragraph-leads-div: `foo <div>bar</div> baz` -> pandoc
+#       `Plain[foo]`/`Div[bar]`/`Para[baz]`; panache keeps one `Para` with
+#       RawInline tags (the general inline-parser boundary the 0472 note
+#       feared).
+# Both want a parser structural lift, not projector byte-walking; each is a
+# full-phase effort. Deferred.
+#
+# FIXED 2026-07-02 (Phase A, corpus 0478): fenced-div reopened inside html
+# div `<div>\n:::x\n</div>` -> pandoc `Div[Div(x)[RawBlock "</div>"]]`. The
+# body-scan loop now tracks fenced-div nesting (`body_fence_depth`) and
+# suspends the `</div>` close match while a fence is open, so the `</div>`
+# lifts into the fence body via the implicit-close path.

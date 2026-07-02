@@ -610,3 +610,6 @@
 475
 476
 477
+
+# html-block (Phase A — fenced-div-in-html-div. An unclosed fenced div (`::: x`) opened inside an HTML `<div>` body greedily consumes the following `</div>` line as a `RawBlock`, so it does NOT close the outer div (`<div>\n:::x\n</div>` -> `Div [Div(x) [RawBlock "</div>"]]`, outer div implicitly closed at EOF). Parser fix in `parse_html_block`'s body-scan loop: a `body_fence_depth` counter (bumped by `try_parse_div_fence_open`, dropped by `is_div_closing_fence`) suspends the depth-aware `</div>` close match while a fence is open, so the whole body (including `</div>`) lifts on the no-close path with an implicit close. Interleaved shapes still pair normally: `<div>\n:::x\n:::\n</div>` closes the fence first, then `</div>` closes the outer div (`Div [Div(x) []]`). Gated to Pandoc + the `fenced_divs` extension; CommonMark keeps the opaque `HTML_BLOCK` (`:::` is ordinary text there) — paired parser goldens pin the divergence.)
+478
