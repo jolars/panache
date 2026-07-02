@@ -930,14 +930,24 @@ design decisions, and per-session workflow. Parser invariants:
 
 - [x] Math parser producing a lossless structural TeX CST for inline and display
   math (`MATH_CONTENT` subtree; groups, environments, commands, alignment,
-  scripts, comments) with a diagnostics side-channel. Landed in
+  scripts, comments, and `\left`/`\right` delimiter pairs). Landed in
   `crates/panache-parser/src/parser/math.rs`.
-- [x] Surface math diagnostics (unclosed/mismatched braces and environments)
-  through the linter and LSP. Landed as the always-on `math-syntax` lint
-  rule (`src/linter/rules/math_content.rs`), surfaced via the registry to
-  CLI + LSP. Derives the five diagnostics directly from the embedded
-  `MATH_CONTENT` CST shape (no re-parse); spans are the offending tokens'
-  host ranges.
+- [x] Surface math diagnostics (unclosed/mismatched braces and environments,
+  unbalanced `\left`/`\right`) through the linter and LSP. Landed as the
+  always-on `math-syntax` lint rule (`src/linter/rules/math_content.rs`),
+  surfaced via the registry to CLI + LSP. All diagnostics derive from the
+  embedded `MATH_CONTENT` CST shape via the single shared
+  `syntax::math_diagnostics` (no re-parse, no side-channel; also consumed by
+  the formatter to leave malformed math verbatim); spans are the offending
+  tokens' host ranges.
+- [ ] Migrate the math formatter's `\left`/`\right` line-break tracking to the
+  `MATH_DELIMITED` node. The break-candidate scan
+  (`crates/panache-formatter/src/formatter/math/linebreak.rs`) and
+  `command_class` (`operators.rs`) still track delimiter depth by command
+  *text* (`name == "left"`/`"right"`), which is now partly redundant with
+  the structural node. Harmless as a fallback today (formatter goldens are
+  byte-identical), but node-awareness would let the scan treat a delimited
+  run as one opaque operand instead of re-deriving depth.
 - [x] Math formatter that reformats content semantics-safely (align `&` columns,
   indent environment bodies, normalize `\\`) while preserving idempotency
   (`format(format(math)) == format(math)`), behind an experimental gate.
