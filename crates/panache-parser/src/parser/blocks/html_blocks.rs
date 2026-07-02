@@ -1812,16 +1812,32 @@ pub(crate) fn parse_html_block_with_wrapper(
                         String::with_capacity(same_line_trailing.len() + post_nl.len());
                     trailing_text.push_str(same_line_trailing);
                     trailing_text.push_str(post_nl);
-                    let mut inner_options = config.clone();
-                    let refdefs = config.refdef_labels.clone().unwrap_or_default();
-                    inner_options.refdef_labels = Some(refdefs.clone());
-                    let inner_root = crate::parser::parse_with_refdefs(
-                        &trailing_text,
-                        Some(inner_options),
-                        refdefs,
-                    );
-                    let mut bq = None;
-                    graft_document_children(builder, &inner_root, LastParaDemote::Never, &mut bq);
+                    if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
+                        // `<div>x</div> y <div>z</div>`: peel each further
+                        // matched `<div>...</div>` pair in the trailing into
+                        // its own sibling `HTML_BLOCK_DIV`, with inter-tag
+                        // text as demoted `Plain` blocks. A plain reparse of
+                        // the trailing keeps mid-line `<div>`s as inline raw
+                        // HTML (`Para [.., RawInline "<div>", ..]`); pandoc-
+                        // native lifts each to a block-level `Div`.
+                        graft_same_line_div_peel(builder, &trailing_text, config);
+                    } else {
+                        let mut inner_options = config.clone();
+                        let refdefs = config.refdef_labels.clone().unwrap_or_default();
+                        inner_options.refdef_labels = Some(refdefs.clone());
+                        let inner_root = crate::parser::parse_with_refdefs(
+                            &trailing_text,
+                            Some(inner_options),
+                            refdefs,
+                        );
+                        let mut bq = None;
+                        graft_document_children(
+                            builder,
+                            &inner_root,
+                            LastParaDemote::Never,
+                            &mut bq,
+                        );
+                    }
                 }
                 return start_pos + 1;
             }
@@ -2154,16 +2170,30 @@ pub(crate) fn parse_html_block_with_wrapper(
                         String::with_capacity(close_trailing.len() + close_post_nl.len());
                     trailing_text.push_str(close_trailing);
                     trailing_text.push_str(close_post_nl);
-                    let mut inner_options = config.clone();
-                    let refdefs = config.refdef_labels.clone().unwrap_or_default();
-                    inner_options.refdef_labels = Some(refdefs.clone());
-                    let inner_root = crate::parser::parse_with_refdefs(
-                        &trailing_text,
-                        Some(inner_options),
-                        refdefs,
-                    );
-                    let mut bq = None;
-                    graft_document_children(builder, &inner_root, LastParaDemote::Never, &mut bq);
+                    if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV && bq_depth == 0 {
+                        // Multi-line div variant of `<div>x</div> y
+                        // <div>z</div>` — the close line carries the
+                        // inter-tag text and a further `<div>` pair. Peel
+                        // each into a sibling `HTML_BLOCK_DIV` (see
+                        // `graft_same_line_div_peel`).
+                        graft_same_line_div_peel(builder, &trailing_text, config);
+                    } else {
+                        let mut inner_options = config.clone();
+                        let refdefs = config.refdef_labels.clone().unwrap_or_default();
+                        inner_options.refdef_labels = Some(refdefs.clone());
+                        let inner_root = crate::parser::parse_with_refdefs(
+                            &trailing_text,
+                            Some(inner_options),
+                            refdefs,
+                        );
+                        let mut bq = None;
+                        graft_document_children(
+                            builder,
+                            &inner_root,
+                            LastParaDemote::Never,
+                            &mut bq,
+                        );
+                    }
                     current_pos += 1;
                     return current_pos;
                 }
@@ -3094,6 +3124,95 @@ fn try_split_close_line_depth_aware<'a>(
 ) -> Option<(&'a str, &'a str)> {
     let (close_start, _close_end) = matched_close_offset(line, tag_name)?;
     Some((&line[..close_start], &line[close_start..]))
+}
+
+/// Locate the next `<tag ...>...</tag>` matched pair in `s`. Returns
+/// `(open_start, pair_end)` where `open_start` is the byte offset of the
+/// open `<` and `pair_end` is one past the matched close's `>`. Opens
+/// without a depth-zero matched close (unclosed) are skipped. Close-only
+/// forms (`</tag>`) never match an open. Quote-aware throughout.
+fn find_next_matched_pair(s: &str, tag_name: &str) -> Option<(usize, usize)> {
+    let bytes = s.as_bytes();
+    let mut search = 0usize;
+    while let Some(rel) = bytes[search..].iter().position(|&b| b == b'<') {
+        let lt = search + rel;
+        // `locate_open_tag_close_gt` returns `None` for close tags and
+        // non-`<tag` shapes; when it matches, the returned index is the
+        // open tag's `>` relative to `s[lt..]`.
+        if let Some(gt_rel) = locate_open_tag_close_gt(&s[lt..], tag_name) {
+            let after_open = lt + gt_rel + 1;
+            if let Some((_close_start, close_end)) =
+                matched_close_offset(&s[after_open..], tag_name)
+            {
+                return Some((lt, after_open + close_end));
+            }
+        }
+        search = lt + 1;
+    }
+    None
+}
+
+/// Peel a same-line `<div>` trailing (the bytes after the first matched
+/// `</div>`) into alternating interstitial-text and `<div>...</div>`
+/// sibling blocks, matching pandoc-native's per-tag block split:
+/// `<div>x</div> y <div>z</div>` → `Div[Plain x], Plain[y], Div[Plain z]`.
+///
+/// Each segment is reparsed as a fresh document and grafted, so the CST
+/// stays byte-equal to source: only the final segment carries the source
+/// line's terminating newline, and no synthetic bytes are introduced.
+/// Inter-tag text between two divs demotes `Para`→`Plain` (butted
+/// between blocks); trailing text after the last div stays `Para`.
+/// Whitespace-only gaps parse to `BLANK_LINE` (no block emitted, bytes
+/// preserved) and are skipped by the projector.
+fn graft_same_line_div_peel(
+    builder: &mut GreenNodeBuilder<'static>,
+    trailing: &str,
+    config: &ParserOptions,
+) {
+    let mut rest = trailing;
+    loop {
+        match find_next_matched_pair(rest, "div") {
+            Some((open_start, pair_end)) => {
+                let interstitial = &rest[..open_start];
+                let div_segment = &rest[open_start..pair_end];
+                if !interstitial.is_empty() {
+                    emit_html_block_body_lifted(
+                        builder,
+                        interstitial,
+                        &[],
+                        "",
+                        LastParaDemote::SkipTrailingBlanks,
+                        config,
+                    );
+                }
+                emit_html_block_body_lifted(
+                    builder,
+                    div_segment,
+                    &[],
+                    "",
+                    LastParaDemote::Never,
+                    config,
+                );
+                rest = &rest[pair_end..];
+                if rest.is_empty() {
+                    break;
+                }
+            }
+            None => {
+                if !rest.is_empty() {
+                    emit_html_block_body_lifted(
+                        builder,
+                        rest,
+                        &[],
+                        "",
+                        LastParaDemote::Never,
+                        config,
+                    );
+                }
+                break;
+            }
+        }
+    }
 }
 
 /// Emit the open-tag line of a lift-eligible HTML block (div or non-div

@@ -329,6 +329,8 @@ golden_test_cases!(
     html_block_div_fenced_div_body_pandoc,
     html_block_div_inner_blocks_commonmark,
     html_block_div_inner_blocks_pandoc,
+    html_block_div_inter_tag_text_commonmark,
+    html_block_div_inter_tag_text_pandoc,
     html_block_div_blockquote_depth_2_commonmark,
     html_block_div_blockquote_depth_2_pandoc,
     html_block_div_blockquote_messy_commonmark,
