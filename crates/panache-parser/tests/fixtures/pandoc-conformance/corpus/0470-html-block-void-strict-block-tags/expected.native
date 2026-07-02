@@ -1,0 +1,6 @@
+[ RawBlock (Format "html") "<hr>"
+, RawBlock (Format "html") "<hr />"
+, RawBlock (Format "html") "<hr id=\"bar\">"
+, RawBlock (Format "html") "<col>"
+, RawBlock (Format "html") "<meta>"
+]

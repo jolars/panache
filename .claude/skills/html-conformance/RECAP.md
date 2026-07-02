@@ -246,16 +246,21 @@ interleave; `parse_pandoc_blocks` (inter-tag text reparse via
 `collect_html_block_text_skip_bq_markers` (also `html_raw_block`
 verbatim-in-bq); table-cell reparses.
 
-- **7c side effect: `<hr>` (no `/`) opens nest.** `<hr>` is a
-  lift-eligible matched-pair tag in panache (pre-existing quirk;
-  pandoc treats it as void). After 7c the open-only lift recurses, so
-  `<hr>\n<hr />\n<hr id="bar">` nests trailing tags as child
-  HTML_BLOCKs under the first `<hr>` (self-closing `<hr />` terminate;
-  trailing `<hr id>` stays a clean open with HTML_ATTRS → id now
-  exposed to salsa, consistent with the non-div-attr divergence).
-  Lossless + projection-correct (9 sibling RawBlocks) + idempotent,
-  just cosmetically odd. Pinned by `writer_html_blocks`. Real fix:
-  classify `<hr>` as void (out of 7c scope).
+- **Void strict-block tags (`col`, `hr`, `meta`) close on the open
+  line.** These are HTML void elements that live in `PANDOC_BLOCK_TAGS`
+  (strict block: always split, DO interrupt a paragraph) but have no
+  close form. `PANDOC_VOID_STRICT_BLOCK_TAGS` (2026-07-02) makes the
+  parser emit `closes_at_open_tag: true` / `depth_aware: false` for
+  them under Pandoc, so `<hr>\n<hr>\n<hr>` is three sibling
+  `HTML_BLOCK`s, NOT nested (fixes the pre-7c matched-pair-body-lift
+  quirk). They're excluded from `is_pandoc_lift_eligible_block_tag` +
+  `is_pandoc_matched_pair_tag` and stay OUT of the dispatcher's
+  `cannot_interrupt` void set (distinct from `PANDOC_VOID_BLOCK_TAGS` =
+  `area`/`embed`/`source`/`track`, which DON'T interrupt). Attrs are no
+  longer split into HTML_ATTRS (`<hr id>` stays opaque — pandoc lifts no
+  anchor there). CommonMark keeps type-6 (block until blank line). Don't
+  add `col`/`hr`/`meta` to `PANDOC_VOID_BLOCK_TAGS` — that would wrongly
+  make them non-interrupting.
 
 ### Structural lift (Fix #3 / Fix #4 family)
 
@@ -419,72 +424,63 @@ verbatim-in-bq); table-cell reparses.
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-07-02 (Phase 7b — blockquote standalone-tag split)
+## Latest session — 2026-07-02 (void strict-block tags — `<hr>`/`<col>`/`<meta>`)
 
-Conformance: **html 268 → 271** (3 new corpus pins, 0467-0469). 469
+Conformance: **html 271 → 273** (2 new corpus pins, 0470-0471). 471
 total, 1 fail (pre-existing blocked 0390). Workspace: only the
 pre-existing `r_air_formats_equals_spacing_in_quarto_r_block` external-
-formatter failure remains (fails on clean baseline too — `air` version
-quirk, unrelated). CST-fidelity win: a single line of ≥ 2 standalone
-block-level tags inside a blockquote (`> </p></div>`, `> <embed
-src="a"><embed src="b">`, `> </p><embed>`) now emits one structural
-`HTML_BLOCK_TAG` per tag instead of one baked TEXT token, so consumers
-see the per-tag split without re-tokenizing bytes.
-
-**Diagnostic finding (prior target #4 was a non-bug):** the "salsa
-`<div id>` anchor false-positive" was an artifact of a stray
-`/tmp/panache.toml` (`flavor = "myst"`) shadowing test files under
-`/tmp/…` — config discovery walks up from the input file's dir, so MyST
-(CommonMark-based, no div lift) was applied and the id never registered.
-In a clean dir the `<div id>` anchor resolves correctly. Dropped from
-the target list; folded into Persistent traps (Disk + tooling).
+formatter failure remains (fails on clean baseline too — unrelated).
+Resolved the prior session's #1 target: the 7c `<hr>`-nesting quirk.
+`<hr>`, `<col>`, and `<meta>` are HTML void elements that were
+classified only as strict-block (`PANDOC_BLOCK_TAGS`), so the parser
+opened a depth-aware block that swallowed following lines as a
+matched-pair body lift (`<hr>\n<hr>\n<hr>` nested the trailing tags
+under the first). They now close on the open-tag line and emit sibling
+`HTML_BLOCK`s.
 
 ### What landed
 
-- Parser: `try_parse_standalone_block_tags_split` dropped its
-  `bq_depth == 0` guard. The dispatcher emits `> ` prefix tokens as
-  siblings of `HTML_BLOCK`, so `strip_line_0_for_emission` yields clean
-  `</p></div>` and the segment scan splits it. Inherently safe: if the
-  strip leaves any non-tag bytes (e.g. an un-stripped list marker),
-  `split_line_into_standalone_tags` returns `None` and the block falls
-  through to the legacy byte walker.
-- Projector unchanged: the split shape (≥ 2 `HTML_BLOCK_TAG`, no
-  `HTML_BLOCK_CONTENT`) already routes via
-  `html_block_is_standalone_tag_sequence` → `emit_html_block_structural`,
-  and the tags carry no bq markers (siblings), so `open_tag_raw_block_
-  text` returns the tag bytes directly. CommonMark stays baked (Pandoc-
-  gated). Block extent for `> </p></div>` was already single-line, so no
-  extent change; verified multi-line bq shapes (`> </p></div>\n> more`)
-  unaffected.
+- Parser (`html_blocks.rs`, only source file): new
+  `PANDOC_VOID_STRICT_BLOCK_TAGS = ["col", "hr", "meta"]` +
+  `is_pandoc_void_strict_block_tag_name`. The `is_block_tag` arm of
+  `try_parse_html_block_start` emits `closes_at_open_tag: true` /
+  `depth_aware: false` for these under Pandoc (CommonMark keeps type-6).
+  Excluded from `is_pandoc_lift_eligible_block_tag` +
+  `is_pandoc_matched_pair_tag`. Left OUT of the dispatcher's
+  `cannot_interrupt` set, so `foo\n<hr>` still splits Plain + RawBlock
+  (verified vs pandoc-native — unlike `<embed>` which stays inline).
+- Projector unchanged — the sibling opaque `HTML_BLOCK`s already route
+  through `split_html_block_by_tags` to one RawBlock each. `<hr id>`
+  attrs are no longer HTML_ATTRS-split (opaque, no salsa anchor lift),
+  matching pandoc's opaque RawBlock.
+- Verified: bq (`> foo\n> <hr>\n> bar` interrupts correctly), trailing
+  (`<hr> foo` → RawBlock + Para), nonsensical `</hr>` close (one
+  RawBlock). All match pandoc-native.
 
 ### Files in committable diff
 
-- `crates/panache-parser/src/parser/blocks/html_blocks.rs` (only source
-  file — no projector change); paired parser goldens
-  (`html_block_blockquote_standalone_close_pair_{pandoc,commonmark}`) +
-  snapshots; formatter golden `html_block_blockquote_standalone_tags`;
-  corpus 0467-0469 + allowlist + report.
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs`; parser
+  goldens (`html_block_void_strict_block_tags_{pandoc,commonmark}`) +
+  snapshots + updated `writer_html_blocks` snapshot; formatter golden
+  `html_block_void_strict_block_tags`; corpus 0470-0471 + allowlist +
+  report.
 
 ### Suggested next sub-targets
 
-1. **`<hr>` void classification** — stop `<hr>` absorbing following
-   lines (removes the 7c nesting quirk, pinned by `writer_html_blocks`).
-   Wide-ish blast radius; verify vs pandoc-native (`<hr>` is void there).
-2. **7e multi-tag interleave (D3)** — mixed sequences where tags and
+1. **7e multi-tag interleave (D3)** — mixed sequences where tags and
    inter-tag text interleave still go through `split_html_block_by_tags`.
-3. **Softbreak (0390)** — Comment/PI trailing-text softbreak continuation
+2. **Softbreak (0390)** — Comment/PI trailing-text softbreak continuation
    (`<!-- hi --> trailing\nmore`); needs open-paragraph carry across the
    HTML-block boundary or projector-side Para fusion. Still blocked.
-4. **Multi-line standalone-tag sequences** — 0304 `<embed>\n<embed>`
+3. **Multi-line standalone-tag sequences** — 0304 `<embed>\n<embed>`
    already emits two clean separate `HTML_BLOCK`s (no fidelity gap); the
-   remaining opaque case is mixed close/void with inter-tag text (see #2).
+   remaining opaque case is mixed close/void with inter-tag text (see #1).
 
 ### New trap
 
-None new to the parser split beyond the updated "Baked multi-tag TEXT vs
-structural split" bullet. The load-bearing finding this session — stray
-`/tmp/panache.toml` shadowing test files — is folded into Persistent
-traps (Disk + tooling).
+The `<hr>`/`col`/`meta` void-strict handling is folded into Persistent
+traps (Parser shape & losslessness) — replacing the now-resolved "7c
+side effect: `<hr>` opens nest" bullet.
 
 --------------------------------------------------------------------------------
 
@@ -493,6 +489,7 @@ traps (Disk + tooling).
 Newest first. One line per session: date — phase/sub-target — pass
 count delta — root cause / lever.
 
+- 2026-07-02 — Void strict-block tags (`<hr>`/`<col>`/`<meta>` → sibling `HTML_BLOCK`s, not nested) — html 271 → 273 — new `PANDOC_VOID_STRICT_BLOCK_TAGS`; `closes_at_open_tag: true` under Pandoc; excluded from lift/matched-pair but kept out of `cannot_interrupt`; resolves the 7c `<hr>`-nesting quirk; corpus 0470-0471.
 - 2026-07-02 — Phase 7c blockquote open-only lift (`> <section>foo\n> bar` → structural PARAGRAPH/HEADING child) — html 265 → 268 — `emit_html_block_body` takes `&ContainerPrefix` + `open_only` flag; no-close bq path routes through `emit_html_block_body_lifted_bq_messy`; projector unchanged; corpus 0464-0466.
 - 2026-07-02 — Phase 7b blockquote standalone-tag split (`> </p></div>` → one `HTML_BLOCK_TAG` per tag) — html 268 → 271 — dropped `try_parse_standalone_block_tags_split`'s `bq_depth == 0` guard (`> ` prefix is an `HTML_BLOCK` sibling, strip yields clean tags, non-tag bytes bail to byte walker); projector unchanged; corpus 0467-0469. Also disproved prior target #4 (`<div id>` anchor false-positive was a stray `/tmp/panache.toml` `flavor=myst`, not a bug).
 - 2026-07-02 — Phase 7c open-only body lift (non-div strict-block / inline-block open + trailing body, no close → structural CST body) — html 262 → 265 — `emit_html_block_body` non-div `HTML_BLOCK` + `bq_depth == 0` lift arm; projector `html_block_has_open_only_structural_lift`; bq stayed opaque; `<hr>`-nesting side effect pinned by `writer_html_blocks`.

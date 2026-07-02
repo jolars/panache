@@ -598,3 +598,6 @@
 467
 468
 469
+# html-block (Void strict-block tags — `<hr>`, `<col>`, `<meta>` are HTML void elements that live in pandoc's `blockHtmlTags` (strict block: they always split and DO interrupt a running paragraph, unlike the `eitherBlockOrInline` void set `<area>`/`<embed>`/`<source>`/`<track>`) yet have no closing form. The parser now closes their HTML block on the open-tag line (`closes_at_open_tag: true`, `depth_aware: false`) under Pandoc via the new `PANDOC_VOID_STRICT_BLOCK_TAGS` set, so `<hr>\n<hr>\n<hr>` emits three sibling `HTML_BLOCK`s (one `RawBlock` each) instead of nesting the trailing tags as children of the first via the pre-existing matched-pair body-lift quirk. They are excluded from `is_pandoc_lift_eligible_block_tag` and `is_pandoc_matched_pair_tag`, and stay OUT of the dispatcher's `cannot_interrupt` void set so `foo\n<hr>` still splits into `Plain [foo]` + `RawBlock "<hr>"`. Attrs are no longer split into `HTML_ATTRS` (pandoc keeps `<hr id="bar">` opaque — no anchor lift). CommonMark keeps the type-6 shape (block continues until a blank line) — paired parser goldens pin the divergence.)
+470
+471

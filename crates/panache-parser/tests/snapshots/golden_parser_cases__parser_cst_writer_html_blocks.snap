@@ -237,51 +237,39 @@ DOCUMENT@0..839
     NEWLINE@717..718 "\n"
   BLANK_LINE@718..719
     BLANK_LINE@718..719 "\n"
-  HTML_BLOCK@719..839
+  HTML_BLOCK@719..724
     HTML_BLOCK_TAG@719..724
-      TEXT@719..722 "<hr"
-      TEXT@722..723 ">"
+      TEXT@719..723 "<hr>"
       NEWLINE@723..724 "\n"
-    HTML_BLOCK@724..731
-      HTML_BLOCK_TAG@724..731
-        TEXT@724..730 "<hr />"
-        NEWLINE@730..731 "\n"
-    HTML_BLOCK@731..738
-      HTML_BLOCK_TAG@731..738
-        TEXT@731..737 "<hr />"
-        NEWLINE@737..738 "\n"
-    HTML_BLOCK@738..839
-      HTML_BLOCK_TAG@738..743
-        TEXT@738..741 "<hr"
-        TEXT@741..742 ">"
-        NEWLINE@742..743 "\n"
-      HTML_BLOCK@743..750
-        HTML_BLOCK_TAG@743..750
-          TEXT@743..749 "<hr />"
-          NEWLINE@749..750 "\n"
-      HTML_BLOCK@750..757
-        HTML_BLOCK_TAG@750..757
-          TEXT@750..756 "<hr />"
-          NEWLINE@756..757 "\n"
-      HTML_BLOCK@757..785
-        HTML_BLOCK_TAG@757..785
-          TEXT@757..784 "<hr class=\"foo\" id=\"b ..."
-          NEWLINE@784..785 "\n"
-      HTML_BLOCK@785..813
-        HTML_BLOCK_TAG@785..813
-          TEXT@785..812 "<hr class=\"foo\" id=\"b ..."
-          NEWLINE@812..813 "\n"
-      HTML_BLOCK@813..839
-        HTML_BLOCK_TAG@813..839
-          TEXT@813..816 "<hr"
-          WHITESPACE@816..817 " "
-          HTML_ATTRS@817..837
-            TEXT@817..824 "class=\""
-            ATTR_CLASS@824..827 "foo"
-            TEXT@827..828 "\""
-            WHITESPACE@828..829 " "
-            TEXT@829..833 "id=\""
-            ATTR_ID@833..836 "bar"
-            TEXT@836..837 "\""
-          TEXT@837..838 ">"
-          NEWLINE@838..839 "\n"
+  HTML_BLOCK@724..731
+    HTML_BLOCK_TAG@724..731
+      TEXT@724..730 "<hr />"
+      NEWLINE@730..731 "\n"
+  HTML_BLOCK@731..738
+    HTML_BLOCK_TAG@731..738
+      TEXT@731..737 "<hr />"
+      NEWLINE@737..738 "\n"
+  HTML_BLOCK@738..743
+    HTML_BLOCK_TAG@738..743
+      TEXT@738..742 "<hr>"
+      NEWLINE@742..743 "\n"
+  HTML_BLOCK@743..750
+    HTML_BLOCK_TAG@743..750
+      TEXT@743..749 "<hr />"
+      NEWLINE@749..750 "\n"
+  HTML_BLOCK@750..757
+    HTML_BLOCK_TAG@750..757
+      TEXT@750..756 "<hr />"
+      NEWLINE@756..757 "\n"
+  HTML_BLOCK@757..785
+    HTML_BLOCK_TAG@757..785
+      TEXT@757..784 "<hr class=\"foo\" id=\"b ..."
+      NEWLINE@784..785 "\n"
+  HTML_BLOCK@785..813
+    HTML_BLOCK_TAG@785..813
+      TEXT@785..812 "<hr class=\"foo\" id=\"b ..."
+      NEWLINE@812..813 "\n"
+  HTML_BLOCK@813..839
+    HTML_BLOCK_TAG@813..839
+      TEXT@813..838 "<hr class=\"foo\" id=\"b ..."
+      NEWLINE@838..839 "\n"

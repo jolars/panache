@@ -234,6 +234,28 @@ pub fn is_pandoc_void_block_tag_name(name: &str) -> bool {
     PANDOC_VOID_BLOCK_TAGS.contains(&lower.as_str())
 }
 
+/// Pandoc's *strict-block* void elements: HTML void tags (`col`, `hr`,
+/// `meta`) that live in [`PANDOC_BLOCK_TAGS`] (so they always split and
+/// DO interrupt a running paragraph, unlike the `eitherBlockOrInline`
+/// void set in [`PANDOC_VOID_BLOCK_TAGS`]) yet have no closing form.
+///
+/// Because they are void, the parser must close the block on the
+/// open-tag line (`closes_at_open_tag: true`, `depth_aware: false`);
+/// otherwise a bare `<hr>` would open a depth-aware block that swallows
+/// the following lines as a matched-pair body lift (the pre-7c quirk
+/// where `<hr>\n<hr>\n<hr>` nested the trailing tags as children rather
+/// than emitting three sibling `RawBlock`s). They stay OUT of the
+/// dispatcher's `cannot_interrupt` set, so `foo\n<hr>` still splits into
+/// `Plain [foo]` + `RawBlock "<hr>"`, matching pandoc-native.
+const PANDOC_VOID_STRICT_BLOCK_TAGS: &[&str] = &["col", "hr", "meta"];
+
+/// Whether `name` (case-insensitive) is a Pandoc strict-block void tag
+/// (`col`, `hr`, `meta`) — see [`PANDOC_VOID_STRICT_BLOCK_TAGS`].
+pub(crate) fn is_pandoc_void_strict_block_tag_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    PANDOC_VOID_STRICT_BLOCK_TAGS.contains(&lower.as_str())
+}
+
 /// Whether the given tag name is eligible for the Phase 6 / Fix #4
 /// structural body lift inside an `HTML_BLOCK` wrapper: it's a Pandoc
 /// block-level tag (strict-block from `PANDOC_BLOCK_TAGS` OR non-void
@@ -256,7 +278,9 @@ pub(crate) fn is_pandoc_lift_eligible_block_tag(name: &str) -> bool {
     if VERBATIM_TAGS.contains(&lower.as_str()) {
         return false;
     }
-    if PANDOC_VOID_BLOCK_TAGS.contains(&lower.as_str()) {
+    if PANDOC_VOID_BLOCK_TAGS.contains(&lower.as_str())
+        || PANDOC_VOID_STRICT_BLOCK_TAGS.contains(&lower.as_str())
+    {
         return false;
     }
     if lower == "div" {
@@ -278,7 +302,9 @@ pub(crate) fn is_pandoc_lift_eligible_block_tag(name: &str) -> bool {
 /// list item mid-construct.
 pub(crate) fn is_pandoc_matched_pair_tag(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
-    if PANDOC_VOID_BLOCK_TAGS.contains(&lower.as_str()) {
+    if PANDOC_VOID_BLOCK_TAGS.contains(&lower.as_str())
+        || PANDOC_VOID_STRICT_BLOCK_TAGS.contains(&lower.as_str())
+    {
         return false;
     }
     PANDOC_BLOCK_TAGS.contains(&lower.as_str())
@@ -465,12 +491,20 @@ pub(crate) fn try_parse_html_block_start(
         };
         if is_block_tag {
             let is_verbatim = VERBATIM_TAGS.contains(&tag_lower.as_str());
+            // Void strict-block tags (`col`, `hr`, `meta`) have no
+            // closing form, so under Pandoc the block must close on the
+            // open-tag line — otherwise a bare `<hr>` opens a depth-aware
+            // block and the matched-pair body lift swallows the following
+            // lines (`<hr>\n<hr>` nesting the second as a child instead of
+            // a sibling `RawBlock`). CommonMark keeps the type-6 shape
+            // (block continues until a blank line).
+            let is_void_strict = !is_commonmark && is_pandoc_void_strict_block_tag_name(&tag_lower);
             return Some(HtmlBlockType::BlockTag {
                 tag_name: tag_lower,
                 is_verbatim,
                 closed_by_blank_line: is_commonmark && !is_verbatim,
-                depth_aware: !is_commonmark,
-                closes_at_open_tag: false,
+                depth_aware: !is_commonmark && !is_void_strict,
+                closes_at_open_tag: is_void_strict,
                 is_closing,
             });
         }

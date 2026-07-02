@@ -266,6 +266,7 @@ golden_test_cases!(
     html_block_raw_pre,
     html_block_standalone_tags,
     html_block_blockquote_standalone_tags,
+    html_block_void_strict_block_tags,
     html_block_open_trailing,
     html_block_blockquote_open_trailing,
     html_block_comment_trailing_split,

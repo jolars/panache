@@ -1,0 +1,4 @@
+[ Plain [ Str "foo" ]
+, RawBlock (Format "html") "<hr>"
+, Para [ Str "bar" ]
+]
