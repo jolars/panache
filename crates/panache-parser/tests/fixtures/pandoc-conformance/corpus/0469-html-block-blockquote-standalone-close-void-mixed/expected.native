@@ -1,0 +1,5 @@
+[ BlockQuote
+    [ RawBlock (Format "html") "</p>"
+    , RawBlock (Format "html") "<embed>"
+    ]
+]

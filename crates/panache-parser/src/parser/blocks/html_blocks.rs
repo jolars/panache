@@ -1004,9 +1004,15 @@ fn split_line_into_standalone_tags(line: &str) -> Option<Vec<StandaloneTagSegmen
 ///
 /// Single-tag blocks (`</p>`, `<embed>`) stay on the legacy path —
 /// their CST is already faithful (one tag, one `HTML_BLOCK_TAG`) and
-/// changing it would churn snapshots with no fidelity gain. Blockquote
-/// context (`bq_depth > 0`) also stays on the legacy path. Returns the
-/// number of lines consumed (always 1) on success.
+/// changing it would churn snapshots with no fidelity gain.
+///
+/// Blockquote context (`bq_depth > 0`) is handled too: the dispatcher
+/// emits the `> ` prefix tokens as siblings, so the tags inside the
+/// `HTML_BLOCK` carry no bq markers and split cleanly. The prefix is
+/// stripped via `strip_line_0_for_emission`; if that strip leaves any
+/// non-tag bytes (e.g. an un-stripped list marker), the segment scan
+/// bails and the block falls through to the legacy byte walker. Returns
+/// the number of lines consumed (always 1) on success.
 fn try_parse_standalone_block_tags_split(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
@@ -1031,9 +1037,6 @@ fn try_parse_standalone_block_tags_split(
             ..
         }
     ) {
-        return None;
-    }
-    if prefix.bq_depth() != 0 {
         return None;
     }
     let first_inner = prefix.strip_line_0_for_emission(lines[start_pos]);

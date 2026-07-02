@@ -594,3 +594,7 @@
 464
 465
 466
+# html-block (Phase 7b blockquote extension — the standalone-tag split above now also fires inside a blockquote (`> </p></div>`, `> <embed src="a"><embed src="b">`, `> </p><embed>`). The dispatcher emits the `> ` prefix tokens as siblings of the `HTML_BLOCK`, so the tags inside carry no bq markers and split cleanly; `try_parse_standalone_block_tags_split` dropped its `bq_depth == 0` guard and now strips the line-0 prefix via `strip_line_0_for_emission` before scanning segments. If that strip leaves any non-tag bytes (e.g. an un-stripped list marker), `split_line_into_standalone_tags` bails and the block falls through to the legacy byte walker, so the change is inherently safe. Projector routes via the same `html_block_is_standalone_tag_sequence` predicate — no new byte walking. Matches pandoc-native `BlockQuote [RawBlock "</p>", RawBlock "</div>"]`. CommonMark keeps the opaque baked shape — paired parser goldens pin the divergence.)
+467
+468
+469

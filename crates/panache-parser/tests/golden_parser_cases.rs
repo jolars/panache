@@ -409,6 +409,8 @@ golden_test_cases!(
     html_block_standalone_close_pair_pandoc,
     html_block_standalone_void_pair_commonmark,
     html_block_standalone_void_pair_pandoc,
+    html_block_blockquote_standalone_close_pair_commonmark,
+    html_block_blockquote_standalone_close_pair_pandoc,
     html_block_inline_block_blockquote_commonmark,
     html_block_inline_block_blockquote_pandoc,
     html_block_inline_block_blockquote_messy_commonmark,
