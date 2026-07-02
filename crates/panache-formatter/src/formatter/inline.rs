@@ -530,23 +530,21 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             // verbatim (byte-identical to before).
             if is_display_math {
                 let opts = MathFormatOptions::from_config(config, MathContext::Display);
-                if opts.enabled {
-                    let clean = InlineMath::cast(node.clone())
-                        .map(|m| m.content())
-                        .unwrap_or_else(|| content.clone());
-                    format!("{}\n{}\n{}", open, math::format_math(&clean, &opts), close)
-                } else {
-                    format!("{}\n{}\n{}", open, content.trim(), close)
+                let clean = InlineMath::cast(node.clone())
+                    .map(|m| m.content())
+                    .unwrap_or_else(|| content.clone());
+                match math::format_math(&clean, &opts) {
+                    Some(body) => format!("{}\n{}\n{}", open, body, close),
+                    None => format!("{}\n{}\n{}", open, content.trim(), close),
                 }
             } else {
                 let opts = MathFormatOptions::from_config(config, MathContext::Inline);
-                if opts.enabled {
-                    let clean = InlineMath::cast(node.clone())
-                        .map(|m| m.content())
-                        .unwrap_or_else(|| content.clone());
-                    format!("{}{}{}", open, math::format_math(&clean, &opts), close)
-                } else {
-                    format!("{}{}{}", open, content, close)
+                let clean = InlineMath::cast(node.clone())
+                    .map(|m| m.content())
+                    .unwrap_or_else(|| content.clone());
+                match math::format_math(&clean, &opts) {
+                    Some(body) => format!("{}{}{}", open, body, close),
+                    None => format!("{}{}{}", open, content, close),
                 }
             }
         }
@@ -589,14 +587,17 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             if is_environment {
                 let opts = MathFormatOptions::from_config(config, MathContext::EnvironmentBody);
                 result.push_str(open);
-                if opts.enabled {
-                    result.push('\n');
-                    result.push_str(&math::format_math(&content, &opts));
-                    result.push('\n');
-                } else {
-                    result.push_str(&content);
-                    if !content.ends_with('\n') {
+                match math::format_math(&content, &opts) {
+                    Some(body) => {
                         result.push('\n');
+                        result.push_str(&body);
+                        result.push('\n');
+                    }
+                    None => {
+                        result.push_str(&content);
+                        if !content.ends_with('\n') {
+                            result.push('\n');
+                        }
                     }
                 }
                 result.push_str(close);
@@ -611,52 +612,55 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             result.push('\n');
 
             let opts = MathFormatOptions::from_config(config, MathContext::Display);
-            if opts.enabled {
-                result.push_str(&math::format_math(&content, &opts));
-                result.push('\n');
-            } else {
-                // Process content: drop leading blank (whitespace-only) lines and
-                // trailing whitespace, strip common leading indentation, then
-                // re-indent every line by `math_indent`. Leading whitespace-only
-                // lines must be dropped rather than emitted: a blank line directly
-                // after the opening `$$` reparses as a paragraph break that splits
-                // the display math (pandoc ends `$$…$$` on any blank line), so
-                // emitting one is not lossless across passes. The opening marker's
-                // own trailing whitespace (`$$ `) surfaces here as exactly such a
-                // leading line. Stripping only full blank lines (not leading spaces
-                // of a content line) keeps each real line's indent visible to
-                // `min_indent`, so the re-indent stays idempotent.
-                let mut trimmed_content = content.trim_end();
-                while let Some((first, rest)) = trimmed_content.split_once('\n') {
-                    if first.trim().is_empty() {
-                        trimmed_content = rest;
-                    } else {
-                        break;
-                    }
+            match math::format_math(&content, &opts) {
+                Some(body) => {
+                    result.push_str(&body);
+                    result.push('\n');
                 }
-                if !trimmed_content.is_empty() {
-                    // Find minimum indentation across all non-empty lines
-                    let min_indent = trimmed_content
-                        .lines()
-                        .filter(|line| !line.trim().is_empty())
-                        .map(|line| line.len() - line.trim_start().len())
-                        .min()
-                        .unwrap_or(0);
-
-                    let pad = " ".repeat(config.math_indent);
-                    // Strip common indentation, then re-indent each line.
-                    for line in trimmed_content.lines() {
-                        let stripped = if line.len() >= min_indent {
-                            &line[min_indent..]
+                None => {
+                    // Process content: drop leading blank (whitespace-only) lines and
+                    // trailing whitespace, strip common leading indentation, then
+                    // re-indent every line by `math_indent`. Leading whitespace-only
+                    // lines must be dropped rather than emitted: a blank line directly
+                    // after the opening `$$` reparses as a paragraph break that splits
+                    // the display math (pandoc ends `$$…$$` on any blank line), so
+                    // emitting one is not lossless across passes. The opening marker's
+                    // own trailing whitespace (`$$ `) surfaces here as exactly such a
+                    // leading line. Stripping only full blank lines (not leading spaces
+                    // of a content line) keeps each real line's indent visible to
+                    // `min_indent`, so the re-indent stays idempotent.
+                    let mut trimmed_content = content.trim_end();
+                    while let Some((first, rest)) = trimmed_content.split_once('\n') {
+                        if first.trim().is_empty() {
+                            trimmed_content = rest;
                         } else {
-                            line
-                        };
-                        // Skip padding blank lines to avoid trailing whitespace.
-                        if !stripped.is_empty() {
-                            result.push_str(&pad);
-                            result.push_str(stripped);
+                            break;
                         }
-                        result.push('\n');
+                    }
+                    if !trimmed_content.is_empty() {
+                        // Find minimum indentation across all non-empty lines
+                        let min_indent = trimmed_content
+                            .lines()
+                            .filter(|line| !line.trim().is_empty())
+                            .map(|line| line.len() - line.trim_start().len())
+                            .min()
+                            .unwrap_or(0);
+
+                        let pad = " ".repeat(config.math_indent);
+                        // Strip common indentation, then re-indent each line.
+                        for line in trimmed_content.lines() {
+                            let stripped = if line.len() >= min_indent {
+                                &line[min_indent..]
+                            } else {
+                                line
+                            };
+                            // Skip padding blank lines to avoid trailing whitespace.
+                            if !stripped.is_empty() {
+                                result.push_str(&pad);
+                                result.push_str(stripped);
+                            }
+                            result.push('\n');
+                        }
                     }
                 }
             }

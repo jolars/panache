@@ -2680,14 +2680,17 @@ impl Formatter {
                             &self.config,
                             MathContext::EnvironmentBody,
                         );
-                        if opts.enabled {
-                            self.output.push('\n');
-                            self.output.push_str(&math::format_math(&content, &opts));
-                            self.output.push('\n');
-                        } else {
-                            self.output.push_str(&content);
-                            if !content.ends_with('\n') {
+                        match math::format_math(&content, &opts) {
+                            Some(body) => {
                                 self.output.push('\n');
+                                self.output.push_str(&body);
+                                self.output.push('\n');
+                            }
+                            None => {
+                                self.output.push_str(&content);
+                                if !content.ends_with('\n') {
+                                    self.output.push('\n');
+                                }
                             }
                         }
                     }
@@ -2704,15 +2707,18 @@ impl Formatter {
                 // Math content
                 if let Some(content) = math_content {
                     let opts = MathFormatOptions::from_config(&self.config, MathContext::Display);
-                    if opts.enabled {
-                        self.output.push_str(&math::format_math(&content, &opts));
-                        self.output.push('\n');
-                    } else {
-                        let math_indent = self.config.math_indent;
-                        for line in content.trim().lines() {
-                            self.output.push_str(&" ".repeat(math_indent));
-                            self.output.push_str(line.trim_end());
+                    match math::format_math(&content, &opts) {
+                        Some(body) => {
+                            self.output.push_str(&body);
                             self.output.push('\n');
+                        }
+                        None => {
+                            let math_indent = self.config.math_indent;
+                            for line in content.trim().lines() {
+                                self.output.push_str(&" ".repeat(math_indent));
+                                self.output.push_str(line.trim_end());
+                                self.output.push('\n');
+                            }
                         }
                     }
                 }

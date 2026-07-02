@@ -77,21 +77,23 @@ impl MathFormatOptions {
     }
 }
 
-/// Format clean math content (delimiters excluded, both in and out).
+/// Reflow clean math content (delimiters excluded, both in and out).
 ///
-/// Returns the input unchanged — never panicking, never erroring — on any bail
-/// condition: the gate is off, the content has an unescaped lone `$` (a
-/// preservation guard against cross-pass drift), or the structural parse
-/// reports a diagnostic (malformed math is never reflowed). Otherwise it
-/// re-emits the content per `STYLE.md`.
-pub fn format_math(input: &str, opts: &MathFormatOptions) -> String {
+/// Returns `None` — never panicking, never erroring — on any bail condition: the
+/// gate is off, the content has an unescaped lone `$` (a preservation guard
+/// against cross-pass drift), or the structural parse reports a diagnostic
+/// (malformed math is never reflowed). The caller then emits the content through
+/// its own verbatim path, so gate-off and malformed-gate-on stay byte-identical
+/// and no fence-padding normalization is duplicated here. On success it returns
+/// the reflowed content per `STYLE.md`.
+pub fn format_math(input: &str, opts: &MathFormatOptions) -> Option<String> {
     if !opts.enabled {
-        return input.to_string();
+        return None;
     }
     // Lone unescaped `$` inside content confuses delimiter handling downstream;
     // mirror the existing `has_unescaped_single_dollar_in_content` guard.
     if has_unescaped_single_dollar(input) {
-        return input.to_string();
+        return None;
     }
     let tree = SyntaxNode::new_root(parse_math_content(
         input,
@@ -100,11 +102,11 @@ pub fn format_math(input: &str, opts: &MathFormatOptions) -> String {
         },
     ));
     // Malformed math (unclosed/mismatched braces or environments) has an
-    // untrustworthy row/column structure — leave it exactly as written.
+    // untrustworthy row/column structure — leave it to the caller's verbatim path.
     if !math_diagnostics(&tree).is_empty() {
-        return input.to_string();
+        return None;
     }
-    render::render(&tree, opts)
+    Some(render::render(&tree, opts))
 }
 
 /// String-level twin of `DisplayMath::has_unescaped_single_dollar_in_content`
@@ -150,7 +152,13 @@ mod tests {
     }
 
     fn fmt(input: &str, context: MathContext) -> String {
-        format_math(input, &opts(context))
+        fmt_with(input, &opts(context))
+    }
+
+    /// Reflow with explicit options; unwraps because these cases are well-formed
+    /// (`format_math` only returns `None` for gate-off / lone-`$` / malformed).
+    fn fmt_with(input: &str, o: &MathFormatOptions) -> String {
+        format_math(input, o).expect("expected reflowable math")
     }
 
     /// Every well-formed case must be a fixed point of itself.
@@ -161,13 +169,14 @@ mod tests {
     }
 
     #[test]
-    fn gate_off_is_verbatim() {
+    fn gate_off_returns_none() {
+        // Gate off ⇒ the caller emits verbatim through its own path.
         let off = MathFormatOptions {
             enabled: false,
             ..opts(MathContext::Display)
         };
         let input = "\\begin{aligned}\nx&=1\\\\\ny &= 22\n\\end{aligned}";
-        assert_eq!(format_math(input, &off), input);
+        assert_eq!(format_math(input, &off), None);
     }
 
     #[test]
@@ -184,16 +193,20 @@ mod tests {
     }
 
     #[test]
-    fn malformed_math_is_verbatim() {
-        // Unclosed group → diagnostic → bail.
+    fn malformed_math_bails() {
+        // Unclosed group → diagnostic → bail; the caller emits it verbatim. The
+        // end-to-end verbatim shape (no doubled fence newlines) is covered by the
+        // `math_malformed_delimiter_experimental` golden case.
         let input = "\\frac{1}{2";
-        assert_eq!(fmt(input, MathContext::Inline), input);
+        assert_eq!(format_math(input, &opts(MathContext::Inline)), None);
+        // An unclosed `\left` (a `MATH_DELIMITED` lacking `\right`) also bails.
+        assert_eq!(format_math("\\left( x", &opts(MathContext::Display)), None);
     }
 
     #[test]
-    fn lone_dollar_is_verbatim() {
+    fn lone_dollar_bails() {
         let input = "a $ b";
-        assert_eq!(fmt(input, MathContext::Inline), input);
+        assert_eq!(format_math(input, &opts(MathContext::Inline)), None);
     }
 
     #[test]
@@ -359,10 +372,10 @@ mod tests {
         // First `=` stays; the second starts a continuation aligned under it
         // (equality chain ⇒ relations stack under the first relation).
         let expected = "A = bbbbbbbbbb\n  = cccccccccc";
-        assert_eq!(format_math(input, &narrow), expected);
+        assert_eq!(fmt_with(input, &narrow), expected);
         // Re-feeding the broken (multi-line) form recomputes the same layout.
-        let once = format_math(input, &narrow);
-        assert_eq!(format_math(&once, &narrow), once);
+        let once = fmt_with(input, &narrow);
+        assert_eq!(fmt_with(&once, &narrow), once);
     }
 
     #[test]
@@ -371,7 +384,7 @@ mod tests {
         // to the pre-line-breaking behavior).
         let wide = opts(MathContext::Display); // line_width 80
         assert_eq!(
-            format_math("A = bbbbbbbbbb = cccccccccc", &wide),
+            fmt_with("A = bbbbbbbbbb = cccccccccc", &wide),
             "A = bbbbbbbbbb = cccccccccc"
         );
     }
@@ -386,9 +399,9 @@ mod tests {
         // Relations break first; each over-width segment nests its `+` term one
         // indent level deeper, under the relation's right-hand side.
         let expected = "A = aaaaaaaaaa\n    + bbbbbbbbbb\n  = cccccccccc\n    + dddddddddd";
-        assert_eq!(format_math(input, &narrow), expected);
-        let once = format_math(input, &narrow);
-        assert_eq!(format_math(&once, &narrow), once);
+        assert_eq!(fmt_with(input, &narrow), expected);
+        let once = fmt_with(input, &narrow);
+        assert_eq!(fmt_with(&once, &narrow), once);
     }
 
     #[test]
@@ -398,7 +411,7 @@ mod tests {
         // the rendered math). Regression for the logical-row re-join.
         let wide = opts(MathContext::Display);
         let input = "% leading comment\nx = 1";
-        assert_eq!(format_math(input, &wide), "% leading comment\nx = 1");
+        assert_eq!(fmt_with(input, &wide), "% leading comment\nx = 1");
         assert_idempotent(input, MathContext::Display);
     }
 
@@ -410,14 +423,14 @@ mod tests {
         };
         // A single over-width fraction with no top-level operator stays one line.
         let frac = "\\frac{aaaaaaaa}{bbbbbbbb}";
-        assert_eq!(format_math(frac, &narrow), frac);
+        assert_eq!(fmt_with(frac, &narrow), frac);
         // Relation *and* binary operators buried inside `\left(…\right)` are not
         // depth-0 break points, so this over-width row has no break candidate and
         // stays on one line (the broader binary-breaking scope must still respect
         // delimiter opacity).
         let paren = "\\left( xxxx = yyyy + wwww \\right)";
-        let once = format_math(paren, &narrow);
+        let once = fmt_with(paren, &narrow);
         assert!(!once.contains('\n'), "should not break: {once:?}");
-        assert_eq!(format_math(&once, &narrow), once);
+        assert_eq!(fmt_with(&once, &narrow), once);
     }
 }

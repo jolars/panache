@@ -171,7 +171,9 @@ fn corpus_cross_validates_against_pulldown_latex() {
             continue;
         };
 
-        let formatted = format_math(&input, &format_opts(context));
+        // `None` ⇒ non-reflowable (malformed / lone `$`): the caller emits the
+        // content verbatim, so the cross-validated output is the input itself.
+        let formatted = format_math(&input, &format_opts(context)).unwrap_or_else(|| input.clone());
         let Some(after) = render_mathml(&formatted) else {
             // The formatter turned oracle-parseable input into something the
             // oracle rejects — that is a real formatter bug.

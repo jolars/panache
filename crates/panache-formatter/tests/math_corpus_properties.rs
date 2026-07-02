@@ -9,9 +9,9 @@
 //!    byte-for-byte: `parse_math_content(x).text() == x`. (The corpus holds
 //!    bare content with no host container prefixes, so `tree.text()` is the right
 //!    surface — same shape as `debug format --checks losslessness`.)
-//! 3. **Gate-off verbatim.** `format_math(x, { enabled: false, .. }) == x`, so a
-//!    mis-wired call site can never change bytes when the experimental gate is
-//!    off.
+//! 3. **Gate-off returns `None`.** `format_math(x, { enabled: false, .. })` is
+//!    `None`, so the caller falls back to its verbatim path and a mis-wired call
+//!    site can never change bytes when the experimental gate is off.
 //!
 //! This is the load-bearing correctness signal; the `pulldown-latex`
 //! cross-validation in `math_cross_validation.rs` (Tier 2) is a secondary
@@ -117,26 +117,28 @@ fn corpus_satisfies_math_formatter_properties() {
             continue;
         }
 
-        // (3) Gate-off verbatim: the off path must never change bytes.
-        let off = format_math(&input, &opts(false, context));
-        if off != input {
+        // (3) Gate-off returns None: the caller then emits the content verbatim,
+        // so a mis-wired off call site can never change bytes.
+        if format_math(&input, &opts(false, context)).is_some() {
             failures.push(format!(
-                "[{id}] gate-off changed bytes:\n  input:\n{}\n  off:\n{}",
+                "[{id}] gate-off should return None (caller emits verbatim):\n  input:\n{}",
                 indent_block(&input),
-                indent_block(&off),
             ));
             continue;
         }
 
-        // (1) Idempotency: a second pass is a no-op.
-        let once = format_math(&input, &opts(true, context));
-        let twice = format_math(&once, &opts(true, context));
-        if once != twice {
-            failures.push(format!(
-                "[{id}] idempotency break:\n  pass1:\n{}\n  pass2:\n{}",
-                indent_block(&once),
-                indent_block(&twice),
-            ));
+        // (1) Idempotency: reflowing a reflowed result is a no-op. Non-reflowable
+        // content (malformed / lone `$`) returns None and is emitted verbatim by
+        // the caller, so there is nothing to iterate.
+        if let Some(once) = format_math(&input, &opts(true, context)) {
+            let twice = format_math(&once, &opts(true, context));
+            if twice.as_deref() != Some(once.as_str()) {
+                failures.push(format!(
+                    "[{id}] idempotency break:\n  pass1:\n{}\n  pass2:\n{}",
+                    indent_block(&once),
+                    indent_block(twice.as_deref().unwrap_or("<None>")),
+                ));
+            }
         }
     }
 
