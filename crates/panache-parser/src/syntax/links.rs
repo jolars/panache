@@ -108,6 +108,20 @@ impl LinkText {
             .map(|token| token.text().to_string())
             .collect()
     }
+
+    /// Returns the raw source text of the label (every byte between the
+    /// brackets), used for CommonMark reference-label matching.
+    ///
+    /// Unlike [`text_content`](Self::text_content), which collects only `TEXT`
+    /// tokens and therefore drops inline markup, this preserves the label
+    /// verbatim. That matters for shortcut/collapsed reference links whose
+    /// label parses as inline structure (e.g. a code span `` [`insta`] ``):
+    /// the reference definition stores its label as raw text, and the parser's
+    /// refdef map matches on raw text, so usage-side label extraction must do
+    /// the same or the labels won't compare equal.
+    pub fn raw_label(&self) -> String {
+        self.0.text().to_string()
+    }
 }
 
 pub struct LinkDest(SyntaxNode);

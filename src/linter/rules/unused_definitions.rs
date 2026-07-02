@@ -64,7 +64,7 @@ impl Rule for UnusedDefinitionsRule {
             }
             for range in ranges {
                 diagnostics.push(Diagnostic::warning(
-                    Location::from_range(*range, input),
+                    Location::from_range(label_bracket_range(input, *range), input),
                     "unused-definition-label",
                     format!("Reference definition '[{}]' is never used", label),
                 ));
@@ -77,7 +77,7 @@ impl Rule for UnusedDefinitionsRule {
             }
             for range in ranges {
                 diagnostics.push(Diagnostic::warning(
-                    Location::from_range(*range, input),
+                    Location::from_range(label_bracket_range(input, *range), input),
                     "unused-footnote-id",
                     format!("Footnote '[^{}]' is never used", id),
                 ));
@@ -147,6 +147,39 @@ fn collect_usage_labels(nodes: impl Iterator<Item = SyntaxNode>) -> UsageLabels 
     }
 }
 
+/// Narrow a definition's full-node range down to just its `[label]` (or
+/// `[^id]`) bracket span, so the diagnostic underlines the label rather than
+/// the whole definition line (destination URL or footnote body included).
+///
+/// Falls back to the original range if no bracket pair is found. Honors
+/// backslash escapes so an escaped `\]` inside the label doesn't close it.
+fn label_bracket_range(input: &str, range: rowan::TextRange) -> rowan::TextRange {
+    let start: usize = range.start().into();
+    let end: usize = range.end().into();
+    let Some(slice) = input.get(start..end) else {
+        return range;
+    };
+    let Some(open) = slice.find('[') else {
+        return range;
+    };
+    let bytes = slice.as_bytes();
+    let mut i = open + 1;
+    let mut escaped = false;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' if !escaped => escaped = true,
+            b']' if !escaped => {
+                let abs_start = (start + open) as u32;
+                let abs_end = (start + i + 1) as u32;
+                return rowan::TextRange::new(abs_start.into(), abs_end.into());
+            }
+            _ => escaped = false,
+        }
+        i += 1;
+    }
+    range
+}
+
 fn usage_label_from_link(link: Link) -> Option<String> {
     if link
         .syntax()
@@ -164,8 +197,11 @@ fn usage_label_from_link(link: Link) -> Option<String> {
             return Some(label);
         }
     }
+    // Match on the raw label source, not rendered text: a shortcut label may
+    // parse as inline structure (e.g. a code span `` [`insta`] ``) that
+    // `text_content` drops, which would fail to match the definition's label.
     link.text()
-        .map(|text| normalize_label(&text.text_content()))
+        .map(|text| normalize_label(&text.raw_label()))
         .filter(|label| !label.is_empty())
 }
 
@@ -324,6 +360,41 @@ mod tests {
         let input = "See [Label].\n\n[Label]: https://example.com\n";
         let diagnostics = parse_and_lint(input);
         assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn accepts_shortcut_reference_with_code_span_label() {
+        // `[`insta`]` is a shortcut reference link whose label is a code span.
+        // Its raw label matches the `[`insta`]:` definition, so the definition
+        // is used, not unused. The usage side must compare on raw label text,
+        // not rendered text (which would drop the code span and mismatch).
+        let input = "[`insta`]\n\n[`insta`]: https://insta.rs/\n";
+        let diagnostics = parse_and_lint(input);
+        assert!(
+            diagnostics.is_empty(),
+            "code-span shortcut label should count as a usage: {diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn unused_definition_span_covers_only_the_label() {
+        let input = "[unused]: https://example.org\n";
+        let diagnostics = parse_and_lint(input);
+        assert_eq!(diagnostics.len(), 1);
+        let range = diagnostics[0].location.range;
+        assert_eq!(
+            &input[range], "[unused]",
+            "span should cover only the label"
+        );
+    }
+
+    #[test]
+    fn unused_footnote_span_covers_only_the_label() {
+        let input = "[^2]: Unused.\n";
+        let diagnostics = parse_and_lint(input);
+        assert_eq!(diagnostics.len(), 1);
+        let range = diagnostics[0].location.range;
+        assert_eq!(&input[range], "[^2]", "span should cover only the label");
     }
 
     #[test]
