@@ -269,6 +269,15 @@ const PRESETS: &[FormatterPresetMetadata] = &[
         supported_languages: &["erlang", "erl"],
     },
     FormatterPresetMetadata {
+        name: "fatou",
+        url: "https://github.com/jolars/fatou",
+        description: "Formatter for the Julia programming language.",
+        cmd: "fatou",
+        args: &["format"],
+        stdin: true,
+        supported_languages: &["julia", "jl"],
+    },
+    FormatterPresetMetadata {
         name: "fish_indent",
         url: "https://fishshell.com/docs/current/cmds/fish_indent.html",
         description: "Indent or prettify fish shell scripts.",
@@ -691,6 +700,7 @@ pub fn formatter_preset_names() -> &'static [&'static str] {
         "cue-fmt",
         "dfmt",
         "efmt",
+        "fatou",
         "fish_indent",
         "fixjson",
         "gdformat",
@@ -800,6 +810,17 @@ mod tests {
             assert!(
                 presets.iter().any(|preset| preset.name == "runic"),
                 "Expected runic preset to support {language}"
+            );
+        }
+    }
+
+    #[test]
+    fn fatou_is_available_for_julia() {
+        for language in ["julia", "jl"] {
+            let presets = formatter_presets_for_language(language);
+            assert!(
+                presets.iter().any(|preset| preset.name == "fatou"),
+                "Expected fatou preset to support {language}"
             );
         }
     }

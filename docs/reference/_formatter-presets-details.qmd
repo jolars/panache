@@ -455,6 +455,25 @@ Command
 Type
 :   Stdin
 
+## `fatou`
+
+Formatter for the Julia programming language.
+
+Homepage
+:   <https://github.com/jolars/fatou>
+
+Supported Languages
+:   `julia`, `jl`
+
+Command
+:   `fatou`
+
+`args`
+:   `[format]`
+
+Type
+:   Stdin
+
 ## `fish_indent`
 
 Indent or prettify fish shell scripts.
