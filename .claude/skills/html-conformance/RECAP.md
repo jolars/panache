@@ -309,6 +309,22 @@ verbatim-in-bq); table-cell reparses.
   past trailing BLANK_LINEs), `OnlyIfLast` (non-div strict-block
   close — demote only when last child is PARAGRAPH, no trailing
   BLANK_LINE).
+- **Comment/PI trailing softbreak fusion is parser-side, gated on
+  `at_outermost_level`** (computed at the dispatcher from
+  `!ctx.in_fenced_div && !ctx.in_list && bq_depth == 0 &&
+  content_indent == 0 && myst_directive_closer.is_none()`, threaded
+  into `parse_html_block_with_wrapper` →
+  `try_parse_comment_pi_with_trailing_split`). At the outermost level,
+  `<!-- hi --> trailing\nmore` fuses the continuation into ONE `Para`
+  (pandoc): reparse `trailing + rest-of-doc`, graft ONLY the first
+  block, map `first.text_range().end()` back to a consumed-line count
+  (bytes ≤ `trailing.len()` = close line already counted; add each
+  fully-covered later line). Inside a container KEEP the close-line-
+  only split — a fresh suffix reparse doesn't know it's inside a
+  container, so a bare `:::` / `> ` / list-indent boundary would fuse
+  into the para (verified: bare `:::` is swallowed by a fresh-doc
+  para) and swallow the container close. CommonMark keeps opaque
+  HTML_BLOCK (whole first line). Corpus 0390.
 - **`HTML_BLOCK_DIV` retag at dispatcher is two-pronged** — fires iff
   `probe_open_tag_line_has_close_gt(ctx.content,"div")` (single-line)
   OR `pandoc_html_open_tag_closes(...)` (multi-line). Incomplete
@@ -479,60 +495,74 @@ verbatim-in-bq); table-cell reparses.
 | B | `<div>` inter-tag structural lift (`<div>x</div> y <div>z</div>`) | **Landed 2026-07-02.** `graft_same_line_div_peel` peels each pair into a sibling `HTML_BLOCK_DIV`; interstitial→`Plain`, tail→`Para`. Single-line + multi-line-first-div. Corpus 0479. Multi-line-SECOND-div deferred (depth model). Detail in Persistent traps. |
 | 6 | Lift inner HTML content into structural CST children | **All non-bq + bq shapes lifted** for `<div>` + non-div Pandoc strict-block tags (clean, open-trailing, butted/indented-close, same-line, empty, multi-line-open, depth-aware nested, multi-close, unclosed, multi-line-open+matched-close top-level+bq; inline-block matched-pair). List items + bq-in-listitem covered. `PARAGRAPH→PLAIN` retag at adjacency. All mechanisms in Persistent traps. **Pass count 105 → 257.** |
 | A | fenced-div-in-html-div (`<div>\n:::x\n</div>`) | **Landed 2026-07-02.** `body_fence_depth` suspends the `</div>` close while an inner `:::` fence is open; body lifts with implicit EOF close. Corpus 0478. Detail in Persistent traps. First of the remaining-gaps roadmap (A fenced-div-in-div, B `<div>` inter-tag, C 0390 softbreak, D paragraph-leads-tag). |
+| C | Comment/PI trailing softbreak fusion (`<!-- hi --> trailing\nmore`) | **Landed 2026-07-02.** `at_outermost_level` gate reparses trailing+rest, grafts first block, maps `text_range().end()` to a consumed-line count. Corpus 0390 (last html fail) → **html 100% (282/282), total 479/479**. Container cases stay close-line-split. Detail in Persistent traps. |
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-07-02 (Phase B — `<div>` inter-tag lift)
+## Latest session — 2026-07-02 (Phase C — comment/PI trailing softbreak)
 
-Conformance: **html 280 → 281 passing** (282 total, 0390 still the only
-fail); total **477 → 478 / 479**. Second phase of the remaining-gaps
-roadmap: A fenced-div-in-div (done), B `<div>` inter-tag (this), C 0390
-softbreak, D paragraph-leads-tag.
+Conformance: **html 281 → 282 passing** (282 total, **0 fail — html
+100%**); total **478 → 479 / 479 (100%)**. Third phase of the
+remaining-gaps roadmap: A fenced-div-in-div (done), B `<div>` inter-tag
+(done), C 0390 softbreak (this), D paragraph-leads-tag (deferred). Closes
+the last html conformance fail.
 
 ### What landed
 
-- `<div>x</div> y <div>z</div>` now projects `Div[Plain x], Plain[y],
-  Div[Plain z]` (was `Div[Plain x], Para[y, RawInline "<div>", z,
-  RawInline "</div>"]` — only the first div lifted; the rest reparsed as
-  a paragraph where the mid-line `<div>` got no block-start detection).
-- Fix: `graft_same_line_div_peel` loops `find_next_matched_pair` over the
-  after-first-close trailing, peeling each `<div>...</div>` pair into a
-  sibling `HTML_BLOCK_DIV` via a fresh-document reparse (col-0 open →
-  lifts). Interstitial text grafts as demoted `Plain`; tail text stays
-  `Para`; whitespace-only gaps → `BLANK_LINE` (bytes preserved, skipped).
-  Byte-lossless (only the final segment carries the newline). Parser-side
-  only — no projector change, no byte-walker growth.
-- Wired at both the single-line `same_line_closed` path and the multi-
-  line-first-div content-scan close-line path (gated `HTML_BLOCK_DIV` +
-  `bq_depth == 0`). Verified 7 variants + attrs (`<div id>`/`<div class>`
-  on both pairs) against pandoc-native — all match.
-- Confirmed the multi-line-SECOND-div shape (`</div> y <div>\n…`) stays
-  divergent (pre-existing depth-model limitation, not a regression) —
-  deferred, not in corpus.
+- `<!-- hi --> trailing\nmore` now projects `RawBlock, Para [trailing,
+  SoftBreak, more]` (was two separate `Para`s — the trailing split
+  consumed only the close line and the outer dispatcher started a fresh
+  paragraph on `more`).
+- Fix, parser-side only: `try_parse_comment_pi_with_trailing_split` gains
+  an `at_outermost_level` gate (computed at the dispatcher from
+  `!in_fenced_div && !in_list && bq_depth == 0 && content_indent == 0 &&
+  myst_directive_closer.is_none()`, threaded through
+  `parse_html_block_with_wrapper`). At the outermost level it reparses
+  `trailing + rest-of-doc`, grafts ONLY the first block, and maps
+  `first.text_range().end()` back to a consumed-line count — so the
+  parser's own greedy paragraph continuation decides the extent and the
+  outer dispatcher still owns everything past the paragraph.
+- Inside a container the close-line-only split is kept: a fresh suffix
+  reparse doesn't know it's inside a fenced div / bq / list, and a bare
+  `:::` / `> ` / list-indent boundary would fuse into the para (verified
+  bare `:::` is swallowed by a fresh-doc para) and swallow the container
+  close. Those container shapes stay divergent (pre-existing, not in
+  corpus). CommonMark keeps opaque HTML_BLOCK.
+- No projector change, no byte-walker growth. Byte-lossless (grafted
+  first-block bytes are contiguous with the comment marker).
 
 ### Files in committable diff
 
-- `crates/panache-parser/src/parser/blocks/html_blocks.rs` (peel helper +
-  `find_next_matched_pair`; two trailing-graft call sites).
-- Parser goldens `html_block_div_inter_tag_text_{pandoc,commonmark}` +
-  snapshots; formatter golden `html_block_div_inter_tag_text`.
-- Corpus 0479 + allowlist entry; `report.txt`/`report.json`; this RECAP.
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs` (helper gate +
+  reparse/graft-first/line-count; `#[allow(too_many_arguments)]`).
+- `crates/panache-parser/src/parser/block_dispatcher.rs` (`at_outermost_
+  level` computation + threaded arg).
+- Parser goldens `html_block_comment_trailing_softbreak_{pandoc,commonmark}`
+  + snapshots; formatter golden `html_block_comment_trailing_softbreak`.
+- Corpus 0390 moved blocked → allowlist; `report.txt`/`report.json`; this
+  RECAP.
 
 ### Suggested next sub-targets (ranked)
 
-1. **Phase C — 0390 softbreak (parser-faithful)**. Consume lazy-
-   continuation lines into the comment/PI trailing paragraph
-   (`try_parse_comment_pi_with_trailing_split`), return true consumed
-   count, yield at container boundaries. The lone remaining html fail.
-2. **Multi-line-second-div inter-tag** (`<div>a</div> y <div>\nz\n</div>`).
+1. **Multi-line-second-div inter-tag** (`<div>a</div> y <div>\nz\n</div>`).
    Requires the content-scan depth model to treat a `</div> … <div>`
    close line as closing-then-fresh-block, not depth-neutral. Medium-deep;
-   would complete the `<div>` inter-tag family.
+   would complete the `<div>` inter-tag family. Not in corpus.
+2. **Container comment/PI softbreak fusion** (`:::x\n<!-- --> t\nmore\n:::`,
+   bq/list variants). Extend Phase C past the `at_outermost_level` gate:
+   needs a container-end scan (stop at `:::` / `> ` / list-indent) so the
+   suffix reparse doesn't swallow the close. Currently divergent, not in
+   corpus.
 3. **Phase D — paragraph-leads-tag** (`foo <div>bar</div> baz`). Deep;
    inline layer has no block-tag classifier + line-anchored block model.
    Exploratory decision session first (parser mid-line split vs
    projector transform).
 4. **Entity decoding** — out of skill scope; general-conformance effort.
+
+Note: with html at 100%, the corpus itself is the constraint — the ranked
+targets above are all NOT in the corpus, so the next session likely starts
+by seeding corpus cases for one of them (or the deferred `blocked.txt`
+`<div>`-family / para-leads-tag shapes) before any parser work.
 
 --------------------------------------------------------------------------------
 
@@ -543,7 +573,6 @@ count delta — root cause / lever.
 
 - 2026-07-02 — Phase B `<div>` inter-tag lift (`<div>x</div> y <div>z</div>` → `Div, Plain, Div`) — html 280 → 281 — `graft_same_line_div_peel` peels each pair into a sibling `HTML_BLOCK_DIV`, interstitial→`Plain`, tail→`Para`, ws-gap→`BLANK_LINE`; two trailing-graft call sites; parser-side, no projector change; corpus 0479. Multi-line-second-div deferred.
 - 2026-07-02 — Phase A fenced-div-in-html-div (`<div>\n:::x\n</div>` → `Div[Div(x)[RawBlock "</div>"]]`) — html 279 → 280 — `body_fence_depth` suspends the `</div>` close while an inner `:::` fence is open; body lifts via implicit-close path; parser-side, no projector change; corpus 0478.
-- 2026-07-02 — Triage: plateau confirmed (476/477) — html flat — swept ~55 probes; all remaining divergences are the block-`<div>`-in-paragraph family (inter-tag, para-leads-div, fenced-div-in-div) or cross-cutting entity decoding; no bounded in-scope fix; report count corrected 2→1; blocked.txt `<div>`-family note expanded.
 - 2026-07-02 — 7e same-line matched-pair inter-tag text (triage + fix) — html 273 → 279 — triage pinned neighbors 0473/0474; fix `same_line_trailing_forces_opaque` keeps `<p>foo</p> bar <p>baz</p>` opaque → splitter flat RawBlock/Plain; corpus 0472/0475-0477; `<div>` inter-tag deferred (done Phase B).
 - 2026-07-02 — Void strict-block tags (`<hr>`/`<col>`/`<meta>` → sibling `HTML_BLOCK`s, not nested) — html 271 → 273 — new `PANDOC_VOID_STRICT_BLOCK_TAGS`; `closes_at_open_tag: true` under Pandoc; excluded from lift/matched-pair but kept out of `cannot_interrupt`; resolves the 7c `<hr>`-nesting quirk; corpus 0470-0471.
 - 2026-07-02 — Phase 7c blockquote open-only lift (`> <section>foo\n> bar` → structural PARAGRAPH/HEADING child) — html 265 → 268 — `emit_html_block_body` takes `&ContainerPrefix` + `open_only` flag; no-close bq path routes through `emit_html_block_body_lifted_bq_messy`; projector unchanged; corpus 0464-0466.

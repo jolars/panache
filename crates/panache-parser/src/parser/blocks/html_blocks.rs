@@ -811,6 +811,7 @@ fn html_block_node_kind(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn try_parse_comment_pi_with_trailing_split(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
@@ -818,6 +819,7 @@ fn try_parse_comment_pi_with_trailing_split(
     block_type: &HtmlBlockType,
     wrapper_kind: SyntaxKind,
     bq_depth: usize,
+    at_outermost_level: bool,
     config: &ParserOptions,
 ) -> Option<usize> {
     let marker: &str = match block_type {
@@ -928,18 +930,53 @@ fn try_parse_comment_pi_with_trailing_split(
 
     builder.finish_node(); // HTML_BLOCK
 
-    // Recursively parse JUST the trailing bytes on the close line
-    // and graft top-level children as siblings of the HTML_BLOCK we
-    // just closed. We do NOT consume subsequent lines here — the
-    // outer dispatcher continues from `close_line_idx + 1` and
-    // handles container-boundary lines (`:::` div closes, blockquote
-    // markers, list-marker continuations) correctly. Multi-line
-    // softbreak continuation (`<!-- --> trailing\nmore\n` →
-    // `Para [trailing, SoftBreak, more]`) is NOT modeled — the
-    // outer dispatcher sees `more` after the close line and starts
-    // a fresh paragraph. Refdefs flow through from the outer config
-    // (same pattern as `emit_html_block_body_lifted_inner`).
+    // Recursively parse the trailing bytes on the close line and graft
+    // top-level children as siblings of the HTML_BLOCK we just closed.
+    // Refdefs flow through from the outer config (same pattern as
+    // `emit_html_block_body_lifted_inner`).
+    //
+    // Under Pandoc a paragraph greedily fuses following lines as
+    // soft-break continuations (`<!-- --> trailing\nmore\n` ->
+    // `RawBlock, Para [trailing, SoftBreak, more]`). When the comment/PI
+    // sits at the outermost level (no enclosing fenced div, list,
+    // blockquote, or content-indent container), reparse the trailing
+    // bytes together with the remaining document so the parser's own
+    // paragraph-continuation rules decide the extent, graft ONLY that
+    // first block, and hand the rest back to the outer dispatcher. Inside
+    // a container we cannot consume past the close line without risking
+    // swallowing its close marker (`:::`, `> `, list indent), so keep the
+    // close-line-only split there.
     if !trailing.is_empty() {
+        if at_outermost_level && close_line_idx + 1 < lines.len() {
+            let mut inner_options = config.clone();
+            let refdefs = config.refdef_labels.clone().unwrap_or_default();
+            inner_options.refdef_labels = Some(refdefs.clone());
+            let mut fragment = String::from(trailing);
+            for line in &lines[close_line_idx + 1..] {
+                fragment.push_str(line);
+            }
+            let inner_root =
+                crate::parser::parse_with_refdefs(&fragment, Some(inner_options), refdefs);
+            if let Some(first) = inner_root.first_child() {
+                // Map the first block's end offset in the reparsed fragment
+                // back to a source-line count. Bytes up to `trailing.len()`
+                // are the close line (already counted); each subsequent line
+                // fully covered by the first block is an extra consumed line.
+                let block_end: usize = first.text_range().end().into();
+                let mut consumed_bytes = trailing.len();
+                let mut extra_lines = 0usize;
+                let mut idx = close_line_idx + 1;
+                while idx < lines.len() && consumed_bytes < block_end {
+                    consumed_bytes += lines[idx].len();
+                    extra_lines += 1;
+                    idx += 1;
+                }
+                let mut bq = None;
+                graft_subtree(builder, &first, &mut bq);
+                return Some(close_line_idx + 1 + extra_lines);
+            }
+        }
+
         let mut inner_options = config.clone();
         let refdefs = config.refdef_labels.clone().unwrap_or_default();
         inner_options.refdef_labels = Some(refdefs.clone());
@@ -1102,6 +1139,7 @@ fn try_parse_standalone_block_tags_split(
 /// (`HTML_BLOCK` for opaque preservation, `HTML_BLOCK_DIV` for the
 /// Pandoc-dialect `<div>` lift). Children are emitted byte-for-byte
 /// identical to the source either way; only the wrapper retag changes.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn parse_html_block_with_wrapper(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
@@ -1109,6 +1147,7 @@ pub(crate) fn parse_html_block_with_wrapper(
     block_type: HtmlBlockType,
     prefix: &ContainerPrefix,
     wrapper_kind: SyntaxKind,
+    at_outermost_level: bool,
     config: &ParserOptions,
 ) -> usize {
     let bq_depth = prefix.bq_depth();
@@ -1131,6 +1170,7 @@ pub(crate) fn parse_html_block_with_wrapper(
             &block_type,
             wrapper_kind,
             bq_depth,
+            at_outermost_level,
             config,
         )
     {
@@ -4258,6 +4298,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
+            true,
             &opts,
         );
 
@@ -4279,6 +4320,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
+            true,
             &opts,
         );
 
@@ -4300,6 +4342,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
+            true,
             &opts,
         );
 
@@ -4328,6 +4371,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
+            true,
             &opts,
         );
 
@@ -4353,6 +4397,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
+            true,
             &opts,
         );
         assert_eq!(new_pos, 1);
@@ -4378,6 +4423,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
+            true,
             &opts,
         );
         // Three lines, closed at first `</script>` (line 2). new_pos = 3.
@@ -4411,6 +4457,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
+            true,
             &opts,
         );
 
@@ -4455,6 +4502,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
+            true,
             &opts,
         );
 
@@ -4493,6 +4541,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
+            true,
             &opts,
         );
 

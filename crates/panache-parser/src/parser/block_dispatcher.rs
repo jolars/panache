@@ -2077,6 +2077,18 @@ impl BlockParser for HtmlBlockParser {
             _ => crate::syntax::SyntaxKind::HTML_BLOCK,
         };
 
+        // Whether the block sits at the outermost level, with no enclosing
+        // container that owns a following close marker or continuation
+        // prefix. Only then may the Pandoc comment/PI trailing-text split
+        // fuse soft-break continuation lines into the trailing paragraph
+        // (consuming past the close line cannot swallow a `:::` / `> ` /
+        // list-indent boundary).
+        let at_outermost_level = !ctx.in_fenced_div
+            && !ctx.in_list
+            && ctx.blockquote_depth == 0
+            && ctx.content_indent == 0
+            && ctx.myst_directive_closer.is_none();
+
         let new_pos = parse_html_block_with_wrapper(
             builder,
             lines,
@@ -2084,6 +2096,7 @@ impl BlockParser for HtmlBlockParser {
             block_type,
             prefix,
             wrapper_kind,
+            at_outermost_level,
             ctx.config,
         );
         new_pos - line_pos
