@@ -1358,6 +1358,17 @@ fn emit_html_block(node: &SyntaxNode, out: &mut Vec<Block>) {
         emit_html_block_structural(node, out);
         return;
     }
+    // Phase 7c open-only lift: a non-div strict-block / inline-block open
+    // tag with a trailing body and no matching close (`<section>foo`).
+    // The parser lifts the body into structural children (one clean open
+    // `HTML_BLOCK_TAG` + block children, no close tag, no
+    // `HTML_BLOCK_CONTENT`). Walk them structurally so the open tag
+    // projects to a lone `RawBlock` and the body to sibling blocks —
+    // matching pandoc-native's `RawBlock "<section>"` + `Para [foo]`.
+    if html_block_has_open_only_structural_lift(node) {
+        emit_html_block_structural(node, out);
+        return;
+    }
     // Strip BLOCK_QUOTE_MARKER + WHITESPACE prefix tokens so the
     // byte-level walkers below see clean HTML — the parser keeps bq
     // markers as structural tokens inside HTML_BLOCK for verbatim-tag
@@ -1462,6 +1473,42 @@ fn html_block_is_standalone_tag_sequence(node: &SyntaxNode) -> bool {
         }
     }
     tag_count >= 2
+}
+
+/// True when an `HTML_BLOCK` carries the Phase 7c open-only lift shape:
+/// exactly one `HTML_BLOCK_TAG` (a clean open, ending at `>`), no
+/// `HTML_BLOCK_CONTENT`, and at least one structural block child. The
+/// parser emits this for a non-div strict-block / inline-block open tag
+/// with a trailing body and no matching close (`<section>foo`,
+/// `<video>foo\nbar`). Projecting via `emit_html_block_structural` emits
+/// the open tag as a lone `RawBlock` and the body as sibling blocks,
+/// matching pandoc-native. A lone open tag with no body (`<section>`)
+/// has no block child and stays on the byte walker (single RawBlock).
+fn html_block_has_open_only_structural_lift(node: &SyntaxNode) -> bool {
+    let mut tags = node
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::HTML_BLOCK_TAG);
+    let Some(open_tag) = tags.next() else {
+        return false;
+    };
+    if tags.next().is_some() {
+        return false;
+    }
+    if !html_block_open_tag_is_clean(&open_tag) {
+        return false;
+    }
+    if node
+        .children()
+        .any(|c| c.kind() == SyntaxKind::HTML_BLOCK_CONTENT)
+    {
+        return false;
+    }
+    node.children().any(|c| {
+        !matches!(
+            c.kind(),
+            SyntaxKind::HTML_BLOCK_TAG | SyntaxKind::BLANK_LINE
+        )
+    })
 }
 
 /// Emit an `HTML_BLOCK` whose body has been structurally lifted: walk

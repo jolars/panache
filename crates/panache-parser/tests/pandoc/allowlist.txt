@@ -586,3 +586,7 @@
 458
 459
 460
+# html-block (Phase 7c — open-only body lift. A non-div strict-block / inline-block open tag with a trailing body and no matching close (`<section>foo`, `<video>bar\nbaz`) now lifts the body into structural CST children instead of leaving it as opaque `HTML_BLOCK_CONTENT` TEXT: the parser emits one clean open `HTML_BLOCK_TAG` (ending at `>`) followed by the recursively-parsed body (`PARAGRAPH`, `HEADING`, `LIST`, …) as sibling children, matching pandoc-native's `RawBlock "<section>"` + `Para [foo]` (open tag as a lone RawBlock, body as fresh markdown siblings — no `<div>`-style wrapping, `Para` preserved). `emit_html_block_body` gained a non-div `HTML_BLOCK` + `bq_depth == 0` lift arm alongside the existing unbalanced-`<div>` arm, both using `LastParaDemote::Never`. Projector routes the shape via the new `html_block_has_open_only_structural_lift` predicate (exactly one clean open `HTML_BLOCK_TAG`, no `HTML_BLOCK_CONTENT`, >= 1 structural block child) through `emit_html_block_structural`, so it no longer byte-walks these with `split_html_block_by_tags`. Blockquote-wrapped bodies stay on the byte walker (their lines carry `> ` markers this path would not re-inject). CommonMark keeps the opaque baked single-`HTML_BLOCK_TAG` shape — paired parser goldens pin the divergence.)
+461
+462
+463

@@ -2175,6 +2175,29 @@ fn emit_html_block_body(
         );
         return;
     }
+    // Phase 7c: non-div strict-block / inline-block open tag with trailing
+    // body and no matching close (`<section>foo`, `<video>foo\nbar`).
+    // Pandoc-native emits the open tag as a standalone `RawBlock` followed
+    // by the body parsed as fresh markdown siblings (`RawBlock "<section>"`
+    // + `Para [foo]`) — NOT a wrapping like `<div>`. Lift the body into
+    // structural CST children so the open `HTML_BLOCK_TAG` stays a lone
+    // RawBlock and the body (`Para`, `Header`, `BulletList`, …) becomes
+    // visible to consumers instead of opaque `HTML_BLOCK_CONTENT` TEXT.
+    // No demotion (pandoc keeps the trailing `Para`). Gated to `bq_depth ==
+    // 0`: inside a blockquote the body lines still carry `> ` markers that
+    // this path would not re-inject, so those stay on the opaque byte
+    // walker.
+    if lift_mode && wrapper_kind == SyntaxKind::HTML_BLOCK && bq_depth == 0 {
+        emit_html_block_body_lifted(
+            builder,
+            pre_content,
+            content_lines,
+            "",
+            LastParaDemote::Never,
+            config,
+        );
+        return;
+    }
     // Legacy path: opaque TEXT capture. `pre_content` is always empty
     // here (lift_mode is the only path that populates it), but be
     // defensive — if a trailing prefix snuck in, emit it as TEXT so

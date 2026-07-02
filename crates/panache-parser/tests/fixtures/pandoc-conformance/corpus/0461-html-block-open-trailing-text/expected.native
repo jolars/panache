@@ -1,0 +1,3 @@
+[ RawBlock (Format "html") "<section>"
+, Para [ Str "foo" ]
+]
