@@ -216,7 +216,9 @@ retagged single-construct opaque shapes (comment/PI/verbatim) to
 `emit_html_block`'s byte-sniff early-return now dead for Pandoc,
 alive for CommonMark + `<![CDATA[`/`<!`). **7b** split standalone
 tag sequences. **7c** removed non-div unmatched-open + trailing
-(`bq_depth == 0`) via `html_block_has_open_only_structural_lift`.
+via `html_block_has_open_only_structural_lift` — first `bq_depth == 0`,
+then extended to `bq_depth > 0` (bq open-only body re-injects `> `
+prefixes via `emit_html_block_body_lifted_bq_messy`).
 
 Retag mechanism (7a/7c share the `HTML_BLOCK_DIV` precedent):
 `wrapper_kind` stays `HTML_BLOCK` (lift gates + child tokens
@@ -269,6 +271,15 @@ verbatim-in-bq); table-cell reparses.
   opens (`<div\n` no `>`) keep opaque HTML_BLOCK. Multi-line +
   trailing on close-`>` line: `emit_multiline_open_tag_with_attrs`
   captures trailing into `pre_content` via `lift_trailing=true`.
+- **`emit_html_block_body` has two call sites; only the no-close one
+  may bq-lift.** The function takes `open_only: bool` — the close-found
+  site (2095) passes `false`, the end-of-input no-close site (2121)
+  passes `true`. The `HTML_BLOCK` + `bq_depth > 0` open-only lift arm
+  (routes through `emit_html_block_body_lifted_bq_messy`, empty
+  leading/close-prefix) is gated on `open_only`, so a bq shape with a
+  close tag (whose body clean/messy lifts didn't fire) keeps the legacy
+  opaque path. `bq_depth` comes from the threaded `prefix:
+  &ContainerPrefix`.
 - **Lifted HTML_BLOCK[_DIV] MUST route structural, not byte path.**
   `collect_block` → `html_div_block`; `emit_html_block` → lifted →
   `emit_html_block_structural` (NOT `split_html_block_by_tags`, whose
@@ -390,62 +401,73 @@ verbatim-in-bq); table-cell reparses.
 | 4 | Comments, PIs, declarations, CDATA projection | **Conformance landed** (2026-05-08); type-4 CM lowercase still gappy. CST opaque (these constructs project as RawBlock / RawInline). |
 | 5 | `markdown_in_html_blocks` interaction edge cases | **Conformance landed** — depth-aware nested div, Plain/Para promotion, refs inheritance, **projector-level splitter** (`split_html_block_by_tags` byte walker + `parse_pandoc_blocks` recursive reparse), outer-matched-pair-abandons-on-void-interior. **The structural CST lift was deferred** — Phase 5's mechanism is the projector reparsing bytes, not the parser emitting structure. |
 | 7b | Standalone-tag split — single line of ≥ 2 standalone block-level tags (close + void) emits one `HTML_BLOCK_TAG` per tag. | **Landed 2026-06-29.** Parser early-branch `try_parse_standalone_block_tags_split` (Pandoc, `closes_at_open_tag: true`, `bq_depth == 0`, line parses as ≥ 2 tags). Projector routes via `html_block_is_standalone_tag_sequence` → `emit_html_block_structural` (no new byte walking). Single tags + multi-line (HTML_BLOCK_CONTENT) + bq stay on the byte walker. CommonMark keeps baked shape. html 259 → 262. |
-| 7c | Open-only body lift — non-div strict-block / inline-block open tag + trailing body + no matching close (`<section>foo`, `<video>bar\nbaz`) lifts the body into structural CST children. | **Landed 2026-07-02.** `emit_html_block_body` gained a non-div `HTML_BLOCK` + `bq_depth == 0` lift arm (mirrors the existing unbalanced-`<div>` arm, `LastParaDemote::Never`) → open `HTML_BLOCK_TAG` + recursively-parsed body (`PARAGRAPH`/`HEADING`/`LIST`/…) as siblings, no `HTML_BLOCK_CONTENT`. Projector routes via new `html_block_has_open_only_structural_lift` predicate (1 clean open tag, no HTML_BLOCK_CONTENT, ≥ 1 block child) → `emit_html_block_structural`. Matches pandoc-native `RawBlock "<section>"` + `Para [foo]` (open = lone RawBlock, body = fresh siblings, Para preserved). Bq bodies stay on the byte walker. CommonMark keeps baked shape. html 262 → 265. |
+| 7c | Open-only body lift — non-div strict-block / inline-block open tag + trailing body + no matching close (`<section>foo`, `<video>bar\nbaz`) lifts the body into structural CST children. | **Landed 2026-07-02; bq extension landed 2026-07-02 (same day).** `emit_html_block_body` gained a non-div `HTML_BLOCK` + `bq_depth == 0` lift arm (mirrors the existing unbalanced-`<div>` arm, `LastParaDemote::Never`) → open `HTML_BLOCK_TAG` + recursively-parsed body (`PARAGRAPH`/`HEADING`/`LIST`/…) as siblings, no `HTML_BLOCK_CONTENT`. Projector routes via new `html_block_has_open_only_structural_lift` predicate (1 clean open tag, no HTML_BLOCK_CONTENT, ≥ 1 block child) → `emit_html_block_structural`. Matches pandoc-native `RawBlock "<section>"` + `Para [foo]` (open = lone RawBlock, body = fresh siblings, Para preserved). **Bq extension:** the same shape inside a blockquote (`> <section>foo\n> bar`) now lifts too — `emit_html_block_body` takes `prefix: &ContainerPrefix` + an `open_only` flag; the no-close path with `bq_depth > 0` routes through `emit_html_block_body_lifted_bq_messy` (empty leading/close-prefix) so continuation-line `> ` markers re-inject at line start. CommonMark keeps baked shape. html 262 → 265 → 268. |
 | 7a | Single-construct opaque lift — comment / PI / verbatim retag to `HTML_BLOCK_RAW` so the projector routes by kind. | **Landed 2026-06-17.** New `HTML_BLOCK_RAW` wrapper applied under `Dialect::Pandoc` via `html_block_node_kind` at the two `start_node` sites in `parse_html_block_with_wrapper` (incl. the comment/PI trailing-split head); `wrapper_kind` stays `HTML_BLOCK` so all lift gates + child tokens are unchanged (byte-lossless, `HTML_BLOCK_DIV` precedent). Projector `collect_block` → `html_raw_block` → one `RawBlock` (trailing-trim + 1-3 leading-space strip via `html_raw_block_text`); `emit_html_block` byte-sniff arm now dead for Pandoc. All consumers updated (formatter ×~8, list-item lift gate, folding, html_entities, both directives copies). Conformance **flat** (CST-fidelity refactor — report.txt byte-identical); 6 paired parser goldens + 2 formatter goldens added. **Remaining (7b-7e roadmap, NOT done): standalone single-tag (close/void), single open + trailing, void sequences, multi-tag interleave (D3) — `split_html_block_by_tags` + `parse_pandoc_blocks` still serve those.** |
 | 6 (new) | Lift inner HTML block content into structural CST children — `HTML_BLOCK_DIV` / `HTML_BLOCK` get `PARAGRAPH` / `LIST` / etc. as direct children; projector byte walkers become vestigial; `PARAGRAPH→PLAIN` retag at adjacent-HTML-block boundary. | **All non-bq + bq shapes lifted for `<div>` and non-div Pandoc strict-block tags.** Shapes covered: clean multi-line, open-trailing, butted-close, indented-close, same-line, same-line + trailing-text-after-close, empty / blank-only, multi-line open (clean and trailing), depth-aware nested same-tag (`<div><div>x</div></div>` and trailing variants), multi-close trailing (`<div>foo</div></div>` and variants — projects as `Div + RawBlock` per pandoc-native), unclosed `<div>` (projects as `Div [...]` with implicit close), multi-line open + matched close in `pre_content` (single-close, nested, trailing-close, trailing-text — `<div\n  id="x">foo</div>` / `<div\n  id="x">foo</div></div>` / `<div\n  id="x"><div>x</div></div>` / `<div\n  id="x">foo</div>bar` and strict-block `<form\n  id="x">foo</form>`, **at top level and inside a blockquote** via `bq_multiline_close_lift_tag`). Inline-block matched-pair abandons when body begins with a void block tag (Plain via OnlyIfLast). Bq via four discriminator gates (`bq_clean_lift`, `same_line_bq_lift_tag`, `bq_messy_lift_tag`, `bq_multiline_close_lift_tag`). Dispatcher's `HTML_BLOCK_DIV` retag gate uses `pandoc_html_open_tag_closes` AND requires `is_closing: false`. Same-line / multi-line close-line lift paths use depth-aware split (`matched_close_offset` + `try_split_close_line_depth_aware`) + `split_close_marker_end` + trailing graft. `div_has_structural_inner` accepts unclosed div (1 HTML_BLOCK_TAG + structural body, no close). List items: same-line / fully-contained lift via `ListItemBuffer::emit_as_block` reparse + graft (formatter `format_list_item` HTML_BLOCK arm); multi-line lift via close-form dispatcher gate (`BlockContext::list_item_unclosed_html_block_tag` + `ListItemBuffer::unclosed_pandoc_matched_pair_tag`); indent normalization via `strip_list_item_indent` + `LinePrefixState` re-injection (projector `walk_skip_bq_markers` line-start-WS strip). List-item Comment/PI trailing-text via 2-child `try_emit_html_block_lift` branch + formatter `find_content_node` PLAIN-after-HTML_BLOCK guard. Inline-block matched-pair multi-line-open + same-line close (`<video\n  src="x">body</video>` / `<iframe\n  ...>...</iframe>` and bq variants) works transparently via the existing parser-side structural lift (open `HTML_BLOCK_TAG` + PLAIN body + close `HTML_BLOCK_TAG`, no HTML_BLOCK_DIV retag), pinned by 0448-0451. **Bq-in-listitem first-line dispatch landed 2026-05-18** via `ListItemFinish::BqDispatch` + `Parser::dispatch_bq_after_list_item` helper — fixes headings/HRs/etc. on `- > # heading` etc. (pinned by corpus 0454/0455 in `block` section). **Pass count history: 105 → 257.** bq-in-listitem first-line HTML block (`- > <div>...`, corpus 0452/0453) was **unblocked** by a later (unrecorded-in-RECAP) `ContainerPrefix` session — see the `# html-block (bq-in-listitem first-line HTML…)` allowlist comment near line 580; both now pass + allowlisted, and the stale `blocked.txt` 452/453 entry was removed 2026-06-29. |
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-07-02 (Phase 7c — open-only body lift)
+## Latest session — 2026-07-02 (Phase 7c — blockquote open-only lift)
 
-Conformance: **html 262 → 265** (3 new corpus pins). 463 total, 1 fail
-(pre-existing blocked 0390). Workspace: only the pre-existing
-`r_air_formats_equals_spacing_in_quarto_r_block` external-formatter
-failure remains (fails on clean baseline too — an `air` version quirk,
-unrelated). Genuine CST-fidelity win: the body of an unmatched non-div
-open tag (heading, list, para) becomes a **structural CST node** instead
-of opaque `HTML_BLOCK_CONTENT` TEXT, so consumers (salsa heading walk,
-linter, LSP) see it directly instead of re-parsing bytes.
+Conformance: **html 265 → 268** (3 new corpus pins, 0464-0466). 466
+total, 1 fail (pre-existing blocked 0390). Workspace: only the
+pre-existing `r_air_formats_equals_spacing_in_quarto_r_block` external-
+formatter failure remains (fails on clean baseline too — `air` version
+quirk, unrelated). CST-fidelity win: an unmatched non-div open tag body
+inside a blockquote (`> <section>foo\n> bar`, `> <video src="x">clip\n>
+more`, clean-open `> <section>\n> # hi`) becomes a **structural
+`PARAGRAPH`/`HEADING`** child instead of opaque `HTML_BLOCK_CONTENT`
+TEXT, so consumers see it directly. Top-ranked suggestion from the prior
+session.
 
 ### What landed
 
-- Parser: `emit_html_block_body` gained a second lift arm (`lift_mode &&
-  wrapper_kind == HTML_BLOCK && bq_depth == 0`, mirroring the unbalanced-
-  `<div>` arm), reached on the no-close path for lift-eligible strict-
-  block / inline-block opens with trailing body. Lifts via
-  `emit_html_block_body_lifted(..., LastParaDemote::Never, ...)` — open
-  tag stays a lone RawBlock, body grafts as siblings, `Para` preserved.
-- Projector: `html_block_has_open_only_structural_lift` (1 clean open
-  tag, no HTML_BLOCK_CONTENT, ≥ 1 block child) → `emit_html_block_
-  structural`. Lone open (`<section>`) has 0 block children → byte
-  walker → one RawBlock (correct).
-- Bq bodies stay opaque (would need `> ` re-injection); CommonMark
-  byte-identical (Pandoc-gated); `writer_html_blocks` snapshot updated
-  for the `<hr>`-nesting side effect.
+- Parser: `emit_html_block_body` now takes `prefix: &ContainerPrefix`
+  (replacing the bare `bq_depth`) + an `open_only: bool` flag. On the
+  no-close path (`open_only == true`) with `lift_mode && wrapper_kind ==
+  HTML_BLOCK && bq_depth > 0` it routes through the existing
+  `emit_html_block_body_lifted_bq_messy` with empty `leading` /
+  `close_line_prefix` — so line-0 open-trailing (`pre_content`, no bq
+  prefix) + continuation `content_lines` (carrying `> `) reparse and
+  re-inject each line's prefix. `LastParaDemote::Never` (open-only).
+- `open_only` guards against the close-found call site (2095): for bq
+  non-div, `close_split_tag` is always `None`, so that site is reached
+  whenever a close exists and clean/messy lifts didn't fire — passing
+  `open_only == false` there preserves legacy behavior.
+- Projector unchanged: the lifted shape (1 clean open tag, no
+  HTML_BLOCK_CONTENT, ≥ 1 block child) already routes via
+  `html_block_has_open_only_structural_lift` → `emit_html_block_
+  structural`, independent of the bq wrapper. CommonMark stays opaque
+  (Pandoc-gated).
 
 ### Files in committable diff
 
-- `crates/panache-parser/src/{parser/blocks/html_blocks.rs,
-  pandoc_ast.rs}`; 2 paired parser goldens (`html_block_section_open_
-  trailing[_heading]_{pandoc,commonmark}`) + updated `writer_html_blocks`
-  snapshot; formatter golden `html_block_open_trailing`; corpus
-  0461-0463 + allowlist + report.
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs` (only file
+  touched — no projector change); 2 paired parser goldens
+  (`html_block_section_blockquote_open_trailing_{pandoc,commonmark}`) +
+  snapshots; formatter golden `html_block_blockquote_open_trailing`;
+  corpus 0464-0466 + allowlist + report.
 
 ### Suggested next sub-targets
 
-1. **Blockquote open-only lift** — 7c is `bq_depth == 0`; `> <section>foo`
-   byte-walks. Needs BqPrefixState body re-injection.
-2. **Multi-line standalone-tag sequences** (0304 `<embed>\n<embed>` —
+1. **Multi-line standalone-tag sequences** (0304 `<embed>\n<embed>` —
    2nd tag in `HTML_BLOCK_CONTENT`): extend the 7b split.
-3. **Blockquote standalone-tag split** (`> </p></div>`).
-4. **`<hr>` void classification** — stop `<hr>` absorbing following
+2. **Blockquote standalone-tag split** (`> </p></div>`).
+3. **`<hr>` void classification** — stop `<hr>` absorbing following
    lines (removes 7c nesting). Wide-ish blast radius; verify vs pandoc.
+4. **Salsa `<section id>`/`<div id>` anchor false-positive** — CLI
+   `panache lint` reports `undefined-anchor` for `<div id="x">…` even on
+   the clean baseline (RECAP quick-repro expects zero). Not a regression
+   from this session; likely a workspace/single-file salsa-wiring gap
+   (unit tests for the rule pass). Worth a focused look.
 5. **7e multi-tag interleave (D3)** + **softbreak (0390)** — unchanged.
 
 ### New trap
 
-Folded into Persistent traps (`<hr>`-nesting + open-only lift note under
-"Projector-as-second-stage-parser smell").
+`emit_html_block_body`'s new `open_only` flag: the bq-lift arm MUST stay
+gated on it — the shared function has two call sites and only the
+no-close one (`open_only == true`) may lift bq bodies. Folded into
+Persistent traps under "Structural lift (Fix #3 / Fix #4 family)".
 
 --------------------------------------------------------------------------------
 
@@ -454,14 +476,12 @@ Folded into Persistent traps (`<hr>`-nesting + open-only lift note under
 Newest first. One line per session: date — phase/sub-target — pass
 count delta — root cause / lever.
 
+- 2026-07-02 — Phase 7c open-only body lift (non-div strict-block / inline-block open + trailing body, no close → structural CST body) — html 262 → 265 — `emit_html_block_body` non-div `HTML_BLOCK` + `bq_depth == 0` lift arm; projector `html_block_has_open_only_structural_lift`; bq stayed opaque; `<hr>`-nesting side effect pinned by `writer_html_blocks`.
 - 2026-06-29 — Phase 7b standalone-tag split (single line of ≥ 2 standalone close/void tags → one `HTML_BLOCK_TAG` each) — html 259 → 262 — parser early-branch `try_parse_standalone_block_tags_split` + `split_line_into_standalone_tags`; projector `html_block_is_standalone_tag_sequence` → `emit_html_block_structural` (no new byte walking); single-tag + multi-line + bq stay legacy; also removed stale `blocked.txt` 452/453.
 
 - 2026-06-17 — Phase 7a single-construct opaque lift (comment/PI/verbatim → `HTML_BLOCK_RAW`) — html flat (CST-fidelity refactor) — `html_block_node_kind` retags wrapper at the two `start_node` sites; `wrapper_kind` stays `HTML_BLOCK` as behavior gate (byte-identical children); projector `html_raw_block` routes by kind; all ~8 consumers updated.
 - 2026-05-18 — bq-in-listitem dispatch (option (a)) — block 15 → 17, html flat — `ListItemFinish::BqDispatch` + `Parser::dispatch_bq_after_list_item` hand post-`> ` content to caller instead of eager paragraph; 0452/0453 HTML-block stay blocked (dispatcher walks raw `lines[line_pos]` without list-marker strip).
 
-- 2026-05-17 — Negative-space pin (`<video\n…>body</video>`, `<iframe\n…>` and bq variants) + bq-in-listitem first-line diagnosis (0452/0453) — html 253 → 257 — already-correct parser-side structural lift pinned; eager-paragraph at `finish_list_item_with_optional_nested` line 1499 identified as the root cause.
-- 2026-05-15 — Phase 6 (three waves) — depth-aware same-line + multi-line close-line lift, multi-line open + same-line close on `pre_content`, and the bq variant of both — html 235 → 253 — `matched_close_offset` + `try_split_close_line_depth_aware` + `split_close_marker_end` + `graft_document_children`; new gate `bq_multiline_close_lift_tag`; `div_has_structural_inner` accepts unclosed div. (All folded into Persistent traps.)
-- 2026-05-15 — Phase 6 — same-line `<div>foo</div>bar` / `<form>foo</form>bar` trailing-text lift (top-level, bq, list-item, with-id); negative-space pins for `>   <!-- hi --> trailing` and bq-nested variants — html 226 → 235 — `probe_same_line_lift` widened (ends_with → contains, still `(0, 1)`); `split_close_marker_end` quote-aware close-marker split + sibling graft via `graft_document_children`; list-item buffer 2-child branch widened to HTML_BLOCK_DIV + PARAGRAPH.
-- 2026-05-13 — Phase 6 wave (multiple subtargets) — html 142 → 226 — Combined: list-item Comment/PI trailing-text split via 2-child `try_emit_html_block_lift` branch + formatter `find_content_node` PLAIN-after-HTML_BLOCK guard; indented `isInlineTag` demotion in `HtmlBlockParser::detect_prepared` (Comment, PI, `<style>` o+c, `</script>`, math-tex `<script>`, Type7, inline-block matched-pair, void) when `leading_spaces > content_col`; top-level / bq Comment/PI trailing-text split via `try_parse_comment_pi_with_trailing_split` + `emit_bq_prefix_tokens` + first-line indent strip; list-item indent normalization via `strip_list_item_indent` + `LinePrefixState` (mirrors `BqPrefixState`) + projector `walk_skip_bq_markers` line-start-WS strip; multi-line list-item HTML lift via close-form dispatcher gate (`BlockContext::list_item_unclosed_html_block_tag` + `ListItemBuffer::unclosed_pandoc_matched_pair_tag`).
-- 2026-05-11/12 — Phase 6 — non-div strict-block + bq + list-item structural lift wave — html 142 → 171 — `is_pandoc_lift_eligible_block_tag`, `LastParaDemote::{OnlyIfLast,SkipTrailingBlanks,Never}`, `parse_with_refdefs` graft, `emit_multiline_open_tag_with_attrs`; three bq discriminator gates + `BqPrefixState`; `ListItemBuffer::try_emit_html_block_lift` + formatter LIST_MARKER arm; pruned vestigial `try_div_html_block`.
+- 2026-05-17 — Negative-space pin (`<video\n…>body</video>`, `<iframe\n…>` and bq variants) + bq-in-listitem first-line diagnosis (0452/0453) — html 253 → 257 — already-correct parser-side lift pinned; eager-paragraph root cause identified.
+- 2026-05-11→15 — Phase 6 structural-lift waves (all traps in Persistent) — html 142 → 253 — non-div strict-block + bq + list-item lift; depth-aware same-line/multi-line close-line lift + multi-line-open+same-line-close (`pre_content`) + bq variants; same-line trailing-text lift; Comment/PI trailing split + indented `isInlineTag` demotion + list-item indent normalization. Levers: `is_pandoc_lift_eligible_block_tag`, `LastParaDemote`, `graft_document_children`, `matched_close_offset` + `try_split_close_line_depth_aware` + `split_close_marker_end`, `bq_multiline_close_lift_tag`, `BqPrefixState`/`LinePrefixState`, `try_emit_html_block_lift`; pruned vestigial `try_div_html_block`.
 - 2026-05-08/11 — Phases 1-5 seed — html 0 → 142 — `HTML_BLOCK_DIV`/`INLINE_HTML_SPAN` retag, `HTML_ATTRS`, projector `inline_pending`, CM/Pandoc blockHtmlTags split, `closes_at_open_tag`, `pandoc_html_open_tag_closes`, `PANDOC_VOID_BLOCK_TAGS`, PARAGRAPH→PLAIN retag at YesCanInterrupt, `is_closing` field, pandoc `isInlineTag` (issue #10643).

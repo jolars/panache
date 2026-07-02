@@ -2096,9 +2096,10 @@ pub(crate) fn parse_html_block_with_wrapper(
                     builder,
                     &pre_content,
                     &content_lines,
-                    bq_depth,
+                    prefix,
                     wrapper_kind,
                     lift_mode,
+                    false,
                     config,
                 );
                 builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
@@ -2122,9 +2123,10 @@ pub(crate) fn parse_html_block_with_wrapper(
             builder,
             &pre_content,
             &content_lines,
-            bq_depth,
+            prefix,
             wrapper_kind,
             lift_mode,
+            true,
             config,
         );
     }
@@ -2150,15 +2152,18 @@ pub(crate) fn parse_html_block_with_wrapper(
 /// CST bytes remain byte-identical to source: the recursive parser is
 /// lossless on the same byte slice the legacy path would have captured
 /// as TEXT.
+#[allow(clippy::too_many_arguments)]
 fn emit_html_block_body(
     builder: &mut GreenNodeBuilder<'static>,
     pre_content: &str,
     content_lines: &[&str],
-    bq_depth: usize,
+    prefix: &ContainerPrefix,
     wrapper_kind: SyntaxKind,
     lift_mode: bool,
+    open_only: bool,
     config: &ParserOptions,
 ) {
+    let bq_depth = prefix.bq_depth();
     if pre_content.is_empty() && content_lines.is_empty() {
         return;
     }
@@ -2193,6 +2198,30 @@ fn emit_html_block_body(
             pre_content,
             content_lines,
             "",
+            LastParaDemote::Never,
+            config,
+        );
+        return;
+    }
+    // Phase 7c (blockquote): same open-only strict-block / inline-block
+    // shape as above, but inside a blockquote (`> <section>foo\n> bar`).
+    // Line 0's `> ` is consumed by the outer BLOCK_QUOTE, so the
+    // open-tag trailing sits in `pre_content` with no bq prefix; the
+    // continuation `content_lines` still carry their `> ` markers.
+    // `emit_html_block_body_lifted_bq_messy` re-injects each line's
+    // captured bq prefix at line start so the lifted `PARAGRAPH` stays
+    // byte-equal to source. No close line (open-only), so `leading` and
+    // `close_line_prefix` are empty. No demotion — pandoc keeps the
+    // trailing `Para` (`RawBlock "<section>"` + `Para [foo, SoftBreak,
+    // bar]`).
+    if open_only && lift_mode && wrapper_kind == SyntaxKind::HTML_BLOCK && bq_depth > 0 {
+        emit_html_block_body_lifted_bq_messy(
+            builder,
+            pre_content,
+            content_lines,
+            "",
+            "",
+            prefix,
             LastParaDemote::Never,
             config,
         );

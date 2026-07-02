@@ -590,3 +590,7 @@
 461
 462
 463
+# html-block (Phase 7c blockquote extension — the open-only body lift above now also fires inside a blockquote (`> <section>foo\n> bar`, `> <video src="x">clip\n> more`, clean-open `> <section>\n> # hi`). `emit_html_block_body` takes an `open_only` flag and a `&ContainerPrefix`; on the no-close path with `bq_depth > 0` it routes through `emit_html_block_body_lifted_bq_messy` (leading/close-prefix empty) so each continuation line's `> ` marker is re-injected at line start and the lifted `PARAGRAPH`/`HEADING`/… stays byte-equal to source. Line 0's `> ` is owned by the outer BLOCK_QUOTE, so the open-tag trailing sits in `pre_content` with no bq prefix. Projector routes via the same `html_block_has_open_only_structural_lift` predicate — no new byte walking. Matches pandoc-native `BlockQuote [RawBlock "<section>", Para [foo, SoftBreak, bar]]`. `LastParaDemote::Never` (no close butted). CommonMark keeps the opaque baked shape — paired parser goldens pin the divergence.)
+464
+465
+466

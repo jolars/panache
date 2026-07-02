@@ -1,0 +1,5 @@
+[ BlockQuote
+    [ RawBlock (Format "html") "<video src=\"x\">"
+    , Para [ Str "clip" , SoftBreak , Str "more" ]
+    ]
+]

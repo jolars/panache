@@ -1,0 +1,5 @@
+[ BlockQuote
+    [ RawBlock (Format "html") "<section>"
+    , Para [ Str "foo" , SoftBreak , Str "bar" ]
+    ]
+]

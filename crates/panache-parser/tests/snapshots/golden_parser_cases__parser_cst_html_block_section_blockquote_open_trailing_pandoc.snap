@@ -1,0 +1,20 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 99
+expression: cst_output
+---
+DOCUMENT@0..21
+  BLOCK_QUOTE@0..21
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    HTML_BLOCK@2..21
+      HTML_BLOCK_TAG@2..11
+        TEXT@2..10 "<section"
+        TEXT@10..11 ">"
+      PARAGRAPH@11..21
+        TEXT@11..14 "foo"
+        NEWLINE@14..15 "\n"
+        BLOCK_QUOTE_MARKER@15..16 ">"
+        WHITESPACE@16..17 " "
+        TEXT@17..20 "bar"
+        NEWLINE@20..21 "\n"

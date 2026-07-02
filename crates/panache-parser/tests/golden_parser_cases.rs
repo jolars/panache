@@ -423,6 +423,8 @@ golden_test_cases!(
     html_block_strict_block_blockquote_same_line_pandoc,
     html_block_section_blockquote_multiline_open_commonmark,
     html_block_section_blockquote_multiline_open_pandoc,
+    html_block_section_blockquote_open_trailing_commonmark,
+    html_block_section_blockquote_open_trailing_pandoc,
     html_block_section_open_trailing_commonmark,
     html_block_section_open_trailing_pandoc,
     html_block_section_open_trailing_heading_commonmark,
