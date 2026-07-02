@@ -16,3 +16,27 @@
 # carrying across siblings (CST shape change) or projector-side fusion
 # of adjacent Para children. Deferred.
 390
+
+# Phase 7e — Matched-pair block tags with same-line inter-tag text.
+# `<p>foo</p> bar <p>baz</p>` should project as a flat alternation of
+# `RawBlock`/`Plain` (7 blocks, `bar` demoted to `Plain`) because pandoc
+# treats the whole line as one type-6 HTML block. Panache instead lifts
+# the first matched pair `<p>foo</p>` (correct: RawBlock/Plain/RawBlock)
+# then reparses the same-line trailing ` bar <p>baz</p>` as a PARAGRAPH,
+# where the inline parser turns the second `<p>`/`</p>` into `RawInline`.
+# Root cause is the INLINE parser: panache treats block-level tags
+# (`<p>`, `<div>`, ...) encountered mid-text as inline `RawInline`, but
+# pandoc forces a block boundary at them (`foo <p>bar</p>` -> pandoc
+# `Plain [foo]` + `RawBlock "<p>"` ...; panache keeps one `Para` with
+# inline `<p>`). Note the divergence is SAME-LINE only: the multi-line
+# form (`<p>foo</p>\nbar\n<p>baz</p>`, corpus 0473) and the void-trailing
+# form (`<p>a</p> mid <embed> end`, corpus 0474) already match pandoc.
+# Two possible fixes, both out of scope for one bounded session: (a)
+# teach the inline parser to terminate a paragraph at a block-level HTML
+# tag (broad blast radius — every `text <p>` shape changes); (b) suppress
+# the premature same-line matched-pair lift when the trailing content
+# contains another block-level tag and keep the whole line as one opaque
+# `HTML_BLOCK` so `split_html_block_by_tags` splits it (needs a new
+# "opaque whole-line" fallthrough — today even `<p>foo</p> bar` is
+# lift+grafted, not kept opaque). Deferred.
+472

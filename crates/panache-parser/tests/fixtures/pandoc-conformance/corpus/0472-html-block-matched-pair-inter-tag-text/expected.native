@@ -1,0 +1,8 @@
+[ RawBlock (Format "html") "<p>"
+, Plain [ Str "foo" ]
+, RawBlock (Format "html") "</p>"
+, Plain [ Str "bar" ]
+, RawBlock (Format "html") "<p>"
+, Plain [ Str "baz" ]
+, RawBlock (Format "html") "</p>"
+]

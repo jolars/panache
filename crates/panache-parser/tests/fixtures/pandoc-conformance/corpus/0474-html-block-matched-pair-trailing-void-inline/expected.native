@@ -1,0 +1,11 @@
+[ RawBlock (Format "html") "<p>"
+, Plain [ Str "a" ]
+, RawBlock (Format "html") "</p>"
+, Para
+    [ Str "mid"
+    , Space
+    , RawInline (Format "html") "<embed>"
+    , Space
+    , Str "end"
+    ]
+]
