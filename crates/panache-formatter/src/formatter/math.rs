@@ -23,8 +23,8 @@
 //! default) callers emit math verbatim and never reach this module; on, they
 //! route content through [`format_math`].
 
-use panache_parser::parser::math::{MathParseOptions, parse_math_report};
-use panache_parser::syntax::SyntaxNode;
+use panache_parser::parser::math::{MathParseOptions, parse_math_content};
+use panache_parser::syntax::{SyntaxNode, math_diagnostics};
 
 mod linebreak;
 pub mod operators;
@@ -93,18 +93,17 @@ pub fn format_math(input: &str, opts: &MathFormatOptions) -> String {
     if has_unescaped_single_dollar(input) {
         return input.to_string();
     }
-    let report = parse_math_report(
+    let tree = SyntaxNode::new_root(parse_math_content(
         input,
         MathParseOptions {
             bookdown_equation_labels: opts.bookdown_equation_labels,
         },
-    );
+    ));
     // Malformed math (unclosed/mismatched braces or environments) has an
     // untrustworthy row/column structure — leave it exactly as written.
-    if !report.diagnostics.is_empty() {
+    if !math_diagnostics(&tree).is_empty() {
         return input.to_string();
     }
-    let tree = SyntaxNode::new_root(report.green);
     render::render(&tree, opts)
 }
 

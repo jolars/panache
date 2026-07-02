@@ -1,0 +1,112 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 99
+expression: cst_output
+---
+DOCUMENT@0..217
+  PARAGRAPH@0..44
+    TEXT@0..15 "Balanced pair: "
+    INLINE_MATH@15..43
+      INLINE_MATH_MARKER@15..16 "$"
+      MATH_CONTENT@16..42
+        MATH_DELIMITED@16..42
+          MATH_COMMAND@16..21 "\\left"
+          MATH_OPEN@21..22 "("
+          MATH_SPACE@22..23 " "
+          MATH_COMMAND@23..28 "\\frac"
+          MATH_GROUP@28..31
+            MATH_GROUP_OPEN@28..29 "{"
+            MATH_TEXT@29..30 "a"
+            MATH_GROUP_CLOSE@30..31 "}"
+          MATH_GROUP@31..34
+            MATH_GROUP_OPEN@31..32 "{"
+            MATH_TEXT@32..33 "b"
+            MATH_GROUP_CLOSE@33..34 "}"
+          MATH_SPACE@34..35 " "
+          MATH_COMMAND@35..41 "\\right"
+          MATH_CLOSE@41..42 ")"
+      INLINE_MATH_MARKER@42..43 "$"
+    NEWLINE@43..44 "\n"
+  BLANK_LINE@44..45
+    BLANK_LINE@44..45 "\n"
+  PARAGRAPH@45..119
+    TEXT@45..77 "Asymmetric and null d ..."
+    INLINE_MATH@77..95
+      INLINE_MATH_MARKER@77..78 "$"
+      MATH_CONTENT@78..94
+        MATH_DELIMITED@78..94
+          MATH_COMMAND@78..83 "\\left"
+          MATH_TEXT@83..84 "."
+          MATH_SPACE@84..85 " "
+          MATH_TEXT@85..86 "x"
+          MATH_SPACE@86..87 " "
+          MATH_COMMAND@87..93 "\\right"
+          MATH_TEXT@93..94 "|"
+      INLINE_MATH_MARKER@94..95 "$"
+    TEXT@95..100 " and "
+    INLINE_MATH@100..118
+      INLINE_MATH_MARKER@100..101 "$"
+      MATH_CONTENT@101..117
+        MATH_DELIMITED@101..117
+          MATH_COMMAND@101..106 "\\left"
+          MATH_OPEN@106..107 "["
+          MATH_SPACE@107..108 " "
+          MATH_TEXT@108..109 "y"
+          MATH_SPACE@109..110 " "
+          MATH_COMMAND@110..116 "\\right"
+          MATH_CLOSE@116..117 ")"
+      INLINE_MATH_MARKER@117..118 "$"
+    NEWLINE@118..119 "\n"
+  BLANK_LINE@119..120
+    BLANK_LINE@119..120 "\n"
+  PARAGRAPH@120..162
+    TEXT@120..128 "Nested: "
+    INLINE_MATH@128..161
+      INLINE_MATH_MARKER@128..129 "$"
+      MATH_CONTENT@129..160
+        MATH_DELIMITED@129..160
+          MATH_COMMAND@129..134 "\\left"
+          MATH_OPEN@134..135 "["
+          MATH_SPACE@135..136 " "
+          MATH_DELIMITED@136..152
+            MATH_COMMAND@136..141 "\\left"
+            MATH_OPEN@141..142 "("
+            MATH_SPACE@142..143 " "
+            MATH_TEXT@143..144 "a"
+            MATH_SPACE@144..145 " "
+            MATH_COMMAND@145..151 "\\right"
+            MATH_CLOSE@151..152 ")"
+          MATH_SPACE@152..153 " "
+          MATH_COMMAND@153..159 "\\right"
+          MATH_CLOSE@159..160 "]"
+      INLINE_MATH_MARKER@160..161 "$"
+    NEWLINE@161..162 "\n"
+  BLANK_LINE@162..163
+    BLANK_LINE@162..163 "\n"
+  PARAGRAPH@163..197
+    TEXT@163..188 "Display with an unclo ..."
+    INLINE_CODE@188..195
+      INLINE_CODE_MARKER@188..189 "`"
+      INLINE_CODE_CONTENT@189..194 "\\left"
+      INLINE_CODE_MARKER@194..195 "`"
+    TEXT@195..196 ":"
+    NEWLINE@196..197 "\n"
+  BLANK_LINE@197..198
+    BLANK_LINE@197..198 "\n"
+  PARAGRAPH@198..217
+    DISPLAY_MATH@198..216
+      DISPLAY_MATH_MARKER@198..200 "$$"
+      MATH_CONTENT@200..214
+        MATH_NEWLINE@200..201 "\n"
+        MATH_DELIMITED@201..214
+          MATH_COMMAND@201..206 "\\left"
+          MATH_OPEN@206..207 "("
+          MATH_SPACE@207..208 " "
+          MATH_TEXT@208..209 "x"
+          MATH_SPACE@209..210 " "
+          MATH_OPERATOR@210..211 "+"
+          MATH_SPACE@211..212 " "
+          MATH_TEXT@212..213 "y"
+          MATH_NEWLINE@213..214 "\n"
+      DISPLAY_MATH_MARKER@214..216 "$$"
+    NEWLINE@216..217 "\n"

@@ -290,6 +290,22 @@ undefined-references = false
 }
 
 #[test]
+fn test_math_delimiter_diagnostics() {
+    // `math-syntax` requires a tex-math extension; the Pandoc flavor enables it.
+    let diagnostics = lint_file_with_config("math_delimiters.md", "flavor = \"pandoc\"\n");
+    let codes: Vec<&str> = diagnostics.iter().map(|d| d.code.as_str()).collect();
+    // Unclosed `\left(` in the display block, stray `\right)` in the inline span.
+    assert!(
+        codes.contains(&"math-unclosed-delimiter"),
+        "expected math-unclosed-delimiter, got {codes:?}"
+    );
+    assert!(
+        codes.contains(&"math-unexpected-right"),
+        "expected math-unexpected-right, got {codes:?}"
+    );
+}
+
+#[test]
 fn test_unused_definitions() {
     let diagnostics = lint_file("unused_definitions.md");
     let unused_labels: Vec<_> = diagnostics

@@ -2,28 +2,29 @@
 //!
 //! The math parser embeds a lossless structural `MATH_CONTENT` CST into the host
 //! tree; unbalanced braces and unclosed/mismatched environments leave an
-//! unambiguous signature in that tree. This rule reads those signatures
-//! directly — it does **not** re-parse the content. The embedded tokens already
-//! carry host-document ranges (they were spliced into the host tree), so a
-//! diagnostic's span is just the offending token's `text_range()`; there is no
-//! offset remapping and the blockquote-prefix wrinkle never arises.
+//! unambiguous signature in that tree. This rule is a thin adapter over
+//! [`math_diagnostics`], the shared CST walk that is the single source of truth
+//! for math diagnostics (also consumed by the formatter and LSP). The embedded
+//! tokens already carry host-document ranges (they were spliced into the host
+//! tree), so a diagnostic's span is just the offending token's `text_range()`;
+//! there is no offset remapping and the blockquote-prefix wrinkle never arises.
 //!
-//! The five conditions mirror the parser's own `parse_math_report` checks
-//! (`crates/panache-parser/src/parser/math.rs`), read off the resulting shape:
+//! The rule's only job is to map each neutral [`MathDiagnosticKind`] to a linter
+//! code and message:
 //!
-//! | code | CST signature |
-//! |------|---------------|
-//! | `math-unclosed-group` | a `MATH_GROUP` with no `MATH_GROUP_CLOSE` child |
-//! | `math-unexpected-close-brace` | a `MATH_GROUP_CLOSE` whose parent isn't a `MATH_GROUP` |
-//! | `math-unclosed-environment` | a `MATH_ENVIRONMENT` with no `\end` command |
-//! | `math-mismatched-environment` | a `MATH_ENVIRONMENT` whose begin/end names differ |
-//! | `math-unexpected-end` | a `\end` `MATH_COMMAND` whose parent isn't a `MATH_ENVIRONMENT` |
-
-use rowan::TextRange;
+//! | code | kind |
+//! |------|------|
+//! | `math-unclosed-group` | [`MathDiagnosticKind::UnclosedGroup`] |
+//! | `math-unexpected-close-brace` | [`MathDiagnosticKind::UnexpectedCloseBrace`] |
+//! | `math-unclosed-environment` | [`MathDiagnosticKind::UnclosedEnvironment`] |
+//! | `math-mismatched-environment` | [`MathDiagnosticKind::MismatchedEnvironment`] |
+//! | `math-unexpected-end` | [`MathDiagnosticKind::UnexpectedEnd`] |
+//! | `math-unclosed-delimiter` | [`MathDiagnosticKind::UnclosedDelimiter`] |
+//! | `math-unexpected-right` | [`MathDiagnosticKind::UnexpectedRight`] |
 
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
-use crate::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
+use crate::syntax::{MathDiagnosticKind, SyntaxKind, math_diagnostics};
 
 pub struct MathContentRule;
 
@@ -45,6 +46,8 @@ impl Rule for MathContentRule {
                     DiagnosticCode::error("math-unclosed-environment"),
                     DiagnosticCode::error("math-mismatched-environment"),
                     DiagnosticCode::error("math-unexpected-end"),
+                    DiagnosticCode::error("math-unclosed-delimiter"),
+                    DiagnosticCode::error("math-unexpected-right"),
                 ]
             },
         }
@@ -57,143 +60,56 @@ impl Rule for MathContentRule {
     fn check(&self, cx: &LintContext) -> Vec<Diagnostic> {
         let input = cx.input;
         let mut out = Vec::new();
-        // Bound the walk to math subtrees: every malformed-math token lives under
-        // a `MATH_CONTENT` node.
+        // Every malformed-math token lives under a `MATH_CONTENT` node; the
+        // shared walk derives the diagnostics (with host-aligned ranges) from
+        // each subtree's shape.
         for content in cx.nodes(SyntaxKind::MATH_CONTENT) {
-            for node in content.descendants() {
-                match node.kind() {
-                    SyntaxKind::MATH_GROUP => check_unclosed_group(&node, input, &mut out),
-                    SyntaxKind::MATH_ENVIRONMENT => check_environment(&node, input, &mut out),
-                    _ => {}
-                }
-                // Stray tokens are flagged by their parent context: each token is
-                // a direct child of exactly one node, so iterating every node's
-                // direct children visits every token once.
-                for child in node.children_with_tokens() {
-                    let Some(token) = child.as_token() else {
-                        continue;
-                    };
-                    match token.kind() {
-                        SyntaxKind::MATH_GROUP_CLOSE if node.kind() != SyntaxKind::MATH_GROUP => {
-                            out.push(err(
-                                token.text_range(),
-                                "math-unexpected-close-brace",
-                                "unmatched closing brace `}`",
-                                input,
-                            ));
-                        }
-                        SyntaxKind::MATH_COMMAND
-                            if node.kind() != SyntaxKind::MATH_ENVIRONMENT
-                                && token.text() == r"\end" =>
-                        {
-                            out.push(err(
-                                token.text_range(),
-                                "math-unexpected-end",
-                                r"`\end` without a matching `\begin`",
-                                input,
-                            ));
-                        }
-                        _ => {}
-                    }
-                }
+            for d in math_diagnostics(content) {
+                let (code, message) = describe(d.kind);
+                out.push(Diagnostic::error(
+                    Location::from_range(d.range, input),
+                    code,
+                    message,
+                ));
             }
         }
         out
     }
 }
 
-/// A `MATH_GROUP` is well-formed only if it carries a closing `}`; the parser
-/// emits the `MATH_GROUP_CLOSE` token solely when the brace is matched.
-fn check_unclosed_group(group: &SyntaxNode, input: &str, out: &mut Vec<Diagnostic>) {
-    let has_close = group
-        .children_with_tokens()
-        .any(|c| c.kind() == SyntaxKind::MATH_GROUP_CLOSE);
-    if has_close {
-        return;
-    }
-    if let Some(open) = group
-        .children_with_tokens()
-        .find(|c| c.kind() == SyntaxKind::MATH_GROUP_OPEN)
-    {
-        out.push(err(
-            open.text_range(),
-            "math-unclosed-group",
-            "unclosed `{` group",
-            input,
-        ));
-    }
-}
-
-fn check_environment(env: &SyntaxNode, input: &str, out: &mut Vec<Diagnostic>) {
-    let children: Vec<SyntaxElement> = env.children_with_tokens().collect();
-    let is_cmd = |el: &SyntaxElement, text: &str| {
-        el.as_token()
-            .is_some_and(|t| t.kind() == SyntaxKind::MATH_COMMAND && t.text() == text)
-    };
-    let begin_idx = children.iter().position(|c| is_cmd(c, r"\begin"));
-
-    let Some(end_idx) = children.iter().position(|c| is_cmd(c, r"\end")) else {
-        // No closing `\end` command: point at the opening `\begin`.
-        let range = begin_idx
-            .map(|i| children[i].text_range())
-            .unwrap_or_else(|| env.text_range());
-        out.push(err(
-            range,
-            "math-unclosed-environment",
-            r"`\begin` without a matching `\end`",
-            input,
-        ));
-        return;
-    };
-
-    let begin_name = begin_idx
-        .and_then(|bi| group_name_after(&children, bi))
-        .unwrap_or_default();
-    let end_name = group_name_after(&children, end_idx).unwrap_or_default();
-    if begin_name != end_name {
-        // Point at the offending `\end` name (or the `\end` token if unnamed).
-        let range =
-            group_range_after(&children, end_idx).unwrap_or_else(|| children[end_idx].text_range());
-        out.push(err(
-            range,
-            "math-mismatched-environment",
-            r"`\end` name does not match the open `\begin`",
-            input,
-        ));
-    }
-}
-
-/// Inner text of the first `MATH_GROUP` after `idx` (the environment name
-/// group), with its braces stripped — mirrors `parse_environment_name`.
-fn group_name_after(children: &[SyntaxElement], idx: usize) -> Option<String> {
-    children[idx + 1..].iter().find_map(|c| {
-        c.as_node()
-            .filter(|n| n.kind() == SyntaxKind::MATH_GROUP)
-            .map(|g| {
-                g.text()
-                    .to_string()
-                    .trim_start_matches('{')
-                    .trim_end_matches('}')
-                    .to_string()
-            })
-    })
-}
-
-fn group_range_after(children: &[SyntaxElement], idx: usize) -> Option<TextRange> {
-    children[idx + 1..].iter().find_map(|c| {
-        c.as_node()
-            .filter(|n| n.kind() == SyntaxKind::MATH_GROUP)
-            .map(|g| g.text_range())
-    })
-}
-
+/// Map a neutral [`MathDiagnosticKind`] to this rule's `(code, message)`.
+///
 /// Malformed math is build-breaking — `quarto render` to PDF hard-fails on an
 /// unclosed brace or mismatched environment, and MathJax/KaTeX silently drop the
 /// equation. So these ride at `Error` severity. The rule stays suppressible via
 /// `[lint.rules] math-syntax = false` (or an ignore directive) for the rare
 /// macro-expanded TeX that only *looks* unbalanced to a structural parser.
-fn err(range: TextRange, code: &'static str, message: &'static str, input: &str) -> Diagnostic {
-    Diagnostic::error(Location::from_range(range, input), code, message)
+fn describe(kind: MathDiagnosticKind) -> (&'static str, &'static str) {
+    match kind {
+        MathDiagnosticKind::UnclosedGroup => ("math-unclosed-group", "unclosed `{` group"),
+        MathDiagnosticKind::UnexpectedCloseBrace => {
+            ("math-unexpected-close-brace", "unmatched closing brace `}`")
+        }
+        MathDiagnosticKind::UnclosedEnvironment => (
+            "math-unclosed-environment",
+            r"`\begin` without a matching `\end`",
+        ),
+        MathDiagnosticKind::MismatchedEnvironment => (
+            "math-mismatched-environment",
+            r"`\end` name does not match the open `\begin`",
+        ),
+        MathDiagnosticKind::UnexpectedEnd => {
+            ("math-unexpected-end", r"`\end` without a matching `\begin`")
+        }
+        MathDiagnosticKind::UnclosedDelimiter => (
+            "math-unclosed-delimiter",
+            r"`\left` without a matching `\right`",
+        ),
+        MathDiagnosticKind::UnexpectedRight => (
+            "math-unexpected-right",
+            r"`\right` without a matching `\left`",
+        ),
+    }
 }
 
 #[cfg(test)]

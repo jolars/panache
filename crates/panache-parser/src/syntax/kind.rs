@@ -97,6 +97,7 @@ pub enum SyntaxKind {
     // Math content (structural TeX CST under MATH_CONTENT)
     MATH_GROUP,       // { ... } brace group (node)
     MATH_ENVIRONMENT, // \begin{env} ... \end{env} (node)
+    MATH_DELIMITED,   // \left<d> ... \right<d> paired delimiters (node)
     MATH_GROUP_OPEN,  // {
     MATH_GROUP_CLOSE, // }
     MATH_COMMAND,     // \foo control word or \% control symbol

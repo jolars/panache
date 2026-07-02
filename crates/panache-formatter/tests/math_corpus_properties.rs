@@ -6,7 +6,7 @@
 //!
 //! 1. **Idempotency.** `format_math(format_math(x)) == format_math(x)`.
 //! 2. **Parser losslessness.** The structural math CST reconstructs the input
-//!    byte-for-byte: `parse_math_report(x).green.text() == x`. (The corpus holds
+//!    byte-for-byte: `parse_math_content(x).text() == x`. (The corpus holds
 //!    bare content with no host container prefixes, so `tree.text()` is the right
 //!    surface — same shape as `debug format --checks losslessness`.)
 //! 3. **Gate-off verbatim.** `format_math(x, { enabled: false, .. }) == x`, so a
@@ -25,7 +25,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use panache_formatter::formatter::math::{MathContext, MathFormatOptions, format_math};
-use panache_parser::parser::math::{MathParseOptions, parse_math_report};
+use panache_parser::parser::math::{MathParseOptions, parse_math_content};
 use panache_parser::syntax::SyntaxNode;
 
 fn corpus_root() -> PathBuf {
@@ -100,13 +100,13 @@ fn corpus_satisfies_math_formatter_properties() {
         let context = context_for(&id);
 
         // (2) Parser losslessness: the structural CST round-trips the input.
-        let report = parse_math_report(
+        let green = parse_math_content(
             &input,
             MathParseOptions {
                 bookdown_equation_labels: false,
             },
         );
-        let tree_text = SyntaxNode::new_root(report.green).text().to_string();
+        let tree_text = SyntaxNode::new_root(green).text().to_string();
         if tree_text != input {
             failures.push(format!(
                 "[{id}] losslessness break ({:+} bytes):\n  input:\n{}\n  tree:\n{}",

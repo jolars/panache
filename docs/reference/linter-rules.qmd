@@ -1134,7 +1134,9 @@ Diagnostic codes
     [`math-unexpected-close-brace`](#math-unexpected-close-brace),
     [`math-unclosed-environment`](#math-unclosed-environment),
     [`math-mismatched-environment`](#math-mismatched-environment),
-    [`math-unexpected-end`](#math-unexpected-end)
+    [`math-unexpected-end`](#math-unexpected-end),
+    [`math-unclosed-delimiter`](#math-unclosed-delimiter),
+    [`math-unexpected-right`](#math-unexpected-right)
 
 Description
 
@@ -1148,11 +1150,11 @@ Description
     or the mismatched `\end`).
 
     The check is purely syntactic: TeX is a macro language, so the rule does not
-    validate command names, argument arity, or semantics---only brace and
-    environment nesting. Because a macro can expand to braces or an environment the
-    structural parser cannot see, valid TeX can occasionally look unbalanced; in
-    that rare case disable the rule with `[lint.rules] math-syntax     = false` or
-    an ignore directive.
+    validate command names, argument arity, or semantics---only brace, environment,
+    and `\left`/`\right` delimiter nesting. Because a macro can expand to braces or
+    an environment the structural parser cannot see, valid TeX can occasionally look
+    unbalanced; in that rare case disable the rule with
+    `[lint.rules] math-syntax     = false` or an ignore directive.
 
 **Example violation:**
 
@@ -1193,6 +1195,15 @@ Emitted when a `\begin{a}` is closed by `\end{b}` with a different name.
 #### `math-unexpected-end` {#math-unexpected-end}
 
 Emitted when an `\end` appears with no open `\begin`.
+
+#### `math-unclosed-delimiter` {#math-unclosed-delimiter}
+
+Emitted when a `\left` delimiter is never closed by a matching `\right` (for
+example `\left( x` with no `\right)`).
+
+#### `math-unexpected-right` {#math-unexpected-right}
+
+Emitted when a `\right` appears with no open `\left`.
 
 ### `quarto-schema` {#quarto-schema}
 

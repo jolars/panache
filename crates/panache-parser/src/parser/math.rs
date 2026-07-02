@@ -12,52 +12,19 @@
 //! alignment tabs (`&`), line breaks (`\\`), sub/superscript markers, comments,
 //! and whitespace. Everything else is an ordinary-atom run ([`MATH_TEXT`]).
 //!
-//! Two outputs, two channels — the same split YAML uses (see
-//! `parser/yaml/model.rs`) and that texlab uses for LaTeX:
-//!
-//! - the **CST is lossless and never fails** (`node.text() == content` for every
-//!   input; worst case is a single `MATH_TEXT` atom), and
-//! - **errors ride a side-channel** ([`MathParseReport::diagnostics`]) so the
-//!   linter (and by proxy the LSP) can surface unbalanced braces and mismatched
-//!   environments without the parser ever rejecting input.
+//! The **CST is lossless and never fails** (`node.text() == content` for every
+//! input; worst case is a single `MATH_TEXT` atom). Structural problems
+//! (unbalanced braces, unclosed or mismatched environments) are *not* reported
+//! here: they are derived from the realized tree shape by
+//! [`crate::syntax::math_diagnostics`], the single source of truth shared by the
+//! linter, formatter, and LSP. Keeping the parser diagnostic-free means the
+//! host-aligned ranges come for free from the spliced subtree.
 //!
 //! [`MATH_TEXT`]: SyntaxKind::MATH_TEXT
 
 use crate::parser::inlines::bookdown::try_parse_bookdown_equation_definition;
 use crate::syntax::SyntaxKind;
 use rowan::{GreenNode, GreenNodeBuilder};
-
-/// A non-fatal problem found while parsing math content. Byte offsets are
-/// relative to the math content string (the caller offsets them into host
-/// document coordinates when surfacing through the linter/LSP).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MathDiagnostic {
-    pub code: &'static str,
-    pub message: &'static str,
-    pub byte_start: usize,
-    pub byte_end: usize,
-}
-
-/// The lossless CST plus any diagnostics gathered on the side-channel.
-#[derive(Debug, Clone)]
-pub struct MathParseReport {
-    pub green: GreenNode,
-    pub diagnostics: Vec<MathDiagnostic>,
-}
-
-/// Stable diagnostic codes for math content. Mirrors `yaml::diagnostic_codes`.
-pub mod diagnostic_codes {
-    /// A `{` was never closed before the end of the math content.
-    pub const UNCLOSED_GROUP: &str = "MATH_UNCLOSED_GROUP";
-    /// A `}` appeared with no matching `{`.
-    pub const UNEXPECTED_CLOSE_BRACE: &str = "MATH_UNEXPECTED_CLOSE_BRACE";
-    /// A `\begin{env}` was never closed by a matching `\end{env}`.
-    pub const UNCLOSED_ENVIRONMENT: &str = "MATH_UNCLOSED_ENVIRONMENT";
-    /// A `\begin{a}` was closed by `\end{b}` with a different name.
-    pub const MISMATCHED_ENVIRONMENT: &str = "MATH_MISMATCHED_ENVIRONMENT";
-    /// An `\end` appeared with no open `\begin`.
-    pub const UNEXPECTED_END: &str = "MATH_UNEXPECTED_END";
-}
 
 /// Flavor-/extension-dependent parsing options for math content. Default is
 /// all-off (pure TeX). The math grammar itself is flavor-agnostic; only
@@ -70,29 +37,20 @@ pub struct MathParseOptions {
     pub bookdown_equation_labels: bool,
 }
 
-/// Parse math content into a lossless `MATH_CONTENT` green node, discarding
-/// diagnostics. `content` is the raw text between (but excluding) the math
-/// delimiters.
+/// Parse math content into a lossless `MATH_CONTENT` green node. `content` is
+/// the raw text between (but excluding) the math delimiters. Never fails:
+/// `SyntaxNode::new_root(result).text() == content` for every input.
 pub fn parse_math_content(content: &str, opts: MathParseOptions) -> GreenNode {
-    parse_math_report(content, opts).green
-}
-
-/// Parse math content into a lossless CST plus a side-channel of diagnostics.
-pub fn parse_math_report(content: &str, opts: MathParseOptions) -> MathParseReport {
     let mut parser = MathParser {
         input: content,
         pos: 0,
         builder: GreenNodeBuilder::new(),
-        diagnostics: Vec::new(),
         opts,
     };
     parser.builder.start_node(SyntaxKind::MATH_CONTENT.into());
     parser.parse_elements(Ctx::Top);
     parser.builder.finish_node();
-    MathParseReport {
-        green: parser.builder.finish(),
-        diagnostics: parser.diagnostics,
-    }
+    parser.builder.finish()
 }
 
 /// Parse context, controlling which delimiter ends the current element run.
@@ -104,13 +62,14 @@ enum Ctx {
     Group,
     /// Inside a `\begin{env} ... \end{env}` body; stops at `\end`.
     Env,
+    /// Inside a `\left<d> ... \right<d>` body; stops at `\right`.
+    LeftRight,
 }
 
 struct MathParser<'a> {
     input: &'a str,
     pos: usize,
     builder: GreenNodeBuilder<'static>,
-    diagnostics: Vec<MathDiagnostic>,
     opts: MathParseOptions,
 }
 
@@ -121,15 +80,6 @@ impl MathParser<'_> {
 
     fn peek_char(&self) -> Option<char> {
         self.rest().chars().next()
-    }
-
-    fn diagnose(&mut self, code: &'static str, message: &'static str, start: usize, end: usize) {
-        self.diagnostics.push(MathDiagnostic {
-            code,
-            message,
-            byte_start: start,
-            byte_end: end,
-        });
     }
 
     /// Emit a token of `len` bytes (from the current position) with `kind`.
@@ -156,16 +106,9 @@ impl MathParser<'_> {
             match c {
                 '}' if ctx == Ctx::Group => break,
                 // A `}` outside any group is an unmatched close: keep it as a
-                // faithful (stray) close token and flag it on the side-channel.
-                '}' => {
-                    self.diagnose(
-                        diagnostic_codes::UNEXPECTED_CLOSE_BRACE,
-                        "unmatched closing brace `}`",
-                        self.pos,
-                        self.pos + 1,
-                    );
-                    self.bump_bytes(1, SyntaxKind::MATH_GROUP_CLOSE);
-                }
+                // faithful (stray) close token. `math_diagnostics` flags it from
+                // the shape (a `MATH_GROUP_CLOSE` with no enclosing `MATH_GROUP`).
+                '}' => self.bump_bytes(1, SyntaxKind::MATH_GROUP_CLOSE),
                 '\\' => {
                     if self.rest().starts_with("\\\\") {
                         self.bump_bytes(2, SyntaxKind::MATH_LINE_BREAK);
@@ -174,13 +117,17 @@ impl MathParser<'_> {
                             "begin" => self.parse_environment(),
                             "end" if ctx == Ctx::Env => break,
                             "end" => {
-                                // Stray `\end` with no open `\begin` at this level.
-                                self.diagnose(
-                                    diagnostic_codes::UNEXPECTED_END,
-                                    "`\\end` without a matching `\\begin`",
-                                    self.pos,
-                                    self.pos + 1 + word.len(),
-                                );
+                                // Stray `\end` with no open `\begin` at this
+                                // level; keep it as a plain command token.
+                                // `math_diagnostics` flags it from the shape.
+                                self.parse_control_word();
+                            }
+                            "left" => self.parse_delimited(),
+                            "right" if ctx == Ctx::LeftRight => break,
+                            "right" => {
+                                // Stray `\right` with no open `\left` at this
+                                // level; keep it as a plain command token.
+                                // `math_diagnostics` flags it from the shape.
                                 self.parse_control_word();
                             }
                             _ => self.parse_control_word(),
@@ -226,68 +173,81 @@ impl MathParser<'_> {
     }
 
     /// `\begin{env} ... \end{env}`. Matching is done by recursion plus the
-    /// `Env` context; name mismatches and missing `\end` are reported on the
-    /// side-channel but never abort the parse.
+    /// `Env` context. The begin/end name groups are captured as `MATH_GROUP`
+    /// children; a missing `\end` or a name mismatch is left in the shape for
+    /// `math_diagnostics` to report, and never aborts the parse.
     fn parse_environment(&mut self) {
-        let begin_start = self.pos;
         self.builder.start_node(SyntaxKind::MATH_ENVIRONMENT.into());
         self.parse_control_word(); // \begin
-        let begin_name = self.parse_environment_name();
+        self.parse_environment_name(); // {name} group, if present
         self.parse_elements(Ctx::Env);
         if self.peek_control_word() == Some("end") {
-            let end_start = self.pos;
             self.parse_control_word(); // \end
-            let end_name = self.parse_environment_name();
-            if begin_name != end_name {
-                self.diagnose(
-                    diagnostic_codes::MISMATCHED_ENVIRONMENT,
-                    "`\\end` name does not match the open `\\begin`",
-                    end_start,
-                    self.pos,
-                );
-            }
-        } else {
-            self.diagnose(
-                diagnostic_codes::UNCLOSED_ENVIRONMENT,
-                "`\\begin` without a matching `\\end`",
-                begin_start,
-                self.pos,
-            );
+            self.parse_environment_name(); // {name} group, if present
         }
         self.builder.finish_node();
     }
 
-    /// Parse the `{name}` group following `\begin` / `\end` (if present) and
-    /// return the inner name text for matching. Empty when absent.
-    fn parse_environment_name(&mut self) -> String {
-        if self.peek_char() != Some('{') {
-            return String::new();
+    /// Parse the `{name}` group following `\begin` / `\end`, if present. The
+    /// name is captured as a `MATH_GROUP` in the CST; begin/end matching is
+    /// derived from the tree shape by `math_diagnostics`.
+    fn parse_environment_name(&mut self) {
+        if self.peek_char() == Some('{') {
+            self.parse_group();
         }
-        let open = self.pos;
-        self.parse_group();
-        // Inner text = the group span minus its braces.
-        self.input[open..self.pos]
-            .trim_start_matches('{')
-            .trim_end_matches('}')
-            .to_string()
     }
 
     fn parse_group(&mut self) {
-        let open = self.pos;
         self.builder.start_node(SyntaxKind::MATH_GROUP.into());
         self.bump_bytes(1, SyntaxKind::MATH_GROUP_OPEN); // {
         self.parse_elements(Ctx::Group);
         if self.peek_char() == Some('}') {
             self.bump_bytes(1, SyntaxKind::MATH_GROUP_CLOSE); // }
-        } else {
-            self.diagnose(
-                diagnostic_codes::UNCLOSED_GROUP,
-                "unclosed `{` group",
-                open,
-                open + 1,
-            );
+        }
+        // An unclosed group (no `MATH_GROUP_CLOSE`) is left as-is; the missing
+        // close token is what `math_diagnostics` keys on.
+        self.builder.finish_node();
+    }
+
+    /// `\left<d> ... \right<d>`. Both `\left` and `\right` take a delimiter
+    /// argument; TeX allows asymmetric pairs (`\left( … \right]`) and the null
+    /// delimiter `.` (`\left.`), so no delimiter *matching* is attempted — only
+    /// the `\left`/`\right` pairing is structural. A missing `\right` leaves a
+    /// `MATH_DELIMITED` node without its closing command, which
+    /// `math_diagnostics` reports.
+    fn parse_delimited(&mut self) {
+        self.builder.start_node(SyntaxKind::MATH_DELIMITED.into());
+        self.parse_control_word(); // \left
+        self.consume_delimiter(); // opening delimiter argument
+        self.parse_elements(Ctx::LeftRight);
+        if self.peek_control_word() == Some("right") {
+            self.parse_control_word(); // \right
+            self.consume_delimiter(); // closing delimiter argument
         }
         self.builder.finish_node();
+    }
+
+    /// Consume the single delimiter that follows `\left` / `\right`, when it sits
+    /// immediately at the cursor. Brackets keep their fixed `MATH_OPEN`/
+    /// `MATH_CLOSE` kind; the ambiguous `. | /` stay `MATH_TEXT` (as elsewhere);
+    /// a control-sequence delimiter (`\{`, `\langle`, `\|`, …) is a `MATH_COMMAND`.
+    /// If a space or anything else intervenes, nothing is consumed here and the
+    /// surrounding element loop tokenizes it normally — losslessness holds either
+    /// way; only the token's node membership shifts.
+    fn consume_delimiter(&mut self) {
+        match self.peek_char() {
+            Some('(' | '[') => self.bump_bytes(1, SyntaxKind::MATH_OPEN),
+            Some(')' | ']') => self.bump_bytes(1, SyntaxKind::MATH_CLOSE),
+            Some('.' | '|' | '/') => self.bump_bytes(1, SyntaxKind::MATH_TEXT),
+            Some('\\') => {
+                if self.peek_control_word().is_some() {
+                    self.parse_control_word();
+                } else {
+                    self.parse_control_symbol();
+                }
+            }
+            _ => {}
+        }
     }
 
     /// `\` + a run of control-word characters (e.g. `\alpha`, `\frac`, `\begin`).
@@ -386,14 +346,6 @@ mod tests {
             .descendants_with_tokens()
             .filter_map(|el| el.into_token())
             .map(|tok| tok.kind())
-            .collect()
-    }
-
-    fn codes(content: &str) -> Vec<&'static str> {
-        parse_math_report(content, MathParseOptions::default())
-            .diagnostics
-            .into_iter()
-            .map(|d| d.code)
             .collect()
     }
 
@@ -584,10 +536,6 @@ mod tests {
             .count();
         assert_eq!(commands, 2);
         assert_lossless(content);
-        assert!(
-            codes(content).is_empty(),
-            "well-formed env has no diagnostics"
-        );
     }
 
     #[test]
@@ -599,7 +547,6 @@ mod tests {
             .count();
         assert_eq!(envs, 2);
         assert_lossless(content);
-        assert!(codes(content).is_empty());
     }
 
     #[test]
@@ -638,47 +585,101 @@ mod tests {
         assert_lossless("a\\");
     }
 
-    // --- Diagnostics side-channel (lossless even when malformed) ---
-
+    // Malformed-math cases stay lossless (diagnostics now live in
+    // `syntax::math::math_diagnostics`, tested there).
     #[test]
-    fn unclosed_group_is_lossless_and_diagnosed() {
-        assert_lossless("{a");
-        assert_eq!(codes("{a"), vec![diagnostic_codes::UNCLOSED_GROUP]);
+    fn malformed_math_is_still_lossless() {
+        for content in [
+            "{a",
+            "a}b",
+            r"\begin{aligned} x &= 1",
+            r"\begin{aligned}x\end{matrix}",
+            r"x \end{aligned}",
+        ] {
+            assert_lossless(content);
+        }
+    }
+
+    // --- `\left` / `\right` paired delimiters (MATH_DELIMITED node) ---
+
+    fn delimited_count(content: &str) -> usize {
+        node(content)
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::MATH_DELIMITED)
+            .count()
     }
 
     #[test]
-    fn stray_close_brace_is_lossless_and_diagnosed() {
-        assert_lossless("a}b");
-        assert_eq!(codes("a}b"), vec![diagnostic_codes::UNEXPECTED_CLOSE_BRACE]);
-    }
-
-    #[test]
-    fn unclosed_environment_is_diagnosed() {
-        let content = r"\begin{aligned} x &= 1";
+    fn left_right_wraps_a_delimited_node() {
+        let content = r"\left( x + y \right)";
+        let tree = node(content);
+        let delim = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::MATH_DELIMITED)
+            .expect("delimited node");
+        assert_eq!(delim.text().to_string(), content);
+        // The `\left` and `\right` are direct command children of the node.
+        let commands: Vec<String> = delim
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|t| t.kind() == SyntaxKind::MATH_COMMAND)
+            .map(|t| t.text().to_string())
+            .collect();
+        assert_eq!(commands, vec![r"\left", r"\right"]);
         assert_lossless(content);
-        assert_eq!(codes(content), vec![diagnostic_codes::UNCLOSED_ENVIRONMENT]);
     }
 
     #[test]
-    fn mismatched_environment_is_diagnosed() {
-        let content = r"\begin{aligned}x\end{matrix}";
-        assert_lossless(content);
+    fn left_right_delimiters_keep_their_token_kinds() {
+        // Opening `(` and closing `)` stay MATH_OPEN / MATH_CLOSE inside the node.
         assert_eq!(
-            codes(content),
-            vec![diagnostic_codes::MISMATCHED_ENVIRONMENT]
+            token_kinds(r"\left(x\right)"),
+            vec![
+                SyntaxKind::MATH_COMMAND, // \left
+                SyntaxKind::MATH_OPEN,    // (
+                SyntaxKind::MATH_TEXT,    // x
+                SyntaxKind::MATH_COMMAND, // \right
+                SyntaxKind::MATH_CLOSE,   // )
+            ]
         );
     }
 
     #[test]
-    fn stray_end_is_diagnosed() {
-        let content = r"x \end{aligned}";
-        assert_lossless(content);
-        assert_eq!(codes(content), vec![diagnostic_codes::UNEXPECTED_END]);
+    fn null_delimiter_and_asymmetric_pairs_are_lossless() {
+        // `\left.` null delimiter, `.` stays MATH_TEXT.
+        for content in [
+            r"\left. x \right|",
+            r"\left( x \right]",
+            r"\left\{ x \right\}",
+        ] {
+            assert_eq!(delimited_count(content), 1, "one node: {content:?}");
+            assert_lossless(content);
+        }
     }
 
     #[test]
-    fn well_formed_math_has_no_diagnostics() {
-        assert!(codes(r"\frac{1}{2} + x^{2}").is_empty());
+    fn nested_delimited_is_lossless() {
+        let content = r"\left[ \left( a \right) \right]";
+        assert_eq!(delimited_count(content), 2);
+        assert_lossless(content);
+    }
+
+    #[test]
+    fn unclosed_and_stray_delimiters_stay_lossless() {
+        // Unclosed `\left(` still builds a (single) node; stray `\right)` builds
+        // none. Both are lossless; the diagnostics live in `math_diagnostics`.
+        assert_eq!(delimited_count(r"\left( x"), 1);
+        assert_lossless(r"\left( x");
+        assert_eq!(delimited_count(r"x \right)"), 0);
+        assert_lossless(r"x \right)");
+    }
+
+    #[test]
+    fn leftarrow_and_rightarrow_are_not_delimiters() {
+        // `\leftarrow` / `\rightarrow` are ordinary commands, not `\left`/`\right`.
+        let content = r"a \leftarrow b \rightarrow c";
+        assert_eq!(delimited_count(content), 0);
+        assert_lossless(content);
     }
 
     // --- Bookdown equation labels (gated on the extension) ---
