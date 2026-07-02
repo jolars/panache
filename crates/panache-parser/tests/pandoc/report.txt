@@ -1,12 +1,12 @@
 Pandoc-native conformance report (pandoc 3.9.0.2)
-472 / 474 cases passing (99.6%)
-2 failing
+476 / 477 cases passing (99.8%)
+1 failing
 2 blocked-list entries
 
 === Per-section pass / fail ===
   block: 18 pass / 0 fail
   citation: 1 pass / 0 fail
-  html: 275 pass / 2 fail
+  html: 279 pass / 1 fail
   imported: 162 pass / 0 fail
   inline: 16 pass / 0 fail
 
@@ -481,8 +481,12 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 469
 470
 471
+472
 473
 474
+475
+476
+477
 
 === Passing cases grouped by section ===
 # block
@@ -782,8 +786,12 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 469
 470
 471
+472
 473
 474
+475
+476
+477
 
 # imported
 26
@@ -971,7 +979,4 @@ Pandoc-native conformance report (pandoc 3.9.0.2)
 # 390 (html-block-comment-trailing-softbreak)
   expected: [ RawBlock ( Format "html" ) "<!-- hi -->" , Para [ Str "trailing" , SoftBreak , Str "more" ] ]
   got:      [ RawBlock ( Format "html" ) "<!-- hi -->" , Para [ Str "trailing" ] , Para [ Str "more" ] ]
-# 472 (html-block-matched-pair-inter-tag-text)
-  expected: [ RawBlock ( Format "html" ) "<p>" , Plain [ Str "foo" ] , RawBlock ( Format "html" ) "</p>" , Plain [ Str "bar" ] , RawBlock ( Format "html" ) "<p>" , Plain [ Str "baz" ] , RawBlock ( Format "html" ) "</p>" ]
-  got:      [ RawBlock ( Format "html" ) "<p>" , Plain [ Str "foo" ] , RawBlock ( Format "html" ) "</p>" , Para [ Str "bar" , Space , RawInline ( Format "html" ) "<p>" , Str "baz" , RawInline ( Format "html" ) "</p>" ] ]
 

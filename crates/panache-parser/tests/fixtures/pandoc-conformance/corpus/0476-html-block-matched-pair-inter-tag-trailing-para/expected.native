@@ -1,0 +1,9 @@
+[ RawBlock (Format "html") "<p>"
+, Plain [ Str "a" ]
+, RawBlock (Format "html") "</p>"
+, Plain [ Str "b" ]
+, RawBlock (Format "html") "<p>"
+, Plain [ Str "c" ]
+, RawBlock (Format "html") "</p>"
+, Para [ Str "d" ]
+]

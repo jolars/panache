@@ -381,6 +381,8 @@ golden_test_cases!(
     html_block_form_multiline_same_line_close_pandoc,
     html_block_incomplete_open_commonmark,
     html_block_incomplete_open_pandoc,
+    html_block_matched_pair_inter_tag_text_commonmark,
+    html_block_matched_pair_inter_tag_text_pandoc,
     html_block_multiline_embed_open_commonmark,
     html_block_multiline_embed_open_pandoc,
     html_block_p_close_standalone_commonmark,

@@ -100,15 +100,21 @@ back into a session entry only if it's purely historical.
 - **Block-level tags mid-paragraph force a block boundary in pandoc;
   panache inlines them.** `foo <p>bar</p>` → pandoc `Plain [foo]` +
   `RawBlock "<p>"`/…; panache keeps one `Para` with `RawInline "<p>"`.
-  Symptom: same-line inter-tag text between matched-pair block tags
-  (`<p>foo</p> bar <p>baz</p>`, blocked 0472) — parser lifts the first
-  pair correctly then reparses the same-line tail as a PARAGRAPH whose
-  inline parser inlines the 2nd `<p>`. SAME-LINE only: multi-line
-  (`<p>foo</p>\nbar\n<p>baz</p>`, 0473) and void-trailing
-  (`<p>a</p> mid <embed> end`, 0474) already match (allowlisted guards).
-  Fix is broad (inline-parser block boundary) or needs a new opaque-
-  whole-line fallthrough (today even `<p>foo</p> bar` is lift+grafted,
-  not kept opaque) — deferred, see blocked.txt 472.
+  Same-line inter-tag text between NON-DIV matched-pair strict-block
+  tags (`<p>foo</p> bar <p>baz</p>`, 0472/0475/0476/0477) is FIXED via
+  option (b): `same_line_trailing_forces_opaque` suppresses the
+  same-line strict-block lift when the after-first-close trailing
+  (ws-trimmed) starts with non-`<` text AND holds a later matched-pair
+  tag → whole line kept opaque `HTML_BLOCK` → projector
+  `split_html_block_by_tags` produces the flat RawBlock/Plain split
+  (tail-after-last-tag stays `Para`). Gate is narrow: consecutive /
+  ws-only (`<p>a</p><p>b</p>`, `<p>a</p> <p>b</p>`) trim to `<`-leading
+  → keep clean sibling-lift; void-only trailing (`<embed>`, 0474) has
+  no matched-pair tag → tail `Para`. Still divergent: (a) `<div>`
+  inter-tag (`<div>x</div> y <div>z</div>` → pandoc `Div`/`Plain`/`Div`;
+  splitter emits RawBlock not Div, risks the HTML_BLOCK_DIV-panic) —
+  not in corpus; (b) the general inline-parser boundary for
+  `foo <p>bar</p>` where a paragraph LEADS the tag — broad, unaddressed.
 - **Closing forms of all matched-pair sets ARE block starts** — emit
   `BlockTag { closes_at_open_tag: true }`. Dispatcher's
   `cannot_interrupt` keys on inline-block + void only (strict-block +
@@ -431,64 +437,79 @@ verbatim-in-bq); table-cell reparses.
 | 5 | `markdown_in_html_blocks` interaction edge cases | **Conformance landed** — depth-aware nested div, Plain/Para promotion, refs inheritance, **projector-level splitter** (`split_html_block_by_tags` byte walker + `parse_pandoc_blocks` recursive reparse), outer-matched-pair-abandons-on-void-interior. **The structural CST lift was deferred** — Phase 5's mechanism is the projector reparsing bytes, not the parser emitting structure. |
 | 7b | Standalone-tag split — single line of ≥ 2 standalone block-level tags (close + void) emits one `HTML_BLOCK_TAG` per tag. | **Landed 2026-06-29; bq extension landed 2026-07-02.** Parser early-branch `try_parse_standalone_block_tags_split` (Pandoc, `closes_at_open_tag: true`, line parses as ≥ 2 tags). Projector routes via `html_block_is_standalone_tag_sequence` → `emit_html_block_structural` (no new byte walking). **Bq extension:** dropped the `bq_depth == 0` guard — the `> ` prefix is a sibling of `HTML_BLOCK`, so `strip_line_0_for_emission` yields clean tags and `> </p></div>` splits structurally (corpus 0467-0469). Single tags stay baked; if the prefix strip leaves non-tag bytes the segment scan bails to the byte walker. CommonMark keeps baked shape. html 259 → 262 → 271. |
 | 7c | Open-only body lift — non-div strict-block / inline-block open tag + trailing body + no matching close (`<section>foo`, `<video>bar\nbaz`) lifts the body into structural CST children. | **Landed 2026-07-02; bq extension landed 2026-07-02 (same day).** `emit_html_block_body` gained a non-div `HTML_BLOCK` + `bq_depth == 0` lift arm (mirrors the existing unbalanced-`<div>` arm, `LastParaDemote::Never`) → open `HTML_BLOCK_TAG` + recursively-parsed body (`PARAGRAPH`/`HEADING`/`LIST`/…) as siblings, no `HTML_BLOCK_CONTENT`. Projector routes via new `html_block_has_open_only_structural_lift` predicate (1 clean open tag, no HTML_BLOCK_CONTENT, ≥ 1 block child) → `emit_html_block_structural`. Matches pandoc-native `RawBlock "<section>"` + `Para [foo]` (open = lone RawBlock, body = fresh siblings, Para preserved). **Bq extension:** the same shape inside a blockquote (`> <section>foo\n> bar`) now lifts too — `emit_html_block_body` takes `prefix: &ContainerPrefix` + an `open_only` flag; the no-close path with `bq_depth > 0` routes through `emit_html_block_body_lifted_bq_messy` (empty leading/close-prefix) so continuation-line `> ` markers re-inject at line start. CommonMark keeps baked shape. html 262 → 265 → 268. |
-| 7e | Multi-tag interleave (tags + inter-tag text on one block). | **Triaged 2026-07-02; no fix landed.** Correct shapes already structural (consecutive matched pairs; 7b standalone split). The remaining gap is a genuine correctness divergence, not fidelity: same-line inter-tag text between matched-pair block tags (`<p>foo</p> bar <p>baz</p>`) — root cause is the inline parser inlining block-level tags. Blocked 0472; correct neighbors pinned 0473-0474. |
+| 7e | Multi-tag interleave (tags + inter-tag text on one block). | **Same-line non-div matched-pair inter-tag text FIXED 2026-07-02** (option b). `same_line_trailing_forces_opaque` suppresses the same-line strict-block lift when the after-first-close trailing (ws-trimmed) starts with non-`<` text AND holds a later matched-pair tag → whole line kept opaque `HTML_BLOCK` → projector `split_html_block_by_tags` produces the flat RawBlock/Plain split. `<p>foo</p> bar <p>baz</p>` (0472), no-ws (0475), tail→Para (0476), consecutive-stay-lifted (0477). CommonMark unaffected (always type-6 opaque). **Still open:** `<div>` inter-tag (needs Div-per-tag, risks HTML_BLOCK_DIV panic), and the general paragraph-LEADS-tag inline boundary (`foo <p>bar</p>`). Neighbors 0473-0474 still pinned. |
 | 7a | Single-construct opaque lift — comment / PI / verbatim retag to `HTML_BLOCK_RAW` so the projector routes by kind. | **Landed 2026-06-17.** New `HTML_BLOCK_RAW` wrapper applied under `Dialect::Pandoc` via `html_block_node_kind` at the two `start_node` sites in `parse_html_block_with_wrapper` (incl. the comment/PI trailing-split head); `wrapper_kind` stays `HTML_BLOCK` so all lift gates + child tokens are unchanged (byte-lossless, `HTML_BLOCK_DIV` precedent). Projector `collect_block` → `html_raw_block` → one `RawBlock` (trailing-trim + 1-3 leading-space strip via `html_raw_block_text`); `emit_html_block` byte-sniff arm now dead for Pandoc. All consumers updated (formatter ×~8, list-item lift gate, folding, html_entities, both directives copies). Conformance **flat** (CST-fidelity refactor — report.txt byte-identical); 6 paired parser goldens + 2 formatter goldens added. **Remaining (7b-7e roadmap, NOT done): standalone single-tag (close/void), single open + trailing, void sequences, multi-tag interleave (D3) — `split_html_block_by_tags` + `parse_pandoc_blocks` still serve those.** |
 | 6 (new) | Lift inner HTML block content into structural CST children — `HTML_BLOCK_DIV` / `HTML_BLOCK` get `PARAGRAPH` / `LIST` / etc. as direct children; projector byte walkers become vestigial; `PARAGRAPH→PLAIN` retag at adjacent-HTML-block boundary. | **All non-bq + bq shapes lifted for `<div>` and non-div Pandoc strict-block tags.** Shapes covered: clean multi-line, open-trailing, butted-close, indented-close, same-line, same-line + trailing-text-after-close, empty / blank-only, multi-line open (clean and trailing), depth-aware nested same-tag (`<div><div>x</div></div>` and trailing variants), multi-close trailing (`<div>foo</div></div>` and variants — projects as `Div + RawBlock` per pandoc-native), unclosed `<div>` (projects as `Div [...]` with implicit close), multi-line open + matched close in `pre_content` (single-close, nested, trailing-close, trailing-text — `<div\n  id="x">foo</div>` / `<div\n  id="x">foo</div></div>` / `<div\n  id="x"><div>x</div></div>` / `<div\n  id="x">foo</div>bar` and strict-block `<form\n  id="x">foo</form>`, **at top level and inside a blockquote** via `bq_multiline_close_lift_tag`). Inline-block matched-pair abandons when body begins with a void block tag (Plain via OnlyIfLast). Bq via four discriminator gates (`bq_clean_lift`, `same_line_bq_lift_tag`, `bq_messy_lift_tag`, `bq_multiline_close_lift_tag`). Dispatcher's `HTML_BLOCK_DIV` retag gate uses `pandoc_html_open_tag_closes` AND requires `is_closing: false`. Same-line / multi-line close-line lift paths use depth-aware split (`matched_close_offset` + `try_split_close_line_depth_aware`) + `split_close_marker_end` + trailing graft. `div_has_structural_inner` accepts unclosed div (1 HTML_BLOCK_TAG + structural body, no close). List items: same-line / fully-contained lift via `ListItemBuffer::emit_as_block` reparse + graft (formatter `format_list_item` HTML_BLOCK arm); multi-line lift via close-form dispatcher gate (`BlockContext::list_item_unclosed_html_block_tag` + `ListItemBuffer::unclosed_pandoc_matched_pair_tag`); indent normalization via `strip_list_item_indent` + `LinePrefixState` re-injection (projector `walk_skip_bq_markers` line-start-WS strip). List-item Comment/PI trailing-text via 2-child `try_emit_html_block_lift` branch + formatter `find_content_node` PLAIN-after-HTML_BLOCK guard. Inline-block matched-pair multi-line-open + same-line close (`<video\n  src="x">body</video>` / `<iframe\n  ...>...</iframe>` and bq variants) works transparently via the existing parser-side structural lift (open `HTML_BLOCK_TAG` + PLAIN body + close `HTML_BLOCK_TAG`, no HTML_BLOCK_DIV retag), pinned by 0448-0451. **Bq-in-listitem first-line dispatch landed 2026-05-18** via `ListItemFinish::BqDispatch` + `Parser::dispatch_bq_after_list_item` helper — fixes headings/HRs/etc. on `- > # heading` etc. (pinned by corpus 0454/0455 in `block` section). **Pass count history: 105 → 257.** bq-in-listitem first-line HTML block (`- > <div>...`, corpus 0452/0453) was **unblocked** by a later (unrecorded-in-RECAP) `ContainerPrefix` session — see the `# html-block (bq-in-listitem first-line HTML…)` allowlist comment near line 580; both now pass + allowlisted, and the stale `blocked.txt` 452/453 entry was removed 2026-06-29. |
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-07-02 (7e triage — matched-pair inter-tag text)
+## Latest session — 2026-07-02 (7e — same-line matched-pair inter-tag text fix)
 
-Conformance: **html 273 → 275** (2 correct-neighbor pins 0473-0474
-allowlisted; 1 divergence 0472 blocked). 474 total, 2 fail (blocked
-0390 + new blocked 0472). Workspace: only the pre-existing
+Conformance: **html 275 → 279** (0472 flipped to passing + 3 new
+regression corpus 0475-0477). 477 total, 1 fail (blocked 0390 only —
+0472 removed from blocked.txt). Workspace: only the pre-existing
 `r_air_formats_equals_spacing_in_quarto_r_block` external-formatter
-failure remains (fails on clean baseline too — unrelated). **No Rust
-code changed** (corpus/docs only, zero regression risk).
+failure (fails on clean baseline too — unrelated). Allowlists,
+clippy, fmt, full parser suite all green.
 
-Investigated the prior #1 target (7e multi-tag interleave). Found the
-premise partly outdated: the correct interleave shapes are ALREADY
-structural (`<p>a</p><p>b</p>` → two matched-pair `HTML_BLOCK`s;
-`</p><embed>` → 7b split), not opaque byte-walker cases. The real gap
-is a genuine correctness divergence, NOT a fidelity refactor:
-`<p>foo</p> bar <p>baz</p>` (same-line inter-tag text) projects wrong.
+Took the prior #1 target (0472). The blocked note called both fixes
+out-of-scope, but probing showed the divergence is NARROWER than
+recorded: only non-div matched-pair strict-block tags with same-line
+inter-tag TEXT diverge, and option (b) (keep line opaque → projector
+splitter) is a small, well-gated parser change — not the broad
+inline-parser rewrite the note feared.
 
 ### What landed
 
-- Root-caused the divergence to the INLINE parser: panache inlines
-  block-level tags (`<p>`) mid-paragraph as `RawInline`; pandoc forces
-  a block boundary (`foo <p>bar</p>` → `Plain [foo]` + `RawBlock`).
-  Confirmed SAME-LINE only — multi-line and void-trailing forms match.
-- Two fix avenues scoped and rejected as out-of-scope for one bounded
-  session (inline-parser block boundary = broad blast radius; opaque-
-  whole-line fallthrough = new parser path). Both documented in
-  blocked.txt 472 for a future session.
-- Pinned the two correct neighbors (0473 multi-line inter-tag,
-  0474 void-trailing) as regression guards so a future 0472 fix cannot
-  silently over-break at void tags or disturb the multi-line demotion.
+- **Parser fix (bucket: parser-shape).** New
+  `same_line_trailing_forces_opaque(line, tag)` +
+  `trailing_contains_matched_pair_tag` in `html_blocks.rs`; wired as a
+  `&& !…` guard into `same_line_strict_lift_safe`. When it fires,
+  `strict_block_lift` → false → `lift_mode` false → open tag emits as
+  one opaque TEXT token → single opaque `HTML_BLOCK` → existing
+  projector `split_html_block_by_tags` produces pandoc's flat
+  RawBlock/Plain split (inter-tag → Plain, tail-after-last → Para).
+- Gate is precise: fires only when after-first-close trailing
+  (ws-trimmed) starts with non-`<` text AND contains a later
+  matched-pair tag. Consecutive / ws-only (`<p>a</p><p>b</p>`) trim to
+  `<`-leading → keep clean sibling-lift; void-only (`<embed>`, 0474)
+  → no matched-pair tag → tail Para. Verified all 7 hand-probed
+  variants match pandoc-native; formatter idempotent.
+- Non-div only. `<div>` inter-tag left divergent (would need Div-per-
+  tag; risks the HTML_BLOCK_DIV-without-structural-inner panic).
+- Fixtures: 2 paired parser goldens (pandoc + commonmark, identical
+  opaque CST), 1 formatter golden (idempotency), 3 corpus guards
+  (0475 no-ws, 0476 tail→Para, 0477 consecutive).
 
 ### Files in committable diff
 
-- `crates/panache-parser/tests/`: corpus 0472-0474 + allowlist
-  (0473/0474) + blocked.txt (472) + report{.txt,.json}. No source.
+- `crates/panache-parser/src/parser/blocks/html_blocks.rs` (helpers +
+  gate).
+- `crates/panache-parser/tests/` (2 parser goldens + snapshots,
+  golden_parser_cases list, corpus 0475-0477, allowlist 472/475/476/
+  477 + reworded 0473/0474 header, blocked.txt, report{.txt,.json}).
+- `tests/` (1 formatter golden + golden_cases list).
+- `.claude/skills/html-conformance/RECAP.md`.
 
 ### Suggested next sub-targets
 
-1. **0472 inline-parser block boundary** — teach the inline parser to
-   terminate a paragraph at a block-level HTML open tag (matched-pair
-   sets, NOT void `eitherBlockOrInline`). Broad — needs its own phasing;
-   0473/0474 guard the edges, `foo <p>bar</p>` is the minimal repro.
-2. **Softbreak (0390)** — Comment/PI trailing-text softbreak continuation
-   (`<!-- hi --> trailing\nmore`); needs open-paragraph carry across the
-   HTML-block boundary or projector-side Para fusion. Still blocked.
-3. **7e fidelity (lower value)** — the remaining opaque byte-walker cases
-   (`split_html_block_by_tags`) are correct; lifting them to structural
-   CST is a no-pass-rate-change refactor. Deprioritize behind 0472.
+1. **`<div>` inter-tag** (`<div>x</div> y <div>z</div>` → `Div`/`Plain`/
+   `Div`) — the div analog of what just landed. Needs the splitter (or
+   a structural lift) to emit `Div` per tag; watch the HTML_BLOCK_DIV
+   panic. Not in corpus yet — seed it first.
+2. **Softbreak (0390)** — Comment/PI trailing-text softbreak
+   continuation (`<!-- hi --> trailing\nmore`); needs open-paragraph
+   carry across the HTML-block boundary or projector-side Para fusion.
+   Last remaining corpus failure.
+3. **General inline-parser boundary** (`foo <p>bar</p>` where a
+   paragraph LEADS the tag) — the broad case the 0472 note feared;
+   still unaddressed, needs its own phasing.
 
 ### New trap
 
-Folded into Persistent traps (Pandoc tag categorization) — the block-
-level-tag-mid-paragraph inline/block boundary divergence.
+Folded into Persistent traps (Pandoc tag categorization) — updated the
+block-level-tag-mid-paragraph bullet to record the same-line fix and
+the two remaining sub-cases.
 
 --------------------------------------------------------------------------------
 
@@ -497,6 +518,7 @@ level-tag-mid-paragraph inline/block boundary divergence.
 Newest first. One line per session: date — phase/sub-target — pass
 count delta — root cause / lever.
 
+- 2026-07-02 — 7e same-line matched-pair inter-tag text triage — html 273 → 275 — no code; found only same-line non-div matched-pair diverges; pinned neighbors 0473/0474; blocked 0472 (later fixed same day).
 - 2026-07-02 — Void strict-block tags (`<hr>`/`<col>`/`<meta>` → sibling `HTML_BLOCK`s, not nested) — html 271 → 273 — new `PANDOC_VOID_STRICT_BLOCK_TAGS`; `closes_at_open_tag: true` under Pandoc; excluded from lift/matched-pair but kept out of `cannot_interrupt`; resolves the 7c `<hr>`-nesting quirk; corpus 0470-0471.
 - 2026-07-02 — Phase 7c blockquote open-only lift (`> <section>foo\n> bar` → structural PARAGRAPH/HEADING child) — html 265 → 268 — `emit_html_block_body` takes `&ContainerPrefix` + `open_only` flag; no-close bq path routes through `emit_html_block_body_lifted_bq_messy`; projector unchanged; corpus 0464-0466.
 - 2026-07-02 — Phase 7b blockquote standalone-tag split (`> </p></div>` → one `HTML_BLOCK_TAG` per tag) — html 268 → 271 — dropped `try_parse_standalone_block_tags_split`'s `bq_depth == 0` guard (`> ` prefix is an `HTML_BLOCK` sibling, strip yields clean tags, non-tag bytes bail to byte walker); projector unchanged; corpus 0467-0469. Also disproved prior target #4 (`<div id>` anchor false-positive was a stray `/tmp/panache.toml` `flavor=myst`, not a bug).

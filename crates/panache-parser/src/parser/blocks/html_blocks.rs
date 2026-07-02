@@ -1290,6 +1290,12 @@ pub(crate) fn parse_html_block_with_wrapper(
         multiline_open_end.is_none() && depth <= 0 && {
             let (line_no_nl, _) = strip_newline(first_inner);
             probe_same_line_lift(line_no_nl, name)
+                // Suppress the lift when the same-line trailing after the
+                // first matched close holds inter-tag TEXT before another
+                // matched-pair block tag. Pandoc treats the whole line as
+                // one opaque type-6 block (`<p>foo</p> bar <p>baz</p>`,
+                // corpus 0472); keep it opaque for the projector splitter.
+                && !same_line_trailing_forces_opaque(line_no_nl, name)
         }
     });
     // Strict-block lift gate: accept (a) a multi-line open tag spanning
@@ -2734,6 +2740,106 @@ pub(crate) fn probe_open_tag_line_has_close_gt(line: &str, tag_name: &str) -> bo
             _ => {}
         }
         i += 1;
+    }
+    false
+}
+
+/// When a non-div strict-block same-line matched pair (`<p>foo</p>...`)
+/// has trailing content after the first matched close, decide whether
+/// pandoc would keep the WHOLE line as one opaque type-6 HTML block
+/// (flat `RawBlock`/`Plain` alternation, resolved later by the
+/// projector's byte splitter) rather than lifting the first pair and
+/// reparsing the tail.
+///
+/// Pandoc keeps the line opaque when the after-close trailing contains
+/// genuine inter-tag TEXT followed by another matched-pair block tag:
+/// `<p>foo</p> bar <p>baz</p>` -> 7 flat blocks with `bar` demoted to
+/// `Plain` (corpus 0472). It does NOT keep it opaque when:
+/// - the trailing is empty or begins (after whitespace) with a tag —
+///   consecutive / whitespace-only pairs (`<p>a</p><p>b</p>`,
+///   `<p>a</p> <p>b</p>`) reparse into clean sibling `HTML_BLOCK`s; or
+/// - the trailing is plain text with no later matched-pair tag
+///   (`<p>a</p> bar` -> `Para [bar]`); or
+/// - the only later tag is a void `eitherBlockOrInline` tag
+///   (`<p>a</p> mid <embed> end` -> inline `<embed>` in a `Para`,
+///   corpus 0474).
+///
+/// Only relevant for non-div strict-block tags: `<div>` projects each
+/// tag as a structural `Div` and keeps its own lift path.
+fn same_line_trailing_forces_opaque(line: &str, tag_name: &str) -> bool {
+    let bytes = line.as_bytes();
+    let indent_end = bytes
+        .iter()
+        .position(|&b| b != b' ' && b != b'\t')
+        .unwrap_or(bytes.len());
+    let rest = &line[indent_end..];
+    let rest_bytes = rest.as_bytes();
+    let prefix_len = 1 + tag_name.len();
+    if rest_bytes.len() < prefix_len
+        || rest_bytes[0] != b'<'
+        || !rest_bytes[1..prefix_len].eq_ignore_ascii_case(tag_name.as_bytes())
+    {
+        return false;
+    }
+    // Locate the open tag's closing `>` (quote-aware).
+    let after_name = &rest[prefix_len..];
+    let after_name_bytes = after_name.as_bytes();
+    let mut i = 0usize;
+    let mut quote: Option<u8> = None;
+    let mut gt_idx: Option<usize> = None;
+    while i < after_name_bytes.len() {
+        match (quote, after_name_bytes[i]) {
+            (None, b'"') | (None, b'\'') => quote = Some(after_name_bytes[i]),
+            (Some(q), b2) if b2 == q => quote = None,
+            (None, b'>') => {
+                gt_idx = Some(i);
+                break;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    let Some(gt_idx) = gt_idx else {
+        return false;
+    };
+    let trailing = &after_name[gt_idx + 1..];
+    let Some((_, close_end)) = matched_close_offset(trailing, tag_name) else {
+        return false;
+    };
+    let after_close = &trailing[close_end..];
+    // Trailing that is empty or begins (after whitespace) with a tag is
+    // handled correctly by the tail reparse; only inter-tag TEXT forces
+    // the opaque whole-line treatment.
+    let trimmed = after_close.trim_start();
+    if trimmed.is_empty() || trimmed.starts_with('<') {
+        return false;
+    }
+    trailing_contains_matched_pair_tag(after_close)
+}
+
+/// Scan `s` for any pandoc matched-pair block tag (`<name ...>` or
+/// `</name>`). Byte walk over tag-name starts; good enough for the
+/// same-line-opaque heuristic (attribute values rarely embed `<tag`).
+fn trailing_contains_matched_pair_tag(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if bytes[i] != b'<' {
+            i += 1;
+            continue;
+        }
+        let mut j = i + 1;
+        if j < bytes.len() && bytes[j] == b'/' {
+            j += 1;
+        }
+        let name_start = j;
+        while j < bytes.len() && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'-') {
+            j += 1;
+        }
+        if j > name_start && is_pandoc_matched_pair_tag(&s[name_start..j]) {
+            return true;
+        }
+        i = j.max(i + 1);
     }
     false
 }
