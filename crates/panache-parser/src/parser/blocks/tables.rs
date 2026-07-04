@@ -171,15 +171,25 @@ fn extract_columns(separator: &str, offset: usize) -> Vec<Column> {
     columns
 }
 
-/// Convert a character column offset into a UTF-8 byte index for `line`.
+/// Convert a display-column offset into a UTF-8 byte index for `line`.
 ///
-/// Simple-table column boundaries come from ASCII separator lines where
-/// character and byte offsets are identical. Data rows may contain multibyte
-/// characters, so we must remap offsets before slicing.
+/// Simple- and multiline-table column boundaries come from ASCII separator
+/// lines whose dashes and spaces are each one display column wide, so the
+/// `Column` offsets are effectively *display* columns. Header and data rows may
+/// contain wide characters (CJK, fullwidth forms) that occupy two display
+/// columns, or combining marks that occupy zero, so we must remap by
+/// accumulated display width rather than character count. Pandoc aligns simple
+/// tables the same way. The returned byte index is that of the first character
+/// whose start reaches `offset`, matching how an author lays cells out visually.
 fn column_offset_to_byte_index(line: &str, offset: usize) -> usize {
-    line.char_indices()
-        .nth(offset)
-        .map_or(line.len(), |(byte_idx, _)| byte_idx)
+    let mut width = 0;
+    for (byte_idx, ch) in line.char_indices() {
+        if width >= offset {
+            return byte_idx;
+        }
+        width += UnicodeWidthChar::width(ch).unwrap_or(0);
+    }
+    line.len()
 }
 
 /// Try to parse a table caption from a line.
@@ -1456,6 +1466,37 @@ mod tests {
         let line = "-------     ------ ----------   -------";
         let columns = extract_columns(line, 0);
         assert_eq!(columns.len(), 4);
+    }
+
+    #[test]
+    fn column_offset_maps_by_display_width() {
+        // Wide CJK characters occupy two display columns each. A column offset
+        // of 4 display columns lands after two wide chars (6 bytes), not after
+        // four chars.
+        let line = "地號xy";
+        assert_eq!(column_offset_to_byte_index(line, 4), 6);
+        // ASCII stays byte-for-byte.
+        assert_eq!(column_offset_to_byte_index("abcd", 2), 2);
+    }
+
+    #[test]
+    fn simple_table_cjk_header_keeps_footnote_ref_intact() {
+        // Regression for #411: wide (double-width) header text pushed the
+        // footnote reference across a char-counted column boundary, splitting
+        // `[^d]` so it never parsed as a FOOTNOTE_REFERENCE and the linter
+        // flagged the definition as unused.
+        let input = "\
+ 地號    地主    路段      總長[^d] 水利局舖的[^s]
+------ -------   -------- --------- --------------
+2976    Ralph    南段          64   33
+";
+        let tree = crate::parser::parse(input, None);
+        let refs: Vec<_> = tree
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
+            .map(|n| n.text().to_string())
+            .collect();
+        assert_eq!(refs, vec!["[^d]".to_string(), "[^s]".to_string()]);
     }
 
     #[test]
