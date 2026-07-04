@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.61.0](https://github.com/jolars/panache/compare/v2.60.0...v2.61.0) (2026-07-04)
+
+### Features
+- **parser:** fuse comment/PI trailing softbreak lines ([`3fa513c`](https://github.com/jolars/panache/commit/3fa513ce3dc2fd72abb1a2ca739d876393467505))
+- **parser:** lift `<div>` inter-tag text to sibling blocks ([`5f04265`](https://github.com/jolars/panache/commit/5f04265dfb5a77e56fe9f448f159261297b9f80d))
+- **parser:** lift fenced div swallowing html `</div>` ([`7b11daf`](https://github.com/jolars/panache/commit/7b11daf64a0fabb6fd4774006971aef387a9c259))
+- **parser:** split same-line matched-pair inter-tag HTML ([`119014c`](https://github.com/jolars/panache/commit/119014c7f9f90a3d38d36c37562d37f4bfd1dd29))
+- **parser:** classify void strict-block HTML tags ([`fcfea15`](https://github.com/jolars/panache/commit/fcfea15ce69d9a44fe2dcc0f18b29a86e2a7b3fc))
+- **parser:** split blockquote standalone HTML tags ([`b29d46c`](https://github.com/jolars/panache/commit/b29d46c032c430bbc8e5ad561df209ffea00262c))
+- **parser:** lift blockquote open-only HTML body ([`e3b93a5`](https://github.com/jolars/panache/commit/e3b93a50453174cc5a6ba855d673c680b4823f57))
+- **config:** add `fatou` formatter preset ([`8d70ee0`](https://github.com/jolars/panache/commit/8d70ee0aaeedf0c0edfa623ac02df2adc225f898))
+- **parser:** flag unbalanced `\left`/`\right` in math ([`73750c9`](https://github.com/jolars/panache/commit/73750c9b854e8899fcd2b7180c21f9b2eb7af892))
+- **parser:** lift open-only HTML block bodies ([`7a831ff`](https://github.com/jolars/panache/commit/7a831ff881c995cc9dfa57fb2aa6650699c431d8))
+
+### Bug Fixes
+- **formatter:** route non-reflowable math verbatim ([`bd577dc`](https://github.com/jolars/panache/commit/bd577dcd7884428b83ea9034a048863c97368c28))
+- **linter:** match reference labels on raw source text ([`cb7ae6d`](https://github.com/jolars/panache/commit/cb7ae6d006d62d439f3df0e431186858d355c2f2))
+- **parser:** map simple-table columns by display width ([`c2f1b14`](https://github.com/jolars/panache/commit/c2f1b141894cf66c323831e8100e4118529a8496)), fixes [#411](https://github.com/jolars/panache/issues/411)
+
+### Dependencies
+- updated crates/panache-formatter to v0.19.0
+- updated crates/panache-parser to v0.21.0
+
 ## [2.60.0](https://github.com/jolars/panache/compare/v2.59.0...v2.60.0) (2026-07-01)
 
 ### Highlights
