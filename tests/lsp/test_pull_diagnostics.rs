@@ -2,8 +2,86 @@
 //! `workspace/diagnostic`), and the push/pull mode-switch.
 
 use super::helpers::*;
+use lsp_server::{ErrorCode, Message};
 use lsp_types::*;
 use std::time::Duration;
+
+/// The `id`'d response among drained client messages, if one has been sent.
+fn response_for<'a>(
+    messages: &'a [Message],
+    id: &lsp_server::RequestId,
+) -> Option<&'a lsp_server::Response> {
+    messages.iter().find_map(|msg| match msg {
+        Message::Response(resp) if resp.id == *id => Some(resp),
+        _ => None,
+    })
+}
+
+/// A `textDocument/diagnostic` pull is dispatched to the worker pool, not answered
+/// inline on the event loop: the response arrives only after a `pump` drives the
+/// pooled result. Inline dispatch (the old behavior) recomputed the whole linter
+/// on the main thread per pull, so a neovim keystroke-burst of pulls pegged the
+/// loop and froze a synchronous format-on-save behind them. Regression guard for
+/// that freeze.
+#[test]
+fn document_pull_is_answered_off_the_event_loop() {
+    let mut server = TestLspServer::new();
+    server.initialize_pull("file:///workspace");
+    let uri = "file:///workspace/doc.qmd";
+    server.open_document(uri, "# H1\n\n### H3 skip\n", "quarto");
+    server.pump(Duration::from_secs(2));
+    server.drain_client_messages();
+
+    let id = server.send_document_diagnostic_request_raw(7, uri);
+    // Inline handling would already have sent the response; the pooled path posts
+    // its result to the task channel, which only `pump` turns into a response.
+    let immediate = server.drain_client_messages();
+    assert!(
+        response_for(&immediate, &id).is_none(),
+        "pull must not be answered inline on the event loop"
+    );
+
+    server.pump(Duration::from_secs(2));
+    let drained = server.drain_client_messages();
+    let response = response_for(&drained, &id).expect("expected an async response for the pull");
+    assert!(
+        response.error.is_none(),
+        "the pull should succeed, got error: {:?}",
+        response.error
+    );
+}
+
+/// An in-flight `textDocument/diagnostic` pull is cancellable via `$/cancelRequest`
+/// because it runs on the pool. This is the mechanism that keeps a burst of pulls
+/// from stacking full recomputes: a superseding edit (or explicit cancel) drops
+/// the earlier pull instead of running every one to completion.
+#[test]
+fn document_pull_is_cancellable() {
+    let mut server = TestLspServer::new();
+    server.initialize_pull("file:///workspace");
+    let uri = "file:///workspace/doc.qmd";
+    server.open_document(uri, "# H1\n\n### H3 skip\n", "quarto");
+    server.pump(Duration::from_secs(2));
+    server.drain_client_messages();
+
+    let id = server.send_document_diagnostic_request_raw(11, uri);
+    server.send_cancel(id.clone());
+    server.pump(Duration::from_secs(2));
+
+    let drained = server.drain_client_messages();
+    let response = response_for(&drained, &id).expect("expected a response for the cancelled pull");
+    let err = response
+        .error
+        .as_ref()
+        .expect("a cancelled pull should produce an error response");
+    assert_eq!(
+        err.code,
+        ErrorCode::RequestCanceled as i32,
+        "expected RequestCanceled, got code {}: {}",
+        err.code,
+        err.message
+    );
+}
 
 /// Collect the `(uri, items)` pairs from full reports in a workspace result.
 fn workspace_full_reports(

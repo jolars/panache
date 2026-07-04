@@ -346,35 +346,38 @@ fn result_id_for(items: &[Diagnostic]) -> String {
     hasher.finish().to_string()
 }
 
-/// Pull handler for `textDocument/diagnostic`.
+/// Pull handler for `textDocument/diagnostic`, run on the worker pool.
 ///
-/// Computes the pulled document's diagnostics **on demand** from a fresh snapshot
-/// rather than reading the debounced settle store. A client (e.g. neovim) pulls
-/// right after a `didChange`, before the 200 ms settle has re-linted; serving the
-/// store there returns the *previous* edit's diagnostics (a persistent
-/// one-edit-behind lag, since the client doesn't reliably re-pull on the
-/// post-settle `workspace/diagnostic/refresh`). Recomputing here makes every pull
-/// reflect the current buffer — rust-analyzer's model. The compute is read-only
-/// (no salsa input writes), so it never cancels an in-flight settle pass; the
-/// settle still owns push delivery, cross-file/manifest diagnostics, and loading
-/// newly-referenced includes/bibliographies. The store remains the source for
-/// `related_documents` (refreshed by the settle) and for push clients.
+/// Recomputes the pulled document's diagnostics over the snapshot so the report
+/// reflects the **current** buffer. Serving the debounced settle store here
+/// instead would trail the buffer by up to one debounce, which surfaced as neovim
+/// showing diagnostics "one edit behind" (it pulls immediately after `didChange`,
+/// before the settle re-lints). Running on the pool rather than inline on the
+/// event loop keeps the recompute off the main thread: it no longer blocks a
+/// synchronous `textDocument/formatting`, and a concurrent edit's salsa write
+/// cancels an in-flight pull (unwinding to `ContentModified`, on which the client
+/// re-pulls) so a keystroke burst can't stack full lints and freeze the editor.
+///
+/// This gives freshness *and* responsiveness without redundant work: the heavy
+/// part — rebuilding the cross-document reference index that resolves `@ref`s
+/// against every chapter of a book — is memoized by salsa, so an *unchanged*
+/// re-pull is cheap and only an edited buffer pays the rebuild (and only
+/// off-thread). External linters are still skipped on a pull (they run on the
+/// settle).
 ///
 /// Returns an `unchanged` report when the client's `previous_result_id` still
-/// matches the recomputed [`result_id_for`] the items, else a full report.
-///
-/// For clients that advertise `related_document_support`, `related_documents` is
-/// populated with the cross-file diagnostics of the pulled document's
-/// project-graph closure (see [`related_documents`]); otherwise it is left empty
-/// and those diagnostics reach the client only via `workspace/diagnostic` (the
-/// server advertises `inter_file_dependencies` + `workspace_diagnostics`).
+/// matches, else a full report. For `related_document_support` clients,
+/// `related_documents` carries the cross-file diagnostics of the pulled document's
+/// project-graph closure, read from the snapshot's store view (see
+/// [`related_documents`]); otherwise those reach the client only via
+/// `workspace/diagnostic`.
 pub(crate) fn document_diagnostic(
-    gs: &GlobalState,
+    snap: &StateSnapshot,
     params: DocumentDiagnosticParams,
 ) -> Streamed<DocumentDiagnosticReportResult> {
     // A push-only client is served by push: never surface diagnostics through a
     // pull (keeps push and pull mutually exclusive — no double reporting).
-    if !gs.supports_pull_diagnostics {
+    if !snap.supports_pull_diagnostics {
         return Streamed::whole(DocumentDiagnosticReportResult::Report(
             DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
                 related_documents: None,
@@ -385,12 +388,11 @@ pub(crate) fn document_diagnostic(
     let token = params.partial_result_params.partial_result_token;
     let uri = params.text_document.uri;
 
-    // Compute this document's diagnostics on demand over a fresh snapshot.
-    // `compute_publishes` returns one entry per affected URI; the requested URI's
-    // own entry carries its built-in + own cross-file diagnostics. External
-    // linters are intentionally skipped on a pull (they run on the settle).
-    let snap = gs.snapshot();
-    let items = compute_publishes(&snap, &uri, false)
+    // Recompute this document's own diagnostics over the snapshot. `compute_publishes`
+    // returns one entry per affected URI; the requested URI's entry carries its
+    // built-in + own cross-file diagnostics. The salsa reads here can be cancelled
+    // by a concurrent write, unwinding this pooled job into a `ContentModified`.
+    let items = compute_publishes(snap, &uri, false)
         .into_iter()
         .find(|(target, _, _)| *target == uri)
         .map(|(_, _, items)| items)
@@ -401,7 +403,7 @@ pub(crate) fn document_diagnostic(
     // documents whose diagnostics changed. When the client asked for partial
     // results, the first chunk rides in the response and the rest stream as
     // `$/progress` notifications (see `split_related`).
-    let related = related_documents(gs, &uri);
+    let related = related_documents(snap, &uri);
     let (related, progress) = split_related(token.as_ref(), related);
     let report = if params.previous_result_id.as_deref() == Some(result_id.as_str()) {
         DocumentDiagnosticReport::Unchanged(RelatedUnchangedDocumentDiagnosticReport {
@@ -479,16 +481,16 @@ fn split_related(
 /// diagnostics were cleared has been dropped from the store and so simply falls
 /// out of the map (the authoritative clear path stays `workspace/diagnostic`).
 ///
-/// Runs inline on the main thread: `snapshot` is an `Arc` bump and
-/// `project_structure` is a memoized, range-free query the settle already warms.
+/// Reads the store view carried on the snapshot, so it runs on the pool with the
+/// rest of the pull handler; `project_structure` is a memoized, range-free query
+/// the settle already warms.
 fn related_documents(
-    gs: &GlobalState,
+    snap: &StateSnapshot,
     uri: &Uri,
 ) -> Option<HashMap<Uri, DocumentDiagnosticReportKind>> {
-    if !gs.supports_related_documents {
+    if !snap.supports_related_documents {
         return None;
     }
-    let snap = gs.snapshot();
     let doc_state = snap.document_state(uri)?;
     // In-memory buffers have no path and no project graph; nothing to relate.
     let root = uri.to_file_path()?.into_owned();
@@ -503,7 +505,7 @@ fn related_documents(
         if target == *uri {
             continue;
         }
-        let Some(stored) = gs.diagnostics.get(&target) else {
+        let Some(stored) = snap.diagnostics.get(&target) else {
             continue;
         };
         if stored.items.is_empty() {

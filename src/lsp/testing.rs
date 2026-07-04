@@ -668,6 +668,31 @@ impl LspTester {
         req_id
     }
 
+    /// Push a `textDocument/diagnostic` request through the real dispatcher so it
+    /// spawns onto the worker pool (rather than answering inline). Returns the id
+    /// for use with [`Self::send_cancel`]; the response arrives via [`Self::pump`].
+    pub fn send_document_diagnostic_request_raw(
+        &mut self,
+        id: i32,
+        uri: &str,
+    ) -> lsp_server::RequestId {
+        let req_id = lsp_server::RequestId::from(id);
+        let params = DocumentDiagnosticParams {
+            text_document: text_doc(uri),
+            identifier: None,
+            previous_result_id: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        let req = lsp_server::Request::new(
+            req_id.clone(),
+            request::DocumentDiagnosticRequest::METHOD.to_owned(),
+            params,
+        );
+        self.gs.on_request(req);
+        req_id
+    }
+
     /// Send a `$/cancelRequest` for the given id through the real dispatcher.
     pub fn send_cancel(&mut self, id: lsp_server::RequestId) {
         // `lsp_server::RequestId` keeps its variants private; serde converts
@@ -741,7 +766,7 @@ impl LspTester {
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
         };
-        handlers::diagnostics::document_diagnostic(&self.gs, params).response
+        handlers::diagnostics::document_diagnostic(&self.gs.snapshot(), params).response
     }
 
     /// Pull `textDocument/diagnostic` with a `partialResultToken`. Returns the
@@ -766,7 +791,7 @@ impl LspTester {
                 partial_result_token: Some(ProgressToken::Number(token)),
             },
         };
-        let streamed = handlers::diagnostics::document_diagnostic(&self.gs, params);
+        let streamed = handlers::diagnostics::document_diagnostic(&self.gs.snapshot(), params);
         let progress = decode_progress(streamed.progress, token);
         (streamed.response, progress)
     }

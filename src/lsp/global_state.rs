@@ -53,7 +53,11 @@ pub(crate) struct StoredDiagnostics {
 /// clear-tracker, so a shared manifest stays reported until no settle reports it.
 #[derive(Default)]
 pub(crate) struct DiagnosticCollection {
-    current: HashMap<Uri, StoredDiagnostics>,
+    // `Arc` so a pooled `textDocument/diagnostic` handler can read the store off
+    // the main thread (for `related_documents`) via a cheap clone; mutation is
+    // copy-on-write through `Arc::make_mut`, which is uncontended because the main
+    // loop is the sole writer.
+    current: Arc<HashMap<Uri, StoredDiagnostics>>,
     result_seq: u64,
 }
 
@@ -83,7 +87,7 @@ impl DiagnosticCollection {
             if !pull {
                 sender.publish_diagnostics(uri.clone(), items.clone(), version);
             }
-            self.current.insert(
+            Arc::make_mut(&mut self.current).insert(
                 uri,
                 StoredDiagnostics {
                     version,
@@ -106,12 +110,14 @@ impl DiagnosticCollection {
     /// Remove a single URI immediately (a closed document), clearing it on push
     /// clients so a pull issued before the next settle no longer reports it.
     pub(crate) fn drop_uri(&mut self, uri: &Uri, sender: &ClientSender, pull: bool) {
-        if self.current.remove(uri).is_some() && !pull {
+        if Arc::make_mut(&mut self.current).remove(uri).is_some() && !pull {
             sender.publish_diagnostics(uri.clone(), Vec::new(), None);
         }
     }
 
-    /// The stored diagnostics for `uri`, for a pull `textDocument/diagnostic`.
+    /// The stored diagnostics for `uri` (test-only: production pulls read the
+    /// store via the snapshot's `HashMap` on the pool).
+    #[cfg(test)]
     pub(crate) fn get(&self, uri: &Uri) -> Option<&StoredDiagnostics> {
         self.current.get(uri)
     }
@@ -119,6 +125,12 @@ impl DiagnosticCollection {
     /// Every stored `(uri, diagnostics)`, for a pull `workspace/diagnostic`.
     pub(crate) fn iter(&self) -> impl Iterator<Item = (&Uri, &StoredDiagnostics)> {
         self.current.iter()
+    }
+
+    /// A cheap, shareable handle to the current store, for a pooled pull handler
+    /// to read (`related_documents`) off the main thread.
+    pub(crate) fn shared(&self) -> Arc<HashMap<Uri, StoredDiagnostics>> {
+        Arc::clone(&self.current)
     }
 }
 
@@ -202,6 +214,12 @@ pub(crate) struct StateSnapshot {
     analysis: crate::salsa::Analysis,
     pub(crate) document_map: Arc<DocumentMap>,
     pub(crate) workspace_folders: Vec<PathBuf>,
+    /// Read-only view of the diagnostic store at snapshot time, so a pooled pull
+    /// handler can attach `related_documents` without touching `GlobalState`.
+    pub(crate) diagnostics: Arc<HashMap<Uri, StoredDiagnostics>>,
+    /// Client capabilities the pull handler needs, copied so it runs off-thread.
+    pub(crate) supports_pull_diagnostics: bool,
+    pub(crate) supports_related_documents: bool,
 }
 
 impl StateSnapshot {
@@ -304,6 +322,14 @@ impl StateSnapshot {
 pub(crate) enum Task {
     /// A request answer ready to forward to the client.
     Response(Response),
+    /// A pooled request answer that also streams ordered `$/progress` chunks: the
+    /// main loop sends `response` first, then each notification (see the pull
+    /// diagnostics handler). Kept distinct from [`Task::Response`] so the response/
+    /// progress ordering the protocol requires stays on the main loop.
+    StreamingResponse {
+        response: Response,
+        progress: Vec<lsp_server::Notification>,
+    },
     /// Diagnostics from a quiescent settle pass that re-lints *every* open
     /// document over one snapshot. `publishes` is the complete, merged set (one
     /// entry per URI, across all documents and project manifests); the main loop
@@ -474,6 +500,9 @@ impl GlobalState {
             analysis: crate::salsa::Analysis::new(self.salsa.clone()),
             document_map: Arc::clone(&self.document_map),
             workspace_folders: self.workspace_folders.clone(),
+            diagnostics: self.diagnostics.shared(),
+            supports_pull_diagnostics: self.supports_pull_diagnostics,
+            supports_related_documents: self.supports_related_documents,
         }
     }
 

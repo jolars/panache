@@ -4,7 +4,7 @@
 #![allow(clippy::mutable_key_type)]
 
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossbeam_channel::select;
 use lsp_server::{Connection, Message};
@@ -82,6 +82,21 @@ pub fn run() -> std::io::Result<()> {
 /// `dispatch_due_lints` re-arms a real deadline the moment one is scheduled.
 const IDLE_TICK: Duration = Duration::from_secs(3600);
 
+/// A single main-loop step blocks the event loop for its whole duration: every
+/// pending client request (format-on-save included) waits until it returns. Warn
+/// when one exceeds this so a perceptible stall names its own culprit in the log
+/// instead of hiding as a gap between unrelated lines. Normal steps are single-
+/// digit milliseconds; the settle read pass runs off-thread and never lands here.
+const SLOW_STEP: Duration = Duration::from_millis(50);
+
+/// Log a `warn` when a main-loop step blocked longer than [`SLOW_STEP`].
+fn log_if_slow(label: &str, start: Instant) {
+    let elapsed = start.elapsed();
+    if elapsed >= SLOW_STEP {
+        log::warn!("main-loop step blocked {elapsed:?}: {label}");
+    }
+}
+
 fn main_loop(gs: &mut GlobalState, conn: &Connection) -> std::io::Result<()> {
     // Clone the worker-result receiver so the `select!` doesn't borrow `gs`.
     let task_rx = gs.task_receiver.clone();
@@ -99,26 +114,40 @@ fn main_loop(gs: &mut GlobalState, conn: &Connection) -> std::io::Result<()> {
                         if conn.handle_shutdown(&req).map_err(to_io)? {
                             break;
                         }
+                        let label = format!("request {} (id {})", req.method, req.id);
+                        let t = Instant::now();
                         gs.on_request(req);
+                        log_if_slow(&label, t);
                     }
                     Message::Notification(not) => {
                         if not.method == lsp_types::notification::Exit::METHOD {
                             break;
                         }
+                        let label = format!("notification {}", not.method);
+                        let t = Instant::now();
                         gs.on_notification(not);
+                        log_if_slow(&label, t);
                     }
-                    Message::Response(resp) => gs.on_client_response(resp),
+                    Message::Response(resp) => {
+                        let t = Instant::now();
+                        gs.on_client_response(resp);
+                        log_if_slow("client response", t);
+                    }
                 }
             }
             recv(task_rx) -> task => {
                 if let Ok(task) = task {
+                    let t = Instant::now();
                     gs.on_task(task);
+                    log_if_slow("worker task result", t);
                 }
             }
             default(timeout) => {}
         }
 
+        let t = Instant::now();
         gs.dispatch_due_lints();
+        log_if_slow("dispatch_due_lints", t);
     }
 
     Ok(())

@@ -381,9 +381,15 @@ impl GlobalState {
             };
         }
 
-        inline_streaming!(
+        // `textDocument/diagnostic` recomputes the pulled document (to stay current
+        // with the buffer), so it runs on the pool: inline it would block the event
+        // loop per pull and, since neovim pulls once per keystroke, freeze a
+        // synchronous format-on-save behind a burst. `workspace/diagnostic` only
+        // reads the store, so it stays inline.
+        pool!(
             r::DocumentDiagnosticRequest,
-            handlers::diagnostics::document_diagnostic
+            handlers::diagnostics::document_diagnostic,
+            spawn_streaming_request
         );
         inline_streaming!(
             r::WorkspaceDiagnosticRequest,
@@ -539,6 +545,22 @@ impl GlobalState {
                     self.respond(resp);
                 }
             }
+            Task::StreamingResponse { response, progress } => {
+                if self.cancelled.contains(&response.id) {
+                    let id = response.id.clone();
+                    self.respond(Response::new_err(
+                        id,
+                        ErrorCode::RequestCanceled as i32,
+                        "request cancelled".to_owned(),
+                    ));
+                } else {
+                    // Response first, then its `$/progress` chunks in order.
+                    self.respond(response);
+                    for note in progress {
+                        self.sender.send(lsp_server::Message::Notification(note));
+                    }
+                }
+            }
             Task::Diagnostics {
                 generation,
                 publishes,
@@ -583,6 +605,56 @@ impl GlobalState {
         R: Serialize + Send + 'static,
     {
         self.spawn_request_on(RequestPool::Main, id, params, f);
+    }
+
+    /// Spawn a pooled request whose handler streams ordered `$/progress` after its
+    /// response ([`handlers::diagnostics::Streamed`]). Used by
+    /// `textDocument/diagnostic`: the recompute runs off the event loop (so a
+    /// keystroke burst of pulls can't block a synchronous format-on-save), and a
+    /// concurrent edit's salsa write cancels an in-flight pull into a
+    /// `ContentModified` the client re-pulls on.
+    pub(crate) fn spawn_streaming_request<P, R>(
+        &mut self,
+        id: RequestId,
+        params: P,
+        f: fn(&StateSnapshot, P) -> handlers::diagnostics::Streamed<R>,
+    ) where
+        P: Send + 'static,
+        R: Serialize + Send + 'static,
+    {
+        self.in_flight.insert(id.clone());
+        let snap = self.snapshot();
+        let sender = self.pool.result_sender();
+        self.pool.spawn(move || {
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                catch_cancelled(|| f(&snap, params))
+            }));
+            let task = match outcome {
+                Ok(Some(streamed)) => Task::StreamingResponse {
+                    response: Response::new_ok(id, streamed.response),
+                    progress: streamed.progress,
+                },
+                Ok(None) => Task::Response(Response::new_err(
+                    id,
+                    ErrorCode::ContentModified as i32,
+                    "content modified".to_owned(),
+                )),
+                Err(panic) => {
+                    let msg = panic
+                        .downcast_ref::<&'static str>()
+                        .copied()
+                        .or_else(|| panic.downcast_ref::<String>().map(String::as_str))
+                        .unwrap_or("<non-string panic payload>");
+                    log::error!("LSP streaming request handler panicked: {msg}");
+                    Task::Response(Response::new_err(
+                        id,
+                        ErrorCode::InternalError as i32,
+                        "internal error: request handler panicked".to_owned(),
+                    ))
+                }
+            };
+            let _ = sender.send(task);
+        });
     }
 
     /// Spawn a formatting request on the dedicated `fmt_pool` so a slow
@@ -754,7 +826,21 @@ impl GlobalState {
         // keystroke burst may have added an include/bibliography since the last
         // pass; `file_text` no longer lazy-loads (audit §3.2), so the writer loads
         // them here, coalesced onto the settle boundary.
+        //
+        // This runs on the main thread, so a large project graph (e.g. a bookdown
+        // book: every chapter re-read and re-parsed for cross-reference
+        // resolution) blocks the event loop and stalls a pending format-on-save.
+        // Time it so a perceptible stall is attributable here rather than to the
+        // off-thread read pass below.
+        let reload_start = Instant::now();
         documents::reload_open_documents_referenced_files(self);
+        let reload_elapsed = reload_start.elapsed();
+        if reload_elapsed >= Duration::from_millis(50) {
+            log::warn!(
+                "settle write-phase (referenced-file reload) blocked {reload_elapsed:?} for {} open doc(s)",
+                self.document_map.len()
+            );
+        }
 
         // Read phase: snapshot and spawn the single all-docs pass over the
         // now-settled database under a fresh generation.
