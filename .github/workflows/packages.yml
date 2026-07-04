@@ -260,3 +260,31 @@ jobs:
           gh release upload --clobber "$TAG" "$RPM_FILE"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publish a SHA256SUMS manifest covering every asset attached to the release.
+  # Runs after all per-target build jobs so all assets are already uploaded.
+  # Guards against accidental corruption and lets the installer scripts verify
+  # downloads; it is not a substitute for signing/provenance.
+  checksums:
+    name: Publish SHA256SUMS
+    needs: build-binaries
+    if: inputs.upload == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Generate and upload SHA256SUMS
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          cd "$workdir"
+          # Pull every asset already on the release, dropping any SHA256SUMS
+          # from a prior run so the manifest never checksums itself.
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
+          rm -f SHA256SUMS
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+          gh release upload --clobber "$TAG" SHA256SUMS
