@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.19.0](https://github.com/jolars/panache/compare/panache-formatter-v0.18.0...panache-formatter-v0.19.0) (2026-07-04)
+
+### Features
+- **parser:** flag unbalanced `\left`/`\right` in math ([`73750c9`](https://github.com/jolars/panache/commit/73750c9b854e8899fcd2b7180c21f9b2eb7af892))
+
+### Bug Fixes
+- **formatter:** route non-reflowable math verbatim ([`bd577dc`](https://github.com/jolars/panache/commit/bd577dcd7884428b83ea9034a048863c97368c28))
+
+### Dependencies
+- updated crates/panache-parser to v0.21.0
+
 ## [0.18.0](https://github.com/jolars/panache/compare/panache-formatter-v0.17.0...panache-formatter-v0.18.0) (2026-07-01)
 
 ### Features
