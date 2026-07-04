@@ -33,6 +33,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
+      id-token: write # mint the OIDC token for keyless provenance signing
+      attestations: write # store the build provenance attestation
     strategy:
       fail-fast: false
       matrix:
@@ -178,6 +180,21 @@ jobs:
           path: |
             panache-${{ matrix.target }}.tar.gz
             panache-${{ matrix.target }}.zip
+
+      # Sign a provenance statement binding the archive digest to this
+      # workflow's identity (keyless, via Sigstore). Consumers verify with
+      # `gh attestation verify`. Only on real release uploads.
+      - name: Attest build provenance (Unix)
+        if: inputs.upload == 'true' && runner.os != 'Windows'
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: panache-${{ matrix.target }}.tar.gz
+
+      - name: Attest build provenance (Windows)
+        if: inputs.upload == 'true' && runner.os == 'Windows'
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: panache-${{ matrix.target }}.zip
 
       - name: Upload binary to release
         if: inputs.upload == 'true'

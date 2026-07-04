@@ -131,6 +131,8 @@ jobs:
       tag: ${{ needs.versionary.outputs.tag_name }}
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
   publish-code-extensions:
     name: Publish Code Extensions
