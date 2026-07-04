@@ -403,15 +403,19 @@ fn r_air_formats_equals_spacing_in_quarto_r_block() {
         ..Default::default()
     };
 
+    // Use a named argument (`x=1`) rather than a bare assignment (`a=1`):
+    // air normalizes top-level assignment to `<-`, but keeps `=` in call
+    // arguments and only inserts the surrounding spaces, which is the
+    // equals-spacing behavior this test pins.
     let input = r#"
 ```{r}
-a=1
+plot(x=1)
 ```
 "#
     .trim_start();
 
     let output = format(input, Some(config), None);
-    assert!(output.contains("a = 1"));
+    assert!(output.contains("plot(x = 1)"));
 }
 
 #[test]
