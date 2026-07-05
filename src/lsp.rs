@@ -70,6 +70,11 @@ pub fn run() -> std::io::Result<()> {
 
     main_loop(&mut gs, &connection)?;
 
+    // `gs` holds a clone of the connection's message sender; the writer IO thread
+    // only stops once *every* sender is dropped. Drop `gs` before joining so the
+    // writer's channel disconnects and the process can actually exit (otherwise
+    // `join` blocks forever and the server lingers after the client is gone).
+    drop(gs);
     drop(connection);
     io_threads.join()?;
     Ok(())
