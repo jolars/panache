@@ -11,7 +11,7 @@ use lsp_types::notification::Notification as _;
 use lsp_types::request::Request as _;
 use lsp_types::*;
 
-use super::dispatch::server_capabilities;
+use super::dispatch::{server_capabilities, server_info};
 use super::global_state::{ClientSender, GlobalState};
 use super::{documents, handlers};
 use crate::salsa::Db;
@@ -174,10 +174,7 @@ impl LspTester {
         self.initialize_with_options(root_uri, initialization_options);
         InitializeResult {
             capabilities: server_capabilities(),
-            server_info: Some(ServerInfo {
-                name: "panache-lsp".to_string(),
-                version: Some(env!("CARGO_PKG_VERSION").to_string()),
-            }),
+            server_info: Some(server_info()),
         }
     }
 

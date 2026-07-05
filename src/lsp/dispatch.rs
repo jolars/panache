@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use lsp_server::{ErrorCode, ExtractError, Notification, Request, RequestId, Response};
 use lsp_types::notification::Notification as _;
 use lsp_types::request::Request as _;
-use lsp_types::{InitializeParams, ServerCapabilities, Uri};
+use lsp_types::{InitializeParams, ServerCapabilities, ServerInfo, Uri};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -27,6 +27,15 @@ use super::{documents, handlers};
 enum RequestPool {
     Main,
     Fmt,
+}
+
+/// Build the `serverInfo` reported at `initialize` so clients (e.g. Neovim's
+/// `:LspInfo`) can display the server name and version.
+pub(crate) fn server_info() -> ServerInfo {
+    ServerInfo {
+        name: "panache-lsp".to_string(),
+        version: Some(env!("CARGO_PKG_VERSION").to_string()),
+    }
 }
 
 /// Build the static server capabilities advertised at `initialize`.

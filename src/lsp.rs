@@ -59,9 +59,17 @@ fn to_io<E: std::fmt::Display>(e: E) -> std::io::Error {
 pub fn run() -> std::io::Result<()> {
     let (connection, io_threads) = Connection::stdio();
 
-    let capabilities = serde_json::to_value(dispatch::server_capabilities()).map_err(to_io)?;
-    // Performs the full initialize/initialized handshake and returns the params.
-    let init_value = connection.initialize(capabilities).map_err(to_io)?;
+    // Drive the handshake by hand (rather than `Connection::initialize`) so the
+    // `InitializeResult` can carry `serverInfo` alongside capabilities; the
+    // convenience helper hardcodes `serverInfo: null`.
+    let (id, init_value) = connection.initialize_start().map_err(to_io)?;
+    let init_result = serde_json::json!({
+        "capabilities": dispatch::server_capabilities(),
+        "serverInfo": dispatch::server_info(),
+    });
+    connection
+        .initialize_finish(id, init_result)
+        .map_err(to_io)?;
     let init_params: InitializeParams = serde_json::from_value(init_value).map_err(to_io)?;
 
     let mut gs = GlobalState::new(ClientSender::new(connection.sender.clone()));
