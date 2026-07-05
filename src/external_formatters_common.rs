@@ -285,7 +285,52 @@ fn virtual_filename_for_language(language: &str) -> String {
 }
 
 fn normalized_language(language: &str) -> String {
-    language.trim().to_ascii_lowercase().replace('_', "-")
+    language
+        .trim()
+        .trim_start_matches('.')
+        .to_ascii_lowercase()
+        .replace('_', "-")
+}
+
+/// Collapse a language name to a canonical identity for formatter-key matching.
+///
+/// Alias groups that share a formatter (e.g. `julia`/`jl`, `python`/`py`,
+/// `bash`/`sh`/`zsh`) resolve to the same string, so a `[formatters]` entry
+/// keyed on any spelling matches a code block written with any other spelling in
+/// the same group. Unknown languages return their own normalized form rather
+/// than a shared fallback bucket, so two distinct unrecognized languages never
+/// collide.
+///
+/// The alias groups are exactly those encoded by
+/// [`temp_file_extension_for_language`]; its extension doubles as the canonical
+/// key, except for the catch-all `txt` bucket which would otherwise merge every
+/// unrecognized language.
+pub(crate) fn canonical_language(language: &str) -> String {
+    let normalized = normalized_language(language);
+    match temp_file_extension_for_language(&normalized) {
+        "txt" => normalized,
+        canonical => canonical.to_string(),
+    }
+}
+
+/// Resolve the formatter chain configured for `language`.
+///
+/// An exact key match wins first, preserving the user's literal intent when both
+/// an alias and its canonical spelling are configured. Otherwise, any key in the
+/// same alias group (see [`canonical_language`]) matches, so `[formatters] jl`
+/// formats a `{julia}` block and vice versa.
+pub(crate) fn resolve_formatter_configs<'a>(
+    formatters: &'a HashMap<String, Vec<FormatterConfig>>,
+    language: &str,
+) -> Option<&'a Vec<FormatterConfig>> {
+    if let Some(configs) = formatters.get(language) {
+        return Some(configs);
+    }
+    let target = canonical_language(language);
+    formatters
+        .iter()
+        .find(|(key, _)| canonical_language(key) == target)
+        .map(|(_, configs)| configs)
 }
 
 fn missing_formatter_warning_message(missing: &HashSet<String>) -> Option<String> {
@@ -295,8 +340,9 @@ fn missing_formatter_warning_message(missing: &HashSet<String>) -> Option<String
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::{
-        find_missing_formatter_commands, missing_formatter_warning_message, resolve_file_args,
-        resolve_stdin_args, substitute_placeholders, temp_file_extension_for_language,
+        canonical_language, find_missing_formatter_commands, missing_formatter_warning_message,
+        resolve_file_args, resolve_formatter_configs, resolve_stdin_args, substitute_placeholders,
+        temp_file_extension_for_language,
     };
     use crate::config::FormatterConfig;
     use std::collections::{HashMap, HashSet};
@@ -489,5 +535,63 @@ mod tests {
                 "/tmp/x.py".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn canonical_language_collapses_alias_groups() {
+        assert_eq!(canonical_language("julia"), canonical_language("jl"));
+        assert_eq!(canonical_language("python"), canonical_language("py"));
+        assert_eq!(canonical_language("rust"), canonical_language("rs"));
+        assert_eq!(canonical_language("bash"), canonical_language("sh"));
+        // Normalization: whitespace, case, leading dot, underscores.
+        assert_eq!(canonical_language("  .Julia "), canonical_language("jl"));
+        assert_eq!(canonical_language("c_sharp"), canonical_language("cs"));
+    }
+
+    #[test]
+    fn canonical_language_keeps_unknowns_distinct() {
+        // Both fall in the `txt` extension bucket but must not collide.
+        assert_ne!(canonical_language("foolang"), canonical_language("barlang"));
+        assert_eq!(canonical_language("foolang"), "foolang");
+    }
+
+    fn fatou_like_chain() -> Vec<FormatterConfig> {
+        vec![FormatterConfig {
+            cmd: "fatou".to_string(),
+            args: vec![],
+            enabled: true,
+            stdin: true,
+        }]
+    }
+
+    #[test]
+    fn resolve_formatter_configs_matches_via_alias() {
+        // Config keyed on `jl`, code block reported as `julia` (the Quarto
+        // executable-cell spelling): the alias must still resolve.
+        let mut formatters = HashMap::new();
+        formatters.insert("jl".to_string(), fatou_like_chain());
+
+        assert!(resolve_formatter_configs(&formatters, "julia").is_some());
+        assert!(resolve_formatter_configs(&formatters, "jl").is_some());
+        assert!(resolve_formatter_configs(&formatters, "python").is_none());
+    }
+
+    #[test]
+    fn resolve_formatter_configs_prefers_exact_key() {
+        // When both spellings are configured, the literal block language wins.
+        let mut formatters = HashMap::new();
+        formatters.insert(
+            "jl".to_string(),
+            vec![FormatterConfig {
+                cmd: "runic".to_string(),
+                args: vec![],
+                enabled: true,
+                stdin: true,
+            }],
+        );
+        formatters.insert("julia".to_string(), fatou_like_chain());
+
+        let resolved = resolve_formatter_configs(&formatters, "julia").expect("resolved");
+        assert_eq!(resolved[0].cmd, "fatou");
     }
 }

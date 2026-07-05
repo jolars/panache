@@ -1174,6 +1174,12 @@ sequentially:
 python = ["isort", "black"]
 ```
 
+The language key matches a code block by its language alias group, so common
+aliases are interchangeable: a `jl` key formats `{julia}` blocks, `py` matches
+`python`, `rs` matches `rust`, and `sh` matches `bash` or `zsh`. An exact key
+match always wins, so you can still register different chains for spellings that
+resolve to distinct languages.
+
 Go to [Formatter Presets](#formatter-presets) for a list of built-in presets.
 
 ### Custom Formatters

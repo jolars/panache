@@ -43,6 +43,50 @@ if true; then echo ok; fi
 }
 
 #[test]
+fn formatter_key_resolves_via_language_alias() {
+    // The formatter is configured under `bash`, but the code block is tagged
+    // `sh`. These are the same language for formatting purposes, so the alias
+    // must resolve (previously the exact-match lookup silently skipped it).
+    if which::which("shfmt").is_err() {
+        println!("Skipping shfmt test - shfmt not installed");
+        return;
+    }
+
+    let mut formatters = HashMap::new();
+    formatters.insert(
+        "bash".to_string(),
+        vec![panache::config::FormatterConfig {
+            cmd: "shfmt".to_string(),
+            args: vec![],
+            enabled: true,
+            stdin: true,
+        }],
+    );
+
+    let config = Config {
+        flavor: Flavor::Quarto,
+        extensions: Extensions::for_flavor(Flavor::Quarto),
+        formatters,
+        ..Default::default()
+    };
+
+    let input = r#"
+```sh
+if true; then echo ok; fi
+```
+"#
+    .trim_start();
+
+    let output = format(input, Some(config), None);
+
+    assert!(output.contains("```sh"));
+    assert!(
+        output.contains("if true; then"),
+        "shfmt should expand the one-liner even though the key is `bash`, got:\n{output}"
+    );
+}
+
+#[test]
 fn identical_blocks_are_deduplicated_and_all_formatted() {
     // Multiple identical same-language blocks share one formatter invocation
     // (dedup), but every block must still receive the formatted output.

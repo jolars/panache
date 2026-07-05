@@ -16,8 +16,8 @@ pub use crate::external_formatters_common::FormatterError;
 use crate::external_formatters_common::{
     FormatterIoMode, find_missing_formatter_commands, log_formatter_invocation,
     log_formatter_nonzero_exit, log_formatter_spawn_failed, log_formatter_success,
-    log_formatter_timeout, log_missing_formatter_commands, resolve_file_args, resolve_stdin_args,
-    temp_file_extension_for_language,
+    log_formatter_timeout, log_missing_formatter_commands, resolve_file_args,
+    resolve_formatter_configs, resolve_stdin_args, temp_file_extension_for_language,
 };
 use panache_formatter::{ExternalCodeBlock, FormattedCodeMap};
 
@@ -307,7 +307,7 @@ fn run_formatter_chain(
     missing_formatters: &HashSet<String>,
     timeout: Duration,
 ) -> Option<String> {
-    let formatter_configs = formatters.get(lang)?;
+    let formatter_configs = resolve_formatter_configs(formatters, lang)?;
     if formatter_configs.is_empty() {
         return None;
     }
