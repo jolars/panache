@@ -439,19 +439,7 @@ intentionally excluded.
   `HTML_ATTRS`-style --- never synthetic tokens) instead of forcing the
   projector to recompute it. Each bucket below is its own bounded step,
   verified against pandoc-native + CommonMark (both must stay byte-identical
-  or improve). Roadmap:
-
-  - [ ] **HTML opaque-block split.** Continue the HTML lift. **Phase 7a done**
-    (2026-06-17): single-construct opaque shapes (comments, PI, verbatim
-    `<pre>`/`<script>`/`<style>`/`<textarea>`) now retag to `HTML_BLOCK_RAW`
-    at parse time, so the projector routes by kind and `emit_html_block`'s
-    byte-sniff arm is dead for Pandoc. **Remaining (7b-7e):** standalone
-    single-tag (close/void), single open + trailing, void sequences, and the
-    hard multi-tag interleave (D3) still flow through
-    `split_html_block_by_tags` / `parse_pandoc_blocks`. Note: D3's inter-tag
-    markdown reparse *relocates* into the parser rather than disappearing
-    --- the walker is not fully deletable. Largest bucket; coordinate with
-    the `html-conformance` skill.
+  or improve).
 
 - [ ] Formatter trims leading/trailing spaces *inside* inline-code spans. A span
   whose backticks wrap content with leading spaces (two spaces, then
