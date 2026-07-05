@@ -310,6 +310,7 @@ golden_test_cases!(
     inline_link_dest_strict_commonmark,
     inline_footnotes,
     inline_math,
+    inline_math_interior_newline_reflow,
     math_align_experimental,
     math_binary_relation_lhs_experimental,
     math_blockquote_experimental,

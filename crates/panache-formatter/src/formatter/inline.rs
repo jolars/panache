@@ -544,7 +544,12 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                     .unwrap_or_else(|| content.clone());
                 match math::format_math(&clean, &opts) {
                     Some(body) => format!("{}{}{}", open, body, close),
-                    None => format!("{}{}{}", open, content, close),
+                    // A raw newline inside inline `$…$` is insignificant TeX
+                    // whitespace, but emitted verbatim it survives as a physical
+                    // break that splits the span across lines during reflow.
+                    // Collapse newline-bearing whitespace to a single space so the
+                    // span stays one atomic wrap unit (gate-off / bail path).
+                    None => format!("{}{}{}", open, collapse_internal_newlines(&content), close),
                 }
             }
         }
