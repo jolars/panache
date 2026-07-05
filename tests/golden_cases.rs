@@ -311,6 +311,7 @@ golden_test_cases!(
     inline_footnotes,
     inline_math,
     math_align_experimental,
+    math_binary_relation_lhs_experimental,
     math_blockquote_experimental,
     math_linebreak_binary_chain_experimental,
     math_linebreak_experimental,

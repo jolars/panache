@@ -405,6 +405,25 @@ mod tests {
     }
 
     #[test]
+    fn display_binary_on_relation_lhs_hangs_flush() {
+        // A top-level binary operator on the *left* of the relation (`H - H \leq
+        // ...`) must break flush under the head term (offset 0), not under the
+        // relation's right-hand column — that column lies *inside* the
+        // continuation's own text and would shove the `-` operand absurdly far
+        // right (regression: a display equation with an LHS `-` blew up to ~35
+        // leading spaces).
+        let narrow = MathFormatOptions {
+            line_width: 20,
+            ..opts(MathContext::Display)
+        };
+        let input = "H(a) - H(b) \\leq \\frac{L}{2n}";
+        let expected = "H(a)\n- H(b) \\leq \\frac{L}{2n}";
+        assert_eq!(fmt_with(input, &narrow), expected);
+        let once = fmt_with(input, &narrow);
+        assert_eq!(fmt_with(&once, &narrow), once);
+    }
+
+    #[test]
     fn display_comment_terminating_newline_is_not_joined() {
         // A `%` comment runs to EOL; the soft newline ending it must remain a row
         // boundary, or the next line is absorbed into the comment (and lost from

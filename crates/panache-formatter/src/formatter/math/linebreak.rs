@@ -279,11 +279,17 @@ fn break_binary_segment(
         return vec![format!("{base_pad}{single}")];
     }
 
-    // The operand sequence starts past this segment's own relation (if any); a
-    // relationless segment (a bare binary chain) starts at its head term.
+    // The operand sequence starts past this segment's own relation, but *only*
+    // when the binary operators being broken sit on the relation's right-hand
+    // side (`a = b + c` ⇒ `+ c` under `b`). When the first top-level binary
+    // operator *precedes* the relation, the run being broken is the left-hand
+    // side, whose head term is at column 0 — hanging it under the relation's RHS
+    // column would push a left-side operand past the very relation it comes
+    // before (`H - H \leq …` ⇒ an absurd indent). A relationless segment (a bare
+    // binary chain) likewise starts at its head term.
     let rhs_offset = match first_top_level_relation_index(seg) {
-        Some(r) => render::render_inline(&seg[..=r]).trim().chars().count() + 1,
-        None => 0,
+        Some(r) if bins[0] > r => render::render_inline(&seg[..=r]).trim().chars().count() + 1,
+        _ => 0,
     };
     let bin_pad = " ".repeat(base_indent + rhs_offset);
     let mut out: Vec<String> = Vec::new();

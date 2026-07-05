@@ -1,0 +1,4 @@
+\[
+  H(\theta_n)
+  - H(\theta^\star) \leq \frac{L \|\theta_0 - \theta^\star\|_2^2}{2n}
+\]
