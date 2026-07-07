@@ -1,0 +1,4 @@
+[ Div ( "" , [] , [] ) [ Plain [ Str "foo" ] ]
+, Plain [ Str "bar" ]
+, Div ( "" , [] , [] ) [ Plain [ Str "baz" ] ]
+]

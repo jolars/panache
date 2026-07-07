@@ -11,14 +11,16 @@
 # suppresses the same-line strict-block lift when the after-close
 # trailing holds inter-tag TEXT before another matched-pair tag, keeping
 # the line opaque for `split_html_block_by_tags`. See allowlist 472/475/
-# 476/477. Three `<div>`-family variants remain divergent (verified
-# 2026-07-02, not in corpus):
-#   (1) inter-tag text: `<div>x</div> y <div>z</div>` and the no-ws form
-#       `<div>foo</div>bar<div>baz</div>` -> pandoc `Div`/`Plain`/`Div`;
-#       panache lifts the first div then inlines the rest into one `Para`
-#       (RawInline `<div>`). Needs multi-div-per-line structural lift, OR
-#       the splitter to emit `Div` per pair (risks the HTML_BLOCK_DIV-
-#       without-structural-inner panic; discouraged per the skill).
+# 476/477. Same-line `<div>` inter-tag text is FIXED (Phase B,
+# `graft_same_line_div_peel`): both the whitespace form `<div>x</div> y
+# <div>z</div>` (corpus 0479) and the no-ws form
+# `<div>foo</div>bar<div>baz</div>` (corpus 0480) now project
+# `Div`/`Plain`/`Div`. Remaining divergent `<div>`-family variants
+# (verified 2026-07-08, not in corpus):
+#   (1) multi-line SECOND div: `<div>a</div> y <div>\nz\n</div>` -> pandoc
+#       `Div`/`Plain`/`Div`; the content-scan depth model treats the
+#       `</div> ... <div>` close line as depth-neutral (close then re-open)
+#       so the whole span stays ONE div. Needs the depth-model rework.
 #   (2) paragraph-leads-div: `foo <div>bar</div> baz` -> pandoc
 #       `Plain[foo]`/`Div[bar]`/`Para[baz]`; panache keeps one `Para` with
 #       RawInline tags (the general inline-parser boundary the 0472 note
