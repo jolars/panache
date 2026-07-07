@@ -811,6 +811,48 @@ fn html_block_node_kind(
     }
 }
 
+/// How far the Pandoc comment/PI trailing-text split may fuse soft-break
+/// continuation lines into the trailing paragraph.
+///
+/// Pandoc closes the comment/PI `RawBlock` at the close marker and then
+/// parses the trailing bytes plus following lines as ordinary blocks, so a
+/// bare continuation line joins the trailing text as a soft-break
+/// (`<!-- --> t\nmore` -> `RawBlock, Para [t, SoftBreak, more]`). Fusing
+/// requires reparsing past the close line, which is only safe up to the
+/// point where an enclosing container's close marker begins — consuming it
+/// would swallow the boundary (`:::`, `> `, list indent).
+#[derive(Clone, Copy)]
+pub(crate) enum SoftbreakFusion {
+    /// Outermost level: fuse continuation lines to the end of the document.
+    ToDocEnd,
+    /// Inside a plain (no line-prefix) fenced div: fuse up to the div's
+    /// closing `:::` fence, which the outer dispatcher still owns.
+    ToFencedDivClose,
+    /// Inside a line-prefix container (blockquote / list / content indent),
+    /// or fusion otherwise disabled: keep the close-line-only split.
+    None,
+}
+
+/// Index of the line that closes the fenced div enclosing `start` (the
+/// first bare `:::` close fence at the current nesting depth), or
+/// `lines.len()` when the div is unclosed at end of input. `start` must be
+/// past the comment/PI close line so `:::` lines inside the comment body
+/// don't terminate the scan early.
+fn fenced_div_body_end(lines: &[&str], start: usize) -> usize {
+    let mut depth = 0usize;
+    for (offset, line) in lines[start..].iter().enumerate() {
+        if super::fenced_divs::try_parse_div_fence_open(line).is_some() {
+            depth += 1;
+        } else if super::fenced_divs::is_div_closing_fence(line) {
+            if depth == 0 {
+                return start + offset;
+            }
+            depth -= 1;
+        }
+    }
+    lines.len()
+}
+
 #[allow(clippy::too_many_arguments)]
 fn try_parse_comment_pi_with_trailing_split(
     builder: &mut GreenNodeBuilder<'static>,
@@ -819,7 +861,7 @@ fn try_parse_comment_pi_with_trailing_split(
     block_type: &HtmlBlockType,
     wrapper_kind: SyntaxKind,
     bq_depth: usize,
-    at_outermost_level: bool,
+    fusion: SoftbreakFusion,
     config: &ParserOptions,
 ) -> Option<usize> {
     let marker: &str = match block_type {
@@ -937,22 +979,30 @@ fn try_parse_comment_pi_with_trailing_split(
     //
     // Under Pandoc a paragraph greedily fuses following lines as
     // soft-break continuations (`<!-- --> trailing\nmore\n` ->
-    // `RawBlock, Para [trailing, SoftBreak, more]`). When the comment/PI
-    // sits at the outermost level (no enclosing fenced div, list,
-    // blockquote, or content-indent container), reparse the trailing
-    // bytes together with the remaining document so the parser's own
-    // paragraph-continuation rules decide the extent, graft ONLY that
-    // first block, and hand the rest back to the outer dispatcher. Inside
-    // a container we cannot consume past the close line without risking
-    // swallowing its close marker (`:::`, `> `, list indent), so keep the
-    // close-line-only split there.
+    // `RawBlock, Para [trailing, SoftBreak, more]`). Reparse the trailing
+    // bytes together with the following lines up to `fusion_end` so the
+    // parser's own paragraph-continuation rules decide the extent, graft
+    // ONLY that first block, and hand the rest back to the outer
+    // dispatcher. `fusion_end` is the end of the document at the outermost
+    // level and the enclosing fenced div's closing `:::` line inside a
+    // plain fenced div; either way the fragment excludes any container
+    // close marker, so it can't be swallowed into the paragraph. Inside a
+    // line-prefix container (blockquote / list / content indent) fusion is
+    // disabled and the close-line-only split is kept.
+    let fusion_end: Option<usize> = match fusion {
+        SoftbreakFusion::ToDocEnd => Some(lines.len()),
+        SoftbreakFusion::ToFencedDivClose => Some(fenced_div_body_end(lines, close_line_idx + 1)),
+        SoftbreakFusion::None => None,
+    };
     if !trailing.is_empty() {
-        if at_outermost_level && close_line_idx + 1 < lines.len() {
+        if let Some(end) = fusion_end
+            && close_line_idx + 1 < end
+        {
             let mut inner_options = config.clone();
             let refdefs = config.refdef_labels.clone().unwrap_or_default();
             inner_options.refdef_labels = Some(refdefs.clone());
             let mut fragment = String::from(trailing);
-            for line in &lines[close_line_idx + 1..] {
+            for line in &lines[close_line_idx + 1..end] {
                 fragment.push_str(line);
             }
             let inner_root =
@@ -966,7 +1016,7 @@ fn try_parse_comment_pi_with_trailing_split(
                 let mut consumed_bytes = trailing.len();
                 let mut extra_lines = 0usize;
                 let mut idx = close_line_idx + 1;
-                while idx < lines.len() && consumed_bytes < block_end {
+                while idx < end && consumed_bytes < block_end {
                     consumed_bytes += lines[idx].len();
                     extra_lines += 1;
                     idx += 1;
@@ -1147,7 +1197,7 @@ pub(crate) fn parse_html_block_with_wrapper(
     block_type: HtmlBlockType,
     prefix: &ContainerPrefix,
     wrapper_kind: SyntaxKind,
-    at_outermost_level: bool,
+    fusion: SoftbreakFusion,
     config: &ParserOptions,
 ) -> usize {
     let bq_depth = prefix.bq_depth();
@@ -1170,7 +1220,7 @@ pub(crate) fn parse_html_block_with_wrapper(
             &block_type,
             wrapper_kind,
             bq_depth,
-            at_outermost_level,
+            fusion,
             config,
         )
     {
@@ -4298,7 +4348,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
-            true,
+            SoftbreakFusion::ToDocEnd,
             &opts,
         );
 
@@ -4320,7 +4370,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
-            true,
+            SoftbreakFusion::ToDocEnd,
             &opts,
         );
 
@@ -4342,7 +4392,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
-            true,
+            SoftbreakFusion::ToDocEnd,
             &opts,
         );
 
@@ -4371,7 +4421,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
-            true,
+            SoftbreakFusion::ToDocEnd,
             &opts,
         );
 
@@ -4397,7 +4447,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
-            true,
+            SoftbreakFusion::ToDocEnd,
             &opts,
         );
         assert_eq!(new_pos, 1);
@@ -4423,7 +4473,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
-            true,
+            SoftbreakFusion::ToDocEnd,
             &opts,
         );
         // Three lines, closed at first `</script>` (line 2). new_pos = 3.
@@ -4457,7 +4507,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
-            true,
+            SoftbreakFusion::ToDocEnd,
             &opts,
         );
 
@@ -4502,7 +4552,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK_DIV,
-            true,
+            SoftbreakFusion::ToDocEnd,
             &opts,
         );
 
@@ -4541,7 +4591,7 @@ mod tests {
             block_type,
             &ContainerPrefix::default(),
             SyntaxKind::HTML_BLOCK,
-            true,
+            SoftbreakFusion::ToDocEnd,
             &opts,
         );
 

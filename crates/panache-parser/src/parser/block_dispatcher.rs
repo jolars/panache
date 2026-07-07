@@ -37,7 +37,7 @@ use super::blocks::headings::{
 };
 use super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use super::blocks::html_blocks::{
-    HtmlBlockType, is_pandoc_inline_block_tag_name, is_pandoc_void_block_tag_name,
+    HtmlBlockType, SoftbreakFusion, is_pandoc_inline_block_tag_name, is_pandoc_void_block_tag_name,
     pandoc_html_open_tag_closes, parse_html_block_with_wrapper, probe_open_tag_line_has_close_gt,
     try_parse_html_block_start,
 };
@@ -2077,17 +2077,28 @@ impl BlockParser for HtmlBlockParser {
             _ => crate::syntax::SyntaxKind::HTML_BLOCK,
         };
 
-        // Whether the block sits at the outermost level, with no enclosing
-        // container that owns a following close marker or continuation
-        // prefix. Only then may the Pandoc comment/PI trailing-text split
-        // fuse soft-break continuation lines into the trailing paragraph
-        // (consuming past the close line cannot swallow a `:::` / `> ` /
-        // list-indent boundary).
-        let at_outermost_level = !ctx.in_fenced_div
-            && !ctx.in_list
+        // How far the Pandoc comment/PI trailing-text split may fuse
+        // soft-break continuation lines into the trailing paragraph. A
+        // line-prefix container (blockquote / list / content indent) owns a
+        // continuation prefix, so fusion is disabled there. At the outermost
+        // level fusion runs to end of document; inside a plain fenced div it
+        // runs up to the div's closing `:::` line (the outer dispatcher still
+        // owns that boundary), so the reparse never swallows it.
+        let fusion = if !ctx.in_list
             && ctx.blockquote_depth == 0
             && ctx.content_indent == 0
-            && ctx.myst_directive_closer.is_none();
+            && ctx.myst_directive_closer.is_none()
+        {
+            if !ctx.in_fenced_div {
+                SoftbreakFusion::ToDocEnd
+            } else if ctx.config.extensions.fenced_divs {
+                SoftbreakFusion::ToFencedDivClose
+            } else {
+                SoftbreakFusion::None
+            }
+        } else {
+            SoftbreakFusion::None
+        };
 
         let new_pos = parse_html_block_with_wrapper(
             builder,
@@ -2096,7 +2107,7 @@ impl BlockParser for HtmlBlockParser {
             block_type,
             prefix,
             wrapper_kind,
-            at_outermost_level,
+            fusion,
             ctx.config,
         );
         new_pos - line_pos

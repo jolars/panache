@@ -1,0 +1,4 @@
+::: x
+<!-- hi -->
+trailing more
+:::

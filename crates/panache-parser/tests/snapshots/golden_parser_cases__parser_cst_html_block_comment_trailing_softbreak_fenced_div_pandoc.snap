@@ -1,0 +1,22 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..35
+  FENCED_DIV@0..35
+    DIV_FENCE_OPEN@0..5
+      TEXT@0..3 ":::"
+      DIV_INFO@3..4
+        TEXT@3..4 "x"
+      NEWLINE@4..5 "\n"
+    HTML_BLOCK_RAW@5..16
+      HTML_BLOCK_TAG@5..16
+        TEXT@5..16 "<!-- hi -->"
+    PARAGRAPH@16..31
+      TEXT@16..25 " trailing"
+      NEWLINE@25..26 "\n"
+      TEXT@26..30 "more"
+      NEWLINE@30..31 "\n"
+    DIV_FENCE_CLOSE@31..35
+      TEXT@31..34 ":::"
+      NEWLINE@34..35 "\n"
