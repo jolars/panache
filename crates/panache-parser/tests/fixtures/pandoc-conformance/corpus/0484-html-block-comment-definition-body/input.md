@@ -1,0 +1,3 @@
+Term
+
+:   <!-- hi --> trailing

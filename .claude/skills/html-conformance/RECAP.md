@@ -433,8 +433,25 @@ verbatim-in-bq); table-cell reparses.
   (pandoc RawBlock text is tag bytes only). HTML_ATTRS branch
   (multi-line canonicalization) unaffected.
 
-### List-item HTML structural lift
+### List-item / definition-body HTML structural lift
 
+- **Definition-body marker-line HTML (`:   <html>`) dispatches via
+  `Parser::try_dispatch_definition_html_block`** (added to the def
+  first-content-line cascade in `handle_definition_list_effect`, alongside
+  the bq/list/fence arms). The marker line otherwise flows into
+  `emit_definition_plain_or_heading`, which only special-cases ATX headings
+  → raw HTML would parse as inline `RawInline`-in-`Para`. HTML on a *later*
+  def-body line already dispatches correctly via the normal container path;
+  only the first content line needed this. Gate is single-line-close only:
+  a THROWAWAY `GreenNodeBuilder` parses a synthetic window (line 0 =
+  post-marker bytes; continuation lines = `prefix.strip`ped raw lines) and
+  the arm fires iff `parse_html_block_with_wrapper` consumes exactly 1
+  line; the real emit uses ONLY the marker-line bytes (byte-lossless — no
+  continuation consumed). `fusion = None` (content-indent container).
+  `definition_html_block_wrapper_kind` mirrors the dispatcher's
+  `HTML_BLOCK_DIV` retag gate. Multi-line-open bodies fall through (a
+  PRE-EXISTING losslessness failure on `:   <div>\n…\n</div>`, not this
+  arm's regression) and continuation softbreak fusion stays deferred.
 - **`ListItemBuffer::emit_as_block` lifts same-line / fully-contained
   HTML via `try_emit_html_block_lift`.** Strict gate:
   `try_parse_html_block_start` recognizes line 0, inner reparse yields
@@ -516,85 +533,85 @@ verbatim-in-bq); table-cell reparses.
 | 6 | Lift inner HTML content into structural CST children | **All non-bq + bq shapes lifted** for `<div>` + non-div Pandoc strict-block tags (clean, open-trailing, butted/indented-close, same-line, empty, multi-line-open, depth-aware nested, multi-close, unclosed, multi-line-open+matched-close top-level+bq; inline-block matched-pair). List items + bq-in-listitem covered. `PARAGRAPH→PLAIN` retag at adjacency. All mechanisms in Persistent traps. **Pass count 105 → 257.** |
 | A | fenced-div-in-html-div (`<div>\n:::x\n</div>`) | **Landed 2026-07-02.** `body_fence_depth` suspends the `</div>` close while an inner `:::` fence is open; body lifts with implicit EOF close. Corpus 0478. Detail in Persistent traps. First of the remaining-gaps roadmap (A fenced-div-in-div, B `<div>` inter-tag, C 0390 softbreak, D paragraph-leads-tag). |
 | C | Comment/PI trailing softbreak fusion (`<!-- hi --> trailing\nmore`) | **Landed 2026-07-02; fenced-div container 2026-07-08; blockquote container 2026-07-08.** `SoftbreakFusion` enum bounds the reparse: `ToDocEnd` (outermost, corpus 0390) + `ToFencedDivClose` (plain fenced div, corpus 0481, `fenced_div_body_end`) + `ToBlockquoteEnd` (pure blockquote, corpus 0482, `blockquote_body_end` + `> `-prefix strip/re-inject via `ContainerPrefixState`). Grafts first block, maps `text_range().end()` to consumed lines. **List/content-indent containers stay `None` (need list-indent strip); lazy `>`-less bq continuation stays divergent (broader bq-continuation gap). Both deferred.** Detail in Persistent traps. |
+| D | Definition-body marker-line HTML dispatch (`:   <div>x</div>`) | **Landed 2026-07-08.** `try_dispatch_definition_html_block` arm in the def first-content-line cascade (mirrors bq/list/fence). Throwaway-builder probe lifts only blocks that CLOSE on the marker line → byte-lossless single-line emit; `<div id>` registers in the anchor index. Corpus 0483/0484. Multi-line-open bodies + continuation softbreak fusion deferred. Detail in Persistent traps. |
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-07-08 (Phase C — blockquote container softbreak fusion)
+## Latest session — 2026-07-08 (Phase D — definition-body marker-line HTML dispatch)
 
-Conformance: **html 284 → 285 passing** (285 total, **0 fail — html
-100%**); total **481 → 482 / 482 (100%)**. Parser-side session: extended
-Phase C's comment/PI trailing softbreak fusion from the outermost level
-and plain fenced div into a **pure blockquote**, the next deferred
-container variant. This was the previous session's ranked target #1.
+Conformance: **html 285 → 287 passing** (287 total, **0 fail — html
+100%**); total **482 → 484 / 484 (100%)**. Parser-side session: HTML blocks
+on a **definition body's marker line** (`:   <div>x</div>`, `:   <!-- hi -->`)
+now dispatch structurally instead of falling into the buffered-plain path
+(parsed as inline `RawInline`-in-`Para`). This is the structural-dispatch
+half of the previous session's ranked target #1 ("List / content-indent
+container"); the softbreak-fusion half stays deferred.
 
 ### What landed
 
-- `> <!-- hi --> trailing\n> more` now projects `BlockQuote [RawBlock
-  "<!-- hi -->", Para [trailing, SoftBreak, more]]` (was `Para [trailing],
-  Para [more]` — two paras). Matches pandoc-native. Works at nested depth
-  (`> > ...`) and with the PI form (`<?php ?>`).
-- New `SoftbreakFusion::ToBlockquoteEnd` variant. `blockquote_body_end`
-  bounds the reparse at the first line whose `count_blockquote_markers`
-  depth `< bq_depth` (the blockquote boundary).
-- The fusion reparse now strips each continuation line's `> ` prefix into
-  the fragment and captures it in a `prefix_lines` vec (line 0 = `trailing`
-  gets an empty prefix — its `> ` was already emitted upstream), then
-  `graft_subtree`s the first block with a `ContainerPrefixState` that
-  re-injects the prefixes at line start → byte-lossless. Consumed-line
-  mapping now accumulates STRIPPED line lengths (fragment coords). For
-  `bq_depth == 0` (ToDocEnd/ToFencedDivClose) the strip is a no-op and the
-  state collapses to `None` — behavior identical to before.
-- Dispatcher fusion selection restructured: list/content-indent/directive →
-  `None` first; then `blockquote_depth > 0` → `ToBlockquoteEnd`; else the
-  existing doc-end / fenced-div branches.
-- Edge cases verified against pandoc-native: nested bq depth-2, 3+
-  continuation lines, blank-line boundary (only first block fused), PI
-  form. Lazy `>`-less continuation left divergent (broader bq-continuation
-  gap; `blockquote_body_end` stops at the non-`>` line — no regression).
+- `:   <div id="d">x</div>` → `Div ("d",[],[]) [Plain [x]]` (0483);
+  `:   <!-- hi --> trailing` → `RawBlock "<!-- hi -->", Para [trailing]`
+  (0484). Matches pandoc-native. The `<div id>` id registers in the anchor
+  index automatically (HTML_ATTRS → `AttributeNode` walk), resolving
+  issue-#263-style `#anchor` links in def bodies (verified: clean-dir lint
+  emits no false `undefined-anchor`, control still warns on a bad anchor).
+- The gap was ONLY the marker line (first content line); it went through
+  `emit_definition_plain_or_heading`, which special-cases only ATX
+  headings. HTML on a *later* def-body line already dispatched correctly
+  via the normal container path.
+- New `try_dispatch_definition_html_block` arm in the def first-content-line
+  cascade (mirrors the bq/list/fence arms). Probes the block extent by
+  parsing a synthetic line window (line 0 = post-marker bytes; continuation
+  lines = outer-prefix-stripped) into a THROWAWAY `GreenNodeBuilder`; only
+  blocks that CLOSE on the marker line lift, emitted from the single
+  marker-line bytes → byte-lossless. `definition_html_block_wrapper_kind`
+  replicates the dispatcher's `HTML_BLOCK_DIV` retag gate.
+- Deferred (fall through, NO regression): multi-line HTML bodies that OPEN
+  on the marker line (`:   <div>\n    x\n    </div>` — this shape has a
+  PRE-EXISTING losslessness failure, verified on baseline); softbreak
+  fusion of a continuation line into the trailing `Para` (fusion is `None`
+  for content-indent containers).
 
 ### Files in committable diff
 
-- `parser/blocks/html_blocks.rs` (`ToBlockquoteEnd`, `blockquote_body_end`,
-  prefix-strip/re-inject in the fusion reparse) + `parser/block_dispatcher.rs`
-  (fusion-selection restructure).
-- Corpus `0482-html-block-comment-trailing-softbreak-blockquote/`;
-  allowlist (new Phase C blockquote section) + report.{txt,json}.
-- Paired parser goldens
-  `html_block_comment_trailing_softbreak_blockquote_{pandoc,commonmark}`
-  (+ snapshots) wired into `golden_parser_cases.rs`.
-- Formatter golden `html_block_comment_trailing_softbreak_blockquote`
-  wired into `golden_cases.rs`.
+- `parser/core.rs` (`try_dispatch_definition_html_block` +
+  `definition_html_block_wrapper_kind` + cascade arm + `html_blocks` import).
+- Corpus `0483-html-block-div-definition-body/`,
+  `0484-html-block-comment-definition-body/`; allowlist (new Phase D
+  section) + report.{txt,json}.
+- Paired parser goldens `html_block_div_definition_body_{pandoc,commonmark}`
+  (+ snapshots) in `golden_parser_cases.rs`.
+- Formatter golden `html_block_div_definition_body` in `golden_cases.rs`.
 - This RECAP.
 
 ### Suggested next sub-targets (ranked)
 
-1. **List / content-indent container softbreak fusion** (`- <!-- --> t\n
-   more` loose-item multi-line, footnote/definition bodies). Same
-   `ToBlockquoteEnd` template, but the fragment lines also carry
-   list-indent, so the strip/re-inject must handle `ContainerPrefixLine`'s
-   `list_indent` field (not just `bq_only`) and the bound is the
-   container's content extent. Note tight list items ALREADY fuse via
-   `ListItemBuffer` (verified: `- <!-- hi --> t\n  more` →
-   `Plain [t, SoftBreak, more]`); this is only the loose/nested-container
-   remainder. Medium.
-2. **Multi-line-second-div inter-tag** (`<div>a</div> y <div>\nz\n</div>`).
+1. **Def-body / content-indent softbreak fusion** (`:   <!-- --> t\n
+   more` → one `Para [t, SoftBreak, more]`; also loose list items,
+   footnote bodies). Now that the RawBlock dispatches, the remaining gap is
+   fusing the continuation line. Needs a `SoftbreakFusion` variant bounded
+   by the container's content extent, with content-indent strip/re-inject
+   (`ContainerPrefixLine.list_indent`, not just `bq_only`). Tight list
+   items ALREADY fuse via `ListItemBuffer`. Medium.
+2. **Multi-line HTML body on def marker line** (`:   <div>\n    x\n
+   </div>` → `Div [Para x]`). PRE-EXISTING losslessness failure on this
+   shape (fails on baseline too). Same continuation-line content-indent
+   strip/re-inject machinery as #1. Medium.
+3. **Footnote-body marker-line HTML** (`[^1]: <!-- -->`). Same class as
+   def bodies; check whether the footnote first-content-line path has the
+   analogous inline-instead-of-block gap.
+4. **Multi-line-second-div inter-tag** (`<div>a</div> y <div>\nz\n</div>`).
    Content-scan depth model must treat a `</div> … <div>` close line as
-   close-then-fresh-block, not depth-neutral. Would complete the `<div>`
-   inter-tag family. Not in corpus.
-3. **Lazy blockquote paragraph continuation** (`> <!-- --> t\nmore` with a
-   bare `more`). Pandoc fuses `more` into the bq paragraph; panache emits a
-   top-level `Para [more]` outside the bq entirely — a broader
-   blockquote-continuation gap, not softbreak-specific. Bigger than a
-   fusion tweak.
-4. **Phase D — paragraph-leads-tag** (`foo <div>bar</div> baz`). Deep;
+   close-then-fresh-block. Completes the `<div>` inter-tag family. Not in
+   corpus.
+5. **Phase (paragraph-leads-tag)** (`foo <div>bar</div> baz`). Deep;
    inline layer has no block-tag classifier + line-anchored block model.
    Exploratory decision session first.
 
 ### New trap
 
-None fundamentally new; folded into the updated `SoftbreakFusion` bullet
-in Persistent traps (now covers `ToBlockquoteEnd` + the prefix
-strip/re-inject and consumed-byte-in-stripped-coords detail).
+Folded into Persistent traps ("List-item / definition-body HTML structural
+lift") — the throwaway-builder extent probe + single-line-close lift gate.
 
 --------------------------------------------------------------------------------
 
@@ -606,14 +623,8 @@ count delta — root cause / lever.
 - 2026-07-08 — Phase C blockquote container softbreak fusion (`> <!-- --> t\n> more` → `BlockQuote [RawBlock, Para [t, SoftBreak, more]]`) — html 284 → 285 (html 100%, total 482/482) — new `SoftbreakFusion::ToBlockquoteEnd`; `blockquote_body_end` bounds at first line with bq-depth `< bq_depth`; fusion reparse strips each continuation `> ` prefix and re-injects via `ContainerPrefixState` (line 0 empty), consumed-line map in stripped coords; nested-depth + PI verified; list/content-indent still `None`, lazy `>`-less continuation still divergent; corpus 0482.
 - 2026-07-08 — Phase C fenced-div container softbreak fusion (`:::x\n<!-- --> t\nmore\n:::` → `Div [RawBlock, Para [t, SoftBreak, more]]`) — html 283 → 284 — `SoftbreakFusion` enum (`ToDocEnd`/`ToFencedDivClose`/`None`) replaces `at_outermost_level` bool; `fenced_div_body_end` bounds the reparse at the enclosing `:::` (scan started past the comment close); bq/list still `None` (deferred, need fragment prefix-stripping); corpus 0481.
 - 2026-07-08 — corpus pin `<div>` inter-tag no-ws (`<div>foo</div>bar<div>baz</div>` → `Div`/`Plain`/`Div`) — html 282 → 283 — Phase B's `graft_same_line_div_peel` already handled the no-ws form; pinned as corpus 0480 + paired parser/formatter goldens; corrected stale `blocked.txt` item (1) that still claimed both ws+no-ws divergent. No parser change.
-- 2026-07-02 — Phase C comment/PI trailing softbreak (`<!-- hi --> trailing\nmore` → `RawBlock, Para [trailing, SoftBreak, more]`) — html 281 → 282 (html 100%, total 479/479) — `at_outermost_level` gate reparses trailing+rest, grafts first block, maps `text_range().end()` to consumed-line count; container shapes stay close-line-split; corpus 0390 (last html fail).
-- 2026-07-02 — Phase B `<div>` inter-tag lift (`<div>x</div> y <div>z</div>` → `Div, Plain, Div`) — html 280 → 281 — `graft_same_line_div_peel` peels each pair into a sibling `HTML_BLOCK_DIV`, interstitial→`Plain`, tail→`Para`, ws-gap→`BLANK_LINE`; two trailing-graft call sites; parser-side, no projector change; corpus 0479. Multi-line-second-div deferred.
-- 2026-07-02 — Phase A fenced-div-in-html-div (`<div>\n:::x\n</div>` → `Div[Div(x)[RawBlock "</div>"]]`) — html 279 → 280 — `body_fence_depth` suspends the `</div>` close while an inner `:::` fence is open; body lifts via implicit-close path; parser-side, no projector change; corpus 0478.
-- 2026-07-02 — 7e same-line matched-pair inter-tag text (triage + fix) — html 273 → 279 — triage pinned neighbors 0473/0474; fix `same_line_trailing_forces_opaque` keeps `<p>foo</p> bar <p>baz</p>` opaque → splitter flat RawBlock/Plain; corpus 0472/0475-0477; `<div>` inter-tag deferred (done Phase B).
-- 2026-07-02 — Void strict-block tags (`<hr>`/`<col>`/`<meta>` → sibling `HTML_BLOCK`s, not nested) — html 271 → 273 — new `PANDOC_VOID_STRICT_BLOCK_TAGS`; `closes_at_open_tag: true` under Pandoc; excluded from lift/matched-pair but kept out of `cannot_interrupt`; resolves the 7c `<hr>`-nesting quirk; corpus 0470-0471.
-- 2026-07-02 — Phase 7c blockquote open-only lift (`> <section>foo\n> bar` → structural PARAGRAPH/HEADING child) — html 265 → 268 — `emit_html_block_body` takes `&ContainerPrefix` + `open_only` flag; no-close bq path routes through `emit_html_block_body_lifted_bq_messy`; projector unchanged; corpus 0464-0466.
-- 2026-07-02 — Phase 7b blockquote standalone-tag split (`> </p></div>` → one `HTML_BLOCK_TAG` per tag) — html 268 → 271 — dropped `try_parse_standalone_block_tags_split`'s `bq_depth == 0` guard (`> ` prefix is an `HTML_BLOCK` sibling, strip yields clean tags, non-tag bytes bail to byte walker); projector unchanged; corpus 0467-0469. Also disproved prior target #4 (`<div id>` anchor false-positive was a stray `/tmp/panache.toml` `flavor=myst`, not a bug).
-- 2026-07-02 — Phase 7c open-only body lift (non-div strict-block / inline-block open + trailing body, no close → structural CST body) — html 262 → 265 — `emit_html_block_body` non-div `HTML_BLOCK` + `bq_depth == 0` lift arm; projector `html_block_has_open_only_structural_lift`; bq stayed opaque; `<hr>`-nesting side effect pinned by `writer_html_blocks`.
+- 2026-07-02 — Phases A/B/C + 7e (single day cluster) — html 262 → 282 (total 479/479) — Phase C comment/PI trailing softbreak `at_outermost_level` (corpus 0390); Phase B `<div>` inter-tag `graft_same_line_div_peel` (0479); Phase A fenced-div-in-html-div `body_fence_depth` (0478); 7e `same_line_trailing_forces_opaque` for `<p>foo</p> bar <p>baz</p>` (0472/0475-0477); void strict-block `PANDOC_VOID_STRICT_BLOCK_TAGS` `<hr>`/`<col>`/`<meta>` sibling-not-nested (0470-0471). All levers in Persistent.
+- 2026-07-02 — Phase 7b/7c blockquote lifts (`> </p></div>` standalone split 0467-0469; `> <section>foo\n> bar` open-only lift 0464-0466; non-div open-only body lift) — html 262 → 271 — dropped `bq_depth==0` guards; `emit_html_block_body` `open_only` + `&ContainerPrefix`; `emit_html_block_body_lifted_bq_messy`; projector `html_block_has_open_only_structural_lift`. Also disproved a `<div id>` anchor false-positive (stray `/tmp/panache.toml` `flavor=myst`, not a bug).
 - 2026-06-29 — Phase 7b standalone-tag split (single line of ≥ 2 standalone close/void tags → one `HTML_BLOCK_TAG` each) — html 259 → 262 — parser early-branch `try_parse_standalone_block_tags_split` + `split_line_into_standalone_tags`; projector `html_block_is_standalone_tag_sequence` → `emit_html_block_structural` (no new byte walking); single-tag + multi-line + bq stay legacy; also removed stale `blocked.txt` 452/453.
 - 2026-06-17 — Phase 7a single-construct opaque lift (comment/PI/verbatim → `HTML_BLOCK_RAW`) — html flat (CST-fidelity refactor) — `html_block_node_kind` retags wrapper at the two `start_node` sites; `wrapper_kind` stays `HTML_BLOCK` as behavior gate (byte-identical children); projector `html_raw_block` routes by kind; all ~8 consumers updated.
 - 2026-05-18 — bq-in-listitem dispatch (option (a)) — block 15 → 17, html flat — `ListItemFinish::BqDispatch` + `Parser::dispatch_bq_after_list_item` hand post-`> ` content to caller instead of eager paragraph; 0452/0453 HTML-block stay blocked (dispatcher walks raw `lines[line_pos]` without list-marker strip).

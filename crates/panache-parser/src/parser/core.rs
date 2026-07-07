@@ -16,6 +16,7 @@ use super::blocks::headings::{
     try_parse_setext_heading,
 };
 use super::blocks::horizontal_rules::try_parse_horizontal_rule;
+use super::blocks::html_blocks;
 use super::blocks::line_blocks;
 use super::blocks::lists;
 use super::blocks::paragraphs;
@@ -1417,6 +1418,90 @@ impl<'a> Parser<'a> {
         self.dispatch_bq_after_list_item(finish)
     }
 
+    /// Dispatch a leading HTML block on a definition body's marker line
+    /// (`:   <html>`).
+    ///
+    /// The first content line of a definition body otherwise flows into the
+    /// buffered-plain path, which only special-cases ATX headings — a raw
+    /// HTML block there would be parsed as inline text (`RawInline` inside a
+    /// `Para`) instead of a structural block (`RawBlock` / `Div`), diverging
+    /// from pandoc-native. This mirrors the blockquote / list / fenced-code
+    /// arms of the definition first-content-line cascade. HTML that appears
+    /// on a *later* definition-body line already dispatches correctly through
+    /// the normal container path.
+    ///
+    /// Scope: only blocks that CLOSE on the marker line are lifted here. The
+    /// extent is probed by parsing a synthetic line window (line 0 = the
+    /// already-stripped post-marker bytes; continuation lines = the raw
+    /// following lines with the outer container prefix stripped) into a
+    /// throwaway builder and checking the block consumes exactly one line.
+    /// Multi-line HTML bodies that open on the marker line fall through to
+    /// the buffered-plain path (deferred — they need content-indent
+    /// strip/re-inject for the continuation lines).
+    ///
+    /// Returns `Some(0)` when a marker-line HTML block was emitted (no lines
+    /// beyond the marker are consumed), or `None` when no leading HTML block
+    /// closes on the marker line.
+    fn try_dispatch_definition_html_block(
+        &mut self,
+        content_line: &str,
+        content_col: usize,
+    ) -> Option<usize> {
+        let is_commonmark = self.config.dialect == crate::options::Dialect::CommonMark;
+        let (content_no_nl, _) = strip_newline(content_line);
+        let block_type = html_blocks::try_parse_html_block_start(content_no_nl, is_commonmark)?;
+
+        // Probe: does the block close on the marker line? Parse a synthetic
+        // window into a throwaway builder and read back the line count. The
+        // continuation lines carry their outer container prefix; strip it so
+        // the probe sees the same content the real dispatch would.
+        let closes_on_marker_line = {
+            let bq_depth = self.current_blockquote_depth();
+            let prefix =
+                ContainerPrefix::from_scalars(bq_depth, 0, bq_depth > 0, content_col, false);
+            let mut synthetic: Vec<&str> = Vec::with_capacity(self.lines.len() - self.pos);
+            synthetic.push(content_line);
+            for line in &self.lines[self.pos + 1..] {
+                synthetic.push(prefix.strip(line));
+            }
+            let mut probe = GreenNodeBuilder::new();
+            probe.start_node(SyntaxKind::DOCUMENT.into());
+            let consumed = html_blocks::parse_html_block_with_wrapper(
+                &mut probe,
+                &synthetic,
+                0,
+                block_type.clone(),
+                &ContainerPrefix::default(),
+                SyntaxKind::HTML_BLOCK,
+                html_blocks::SoftbreakFusion::None,
+                self.config,
+            );
+            probe.finish_node();
+            consumed == 1
+        };
+        if !closes_on_marker_line {
+            return None;
+        }
+
+        // Emit for real using only the marker line's bytes: the block closed
+        // on line 0, so no continuation lines are consumed and the CST stays
+        // byte-equal to source (marker + spaces already emitted upstream).
+        let wrapper_kind =
+            definition_html_block_wrapper_kind(&block_type, content_no_nl, self.config);
+        let single = [content_line];
+        html_blocks::parse_html_block_with_wrapper(
+            &mut self.builder,
+            &single,
+            0,
+            block_type,
+            &ContainerPrefix::default(),
+            wrapper_kind,
+            html_blocks::SoftbreakFusion::None,
+            self.config,
+        );
+        Some(0)
+    }
+
     /// Returns the number of extra lines consumed beyond the block parser's
     /// reported `lines_consumed` (= 1 for definition list). Non-zero when
     /// the Definition arm opens a fenced code block on the marker line
@@ -1692,6 +1777,16 @@ impl<'a> Parser<'a> {
                             )
                         };
                         extras = new_pos.saturating_sub(self.pos).saturating_sub(1);
+                    } else if let Some(html_extras) =
+                        self.try_dispatch_definition_html_block(content_line, content_col)
+                    {
+                        self.containers.push(Container::Definition {
+                            content_col,
+                            plain_open: false,
+                            plain_buffer: TextBuffer::new(),
+                        });
+                        definition_pushed = true;
+                        extras = html_extras;
                     } else {
                         let (_, newline_str) = strip_newline(current_line);
                         let (content_without_newline, _) = strip_newline(after_marker_and_spaces);
@@ -3941,6 +4036,34 @@ fn try_parse_any_table_kind(
         consumed = tables::try_parse_simple_table(window, builder, config);
     }
     consumed
+}
+
+/// Wrapper kind for a marker-line HTML block in a definition body. Mirrors
+/// the dispatcher's `HtmlBlockParser::parse_prepared` div-lift gate: a
+/// `<div ...>` whose `>` closes on the line retags to `HTML_BLOCK_DIV` under
+/// Pandoc (with `native_divs`) so the projector emits `Block::Div` and the
+/// salsa anchor index reads the open tag's id. Everything else keeps the
+/// opaque `HTML_BLOCK` shape (which itself may retag to `HTML_BLOCK_RAW` for
+/// single-construct opaque shapes inside `parse_html_block_with_wrapper`).
+fn definition_html_block_wrapper_kind(
+    block_type: &html_blocks::HtmlBlockType,
+    content_no_nl: &str,
+    config: &ParserOptions,
+) -> SyntaxKind {
+    match block_type {
+        html_blocks::HtmlBlockType::BlockTag {
+            tag_name,
+            is_closing: false,
+            ..
+        } if tag_name == "div"
+            && config.dialect == crate::options::Dialect::Pandoc
+            && config.extensions.native_divs
+            && html_blocks::probe_open_tag_line_has_close_gt(content_no_nl, "div") =>
+        {
+            SyntaxKind::HTML_BLOCK_DIV
+        }
+        _ => SyntaxKind::HTML_BLOCK,
+    }
 }
 
 fn emit_definition_plain_or_heading(
