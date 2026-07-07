@@ -339,6 +339,8 @@ golden_test_cases!(
     html_block_comment_trailing_softbreak_fenced_div_pandoc,
     html_block_comment_trailing_softbreak_blockquote_commonmark,
     html_block_comment_trailing_softbreak_blockquote_pandoc,
+    html_block_comment_definition_body_trailing_softbreak_commonmark,
+    html_block_comment_definition_body_trailing_softbreak_pandoc,
     html_block_div_definition_body_commonmark,
     html_block_div_definition_body_pandoc,
     html_block_div_definition_body_multiline_commonmark,

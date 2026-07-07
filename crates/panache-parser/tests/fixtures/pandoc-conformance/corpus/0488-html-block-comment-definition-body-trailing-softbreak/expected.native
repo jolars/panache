@@ -1,0 +1,9 @@
+[ DefinitionList
+    [ ( [ Str "Term" ]
+      , [ [ RawBlock (Format "html") "<!-- hi -->"
+          , Para [ Str "trailing" , SoftBreak , Str "more" ]
+          ]
+        ]
+      )
+    ]
+]

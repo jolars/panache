@@ -285,6 +285,7 @@ golden_test_cases!(
     html_block_div_inter_tag_no_space,
     html_block_comment_trailing_softbreak_fenced_div,
     html_block_comment_trailing_softbreak_blockquote,
+    html_block_comment_definition_body_trailing_softbreak,
     html_block_div_definition_body,
     html_block_div_definition_body_multiline,
     html_block_div_footnote_body,

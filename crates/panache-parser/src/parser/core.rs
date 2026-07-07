@@ -24,7 +24,9 @@ use super::blocks::raw_blocks::{extract_environment_name, is_inline_math_environ
 use super::blocks::tables;
 use super::diagnostics::{Diagnostics, SyntaxError};
 use super::utils::container_stack;
-use super::utils::helpers::{is_blank_line, split_lines_inclusive, strip_newline};
+use super::utils::helpers::{
+    is_blank_line, split_lines_inclusive, strip_leading_spaces_n, strip_newline,
+};
 use super::utils::inline_emission;
 use super::utils::marker_utils;
 use super::utils::text_buffer;
@@ -1492,6 +1494,28 @@ impl<'a> Parser<'a> {
             marker_line_html_block_wrapper_kind(&block_type, content_no_nl, self.config);
 
         if probe_consumed == 1 {
+            // A comment/PI whose close-line carries trailing text
+            // (`:   <!-- hi --> t`) softbreak-fuses that text with the
+            // following non-blank continuation lines into ONE paragraph
+            // (`RawBlock, Para/Plain [t, SoftBreak, more]`), matching pandoc.
+            // The plain single-line emit below would leave the continuation
+            // to the definition's plain buffer as a separate block. Route the
+            // marker line plus its fusible-paragraph continuation lines
+            // through the multi-line lift, which reparses the window and lets
+            // the parser's own paragraph-continuation rules fuse them. Gated
+            // to Pandoc + `bq_depth == 0`, mirroring the multi-line body lift
+            // below.
+            if self.config.dialect == crate::options::Dialect::Pandoc
+                && bq_depth == 0
+                && let Some(extras) = self.try_fuse_definition_comment_trailing(
+                    content_line,
+                    content_no_nl,
+                    content_col,
+                )
+            {
+                return Some(extras);
+            }
+
             // Emit for real using only the marker line's bytes: the block
             // closed on line 0, so no continuation lines are consumed and the
             // CST stays byte-equal to source (marker + spaces already emitted
@@ -1546,6 +1570,89 @@ impl<'a> Parser<'a> {
             return None;
         }
         Some(probe_consumed.saturating_sub(1))
+    }
+
+    /// Fuse a definition-body comment/PI close-line trailing text with its
+    /// following non-blank continuation lines into one paragraph, matching
+    /// pandoc (`:   <!-- --> t\n    more` -> `RawBlock, Para/Plain [t,
+    /// SoftBreak, more]`). Returns the number of continuation lines consumed
+    /// on success (grafted as siblings of the definition), or `None` when
+    /// there is nothing to fuse (no trailing text, no continuation, or the
+    /// window doesn't reparse to a clean `RawBlock` + single-paragraph split).
+    /// The caller has already established Pandoc dialect + `bq_depth == 0`.
+    fn try_fuse_definition_comment_trailing(
+        &mut self,
+        content_line: &str,
+        content_no_nl: &str,
+        content_col: usize,
+    ) -> Option<usize> {
+        // Only comment (`<!-- -->`) and PI (`<? ?>`) blocks take the
+        // trailing-split-with-fusion path; their close markers are `-->`
+        // and `?>`.
+        let trimmed = content_no_nl.trim_start();
+        let marker = if trimmed.starts_with("<!--") {
+            "-->"
+        } else if trimmed.starts_with("<?") {
+            "?>"
+        } else {
+            return None;
+        };
+        // Require non-whitespace text after the close marker on the marker
+        // line — without trailing text there is nothing to fuse (a bare
+        // comment plus a following line stays two separate blocks).
+        let close = content_no_nl.find(marker)?;
+        let trailing = &content_no_nl[close + marker.len()..];
+        if trailing.trim().is_empty() {
+            return None;
+        }
+
+        // Fusible-paragraph extent: consecutive non-blank continuation lines
+        // after the marker line, up to the first blank line (a blank line
+        // ends the paragraph in both pandoc and the inner reparse). Most
+        // interrupting blocks (heading, fence, blockquote, HTML) interrupt a
+        // paragraph at both the document top level and inside a def body, so
+        // the inner reparse (which works in top-level coordinates) already
+        // yields more than two children and the lift's 2-child gate rejects
+        // the window. A list item is the exception: pandoc-markdown lists
+        // cannot interrupt a paragraph at the top level (so the reparse would
+        // wrongly fuse one), but a list at the definition's content indent IS
+        // a separate block in the def body. Stop the scan at such a line so
+        // the definition container emits the list on its own.
+        let mut fuse_count = 0usize;
+        while self.pos + 1 + fuse_count < self.lines.len() {
+            let line = self.lines[self.pos + 1 + fuse_count];
+            if is_blank_line(line) {
+                break;
+            }
+            let stripped = strip_leading_spaces_n(line, content_col);
+            if lists::try_parse_list_marker(stripped, self.config, lists::OpenListHint::None)
+                .is_some()
+            {
+                break;
+            }
+            fuse_count += 1;
+        }
+        if fuse_count == 0 {
+            return None;
+        }
+
+        let mut text = String::from(content_line);
+        for line in &self.lines[self.pos + 1..self.pos + 1 + fuse_count] {
+            text.push_str(line);
+        }
+        // Loose (blank line before the marker) -> `Para`; tight -> `Plain`.
+        let use_paragraph = self.pos > 0 && is_blank_line(self.lines[self.pos - 1]);
+        let lifted = super::utils::list_item_buffer::try_emit_html_block_lift(
+            &mut self.builder,
+            &text,
+            self.config,
+            content_col,
+            use_paragraph,
+        );
+        if !lifted {
+            return None;
+        }
+        Some(fuse_count)
     }
 
     /// Dispatch an HTML block that opens AND closes on a footnote body's first
