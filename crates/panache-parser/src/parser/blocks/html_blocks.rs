@@ -828,8 +828,14 @@ pub(crate) enum SoftbreakFusion {
     /// Inside a plain (no line-prefix) fenced div: fuse up to the div's
     /// closing `:::` fence, which the outer dispatcher still owns.
     ToFencedDivClose,
-    /// Inside a line-prefix container (blockquote / list / content indent),
-    /// or fusion otherwise disabled: keep the close-line-only split.
+    /// Inside a pure blockquote (no list / content-indent / directive
+    /// nesting): fuse up to the first line that no longer continues the
+    /// blockquote at the current marker depth. The continuation lines'
+    /// `> ` prefixes are stripped before reparse and re-injected during
+    /// graft so the CST stays byte-equal to source.
+    ToBlockquoteEnd,
+    /// Inside a list / content-indent container, or fusion otherwise
+    /// disabled: keep the close-line-only split.
     None,
 }
 
@@ -848,6 +854,22 @@ fn fenced_div_body_end(lines: &[&str], start: usize) -> usize {
                 return start + offset;
             }
             depth -= 1;
+        }
+    }
+    lines.len()
+}
+
+/// Index of the first line at/after `start` that no longer continues
+/// the enclosing blockquote at `bq_depth` markers (or `lines.len()`
+/// when every remaining line continues it). Bounds the softbreak-fusion
+/// reparse so it never crosses the blockquote boundary. Lazy paragraph
+/// continuation (a bare, `>`-less line) is intentionally excluded — it
+/// is a broader blockquote-continuation gap handled elsewhere.
+fn blockquote_body_end(lines: &[&str], start: usize, bq_depth: usize) -> usize {
+    for (offset, line) in lines[start..].iter().enumerate() {
+        let (depth, _) = count_blockquote_markers(line);
+        if depth < bq_depth {
+            return start + offset;
         }
     }
     lines.len()
@@ -984,14 +1006,17 @@ fn try_parse_comment_pi_with_trailing_split(
     // parser's own paragraph-continuation rules decide the extent, graft
     // ONLY that first block, and hand the rest back to the outer
     // dispatcher. `fusion_end` is the end of the document at the outermost
-    // level and the enclosing fenced div's closing `:::` line inside a
-    // plain fenced div; either way the fragment excludes any container
-    // close marker, so it can't be swallowed into the paragraph. Inside a
-    // line-prefix container (blockquote / list / content indent) fusion is
-    // disabled and the close-line-only split is kept.
+    // level, the enclosing fenced div's closing `:::` line inside a plain
+    // fenced div, and the blockquote boundary inside a pure blockquote;
+    // either way the fragment excludes any container close marker, so it
+    // can't be swallowed into the paragraph. Inside a list / content-indent
+    // container fusion is disabled and the close-line-only split is kept.
     let fusion_end: Option<usize> = match fusion {
         SoftbreakFusion::ToDocEnd => Some(lines.len()),
         SoftbreakFusion::ToFencedDivClose => Some(fenced_div_body_end(lines, close_line_idx + 1)),
+        SoftbreakFusion::ToBlockquoteEnd => {
+            Some(blockquote_body_end(lines, close_line_idx + 1, bq_depth))
+        }
         SoftbreakFusion::None => None,
     };
     if !trailing.is_empty() {
@@ -1001,9 +1026,28 @@ fn try_parse_comment_pi_with_trailing_split(
             let mut inner_options = config.clone();
             let refdefs = config.refdef_labels.clone().unwrap_or_default();
             inner_options.refdef_labels = Some(refdefs.clone());
+            // Build the reparse fragment from `trailing` plus each
+            // continuation line with its outer blockquote prefix stripped,
+            // so the parser's paragraph-continuation rules fuse them. Line 0
+            // (the `trailing` bytes) carries no prefix — line 0's `> ` was
+            // already emitted by the outer dispatcher; each continuation
+            // line contributes its stripped `> ` prefix, re-injected during
+            // graft so the CST stays byte-equal to source. For non-bq
+            // fusions `bq_depth == 0` so the strip is a no-op and every
+            // captured prefix is empty (state collapses to `None`).
             let mut fragment = String::from(trailing);
+            let mut prefix_lines: Vec<ContainerPrefixLine> = vec![ContainerPrefixLine::default()];
+            let mut stripped_lens: Vec<usize> = Vec::new();
             for line in &lines[close_line_idx + 1..end] {
-                fragment.push_str(line);
+                let inner = if bq_depth > 0 {
+                    strip_n_blockquote_markers(line, bq_depth)
+                } else {
+                    line
+                };
+                let prefix = &line[..line.len() - inner.len()];
+                fragment.push_str(inner);
+                prefix_lines.push(ContainerPrefixLine::bq_only(prefix.to_string()));
+                stripped_lens.push(inner.len());
             }
             let inner_root =
                 crate::parser::parse_with_refdefs(&fragment, Some(inner_options), refdefs);
@@ -1012,16 +1056,16 @@ fn try_parse_comment_pi_with_trailing_split(
                 // back to a source-line count. Bytes up to `trailing.len()`
                 // are the close line (already counted); each subsequent line
                 // fully covered by the first block is an extra consumed line.
+                // `stripped_lens` mirrors the fragment coordinates (prefixes
+                // stripped), so the comparison against `block_end` is exact.
                 let block_end: usize = first.text_range().end().into();
                 let mut consumed_bytes = trailing.len();
                 let mut extra_lines = 0usize;
-                let mut idx = close_line_idx + 1;
-                while idx < end && consumed_bytes < block_end {
-                    consumed_bytes += lines[idx].len();
+                while extra_lines < stripped_lens.len() && consumed_bytes < block_end {
+                    consumed_bytes += stripped_lens[extra_lines];
                     extra_lines += 1;
-                    idx += 1;
                 }
-                let mut bq = None;
+                let mut bq = ContainerPrefixState::new(prefix_lines);
                 graft_subtree(builder, &first, &mut bq);
                 return Some(close_line_idx + 1 + extra_lines);
             }

@@ -1,0 +1,5 @@
+[ BlockQuote
+    [ RawBlock (Format "html") "<!-- hi -->"
+    , Para [ Str "trailing" , SoftBreak , Str "more" ]
+    ]
+]

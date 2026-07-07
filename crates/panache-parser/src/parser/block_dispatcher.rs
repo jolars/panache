@@ -2078,27 +2078,26 @@ impl BlockParser for HtmlBlockParser {
         };
 
         // How far the Pandoc comment/PI trailing-text split may fuse
-        // soft-break continuation lines into the trailing paragraph. A
-        // line-prefix container (blockquote / list / content indent) owns a
-        // continuation prefix, so fusion is disabled there. At the outermost
-        // level fusion runs to end of document; inside a plain fenced div it
-        // runs up to the div's closing `:::` line (the outer dispatcher still
-        // owns that boundary), so the reparse never swallows it.
-        let fusion = if !ctx.in_list
-            && ctx.blockquote_depth == 0
-            && ctx.content_indent == 0
-            && ctx.myst_directive_closer.is_none()
-        {
-            if !ctx.in_fenced_div {
+        // soft-break continuation lines into the trailing paragraph. At the
+        // outermost level fusion runs to end of document; inside a plain
+        // fenced div it runs up to the div's closing `:::` line; inside a
+        // pure blockquote it runs up to the blockquote boundary (the
+        // continuation `> ` prefixes are stripped for the reparse and
+        // re-injected during graft). A list / content-indent / directive
+        // container still disables fusion (the reparse fragment would need
+        // more than a simple `> `-prefix strip).
+        let fusion =
+            if ctx.in_list || ctx.content_indent != 0 || ctx.myst_directive_closer.is_some() {
+                SoftbreakFusion::None
+            } else if ctx.blockquote_depth > 0 {
+                SoftbreakFusion::ToBlockquoteEnd
+            } else if !ctx.in_fenced_div {
                 SoftbreakFusion::ToDocEnd
             } else if ctx.config.extensions.fenced_divs {
                 SoftbreakFusion::ToFencedDivClose
             } else {
                 SoftbreakFusion::None
-            }
-        } else {
-            SoftbreakFusion::None
-        };
+            };
 
         let new_pos = parse_html_block_with_wrapper(
             builder,

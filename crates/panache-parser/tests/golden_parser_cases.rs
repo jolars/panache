@@ -337,6 +337,8 @@ golden_test_cases!(
     html_block_div_inter_tag_no_space_pandoc,
     html_block_comment_trailing_softbreak_fenced_div_commonmark,
     html_block_comment_trailing_softbreak_fenced_div_pandoc,
+    html_block_comment_trailing_softbreak_blockquote_commonmark,
+    html_block_comment_trailing_softbreak_blockquote_pandoc,
     html_block_div_blockquote_depth_2_commonmark,
     html_block_div_blockquote_depth_2_pandoc,
     html_block_div_blockquote_messy_commonmark,
