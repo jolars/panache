@@ -342,7 +342,7 @@ impl ListItemBuffer {
 /// re-injected as `WHITESPACE` tokens at the start of each continuation
 /// line during graft so the result is byte-equal to the original
 /// buffer text.
-fn try_emit_html_block_lift(
+pub(crate) fn try_emit_html_block_lift(
     builder: &mut GreenNodeBuilder<'static>,
     text: &str,
     config: &ParserOptions,

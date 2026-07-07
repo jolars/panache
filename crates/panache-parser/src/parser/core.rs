@@ -1460,14 +1460,14 @@ impl<'a> Parser<'a> {
         // window into a throwaway builder and read back the line count. The
         // continuation lines carry their outer container prefix; strip it so
         // the probe sees the same content the real dispatch would.
-        let closes_on_marker_line = {
-            let bq_depth = self.current_blockquote_depth();
-            let prefix =
-                ContainerPrefix::from_scalars(bq_depth, 0, bq_depth > 0, content_col, false);
+        let bq_depth = self.current_blockquote_depth();
+        let content_prefix =
+            ContainerPrefix::from_scalars(bq_depth, 0, bq_depth > 0, content_col, false);
+        let probe_consumed = {
             let mut synthetic: Vec<&str> = Vec::with_capacity(self.lines.len() - self.pos);
             synthetic.push(content_line);
             for line in &self.lines[self.pos + 1..] {
-                synthetic.push(prefix.strip(line));
+                synthetic.push(content_prefix.strip(line));
             }
             let mut probe = GreenNodeBuilder::new();
             probe.start_node(SyntaxKind::DOCUMENT.into());
@@ -1482,29 +1482,70 @@ impl<'a> Parser<'a> {
                 self.config,
             );
             probe.finish_node();
-            consumed == 1
+            consumed
         };
-        if !closes_on_marker_line {
+        if probe_consumed == 0 {
             return None;
         }
 
-        // Emit for real using only the marker line's bytes: the block closed
-        // on line 0, so no continuation lines are consumed and the CST stays
-        // byte-equal to source (marker + spaces already emitted upstream).
         let wrapper_kind =
             marker_line_html_block_wrapper_kind(&block_type, content_no_nl, self.config);
-        let single = [content_line];
-        html_blocks::parse_html_block_with_wrapper(
+
+        if probe_consumed == 1 {
+            // Emit for real using only the marker line's bytes: the block
+            // closed on line 0, so no continuation lines are consumed and the
+            // CST stays byte-equal to source (marker + spaces already emitted
+            // upstream).
+            let single = [content_line];
+            html_blocks::parse_html_block_with_wrapper(
+                &mut self.builder,
+                &single,
+                0,
+                block_type,
+                &ContainerPrefix::default(),
+                wrapper_kind,
+                html_blocks::SoftbreakFusion::None,
+                self.config,
+            );
+            return Some(0);
+        }
+
+        // Multi-line HTML body opening on the marker line (`<div>\n  x\n
+        // </div>`). The single-line emit path can't handle this — the body
+        // lines carry the definition's content indent, which the plain block
+        // parser would preserve verbatim (parsing the body as an indented code
+        // block). Reuse the list-item lift: build the block text from the
+        // marker-line post-marker bytes plus the raw continuation lines, strip
+        // `content_col` of leading indent from the continuation lines before
+        // the inner reparse (so the body parses as markdown, not code), and
+        // re-inject the stripped indent during graft so the CST stays
+        // byte-equal to source. Gated to Pandoc — CommonMark keeps the opaque
+        // shape (the lift hardcodes the Pandoc HTML-block grammar). Also gated
+        // to `bq_depth == 0`: inside a blockquote the continuation lines carry
+        // `> ` markers that the list-item lift doesn't strip, so a nested
+        // definition falls through to the pre-existing path.
+        if self.config.dialect != crate::options::Dialect::Pandoc || bq_depth != 0 {
+            return None;
+        }
+        let mut text = String::from(content_line);
+        for line in &self.lines[self.pos + 1..self.pos + probe_consumed] {
+            text.push_str(line);
+        }
+        // A definition is loose (body paragraphs render as `Para`) when a blank
+        // line separates the term from the marker line; tight otherwise
+        // (`Plain`). Only affects the trailing-text split shape.
+        let use_paragraph = self.pos > 0 && is_blank_line(self.lines[self.pos - 1]);
+        let lifted = super::utils::list_item_buffer::try_emit_html_block_lift(
             &mut self.builder,
-            &single,
-            0,
-            block_type,
-            &ContainerPrefix::default(),
-            wrapper_kind,
-            html_blocks::SoftbreakFusion::None,
+            &text,
             self.config,
+            content_col,
+            use_paragraph,
         );
-        Some(0)
+        if !lifted {
+            return None;
+        }
+        Some(probe_consumed.saturating_sub(1))
     }
 
     /// Dispatch an HTML block that opens AND closes on a footnote body's first

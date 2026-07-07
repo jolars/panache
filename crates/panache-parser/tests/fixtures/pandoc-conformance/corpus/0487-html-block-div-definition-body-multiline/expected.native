@@ -1,0 +1,6 @@
+[ DefinitionList
+    [ ( [ Str "Term" ]
+      , [ [ Div ( "d" , [] , [] ) [ Para [ Str "x" ] ] ] ]
+      )
+    ]
+]
