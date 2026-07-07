@@ -1,0 +1,11 @@
+[ Para
+    [ Str "Text."
+    , Note
+        [ Para
+            [ RawInline (Format "html") "<!-- hi -->"
+            , Space
+            , Str "trailing"
+            ]
+        ]
+    ]
+]

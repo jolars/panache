@@ -1866,6 +1866,31 @@ fn is_math_tex_script_open(content: &str) -> bool {
     })
 }
 
+/// Whether an HTML block start cannot interrupt a running paragraph under the
+/// given dialect (pandoc's `isInlineTag` set, plus the issue-#10643 special
+/// cases). `content` is the raw (bq/list-indent-stripped) first line, needed
+/// for the `<script type="math/tex…">` attribute probe. Shared between the
+/// block dispatcher and the footnote-body marker-line HTML dispatch, which
+/// lifts only tags that CAN interrupt (i.e. `!cannot_interrupt`).
+pub(crate) fn html_block_cannot_interrupt(
+    block_type: &HtmlBlockType,
+    content: &str,
+    is_pandoc: bool,
+) -> bool {
+    matches!(block_type, HtmlBlockType::Type7)
+        || (matches!(block_type, HtmlBlockType::Comment) && is_pandoc)
+        || (matches!(block_type, HtmlBlockType::ProcessingInstruction) && is_pandoc)
+        || (is_pandoc
+            && matches!(block_type, HtmlBlockType::BlockTag { tag_name, is_closing, .. }
+                if is_pandoc_inline_block_tag_name(tag_name)
+                    || is_pandoc_void_block_tag_name(tag_name)
+                    || tag_name.eq_ignore_ascii_case("style")
+                    || (*is_closing && tag_name.eq_ignore_ascii_case("script"))
+                    || (!*is_closing
+                        && tag_name.eq_ignore_ascii_case("script")
+                        && is_math_tex_script_open(content))))
+}
+
 pub(crate) struct HtmlBlockParser;
 
 impl BlockParser for HtmlBlockParser {
@@ -1968,18 +1993,7 @@ impl BlockParser for HtmlBlockParser {
         // DO interrupt — they're in `blockTags` and have no `isInlineTag`
         // override.
         let is_pandoc = ctx.config.dialect == crate::options::Dialect::Pandoc;
-        let cannot_interrupt = matches!(block_type, HtmlBlockType::Type7)
-            || (matches!(block_type, HtmlBlockType::Comment) && is_pandoc)
-            || (matches!(block_type, HtmlBlockType::ProcessingInstruction) && is_pandoc)
-            || (is_pandoc
-                && matches!(&block_type, HtmlBlockType::BlockTag { tag_name, is_closing, .. }
-                    if is_pandoc_inline_block_tag_name(tag_name)
-                        || is_pandoc_void_block_tag_name(tag_name)
-                        || tag_name.eq_ignore_ascii_case("style")
-                        || (*is_closing && tag_name.eq_ignore_ascii_case("script"))
-                        || (!*is_closing
-                            && tag_name.eq_ignore_ascii_case("script")
-                            && is_math_tex_script_open(content))));
+        let cannot_interrupt = html_block_cannot_interrupt(&block_type, content, is_pandoc);
         // Pandoc-specific: when an `isInlineTag` construct (the
         // `cannot_interrupt` set) appears with leading indent BEYOND
         // the current container's content_col, pandoc-native treats

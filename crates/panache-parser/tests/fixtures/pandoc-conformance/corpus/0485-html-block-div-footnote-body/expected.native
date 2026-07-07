@@ -1,0 +1,6 @@
+[ Para
+    [ Str "Text."
+    , Note
+        [ Div ( "d" , [] , [] ) [ Plain [ Strong [ Str "Hi" ] ] ] ]
+    ]
+]

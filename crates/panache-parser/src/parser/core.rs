@@ -1054,6 +1054,11 @@ impl<'a> Parser<'a> {
             return blank_count;
         }
 
+        if let Some(extras) = self.try_dispatch_footnote_html_block(first_line_content, content_col)
+        {
+            return extras;
+        }
+
         paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
         paragraphs::append_paragraph_line(
             &mut self.containers,
@@ -1487,8 +1492,79 @@ impl<'a> Parser<'a> {
         // on line 0, so no continuation lines are consumed and the CST stays
         // byte-equal to source (marker + spaces already emitted upstream).
         let wrapper_kind =
-            definition_html_block_wrapper_kind(&block_type, content_no_nl, self.config);
+            marker_line_html_block_wrapper_kind(&block_type, content_no_nl, self.config);
         let single = [content_line];
+        html_blocks::parse_html_block_with_wrapper(
+            &mut self.builder,
+            &single,
+            0,
+            block_type,
+            &ContainerPrefix::default(),
+            wrapper_kind,
+            html_blocks::SoftbreakFusion::None,
+            self.config,
+        );
+        Some(0)
+    }
+
+    /// Dispatch an HTML block that opens AND closes on a footnote body's first
+    /// content line (`[^1]: <div>x</div>`). Mirrors
+    /// `try_dispatch_definition_html_block`, but only tags that can interrupt a
+    /// paragraph lift: pandoc keeps comments, PIs, `<span>`, and void
+    /// inline-block tags (`<embed>`) inline inside footnote bodies (unlike
+    /// definition bodies, where a leading comment lifts to a `RawBlock`). Gated
+    /// on Pandoc dialect so GFM/CommonMark footnotes stay byte-identical.
+    /// Returns `Some(0)` when the block was emitted (no extra lines consumed).
+    fn try_dispatch_footnote_html_block(
+        &mut self,
+        first_line_content: &str,
+        content_col: usize,
+    ) -> Option<usize> {
+        if self.config.dialect != crate::options::Dialect::Pandoc {
+            return None;
+        }
+        let (content_no_nl, _) = strip_newline(first_line_content);
+        let block_type = html_blocks::try_parse_html_block_start(content_no_nl, false)?;
+        if super::block_dispatcher::html_block_cannot_interrupt(&block_type, content_no_nl, true) {
+            return None;
+        }
+
+        // Probe: does the block close on the marker line? Parse a synthetic
+        // window (line 0 = post-marker bytes; continuation lines stripped of
+        // the footnote's 4-space content indent) into a throwaway builder.
+        let closes_on_marker_line = {
+            let bq_depth = self.current_blockquote_depth();
+            let prefix =
+                ContainerPrefix::from_scalars(bq_depth, 0, bq_depth > 0, content_col, false);
+            let mut synthetic: Vec<&str> = Vec::with_capacity(self.lines.len() - self.pos);
+            synthetic.push(first_line_content);
+            for line in &self.lines[self.pos + 1..] {
+                synthetic.push(prefix.strip(line));
+            }
+            let mut probe = GreenNodeBuilder::new();
+            probe.start_node(SyntaxKind::DOCUMENT.into());
+            let consumed = html_blocks::parse_html_block_with_wrapper(
+                &mut probe,
+                &synthetic,
+                0,
+                block_type.clone(),
+                &ContainerPrefix::default(),
+                SyntaxKind::HTML_BLOCK,
+                html_blocks::SoftbreakFusion::None,
+                self.config,
+            );
+            probe.finish_node();
+            consumed == 1
+        };
+        if !closes_on_marker_line {
+            return None;
+        }
+
+        // Emit for real using only the marker line's bytes (byte-lossless: the
+        // block closed on line 0, no continuation consumed).
+        let wrapper_kind =
+            marker_line_html_block_wrapper_kind(&block_type, content_no_nl, self.config);
+        let single = [first_line_content];
         html_blocks::parse_html_block_with_wrapper(
             &mut self.builder,
             &single,
@@ -4045,7 +4121,10 @@ fn try_parse_any_table_kind(
 /// salsa anchor index reads the open tag's id. Everything else keeps the
 /// opaque `HTML_BLOCK` shape (which itself may retag to `HTML_BLOCK_RAW` for
 /// single-construct opaque shapes inside `parse_html_block_with_wrapper`).
-fn definition_html_block_wrapper_kind(
+/// Wrapper `SyntaxKind` for an HTML block lifted from a container marker line
+/// (definition body or footnote body). `<div>` under Pandoc + `native_divs`
+/// retags to `HTML_BLOCK_DIV`; everything else stays opaque `HTML_BLOCK`.
+fn marker_line_html_block_wrapper_kind(
     block_type: &html_blocks::HtmlBlockType,
     content_no_nl: &str,
     config: &ParserOptions,

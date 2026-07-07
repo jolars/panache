@@ -985,6 +985,21 @@ impl Formatter {
                             self.output.push(' ');
                             self.format_node_sync(child, child_indent);
                             continue;
+                        } else if matches!(
+                            child.kind(),
+                            SyntaxKind::HTML_BLOCK
+                                | SyntaxKind::HTML_BLOCK_RAW
+                                | SyntaxKind::HTML_BLOCK_DIV
+                        ) {
+                            // A raw HTML block lifted onto the footnote marker
+                            // line (`[^1]: <div>x</div>`) stays on that line
+                            // after the marker + a single space, like the
+                            // paragraph case. Without this the marker's trailing
+                            // WHITESPACE token is dropped and the block collapses
+                            // onto the colon (`[^1]:<div>...`).
+                            self.output.push(' ');
+                            self.format_node_sync(child, child_indent);
+                            continue;
                         }
                     }
 
