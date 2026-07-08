@@ -288,6 +288,7 @@ golden_test_cases!(
     html_block_comment_definition_body_trailing_softbreak,
     html_block_div_definition_body,
     html_block_div_definition_body_multiline,
+    html_block_div_definition_body_later_line,
     html_block_div_footnote_body,
     html_block_div_multiline_open_trailing_idempotent,
     html_block_div_multiline_same_line_close,

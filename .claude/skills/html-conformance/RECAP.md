@@ -512,6 +512,33 @@ verbatim-in-bq); table-cell reparses.
   `\n` via `trim_start`), so a `ToDocEnd` probe over-consumes past blanks.
   Corpus 0488. Deferred: the list-adjacent trailing stays `Para` vs pandoc's
   `Plain` (pre-existing def looseness gap, also present in the plain path).
+- **Later-line (non-marker) HTML in a content-container body dispatches
+  via `Parser::try_dispatch_content_indent_html_block`** (a new arm in
+  `parse_inner_content`, gated `content_indent > 0` + Pandoc + `bq_depth ==
+  0` + innermost `Definition`/`FootnoteDefinition`/`Admonition` + the
+  stripped line is an HTML-block start). It probes the block extent, then
+  routes through `try_emit_html_block_lift`. Without it the general
+  dispatcher's `parse_html_block_with_wrapper` ignores the `ContentIndent`
+  prefix op, dropping the stripped line-0 indent (losslessness) and
+  reparsing the body with its indent intact (`Div [CodeBlock]` instead of
+  `Div [Para]`). CRITICAL: the line-0 content indent must live *inside* the
+  lifted HTML block (as the open tag's leading `WHITESPACE`), NOT as a
+  sibling `WHITESPACE` under `DEFINITION` — the formatter dumps HTML blocks
+  verbatim (ignoring its `indent` param) and the `DEFINITION` formatter
+  SKIPS direct `WHITESPACE` children ("normalize spacing"), so a sibling
+  indent is dropped on format and the div escapes the definition (a
+  semantic change on round-trip, worse than non-idempotency). Lever:
+  `try_emit_html_block_lift` gained a `line0_prefix: &str` arg — all other
+  callers (list-item, marker-line def, comment-fusion) pass `""` (their
+  line-0 indent was the upstream list/def marker); this caller passes the
+  stripped content indent, which overrides `prefixes[0]` so the graft
+  injects it before the open tag's first token. Covers single-line +
+  multi-line across def/footnote/admonition bodies; `<div id>` registers in
+  the anchor index. Deferred (pre-existing gaps, unchanged by this arm since
+  it's gated out / the lift declines): bq-nested def later-line
+  (`bq_depth > 0`) and unclosed-div later-line (`try_emit_html_block_lift`
+  needs a matched close → falls back to the indent-dropping general
+  dispatch). Corpus 0489.
 - **`ListItemBuffer::emit_as_block` lifts same-line / fully-contained
   HTML via `try_emit_html_block_lift`.** Strict gate:
   `try_parse_html_block_start` recognizes line 0, inner reparse yields
@@ -595,86 +622,84 @@ verbatim-in-bq); table-cell reparses.
 | C | Comment/PI trailing softbreak fusion (`<!-- hi --> trailing\nmore`) | **Landed 2026-07-02; fenced-div container 2026-07-08; blockquote container 2026-07-08.** `SoftbreakFusion` enum bounds the reparse: `ToDocEnd` (outermost, corpus 0390) + `ToFencedDivClose` (plain fenced div, corpus 0481, `fenced_div_body_end`) + `ToBlockquoteEnd` (pure blockquote, corpus 0482, `blockquote_body_end` + `> `-prefix strip/re-inject via `ContainerPrefixState`). Grafts first block, maps `text_range().end()` to consumed lines. **List/content-indent containers stay `None` (need list-indent strip); lazy `>`-less bq continuation stays divergent (broader bq-continuation gap). Both deferred.** Detail in Persistent traps. |
 | D | Definition-body marker-line HTML dispatch (`:   <div>x</div>`, `:   <div>\n x\n</div>`) | **Landed 2026-07-08; multi-line-open body 2026-07-08.** `try_dispatch_definition_html_block` arm in the def first-content-line cascade (mirrors bq/list/fence). Throwaway-builder probe branches on `probe_consumed`: single-line close → byte-lossless marker-line emit; multi-line body → reuse `list_item_buffer::try_emit_html_block_lift` (strip `content_col` + reparse dedented + re-inject) so `Div [Para x]` matches pandoc (fixed a **losslessness** failure that reordered open/close tags). `<div id>` registers in the anchor index. Gated Pandoc + `bq_depth==0`. Corpus 0483/0484/**0487**. **Trailing softbreak fusion landed 2026-07-08** (`:   <!-- --> t\n    more` → one `Para`/`Plain`, corpus 0488, `try_fuse_definition_comment_trailing` with list-stop guard). def-in-bq multi-line + later-line multi-line (separate normal-container path) deferred. Detail in Persistent traps. |
 | E | Footnote-body marker-line HTML dispatch (`[^1]: <div>x</div>`) | **Landed 2026-07-08.** `try_dispatch_footnote_html_block` in `handle_footnote_open_effect`, mirroring Phase D but gated on `!html_block_cannot_interrupt` (extracted shared predicate) — footnotes keep comments/PIs/`<span>`/void-inline-block INLINE (unlike def bodies). `<div id>` registers in anchor index. Formatter marker-space drop fixed. Corpus 0485/0486. Gated Pandoc dialect. Multi-line-open + softbreak fusion deferred. Detail in Persistent traps. |
+| F | Later-line (non-marker) HTML block in a content-container body (`:   text\n\n    <div>\n    x\n    </div>`) | **Landed 2026-07-08.** `try_dispatch_content_indent_html_block` arm in `parse_inner_content` routes def/footnote/admonition later-line HTML through `try_emit_html_block_lift` with a new `line0_prefix` arg (line-0 indent injected *inside* the open tag so the formatter's verbatim HTML dump keeps the div in the definition). Fixes a losslessness drop + `Div [CodeBlock]`-instead-of-`Div [Para]` body. Single-line + multi-line, def/footnote/admonition. Gated Pandoc + `bq_depth==0`. Corpus 0489. bq-nested-def + unclosed-div later-line deferred (pre-existing gaps). Detail in Persistent traps. |
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-07-08 (Phase D extension — definition-body comment/PI trailing softbreak fusion)
+## Latest session — 2026-07-08 (Phase F — later-line HTML block in a content-container body)
 
-Conformance: **html 290 → 291 passing** (291 total, **0 fail — html
-100%**); total **487 → 488 / 488 (100%)**. Parser + formatter session:
-closed the previous session's ranked next-target #1. A comment/PI on a
-definition marker line whose close marker is followed by trailing text
-(`:   <!-- hi --> trailing`) now fuses that text with the following
-non-blank continuation lines into ONE paragraph, matching pandoc; previously
-the trailing text emitted as its own block and the continuation fell to the
-plain buffer as a second block.
+Conformance: **html 291 → 292 passing** (292 total, **0 fail — html
+100%**); total **488 → 489 / 489 (100%)**. Parser + formatter session:
+closed the previous session's ranked next-target #1. A raw HTML block that
+opens on a *later* (non-marker) line of a definition/footnote/admonition body
+(`:   text\n\n    <div id="d">\n    x\n    </div>`) now dispatches
+structurally — previously the general dispatcher dropped the stripped line-0
+indent (losslessness fail) and reparsed the body as an indented `CodeBlock`.
 
 ### What landed
 
-- `:   <!-- hi --> trailing\n    more` → `RawBlock "<!-- hi -->", Para
-  [trailing, SoftBreak, more]` (0488), byte-lossless, matching pandoc-native.
-  Verified loose→`Para` / tight→`Plain`, blank-terminated (second para stays
-  separate), multi-line continuation, PI form, lazy under-indented
-  continuation — all correct.
-- New `Parser::try_fuse_definition_comment_trailing`, called from the
-  `probe_consumed == 1` branch before the single-line emit. Gathers the
-  fusible-paragraph extent (non-blank continuation lines up to first blank,
-  **stopping at a list-item start**) and routes the window through the
-  existing `try_emit_html_block_lift` (reuses its 2-child trailing-split +
-  looseness demotion). No new `SoftbreakFusion` variant needed.
-- **List-stop guard is the load-bearing insight**: a list interrupts a
-  paragraph in a def body but NOT at the document top level
-  (pandoc-markdown), where the inner reparse runs — so a naive reparse would
-  wrongly fuse a list. Other interrupting blocks (heading/fence/blockquote)
-  interrupt at both levels, so the reparse's 2-child gate rejects them
-  (falls back to single-line emit). Confirmed no regression on the
-  list-continuation case (back to its pre-existing `Para`-vs-`Plain`
-  divergence, list separate).
-- **Dead end noted**: probing with `SoftbreakFusion::ToDocEnd` over-consumes
-  past blank lines because `content_prefix.strip` collapses blank lines
-  (`strip_content_indent` trims `\n`). Avoided by the targeted helper.
-- Gated `Dialect::Pandoc && bq_depth == 0`; CommonMark keeps opaque
-  `HTML_BLOCK` (paired parser goldens pin the divergence).
+- `Term\n\n:   text\n\n    <div id="d">\n    x\n    </div>` → `Div ("d",[],[])
+  [Para [x]]` (0489), byte-lossless + idempotent, matching pandoc-native.
+  Verified single-line (`Div [Plain x]`), footnote body, admonition body,
+  later-line comment (`RawBlock`) — all correct.
+- New `Parser::try_dispatch_content_indent_html_block`, a `parse_inner_content`
+  arm gated `content_indent > 0` + Pandoc + `bq_depth == 0` + innermost
+  content container + HTML-block-start. Probes the block extent, then routes
+  through `try_emit_html_block_lift`. `<div id>` registers in the anchor index.
+- **Load-bearing insight (formatter half)**: the line-0 content indent must
+  live *inside* the lifted HTML block (open tag's leading `WHITESPACE`), NOT
+  as a sibling `WHITESPACE` under `DEFINITION`. The formatter dumps HTML
+  blocks verbatim (ignores its `indent` param) and the `DEFINITION` formatter
+  SKIPS direct `WHITESPACE` children — a sibling indent is dropped on format
+  and the div *escapes the definition* (semantic change on round-trip). Lever:
+  `try_emit_html_block_lift` gained a `line0_prefix: &str` arg overriding
+  `prefixes[0]`; all other callers pass `""`.
+- **Dead end noted**: the first attempt emitted the indent as a sibling
+  `WHITESPACE` (parser-lossless, but format moved the div out of the def).
+  Fixed by moving the indent inside via `line0_prefix`.
+- Gated `Dialect::Pandoc && bq_depth == 0`; CommonMark has no def lists so the
+  indented block is a `CodeBlock` (paired parser goldens pin the divergence).
+- Confirmed via `git stash` that the two deferred shapes (bq-nested-def
+  later-line, unclosed-div later-line) already failed losslessness *before*
+  this change — no regression (the arm is gated out / the lift declines,
+  falling back to the pre-existing general dispatch).
 
 ### Files in committable diff
 
-- `parser/core.rs` (`try_fuse_definition_comment_trailing` + call site +
-  `strip_leading_spaces_n` import).
-- Corpus `0488-…-trailing-softbreak/`; allowlist (new html-block section) +
+- `parser/core.rs` (`try_dispatch_content_indent_html_block` + `parse_inner_content`
+  arm); `parser/utils/list_item_buffer.rs` (`line0_prefix` arg + 4 `""` call
+  sites).
+- Corpus `0489-…-later-line/`; allowlist (new html-block section) +
   report.{txt,json}.
-- Paired parser goldens
-  `html_block_comment_definition_body_trailing_softbreak_{pandoc,commonmark}`
-  (+ snapshots); formatter golden
-  `html_block_comment_definition_body_trailing_softbreak`.
+- Paired parser goldens `html_block_div_definition_body_later_line_{pandoc,commonmark}`
+  (+ snapshots); formatter golden `html_block_div_definition_body_later_line`.
 - This RECAP.
 
 ### Suggested next sub-targets (ranked)
 
-1. **Later-line multi-line HTML in def/list body** (`\n    <div>\n    x\n
-   </div>` on a non-marker def-body line → `Div [Para x]`, currently drops
-   indent → `Div [CodeBlock x]` + losslessness fail). Separate
-   normal-container dispatch path from the marker-line arm; the def
-   container doesn't content-indent-normalize HTML blocks the way list
-   items do. Medium.
-2. **Def-body list-adjacent trailing looseness** (`:   <!-- --> t\n    -
+1. **Unclosed-div later-line in a content-container body** (`:   text\n\n
+   <div>\n    x` with no `</div>` → pandoc `Div [Para x]` implicit close,
+   panache `Div [CodeBlock x]` + losslessness fail). `try_emit_html_block_lift`
+   needs a matched close; the open-only lift path (`emit_html_block_body`
+   `open_only`) would have to be reachable from `try_dispatch_content_indent_html_block`.
+   Medium.
+2. **bq-nested def later-line** (`> :   text\n>\n>     <div>...`) — the arm is
+   gated `bq_depth == 0`; the lift doesn't strip `> ` markers. Pre-existing
+   losslessness gap shared with Phase D's def-in-bq deferral. Medium.
+3. **Def-body list-adjacent trailing looseness** (`:   <!-- --> t\n    -
    item` → pandoc `Plain [t]` but panache `Para [t]`). Pre-existing def
-   looseness gap (also in the plain path, not HTML-specific): a paragraph
-   immediately followed by a list with no blank line demotes to `Plain`.
-   Broader than html-conformance; verify in the plain def path first. Small
-   but cross-cutting.
-3. **Multi-line-second-div inter-tag** (`<div>a</div> y <div>\nz\n</div>`).
+   looseness gap (also in the plain path, not HTML-specific). Small but
+   cross-cutting; verify in the plain def path first.
+4. **Multi-line-second-div inter-tag** (`<div>a</div> y <div>\nz\n</div>`).
    Content-scan depth model must treat a `</div> … <div>` close line as
    close-then-fresh-block. Completes the `<div>` inter-tag family. Not in
    corpus.
-4. **Phase (paragraph-leads-tag)** (`foo <div>bar</div> baz`). Deep; inline
-   layer has no block-tag classifier + line-anchored block model.
-   Exploratory decision session first.
 
 ### New trap
 
 Folded into Persistent traps ("List-item / definition-body HTML structural
-lift") — the `try_fuse_definition_comment_trailing` helper, the list-stop
-guard rationale, and the `SoftbreakFusion`-blank-collapse dead end.
+lift") — the `try_dispatch_content_indent_html_block` arm, the
+indent-must-live-inside-the-block insight, and the `line0_prefix` lever.
 
 --------------------------------------------------------------------------------
 
@@ -683,6 +708,7 @@ guard rationale, and the `SoftbreakFusion`-blank-collapse dead end.
 Newest first. One line per session: date — phase/sub-target — pass
 count delta — root cause / lever.
 
+- 2026-07-08 — Phase D extension definition-body comment/PI trailing softbreak fusion (`:   <!-- --> t\n    more` → one `Para`/`Plain`) — html 290 → 291 (total 487 → 488) — `try_fuse_definition_comment_trailing` gathers fusible-paragraph extent (stop at list-item start — lists interrupt in a def body but not at doc top level where the reparse runs), routes through `try_emit_html_block_lift`; no new `SoftbreakFusion` variant; corpus 0488.
 - 2026-07-08 — Phase D extension multi-line HTML body on a definition marker line (`:   <div id="d">\n    x\n    </div>`) — html 289 → 290 (total 486 → 487) — `try_dispatch_definition_html_block` branches on probe line count; multi-line body reuses `try_emit_html_block_lift` (strip `content_col` + reparse dedented + re-inject) → `Div [Para x]`; fixed a losslessness failure (open/close tag reorder); gated Pandoc + `bq_depth==0`; corpus 0487.
 - 2026-07-08 — Phase E footnote-body marker-line HTML dispatch (`[^1]: <div>x</div>`) — html 287 → 289 (total 486/486) — `try_dispatch_footnote_html_block` in `handle_footnote_open_effect` mirrors Phase D but gated on `!html_block_cannot_interrupt` (extracted shared `isInlineTag` predicate) — footnotes keep comments/PIs/`<span>`/void-inline-block INLINE (unlike def bodies); `<div id>` anchor-index registration; formatter `FOOTNOTE_DEFINITION` marker-space drop fixed; corpus 0485/0486.
 - 2026-07-08 — Phase D definition-body marker-line HTML dispatch (`:   <div>x</div>`, `:   <!-- hi -->`) — html 285 → 287 (total 484/484) — `try_dispatch_definition_html_block` arm in the def first-content-line cascade (mirrors bq/list/fence); throwaway-builder probe lifts only marker-line-closing blocks → byte-lossless single-line emit; `<div id>` anchor-index registration; multi-line-open + softbreak fusion deferred; corpus 0483/0484.

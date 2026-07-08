@@ -1565,11 +1565,120 @@ impl<'a> Parser<'a> {
             self.config,
             content_col,
             use_paragraph,
+            "",
         );
         if !lifted {
             return None;
         }
         Some(probe_consumed.saturating_sub(1))
+    }
+
+    /// Dispatch an HTML block that opens on a *later* (non-marker) line of a
+    /// content-container body (definition, footnote, admonition) whose lines
+    /// carry a `content_col` indent. The general dispatcher's
+    /// `parse_html_block_with_wrapper` ignores the `ContentIndent` prefix op,
+    /// dropping the stripped indent (losslessness fail) and reparsing the body
+    /// with its indent intact (an indented `CodeBlock` instead of markdown).
+    /// This routes the block through the list-item lift, which strips
+    /// `content_col`, reparses the dedented body as markdown, and re-injects
+    /// the indent per line. The line-0 indent is injected *inside* the lifted
+    /// block (as the open tag's leading `WHITESPACE`, via the lift's
+    /// `line0_prefix` arg) rather than as a sibling — the formatter dumps HTML
+    /// blocks verbatim and the `DEFINITION` formatter drops direct `WHITESPACE`
+    /// children, so a sibling indent would vanish on format.
+    ///
+    /// `stripped_content` is the current line with its content indent already
+    /// removed; `content_col` is that indent width; `indent_to_emit` is the
+    /// stripped indent bytes for line 0. Returns the number of lines consumed
+    /// on success. The caller has established Pandoc dialect, top-level
+    /// blockquote depth 0, and an open content container.
+    fn try_dispatch_content_indent_html_block(
+        &mut self,
+        stripped_content: &str,
+        content_col: usize,
+        indent_to_emit: Option<&str>,
+    ) -> Option<usize> {
+        let (content_no_nl, _) = strip_newline(stripped_content);
+        let block_type = html_blocks::try_parse_html_block_start(content_no_nl, false)?;
+
+        // Probe how many lines the block spans by reparsing a synthetic window
+        // (line 0 already dedented, continuation lines content-indent-stripped)
+        // into a throwaway builder.
+        let content_prefix = ContainerPrefix::from_scalars(0, 0, false, content_col, false);
+        let probe_consumed = {
+            let mut synthetic: Vec<&str> = Vec::with_capacity(self.lines.len() - self.pos);
+            synthetic.push(stripped_content);
+            for line in &self.lines[self.pos + 1..] {
+                synthetic.push(content_prefix.strip(line));
+            }
+            let mut probe = GreenNodeBuilder::new();
+            probe.start_node(SyntaxKind::DOCUMENT.into());
+            let consumed = html_blocks::parse_html_block_with_wrapper(
+                &mut probe,
+                &synthetic,
+                0,
+                block_type.clone(),
+                &ContainerPrefix::default(),
+                SyntaxKind::HTML_BLOCK,
+                html_blocks::SoftbreakFusion::None,
+                self.config,
+            );
+            probe.finish_node();
+            consumed
+        };
+        if probe_consumed == 0 {
+            return None;
+        }
+
+        // Build the block text: line 0 dedented, continuation lines raw (the
+        // lift strips `content_col` from them). Loose (blank line before) ->
+        // `Para`, tight -> `Plain`; only affects the trailing-text split shape.
+        let mut text = String::from(stripped_content);
+        for line in &self.lines[self.pos + 1..self.pos + probe_consumed] {
+            text.push_str(line);
+        }
+        let use_paragraph = self.pos > 0 && is_blank_line(self.lines[self.pos - 1]);
+        // The line-0 content indent is injected *inside* the lifted block (as
+        // the open tag's leading WHITESPACE) rather than as a sibling: the
+        // formatter dumps HTML blocks verbatim and the DEFINITION formatter
+        // drops direct WHITESPACE children, so the indent must live in the
+        // block's own bytes to survive a round-trip.
+        let line0_prefix = indent_to_emit.unwrap_or("");
+
+        // The lift both validates and emits, so probe it into a throwaway
+        // builder first — if it can't cleanly lift (shape the lift rejects),
+        // fall back to the general dispatch without mutating the real tree.
+        let lift_ok = {
+            let mut probe = GreenNodeBuilder::new();
+            probe.start_node(SyntaxKind::DOCUMENT.into());
+            let ok = super::utils::list_item_buffer::try_emit_html_block_lift(
+                &mut probe,
+                &text,
+                self.config,
+                content_col,
+                use_paragraph,
+                line0_prefix,
+            );
+            probe.finish_node();
+            ok
+        };
+        if !lift_ok {
+            return None;
+        }
+
+        // Flush any buffered plain / list-item content and close the open
+        // paragraph so block order stays lossless, then graft the lifted block.
+        self.emit_buffered_plain_if_needed();
+        self.prepare_for_block_element();
+        super::utils::list_item_buffer::try_emit_html_block_lift(
+            &mut self.builder,
+            &text,
+            self.config,
+            content_col,
+            use_paragraph,
+            line0_prefix,
+        );
+        Some(probe_consumed)
     }
 
     /// Fuse a definition-body comment/PI close-line trailing text with its
@@ -1648,6 +1757,7 @@ impl<'a> Parser<'a> {
             self.config,
             content_col,
             use_paragraph,
+            "",
         );
         if !lifted {
             return None;
@@ -3555,6 +3665,36 @@ impl<'a> Parser<'a> {
                     return self.parse_inner_content(inner_content, Some(inner_content));
                 }
             }
+        }
+
+        // Later-line HTML block inside a content-container body (definition,
+        // footnote, admonition). The general block dispatcher's
+        // `parse_html_block_with_wrapper` ignores the `ContentIndent` prefix
+        // op, so it silently drops the stripped content indent (losslessness
+        // fail) and reparses the body with its indent intact (an indented
+        // `CodeBlock` instead of markdown). Route the block through the
+        // content-indent-normalizing lift before the general dispatch reaches
+        // it. Gated Pandoc + top-level blockquote depth 0 (the lift hardcodes
+        // the Pandoc HTML grammar and doesn't strip `> ` markers); CommonMark
+        // keeps the opaque shape.
+        if content_indent > 0
+            && self.config.dialect == crate::options::Dialect::Pandoc
+            && self.current_blockquote_depth() == 0
+            && matches!(
+                self.containers.last(),
+                Some(
+                    Container::Definition { .. }
+                        | Container::FootnoteDefinition { .. }
+                        | Container::Admonition { .. }
+                )
+            )
+            && let Some(consumed) = self.try_dispatch_content_indent_html_block(
+                stripped_content,
+                content_indent,
+                indent_to_emit,
+            )
+        {
+            return LineDispatch::consumed(consumed);
         }
 
         // Store the stripped content for later use

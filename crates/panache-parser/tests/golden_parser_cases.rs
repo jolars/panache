@@ -345,6 +345,8 @@ golden_test_cases!(
     html_block_div_definition_body_pandoc,
     html_block_div_definition_body_multiline_commonmark,
     html_block_div_definition_body_multiline_pandoc,
+    html_block_div_definition_body_later_line_commonmark,
+    html_block_div_definition_body_later_line_pandoc,
     html_block_div_footnote_body_gfm,
     html_block_div_footnote_body_pandoc,
     html_block_div_blockquote_depth_2_commonmark,

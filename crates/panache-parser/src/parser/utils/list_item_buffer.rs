@@ -275,7 +275,7 @@ impl ListItemBuffer {
                     .segments
                     .iter()
                     .all(|s| matches!(s, ListItemContent::Text(_)))
-                && try_emit_html_block_lift(builder, &text, config, content_col, use_paragraph)
+                && try_emit_html_block_lift(builder, &text, config, content_col, use_paragraph, "")
             {
                 return;
             }
@@ -342,12 +342,21 @@ impl ListItemBuffer {
 /// re-injected as `WHITESPACE` tokens at the start of each continuation
 /// line during graft so the result is byte-equal to the original
 /// buffer text.
+///
+/// `line0_prefix` is re-injected at the very start of the grafted block
+/// (before the open tag's first token, so it lands *inside* the block).
+/// List-item and marker-line callers pass `""` — their line-0 indent was
+/// already emitted upstream as the list marker / definition marker. The
+/// later-line content-container caller passes the stripped content indent
+/// so the block's first line carries it too (the formatter dumps HTML
+/// blocks verbatim, so the indent must live inside the block).
 pub(crate) fn try_emit_html_block_lift(
     builder: &mut GreenNodeBuilder<'static>,
     text: &str,
     config: &ParserOptions,
     content_col: usize,
     use_paragraph: bool,
+    line0_prefix: &str,
 ) -> bool {
     let first_line = text.split_inclusive('\n').next().unwrap_or(text);
     let first_line_no_nl = first_line
@@ -358,11 +367,18 @@ pub(crate) fn try_emit_html_block_lift(
         return false;
     }
 
-    let (parse_text, prefixes) = if content_col > 0 {
+    let (parse_text, mut prefixes) = if content_col > 0 {
         strip_list_item_indent(text, content_col)
     } else {
         (text.to_string(), Vec::new())
     };
+    if !line0_prefix.is_empty() {
+        if prefixes.is_empty() {
+            prefixes.push(line0_prefix.to_string());
+        } else {
+            prefixes[0] = line0_prefix.to_string();
+        }
+    }
 
     let refdefs = config.refdef_labels.clone().unwrap_or_default();
     let inner_root = crate::parser::parse_with_refdefs(&parse_text, Some(config.clone()), refdefs);
