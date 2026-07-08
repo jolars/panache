@@ -395,7 +395,6 @@ fn chain_fingerprint(configs: &[FormatterConfig]) -> String {
             fp.push_str(arg);
             fp.push('\u{1}');
         }
-        fp.push(if cfg.enabled { 'E' } else { 'D' });
         fp.push(if cfg.stdin { 'S' } else { 'F' });
         fp.push('\u{2}');
     }
@@ -436,7 +435,6 @@ mod tests {
         FormatterConfig {
             cmd: cmd.to_string(),
             args: args.iter().map(|a| a.to_string()).collect(),
-            enabled: true,
             stdin,
         }
     }

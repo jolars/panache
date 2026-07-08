@@ -16,7 +16,6 @@ fn code_block_with_shfmt() {
         vec![panache::config::FormatterConfig {
             cmd: "shfmt".to_string(),
             args: vec![],
-            enabled: true,
             stdin: true,
         }],
     );
@@ -58,7 +57,6 @@ fn formatter_key_resolves_via_language_alias() {
         vec![panache::config::FormatterConfig {
             cmd: "shfmt".to_string(),
             args: vec![],
-            enabled: true,
             stdin: true,
         }],
     );
@@ -101,7 +99,6 @@ fn identical_blocks_are_deduplicated_and_all_formatted() {
         vec![panache::config::FormatterConfig {
             cmd: "shfmt".to_string(),
             args: vec![],
-            enabled: true,
             stdin: true,
         }],
     );
@@ -142,7 +139,6 @@ fn code_block_with_external_formatter() {
         vec![panache::config::FormatterConfig {
             cmd: "tr".to_string(),
             args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
-            enabled: true,
             stdin: true,
         }],
     );
@@ -180,7 +176,6 @@ fn myst_directive_body_with_external_formatter() {
         vec![panache::config::FormatterConfig {
             cmd: "tr".to_string(),
             args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
-            enabled: true,
             stdin: true,
         }],
     );
@@ -227,7 +222,6 @@ fn formatter_args_substitute_lang_placeholder() {
         vec![panache::config::FormatterConfig {
             cmd: "sed".to_string(),
             args: vec!["s/{lang}/REPL/g".to_string()],
-            enabled: true,
             stdin: true,
         }],
     );
@@ -263,7 +257,6 @@ fn untagged_code_block_with_empty_string_formatter_key() {
         vec![panache::config::FormatterConfig {
             cmd: "tr".to_string(),
             args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
-            enabled: true,
             stdin: true,
         }],
     );
@@ -359,7 +352,6 @@ fn code_block_with_failing_formatter() {
         vec![panache::config::FormatterConfig {
             cmd: "false".to_string(), // Always fails
             args: vec![],
-            enabled: true,
             stdin: true,
         }],
     );
@@ -391,7 +383,6 @@ fn python_hashpipe_prefix_preserved_with_external_formatter() {
         vec![panache::config::FormatterConfig {
             cmd: "tr".to_string(),
             args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
-            enabled: true,
             stdin: true,
         }],
     );
@@ -435,7 +426,6 @@ fn r_air_formats_equals_spacing_in_quarto_r_block() {
         vec![panache::config::FormatterConfig {
             cmd: "air".to_string(),
             args: vec!["format".to_string(), "{}".to_string()],
-            enabled: true,
             stdin: false,
         }],
     );
@@ -475,7 +465,6 @@ fn r_air_preserves_single_blank_line_between_hashpipe_options_and_code() {
         vec![panache::config::FormatterConfig {
             cmd: "air".to_string(),
             args: vec!["format".to_string(), "{}".to_string()],
-            enabled: true,
             stdin: false,
         }],
     );

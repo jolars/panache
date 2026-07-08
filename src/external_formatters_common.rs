@@ -356,13 +356,11 @@ mod tests {
                 FormatterConfig {
                     cmd: "definitely-not-a-real-formatter-123".to_string(),
                     args: vec![],
-                    enabled: true,
                     stdin: true,
                 },
                 FormatterConfig {
                     cmd: "definitely-not-a-real-formatter-123".to_string(),
                     args: vec![],
-                    enabled: true,
                     stdin: true,
                 },
             ],
@@ -381,7 +379,6 @@ mod tests {
             vec![FormatterConfig {
                 cmd: "   ".to_string(),
                 args: vec![],
-                enabled: true,
                 stdin: true,
             }],
         );
@@ -559,7 +556,6 @@ mod tests {
         vec![FormatterConfig {
             cmd: "fatou".to_string(),
             args: vec![],
-            enabled: true,
             stdin: true,
         }]
     }
@@ -585,7 +581,6 @@ mod tests {
             vec![FormatterConfig {
                 cmd: "runic".to_string(),
                 args: vec![],
-                enabled: true,
                 stdin: true,
             }],
         );

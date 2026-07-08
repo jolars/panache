@@ -305,8 +305,8 @@ undefined-references = false
 ```
 
 ::: {.callout-note}
-Legacy `[lint] rule = true/false` is still supported for backward compatibility,
-but deprecated.
+The flat `[lint] rule = true/false` shape was removed in 3.0. Put rule toggles
+under `[lint.rules]`.
 :::
 
 ## LSP Integration

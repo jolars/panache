@@ -70,7 +70,6 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
                 .map(|entry| panache_formatter::config::FormatterConfig {
                     cmd: entry.cmd.clone(),
                     args: entry.args.clone(),
-                    enabled: entry.enabled,
                     stdin: entry.stdin,
                 })
                 .collect();

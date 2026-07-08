@@ -44,10 +44,8 @@ pub struct Extensions {
 
     // Headings
     /// Require blank line before headers (default: enabled)
-    #[cfg_attr(feature = "serde", serde(alias = "blank_before_header"))]
     pub blank_before_header: bool,
     /// Full attribute syntax on headers {#id .class key=value}
-    #[cfg_attr(feature = "serde", serde(alias = "header_attributes"))]
     pub header_attributes: bool,
     /// Auto-generate identifiers from headings
     pub auto_identifiers: bool,
@@ -58,41 +56,31 @@ pub struct Extensions {
 
     // Block quotes
     /// Require blank line before blockquotes (default: enabled)
-    #[cfg_attr(feature = "serde", serde(alias = "blank_before_blockquote"))]
     pub blank_before_blockquote: bool,
 
     // Lists
     /// Fancy list markers (roman numerals, letters, etc.)
-    #[cfg_attr(feature = "serde", serde(alias = "fancy_lists"))]
     pub fancy_lists: bool,
     /// Start ordered lists at arbitrary numbers
     pub startnum: bool,
     /// Example lists with (@) markers
-    #[cfg_attr(feature = "serde", serde(alias = "example_lists"))]
     pub example_lists: bool,
     /// GitHub-style task lists - [ ] and - [x]
-    #[cfg_attr(feature = "serde", serde(alias = "task_lists"))]
     pub task_lists: bool,
     /// Term/definition syntax
-    #[cfg_attr(feature = "serde", serde(alias = "definition_lists"))]
     pub definition_lists: bool,
     /// Allow lists without a preceding blank line
-    #[cfg_attr(feature = "serde", serde(alias = "lists_without_preceding_blankline"))]
     pub lists_without_preceding_blankline: bool,
     /// [NON-DEFAULT] Pandoc <= 2.0 list semantics: continuation paragraphs and
     /// nested lists require four-space (one tab-width) indentation
-    #[cfg_attr(feature = "serde", serde(alias = "four_space_rule"))]
     pub four_space_rule: bool,
 
     // Code blocks
     /// Fenced code blocks with backticks
-    #[cfg_attr(feature = "serde", serde(alias = "backtick_code_blocks"))]
     pub backtick_code_blocks: bool,
     /// Fenced code blocks with tildes
-    #[cfg_attr(feature = "serde", serde(alias = "fenced_code_blocks"))]
     pub fenced_code_blocks: bool,
     /// Attributes on fenced code blocks {.language #id}
-    #[cfg_attr(feature = "serde", serde(alias = "fenced_code_attributes"))]
     pub fenced_code_attributes: bool,
     /// Executable code syntax (currently fenced chunks like ```{r} / ```{python})
     pub executable_code: bool,
@@ -101,44 +89,34 @@ pub struct Extensions {
     /// Quarto inline executable code (`...`{r} ...)
     pub quarto_inline_code: bool,
     /// Attributes on inline code
-    #[cfg_attr(feature = "serde", serde(alias = "inline_code_attributes"))]
     pub inline_code_attributes: bool,
 
     // Tables
     /// Simple table syntax
-    #[cfg_attr(feature = "serde", serde(alias = "simple_tables"))]
     pub simple_tables: bool,
     /// Multiline cell content in tables
-    #[cfg_attr(feature = "serde", serde(alias = "multiline_tables"))]
     pub multiline_tables: bool,
     /// Grid-style tables
-    #[cfg_attr(feature = "serde", serde(alias = "grid_tables"))]
     pub grid_tables: bool,
     /// Pipe tables (GitHub/PHP Markdown style)
-    #[cfg_attr(feature = "serde", serde(alias = "pipe_tables"))]
     pub pipe_tables: bool,
     /// Table captions
-    #[cfg_attr(feature = "serde", serde(alias = "table_captions"))]
     pub table_captions: bool,
 
     // Divs
     /// Fenced divs ::: {.class}
-    #[cfg_attr(feature = "serde", serde(alias = "fenced_divs"))]
     pub fenced_divs: bool,
     /// HTML <div> elements
-    #[cfg_attr(feature = "serde", serde(alias = "native_divs"))]
     pub native_divs: bool,
 
     // Other block elements
     /// Line blocks for poetry | prefix
-    #[cfg_attr(feature = "serde", serde(alias = "line_blocks"))]
     pub line_blocks: bool,
 
     // ===== Inline elements =====
 
     // Emphasis
     /// Underscores don't trigger emphasis in snake_case
-    #[cfg_attr(feature = "serde", serde(alias = "intraword_underscores"))]
     pub intraword_underscores: bool,
     /// Strikethrough ~~text~~
     pub strikeout: bool,
@@ -148,45 +126,34 @@ pub struct Extensions {
 
     // Links
     /// Inline links [text](url)
-    #[cfg_attr(feature = "serde", serde(alias = "inline_links"))]
     pub inline_links: bool,
     /// Reference links [text][ref]
-    #[cfg_attr(feature = "serde", serde(alias = "reference_links"))]
     pub reference_links: bool,
     /// Shortcut reference links [ref] without second []
-    #[cfg_attr(feature = "serde", serde(alias = "shortcut_reference_links"))]
     pub shortcut_reference_links: bool,
     /// Attributes on links [text](url){.class}
-    #[cfg_attr(feature = "serde", serde(alias = "link_attributes"))]
     pub link_attributes: bool,
     /// Automatic links <http://example.com>
     pub autolinks: bool,
 
     // Images
     /// Inline images ![alt](url)
-    #[cfg_attr(feature = "serde", serde(alias = "inline_images"))]
     pub inline_images: bool,
     /// Paragraph with just image becomes figure
-    #[cfg_attr(feature = "serde", serde(alias = "implicit_figures"))]
     pub implicit_figures: bool,
 
     // Math
     /// Dollar-delimited math $x$ and $$equation$$
-    #[cfg_attr(feature = "serde", serde(alias = "tex_math_dollars"))]
     pub tex_math_dollars: bool,
     /// [NON-DEFAULT] GFM math: inline $`...`$ and fenced ``` math blocks
-    #[cfg_attr(feature = "serde", serde(alias = "tex_math_gfm"))]
     pub tex_math_gfm: bool,
     /// [NON-DEFAULT] Single backslash math \(...\) and \[...\] (RMarkdown default)
-    #[cfg_attr(feature = "serde", serde(alias = "tex_math_single_backslash"))]
     pub tex_math_single_backslash: bool,
     /// [NON-DEFAULT] Double backslash math \\(...\\) and \\[...\\]
-    #[cfg_attr(feature = "serde", serde(alias = "tex_math_double_backslash"))]
     pub tex_math_double_backslash: bool,
 
     // Footnotes
     /// Inline footnotes ^[text]
-    #[cfg_attr(feature = "serde", serde(alias = "inline_footnotes"))]
     pub inline_footnotes: bool,
     /// Reference footnotes `[^1]` (requires footnote parsing)
     pub footnotes: bool,
@@ -197,54 +164,41 @@ pub struct Extensions {
 
     // Spans
     /// Bracketed spans [text]{.class}
-    #[cfg_attr(feature = "serde", serde(alias = "bracketed_spans"))]
     pub bracketed_spans: bool,
     /// HTML <span> elements
-    #[cfg_attr(feature = "serde", serde(alias = "native_spans"))]
     pub native_spans: bool,
 
     // ===== Metadata =====
     /// YAML metadata block
-    #[cfg_attr(feature = "serde", serde(alias = "yaml_metadata_block"))]
     pub yaml_metadata_block: bool,
     /// Pandoc title block (Title/Author/Date)
-    #[cfg_attr(feature = "serde", serde(alias = "pandoc_title_block"))]
     pub pandoc_title_block: bool,
     /// [NON-DEFAULT] MultiMarkdown metadata/title block (Key: Value ...)
     pub mmd_title_block: bool,
 
     // ===== Raw content =====
     /// Raw HTML blocks and inline
-    #[cfg_attr(feature = "serde", serde(alias = "raw_html"))]
     pub raw_html: bool,
     /// Markdown inside HTML blocks
-    #[cfg_attr(feature = "serde", serde(alias = "markdown_in_html_blocks"))]
     pub markdown_in_html_blocks: bool,
     /// LaTeX commands and environments
-    #[cfg_attr(feature = "serde", serde(alias = "raw_tex"))]
     pub raw_tex: bool,
     /// Generic raw blocks with {=format} syntax
-    #[cfg_attr(feature = "serde", serde(alias = "raw_attribute"))]
     pub raw_attribute: bool,
 
     // ===== Escapes and special characters =====
     /// Backslash escapes any symbol
-    #[cfg_attr(feature = "serde", serde(alias = "all_symbols_escapable"))]
     pub all_symbols_escapable: bool,
     /// Backslash at line end = hard line break
-    #[cfg_attr(feature = "serde", serde(alias = "escaped_line_breaks"))]
     pub escaped_line_breaks: bool,
 
     // ===== NON-DEFAULT EXTENSIONS =====
     // These are disabled by default in Pandoc
     /// [NON-DEFAULT] Bare URLs become links
-    #[cfg_attr(feature = "serde", serde(alias = "autolink_bare_uris"))]
     pub autolink_bare_uris: bool,
     /// [NON-DEFAULT] Newline = <br>
-    #[cfg_attr(feature = "serde", serde(alias = "hard_line_breaks"))]
     pub hard_line_breaks: bool,
     /// [NON-DEFAULT] Ignore soft breaks between two East Asian wide characters
-    #[cfg_attr(feature = "serde", serde(alias = "east_asian_line_breaks"))]
     pub east_asian_line_breaks: bool,
     /// [NON-DEFAULT] MultiMarkdown style heading identifiers [my-id]
     pub mmd_header_identifiers: bool,
@@ -254,34 +208,26 @@ pub struct Extensions {
     pub alerts: bool,
     /// [NON-DEFAULT] python-markdown admonitions (`!!! note`) with 4-space
     /// indented content
-    #[cfg_attr(feature = "serde", serde(alias = "python_markdown_admonitions"))]
     pub python_markdown_admonitions: bool,
     /// [NON-DEFAULT] pymdownx details: collapsible admonitions (`???`/`???+`)
-    #[cfg_attr(feature = "serde", serde(alias = "pymdownx_details"))]
     pub pymdownx_details: bool,
     /// [NON-DEFAULT] :emoji: syntax
     pub emoji: bool,
     /// [NON-DEFAULT] Highlighted ==text==
     pub mark: bool,
     /// [NON-DEFAULT] Pandoc wikilinks with title after pipe: `[[url|title]]`
-    #[cfg_attr(feature = "serde", serde(alias = "wikilinks_title_after_pipe"))]
     pub wikilinks_title_after_pipe: bool,
     /// [NON-DEFAULT] Pandoc wikilinks with title before pipe: `[[title|url]]`
-    #[cfg_attr(feature = "serde", serde(alias = "wikilinks_title_before_pipe"))]
     pub wikilinks_title_before_pipe: bool,
     /// [NON-DEFAULT] Allow whitespace between reference link brackets: `[foo] [bar]`
-    #[cfg_attr(feature = "serde", serde(alias = "spaced_reference_links"))]
     pub spaced_reference_links: bool,
 
     // ===== Quarto-specific extensions =====
     /// Quarto callout blocks (.callout-note, etc.)
-    #[cfg_attr(feature = "serde", serde(alias = "quarto_callouts"))]
     pub quarto_callouts: bool,
     /// Quarto cross-references @fig-id, @tbl-id
-    #[cfg_attr(feature = "serde", serde(alias = "quarto_crossrefs"))]
     pub quarto_crossrefs: bool,
     /// Quarto shortcodes {{< name args >}}
-    #[cfg_attr(feature = "serde", serde(alias = "quarto_shortcodes"))]
     pub quarto_shortcodes: bool,
     /// Bookdown references \@ref(label) and (\#label)
     pub bookdown_references: bool,
@@ -292,35 +238,27 @@ pub struct Extensions {
     /// [NON-DEFAULT] Svelte template syntax: `{#if}`/`{:else}`/`{/each}` block
     /// logic, `{@html ...}`/`{@const ...}` tags, and `{expr}` interpolation.
     /// Parsed as opaque, lossless spans (content preserved verbatim).
-    #[cfg_attr(feature = "serde", serde(alias = "svelte_template"))]
     pub svelte_template: bool,
 
     // ===== MyST-specific extensions =====
     /// [NON-DEFAULT] MyST directives: ```` ```{name} ```` (and, with
     /// `myst_colon_fence`, `:::{name}`) blocks carrying `:key: value` options
     /// and a markdown body.
-    #[cfg_attr(feature = "serde", serde(alias = "myst_directives"))]
     pub myst_directives: bool,
     /// [NON-DEFAULT] MyST inline roles: `` {name}`content` ``.
-    #[cfg_attr(feature = "serde", serde(alias = "myst_roles"))]
     pub myst_roles: bool,
     /// [NON-DEFAULT] MyST targets `(label)=` preceding a block.
-    #[cfg_attr(feature = "serde", serde(alias = "myst_targets"))]
     pub myst_targets: bool,
     /// [NON-DEFAULT] MyST inline substitutions `{{ name }}`.
-    #[cfg_attr(feature = "serde", serde(alias = "myst_substitutions"))]
     pub myst_substitutions: bool,
     /// [NON-DEFAULT] MyST line comments beginning with `%`.
-    #[cfg_attr(feature = "serde", serde(alias = "myst_comments"))]
     pub myst_comments: bool,
     /// [NON-DEFAULT] MyST colon-fence directive form `:::{name}` (off by default
     /// even in MyST, matching `myst-parser`'s opt-in `colon_fence` extension).
-    #[cfg_attr(feature = "serde", serde(alias = "myst_colon_fence"))]
     pub myst_colon_fence: bool,
     /// [NON-DEFAULT] MyST block breaks: a line of 3+ `+` markers (`+++`),
     /// optionally carrying trailing cell metadata. `myst-parser` loads these via
     /// `myst_block_plugin`, so they are on by default for `Flavor::Myst`.
-    #[cfg_attr(feature = "serde", serde(alias = "myst_block_breaks"))]
     pub myst_block_breaks: bool,
 }
 
@@ -786,21 +724,19 @@ macro_rules! known_extensions {
         impl Extensions {
             /// Canonical kebab-case names accepted in `[extensions]`. Used by
             /// the config loader's typo check and by the JSON Schema
-            /// generator. Snake_case is also accepted at runtime via
-            /// normalization in [`Extensions::set_by_name`].
+            /// generator. Only kebab-case is accepted; the snake_case aliases
+            /// were removed in 3.0.
             pub const KNOWN_NAMES: &'static [&'static str] = &[ $($kebab),* ];
 
-            /// True if `name` (in either kebab- or snake-case) is a known
-            /// extension key.
+            /// True if `name` is a known (kebab-case) extension key.
             pub fn is_known_name(name: &str) -> bool {
-                let normalized = name.replace('_', "-");
-                Self::KNOWN_NAMES.iter().any(|k| *k == normalized)
+                Self::KNOWN_NAMES.iter().any(|k| *k == name)
             }
 
             /// Set the named extension on `self`, returning `true` if `name`
-            /// matched a known field. Kebab- and snake-case are accepted.
+            /// matched a known field. Only kebab-case is accepted.
             fn set_by_name(&mut self, name: &str, value: bool) -> bool {
-                match name.replace('_', "-").as_str() {
+                match name {
                     $( $kebab => { self.$field = value; true } )*
                     _ => false,
                 }

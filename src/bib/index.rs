@@ -242,17 +242,6 @@ impl BibIndex {
     pub fn entries(&self) -> impl Iterator<Item = &BibEntry> {
         self.entries.values()
     }
-
-    /// Get entry location (legacy API).
-    pub fn get_location(&self, key: &str) -> Option<BibEntryLocation> {
-        self.entries
-            .get(&key.to_lowercase())
-            .map(|entry| BibEntryLocation {
-                key: entry.key.clone(),
-                file: entry.source_file.clone(),
-                span: entry.span,
-            })
-    }
 }
 
 #[cfg(test)]

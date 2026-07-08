@@ -17,8 +17,6 @@ pub struct FormatterConfig {
     pub cmd: String,
     /// Arguments to pass to the command (e.g., ["-", "--line-length=80"])
     pub args: Vec<String>,
-    /// Whether this formatter is enabled (deprecated, kept for backwards compatibility)
-    pub enabled: bool,
     /// Whether the formatter reads from stdin (true) or requires a file path (false)
     pub stdin: bool,
 }
@@ -61,15 +59,11 @@ pub struct FormatterDefinition {
     /// Arguments to pass (None = inherit from preset if name matches)
     pub args: Option<Vec<String>>,
     /// Arguments to prepend to base args (from preset or explicit args)
-    #[serde(alias = "prepend_args")]
     pub prepend_args: Option<Vec<String>>,
     /// Arguments to append to base args (from preset or explicit args)
-    #[serde(alias = "append_args")]
     pub append_args: Option<Vec<String>>,
     /// Whether the formatter reads from stdin (None = inherit from preset if name matches)
     pub stdin: Option<bool>,
-    /// DEPRECATED: Whether formatter is enabled (old format only)
-    pub enabled: Option<bool>,
 }
 
 /// Internal struct for deserializing FormatterConfig with preset support.
@@ -82,8 +76,6 @@ struct RawFormatterConfig {
     cmd: Option<String>,
     /// Arguments to pass to the command
     args: Option<Vec<String>>,
-    /// Whether this formatter is enabled
-    enabled: bool,
     /// Whether the formatter reads from stdin
     stdin: bool,
 }
@@ -94,7 +86,6 @@ impl Default for RawFormatterConfig {
             preset: None,
             cmd: None,
             args: None,
-            enabled: true,
             stdin: true,
         }
     }
@@ -124,11 +115,9 @@ impl<'de> Deserialize<'de> for FormatterConfig {
                 ))
             })?;
 
-            // Return the preset, but respect enabled field if explicitly set
             Ok(FormatterConfig {
                 cmd: preset.cmd,
                 args: preset.args,
-                enabled: raw.enabled,
                 stdin: preset.stdin,
             })
         } else if let Some(cmd) = raw.cmd {
@@ -136,7 +125,6 @@ impl<'de> Deserialize<'de> for FormatterConfig {
             Ok(FormatterConfig {
                 cmd,
                 args: raw.args.unwrap_or_default(),
-                enabled: raw.enabled,
                 stdin: raw.stdin,
             })
         } else {
@@ -145,7 +133,6 @@ impl<'de> Deserialize<'de> for FormatterConfig {
             Ok(FormatterConfig {
                 cmd: String::new(),
                 args: raw.args.unwrap_or_default(),
-                enabled: raw.enabled,
                 stdin: raw.stdin,
             })
         }
@@ -157,7 +144,6 @@ impl Default for FormatterConfig {
         Self {
             cmd: String::new(),
             args: Vec::new(),
-            enabled: true,
             stdin: true,
         }
     }
@@ -343,13 +329,6 @@ pub struct StyleConfig {
     /// Fallback document language for sentence wrapping when the document has no
     /// YAML `lang:`. A code such as `de` or `pt-BR`.
     pub lang: Option<String>,
-    /// DEPRECATED no-op table. Kept so `[format.code-blocks]` /
-    /// `[style.code-blocks]` configs from older releases keep parsing under
-    /// `deny_unknown_fields`; `check_deprecated_code_block_style_options`
-    /// surfaces the warning. Schema hides it.
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
-    pub code_blocks: Option<toml::Value>,
 }
 
 impl Default for StyleConfig {
@@ -367,7 +346,6 @@ impl Default for StyleConfig {
             built_in_greedy_wrap: true,
             no_break_abbreviations: None,
             lang: None,
-            code_blocks: None,
         }
     }
 }
@@ -469,7 +447,6 @@ impl<'de> Deserialize<'de> for LintConfig {
     {
         let value = toml::Value::deserialize(deserializer)?;
         let mut rules = HashMap::new();
-        let mut used_legacy_shape = false;
 
         let mut table = value
             .as_table()
@@ -486,7 +463,8 @@ impl<'de> Deserialize<'de> for LintConfig {
             ));
         }
 
-        // New shape: [lint.rules]
+        // Rules live under [lint.rules]. The legacy flat `[lint] rule = true`
+        // shape was removed in 3.0.
         if let Some(rules_value) = table.remove("rules") {
             let rules_table = rules_value
                 .as_table()
@@ -502,22 +480,12 @@ impl<'de> Deserialize<'de> for LintConfig {
             }
         }
 
-        // Legacy shape: [lint] rule-name = true/false
-        for (name, enabled) in table {
-            let enabled = enabled.as_bool().ok_or_else(|| {
-                serde::de::Error::custom(format!(
-                    "Unsupported [lint] key '{}'; use [lint.rules] for rule toggles",
-                    name
-                ))
-            })?;
-            used_legacy_shape = true;
-            rules.insert(name, enabled);
-        }
-
-        if used_legacy_shape {
-            eprintln!(
-                "Warning: [lint] rule = true/false is deprecated; use [lint.rules] rule = true/false."
-            );
+        // Any remaining top-level key is the removed flat shape.
+        if let Some((name, _)) = table.iter().next() {
+            return Err(serde::de::Error::custom(format!(
+                "Unsupported [lint] key '{}'; put rule toggles under [lint.rules]",
+                name
+            )));
         }
 
         Ok(Self {
@@ -590,42 +558,17 @@ struct RawConfig {
     #[serde(default)]
     compat: Option<CompatConfig>,
 
-    // New preferred formatting section
+    // Preferred formatting section
     #[serde(default)]
     #[serde(rename = "format")]
     format_section: Option<StyleConfig>,
 
-    // DEPRECATED: [style] section (kept for backwards compatibility)
-    #[serde(default)]
-    style: Option<StyleConfig>,
-
-    // DEPRECATED no-op table. Kept so top-level `[code-blocks]` configs from
-    // older releases keep parsing under `deny_unknown_fields`;
-    // `check_deprecated_code_block_style_options` surfaces the warning. Schema
-    // hides it.
-    #[serde(default, skip_serializing)]
-    #[schemars(skip)]
-    #[allow(dead_code)]
-    code_blocks: Option<toml::Value>,
-
-    // DEPRECATED: Old top-level style fields (kept for backwards compatibility).
-    // `Option` distinguishes "unset" from an explicit value so an old-format
-    // config without this key still inherits the current default rather than
-    // the `usize` zero sentinel.
-    #[serde(default)]
-    math_indent: Option<usize>,
-    #[serde(default)]
-    math_delimiter_style: MathDelimiterStyle,
-    #[serde(default)]
-    wrap: Option<WrapMode>,
+    /// DEPRECATED no-op: `blank-lines` is retained only so older configs keep
+    /// parsing and `check_deprecated_blank_lines` can warn. When no `[format]`
+    /// section is present this top-level value still feeds `blank_lines`.
     #[serde(default = "default_blank_lines")]
     blank_lines: BlankLines,
-    #[serde(default)]
-    tab_stops: TabStopMode,
-    #[serde(default = "default_tab_width")]
-    tab_width: usize,
-    // NEW: Language → Formatter(s) mapping
-    // This will be a raw Value that we'll parse manually to handle both formats
+    // Language → Formatter(s) mapping (parsed manually as a raw Value).
     #[serde(default)]
     #[schemars(schema_with = "schema_helpers::formatters_schema")]
     formatters: Option<toml::Value>,
@@ -680,10 +623,6 @@ fn default_external_max_parallel() -> usize {
 
 fn default_blank_lines() -> BlankLines {
     BlankLines::Collapse
-}
-
-fn default_tab_width() -> usize {
-    4
 }
 
 /// Resolve a single formatter name to a FormatterConfig.
@@ -765,7 +704,6 @@ fn resolve_formatter_name(
                 Ok(FormatterConfig {
                     cmd: cmd.clone(),
                     args,
-                    enabled: true,
                     stdin: definition.stdin.unwrap_or(true),
                 })
             }
@@ -846,69 +784,15 @@ impl RawConfig {
         // `[compat] pandoc` wins over the deprecated top-level alias.
         let resolved_pandoc_compat = compat.pandoc.or(self.pandoc_compat).unwrap_or_default();
 
-        // Check for deprecated top-level style fields
-        let has_deprecated_fields = self.wrap.is_some()
-            || self.math_indent.is_some()
-            || self.math_delimiter_style != MathDelimiterStyle::default()
-            || self.blank_lines != default_blank_lines()
-            || self.tab_stops != TabStopMode::Normalize
-            || self.tab_width != default_tab_width();
-
-        if has_deprecated_fields && self.format_section.is_none() && self.style.is_none() {
-            eprintln!(
-                "Warning: top-level style fields (wrap, math-indent, etc.) \
-                 are deprecated. Please move them under [format] section. \
-                 See documentation for the new format."
-            );
-        }
-
-        // Merge formatting config: prefer [format], then deprecated [style], then old top-level fields.
-        let style = if let Some(format_config) = self.format_section {
-            if self.style.is_some() {
-                eprintln!(
-                    "Warning: Both [format] and deprecated [style] sections found. \
-                     Using [format] section."
-                );
-            }
-            if has_deprecated_fields {
-                eprintln!(
-                    "Warning: Both [format] section and top-level style fields found. \
-                     Using [format] section and ignoring top-level fields."
-                );
-            }
-
-            format_config
-        } else if let Some(style_config) = self.style {
-            eprintln!("Warning: [style] section is deprecated. Please use [format] instead.");
-            if has_deprecated_fields {
-                eprintln!(
-                    "Warning: Both deprecated [style] section and top-level style fields found. \
-                     Using [style] section and ignoring top-level fields."
-                );
-            }
-            style_config
+        // `[format]` is the only formatting section. When it is absent, the
+        // deprecated top-level `blank-lines` alias still feeds `blank_lines`;
+        // every other setting takes its default.
+        let had_format_section = self.format_section.is_some();
+        let style = self.format_section.unwrap_or_default();
+        let blank_lines = if had_format_section {
+            style.blank_lines
         } else {
-            // Old format - construct StyleConfig from top-level fields.
-            // `line-width`/`line-ending` are resolved separately below (they
-            // fall back to the deprecated top-level keys), so leave them unset
-            // here.
-            StyleConfig {
-                line_width: None,
-                line_ending: None,
-                wrap: self.wrap.or(Some(WrapMode::Reflow)),
-                blank_lines: self.blank_lines,
-                math_delimiter_style: self.math_delimiter_style,
-                math_indent: self
-                    .math_indent
-                    .unwrap_or(StyleConfig::default().math_indent),
-                table_indent: DEFAULT_TABLE_INDENT,
-                tab_stops: self.tab_stops,
-                tab_width: self.tab_width,
-                built_in_greedy_wrap: true,
-                no_break_abbreviations: None,
-                lang: None,
-                code_blocks: None,
-            }
+            self.blank_lines
         };
 
         // `line-width`/`line-ending` now live under `[format]`; the top-level
@@ -945,7 +829,7 @@ impl RawConfig {
             flavor: self.flavor,
             line_width,
             wrap: style.wrap,
-            blank_lines: style.blank_lines,
+            blank_lines,
             math_delimiter_style: style.math_delimiter_style,
             math_indent: style.math_indent,
             table_indent: style.table_indent,
@@ -978,8 +862,11 @@ impl RawConfig {
     }
 }
 
-/// Resolve formatter configuration from both old and new formats.
-/// Returns HashMap<String, Vec<FormatterConfig>> for language → formatter(s) mapping.
+/// Resolve formatter configuration into a language → formatter(s) mapping.
+///
+/// The shape is `[formatters] r = "air", python = ["isort", "black"]` with
+/// optional `[formatters.<name>]` definition tables. The legacy per-language
+/// `[formatters.<lang>]` config format was removed in 3.0.
 fn resolve_formatters(
     raw_formatters: Option<toml::Value>,
 ) -> HashMap<String, Vec<FormatterConfig>> {
@@ -987,32 +874,17 @@ fn resolve_formatters(
         return HashMap::new();
     };
 
-    // Try to determine which format this is
     let toml::Value::Table(table) = value else {
         eprintln!("Warning: Invalid formatters configuration - expected table");
         return HashMap::new();
     };
 
-    // Strategy: Detect old format vs new format
-    // Old format: ALL entries are tables with preset/cmd/args (language-specific configs)
-    // New format: Mix of strings/arrays (language mappings) and optionally tables (named definitions)
-
-    let has_string_or_array = table
-        .values()
-        .any(|v| matches!(v, toml::Value::String(_) | toml::Value::Array(_)));
-
-    if has_string_or_array {
-        // New format detected (has language mappings as strings/arrays)
-        resolve_new_format_formatters(table)
-    } else {
-        // Old format (all entries are tables)
-        resolve_old_format_formatters(table)
-    }
+    resolve_formatter_table(table)
 }
 
-/// Resolve new format: [formatters] = { r = "air", python = ["isort", "black"] }
-/// Plus optional [formatters.air] and [formatters.isort] definitions.
-fn resolve_new_format_formatters(
+/// Resolve `[formatters] = { r = "air", python = ["isort", "black"] }` plus any
+/// `[formatters.air]` / `[formatters.isort]` definitions.
+fn resolve_formatter_table(
     table: toml::map::Map<String, toml::Value>,
 ) -> HashMap<String, Vec<FormatterConfig>> {
     let mut mappings = HashMap::new();
@@ -1070,95 +942,6 @@ fn resolve_new_format_formatters(
     }
 
     resolved
-}
-
-/// Resolve old format: [formatters.r] with preset/cmd fields directly.
-fn resolve_old_format_formatters(
-    table: toml::map::Map<String, toml::Value>,
-) -> HashMap<String, Vec<FormatterConfig>> {
-    eprintln!(
-        "Warning: Old formatter configuration format detected. \
-         Please migrate to the new format with [formatters] section. \
-         See documentation for the new format."
-    );
-
-    let mut resolved = HashMap::new();
-    for (lang, value) in table {
-        let definition: Result<FormatterDefinition, _> = value.try_into();
-        match definition {
-            Ok(def) => {
-                // Skip if disabled (old format only)
-                // enabled is Option<bool> now, so check for Some(false)
-                if def.enabled == Some(false) {
-                    continue;
-                }
-
-                match resolve_old_format_definition(&lang, &def) {
-                    Ok(config) => {
-                        resolved.insert(lang, vec![config]);
-                    }
-                    Err(e) => {
-                        eprintln!("Error in old formatter config for '{}': {}", lang, e);
-                        eprintln!("Skipping formatter for '{}'", lang);
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("Error parsing old formatter config for '{}': {}", lang, e);
-            }
-        }
-    }
-
-    resolved
-}
-
-/// Resolve old-format formatter definition (inline preset/cmd in formatters.LANG).
-fn resolve_old_format_definition(
-    _lang: &str,
-    definition: &FormatterDefinition,
-) -> Result<FormatterConfig, String> {
-    // Check for conflicts
-    if definition.preset.is_some() && definition.cmd.is_some() {
-        return Err("'preset' and 'cmd' are mutually exclusive".to_string());
-    }
-
-    if let Some(preset_name) = &definition.preset {
-        // Resolve preset
-        let preset = get_formatter_preset(preset_name).ok_or_else(|| {
-            let available = formatter_preset_names().join(", ");
-            format!(
-                "Unknown formatter preset '{}'. Available presets: {}",
-                preset_name, available
-            )
-        })?;
-
-        let mut args = definition.args.clone().unwrap_or(preset.args);
-
-        // Apply prepend/append modifiers
-        apply_arg_modifiers(&mut args, definition);
-
-        Ok(FormatterConfig {
-            cmd: preset.cmd,
-            args,
-            enabled: true, // enabled field checked by caller
-            stdin: preset.stdin,
-        })
-    } else if let Some(cmd) = &definition.cmd {
-        // Custom command
-        let mut args = definition.args.clone().unwrap_or_default();
-
-        // Apply prepend/append modifiers
-        apply_arg_modifiers(&mut args, definition);
-
-        Ok(FormatterConfig {
-            cmd: cmd.clone(),
-            args,
-            enabled: true,
-            stdin: definition.stdin.unwrap_or(true),
-        })
-    } else {
-        Err("must specify either 'preset' or 'cmd'".to_string())
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -102,14 +102,6 @@
             "null"
           ]
         },
-        "enabled": {
-          "default": null,
-          "description": "DEPRECATED: Whether formatter is enabled (old format only)",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
         "prepend-args": {
           "default": null,
           "description": "Arguments to prepend to base args (from preset or explicit args)",
@@ -365,7 +357,8 @@
   "description": "Schema for panache.toml. Generated from the host Config types; do not hand-edit — run `UPDATE_EXPECTED=1 cargo test config_schema` instead.",
   "properties": {
     "blank-lines": {
-      "$ref": "#/$defs/BlankLines"
+      "$ref": "#/$defs/BlankLines",
+      "description": "DEPRECATED no-op: `blank-lines` is retained only so older configs keep\nparsing and `check_deprecated_blank_lines` can warn. When no `[format]`\nsection is present this top-level value still feeds `blank_lines`."
     },
     "cache": {
       "default": null,
@@ -738,18 +731,6 @@
       "default": {},
       "type": "object"
     },
-    "math-delimiter-style": {
-      "$ref": "#/$defs/MathDelimiterStyle"
-    },
-    "math-indent": {
-      "default": null,
-      "format": "uint",
-      "minimum": 0,
-      "type": [
-        "integer",
-        "null"
-      ]
-    },
     "pandoc-compat": {
       "anyOf": [
         {
@@ -761,35 +742,6 @@
       ],
       "default": null,
       "description": "DEPRECATED: use `[compat] pandoc` instead. Still read as an alias."
-    },
-    "style": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/StyleConfig"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "tab-stops": {
-      "$ref": "#/$defs/TabStopMode"
-    },
-    "tab-width": {
-      "default": 4,
-      "format": "uint",
-      "minimum": 0,
-      "type": "integer"
-    },
-    "wrap": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/WrapMode"
-        },
-        {
-          "type": "null"
-        }
-      ]
     }
   },
   "title": "Panache configuration",

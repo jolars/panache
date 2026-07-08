@@ -37,16 +37,6 @@ pub fn parse_csl_yaml_full(input: &str) -> Result<Vec<ParsedEntry>, String> {
     Ok(result)
 }
 
-/// Legacy function: extract only citation keys and spans.
-pub fn parse_csl_yaml_entries(input: &str) -> Result<Vec<(String, Span)>, String> {
-    parse_csl_yaml_full(input).map(|entries| {
-        entries
-            .into_iter()
-            .map(|(id, _entry_type, _fields, span)| (id, span))
-            .collect()
-    })
-}
-
 fn parse_csl_entry_maps(input: &str) -> Result<Vec<YamlBlockMap>, String> {
     let document = parse_yaml_document(input)
         .ok_or_else(|| "Invalid CSL-YAML: missing root node".to_string())?;

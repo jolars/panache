@@ -40,7 +40,7 @@ fn test_parse_with_config() {
     fs::write(&test_file, "Inline math: $x^2$").unwrap();
     fs::write(
         &config_file,
-        "flavor = \"quarto\"\n\n[extensions]\ntex_math_dollars = true",
+        "flavor = \"quarto\"\n\n[extensions]\ntex-math-dollars = true",
     )
     .unwrap();
 
@@ -111,29 +111,9 @@ fn test_parse_json_output() {
 }
 
 #[test]
-fn test_parse_verify_stdin() {
-    cargo_bin_cmd!("panache")
-        .args(["parse", "--verify"])
-        .write_stdin("# Heading\n\nParagraph.")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("DOCUMENT"));
-}
-
-#[test]
 fn test_parse_quiet_stdin() {
     cargo_bin_cmd!("panache")
         .args(["parse", "--quiet"])
-        .write_stdin("# Heading\n\nParagraph.")
-        .assert()
-        .success()
-        .stdout(predicate::str::is_empty());
-}
-
-#[test]
-fn test_parse_verify_quiet_stdin() {
-    cargo_bin_cmd!("panache")
-        .args(["parse", "--verify", "--quiet"])
         .write_stdin("# Heading\n\nParagraph.")
         .assert()
         .success()

@@ -18,14 +18,14 @@ mod preview;
 mod ris;
 
 pub use bibtex::{BibtexEntry, parse_bibtex, parse_bibtex_full};
-pub use csl_json::{parse_csl_json_entries, parse_csl_json_full};
-pub use csl_yaml::{parse_csl_yaml_entries, parse_csl_yaml_full};
+pub use csl_json::parse_csl_json_full;
+pub use csl_yaml::parse_csl_yaml_full;
 pub use index::{
     BibDuplicate, BibEntry, BibEntryLocation, BibFormat, BibIndex, BibLoadError, load_bibliography,
     load_bibliography_from_text,
 };
 pub use preview::format_entry_preview;
-pub use ris::{parse_ris_entries, parse_ris_full, validate_ris};
+pub use ris::{parse_ris_full, validate_ris};
 
 /// Parsed entry data: (id, entry_type, fields, span).
 ///

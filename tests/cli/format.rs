@@ -345,50 +345,6 @@ fn test_format_invalid_range() {
 }
 
 #[test]
-fn test_format_verify_stdin_to_stdout() {
-    cargo_bin_cmd!("panache")
-        .args(["format", "--verify"])
-        .write_stdin("# Heading\n\nParagraph.")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("# Heading"));
-}
-
-#[test]
-fn test_format_verify_check_unformatted() {
-    let temp_dir = TempDir::new().unwrap();
-    let test_file = temp_dir.path().join("test.qmd");
-    fs::write(
-        &test_file,
-        "# Heading\n\nThis is a very long line that exceeds the default line width of 80 characters and should be wrapped when formatted.",
-    )
-    .unwrap();
-
-    cargo_bin_cmd!("panache")
-        .args(["format", "--verify", "--check", test_file.to_str().unwrap()])
-        .assert()
-        .failure()
-        .stdout(predicate::str::contains("Diff in"));
-}
-
-#[test]
-fn test_format_verify_does_not_write_file() {
-    let temp_dir = TempDir::new().unwrap();
-    let test_file = temp_dir.path().join("test.qmd");
-    let input = "# Heading\n\nThis is a very long line that exceeds the default line width of 80 characters and should be wrapped when formatted.";
-    fs::write(&test_file, input).unwrap();
-
-    cargo_bin_cmd!("panache")
-        .args(["format", "--verify", test_file.to_str().unwrap()])
-        .assert()
-        .success()
-        .stdout(predicate::str::is_empty());
-
-    let content_after = fs::read_to_string(&test_file).unwrap();
-    assert_eq!(content_after, input);
-}
-
-#[test]
 fn test_format_stdin_filename_infers_quarto_flavor() {
     cargo_bin_cmd!("panache")
         .args(["format", "--stdin-filename", "doc.qmd"])

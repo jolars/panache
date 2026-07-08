@@ -114,18 +114,24 @@ swallowed:
 
 All three clear automatically once the config parses, and formatting resumes.
 
-Keys that were valid in older releases and have since been deprecated still
-parse, but Panache prints a warning. The current crop is:
+Some keys that were valid in older releases are still accepted as deprecated
+aliases and print a warning. The current crop is:
 
-- snake_case names under `[extensions]` (e.g. `quarto_crossrefs` → use
-  `quarto-crossrefs`)
-- snake_case fields under `[formatters.*]` (e.g. `prepend_args` →
-  `prepend-args`)
-- the top-level, `[format]`, or `[style]` `code-blocks` table (now a no-op)
-- the top-level, `[format]`, or `[style]` `blank-lines` key (now a no-op)
-- the top-level `[style]` section itself (use `[format]`)
 - top-level `line-width` and `line-ending` (use `[format] line-width` and
   `[format] line-ending`)
+- top-level `pandoc-compat` (use `[compat] pandoc`)
+- the top-level or `[format]` `blank-lines` key (now a no-op)
+
+The following were removed in 3.0 and are now rejected:
+
+- snake_case names under `[extensions]` (use kebab-case, e.g. `quarto-crossrefs`
+  instead of `quarto_crossrefs`)
+- snake_case fields under `[formatters.*]` (use `prepend-args` / `append-args`)
+- the `code-blocks` table in any position (long a no-op)
+- the top-level `[style]` section (use `[format]`)
+- the flat `[lint] rule = true` shape (use `[lint.rules] rule = true`)
+- the per-language `[formatters.<lang>]` config format with `preset`/`enabled`
+  (use the `[formatters] <lang> = "<name>"` mapping)
 
 ## Editor Support {#editor-support}
 

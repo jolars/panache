@@ -16,7 +16,6 @@ impl FormatterPresetMetadata {
         FormatterConfig {
             cmd: self.cmd.to_string(),
             args: self.args.iter().map(ToString::to_string).collect(),
-            enabled: true,
             stdin: self.stdin,
         }
     }

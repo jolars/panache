@@ -47,7 +47,6 @@ pub enum TabStopMode {
 pub struct FormatterConfig {
     pub cmd: String,
     pub args: Vec<String>,
-    pub enabled: bool,
     pub stdin: bool,
 }
 
@@ -148,14 +147,15 @@ macro_rules! known_formatter_extensions {
             /// affect formatter behavior (a subset of the parser names).
             pub const KNOWN_NAMES: &'static [&'static str] = &[ $($kebab),* ];
 
-            /// True if `name` matches a known formatter extension.
+            /// True if `name` matches a known formatter extension. Only
+            /// kebab-case is accepted; snake_case aliases were removed in 3.0.
             pub fn is_known_name(name: &str) -> bool {
-                let normalized = name.replace('_', "-").to_ascii_lowercase();
+                let normalized = name.to_ascii_lowercase();
                 Self::KNOWN_NAMES.iter().any(|k| *k == normalized)
             }
 
             fn set_by_name(&mut self, name: &str, value: bool) -> bool {
-                match name.replace('_', "-").to_ascii_lowercase().as_str() {
+                match name.to_ascii_lowercase().as_str() {
                     $( $kebab => { self.$field = value; true } )*
                     _ => false,
                 }

@@ -1,3 +1,5 @@
 flavor = "rmarkdown"
 line-width = 80
+
+[format]
 math-delimiter-style = "dollars"

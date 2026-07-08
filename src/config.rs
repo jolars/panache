@@ -87,127 +87,6 @@ pub const DEFAULT_INCLUDE_PATTERNS: &[&str] = &[
 const CANDIDATE_NAMES: &[&str] = &[".panache.toml", "panache.toml"];
 const MARKDOWN_FAMILY_EXTENSIONS: &[&str] = &["md", "markdown", "mdown", "mkd"];
 
-fn check_deprecated_extension_names(s: &str, path: &Path) {
-    let Ok(toml_value) = toml::from_str::<toml::Value>(s) else {
-        return;
-    };
-
-    let Some(extensions_table) = toml_value
-        .as_table()
-        .and_then(|t| t.get("extensions"))
-        .and_then(|v| v.as_table())
-    else {
-        return;
-    };
-
-    let deprecated_names: Vec<&str> = extensions_table
-        .keys()
-        .filter(|k| k.contains('_'))
-        .map(|k| k.as_str())
-        .collect();
-
-    if !deprecated_names.is_empty() {
-        eprintln!(
-            "Warning: Deprecated snake_case extension names found in {}:",
-            path.display()
-        );
-        eprintln!("  The following extensions use deprecated snake_case naming:");
-        for name in &deprecated_names {
-            let kebab = name.replace('_', "-");
-            eprintln!("    {} -> {} (use kebab-case)", name, kebab);
-        }
-        eprintln!("  Snake_case extension names are deprecated and will be removed in v1.0.0.");
-        eprintln!(
-            "  Please update your config to use kebab-case (e.g., quarto-crossrefs instead of quarto_crossrefs)."
-        );
-    }
-}
-
-fn check_deprecated_formatter_names(s: &str, path: &Path) {
-    let Ok(toml_value) = toml::from_str::<toml::Value>(s) else {
-        return;
-    };
-
-    let Some(formatters_table) = toml_value
-        .as_table()
-        .and_then(|t| t.get("formatters"))
-        .and_then(|v| v.as_table())
-    else {
-        return;
-    };
-
-    let mut found_deprecated = false;
-    for (formatter_name, formatter_value) in formatters_table {
-        if let Some(formatter_def) = formatter_value.as_table() {
-            let deprecated_fields: Vec<&str> = formatter_def
-                .keys()
-                .filter(|k| matches!(k.as_str(), "prepend_args" | "append_args"))
-                .map(|k| k.as_str())
-                .collect();
-
-            if !deprecated_fields.is_empty() {
-                if !found_deprecated {
-                    eprintln!(
-                        "Warning: Deprecated snake_case formatter field names found in {}:",
-                        path.display()
-                    );
-                    found_deprecated = true;
-                }
-                eprintln!("  In [formatters.{}]:", formatter_name);
-                for field in deprecated_fields {
-                    let kebab = field.replace('_', "-");
-                    eprintln!("    {} -> {}", field, kebab);
-                }
-            }
-        }
-    }
-
-    if found_deprecated {
-        eprintln!(
-            "  Snake_case formatter field names are deprecated and will be removed in v1.0.0."
-        );
-        eprintln!(
-            "  Please update your config to use kebab-case (e.g., prepend-args instead of prepend_args)."
-        );
-    }
-}
-
-fn check_deprecated_code_block_style_options(s: &str, path: &Path) {
-    let Ok(toml_value) = toml::from_str::<toml::Value>(s) else {
-        return;
-    };
-    let Some(root) = toml_value.as_table() else {
-        return;
-    };
-
-    let top_level = root.contains_key("code-blocks");
-    let format_nested = root
-        .get("format")
-        .and_then(|v| v.as_table())
-        .is_some_and(|format| format.contains_key("code-blocks"));
-    let style_nested = root
-        .get("style")
-        .and_then(|v| v.as_table())
-        .is_some_and(|style| style.contains_key("code-blocks"));
-
-    if top_level || format_nested || style_nested {
-        eprintln!(
-            "Warning: Deprecated code block style options found in {}:",
-            path.display()
-        );
-        if format_nested {
-            eprintln!("  - [format.code-blocks]");
-        }
-        if top_level {
-            eprintln!("  - [code-blocks]");
-        }
-        if style_nested {
-            eprintln!("  - [style.code-blocks]");
-        }
-        eprintln!("  These options are now no-ops and will be removed in a future release.");
-    }
-}
-
 fn check_deprecated_blank_lines(s: &str, path: &Path) {
     let Ok(toml_value) = toml::from_str::<toml::Value>(s) else {
         return;
@@ -305,9 +184,6 @@ fn parse_config_str(s: &str, path: &Path) -> io::Result<Config> {
 /// failure. [`parse_config_str`] wraps the error into an [`io::Error`] for the
 /// existing `io::Result` callers.
 fn parse_config_detailed(s: &str, path: &Path) -> Result<Config, ConfigError> {
-    check_deprecated_extension_names(s, path);
-    check_deprecated_formatter_names(s, path);
-    check_deprecated_code_block_style_options(s, path);
     check_deprecated_blank_lines(s, path);
 
     if let Err(msg) = validate_extension_names(s) {
@@ -533,9 +409,6 @@ fn load_merged_toml(path: &Path, chain: &mut Vec<PathBuf>) -> Result<toml::Table
     })?;
 
     // Per-file deprecation/validation checks so warnings carry this file's path.
-    check_deprecated_extension_names(&s, path);
-    check_deprecated_formatter_names(&s, path);
-    check_deprecated_code_block_style_options(&s, path);
     check_deprecated_blank_lines(&s, path);
     if let Err(msg) = validate_extension_names(&s) {
         return Err(ConfigError {
@@ -1914,20 +1787,78 @@ mod tests {
     }
 
     #[test]
-    fn deprecated_code_blocks_table_still_parses() {
-        // `[code-blocks]` is a no-op since the feature was removed, but older
-        // configs still in the wild use it — the deprecation warning must keep
-        // firing without `deny_unknown_fields` hard-failing the load.
+    fn removed_code_blocks_table_now_errors() {
+        // `[code-blocks]` was a no-op for several releases; in 3.0 it is
+        // rejected under `deny_unknown_fields`.
         let toml = "flavor = \"pandoc\"\n[code-blocks]\nattribute-style = \"explicit\"\n";
         parse_config_str(toml, Path::new("panache.toml"))
-            .expect("deprecated [code-blocks] table must still parse");
+            .expect_err("removed [code-blocks] table must error");
     }
 
     #[test]
-    fn deprecated_format_code_blocks_subtable_still_parses() {
+    fn removed_format_code_blocks_subtable_now_errors() {
         let toml = "[format.code-blocks]\nattribute-style = \"explicit\"\n";
         parse_config_str(toml, Path::new("panache.toml"))
-            .expect("deprecated [format.code-blocks] subtable must still parse");
+            .expect_err("removed [format.code-blocks] subtable must error");
+    }
+
+    #[test]
+    fn removed_style_section_now_errors() {
+        // The `[style]` section was superseded by `[format]` and removed in 3.0.
+        let toml = "[style]\nline-width = 100\n";
+        parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("removed [style] section must error");
+    }
+
+    #[test]
+    fn removed_top_level_style_field_now_errors() {
+        // Old top-level style scalars (wrap, math-indent, tab-stops, ...) moved
+        // under `[format]` and are rejected at the top level in 3.0.
+        let toml = "wrap = \"preserve\"\n";
+        parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("removed top-level `wrap` must error");
+    }
+
+    #[test]
+    fn removed_flat_lint_shape_now_errors() {
+        // Legacy `[lint] rule = true` was replaced by `[lint.rules]`.
+        let toml = "[lint]\nheading-hierarchy = false\n";
+        parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("removed flat [lint] shape must error");
+    }
+
+    #[test]
+    fn lint_rules_subtable_still_parses() {
+        // The canonical `[lint.rules]` shape keeps working.
+        let toml = "[lint.rules]\nheading-hierarchy = false\n";
+        let cfg =
+            parse_config_str(toml, Path::new("panache.toml")).expect("[lint.rules] must parse");
+        assert!(!cfg.lint.is_rule_enabled("heading-hierarchy"));
+    }
+
+    #[test]
+    fn kebab_case_formatter_prepend_args_applies() {
+        // The canonical `prepend-args` spelling prepends to the preset args.
+        let toml = "[formatters]\nr = \"air\"\n\n[formatters.air]\nprepend-args = [\"--extra\"]\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("kebab-case prepend-args must parse");
+        let air = &cfg.formatters["r"][0];
+        assert_eq!(air.args.first().map(String::as_str), Some("--extra"));
+    }
+
+    #[test]
+    fn snake_case_formatter_field_is_not_honored() {
+        // The removed `prepend_args` snake_case alias no longer parses, so the
+        // definition is dropped and the prepended arg is not applied.
+        let toml = "[formatters]\nr = \"air\"\n\n[formatters.air]\nprepend_args = [\"--extra\"]\n";
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("config still parses; the bad definition is dropped");
+        let has_extra = cfg
+            .formatters
+            .get("r")
+            .and_then(|fmts| fmts.first())
+            .is_some_and(|air| air.args.iter().any(|a| a == "--extra"));
+        assert!(!has_extra, "snake_case prepend_args must not be applied");
     }
 
     #[test]
@@ -2007,11 +1938,11 @@ mod tests {
     }
 
     #[test]
-    fn snake_case_extension_name_still_parses() {
-        // Existing back-compat: snake_case names normalize to kebab-case.
+    fn snake_case_extension_name_now_errors() {
+        // 3.0 dropped the snake_case aliases; kebab-case is the only spelling.
         let toml = "[extensions]\nquarto_crossrefs = true\n";
         parse_config_str(toml, Path::new("panache.toml"))
-            .expect("snake_case extension alias must still parse");
+            .expect_err("snake_case extension name must error");
     }
 
     #[test]

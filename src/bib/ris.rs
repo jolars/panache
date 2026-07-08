@@ -27,24 +27,6 @@ pub fn parse_ris_full(input: &str) -> Result<Vec<ParsedEntry>, String> {
     Ok(entries)
 }
 
-/// Legacy function: extract only citation keys.
-pub fn parse_ris_entries(input: &str) -> Result<Vec<(String, Span)>, String> {
-    let records = parse_records(input)?;
-
-    if records.is_empty() {
-        return Err("RIS file contains no records".to_string());
-    }
-
-    let mut entries = Vec::new();
-    for record in records {
-        if let Some((id, span)) = extract_id(&record)? {
-            entries.push((id, span));
-        }
-    }
-
-    Ok(entries)
-}
-
 /// Validate RIS file structure.
 pub fn validate_ris(input: &str) -> Result<(), String> {
     let records = parse_records(input)?;
@@ -252,41 +234,6 @@ fn extract_full_entry(record: &RisRecord) -> Result<Option<ParsedEntry>, String>
         Some((id, span)) => Ok(Some((id, entry_type, fields, span))),
         None => Ok(None),
     }
-}
-
-/// Extract only ID from a record.
-fn extract_id(record: &RisRecord) -> Result<Option<(String, Span)>, String> {
-    let mut has_ty = false;
-    let mut has_er = false;
-    let mut id_value: Option<(String, Span)> = None;
-
-    for tag in &record.tags {
-        match tag.name.as_str() {
-            "TY" => has_ty = true,
-            "ER" => has_er = true,
-            "ID" => {
-                if id_value.is_none() && !tag.value.is_empty() {
-                    id_value = Some((
-                        tag.value.clone(),
-                        Span {
-                            start: tag.value_start,
-                            end: tag.value_end,
-                        },
-                    ));
-                }
-            }
-            _ => {}
-        }
-    }
-
-    if !has_ty {
-        return Err("RIS record missing TY tag".to_string());
-    }
-    if !has_er {
-        return Err("RIS record missing ER tag".to_string());
-    }
-
-    Ok(id_value)
 }
 
 #[cfg(test)]

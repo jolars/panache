@@ -10,7 +10,6 @@ fn test_yaml_frontmatter_ignores_external_yaml_formatter() {
         vec![panache_formatter::config::FormatterConfig {
             cmd: "tr".to_string(),
             args: vec!["-d".to_string(), "\\n\\r\\t ".to_string()],
-            enabled: true,
             stdin: true,
         }],
     );

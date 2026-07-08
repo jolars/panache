@@ -843,17 +843,7 @@ fn main() -> io::Result<()> {
     init_logger(debug_log.as_deref());
 
     match cli.command {
-        Commands::Parse {
-            file,
-            to,
-            json,
-            verify,
-        } => {
-            if verify {
-                eprintln!(
-                    "Warning: `panache parse --verify` is deprecated; use `panache debug format --checks losslessness`."
-                );
-            }
+        Commands::Parse { file, to, json } => {
             let file = normalize_parse_path(file);
             let input_path = file.as_deref().or(cli.stdin_filename.as_deref());
             let start_dir = start_dir_for(input_path)?;
@@ -874,17 +864,6 @@ fn main() -> io::Result<()> {
 
             let input = read_all(file.as_ref())?;
             let tree = parse(&input, Some(cfg));
-            if verify {
-                let tree_text = tree.text().to_string();
-                if input != tree_text {
-                    let file_label = file.as_ref().and_then(|p| p.to_str()).unwrap_or("<stdin>");
-                    eprintln!(
-                        "Verification failed (losslessness): parser output differs from input"
-                    );
-                    print_diff(file_label, &input, &tree_text, use_color);
-                    std::process::exit(1);
-                }
-            }
             if let Some(json_path) = json {
                 let json_value = panache::syntax::cst_to_json(&tree);
                 let json_output =
@@ -908,15 +887,9 @@ fn main() -> io::Result<()> {
             files,
             check,
             range,
-            verify,
             force_exclude,
             option,
         } => {
-            if verify {
-                eprintln!(
-                    "Warning: `panache format --verify` is deprecated; use `panache debug format --checks all`."
-                );
-            }
             let files = match normalize_input_paths(files) {
                 Ok(files) => files,
                 Err(err) => {
@@ -964,28 +937,7 @@ fn main() -> io::Result<()> {
                 }
 
                 let input = read_all(None)?;
-                if verify {
-                    let tree = parse(&input, Some(cfg.clone()));
-                    let tree_text = tree.text().to_string();
-                    if input != tree_text {
-                        eprintln!(
-                            "Verification failed (losslessness): parser output differs from input"
-                        );
-                        print_diff("<stdin>", &input, &tree_text, use_color);
-                        std::process::exit(1);
-                    }
-                }
-                let output = format(&input, Some(cfg.clone()), parsed_range);
-                if verify {
-                    let output_twice = format(&output, Some(cfg), parsed_range);
-                    if output != output_twice {
-                        eprintln!(
-                            "Verification failed (idempotency): format(format(x)) != format(x)"
-                        );
-                        print_diff("<stdin>", &output, &output_twice, use_color);
-                        std::process::exit(1);
-                    }
-                }
+                let output = format(&input, Some(cfg), parsed_range);
 
                 if check {
                     if input != output {
@@ -1104,20 +1056,7 @@ fn main() -> io::Result<()> {
                     FormatCacheMode::Write
                 };
 
-                if verify {
-                    let tree = parse(&input, Some(cfg.clone()));
-                    let tree_text = tree.text().to_string();
-                    if input != tree_text {
-                        let file_name = file_path.to_str().unwrap_or("<unknown>");
-                        eprintln!(
-                            "Verification failed (losslessness): parser output differs from input"
-                        );
-                        print_diff(file_name, &input, &tree_text, use_color);
-                        std::process::exit(1);
-                    }
-                }
-
-                let output = if !verify && parsed_range.is_none() {
+                let output = if parsed_range.is_none() {
                     if let Some(cache_handle) = cache_shared.as_ref() {
                         let file_fingerprint = CliCache::file_fingerprint(&input);
                         let config_fingerprint = CliCache::config_fingerprint(&cfg);
@@ -1166,18 +1105,6 @@ fn main() -> io::Result<()> {
                     format(&input, Some(cfg.clone()), parsed_range)
                 };
 
-                if verify {
-                    let output_twice = format(&output, Some(cfg), parsed_range);
-                    if output != output_twice {
-                        let file_name = file_path.to_str().unwrap_or("<unknown>");
-                        eprintln!(
-                            "Verification failed (idempotency): format(format(x)) != format(x)"
-                        );
-                        print_diff(file_name, &output, &output_twice, use_color);
-                        std::process::exit(1);
-                    }
-                }
-
                 Ok(FormatOutcome {
                     file_path: file_path.clone(),
                     input,
@@ -1220,16 +1147,14 @@ fn main() -> io::Result<()> {
                     } else if expanded_files.len() == 1 && !cli.quiet {
                         println!("{} is correctly formatted", o.file_path.display());
                     }
-                } else if !verify {
-                    if o.input != o.output {
-                        fs::write(&o.file_path, &o.output)?;
-                        if !cli.quiet {
-                            println!("Formatted {}", o.file_path.display());
-                        }
-                        reformatted_count += 1;
-                    } else {
-                        unchanged_count += 1;
+                } else if o.input != o.output {
+                    fs::write(&o.file_path, &o.output)?;
+                    if !cli.quiet {
+                        println!("Formatted {}", o.file_path.display());
                     }
+                    reformatted_count += 1;
+                } else {
+                    unchanged_count += 1;
                 }
             }
 
@@ -1241,7 +1166,7 @@ fn main() -> io::Result<()> {
                 } else {
                     std::process::exit(1);
                 }
-            } else if !verify && !cli.quiet {
+            } else if !cli.quiet {
                 if reformatted_count == 0 {
                     println!(
                         "{}",
@@ -2706,14 +2631,16 @@ mod tests {
         }
 
         #[test]
-        fn extensions_dot_key_accepts_snake_case_alias() {
+        fn extensions_dot_key_ignores_snake_case_alias() {
+            // 3.0 dropped snake_case extension aliases; the snake_case spelling
+            // no longer matches a known extension, so it is not applied.
             let mut c = cfg();
             apply_format_overrides(
                 &mut c,
                 &["extensions.east_asian_line_breaks=true".to_string()],
             )
             .unwrap();
-            assert!(c.extensions.east_asian_line_breaks);
+            assert!(!c.extensions.east_asian_line_breaks);
         }
 
         #[test]

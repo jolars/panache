@@ -1,5 +1,3 @@
 # Test configuration for raw_blocks test case
 # Disable external formatters to test raw block handling in isolation
 
-[formatters.python]
-enabled = false
