@@ -313,9 +313,8 @@ provides auto-fix
 **Usage:**
 
 ```bash
-panache lint document.qmd
-panache lint --check document.qmd # CI mode (exit 1 if violations)
-panache lint --fix document.qmd   # Apply auto-fixes
+panache lint document.qmd       # Exits 1 if violations found (CI-ready)
+panache lint --fix document.qmd # Apply auto-fixes
 ```
 
 ## File Organization Principles

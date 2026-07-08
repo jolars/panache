@@ -257,14 +257,15 @@ issues:
 panache lint --fix document.qmd
 ```
 
-To exit with an error code if any lint issues are found (without fixing), use
-`--check`:
+`panache lint` exits with an error code whenever any lint issues are found, so
+it plugs into CI/CD pipelines directly:
 
 ```bash
-panache lint --check .
+panache lint .
 ```
 
-This is typically used in CI/CD pipelines to enforce linting rules.
+(The `--check` flag is deprecated and now a no-op, since this is the default
+behavior.)
 
 ### Parsing
 

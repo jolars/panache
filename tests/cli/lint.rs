@@ -35,33 +35,58 @@ fn test_lint_with_violations() {
     cargo_bin_cmd!("panache")
         .args(["lint", test_file.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("warning"))
         .stdout(predicate::str::contains("heading-hierarchy"));
 }
 
 #[test]
-fn test_lint_check_mode_clean() {
+fn test_lint_default_exits_nonzero_on_violations() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(&test_file, "# Heading\n\n### Subheading").unwrap();
+
+    // No `--check` flag: a violation must fail the exit code by default.
+    cargo_bin_cmd!("panache")
+        .args(["lint", test_file.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Found"));
+}
+
+#[test]
+fn test_lint_clean_file_succeeds() {
     let temp_dir = TempDir::new().unwrap();
     let test_file = temp_dir.path().join("test.qmd");
     fs::write(&test_file, "# Heading\n\n## Subheading\n\nParagraph.").unwrap();
 
     cargo_bin_cmd!("panache")
-        .args(["lint", "--check", test_file.to_str().unwrap()])
+        .args(["lint", test_file.to_str().unwrap()])
         .assert()
         .success();
 }
 
 #[test]
-fn test_lint_check_mode_violations() {
+fn test_lint_check_flag_is_deprecated_noop() {
     let temp_dir = TempDir::new().unwrap();
-    let test_file = temp_dir.path().join("test.qmd");
-    fs::write(&test_file, "# Heading\n\n### Subheading").unwrap();
+    let clean = temp_dir.path().join("clean.qmd");
+    let dirty = temp_dir.path().join("dirty.qmd");
+    fs::write(&clean, "# Heading\n\n## Subheading\n\nParagraph.").unwrap();
+    fs::write(&dirty, "# Heading\n\n### Subheading").unwrap();
+
+    // `--check` still emits a deprecation warning and preserves the exit codes
+    // that are now the default: success on clean input, failure on violations.
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--check", clean.to_str().unwrap()])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("deprecated"));
 
     cargo_bin_cmd!("panache")
-        .args(["lint", "--check", test_file.to_str().unwrap()])
+        .args(["lint", "--check", dirty.to_str().unwrap()])
         .assert()
         .failure()
+        .stderr(predicate::str::contains("deprecated"))
         .stderr(predicate::str::contains("Found"));
 }
 
@@ -214,7 +239,7 @@ fn test_lint_multiple_files() {
     cargo_bin_cmd!("panache")
         .args(["lint", file1.to_str().unwrap(), file2.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("test1.qmd"));
 }
 
@@ -230,7 +255,7 @@ fn test_lint_directory() {
     cargo_bin_cmd!("panache")
         .args(["lint", temp_dir.path().to_str().unwrap()])
         .assert()
-        .success();
+        .failure();
 }
 
 #[test]
@@ -323,7 +348,7 @@ fn test_lint_stdin() {
         .arg("lint")
         .write_stdin("# Heading\n\n### Subheading")
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("warning"));
 }
 
@@ -333,7 +358,7 @@ fn test_lint_stdin_shows_source_snippet() {
         .args(["lint", "--color", "never"])
         .write_stdin("# Heading\n\n### Subheading")
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("--> <stdin>:3:1"))
         .stdout(predicate::str::contains("3 | ### Subheading"))
         .stdout(predicate::str::contains("^"))
@@ -382,7 +407,7 @@ fn test_lint_stdin_short_message_format() {
         .args(["lint", "--message-format", "short", "--color", "never"])
         .write_stdin("# Heading\n\n### Subheading")
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains(
             "<stdin>:3:1: warning[heading-hierarchy]: Heading level skipped from h1 to h3; expected h2",
         ))
@@ -406,7 +431,7 @@ fn test_lint_file_short_message_format() {
             test_file.to_str().unwrap(),
         ])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains(
             ":3:1: warning[heading-hierarchy]: Heading level skipped",
         ))
@@ -422,7 +447,7 @@ fn test_lint_short_message_format_preserves_diagnostic_order() {
         .write_stdin("# H1\n\n### H3\n\n##### H5\n");
 
     let output = cmd.output().unwrap();
-    assert!(output.status.success());
+    assert!(!output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     let first = stdout.find("<stdin>:3:1").unwrap();
@@ -453,7 +478,7 @@ fn test_lint_external_staticcheck_does_not_print_panache_rule_guidance() {
         .current_dir(temp_dir.path())
         .args(["lint", "--color", "never", file_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("[SA5009]"))
         .stdout(predicate::str::contains("[lint.rules] SA5009").not())
         .stdout(predicate::str::contains("linting.html#SA5009").not());
@@ -465,7 +490,7 @@ fn test_lint_color_always_shows_ansi_diagnostics() {
         .args(["lint", "--color", "always"])
         .write_stdin("# Heading\n\n### Subheading")
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("heading-hierarchy"))
         .stdout(predicate::str::contains("\u{1b}["));
 }
@@ -476,7 +501,7 @@ fn test_lint_color_never_disables_ansi_diagnostics() {
         .args(["lint", "--color", "never"])
         .write_stdin("# Heading\n\n### Subheading")
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("warning"))
         .stdout(predicate::str::contains("\u{1b}[").not());
 }
@@ -502,7 +527,7 @@ fn test_lint_bibliography_integration() {
     cargo_bin_cmd!("panache")
         .args(["lint", doc_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("missing-bibliography-key"))
         .stdout(predicate::str::contains("missing"));
 }
@@ -533,7 +558,7 @@ fn test_lint_project_manifest_bibliography_duplicate() {
     cargo_bin_cmd!("panache")
         .args(["--no-cache", "lint", project.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("duplicate-bibliography-key"))
         .stdout(predicate::str::contains("'dup'"))
         .stdout(predicate::str::contains("_quarto.yml"));
@@ -553,7 +578,7 @@ fn test_lint_project_manifest_bibliography_duplicate() {
             project.join("_quarto.yml").to_str().unwrap(),
         ])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("duplicate-bibliography-key"));
 }
 
@@ -585,14 +610,14 @@ fn test_lint_inline_references_in_metadata() {
     cargo_bin_cmd!("panache")
         .args(["lint", doc_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("missing-bibliography-key"))
         .stdout(predicate::str::contains("missing"));
 
     cargo_bin_cmd!("panache")
         .args(["lint", dup_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("duplicate-inline-reference-id"));
 }
 
@@ -616,7 +641,7 @@ missing-chunk-labels = false
         .current_dir(temp_dir.path())
         .args(["lint", "--color", "never", doc_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("yaml-parse-error"))
         .stdout(predicate::str::contains("YAML parse error"));
 }
@@ -639,7 +664,7 @@ fn test_lint_reports_frontmatter_yaml_parse_error() {
         .current_dir(temp_dir.path())
         .args(["lint", "--color", "never", doc_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("yaml-parse-error"))
         .stdout(predicate::str::contains("YAML parse error"));
 }
@@ -665,7 +690,7 @@ fn test_lint_csl_yaml_bibliography() {
     cargo_bin_cmd!("panache")
         .args(["lint", doc_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("missing-bibliography-key"))
         .stdout(predicate::str::contains("missing"));
 }
@@ -691,7 +716,7 @@ fn test_lint_csl_json_bibliography() {
     cargo_bin_cmd!("panache")
         .args(["lint", doc_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("missing-bibliography-key"))
         .stdout(predicate::str::contains("missing"));
 }
@@ -713,7 +738,7 @@ fn test_lint_ris_bibliography() {
     cargo_bin_cmd!("panache")
         .args(["lint", doc_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("missing-bibliography-key"))
         .stdout(predicate::str::contains("missing"));
 }
@@ -735,7 +760,7 @@ fn test_lint_ris_missing_id() {
     cargo_bin_cmd!("panache")
         .args(["lint", doc_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("missing-bibliography-key"))
         .stdout(predicate::str::contains("missing"));
 }
@@ -757,7 +782,7 @@ fn test_lint_ris_invalid_tag() {
     cargo_bin_cmd!("panache")
         .args(["lint", doc_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("bibliography-parse-error"))
         .stdout(predicate::str::contains("invalid content"));
 }
@@ -774,7 +799,7 @@ fn test_lint_includes_reports_child_diagnostics() {
     cargo_bin_cmd!("panache")
         .args(["lint", parent_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("_child.qmd"))
         .stdout(predicate::str::contains("heading-hierarchy"));
 }
@@ -795,7 +820,7 @@ fn test_lint_includes_duplicate_reference_definitions() {
     cargo_bin_cmd!("panache")
         .args(["lint", parent_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("duplicate-reference-labels"));
 }
 
@@ -812,7 +837,7 @@ fn test_lint_reports_unused_definitions() {
     cargo_bin_cmd!("panache")
         .args(["lint", doc_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("unused-footnote-id"))
         .stdout(predicate::str::contains("unused-definition-label"));
 }
@@ -833,7 +858,7 @@ fn test_lint_quiet_suppresses_diagnostic_output() {
         ])
         .output()
         .unwrap();
-    assert!(output.status.success());
+    assert!(!output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.is_empty(),
@@ -887,7 +912,7 @@ fn test_lint_includes_cycle_reports_single_diagnostic() {
         .args(["lint", "--color", "never", parent_path.to_str().unwrap()])
         .output()
         .unwrap();
-    assert!(output.status.success());
+    assert!(!output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     let occurrences = stdout.matches("[include-cycle]").count();
     assert_eq!(
@@ -917,7 +942,7 @@ missing-chunk-labels = false
         .args(["lint", "--color", "never", doc_path.to_str().unwrap()])
         .output()
         .unwrap();
-    assert!(output.status.success());
+    assert!(!output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     let occurrences = stdout.matches("[yaml-parse-error]").count();
     assert_eq!(
@@ -965,7 +990,7 @@ fn test_lint_includes_missing_file_reports_diagnostic() {
     cargo_bin_cmd!("panache")
         .args(["lint", parent_path.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("include-not-found"))
         .stdout(predicate::str::contains("missing.qmd"));
 }
@@ -986,7 +1011,7 @@ fn test_lint_cache_reuse_and_invalidation_on_input_change() {
             test_file.to_str().unwrap(),
         ])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("heading-hierarchy"));
 
     assert!(cache_file.exists(), "expected cache file to be created");
@@ -1000,7 +1025,7 @@ fn test_lint_cache_reuse_and_invalidation_on_input_change() {
             test_file.to_str().unwrap(),
         ])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("heading-hierarchy"));
 
     let second_modified = fs::metadata(&cache_file).unwrap().modified().unwrap();
@@ -1048,7 +1073,7 @@ fn test_lint_cache_invalidation_on_included_file_change() {
             parent.to_str().unwrap(),
         ])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("heading-hierarchy"));
 
     let first_modified = fs::metadata(&cache_file).unwrap().modified().unwrap();
@@ -1061,7 +1086,7 @@ fn test_lint_cache_invalidation_on_included_file_change() {
             parent.to_str().unwrap(),
         ])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("heading-hierarchy"));
     let second_modified = fs::metadata(&cache_file).unwrap().modified().unwrap();
     assert_eq!(first_modified, second_modified);
@@ -1104,7 +1129,7 @@ fn test_lint_no_cache_skips_cache_file_creation() {
             test_file.to_str().unwrap(),
         ])
         .assert()
-        .success();
+        .failure();
 
     assert!(
         !cache_file.exists(),
@@ -1118,7 +1143,7 @@ fn test_lint_dash_reads_stdin() {
         .args(["lint", "-"])
         .write_stdin("# Heading\n\n### Subheading")
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("warning"))
         .stdout(predicate::str::contains("heading-hierarchy"));
 }
@@ -1218,7 +1243,7 @@ fn test_lint_quarto_yml_schema_violation() {
     cargo_bin_cmd!("panache")
         .args(["lint", manifest.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("quarto-schema-type-mismatch"));
 }
 
@@ -1246,7 +1271,7 @@ fn test_lint_quarto_yml_unknown_key_is_opt_in() {
             manifest.to_str().unwrap(),
         ])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("quarto-schema-unknown-key"))
         .stdout(predicate::str::contains("forrmat"));
 }
@@ -1304,6 +1329,6 @@ fn test_lint_metadata_yml_validates_against_front_matter() {
     cargo_bin_cmd!("panache")
         .args(["lint", manifest.to_str().unwrap()])
         .assert()
-        .success()
+        .failure()
         .stdout(predicate::str::contains("quarto-schema-type-mismatch"));
 }

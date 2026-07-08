@@ -162,7 +162,7 @@ Configure rules in panache.toml with [lint] section.
 
 ###### **Options:**
 
-* `--check` — Exit with code 1 if violations found (CI mode)
+* `--check` — Deprecated and now a no-op. `panache lint` exits with code 1 whenever any violations are found, so this flag is no longer needed. It is still accepted for backward compatibility but will be removed in a future release. Use `--fix` to apply auto-fixes instead of reporting.
 * `--fix` — Automatically fix violations where possible
 * `--unsafe-fixes` — Apply auto-fixes marked unsafe in addition to safe ones. 
 

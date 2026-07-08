@@ -1595,6 +1595,12 @@ fn main() -> io::Result<()> {
             message_format,
             force_exclude,
         } => {
+            if check {
+                eprintln!(
+                    "Warning: `panache lint --check` is deprecated; linting exits non-zero on \
+                     violations by default. The flag is now a no-op."
+                );
+            }
             let files = match normalize_input_paths(files) {
                 Ok(files) => files,
                 Err(err) => {
@@ -1656,7 +1662,7 @@ fn main() -> io::Result<()> {
                 merge_missing_diagnostics(&mut diagnostics, yaml_diags);
 
                 if diagnostics.is_empty() {
-                    if !check && !cli.quiet {
+                    if !cli.quiet {
                         println!("No issues found");
                     }
                     return Ok(());
@@ -1673,7 +1679,12 @@ fn main() -> io::Result<()> {
                     if unsafe_skipped > 0 && !cli.quiet {
                         eprintln!("{}", unsafe_fixes_hint(unsafe_skipped));
                     }
-                } else if !cli.quiet {
+                    // `--fix` retains an exit code of 0: the fixes were written to
+                    // stdout. Only the reporting mode signals violations via exit code.
+                    return Ok(());
+                }
+
+                if !cli.quiet {
                     print_diagnostics(
                         &diagnostics,
                         None,
@@ -1684,11 +1695,8 @@ fn main() -> io::Result<()> {
                     );
                 }
 
-                if check {
-                    std::process::exit(1);
-                }
-
-                return Ok(());
+                // Reporting mode exits non-zero whenever violations are found.
+                std::process::exit(1);
             }
 
             // Expand paths (handle directories)
@@ -2054,11 +2062,16 @@ fn main() -> io::Result<()> {
 
             let total_files = expanded_files.len() + manifest_files.len();
 
-            if !any_issues && !check && !cli.quiet {
+            if !any_issues && !cli.quiet {
                 println!("No issues found in {} file(s)", total_files);
             }
 
-            if check && any_issues {
+            // Reporting mode exits non-zero whenever violations are found. `--fix`
+            // keeps an exit code of 0: it prints its own "Fixed N" summary and
+            // rewrites files rather than signalling via the exit code.
+            if any_issues && !fix {
+                // The summary is emitted even under `--quiet` so CI can surface the
+                // count on stderr while stdout stays clean.
                 eprintln!(
                     "\nFound {} issue(s) across {} file(s)",
                     total_issues, total_files

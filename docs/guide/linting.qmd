@@ -100,18 +100,18 @@ unsafe fixes behave in the editor.
 
 ### CI Mode
 
-If you want to enforce linting in a CI/CD pipeline, use the `--check` flag. This
-will run the linter and exit with code 1 if any violations are found:
+`panache lint` exits with code 1 whenever any violations are found, so it works
+in a CI/CD pipeline without any extra flags:
 
 ```bash
-panache lint --check .
+panache lint .
 ```
 
-This mode is ideal for enforcing linting in CI/CD pipelines:
-
-```bash
-panache lint --check . || exit 1
-```
+::: {.callout-note}
+The `--check` flag is deprecated and now a no-op: exiting non-zero on violations
+is the default behavior. It is still accepted for backward compatibility but
+will be removed in a future release.
+:::
 
 ### Message format
 

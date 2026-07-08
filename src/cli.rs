@@ -355,9 +355,15 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
         )]
         files: Vec<PathBuf>,
 
-        /// Check mode: exit with code 1 if violations found
+        /// Deprecated: linting exits non-zero on violations by default
         #[arg(long)]
-        #[arg(help = "Exit with code 1 if violations found (CI mode)")]
+        #[arg(help = "Deprecated (no-op): lint now exits non-zero on violations by default")]
+        #[arg(
+            long_help = "Deprecated and now a no-op. `panache lint` exits with code 1 whenever \
+            any violations are found, so this flag is no longer needed. It is still accepted for \
+            backward compatibility but will be removed in a future release. Use `--fix` to apply \
+            auto-fixes instead of reporting."
+        )]
         check: bool,
 
         /// Apply auto-fixes
