@@ -186,13 +186,13 @@ jobs:
       # `gh attestation verify`. Only on real release uploads.
       - name: Attest build provenance (Unix)
         if: inputs.upload == 'true' && runner.os != 'Windows'
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: panache-${{ matrix.target }}.tar.gz
 
       - name: Attest build provenance (Windows)
         if: inputs.upload == 'true' && runner.os == 'Windows'
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: panache-${{ matrix.target }}.zip
 
