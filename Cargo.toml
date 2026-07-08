@@ -88,7 +88,7 @@ similar-asserts = "2.0.0"
 insta = { version = "1.47.2", features = ["json"] }
 assert_cmd = "2.0"
 predicates = "3.0"
-jsonschema = { version = "0.46", default-features = false }
+jsonschema = { version = "0.47", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rayon = "1.10.0"
