@@ -86,7 +86,8 @@ pub(crate) fn load_project_files(
     salsa_config: crate::salsa::FileConfig,
     root_path: PathBuf,
 ) -> HashSet<PathBuf> {
-    gs.salsa
+    gs.writer
+        .db_mut()
         .load_referenced_files(salsa_file, salsa_config, root_path)
 }
 
@@ -129,7 +130,8 @@ pub(crate) fn reload_open_documents_referenced_files(gs: &mut GlobalState) {
         if open_paths.contains(&path) {
             continue;
         }
-        gs.salsa
+        gs.writer
+            .db_mut()
             .resync_cached_file_from_disk(&path, Durability::MEDIUM);
     }
 }
@@ -153,7 +155,7 @@ pub(crate) fn reload_open_documents_config(gs: &mut GlobalState) {
     for (uri, salsa_config) in entries {
         let new_config = gs.load_config_notifying(&uri);
         salsa_config
-            .set_config(&mut gs.salsa)
+            .set_config(gs.writer.db_mut())
             .with_durability(Durability::MEDIUM)
             .to(new_config);
     }
@@ -179,16 +181,18 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     // and avoids two untitled buffers colliding on one key) (audit §3.3 / G3).
     let salsa_file = match doc_path.clone() {
         Some(path) => {
-            gs.salsa
+            gs.writer
+                .db_mut()
                 .update_file_text_with_durability(path, text.clone(), Durability::LOW)
         }
         None => gs
-            .salsa
+            .writer
+            .db_mut()
             .create_in_memory_file(text.clone(), Durability::LOW),
     };
     let salsa_config = {
-        let cfg = crate::salsa::FileConfig::new(&gs.salsa, config.clone());
-        cfg.set_config(&mut gs.salsa)
+        let cfg = crate::salsa::FileConfig::new(gs.writer.db(), config.clone());
+        cfg.set_config(gs.writer.db_mut())
             .with_durability(Durability::MEDIUM)
             .to(config.clone());
         cfg
@@ -239,7 +243,7 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
         return;
     };
 
-    let original_text = salsa_file.content_or_empty(&gs.salsa).to_string();
+    let original_text = salsa_file.content_or_empty(gs.writer.db()).to_string();
 
     // Compute the post-edit text and (when incremental parsing is enabled and
     // edit ranges can be derived) the old/new edit ranges.
@@ -273,15 +277,16 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
     // then reuses the cached refdef map and downstream queries hit the same cache.
     let doc_path_for_salsa = uri.to_file_path().map(|p| p.into_owned());
     if let Some(path) = doc_path_for_salsa.as_ref() {
-        gs.salsa
+        gs.writer
+            .db_mut()
             .update_file_text(path.clone(), updated_text.clone());
     } else {
         salsa_file
-            .set_text(&mut gs.salsa)
+            .set_text(gs.writer.db_mut())
             .with_durability(Durability::LOW)
             .to(Some(std::sync::Arc::from(updated_text.clone())));
     }
-    let refdefs = crate::salsa::refdef_set(&gs.salsa, salsa_file, salsa_config).clone();
+    let refdefs = crate::salsa::refdef_set(gs.writer.db(), salsa_file, salsa_config).clone();
 
     let (green, strategy) = if let Some((old_edit, new_edit)) = edit_ranges {
         let old_tree = SyntaxNode::new_root(original_tree_green);
@@ -328,7 +333,7 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
     }
 
     salsa_config
-        .set_config(&mut gs.salsa)
+        .set_config(gs.writer.db_mut())
         .with_durability(Durability::MEDIUM)
         .to(config.clone());
 
@@ -389,11 +394,11 @@ pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams
         let tracked = load_project_files(gs, state.salsa_file, state.salsa_config, path);
         retained.extend(tracked);
     }
-    for cached in gs.salsa.cached_file_paths() {
+    for cached in gs.writer.db().cached_file_paths() {
         if retained.contains(&cached) {
             continue;
         }
-        let _ = gs.salsa.evict_file_text(&cached);
+        let _ = gs.writer.db_mut().evict_file_text(&cached);
     }
 
     // Closing a document changes the database for the remaining open docs (a

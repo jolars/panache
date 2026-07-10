@@ -26,7 +26,7 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
         .filter_map(|change| change.uri.to_file_path().map(|p| p.into_owned()))
         .collect();
     for path in &changed_paths {
-        gs.salsa.intern_file(Some(path.clone()));
+        gs.writer.db_mut().intern_file(Some(path.clone()));
     }
 
     // A `panache.toml`/`.panache.toml` edit changes config for open documents
@@ -66,11 +66,10 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
 
         // Always keep salsa's cached file text in sync when possible.
         if let Ok(contents) = std::fs::read_to_string(&path)
-            && gs.salsa.update_file_text_if_cached_with_durability(
-                &path,
-                contents,
-                Durability::MEDIUM,
-            )
+            && gs
+                .writer
+                .db_mut()
+                .update_file_text_if_cached_with_durability(&path, contents, Durability::MEDIUM)
         {
             gs.sender.log_message(
                 MessageType::INFO,
@@ -116,13 +115,16 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
             let mut relint = false;
             if is_bibliography {
                 let parsed_yaml_regions = crate::salsa::parsed_yaml_regions_for_file(
-                    &gs.salsa,
+                    gs.writer.db(),
                     state.salsa_file,
                     state.salsa_config,
                 );
                 if helpers::is_yaml_frontmatter_valid(parsed_yaml_regions) {
-                    let metadata =
-                        crate::salsa::metadata(&gs.salsa, state.salsa_file, state.salsa_config);
+                    let metadata = crate::salsa::metadata(
+                        gs.writer.db(),
+                        state.salsa_file,
+                        state.salsa_config,
+                    );
                     if let Some(bib_info) = metadata.bibliography.as_ref()
                         && bib_info.paths.iter().any(|p| p == &path)
                     {
@@ -132,7 +134,7 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
             }
             if !relint && is_manifest {
                 let graph = crate::salsa::project_structure(
-                    &gs.salsa,
+                    gs.writer.db(),
                     state.salsa_file,
                     state.salsa_config,
                 );

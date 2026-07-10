@@ -549,7 +549,7 @@ impl LspTester {
         Some(
             state
                 .salsa_file
-                .content_or_empty(&self.gs.salsa)
+                .content_or_empty(self.gs.writer.db())
                 .to_string(),
         )
     }
@@ -562,8 +562,8 @@ impl LspTester {
     }
 
     pub fn get_cached_file_text(&self, path: &std::path::Path) -> Option<String> {
-        let file = self.gs.salsa.file_text(path.to_path_buf())?;
-        Some(file.content_or_empty(&self.gs.salsa).to_string())
+        let file = self.gs.writer.db().file_text(path.to_path_buf())?;
+        Some(file.content_or_empty(self.gs.writer.db()).to_string())
     }
 
     // --- main-loop pumping (publishes + cancel) ---
@@ -707,9 +707,12 @@ impl LspTester {
         uri: &str,
     ) -> Option<Vec<crate::linter::diagnostics::Diagnostic>> {
         let state = self.gs.document_map.get(uri)?;
-        let plan =
-            crate::salsa::built_in_lint_plan(&self.gs.salsa, state.salsa_file, state.salsa_config)
-                .clone();
+        let plan = crate::salsa::built_in_lint_plan(
+            self.gs.writer.db(),
+            state.salsa_file,
+            state.salsa_config,
+        )
+        .clone();
         Some(plan.diagnostics)
     }
 

@@ -42,7 +42,7 @@ fn op_uri_to_path(uri: &str) -> Option<PathBuf> {
 pub(crate) fn did_create_files(gs: &mut GlobalState, params: CreateFilesParams) {
     for file in &params.files {
         if let Some(path) = op_uri_to_path(&file.uri) {
-            gs.salsa.intern_file(Some(path));
+            gs.writer.db_mut().intern_file(Some(path));
         }
     }
     reload_open_documents_referenced_files(gs);
@@ -61,8 +61,8 @@ pub(crate) fn did_delete_files(gs: &mut GlobalState, params: DeleteFilesParams) 
                 .drop_uri(&uri, &gs.sender, gs.supports_pull_diagnostics);
         }
         if let Some(path) = op_uri_to_path(&file.uri) {
-            gs.salsa.evict_file_text(&path);
-            gs.salsa.intern_file(Some(path));
+            gs.writer.db_mut().evict_file_text(&path);
+            gs.writer.db_mut().intern_file(Some(path));
         }
     }
     reload_open_documents_referenced_files(gs);
@@ -82,11 +82,11 @@ pub(crate) fn did_rename_files(gs: &mut GlobalState, params: RenameFilesParams) 
                 .drop_uri(&old_uri, &gs.sender, gs.supports_pull_diagnostics);
         }
         if let Some(old_path) = op_uri_to_path(&rename.old_uri) {
-            gs.salsa.evict_file_text(&old_path);
-            gs.salsa.intern_file(Some(old_path));
+            gs.writer.db_mut().evict_file_text(&old_path);
+            gs.writer.db_mut().intern_file(Some(old_path));
         }
         if let Some(new_path) = op_uri_to_path(&rename.new_uri) {
-            gs.salsa.intern_file(Some(new_path));
+            gs.writer.db_mut().intern_file(Some(new_path));
         }
     }
     reload_open_documents_referenced_files(gs);

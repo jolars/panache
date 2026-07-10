@@ -376,8 +376,10 @@ pub(crate) struct GlobalState {
     /// bookkeeping unified behind one diff-based owner.
     pub(crate) diagnostics: DiagnosticCollection,
 
-    /// The master salsa handle, mutated only on the main thread.
-    pub(crate) salsa: crate::salsa::SalsaDb,
+    /// The salsa writer. Owns the master database handle, mutated only on the
+    /// main thread. Concentrates every salsa-touching access behind one type so
+    /// the database can later move onto a dedicated writer thread.
+    pub(crate) writer: crate::lsp::writer::WriterHandle,
 
     pub(crate) pool: TaskPool<Task>,
     /// Dedicated single-thread pool for formatting requests. Matches
@@ -446,7 +448,7 @@ impl GlobalState {
             supports_diagnostic_refresh: false,
             supports_related_documents: false,
             diagnostics: DiagnosticCollection::default(),
-            salsa: crate::salsa::SalsaDb::default(),
+            writer: crate::lsp::writer::WriterHandle::new(),
             pool,
             fmt_pool,
             task_receiver,
@@ -497,7 +499,7 @@ impl GlobalState {
     /// A cheap read snapshot for a worker thread.
     pub(crate) fn snapshot(&self) -> StateSnapshot {
         StateSnapshot {
-            analysis: crate::salsa::Analysis::new(self.salsa.clone()),
+            analysis: self.writer.analysis(),
             document_map: Arc::clone(&self.document_map),
             workspace_folders: self.workspace_folders.clone(),
             diagnostics: self.diagnostics.shared(),
