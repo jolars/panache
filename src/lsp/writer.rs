@@ -20,10 +20,11 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use lsp_types::{MessageType, Uri};
 
-use crate::lsp::global_state::ClientSender;
+use crate::lsp::global_state::{ClientSender, DocumentMap};
 use crate::salsa::{Analysis, SalsaDb};
 
 /// Owns the master salsa database handle and the config state that feeds it.
@@ -32,10 +33,16 @@ use crate::salsa::{Analysis, SalsaDb};
 /// `salsa::Storage`); writes go through [`db_mut`](Self::db_mut). Config
 /// resolution lives here too (workspace roots, the extend-chain watch set, the
 /// toast-dedup record) because loading a document's config is a write-side
-/// concern that feeds `FileConfig` inputs. The document map and settle machinery
-/// migrate here in later phases.
+/// concern that feeds `FileConfig` inputs. The writer owns the whole document
+/// map (salsa handles + trees + paths), not just the salsa-input side, so it
+/// can mint a complete `StateSnapshot` without bouncing back to the main loop.
+/// The settle machinery migrates here in a later phase.
 pub(crate) struct WriterHandle {
     db: SalsaDb,
+
+    /// Open documents. `Arc` so snapshots clone it in O(1); writers use
+    /// [`Arc::make_mut`] for copy-on-write single-writer semantics.
+    document_map: Arc<DocumentMap>,
 
     /// Workspace roots, for per-document (longest-prefix) config resolution.
     workspace_folders: Vec<PathBuf>,
@@ -62,6 +69,7 @@ impl WriterHandle {
     pub(crate) fn new(sender: ClientSender) -> Self {
         Self {
             db: SalsaDb::default(),
+            document_map: Arc::new(DocumentMap::new()),
             workspace_folders: Vec::new(),
             watched_config_files: HashSet::new(),
             config_error_reports: HashMap::new(),
@@ -83,6 +91,22 @@ impl WriterHandle {
     /// Mint a cheap read-only snapshot of the database for a worker thread.
     pub(crate) fn analysis(&self) -> Analysis {
         Analysis::new(self.db.clone())
+    }
+
+    /// Shared read access to the open-document map.
+    pub(crate) fn document_map(&self) -> &DocumentMap {
+        &self.document_map
+    }
+
+    /// Mutable access to the document map (copy-on-write if a snapshot still
+    /// holds the previous `Arc`).
+    pub(crate) fn document_map_mut(&mut self) -> &mut DocumentMap {
+        Arc::make_mut(&mut self.document_map)
+    }
+
+    /// A cheap `Arc` clone of the document map, for snapshot assembly.
+    pub(crate) fn document_map_arc(&self) -> Arc<DocumentMap> {
+        Arc::clone(&self.document_map)
     }
 
     /// The current workspace roots.

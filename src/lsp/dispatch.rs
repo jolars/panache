@@ -795,7 +795,8 @@ impl GlobalState {
         let snap = self.snapshot();
         let sender = self.pool.result_sender();
         let uris: Vec<Uri> = self
-            .document_map
+            .writer
+            .document_map()
             .keys()
             .filter_map(|key| key.parse::<Uri>().ok())
             .collect();
@@ -890,7 +891,7 @@ impl GlobalState {
         if reload_elapsed >= Duration::from_millis(50) {
             log::warn!(
                 "settle write-phase (referenced-file reload) blocked {reload_elapsed:?} for {} open doc(s)",
-                self.document_map.len()
+                self.writer.document_map().len()
             );
         }
 

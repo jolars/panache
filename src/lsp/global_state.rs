@@ -351,9 +351,6 @@ pub(crate) enum Task {
 pub(crate) struct GlobalState {
     pub(crate) sender: ClientSender,
 
-    /// Open documents. `Arc` so snapshots clone it in O(1); writers use
-    /// [`Arc::make_mut`] for copy-on-write single-writer semantics.
-    pub(crate) document_map: Arc<DocumentMap>,
     pub(crate) runtime_settings: LspRuntimeSettings,
 
     /// Whether the client advertised support for the pull diagnostics model at
@@ -424,7 +421,6 @@ impl GlobalState {
         let pool = TaskPool::new(task_tx.clone(), default_pool_size());
         let fmt_pool = TaskPool::new(task_tx, 1);
         Self {
-            document_map: Arc::new(DocumentMap::new()),
             runtime_settings: LspRuntimeSettings::default(),
             supports_pull_diagnostics: false,
             supports_diagnostic_refresh: false,
@@ -450,18 +446,12 @@ impl GlobalState {
     pub(crate) fn snapshot(&self) -> StateSnapshot {
         StateSnapshot {
             analysis: self.writer.analysis(),
-            document_map: Arc::clone(&self.document_map),
+            document_map: self.writer.document_map_arc(),
             workspace_folders: self.writer.workspace_folders().to_vec(),
             diagnostics: self.diagnostics.shared(),
             supports_pull_diagnostics: self.supports_pull_diagnostics,
             supports_related_documents: self.supports_related_documents,
         }
-    }
-
-    /// Mutable access to the document map (copy-on-write if a snapshot still
-    /// holds the previous `Arc`).
-    pub(crate) fn document_map_mut(&mut self) -> &mut DocumentMap {
-        Arc::make_mut(&mut self.document_map)
     }
 
     /// Send a successful or error response for `id` to the client and clear it

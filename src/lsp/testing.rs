@@ -545,7 +545,7 @@ impl LspTester {
     // --- state inspection (test-only) ---
 
     pub fn get_document_content(&self, uri: &str) -> Option<String> {
-        let state = self.gs.document_map.get(uri)?;
+        let state = self.gs.writer.document_map().get(uri)?;
         Some(
             state
                 .salsa_file
@@ -556,7 +556,8 @@ impl LspTester {
 
     pub fn get_document_tree(&self, uri: &str) -> Option<crate::SyntaxNode> {
         self.gs
-            .document_map
+            .writer
+            .document_map()
             .get(uri)
             .map(|state| crate::SyntaxNode::new_root(state.tree.clone()))
     }
@@ -706,7 +707,7 @@ impl LspTester {
         &self,
         uri: &str,
     ) -> Option<Vec<crate::linter::diagnostics::Diagnostic>> {
-        let state = self.gs.document_map.get(uri)?;
+        let state = self.gs.writer.document_map().get(uri)?;
         let plan = crate::salsa::built_in_lint_plan(
             self.gs.writer.db(),
             state.salsa_file,
@@ -726,7 +727,7 @@ impl LspTester {
     pub fn relint_all_open_documents(&self) -> usize {
         let snap = self.snapshot();
         let mut total = 0;
-        for key in self.gs.document_map.keys() {
+        for key in self.gs.writer.document_map().keys() {
             if let Ok(uri) = key.parse::<Uri>() {
                 total += handlers::diagnostics::compute_publishes(&snap, &uri, false).len();
             }

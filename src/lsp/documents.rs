@@ -98,14 +98,16 @@ pub(crate) fn load_project_files(
 /// loading here before the next snapshot lets the re-lint observe fresh content.
 pub(crate) fn reload_open_documents_referenced_files(gs: &mut GlobalState) {
     let open_docs: Vec<(crate::salsa::FileText, crate::salsa::FileConfig, PathBuf)> = gs
-        .document_map
+        .writer
+        .document_map()
         .values()
         .filter_map(|state| Some((state.salsa_file, state.salsa_config, state.path.clone()?)))
         .collect();
     // A path open as a document has buffer-authoritative content; it must never
     // be re-read from disk below or an unsaved edit would be clobbered.
     let open_paths: HashSet<PathBuf> = gs
-        .document_map
+        .writer
+        .document_map()
         .values()
         .filter_map(|state| state.path.clone())
         .collect();
@@ -148,7 +150,8 @@ pub(crate) fn reload_open_documents_referenced_files(gs: &mut GlobalState) {
 /// re-publishes diagnostics.
 pub(crate) fn reload_open_documents_config(gs: &mut GlobalState) {
     let entries: Vec<(lsp_types::Uri, crate::salsa::FileConfig)> = gs
-        .document_map
+        .writer
+        .document_map()
         .iter()
         .filter_map(|(uri_str, state)| Some((uri_str.parse().ok()?, state.salsa_config)))
         .collect();
@@ -198,7 +201,7 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
         cfg
     };
 
-    gs.document_map_mut().insert(
+    gs.writer.document_map_mut().insert(
         uri_string.clone(),
         DocumentState {
             path: doc_path.clone(),
@@ -236,7 +239,8 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
     let incremental_enabled = gs.runtime_settings.experimental_incremental_parsing;
 
     let Some((salsa_file, salsa_config, original_tree_green)) = gs
-        .document_map
+        .writer
+        .document_map()
         .get(&uri_string)
         .map(|doc| (doc.salsa_file, doc.salsa_config, doc.tree.clone()))
     else {
@@ -325,7 +329,7 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
 
     log::debug!("did_change parse strategy={strategy} changes={change_count}");
 
-    if let Some(doc_state) = gs.document_map_mut().get_mut(&uri_string) {
+    if let Some(doc_state) = gs.writer.document_map_mut().get_mut(&uri_string) {
         doc_state.tree = green;
         doc_state.path = doc_path_for_salsa.clone();
     } else {
@@ -360,7 +364,8 @@ pub(crate) fn did_save(gs: &mut GlobalState, params: DidSaveTextDocumentParams) 
     // them. (The dispatch write phase reloads too, but doing it here keeps
     // interactive reads in the debounce window consistent.)
     if let Some((salsa_file, salsa_config, Some(path))) = gs
-        .document_map
+        .writer
+        .document_map()
         .get(&uri.to_string())
         .map(|doc| (doc.salsa_file, doc.salsa_config, doc.path.clone()))
     {
@@ -375,7 +380,7 @@ pub(crate) fn did_save(gs: &mut GlobalState, params: DidSaveTextDocumentParams) 
 pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams) {
     let uri = params.text_document.uri.clone();
     let uri_string = uri.to_string();
-    gs.document_map_mut().remove(&uri_string);
+    gs.writer.document_map_mut().remove(&uri_string);
 
     // Drop the closed document's own diagnostics immediately so a pull issued
     // before the next settle no longer reports it (push: empty publish). Any
@@ -385,7 +390,7 @@ pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams
     gs.diagnostics
         .drop_uri(&uri, &gs.sender, gs.supports_pull_diagnostics);
 
-    let states: Vec<DocumentState> = gs.document_map.values().cloned().collect();
+    let states: Vec<DocumentState> = gs.writer.document_map().values().cloned().collect();
     let mut retained = HashSet::new();
     for state in states {
         let Some(path) = state.path.clone() else {

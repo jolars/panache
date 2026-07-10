@@ -98,7 +98,8 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
         // re-publish on, or clear from, the manifest's own URI). Consult salsa so
         // the reads observe the freshly-synced content above.
         let states: Vec<(String, DocumentState)> = gs
-            .document_map
+            .writer
+            .document_map()
             .iter()
             .map(|(uri_str, state)| (uri_str.clone(), state.clone()))
             .collect();

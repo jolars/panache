@@ -44,7 +44,7 @@ Guard: the test `transient_cross_thread_snapshots_stay_live_and_visible` in
 `src/lsp/writer.rs` pins this. If it fails, or anyone reintroduces a persistent
 `read_db` clone on the main loop, that's the regression.
 
-## Landed so far (4 commits on `lsp-writer-thread`, oldest first)
+## Landed so far (5 commits on `lsp-writer-thread`, oldest first)
 
 1. `07e5ea24` refactor(lsp): route salsa access through `WriterHandle` ---
    `WriterHandle` owns the `SalsaDb`; all `gs.salsa` sites go through
@@ -58,30 +58,21 @@ Guard: the test `transient_cross_thread_snapshots_stay_live_and_visible` in
    `workspace_folders`, extend-chain watch set, config-error toast dedup, and
    `load_config_notifying` moved onto `WriterHandle` (holds a `ClientSender`
    clone). **Writer now owns db + config.**
+5. refactor(lsp): move document map into the writer --- `WriterHandle` owns the
+   whole `Arc<DocumentMap>` (per the design decision below: whole map, not just
+   the salsa-input side); `GlobalState` accesses it via
+   `writer.document_map()/document_map_mut()`, `snapshot()` uses
+   `writer.document_map_arc()`. `StateSnapshot`'s own `document_map` field is
+   unchanged. **Writer now owns db + config + document map.**
 
 Every commit is green: LSP suite (296 tests), clippy `-D warnings`, rustfmt.
 
-## Next edits (mapped, not started)
+## Next edits
 
-**1. Document map → writer.** Add `document_map()` / `document_map_mut()` (via
-`Arc::make_mut`) / `document_map_arc()` to `WriterHandle`; remove the
-`Arc<DocumentMap>` field from `GlobalState`. `StateSnapshot`'s OWN
-`document_map` field STAYS (it is assembled at snapshot time). GlobalState-side
-sites (\~15, some multi-line `gs\n.document_map…`):
-
-- `src/lsp/documents.rs`: 101, 108, 151, 201, 239, 328, 363, 378, 388
-- `src/lsp/dispatch.rs`: 798, 893
-- `src/lsp/handlers/file_watcher.rs`: 101
-- `src/lsp/testing.rs`: 548, 559, 709, 729
-
-Rule: `gs.document_map` → `gs.writer.document_map()`; `gs.document_map_mut()` →
-`gs.writer.document_map_mut()`; `snapshot()`'s `Arc::clone(&self.document_map)`
-→ `self.writer.document_map_arc()`.
-
-**2. Diagnostics store → writer** --- defer; entangled with `on_task`/settle
+**1. Diagnostics store → writer** --- defer; entangled with `on_task`/settle
 application, so it lands with the settle-on-writer phase.
 
-**3. Thread spawn** (`WriterHandle::spawn()` + `ReadJob` channel + `Outbound`
+**2. Thread spawn** (`WriterHandle::spawn()` + `ReadJob` channel + `Outbound`
 channel), then **settle on the writer**, then the **harvester thread** for the
 referenced-file disk I/O (the actual latency win), then **version-gating** of
 publishes.
@@ -117,7 +108,7 @@ cd <repo> && git checkout lsp-writer-thread
 # read this file top-to-bottom, then:
 cargo test --features lsp lsp
 cargo clippy --features lsp --all-targets -- -D warnings
-# continue at "Next edits -> 1. Document map -> writer"
+# continue at "Next edits -> 2. Thread spawn"
 ```
 
 Keep each field-group move a separate green commit. Verify per step with the two
