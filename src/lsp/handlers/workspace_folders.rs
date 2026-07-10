@@ -23,16 +23,13 @@ pub(crate) fn did_change_workspace_folders(
         .iter()
         .filter_map(|folder| folder.uri.to_file_path().map(|p| p.into_owned()))
         .collect();
-    gs.workspace_folders
-        .retain(|folder| !removed.contains(folder));
-
-    for folder in &params.event.added {
-        if let Some(path) = folder.uri.to_file_path().map(|p| p.into_owned())
-            && !gs.workspace_folders.contains(&path)
-        {
-            gs.workspace_folders.push(path);
-        }
-    }
+    let added: Vec<_> = params
+        .event
+        .added
+        .iter()
+        .filter_map(|folder| folder.uri.to_file_path().map(|p| p.into_owned()))
+        .collect();
+    gs.writer.update_workspace_folders(&removed, added);
 
     crate::lsp::documents::reload_open_documents_config(gs);
     gs.arm_settle();

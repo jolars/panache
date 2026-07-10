@@ -354,7 +354,6 @@ pub(crate) struct GlobalState {
     /// Open documents. `Arc` so snapshots clone it in O(1); writers use
     /// [`Arc::make_mut`] for copy-on-write single-writer semantics.
     pub(crate) document_map: Arc<DocumentMap>,
-    pub(crate) workspace_folders: Vec<PathBuf>,
     pub(crate) runtime_settings: LspRuntimeSettings,
 
     /// Whether the client advertised support for the pull diagnostics model at
@@ -417,21 +416,6 @@ pub(crate) struct GlobalState {
     /// externals run only for these. Retired in `on_task` once the pass that ran
     /// them completes, so a save queued after dispatch survives a cancellation.
     pub(crate) external_pending: HashSet<Uri>,
-
-    /// The last config parse error toasted per config-file path, so a broken
-    /// `panache.toml` raises a `window/showMessage` once (not on every keystroke
-    /// that reloads config). Cleared when the file parses again, so a later
-    /// breakage re-notifies. The persistent surface is the diagnostic published
-    /// on the config file itself; this is the one-shot heads-up.
-    pub(crate) config_error_reports: HashMap<PathBuf, String>,
-
-    /// Canonical paths of config files reached via `extend` by some open
-    /// document's config. The config-name globs only match `panache.toml` /
-    /// `.panache.toml`, so a differently-named base (`base.toml`) would go
-    /// unwatched; the file watcher consults this set to reload open documents
-    /// when such a base changes. Accumulated as documents load their config;
-    /// stale entries only cost an occasional harmless (idempotent) reload.
-    pub(crate) watched_config_files: HashSet<PathBuf>,
 }
 
 impl GlobalState {
@@ -440,15 +424,14 @@ impl GlobalState {
         let pool = TaskPool::new(task_tx.clone(), default_pool_size());
         let fmt_pool = TaskPool::new(task_tx, 1);
         Self {
-            sender,
             document_map: Arc::new(DocumentMap::new()),
-            workspace_folders: Vec::new(),
             runtime_settings: LspRuntimeSettings::default(),
             supports_pull_diagnostics: false,
             supports_diagnostic_refresh: false,
             supports_related_documents: false,
             diagnostics: DiagnosticCollection::default(),
-            writer: crate::lsp::writer::WriterHandle::new(),
+            writer: crate::lsp::writer::WriterHandle::new(sender.clone()),
+            sender,
             pool,
             fmt_pool,
             task_receiver,
@@ -460,39 +443,6 @@ impl GlobalState {
             lint_generation: 0,
             last_applied_lint_generation: 0,
             external_pending: HashSet::new(),
-            config_error_reports: HashMap::new(),
-            watched_config_files: HashSet::new(),
-        }
-    }
-
-    /// Load config for `uri` on the main loop, toasting once when a discovered
-    /// `panache.toml` fails to parse and falling back to the flavor-detected
-    /// default so the document still parses and lints.
-    ///
-    /// The persistent surface is the diagnostic the settle pass publishes on the
-    /// config file (see [`crate::lsp::handlers::diagnostics::config_publishes`]);
-    /// this adds a one-shot `window/showMessage` and clears the dedup record when
-    /// the file parses again, so a later breakage re-notifies.
-    pub(crate) fn load_config_notifying(&mut self, uri: &Uri) -> crate::Config {
-        match crate::lsp::config::try_load_config_with_chain(&self.workspace_folders, Some(uri)) {
-            Ok((config, source, chain)) => {
-                if let Some(path) = source.path() {
-                    self.config_error_reports.remove(path);
-                }
-                // Track every file in the extend chain so the watcher reloads
-                // this document when a base config (any name/location) changes.
-                self.watched_config_files.extend(chain);
-                config
-            }
-            Err(err) => {
-                if self.config_error_reports.get(&err.path) != Some(&err.message) {
-                    self.sender
-                        .show_message(MessageType::ERROR, format!("panache: {err}"));
-                    self.config_error_reports
-                        .insert(err.path.clone(), err.message.clone());
-                }
-                crate::lsp::config::default_config_for_uri(Some(uri))
-            }
         }
     }
 
@@ -501,7 +451,7 @@ impl GlobalState {
         StateSnapshot {
             analysis: self.writer.analysis(),
             document_map: Arc::clone(&self.document_map),
-            workspace_folders: self.workspace_folders.clone(),
+            workspace_folders: self.writer.workspace_folders().to_vec(),
             diagnostics: self.diagnostics.shared(),
             supports_pull_diagnostics: self.supports_pull_diagnostics,
             supports_related_documents: self.supports_related_documents,

@@ -41,7 +41,8 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
             path.file_name().and_then(|name| name.to_str()),
             Some("panache.toml") | Some(".panache.toml")
         ) || gs
-            .watched_config_files
+            .writer
+            .watched_config_files()
             .contains(&path.canonicalize().unwrap_or_else(|_| path.clone()))
     });
     if config_changed {

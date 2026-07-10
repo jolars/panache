@@ -229,7 +229,7 @@ impl GlobalState {
         {
             folders.push(path.into_owned());
         }
-        self.workspace_folders = folders;
+        self.writer.set_workspace_folders(folders);
 
         let experimental = experimental_incremental_parsing_from_initialize(&params);
         self.runtime_settings.experimental_incremental_parsing = experimental;

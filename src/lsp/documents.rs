@@ -153,7 +153,7 @@ pub(crate) fn reload_open_documents_config(gs: &mut GlobalState) {
         .filter_map(|(uri_str, state)| Some((uri_str.parse().ok()?, state.salsa_config)))
         .collect();
     for (uri, salsa_config) in entries {
-        let new_config = gs.load_config_notifying(&uri);
+        let new_config = gs.writer.load_config_notifying(&uri);
         salsa_config
             .set_config(gs.writer.db_mut())
             .with_durability(Durability::MEDIUM)
@@ -169,7 +169,7 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     log::debug!("did_open uri={uri_string}, bytes={}", text.len());
     let start = Instant::now();
 
-    let config = gs.load_config_notifying(&uri);
+    let config = gs.writer.load_config_notifying(&uri);
     let tree = {
         let syntax_tree = crate::parse(&text, Some(config.clone()));
         GreenNode::from(syntax_tree.green())
@@ -232,7 +232,7 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
     log::debug!("did_change uri={uri_string}, changes={change_count}");
     let start = Instant::now();
 
-    let config = gs.load_config_notifying(&uri);
+    let config = gs.writer.load_config_notifying(&uri);
     let incremental_enabled = gs.runtime_settings.experimental_incremental_parsing;
 
     let Some((salsa_file, salsa_config, original_tree_green)) = gs

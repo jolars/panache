@@ -18,23 +18,54 @@
 //!
 //! [`GlobalState`]: crate::lsp::global_state::GlobalState
 
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+
+use lsp_types::{MessageType, Uri};
+
+use crate::lsp::global_state::ClientSender;
 use crate::salsa::{Analysis, SalsaDb};
 
-/// Owns the master salsa database handle.
+/// Owns the master salsa database handle and the config state that feeds it.
 ///
 /// Reads clone the handle (`Analysis`, a cheap `Arc` bump over the shared
-/// `salsa::Storage`); writes go through [`db_mut`](Self::db_mut). The wrapper
-/// carries no other state yet — the salsa-input side of the document map and the
-/// settle machinery migrate here in later phases.
+/// `salsa::Storage`); writes go through [`db_mut`](Self::db_mut). Config
+/// resolution lives here too (workspace roots, the extend-chain watch set, the
+/// toast-dedup record) because loading a document's config is a write-side
+/// concern that feeds `FileConfig` inputs. The document map and settle machinery
+/// migrate here in later phases.
 pub(crate) struct WriterHandle {
     db: SalsaDb,
+
+    /// Workspace roots, for per-document (longest-prefix) config resolution.
+    workspace_folders: Vec<PathBuf>,
+
+    /// Canonical paths of config files reached via `extend` by some open
+    /// document's config. The config-name globs only match `panache.toml` /
+    /// `.panache.toml`, so a differently-named base (`base.toml`) would go
+    /// unwatched; the file watcher consults this set to reload open documents
+    /// when such a base changes.
+    watched_config_files: HashSet<PathBuf>,
+
+    /// The last config parse error toasted per config-file path, so a broken
+    /// `panache.toml` raises a `window/showMessage` once (not on every keystroke
+    /// that reloads config). Cleared when the file parses again, so a later
+    /// breakage re-notifies.
+    config_error_reports: HashMap<PathBuf, String>,
+
+    /// Client channel for the one-shot config-parse-error toast.
+    sender: ClientSender,
 }
 
 impl WriterHandle {
     /// A fresh writer over a default (empty) database.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(sender: ClientSender) -> Self {
         Self {
             db: SalsaDb::default(),
+            workspace_folders: Vec::new(),
+            watched_config_files: HashSet::new(),
+            config_error_reports: HashMap::new(),
+            sender,
         }
     }
 
@@ -53,11 +84,64 @@ impl WriterHandle {
     pub(crate) fn analysis(&self) -> Analysis {
         Analysis::new(self.db.clone())
     }
-}
 
-impl Default for WriterHandle {
-    fn default() -> Self {
-        Self::new()
+    /// The current workspace roots.
+    pub(crate) fn workspace_folders(&self) -> &[PathBuf] {
+        &self.workspace_folders
+    }
+
+    /// Replace the workspace roots (set once at `initialize`).
+    pub(crate) fn set_workspace_folders(&mut self, folders: Vec<PathBuf>) {
+        self.workspace_folders = folders;
+    }
+
+    /// Apply a `didChangeWorkspaceFolders` delta: drop removed roots, append new
+    /// ones (deduplicated).
+    pub(crate) fn update_workspace_folders(&mut self, removed: &[PathBuf], added: Vec<PathBuf>) {
+        self.workspace_folders
+            .retain(|folder| !removed.contains(folder));
+        for path in added {
+            if !self.workspace_folders.contains(&path) {
+                self.workspace_folders.push(path);
+            }
+        }
+    }
+
+    /// Config files reached via `extend`, watched so a renamed base config still
+    /// triggers a reload.
+    pub(crate) fn watched_config_files(&self) -> &HashSet<PathBuf> {
+        &self.watched_config_files
+    }
+
+    /// Load config for `uri`, toasting once when a discovered `panache.toml`
+    /// fails to parse and falling back to the flavor-detected default so the
+    /// document still parses and lints.
+    ///
+    /// The persistent surface is the diagnostic the settle pass publishes on the
+    /// config file (see [`crate::lsp::handlers::diagnostics::config_publishes`]);
+    /// this adds a one-shot `window/showMessage` and clears the dedup record when
+    /// the file parses again, so a later breakage re-notifies.
+    pub(crate) fn load_config_notifying(&mut self, uri: &Uri) -> crate::Config {
+        match crate::lsp::config::try_load_config_with_chain(&self.workspace_folders, Some(uri)) {
+            Ok((config, source, chain)) => {
+                if let Some(path) = source.path() {
+                    self.config_error_reports.remove(path);
+                }
+                // Track every file in the extend chain so the watcher reloads
+                // this document when a base config (any name/location) changes.
+                self.watched_config_files.extend(chain);
+                config
+            }
+            Err(err) => {
+                if self.config_error_reports.get(&err.path) != Some(&err.message) {
+                    self.sender
+                        .show_message(MessageType::ERROR, format!("panache: {err}"));
+                    self.config_error_reports
+                        .insert(err.path.clone(), err.message.clone());
+                }
+                crate::lsp::config::default_config_for_uri(Some(uri))
+            }
+        }
     }
 }
 
@@ -95,7 +179,9 @@ mod tests {
         const ROUNDS: u64 = 200;
         let path = std::path::PathBuf::from("/spike/doc.qmd");
 
-        let mut writer = WriterHandle::new();
+        // A throwaway client channel; this test never emits toasts.
+        let (client_tx, _client_rx) = crossbeam_channel::unbounded();
+        let mut writer = WriterHandle::new(crate::lsp::global_state::ClientSender::new(client_tx));
         let file = writer.db_mut().update_file_text_with_durability(
             path.clone(),
             "v0".to_string(),
