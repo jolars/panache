@@ -8,10 +8,15 @@ use lsp_types::{DidChangeWatchedFilesParams, MessageType, Uri};
 
 use super::super::helpers;
 use crate::lsp::DocumentState;
-use crate::lsp::global_state::GlobalState;
 use crate::lsp::uri_ext::UriExt;
+use crate::lsp::writer::WriterHandle;
+use crate::lsp::writer_command::WriteEffects;
 
-pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWatchedFilesParams) {
+pub(crate) fn did_change_watched_files(
+    w: &mut WriterHandle,
+    fx: &mut WriteEffects,
+    params: DidChangeWatchedFilesParams,
+) {
     // A watcher event means the filesystem changed in a way salsa cannot see
     // through its inputs: `collect_includes` / `find_project_documents` probe the
     // filesystem directly (residual G3 reads), so a newly-created include is
@@ -26,7 +31,7 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
         .filter_map(|change| change.uri.to_file_path().map(|p| p.into_owned()))
         .collect();
     for path in &changed_paths {
-        gs.writer.db_mut().intern_file(Some(path.clone()));
+        w.db_mut().intern_file(Some(path.clone()));
     }
 
     // A `panache.toml`/`.panache.toml` edit changes config for open documents
@@ -40,19 +45,18 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
         matches!(
             path.file_name().and_then(|name| name.to_str()),
             Some("panache.toml") | Some(".panache.toml")
-        ) || gs
-            .writer
+        ) || w
             .watched_config_files()
             .contains(&path.canonicalize().unwrap_or_else(|_| path.clone()))
     });
     if config_changed {
-        crate::lsp::documents::reload_open_documents_config(gs);
+        crate::lsp::documents::reload_open_documents_config(w);
     }
 
     // Reloading the open documents' referenced files on the writer then loads any
     // newly-created file (flipping its `None`->`Some` text input) before the
     // cached-text sync and re-lint below, so both observe fresh content.
-    crate::lsp::documents::reload_open_documents_referenced_files(gs);
+    crate::lsp::documents::reload_open_documents_referenced_files(w);
 
     for change in params.changes {
         let Some(path) = change.uri.to_file_path().map(|p| p.into_owned()) else {
@@ -67,12 +71,13 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
 
         // Always keep salsa's cached file text in sync when possible.
         if let Ok(contents) = std::fs::read_to_string(&path)
-            && gs
-                .writer
-                .db_mut()
-                .update_file_text_if_cached_with_durability(&path, contents, Durability::MEDIUM)
+            && w.db_mut().update_file_text_if_cached_with_durability(
+                &path,
+                contents,
+                Durability::MEDIUM,
+            )
         {
-            gs.sender.log_message(
+            w.sender().log_message(
                 MessageType::INFO,
                 format!("Updated cached file: {}", path.display()),
             );
@@ -87,7 +92,7 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
             continue;
         }
 
-        gs.sender.log_message(
+        w.sender().log_message(
             MessageType::INFO,
             format!("Referenced file changed: {}", path.display()),
         );
@@ -97,8 +102,7 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
         // takes effect immediately (bib indices refresh; manifest parse errors
         // re-publish on, or clear from, the manifest's own URI). Consult salsa so
         // the reads observe the freshly-synced content above.
-        let states: Vec<(String, DocumentState)> = gs
-            .writer
+        let states: Vec<(String, DocumentState)> = w
             .document_map()
             .iter()
             .map(|(uri_str, state)| (uri_str.clone(), state.clone()))
@@ -117,16 +121,13 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
             let mut relint = false;
             if is_bibliography {
                 let parsed_yaml_regions = crate::salsa::parsed_yaml_regions_for_file(
-                    gs.writer.db(),
+                    w.db(),
                     state.salsa_file,
                     state.salsa_config,
                 );
                 if helpers::is_yaml_frontmatter_valid(parsed_yaml_regions) {
-                    let metadata = crate::salsa::metadata(
-                        gs.writer.db(),
-                        state.salsa_file,
-                        state.salsa_config,
-                    );
+                    let metadata =
+                        crate::salsa::metadata(w.db(), state.salsa_file, state.salsa_config);
                     if let Some(bib_info) = metadata.bibliography.as_ref()
                         && bib_info.paths.iter().any(|p| p == &path)
                     {
@@ -135,11 +136,8 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
                 }
             }
             if !relint && is_manifest {
-                let graph = crate::salsa::project_structure(
-                    gs.writer.db(),
-                    state.salsa_file,
-                    state.salsa_config,
-                );
+                let graph =
+                    crate::salsa::project_structure(w.db(), state.salsa_file, state.salsa_config);
                 relint = graph
                     .dependencies(&doc_path, Some(crate::salsa::EdgeKind::ProjectConfig))
                     .into_iter()
@@ -158,7 +156,7 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
         // open document, so manifest parse errors re-publish on (or clear from)
         // the manifest's own URI even for documents not flagged here.
         for uri in affected_documents {
-            gs.arm_settle_external(uri);
+            fx.arm_settle_external(uri);
         }
     }
 
@@ -166,6 +164,6 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
     // text); arm the settle so the all-docs pass re-lints over the fresh state
     // even when no document was flagged for external linters above.
     if !changed_paths.is_empty() {
-        gs.arm_settle();
+        fx.arm_settle();
     }
 }

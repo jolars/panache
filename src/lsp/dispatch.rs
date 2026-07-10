@@ -232,7 +232,9 @@ impl GlobalState {
         self.writer.set_workspace_folders(folders);
 
         let experimental = experimental_incremental_parsing_from_initialize(&params);
-        self.runtime_settings.experimental_incremental_parsing = experimental;
+        self.writer
+            .runtime_settings_mut()
+            .experimental_incremental_parsing = experimental;
         log::debug!(
             "lsp runtime setting experimental.incrementalParsing={experimental} (initialize options)"
         );
@@ -539,35 +541,30 @@ impl GlobalState {
 
     /// The single entry point for every database-mutating notification.
     ///
-    /// Runs synchronously on the main loop today; the writer-thread port moves
-    /// the salsa side of each arm off-thread while this stays the place the main
-    /// loop enqueues a [`WriteCommand`].
+    /// The handler itself runs against writer-owned state
+    /// ([`WriterHandle::apply`](crate::lsp::writer::WriterHandle::apply)); the
+    /// main-loop side effects it requested are applied here afterwards. When the
+    /// writer moves off-thread, this becomes "send the command, apply the
+    /// effects when they come back".
     pub(crate) fn apply_write(&mut self, cmd: crate::lsp::writer_command::WriteCommand) {
-        use crate::lsp::writer_command::WriteCommand;
+        let mut fx = crate::lsp::writer_command::WriteEffects::default();
+        self.writer.apply(cmd, &mut fx);
+        self.apply_write_effects(fx);
+    }
 
-        match cmd {
-            WriteCommand::DidOpen(params) => documents::did_open(self, params),
-            WriteCommand::DidChange(params) => documents::did_change(self, params),
-            WriteCommand::DidSave(params) => documents::did_save(self, params),
-            WriteCommand::DidClose(params) => documents::did_close(self, params),
-            WriteCommand::DidChangeConfiguration(params) => {
-                handlers::configuration::did_change_configuration(self, params)
-            }
-            WriteCommand::DidChangeWatchedFiles(params) => {
-                handlers::file_watcher::did_change_watched_files(self, params)
-            }
-            WriteCommand::DidChangeWorkspaceFolders(params) => {
-                handlers::workspace_folders::did_change_workspace_folders(self, params)
-            }
-            WriteCommand::DidCreateFiles(params) => {
-                handlers::file_operations::did_create_files(self, params)
-            }
-            WriteCommand::DidRenameFiles(params) => {
-                handlers::file_operations::did_rename_files(self, params)
-            }
-            WriteCommand::DidDeleteFiles(params) => {
-                handlers::file_operations::did_delete_files(self, params)
-            }
+    /// Apply the main-loop side effects a write handler requested: immediate
+    /// diagnostics drops, then settle arming (order matters only in that a drop
+    /// must not wait behind the debounce window).
+    pub(crate) fn apply_write_effects(&mut self, fx: crate::lsp::writer_command::WriteEffects) {
+        for uri in fx.dropped {
+            self.diagnostics
+                .drop_uri(&uri, &self.sender, self.supports_pull_diagnostics);
+        }
+        if fx.settle {
+            self.arm_settle();
+        }
+        for uri in fx.external {
+            self.arm_settle_external(uri);
         }
     }
 
@@ -886,7 +883,7 @@ impl GlobalState {
         // Time it so a perceptible stall is attributable here rather than to the
         // off-thread read pass below.
         let reload_start = Instant::now();
-        documents::reload_open_documents_referenced_files(self);
+        documents::reload_open_documents_referenced_files(&mut self.writer);
         let reload_elapsed = reload_start.elapsed();
         if reload_elapsed >= Duration::from_millis(50) {
             log::warn!(

@@ -13,7 +13,8 @@ use lsp_types::*;
 
 use super::dispatch::{server_capabilities, server_info};
 use super::global_state::{ClientSender, GlobalState};
-use super::{documents, handlers};
+use super::handlers;
+use super::writer_command::WriteCommand;
 use crate::salsa::Db;
 
 /// Decode the `value` of each streamed `$/progress` notification, asserting every
@@ -179,7 +180,10 @@ impl LspTester {
     }
 
     pub fn experimental_incremental_parsing_enabled(&self) -> bool {
-        self.gs.runtime_settings.experimental_incremental_parsing
+        self.gs
+            .writer
+            .runtime_settings()
+            .experimental_incremental_parsing
     }
 
     pub fn open_document(&mut self, uri: &str, content: &str, language_id: &str) {
@@ -191,7 +195,7 @@ impl LspTester {
                 text: content.to_string(),
             },
         };
-        documents::did_open(&mut self.gs, params);
+        self.gs.apply_write(WriteCommand::DidOpen(params));
     }
 
     pub fn close_document(&mut self, uri: &str) {
@@ -200,7 +204,7 @@ impl LspTester {
                 uri: uri.parse().unwrap(),
             },
         };
-        documents::did_close(&mut self.gs, params);
+        self.gs.apply_write(WriteCommand::DidClose(params));
     }
 
     pub fn edit_document(&mut self, uri: &str, changes: Vec<TextDocumentContentChangeEvent>) {
@@ -211,7 +215,7 @@ impl LspTester {
             },
             content_changes: changes,
         };
-        documents::did_change(&mut self.gs, params);
+        self.gs.apply_write(WriteCommand::DidChange(params));
     }
 
     pub fn save_document(&mut self, uri: &str) {
@@ -221,12 +225,13 @@ impl LspTester {
             },
             text: None,
         };
-        documents::did_save(&mut self.gs, params);
+        self.gs.apply_write(WriteCommand::DidSave(params));
     }
 
     pub fn did_change_watched_files(&mut self, files: Vec<FileEvent>) {
         let params = DidChangeWatchedFilesParams { changes: files };
-        handlers::file_watcher::did_change_watched_files(&mut self.gs, params);
+        self.gs
+            .apply_write(WriteCommand::DidChangeWatchedFiles(params));
     }
 
     pub fn did_change_workspace_folders(&mut self, added: &[&str], removed: &[&str]) {
@@ -244,12 +249,14 @@ impl LspTester {
                 removed: to_folders(removed),
             },
         };
-        handlers::workspace_folders::did_change_workspace_folders(&mut self.gs, params);
+        self.gs
+            .apply_write(WriteCommand::DidChangeWorkspaceFolders(params));
     }
 
     pub fn did_change_configuration(&mut self, settings: serde_json::Value) {
         let params = DidChangeConfigurationParams { settings };
-        handlers::configuration::did_change_configuration(&mut self.gs, params);
+        self.gs
+            .apply_write(WriteCommand::DidChangeConfiguration(params));
     }
 
     pub fn did_create_files(&mut self, created: Vec<&str>) {
@@ -261,7 +268,7 @@ impl LspTester {
                 })
                 .collect(),
         };
-        handlers::file_operations::did_create_files(&mut self.gs, params);
+        self.gs.apply_write(WriteCommand::DidCreateFiles(params));
     }
 
     pub fn did_delete_files(&mut self, deleted: Vec<&str>) {
@@ -273,7 +280,7 @@ impl LspTester {
                 })
                 .collect(),
         };
-        handlers::file_operations::did_delete_files(&mut self.gs, params);
+        self.gs.apply_write(WriteCommand::DidDeleteFiles(params));
     }
 
     pub fn did_rename_files(&mut self, renames: Vec<(String, String)>) {
@@ -283,7 +290,7 @@ impl LspTester {
                 .map(|(old_uri, new_uri)| FileRename { old_uri, new_uri })
                 .collect(),
         };
-        handlers::file_operations::did_rename_files(&mut self.gs, params);
+        self.gs.apply_write(WriteCommand::DidRenameFiles(params));
     }
 
     // --- requests ---

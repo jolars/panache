@@ -2,8 +2,9 @@
 
 use lsp_types::DidChangeWorkspaceFoldersParams;
 
-use crate::lsp::global_state::GlobalState;
 use crate::lsp::uri_ext::UriExt;
+use crate::lsp::writer::WriterHandle;
+use crate::lsp::writer_command::WriteEffects;
 
 /// Apply a workspace-folder change: drop removed folders, append added ones,
 /// then re-resolve config for every open document.
@@ -14,7 +15,8 @@ use crate::lsp::uri_ext::UriExt;
 /// all and re-lint over the fresh state --- the same path the config-file watcher
 /// uses (see [`crate::lsp::handlers::file_watcher`]).
 pub(crate) fn did_change_workspace_folders(
-    gs: &mut GlobalState,
+    w: &mut WriterHandle,
+    fx: &mut WriteEffects,
     params: DidChangeWorkspaceFoldersParams,
 ) {
     let removed: Vec<_> = params
@@ -29,8 +31,8 @@ pub(crate) fn did_change_workspace_folders(
         .iter()
         .filter_map(|folder| folder.uri.to_file_path().map(|p| p.into_owned()))
         .collect();
-    gs.writer.update_workspace_folders(&removed, added);
+    w.update_workspace_folders(&removed, added);
 
-    crate::lsp::documents::reload_open_documents_config(gs);
-    gs.arm_settle();
+    crate::lsp::documents::reload_open_documents_config(w);
+    fx.arm_settle();
 }

@@ -1,13 +1,13 @@
 //! Document lifecycle notifications (`didOpen`/`didChange`/`didSave`/`didClose`).
 //!
-//! These run synchronously on the main-loop thread with `&mut GlobalState`: they
-//! are the sole writers of the salsa database and the document map. Parsing and
-//! state updates happen inline so interactive requests always see the latest
-//! tree; the expensive lint (project-graph recompute + diagnostics) is deferred
-//! to the debounced workspace settle, which re-lints every open document over one
-//! snapshot. Every salsa-input write here arms that settle (directly or via
-//! [`GlobalState::arm_settle_external`]) so a write that cancels an in-flight
-//! pass also schedules its recomputation.
+//! These run against writer-owned state (`&mut WriterHandle`) — the salsa
+//! database and the document map — with main-loop side effects requested via
+//! [`WriteEffects`]. Parsing and state updates happen inline so interactive
+//! requests always see the latest tree; the expensive lint (project-graph
+//! recompute + diagnostics) is deferred to the debounced workspace settle, which
+//! re-lints every open document over one snapshot. Every salsa-input write here
+//! arms that settle (directly or via [`WriteEffects::arm_settle_external`]) so a
+//! write that cancels an in-flight pass also schedules its recomputation.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -21,8 +21,9 @@ use rowan::GreenNode;
 use salsa::{Durability, Setter};
 
 use super::conversions::{apply_content_change, apply_content_change_with_edit_ranges};
-use super::global_state::GlobalState;
 use super::uri_ext::UriExt;
+use super::writer::WriterHandle;
+use super::writer_command::WriteEffects;
 use crate::lsp::DocumentState;
 use crate::parser::{parse_incremental_suffix_with_refdefs, parse_with_refdefs};
 use crate::syntax::SyntaxNode;
@@ -81,13 +82,12 @@ fn apply_changes_descending_with_combined_ranges(
 /// (shared with the CLI lint path); returns the final tracked set for
 /// `did_close` retention.
 pub(crate) fn load_project_files(
-    gs: &mut GlobalState,
+    w: &mut WriterHandle,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     root_path: PathBuf,
 ) -> HashSet<PathBuf> {
-    gs.writer
-        .db_mut()
+    w.db_mut()
         .load_referenced_files(salsa_file, salsa_config, root_path)
 }
 
@@ -96,24 +96,22 @@ pub(crate) fn load_project_files(
 /// A filesystem change (watcher event, file operation) may have flipped a
 /// referenced include/bibliography's `None`->`Some` text input (or vice versa);
 /// loading here before the next snapshot lets the re-lint observe fresh content.
-pub(crate) fn reload_open_documents_referenced_files(gs: &mut GlobalState) {
-    let open_docs: Vec<(crate::salsa::FileText, crate::salsa::FileConfig, PathBuf)> = gs
-        .writer
+pub(crate) fn reload_open_documents_referenced_files(w: &mut WriterHandle) {
+    let open_docs: Vec<(crate::salsa::FileText, crate::salsa::FileConfig, PathBuf)> = w
         .document_map()
         .values()
         .filter_map(|state| Some((state.salsa_file, state.salsa_config, state.path.clone()?)))
         .collect();
     // A path open as a document has buffer-authoritative content; it must never
     // be re-read from disk below or an unsaved edit would be clobbered.
-    let open_paths: HashSet<PathBuf> = gs
-        .writer
+    let open_paths: HashSet<PathBuf> = w
         .document_map()
         .values()
         .filter_map(|state| state.path.clone())
         .collect();
     let mut referenced: HashSet<PathBuf> = HashSet::new();
     for (salsa_file, salsa_config, path) in open_docs {
-        referenced.extend(load_project_files(gs, salsa_file, salsa_config, path));
+        referenced.extend(load_project_files(w, salsa_file, salsa_config, path));
     }
     // Self-heal: refresh referenced files whose on-disk content changed since
     // they were cached. Not every client delivers `didChangeWatchedFiles` for
@@ -132,8 +130,7 @@ pub(crate) fn reload_open_documents_referenced_files(gs: &mut GlobalState) {
         if open_paths.contains(&path) {
             continue;
         }
-        gs.writer
-            .db_mut()
+        w.db_mut()
             .resync_cached_file_from_disk(&path, Durability::MEDIUM);
     }
 }
@@ -148,31 +145,34 @@ pub(crate) fn reload_open_documents_referenced_files(gs: &mut GlobalState) {
 /// unconditional `did_change` write (salsa only bumps the revision when the
 /// value actually differs); the caller arms the settle so the all-docs re-lint
 /// re-publishes diagnostics.
-pub(crate) fn reload_open_documents_config(gs: &mut GlobalState) {
-    let entries: Vec<(lsp_types::Uri, crate::salsa::FileConfig)> = gs
-        .writer
+pub(crate) fn reload_open_documents_config(w: &mut WriterHandle) {
+    let entries: Vec<(lsp_types::Uri, crate::salsa::FileConfig)> = w
         .document_map()
         .iter()
         .filter_map(|(uri_str, state)| Some((uri_str.parse().ok()?, state.salsa_config)))
         .collect();
     for (uri, salsa_config) in entries {
-        let new_config = gs.writer.load_config_notifying(&uri);
+        let new_config = w.load_config_notifying(&uri);
         salsa_config
-            .set_config(gs.writer.db_mut())
+            .set_config(w.db_mut())
             .with_durability(Durability::MEDIUM)
             .to(new_config);
     }
 }
 
 /// Handle `textDocument/didOpen`.
-pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) {
+pub(crate) fn did_open(
+    w: &mut WriterHandle,
+    fx: &mut WriteEffects,
+    params: DidOpenTextDocumentParams,
+) {
     let uri = params.text_document.uri.clone();
     let uri_string = uri.to_string();
     let text = params.text_document.text.clone();
     log::debug!("did_open uri={uri_string}, bytes={}", text.len());
     let start = Instant::now();
 
-    let config = gs.writer.load_config_notifying(&uri);
+    let config = w.load_config_notifying(&uri);
     let tree = {
         let syntax_tree = crate::parse(&text, Some(config.clone()));
         GreenNode::from(syntax_tree.green())
@@ -184,24 +184,22 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     // and avoids two untitled buffers colliding on one key) (audit §3.3 / G3).
     let salsa_file = match doc_path.clone() {
         Some(path) => {
-            gs.writer
-                .db_mut()
+            w.db_mut()
                 .update_file_text_with_durability(path, text.clone(), Durability::LOW)
         }
-        None => gs
-            .writer
+        None => w
             .db_mut()
             .create_in_memory_file(text.clone(), Durability::LOW),
     };
     let salsa_config = {
-        let cfg = crate::salsa::FileConfig::new(gs.writer.db(), config.clone());
-        cfg.set_config(gs.writer.db_mut())
+        let cfg = crate::salsa::FileConfig::new(w.db(), config.clone());
+        cfg.set_config(w.db_mut())
             .with_durability(Durability::MEDIUM)
             .to(config.clone());
         cfg
     };
 
-    gs.writer.document_map_mut().insert(
+    w.document_map_mut().insert(
         uri_string.clone(),
         DocumentState {
             path: doc_path.clone(),
@@ -212,10 +210,10 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     );
 
     if let Some(path) = doc_path.as_ref() {
-        load_project_files(gs, salsa_file, salsa_config, path.clone());
+        load_project_files(w, salsa_file, salsa_config, path.clone());
     }
 
-    gs.sender
+    w.sender()
         .log_message(MessageType::INFO, format!("Opened document: {uri_string}"));
 
     // Arm the workspace settle instead of spawning a lint inline: a
@@ -223,23 +221,26 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     // would be cancelled by the next open's write. Open runs external linters
     // (like save) so their diagnostics surface without waiting for the first
     // manual save.
-    gs.arm_settle_external(uri);
+    fx.arm_settle_external(uri);
     log::debug!("did_open complete in {:?}", start.elapsed());
 }
 
 /// Handle `textDocument/didChange`.
-pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentParams) {
+pub(crate) fn did_change(
+    w: &mut WriterHandle,
+    fx: &mut WriteEffects,
+    params: DidChangeTextDocumentParams,
+) {
     let uri = params.text_document.uri.clone();
     let uri_string = uri.to_string();
     let change_count = params.content_changes.len();
     log::debug!("did_change uri={uri_string}, changes={change_count}");
     let start = Instant::now();
 
-    let config = gs.writer.load_config_notifying(&uri);
-    let incremental_enabled = gs.runtime_settings.experimental_incremental_parsing;
+    let config = w.load_config_notifying(&uri);
+    let incremental_enabled = w.runtime_settings().experimental_incremental_parsing;
 
-    let Some((salsa_file, salsa_config, original_tree_green)) = gs
-        .writer
+    let Some((salsa_file, salsa_config, original_tree_green)) = w
         .document_map()
         .get(&uri_string)
         .map(|doc| (doc.salsa_file, doc.salsa_config, doc.tree.clone()))
@@ -247,7 +248,7 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
         return;
     };
 
-    let original_text = salsa_file.content_or_empty(gs.writer.db()).to_string();
+    let original_text = salsa_file.content_or_empty(w.db()).to_string();
 
     // Compute the post-edit text and (when incremental parsing is enabled and
     // edit ranges can be derived) the old/new edit ranges.
@@ -281,16 +282,15 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
     // then reuses the cached refdef map and downstream queries hit the same cache.
     let doc_path_for_salsa = uri.to_file_path().map(|p| p.into_owned());
     if let Some(path) = doc_path_for_salsa.as_ref() {
-        gs.writer
-            .db_mut()
+        w.db_mut()
             .update_file_text(path.clone(), updated_text.clone());
     } else {
         salsa_file
-            .set_text(gs.writer.db_mut())
+            .set_text(w.db_mut())
             .with_durability(Durability::LOW)
             .to(Some(std::sync::Arc::from(updated_text.clone())));
     }
-    let refdefs = crate::salsa::refdef_set(gs.writer.db(), salsa_file, salsa_config).clone();
+    let refdefs = crate::salsa::refdef_set(w.db(), salsa_file, salsa_config).clone();
 
     let (green, strategy) = if let Some((old_edit, new_edit)) = edit_ranges {
         let old_tree = SyntaxNode::new_root(original_tree_green);
@@ -329,7 +329,7 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
 
     log::debug!("did_change parse strategy={strategy} changes={change_count}");
 
-    if let Some(doc_state) = gs.writer.document_map_mut().get_mut(&uri_string) {
+    if let Some(doc_state) = w.document_map_mut().get_mut(&uri_string) {
         doc_state.tree = green;
         doc_state.path = doc_path_for_salsa.clone();
     } else {
@@ -337,14 +337,14 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
     }
 
     salsa_config
-        .set_config(gs.writer.db_mut())
+        .set_config(w.db_mut())
         .with_durability(Durability::MEDIUM)
         .to(config.clone());
 
     // Defer the expensive re-lint to the debounced settle so a burst of
     // keystrokes collapses into one pass and a save's formatting request never
     // queues behind per-keystroke work. No external linters — they wait for save.
-    gs.arm_settle();
+    fx.arm_settle();
 
     log::debug!(
         "did_change complete (parse+state) in {:?}; settle armed",
@@ -357,60 +357,66 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
 /// Save is the point at which heavier external linters run (skipped on every
 /// keystroke). The fresh settle re-lints every open document; only the saved
 /// document runs external linters.
-pub(crate) fn did_save(gs: &mut GlobalState, params: DidSaveTextDocumentParams) {
+pub(crate) fn did_save(
+    w: &mut WriterHandle,
+    fx: &mut WriteEffects,
+    params: DidSaveTextDocumentParams,
+) {
     let uri = params.text_document.uri;
     // A save may have introduced new includes/bibliography since the document
     // was opened; load them on the writer so the debounced pass's snapshot sees
     // them. (The dispatch write phase reloads too, but doing it here keeps
     // interactive reads in the debounce window consistent.)
-    if let Some((salsa_file, salsa_config, Some(path))) = gs
-        .writer
+    if let Some((salsa_file, salsa_config, Some(path))) = w
         .document_map()
         .get(&uri.to_string())
         .map(|doc| (doc.salsa_file, doc.salsa_config, doc.path.clone()))
     {
-        load_project_files(gs, salsa_file, salsa_config, path);
+        load_project_files(w, salsa_file, salsa_config, path);
     }
     // Save is the heavy pass: external linters for the saved document. Debounced
     // like every other settle so a save-all burst coalesces into one pass.
-    gs.arm_settle_external(uri);
+    fx.arm_settle_external(uri);
 }
 
 /// Handle `textDocument/didClose`.
-pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams) {
+pub(crate) fn did_close(
+    w: &mut WriterHandle,
+    fx: &mut WriteEffects,
+    params: DidCloseTextDocumentParams,
+) {
     let uri = params.text_document.uri.clone();
     let uri_string = uri.to_string();
-    gs.writer.document_map_mut().remove(&uri_string);
+    w.document_map_mut().remove(&uri_string);
 
     // Drop the closed document's own diagnostics immediately so a pull issued
     // before the next settle no longer reports it (push: empty publish). Any
     // manifests it contributed are reconciled by the settle armed below: the
     // all-docs pass re-lints the remaining documents and the clear-on-fix diff
     // clears a manifest once no open document still reports it.
-    gs.diagnostics
-        .drop_uri(&uri, &gs.sender, gs.supports_pull_diagnostics);
+    fx.drop_diagnostics(uri);
 
-    let states: Vec<DocumentState> = gs.writer.document_map().values().cloned().collect();
+    let states: Vec<DocumentState> = w.document_map().values().cloned().collect();
     let mut retained = HashSet::new();
     for state in states {
         let Some(path) = state.path.clone() else {
             continue;
         };
-        let tracked = load_project_files(gs, state.salsa_file, state.salsa_config, path);
+        let tracked = load_project_files(w, state.salsa_file, state.salsa_config, path);
         retained.extend(tracked);
     }
-    for cached in gs.writer.db().cached_file_paths() {
+    for cached in w.db().cached_file_paths() {
         if retained.contains(&cached) {
             continue;
         }
-        let _ = gs.writer.db_mut().evict_file_text(&cached);
+        let _ = w.db_mut().evict_file_text(&cached);
     }
 
     // Closing a document changes the database for the remaining open docs (a
     // closed include affects its parent), and the eviction above may cancel an
     // in-flight pass. Arm the settle so the remaining docs are re-linted over the
     // post-close snapshot.
-    gs.arm_settle();
+    fx.arm_settle();
 }
 
 #[cfg(test)]

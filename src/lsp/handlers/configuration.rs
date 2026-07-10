@@ -9,23 +9,28 @@ use lsp_types::DidChangeConfigurationParams;
 
 use crate::lsp::dispatch::runtime_incremental_parsing_from_value;
 use crate::lsp::documents;
-use crate::lsp::global_state::GlobalState;
+use crate::lsp::writer::WriterHandle;
+use crate::lsp::writer_command::WriteEffects;
 
-pub(crate) fn did_change_configuration(gs: &mut GlobalState, params: DidChangeConfigurationParams) {
+pub(crate) fn did_change_configuration(
+    w: &mut WriterHandle,
+    fx: &mut WriteEffects,
+    params: DidChangeConfigurationParams,
+) {
     // The push payload is optional: clients using the pull model send `null`.
     // Either way we still reload on-disk config below, so a bare notification is
     // a useful "reload config" signal.
     if !params.settings.is_null()
         && let Some(incremental) = runtime_incremental_parsing_from_value(&params.settings)
-        && gs.runtime_settings.experimental_incremental_parsing != incremental
+        && w.runtime_settings().experimental_incremental_parsing != incremental
     {
         log::debug!(
             "lsp runtime setting experimental.incrementalParsing={incremental} \
              (didChangeConfiguration)"
         );
-        gs.runtime_settings.experimental_incremental_parsing = incremental;
+        w.runtime_settings_mut().experimental_incremental_parsing = incremental;
     }
 
-    documents::reload_open_documents_config(gs);
-    gs.arm_settle();
+    documents::reload_open_documents_config(w);
+    fx.arm_settle();
 }

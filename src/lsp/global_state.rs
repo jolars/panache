@@ -18,7 +18,6 @@ use lsp_server::{Message, Notification, Request, RequestId, Response};
 use lsp_types::{Diagnostic, MessageType, Uri};
 
 use super::DocumentState;
-use super::LspRuntimeSettings;
 use super::config::load_config;
 use super::task_pool::{TaskPool, default_pool_size};
 use crate::Config;
@@ -351,8 +350,6 @@ pub(crate) enum Task {
 pub(crate) struct GlobalState {
     pub(crate) sender: ClientSender,
 
-    pub(crate) runtime_settings: LspRuntimeSettings,
-
     /// Whether the client advertised support for the pull diagnostics model at
     /// `initialize`. When `true` the server stops pushing
     /// `textDocument/publishDiagnostics` and serves diagnostics from
@@ -421,7 +418,6 @@ impl GlobalState {
         let pool = TaskPool::new(task_tx.clone(), default_pool_size());
         let fmt_pool = TaskPool::new(task_tx, 1);
         Self {
-            runtime_settings: LspRuntimeSettings::default(),
             supports_pull_diagnostics: false,
             supports_diagnostic_refresh: false,
             supports_related_documents: false,

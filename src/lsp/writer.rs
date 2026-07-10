@@ -24,7 +24,9 @@ use std::sync::Arc;
 
 use lsp_types::{MessageType, Uri};
 
+use crate::lsp::LspRuntimeSettings;
 use crate::lsp::global_state::{ClientSender, DocumentMap};
+use crate::lsp::writer_command::{WriteCommand, WriteEffects};
 use crate::salsa::{Analysis, SalsaDb};
 
 /// Owns the master salsa database handle and the config state that feeds it.
@@ -43,6 +45,12 @@ pub(crate) struct WriterHandle {
     /// Open documents. `Arc` so snapshots clone it in O(1); writers use
     /// [`Arc::make_mut`] for copy-on-write single-writer semantics.
     document_map: Arc<DocumentMap>,
+
+    /// Runtime settings pushed by the client (`initializationOptions`,
+    /// `workspace/didChangeConfiguration`). Owned here because both writers of
+    /// it are write-side (initialize, the configuration notification) and its
+    /// only reader is `did_change`'s incremental-parsing gate.
+    runtime_settings: LspRuntimeSettings,
 
     /// Workspace roots, for per-document (longest-prefix) config resolution.
     workspace_folders: Vec<PathBuf>,
@@ -70,6 +78,7 @@ impl WriterHandle {
         Self {
             db: SalsaDb::default(),
             document_map: Arc::new(DocumentMap::new()),
+            runtime_settings: LspRuntimeSettings::default(),
             workspace_folders: Vec::new(),
             watched_config_files: HashSet::new(),
             config_error_reports: HashMap::new(),
@@ -107,6 +116,56 @@ impl WriterHandle {
     /// A cheap `Arc` clone of the document map, for snapshot assembly.
     pub(crate) fn document_map_arc(&self) -> Arc<DocumentMap> {
         Arc::clone(&self.document_map)
+    }
+
+    /// The client channel, for write handlers that log or toast.
+    pub(crate) fn sender(&self) -> &ClientSender {
+        &self.sender
+    }
+
+    /// The client-pushed runtime settings.
+    pub(crate) fn runtime_settings(&self) -> &LspRuntimeSettings {
+        &self.runtime_settings
+    }
+
+    /// Mutable access to the runtime settings (initialize, configuration push).
+    pub(crate) fn runtime_settings_mut(&mut self) -> &mut LspRuntimeSettings {
+        &mut self.runtime_settings
+    }
+
+    /// Apply one database-mutating notification against writer-owned state,
+    /// accumulating requested main-loop side effects into `fx`.
+    ///
+    /// This is the function the writer thread runs per received command; today
+    /// the main loop calls it inline via
+    /// [`GlobalState::apply_write`](crate::lsp::global_state::GlobalState::apply_write).
+    pub(crate) fn apply(&mut self, cmd: WriteCommand, fx: &mut WriteEffects) {
+        use crate::lsp::{documents, handlers};
+
+        match cmd {
+            WriteCommand::DidOpen(params) => documents::did_open(self, fx, params),
+            WriteCommand::DidChange(params) => documents::did_change(self, fx, params),
+            WriteCommand::DidSave(params) => documents::did_save(self, fx, params),
+            WriteCommand::DidClose(params) => documents::did_close(self, fx, params),
+            WriteCommand::DidChangeConfiguration(params) => {
+                handlers::configuration::did_change_configuration(self, fx, params)
+            }
+            WriteCommand::DidChangeWatchedFiles(params) => {
+                handlers::file_watcher::did_change_watched_files(self, fx, params)
+            }
+            WriteCommand::DidChangeWorkspaceFolders(params) => {
+                handlers::workspace_folders::did_change_workspace_folders(self, fx, params)
+            }
+            WriteCommand::DidCreateFiles(params) => {
+                handlers::file_operations::did_create_files(self, fx, params)
+            }
+            WriteCommand::DidRenameFiles(params) => {
+                handlers::file_operations::did_rename_files(self, fx, params)
+            }
+            WriteCommand::DidDeleteFiles(params) => {
+                handlers::file_operations::did_delete_files(self, fx, params)
+            }
+        }
     }
 
     /// The current workspace roots.
