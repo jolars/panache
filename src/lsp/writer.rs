@@ -82,9 +82,9 @@ mod tests {
     ///    snapshot per read.
     /// 2. Given transient snapshots, cross-thread reads are safe: a reader on
     ///    another thread holds its snapshot only for the duration of one read,
-    ///    then drops it, so the owner's write proceeds once the count returns to
-    ///    1. A read racing a write either observes a valid revision or unwinds to
-    ///    a cancellation that `catch_cancelled` maps to `None`.
+    ///    then drops it, so the owner's write proceeds once the clone count
+    ///    returns to one. A read racing a write either observes a valid revision
+    ///    or unwinds to a cancellation that `catch_cancelled` maps to `None`.
     ///
     /// The test hands the reader a *fresh* snapshot per round and waits for it to
     /// drop before the next write, mirroring the "owner mints, reader drops"

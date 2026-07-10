@@ -27,6 +27,7 @@ mod task_pool;
 pub mod testing;
 mod uri_ext;
 mod writer;
+mod writer_command;
 
 pub(crate) use global_state::{ClientSender, GlobalState};
 #[doc(hidden)]

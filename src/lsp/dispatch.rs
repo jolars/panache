@@ -482,6 +482,24 @@ impl GlobalState {
     pub(crate) fn on_notification(&mut self, mut not: Notification) {
         use lsp_types::notification as n;
 
+        use crate::lsp::writer_command::WriteCommand;
+
+        // Database-mutating notifications funnel through `apply_write`, the single
+        // write chokepoint the writer-thread port lifts off the main loop.
+        macro_rules! write_cmd {
+            ($N:ty, $variant:expr) => {
+                not = match not.extract::<<$N as n::Notification>::Params>(<$N>::METHOD) {
+                    Ok(params) => return self.apply_write($variant(params)),
+                    Err(ExtractError::MethodMismatch(not)) => not,
+                    Err(ExtractError::JsonError { method, error }) => {
+                        log::error!("invalid params for {method}: {error}");
+                        return;
+                    }
+                };
+            };
+        }
+
+        // Non-write notifications keep their direct handler.
         macro_rules! handle {
             ($N:ty, $handler:expr) => {
                 not = match not.extract::<<$N as n::Notification>::Params>(<$N>::METHOD) {
@@ -495,37 +513,62 @@ impl GlobalState {
             };
         }
 
-        handle!(n::DidOpenTextDocument, documents::did_open);
-        handle!(n::DidChangeTextDocument, documents::did_change);
-        handle!(n::DidSaveTextDocument, documents::did_save);
-        handle!(n::DidCloseTextDocument, documents::did_close);
-        handle!(
+        write_cmd!(n::DidOpenTextDocument, WriteCommand::DidOpen);
+        write_cmd!(n::DidChangeTextDocument, WriteCommand::DidChange);
+        write_cmd!(n::DidSaveTextDocument, WriteCommand::DidSave);
+        write_cmd!(n::DidCloseTextDocument, WriteCommand::DidClose);
+        write_cmd!(
             n::DidChangeConfiguration,
-            handlers::configuration::did_change_configuration
+            WriteCommand::DidChangeConfiguration
         );
-        handle!(
+        write_cmd!(
             n::DidChangeWatchedFiles,
-            handlers::file_watcher::did_change_watched_files
+            WriteCommand::DidChangeWatchedFiles
         );
-        handle!(
+        write_cmd!(
             n::DidChangeWorkspaceFolders,
-            handlers::workspace_folders::did_change_workspace_folders
+            WriteCommand::DidChangeWorkspaceFolders
         );
-        handle!(
-            n::DidCreateFiles,
-            handlers::file_operations::did_create_files
-        );
-        handle!(
-            n::DidRenameFiles,
-            handlers::file_operations::did_rename_files
-        );
-        handle!(
-            n::DidDeleteFiles,
-            handlers::file_operations::did_delete_files
-        );
+        write_cmd!(n::DidCreateFiles, WriteCommand::DidCreateFiles);
+        write_cmd!(n::DidRenameFiles, WriteCommand::DidRenameFiles);
+        write_cmd!(n::DidDeleteFiles, WriteCommand::DidDeleteFiles);
         handle!(n::Cancel, GlobalState::on_cancel);
 
         log::debug!("ignoring notification: {}", not.method);
+    }
+
+    /// The single entry point for every database-mutating notification.
+    ///
+    /// Runs synchronously on the main loop today; the writer-thread port moves
+    /// the salsa side of each arm off-thread while this stays the place the main
+    /// loop enqueues a [`WriteCommand`].
+    pub(crate) fn apply_write(&mut self, cmd: crate::lsp::writer_command::WriteCommand) {
+        use crate::lsp::writer_command::WriteCommand;
+
+        match cmd {
+            WriteCommand::DidOpen(params) => documents::did_open(self, params),
+            WriteCommand::DidChange(params) => documents::did_change(self, params),
+            WriteCommand::DidSave(params) => documents::did_save(self, params),
+            WriteCommand::DidClose(params) => documents::did_close(self, params),
+            WriteCommand::DidChangeConfiguration(params) => {
+                handlers::configuration::did_change_configuration(self, params)
+            }
+            WriteCommand::DidChangeWatchedFiles(params) => {
+                handlers::file_watcher::did_change_watched_files(self, params)
+            }
+            WriteCommand::DidChangeWorkspaceFolders(params) => {
+                handlers::workspace_folders::did_change_workspace_folders(self, params)
+            }
+            WriteCommand::DidCreateFiles(params) => {
+                handlers::file_operations::did_create_files(self, params)
+            }
+            WriteCommand::DidRenameFiles(params) => {
+                handlers::file_operations::did_rename_files(self, params)
+            }
+            WriteCommand::DidDeleteFiles(params) => {
+                handlers::file_operations::did_delete_files(self, params)
+            }
+        }
     }
 
     /// `$/cancelRequest`: mark the id so its eventual result is relabeled.
