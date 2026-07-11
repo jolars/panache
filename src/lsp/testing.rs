@@ -620,9 +620,7 @@ impl LspTester {
     /// debounced publish path.
     pub fn pump(&mut self, timeout: Duration) {
         // Force any armed settle to be due immediately.
-        if self.gs.settle_deadline.is_some() {
-            self.gs.settle_deadline = Some(Instant::now());
-        }
+        self.gs.writer.state_mut().expedite_settle();
         self.gs.dispatch_due_lints();
 
         let receiver = self.gs.task_receiver.clone();
@@ -640,12 +638,12 @@ impl LspTester {
                 Err(_) => {
                     // Quiescent only when nothing is due AND every dispatched
                     // settle has landed. A pass dispatched into the pool clears
-                    // `settle_deadline` but its result is still in flight; exiting
-                    // here would abandon it and lose the batch's diagnostics (a
-                    // burst `did_open` over many docs outruns the poll step).
-                    let settle_in_flight =
-                        self.gs.last_applied_lint_generation != self.gs.lint_generation;
-                    if self.gs.settle_deadline.is_none() && !settle_in_flight {
+                    // the settle deadline but its result is still in flight;
+                    // exiting here would abandon it and lose the batch's
+                    // diagnostics (a burst `did_open` over many docs outruns the
+                    // poll step).
+                    let writer = self.gs.writer.state();
+                    if writer.settle_deadline().is_none() && !writer.settle_in_flight() {
                         break;
                     }
                     self.gs.dispatch_due_lints();
@@ -757,7 +755,7 @@ impl LspTester {
 
     /// Whether the server is in pull-diagnostics mode (push suppressed).
     pub fn pull_diagnostics_enabled(&self) -> bool {
-        self.gs.supports_pull_diagnostics
+        self.gs.writer.state().supports_pull_diagnostics()
     }
 
     /// Pull `textDocument/diagnostic` for `uri`, optionally with a prior
@@ -822,7 +820,7 @@ impl LspTester {
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
         };
-        handlers::diagnostics::workspace_diagnostic(&self.gs, params).response
+        handlers::diagnostics::workspace_diagnostic(&self.snapshot(), params).response
     }
 
     /// Pull `workspace/diagnostic` with a `partialResultToken`. Returns the
@@ -850,7 +848,7 @@ impl LspTester {
                 partial_result_token: Some(ProgressToken::Number(token)),
             },
         };
-        let streamed = handlers::diagnostics::workspace_diagnostic(&self.gs, params);
+        let streamed = handlers::diagnostics::workspace_diagnostic(&self.snapshot(), params);
         let progress = decode_progress(streamed.progress, token);
         (streamed.response, progress)
     }

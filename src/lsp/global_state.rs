@@ -1,17 +1,19 @@
 //! The synchronous server state, modeled on rust-analyzer's `GlobalState`.
 //!
-//! The [`main loop`](crate::lsp::run) owns a single [`GlobalState`] and is the
-//! only thread that mutates it — notably, it is the sole writer of the salsa
-//! database, so writes are serialized by construction and need no lock. Heavy
+//! The [`main loop`](crate::lsp::run) owns a single [`GlobalState`]: the LSP
+//! transport (client sender, in-flight/cancelled request ids) and the task
+//! pools. The salsa database, document map, config state, diagnostics store,
+//! and settle machinery live on the writer
+//! ([`WriterState`](crate::lsp::writer::WriterState)) — inline during the
+//! handshake and in tests, on the dedicated writer thread in production. Heavy
 //! reads (hover, completion, formatting, lint) are dispatched to the
 //! [`TaskPool`] over a cheap [`StateSnapshot`] (a clone of the salsa handle plus
 //! an `Arc` of the document map); their results return to the main loop as
-//! [`Task`] values to be turned into responses or diagnostics publishes.
+//! [`Task`] values to be turned into responses or forwarded to the writer.
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Instant;
 
 use crossbeam_channel::{Receiver, Sender};
 use lsp_server::{Message, Notification, Request, RequestId, Response};
@@ -45,17 +47,19 @@ pub(crate) struct StoredDiagnostics {
 
 /// Single owner of the server's current diagnostic set, unifying push delivery,
 /// the pull store, and clear-on-fix bookkeeping (rust-analyzer's
-/// `DiagnosticCollection`). Each applied settle pass hands [`Self::apply`] the
+/// `DiagnosticCollection`). Owned by the writer
+/// ([`WriterState`](crate::lsp::writer::WriterState)), which applies every
+/// settle result. Each applied settle pass hands [`Self::apply`] the
 /// complete merged map — every URI across all open documents and project
 /// manifests — and it diffs that against the retained set to publish/store only
 /// what changed and clear what disappeared. The retained keys *are* the
 /// clear-tracker, so a shared manifest stays reported until no settle reports it.
 #[derive(Default)]
 pub(crate) struct DiagnosticCollection {
-    // `Arc` so a pooled `textDocument/diagnostic` handler can read the store off
-    // the main thread (for `related_documents`) via a cheap clone; mutation is
-    // copy-on-write through `Arc::make_mut`, which is uncontended because the main
-    // loop is the sole writer.
+    // `Arc` so a pooled pull handler can read the store off-thread (for
+    // `related_documents` and `workspace/diagnostic`) via the cheap clone every
+    // `StateSnapshot` carries; mutation is copy-on-write through `Arc::make_mut`,
+    // which is uncontended because the writer is the sole mutator.
     current: Arc<HashMap<Uri, StoredDiagnostics>>,
     result_seq: u64,
 }
@@ -121,13 +125,9 @@ impl DiagnosticCollection {
         self.current.get(uri)
     }
 
-    /// Every stored `(uri, diagnostics)`, for a pull `workspace/diagnostic`.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&Uri, &StoredDiagnostics)> {
-        self.current.iter()
-    }
-
-    /// A cheap, shareable handle to the current store, for a pooled pull handler
-    /// to read (`related_documents`) off the main thread.
+    /// A cheap, shareable handle to the current store, carried on every
+    /// [`StateSnapshot`] so the pooled pull handlers (`workspace/diagnostic`,
+    /// `related_documents`) read it off-thread.
     pub(crate) fn shared(&self) -> Arc<HashMap<Uri, StoredDiagnostics>> {
         Arc::clone(&self.current)
     }
@@ -222,23 +222,24 @@ pub(crate) struct StateSnapshot {
 }
 
 impl StateSnapshot {
-    /// Assemble a snapshot from the writer-owned parts (`analysis`,
-    /// `document_map`, `workspace_folders`) and the main-loop-owned
-    /// [`SnapshotBits`](crate::lsp::writer::SnapshotBits) captured when the read
-    /// was forwarded.
+    /// Assemble a snapshot from the writer-owned parts. All fields come from
+    /// [`WriterState`](crate::lsp::writer::WriterState) now that it owns the
+    /// diagnostics store and the pull-capability flags.
     pub(crate) fn assemble(
         analysis: crate::salsa::Analysis,
         document_map: Arc<DocumentMap>,
         workspace_folders: Vec<PathBuf>,
-        bits: crate::lsp::writer::SnapshotBits,
+        diagnostics: Arc<HashMap<Uri, StoredDiagnostics>>,
+        supports_pull_diagnostics: bool,
+        supports_related_documents: bool,
     ) -> Self {
         Self {
             analysis,
             document_map,
             workspace_folders,
-            diagnostics: bits.diagnostics,
-            supports_pull_diagnostics: bits.supports_pull_diagnostics,
-            supports_related_documents: bits.supports_related_documents,
+            diagnostics,
+            supports_pull_diagnostics,
+            supports_related_documents,
         }
     }
 
@@ -351,51 +352,40 @@ pub(crate) enum Task {
     },
     /// Diagnostics from a quiescent settle pass that re-lints *every* open
     /// document over one snapshot. `publishes` is the complete, merged set (one
-    /// entry per URI, across all documents and project manifests); the main loop
-    /// diffs it against the previous settle to clear URIs no longer reported.
-    /// `generation` lets the main loop drop a pass superseded by a newer settle.
-    /// `external_ran` is the set of URIs this pass ran external linters for, so
-    /// the main loop retires exactly those from `external_pending` (a save queued
-    /// after dispatch survives). A pass cancelled by a concurrent write returns
-    /// nothing and is simply dropped — the cancelling write already armed the
-    /// next settle, which re-lints everything.
+    /// entry per URI, across all documents and project manifests). The main loop
+    /// forwards the result to the writer — the owner of the diagnostics store
+    /// and the lint generation — which diffs it against the previous settle,
+    /// drops a pass superseded by a newer settle, and retires exactly the
+    /// `external_ran` URIs from its pending set (a save queued after dispatch
+    /// survives). A pass cancelled by a concurrent write returns nothing and is
+    /// simply dropped — the cancelling write already armed the next settle,
+    /// which re-lints everything.
     Diagnostics {
         generation: u64,
         publishes: Vec<(Uri, Option<i32>, Vec<Diagnostic>)>,
         external_ran: HashSet<Uri>,
     },
-    /// Main-loop side effects of a write applied on the writer thread (settle
-    /// arming, immediate diagnostics drops). Only ever posted in threaded mode;
-    /// inline mode applies effects synchronously in `apply_write`.
-    WriteEffects(crate::lsp::writer_command::WriteEffects),
+    /// The writer applied a settle result to its store (threaded mode); the main
+    /// loop should nudge pull clients to re-pull via
+    /// `workspace/diagnostic/refresh` (a server→client request, so it needs the
+    /// main loop's outgoing-id tracking).
+    RefreshDiagnostics,
 }
 
 /// The synchronous, single-threaded-mutation server state.
 pub(crate) struct GlobalState {
     pub(crate) sender: ClientSender,
 
-    /// Whether the client advertised support for the pull diagnostics model at
-    /// `initialize`. When `true` the server stops pushing
-    /// `textDocument/publishDiagnostics` and serves diagnostics from
-    /// [`Self::diagnostics`] on demand instead (mode-switch — no double reporting).
-    pub(crate) supports_pull_diagnostics: bool,
     /// Whether the client supports `workspace/diagnostic/refresh`. Lets the
     /// server nudge the client to re-pull when an async pass (save-time external
-    /// linters, cross-file dependents) updates the store.
+    /// linters, cross-file dependents) updates the store. Main-loop-owned (the
+    /// refresh is a server→client request with a tracked outgoing id), unlike
+    /// the pull-capability flags, which live on the writer with the store.
     pub(crate) supports_diagnostic_refresh: bool,
-    /// Whether the client advertised `textDocument.diagnostic.relatedDocumentSupport`.
-    /// When `true`, `document_diagnostic` attaches the cross-file diagnostics of
-    /// the pulled document's project-graph closure under `related_documents`, so
-    /// they reach the client on a per-document pull rather than only via
-    /// `workspace/diagnostic`.
-    pub(crate) supports_related_documents: bool,
-    /// The current diagnostic set: push delivery, the pull store, and clear-on-fix
-    /// bookkeeping unified behind one diff-based owner.
-    pub(crate) diagnostics: DiagnosticCollection,
 
-    /// The salsa writer. Owns the master database handle, mutated only on the
-    /// main thread. Concentrates every salsa-touching access behind one type so
-    /// the database can later move onto a dedicated writer thread.
+    /// The salsa writer. Owns the master database handle, the document map,
+    /// config state, the diagnostics store, and the settle machinery — inline
+    /// until [`Self::spawn_writer`], on the dedicated writer thread after.
     pub(crate) writer: crate::lsp::writer::WriterHandle,
 
     pub(crate) pool: TaskPool<Task>,
@@ -412,28 +402,6 @@ pub(crate) struct GlobalState {
     /// Outgoing server→client request ids → method, for logging replies.
     pub(crate) outgoing: HashMap<RequestId, &'static str>,
     pub(crate) next_outgoing_id: i32,
-
-    /// Single debounce timer for the whole workspace. `Some(t)` means a quiescent
-    /// re-lint of *all* open documents is due at `t`; each salsa-input write
-    /// pushes it out by [`DIAGNOSTICS_DEBOUNCE`]. The all-docs model needs no
-    /// per-document deadlines and no cancel→re-arm net: any write that cancels an
-    /// in-flight pass has, by construction, already armed the next settle.
-    pub(crate) settle_deadline: Option<Instant>,
-    /// One global lint generation, bumped per dispatched settle pass. The pass
-    /// result is tagged with it and dropped in `on_task` if a newer settle has
-    /// since been dispatched.
-    pub(crate) lint_generation: u64,
-    /// The highest lint generation whose settle result has actually been applied
-    /// to the store. Lags `lint_generation` while a dispatched pass is still in
-    /// flight; equal to it once that pass lands. The test harness's `pump` uses
-    /// the gap to know a settle is still pending (production's main loop blocks on
-    /// the task channel instead and never needs it).
-    pub(crate) last_applied_lint_generation: u64,
-    /// URIs whose next settle pass must also run external linters (the expensive
-    /// on-save/-open signal). Built-ins run for every open doc each settle;
-    /// externals run only for these. Retired in `on_task` once the pass that ran
-    /// them completes, so a save queued after dispatch survives a cancellation.
-    pub(crate) external_pending: HashSet<Uri>,
 }
 
 impl GlobalState {
@@ -442,10 +410,7 @@ impl GlobalState {
         let pool = TaskPool::new(task_tx.clone(), default_pool_size());
         let fmt_pool = TaskPool::new(task_tx, 1);
         Self {
-            supports_pull_diagnostics: false,
             supports_diagnostic_refresh: false,
-            supports_related_documents: false,
-            diagnostics: DiagnosticCollection::default(),
             writer: crate::lsp::writer::WriterHandle::new(sender.clone()),
             sender,
             pool,
@@ -455,20 +420,6 @@ impl GlobalState {
             cancelled: HashSet::new(),
             outgoing: HashMap::new(),
             next_outgoing_id: 1,
-            settle_deadline: None,
-            lint_generation: 0,
-            last_applied_lint_generation: 0,
-            external_pending: HashSet::new(),
-        }
-    }
-
-    /// The main-loop-owned fields of a [`StateSnapshot`], captured at forward
-    /// time; the writer completes the snapshot with its db/document-map state.
-    pub(crate) fn snapshot_bits(&self) -> crate::lsp::writer::SnapshotBits {
-        crate::lsp::writer::SnapshotBits {
-            diagnostics: self.diagnostics.shared(),
-            supports_pull_diagnostics: self.supports_pull_diagnostics,
-            supports_related_documents: self.supports_related_documents,
         }
     }
 
@@ -476,7 +427,7 @@ impl GlobalState {
     /// mode snapshots are minted by the writer thread per
     /// [`ReadJob`](crate::lsp::writer::ReadJob).
     pub(crate) fn snapshot(&self) -> StateSnapshot {
-        self.writer.state().mint_snapshot(self.snapshot_bits())
+        self.writer.state().mint_snapshot()
     }
 
     /// Move the writer state onto its dedicated thread. Called once after
@@ -517,23 +468,6 @@ impl GlobalState {
         {
             log::warn!("server request {method} failed: {}", err.message);
         }
-    }
-
-    /// Arm (or push out) the single workspace settle timer. All lint dispatch
-    /// funnels through here so the expensive all-docs re-lint runs once, at a
-    /// quiescent point after the edit burst's writes have settled (rust-analyzer
-    /// recomputes diagnostics the same way, after `process_changes`). Every
-    /// salsa-input write must call this — directly or via [`Self::arm_settle_external`]
-    /// — so a write that cancels an in-flight pass also schedules its recomputation.
-    pub(crate) fn arm_settle(&mut self) {
-        self.settle_deadline = Some(Instant::now() + DIAGNOSTICS_DEBOUNCE);
-    }
-
-    /// Arm the settle timer and mark `uri` as needing external linters on the
-    /// next pass (the on-open/-save/referenced-file-change signal).
-    pub(crate) fn arm_settle_external(&mut self, uri: Uri) {
-        self.external_pending.insert(uri);
-        self.arm_settle();
     }
 
     /// Ask the client to re-pull diagnostics, if it supports refresh. A no-op in

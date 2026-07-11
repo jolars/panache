@@ -2,8 +2,9 @@
 //!
 //! These functions run on a [`TaskPool`](crate::lsp::task_pool) worker over a
 //! [`StateSnapshot`]. They never touch the client directly — they *return* the
-//! publishes, and the main loop turns them into `textDocument/publishDiagnostics`
-//! notifications (dropping stale ones via the lint generation counter).
+//! publishes, and the writer's diagnostics store turns them into
+//! `textDocument/publishDiagnostics` notifications (dropping stale ones via the
+//! lint generation counter).
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
@@ -21,7 +22,7 @@ use lsp_types::{
 use serde::Serialize;
 
 use super::super::conversions::{convert_diagnostic, offset_to_position};
-use crate::lsp::global_state::{GlobalState, StateSnapshot};
+use crate::lsp::global_state::StateSnapshot;
 use crate::lsp::uri_ext::UriExt;
 
 /// A single `publishDiagnostics` payload: target URI, optional version, diags.
@@ -543,18 +544,20 @@ fn project_closure(graph: &crate::salsa::ProjectGraph, root: &PathBuf) -> HashSe
     visited
 }
 
-/// Pull handler for `workspace/diagnostic`.
+/// Pull handler for `workspace/diagnostic`, run on the worker pool over a
+/// snapshot (the writer owns the diagnostics store, so the pooled route is
+/// what reads its current view, FIFO-ordered after preceding writes).
 ///
 /// Returns one report per URI in the pull store, emitting `unchanged` where the
 /// client already holds the current `result_id` (matched against
 /// `previous_result_ids`).
 pub(crate) fn workspace_diagnostic(
-    gs: &GlobalState,
+    snap: &StateSnapshot,
     params: WorkspaceDiagnosticParams,
 ) -> Streamed<WorkspaceDiagnosticReportResult> {
     // Push-only clients are served by push; never surface the unified store via a
     // pull (see `document_diagnostic`).
-    if !gs.supports_pull_diagnostics {
+    if !snap.supports_pull_diagnostics {
         return Streamed::whole(WorkspaceDiagnosticReportResult::Report(
             WorkspaceDiagnosticReport { items: Vec::new() },
         ));
@@ -565,7 +568,7 @@ pub(crate) fn workspace_diagnostic(
         .map(|prev| (&prev.uri, prev.value.as_str()))
         .collect();
 
-    let items: Vec<WorkspaceDocumentDiagnosticReport> = gs
+    let items: Vec<WorkspaceDocumentDiagnosticReport> = snap
         .diagnostics
         .iter()
         .map(|(uri, stored)| {

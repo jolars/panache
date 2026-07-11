@@ -97,8 +97,10 @@ pub fn run() -> std::io::Result<()> {
 /// How long `select!` parks when there's no pending lint deadline. crossbeam's
 /// `select!` arms are fixed at compile time, so we can't drop the timeout arm
 /// when idle; instead we wake on a coarse interval. The exact value is
-/// irrelevant — any client message or worker result wakes us immediately, and
-/// `dispatch_due_lints` re-arms a real deadline the moment one is scheduled.
+/// irrelevant — any client message or worker result wakes us immediately. In
+/// production (threaded writer) this is always the timeout: the writer thread
+/// self-times the debounced settle, so the main loop has no lint deadline to
+/// watch; the deadline arm only matters in inline mode (pre-spawn, tests).
 const IDLE_TICK: Duration = Duration::from_secs(3600);
 
 /// A single main-loop step blocks the event loop for its whole duration: every

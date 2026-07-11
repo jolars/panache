@@ -84,24 +84,36 @@ Guard: the test `transient_cross_thread_snapshots_stay_live_and_visible` in
    harvester phase below. `settle_task` (the all-docs read pass) is a free fn in
    `dispatch.rs` shared by inline and threaded paths. Smoke test:
    `threaded_writer_serves_writes_reads_and_settles`.
+8. refactor(lsp): move diagnostics store + settle machinery into the writer ---
+   `WriterState` now owns `DiagnosticCollection`, both lint generations,
+   `external_pending`, `settle_deadline`, and copies of the pull-capability
+   flags (set pre-spawn at `initialize`; `GlobalState` keeps only
+   `supports_diagnostic_refresh` --- the refresh is an outgoing request with
+   main-loop-tracked ids). Consequences: `Task::WriteEffects` and `SnapshotBits`
+   are gone (write effects apply writer-side; the writer mints complete
+   snapshots from its own state); the writer **self-times the settle** in
+   threaded mode (`recv_timeout` against its own deadline), so
+   `SettleJob`/`submit_settle` are gone and the main loop's
+   `dispatch_due_lints`/`next_lint_timeout` are inline-mode-only no-ops after
+   spawn; settle results still ride the task channel (`Task::Diagnostics`) and
+   `on_task` forwards them back via `WriterHandle::forward_settle_result`
+   (routing through the main loop avoids a self-referential writer sender that
+   would keep its channel from disconnecting on shutdown); the refresh nudge
+   returns as `Task::RefreshDiagnostics`; `workspace/diagnostic` moved from the
+   inline-streaming path to a pooled `spawn_streaming_request` over the
+   snapshot's store view (the `inline_streaming` macro is deleted), which also
+   makes it FIFO-ordered after forwarded writes and properly cancellable.
 
 Every commit is green: full suite w/ `--features lsp` (296 LSP integration tests
 included), clippy `-D warnings`, rustfmt.
 
 ## Next edits
 
-**1. Diagnostics store + settle machinery → writer** --- move
-`DiagnosticCollection`, `lint_generation`/`last_applied_lint_generation`,
-`external_pending`, and possibly the `settle_deadline` timer onto the writer so
-effects stop round-tripping. Entangled with `on_task`; the pull-diagnostics
-handlers read the store on the main loop, so the store may need to stay shared
-(`Arc`) or the pull path re-routed.
-
-**2. Harvester thread** --- move the referenced-file disk I/O off the writer
+**1. Harvester thread** --- move the referenced-file disk I/O off the writer
 thread too (it currently holds up queued writes/reads behind a slow reload; see
-the timing warn in `writer_thread`'s `Settle` arm).
+the timing warn around `begin_due_settle`'s reload).
 
-**3. Version-gating** of publishes.
+**2. Version-gating** of publishes.
 
 Watch out for: in threaded mode nothing on the main loop may call
 `writer.state()`/`state_mut()` or the inline delegates (`db()`,
@@ -111,13 +123,14 @@ threaded harness) to catch it.
 
 ## End-state design (for orientation)
 
-- **Writer thread owns:** `SalsaDb`, the salsa-input side of documents (or the
-  whole document map --- see below), config state, diagnostics store, settle
-  machinery. Mints transient `StateSnapshot`s per `ReadJob`.
+- **Writer thread owns (all landed):** `SalsaDb`, the whole document map, config
+  state, the diagnostics store, and the settle machinery (deadline, generations,
+  pending externals; self-timed via `recv_timeout`). Mints transient
+  `StateSnapshot`s per `ReadJob`.
 - **Main loop owns:** the LSP transport (`sender`, in-flight/cancelled request
-  ids), the `settle_deadline` timer, `external_pending`. Forwards
-  `WriteCommand`s and `ReadJob`s to the writer; drains `Outbound` (diagnostics
-  publishes, toasts) to the client.
+  ids, outgoing-request ids + `supports_diagnostic_refresh`) and the task pools.
+  Forwards `WriteCommand`s, `ReadJob`s, and settle results to the writer; turns
+  `Task`s into client messages.
 - **`LspTester` harness** (`src/lsp/testing.rs`) drives handlers synchronously
   over `&mut GlobalState` and 28 `tests/lsp/*` files depend on it. Preserve this
   as the writer's `inline()` mode (owns the db in-thread, mints snapshots
@@ -126,13 +139,6 @@ threaded harness) to catch it.
   `decide()` for diagnostics): panache has cross-document diagnostics (a shared
   manifest error deduped across docs) that a per-URI model would break.
 
-Design decision in flight: whether the writer owns the *entire* document map
-(salsa handles + trees + text) or only the salsa-input side. The whole-map
-option is simpler for read-snapshot assembly (the writer mints a complete
-snapshot with no bounce back to the main loop) and keeps did_change's
-`set_text → refdef_set → parse` colocated with the db; the current lean is
-toward the whole map on the writer, with the main loop as thin transport.
-
 ## How to resume
 
 ```text
@@ -140,7 +146,7 @@ cd <repo> && git checkout lsp-writer-thread
 # read this file top-to-bottom, then:
 cargo test --features lsp lsp
 cargo clippy --features lsp --all-targets -- -D warnings
-# continue at "Next edits -> 1. Diagnostics store + settle machinery -> writer"
+# continue at "Next edits -> 1. Harvester thread"
 ```
 
 Keep each field-group move a separate green commit. Verify per step with the two

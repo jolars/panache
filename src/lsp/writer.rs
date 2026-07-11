@@ -10,11 +10,16 @@
 //!   `initialize`/`initialized` handshake.
 //! - **Threaded** (after [`WriterHandle::spawn`]): the state moves onto the
 //!   dedicated `panache-lsp-writer` thread. Writes are forwarded as
-//!   [`WriteCommand`]s (their main-loop side effects return as
-//!   [`Task::WriteEffects`]), pooled reads as [`ReadJob`]s (the writer mints the
-//!   [`StateSnapshot`] and hands the job to the task pools), and the debounced
-//!   settle as [`SettleJob`]s (the referenced-file disk I/O write phase runs on
-//!   the writer, off the main event loop).
+//!   [`WriteCommand`]s and applied entirely on the writer (it owns the
+//!   diagnostics store and the settle machinery, so no effects round-trip);
+//!   pooled reads are forwarded as [`ReadJob`]s (the writer mints the
+//!   [`StateSnapshot`] and hands the job to the task pools); the debounced
+//!   settle **self-times on the writer thread** (`recv_timeout` on its
+//!   channel), so the referenced-file disk I/O write phase runs on the writer,
+//!   off the main event loop. Settle results ride the task channel to the main
+//!   loop, which forwards them back via
+//!   [`WriterHandle::forward_settle_result`]; the refresh nudge returns as
+//!   [`Task::RefreshDiagnostics`].
 //!
 //! **Concurrency invariant (validated by the test below).** A salsa write
 //! (`db_mut()` → `zalsa_mut` → `cancel_others`) blocks until the live-clone count
@@ -30,11 +35,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crossbeam_channel::{Receiver, Sender};
-use lsp_types::{MessageType, Uri};
+use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
+use lsp_types::{Diagnostic, MessageType, Uri};
 
 use crate::lsp::LspRuntimeSettings;
-use crate::lsp::global_state::{ClientSender, DocumentMap, StateSnapshot, StoredDiagnostics, Task};
+use crate::lsp::global_state::{
+    ClientSender, DIAGNOSTICS_DEBOUNCE, DiagnosticCollection, DocumentMap, StateSnapshot, Task,
+};
 use crate::lsp::task_pool::TaskSpawner;
 use crate::lsp::writer_command::{WriteCommand, WriteEffects};
 use crate::salsa::{Analysis, SalsaDb};
@@ -48,7 +55,9 @@ use crate::salsa::{Analysis, SalsaDb};
 /// concern that feeds `FileConfig` inputs. The writer owns the whole document
 /// map (salsa handles + trees + paths), not just the salsa-input side, so it
 /// can mint a complete [`StateSnapshot`] without bouncing back to the main
-/// loop. The settle machinery migrates here in a later phase.
+/// loop. It also owns the diagnostics store and the settle machinery (deadline,
+/// lint generations, pending externals), so a write's side effects apply here
+/// with no main-loop round trip.
 pub(crate) struct WriterState {
     db: SalsaDb,
 
@@ -78,7 +87,49 @@ pub(crate) struct WriterState {
     /// breakage re-notifies.
     config_error_reports: HashMap<PathBuf, String>,
 
-    /// Client channel for the one-shot config-parse-error toast.
+    /// The current diagnostic set: push delivery, the pull store, and
+    /// clear-on-fix bookkeeping unified behind one diff-based owner. Snapshots
+    /// carry a cheap `Arc` view of it for the pull handlers.
+    diagnostics: DiagnosticCollection,
+
+    /// Single debounce timer for the whole workspace. `Some(t)` means a quiescent
+    /// re-lint of *all* open documents is due at `t`; each salsa-input write
+    /// pushes it out by [`DIAGNOSTICS_DEBOUNCE`]. The all-docs model needs no
+    /// per-document deadlines and no cancel→re-arm net: any write that cancels an
+    /// in-flight pass has, by construction, already armed the next settle. In
+    /// threaded mode the writer thread's `recv_timeout` watches this; inline mode
+    /// polls it via `GlobalState::dispatch_due_lints`.
+    settle_deadline: Option<Instant>,
+
+    /// One global lint generation, bumped per dispatched settle pass. The pass
+    /// result is tagged with it and dropped in [`Self::apply_settle_result`] if
+    /// a newer settle has since been dispatched.
+    lint_generation: u64,
+
+    /// The highest lint generation whose settle result has actually been applied
+    /// to the store. Lags `lint_generation` while a dispatched pass is still in
+    /// flight; equal to it once that pass lands. The test harness's `pump` uses
+    /// the gap to know a settle is still pending.
+    last_applied_lint_generation: u64,
+
+    /// URIs whose next settle pass must also run external linters (the expensive
+    /// on-save/-open signal). Built-ins run for every open doc each settle;
+    /// externals run only for these. Retired once the pass that ran them
+    /// completes, so a save queued after dispatch survives a cancellation.
+    external_pending: HashSet<Uri>,
+
+    /// Whether the client advertised pull-diagnostics support at `initialize`
+    /// (set pre-spawn). When `true` the store never pushes
+    /// `textDocument/publishDiagnostics`; pull handlers serve it instead
+    /// (mode-switch — no double reporting).
+    supports_pull_diagnostics: bool,
+
+    /// Whether the client advertised `textDocument.diagnostic.relatedDocumentSupport`
+    /// (set pre-spawn); carried onto snapshots for the per-document pull handler.
+    supports_related_documents: bool,
+
+    /// Client channel for diagnostics publishes and the one-shot
+    /// config-parse-error toast.
     sender: ClientSender,
 }
 
@@ -92,6 +143,13 @@ impl WriterState {
             workspace_folders: Vec::new(),
             watched_config_files: HashSet::new(),
             config_error_reports: HashMap::new(),
+            diagnostics: DiagnosticCollection::default(),
+            settle_deadline: None,
+            lint_generation: 0,
+            last_applied_lint_generation: 0,
+            external_pending: HashSet::new(),
+            supports_pull_diagnostics: false,
+            supports_related_documents: false,
             sender,
         }
     }
@@ -143,23 +201,34 @@ impl WriterState {
         &mut self.runtime_settings
     }
 
-    /// Complete a [`StateSnapshot`] from this state plus the main-loop-owned
-    /// `bits` captured when the read was forwarded.
-    pub(crate) fn mint_snapshot(&self, bits: SnapshotBits) -> StateSnapshot {
+    /// Mint a complete [`StateSnapshot`] from writer-owned state.
+    pub(crate) fn mint_snapshot(&self) -> StateSnapshot {
         StateSnapshot::assemble(
             self.analysis(),
             self.document_map_arc(),
             self.workspace_folders.clone(),
-            bits,
+            self.diagnostics.shared(),
+            self.supports_pull_diagnostics,
+            self.supports_related_documents,
         )
     }
 
     /// Apply one database-mutating notification against writer-owned state,
-    /// accumulating requested main-loop side effects into `fx`.
+    /// including its side effects (settle arming, external marking, immediate
+    /// diagnostics drops) — all writer-owned now, so nothing travels back to
+    /// the main loop.
     ///
     /// This is the function the writer thread runs per received command; inline
     /// mode calls it synchronously via [`WriterHandle::forward_write`].
-    pub(crate) fn apply(&mut self, cmd: WriteCommand, fx: &mut WriteEffects) {
+    pub(crate) fn apply_write(&mut self, cmd: WriteCommand) {
+        let mut fx = WriteEffects::default();
+        self.apply(cmd, &mut fx);
+        self.apply_effects(fx);
+    }
+
+    /// Run the handler for one write command, accumulating its requested side
+    /// effects into `fx` (applied by [`Self::apply_write`]).
+    fn apply(&mut self, cmd: WriteCommand, fx: &mut WriteEffects) {
         use crate::lsp::{documents, handlers};
 
         match cmd {
@@ -186,6 +255,163 @@ impl WriterState {
                 handlers::file_operations::did_delete_files(self, fx, params)
             }
         }
+    }
+
+    /// Apply the side effects a write handler requested: immediate diagnostics
+    /// drops, then settle arming (order matters only in that a drop must not
+    /// wait behind the debounce window).
+    fn apply_effects(&mut self, fx: WriteEffects) {
+        for uri in fx.dropped {
+            self.diagnostics
+                .drop_uri(&uri, &self.sender, self.supports_pull_diagnostics);
+        }
+        if fx.settle {
+            self.arm_settle();
+        }
+        for uri in fx.external {
+            self.arm_settle_external(uri);
+        }
+    }
+
+    /// Arm (or push out) the single workspace settle timer. All lint dispatch
+    /// funnels through here so the expensive all-docs re-lint runs once, at a
+    /// quiescent point after the edit burst's writes have settled (rust-analyzer
+    /// recomputes diagnostics the same way, after `process_changes`).
+    fn arm_settle(&mut self) {
+        self.settle_deadline = Some(Instant::now() + DIAGNOSTICS_DEBOUNCE);
+    }
+
+    /// Arm the settle timer and mark `uri` as needing external linters on the
+    /// next pass (the on-open/-save/referenced-file-change signal).
+    pub(crate) fn arm_settle_external(&mut self, uri: Uri) {
+        self.external_pending.insert(uri);
+        self.arm_settle();
+    }
+
+    /// The armed settle deadline, if any. The writer thread's `recv_timeout`
+    /// watches this; inline mode feeds it into the main loop's `select!` timeout.
+    pub(crate) fn settle_deadline(&self) -> Option<Instant> {
+        self.settle_deadline
+    }
+
+    /// Pull an armed settle deadline up to *now* (test harness: makes the next
+    /// dispatch immediate without waiting out the debounce window).
+    pub(crate) fn expedite_settle(&mut self) {
+        if self.settle_deadline.is_some() {
+            self.settle_deadline = Some(Instant::now());
+        }
+    }
+
+    /// Whether a dispatched settle pass has not yet landed back in the store.
+    /// The test harness's `pump` uses this to keep draining; production blocks
+    /// on the task channel instead and never needs it.
+    pub(crate) fn settle_in_flight(&self) -> bool {
+        self.last_applied_lint_generation != self.lint_generation
+    }
+
+    /// If the settle deadline has elapsed, run the settle's **write phase** and
+    /// prepare its read pass: load every open document's referenced files
+    /// (includes/bibliographies) so the pass observes fresh content, then mint
+    /// the snapshot the pass runs over. Returns `None` when no settle is due.
+    ///
+    /// The write phase is disk I/O and runs on the calling thread — the writer
+    /// thread in production (holding up queued writes/reads behind it until the
+    /// harvester phase moves it off), the main loop in inline mode. Timed so a
+    /// perceptible stall names its own culprit in the log.
+    pub(crate) fn begin_due_settle(&mut self) -> Option<PreparedSettle> {
+        let deadline = self.settle_deadline?;
+        if deadline > Instant::now() {
+            return None;
+        }
+        self.settle_deadline = None;
+
+        self.lint_generation += 1;
+        let generation = self.lint_generation;
+        let external = self.external_pending.clone();
+
+        let reload_start = Instant::now();
+        crate::lsp::documents::reload_open_documents_referenced_files(self);
+        let reload_elapsed = reload_start.elapsed();
+        if reload_elapsed >= Duration::from_millis(50) {
+            log::warn!(
+                "settle write-phase (referenced-file reload) blocked {reload_elapsed:?} for {} open doc(s)",
+                self.document_map().len()
+            );
+        }
+
+        let uris: Vec<Uri> = self
+            .document_map()
+            .keys()
+            .filter_map(|key| key.parse::<Uri>().ok())
+            .collect();
+        Some(PreparedSettle {
+            generation,
+            external,
+            snap: self.mint_snapshot(),
+            uris,
+        })
+    }
+
+    /// Apply one settle pass result to the store. Returns `true` when the pass
+    /// was current and applied (the caller should nudge pull clients to
+    /// re-pull); a pass superseded by a newer settle is dropped wholesale — no
+    /// delivery, no clear, no external retirement.
+    pub(crate) fn apply_settle_result(
+        &mut self,
+        generation: u64,
+        publishes: Vec<(Uri, Option<i32>, Vec<Diagnostic>)>,
+        external_ran: HashSet<Uri>,
+    ) -> bool {
+        if generation != self.lint_generation {
+            return false;
+        }
+        // Record that this generation's pass has landed, so a waiter (the test
+        // harness's `pump`) can tell the settle is no longer in flight.
+        self.last_applied_lint_generation = generation;
+        // Hand the complete merged set to the collection: it upserts the URIs
+        // whose diagnostics changed, leaves unchanged ones untouched (no
+        // redundant push, stable pull `result_id`), and clears every URI the
+        // previous settle held but this one omits — clear-on-fix for fixed
+        // manifests, closed docs, and resolved cross-file diagnostics alike. A
+        // shared `_quarto.yml` stays flagged as long as any open doc still
+        // reports it.
+        self.diagnostics
+            .apply(publishes, &self.sender, self.supports_pull_diagnostics);
+        // Retire exactly the externals this pass ran (a save queued after
+        // dispatch stays pending for the next settle).
+        self.external_pending
+            .retain(|uri| !external_ran.contains(uri));
+        true
+    }
+
+    /// Record the client's pull-diagnostics capabilities (set once at
+    /// `initialize`, pre-spawn).
+    pub(crate) fn set_pull_capabilities(&mut self, pull: bool, related: bool) {
+        self.supports_pull_diagnostics = pull;
+        self.supports_related_documents = related;
+    }
+
+    /// Whether the client is served via pull diagnostics (push suppressed).
+    pub(crate) fn supports_pull_diagnostics(&self) -> bool {
+        self.supports_pull_diagnostics
+    }
+
+    /// The stored diagnostics collection (test-only inspection).
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> &DiagnosticCollection {
+        &self.diagnostics
+    }
+
+    /// The pending-externals set (test-only inspection).
+    #[cfg(test)]
+    pub(crate) fn external_pending(&self) -> &HashSet<Uri> {
+        &self.external_pending
+    }
+
+    /// Force the lint generation (test-only: simulates prior settles).
+    #[cfg(test)]
+    pub(crate) fn set_lint_generation(&mut self, generation: u64) {
+        self.lint_generation = generation;
     }
 
     /// Replace the workspace roots (set once at `initialize`).
@@ -243,13 +469,16 @@ impl WriterState {
     }
 }
 
-/// The main-loop-owned fields of a [`StateSnapshot`], captured when a read is
-/// forwarded to the writer; the writer completes the snapshot with its
-/// db/document-map/config state.
-pub(crate) struct SnapshotBits {
-    pub(crate) diagnostics: Arc<HashMap<Uri, StoredDiagnostics>>,
-    pub(crate) supports_pull_diagnostics: bool,
-    pub(crate) supports_related_documents: bool,
+/// A due settle's write phase completed and its read pass prepared: the
+/// generation tag, the externals to run, the snapshot the pass reads, and the
+/// open-document URIs it lints. Handed to
+/// [`settle_task`](crate::lsp::dispatch::settle_task) by both the inline
+/// dispatcher and the writer thread.
+pub(crate) struct PreparedSettle {
+    pub(crate) generation: u64,
+    pub(crate) external: HashSet<Uri>,
+    pub(crate) snap: StateSnapshot,
+    pub(crate) uris: Vec<Uri>,
 }
 
 /// Which worker pool a [`ReadJob`] runs on: the shared `Main` pool for
@@ -261,20 +490,11 @@ pub(crate) enum ReadPool {
 }
 
 /// A pooled read forwarded to the writer: the writer mints the snapshot (it
-/// owns the db) and hands `run` to the requested pool.
+/// owns the db, the document map, and the diagnostics store) and hands `run`
+/// to the requested pool.
 pub(crate) struct ReadJob {
     pub(crate) pool: ReadPool,
-    pub(crate) bits: SnapshotBits,
     pub(crate) run: Box<dyn FnOnce(StateSnapshot) + Send>,
-}
-
-/// A due workspace settle forwarded to the writer: the writer runs the
-/// referenced-file reload (write phase) on its own thread, then mints the
-/// snapshot and spawns the all-docs read pass.
-pub(crate) struct SettleJob {
-    pub(crate) generation: u64,
-    pub(crate) external: HashSet<Uri>,
-    pub(crate) bits: SnapshotBits,
 }
 
 /// Spawn handles onto the main loop's task pools, given to the writer thread so
@@ -288,7 +508,15 @@ pub(crate) struct PoolSpawners {
 enum WriterMsg {
     Write(WriteCommand),
     Read(ReadJob),
-    Settle(SettleJob),
+    /// A completed settle pass, forwarded back by the main loop's `on_task`
+    /// (the pool posts results on the task channel; routing them through the
+    /// main loop spares the writer a self-referential sender that would keep
+    /// its own channel from ever disconnecting on shutdown).
+    SettleResult {
+        generation: u64,
+        publishes: Vec<(Uri, Option<i32>, Vec<Diagnostic>)>,
+        external_ran: HashSet<Uri>,
+    },
 }
 
 /// The main loop's handle to the writer state; see the module docs for the
@@ -359,21 +587,46 @@ impl WriterHandle {
             .expect("failed to spawn LSP writer thread");
     }
 
-    /// Route a write to the state. Inline: applied now, effects returned for
-    /// immediate application. Threaded: forwarded, effects come back later as
-    /// [`Task::WriteEffects`]; returns `None`.
-    pub(crate) fn forward_write(&mut self, cmd: WriteCommand) -> Option<WriteEffects> {
+    /// Route a write to the state: applied now (with its side effects) in
+    /// inline mode, forwarded to the writer thread in threaded mode. Either
+    /// way nothing comes back — the writer owns every effect target.
+    pub(crate) fn forward_write(&mut self, cmd: WriteCommand) {
         match &mut self.mode {
-            WriterMode::Inline(state) => {
-                let mut fx = WriteEffects::default();
-                state.apply(cmd, &mut fx);
-                Some(fx)
-            }
+            WriterMode::Inline(state) => state.apply_write(cmd),
             WriterMode::Threaded { tx } => {
                 if tx.send(WriterMsg::Write(cmd)).is_err() {
                     log::warn!("LSP writer channel closed; dropping write");
                 }
-                None
+            }
+        }
+    }
+
+    /// Route a completed settle pass to the store owner. Inline: applied now;
+    /// returns whether the pass was current (the caller sends the refresh
+    /// nudge). Threaded: forwarded; the nudge returns later as
+    /// [`Task::RefreshDiagnostics`], so this returns `false`.
+    pub(crate) fn forward_settle_result(
+        &mut self,
+        generation: u64,
+        publishes: Vec<(Uri, Option<i32>, Vec<Diagnostic>)>,
+        external_ran: HashSet<Uri>,
+    ) -> bool {
+        match &mut self.mode {
+            WriterMode::Inline(state) => {
+                state.apply_settle_result(generation, publishes, external_ran)
+            }
+            WriterMode::Threaded { tx } => {
+                if tx
+                    .send(WriterMsg::SettleResult {
+                        generation,
+                        publishes,
+                        external_ran,
+                    })
+                    .is_err()
+                {
+                    log::warn!("LSP writer channel closed; dropping settle result");
+                }
+                false
             }
         }
     }
@@ -387,17 +640,6 @@ impl WriterHandle {
         };
         if tx.send(WriterMsg::Read(job)).is_err() {
             log::warn!("LSP writer channel closed; dropping read");
-        }
-    }
-
-    /// Forward a due settle to the writer thread (write phase + read-pass
-    /// spawn). Threaded mode only, like [`submit_read`](Self::submit_read).
-    pub(crate) fn submit_settle(&self, job: SettleJob) {
-        let WriterMode::Threaded { tx } = &self.mode else {
-            panic!("submit_settle is threaded-mode-only");
-        };
-        if tx.send(WriterMsg::Settle(job)).is_err() {
-            log::warn!("LSP writer channel closed; dropping settle");
         }
     }
 
@@ -429,9 +671,11 @@ impl WriterHandle {
     }
 }
 
-/// The writer thread's event loop: apply writes (posting their main-loop
-/// effects back on the task channel), mint snapshots for reads, and run the
-/// settle write phase before spawning the settle read pass.
+/// The writer thread's event loop: apply writes (side effects and all — the
+/// writer owns every effect target), mint snapshots for reads, self-time the
+/// debounced settle (`recv_timeout` against the writer-owned deadline, so no
+/// main-loop timer is involved), and apply forwarded settle results to the
+/// store, posting the [`Task::RefreshDiagnostics`] nudge for applied ones.
 ///
 /// Exits when every `WriterMsg` sender drops (server shutdown) or the task
 /// channel closes (main loop gone).
@@ -441,17 +685,29 @@ fn writer_thread(
     pools: PoolSpawners,
     task_tx: Sender<Task>,
 ) {
-    for msg in rx {
-        match msg {
-            WriterMsg::Write(cmd) => {
-                let mut fx = WriteEffects::default();
-                state.apply(cmd, &mut fx);
-                if task_tx.send(Task::WriteEffects(fx)).is_err() {
-                    break;
+    loop {
+        let msg = match state.settle_deadline() {
+            // A settle is armed: wait for the next message at most until the
+            // deadline, then fire the settle. A write arriving first pushes
+            // the deadline out (debounce); a read arriving first is served
+            // before the settle, which was due later anyway.
+            Some(deadline) => {
+                let timeout = deadline.saturating_duration_since(Instant::now());
+                match rx.recv_timeout(timeout) {
+                    Ok(msg) => Some(msg),
+                    Err(RecvTimeoutError::Timeout) => None,
+                    Err(RecvTimeoutError::Disconnected) => break,
                 }
             }
-            WriterMsg::Read(job) => {
-                let snap = state.mint_snapshot(job.bits);
+            None => match rx.recv() {
+                Ok(msg) => Some(msg),
+                Err(_) => break,
+            },
+        };
+        match msg {
+            Some(WriterMsg::Write(cmd)) => state.apply_write(cmd),
+            Some(WriterMsg::Read(job)) => {
+                let snap = state.mint_snapshot();
                 let spawner = match job.pool {
                     ReadPool::Main => &pools.main,
                     ReadPool::Fmt => &pools.fmt,
@@ -459,37 +715,32 @@ fn writer_thread(
                 let run = job.run;
                 spawner.spawn(move || run(snap));
             }
-            WriterMsg::Settle(job) => {
-                // Write phase: load every open document's referenced files
-                // (includes/bibliographies) before the snapshot, so the read
-                // pass observes fresh content. This is the disk-I/O phase that
-                // used to stall the main event loop; here it only occupies the
-                // writer thread. Still timed: a slow reload now delays queued
-                // writes and reads behind it (a later harvester phase moves it
-                // off the writer too).
-                let reload_start = Instant::now();
-                crate::lsp::documents::reload_open_documents_referenced_files(&mut state);
-                let reload_elapsed = reload_start.elapsed();
-                if reload_elapsed >= Duration::from_millis(50) {
-                    log::warn!(
-                        "settle write-phase (referenced-file reload) held the writer {reload_elapsed:?} for {} open doc(s)",
-                        state.document_map().len()
-                    );
+            Some(WriterMsg::SettleResult {
+                generation,
+                publishes,
+                external_ran,
+            }) => {
+                if state.apply_settle_result(generation, publishes, external_ran)
+                    && task_tx.send(Task::RefreshDiagnostics).is_err()
+                {
+                    break;
                 }
-
-                let uris: Vec<Uri> = state
-                    .document_map()
-                    .keys()
-                    .filter_map(|key| key.parse::<Uri>().ok())
-                    .collect();
-                let snap = state.mint_snapshot(job.bits);
-                pools.main.spawn(crate::lsp::dispatch::settle_task(
-                    snap,
-                    uris,
-                    job.generation,
-                    job.external,
-                    task_tx.clone(),
-                ));
+            }
+            // Deadline elapsed: run the settle write phase (the disk-I/O
+            // referenced-file reload that used to stall the main event loop;
+            // here it only occupies the writer thread — a slow reload delays
+            // queued writes and reads behind it until a later harvester phase
+            // moves it off the writer too) and spawn the all-docs read pass.
+            None => {
+                if let Some(prepared) = state.begin_due_settle() {
+                    pools.main.spawn(crate::lsp::dispatch::settle_task(
+                        prepared.snap,
+                        prepared.uris,
+                        prepared.generation,
+                        prepared.external,
+                        task_tx.clone(),
+                    ));
+                }
             }
         }
     }
@@ -499,9 +750,7 @@ fn writer_thread(
 mod tests {
     use salsa::Durability;
 
-    use super::{
-        PoolSpawners, ReadJob, ReadPool, SettleJob, SnapshotBits, WriterHandle, WriterState,
-    };
+    use super::{PoolSpawners, ReadJob, ReadPool, WriterHandle, WriterState};
     use crate::lsp::global_state::{ClientSender, Task};
     use crate::lsp::helpers::catch_cancelled;
     use crate::lsp::task_pool::TaskPool;
@@ -510,14 +759,6 @@ mod tests {
     fn client_sender() -> ClientSender {
         let (tx, _rx) = crossbeam_channel::unbounded();
         ClientSender::new(tx)
-    }
-
-    fn empty_bits() -> SnapshotBits {
-        SnapshotBits {
-            diagnostics: std::sync::Arc::new(std::collections::HashMap::new()),
-            supports_pull_diagnostics: false,
-            supports_related_documents: false,
-        }
     }
 
     /// Pins down the salsa concurrency invariant the writer-thread port must
@@ -610,10 +851,12 @@ mod tests {
     }
 
     /// End-to-end smoke test of threaded mode: a forwarded `didOpen` write
-    /// applies on the writer thread and posts its effects back on the task
-    /// channel; a forwarded read observes the written document through a
-    /// writer-minted snapshot; a forwarded settle produces a tagged
-    /// `Task::Diagnostics` through the pool.
+    /// applies on the writer thread (no effects round-trip — the writer owns
+    /// the settle machinery it arms); a forwarded read observes the written
+    /// document through a writer-minted snapshot; the debounced settle
+    /// self-fires on the writer thread and posts a tagged `Task::Diagnostics`
+    /// through the pool, and forwarding that result back yields the
+    /// `Task::RefreshDiagnostics` nudge.
     #[test]
     fn threaded_writer_serves_writes_reads_and_settles() {
         let timeout = std::time::Duration::from_secs(10);
@@ -629,8 +872,8 @@ mod tests {
             task_tx,
         );
 
-        // Write: forwarded, effects come back as a task (didOpen arms an
-        // external settle for the opened uri).
+        // Write: forwarded and applied on the writer thread; it arms the
+        // debounced settle (with externals for the opened uri) over there.
         let uri: lsp_types::Uri = "file:///nonexistent-spike/doc.qmd".parse().unwrap();
         let params = lsp_types::DidOpenTextDocumentParams {
             text_document: lsp_types::TextDocumentItem {
@@ -640,41 +883,48 @@ mod tests {
                 text: "# Heading\n\nBody text.\n".into(),
             },
         };
-        assert!(
-            writer
-                .forward_write(WriteCommand::DidOpen(params))
-                .is_none(),
-            "threaded mode must not apply writes synchronously"
-        );
-        let effects = match task_rx.recv_timeout(timeout).expect("effects task") {
-            Task::WriteEffects(fx) => fx,
-            _ => panic!("expected Task::WriteEffects first"),
-        };
-        assert_eq!(effects.external, vec![uri.clone()]);
+        writer.forward_write(WriteCommand::DidOpen(params));
 
-        // Read: the writer mints the snapshot; the job (run on the pool)
-        // observes the document written above.
+        // Read: FIFO-ordered after the write; the writer mints the snapshot and
+        // the job (run on the pool) observes the document written above.
+        let read_uri = uri.clone();
         let (seen_tx, seen_rx) = crossbeam_channel::bounded::<Option<String>>(1);
         writer.submit_read(ReadJob {
             pool: ReadPool::Main,
-            bits: empty_bits(),
             run: Box::new(move |snap| {
-                let _ = seen_tx.send(snap.document_content(&uri));
+                let _ = seen_tx.send(snap.document_content(&read_uri));
             }),
         });
         let seen = seen_rx.recv_timeout(timeout).expect("read ran");
         assert_eq!(seen.as_deref(), Some("# Heading\n\nBody text.\n"));
 
-        // Settle: write phase + read pass on the writer side, result tagged
-        // with our generation.
-        writer.submit_settle(SettleJob {
-            generation: 7,
-            external: std::collections::HashSet::new(),
-            bits: empty_bits(),
-        });
-        match task_rx.recv_timeout(timeout).expect("settle result") {
-            Task::Diagnostics { generation, .. } => assert_eq!(generation, 7),
-            _ => panic!("expected Task::Diagnostics from the settle"),
+        // Settle: the didOpen armed it; the writer self-fires after the
+        // debounce window and spawns the read pass, whose result lands on the
+        // task channel tagged with the writer's first generation.
+        let (generation, publishes, external_ran) =
+            match task_rx.recv_timeout(timeout).expect("settle result") {
+                Task::Diagnostics {
+                    generation,
+                    publishes,
+                    external_ran,
+                } => (generation, publishes, external_ran),
+                _ => panic!("expected Task::Diagnostics from the self-timed settle"),
+            };
+        assert_eq!(generation, 1);
+        assert!(
+            external_ran.contains(&uri),
+            "didOpen queued external linters for the opened doc"
+        );
+
+        // Forward the result back (as the main loop's `on_task` does): the
+        // writer applies it to its store and posts the refresh nudge.
+        assert!(
+            !writer.forward_settle_result(generation, publishes, external_ran),
+            "threaded mode must not apply settle results synchronously"
+        );
+        match task_rx.recv_timeout(timeout).expect("refresh nudge") {
+            Task::RefreshDiagnostics => {}
+            _ => panic!("expected Task::RefreshDiagnostics after the settle applied"),
         }
     }
 }

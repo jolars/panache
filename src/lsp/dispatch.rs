@@ -1,10 +1,12 @@
 //! Request/notification/task routing for the synchronous main loop.
 //!
 //! [`GlobalState::on_request`] ships read requests to the [`TaskPool`] over a
-//! [`StateSnapshot`]; [`GlobalState::on_notification`] mutates state inline on
-//! the main thread; [`GlobalState::on_task`] turns completed worker results into
-//! client messages. The salsa-cancellation safety net lives here: a pooled read
-//! that unwinds with [`salsa::Cancelled`] becomes a `ContentModified` response.
+//! [`StateSnapshot`]; [`GlobalState::on_notification`] routes database-mutating
+//! notifications to the writer (inline or over its channel);
+//! [`GlobalState::on_task`] turns completed worker results into client messages
+//! and forwards settle results back to the writer. The salsa-cancellation
+//! safety net lives here: a pooled read that unwinds with [`salsa::Cancelled`]
+//! becomes a `ContentModified` response.
 
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -17,11 +19,11 @@ use serde::Serialize;
 use serde_json::Value;
 
 use super::global_state::{GlobalState, StateSnapshot, Task};
+use super::handlers;
 use super::helpers::catch_cancelled;
 use super::uri_ext::UriExt;
-use super::{documents, handlers};
 
-use super::writer::{ReadJob, ReadPool, SettleJob};
+use super::writer::{ReadJob, ReadPool};
 
 /// Build the `serverInfo` reported at `initialize` so clients (e.g. Neovim's
 /// `:LspInfo`) can display the server name and version.
@@ -236,8 +238,10 @@ impl GlobalState {
         // Pull diagnostics mode-switch: a client that advertises
         // `textDocument.diagnostic` is served via pull only (push is suppressed).
         // `workspace.diagnostic.refresh_support` lets us nudge it to re-pull when
-        // an async pass updates the store.
-        self.supports_pull_diagnostics = params
+        // an async pass updates the store. The pull flags live on the writer
+        // (with the store); the refresh flag stays here (the refresh is a
+        // server→client request with a main-loop-tracked id).
+        let supports_pull_diagnostics = params
             .capabilities
             .text_document
             .as_ref()
@@ -251,19 +255,22 @@ impl GlobalState {
             .unwrap_or(false);
         // Independent of pull support: lets `document_diagnostic` carry cross-file
         // diagnostics for the pulled document's project-graph closure inline.
-        self.supports_related_documents = params
+        let supports_related_documents = params
             .capabilities
             .text_document
             .as_ref()
             .and_then(|td| td.diagnostic.as_ref())
             .and_then(|d| d.related_document_support)
             .unwrap_or(false);
+        self.writer
+            .state_mut()
+            .set_pull_capabilities(supports_pull_diagnostics, supports_related_documents);
         log::debug!(
             "lsp pull diagnostics: supported={} refresh={}",
-            self.supports_pull_diagnostics,
+            supports_pull_diagnostics,
             self.supports_diagnostic_refresh
         );
-        if self.supports_pull_diagnostics && !self.supports_diagnostic_refresh {
+        if supports_pull_diagnostics && !self.supports_diagnostic_refresh {
             log::debug!(
                 "client supports pull diagnostics but not refresh; async results \
                  (save-time external linters, cross-file) reach it only on its next pull"
@@ -357,48 +364,23 @@ impl GlobalState {
             };
         }
 
-        // Answer a request inline on the main thread, the handler returning a
-        // `Streamed { response, progress }`: the response is sent first, then
-        // each pre-built `$/progress` notification in order. Used by the pull
-        // diagnostics handlers, which read `GlobalState`'s store directly (a
-        // cheap map lookup) rather than a pooled `StateSnapshot`, and stream the
-        // remainder when the client supplies a `partialResultToken` (an absent
-        // token leaves `progress` empty, so the whole report rides in the
-        // response).
-        macro_rules! inline_streaming {
-            ($R:ty, $handler:expr) => {
-                req = match req.extract::<<$R as r::Request>::Params>(<$R>::METHOD) {
-                    Ok((id, params)) => {
-                        let handlers::diagnostics::Streamed { response, progress } =
-                            $handler(self, params);
-                        self.respond(Response::new_ok(id, response));
-                        for note in progress {
-                            self.sender.send(lsp_server::Message::Notification(note));
-                        }
-                        return;
-                    }
-                    Err(ExtractError::MethodMismatch(req)) => req,
-                    Err(ExtractError::JsonError { method, error }) => {
-                        log::error!("invalid params for {method}: {error}");
-                        return;
-                    }
-                };
-            };
-        }
-
-        // `textDocument/diagnostic` recomputes the pulled document (to stay current
-        // with the buffer), so it runs on the pool: inline it would block the event
-        // loop per pull and, since neovim pulls once per keystroke, freeze a
-        // synchronous format-on-save behind a burst. `workspace/diagnostic` only
-        // reads the store, so it stays inline.
+        // Both pull-diagnostics requests run on the pool over a snapshot.
+        // `textDocument/diagnostic` recomputes the pulled document (to stay
+        // current with the buffer): inline it would block the event loop per
+        // pull and, since neovim pulls once per keystroke, freeze a synchronous
+        // format-on-save behind a burst. `workspace/diagnostic` only reads the
+        // diagnostics store — but the writer owns that store now, so the pooled
+        // route is also what keeps the pull FIFO-ordered after any write (and
+        // settle result) forwarded before it.
         pool!(
             r::DocumentDiagnosticRequest,
             handlers::diagnostics::document_diagnostic,
             spawn_streaming_request
         );
-        inline_streaming!(
+        pool!(
             r::WorkspaceDiagnosticRequest,
-            handlers::diagnostics::workspace_diagnostic
+            handlers::diagnostics::workspace_diagnostic,
+            spawn_streaming_request
         );
 
         pool!(
@@ -535,31 +517,13 @@ impl GlobalState {
 
     /// The single entry point for every database-mutating notification.
     ///
-    /// The handler itself runs against writer-owned state
-    /// ([`WriterState::apply`](crate::lsp::writer::WriterState::apply)). Inline
-    /// mode applies it synchronously and gets the requested main-loop side
-    /// effects back to apply now; threaded mode forwards the command to the
-    /// writer thread, and the effects come back later as [`Task::WriteEffects`].
+    /// The handler runs against writer-owned state, side effects included
+    /// ([`WriterState::apply_write`](crate::lsp::writer::WriterState::apply_write)):
+    /// inline mode applies it synchronously, threaded mode forwards the command
+    /// to the writer thread. Nothing comes back either way — the writer owns
+    /// the diagnostics store and the settle machinery the effects target.
     pub(crate) fn apply_write(&mut self, cmd: crate::lsp::writer_command::WriteCommand) {
-        if let Some(fx) = self.writer.forward_write(cmd) {
-            self.apply_write_effects(fx);
-        }
-    }
-
-    /// Apply the main-loop side effects a write handler requested: immediate
-    /// diagnostics drops, then settle arming (order matters only in that a drop
-    /// must not wait behind the debounce window).
-    pub(crate) fn apply_write_effects(&mut self, fx: crate::lsp::writer_command::WriteEffects) {
-        for uri in fx.dropped {
-            self.diagnostics
-                .drop_uri(&uri, &self.sender, self.supports_pull_diagnostics);
-        }
-        if fx.settle {
-            self.arm_settle();
-        }
-        for uri in fx.external {
-            self.arm_settle_external(uri);
-        }
+        self.writer.forward_write(cmd);
     }
 
     /// `$/cancelRequest`: mark the id so its eventual result is relabeled.
@@ -609,34 +573,24 @@ impl GlobalState {
                 publishes,
                 external_ran,
             } => {
-                // Drop a pass superseded by a newer settle.
-                if generation != self.lint_generation {
-                    return;
+                // Forward the pass result to the store owner. The writer checks
+                // the generation (dropping a superseded pass), applies the
+                // merged set to the collection, and retires exactly the
+                // externals this pass ran. Inline mode applies it here and now
+                // — a `true` return means it was current, so nudge pull clients
+                // with one coalesced refresh (a no-op for push clients).
+                // Threaded mode forwards to the writer thread; its nudge comes
+                // back as [`Task::RefreshDiagnostics`].
+                if self
+                    .writer
+                    .forward_settle_result(generation, publishes, external_ran)
+                {
+                    self.send_diagnostic_refresh();
                 }
-                // Record that this generation's pass has landed, so a waiter
-                // (the test harness's `pump`) can tell the settle is no longer in
-                // flight.
-                self.last_applied_lint_generation = generation;
-                // Hand the complete merged set to the collection: it upserts the
-                // URIs whose diagnostics changed, leaves unchanged ones untouched
-                // (no redundant push, stable pull `result_id`), and clears every
-                // URI the previous settle held but this one omits — clear-on-fix
-                // for fixed manifests, closed docs, and resolved cross-file
-                // diagnostics alike. A shared `_quarto.yml` stays flagged as long
-                // as any open doc still reports it.
-                self.diagnostics
-                    .apply(publishes, &self.sender, self.supports_pull_diagnostics);
-                // Retire exactly the externals this pass ran (a save queued after
-                // dispatch stays pending for the next settle).
-                self.external_pending
-                    .retain(|uri| !external_ran.contains(uri));
-                // One coalesced nudge after the whole batch (pull + refresh only; a
-                // no-op for push clients).
-                self.send_diagnostic_refresh();
             }
-            // A write applied on the writer thread; its main-loop side effects
-            // (settle arming, diagnostics drops) land here.
-            Task::WriteEffects(fx) => self.apply_write_effects(fx),
+            // The writer thread applied a settle result to its store; nudge
+            // pull clients to re-pull.
+            Task::RefreshDiagnostics => self.send_diagnostic_refresh(),
         }
     }
 
@@ -703,7 +657,6 @@ impl GlobalState {
         if self.writer.is_threaded() {
             self.writer.submit_read(ReadJob {
                 pool: ReadPool::Main,
-                bits: self.snapshot_bits(),
                 run: Box::new(run),
             });
         } else {
@@ -778,7 +731,6 @@ impl GlobalState {
             // read keeps it FIFO-ordered after any write sent just before it.
             self.writer.submit_read(ReadJob {
                 pool,
-                bits: self.snapshot_bits(),
                 run: Box::new(run),
             });
         } else {
@@ -790,100 +742,59 @@ impl GlobalState {
         }
     }
 
-    /// Spawn one settle pass that re-lints **every** open document over a single
-    /// snapshot, tagged with `generation`. `external` is the set of URIs to also
-    /// run external linters for (built-ins run for all docs regardless).
-    ///
-    /// One job, not a fan-out: a fan-out of N jobs would each clone a separate
-    /// salsa handle that does not share one revision atomically, so a write
-    /// landing mid-fan-out could cancel some jobs and not others — reintroducing
-    /// the split-generation problem this model deletes. One job makes a concurrent
-    /// write cancel the whole pass atomically; the partial work is discarded and
-    /// the cancelling write has already armed the next settle, so nothing needs
-    /// re-arming.
-    pub(crate) fn spawn_settle_pass(
-        &mut self,
-        generation: u64,
-        external: std::collections::HashSet<Uri>,
-    ) {
-        let snap = self.snapshot();
-        let sender = self.pool.result_sender();
-        let uris: Vec<Uri> = self
-            .writer
-            .document_map()
-            .keys()
-            .filter_map(|key| key.parse::<Uri>().ok())
-            .collect();
-        self.pool
-            .spawn(settle_task(snap, uris, generation, external, sender));
-    }
-
     /// Time until the workspace settle deadline, for the main-loop `select!`.
+    /// `None` in threaded mode: the writer thread watches its own deadline.
     pub(crate) fn next_lint_timeout(&self) -> Option<Duration> {
-        self.settle_deadline
+        if self.writer.is_threaded() {
+            return None;
+        }
+        self.writer
+            .state()
+            .settle_deadline()
             .map(|deadline| deadline.saturating_duration_since(Instant::now()))
     }
 
     /// If the workspace settle deadline has elapsed, re-lint every open document.
+    /// Inline mode only — in threaded mode the writer thread self-times the
+    /// settle, so this is a no-op (the port's latency win: the write phase's
+    /// referenced-file disk I/O runs off the main event loop, and a
+    /// format-on-save landing during it no longer waits).
     ///
-    /// Two phases on purpose: **first** apply every open document's writes (load
-    /// newly-referenced includes/bibliographies), **then** snapshot and spawn the
-    /// single read pass. Loading after the snapshot would cancel the pass, so the
-    /// write phase is batched ahead of it — the pass reads a settled database.
+    /// Two phases on purpose ([`WriterState::begin_due_settle`]): **first**
+    /// apply every open document's writes (load newly-referenced
+    /// includes/bibliographies), **then** snapshot and spawn the single read
+    /// pass. Loading after the snapshot would cancel the pass, so the write
+    /// phase is batched ahead of it — the pass reads a settled database.
+    ///
+    /// One job, not a fan-out: a fan-out of N jobs would each clone a separate
+    /// salsa handle that does not share one revision atomically, so a write
+    /// landing mid-fan-out could cancel some jobs and not others —
+    /// reintroducing the split-generation problem this model deletes. One job
+    /// makes a concurrent write cancel the whole pass atomically; the partial
+    /// work is discarded and the cancelling write has already armed the next
+    /// settle, so nothing needs re-arming.
+    ///
+    /// [`WriterState::begin_due_settle`]: crate::lsp::writer::WriterState::begin_due_settle
     //
     // Backstop hook: for pathological sessions with more open docs than the salsa
     // lru (512), a future `MAX_DOCS_PER_SETTLE` cap could lint a prioritized
     // subset (saved + recently-changed) per settle and re-arm for the remainder.
     // The raised lru removes the cliff for realistic sessions, so it is unused.
     pub(crate) fn dispatch_due_lints(&mut self) {
-        let Some(deadline) = self.settle_deadline else {
+        if self.writer.is_threaded() {
+            return;
+        }
+        let Some(prepared) = self.writer.state_mut().begin_due_settle() else {
             return;
         };
-        if deadline > Instant::now() {
-            return;
-        }
-        self.settle_deadline = None;
-
-        self.lint_generation += 1;
-        let generation = self.lint_generation;
-        let external = self.external_pending.clone();
-
-        // Threaded: forward the whole settle to the writer thread, which runs
-        // the write phase (referenced-file reload) off the main loop before
-        // minting the snapshot and spawning the read pass. This is the port's
-        // latency win: a format-on-save landing during the settle no longer
-        // waits behind the disk I/O.
-        if self.writer.is_threaded() {
-            self.writer.submit_settle(SettleJob {
-                generation,
-                external,
-                bits: self.snapshot_bits(),
-            });
-            return;
-        }
-
-        // Inline write phase: load every open document's referenced files first.
-        // A keystroke burst may have added an include/bibliography since the last
-        // pass; `file_text` no longer lazy-loads (audit §3.2), so the writer loads
-        // them here, coalesced onto the settle boundary.
-        //
-        // This runs on the calling thread, so a large project graph (e.g. a
-        // bookdown book: every chapter re-read and re-parsed for cross-reference
-        // resolution) blocks it. Time it so a perceptible stall is attributable
-        // here rather than to the off-thread read pass below.
-        let reload_start = Instant::now();
-        documents::reload_open_documents_referenced_files(self.writer.state_mut());
-        let reload_elapsed = reload_start.elapsed();
-        if reload_elapsed >= Duration::from_millis(50) {
-            log::warn!(
-                "settle write-phase (referenced-file reload) blocked {reload_elapsed:?} for {} open doc(s)",
-                self.writer.document_map().len()
-            );
-        }
-
-        // Read phase: snapshot and spawn the single all-docs pass over the
-        // now-settled database.
-        self.spawn_settle_pass(generation, external);
+        let sender = self.pool.result_sender();
+        self.pool.spawn(settle_task(
+            prepared.snap,
+            prepared.uris,
+            prepared.generation,
+            prepared.external,
+            sender,
+        ));
     }
 }
 
@@ -985,25 +896,33 @@ mod tests {
         s.parse().expect("valid uri")
     }
 
-    /// A current-generation settle result is applied: the published URI is stored,
-    /// a URI the previous settle reported but this one omits is cleared, and
-    /// exactly the externals this pass ran are retired — an external queued after
-    /// dispatch (here `b`) survives for the next settle.
+    /// A current-generation settle result is applied (via the writer, the store
+    /// owner): the published URI is stored, a URI the previous settle reported
+    /// but this one omits is cleared, and exactly the externals this pass ran
+    /// are retired — an external queued after dispatch (here `b`) survives for
+    /// the next settle.
     #[test]
     fn settle_result_retires_external_and_clears_stale_uris() {
         let (tx, _client_rx) = crossbeam_channel::unbounded();
         let mut gs = GlobalState::new(ClientSender::new(tx));
-        gs.supports_pull_diagnostics = true;
         let (a, b, x) = (
             uri("file:///a.qmd"),
             uri("file:///b.qmd"),
             uri("file:///x.qmd"),
         );
-        // Seed the collection with `x` from a prior settle.
-        gs.lint_generation = 5;
-        gs.diagnostics
-            .apply(vec![(x.clone(), None, Vec::new())], &gs.sender, true);
-        gs.external_pending = [a.clone(), b.clone()].into_iter().collect();
+        {
+            let ws = gs.writer.state_mut();
+            ws.set_pull_capabilities(true, false);
+            // Seed the collection with `x` from a prior settle.
+            ws.set_lint_generation(5);
+            assert!(ws.apply_settle_result(
+                5,
+                vec![(x.clone(), None, Vec::new())],
+                std::collections::HashSet::new(),
+            ));
+            ws.arm_settle_external(a.clone());
+            ws.arm_settle_external(b.clone());
+        }
 
         gs.on_task(Task::Diagnostics {
             generation: 5,
@@ -1011,14 +930,15 @@ mod tests {
             external_ran: [a.clone()].into_iter().collect(),
         });
 
-        assert!(!gs.external_pending.contains(&a), "ran external retired");
+        let ws = gs.writer.state();
+        assert!(!ws.external_pending().contains(&a), "ran external retired");
         assert!(
-            gs.external_pending.contains(&b),
+            ws.external_pending().contains(&b),
             "external queued after dispatch must survive"
         );
-        assert!(gs.diagnostics.get(&a).is_some(), "published `a` stored");
+        assert!(ws.diagnostics().get(&a).is_some(), "published `a` stored");
         assert!(
-            gs.diagnostics.get(&x).is_none(),
+            ws.diagnostics().get(&x).is_none(),
             "omitted `x` cleared from the collection"
         );
     }
@@ -1029,12 +949,18 @@ mod tests {
     fn stale_settle_result_is_dropped() {
         let (tx, _client_rx) = crossbeam_channel::unbounded();
         let mut gs = GlobalState::new(ClientSender::new(tx));
-        gs.supports_pull_diagnostics = true;
         let (a, x) = (uri("file:///a.qmd"), uri("file:///x.qmd"));
-        gs.lint_generation = 9;
-        gs.diagnostics
-            .apply(vec![(x.clone(), None, Vec::new())], &gs.sender, true);
-        gs.external_pending = [a.clone()].into_iter().collect();
+        {
+            let ws = gs.writer.state_mut();
+            ws.set_pull_capabilities(true, false);
+            ws.set_lint_generation(9);
+            assert!(ws.apply_settle_result(
+                9,
+                vec![(x.clone(), None, Vec::new())],
+                std::collections::HashSet::new(),
+            ));
+            ws.arm_settle_external(a.clone());
+        }
 
         gs.on_task(Task::Diagnostics {
             generation: 7,
@@ -1042,8 +968,12 @@ mod tests {
             external_ran: [a.clone()].into_iter().collect(),
         });
 
-        assert_eq!(gs.external_pending, [a.clone()].into_iter().collect());
-        assert!(gs.diagnostics.get(&a).is_none(), "stale pass not applied");
-        assert!(gs.diagnostics.get(&x).is_some(), "prior `x` untouched");
+        let ws = gs.writer.state();
+        assert_eq!(
+            ws.external_pending().clone(),
+            [a.clone()].into_iter().collect()
+        );
+        assert!(ws.diagnostics().get(&a).is_none(), "stale pass not applied");
+        assert!(ws.diagnostics().get(&x).is_some(), "prior `x` untouched");
     }
 }

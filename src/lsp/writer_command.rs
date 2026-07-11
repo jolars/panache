@@ -3,12 +3,9 @@
 //! Every notification that mutates the salsa database is modeled as a
 //! [`WriteCommand`]. The main loop builds one and hands it to
 //! [`GlobalState::apply_write`](crate::lsp::global_state::GlobalState::apply_write),
-//! the single chokepoint through which all writes flow. Today `apply_write` runs
-//! synchronously on the main loop; a later phase relocates the salsa side of it
-//! onto a dedicated writer thread, at which point `WriteCommand` becomes the
-//! message serialized across the channel. Centralizing writes behind one enum
-//! now is what makes that relocation a transport change rather than a re-wiring
-//! of every handler.
+//! the single chokepoint through which all writes flow — applied synchronously
+//! in inline mode, serialized across the channel to the dedicated writer thread
+//! in threaded mode.
 
 use lsp_types::{
     CreateFilesParams, DeleteFilesParams, DidChangeConfigurationParams,
