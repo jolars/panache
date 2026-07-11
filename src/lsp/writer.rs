@@ -332,6 +332,17 @@ impl WriterState {
         self.last_applied_lint_generation != self.lint_generation
     }
 
+    /// Push an armed settle deadline out to `deadline` (no-op when none is
+    /// armed). Harvest-cycle bookkeeping: an in-flight cycle's completion pass
+    /// covers every write applied so far, so a deadline firing mid-cycle only
+    /// needs to re-fire at the cycle's expiry — where a cycle whose batch was
+    /// lost is detected and aborted instead of swallowing settles forever.
+    pub(crate) fn defer_settle_until(&mut self, deadline: Instant) {
+        if self.settle_deadline.is_some() {
+            self.settle_deadline = Some(deadline);
+        }
+    }
+
     /// Clear the settle deadline if it has elapsed. `true` means a settle
     /// should begin now.
     pub(crate) fn take_due_settle(&mut self) -> bool {
@@ -845,24 +856,46 @@ fn spawn_settle_pass(pools: &PoolSpawners, task_tx: &Sender<Task>, prepared: Pre
     ));
 }
 
+/// How long an in-flight harvest cycle may run before the writer assumes its
+/// batch was lost (harvester death, a dropped relay) and aborts the cycle. A
+/// `Some` cycle defers every settle deadline, so without this backstop one
+/// lost batch would freeze diagnostics for the whole session. Generous: a
+/// healthy cycle is disk reads plus two channel hops, well under a second.
+const HARVEST_CYCLE_TIMEOUT: Duration = if cfg!(test) {
+    Duration::from_millis(500)
+} else {
+    Duration::from_secs(30)
+};
+
 /// The dedicated `panache-lsp-harvester` thread: reads each requested batch of
 /// referenced files from disk (the settle write phase's only slow part) and
 /// posts the contents on the task channel, from where the main loop forwards
 /// them back to the writer as [`WriterMsg::Harvested`]. Owns no state — the
 /// writer decides what to read (discovery) and what to keep (compare-and-set).
 ///
+/// A batch is posted even if reading it panics (an empty one): the batch is
+/// the cycle's only progress signal, and the writer must not wait on one that
+/// will never come. The unread paths stay interned `None` until the next
+/// cycle (a fresh `requested` set) re-reads them.
+///
 /// Exits when the writer drops its request sender or the task channel closes.
 fn harvester_thread(rx: Receiver<Vec<PathBuf>>, task_tx: Sender<Task>) {
     for paths in rx {
         let read_start = Instant::now();
         let count = paths.len();
-        let batch: Vec<(PathBuf, Option<String>)> = paths
-            .into_iter()
-            .map(|path| {
-                let content = std::fs::read_to_string(&path).ok();
-                (path, content)
-            })
-            .collect();
+        let batch = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            paths
+                .into_iter()
+                .map(|path| {
+                    let content = std::fs::read_to_string(&path).ok();
+                    (path, content)
+                })
+                .collect::<Vec<(PathBuf, Option<String>)>>()
+        }))
+        .unwrap_or_else(|_| {
+            log::error!("LSP harvester panicked reading a batch; posting it empty");
+            Vec::new()
+        });
         log::debug!(
             "settle harvest read {count} referenced file(s) in {:?}",
             read_start.elapsed()
@@ -930,10 +963,11 @@ fn writer_thread(
         })
         .expect("failed to spawn LSP harvester thread");
 
-    // The paths already requested in the in-flight harvest cycle; `None` when
-    // no cycle is running. At most one cycle (one outstanding harvester batch)
-    // exists at a time.
-    let mut harvest: Option<HashSet<PathBuf>> = None;
+    // The in-flight harvest cycle: the paths already requested plus the
+    // cycle's start (for the lost-batch backstop). `None` when no cycle is
+    // running; at most one cycle (one outstanding harvester batch) exists at
+    // a time.
+    let mut harvest: Option<(HashSet<PathBuf>, Instant)> = None;
 
     loop {
         let msg = match state.settle_deadline() {
@@ -988,7 +1022,7 @@ fn writer_thread(
             // (discovery found new references in the freshly loaded content)
             // or complete the settle and spawn its read pass.
             Some(WriterMsg::Harvested(batch)) => {
-                let Some(requested) = harvest.as_mut() else {
+                let Some((requested, _)) = harvest.as_mut() else {
                     log::warn!("harvest batch without an in-flight cycle; dropped");
                     continue;
                 };
@@ -1020,12 +1054,27 @@ fn writer_thread(
             // immediately when there is nothing to read — no open on-disk
             // documents, or every referenced path is an open buffer).
             None => {
-                if harvest.is_some() {
+                if let Some((_, started)) = &harvest {
                     // A cycle is already in flight; the pass it will spawn
                     // reads a snapshot minted at completion, so every write
                     // applied so far — including whichever armed this deadline
-                    // — is covered. Just clear the deadline.
+                    // — is covered. Defer the deadline to the cycle's expiry
+                    // instead of clearing it: a healthy cycle completes first
+                    // (completion clears the deadline), while a cycle whose
+                    // batch was lost re-fires here and is aborted below.
+                    let expiry = *started + HARVEST_CYCLE_TIMEOUT;
+                    if Instant::now() < expiry {
+                        state.defer_settle_until(expiry);
+                        continue;
+                    }
+                    log::warn!(
+                        "harvest cycle stalled for {HARVEST_CYCLE_TIMEOUT:?}; \
+                         assuming its batch was lost and reloading synchronously"
+                    );
+                    harvest = None;
                     state.take_due_settle();
+                    crate::lsp::documents::reload_open_documents_referenced_files(&mut state);
+                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
                     continue;
                 }
                 if !state.take_due_settle() {
@@ -1040,7 +1089,7 @@ fn writer_thread(
                 if first.is_empty() {
                     spawn_settle_pass(&pools, &task_tx, state.complete_settle());
                 } else if harvest_tx.send(first).is_ok() {
-                    harvest = Some(requested);
+                    harvest = Some((requested, Instant::now()));
                     state.begin_harvest_cycle();
                 } else {
                     log::warn!("LSP harvester channel closed; reloading synchronously");
@@ -1387,6 +1436,77 @@ mod tests {
             .content_or_empty(state.db())
             .to_string();
         assert!(text.contains("One"), "bib content loaded, got: {text}");
+    }
+
+    /// A lost harvest batch must not wedge diagnostics for the session.
+    /// While a cycle is in flight every elapsed settle deadline is covered by
+    /// the cycle's completion pass — but if the batch never lands (harvester
+    /// death, a dropped relay), that pass never runs, and pre-backstop the
+    /// deadline was simply swallowed: no timeout, no retry, diagnostics
+    /// frozen until restart. The cycle timeout aborts a stalled cycle and
+    /// serves the settle via the synchronous reload.
+    #[test]
+    fn lost_harvest_batch_recovers_via_cycle_timeout() {
+        use crate::lsp::uri_ext::UriExt;
+
+        let timeout = std::time::Duration::from_secs(10);
+        let dir = tempfile::tempdir().expect("tempdir");
+        let doc_path = dir.path().join("main.qmd");
+        let bib_path = dir.path().join("refs.bib");
+        let doc_text = "---\nbibliography: refs.bib\n---\n\n# Heading\n\nCite [@key].\n";
+        std::fs::write(&doc_path, doc_text).expect("write doc");
+        std::fs::write(&bib_path, "@article{key, title={One}}\n").expect("write bib");
+
+        let (task_tx, task_rx) = crossbeam_channel::unbounded::<Task>();
+        let pool = TaskPool::new(task_tx.clone(), 1);
+        let mut writer = WriterHandle::new(client_sender());
+        writer.spawn(
+            PoolSpawners {
+                main: pool.spawner(),
+                fmt: pool.spawner(),
+            },
+            task_tx,
+        );
+
+        let uri = lsp_types::Uri::from_file_path(&doc_path).expect("uri");
+        writer.forward_write(WriteCommand::DidOpen(
+            lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: doc_text.to_owned(),
+                },
+            },
+        ));
+
+        // The self-timed settle starts a harvest cycle; drop its batch on the
+        // floor instead of forwarding it (a lost relay).
+        match task_rx.recv_timeout(timeout).expect("harvest batch") {
+            Task::Harvested(_) => {}
+            _ => panic!("expected the harvest batch first"),
+        }
+
+        // A later edit arms a new deadline. Its firing is deferred to the
+        // stalled cycle's expiry, which then aborts to the synchronous reload
+        // — whose settle pass must land as `Task::Diagnostics`.
+        writer.forward_write(WriteCommand::DidChange(
+            lsp_types::DidChangeTextDocumentParams {
+                text_document: lsp_types::VersionedTextDocumentIdentifier { uri, version: 1 },
+                content_changes: vec![lsp_types::TextDocumentContentChangeEvent {
+                    range: None,
+                    range_length: None,
+                    text: format!("{doc_text}\nMore.\n"),
+                }],
+            },
+        ));
+        loop {
+            match task_rx.recv_timeout(timeout) {
+                Ok(Task::Diagnostics { .. }) => break,
+                Ok(_) => continue,
+                Err(err) => panic!("stalled cycle never recovered: {err}"),
+            }
+        }
     }
 
     /// A panicking write handler must not take the writer thread down: pool
