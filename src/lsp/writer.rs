@@ -1342,6 +1342,73 @@ mod tests {
         );
     }
 
+    /// A mid-cycle project load (`did_open`/`did_save` of a document) must
+    /// not shield referenced paths it did not actually read:
+    /// `load_referenced_files` populates *absent* inputs only, so an
+    /// already-cached bibliography keeps its stale content through the load.
+    /// Blanket-shielding the whole tracked set would mark that stale input
+    /// "disk-fresh" and discard the in-flight harvest batch carrying the real
+    /// disk content — the settle pass then lints over the stale text, and
+    /// `complete_settle` clears the deadline, so the wrong diagnostics
+    /// persist until an unrelated later event.
+    #[test]
+    fn project_load_shields_only_freshly_read_paths() {
+        use crate::lsp::uri_ext::UriExt;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a_path = dir.path().join("a.qmd");
+        let b_path = dir.path().join("b.qmd");
+        let bib_path = dir.path().join("refs.bib");
+        let doc_text = "---\nbibliography: refs.bib\n---\n\nCite [@key].\n";
+        std::fs::write(&a_path, doc_text).expect("write a");
+        std::fs::write(&b_path, doc_text).expect("write b");
+        std::fs::write(&bib_path, "@article{key, title={One}}\n").expect("write bib");
+
+        let mut state = WriterState::new(client_sender());
+        let open = |path: &std::path::Path| {
+            WriteCommand::DidOpen(lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri: lsp_types::Uri::from_file_path(path).expect("uri"),
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: doc_text.to_owned(),
+                },
+            })
+        };
+        // Opening A caches the bibliography (v1) from disk.
+        state.apply_write(open(&a_path));
+
+        // Out-of-band edit: the disk moves to v2, salsa still holds v1.
+        std::fs::write(&bib_path, "@article{key, title={Two}}\n").expect("edit bib");
+
+        // The settle's harvest cycle reads v2 off-thread.
+        let mut requested = std::collections::HashSet::new();
+        state.begin_harvest_cycle();
+        state.harvest_round(&mut requested);
+        let batch = vec![(
+            bib_path.clone(),
+            Some(std::fs::read_to_string(&bib_path).expect("read bib")),
+        )];
+
+        // Mid-cycle: B (also referencing refs.bib) opens. Its project load
+        // finds the bibliography already cached and does NOT re-read it, so
+        // it must not shield it either.
+        state.apply_write(open(&b_path));
+
+        // The batch's fresh v2 content must still apply.
+        state.apply_harvest(batch, &mut requested);
+        let text = state
+            .db()
+            .file_text_if_cached(&bib_path)
+            .expect("bib cached")
+            .content_or_empty(state.db())
+            .to_string();
+        assert!(
+            text.contains("Two"),
+            "harvest heal survived the cached-path project load, got: {text}"
+        );
+    }
+
     /// A path evicted mid-cycle (`did_close`) and then re-referenced by
     /// another document (`did_change`) must be harvested again in the same
     /// cycle. The batch's content is skipped on apply (the eviction must not

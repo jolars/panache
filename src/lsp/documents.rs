@@ -86,15 +86,18 @@ pub(crate) fn load_project_files(
     salsa_config: crate::salsa::FileConfig,
     root_path: PathBuf,
 ) -> HashSet<PathBuf> {
-    let tracked = w
+    let load = w
         .db_mut()
         .load_referenced_files(salsa_file, salsa_config, root_path);
-    // These inputs now reflect the disk; a harvest batch read before this
-    // load must not regress them (no-op outside a harvest cycle).
-    for path in &tracked {
+    // Only the freshly-read inputs now reflect the disk; a harvest batch read
+    // before this load must not regress them (no-op outside a harvest cycle).
+    // An already-cached path was NOT re-read (`load_file_from_disk` populates
+    // absent inputs only) and may be stale — it must stay harvestable, or the
+    // in-flight batch carrying its out-of-band edit would be discarded.
+    for path in &load.loaded {
         w.shield_from_harvest(path);
     }
-    tracked
+    load.tracked
 }
 
 /// Reload every open document's project-referenced files on the writer.

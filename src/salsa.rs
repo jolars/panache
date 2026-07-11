@@ -2643,27 +2643,40 @@ impl SalsaDb {
     /// finite transitive closure of `root_path`, each pass only adds inputs, and
     /// a file missing on disk stays `None` (interned once, not retried).
     ///
-    /// Returns the final tracked path set (the caller uses it for retention).
+    /// Returns the final tracked path set (the caller uses it for retention)
+    /// plus the subset this call actually read from disk. The distinction
+    /// matters to the LSP's harvest shield: only a freshly-read input reflects
+    /// the disk — an already-cached one was *not* re-read and may be stale.
     pub fn load_referenced_files(
         &mut self,
         root_file: FileText,
         config: FileConfig,
         root_path: PathBuf,
-    ) -> HashSet<PathBuf> {
+    ) -> ReferencedFileLoad {
+        let mut loaded = HashSet::new();
         loop {
             let tracked = self.discover_referenced_files(root_file, config, root_path.clone());
             let mut progress = false;
             for path in &tracked {
                 let id = self.intern_file(Some(path.clone()));
                 if self.load_file_from_disk(id) {
+                    loaded.insert(path.clone());
                     progress = true;
                 }
             }
             if !progress {
-                return tracked;
+                return ReferencedFileLoad { tracked, loaded };
             }
         }
     }
+}
+
+/// The outcome of [`SalsaDb::load_referenced_files`]: the full tracked set and
+/// the subset of paths whose absent (`None`) inputs this call populated from
+/// disk. Already-cached paths appear in `tracked` but not `loaded`.
+pub struct ReferencedFileLoad {
+    pub tracked: HashSet<PathBuf>,
+    pub loaded: HashSet<PathBuf>,
 }
 
 /// A read-only view of [`SalsaDb`] handed to worker threads.
