@@ -646,11 +646,7 @@ impl GlobalState {
                     "content modified".to_owned(),
                 )),
                 Err(panic) => {
-                    let msg = panic
-                        .downcast_ref::<&'static str>()
-                        .copied()
-                        .or_else(|| panic.downcast_ref::<String>().map(String::as_str))
-                        .unwrap_or("<non-string panic payload>");
+                    let msg = crate::lsp::helpers::panic_message(panic.as_ref());
                     log::error!("LSP streaming request handler panicked: {msg}");
                     Task::Response(Response::new_err(
                         id,
@@ -661,18 +657,7 @@ impl GlobalState {
             };
             let _ = sender.send(task);
         };
-        if self.writer.is_threaded() {
-            let delivered = self.writer.submit_read(ReadJob {
-                pool: ReadPool::Main,
-                run: Box::new(run),
-            });
-            if !delivered {
-                self.respond_writer_unavailable(submit_id);
-            }
-        } else {
-            let snap = self.snapshot();
-            self.pool.spawn(move || run(snap));
-        }
+        self.submit_pooled_read(ReadPool::Main, submit_id, run);
     }
 
     /// Spawn a formatting request on the dedicated `fmt_pool` so a slow
@@ -722,11 +707,7 @@ impl GlobalState {
                     "content modified".to_owned(),
                 )),
                 Err(panic) => {
-                    let msg = panic
-                        .downcast_ref::<&'static str>()
-                        .copied()
-                        .or_else(|| panic.downcast_ref::<String>().map(String::as_str))
-                        .unwrap_or("<non-string panic payload>");
+                    let msg = crate::lsp::helpers::panic_message(panic.as_ref());
                     log::error!("LSP request handler panicked: {msg}");
                     Task::Response(Response::new_err(
                         id,
@@ -737,15 +718,29 @@ impl GlobalState {
             };
             let _ = sender.send(task);
         };
+        self.submit_pooled_read(pool, submit_id, run);
+    }
+
+    /// Route a prepared read job to the requested pool: forwarded to the
+    /// writer thread when threaded (the writer owns the db, so it mints the
+    /// snapshot — and forwarding keeps the read FIFO-ordered after any write
+    /// sent just before it), spawned over a locally minted snapshot inline.
+    ///
+    /// `id` is already in `in_flight`; when the writer thread is gone the
+    /// request is answered here, or the client would wait on it forever.
+    fn submit_pooled_read(
+        &mut self,
+        pool: ReadPool,
+        id: RequestId,
+        run: impl FnOnce(StateSnapshot) + Send + 'static,
+    ) {
         if self.writer.is_threaded() {
-            // The writer owns the db, so it mints the snapshot: forwarding the
-            // read keeps it FIFO-ordered after any write sent just before it.
             let delivered = self.writer.submit_read(ReadJob {
                 pool,
                 run: Box::new(run),
             });
             if !delivered {
-                self.respond_writer_unavailable(submit_id);
+                self.respond_writer_unavailable(id);
             }
         } else {
             let snap = self.snapshot();

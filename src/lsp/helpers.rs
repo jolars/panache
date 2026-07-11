@@ -23,6 +23,18 @@ pub(crate) fn catch_cancelled<T>(f: impl FnOnce() -> T) -> Option<T> {
     salsa::Cancelled::catch(std::panic::AssertUnwindSafe(f)).ok()
 }
 
+/// Extract a loggable message from a caught panic payload (`&str` and `String`
+/// payloads; anything else gets a placeholder). One home for the idiom shared
+/// by every `catch_unwind` executor: the pool workers, the request handlers,
+/// and the writer thread's step guard.
+pub(crate) fn panic_message(payload: &(dyn std::any::Any + Send)) -> &str {
+    payload
+        .downcast_ref::<&'static str>()
+        .copied()
+        .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+        .unwrap_or("<non-string panic payload>")
+}
+
 /// Returns `true` when `uri` resolves to a file path that matches the
 /// effective `exclude`/`extend_exclude` patterns from `cfg`, anchored at the
 /// project directory of `source` (falling back to `workspace_root` or the

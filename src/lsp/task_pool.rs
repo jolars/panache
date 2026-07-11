@@ -40,11 +40,7 @@ impl<T: Send + 'static> TaskPool<T> {
                             if let Err(panic) =
                                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(job))
                             {
-                                let msg = panic
-                                    .downcast_ref::<&'static str>()
-                                    .copied()
-                                    .or_else(|| panic.downcast_ref::<String>().map(String::as_str))
-                                    .unwrap_or("<non-string panic payload>");
+                                let msg = crate::lsp::helpers::panic_message(panic.as_ref());
                                 log::error!("LSP task pool worker caught panic: {msg}");
                             }
                         }

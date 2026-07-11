@@ -1036,11 +1036,7 @@ fn guard<T>(what: &str, f: impl FnOnce() -> T) -> Option<T> {
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
         Ok(value) => Some(value),
         Err(panic) => {
-            let msg = panic
-                .downcast_ref::<&'static str>()
-                .copied()
-                .or_else(|| panic.downcast_ref::<String>().map(String::as_str))
-                .unwrap_or("<non-string panic payload>");
+            let msg = crate::lsp::helpers::panic_message(panic.as_ref());
             log::error!("LSP writer step ({what}) panicked: {msg}");
             None
         }
