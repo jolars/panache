@@ -173,26 +173,24 @@ default and `--flavor quarto`):
     move left a `MAX_DOCS_PER_SETTLE` backstop hook in `dispatch_due_lints` for
     the lint-cap piece (currently unused; the raised salsa `lru` removes the
     cliff for realistic sessions).
-  - Format-on-save latency: dedicated-writer rework. Today the main loop owns
-    and *writes* salsa, and diagnostics run behind a 200ms debounce
-    (`DIAGNOSTICS_DEBOUNCE`) re-armed on every `didChange` (`arm_settle`), so a
-    keystroke stream keeps pushing the settle deadline forward. When it fires,
-    `dispatch_due_lints` runs `reload_open_documents_referenced_files`
-    synchronously on the main loop --- a write-phase with disk I/O over the
-    referenced-file/include graph --- and a `textDocument/formatting` request
-    that lands in that window queues behind it, stalling format-on-save on
-    larger projects (e.g. a Bookdown book re-reading chapters for cross-refs).
-    Fix: adopt the sibling servers' model (arity, badness, fatou) --- move salsa
-    to a dedicated single-writer thread (main loop keeps only the buffer map),
-    replace the re-arming debounce with per-URI coalescing + a pure `decide`
-    scheduler (at most one analysis in flight; supersede only a strictly-newer
-    edit of the *same* URI), and split each lint into a cheap write-phase
-    (buffer upsert) and an off-thread read-phase (parse + diagnostics on the
-    read pool under `salsa::Cancelled::catch`), so the referenced-file reload no
-    longer runs on the main loop. Interim mitigation if deferred: move only the
-    referenced-file reload off the main thread and stop re-arming the debounce
-    while a formatting request is pending. This subsumes the shared-pool
-    redesign above.
+  - Format-on-save latency: dedicated-writer rework --- **landed** on the
+    `lsp-writer-thread` branch. Salsa, the document map, config, the diagnostics
+    store, and the settle machinery live on the `panache-lsp-writer` thread (the
+    main loop keeps only the LSP transport and the task pools), and the settle's
+    referenced-file disk I/O runs on a `panache-lsp-harvester` thread so it
+    blocks neither the main loop nor the writer. Deliberately NOT adopted from
+    the sibling servers: per-URI `decide()` scheduling (panache keeps the single
+    all-docs settle pass because cross-document diagnostics --- a shared
+    manifest error deduped across docs --- would break under a per-URI model).
+  - Remaining writer-thread follow-up: `did_open`/`did_save` and the
+    file-operation/watcher handlers still call the synchronous referenced-file
+    loads (`load_project_files`, `reload_open_documents_referenced_files`) on
+    the writer thread. They are event-driven and mostly cache-hits at steady
+    state (`load_file_from_disk` skips already-populated inputs), so a queued
+    write/read only stalls behind them on a cold first open or a big watcher
+    burst. If profiling on a large project (the Bookdown book) shows those
+    stalls matter, route them through the harvester cycle like the settle write
+    phase.
 
 ### External formatter presets backlog (conform.nvim parity)
 
