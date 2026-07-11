@@ -646,9 +646,14 @@ Panache supports both LSP diagnostic delivery models and picks one per client at
 `initialize`:
 
 Push (default)
+
 :   The server sends `textDocument/publishDiagnostics` notifications as it
     computes them. This is the model for clients that don't advertise pull
     support.
+
+    Publishes for open documents carry the document `version` the diagnostics were
+    computed against (pull reports carry it too), so a client can discard a report
+    that raced an edit; the follow-up pass re-publishes under the current version.
 
 Pull
 

@@ -188,9 +188,12 @@ default and `--flavor quarto`):
     the writer thread. They are event-driven and mostly cache-hits at steady
     state (`load_file_from_disk` skips already-populated inputs), so a queued
     write/read only stalls behind them on a cold first open or a big watcher
-    burst. If profiling on a large project (the Bookdown book) shows those
-    stalls matter, route them through the harvester cycle like the settle write
-    phase.
+    burst. Caveat: the watcher/file-op path's `resync_cached_file_from_disk`
+    re-reads every referenced file from disk on *every* event (the
+    compare-then-skip only avoids the salsa write, not the read), so watcher
+    bursts pay full disk I/O even warm. If profiling on a large project (the
+    Bookdown book) shows those stalls matter, route them through the harvester
+    cycle like the settle write phase.
 
 ### External formatter presets backlog (conform.nvim parity)
 
