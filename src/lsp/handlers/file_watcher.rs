@@ -65,17 +65,20 @@ pub(crate) fn did_change_watched_files(w: &mut WriterState, params: DidChangeWat
         );
 
         // Always keep salsa's cached file text in sync when possible.
-        if let Ok(contents) = std::fs::read_to_string(&path)
-            && w.db_mut().update_file_text_if_cached_with_durability(
+        if let Ok(contents) = std::fs::read_to_string(&path) {
+            if w.db_mut().update_file_text_if_cached_with_durability(
                 &path,
                 contents,
                 Durability::MEDIUM,
-            )
-        {
-            w.sender().log_message(
-                MessageType::INFO,
-                format!("Updated cached file: {}", path.display()),
-            );
+            ) {
+                w.sender().log_message(
+                    MessageType::INFO,
+                    format!("Updated cached file: {}", path.display()),
+                );
+            }
+            // The cache now reflects the disk; an in-flight harvest batch read
+            // this path earlier and must not regress it.
+            w.shield_from_harvest(&path);
         }
 
         // `.yml`/`.yaml` can be a project manifest (`_quarto.yml`/`_metadata.yml`/

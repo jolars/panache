@@ -128,6 +128,18 @@ pub(crate) struct WriterState {
     /// (set pre-spawn); carried onto snapshots for the per-document pull handler.
     supports_related_documents: bool,
 
+    /// Paths whose cached text was made disk-fresh by a direct write while a
+    /// harvest cycle is in flight (watcher sync, referenced-file reload or
+    /// load). An in-flight batch read those paths *before* that write, so a
+    /// differing batch entry is stale: applying it would regress the input and
+    /// the settle pass would compute over the older content. [`Self::apply_harvest`]
+    /// skips shielded paths (they are already disk-fresh; nothing to heal).
+    harvest_shield: HashSet<PathBuf>,
+
+    /// Whether a harvest cycle is in flight, gating the shield. Never set in
+    /// inline mode (no harvester), so the shield stays empty there.
+    harvest_cycle_active: bool,
+
     /// Client channel for diagnostics publishes and the one-shot
     /// config-parse-error toast.
     sender: ClientSender,
@@ -150,7 +162,33 @@ impl WriterState {
             external_pending: HashSet::new(),
             supports_pull_diagnostics: false,
             supports_related_documents: false,
+            harvest_shield: HashSet::new(),
+            harvest_cycle_active: false,
             sender,
+        }
+    }
+
+    /// Mark a harvest cycle in flight: from here until
+    /// [`Self::end_harvest_cycle`], direct disk-syncs record their paths so a
+    /// staler in-flight batch can't regress them.
+    pub(crate) fn begin_harvest_cycle(&mut self) {
+        self.harvest_cycle_active = true;
+        self.harvest_shield.clear();
+    }
+
+    /// End the harvest cycle (completed or aborted) and drop the shield.
+    /// Called by [`Self::complete_settle`]; abort paths call it directly.
+    pub(crate) fn end_harvest_cycle(&mut self) {
+        self.harvest_cycle_active = false;
+        self.harvest_shield.clear();
+    }
+
+    /// Record that `path`'s cached text now reflects the disk (a direct
+    /// watcher sync or referenced-file reload), so an in-flight harvest batch
+    /// — read before this write — must not apply to it. No-op outside a cycle.
+    pub(crate) fn shield_from_harvest(&mut self, path: &std::path::Path) {
+        if self.harvest_cycle_active {
+            self.harvest_shield.insert(path.to_owned());
         }
     }
 
@@ -344,6 +382,7 @@ impl WriterState {
     /// on the writer thread, where writes interleave with an in-flight harvest
     /// cycle) would only schedule a redundant re-lint.
     pub(crate) fn complete_settle(&mut self) -> PreparedSettle {
+        self.end_harvest_cycle();
         self.settle_deadline = None;
         self.lint_generation += 1;
         let generation = self.lint_generation;
@@ -403,7 +442,9 @@ impl WriterState {
     /// ([`SalsaDb::apply_harvested_file_text`]). A path opened as a document
     /// since the harvest was requested is skipped (buffer-authoritative), as is
     /// an unreadable file (`None` content: a missing file keeps its last-known
-    /// content rather than being wiped).
+    /// content rather than being wiped) and a path a mid-cycle direct sync
+    /// already made disk-fresh (the batch content predates that sync — see
+    /// [`Self::shield_from_harvest`]).
     pub(crate) fn apply_harvest(&mut self, batch: Vec<(PathBuf, Option<String>)>) {
         let open_paths: HashSet<PathBuf> = self
             .document_map()
@@ -411,7 +452,7 @@ impl WriterState {
             .filter_map(|state| state.path.clone())
             .collect();
         for (path, content) in batch {
-            if open_paths.contains(&path) {
+            if open_paths.contains(&path) || self.harvest_shield.contains(&path) {
                 continue;
             }
             let Some(content) = content else {
@@ -943,6 +984,7 @@ fn writer_thread(
                     // Abort the cycle rather than wedge it (a `Some` harvest
                     // swallows every future deadline); the next write re-arms.
                     harvest = None;
+                    state.end_harvest_cycle();
                     continue;
                 };
                 if next.is_empty() {
@@ -983,6 +1025,7 @@ fn writer_thread(
                     spawn_settle_pass(&pools, &task_tx, state.complete_settle());
                 } else if harvest_tx.send(first).is_ok() {
                     harvest = Some(requested);
+                    state.begin_harvest_cycle();
                 } else {
                     log::warn!("LSP harvester channel closed; reloading synchronously");
                     crate::lsp::documents::reload_open_documents_referenced_files(&mut state);
@@ -1157,6 +1200,74 @@ mod tests {
             .content_or_empty(state.db())
             .to_string();
         assert!(text.contains("Two"), "resynced content, got: {text}");
+    }
+
+    /// A harvest batch read from disk *before* a direct write landed must not
+    /// regress the input: the harvester reads v1, the disk changes to v2, a
+    /// watcher event syncs v2 into salsa on the writer — then the v1 batch
+    /// arrives (it round-trips through the main loop) and, compare-and-set
+    /// seeing v2 != v1, would "refresh" the input back to stale v1. The settle
+    /// pass then computes over v1 and the wrong diagnostics persist until an
+    /// unrelated event arms a fresh cycle.
+    #[test]
+    fn stale_harvest_batch_does_not_regress_watcher_synced_content() {
+        use crate::lsp::uri_ext::UriExt;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let doc_path = dir.path().join("main.qmd");
+        let bib_path = dir.path().join("refs.bib");
+        let doc_text = "---\nbibliography: refs.bib\n---\n\n# Heading\n\nCite [@key].\n";
+        std::fs::write(&doc_path, doc_text).expect("write doc");
+        std::fs::write(&bib_path, "@article{key, title={One}}\n").expect("write bib");
+
+        let mut state = WriterState::new(client_sender());
+        let uri = lsp_types::Uri::from_file_path(&doc_path).expect("uri");
+        state.apply_write(WriteCommand::DidOpen(
+            lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri,
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: doc_text.to_owned(),
+                },
+            },
+        ));
+
+        // Start a harvest cycle and "read" the bibliography as the harvester
+        // would — before the disk changes.
+        let mut requested = std::collections::HashSet::new();
+        state.begin_harvest_cycle();
+        state.harvest_round(&mut requested);
+        let stale_batch = vec![(
+            bib_path.clone(),
+            Some(std::fs::read_to_string(&bib_path).expect("read bib")),
+        )];
+
+        // The disk changes and a watcher event syncs the new content into
+        // salsa on the writer, mid-cycle.
+        std::fs::write(&bib_path, "@article{key, title={Two}}\n").expect("edit bib");
+        let bib_uri = lsp_types::Uri::from_file_path(&bib_path).expect("bib uri");
+        state.apply_write(WriteCommand::DidChangeWatchedFiles(
+            lsp_types::DidChangeWatchedFilesParams {
+                changes: vec![lsp_types::FileEvent {
+                    uri: bib_uri,
+                    typ: lsp_types::FileChangeType::CHANGED,
+                }],
+            },
+        ));
+
+        // The stale batch lands last; it must not clobber the fresher sync.
+        state.apply_harvest(stale_batch);
+        let text = state
+            .db()
+            .file_text_if_cached(&bib_path)
+            .expect("bib cached")
+            .content_or_empty(state.db())
+            .to_string();
+        assert!(
+            text.contains("Two"),
+            "watcher-synced content survived the stale batch, got: {text}"
+        );
     }
 
     /// A panicking write handler must not take the writer thread down: pool
