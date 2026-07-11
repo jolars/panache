@@ -26,7 +26,7 @@ use lsp_types::{CreateFilesParams, DeleteFilesParams, RenameFilesParams, Uri};
 
 use crate::lsp::documents::reload_open_documents_referenced_files;
 use crate::lsp::uri_ext::UriExt;
-use crate::lsp::writer::WriterHandle;
+use crate::lsp::writer::WriterState;
 use crate::lsp::writer_command::WriteEffects;
 
 /// Parse a file-operation URI string into a filesystem path.
@@ -41,7 +41,7 @@ fn op_uri_to_path(uri: &str) -> Option<PathBuf> {
 /// Interning flips a referenced-but-missing path's `None`->`Some` text input
 /// (after the reload below), so a dependent's `include-not-found` clears.
 pub(crate) fn did_create_files(
-    w: &mut WriterHandle,
+    w: &mut WriterState,
     fx: &mut WriteEffects,
     params: CreateFilesParams,
 ) {
@@ -60,7 +60,7 @@ pub(crate) fn did_create_files(
 /// re-interns it so `project_graph` re-runs and its filesystem probes observe
 /// the absence — broken references in dependents surface on the next settle.
 pub(crate) fn did_delete_files(
-    w: &mut WriterHandle,
+    w: &mut WriterState,
     fx: &mut WriteEffects,
     params: DeleteFilesParams,
 ) {
@@ -84,7 +84,7 @@ pub(crate) fn did_delete_files(
 /// `didClose(old)`/`didOpen(new)` pair; we only re-intern paths and re-lint so
 /// references to the old name break and references to the new name resolve.
 pub(crate) fn did_rename_files(
-    w: &mut WriterHandle,
+    w: &mut WriterState,
     fx: &mut WriteEffects,
     params: RenameFilesParams,
 ) {

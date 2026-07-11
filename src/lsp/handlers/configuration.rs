@@ -9,11 +9,11 @@ use lsp_types::DidChangeConfigurationParams;
 
 use crate::lsp::dispatch::runtime_incremental_parsing_from_value;
 use crate::lsp::documents;
-use crate::lsp::writer::WriterHandle;
+use crate::lsp::writer::WriterState;
 use crate::lsp::writer_command::WriteEffects;
 
 pub(crate) fn did_change_configuration(
-    w: &mut WriterHandle,
+    w: &mut WriterState,
     fx: &mut WriteEffects,
     params: DidChangeConfigurationParams,
 ) {

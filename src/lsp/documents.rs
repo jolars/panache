@@ -1,6 +1,6 @@
 //! Document lifecycle notifications (`didOpen`/`didChange`/`didSave`/`didClose`).
 //!
-//! These run against writer-owned state (`&mut WriterHandle`) — the salsa
+//! These run against writer-owned state (`&mut WriterState`) — the salsa
 //! database and the document map — with main-loop side effects requested via
 //! [`WriteEffects`]. Parsing and state updates happen inline so interactive
 //! requests always see the latest tree; the expensive lint (project-graph
@@ -22,7 +22,7 @@ use salsa::{Durability, Setter};
 
 use super::conversions::{apply_content_change, apply_content_change_with_edit_ranges};
 use super::uri_ext::UriExt;
-use super::writer::WriterHandle;
+use super::writer::WriterState;
 use super::writer_command::WriteEffects;
 use crate::lsp::DocumentState;
 use crate::parser::{parse_incremental_suffix_with_refdefs, parse_with_refdefs};
@@ -82,7 +82,7 @@ fn apply_changes_descending_with_combined_ranges(
 /// (shared with the CLI lint path); returns the final tracked set for
 /// `did_close` retention.
 pub(crate) fn load_project_files(
-    w: &mut WriterHandle,
+    w: &mut WriterState,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
     root_path: PathBuf,
@@ -96,7 +96,7 @@ pub(crate) fn load_project_files(
 /// A filesystem change (watcher event, file operation) may have flipped a
 /// referenced include/bibliography's `None`->`Some` text input (or vice versa);
 /// loading here before the next snapshot lets the re-lint observe fresh content.
-pub(crate) fn reload_open_documents_referenced_files(w: &mut WriterHandle) {
+pub(crate) fn reload_open_documents_referenced_files(w: &mut WriterState) {
     let open_docs: Vec<(crate::salsa::FileText, crate::salsa::FileConfig, PathBuf)> = w
         .document_map()
         .values()
@@ -145,7 +145,7 @@ pub(crate) fn reload_open_documents_referenced_files(w: &mut WriterHandle) {
 /// unconditional `did_change` write (salsa only bumps the revision when the
 /// value actually differs); the caller arms the settle so the all-docs re-lint
 /// re-publishes diagnostics.
-pub(crate) fn reload_open_documents_config(w: &mut WriterHandle) {
+pub(crate) fn reload_open_documents_config(w: &mut WriterState) {
     let entries: Vec<(lsp_types::Uri, crate::salsa::FileConfig)> = w
         .document_map()
         .iter()
@@ -162,7 +162,7 @@ pub(crate) fn reload_open_documents_config(w: &mut WriterHandle) {
 
 /// Handle `textDocument/didOpen`.
 pub(crate) fn did_open(
-    w: &mut WriterHandle,
+    w: &mut WriterState,
     fx: &mut WriteEffects,
     params: DidOpenTextDocumentParams,
 ) {
@@ -227,7 +227,7 @@ pub(crate) fn did_open(
 
 /// Handle `textDocument/didChange`.
 pub(crate) fn did_change(
-    w: &mut WriterHandle,
+    w: &mut WriterState,
     fx: &mut WriteEffects,
     params: DidChangeTextDocumentParams,
 ) {
@@ -358,7 +358,7 @@ pub(crate) fn did_change(
 /// keystroke). The fresh settle re-lints every open document; only the saved
 /// document runs external linters.
 pub(crate) fn did_save(
-    w: &mut WriterHandle,
+    w: &mut WriterState,
     fx: &mut WriteEffects,
     params: DidSaveTextDocumentParams,
 ) {
@@ -381,7 +381,7 @@ pub(crate) fn did_save(
 
 /// Handle `textDocument/didClose`.
 pub(crate) fn did_close(
-    w: &mut WriterHandle,
+    w: &mut WriterState,
     fx: &mut WriteEffects,
     params: DidCloseTextDocumentParams,
 ) {

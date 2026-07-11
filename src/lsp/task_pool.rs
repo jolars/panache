@@ -69,6 +69,27 @@ impl<T: Send + 'static> TaskPool<T> {
     pub(crate) fn result_sender(&self) -> Sender<T> {
         self.result_tx.clone()
     }
+
+    /// A detached spawn handle onto this pool's job queue, for a thread (the
+    /// salsa writer) that dispatches work without owning the pool.
+    pub(crate) fn spawner(&self) -> TaskSpawner {
+        TaskSpawner {
+            job_tx: self.job_tx.clone(),
+        }
+    }
+}
+
+/// A clonable handle that spawns jobs onto a [`TaskPool`] without borrowing it.
+#[derive(Clone)]
+pub(crate) struct TaskSpawner {
+    job_tx: Sender<Job>,
+}
+
+impl TaskSpawner {
+    /// Hand a closure to the pool. It runs on some worker thread.
+    pub(crate) fn spawn(&self, f: impl FnOnce() + Send + 'static) {
+        let _ = self.job_tx.send(Box::new(f));
+    }
 }
 
 /// Default worker count for the main request pool — physical cores, matching

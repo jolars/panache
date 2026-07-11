@@ -9,11 +9,11 @@ use lsp_types::{DidChangeWatchedFilesParams, MessageType, Uri};
 use super::super::helpers;
 use crate::lsp::DocumentState;
 use crate::lsp::uri_ext::UriExt;
-use crate::lsp::writer::WriterHandle;
+use crate::lsp::writer::WriterState;
 use crate::lsp::writer_command::WriteEffects;
 
 pub(crate) fn did_change_watched_files(
-    w: &mut WriterHandle,
+    w: &mut WriterState,
     fx: &mut WriteEffects,
     params: DidChangeWatchedFilesParams,
 ) {

@@ -222,6 +222,26 @@ pub(crate) struct StateSnapshot {
 }
 
 impl StateSnapshot {
+    /// Assemble a snapshot from the writer-owned parts (`analysis`,
+    /// `document_map`, `workspace_folders`) and the main-loop-owned
+    /// [`SnapshotBits`](crate::lsp::writer::SnapshotBits) captured when the read
+    /// was forwarded.
+    pub(crate) fn assemble(
+        analysis: crate::salsa::Analysis,
+        document_map: Arc<DocumentMap>,
+        workspace_folders: Vec<PathBuf>,
+        bits: crate::lsp::writer::SnapshotBits,
+    ) -> Self {
+        Self {
+            analysis,
+            document_map,
+            workspace_folders,
+            diagnostics: bits.diagnostics,
+            supports_pull_diagnostics: bits.supports_pull_diagnostics,
+            supports_related_documents: bits.supports_related_documents,
+        }
+    }
+
     /// Shared, read-only database handle for worker read queries.
     pub(crate) fn db(&self) -> &dyn crate::salsa::Db {
         self.analysis.db()
@@ -344,6 +364,10 @@ pub(crate) enum Task {
         publishes: Vec<(Uri, Option<i32>, Vec<Diagnostic>)>,
         external_ran: HashSet<Uri>,
     },
+    /// Main-loop side effects of a write applied on the writer thread (settle
+    /// arming, immediate diagnostics drops). Only ever posted in threaded mode;
+    /// inline mode applies effects synchronously in `apply_write`.
+    WriteEffects(crate::lsp::writer_command::WriteEffects),
 }
 
 /// The synchronous, single-threaded-mutation server state.
@@ -438,16 +462,32 @@ impl GlobalState {
         }
     }
 
-    /// A cheap read snapshot for a worker thread.
-    pub(crate) fn snapshot(&self) -> StateSnapshot {
-        StateSnapshot {
-            analysis: self.writer.analysis(),
-            document_map: self.writer.document_map_arc(),
-            workspace_folders: self.writer.workspace_folders().to_vec(),
+    /// The main-loop-owned fields of a [`StateSnapshot`], captured at forward
+    /// time; the writer completes the snapshot with its db/document-map state.
+    pub(crate) fn snapshot_bits(&self) -> crate::lsp::writer::SnapshotBits {
+        crate::lsp::writer::SnapshotBits {
             diagnostics: self.diagnostics.shared(),
             supports_pull_diagnostics: self.supports_pull_diagnostics,
             supports_related_documents: self.supports_related_documents,
         }
+    }
+
+    /// A cheap read snapshot for a worker thread. Inline mode only: in threaded
+    /// mode snapshots are minted by the writer thread per
+    /// [`ReadJob`](crate::lsp::writer::ReadJob).
+    pub(crate) fn snapshot(&self) -> StateSnapshot {
+        self.writer.state().mint_snapshot(self.snapshot_bits())
+    }
+
+    /// Move the writer state onto its dedicated thread. Called once after
+    /// `initialize`/`initialized` (which configure the writer directly); from
+    /// then on writes, reads, and settles are forwarded over channels.
+    pub(crate) fn spawn_writer(&mut self) {
+        let pools = crate::lsp::writer::PoolSpawners {
+            main: self.pool.spawner(),
+            fmt: self.fmt_pool.spawner(),
+        };
+        self.writer.spawn(pools, self.pool.result_sender());
     }
 
     /// Send a successful or error response for `id` to the client and clear it

@@ -44,7 +44,7 @@ Guard: the test `transient_cross_thread_snapshots_stay_live_and_visible` in
 `src/lsp/writer.rs` pins this. If it fails, or anyone reintroduces a persistent
 `read_db` clone on the main loop, that's the regression.
 
-## Landed so far (5 commits on `lsp-writer-thread`, oldest first)
+## Landed so far (7 commits on `lsp-writer-thread`, oldest first)
 
 1. `07e5ea24` refactor(lsp): route salsa access through `WriterHandle` ---
    `WriterHandle` owns the `SalsaDb`; all `gs.salsa` sites go through
@@ -58,24 +58,56 @@ Guard: the test `transient_cross_thread_snapshots_stay_live_and_visible` in
    `workspace_folders`, extend-chain watch set, config-error toast dedup, and
    `load_config_notifying` moved onto `WriterHandle` (holds a `ClientSender`
    clone). **Writer now owns db + config.**
-5. refactor(lsp): move document map into the writer --- `WriterHandle` owns the
-   whole `Arc<DocumentMap>` (per the design decision below: whole map, not just
-   the salsa-input side); `GlobalState` accesses it via
-   `writer.document_map()/document_map_mut()`, `snapshot()` uses
-   `writer.document_map_arc()`. `StateSnapshot`'s own `document_map` field is
+5. `962babf5` refactor(lsp): move document map into the writer --- the writer
+   owns the whole `Arc<DocumentMap>` (per the design decision below: whole map,
+   not just the salsa-input side). `StateSnapshot`'s own `document_map` field is
    unchanged. **Writer now owns db + config + document map.**
+6. `98751ff0` refactor(lsp): decouple write handlers from `GlobalState` ---
+   write handlers run against writer-owned state (which gains
+   `runtime_settings`) and request main-loop side effects (settle arming,
+   external-lint marking, diagnostics drops) via a `WriteEffects` accumulator
+   applied by `GlobalState::apply_write_effects`. The tester funnels
+   notifications through `apply_write` like production.
+7. refactor(lsp): spawn the dedicated writer thread --- `WriterState` (the owned
+   state) split from `WriterHandle` (a mode wrapper: `Inline(Box<WriterState>)`
+   or `Threaded { tx }`). Production calls `gs.spawn_writer()` after the
+   handshake; `LspTester` stays inline forever. In threaded mode: writes forward
+   as `WriteCommand`s (effects return as `Task::WriteEffects` on the existing
+   task channel --- no separate `Outbound` channel needed); pooled reads forward
+   as `ReadJob`s (main loop captures `SnapshotBits` + the handler closure, the
+   writer mints the `StateSnapshot` and hands the job to the pools via
+   `TaskSpawner` clones); the due settle forwards as a `SettleJob`, so the
+   **referenced-file reload (disk-I/O write phase) runs on the writer thread,
+   off the main event loop**. The main loop now stays responsive during the
+   reload, but note the win is partial: a read forwarded *mid-reload* still
+   queues behind it on the writer channel --- releasing that wait is the
+   harvester phase below. `settle_task` (the all-docs read pass) is a free fn in
+   `dispatch.rs` shared by inline and threaded paths. Smoke test:
+   `threaded_writer_serves_writes_reads_and_settles`.
 
-Every commit is green: LSP suite (296 tests), clippy `-D warnings`, rustfmt.
+Every commit is green: full suite w/ `--features lsp` (296 LSP integration tests
+included), clippy `-D warnings`, rustfmt.
 
 ## Next edits
 
-**1. Diagnostics store → writer** --- defer; entangled with `on_task`/settle
-application, so it lands with the settle-on-writer phase.
+**1. Diagnostics store + settle machinery → writer** --- move
+`DiagnosticCollection`, `lint_generation`/`last_applied_lint_generation`,
+`external_pending`, and possibly the `settle_deadline` timer onto the writer so
+effects stop round-tripping. Entangled with `on_task`; the pull-diagnostics
+handlers read the store on the main loop, so the store may need to stay shared
+(`Arc`) or the pull path re-routed.
 
-**2. Thread spawn** (`WriterHandle::spawn()` + `ReadJob` channel + `Outbound`
-channel), then **settle on the writer**, then the **harvester thread** for the
-referenced-file disk I/O (the actual latency win), then **version-gating** of
-publishes.
+**2. Harvester thread** --- move the referenced-file disk I/O off the writer
+thread too (it currently holds up queued writes/reads behind a slow reload; see
+the timing warn in `writer_thread`'s `Settle` arm).
+
+**3. Version-gating** of publishes.
+
+Watch out for: in threaded mode nothing on the main loop may call
+`writer.state()`/`state_mut()` or the inline delegates (`db()`,
+`document_map()`, ...) --- they panic after `spawn()`. The 296-test suite runs
+inline, so a threaded-only regression needs the writer unit tests (or a future
+threaded harness) to catch it.
 
 ## End-state design (for orientation)
 
@@ -108,7 +140,7 @@ cd <repo> && git checkout lsp-writer-thread
 # read this file top-to-bottom, then:
 cargo test --features lsp lsp
 cargo clippy --features lsp --all-targets -- -D warnings
-# continue at "Next edits -> 2. Thread spawn"
+# continue at "Next edits -> 1. Diagnostics store + settle machinery -> writer"
 ```
 
 Keep each field-group move a separate green commit. Verify per step with the two

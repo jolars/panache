@@ -77,6 +77,10 @@ pub fn run() -> std::io::Result<()> {
     let mut gs = GlobalState::new(ClientSender::new(connection.sender.clone()));
     gs.on_initialize(init_params);
     gs.on_initialized();
+    // Handshake done (it configures the writer state directly); move the salsa
+    // writer onto its dedicated thread so the main loop never blocks on salsa
+    // writes or referenced-file disk I/O.
+    gs.spawn_writer();
 
     main_loop(&mut gs, &connection)?;
 

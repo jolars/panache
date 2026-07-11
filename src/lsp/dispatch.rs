@@ -21,13 +21,7 @@ use super::helpers::catch_cancelled;
 use super::uri_ext::UriExt;
 use super::{documents, handlers};
 
-/// Which worker pool a request runs on: the shared `Main` pool for interactive
-/// reads, or the single-thread `Fmt` pool that isolates slow external
-/// formatters from hover/completion latency.
-enum RequestPool {
-    Main,
-    Fmt,
-}
+use super::writer::{ReadJob, ReadPool, SettleJob};
 
 /// Build the `serverInfo` reported at `initialize` so clients (e.g. Neovim's
 /// `:LspInfo`) can display the server name and version.
@@ -542,14 +536,14 @@ impl GlobalState {
     /// The single entry point for every database-mutating notification.
     ///
     /// The handler itself runs against writer-owned state
-    /// ([`WriterHandle::apply`](crate::lsp::writer::WriterHandle::apply)); the
-    /// main-loop side effects it requested are applied here afterwards. When the
-    /// writer moves off-thread, this becomes "send the command, apply the
-    /// effects when they come back".
+    /// ([`WriterState::apply`](crate::lsp::writer::WriterState::apply)). Inline
+    /// mode applies it synchronously and gets the requested main-loop side
+    /// effects back to apply now; threaded mode forwards the command to the
+    /// writer thread, and the effects come back later as [`Task::WriteEffects`].
     pub(crate) fn apply_write(&mut self, cmd: crate::lsp::writer_command::WriteCommand) {
-        let mut fx = crate::lsp::writer_command::WriteEffects::default();
-        self.writer.apply(cmd, &mut fx);
-        self.apply_write_effects(fx);
+        if let Some(fx) = self.writer.forward_write(cmd) {
+            self.apply_write_effects(fx);
+        }
     }
 
     /// Apply the main-loop side effects a write handler requested: immediate
@@ -640,6 +634,9 @@ impl GlobalState {
                 // no-op for push clients).
                 self.send_diagnostic_refresh();
             }
+            // A write applied on the writer thread; its main-loop side effects
+            // (settle arming, diagnostics drops) land here.
+            Task::WriteEffects(fx) => self.apply_write_effects(fx),
         }
     }
 
@@ -653,7 +650,7 @@ impl GlobalState {
         P: Send + 'static,
         R: Serialize + Send + 'static,
     {
-        self.spawn_request_on(RequestPool::Main, id, params, f);
+        self.spawn_request_on(ReadPool::Main, id, params, f);
     }
 
     /// Spawn a pooled request whose handler streams ordered `$/progress` after its
@@ -672,9 +669,8 @@ impl GlobalState {
         R: Serialize + Send + 'static,
     {
         self.in_flight.insert(id.clone());
-        let snap = self.snapshot();
         let sender = self.pool.result_sender();
-        self.pool.spawn(move || {
+        let run = move |snap: StateSnapshot| {
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 catch_cancelled(|| f(&snap, params))
             }));
@@ -703,7 +699,17 @@ impl GlobalState {
                 }
             };
             let _ = sender.send(task);
-        });
+        };
+        if self.writer.is_threaded() {
+            self.writer.submit_read(ReadJob {
+                pool: ReadPool::Main,
+                bits: self.snapshot_bits(),
+                run: Box::new(run),
+            });
+        } else {
+            let snap = self.snapshot();
+            self.pool.spawn(move || run(snap));
+        }
     }
 
     /// Spawn a formatting request on the dedicated `fmt_pool` so a slow
@@ -718,12 +724,12 @@ impl GlobalState {
         P: Send + 'static,
         R: Serialize + Send + 'static,
     {
-        self.spawn_request_on(RequestPool::Fmt, id, params, f);
+        self.spawn_request_on(ReadPool::Fmt, id, params, f);
     }
 
     fn spawn_request_on<P, R>(
         &mut self,
-        pool: RequestPool,
+        pool: ReadPool,
         id: RequestId,
         params: P,
         f: fn(&StateSnapshot, P) -> R,
@@ -732,13 +738,9 @@ impl GlobalState {
         R: Serialize + Send + 'static,
     {
         self.in_flight.insert(id.clone());
-        let snap = self.snapshot();
-        let pool = match pool {
-            RequestPool::Main => &self.pool,
-            RequestPool::Fmt => &self.fmt_pool,
-        };
-        let sender = pool.result_sender();
-        pool.spawn(move || {
+        // Both pools post on the same result channel, so one sender serves either.
+        let sender = self.pool.result_sender();
+        let run = move |snap: StateSnapshot| {
             // `catch_cancelled` maps a salsa cancellation to `None` and
             // re-raises every other panic. Catch those here so a handler bug
             // becomes an `InternalError` response rather than unwinding past
@@ -770,7 +772,22 @@ impl GlobalState {
                 }
             };
             let _ = sender.send(task);
-        });
+        };
+        if self.writer.is_threaded() {
+            // The writer owns the db, so it mints the snapshot: forwarding the
+            // read keeps it FIFO-ordered after any write sent just before it.
+            self.writer.submit_read(ReadJob {
+                pool,
+                bits: self.snapshot_bits(),
+                run: Box::new(run),
+            });
+        } else {
+            let snap = self.snapshot();
+            match pool {
+                ReadPool::Main => self.pool.spawn(move || run(snap)),
+                ReadPool::Fmt => self.fmt_pool.spawn(move || run(snap)),
+            }
+        }
     }
 
     /// Spawn one settle pass that re-lints **every** open document over a single
@@ -797,53 +814,8 @@ impl GlobalState {
             .keys()
             .filter_map(|key| key.parse::<Uri>().ok())
             .collect();
-        self.pool.spawn(move || {
-            let result = catch_cancelled(|| {
-                // Merge every document's publishes by URI. A project-graph
-                // diagnostic for a shared path is accumulated once per project
-                // document, so the same `Diagnostic` value arrives from several
-                // passes; dedupe by value (a document's *own* built-in diagnostics
-                // are distinct and so survive). A manifest error reachable from
-                // several docs collapses the same way.
-                let mut merged: std::collections::HashMap<Uri, Vec<lsp_types::Diagnostic>> =
-                    std::collections::HashMap::new();
-                for uri in &uris {
-                    let run_external = external.contains(uri);
-                    let mut publishes =
-                        handlers::diagnostics::compute_publishes(&snap, uri, run_external);
-                    let (manifest_pubs, _manifest_uris) =
-                        handlers::diagnostics::manifest_publishes(&snap, uri);
-                    publishes.extend(manifest_pubs);
-                    // A broken discovered `panache.toml` surfaces as a diagnostic
-                    // on its own file (clear-on-fix via the omitted-URI diff).
-                    publishes.extend(handlers::diagnostics::config_publishes(&snap, uri));
-                    for (target, _version, diags) in publishes {
-                        let slot = merged.entry(target).or_default();
-                        for diag in diags {
-                            if !slot.contains(&diag) {
-                                slot.push(diag);
-                            }
-                        }
-                    }
-                }
-                merged
-                    .into_iter()
-                    .map(|(uri, mut diags)| {
-                        diags.sort_by_key(|d| (d.range.start.line, d.range.start.character));
-                        (uri, None, diags)
-                    })
-                    .collect::<Vec<_>>()
-            });
-            // A concurrent write cancels the pass (`result` is `None`); drop it.
-            // That write already armed the next settle, which re-lints everything.
-            if let Some(publishes) = result {
-                let _ = sender.send(Task::Diagnostics {
-                    generation,
-                    publishes,
-                    external_ran: external,
-                });
-            }
-        });
+        self.pool
+            .spawn(settle_task(snap, uris, generation, external, sender));
     }
 
     /// Time until the workspace settle deadline, for the main-loop `select!`.
@@ -872,18 +844,35 @@ impl GlobalState {
         }
         self.settle_deadline = None;
 
-        // Write phase: load every open document's referenced files first. A
-        // keystroke burst may have added an include/bibliography since the last
+        self.lint_generation += 1;
+        let generation = self.lint_generation;
+        let external = self.external_pending.clone();
+
+        // Threaded: forward the whole settle to the writer thread, which runs
+        // the write phase (referenced-file reload) off the main loop before
+        // minting the snapshot and spawning the read pass. This is the port's
+        // latency win: a format-on-save landing during the settle no longer
+        // waits behind the disk I/O.
+        if self.writer.is_threaded() {
+            self.writer.submit_settle(SettleJob {
+                generation,
+                external,
+                bits: self.snapshot_bits(),
+            });
+            return;
+        }
+
+        // Inline write phase: load every open document's referenced files first.
+        // A keystroke burst may have added an include/bibliography since the last
         // pass; `file_text` no longer lazy-loads (audit §3.2), so the writer loads
         // them here, coalesced onto the settle boundary.
         //
-        // This runs on the main thread, so a large project graph (e.g. a bookdown
-        // book: every chapter re-read and re-parsed for cross-reference
-        // resolution) blocks the event loop and stalls a pending format-on-save.
-        // Time it so a perceptible stall is attributable here rather than to the
-        // off-thread read pass below.
+        // This runs on the calling thread, so a large project graph (e.g. a
+        // bookdown book: every chapter re-read and re-parsed for cross-reference
+        // resolution) blocks it. Time it so a perceptible stall is attributable
+        // here rather than to the off-thread read pass below.
         let reload_start = Instant::now();
-        documents::reload_open_documents_referenced_files(&mut self.writer);
+        documents::reload_open_documents_referenced_files(self.writer.state_mut());
         let reload_elapsed = reload_start.elapsed();
         if reload_elapsed >= Duration::from_millis(50) {
             log::warn!(
@@ -893,11 +882,67 @@ impl GlobalState {
         }
 
         // Read phase: snapshot and spawn the single all-docs pass over the
-        // now-settled database under a fresh generation.
-        self.lint_generation += 1;
-        let generation = self.lint_generation;
-        let external = self.external_pending.clone();
+        // now-settled database.
         self.spawn_settle_pass(generation, external);
+    }
+}
+
+/// The all-docs settle read pass, run on a pool worker over one snapshot.
+/// Shared by the inline path ([`GlobalState::spawn_settle_pass`]) and the
+/// writer thread's settle arm.
+pub(crate) fn settle_task(
+    snap: StateSnapshot,
+    uris: Vec<Uri>,
+    generation: u64,
+    external: std::collections::HashSet<Uri>,
+    sender: crossbeam_channel::Sender<Task>,
+) -> impl FnOnce() + Send + 'static {
+    move || {
+        let result = catch_cancelled(|| {
+            // Merge every document's publishes by URI. A project-graph
+            // diagnostic for a shared path is accumulated once per project
+            // document, so the same `Diagnostic` value arrives from several
+            // passes; dedupe by value (a document's *own* built-in diagnostics
+            // are distinct and so survive). A manifest error reachable from
+            // several docs collapses the same way.
+            let mut merged: std::collections::HashMap<Uri, Vec<lsp_types::Diagnostic>> =
+                std::collections::HashMap::new();
+            for uri in &uris {
+                let run_external = external.contains(uri);
+                let mut publishes =
+                    handlers::diagnostics::compute_publishes(&snap, uri, run_external);
+                let (manifest_pubs, _manifest_uris) =
+                    handlers::diagnostics::manifest_publishes(&snap, uri);
+                publishes.extend(manifest_pubs);
+                // A broken discovered `panache.toml` surfaces as a diagnostic
+                // on its own file (clear-on-fix via the omitted-URI diff).
+                publishes.extend(handlers::diagnostics::config_publishes(&snap, uri));
+                for (target, _version, diags) in publishes {
+                    let slot = merged.entry(target).or_default();
+                    for diag in diags {
+                        if !slot.contains(&diag) {
+                            slot.push(diag);
+                        }
+                    }
+                }
+            }
+            merged
+                .into_iter()
+                .map(|(uri, mut diags)| {
+                    diags.sort_by_key(|d| (d.range.start.line, d.range.start.character));
+                    (uri, None, diags)
+                })
+                .collect::<Vec<_>>()
+        });
+        // A concurrent write cancels the pass (`result` is `None`); drop it.
+        // That write already armed the next settle, which re-lints everything.
+        if let Some(publishes) = result {
+            let _ = sender.send(Task::Diagnostics {
+                generation,
+                publishes,
+                external_ran: external,
+            });
+        }
     }
 }
 

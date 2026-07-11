@@ -3,7 +3,7 @@
 use lsp_types::DidChangeWorkspaceFoldersParams;
 
 use crate::lsp::uri_ext::UriExt;
-use crate::lsp::writer::WriterHandle;
+use crate::lsp::writer::WriterState;
 use crate::lsp::writer_command::WriteEffects;
 
 /// Apply a workspace-folder change: drop removed folders, append added ones,
@@ -15,7 +15,7 @@ use crate::lsp::writer_command::WriteEffects;
 /// all and re-lint over the fresh state --- the same path the config-file watcher
 /// uses (see [`crate::lsp::handlers::file_watcher`]).
 pub(crate) fn did_change_workspace_folders(
-    w: &mut WriterHandle,
+    w: &mut WriterState,
     fx: &mut WriteEffects,
     params: DidChangeWorkspaceFoldersParams,
 ) {
