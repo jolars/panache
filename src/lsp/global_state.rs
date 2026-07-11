@@ -370,6 +370,11 @@ pub(crate) enum Task {
     /// `workspace/diagnostic/refresh` (a server→client request, so it needs the
     /// main loop's outgoing-id tracking).
     RefreshDiagnostics,
+    /// A batch of referenced-file contents read off-thread by the harvester
+    /// for the settle write phase. The main loop forwards it straight back to
+    /// the writer (the db owner), which compare-and-set applies it and either
+    /// requests the next harvest round or spawns the settle read pass.
+    Harvested(Vec<(std::path::PathBuf, Option<String>)>),
 }
 
 /// The synchronous, single-threaded-mutation server state.

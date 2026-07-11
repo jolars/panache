@@ -2563,19 +2563,81 @@ impl SalsaDb {
             .to(Arc::new(next));
     }
 
+    /// The discovery half of [`Self::load_referenced_files`]: compute the
+    /// tracked set for `root_file` (the root, its included/sibling documents,
+    /// and bibliography/metadata dependencies) and **intern** every path (which
+    /// mints a `None` input and adds its id to the [`FileSet`] on first
+    /// reference, re-running `project_graph`) — without touching the disk.
+    ///
+    /// Callers supply the load half themselves: [`Self::load_referenced_files`]
+    /// reads each file inline, while the LSP's settle harvest reads them on a
+    /// dedicated thread and applies the contents via
+    /// [`Self::apply_harvested_file_text`].
+    pub fn discover_referenced_files(
+        &mut self,
+        root_file: FileText,
+        config: FileConfig,
+        root_path: PathBuf,
+    ) -> HashSet<PathBuf> {
+        let tracked = {
+            let graph = project_structure(self, root_file, config);
+            let mut tracked = HashSet::new();
+            tracked.insert(root_path);
+            for document in graph.documents() {
+                tracked.insert(document.clone());
+                for dependency in graph.dependencies(document, None) {
+                    tracked.insert(dependency);
+                }
+            }
+            tracked
+        };
+        for path in &tracked {
+            self.intern_file(Some(path.clone()));
+        }
+        tracked
+    }
+
+    /// Apply one harvested (off-thread disk-read) file content to its input,
+    /// unifying the two on-writer load paths: an absent (`None`) input is
+    /// populated like [`Self::load_file_from_disk`] (`HIGH` durability), and a
+    /// cached input whose content changed is refreshed like
+    /// [`Self::resync_cached_file_from_disk`] (`MEDIUM` durability,
+    /// compare-then-skip so an unchanged file causes no revision bump). An
+    /// uncached path is skipped (it was evicted between harvest request and
+    /// apply — e.g. by a `did_close` — and must not be resurrected). Returns
+    /// `true` when the input was actually updated. Writer-only.
+    pub fn apply_harvested_file_text(&mut self, path: &Path, contents: String) -> bool {
+        let Some(file) = self.vfs.input_for_path(path) else {
+            return false;
+        };
+        match file.text(self).as_deref() {
+            None => {
+                file.set_text(self)
+                    .with_durability(Durability::HIGH)
+                    .to(Some(Arc::from(contents)));
+                true
+            }
+            Some(existing) if existing != contents.as_str() => {
+                file.set_text(self)
+                    .with_durability(Durability::MEDIUM)
+                    .to(Some(Arc::from(contents)));
+                true
+            }
+            Some(_) => false,
+        }
+    }
+
     /// Discover and load every file `project_graph` references for `root_file`,
     /// on the writer, until the referenced set reaches a fixpoint.
     ///
     /// `Db::file_text` is a pure lookup (audit §3.2), so a query only sees files
-    /// already loaded. Each pass runs `project_graph` (which records the root,
-    /// its included/sibling documents, and bibliography/metadata edges even when
-    /// a file is unloaded), then for every referenced path **interns** it (which
-    /// mints a `None` input and adds its id to the [`FileSet`] on first
-    /// reference --- re-running `project_graph`) and **loads** it from disk. A
-    /// fresh `None`->`Some` load flips that file's per-file dependency, again
-    /// re-running `project_graph` so it recurses into the freshly-loaded file's
-    /// own references. Both convergence channels live inside salsa's dependency
-    /// graph; no `CacheGeneration` counter is needed (audit §3.3 / G3).
+    /// already loaded. Each pass runs [`Self::discover_referenced_files`] (whose
+    /// interning re-runs `project_graph` via the [`FileSet`]) and **loads**
+    /// every referenced path from disk. A fresh `None`->`Some` load flips that
+    /// file's per-file dependency, again re-running `project_graph` so it
+    /// recurses into the freshly-loaded file's own references. Both convergence
+    /// channels live inside salsa's dependency graph; no `CacheGeneration`
+    /// counter is needed (audit §3.3 / G3).
     ///
     /// Terminates once a pass loads no new content: the referenced set is the
     /// finite transitive closure of `root_path`, each pass only adds inputs, and
@@ -2589,18 +2651,7 @@ impl SalsaDb {
         root_path: PathBuf,
     ) -> HashSet<PathBuf> {
         loop {
-            let tracked = {
-                let graph = project_structure(self, root_file, config);
-                let mut tracked = HashSet::new();
-                tracked.insert(root_path.clone());
-                for document in graph.documents() {
-                    tracked.insert(document.clone());
-                    for dependency in graph.dependencies(document, None) {
-                        tracked.insert(dependency);
-                    }
-                }
-                tracked
-            };
+            let tracked = self.discover_referenced_files(root_file, config, root_path.clone());
             let mut progress = false;
             for path in &tracked {
                 let id = self.intern_file(Some(path.clone()));

@@ -309,25 +309,34 @@ impl WriterState {
         self.last_applied_lint_generation != self.lint_generation
     }
 
-    /// If the settle deadline has elapsed, run the settle's **write phase** and
-    /// prepare its read pass: load every open document's referenced files
-    /// (includes/bibliographies) so the pass observes fresh content, then mint
-    /// the snapshot the pass runs over. Returns `None` when no settle is due.
-    ///
-    /// The write phase is disk I/O and runs on the calling thread — the writer
-    /// thread in production (holding up queued writes/reads behind it until the
-    /// harvester phase moves it off), the main loop in inline mode. Timed so a
-    /// perceptible stall names its own culprit in the log.
-    pub(crate) fn begin_due_settle(&mut self) -> Option<PreparedSettle> {
-        let deadline = self.settle_deadline?;
+    /// Clear the settle deadline if it has elapsed. `true` means a settle
+    /// should begin now.
+    pub(crate) fn take_due_settle(&mut self) -> bool {
+        let Some(deadline) = self.settle_deadline else {
+            return false;
+        };
         if deadline > Instant::now() {
-            return None;
+            return false;
         }
         self.settle_deadline = None;
+        true
+    }
 
-        self.lint_generation += 1;
-        let generation = self.lint_generation;
-        let external = self.external_pending.clone();
+    /// If the settle deadline has elapsed, run the settle's **write phase**
+    /// synchronously and prepare its read pass: load every open document's
+    /// referenced files (includes/bibliographies) so the pass observes fresh
+    /// content, then mint the snapshot the pass runs over. Returns `None` when
+    /// no settle is due.
+    ///
+    /// Inline mode only: the write phase is disk I/O on the calling thread
+    /// (timed so a perceptible stall names its own culprit in the log). The
+    /// writer thread splits it instead — [`Self::harvest_round`] discovers,
+    /// the harvester thread reads, [`Self::apply_harvest`] applies — so the
+    /// disk never blocks queued writes and reads.
+    pub(crate) fn begin_due_settle(&mut self) -> Option<PreparedSettle> {
+        if !self.take_due_settle() {
+            return None;
+        }
 
         let reload_start = Instant::now();
         crate::lsp::documents::reload_open_documents_referenced_files(self);
@@ -339,17 +348,92 @@ impl WriterState {
             );
         }
 
+        Some(self.complete_settle())
+    }
+
+    /// Finish a settle's write phase: bump the lint generation, take the
+    /// pending externals, and mint the snapshot its read pass runs over.
+    ///
+    /// Also clears the settle deadline: every write applied before this mint is
+    /// covered by the pass it feeds, so a deadline those writes armed (possible
+    /// on the writer thread, where writes interleave with an in-flight harvest
+    /// cycle) would only schedule a redundant re-lint.
+    pub(crate) fn complete_settle(&mut self) -> PreparedSettle {
+        self.settle_deadline = None;
+        self.lint_generation += 1;
+        let generation = self.lint_generation;
+        let external = self.external_pending.clone();
         let uris: Vec<Uri> = self
             .document_map()
             .keys()
             .filter_map(|key| key.parse::<Uri>().ok())
             .collect();
-        Some(PreparedSettle {
+        PreparedSettle {
             generation,
             external,
             snap: self.mint_snapshot(),
             uris,
-        })
+        }
+    }
+
+    /// One discovery round of the settle harvest: compute every open document's
+    /// referenced set (interning new paths so `project_graph` re-runs — db
+    /// work, no disk), and return the paths the harvester should read this
+    /// round — referenced, not open in the editor (buffer-authoritative
+    /// content must never be clobbered from disk), and not already requested
+    /// this cycle (`requested` accumulates across rounds, so the cycle
+    /// terminates: each round only adds newly-discovered paths).
+    ///
+    /// Reading every referenced file once per settle is the self-heal for
+    /// clients whose file watching is incomplete — nvim emits no watch event
+    /// for a bibliography open in an unrelated buffer — mirroring the
+    /// synchronous reload's resync (see
+    /// [`documents::reload_open_documents_referenced_files`](crate::lsp::documents::reload_open_documents_referenced_files)).
+    pub(crate) fn harvest_round(&mut self, requested: &mut HashSet<PathBuf>) -> Vec<PathBuf> {
+        let open_docs: Vec<(crate::salsa::FileText, crate::salsa::FileConfig, PathBuf)> = self
+            .document_map()
+            .values()
+            .filter_map(|state| Some((state.salsa_file, state.salsa_config, state.path.clone()?)))
+            .collect();
+        let open_paths: HashSet<PathBuf> = self
+            .document_map()
+            .values()
+            .filter_map(|state| state.path.clone())
+            .collect();
+        let mut tracked: HashSet<PathBuf> = HashSet::new();
+        for (salsa_file, salsa_config, path) in open_docs {
+            tracked.extend(
+                self.db_mut()
+                    .discover_referenced_files(salsa_file, salsa_config, path),
+            );
+        }
+        tracked
+            .into_iter()
+            .filter(|path| !open_paths.contains(path) && requested.insert(path.clone()))
+            .collect()
+    }
+
+    /// Apply one harvested batch: for each `(path, content)` the harvester
+    /// read, populate an absent input or refresh a changed cached one
+    /// ([`SalsaDb::apply_harvested_file_text`]). A path opened as a document
+    /// since the harvest was requested is skipped (buffer-authoritative), as is
+    /// an unreadable file (`None` content: a missing file keeps its last-known
+    /// content rather than being wiped).
+    pub(crate) fn apply_harvest(&mut self, batch: Vec<(PathBuf, Option<String>)>) {
+        let open_paths: HashSet<PathBuf> = self
+            .document_map()
+            .values()
+            .filter_map(|state| state.path.clone())
+            .collect();
+        for (path, content) in batch {
+            if open_paths.contains(&path) {
+                continue;
+            }
+            let Some(content) = content else {
+                continue;
+            };
+            self.db_mut().apply_harvested_file_text(&path, content);
+        }
     }
 
     /// Apply one settle pass result to the store. Returns `true` when the pass
@@ -517,6 +601,10 @@ enum WriterMsg {
         publishes: Vec<(Uri, Option<i32>, Vec<Diagnostic>)>,
         external_ran: HashSet<Uri>,
     },
+    /// One harvested batch of referenced-file contents, forwarded back by the
+    /// main loop's `on_task` (same routing rationale as `SettleResult`: the
+    /// harvester posts on the task channel, not into the writer's own channel).
+    Harvested(Vec<(PathBuf, Option<String>)>),
 }
 
 /// The main loop's handle to the writer state; see the module docs for the
@@ -631,6 +719,22 @@ impl WriterHandle {
         }
     }
 
+    /// Route a harvested batch of referenced-file contents back to the writer
+    /// thread. Threaded mode only in practice — the harvester exists only
+    /// there — so an inline arrival is a routing bug; log and drop.
+    pub(crate) fn forward_harvest(&mut self, batch: Vec<(PathBuf, Option<String>)>) {
+        match &mut self.mode {
+            WriterMode::Inline(_) => {
+                log::warn!("harvest batch arrived in inline writer mode; dropping");
+            }
+            WriterMode::Threaded { tx } => {
+                if tx.send(WriterMsg::Harvested(batch)).is_err() {
+                    log::warn!("LSP writer channel closed; dropping harvest batch");
+                }
+            }
+        }
+    }
+
     /// Forward a pooled read to the writer thread, which mints the snapshot.
     /// Threaded mode only: inline callers mint snapshots synchronously and
     /// spawn onto the pools themselves.
@@ -671,11 +775,59 @@ impl WriterHandle {
     }
 }
 
+/// Spawn a prepared settle's read pass onto the main pool.
+fn spawn_settle_pass(pools: &PoolSpawners, task_tx: &Sender<Task>, prepared: PreparedSettle) {
+    pools.main.spawn(crate::lsp::dispatch::settle_task(
+        prepared.snap,
+        prepared.uris,
+        prepared.generation,
+        prepared.external,
+        task_tx.clone(),
+    ));
+}
+
+/// The dedicated `panache-lsp-harvester` thread: reads each requested batch of
+/// referenced files from disk (the settle write phase's only slow part) and
+/// posts the contents on the task channel, from where the main loop forwards
+/// them back to the writer as [`WriterMsg::Harvested`]. Owns no state — the
+/// writer decides what to read (discovery) and what to keep (compare-and-set).
+///
+/// Exits when the writer drops its request sender or the task channel closes.
+fn harvester_thread(rx: Receiver<Vec<PathBuf>>, task_tx: Sender<Task>) {
+    for paths in rx {
+        let read_start = Instant::now();
+        let count = paths.len();
+        let batch: Vec<(PathBuf, Option<String>)> = paths
+            .into_iter()
+            .map(|path| {
+                let content = std::fs::read_to_string(&path).ok();
+                (path, content)
+            })
+            .collect();
+        log::debug!(
+            "settle harvest read {count} referenced file(s) in {:?}",
+            read_start.elapsed()
+        );
+        if task_tx.send(Task::Harvested(batch)).is_err() {
+            break;
+        }
+    }
+}
+
 /// The writer thread's event loop: apply writes (side effects and all — the
 /// writer owns every effect target), mint snapshots for reads, self-time the
 /// debounced settle (`recv_timeout` against the writer-owned deadline, so no
 /// main-loop timer is involved), and apply forwarded settle results to the
 /// store, posting the [`Task::RefreshDiagnostics`] nudge for applied ones.
+///
+/// The settle's write phase runs as a **harvest cycle** so its disk I/O never
+/// blocks this thread: per round the writer discovers and interns the
+/// referenced set (db work), the harvester thread reads the new paths, and the
+/// contents come back as [`WriterMsg::Harvested`] to be compare-and-set
+/// applied; rounds repeat until discovery finds nothing new (a freshly loaded
+/// include can reference further files), then the read pass is spawned over a
+/// snapshot minted at completion — so writes served *during* the cycle are
+/// covered by the very pass the cycle feeds.
 ///
 /// Exits when every `WriterMsg` sender drops (server shutdown) or the task
 /// channel closes (main loop gone).
@@ -685,6 +837,24 @@ fn writer_thread(
     pools: PoolSpawners,
     task_tx: Sender<Task>,
 ) {
+    // The harvester lives exactly as long as this thread: `harvest_tx` drops
+    // when this function returns, disconnecting the harvester's receiver. Its
+    // results ride the task channel (not `rx`), so this thread's own exit
+    // condition — `rx` disconnecting — stays intact.
+    let (harvest_tx, harvest_rx) = crossbeam_channel::unbounded::<Vec<PathBuf>>();
+    std::thread::Builder::new()
+        .name("panache-lsp-harvester".to_owned())
+        .spawn({
+            let task_tx = task_tx.clone();
+            move || harvester_thread(harvest_rx, task_tx)
+        })
+        .expect("failed to spawn LSP harvester thread");
+
+    // The paths already requested in the in-flight harvest cycle; `None` when
+    // no cycle is running. At most one cycle (one outstanding harvester batch)
+    // exists at a time.
+    let mut harvest: Option<HashSet<PathBuf>> = None;
+
     loop {
         let msg = match state.settle_deadline() {
             // A settle is armed: wait for the next message at most until the
@@ -726,20 +896,54 @@ fn writer_thread(
                     break;
                 }
             }
-            // Deadline elapsed: run the settle write phase (the disk-I/O
-            // referenced-file reload that used to stall the main event loop;
-            // here it only occupies the writer thread — a slow reload delays
-            // queued writes and reads behind it until a later harvester phase
-            // moves it off the writer too) and spawn the all-docs read pass.
+            // A harvested batch: apply it, then either request the next round
+            // (discovery found new references in the freshly loaded content)
+            // or complete the settle and spawn its read pass.
+            Some(WriterMsg::Harvested(batch)) => {
+                state.apply_harvest(batch);
+                let Some(requested) = harvest.as_mut() else {
+                    log::warn!("harvest batch without an in-flight cycle; dropped");
+                    continue;
+                };
+                let next = state.harvest_round(requested);
+                if next.is_empty() {
+                    harvest = None;
+                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
+                } else if harvest_tx.send(next).is_err() {
+                    // Unreachable while we hold `harvest_tx`, but don't wedge
+                    // the cycle if it ever happens: fall back to the
+                    // synchronous reload.
+                    log::warn!("LSP harvester channel closed; reloading synchronously");
+                    harvest = None;
+                    crate::lsp::documents::reload_open_documents_referenced_files(&mut state);
+                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
+                }
+            }
+            // Deadline elapsed: start the settle's harvest cycle (or finish
+            // immediately when there is nothing to read — no open on-disk
+            // documents, or every referenced path is an open buffer).
             None => {
-                if let Some(prepared) = state.begin_due_settle() {
-                    pools.main.spawn(crate::lsp::dispatch::settle_task(
-                        prepared.snap,
-                        prepared.uris,
-                        prepared.generation,
-                        prepared.external,
-                        task_tx.clone(),
-                    ));
+                if harvest.is_some() {
+                    // A cycle is already in flight; the pass it will spawn
+                    // reads a snapshot minted at completion, so every write
+                    // applied so far — including whichever armed this deadline
+                    // — is covered. Just clear the deadline.
+                    state.take_due_settle();
+                    continue;
+                }
+                if !state.take_due_settle() {
+                    continue;
+                }
+                let mut requested = HashSet::new();
+                let first = state.harvest_round(&mut requested);
+                if first.is_empty() {
+                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
+                } else if harvest_tx.send(first).is_ok() {
+                    harvest = Some(requested);
+                } else {
+                    log::warn!("LSP harvester channel closed; reloading synchronously");
+                    crate::lsp::documents::reload_open_documents_referenced_files(&mut state);
+                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
                 }
             }
         }
@@ -850,6 +1054,68 @@ mod tests {
         assert_eq!(final_owned.trim_end(), format!("v{ROUNDS}"));
     }
 
+    /// The harvest primitives split the settle reload correctly: discovery
+    /// requests exactly the referenced non-open paths (once per cycle), the
+    /// applied batch resyncs an out-of-band edit into salsa, and a path open
+    /// as a document is never read from disk (buffer-authoritative).
+    #[test]
+    fn harvest_rounds_resync_referenced_files() {
+        use crate::lsp::uri_ext::UriExt;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let doc_path = dir.path().join("main.qmd");
+        let bib_path = dir.path().join("refs.bib");
+        let doc_text = "---\nbibliography: refs.bib\n---\n\n# Heading\n\nCite [@key].\n";
+        std::fs::write(&doc_path, doc_text).expect("write doc");
+        std::fs::write(&bib_path, "@article{key, title={One}}\n").expect("write bib");
+
+        let mut state = WriterState::new(client_sender());
+        let uri = lsp_types::Uri::from_file_path(&doc_path).expect("uri");
+        state.apply_write(WriteCommand::DidOpen(
+            lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri,
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: doc_text.to_owned(),
+                },
+            },
+        ));
+
+        // Out-of-band edit after `did_open` cached the bibliography.
+        std::fs::write(&bib_path, "@article{key, title={Two}}\n").expect("rewrite bib");
+
+        let mut requested = std::collections::HashSet::new();
+        let round = state.harvest_round(&mut requested);
+        assert!(
+            round.contains(&bib_path),
+            "referenced bibliography requested: {round:?}"
+        );
+        assert!(
+            !round.contains(&doc_path),
+            "open buffer path must never be harvested from disk"
+        );
+
+        // Simulate the harvester, then apply.
+        let batch: Vec<_> = round
+            .iter()
+            .map(|path| (path.clone(), std::fs::read_to_string(path).ok()))
+            .collect();
+        state.apply_harvest(batch);
+
+        // Fixpoint: a second round over the same cycle requests nothing new.
+        assert!(state.harvest_round(&mut requested).is_empty());
+
+        // The out-of-band edit is now visible in salsa.
+        let text = state
+            .db()
+            .file_text_if_cached(&bib_path)
+            .expect("bib cached")
+            .content_or_empty(state.db())
+            .to_string();
+        assert!(text.contains("Two"), "resynced content, got: {text}");
+    }
+
     /// End-to-end smoke test of threaded mode: a forwarded `didOpen` write
     /// applies on the writer thread (no effects round-trip — the writer owns
     /// the settle machinery it arms); a forwarded read observes the written
@@ -926,5 +1192,102 @@ mod tests {
             Task::RefreshDiagnostics => {}
             _ => panic!("expected Task::RefreshDiagnostics after the settle applied"),
         }
+    }
+
+    /// End-to-end harvest cycle in threaded mode: a settle over a document with
+    /// an on-disk bibliography routes the disk read through the harvester
+    /// thread (`Task::Harvested` forwarded back, as the main loop does), and an
+    /// out-of-band bibliography edit is resynced into salsa by the next settle.
+    #[test]
+    fn threaded_settle_harvests_referenced_files_off_thread() {
+        use crate::lsp::uri_ext::UriExt;
+
+        let timeout = std::time::Duration::from_secs(10);
+        let dir = tempfile::tempdir().expect("tempdir");
+        let doc_path = dir.path().join("main.qmd");
+        let bib_path = dir.path().join("refs.bib");
+        let doc_text = "---\nbibliography: refs.bib\n---\n\n# Heading\n\nCite [@key].\n";
+        std::fs::write(&doc_path, doc_text).expect("write doc");
+        std::fs::write(&bib_path, "@article{key, title={One}}\n").expect("write bib");
+
+        let (task_tx, task_rx) = crossbeam_channel::unbounded::<Task>();
+        let pool = TaskPool::new(task_tx.clone(), 1);
+        let mut writer = WriterHandle::new(client_sender());
+        writer.spawn(
+            PoolSpawners {
+                main: pool.spawner(),
+                fmt: pool.spawner(),
+            },
+            task_tx,
+        );
+
+        let uri = lsp_types::Uri::from_file_path(&doc_path).expect("uri");
+        writer.forward_write(WriteCommand::DidOpen(
+            lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: doc_text.to_owned(),
+                },
+            },
+        ));
+
+        // Play the main loop: pump one settle to completion, forwarding
+        // harvest batches back to the writer, and return the last batch seen.
+        let pump_settle = |writer: &mut WriterHandle| -> Vec<(std::path::PathBuf, Option<String>)> {
+            let mut last_batch = Vec::new();
+            loop {
+                match task_rx.recv_timeout(timeout).expect("settle activity") {
+                    Task::Harvested(batch) => {
+                        last_batch = batch.clone();
+                        writer.forward_harvest(batch);
+                    }
+                    Task::Diagnostics { .. } => return last_batch,
+                    _ => {}
+                }
+            }
+        };
+
+        // First settle: the harvest reads the bibliography off-thread.
+        let batch = pump_settle(&mut writer);
+        assert!(
+            batch.iter().any(|(path, _)| path == &bib_path),
+            "first settle harvested the bibliography: {batch:?}"
+        );
+
+        // Out-of-band edit; a save arms the next settle, whose harvest resyncs it.
+        std::fs::write(&bib_path, "@article{key, title={Two}}\n").expect("rewrite bib");
+        writer.forward_write(WriteCommand::DidSave(
+            lsp_types::DidSaveTextDocumentParams {
+                text_document: lsp_types::TextDocumentIdentifier { uri },
+                text: None,
+            },
+        ));
+        let batch = pump_settle(&mut writer);
+        assert!(
+            batch.iter().any(|(path, content)| path == &bib_path
+                && content.as_deref().is_some_and(|c| c.contains("Two"))),
+            "second settle harvested the edited bibliography: {batch:?}"
+        );
+
+        // The resynced content is what reads now observe.
+        let (seen_tx, seen_rx) = crossbeam_channel::bounded::<Option<String>>(1);
+        let probe_path = bib_path.clone();
+        writer.submit_read(ReadJob {
+            pool: ReadPool::Main,
+            run: Box::new(move |snap| {
+                let content = snap
+                    .db()
+                    .file_text(probe_path)
+                    .map(|file| file.content_or_empty(snap.db()).to_string());
+                let _ = seen_tx.send(content);
+            }),
+        });
+        let seen = seen_rx.recv_timeout(timeout).expect("read ran");
+        assert!(
+            seen.as_deref().is_some_and(|c| c.contains("Two")),
+            "pooled read observes the resynced bibliography, got: {seen:?}"
+        );
     }
 }

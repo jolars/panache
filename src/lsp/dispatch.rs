@@ -591,6 +591,9 @@ impl GlobalState {
             // The writer thread applied a settle result to its store; nudge
             // pull clients to re-pull.
             Task::RefreshDiagnostics => self.send_diagnostic_refresh(),
+            // Referenced-file contents the harvester read for the settle write
+            // phase; route them back to the writer, the db owner.
+            Task::Harvested(batch) => self.writer.forward_harvest(batch),
         }
     }
 

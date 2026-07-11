@@ -49,25 +49,31 @@ Guard: the test `transient_cross_thread_snapshots_stay_live_and_visible` in
 1. `07e5ea24` refactor(lsp): route salsa access through `WriterHandle` ---
    `WriterHandle` owns the `SalsaDb`; all `gs.salsa` sites go through
    `db()`/`db_mut()`/`analysis()`.
+
 2. `cf0d5f76` test(lsp): pin salsa cross-thread snapshot invariant --- the spike
    above; corrected the design.
+
 3. `4e8e1af2` refactor(lsp): funnel write notifications through `apply_write`
    --- every DB-mutating notification flows through one
    `GlobalState::apply_write(WriteCommand)` chokepoint (`writer_command.rs`).
+
 4. `bec5d348` refactor(lsp): move config ownership into the writer ---
    `workspace_folders`, extend-chain watch set, config-error toast dedup, and
    `load_config_notifying` moved onto `WriterHandle` (holds a `ClientSender`
    clone). **Writer now owns db + config.**
+
 5. `962babf5` refactor(lsp): move document map into the writer --- the writer
    owns the whole `Arc<DocumentMap>` (per the design decision below: whole map,
    not just the salsa-input side). `StateSnapshot`'s own `document_map` field is
    unchanged. **Writer now owns db + config + document map.**
+
 6. `98751ff0` refactor(lsp): decouple write handlers from `GlobalState` ---
    write handlers run against writer-owned state (which gains
    `runtime_settings`) and request main-loop side effects (settle arming,
    external-lint marking, diagnostics drops) via a `WriteEffects` accumulator
    applied by `GlobalState::apply_write_effects`. The tester funnels
    notifications through `apply_write` like production.
+
 7. refactor(lsp): spawn the dedicated writer thread --- `WriterState` (the owned
    state) split from `WriterHandle` (a mode wrapper: `Inline(Box<WriterState>)`
    or `Threaded { tx }`). Production calls `gs.spawn_writer()` after the
@@ -84,6 +90,7 @@ Guard: the test `transient_cross_thread_snapshots_stay_live_and_visible` in
    harvester phase below. `settle_task` (the all-docs read pass) is a free fn in
    `dispatch.rs` shared by inline and threaded paths. Smoke test:
    `threaded_writer_serves_writes_reads_and_settles`.
+
 8. refactor(lsp): move diagnostics store + settle machinery into the writer ---
    `WriterState` now owns `DiagnosticCollection`, both lint generations,
    `external_pending`, `settle_deadline`, and copies of the pull-capability
@@ -104,16 +111,39 @@ Guard: the test `transient_cross_thread_snapshots_stay_live_and_visible` in
    snapshot's store view (the `inline_streaming` macro is deleted), which also
    makes it FIFO-ordered after forwarded writes and properly cancellable.
 
+9. feat(lsp): harvest settle disk I/O on a dedicated thread --- the settle write
+   phase in threaded mode is now a **harvest cycle**: the writer discovers and
+   interns the referenced set per round (`WriterState::harvest_round` over
+   `SalsaDb::discover_referenced_files`, the split-out discovery half of
+   `load_referenced_files`), the `panache-lsp-harvester` thread reads the paths
+   from disk, and the contents come back as `Task::Harvested` →
+   `WriterMsg::Harvested` (same main-loop-forwarded routing as settle results
+   --- a direct harvester→writer channel would deadlock shutdown circularly) for
+   a compare-and-set apply (`SalsaDb::apply_harvested_file_text`: `None`→`Some`
+   at HIGH durability like `load_file_from_disk`, changed-content refresh at
+   MEDIUM like `resync_cached_file_from_disk`; open-buffer paths skipped at
+   request AND apply time --- buffer-authoritative). Rounds repeat until
+   discovery finds nothing new, then `complete_settle` bumps the generation,
+   takes externals, mints the snapshot, and spawns the read pass --- so writes
+   served mid-cycle are covered by the very pass the cycle feeds, and
+   `complete_settle` clears any deadline they armed (no redundant re-lint). A
+   deadline firing mid-cycle is swallowed for the same reason. At most one cycle
+   is in flight. Inline mode keeps the synchronous
+   `reload_open_documents_referenced_files` (`begin_due_settle`), so the tester
+   stays synchronous. Note: `did_open`/`did_save`/file-op/watcher handlers still
+   call the synchronous load/reload on the writer thread --- event-driven and
+   mostly cached steady-state (loads skip `Some` inputs), but not
+   settle-frequency; could route through the harvester later if profiling says
+   so. Tests: `harvest_rounds_resync_referenced_files` (primitives) and
+   `threaded_settle_harvests_referenced_files_off_thread` (end-to-end
+   out-of-band bibliography resync through the real threads).
+
 Every commit is green: full suite w/ `--features lsp` (296 LSP integration tests
 included), clippy `-D warnings`, rustfmt.
 
 ## Next edits
 
-**1. Harvester thread** --- move the referenced-file disk I/O off the writer
-thread too (it currently holds up queued writes/reads behind a slow reload; see
-the timing warn around `begin_due_settle`'s reload).
-
-**2. Version-gating** of publishes.
+**1. Version-gating** of publishes.
 
 Watch out for: in threaded mode nothing on the main loop may call
 `writer.state()`/`state_mut()` or the inline delegates (`db()`,
@@ -146,7 +176,7 @@ cd <repo> && git checkout lsp-writer-thread
 # read this file top-to-bottom, then:
 cargo test --features lsp lsp
 cargo clippy --features lsp --all-targets -- -D warnings
-# continue at "Next edits -> 1. Harvester thread"
+# continue at "Next edits -> 1. Version-gating"
 ```
 
 Keep each field-group move a separate green commit. Verify per step with the two
