@@ -844,7 +844,12 @@ pub(crate) fn settle_task(
                 .into_iter()
                 .map(|(uri, mut diags)| {
                     diags.sort_by_key(|d| (d.range.start.line, d.range.start.character));
-                    (uri, None, diags)
+                    // Tag the publish with the document version the snapshot
+                    // holds, so the client can discard a report computed
+                    // against a buffer it has since edited. Non-open targets
+                    // (manifests, config files) have no version.
+                    let version = snap.document_state(&uri).map(|state| state.version);
+                    (uri, version, diags)
                 })
                 .collect::<Vec<_>>()
         });

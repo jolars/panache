@@ -138,12 +138,25 @@ Guard: the test `transient_cross_thread_snapshots_stay_live_and_visible` in
    `threaded_settle_harvests_referenced_files_off_thread` (end-to-end
    out-of-band bibliography resync through the real threads).
 
-Every commit is green: full suite w/ `--features lsp` (296 LSP integration tests
-included), clippy `-D warnings`, rustfmt.
+10. feat(lsp): version-gate diagnostics publishes --- `DocumentState` gains
+    `version` (set at `didOpen`, updated at `didChange`); the settle read pass
+    tags each publish with the version the snapshot holds (non-open targets like
+    manifests/config files stay `None`). The tag flows through
+    `DiagnosticCollection` into both push (`publishDiagnostics.version`) and
+    pull (`WorkspaceDocumentDiagnosticReport.version`), so a client discards a
+    report computed against a buffer it has since edited. Note: an
+    items-unchanged settle keeps the stored entry (old version tag) --- no
+    redundant push, and the items still describe the buffer.
+
+Every commit is green: full suite w/ `--features lsp` (296+ LSP integration
+tests included), clippy `-D warnings`, rustfmt.
 
 ## Next edits
 
-**1. Version-gating** of publishes.
+None --- the port and the follow-ups listed at kickoff (writer thread,
+diagnostics/settle ownership, harvester, version-gating) have all landed.
+Remaining before merge: real-editor smoke test on a large project (the Bookdown
+book that motivated this), then **delete this file**.
 
 Watch out for: in threaded mode nothing on the main loop may call
 `writer.state()`/`state_mut()` or the inline delegates (`db()`,
@@ -176,7 +189,7 @@ cd <repo> && git checkout lsp-writer-thread
 # read this file top-to-bottom, then:
 cargo test --features lsp lsp
 cargo clippy --features lsp --all-targets -- -D warnings
-# continue at "Next edits -> 1. Version-gating"
+# see "Next edits" (all planned work has landed)
 ```
 
 Keep each field-group move a separate green commit. Verify per step with the two

@@ -46,6 +46,10 @@ pub struct DocumentState {
     pub salsa_config: crate::salsa::FileConfig,
     /// Cached syntax tree for incremental parsing.
     pub tree: GreenNode,
+    /// The client's latest `textDocument` version (from `didOpen`/`didChange`).
+    /// Tags diagnostics publishes so the client can discard a report computed
+    /// against a buffer it has since edited.
+    pub version: i32,
 }
 
 #[derive(Debug, Clone, Default)]

@@ -206,6 +206,7 @@ pub(crate) fn did_open(
             salsa_file,
             salsa_config,
             tree,
+            version: params.text_document.version,
         },
     );
 
@@ -332,6 +333,7 @@ pub(crate) fn did_change(
     if let Some(doc_state) = w.document_map_mut().get_mut(&uri_string) {
         doc_state.tree = green;
         doc_state.path = doc_path_for_salsa.clone();
+        doc_state.version = params.text_document.version;
     } else {
         return;
     }

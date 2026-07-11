@@ -113,6 +113,35 @@ fn test_did_change_publishes_diagnostics_to_client() {
     );
 }
 
+/// Publishes are version-gated: each carries the document version the settle
+/// snapshot held, so a client can discard a report computed against a buffer
+/// it has since edited (the test harness opens at version 0 and edits at
+/// version 1).
+#[test]
+fn test_publish_diagnostics_carries_document_version() {
+    let mut server = TestLspServer::new();
+    server.initialize("file:///workspace");
+    let uri = "file:///workspace/doc.qmd";
+
+    server.open_document(uri, "# H1\n\n### H3 skip\n", "quarto");
+    server.pump(Duration::from_secs(2));
+    let publishes = server.drain_publish_diagnostics(uri);
+    assert_eq!(
+        publishes.last().expect("did_open publish").version,
+        Some(0),
+        "publish after open carries the opened version"
+    );
+
+    server.edit_document(uri, vec![full_document_change("# H1\n\n#### H4 skip\n")]);
+    server.pump(Duration::from_secs(2));
+    let publishes = server.drain_publish_diagnostics(uri);
+    assert_eq!(
+        publishes.last().expect("did_change publish").version,
+        Some(1),
+        "publish after edit carries the edited version"
+    );
+}
+
 #[test]
 fn test_bibliography_load_error_span_updates_after_ranged_edit() {
     let mut server = TestLspServer::new();
