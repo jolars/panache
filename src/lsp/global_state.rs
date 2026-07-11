@@ -153,12 +153,36 @@ impl DiagnosticCollection {
 /// without any async machinery.
 #[derive(Clone)]
 pub(crate) struct ClientSender {
-    sender: Sender<Message>,
+    kind: ClientSenderKind,
+}
+
+#[derive(Clone)]
+enum ClientSenderKind {
+    /// A clone of the connection's message sender (main loop and inline mode).
+    Direct(Sender<Message>),
+    /// Rides the task channel as [`Task::SendToClient`]; the main loop
+    /// forwards to the client. Held by the writer thread: `io_threads.join()`
+    /// blocks until *every* direct sender clone drops, so a writer wedged in a
+    /// blocking salsa write (its only exit signal is channel disconnect, which
+    /// it observes only in `recv`) must not be able to hold shutdown hostage
+    /// with a direct clone of its own.
+    Relayed(Sender<Task>),
 }
 
 impl ClientSender {
     pub(crate) fn new(sender: Sender<Message>) -> Self {
-        Self { sender }
+        Self {
+            kind: ClientSenderKind::Direct(sender),
+        }
+    }
+
+    /// A sender that relays through the task channel (see
+    /// [`ClientSenderKind::Relayed`]); handed to the writer state when it
+    /// moves onto its thread.
+    pub(crate) fn relayed(tasks: Sender<Task>) -> Self {
+        Self {
+            kind: ClientSenderKind::Relayed(tasks),
+        }
     }
 
     /// Publish diagnostics for a document (fire-and-forget notification).
@@ -204,8 +228,12 @@ impl ClientSender {
 
     /// Send a raw message (response or server→client request) to the client.
     pub(crate) fn send(&self, message: Message) {
-        if let Err(err) = self.sender.send(message) {
-            log::warn!("LSP client channel closed; dropping message: {err}");
+        let closed = match &self.kind {
+            ClientSenderKind::Direct(tx) => tx.send(message).is_err(),
+            ClientSenderKind::Relayed(tx) => tx.send(Task::SendToClient(message)).is_err(),
+        };
+        if closed {
+            log::warn!("LSP client channel closed; dropping message");
         }
     }
 }
@@ -388,6 +416,10 @@ pub(crate) enum Task {
     /// the writer (the db owner), which compare-and-set applies it and either
     /// requests the next harvest round or spawns the settle read pass.
     Harvested(Vec<(std::path::PathBuf, Option<String>)>),
+    /// A client-bound message from the writer thread (diagnostics publish, log,
+    /// toast), relayed here so the writer never holds a direct clone of the
+    /// connection's sender — see [`ClientSender::relayed`].
+    SendToClient(Message),
 }
 
 /// The synchronous, single-threaded-mutation server state.

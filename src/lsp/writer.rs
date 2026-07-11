@@ -729,9 +729,16 @@ impl WriterHandle {
     pub(crate) fn spawn(&mut self, pools: PoolSpawners, task_tx: Sender<Task>) {
         let (tx, rx) = crossbeam_channel::unbounded();
         let prev = std::mem::replace(&mut self.mode, WriterMode::Threaded { tx });
-        let WriterMode::Inline(state) = prev else {
+        let WriterMode::Inline(mut state) = prev else {
             panic!("writer thread already spawned");
         };
+        // The writer must not carry a direct clone of the connection's sender
+        // across the spawn: `io_threads.join()` waits for every clone, and a
+        // writer wedged in a blocking salsa write (it only observes shutdown
+        // in `recv`) would hold its clone past `GlobalState`'s drop, leaving a
+        // zombie process after the client disconnects. Its client traffic
+        // rides the task channel instead ([`Task::SendToClient`]).
+        state.sender = ClientSender::relayed(task_tx.clone());
         std::thread::Builder::new()
             .name("panache-lsp-writer".to_owned())
             .spawn(move || writer_thread(*state, rx, pools, task_tx))
@@ -1438,6 +1445,59 @@ mod tests {
         assert!(text.contains("One"), "bib content loaded, got: {text}");
     }
 
+    /// After `spawn`, the writer must hold no direct clone of the client
+    /// sender: `io_threads.join()` blocks until every clone drops, and a
+    /// writer wedged in a blocking salsa write (its only exit signal is
+    /// channel disconnect, observed only in `recv`) would hold its clone past
+    /// `GlobalState`'s drop — a zombie process after the client disconnects.
+    /// Its client traffic must ride the task channel instead.
+    #[test]
+    fn threaded_writer_relays_client_traffic_via_task_channel() {
+        let timeout = std::time::Duration::from_secs(10);
+        let (client_tx, client_rx) = crossbeam_channel::unbounded();
+        let (task_tx, task_rx) = crossbeam_channel::unbounded::<Task>();
+        let pool = TaskPool::new(task_tx.clone(), 1);
+
+        let mut writer = WriterHandle::new(ClientSender::new(client_tx));
+        writer.spawn(
+            PoolSpawners {
+                main: pool.spawner(),
+                fmt: pool.spawner(),
+            },
+            task_tx,
+        );
+
+        // `did_open` logs "Opened document" through the writer's sender.
+        writer.forward_write(WriteCommand::DidOpen(
+            lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri: "file:///nonexistent-spike/doc.qmd".parse().unwrap(),
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: "# Heading\n".into(),
+                },
+            },
+        ));
+
+        loop {
+            match task_rx
+                .recv_timeout(timeout)
+                .expect("relayed client message")
+            {
+                Task::SendToClient(lsp_server::Message::Notification(n))
+                    if n.method == "window/logMessage" =>
+                {
+                    break;
+                }
+                _ => continue,
+            }
+        }
+        assert!(
+            client_rx.try_recv().is_err(),
+            "the writer must not send directly to the client after spawn"
+        );
+    }
+
     /// A lost harvest batch must not wedge diagnostics for the session.
     /// While a cycle is in flight every elapsed settle deadline is covered by
     /// the cycle's completion pass — but if the batch never lands (harvester
@@ -1481,10 +1541,14 @@ mod tests {
         ));
 
         // The self-timed settle starts a harvest cycle; drop its batch on the
-        // floor instead of forwarding it (a lost relay).
-        match task_rx.recv_timeout(timeout).expect("harvest batch") {
-            Task::Harvested(_) => {}
-            _ => panic!("expected the harvest batch first"),
+        // floor instead of forwarding it (a lost relay). Relayed client
+        // traffic (logs) shares the channel; skip it.
+        loop {
+            match task_rx.recv_timeout(timeout).expect("harvest batch") {
+                Task::Harvested(_) => break,
+                Task::SendToClient(_) => continue,
+                _ => panic!("expected the harvest batch first"),
+            }
         }
 
         // A later edit arms a new deadline. Its firing is deferred to the
@@ -1611,16 +1675,19 @@ mod tests {
 
         // Settle: the didOpen armed it; the writer self-fires after the
         // debounce window and spawns the read pass, whose result lands on the
-        // task channel tagged with the writer's first generation.
-        let (generation, publishes, external_ran) =
+        // task channel tagged with the writer's first generation. Relayed
+        // client traffic (logs) shares the channel; skip it.
+        let (generation, publishes, external_ran) = loop {
             match task_rx.recv_timeout(timeout).expect("settle result") {
                 Task::Diagnostics {
                     generation,
                     publishes,
                     external_ran,
-                } => (generation, publishes, external_ran),
+                } => break (generation, publishes, external_ran),
+                Task::SendToClient(_) => continue,
                 _ => panic!("expected Task::Diagnostics from the self-timed settle"),
-            };
+            }
+        };
         assert_eq!(generation, 1);
         assert!(
             external_ran.contains(&uri),
@@ -1633,9 +1700,12 @@ mod tests {
             !writer.forward_settle_result(generation, publishes, external_ran),
             "threaded mode must not apply settle results synchronously"
         );
-        match task_rx.recv_timeout(timeout).expect("refresh nudge") {
-            Task::RefreshDiagnostics => {}
-            _ => panic!("expected Task::RefreshDiagnostics after the settle applied"),
+        loop {
+            match task_rx.recv_timeout(timeout).expect("refresh nudge") {
+                Task::RefreshDiagnostics => break,
+                Task::SendToClient(_) => continue,
+                _ => panic!("expected Task::RefreshDiagnostics after the settle applied"),
+            }
         }
     }
 

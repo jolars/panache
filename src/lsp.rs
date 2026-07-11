@@ -92,6 +92,9 @@ pub fn run() -> std::io::Result<()> {
     // only stops once *every* sender is dropped. Drop `gs` before joining so the
     // writer's channel disconnects and the process can actually exit (otherwise
     // `join` blocks forever and the server lingers after the client is gone).
+    // The salsa writer thread holds no direct clone (its client traffic is
+    // relayed via the task channel — see `ClientSender::relayed`), so even a
+    // writer wedged in a blocking salsa write can't hold this join hostage.
     drop(gs);
     drop(connection);
     io_threads.join()?;
