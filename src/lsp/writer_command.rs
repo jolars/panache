@@ -28,4 +28,8 @@ pub(crate) enum WriteCommand {
     DidCreateFiles(CreateFilesParams),
     DidRenameFiles(RenameFilesParams),
     DidDeleteFiles(DeleteFilesParams),
+    /// Panics inside `apply_write`, standing in for a buggy handler: the
+    /// writer thread must survive it (tests only).
+    #[cfg(test)]
+    PanicForTest,
 }

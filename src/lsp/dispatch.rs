@@ -626,6 +626,7 @@ impl GlobalState {
         R: Serialize + Send + 'static,
     {
         self.in_flight.insert(id.clone());
+        let submit_id = id.clone();
         let sender = self.pool.result_sender();
         let run = move |snap: StateSnapshot| {
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -658,10 +659,13 @@ impl GlobalState {
             let _ = sender.send(task);
         };
         if self.writer.is_threaded() {
-            self.writer.submit_read(ReadJob {
+            let delivered = self.writer.submit_read(ReadJob {
                 pool: ReadPool::Main,
                 run: Box::new(run),
             });
+            if !delivered {
+                self.respond_writer_unavailable(submit_id);
+            }
         } else {
             let snap = self.snapshot();
             self.pool.spawn(move || run(snap));
@@ -694,6 +698,7 @@ impl GlobalState {
         R: Serialize + Send + 'static,
     {
         self.in_flight.insert(id.clone());
+        let submit_id = id.clone();
         // Both pools post on the same result channel, so one sender serves either.
         let sender = self.pool.result_sender();
         let run = move |snap: StateSnapshot| {
@@ -732,10 +737,13 @@ impl GlobalState {
         if self.writer.is_threaded() {
             // The writer owns the db, so it mints the snapshot: forwarding the
             // read keeps it FIFO-ordered after any write sent just before it.
-            self.writer.submit_read(ReadJob {
+            let delivered = self.writer.submit_read(ReadJob {
                 pool,
                 run: Box::new(run),
             });
+            if !delivered {
+                self.respond_writer_unavailable(submit_id);
+            }
         } else {
             let snap = self.snapshot();
             match pool {
@@ -743,6 +751,17 @@ impl GlobalState {
                 ReadPool::Fmt => self.fmt_pool.spawn(move || run(snap)),
             }
         }
+    }
+
+    /// Answer a request whose read job could not reach the writer thread
+    /// (channel closed). The id is already in `in_flight`; without a response
+    /// the client would wait on it forever.
+    fn respond_writer_unavailable(&mut self, id: RequestId) {
+        self.respond(Response::new_err(
+            id,
+            ErrorCode::InternalError as i32,
+            "internal error: LSP writer thread unavailable".to_owned(),
+        ));
     }
 
     /// Time until the workspace settle deadline, for the main-loop `select!`.
@@ -902,6 +921,35 @@ mod tests {
 
     fn uri(s: &str) -> Uri {
         s.parse().expect("valid uri")
+    }
+
+    /// A read forwarded to a dead writer thread must be answered with an
+    /// error response: the id is already in `in_flight` when the forward
+    /// fails, and silently dropping the job would leave the client waiting
+    /// forever (hover/formatting hang with no `InternalError`, no
+    /// `RequestCanceled`).
+    #[test]
+    fn read_dropped_on_closed_writer_answers_internal_error() {
+        let (tx, client_rx) = crossbeam_channel::unbounded();
+        let mut gs = GlobalState::new(ClientSender::new(tx));
+        gs.writer = crate::lsp::writer::WriterHandle::threaded_disconnected();
+
+        let id = RequestId::from(1);
+        gs.spawn_request::<(), ()>(id.clone(), (), |_, _| ());
+
+        let msg = client_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("dropped read must be answered");
+        let lsp_server::Message::Response(resp) = msg else {
+            panic!("expected an error response, got {msg:?}");
+        };
+        assert_eq!(resp.id, id);
+        let err = resp.error.expect("dropped read must be an error response");
+        assert_eq!(err.code, ErrorCode::InternalError as i32);
+        assert!(
+            !gs.in_flight.contains(&id),
+            "answered id must leave in-flight tracking"
+        );
     }
 
     /// A current-generation settle result is applied (via the writer, the store

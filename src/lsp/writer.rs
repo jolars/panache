@@ -246,6 +246,8 @@ impl WriterState {
             WriteCommand::DidDeleteFiles(params) => {
                 handlers::file_operations::did_delete_files(self, params)
             }
+            #[cfg(test)]
+            WriteCommand::PanicForTest => panic!("writer test panic"),
         }
     }
 
@@ -617,6 +619,16 @@ impl WriterHandle {
         matches!(self.mode, WriterMode::Threaded { .. })
     }
 
+    /// A threaded-mode handle whose writer thread is already gone (tests
+    /// only): every forward fails, exercising the closed-channel paths.
+    #[cfg(test)]
+    pub(crate) fn threaded_disconnected() -> Self {
+        let (tx, _) = crossbeam_channel::unbounded();
+        Self {
+            mode: WriterMode::Threaded { tx },
+        }
+    }
+
     /// Direct access to the state. Inline mode only: panics after
     /// [`spawn`](Self::spawn), when the state lives on the writer thread.
     pub(crate) fn state(&self) -> &WriterState {
@@ -721,13 +733,20 @@ impl WriterHandle {
     /// Forward a pooled read to the writer thread, which mints the snapshot.
     /// Threaded mode only: inline callers mint snapshots synchronously and
     /// spawn onto the pools themselves.
-    pub(crate) fn submit_read(&self, job: ReadJob) {
+    ///
+    /// Returns `false` when the writer thread is gone (channel closed) and the
+    /// job was dropped — the caller must answer the request itself (an id
+    /// already in `in_flight` would otherwise never receive any response).
+    #[must_use]
+    pub(crate) fn submit_read(&self, job: ReadJob) -> bool {
         let WriterMode::Threaded { tx } = &self.mode else {
             panic!("submit_read is threaded-mode-only");
         };
         if tx.send(WriterMsg::Read(job)).is_err() {
             log::warn!("LSP writer channel closed; dropping read");
+            return false;
         }
+        true
     }
 
     // --- inline-mode convenience delegates (main loop pre-spawn + tests) ---
@@ -797,6 +816,27 @@ fn harvester_thread(rx: Receiver<Vec<PathBuf>>, task_tx: Sender<Task>) {
     }
 }
 
+/// Run one writer-thread step, mapping a panic to `None` so a buggy handler
+/// can't take the thread down (mirrors the pool workers' `catch_unwind`).
+/// Pre-guard, a handler panic killed the detached writer and zombified the
+/// server: every later write was silently dropped and every forwarded read
+/// left its request unanswered. The panicking step's partial state is the
+/// price of staying up; the error log names the step.
+fn guard<T>(what: &str, f: impl FnOnce() -> T) -> Option<T> {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
+        Ok(value) => Some(value),
+        Err(panic) => {
+            let msg = panic
+                .downcast_ref::<&'static str>()
+                .copied()
+                .or_else(|| panic.downcast_ref::<String>().map(String::as_str))
+                .unwrap_or("<non-string panic payload>");
+            log::error!("LSP writer step ({what}) panicked: {msg}");
+            None
+        }
+    }
+}
+
 /// The writer thread's event loop: apply writes (side effects and all — the
 /// writer owns every effect target), mint snapshots for reads, self-time the
 /// debounced settle (`recv_timeout` against the writer-owned deadline, so no
@@ -858,9 +898,16 @@ fn writer_thread(
             },
         };
         match msg {
-            Some(WriterMsg::Write(cmd)) => state.apply_write(cmd),
+            Some(WriterMsg::Write(cmd)) => {
+                guard("apply_write", || state.apply_write(cmd));
+            }
             Some(WriterMsg::Read(job)) => {
-                let snap = state.mint_snapshot();
+                // A mint panic drops the job (its request hangs client-side),
+                // but minting is pure clones — the realistic panic sources are
+                // the handler (caught inside `run`) and the write path above.
+                let Some(snap) = guard("mint_snapshot", || state.mint_snapshot()) else {
+                    continue;
+                };
                 let spawner = match job.pool {
                     ReadPool::Main => &pools.main,
                     ReadPool::Fmt => &pools.fmt,
@@ -873,9 +920,10 @@ fn writer_thread(
                 publishes,
                 external_ran,
             }) => {
-                if state.apply_settle_result(generation, publishes, external_ran)
-                    && task_tx.send(Task::RefreshDiagnostics).is_err()
-                {
+                let applied = guard("apply_settle_result", || {
+                    state.apply_settle_result(generation, publishes, external_ran)
+                });
+                if applied == Some(true) && task_tx.send(Task::RefreshDiagnostics).is_err() {
                     break;
                 }
             }
@@ -883,12 +931,20 @@ fn writer_thread(
             // (discovery found new references in the freshly loaded content)
             // or complete the settle and spawn its read pass.
             Some(WriterMsg::Harvested(batch)) => {
-                state.apply_harvest(batch);
                 let Some(requested) = harvest.as_mut() else {
                     log::warn!("harvest batch without an in-flight cycle; dropped");
                     continue;
                 };
-                let next = state.harvest_round(requested);
+                let next = guard("harvest apply/discovery", || {
+                    state.apply_harvest(batch);
+                    state.harvest_round(requested)
+                });
+                let Some(next) = next else {
+                    // Abort the cycle rather than wedge it (a `Some` harvest
+                    // swallows every future deadline); the next write re-arms.
+                    harvest = None;
+                    continue;
+                };
                 if next.is_empty() {
                     harvest = None;
                     spawn_settle_pass(&pools, &task_tx, state.complete_settle());
@@ -918,7 +974,11 @@ fn writer_thread(
                     continue;
                 }
                 let mut requested = HashSet::new();
-                let first = state.harvest_round(&mut requested);
+                let Some(first) =
+                    guard("harvest discovery", || state.harvest_round(&mut requested))
+                else {
+                    continue;
+                };
                 if first.is_empty() {
                     spawn_settle_pass(&pools, &task_tx, state.complete_settle());
                 } else if harvest_tx.send(first).is_ok() {
@@ -1099,6 +1159,58 @@ mod tests {
         assert!(text.contains("Two"), "resynced content, got: {text}");
     }
 
+    /// A panicking write handler must not take the writer thread down: pool
+    /// workers already `catch_unwind` their jobs, and the writer is the same
+    /// kind of long-lived executor. Pre-guard, the panic killed the detached
+    /// thread and every later write/read was silently dropped — a zombie
+    /// server (writes lost, requests never answered) instead of a crash the
+    /// editor could detect and restart from.
+    #[test]
+    fn writer_thread_survives_panicking_write() {
+        let timeout = std::time::Duration::from_secs(10);
+        let (task_tx, _task_rx) = crossbeam_channel::unbounded::<Task>();
+        let pool = TaskPool::new(task_tx.clone(), 1);
+
+        let mut writer = WriterHandle::new(client_sender());
+        writer.spawn(
+            PoolSpawners {
+                main: pool.spawner(),
+                fmt: pool.spawner(),
+            },
+            task_tx,
+        );
+
+        writer.forward_write(WriteCommand::PanicForTest);
+
+        // FIFO channel: the read is handled strictly after the panicking
+        // write, so a reply proves the thread survived it.
+        let (seen_tx, seen_rx) = crossbeam_channel::bounded::<()>(1);
+        assert!(
+            writer.submit_read(ReadJob {
+                pool: ReadPool::Main,
+                run: Box::new(move |_snap| {
+                    let _ = seen_tx.send(());
+                }),
+            }),
+            "writer channel must still be open after the panicking write"
+        );
+        seen_rx
+            .recv_timeout(timeout)
+            .expect("read ran on a writer thread that survived the panic");
+    }
+
+    /// `submit_read` must report a dead writer thread so the dispatcher can
+    /// answer the request instead of leaving its id in flight forever.
+    #[test]
+    fn submit_read_reports_closed_channel() {
+        let writer = WriterHandle::threaded_disconnected();
+        let delivered = writer.submit_read(ReadJob {
+            pool: ReadPool::Main,
+            run: Box::new(|_snap| {}),
+        });
+        assert!(!delivered, "a closed writer channel must be reported");
+    }
+
     /// End-to-end smoke test of threaded mode: a forwarded `didOpen` write
     /// applies on the writer thread (no effects round-trip — the writer owns
     /// the settle machinery it arms); a forwarded read observes the written
@@ -1138,12 +1250,12 @@ mod tests {
         // the job (run on the pool) observes the document written above.
         let read_uri = uri.clone();
         let (seen_tx, seen_rx) = crossbeam_channel::bounded::<Option<String>>(1);
-        writer.submit_read(ReadJob {
+        assert!(writer.submit_read(ReadJob {
             pool: ReadPool::Main,
             run: Box::new(move |snap| {
                 let _ = seen_tx.send(snap.document_content(&read_uri));
             }),
-        });
+        }));
         let seen = seen_rx.recv_timeout(timeout).expect("read ran");
         assert_eq!(seen.as_deref(), Some("# Heading\n\nBody text.\n"));
 
@@ -1257,7 +1369,7 @@ mod tests {
         // The resynced content is what reads now observe.
         let (seen_tx, seen_rx) = crossbeam_channel::bounded::<Option<String>>(1);
         let probe_path = bib_path.clone();
-        writer.submit_read(ReadJob {
+        assert!(writer.submit_read(ReadJob {
             pool: ReadPool::Main,
             run: Box::new(move |snap| {
                 let content = snap
@@ -1266,7 +1378,7 @@ mod tests {
                     .map(|file| file.content_or_empty(snap.db()).to_string());
                 let _ = seen_tx.send(content);
             }),
-        });
+        }));
         let seen = seen_rx.recv_timeout(timeout).expect("read ran");
         assert!(
             seen.as_deref().is_some_and(|c| c.contains("Two")),
