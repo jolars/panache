@@ -69,6 +69,13 @@ impl DiagnosticCollection {
     /// (bumping its `result_id`), leaves unchanged URIs untouched (so a re-pull
     /// still answers `unchanged` and push clients see no redundant notification),
     /// and clears every URI the previous set held but this one omits.
+    ///
+    /// Unchanged items whose version tag advanced still refresh the stored
+    /// version and re-push under the new tag: a version-checking client may
+    /// have discarded an earlier publish whose tag was already behind the
+    /// buffer when it arrived, and skipping here would never send that client
+    /// a currently-tagged report. The `result_id` stays put — the items are
+    /// unchanged, so a re-pull still answers `unchanged`.
     pub(crate) fn apply(
         &mut self,
         publishes: Vec<(Uri, Option<i32>, Vec<Diagnostic>)>,
@@ -78,11 +85,17 @@ impl DiagnosticCollection {
         let mut next: HashSet<Uri> = HashSet::with_capacity(publishes.len());
         for (uri, version, items) in publishes {
             next.insert(uri.clone());
-            let unchanged = self
-                .current
-                .get(&uri)
-                .is_some_and(|entry| entry.items == items);
-            if unchanged {
+            if let Some(entry) = self.current.get(&uri)
+                && entry.items == items
+            {
+                if entry.version != version {
+                    if !pull {
+                        sender.publish_diagnostics(uri.clone(), items.clone(), version);
+                    }
+                    if let Some(entry) = Arc::make_mut(&mut self.current).get_mut(&uri) {
+                        entry.version = version;
+                    }
+                }
                 continue;
             }
             self.result_seq += 1;
@@ -560,5 +573,77 @@ mod tests {
         dc.apply(vec![(a.clone(), None, vec![diag(1)])], &sender, true);
         assert!(dc.get(&a).is_some(), "still-reported uri retained");
         assert!(dc.get(&x).is_none(), "omitted uri cleared");
+    }
+
+    /// An unchanged-items settle whose version tag advanced must refresh the
+    /// stored version and re-push under the new tag. A version-checking client
+    /// may have discarded the earlier publish (its tag was already behind the
+    /// buffer when it arrived), and the unchanged-skip would otherwise never
+    /// send that client a currently-tagged report — diagnostics would stay
+    /// missing until the items actually changed.
+    #[test]
+    fn unchanged_items_refresh_version_and_republish() {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let sender = ClientSender::new(tx);
+        let mut dc = DiagnosticCollection::default();
+        let a = uri("file:///a.qmd");
+
+        dc.apply(vec![(a.clone(), Some(0), vec![diag(2)])], &sender, false);
+        let first = dc.get(&a).expect("stored").result_id.clone();
+        rx.try_recv().expect("initial publish");
+
+        // Same items, newer document version: an edit that didn't change the
+        // diagnostics.
+        dc.apply(vec![(a.clone(), Some(1), vec![diag(2)])], &sender, false);
+        let entry = dc.get(&a).expect("still stored");
+        assert_eq!(
+            entry.version,
+            Some(1),
+            "stored version must track the newest settle"
+        );
+        assert_eq!(
+            entry.result_id, first,
+            "unchanged items must keep their result_id"
+        );
+        let msg = rx
+            .try_recv()
+            .expect("re-publish under the advanced version");
+        let Message::Notification(not) = msg else {
+            panic!("expected a publishDiagnostics notification, got {msg:?}");
+        };
+        let params: lsp_types::PublishDiagnosticsParams =
+            serde_json::from_value(not.params).expect("publishDiagnostics params");
+        assert_eq!(
+            params.version,
+            Some(1),
+            "re-publish carries the new version"
+        );
+
+        // Same items, same version: still skipped entirely.
+        dc.apply(vec![(a.clone(), Some(1), vec![diag(2)])], &sender, false);
+        assert!(
+            rx.try_recv().is_err(),
+            "no redundant publish when neither items nor version changed"
+        );
+    }
+
+    /// Pull mode refreshes the stored version silently (no push), so a
+    /// `workspace/diagnostic` report never carries a version the buffer has
+    /// left behind.
+    #[test]
+    fn unchanged_items_refresh_version_in_pull_mode() {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let sender = ClientSender::new(tx);
+        let mut dc = DiagnosticCollection::default();
+        let a = uri("file:///a.qmd");
+
+        dc.apply(vec![(a.clone(), Some(0), vec![diag(2)])], &sender, true);
+        dc.apply(vec![(a.clone(), Some(3), vec![diag(2)])], &sender, true);
+        assert_eq!(
+            dc.get(&a).expect("stored").version,
+            Some(3),
+            "pull store version must track the newest settle"
+        );
+        assert!(rx.try_recv().is_err(), "pull mode never pushes");
     }
 }
