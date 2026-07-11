@@ -283,6 +283,11 @@ impl WriterState {
 
     /// Mint a complete [`StateSnapshot`] from writer-owned state.
     pub(crate) fn mint_snapshot(&self) -> StateSnapshot {
+        // Test hook for the writer loop's mint-panic answer path.
+        #[cfg(test)]
+        if PANIC_ON_NEXT_MINT_SNAPSHOT.swap(false, std::sync::atomic::Ordering::SeqCst) {
+            panic!("test-injected mint panic");
+        }
         StateSnapshot::assemble(
             self.analysis(),
             self.document_map_arc(),
@@ -695,6 +700,12 @@ impl WriterState {
 static PANIC_ON_NEXT_HARVEST_APPLY: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
+/// Test hook: makes the next [`WriterState::mint_snapshot`] panic, exercising
+/// the writer loop's answer-the-request path for forwarded reads.
+#[cfg(test)]
+static PANIC_ON_NEXT_MINT_SNAPSHOT: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 /// One in-flight settle harvest cycle: the writer discovers referenced paths
 /// ([`WriterState::harvest_round`]), the harvester thread reads them, and the
 /// batch comes back tagged with `id` to be applied
@@ -752,6 +763,11 @@ pub(crate) enum ReadPool {
 /// to the requested pool.
 pub(crate) struct ReadJob {
     pub(crate) pool: ReadPool,
+    /// The request this read answers. Its id is already in the dispatcher's
+    /// `in_flight` set, so if the job cannot run (a snapshot-mint panic), the
+    /// writer must answer it with an error — the client would otherwise wait
+    /// on it forever.
+    pub(crate) id: lsp_server::RequestId,
     pub(crate) run: Box<dyn FnOnce(StateSnapshot) + Send>,
 }
 
@@ -1123,10 +1139,20 @@ fn writer_thread(
                 guard("apply_write", || state.apply_write(cmd));
             }
             Some(WriterMsg::Read(job)) => {
-                // A mint panic drops the job (its request hangs client-side),
-                // but minting is pure clones — the realistic panic sources are
-                // the handler (caught inside `run`) and the write path above.
+                // Minting is pure clones, so a panic here means a real bug —
+                // but the job's request id is already in the dispatcher's
+                // `in_flight` set, so answer it instead of dropping the job
+                // (the client would hang on the request forever, unlike the
+                // pool path, whose handler panics become `InternalError`).
                 let Some(snap) = guard("mint_snapshot", || state.mint_snapshot()) else {
+                    let response = lsp_server::Response::new_err(
+                        job.id,
+                        lsp_server::ErrorCode::InternalError as i32,
+                        "internal error: LSP writer failed to mint a snapshot".to_owned(),
+                    );
+                    if task_tx.send(Task::Response(response)).is_err() {
+                        break;
+                    }
                     continue;
                 };
                 let spawner = match job.pool {
@@ -2177,6 +2203,7 @@ mod tests {
         assert!(
             writer.submit_read(ReadJob {
                 pool: ReadPool::Main,
+                id: lsp_server::RequestId::from(1),
                 run: Box::new(move |_snap| {
                     let _ = seen_tx.send(());
                 }),
@@ -2195,9 +2222,51 @@ mod tests {
         let writer = WriterHandle::threaded_disconnected();
         let delivered = writer.submit_read(ReadJob {
             pool: ReadPool::Main,
+            id: lsp_server::RequestId::from(1),
             run: Box::new(|_snap| {}),
         });
         assert!(!delivered, "a closed writer channel must be reported");
+    }
+
+    /// A snapshot-mint panic must answer the forwarded read's request instead
+    /// of dropping the job: the dispatcher already put the id in `in_flight`
+    /// and delivery succeeded, so no other path will ever respond — the
+    /// client would hang on the request forever.
+    #[test]
+    fn mint_snapshot_panic_answers_the_request() {
+        let timeout = std::time::Duration::from_secs(10);
+        let (task_tx, task_rx) = crossbeam_channel::unbounded::<Task>();
+        let pool = TaskPool::new(task_tx.clone(), 1);
+        let mut writer = WriterHandle::new(client_sender());
+        writer.spawn(
+            PoolSpawners {
+                main: pool.spawner(),
+                fmt: pool.spawner(),
+            },
+            task_tx,
+        );
+
+        super::PANIC_ON_NEXT_MINT_SNAPSHOT.store(true, std::sync::atomic::Ordering::SeqCst);
+        assert!(writer.submit_read(ReadJob {
+            pool: ReadPool::Main,
+            id: lsp_server::RequestId::from(7),
+            run: Box::new(|_snap| panic!("the job must not run without a snapshot")),
+        }));
+
+        loop {
+            match task_rx.recv_timeout(timeout) {
+                Ok(Task::Response(response)) => {
+                    assert_eq!(response.id, lsp_server::RequestId::from(7));
+                    assert!(
+                        response.error.is_some(),
+                        "the request must be answered with an error: {response:?}"
+                    );
+                    break;
+                }
+                Ok(_) => continue,
+                Err(err) => panic!("mint panic left the request unanswered: {err}"),
+            }
+        }
     }
 
     /// End-to-end smoke test of threaded mode: a forwarded `didOpen` write
@@ -2241,6 +2310,7 @@ mod tests {
         let (seen_tx, seen_rx) = crossbeam_channel::bounded::<Option<String>>(1);
         assert!(writer.submit_read(ReadJob {
             pool: ReadPool::Main,
+            id: lsp_server::RequestId::from(1),
             run: Box::new(move |snap| {
                 let _ = seen_tx.send(snap.document_content(&read_uri));
             }),
@@ -2366,6 +2436,7 @@ mod tests {
         let probe_path = bib_path.clone();
         assert!(writer.submit_read(ReadJob {
             pool: ReadPool::Main,
+            id: lsp_server::RequestId::from(1),
             run: Box::new(move |snap| {
                 let content = snap
                     .db()

@@ -737,6 +737,7 @@ impl GlobalState {
         if self.writer.is_threaded() {
             let delivered = self.writer.submit_read(ReadJob {
                 pool,
+                id: id.clone(),
                 run: Box::new(run),
             });
             if !delivered {
