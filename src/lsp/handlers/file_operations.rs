@@ -27,7 +27,6 @@ use lsp_types::{CreateFilesParams, DeleteFilesParams, RenameFilesParams, Uri};
 use crate::lsp::documents::reload_open_documents_referenced_files;
 use crate::lsp::uri_ext::UriExt;
 use crate::lsp::writer::WriterState;
-use crate::lsp::writer_command::WriteEffects;
 
 /// Parse a file-operation URI string into a filesystem path.
 fn op_uri_to_path(uri: &str) -> Option<PathBuf> {
@@ -40,18 +39,14 @@ fn op_uri_to_path(uri: &str) -> Option<PathBuf> {
 ///
 /// Interning flips a referenced-but-missing path's `None`->`Some` text input
 /// (after the reload below), so a dependent's `include-not-found` clears.
-pub(crate) fn did_create_files(
-    w: &mut WriterState,
-    fx: &mut WriteEffects,
-    params: CreateFilesParams,
-) {
+pub(crate) fn did_create_files(w: &mut WriterState, params: CreateFilesParams) {
     for file in &params.files {
         if let Some(path) = op_uri_to_path(&file.uri) {
             w.db_mut().intern_file(Some(path));
         }
     }
     reload_open_documents_referenced_files(w);
-    fx.arm_settle();
+    w.arm_settle();
 }
 
 /// Handle `workspace/didDeleteFiles`: drop each removed file from the graph.
@@ -59,14 +54,10 @@ pub(crate) fn did_create_files(
 /// Clears the deleted file's own diagnostics, evicts its cached text, and
 /// re-interns it so `project_graph` re-runs and its filesystem probes observe
 /// the absence — broken references in dependents surface on the next settle.
-pub(crate) fn did_delete_files(
-    w: &mut WriterState,
-    fx: &mut WriteEffects,
-    params: DeleteFilesParams,
-) {
+pub(crate) fn did_delete_files(w: &mut WriterState, params: DeleteFilesParams) {
     for file in &params.files {
         if let Ok(uri) = file.uri.parse::<Uri>() {
-            fx.drop_diagnostics(uri);
+            w.drop_diagnostics(&uri);
         }
         if let Some(path) = op_uri_to_path(&file.uri) {
             w.db_mut().evict_file_text(&path);
@@ -74,7 +65,7 @@ pub(crate) fn did_delete_files(
         }
     }
     reload_open_documents_referenced_files(w);
-    fx.arm_settle();
+    w.arm_settle();
 }
 
 /// Handle `workspace/didRenameFiles`: treat each rename as delete-old +
@@ -83,14 +74,10 @@ pub(crate) fn did_delete_files(
 /// Open-document relocation is intentionally left to the editor's standard
 /// `didClose(old)`/`didOpen(new)` pair; we only re-intern paths and re-lint so
 /// references to the old name break and references to the new name resolve.
-pub(crate) fn did_rename_files(
-    w: &mut WriterState,
-    fx: &mut WriteEffects,
-    params: RenameFilesParams,
-) {
+pub(crate) fn did_rename_files(w: &mut WriterState, params: RenameFilesParams) {
     for rename in &params.files {
         if let Ok(old_uri) = rename.old_uri.parse::<Uri>() {
-            fx.drop_diagnostics(old_uri);
+            w.drop_diagnostics(&old_uri);
         }
         if let Some(old_path) = op_uri_to_path(&rename.old_uri) {
             w.db_mut().evict_file_text(&old_path);
@@ -101,5 +88,5 @@ pub(crate) fn did_rename_files(
         }
     }
     reload_open_documents_referenced_files(w);
-    fx.arm_settle();
+    w.arm_settle();
 }

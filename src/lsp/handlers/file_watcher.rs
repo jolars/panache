@@ -10,13 +10,8 @@ use super::super::helpers;
 use crate::lsp::DocumentState;
 use crate::lsp::uri_ext::UriExt;
 use crate::lsp::writer::WriterState;
-use crate::lsp::writer_command::WriteEffects;
 
-pub(crate) fn did_change_watched_files(
-    w: &mut WriterState,
-    fx: &mut WriteEffects,
-    params: DidChangeWatchedFilesParams,
-) {
+pub(crate) fn did_change_watched_files(w: &mut WriterState, params: DidChangeWatchedFilesParams) {
     // A watcher event means the filesystem changed in a way salsa cannot see
     // through its inputs: `collect_includes` / `find_project_documents` probe the
     // filesystem directly (residual G3 reads), so a newly-created include is
@@ -156,7 +151,7 @@ pub(crate) fn did_change_watched_files(
         // open document, so manifest parse errors re-publish on (or clear from)
         // the manifest's own URI even for documents not flagged here.
         for uri in affected_documents {
-            fx.arm_settle_external(uri);
+            w.arm_settle_external(uri);
         }
     }
 
@@ -164,6 +159,6 @@ pub(crate) fn did_change_watched_files(
     // text); arm the settle so the all-docs pass re-lints over the fresh state
     // even when no document was flagged for external linters above.
     if !changed_paths.is_empty() {
-        fx.arm_settle();
+        w.arm_settle();
     }
 }

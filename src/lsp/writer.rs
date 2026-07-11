@@ -43,7 +43,7 @@ use crate::lsp::global_state::{
     ClientSender, DIAGNOSTICS_DEBOUNCE, DiagnosticCollection, DocumentMap, StateSnapshot, Task,
 };
 use crate::lsp::task_pool::TaskSpawner;
-use crate::lsp::writer_command::{WriteCommand, WriteEffects};
+use crate::lsp::writer_command::WriteCommand;
 use crate::salsa::{Analysis, SalsaDb};
 
 /// Owns the master salsa database handle and the state that feeds it.
@@ -215,69 +215,52 @@ impl WriterState {
 
     /// Apply one database-mutating notification against writer-owned state,
     /// including its side effects (settle arming, external marking, immediate
-    /// diagnostics drops) — all writer-owned now, so nothing travels back to
-    /// the main loop.
+    /// diagnostics drops) — all writer-owned, so handlers call them directly
+    /// on `self`.
     ///
     /// This is the function the writer thread runs per received command; inline
     /// mode calls it synchronously via [`WriterHandle::forward_write`].
     pub(crate) fn apply_write(&mut self, cmd: WriteCommand) {
-        let mut fx = WriteEffects::default();
-        self.apply(cmd, &mut fx);
-        self.apply_effects(fx);
-    }
-
-    /// Run the handler for one write command, accumulating its requested side
-    /// effects into `fx` (applied by [`Self::apply_write`]).
-    fn apply(&mut self, cmd: WriteCommand, fx: &mut WriteEffects) {
         use crate::lsp::{documents, handlers};
 
         match cmd {
-            WriteCommand::DidOpen(params) => documents::did_open(self, fx, params),
-            WriteCommand::DidChange(params) => documents::did_change(self, fx, params),
-            WriteCommand::DidSave(params) => documents::did_save(self, fx, params),
-            WriteCommand::DidClose(params) => documents::did_close(self, fx, params),
+            WriteCommand::DidOpen(params) => documents::did_open(self, params),
+            WriteCommand::DidChange(params) => documents::did_change(self, params),
+            WriteCommand::DidSave(params) => documents::did_save(self, params),
+            WriteCommand::DidClose(params) => documents::did_close(self, params),
             WriteCommand::DidChangeConfiguration(params) => {
-                handlers::configuration::did_change_configuration(self, fx, params)
+                handlers::configuration::did_change_configuration(self, params)
             }
             WriteCommand::DidChangeWatchedFiles(params) => {
-                handlers::file_watcher::did_change_watched_files(self, fx, params)
+                handlers::file_watcher::did_change_watched_files(self, params)
             }
             WriteCommand::DidChangeWorkspaceFolders(params) => {
-                handlers::workspace_folders::did_change_workspace_folders(self, fx, params)
+                handlers::workspace_folders::did_change_workspace_folders(self, params)
             }
             WriteCommand::DidCreateFiles(params) => {
-                handlers::file_operations::did_create_files(self, fx, params)
+                handlers::file_operations::did_create_files(self, params)
             }
             WriteCommand::DidRenameFiles(params) => {
-                handlers::file_operations::did_rename_files(self, fx, params)
+                handlers::file_operations::did_rename_files(self, params)
             }
             WriteCommand::DidDeleteFiles(params) => {
-                handlers::file_operations::did_delete_files(self, fx, params)
+                handlers::file_operations::did_delete_files(self, params)
             }
         }
     }
 
-    /// Apply the side effects a write handler requested: immediate diagnostics
-    /// drops, then settle arming (order matters only in that a drop must not
-    /// wait behind the debounce window).
-    fn apply_effects(&mut self, fx: WriteEffects) {
-        for uri in fx.dropped {
-            self.diagnostics
-                .drop_uri(&uri, &self.sender, self.supports_pull_diagnostics);
-        }
-        if fx.settle {
-            self.arm_settle();
-        }
-        for uri in fx.external {
-            self.arm_settle_external(uri);
-        }
+    /// Drop `uri` from the diagnostics store immediately (closed/deleted
+    /// documents), ahead of the settle's clear-on-fix diff.
+    pub(crate) fn drop_diagnostics(&mut self, uri: &Uri) {
+        self.diagnostics
+            .drop_uri(uri, &self.sender, self.supports_pull_diagnostics);
     }
 
     /// Arm (or push out) the single workspace settle timer. All lint dispatch
     /// funnels through here so the expensive all-docs re-lint runs once, at a
     /// quiescent point after the edit burst's writes have settled (rust-analyzer
     /// recomputes diagnostics the same way, after `process_changes`).
-    fn arm_settle(&mut self) {
+    pub(crate) fn arm_settle(&mut self) {
         self.settle_deadline = Some(Instant::now() + DIAGNOSTICS_DEBOUNCE);
     }
 

@@ -802,8 +802,8 @@ impl GlobalState {
 }
 
 /// The all-docs settle read pass, run on a pool worker over one snapshot.
-/// Shared by the inline path ([`GlobalState::spawn_settle_pass`]) and the
-/// writer thread's settle arm.
+/// Shared by the inline path ([`GlobalState::dispatch_due_lints`]) and the
+/// writer thread's settle arm ([`crate::lsp::writer`]'s `spawn_settle_pass`).
 pub(crate) fn settle_task(
     snap: StateSnapshot,
     uris: Vec<Uri>,

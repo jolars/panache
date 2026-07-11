@@ -10,13 +10,8 @@ use lsp_types::DidChangeConfigurationParams;
 use crate::lsp::dispatch::runtime_incremental_parsing_from_value;
 use crate::lsp::documents;
 use crate::lsp::writer::WriterState;
-use crate::lsp::writer_command::WriteEffects;
 
-pub(crate) fn did_change_configuration(
-    w: &mut WriterState,
-    fx: &mut WriteEffects,
-    params: DidChangeConfigurationParams,
-) {
+pub(crate) fn did_change_configuration(w: &mut WriterState, params: DidChangeConfigurationParams) {
     // The push payload is optional: clients using the pull model send `null`.
     // Either way we still reload on-disk config below, so a bare notification is
     // a useful "reload config" signal.
@@ -32,5 +27,5 @@ pub(crate) fn did_change_configuration(
     }
 
     documents::reload_open_documents_config(w);
-    fx.arm_settle();
+    w.arm_settle();
 }

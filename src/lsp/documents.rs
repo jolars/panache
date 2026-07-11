@@ -1,13 +1,13 @@
 //! Document lifecycle notifications (`didOpen`/`didChange`/`didSave`/`didClose`).
 //!
 //! These run against writer-owned state (`&mut WriterState`) — the salsa
-//! database and the document map — with main-loop side effects requested via
-//! [`WriteEffects`]. Parsing and state updates happen inline so interactive
-//! requests always see the latest tree; the expensive lint (project-graph
-//! recompute + diagnostics) is deferred to the debounced workspace settle, which
-//! re-lints every open document over one snapshot. Every salsa-input write here
-//! arms that settle (directly or via [`WriteEffects::arm_settle_external`]) so a
-//! write that cancels an in-flight pass also schedules its recomputation.
+//! database, the document map, the settle timer, and the diagnostics store.
+//! Parsing and state updates happen inline so interactive requests always see
+//! the latest tree; the expensive lint (project-graph recompute + diagnostics)
+//! is deferred to the debounced workspace settle, which re-lints every open
+//! document over one snapshot. Every salsa-input write here arms that settle
+//! (via [`WriterState::arm_settle`] or [`WriterState::arm_settle_external`]) so
+//! a write that cancels an in-flight pass also schedules its recomputation.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -23,7 +23,6 @@ use salsa::{Durability, Setter};
 use super::conversions::{apply_content_change, apply_content_change_with_edit_ranges};
 use super::uri_ext::UriExt;
 use super::writer::WriterState;
-use super::writer_command::WriteEffects;
 use crate::lsp::DocumentState;
 use crate::parser::{parse_incremental_suffix_with_refdefs, parse_with_refdefs};
 use crate::syntax::SyntaxNode;
@@ -161,11 +160,7 @@ pub(crate) fn reload_open_documents_config(w: &mut WriterState) {
 }
 
 /// Handle `textDocument/didOpen`.
-pub(crate) fn did_open(
-    w: &mut WriterState,
-    fx: &mut WriteEffects,
-    params: DidOpenTextDocumentParams,
-) {
+pub(crate) fn did_open(w: &mut WriterState, params: DidOpenTextDocumentParams) {
     let uri = params.text_document.uri.clone();
     let uri_string = uri.to_string();
     let text = params.text_document.text.clone();
@@ -222,16 +217,12 @@ pub(crate) fn did_open(
     // would be cancelled by the next open's write. Open runs external linters
     // (like save) so their diagnostics surface without waiting for the first
     // manual save.
-    fx.arm_settle_external(uri);
+    w.arm_settle_external(uri);
     log::debug!("did_open complete in {:?}", start.elapsed());
 }
 
 /// Handle `textDocument/didChange`.
-pub(crate) fn did_change(
-    w: &mut WriterState,
-    fx: &mut WriteEffects,
-    params: DidChangeTextDocumentParams,
-) {
+pub(crate) fn did_change(w: &mut WriterState, params: DidChangeTextDocumentParams) {
     let uri = params.text_document.uri.clone();
     let uri_string = uri.to_string();
     let change_count = params.content_changes.len();
@@ -346,7 +337,7 @@ pub(crate) fn did_change(
     // Defer the expensive re-lint to the debounced settle so a burst of
     // keystrokes collapses into one pass and a save's formatting request never
     // queues behind per-keystroke work. No external linters — they wait for save.
-    fx.arm_settle();
+    w.arm_settle();
 
     log::debug!(
         "did_change complete (parse+state) in {:?}; settle armed",
@@ -359,11 +350,7 @@ pub(crate) fn did_change(
 /// Save is the point at which heavier external linters run (skipped on every
 /// keystroke). The fresh settle re-lints every open document; only the saved
 /// document runs external linters.
-pub(crate) fn did_save(
-    w: &mut WriterState,
-    fx: &mut WriteEffects,
-    params: DidSaveTextDocumentParams,
-) {
+pub(crate) fn did_save(w: &mut WriterState, params: DidSaveTextDocumentParams) {
     let uri = params.text_document.uri;
     // A save may have introduced new includes/bibliography since the document
     // was opened; load them on the writer so the debounced pass's snapshot sees
@@ -378,15 +365,11 @@ pub(crate) fn did_save(
     }
     // Save is the heavy pass: external linters for the saved document. Debounced
     // like every other settle so a save-all burst coalesces into one pass.
-    fx.arm_settle_external(uri);
+    w.arm_settle_external(uri);
 }
 
 /// Handle `textDocument/didClose`.
-pub(crate) fn did_close(
-    w: &mut WriterState,
-    fx: &mut WriteEffects,
-    params: DidCloseTextDocumentParams,
-) {
+pub(crate) fn did_close(w: &mut WriterState, params: DidCloseTextDocumentParams) {
     let uri = params.text_document.uri.clone();
     let uri_string = uri.to_string();
     w.document_map_mut().remove(&uri_string);
@@ -396,7 +379,7 @@ pub(crate) fn did_close(
     // manifests it contributed are reconciled by the settle armed below: the
     // all-docs pass re-lints the remaining documents and the clear-on-fix diff
     // clears a manifest once no open document still reports it.
-    fx.drop_diagnostics(uri);
+    w.drop_diagnostics(&uri);
 
     let states: Vec<DocumentState> = w.document_map().values().cloned().collect();
     let mut retained = HashSet::new();
@@ -418,7 +401,7 @@ pub(crate) fn did_close(
     // closed include affects its parent), and the eviction above may cancel an
     // in-flight pass. Arm the settle so the remaining docs are re-linted over the
     // post-close snapshot.
-    fx.arm_settle();
+    w.arm_settle();
 }
 
 #[cfg(test)]
