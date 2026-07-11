@@ -544,6 +544,13 @@ impl WriterState {
             self.harvest_cycle = Some(cycle);
             return false;
         }
+        // Test hook for the writer loop's guard-abort path: the panic unwinds
+        // past the put-back, so no cycle survives it (as a real apply bug
+        // would behave).
+        #[cfg(test)]
+        if PANIC_ON_NEXT_HARVEST_APPLY.swap(false, std::sync::atomic::Ordering::SeqCst) {
+            panic!("test-injected harvest apply panic");
+        }
         // The batch is this cycle's progress signal: reset the lost-batch
         // backstop so a healthy multi-round cycle (deep include chains, slow
         // disks) is measured per round, not against its total age.
@@ -681,6 +688,12 @@ impl WriterState {
         }
     }
 }
+
+/// Test hook: makes the next [`WriterState::apply_harvest`] panic, exercising
+/// the writer loop's guard-abort path.
+#[cfg(test)]
+static PANIC_ON_NEXT_HARVEST_APPLY: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// One in-flight settle harvest cycle: the writer discovers referenced paths
 /// ([`WriterState::harvest_round`]), the harvester thread reads them, and the
@@ -2069,6 +2082,68 @@ mod tests {
                 Ok(Task::Diagnostics { .. }) => break,
                 Ok(_) => continue,
                 Err(err) => panic!("idle session never recovered the lost batch: {err}"),
+            }
+        }
+    }
+
+    /// A panic while applying a harvest batch must not silently drop the
+    /// settle the cycle was serving: its deadline was consumed when the
+    /// cycle began, so without the abort path completing the settle (over
+    /// current state), an idle session would never publish that edit
+    /// burst's diagnostics — including any pending external lint results.
+    #[test]
+    fn panicking_harvest_apply_still_serves_the_settle() {
+        use crate::lsp::uri_ext::UriExt;
+
+        let timeout = std::time::Duration::from_secs(10);
+        let dir = tempfile::tempdir().expect("tempdir");
+        let doc_path = dir.path().join("main.qmd");
+        let bib_path = dir.path().join("refs.bib");
+        let doc_text = "---\nbibliography: refs.bib\n---\n\n# Heading\n\nCite [@key].\n";
+        std::fs::write(&doc_path, doc_text).expect("write doc");
+        std::fs::write(&bib_path, "@article{key, title={One}}\n").expect("write bib");
+
+        let (task_tx, task_rx) = crossbeam_channel::unbounded::<Task>();
+        let pool = TaskPool::new(task_tx.clone(), 1);
+        let mut writer = WriterHandle::new(client_sender());
+        writer.spawn(
+            PoolSpawners {
+                main: pool.spawner(),
+                fmt: pool.spawner(),
+            },
+            task_tx,
+        );
+
+        writer.forward_write(WriteCommand::DidOpen(
+            lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri: lsp_types::Uri::from_file_path(&doc_path).expect("uri"),
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: doc_text.to_owned(),
+                },
+            },
+        ));
+
+        // Forward the cycle's batch back with the apply rigged to panic,
+        // then go idle: the abort must still complete the settle.
+        loop {
+            match task_rx.recv_timeout(timeout).expect("harvest batch") {
+                Task::Harvested { cycle, batch } => {
+                    super::PANIC_ON_NEXT_HARVEST_APPLY
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
+                    writer.forward_harvest(cycle, batch);
+                    break;
+                }
+                Task::SendToClient(_) => continue,
+                _ => panic!("expected the harvest batch first"),
+            }
+        }
+        loop {
+            match task_rx.recv_timeout(timeout) {
+                Ok(Task::Diagnostics { .. }) => break,
+                Ok(_) => continue,
+                Err(err) => panic!("panic-aborted cycle dropped its settle: {err}"),
             }
         }
     }
