@@ -33,3 +33,30 @@ pub(crate) enum WriteCommand {
     #[cfg(test)]
     PanicForTest,
 }
+
+impl WriteCommand {
+    /// The single document a panicked handler may have left half-updated,
+    /// plus the client version the command carried (when it does): the writer
+    /// loop's post-panic heal target. `None` for commands without one
+    /// mutation target (watcher events, config pushes, file operations) —
+    /// their handlers mutate via the same smaller steps the settle re-runs,
+    /// so there is no single document to rebuild.
+    ///
+    /// `DidClose` is deliberately `None` too: rebuilding a document the
+    /// client just closed would resurrect it server-side, and a partial
+    /// close leaves nothing divergent (the tree is dropped with the entry).
+    pub(crate) fn heal_target(&self) -> Option<(lsp_types::Uri, Option<i32>)> {
+        match self {
+            WriteCommand::DidOpen(params) => Some((
+                params.text_document.uri.clone(),
+                Some(params.text_document.version),
+            )),
+            WriteCommand::DidChange(params) => Some((
+                params.text_document.uri.clone(),
+                Some(params.text_document.version),
+            )),
+            WriteCommand::DidSave(params) => Some((params.text_document.uri.clone(), None)),
+            _ => None,
+        }
+    }
+}

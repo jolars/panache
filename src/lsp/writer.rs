@@ -1136,7 +1136,31 @@ fn writer_thread(
         };
         match msg {
             Some(WriterMsg::Write(cmd)) => {
-                guard("apply_write", || state.apply_write(cmd));
+                let heal = cmd.heal_target();
+                if guard("apply_write", || state.apply_write(cmd)).is_none()
+                    && let Some((uri, version)) = heal
+                {
+                    // The handler may have died between its salsa text write
+                    // and the tree/version update, leaving reads serving a
+                    // tree that no longer matches the text queries compute
+                    // over. Rebuild the document from current salsa state.
+                    if guard("post-panic document resync", || {
+                        crate::lsp::documents::resync_document_after_panic(
+                            &mut state, &uri, version,
+                        )
+                    })
+                    .is_none()
+                    {
+                        // The rebuild hit the same bug; drop the document so
+                        // nothing serves torn state. Reopening it heals.
+                        log::error!(
+                            "dropping document after a failed post-panic resync: {}",
+                            uri.as_str()
+                        );
+                        state.document_map_mut().remove(&uri.to_string());
+                        state.drop_diagnostics(&uri);
+                    }
+                }
             }
             Some(WriterMsg::Read(job)) => {
                 // Minting is pure clones, so a panic here means a real bug —
@@ -2226,6 +2250,84 @@ mod tests {
             run: Box::new(|_snap| {}),
         });
         assert!(!delivered, "a closed writer channel must be reported");
+    }
+
+    /// A panic mid-`did_change` (after the salsa text write, before the tree
+    /// and version update) must not leave the document permanently divergent:
+    /// reads would serve a cached tree that no longer matches the text salsa
+    /// queries compute over, re-diverging on every keystroke if the panic is
+    /// deterministic. The writer loop's heal rebuilds the tree from the
+    /// current salsa text (the server's best knowledge of the buffer).
+    #[test]
+    fn panicking_did_change_heals_the_document() {
+        let timeout = std::time::Duration::from_secs(10);
+        let (task_tx, task_rx) = crossbeam_channel::unbounded::<Task>();
+        let pool = TaskPool::new(task_tx.clone(), 1);
+        let mut writer = WriterHandle::new(client_sender());
+        writer.spawn(
+            PoolSpawners {
+                main: pool.spawner(),
+                fmt: pool.spawner(),
+            },
+            task_tx,
+        );
+
+        let uri: lsp_types::Uri = "file:///nonexistent-spike/doc.qmd".parse().unwrap();
+        writer.forward_write(WriteCommand::DidOpen(
+            lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: "# Old\n".into(),
+                },
+            },
+        ));
+
+        // The change's handler dies after pushing the new text into salsa.
+        crate::lsp::documents::PANIC_AFTER_DID_CHANGE_TEXT_WRITE
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        writer.forward_write(WriteCommand::DidChange(
+            lsp_types::DidChangeTextDocumentParams {
+                text_document: lsp_types::VersionedTextDocumentIdentifier {
+                    uri: uri.clone(),
+                    version: 1,
+                },
+                content_changes: vec![lsp_types::TextDocumentContentChangeEvent {
+                    range: None,
+                    range_length: None,
+                    text: "# New heading\n".to_owned(),
+                }],
+            },
+        ));
+
+        // FIFO: the read runs strictly after the panicking write (and its
+        // heal). The cached tree must describe the new text.
+        let (seen_tx, seen_rx) = crossbeam_channel::bounded::<(String, i32)>(1);
+        let uri_string = uri.to_string();
+        assert!(writer.submit_read(ReadJob {
+            pool: ReadPool::Main,
+            id: lsp_server::RequestId::from(1),
+            run: Box::new(move |snap| {
+                let doc = snap
+                    .document_map
+                    .get(&uri_string)
+                    .expect("document still open");
+                let tree_text = crate::syntax::SyntaxNode::new_root(doc.tree.clone())
+                    .text()
+                    .to_string();
+                let _ = seen_tx.send((tree_text, doc.version));
+            }),
+        }));
+        let (tree_text, version) = seen_rx
+            .recv_timeout(timeout)
+            .expect("read ran after the heal");
+        assert!(
+            tree_text.contains("New heading"),
+            "cached tree must be rebuilt from the written text, got: {tree_text:?}"
+        );
+        assert_eq!(version, 1, "the client's version must be recorded");
+        drop(task_rx);
     }
 
     /// A snapshot-mint panic must answer the forwarded read's request instead

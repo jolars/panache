@@ -29,6 +29,12 @@ use crate::syntax::SyntaxNode;
 
 type CombinedEditRanges = (String, (usize, usize), (usize, usize));
 
+/// Test hook: makes the next `did_change` panic right after its salsa text
+/// write, exercising the writer loop's post-panic document heal.
+#[cfg(test)]
+pub(crate) static PANIC_AFTER_DID_CHANGE_TEXT_WRITE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 fn apply_changes_descending_with_combined_ranges(
     original_text: &str,
     changes: &[TextDocumentContentChangeEvent],
@@ -287,6 +293,13 @@ pub(crate) fn did_change(w: &mut WriterState, params: DidChangeTextDocumentParam
             .with_durability(Durability::LOW)
             .to(Some(std::sync::Arc::from(updated_text.clone())));
     }
+    // Test hook for the writer loop's post-panic document heal: this is the
+    // worst spot to die — salsa already holds the new text while the cached
+    // tree and version still describe the old buffer.
+    #[cfg(test)]
+    if PANIC_AFTER_DID_CHANGE_TEXT_WRITE.swap(false, std::sync::atomic::Ordering::SeqCst) {
+        panic!("test-injected did_change panic");
+    }
     let refdefs = crate::salsa::refdef_set(w.db(), salsa_file, salsa_config).clone();
 
     let (green, strategy) = if let Some((old_edit, new_edit)) = edit_ranges {
@@ -348,6 +361,41 @@ pub(crate) fn did_change(w: &mut WriterState, params: DidChangeTextDocumentParam
         "did_change complete (parse+state) in {:?}; settle armed",
         start.elapsed()
     );
+}
+
+/// Rebuild `uri`'s cached document state from the current salsa text, after a
+/// panicking write handler may have left it half-updated (see the writer
+/// loop's `apply_write` guard). `did_change` pushes the new text into salsa
+/// *before* parsing, so a mid-parse panic strands the old tree and version
+/// against the new text — and a deterministic parser bug would re-strand it
+/// on every keystroke while reads keep serving the stale tree. The salsa
+/// input is the server's best knowledge of the buffer; reparse it fully
+/// (incremental state is exactly what cannot be trusted here) and re-arm the
+/// settle the dead handler never reached.
+pub(crate) fn resync_document_after_panic(
+    w: &mut WriterState,
+    uri: &lsp_types::Uri,
+    version: Option<i32>,
+) {
+    let uri_string = uri.to_string();
+    let Some((salsa_file, salsa_config)) = w
+        .document_map()
+        .get(&uri_string)
+        .map(|doc| (doc.salsa_file, doc.salsa_config))
+    else {
+        return;
+    };
+    let config = w.load_config_notifying(uri);
+    let text = salsa_file.content_or_empty(w.db()).to_string();
+    let refdefs = crate::salsa::refdef_set(w.db(), salsa_file, salsa_config).clone();
+    let green = GreenNode::from(parse_with_refdefs(&text, Some(config), refdefs).green());
+    if let Some(doc_state) = w.document_map_mut().get_mut(&uri_string) {
+        doc_state.tree = green;
+        if let Some(version) = version {
+            doc_state.version = version;
+        }
+    }
+    w.arm_settle();
 }
 
 /// Handle `textDocument/didSave`.
