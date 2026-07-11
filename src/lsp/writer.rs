@@ -445,7 +445,19 @@ impl WriterState {
     /// content rather than being wiped) and a path a mid-cycle direct sync
     /// already made disk-fresh (the batch content predates that sync — see
     /// [`Self::shield_from_harvest`]).
-    pub(crate) fn apply_harvest(&mut self, batch: Vec<(PathBuf, Option<String>)>) {
+    ///
+    /// A path evicted since the harvest was requested (`did_close`, file
+    /// deletion) is skipped too — the eviction must not be resurrected — and
+    /// removed from `requested`: a mid-cycle write may have re-referenced it
+    /// (re-interning a fresh `None` input), and only a re-read this cycle
+    /// gives the settle pass its content. Open-path, shield, and unreadable
+    /// skips stay requested — re-reading those could never make progress, and
+    /// the cycle only terminates because `requested` accumulates.
+    pub(crate) fn apply_harvest(
+        &mut self,
+        batch: Vec<(PathBuf, Option<String>)>,
+        requested: &mut HashSet<PathBuf>,
+    ) {
         let open_paths: HashSet<PathBuf> = self
             .document_map()
             .values()
@@ -458,6 +470,10 @@ impl WriterState {
             let Some(content) = content else {
                 continue;
             };
+            if self.db().file_text_if_cached(&path).is_none() {
+                requested.remove(&path);
+                continue;
+            }
             self.db_mut().apply_harvested_file_text(&path, content);
         }
     }
@@ -977,7 +993,7 @@ fn writer_thread(
                     continue;
                 };
                 let next = guard("harvest apply/discovery", || {
-                    state.apply_harvest(batch);
+                    state.apply_harvest(batch, requested);
                     state.harvest_round(requested)
                 });
                 let Some(next) = next else {
@@ -1187,7 +1203,7 @@ mod tests {
             .iter()
             .map(|path| (path.clone(), std::fs::read_to_string(path).ok()))
             .collect();
-        state.apply_harvest(batch);
+        state.apply_harvest(batch, &mut requested);
 
         // Fixpoint: a second round over the same cycle requests nothing new.
         assert!(state.harvest_round(&mut requested).is_empty());
@@ -1257,7 +1273,7 @@ mod tests {
         ));
 
         // The stale batch lands last; it must not clobber the fresher sync.
-        state.apply_harvest(stale_batch);
+        state.apply_harvest(stale_batch, &mut requested);
         let text = state
             .db()
             .file_text_if_cached(&bib_path)
@@ -1268,6 +1284,109 @@ mod tests {
             text.contains("Two"),
             "watcher-synced content survived the stale batch, got: {text}"
         );
+    }
+
+    /// A path evicted mid-cycle (`did_close`) and then re-referenced by
+    /// another document (`did_change`) must be harvested again in the same
+    /// cycle. The batch's content is skipped on apply (the eviction must not
+    /// be resurrected), but the cycle's `requested` dedup set would otherwise
+    /// suppress the re-read forever: discovery re-interns the path as a fresh
+    /// `None` input, the settle pass reports a load error for a file that
+    /// exists on disk, and `complete_settle` clears the deadline those writes
+    /// armed — the wrong diagnostic persists until an unrelated event.
+    #[test]
+    fn evicted_then_rereferenced_path_is_harvested_again() {
+        use crate::lsp::uri_ext::UriExt;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a_path = dir.path().join("a.qmd");
+        let b_path = dir.path().join("b.qmd");
+        let bib_path = dir.path().join("refs.bib");
+        let a_text = "---\nbibliography: refs.bib\n---\n\nCite [@key].\n";
+        let b_text = "# Standalone\n";
+        std::fs::write(&a_path, a_text).expect("write a");
+        std::fs::write(&b_path, b_text).expect("write b");
+        std::fs::write(&bib_path, "@article{key, title={One}}\n").expect("write bib");
+
+        let mut state = WriterState::new(client_sender());
+        let open = |path: &std::path::Path, text: &str| {
+            WriteCommand::DidOpen(lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri: lsp_types::Uri::from_file_path(path).expect("uri"),
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: text.to_owned(),
+                },
+            })
+        };
+        state.apply_write(open(&a_path, a_text));
+        state.apply_write(open(&b_path, b_text));
+
+        // Start the cycle: the bibliography is requested and "read".
+        let mut requested = std::collections::HashSet::new();
+        state.begin_harvest_cycle();
+        let first = state.harvest_round(&mut requested);
+        assert!(
+            first.contains(&bib_path),
+            "cycle requests the referenced bibliography: {first:?}"
+        );
+        let batch = vec![(
+            bib_path.clone(),
+            Some(std::fs::read_to_string(&bib_path).expect("read bib")),
+        )];
+
+        // Mid-cycle: close A (evicts the bib — B does not reference it yet),
+        // then B starts referencing it.
+        state.apply_write(WriteCommand::DidClose(
+            lsp_types::DidCloseTextDocumentParams {
+                text_document: lsp_types::TextDocumentIdentifier {
+                    uri: lsp_types::Uri::from_file_path(&a_path).expect("uri"),
+                },
+            },
+        ));
+        assert!(
+            state.db().file_text_if_cached(&bib_path).is_none(),
+            "closing A must evict the bibliography"
+        );
+        let b_new = "---\nbibliography: refs.bib\n---\n\nCite [@key].\n";
+        state.apply_write(WriteCommand::DidChange(
+            lsp_types::DidChangeTextDocumentParams {
+                text_document: lsp_types::VersionedTextDocumentIdentifier {
+                    uri: lsp_types::Uri::from_file_path(&b_path).expect("uri"),
+                    version: 1,
+                },
+                content_changes: vec![lsp_types::TextDocumentContentChangeEvent {
+                    range: None,
+                    range_length: None,
+                    text: b_new.to_owned(),
+                }],
+            },
+        ));
+
+        // The batch applies to an evicted path: skipped, and un-requested so
+        // the next round can re-read it for B.
+        state.apply_harvest(batch, &mut requested);
+        let next = state.harvest_round(&mut requested);
+        assert!(
+            next.contains(&bib_path),
+            "re-referenced bibliography must be re-requested: {next:?}"
+        );
+
+        // The re-read populates the fresh input; the settle pass sees content.
+        state.apply_harvest(
+            vec![(
+                bib_path.clone(),
+                Some(std::fs::read_to_string(&bib_path).expect("read bib")),
+            )],
+            &mut requested,
+        );
+        let text = state
+            .db()
+            .file_text_if_cached(&bib_path)
+            .expect("bib re-interned")
+            .content_or_empty(state.db())
+            .to_string();
+        assert!(text.contains("One"), "bib content loaded, got: {text}");
     }
 
     /// A panicking write handler must not take the writer thread down: pool
