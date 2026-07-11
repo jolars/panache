@@ -128,17 +128,17 @@ pub(crate) struct WriterState {
     /// (set pre-spawn); carried onto snapshots for the per-document pull handler.
     supports_related_documents: bool,
 
-    /// Paths whose cached text was made disk-fresh by a direct write while a
-    /// harvest cycle is in flight (watcher sync, referenced-file reload or
-    /// load). An in-flight batch read those paths *before* that write, so a
-    /// differing batch entry is stale: applying it would regress the input and
-    /// the settle pass would compute over the older content. [`Self::apply_harvest`]
-    /// skips shielded paths (they are already disk-fresh; nothing to heal).
-    harvest_shield: HashSet<PathBuf>,
+    /// The in-flight harvest cycle, if any. Never set in inline mode (no
+    /// harvester); at most one cycle (one outstanding harvester batch) exists
+    /// at a time.
+    harvest_cycle: Option<HarvestCycle>,
 
-    /// Whether a harvest cycle is in flight, gating the shield. Never set in
-    /// inline mode (no harvester), so the shield stays empty there.
-    harvest_cycle_active: bool,
+    /// Monotonic id source for harvest cycles. Ids tag every harvester
+    /// request and ride back on the batch, so a late batch from a superseded
+    /// (aborted) cycle is rejected instead of misattributed to the current
+    /// one — the same staleness contract settle results get from
+    /// `lint_generation`.
+    harvest_cycle_counter: u64,
 
     /// Client channel for diagnostics publishes and the one-shot
     /// config-parse-error toast.
@@ -162,34 +162,76 @@ impl WriterState {
             external_pending: HashSet::new(),
             supports_pull_diagnostics: false,
             supports_related_documents: false,
-            harvest_shield: HashSet::new(),
-            harvest_cycle_active: false,
+            harvest_cycle: None,
+            harvest_cycle_counter: 0,
             sender,
         }
     }
 
-    /// Mark a harvest cycle in flight: from here until
+    /// Start a harvest cycle, returning its id: from here until
     /// [`Self::end_harvest_cycle`], direct disk-syncs record their paths so a
-    /// staler in-flight batch can't regress them.
-    pub(crate) fn begin_harvest_cycle(&mut self) {
-        self.harvest_cycle_active = true;
-        self.harvest_shield.clear();
+    /// staler in-flight batch can't regress them, and every harvester request
+    /// carries the id so only this cycle's batches apply.
+    pub(crate) fn begin_harvest_cycle(&mut self) -> u64 {
+        self.harvest_cycle_counter += 1;
+        let id = self.harvest_cycle_counter;
+        self.harvest_cycle = Some(HarvestCycle {
+            id,
+            requested: HashMap::new(),
+            shield: HashSet::new(),
+            last_progress: Instant::now(),
+        });
+        id
     }
 
-    /// End the harvest cycle (completed or aborted) and drop the shield.
-    /// Called by [`Self::complete_settle`]; abort paths call it directly.
+    /// End the harvest cycle (completed or aborted), dropping its request
+    /// stamps and shield. Called by [`Self::complete_settle`]; abort paths
+    /// call it directly. A batch still in flight for the ended cycle is
+    /// rejected by its id.
     pub(crate) fn end_harvest_cycle(&mut self) {
-        self.harvest_cycle_active = false;
-        self.harvest_shield.clear();
+        self.harvest_cycle = None;
+    }
+
+    /// When the in-flight cycle last made progress (started, or applied a
+    /// batch) plus [`HARVEST_CYCLE_TIMEOUT`]: the instant after which the
+    /// writer assumes the cycle's outstanding batch was lost. `None` when no
+    /// cycle is in flight. The writer thread folds this into its wait
+    /// deadline, so a stalled cycle is detected even when no settle deadline
+    /// is armed (an idle session must still recover).
+    pub(crate) fn harvest_expiry(&self) -> Option<Instant> {
+        self.harvest_cycle
+            .as_ref()
+            .map(|cycle| cycle.last_progress + HARVEST_CYCLE_TIMEOUT)
     }
 
     /// Record that `path`'s cached text now reflects the disk (a direct
     /// watcher sync or referenced-file reload), so an in-flight harvest batch
     /// — read before this write — must not apply to it. No-op outside a cycle.
     pub(crate) fn shield_from_harvest(&mut self, path: &std::path::Path) {
-        if self.harvest_cycle_active {
-            self.harvest_shield.insert(path.to_owned());
+        if let Some(cycle) = &mut self.harvest_cycle {
+            cycle.shield.insert(path.to_owned());
         }
+    }
+
+    /// Every open document's salsa inputs and backing path (documents without
+    /// a backing path are skipped).
+    pub(crate) fn open_documents(
+        &self,
+    ) -> Vec<(crate::salsa::FileText, crate::salsa::FileConfig, PathBuf)> {
+        self.document_map()
+            .values()
+            .filter_map(|state| Some((state.salsa_file, state.salsa_config, state.path.clone()?)))
+            .collect()
+    }
+
+    /// The backing paths of all open documents. An open path has
+    /// buffer-authoritative content: it must never be read from (or synced
+    /// to) disk, or an unsaved edit would be clobbered.
+    pub(crate) fn open_document_paths(&self) -> HashSet<PathBuf> {
+        self.document_map()
+            .values()
+            .filter_map(|state| state.path.clone())
+            .collect()
     }
 
     /// Shared read access to the database.
@@ -416,25 +458,30 @@ impl WriterState {
     /// work, no disk), and return the paths the harvester should read this
     /// round — referenced, not open in the editor (buffer-authoritative
     /// content must never be clobbered from disk), and not already requested
-    /// this cycle (`requested` accumulates across rounds, so the cycle
-    /// terminates: each round only adds newly-discovered paths).
+    /// this cycle for the same input (the cycle's request map accumulates
+    /// across rounds, so the cycle terminates: each round only adds
+    /// newly-discovered paths or paths whose input was replaced since their
+    /// stamp was taken — evicted and re-interned mid-cycle, whose fresh
+    /// `None` input only a re-read can populate).
+    ///
+    /// Returns an empty round when no cycle is in flight (the guard-abort
+    /// path may have torn it down).
     ///
     /// Reading every referenced file once per settle is the self-heal for
     /// clients whose file watching is incomplete — nvim emits no watch event
     /// for a bibliography open in an unrelated buffer — mirroring the
     /// synchronous reload's resync (see
     /// [`documents::reload_open_documents_referenced_files`](crate::lsp::documents::reload_open_documents_referenced_files)).
-    pub(crate) fn harvest_round(&mut self, requested: &mut HashSet<PathBuf>) -> Vec<PathBuf> {
-        let open_docs: Vec<(crate::salsa::FileText, crate::salsa::FileConfig, PathBuf)> = self
-            .document_map()
-            .values()
-            .filter_map(|state| Some((state.salsa_file, state.salsa_config, state.path.clone()?)))
-            .collect();
-        let open_paths: HashSet<PathBuf> = self
-            .document_map()
-            .values()
-            .filter_map(|state| state.path.clone())
-            .collect();
+    pub(crate) fn harvest_round(&mut self) -> Vec<PathBuf> {
+        // Take/put-back: the round mutates both the cycle's request map and
+        // the database, which a field borrow can't split. A panic mid-round
+        // (caught by the loop's `guard`) leaves no cycle behind, so the abort
+        // path starts from a clean slate.
+        let Some(mut cycle) = self.harvest_cycle.take() else {
+            return Vec::new();
+        };
+        let open_docs = self.open_documents();
+        let open_paths = self.open_document_paths();
         let mut tracked: HashSet<PathBuf> = HashSet::new();
         for (salsa_file, salsa_config, path) in open_docs {
             tracked.extend(
@@ -442,51 +489,80 @@ impl WriterState {
                     .discover_referenced_files(salsa_file, salsa_config, path),
             );
         }
-        tracked
+        let round = tracked
             .into_iter()
-            .filter(|path| !open_paths.contains(path) && requested.insert(path.clone()))
-            .collect()
+            .filter(|path| !open_paths.contains(path))
+            .filter(|path| {
+                // Stamp the request with the input handle it reads for; the
+                // stamp is what [`Self::apply_harvest`] checks to reject a
+                // batch entry whose input was evicted since. Re-request a
+                // path whose input was replaced (evicted and re-interned
+                // mid-cycle): its stamp no longer matches.
+                let Some(handle) = self.db().file_text_if_cached(path) else {
+                    // Discovery interned every tracked path; unreachable.
+                    return false;
+                };
+                cycle.requested.insert(path.clone(), handle) != Some(handle)
+            })
+            .collect();
+        self.harvest_cycle = Some(cycle);
+        round
     }
 
     /// Apply one harvested batch: for each `(path, content)` the harvester
     /// read, populate an absent input or refresh a changed cached one
-    /// ([`SalsaDb::apply_harvested_file_text`]). A path opened as a document
-    /// since the harvest was requested is skipped (buffer-authoritative), as is
-    /// an unreadable file (`None` content: a missing file keeps its last-known
-    /// content rather than being wiped) and a path a mid-cycle direct sync
-    /// already made disk-fresh (the batch content predates that sync — see
-    /// [`Self::shield_from_harvest`]).
+    /// ([`SalsaDb::apply_harvested_file_text`]).
     ///
-    /// A path evicted since the harvest was requested (`did_close`, file
-    /// deletion) is skipped too — the eviction must not be resurrected — and
-    /// removed from `requested`: a mid-cycle write may have re-referenced it
-    /// (re-interning a fresh `None` input), and only a re-read this cycle
-    /// gives the settle pass its content. Open-path, shield, and unreadable
-    /// skips stay requested — re-reading those could never make progress, and
-    /// the cycle only terminates because `requested` accumulates.
+    /// Returns `false` — dropping the batch wholesale — when `cycle_id` does
+    /// not name the in-flight cycle: a batch from a superseded cycle (aborted
+    /// by the lost-batch backstop while its read was merely slow) predates
+    /// every write the current cycle covers, and applying it would regress
+    /// fresh inputs and steal the current cycle's completion.
+    ///
+    /// Per entry, the stale-input guard runs first: the path's live input
+    /// must still be the one stamped at request time. Evicted since
+    /// (`did_close`) means the input is gone; evicted *and re-interned*
+    /// (`did_delete_files`, rename) means a different handle holding fresh
+    /// `None` text. Either way the batch content predates the eviction and
+    /// must not resurrect it — and no bookkeeping is needed here, because
+    /// [`Self::harvest_round`] re-requests a replaced input via its stamp.
+    ///
+    /// A path opened as a document since the harvest was requested is skipped
+    /// (buffer-authoritative), as is an unreadable file (`None` content: a
+    /// missing file keeps its last-known content rather than being wiped) and
+    /// a path a mid-cycle direct sync already made disk-fresh (the batch
+    /// content predates that sync — see [`Self::shield_from_harvest`]).
     pub(crate) fn apply_harvest(
         &mut self,
+        cycle_id: u64,
         batch: Vec<(PathBuf, Option<String>)>,
-        requested: &mut HashSet<PathBuf>,
-    ) {
-        let open_paths: HashSet<PathBuf> = self
-            .document_map()
-            .values()
-            .filter_map(|state| state.path.clone())
-            .collect();
+    ) -> bool {
+        let Some(mut cycle) = self.harvest_cycle.take() else {
+            return false;
+        };
+        if cycle.id != cycle_id {
+            self.harvest_cycle = Some(cycle);
+            return false;
+        }
+        // The batch is this cycle's progress signal: reset the lost-batch
+        // backstop so a healthy multi-round cycle (deep include chains, slow
+        // disks) is measured per round, not against its total age.
+        cycle.last_progress = Instant::now();
+        let open_paths = self.open_document_paths();
         for (path, content) in batch {
-            if open_paths.contains(&path) || self.harvest_shield.contains(&path) {
+            if cycle.requested.get(&path).copied() != self.db().file_text_if_cached(&path) {
+                continue;
+            }
+            if open_paths.contains(&path) || cycle.shield.contains(&path) {
                 continue;
             }
             let Some(content) = content else {
                 continue;
             };
-            if self.db().file_text_if_cached(&path).is_none() {
-                requested.remove(&path);
-                continue;
-            }
             self.db_mut().apply_harvested_file_text(&path, content);
         }
+        self.harvest_cycle = Some(cycle);
+        true
     }
 
     /// Apply one settle pass result to the store. Returns `true` when the pass
@@ -606,6 +682,38 @@ impl WriterState {
     }
 }
 
+/// One in-flight settle harvest cycle: the writer discovers referenced paths
+/// ([`WriterState::harvest_round`]), the harvester thread reads them, and the
+/// batch comes back tagged with `id` to be applied
+/// ([`WriterState::apply_harvest`]). All of the cycle's staleness bookkeeping
+/// lives here so beginning/ending a cycle is one assignment — there is no
+/// second flag to keep in lockstep.
+struct HarvestCycle {
+    /// This cycle's id (from `harvest_cycle_counter`); batches carrying any
+    /// other id are stale and dropped.
+    id: u64,
+
+    /// Paths requested this cycle, each stamped with the [`FileText`] input
+    /// handle it was read for. Accumulates across rounds (which is what makes
+    /// the cycle terminate); a live input differing from its stamp means the
+    /// path was evicted (and possibly re-interned) since the read was
+    /// requested, so the batch entry is stale and the path needs a re-read.
+    ///
+    /// [`FileText`]: crate::salsa::FileText
+    requested: HashMap<PathBuf, crate::salsa::FileText>,
+
+    /// Paths whose cached text a mid-cycle direct write made disk-fresh
+    /// (watcher sync, referenced-file reload or load). The in-flight batch
+    /// read those paths *before* that write, so a differing batch entry is
+    /// stale: applying it would regress the input and the settle pass would
+    /// compute over the older content.
+    shield: HashSet<PathBuf>,
+
+    /// When the cycle last made progress (began, or applied a batch); the
+    /// lost-batch backstop fires [`HARVEST_CYCLE_TIMEOUT`] after this.
+    last_progress: Instant,
+}
+
 /// A due settle's write phase completed and its read pass prepared: the
 /// generation tag, the externals to run, the snapshot the pass reads, and the
 /// open-document URIs it lints. Handed to
@@ -657,7 +765,12 @@ enum WriterMsg {
     /// One harvested batch of referenced-file contents, forwarded back by the
     /// main loop's `on_task` (same routing rationale as `SettleResult`: the
     /// harvester posts on the task channel, not into the writer's own channel).
-    Harvested(Vec<(PathBuf, Option<String>)>),
+    /// `cycle` echoes the id the request carried, so a batch from a
+    /// superseded cycle is rejected instead of misattributed.
+    Harvested {
+        cycle: u64,
+        batch: Vec<(PathBuf, Option<String>)>,
+    },
 }
 
 /// The main loop's handle to the writer state; see the module docs for the
@@ -792,13 +905,13 @@ impl WriterHandle {
     /// Route a harvested batch of referenced-file contents back to the writer
     /// thread. Threaded mode only in practice — the harvester exists only
     /// there — so an inline arrival is a routing bug; log and drop.
-    pub(crate) fn forward_harvest(&mut self, batch: Vec<(PathBuf, Option<String>)>) {
+    pub(crate) fn forward_harvest(&mut self, cycle: u64, batch: Vec<(PathBuf, Option<String>)>) {
         match &mut self.mode {
             WriterMode::Inline(_) => {
                 log::warn!("harvest batch arrived in inline writer mode; dropping");
             }
             WriterMode::Threaded { tx } => {
-                if tx.send(WriterMsg::Harvested(batch)).is_err() {
+                if tx.send(WriterMsg::Harvested { cycle, batch }).is_err() {
                     log::warn!("LSP writer channel closed; dropping harvest batch");
                 }
             }
@@ -886,8 +999,8 @@ const HARVEST_CYCLE_TIMEOUT: Duration = if cfg!(test) {
 /// cycle (a fresh `requested` set) re-reads them.
 ///
 /// Exits when the writer drops its request sender or the task channel closes.
-fn harvester_thread(rx: Receiver<Vec<PathBuf>>, task_tx: Sender<Task>) {
-    for paths in rx {
+fn harvester_thread(rx: Receiver<(u64, Vec<PathBuf>)>, task_tx: Sender<Task>) {
+    for (cycle, paths) in rx {
         let read_start = Instant::now();
         let count = paths.len();
         let batch = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -907,7 +1020,7 @@ fn harvester_thread(rx: Receiver<Vec<PathBuf>>, task_tx: Sender<Task>) {
             "settle harvest read {count} referenced file(s) in {:?}",
             read_start.elapsed()
         );
-        if task_tx.send(Task::Harvested(batch)).is_err() {
+        if task_tx.send(Task::Harvested { cycle, batch }).is_err() {
             break;
         }
     }
@@ -961,7 +1074,7 @@ fn writer_thread(
     // when this function returns, disconnecting the harvester's receiver. Its
     // results ride the task channel (not `rx`), so this thread's own exit
     // condition — `rx` disconnecting — stays intact.
-    let (harvest_tx, harvest_rx) = crossbeam_channel::unbounded::<Vec<PathBuf>>();
+    let (harvest_tx, harvest_rx) = crossbeam_channel::unbounded::<(u64, Vec<PathBuf>)>();
     std::thread::Builder::new()
         .name("panache-lsp-harvester".to_owned())
         .spawn({
@@ -970,18 +1083,19 @@ fn writer_thread(
         })
         .expect("failed to spawn LSP harvester thread");
 
-    // The in-flight harvest cycle: the paths already requested plus the
-    // cycle's start (for the lost-batch backstop). `None` when no cycle is
-    // running; at most one cycle (one outstanding harvester batch) exists at
-    // a time.
-    let mut harvest: Option<(HashSet<PathBuf>, Instant)> = None;
-
     loop {
-        let msg = match state.settle_deadline() {
-            // A settle is armed: wait for the next message at most until the
-            // deadline, then fire the settle. A write arriving first pushes
-            // the deadline out (debounce); a read arriving first is served
-            // before the settle, which was due later anyway.
+        // Wait for the next message at most until whichever fires first: the
+        // armed settle deadline (a write arriving first pushes it out —
+        // debounce) or the in-flight harvest cycle's lost-batch expiry. The
+        // expiry must feed the wait directly: the deadline that started the
+        // cycle was consumed at dispatch, so an idle session (no later
+        // writes) would otherwise block in `recv` forever and a lost batch
+        // would freeze that settle's diagnostics.
+        let deadline = [state.settle_deadline(), state.harvest_expiry()]
+            .into_iter()
+            .flatten()
+            .min();
+        let msg = match deadline {
             Some(deadline) => {
                 let timeout = deadline.saturating_duration_since(Instant::now());
                 match rx.recv_timeout(timeout) {
@@ -1028,40 +1142,47 @@ fn writer_thread(
             // A harvested batch: apply it, then either request the next round
             // (discovery found new references in the freshly loaded content)
             // or complete the settle and spawn its read pass.
-            Some(WriterMsg::Harvested(batch)) => {
-                let Some((requested, _)) = harvest.as_mut() else {
-                    log::warn!("harvest batch without an in-flight cycle; dropped");
-                    continue;
-                };
-                let next = guard("harvest apply/discovery", || {
-                    state.apply_harvest(batch, requested);
-                    state.harvest_round(requested)
-                });
-                let Some(next) = next else {
-                    // Abort the cycle rather than wedge it (a `Some` harvest
-                    // swallows every future deadline); the next write re-arms.
-                    harvest = None;
-                    state.end_harvest_cycle();
+            Some(WriterMsg::Harvested { cycle, batch }) => {
+                match guard("harvest apply", || state.apply_harvest(cycle, batch)) {
+                    Some(true) => {}
+                    Some(false) => {
+                        // A batch from a superseded cycle (aborted while its
+                        // read was merely slow); the current cycle's own
+                        // batch is still due.
+                        log::warn!("harvest batch from a superseded cycle; dropped");
+                        continue;
+                    }
+                    None => {
+                        // Panic mid-apply (the take/put-back left no cycle
+                        // behind). Serve the settle over current state rather
+                        // than dropping it: its deadline was consumed when
+                        // the cycle began, so with no later write it would
+                        // otherwise never fire — a save's external lint
+                        // results would silently vanish.
+                        spawn_settle_pass(&pools, &task_tx, state.complete_settle());
+                        continue;
+                    }
+                }
+                let Some(next) = guard("harvest discovery", || state.harvest_round()) else {
+                    // Same contract as the apply panic above.
+                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
                     continue;
                 };
                 if next.is_empty() {
-                    harvest = None;
                     spawn_settle_pass(&pools, &task_tx, state.complete_settle());
-                } else if harvest_tx.send(next).is_err() {
+                } else if harvest_tx.send((cycle, next)).is_err() {
                     // Unreachable while we hold `harvest_tx`, but don't wedge
                     // the cycle if it ever happens: fall back to the
                     // synchronous reload.
-                    log::warn!("LSP harvester channel closed; reloading synchronously");
-                    harvest = None;
-                    crate::lsp::documents::reload_open_documents_referenced_files(&mut state);
-                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
+                    log::warn!("LSP harvester channel closed; settling synchronously");
+                    settle_synchronously(&mut state, &pools, &task_tx);
                 }
             }
             // Deadline elapsed: start the settle's harvest cycle (or finish
             // immediately when there is nothing to read — no open on-disk
             // documents, or every referenced path is an open buffer).
             None => {
-                if let Some((_, started)) = &harvest {
+                if let Some(expiry) = state.harvest_expiry() {
                     // A cycle is already in flight; the pass it will spawn
                     // reads a snapshot minted at completion, so every write
                     // applied so far — including whichever armed this deadline
@@ -1069,43 +1190,53 @@ fn writer_thread(
                     // instead of clearing it: a healthy cycle completes first
                     // (completion clears the deadline), while a cycle whose
                     // batch was lost re-fires here and is aborted below.
-                    let expiry = *started + HARVEST_CYCLE_TIMEOUT;
                     if Instant::now() < expiry {
                         state.defer_settle_until(expiry);
                         continue;
                     }
                     log::warn!(
-                        "harvest cycle stalled for {HARVEST_CYCLE_TIMEOUT:?}; \
-                         assuming its batch was lost and reloading synchronously"
+                        "harvest cycle made no progress for {HARVEST_CYCLE_TIMEOUT:?}; \
+                         assuming its batch was lost and settling synchronously"
                     );
-                    harvest = None;
-                    state.take_due_settle();
-                    crate::lsp::documents::reload_open_documents_referenced_files(&mut state);
-                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
+                    settle_synchronously(&mut state, &pools, &task_tx);
                     continue;
                 }
                 if !state.take_due_settle() {
                     continue;
                 }
-                let mut requested = HashSet::new();
-                let Some(first) =
-                    guard("harvest discovery", || state.harvest_round(&mut requested))
-                else {
+                let cycle = state.begin_harvest_cycle();
+                let Some(first) = guard("harvest discovery", || state.harvest_round()) else {
+                    // Panic mid-discovery: serve the settle over current
+                    // state (same contract as the batch arm's aborts).
+                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
                     continue;
                 };
                 if first.is_empty() {
                     spawn_settle_pass(&pools, &task_tx, state.complete_settle());
-                } else if harvest_tx.send(first).is_ok() {
-                    harvest = Some((requested, Instant::now()));
-                    state.begin_harvest_cycle();
-                } else {
-                    log::warn!("LSP harvester channel closed; reloading synchronously");
-                    crate::lsp::documents::reload_open_documents_referenced_files(&mut state);
-                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
+                } else if harvest_tx.send((cycle, first)).is_err() {
+                    log::warn!("LSP harvester channel closed; settling synchronously");
+                    settle_synchronously(&mut state, &pools, &task_tx);
                 }
             }
         }
     }
+}
+
+/// Abort/fallback path: serve the pending settle via the synchronous
+/// referenced-file reload on the writer thread (the pre-harvester behavior),
+/// then spawn its read pass. Ends any in-flight cycle first — a batch still
+/// in flight for it is rejected by its id.
+///
+/// The reload runs guarded: it executes a superset of the discovery code the
+/// harvest rounds guard (plus on-thread disk reads), so a panic degrades to a
+/// pass over current state instead of killing the detached writer thread —
+/// which would silently drop every later write for the session.
+fn settle_synchronously(state: &mut WriterState, pools: &PoolSpawners, task_tx: &Sender<Task>) {
+    state.end_harvest_cycle();
+    guard("synchronous settle reload", || {
+        crate::lsp::documents::reload_open_documents_referenced_files(state);
+    });
+    spawn_settle_pass(pools, task_tx, state.complete_settle());
 }
 
 #[cfg(test)]
@@ -1243,8 +1374,8 @@ mod tests {
         // Out-of-band edit after `did_open` cached the bibliography.
         std::fs::write(&bib_path, "@article{key, title={Two}}\n").expect("rewrite bib");
 
-        let mut requested = std::collections::HashSet::new();
-        let round = state.harvest_round(&mut requested);
+        let cycle = state.begin_harvest_cycle();
+        let round = state.harvest_round();
         assert!(
             round.contains(&bib_path),
             "referenced bibliography requested: {round:?}"
@@ -1259,10 +1390,10 @@ mod tests {
             .iter()
             .map(|path| (path.clone(), std::fs::read_to_string(path).ok()))
             .collect();
-        state.apply_harvest(batch, &mut requested);
+        assert!(state.apply_harvest(cycle, batch), "current cycle's batch");
 
         // Fixpoint: a second round over the same cycle requests nothing new.
-        assert!(state.harvest_round(&mut requested).is_empty());
+        assert!(state.harvest_round().is_empty());
 
         // The out-of-band edit is now visible in salsa.
         let text = state
@@ -1307,9 +1438,8 @@ mod tests {
 
         // Start a harvest cycle and "read" the bibliography as the harvester
         // would — before the disk changes.
-        let mut requested = std::collections::HashSet::new();
-        state.begin_harvest_cycle();
-        state.harvest_round(&mut requested);
+        let cycle = state.begin_harvest_cycle();
+        state.harvest_round();
         let stale_batch = vec![(
             bib_path.clone(),
             Some(std::fs::read_to_string(&bib_path).expect("read bib")),
@@ -1329,7 +1459,7 @@ mod tests {
         ));
 
         // The stale batch lands last; it must not clobber the fresher sync.
-        state.apply_harvest(stale_batch, &mut requested);
+        state.apply_harvest(cycle, stale_batch);
         let text = state
             .db()
             .file_text_if_cached(&bib_path)
@@ -1382,9 +1512,8 @@ mod tests {
         std::fs::write(&bib_path, "@article{key, title={Two}}\n").expect("edit bib");
 
         // The settle's harvest cycle reads v2 off-thread.
-        let mut requested = std::collections::HashSet::new();
-        state.begin_harvest_cycle();
-        state.harvest_round(&mut requested);
+        let cycle = state.begin_harvest_cycle();
+        state.harvest_round();
         let batch = vec![(
             bib_path.clone(),
             Some(std::fs::read_to_string(&bib_path).expect("read bib")),
@@ -1396,7 +1525,7 @@ mod tests {
         state.apply_write(open(&b_path));
 
         // The batch's fresh v2 content must still apply.
-        state.apply_harvest(batch, &mut requested);
+        state.apply_harvest(cycle, batch);
         let text = state
             .db()
             .file_text_if_cached(&bib_path)
@@ -1446,9 +1575,8 @@ mod tests {
         state.apply_write(open(&b_path, b_text));
 
         // Start the cycle: the bibliography is requested and "read".
-        let mut requested = std::collections::HashSet::new();
-        state.begin_harvest_cycle();
-        let first = state.harvest_round(&mut requested);
+        let cycle = state.begin_harvest_cycle();
+        let first = state.harvest_round();
         assert!(
             first.contains(&bib_path),
             "cycle requests the referenced bibliography: {first:?}"
@@ -1486,10 +1614,10 @@ mod tests {
             },
         ));
 
-        // The batch applies to an evicted path: skipped, and un-requested so
-        // the next round can re-read it for B.
-        state.apply_harvest(batch, &mut requested);
-        let next = state.harvest_round(&mut requested);
+        // The batch applies to an evicted path: skipped, and the next round
+        // re-requests it for B (its stamp no longer matches the fresh input).
+        state.apply_harvest(cycle, batch);
+        let next = state.harvest_round();
         assert!(
             next.contains(&bib_path),
             "re-referenced bibliography must be re-requested: {next:?}"
@@ -1497,11 +1625,11 @@ mod tests {
 
         // The re-read populates the fresh input; the settle pass sees content.
         state.apply_harvest(
+            cycle,
             vec![(
                 bib_path.clone(),
                 Some(std::fs::read_to_string(&bib_path).expect("read bib")),
             )],
-            &mut requested,
         );
         let text = state
             .db()
@@ -1510,6 +1638,257 @@ mod tests {
             .content_or_empty(state.db())
             .to_string();
         assert!(text.contains("One"), "bib content loaded, got: {text}");
+    }
+
+    /// A late batch from a superseded cycle must be rejected wholesale. The
+    /// harvester is single-threaded and FIFO: when a cycle is aborted by the
+    /// lost-batch backstop while its read was merely *slow*, the next cycle's
+    /// request queues behind it and the old batch is guaranteed to arrive
+    /// first, inside the new cycle. Without the id check it would be
+    /// misattributed: its stale contents compare-and-set over the abort's
+    /// fresh synchronous reload, and the new cycle's genuine batch dropped.
+    #[test]
+    fn stale_batch_from_superseded_cycle_is_rejected() {
+        use crate::lsp::uri_ext::UriExt;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let doc_path = dir.path().join("main.qmd");
+        let bib_path = dir.path().join("refs.bib");
+        let doc_text = "---\nbibliography: refs.bib\n---\n\nCite [@key].\n";
+        std::fs::write(&doc_path, doc_text).expect("write doc");
+        std::fs::write(&bib_path, "@article{key, title={One}}\n").expect("write bib");
+
+        let mut state = WriterState::new(client_sender());
+        state.apply_write(WriteCommand::DidOpen(
+            lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri: lsp_types::Uri::from_file_path(&doc_path).expect("uri"),
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: doc_text.to_owned(),
+                },
+            },
+        ));
+
+        // Cycle 1 requests the bibliography; its "read" observes v1.
+        let superseded = state.begin_harvest_cycle();
+        state.harvest_round();
+        let stale_batch = vec![(
+            bib_path.clone(),
+            Some(std::fs::read_to_string(&bib_path).expect("read bib")),
+        )];
+
+        // The backstop aborts cycle 1 and settles synchronously: the disk
+        // has moved to v2 and the reload resyncs it.
+        state.end_harvest_cycle();
+        std::fs::write(&bib_path, "@article{key, title={Two}}\n").expect("edit bib");
+        crate::lsp::documents::reload_open_documents_referenced_files(&mut state);
+
+        // Cycle 2 begins; cycle 1's late batch lands first (FIFO harvester).
+        let current = state.begin_harvest_cycle();
+        state.harvest_round();
+        assert!(
+            !state.apply_harvest(superseded, stale_batch),
+            "a superseded cycle's batch must be dropped"
+        );
+        let text = state
+            .db()
+            .file_text_if_cached(&bib_path)
+            .expect("bib cached")
+            .content_or_empty(state.db())
+            .to_string();
+        assert!(
+            text.contains("Two"),
+            "the reload's fresh content survived the stale batch, got: {text}"
+        );
+
+        // The current cycle's own batch still applies.
+        assert!(state.apply_harvest(
+            current,
+            vec![(
+                bib_path.clone(),
+                Some(std::fs::read_to_string(&bib_path).expect("read bib")),
+            )],
+        ));
+    }
+
+    /// An applied batch is the cycle's progress signal: it must push the
+    /// lost-batch expiry out, so a healthy multi-round cycle (deep include
+    /// chains on a slow disk) is measured per round, not against its total
+    /// age — a false abort would run the synchronous reload on the writer
+    /// thread against the same slow disk, with a genuine batch still in
+    /// flight.
+    #[test]
+    fn applied_batch_resets_harvest_expiry() {
+        let mut state = WriterState::new(client_sender());
+        let cycle = state.begin_harvest_cycle();
+        let initial = state.harvest_expiry().expect("cycle in flight");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        assert!(state.apply_harvest(cycle, Vec::new()));
+        assert!(
+            state.harvest_expiry().expect("cycle still in flight") > initial,
+            "an applied batch must reset the lost-batch backstop"
+        );
+    }
+
+    /// The evicted-then-re-referenced re-harvest must survive a mid-cycle
+    /// shield on the same path: a watcher sync shields the bibliography
+    /// (disk-fresh), then `did_close` evicts it, then another document
+    /// re-references it. The batch entry must be recognized as stale (the
+    /// input it was read for is gone) even though the path is shielded, and
+    /// the next round must re-request it — otherwise the re-interned input
+    /// stays `None` and the settle reports a load error for a file that
+    /// exists on disk.
+    #[test]
+    fn shielded_then_evicted_path_is_harvested_again() {
+        use crate::lsp::uri_ext::UriExt;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a_path = dir.path().join("a.qmd");
+        let b_path = dir.path().join("b.qmd");
+        let bib_path = dir.path().join("refs.bib");
+        let a_text = "---\nbibliography: refs.bib\n---\n\nCite [@key].\n";
+        let b_text = "# Standalone\n";
+        std::fs::write(&a_path, a_text).expect("write a");
+        std::fs::write(&b_path, b_text).expect("write b");
+        std::fs::write(&bib_path, "@article{key, title={One}}\n").expect("write bib");
+
+        let mut state = WriterState::new(client_sender());
+        let open = |path: &std::path::Path, text: &str| {
+            WriteCommand::DidOpen(lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri: lsp_types::Uri::from_file_path(path).expect("uri"),
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: text.to_owned(),
+                },
+            })
+        };
+        state.apply_write(open(&a_path, a_text));
+        state.apply_write(open(&b_path, b_text));
+
+        let cycle = state.begin_harvest_cycle();
+        let first = state.harvest_round();
+        assert!(
+            first.contains(&bib_path),
+            "bibliography requested: {first:?}"
+        );
+        let batch = vec![(
+            bib_path.clone(),
+            Some(std::fs::read_to_string(&bib_path).expect("read bib")),
+        )];
+
+        // Mid-cycle: a watcher sync shields the bibliography, then A closes
+        // (evicting it), then B starts referencing it.
+        state.apply_write(WriteCommand::DidChangeWatchedFiles(
+            lsp_types::DidChangeWatchedFilesParams {
+                changes: vec![lsp_types::FileEvent {
+                    uri: lsp_types::Uri::from_file_path(&bib_path).expect("bib uri"),
+                    typ: lsp_types::FileChangeType::CHANGED,
+                }],
+            },
+        ));
+        state.apply_write(WriteCommand::DidClose(
+            lsp_types::DidCloseTextDocumentParams {
+                text_document: lsp_types::TextDocumentIdentifier {
+                    uri: lsp_types::Uri::from_file_path(&a_path).expect("uri"),
+                },
+            },
+        ));
+        assert!(
+            state.db().file_text_if_cached(&bib_path).is_none(),
+            "closing A must evict the bibliography"
+        );
+        let b_new = "---\nbibliography: refs.bib\n---\n\nCite [@key].\n";
+        state.apply_write(WriteCommand::DidChange(
+            lsp_types::DidChangeTextDocumentParams {
+                text_document: lsp_types::VersionedTextDocumentIdentifier {
+                    uri: lsp_types::Uri::from_file_path(&b_path).expect("uri"),
+                    version: 1,
+                },
+                content_changes: vec![lsp_types::TextDocumentContentChangeEvent {
+                    range: None,
+                    range_length: None,
+                    text: b_new.to_owned(),
+                }],
+            },
+        ));
+
+        // The batch entry is stale (its input was evicted); the shield must
+        // not mask that, and the next round must re-request the path.
+        state.apply_harvest(cycle, batch);
+        let next = state.harvest_round();
+        assert!(
+            next.contains(&bib_path),
+            "re-referenced bibliography must be re-requested despite the shield: {next:?}"
+        );
+    }
+
+    /// A file deleted mid-cycle must not be resurrected by its in-flight
+    /// batch entry. `did_delete_files` evicts *and immediately re-interns*
+    /// the path (so `project_graph` re-runs and observes the absence), which
+    /// leaves an input that exists with `None` text — indistinguishable, by
+    /// state alone, from a pending harvest. The batch content read before
+    /// the delete must still be recognized as stale; applying it would pin
+    /// pre-delete content at HIGH durability with nothing ever healing it
+    /// (the file dropped out of the project graph, so no re-read happens).
+    #[test]
+    fn deleted_file_is_not_resurrected_by_inflight_batch() {
+        use crate::lsp::uri_ext::UriExt;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let doc_path = dir.path().join("main.qmd");
+        let child_path = dir.path().join("child.qmd");
+        let doc_text = "# Main\n\n{{< include child.qmd >}}\n";
+        std::fs::write(&doc_path, doc_text).expect("write doc");
+        std::fs::write(&child_path, "# Child\n").expect("write child");
+
+        let mut state = WriterState::new(client_sender());
+        state.apply_write(WriteCommand::DidOpen(
+            lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri: lsp_types::Uri::from_file_path(&doc_path).expect("uri"),
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: doc_text.to_owned(),
+                },
+            },
+        ));
+
+        let cycle = state.begin_harvest_cycle();
+        let first = state.harvest_round();
+        assert!(
+            first.contains(&child_path),
+            "included document requested: {first:?}"
+        );
+        let batch = vec![(
+            child_path.clone(),
+            Some(std::fs::read_to_string(&child_path).expect("read child")),
+        )];
+
+        // Mid-cycle: the file is deleted (explorer operation). The handler
+        // evicts and re-interns; the include existence-probe drops the path
+        // from the project graph, so the reload does not shield it.
+        std::fs::remove_file(&child_path).expect("delete child");
+        state.apply_write(WriteCommand::DidDeleteFiles(lsp_types::DeleteFilesParams {
+            files: vec![lsp_types::FileDelete {
+                uri: lsp_types::Uri::from_file_path(&child_path)
+                    .expect("uri")
+                    .to_string(),
+            }],
+        }));
+
+        // The pre-delete batch entry must not repopulate the input.
+        state.apply_harvest(cycle, batch);
+        let resurrected = state
+            .db()
+            .file_text_if_cached(&child_path)
+            .map(|input| input.content_or_empty(state.db()).to_string());
+        assert_eq!(
+            resurrected.as_deref(),
+            Some(""),
+            "deleted file's content must stay absent, got: {resurrected:?}"
+        );
     }
 
     /// After `spawn`, the writer must hold no direct clone of the client
@@ -1612,7 +1991,7 @@ mod tests {
         // traffic (logs) shares the channel; skip it.
         loop {
             match task_rx.recv_timeout(timeout).expect("harvest batch") {
-                Task::Harvested(_) => break,
+                Task::Harvested { .. } => break,
                 Task::SendToClient(_) => continue,
                 _ => panic!("expected the harvest batch first"),
             }
@@ -1636,6 +2015,64 @@ mod tests {
                 Ok(Task::Diagnostics { .. }) => break,
                 Ok(_) => continue,
                 Err(err) => panic!("stalled cycle never recovered: {err}"),
+            }
+        }
+    }
+
+    /// The lost-batch backstop must fire even when the user goes idle after
+    /// the settle that started the cycle: that settle's deadline was consumed
+    /// at dispatch, so recovery cannot depend on a later write arming a new
+    /// one. The cycle's own expiry must feed the writer's wait deadline —
+    /// otherwise the loop blocks in `recv` forever and the settle's
+    /// diagnostics are never published for the session.
+    #[test]
+    fn lost_harvest_batch_recovers_without_further_writes() {
+        use crate::lsp::uri_ext::UriExt;
+
+        let timeout = std::time::Duration::from_secs(10);
+        let dir = tempfile::tempdir().expect("tempdir");
+        let doc_path = dir.path().join("main.qmd");
+        let bib_path = dir.path().join("refs.bib");
+        let doc_text = "---\nbibliography: refs.bib\n---\n\n# Heading\n\nCite [@key].\n";
+        std::fs::write(&doc_path, doc_text).expect("write doc");
+        std::fs::write(&bib_path, "@article{key, title={One}}\n").expect("write bib");
+
+        let (task_tx, task_rx) = crossbeam_channel::unbounded::<Task>();
+        let pool = TaskPool::new(task_tx.clone(), 1);
+        let mut writer = WriterHandle::new(client_sender());
+        writer.spawn(
+            PoolSpawners {
+                main: pool.spawner(),
+                fmt: pool.spawner(),
+            },
+            task_tx,
+        );
+
+        writer.forward_write(WriteCommand::DidOpen(
+            lsp_types::DidOpenTextDocumentParams {
+                text_document: lsp_types::TextDocumentItem {
+                    uri: lsp_types::Uri::from_file_path(&doc_path).expect("uri"),
+                    language_id: "quarto".into(),
+                    version: 0,
+                    text: doc_text.to_owned(),
+                },
+            },
+        ));
+
+        // Drop the cycle's batch on the floor (a lost relay), then go idle:
+        // no further writes. The expiry alone must recover the settle.
+        loop {
+            match task_rx.recv_timeout(timeout).expect("harvest batch") {
+                Task::Harvested { .. } => break,
+                Task::SendToClient(_) => continue,
+                _ => panic!("expected the harvest batch first"),
+            }
+        }
+        loop {
+            match task_rx.recv_timeout(timeout) {
+                Ok(Task::Diagnostics { .. }) => break,
+                Ok(_) => continue,
+                Err(err) => panic!("idle session never recovered the lost batch: {err}"),
             }
         }
     }
@@ -1821,9 +2258,9 @@ mod tests {
             let mut last_batch = Vec::new();
             loop {
                 match task_rx.recv_timeout(timeout).expect("settle activity") {
-                    Task::Harvested(batch) => {
+                    Task::Harvested { cycle, batch } => {
                         last_batch = batch.clone();
-                        writer.forward_harvest(batch);
+                        writer.forward_harvest(cycle, batch);
                     }
                     Task::Diagnostics { .. } => return last_batch,
                     _ => {}

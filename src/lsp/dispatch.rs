@@ -593,7 +593,7 @@ impl GlobalState {
             Task::RefreshDiagnostics => self.send_diagnostic_refresh(),
             // Referenced-file contents the harvester read for the settle write
             // phase; route them back to the writer, the db owner.
-            Task::Harvested(batch) => self.writer.forward_harvest(batch),
+            Task::Harvested { cycle, batch } => self.writer.forward_harvest(cycle, batch),
             // Client-bound traffic from the writer thread (it holds no direct
             // clone of the connection's sender — see `ClientSender::relayed`).
             Task::SendToClient(message) => self.sender.send(message),

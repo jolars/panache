@@ -415,7 +415,12 @@ pub(crate) enum Task {
     /// for the settle write phase. The main loop forwards it straight back to
     /// the writer (the db owner), which compare-and-set applies it and either
     /// requests the next harvest round or spawns the settle read pass.
-    Harvested(Vec<(std::path::PathBuf, Option<String>)>),
+    /// `cycle` echoes the harvest-cycle id the request carried; the writer
+    /// drops a batch whose cycle has since been superseded.
+    Harvested {
+        cycle: u64,
+        batch: Vec<(std::path::PathBuf, Option<String>)>,
+    },
     /// A client-bound message from the writer thread (diagnostics publish, log,
     /// toast), relayed here so the writer never holds a direct clone of the
     /// connection's sender — see [`ClientSender::relayed`].

@@ -106,18 +106,10 @@ pub(crate) fn load_project_files(
 /// referenced include/bibliography's `None`->`Some` text input (or vice versa);
 /// loading here before the next snapshot lets the re-lint observe fresh content.
 pub(crate) fn reload_open_documents_referenced_files(w: &mut WriterState) {
-    let open_docs: Vec<(crate::salsa::FileText, crate::salsa::FileConfig, PathBuf)> = w
-        .document_map()
-        .values()
-        .filter_map(|state| Some((state.salsa_file, state.salsa_config, state.path.clone()?)))
-        .collect();
+    let open_docs = w.open_documents();
     // A path open as a document has buffer-authoritative content; it must never
     // be re-read from disk below or an unsaved edit would be clobbered.
-    let open_paths: HashSet<PathBuf> = w
-        .document_map()
-        .values()
-        .filter_map(|state| state.path.clone())
-        .collect();
+    let open_paths = w.open_document_paths();
     let mut referenced: HashSet<PathBuf> = HashSet::new();
     for (salsa_file, salsa_config, path) in open_docs {
         referenced.extend(load_project_files(w, salsa_file, salsa_config, path));
