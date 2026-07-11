@@ -7,7 +7,6 @@ use salsa::Durability;
 use lsp_types::{DidChangeWatchedFilesParams, MessageType, Uri};
 
 use super::super::helpers;
-use crate::lsp::DocumentState;
 use crate::lsp::uri_ext::UriExt;
 use crate::lsp::writer::WriterState;
 
@@ -100,32 +99,39 @@ pub(crate) fn did_change_watched_files(w: &mut WriterState, params: DidChangeWat
         // takes effect immediately (bib indices refresh; manifest parse errors
         // re-publish on, or clear from, the manifest's own URI). Consult salsa so
         // the reads observe the freshly-synced content above.
-        let states: Vec<(String, DocumentState)> = w
+        // Project just the fields the loop reads instead of cloning every
+        // `DocumentState` (each carries a `GreenNode` CST). Only path-backed
+        // documents reference files on disk, so drop the rest here.
+        let states: Vec<(
+            String,
+            crate::salsa::FileText,
+            crate::salsa::FileConfig,
+            PathBuf,
+        )> = w
             .document_map()
             .iter()
-            .map(|(uri_str, state)| (uri_str.clone(), state.clone()))
+            .filter_map(|(uri_str, state)| {
+                Some((
+                    uri_str.clone(),
+                    state.salsa_file,
+                    state.salsa_config,
+                    state.path.clone()?,
+                ))
+            })
             .collect();
 
         let mut affected_documents: Vec<Uri> = Vec::new();
-        for (uri_str, state) in states {
-            // Only saved documents reference files on disk.
-            let Some(doc_path) = state.path.clone() else {
-                continue;
-            };
+        for (uri_str, salsa_file, salsa_config, doc_path) in states {
             let Ok(uri) = uri_str.parse::<Uri>() else {
                 continue;
             };
 
             let mut relint = false;
             if is_bibliography {
-                let parsed_yaml_regions = crate::salsa::parsed_yaml_regions_for_file(
-                    w.db(),
-                    state.salsa_file,
-                    state.salsa_config,
-                );
+                let parsed_yaml_regions =
+                    crate::salsa::parsed_yaml_regions_for_file(w.db(), salsa_file, salsa_config);
                 if helpers::is_yaml_frontmatter_valid(parsed_yaml_regions) {
-                    let metadata =
-                        crate::salsa::metadata(w.db(), state.salsa_file, state.salsa_config);
+                    let metadata = crate::salsa::metadata(w.db(), salsa_file, salsa_config);
                     if let Some(bib_info) = metadata.bibliography.as_ref()
                         && bib_info.paths.iter().any(|p| p == &path)
                     {
@@ -134,8 +140,7 @@ pub(crate) fn did_change_watched_files(w: &mut WriterState, params: DidChangeWat
                 }
             }
             if !relint && is_manifest {
-                let graph =
-                    crate::salsa::project_structure(w.db(), state.salsa_file, state.salsa_config);
+                let graph = crate::salsa::project_structure(w.db(), salsa_file, salsa_config);
                 relint = graph
                     .dependencies(&doc_path, Some(crate::salsa::EdgeKind::ProjectConfig))
                     .into_iter()

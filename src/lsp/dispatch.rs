@@ -635,26 +635,13 @@ impl GlobalState {
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 catch_cancelled(|| f(&snap, params))
             }));
-            let task = match outcome {
-                Ok(Some(streamed)) => Task::StreamingResponse {
-                    response: Response::new_ok(id, streamed.response),
-                    progress: streamed.progress,
-                },
-                Ok(None) => Task::Response(Response::new_err(
-                    id,
-                    ErrorCode::ContentModified as i32,
-                    "content modified".to_owned(),
-                )),
-                Err(panic) => {
-                    let msg = crate::lsp::helpers::panic_message(panic.as_ref());
-                    log::error!("LSP streaming request handler panicked: {msg}");
-                    Task::Response(Response::new_err(
-                        id,
-                        ErrorCode::InternalError as i32,
-                        "internal error: request handler panicked".to_owned(),
-                    ))
-                }
-            };
+            let task =
+                read_outcome_task(id, "streaming request handler", outcome, |id, streamed| {
+                    Task::StreamingResponse {
+                        response: Response::new_ok(id, streamed.response),
+                        progress: streamed.progress,
+                    }
+                });
             let _ = sender.send(task);
         };
         self.submit_pooled_read(ReadPool::Main, submit_id, run);
@@ -699,23 +686,9 @@ impl GlobalState {
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 catch_cancelled(|| f(&snap, params))
             }));
-            let task = match outcome {
-                Ok(Some(value)) => Task::Response(Response::new_ok(id, value)),
-                Ok(None) => Task::Response(Response::new_err(
-                    id,
-                    ErrorCode::ContentModified as i32,
-                    "content modified".to_owned(),
-                )),
-                Err(panic) => {
-                    let msg = crate::lsp::helpers::panic_message(panic.as_ref());
-                    log::error!("LSP request handler panicked: {msg}");
-                    Task::Response(Response::new_err(
-                        id,
-                        ErrorCode::InternalError as i32,
-                        "internal error: request handler panicked".to_owned(),
-                    ))
-                }
-            };
+            let task = read_outcome_task(id, "request handler", outcome, |id, value| {
+                Task::Response(Response::new_ok(id, value))
+            });
             let _ = sender.send(task);
         };
         self.submit_pooled_read(pool, submit_id, run);
@@ -816,6 +789,37 @@ impl GlobalState {
             prepared.external,
             sender,
         ));
+    }
+}
+
+/// Map a pooled read's `catch_unwind`/`catch_cancelled` outcome to its `Task`,
+/// shared by the streaming and non-streaming read closures: a live result is
+/// turned into a `Task` by `ok`, a salsa cancellation (`None`) becomes
+/// `ContentModified`, and a handler panic becomes `InternalError` (logged with
+/// `what`). Keeping the cancellation/panic mapping single-sourced means the two
+/// closures can never drift apart on the error contract.
+fn read_outcome_task<T>(
+    id: RequestId,
+    what: &str,
+    outcome: std::thread::Result<Option<T>>,
+    ok: impl FnOnce(RequestId, T) -> Task,
+) -> Task {
+    match outcome {
+        Ok(Some(value)) => ok(id, value),
+        Ok(None) => Task::Response(Response::new_err(
+            id,
+            ErrorCode::ContentModified as i32,
+            "content modified".to_owned(),
+        )),
+        Err(panic) => {
+            let msg = crate::lsp::helpers::panic_message(panic.as_ref());
+            log::error!("LSP {what} panicked: {msg}");
+            Task::Response(Response::new_err(
+                id,
+                ErrorCode::InternalError as i32,
+                "internal error: request handler panicked".to_owned(),
+            ))
+        }
     }
 }
 

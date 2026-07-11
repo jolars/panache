@@ -1005,6 +1005,40 @@ fn spawn_settle_pass(pools: &PoolSpawners, task_tx: &Sender<Task>, prepared: Pre
     ));
 }
 
+/// Complete the pending settle over current state and spawn its read pass: the
+/// common tail of every writer-loop arm that ends a cycle without another
+/// harvest round (discovery converged, or a guard aborted the round mid-cycle).
+fn complete_and_spawn(state: &mut WriterState, pools: &PoolSpawners, task_tx: &Sender<Task>) {
+    spawn_settle_pass(pools, task_tx, state.complete_settle());
+}
+
+/// Dispatch one harvest round for `cycle`: run discovery (guarded) and either
+/// hand the newly-referenced paths to the harvester, complete the settle when
+/// discovery converged, or fall back to a synchronous settle if the harvester
+/// channel is gone. A discovery panic degrades to a settle over current state —
+/// the deadline was consumed when the cycle began, so the pass must still be
+/// spawned or the settle's diagnostics silently vanish.
+fn dispatch_harvest_round(
+    state: &mut WriterState,
+    cycle: u64,
+    pools: &PoolSpawners,
+    harvest_tx: &Sender<(u64, Vec<PathBuf>)>,
+    task_tx: &Sender<Task>,
+) {
+    let Some(round) = guard("harvest discovery", || state.harvest_round()) else {
+        complete_and_spawn(state, pools, task_tx);
+        return;
+    };
+    if round.is_empty() {
+        complete_and_spawn(state, pools, task_tx);
+    } else if harvest_tx.send((cycle, round)).is_err() {
+        // Unreachable while the writer loop holds `harvest_tx`, but don't wedge
+        // the cycle if it ever happens: fall back to the synchronous reload.
+        log::warn!("LSP harvester channel closed; settling synchronously");
+        settle_synchronously(state, pools, task_tx);
+    }
+}
+
 /// How long an in-flight harvest cycle may run before the writer assumes its
 /// batch was lost (harvester death, a dropped relay) and aborts the cycle. A
 /// `Some` cycle defers every settle deadline, so without this backstop one
@@ -1022,29 +1056,36 @@ const HARVEST_CYCLE_TIMEOUT: Duration = if cfg!(test) {
 /// them back to the writer as [`WriterMsg::Harvested`]. Owns no state — the
 /// writer decides what to read (discovery) and what to keep (compare-and-set).
 ///
-/// A batch is posted even if reading it panics (an empty one): the batch is
-/// the cycle's only progress signal, and the writer must not wait on one that
-/// will never come. The unread paths stay interned `None` until the next
-/// cycle (a fresh `requested` set) re-reads them.
+/// Every requested path gets an entry in the posted batch, even if its read
+/// panics (that path degrades to `None`, the same "unreadable" signal a genuine
+/// read error yields). The per-path guard matters: a batch-wide `catch_unwind`
+/// would drop *every* path on a single bad read, and because the writer already
+/// stamped them all as requested, the completing cycle would never re-read them
+/// — the settle would then report spurious missing-file diagnostics over inputs
+/// still interned `None`. A path left `None` here is re-read on the next cycle
+/// (a fresh `requested` set).
 ///
 /// Exits when the writer drops its request sender or the task channel closes.
 fn harvester_thread(rx: Receiver<(u64, Vec<PathBuf>)>, task_tx: Sender<Task>) {
     for (cycle, paths) in rx {
         let read_start = Instant::now();
         let count = paths.len();
-        let batch = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            paths
-                .into_iter()
-                .map(|path| {
-                    let content = std::fs::read_to_string(&path).ok();
-                    (path, content)
-                })
-                .collect::<Vec<(PathBuf, Option<String>)>>()
-        }))
-        .unwrap_or_else(|_| {
-            log::error!("LSP harvester panicked reading a batch; posting it empty");
-            Vec::new()
-        });
+        let batch: Vec<(PathBuf, Option<String>)> = paths
+            .into_iter()
+            .map(|path| {
+                let content = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    std::fs::read_to_string(&path).ok()
+                }))
+                .unwrap_or_else(|_| {
+                    log::error!(
+                        "LSP harvester panicked reading {}; treating it as unreadable",
+                        path.display()
+                    );
+                    None
+                });
+                (path, content)
+            })
+            .collect();
         log::debug!(
             "settle harvest read {count} referenced file(s) in {:?}",
             read_start.elapsed()
@@ -1218,24 +1259,11 @@ fn writer_thread(
                         // the cycle began, so with no later write it would
                         // otherwise never fire — a save's external lint
                         // results would silently vanish.
-                        spawn_settle_pass(&pools, &task_tx, state.complete_settle());
+                        complete_and_spawn(&mut state, &pools, &task_tx);
                         continue;
                     }
                 }
-                let Some(next) = guard("harvest discovery", || state.harvest_round()) else {
-                    // Same contract as the apply panic above.
-                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
-                    continue;
-                };
-                if next.is_empty() {
-                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
-                } else if harvest_tx.send((cycle, next)).is_err() {
-                    // Unreachable while we hold `harvest_tx`, but don't wedge
-                    // the cycle if it ever happens: fall back to the
-                    // synchronous reload.
-                    log::warn!("LSP harvester channel closed; settling synchronously");
-                    settle_synchronously(&mut state, &pools, &task_tx);
-                }
+                dispatch_harvest_round(&mut state, cycle, &pools, &harvest_tx, &task_tx);
             }
             // Deadline elapsed: start the settle's harvest cycle (or finish
             // immediately when there is nothing to read — no open on-disk
@@ -1264,18 +1292,7 @@ fn writer_thread(
                     continue;
                 }
                 let cycle = state.begin_harvest_cycle();
-                let Some(first) = guard("harvest discovery", || state.harvest_round()) else {
-                    // Panic mid-discovery: serve the settle over current
-                    // state (same contract as the batch arm's aborts).
-                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
-                    continue;
-                };
-                if first.is_empty() {
-                    spawn_settle_pass(&pools, &task_tx, state.complete_settle());
-                } else if harvest_tx.send((cycle, first)).is_err() {
-                    log::warn!("LSP harvester channel closed; settling synchronously");
-                    settle_synchronously(&mut state, &pools, &task_tx);
-                }
+                dispatch_harvest_round(&mut state, cycle, &pools, &harvest_tx, &task_tx);
             }
         }
     }

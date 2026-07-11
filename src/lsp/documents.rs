@@ -383,6 +383,17 @@ pub(crate) fn resync_document_after_panic(
         .get(&uri_string)
         .map(|doc| (doc.salsa_file, doc.salsa_config))
     else {
+        // The panic struck before the document was ever inserted (a `did_open`
+        // that died between its salsa text write and the map insert). There is
+        // no cached tree to rebuild, but the salsa write did land, so still arm
+        // the settle the dead handler never reached — the all-docs pass then
+        // reconciles diagnostics over current state, upholding the invariant
+        // that every write (and every heal) arms a settle.
+        log::warn!(
+            "post-panic resync: no document state for {}; arming settle only",
+            uri.as_str()
+        );
+        w.arm_settle();
         return;
     };
     let config = w.load_config_notifying(uri);
@@ -434,13 +445,13 @@ pub(crate) fn did_close(w: &mut WriterState, params: DidCloseTextDocumentParams)
     // clears a manifest once no open document still reports it.
     w.drop_diagnostics(&uri);
 
-    let states: Vec<DocumentState> = w.document_map().values().cloned().collect();
+    // Reuse the shared projection instead of cloning every remaining
+    // `DocumentState` (each carries a `GreenNode` CST) just to read three
+    // fields. `open_documents()` already yields exactly the path-backed
+    // `(salsa_file, salsa_config, path)` tuples this loop needs.
     let mut retained = HashSet::new();
-    for state in states {
-        let Some(path) = state.path.clone() else {
-            continue;
-        };
-        let tracked = load_project_files(w, state.salsa_file, state.salsa_config, path);
+    for (salsa_file, salsa_config, path) in w.open_documents() {
+        let tracked = load_project_files(w, salsa_file, salsa_config, path);
         retained.extend(tracked);
     }
     for cached in w.db().cached_file_paths() {
@@ -461,6 +472,28 @@ pub(crate) fn did_close(w: &mut WriterState, params: DidCloseTextDocumentParams)
 mod tests {
     use super::apply_changes_descending_with_combined_ranges;
     use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
+
+    /// A post-panic resync for a URI with no cached document state (a `did_open`
+    /// that died between its salsa text write and the map insert) must still arm
+    /// the settle the dead handler never reached — otherwise the orphaned salsa
+    /// input is never reconciled and no re-lint runs.
+    #[test]
+    fn resync_absent_document_arms_settle() {
+        use crate::lsp::global_state::ClientSender;
+        use crate::lsp::writer::WriterState;
+
+        let (tx, _rx) = crossbeam_channel::unbounded();
+        let mut w = WriterState::new(ClientSender::new(tx));
+        let uri: lsp_types::Uri = "file:///ghost.qmd".parse().unwrap();
+        assert!(w.settle_deadline().is_none(), "no settle armed initially");
+
+        super::resync_document_after_panic(&mut w, &uri, Some(0));
+
+        assert!(
+            w.settle_deadline().is_some(),
+            "absent-document resync must still arm the settle"
+        );
+    }
 
     fn change(
         start_line: u32,
