@@ -16,6 +16,7 @@ use std::time::Instant;
 use crossbeam_channel::{Receiver, Sender};
 use lsp_server::{Message, Notification, Request, RequestId, Response};
 use lsp_types::{Diagnostic, MessageType, Uri};
+use salsa::{Durability, Setter};
 
 use super::DocumentState;
 use super::LspRuntimeSettings;
@@ -379,6 +380,20 @@ pub(crate) struct GlobalState {
     /// The master salsa handle, mutated only on the main thread.
     pub(crate) salsa: crate::salsa::SalsaDb,
 
+    /// Distinct config values seen this session, each paired with the single
+    /// [`FileConfig`](crate::salsa::FileConfig) salsa input that carries it.
+    ///
+    /// Every salsa query keyed on a document's config (`project_edges`,
+    /// `parsed_tree_root`, `metadata`, ...) memoizes per `(file, FileConfig)`.
+    /// When a project's documents each held a *distinct* `FileConfig`, opening a
+    /// whole book made every document re-parse and re-analyze every *other*
+    /// project document under its own handle — O(docs^2) parses, the dominant
+    /// cold-open cost. Interning by config value gives every document that
+    /// resolves to the same config one shared handle, so that cross-document
+    /// work is computed once and reused. Sessions carry a handful of distinct
+    /// configs at most, so the linear scan is cheap.
+    config_intern: Vec<(crate::Config, crate::salsa::FileConfig)>,
+
     pub(crate) pool: TaskPool<Task>,
     /// Dedicated single-thread pool for formatting requests. Matches
     /// rust-analyzer's split: external formatters can block for hundreds of
@@ -447,6 +462,7 @@ impl GlobalState {
             supports_related_documents: false,
             diagnostics: DiagnosticCollection::default(),
             salsa: crate::salsa::SalsaDb::default(),
+            config_intern: Vec::new(),
             pool,
             fmt_pool,
             task_receiver,
@@ -492,6 +508,27 @@ impl GlobalState {
                 crate::lsp::config::default_config_for_uri(Some(uri))
             }
         }
+    }
+
+    /// Return the shared [`FileConfig`](crate::salsa::FileConfig) salsa input for
+    /// `config`, minting one only when this exact config value has not been seen
+    /// this session.
+    ///
+    /// Documents that resolve to equal configs (the common case — a whole
+    /// project shares one `panache.toml`) then share a single handle, so every
+    /// config-keyed salsa query is memoized once across the project instead of
+    /// per document. See [`Self::config_intern`] for why this matters.
+    pub(crate) fn intern_config(&mut self, config: crate::Config) -> crate::salsa::FileConfig {
+        if let Some((_, handle)) = self.config_intern.iter().find(|(seen, _)| *seen == config) {
+            return *handle;
+        }
+        let handle = crate::salsa::FileConfig::new(&self.salsa, config.clone());
+        handle
+            .set_config(&mut self.salsa)
+            .with_durability(Durability::MEDIUM)
+            .to(config.clone());
+        self.config_intern.push((config, handle));
+        handle
     }
 
     /// A cheap read snapshot for a worker thread.

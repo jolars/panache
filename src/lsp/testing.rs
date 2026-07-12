@@ -561,6 +561,17 @@ impl LspTester {
             .map(|state| crate::SyntaxNode::new_root(state.tree.clone()))
     }
 
+    /// The `FileConfig` salsa input backing `uri`'s document. Two documents that
+    /// resolve to equal config values share one interned handle, so this is
+    /// `==` across them (and config-keyed queries memoize once); a differing
+    /// config yields a distinct handle.
+    pub fn document_salsa_config(&self, uri: &str) -> Option<crate::salsa::FileConfig> {
+        self.gs
+            .document_map
+            .get(uri)
+            .map(|state| state.salsa_config)
+    }
+
     pub fn get_cached_file_text(&self, path: &std::path::Path) -> Option<String> {
         let file = self.gs.salsa.file_text(path.to_path_buf())?;
         Some(file.content_or_empty(&self.gs.salsa).to_string())

@@ -145,17 +145,20 @@ pub(crate) fn reload_open_documents_referenced_files(gs: &mut GlobalState) {
 /// value actually differs); the caller arms the settle so the all-docs re-lint
 /// re-publishes diagnostics.
 pub(crate) fn reload_open_documents_config(gs: &mut GlobalState) {
-    let entries: Vec<(lsp_types::Uri, crate::salsa::FileConfig)> = gs
+    let entries: Vec<(String, lsp_types::Uri)> = gs
         .document_map
-        .iter()
-        .filter_map(|(uri_str, state)| Some((uri_str.parse().ok()?, state.salsa_config)))
+        .keys()
+        .filter_map(|uri_str| Some((uri_str.clone(), uri_str.parse().ok()?)))
         .collect();
-    for (uri, salsa_config) in entries {
+    for (uri_str, uri) in entries {
         let new_config = gs.load_config_notifying(&uri);
-        salsa_config
-            .set_config(&mut gs.salsa)
-            .with_durability(Durability::MEDIUM)
-            .to(new_config);
+        // Re-point at the shared handle for the reloaded value: a no-op when the
+        // config is unchanged, and a switch to the value's shared handle when it
+        // changed (rather than mutating a handle other documents may share).
+        let interned = gs.intern_config(new_config);
+        if let Some(state) = gs.document_map_mut().get_mut(&uri_str) {
+            state.salsa_config = interned;
+        }
     }
 }
 
@@ -186,13 +189,10 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
             .salsa
             .create_in_memory_file(text.clone(), Durability::LOW),
     };
-    let salsa_config = {
-        let cfg = crate::salsa::FileConfig::new(&gs.salsa, config.clone());
-        cfg.set_config(&mut gs.salsa)
-            .with_durability(Durability::MEDIUM)
-            .to(config.clone());
-        cfg
-    };
+    // Share one `FileConfig` input across every document that resolves to this
+    // config value, so config-keyed salsa queries memoize once across the
+    // project rather than per document (see `GlobalState::intern_config`).
+    let salsa_config = gs.intern_config(config.clone());
 
     gs.document_map_mut().insert(
         uri_string.clone(),
@@ -320,17 +320,19 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
 
     log::debug!("did_change parse strategy={strategy} changes={change_count}");
 
+    // Re-point the document at the shared handle for its (possibly reloaded)
+    // config value. When the config is unchanged this is the same interned
+    // handle the document already held, so it is a no-op; when it changed, the
+    // document moves to the value's shared handle rather than mutating a handle
+    // other documents may share (see `GlobalState::intern_config`).
+    let interned_config = gs.intern_config(config.clone());
     if let Some(doc_state) = gs.document_map_mut().get_mut(&uri_string) {
         doc_state.tree = green;
         doc_state.path = doc_path_for_salsa.clone();
+        doc_state.salsa_config = interned_config;
     } else {
         return;
     }
-
-    salsa_config
-        .set_config(&mut gs.salsa)
-        .with_durability(Durability::MEDIUM)
-        .to(config.clone());
 
     // Defer the expensive re-lint to the debounced settle so a burst of
     // keystrokes collapses into one pass and a save's formatting request never

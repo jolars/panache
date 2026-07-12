@@ -944,7 +944,7 @@ fn resolve_formatter_table(
     resolved
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Config {
     pub flavor: Flavor,
     pub extensions: Extensions,
