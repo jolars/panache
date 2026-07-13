@@ -2621,6 +2621,25 @@ impl Formatter {
                 // Decrement depth after processing content
                 self.fenced_div_depth -= 1;
 
+                // Keep a blank line between a trailing horizontal rule and the
+                // closing fence. A rule glued to `:::` is a trap for the
+                // compact `---` spelling (#417): a `---` line followed by
+                // non-blank text opens a YAML metadata block in both panache
+                // and pandoc, swallowing the fence. Checked against the last
+                // non-blank child (not the emitted BLANK_LINE nodes, which the
+                // trailing-blank trim above drops) so both passes agree.
+                let last_non_blank_kind = content_children
+                    .iter()
+                    .rev()
+                    .find(|c| c.kind() != SyntaxKind::BLANK_LINE)
+                    .map(|c| c.kind());
+                if last_non_blank_kind == Some(SyntaxKind::HORIZONTAL_RULE)
+                    && self.output.ends_with('\n')
+                    && !self.output.ends_with("\n\n")
+                {
+                    self.output.push('\n');
+                }
+
                 // Emit closing fence using the opener's colon count.
                 if !self.output.ends_with('\n') {
                     self.output.push('\n');

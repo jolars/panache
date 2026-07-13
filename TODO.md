@@ -512,16 +512,20 @@ setext marker, so compact rules add no new risk there.
   rule to `line-width - indent`. Golden case:
   `horizontal_rule_in_list_item`.
 
-- [ ] **Formatter glues a trailing horizontal rule to a div's closing fence.**
-  An HR as the last child of a fenced div is emitted with no blank line
-  before `:::` --- the blank-after logic in the `HORIZONTAL_RULE` arm of
-  `crates/panache-formatter/src/formatter/core.rs` only fires when
-  `next_sibling` is a block element, and `DIV_FENCE_CLOSE` is not one.
-  Harmless today only because a full-width rule cannot open YAML; a compact
-  `---` in this position reparses as a YAML block that eats the fence (and
-  pandoc hard-errors on the same input). Hard blocker for #417. (Note:
-  pandoc's own markdown writer also glues the rule to the fence, so matching
-  pandoc's writer here is not an option for compact rules.)
+- [x] **Formatter glues a trailing horizontal rule to a div's closing fence.**
+  An HR as the last child of a fenced div was emitted with no blank line
+  before `:::`. Harmless with full-width rules (which cannot open YAML) but
+  a hard blocker for #417: a compact `---` in this position reparses as a
+  YAML block that eats the fence (and pandoc hard-errors on the same input).
+  Fixed in the `FENCED_DIV` arm of
+  `crates/panache-formatter/src/formatter/core.rs`: a blank line is kept
+  before the closing fence when the last non-blank content child is a
+  `HORIZONTAL_RULE`. The check is against the CST children rather than the
+  HR arm's `next_sibling` because the div arm trims trailing `BLANK_LINE`
+  nodes, which would make the two passes disagree. Golden case:
+  `horizontal_rule_div_fence`. (Compact-mode note for #417: an
+  `HTML_BLOCK_RAW` comment glued after a rule also round-trips today and
+  will need the same treatment when compact rules land.)
 
 - [ ] **Likely-dead blank-after exception for setext-candidate paragraphs.** The
   `HORIZONTAL_RULE` arm in `core.rs` skips the blank line after a rule when
