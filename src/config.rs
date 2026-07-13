@@ -104,12 +104,11 @@ fn check_deprecated_blank_lines(s: &str, path: &Path) {
         .get("format")
         .and_then(|v| v.as_table())
         .is_some_and(has_blank_lines);
-    let style_nested = root
-        .get("style")
-        .and_then(|v| v.as_table())
-        .is_some_and(has_blank_lines);
 
-    if top_level || format_nested || style_nested {
+    // `[style] blank-lines` is deliberately not covered: the whole `[style]`
+    // section was removed in 3.0, so the config errors out with a migration
+    // hint before a "no-op" warning could be anything but misleading.
+    if top_level || format_nested {
         eprintln!(
             "Warning: Deprecated `blank-lines` setting found in {}:",
             path.display()
@@ -119,9 +118,6 @@ fn check_deprecated_blank_lines(s: &str, path: &Path) {
         }
         if top_level {
             eprintln!("  - blank-lines (top-level)");
-        }
-        if style_nested {
-            eprintln!("  - [style] blank-lines");
         }
         eprintln!("  This option is now a no-op and will be removed in a future release.");
     }
@@ -194,11 +190,60 @@ fn parse_config_detailed(s: &str, path: &Path) -> Result<Config, ConfigError> {
         });
     }
 
-    toml::from_str(s).map_err(|e| ConfigError {
-        path: path.to_path_buf(),
-        span: e.span(),
-        message: e.to_string(),
+    toml::from_str(s).map_err(|e| {
+        let mut message = e.to_string();
+        if let Some(hint) = removed_surface_hint(&message) {
+            message.push('\n');
+            message.push_str(hint);
+        }
+        ConfigError {
+            path: path.to_path_buf(),
+            span: e.span(),
+            message,
+        }
     })
+}
+
+/// Migration hint for config surface removed in 3.0, matched against the
+/// `unknown field` text of `toml`'s error. Configs from older releases (e.g.
+/// a `[style]` section) otherwise fail with a bare serde error that gives no
+/// pointer to the replacement key. See `docs/guide/configuration.qmd`.
+fn removed_surface_hint(message: &str) -> Option<&'static str> {
+    const HINTS: &[(&str, &str)] = &[
+        (
+            "style",
+            "hint: the `[style]` section was removed in 3.0; move its settings to `[format]`",
+        ),
+        (
+            "wrap",
+            "hint: top-level `wrap` was removed in 3.0; use `[format] wrap`",
+        ),
+        (
+            "math-indent",
+            "hint: top-level `math-indent` was removed in 3.0; use `[format] math-indent`",
+        ),
+        (
+            "math-delimiter-style",
+            "hint: top-level `math-delimiter-style` was removed in 3.0; \
+             use `[format] math-delimiter-style`",
+        ),
+        (
+            "tab-stops",
+            "hint: top-level `tab-stops` was removed in 3.0; use `[format] tab-stops`",
+        ),
+        (
+            "tab-width",
+            "hint: top-level `tab-width` was removed in 3.0; use `[format] tab-width`",
+        ),
+        (
+            "code-blocks",
+            "hint: the `code-blocks` table was a no-op and was removed in 3.0; delete it",
+        ),
+    ];
+    HINTS
+        .iter()
+        .find(|(key, _)| message.contains(&format!("unknown field `{key}`")))
+        .map(|(_, hint)| *hint)
 }
 
 /// True if `name` is a known extension at either the parser or formatter
@@ -1806,8 +1851,12 @@ mod tests {
     fn removed_style_section_now_errors() {
         // The `[style]` section was superseded by `[format]` and removed in 3.0.
         let toml = "[style]\nline-width = 100\n";
-        parse_config_str(toml, Path::new("panache.toml"))
+        let err = parse_config_str(toml, Path::new("panache.toml"))
             .expect_err("removed [style] section must error");
+        assert!(
+            err.to_string().contains("move its settings to `[format]`"),
+            "error must carry a migration hint, got: {err}"
+        );
     }
 
     #[test]
@@ -1815,8 +1864,27 @@ mod tests {
         // Old top-level style scalars (wrap, math-indent, tab-stops, ...) moved
         // under `[format]` and are rejected at the top level in 3.0.
         let toml = "wrap = \"preserve\"\n";
-        parse_config_str(toml, Path::new("panache.toml"))
+        let err = parse_config_str(toml, Path::new("panache.toml"))
             .expect_err("removed top-level `wrap` must error");
+        assert!(
+            err.to_string().contains("use `[format] wrap`"),
+            "error must carry a migration hint, got: {err}"
+        );
+    }
+
+    #[test]
+    fn removed_style_section_with_blank_lines_errors_with_hint() {
+        // Regression for issue #419: real-world pre-3.0 configs pair `[style]`
+        // with the soft-removed `blank-lines` key. The error must point at the
+        // `[format]` migration rather than only the misleading serde message.
+        let toml =
+            "flavor = \"quarto\"\n\n[style]\nwrap = \"preserve\"\nblank-lines = \"collapse\"\n";
+        let err = parse_config_str(toml, Path::new(".panache.toml"))
+            .expect_err("removed [style] section must error");
+        assert!(
+            err.to_string().contains("move its settings to `[format]`"),
+            "error must carry a migration hint, got: {err}"
+        );
     }
 
     #[test]

@@ -122,7 +122,8 @@ aliases and print a warning. The current crop is:
 - top-level `pandoc-compat` (use `[compat] pandoc`)
 - the top-level or `[format]` `blank-lines` key (now a no-op)
 
-The following were removed in 3.0 and are now rejected:
+The following were removed in 3.0 and are now rejected (the parse error includes
+a hint pointing at the replacement key where one exists):
 
 - snake_case names under `[extensions]` (use kebab-case, e.g. `quarto-crossrefs`
   instead of `quarto_crossrefs`)
