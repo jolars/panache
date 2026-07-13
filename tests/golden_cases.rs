@@ -248,6 +248,7 @@ golden_test_cases!(
     table_ordered_marker_first_line_caption,
     list_mixed_bullets_commonmark,
     headings,
+    heading_in_list_item,
     setext_headings,
     setext_heading_in_list_item,
     setext_multiline_commonmark,

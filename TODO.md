@@ -549,20 +549,19 @@ setext marker, so compact rules add no new risk there.
   document-start frontmatter (what GFM tooling actually supports), or mirror
   pandoc exactly.
 
-- [ ] **Parser misses horizontal rules and ATX headings in list items nested two
+- [x] **Parser misses horizontal rules and ATX headings in list items nested two
   levels deep.** Found while fixing the list-item HR ejection above. A rule
   or heading as continuation content of a depth-2 item (`- outer`, nested
-  `- inner`, blank, four-space-indented `***` or `# head`) parses as `PLAIN`
-  (the formatter then escapes the rule to `\*\*\*`), while pandoc-native
-  gives `HorizontalRule`/`Header` inside the inner item. Root cause:
-  `ListItemBuffer::emit_as_block`
-  (`crates/panache-parser/src/parser/utils/list_item_buffer.rs`) runs
-  `try_parse_horizontal_rule`/`try_parse_atx_heading` on the buffered line
-  with the item's leading indent unstripped, so the CommonMark four-space
-  guard rejects it once the content column reaches 4. Strip `content_col`
-  leading columns for *detection* only (emission stays lossless, like the
-  HTML-block lift in the same function); depth 1 (2-space indent) only works
-  today by accident of the `< 4` threshold.
+  `- inner`, blank, four-space-indented `***` or `# head`) parsed as
+  `PLAIN`, while pandoc-native gives `HorizontalRule`/`Header` inside the
+  inner item. Fixed: `ListItemBuffer::emit_as_block` now strips up to
+  `content_col` leading columns for *detection* only (emission stays
+  lossless); depth 1 (2-space indent) only worked before by accident of the
+  `< 4` threshold. The fix exposed the same ejection bug as the HR one in
+  the formatter's `HEADING` arm (pre-existing at depth 1: a continuation
+  heading in an item was emitted at column 0), fixed the same way. Parser
+  golden: `nested_list_item_hr_heading`; formatter golden:
+  `heading_in_list_item`.
 
 ### Performance
 

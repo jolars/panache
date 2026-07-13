@@ -706,7 +706,11 @@ impl Formatter {
                 // Render the heading line itself via the shared, inline-aware
                 // renderer (smart normalization, inline nodes, attributes). The
                 // surrounding blank-line management stays here because it
-                // depends on document-body siblings.
+                // depends on document-body siblings. Inside a list item
+                // (nonzero indent), keep the heading at the item's content
+                // column — emitting it at column 0 would end the list on
+                // reparse and eject the rest of the item.
+                self.output.push_str(&" ".repeat(indent));
                 self.output
                     .push_str(&headings::format_heading(node, &self.config));
                 self.output.push('\n');
