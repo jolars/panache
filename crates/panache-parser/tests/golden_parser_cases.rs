@@ -728,6 +728,8 @@ golden_test_cases!(
     yaml_metadata_dots_closer,
     yaml_metadata_embedded_subtree,
     yaml_metadata_mid_document_gfm,
+    yaml_metadata_nonmapping_mid_document,
+    yaml_metadata_nonmapping_sequence,
     yaml_metadata_normalization,
     yaml_metadata_opening_blank_not_metadata,
 );

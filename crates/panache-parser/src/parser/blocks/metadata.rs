@@ -5,8 +5,8 @@ use crate::parser::diagnostics::{Diagnostics, SyntaxError, SyntaxErrorSource};
 use crate::parser::utils::helpers::{emit_line_tokens, strip_newline};
 use crate::parser::utils::tree_copy::copy_green_children;
 use crate::parser::yaml::{YamlValidationContext, locate_yaml_diagnostic_ctx, parse_stream};
-use crate::syntax::SyntaxKind;
-use rowan::{GreenNodeBuilder, TextRange};
+use crate::syntax::{SyntaxKind, SyntaxNode};
+use rowan::{GreenNode, GreenNodeBuilder, TextRange};
 
 /// Try to parse a YAML metadata block starting at the given position.
 /// Returns the new position after the block if successful, None otherwise.
@@ -15,6 +15,7 @@ use rowan::{GreenNodeBuilder, TextRange};
 /// - Starts with `---` (not followed by blank line)
 /// - Ends with `---` or `...`
 /// - At document start OR preceded by blank line
+/// - Content passes [`prepare_yaml_content`]'s metadata gate
 pub(crate) fn try_parse_yaml_block(
     lines: &[&str],
     pos: usize,
@@ -24,7 +25,109 @@ pub(crate) fn try_parse_yaml_block(
     flavor: Flavor,
 ) -> Option<usize> {
     let closing_pos = find_yaml_block_closing_pos(lines, pos, at_document_start)?;
-    emit_yaml_block(lines, pos, closing_pos, builder, diags, flavor)
+    let content = collect_yaml_content(lines, pos, closing_pos);
+    let outcome = prepare_yaml_content(&content, flavor)?;
+    emit_yaml_block(lines, pos, closing_pos, builder, diags, &outcome)
+}
+
+/// Reconstruct the content between the delimiters as a contiguous byte
+/// string. The lines returned by `split_lines_inclusive` are non-overlapping
+/// slices of the original input that retain their trailing LF / CRLF, so
+/// concatenating them rebuilds the source bytes exactly (including CRLF).
+pub(crate) fn collect_yaml_content(lines: &[&str], pos: usize, closing_pos: usize) -> String {
+    let mut content = String::new();
+    for content_line in lines.iter().take(closing_pos).skip(pos + 1) {
+        content.push_str(content_line);
+    }
+    content
+}
+
+/// Validation + parse outcome for YAML metadata content, computed once at
+/// detection and carried to emission (via `YamlMetadataPrepared`) so the
+/// content is never re-parsed.
+#[derive(Debug, Clone)]
+pub(crate) enum YamlContentOutcome {
+    /// Content failed validation: emit opaque line tokens plus a syntax
+    /// error at content-relative `start..end`. Pandoc hard-errors here, so
+    /// there is no alternative interpretation to fall back to.
+    Invalid {
+        message: &'static str,
+        start: usize,
+        end: usize,
+    },
+    /// Content validated: embed the parsed `YAML_STREAM`'s children.
+    Valid { stream: GreenNode },
+}
+
+/// Validate and parse metadata-block content, applying pandoc's metadata
+/// gate: pandoc accepts frontmatter whose YAML parses to a top-level mapping
+/// or null (empty/comments-only), backtracks to another block interpretation
+/// (simple table, HR + paragraph) when it parses to anything else, and
+/// hard-errors on a YAML parse exception. Returns `None` for the backtrack
+/// case so the dispatcher falls through to the other block parsers; the
+/// hard-error case maps to [`YamlContentOutcome::Invalid`].
+///
+/// The gate only applies to flavors with an asserted frontmatter YAML
+/// consumer (pandoc-family); GFM/CommonMark-family frontmatter stays lenient.
+pub(crate) fn prepare_yaml_content(content: &str, flavor: Flavor) -> Option<YamlContentOutcome> {
+    let yaml_ctx = YamlValidationContext::frontmatter(flavor);
+    if let Some((diag, start, end)) = locate_yaml_diagnostic_ctx(content, "", yaml_ctx) {
+        return Some(YamlContentOutcome::Invalid {
+            message: diag.message,
+            start,
+            end,
+        });
+    }
+    let stream = parse_stream(content);
+    if !yaml_ctx.consumers().is_empty() && !top_level_is_mapping_or_null(&stream) {
+        return None;
+    }
+    Some(YamlContentOutcome::Valid {
+        stream: stream.green().into_owned(),
+    })
+}
+
+/// Whether the first document in a parsed `YAML_STREAM` has a top-level
+/// mapping or null value (pandoc's acceptance rule for metadata blocks).
+/// A stream or document with no content node (empty, comments-only) counts
+/// as null.
+fn top_level_is_mapping_or_null(stream: &SyntaxNode) -> bool {
+    let Some(document) = stream
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_DOCUMENT)
+    else {
+        return true;
+    };
+    let Some(value) = document.children().find(|n| {
+        matches!(
+            n.kind(),
+            SyntaxKind::YAML_BLOCK_MAP
+                | SyntaxKind::YAML_FLOW_MAP
+                | SyntaxKind::YAML_BLOCK_SEQUENCE
+                | SyntaxKind::YAML_FLOW_SEQUENCE
+                | SyntaxKind::YAML_SCALAR
+        )
+    }) else {
+        return true;
+    };
+    match value.kind() {
+        SyntaxKind::YAML_BLOCK_MAP | SyntaxKind::YAML_FLOW_MAP => true,
+        SyntaxKind::YAML_SCALAR => scalar_is_null(&value),
+        _ => false,
+    }
+}
+
+/// Whether a `YAML_SCALAR` node is a plain null scalar (`~`, `null`, `Null`,
+/// `NULL`). Quoted forms keep their quotes in `YAML_SCALAR_TEXT`, so they
+/// correctly resolve to strings, not null.
+fn scalar_is_null(scalar: &SyntaxNode) -> bool {
+    let mut text = String::new();
+    for token in scalar.children_with_tokens().filter_map(|t| t.into_token()) {
+        if token.kind() == SyntaxKind::YAML_SCALAR_TEXT {
+            text.push_str(token.text());
+        }
+    }
+    matches!(text.trim(), "~" | "null" | "Null" | "NULL")
 }
 
 pub(crate) fn find_yaml_block_closing_pos(
@@ -80,7 +183,7 @@ pub(crate) fn emit_yaml_block(
     closing_pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
     diags: &Diagnostics,
-    flavor: Flavor,
+    outcome: &YamlContentOutcome,
 ) -> Option<usize> {
     if pos >= lines.len() || closing_pos <= pos || closing_pos >= lines.len() {
         return None;
@@ -96,50 +199,47 @@ pub(crate) fn emit_yaml_block(
     }
 
     builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
-    // Reconstruct the frontmatter content as a contiguous byte string. The
-    // lines returned by `split_lines_inclusive` are non-overlapping slices
-    // of the original input that retain their trailing LF / CRLF, so
-    // concatenating them rebuilds the source bytes between the delimiters
-    // exactly (including CRLF).
-    let mut content = String::new();
-    for content_line in lines.iter().take(closing_pos).skip(pos + 1) {
-        content.push_str(content_line);
-    }
 
     // Embed the in-tree YAML CST under YAML_METADATA_CONTENT when the
     // content validates. On validation failure, fall back to the
     // opaque line-token shape so downstream re-parse (and the host
     // CST snapshot of malformed YAML) keep their current behavior.
     //
-    // `parse_stream` returns a `YAML_STREAM` wrapping one or more
+    // The stored stream is a `YAML_STREAM` wrapping one or more
     // `YAML_DOCUMENT` children. The wrapper is the YAML-spec stream
     // container — but inside frontmatter the host's
     // `YAML_METADATA_CONTENT` already plays that role (and
     // `find_yaml_block_closing_pos` guarantees a single document by
     // stopping at the first internal `---` / `...`). Splice the stream's
     // children in directly to avoid the redundant wrapper.
-    let yaml_ctx = YamlValidationContext::frontmatter(flavor);
-    if let Some((diag, start_off, end_off)) = locate_yaml_diagnostic_ctx(&content, "", yaml_ctx) {
-        // Malformed frontmatter YAML: record the syntax error at its host
-        // position (the parser already has the verdict), then fall back to the
-        // opaque line-token shape. `content` begins at `lines[pos + 1]`, a
-        // subslice of the host input, so its host start is the pointer offset
-        // from line 0; offsets are identity (no per-line prefix).
-        let host_start = lines[pos + 1].as_ptr() as usize - lines[0].as_ptr() as usize;
-        diags.push(SyntaxError {
-            range: TextRange::new(
-                ((host_start + start_off) as u32).into(),
-                ((host_start + end_off) as u32).into(),
-            ),
-            message: diag.message.to_string(),
-            source: SyntaxErrorSource::Yaml,
-        });
-        for content_line in lines.iter().take(closing_pos).skip(pos + 1) {
-            emit_line_tokens(builder, content_line);
+    match outcome {
+        YamlContentOutcome::Invalid {
+            message,
+            start,
+            end,
+        } => {
+            // Malformed frontmatter YAML: record the syntax error at its host
+            // position (the parser already has the verdict), then fall back to
+            // the opaque line-token shape. The content begins at
+            // `lines[pos + 1]`, a subslice of the host input, so its host
+            // start is the pointer offset from line 0; offsets are identity
+            // (no per-line prefix).
+            let host_start = lines[pos + 1].as_ptr() as usize - lines[0].as_ptr() as usize;
+            diags.push(SyntaxError {
+                range: TextRange::new(
+                    ((host_start + start) as u32).into(),
+                    ((host_start + end) as u32).into(),
+                ),
+                message: message.to_string(),
+                source: SyntaxErrorSource::Yaml,
+            });
+            for content_line in lines.iter().take(closing_pos).skip(pos + 1) {
+                emit_line_tokens(builder, content_line);
+            }
         }
-    } else {
-        let stream_green = parse_stream(&content).green().into_owned();
-        copy_green_children(builder, &stream_green);
+        YamlContentOutcome::Valid { stream } => {
+            copy_green_children(builder, stream);
+        }
     }
     builder.finish_node(); // YAML_METADATA_CONTENT
 
@@ -398,6 +498,78 @@ mod tests {
         let lines = vec!["---", "title: Test", "---", "Content"];
         let result = find_yaml_block_closing_pos(&lines, 0, true);
         assert_eq!(result, Some(2));
+    }
+
+    #[test]
+    fn test_nonmapping_yaml_is_not_metadata() {
+        // Pandoc backtracks when the content is well-formed YAML whose top
+        // level is not a mapping (scalar, sequence): the lines reparse as
+        // ordinary blocks (simple table, or HR + paragraph).
+        for content in ["- a", "plain prose here", "42", "[a, b]"] {
+            let lines = vec!["---", content, "---"];
+            let mut builder = GreenNodeBuilder::new();
+            let result = try_parse_yaml_block(
+                &lines,
+                0,
+                &mut builder,
+                true,
+                &Diagnostics::default(),
+                Flavor::Pandoc,
+            );
+            assert_eq!(result, None, "{content:?} should not parse as metadata");
+        }
+    }
+
+    #[test]
+    fn test_mapping_and_null_yaml_is_metadata() {
+        // Pandoc accepts a top-level mapping, and null or comments-only
+        // content (empty metadata).
+        for content in ["foo: bar", "{a: 1}", "null", "~", "# comment"] {
+            let lines = vec!["---", content, "---"];
+            let mut builder = GreenNodeBuilder::new();
+            let result = try_parse_yaml_block(
+                &lines,
+                0,
+                &mut builder,
+                true,
+                &Diagnostics::default(),
+                Flavor::Pandoc,
+            );
+            assert_eq!(result, Some(3), "{content:?} should parse as metadata");
+        }
+    }
+
+    #[test]
+    fn test_nonmapping_yaml_stays_metadata_for_lenient_flavors() {
+        // GFM/CommonMark frontmatter has no asserted YAML metadata consumer,
+        // so the mapping gate does not apply there.
+        let lines = vec!["---", "42", "---"];
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_yaml_block(
+            &lines,
+            0,
+            &mut builder,
+            true,
+            &Diagnostics::default(),
+            Flavor::Gfm,
+        );
+        assert_eq!(result, Some(3));
+    }
+
+    #[test]
+    fn test_invalid_yaml_stays_metadata_with_diagnostic() {
+        // Pandoc hard-errors on YAML parse exceptions (no fallback
+        // interpretation exists); the lossless analog is keeping the
+        // metadata node and reporting a syntax error.
+        let lines = vec!["---", "foo: \"bar", "---"];
+        let mut builder = GreenNodeBuilder::new();
+        let diags = Diagnostics::default();
+        let result = try_parse_yaml_block(&lines, 0, &mut builder, true, &diags, Flavor::Pandoc);
+        assert_eq!(result, Some(3));
+        assert!(
+            !diags.take().is_empty(),
+            "malformed YAML should surface a syntax error"
+        );
     }
 
     #[test]

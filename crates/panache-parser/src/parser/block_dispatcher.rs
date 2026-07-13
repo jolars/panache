@@ -49,8 +49,9 @@ use super::blocks::lists::{
     try_parse_list_marker,
 };
 use super::blocks::metadata::{
-    emit_yaml_block, find_yaml_block_closing_pos, try_parse_mmd_title_block,
-    try_parse_pandoc_title_block, try_parse_yaml_block,
+    YamlContentOutcome, collect_yaml_content, emit_yaml_block, find_yaml_block_closing_pos,
+    prepare_yaml_content, try_parse_mmd_title_block, try_parse_pandoc_title_block,
+    try_parse_yaml_block,
 };
 use super::blocks::myst_directives::{
     DirectiveOpen, DirectiveOption, is_directive_closing_fence, try_parse_directive_open,
@@ -445,6 +446,7 @@ pub(crate) struct YamlMetadataParser;
 pub(crate) struct YamlMetadataPrepared {
     pub at_document_start: bool,
     pub closing_pos: usize,
+    pub outcome: YamlContentOutcome,
 }
 
 impl BlockParser for YamlMetadataParser {
@@ -493,12 +495,20 @@ impl BlockParser for YamlMetadataParser {
 
         let closing_pos = find_yaml_block_closing_pos(lines, line_pos, ctx.at_document_start)?;
 
+        // Metadata gate: well-formed YAML whose top level is not a mapping
+        // or null is not metadata under pandoc — fall through so the lines
+        // reparse as ordinary blocks. Carries the validation + parse result
+        // to emission to avoid re-parsing the content.
+        let content = collect_yaml_content(lines, line_pos, closing_pos);
+        let outcome = prepare_yaml_content(&content, ctx.config.flavor)?;
+
         // Cache the `at_document_start` flag for emission (avoids any ambiguity if ctx changes).
         Some((
             BlockDetectionResult::Yes,
             Some(Box::new(YamlMetadataPrepared {
                 at_document_start: ctx.at_document_start,
                 closing_pos,
+                outcome,
             })),
         ))
     }
@@ -519,7 +529,7 @@ impl BlockParser for YamlMetadataParser {
                 prepared.closing_pos,
                 builder,
                 &ctx.diags,
-                ctx.config.flavor,
+                &prepared.outcome,
             )
         {
             return new_pos - line_pos;

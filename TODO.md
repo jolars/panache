@@ -536,15 +536,27 @@ setext marker, so compact rules add no new risk there.
   required. Verify and remove; if it *is* reachable, it conflicts with the
   blank-after invariant that a compact rule needs.
 
-- [ ] **Parser swallows invalid YAML as `YAML_METADATA` (pandoc parity).**
+- [x] **Parser swallows invalid YAML as `YAML_METADATA` (pandoc parity).**
   Mid-document `---`, plain prose, `---` becomes `YAML_METADATA` plus a
   diagnostic --- `find_yaml_block_closing_pos`
   (`crates/panache-parser/src/parser/blocks/metadata.rs`) has no validity
   gate, it just scans for the next `---`/`...` line. Pandoc instead
   backtracks to another interpretation when the YAML fails to parse (a
-  simple table in the probe), or hard-errors in other contexts. Needs a
-  design decision (single-pass losslessness vs pandoc-native shape);
-  characterize pandoc's exact fallback rule first.
+  simple table in the probe), or hard-errors in other contexts. Fixed:
+  characterized pandoc's rule --- YAML parse *exception* hard-errors (no
+  fallback; panache keeps `YAML_METADATA` plus diagnostic), well-formed YAML
+  whose top level is not a mapping or null *backtracks*. Detection now
+  applies that gate via `prepare_yaml_content` and carries the parse result
+  to emission (no re-parse); gated on flavors with an asserted frontmatter
+  YAML consumer (Pandoc/Quarto/RMarkdown).
+
+- [ ] **Headerless simple table not detected in YAML-gate fallback.** When the
+  metadata gate rejects a non-mapping block (e.g. `---`, prose, `---`),
+  pandoc parses the whole span as a *headerless simple table* (dashed line,
+  rows, dashed line); panache falls back to HR + setext heading or HR + list
+  instead (see `yaml_metadata_nonmapping_*` parser fixtures). Lossless but
+  not pandoc-native; needs headerless single-column simple-table detection
+  to start at a bare `---` line.
 
 - [x] **GFM flavor enables mid-document YAML metadata blocks.** Pandoc's `gfm`
   reader has no mid-document YAML: it parses `---`, `key: value`, `---` in
