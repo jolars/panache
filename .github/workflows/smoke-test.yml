@@ -92,6 +92,13 @@ jobs:
             printf 'repo\tfailure_type\tfile\tlog_path\treport_path\trepo_sha\tpanache_sha\tpanache_version\tidempotency_input_path\tidempotency_once_path\tidempotency_twice_path\n'
           } > "$FAILURES_TSV"
 
+          # All-defaults config used to rescan files whose repo's own panache
+          # config fails to parse (e.g. pre-3.0 keys). That is the target
+          # repo's breakage, not a panache regression, so those files are
+          # checked against defaults instead of being reported.
+          FALLBACK_CONFIG="$RESULTS_DIR/fallback-panache.toml"
+          printf '# panache scan fallback config: built-in defaults only\n' > "$FALLBACK_CONFIG"
+
           while IFS= read -r repo; do
             if [ -z "$repo" ]; then
               continue
@@ -106,9 +113,21 @@ jobs:
               report_path="$LOGS_DIR/$file_key.report.md"
               pass_dir="$LOGS_DIR/$file_key.passes"
 
+              config_args=()
               if ! (cd "$repo_dir" && "$PANACHE_BIN" debug format --checks all --dump-dir "$pass_dir" --dump-passes "$rel_file") >"$log_path" 2>&1; then
+                # The repo's own config failing to parse would abort every
+                # file before any checks run. Retry against the fallback
+                # config; only failures that persist under a valid config are
+                # panache regressions worth reporting (see issue #419).
+                if grep -Fq 'invalid config' "$log_path"; then
+                  config_args=(--config "$FALLBACK_CONFIG")
+                  if (cd "$repo_dir" && "$PANACHE_BIN" debug format --checks all "${config_args[@]}" --dump-dir "$pass_dir" --dump-passes "$rel_file") >"$log_path" 2>&1; then
+                    echo "notice: $repo has an invalid panache config; $rel_file passed with the fallback config"
+                    continue
+                  fi
+                fi
                 # Generate human-friendly markdown report for issue snippets.
-                (cd "$repo_dir" && "$PANACHE_BIN" debug format --checks all --report "$rel_file") >"$report_path" 2>&1 || true
+                (cd "$repo_dir" && "$PANACHE_BIN" debug format --checks all "${config_args[@]}" --report "$rel_file") >"$report_path" 2>&1 || true
                 matched=0
                 failure_types=""
                 idempotency_input_rel=""
