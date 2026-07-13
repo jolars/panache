@@ -487,6 +487,66 @@ intentionally excluded.
   `crates/panache-formatter/src/formatter/inline_layout.rs`; start with a
   reproducing golden fixture per TDD.
 
+### Horizontal rules vs YAML delimiters (#417 investigation, 2026-07-13)
+
+Findings from investigating issue #417 (a compact `---` horizontal-rule option).
+The feature itself is **deferred** until the items below are resolved. Safety
+analysis summary: a line that is exactly `---`, preceded by a blank line (or
+document start) and followed by a non-blank line, opens a YAML metadata block
+that swallows everything up to the next `---` or `...` line, even across div
+fences --- verified faithful to pandoc (pandoc either swallows the same way or
+hard-errors with a YAML parse exception). YAML metadata also fires inside fenced
+divs and list items in both panache and pandoc. A compact rule is therefore only
+safe when the formatter guarantees blank lines on both sides of every emitted
+`---`; blank-before already holds everywhere, blank-after has the gaps below.
+Setext ambiguity is not affected: a dash underline of *any* length is a valid
+setext marker, so compact rules add no new risk there.
+
+- [ ] **Formatter ejects horizontal rules from list items (idempotency).** An HR
+  inside a list item (`- item`, blank, two-space-indented `---`, blank,
+  two-space-indented `text`) is emitted at column 0 and full width, so the
+  reparse ends the list early and the trailing item content loses its
+  indentation; `debug format --checks all` fails on idempotency. Emission
+  site: the `HORIZONTAL_RULE` arms in
+  `crates/panache-formatter/src/formatter/lists.rs`.
+
+- [ ] **Formatter glues a trailing horizontal rule to a div's closing fence.**
+  An HR as the last child of a fenced div is emitted with no blank line
+  before `:::` --- the blank-after logic in the `HORIZONTAL_RULE` arm of
+  `crates/panache-formatter/src/formatter/core.rs` only fires when
+  `next_sibling` is a block element, and `DIV_FENCE_CLOSE` is not one.
+  Harmless today only because a full-width rule cannot open YAML; a compact
+  `---` in this position reparses as a YAML block that eats the fence (and
+  pandoc hard-errors on the same input). Hard blocker for #417. (Note:
+  pandoc's own markdown writer also glues the rule to the fence, so matching
+  pandoc's writer here is not an option for compact rules.)
+
+- [ ] **Likely-dead blank-after exception for setext-candidate paragraphs.** The
+  `HORIZONTAL_RULE` arm in `core.rs` skips the blank line after a rule when
+  the next sibling is a paragraph whose first two lines form a setext
+  heading (`paragraph_starts_with_setext_heading_candidate`). Probing all
+  flavors suggests this CST shape is unreachable: the parser promotes such
+  shapes to `HEADING` even directly after a rule, with no blank line
+  required. Verify and remove; if it *is* reachable, it conflicts with the
+  blank-after invariant that a compact rule needs.
+
+- [ ] **Parser swallows invalid YAML as `YAML_METADATA` (pandoc parity).**
+  Mid-document `---`, plain prose, `---` becomes `YAML_METADATA` plus a
+  diagnostic --- `find_yaml_block_closing_pos`
+  (`crates/panache-parser/src/parser/blocks/metadata.rs`) has no validity
+  gate, it just scans for the next `---`/`...` line. Pandoc instead
+  backtracks to another interpretation when the YAML fails to parse (a
+  simple table in the probe), or hard-errors in other contexts. Needs a
+  design decision (single-pass losslessness vs pandoc-native shape);
+  characterize pandoc's exact fallback rule first.
+
+- [ ] **GFM flavor enables mid-document YAML metadata blocks.** Pandoc's `gfm`
+  reader has no mid-document YAML: it parses `---`, `key: value`, `---` in
+  the body as HR plus setext heading, while panache's GFM flavor produces
+  `YAML_METADATA`. Restrict `yaml_metadata_block` under GFM to
+  document-start frontmatter (what GFM tooling actually supports), or mirror
+  pandoc exactly.
+
 ### Performance
 
 ### YAML validation: consumer fidelity vs YAML 1.2 (needs design decision)
