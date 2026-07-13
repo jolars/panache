@@ -1,7 +1,7 @@
 use crate::config::{Config, WrapMode};
 use crate::directives::{DirectiveTracker, extract_directive_from_node};
 use crate::syntax::{BlockQuote, DefinitionItem, DisplayMath, FencedDiv, SyntaxKind, SyntaxNode};
-use panache_parser::parser::blocks::headings::{try_parse_atx_heading, try_parse_setext_heading};
+use panache_parser::parser::blocks::headings::try_parse_atx_heading;
 use panache_parser::parser::blocks::horizontal_rules::try_parse_horizontal_rule;
 use panache_parser::parser::utils::attributes::parse_attribute_content;
 use rowan::NodeOrToken;
@@ -265,20 +265,6 @@ impl Formatter {
                 inline_layout::wrap_text_first_fit(text, width)
             }
         }
-    }
-
-    fn paragraph_starts_with_setext_heading_candidate(&self, node: &SyntaxNode) -> bool {
-        if node.kind() != SyntaxKind::PARAGRAPH {
-            return false;
-        }
-        let text = node.text().to_string();
-        let mut lines = text.lines();
-        let first = lines.next().unwrap_or_default();
-        let second = lines.next().unwrap_or_default();
-        if second.is_empty() {
-            return false;
-        }
-        try_parse_setext_heading(&[first, second], 0).is_some()
     }
 
     // Delegate to code_blocks module
@@ -751,7 +737,6 @@ impl Formatter {
                 // Ensure blank line after if followed by block element
                 if let Some(next) = node.next_sibling()
                     && is_block_element(next.kind())
-                    && !self.paragraph_starts_with_setext_heading_candidate(&next)
                     && !self.output.ends_with("\n\n")
                 {
                     self.output.push('\n');

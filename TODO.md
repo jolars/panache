@@ -527,14 +527,13 @@ setext marker, so compact rules add no new risk there.
   `HTML_BLOCK_RAW` comment glued after a rule also round-trips today and
   will need the same treatment when compact rules land.)
 
-- [ ] **Likely-dead blank-after exception for setext-candidate paragraphs.** The
-  `HORIZONTAL_RULE` arm in `core.rs` skips the blank line after a rule when
-  the next sibling is a paragraph whose first two lines form a setext
-  heading (`paragraph_starts_with_setext_heading_candidate`). Probing all
-  flavors suggests this CST shape is unreachable: the parser promotes such
-  shapes to `HEADING` even directly after a rule, with no blank line
-  required. Verify and remove; if it *is* reachable, it conflicts with the
-  blank-after invariant that a compact rule needs.
+- [x] **Likely-dead blank-after exception for setext-candidate paragraphs.**
+  Verified unreachable and removed: all flavors promote rule-adjacent setext
+  shapes to `HEADING` (also in list items and with span-swallowed
+  underlines), and a panic planted in the helper survived the full test
+  suite. The original regression test
+  (`horizontal_rule_before_setext_like_paragraph_stays_idempotent`) stays as
+  coverage.
 
 - [x] **Parser swallows invalid YAML as `YAML_METADATA` (pandoc parity).**
   Mid-document `---`, plain prose, `---` becomes `YAML_METADATA` plus a
