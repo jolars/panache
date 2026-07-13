@@ -734,8 +734,14 @@ impl Formatter {
                 }
 
                 // Output normalized horizontal rule using full available width.
-                self.output
-                    .push_str(&self.horizontal_rule_text(self.config.line_width));
+                // Inside a list item (nonzero indent), keep the rule at the
+                // item's content column and shorten it accordingly — emitting
+                // it at column 0 would end the list on reparse and eject the
+                // rest of the item.
+                self.output.push_str(&" ".repeat(indent));
+                self.output.push_str(
+                    &self.horizontal_rule_text(self.config.line_width.saturating_sub(indent)),
+                );
                 self.output.push('\n');
 
                 // Ensure blank line after if followed by block element

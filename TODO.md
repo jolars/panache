@@ -502,13 +502,15 @@ safe when the formatter guarantees blank lines on both sides of every emitted
 Setext ambiguity is not affected: a dash underline of *any* length is a valid
 setext marker, so compact rules add no new risk there.
 
-- [ ] **Formatter ejects horizontal rules from list items (idempotency).** An HR
+- [x] **Formatter ejects horizontal rules from list items (idempotency).** An HR
   inside a list item (`- item`, blank, two-space-indented `---`, blank,
-  two-space-indented `text`) is emitted at column 0 and full width, so the
-  reparse ends the list early and the trailing item content loses its
-  indentation; `debug format --checks all` fails on idempotency. Emission
-  site: the `HORIZONTAL_RULE` arms in
-  `crates/panache-formatter/src/formatter/lists.rs`.
+  two-space-indented `text`) was emitted at column 0 and full width, so the
+  reparse ended the list early and the trailing item content lost its
+  indentation. Fixed: the `HORIZONTAL_RULE` arm in `format_node_sync`
+  (`crates/panache-formatter/src/formatter/core.rs`) now honors its `indent`
+  parameter (item content column, matching pandoc's writer) and shortens the
+  rule to `line-width - indent`. Golden case:
+  `horizontal_rule_in_list_item`.
 
 - [ ] **Formatter glues a trailing horizontal rule to a div's closing fence.**
   An HR as the last child of a fenced div is emitted with no blank line
