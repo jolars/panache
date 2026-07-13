@@ -1,0 +1,46 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 99
+expression: cst_output
+---
+DOCUMENT@0..84
+  YAML_METADATA@0..25
+    YAML_METADATA_DELIM@0..3 "---"
+    NEWLINE@3..4 "\n"
+    YAML_METADATA_CONTENT@4..21
+      YAML_DOCUMENT@4..21
+        YAML_BLOCK_MAP@4..21
+          YAML_BLOCK_MAP_ENTRY@4..21
+            YAML_BLOCK_MAP_KEY@4..10
+              YAML_SCALAR@4..9
+                YAML_SCALAR_TEXT@4..9 "title"
+              YAML_COLON@9..10 ":"
+            YAML_BLOCK_MAP_VALUE@10..21
+              WHITESPACE@10..11 " "
+              YAML_SCALAR@11..20
+                YAML_SCALAR_TEXT@11..20 "Start Doc"
+              NEWLINE@20..21 "\n"
+    YAML_METADATA_DELIM@21..24 "---"
+    NEWLINE@24..25 "\n"
+  BLANK_LINE@25..26
+    BLANK_LINE@25..26 "\n"
+  PARAGRAPH@26..43
+    TEXT@26..42 "First paragraph."
+    NEWLINE@42..43 "\n"
+  BLANK_LINE@43..44
+    BLANK_LINE@43..44 "\n"
+  HORIZONTAL_RULE@44..48
+    HORIZONTAL_RULE@44..47 "---"
+    NEWLINE@47..48 "\n"
+  HEADING@48..67
+    HEADING_CONTENT@48..62
+      TEXT@48..62 "title: Mid Doc"
+    NEWLINE@62..63 "\n"
+    SETEXT_HEADING_UNDERLINE@63..66
+      SETEXT_HEADING_UNDERLINE@63..66 "---"
+    NEWLINE@66..67 "\n"
+  BLANK_LINE@67..68
+    BLANK_LINE@67..68 "\n"
+  PARAGRAPH@68..84
+    TEXT@68..83 "Last paragraph."
+    NEWLINE@83..84 "\n"

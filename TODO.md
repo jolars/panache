@@ -546,12 +546,15 @@ setext marker, so compact rules add no new risk there.
   design decision (single-pass losslessness vs pandoc-native shape);
   characterize pandoc's exact fallback rule first.
 
-- [ ] **GFM flavor enables mid-document YAML metadata blocks.** Pandoc's `gfm`
+- [x] **GFM flavor enables mid-document YAML metadata blocks.** Pandoc's `gfm`
   reader has no mid-document YAML: it parses `---`, `key: value`, `---` in
   the body as HR plus setext heading, while panache's GFM flavor produces
   `YAML_METADATA`. Restrict `yaml_metadata_block` under GFM to
   document-start frontmatter (what GFM tooling actually supports), or mirror
-  pandoc exactly.
+  pandoc exactly. Fixed: mid-document YAML detection now bails under
+  `Dialect::CommonMark` (gfm, commonmark, mdsvex, myst), which mirrors
+  pandoc exactly --- its `gfm` reader requires `---` on the very first line
+  (even a leading blank line demotes it to HR plus setext heading).
 
 - [x] **Parser misses horizontal rules and ATX headings in list items nested two
   levels deep.** Found while fixing the list-item HR ejection above. A rule

@@ -1,4 +1,4 @@
-use super::helpers::{find_first, parse_blocks_with_config};
+use super::helpers::{find_first, parse_blocks, parse_blocks_gfm, parse_blocks_with_config};
 use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 
@@ -47,6 +47,43 @@ fn yaml_metadata_block_disabled_does_not_parse_yaml_metadata() {
     assert!(
         find_first(&tree, SyntaxKind::YAML_METADATA).is_none(),
         "yaml_metadata_block disabled should prevent YAML metadata parsing"
+    );
+}
+
+#[test]
+fn gfm_restricts_yaml_metadata_to_document_start() {
+    // Pandoc's gfm reader only recognizes YAML metadata as document-leading
+    // frontmatter; mid-document `---`/`key: value`/`---` parses as a
+    // thematic break plus a setext heading.
+    let tree =
+        parse_blocks_gfm("First paragraph.\n\n---\ntitle: Mid Doc\n---\n\nLast paragraph.\n");
+    assert!(
+        find_first(&tree, SyntaxKind::YAML_METADATA).is_none(),
+        "gfm should not parse mid-document YAML metadata"
+    );
+    assert!(
+        find_first(&tree, SyntaxKind::HORIZONTAL_RULE).is_some(),
+        "gfm should parse the opening --- as a thematic break"
+    );
+}
+
+#[test]
+fn gfm_parses_document_start_yaml_metadata() {
+    let tree = parse_blocks_gfm("---\ntitle: Start Doc\n---\n\nBody.\n");
+    assert!(
+        find_first(&tree, SyntaxKind::YAML_METADATA).is_some(),
+        "gfm should parse document-start YAML frontmatter"
+    );
+}
+
+#[test]
+fn pandoc_parses_mid_document_yaml_metadata() {
+    // Pandoc's markdown reader accepts YAML metadata anywhere in the
+    // document when preceded by a blank line.
+    let tree = parse_blocks("First paragraph.\n\n---\ntitle: Mid Doc\n---\n\nLast paragraph.\n");
+    assert!(
+        find_first(&tree, SyntaxKind::YAML_METADATA).is_some(),
+        "pandoc should parse mid-document YAML metadata"
     );
 }
 

@@ -1011,7 +1011,10 @@ pandoc-title-block = true
 ```
 
 `yaml-metadata-block`
-:   YAML frontmatter with `---` delimiters (default: enabled)
+:   YAML frontmatter with `---` delimiters (default: enabled). Pandoc-family
+    flavors also accept metadata blocks mid-document when preceded by a blank
+    line; CommonMark-family flavors (`gfm`, `commonmark`, `mdsvex`, `myst`) only
+    recognize document-start frontmatter, matching pandoc's `gfm` reader.
 
 `pandoc-title-block`
 :   Pandoc title block `% Title`, `% Author`, `% Date` (default: enabled)

@@ -9,7 +9,7 @@
 //! - Inline parsing still integrated (called from within block parsing)
 //! - Maintains exact CST structure and losslessness
 
-use crate::options::ParserOptions;
+use crate::options::{Dialect, ParserOptions};
 use rowan::GreenNodeBuilder;
 use std::any::Any;
 
@@ -472,6 +472,15 @@ impl BlockParser for YamlMetadataParser {
 
         // Fast guard: mid-document YAML requires a preceding blank line.
         if !ctx.has_blank_before && !ctx.at_document_start {
+            return None;
+        }
+
+        // Mid-document YAML metadata is a pandoc-markdown feature. The
+        // CommonMark-family readers (gfm, myst, mdsvex) only recognize YAML
+        // frontmatter on the document's first line; elsewhere `---` is a
+        // thematic break (pandoc's gfm reader parses `---`/`key: value`/`---`
+        // in the body as HR plus setext heading).
+        if !ctx.at_document_start && ctx.config.dialect == Dialect::CommonMark {
             return None;
         }
 
