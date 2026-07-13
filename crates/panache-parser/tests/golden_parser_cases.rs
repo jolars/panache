@@ -601,6 +601,7 @@ golden_test_cases!(
     myst_block_break,
     myst_frontmatter,
     myst_substitution,
+    nested_list_item_hr_heading,
     ordered_marker_max_digits_commonmark,
     ordered_marker_max_digits_pandoc,
     ordered_paren_marker_decimal_commonmark,

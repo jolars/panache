@@ -211,11 +211,18 @@ impl ListItemBuffer {
                 && !line.contains('\n')
                 && !line.contains('\r')
             {
-                if let Some(level) = try_parse_atx_heading(line) {
+                // Detect against the line with the item's leading indent
+                // stripped (a continuation chunk carries it on its first
+                // line): pandoc measures rule/heading indentation from the
+                // item's content column, so a depth-2 rule (4 leading
+                // columns) must not trip the CommonMark 4-space guard.
+                // Emission keeps the original bytes (lossless).
+                let detect_line = &line[item_indent_prefix_len(line, content_col)..];
+                if let Some(level) = try_parse_atx_heading(detect_line) {
                     emit_atx_heading(builder, &text, level, config);
                     return;
                 }
-                if try_parse_horizontal_rule(line).is_some() {
+                if try_parse_horizontal_rule(detect_line).is_some() {
                     emit_horizontal_rule(builder, &text);
                     return;
                 }
@@ -233,8 +240,9 @@ impl ListItemBuffer {
             {
                 let first_line = &text[..first_nl];
                 let after_first = &text[first_nl + 1..];
+                let detect_first = &first_line[item_indent_prefix_len(first_line, content_col)..];
                 if !after_first.is_empty()
-                    && let Some(level) = try_parse_atx_heading(first_line)
+                    && let Some(level) = try_parse_atx_heading(detect_first)
                 {
                     let heading_bytes = &text[..first_nl + 1];
                     emit_atx_heading(builder, heading_bytes, level, config);
@@ -538,6 +546,34 @@ fn graft_node_retag_root(
 /// untouched — its leading columns are owned by the list marker and
 /// its post-marker spaces. Returns the stripped text plus a per-line
 /// prefix vector for losslessness re-injection during graft.
+/// Number of leading bytes covering up to `content_col` columns of
+/// list-item indentation (spaces, or tabs on 4-column stops).
+fn item_indent_prefix_len(line: &str, content_col: usize) -> usize {
+    let mut consumed = 0usize;
+    let mut col = 0usize;
+    for &b in line.as_bytes() {
+        if col >= content_col {
+            break;
+        }
+        match b {
+            b' ' => {
+                col += 1;
+                consumed += 1;
+            }
+            b'\t' => {
+                let next = (col / 4 + 1) * 4;
+                if next > content_col {
+                    break;
+                }
+                col = next;
+                consumed += 1;
+            }
+            _ => break,
+        }
+    }
+    consumed
+}
+
 fn strip_list_item_indent(text: &str, content_col: usize) -> (String, Vec<String>) {
     let mut stripped = String::with_capacity(text.len());
     let mut prefixes: Vec<String> = Vec::new();
@@ -547,28 +583,7 @@ fn strip_list_item_indent(text: &str, content_col: usize) -> (String, Vec<String
             stripped.push_str(line);
             continue;
         }
-        let mut consumed = 0usize;
-        let mut col = 0usize;
-        for &b in line.as_bytes() {
-            if col >= content_col {
-                break;
-            }
-            match b {
-                b' ' => {
-                    col += 1;
-                    consumed += 1;
-                }
-                b'\t' => {
-                    let next = (col / 4 + 1) * 4;
-                    if next > content_col {
-                        break;
-                    }
-                    col = next;
-                    consumed += 1;
-                }
-                _ => break,
-            }
-        }
+        let consumed = item_indent_prefix_len(line, content_col);
         prefixes.push(line[..consumed].to_string());
         stripped.push_str(&line[consumed..]);
     }

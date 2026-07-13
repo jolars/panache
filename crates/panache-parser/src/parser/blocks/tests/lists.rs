@@ -3,7 +3,7 @@ use super::helpers::{
     parse_blocks_with_config,
 };
 use crate::options::{Extensions, Flavor, ParserOptions};
-use crate::syntax::SyntaxKind;
+use crate::syntax::{SyntaxKind, SyntaxNode};
 
 #[test]
 fn simple_bullet_list() {
@@ -676,4 +676,75 @@ fn nested_lower_roman_with_uneven_marker_width_stays_single_nested_list() {
         "nested roman items should stay in one nested list"
     );
     assert_eq!(count_children(&nested_lists[0], SyntaxKind::LIST_ITEM), 3);
+}
+
+/// Count LIST_ITEM ancestors of a node (nesting depth of item content).
+fn list_item_depth(node: &SyntaxNode) -> usize {
+    node.ancestors()
+        .filter(|a| a.kind() == SyntaxKind::LIST_ITEM)
+        .count()
+}
+
+#[test]
+fn horizontal_rule_in_depth_two_list_item() {
+    // pandoc (both -f markdown and -f commonmark): HorizontalRule nested in
+    // the inner item. The item indent (4 columns) must not trip the
+    // CommonMark 4-space guard in `try_parse_horizontal_rule`.
+    let input = "- outer\n\n  - inner\n\n    ***\n\n    deep\n";
+    let tree = parse_blocks(input);
+    let hr = find_first(&tree, SyntaxKind::HORIZONTAL_RULE)
+        .expect("nested rule should parse as HORIZONTAL_RULE");
+    assert_eq!(list_item_depth(&hr), 2, "rule should sit in the inner item");
+}
+
+#[test]
+fn atx_heading_in_depth_two_list_item() {
+    // pandoc (both dialects): Header nested in the inner item.
+    let input = "- outer\n\n  - inner\n\n    # head\n";
+    let tree = parse_blocks(input);
+    let heading =
+        find_first(&tree, SyntaxKind::HEADING).expect("nested ATX heading should parse as HEADING");
+    assert_eq!(list_item_depth(&heading), 2);
+}
+
+#[test]
+fn atx_heading_then_text_in_depth_two_list_item() {
+    // pandoc (both dialects): Header followed by a separate Para/Plain,
+    // both inside the inner item (multi-line buffer chunk).
+    let input = "- outer\n\n  - inner\n\n    # head\n    more\n";
+    let tree = parse_blocks(input);
+    let heading =
+        find_first(&tree, SyntaxKind::HEADING).expect("nested ATX heading should parse as HEADING");
+    assert_eq!(list_item_depth(&heading), 2);
+    let trailing = heading
+        .next_sibling()
+        .expect("heading should have trailing sibling block");
+    assert!(
+        matches!(trailing.kind(), SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH),
+        "trailing text should be a separate block, got {:?}",
+        trailing.kind()
+    );
+}
+
+#[test]
+fn horizontal_rule_three_extra_spaces_in_list_item() {
+    // Content column + up to 3 extra spaces is still a thematic break in
+    // pandoc (both dialects): `- item` with a rule indented 5 columns.
+    let input = "- item\n\n     ---\n\n  text\n";
+    let tree = parse_blocks(input);
+    let hr = find_first(&tree, SyntaxKind::HORIZONTAL_RULE)
+        .expect("rule at content_col + 3 should parse as HORIZONTAL_RULE");
+    assert_eq!(list_item_depth(&hr), 1);
+}
+
+#[test]
+fn horizontal_rule_four_extra_spaces_in_list_item_is_not_a_rule() {
+    // Content column + 4 spaces is indented-code territory in pandoc, not a
+    // thematic break; detection must not claim it after indent stripping.
+    let input = "- item\n\n      ---\n\n  text\n";
+    let tree = parse_blocks(input);
+    assert!(
+        find_first(&tree, SyntaxKind::HORIZONTAL_RULE).is_none(),
+        "rule at content_col + 4 must not parse as HORIZONTAL_RULE"
+    );
 }
