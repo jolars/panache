@@ -249,6 +249,16 @@ Set the maximum line width for text wrapping under `[format]`:
 line-width = 80
 ```
 
+The default is 80, and the width is measured in Unicode display columns, not
+characters or bytes: East Asian wide characters count as two columns, so `x宮`
+is 3 columns (rather than 2 characters or 4 UTF-8 bytes), matching how wide the
+text renders in a terminal.
+
+You do not need to set `wrap` for `line-width` to apply: the default
+`wrap = "reflow"` already refills paragraphs to this width. The other wrap modes
+leave paragraphs alone, but `line-width` still governs table captions,
+horizontal-rule length, YAML scalar folding, and display-math breaking.
+
 The `-o`/`--option` flag on `panache format` can override this setting for a
 single invocation, e.g. `panache format -o line-width=100`. This is an escape
 hatch for ad-hoc runs; prefer `panache.toml` so that everyone formatting the

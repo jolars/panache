@@ -36,9 +36,12 @@ wrap = "reflow" # or "preserve", "sentence", or "semantic"
 
 If `wrap` is set to `reflow`, Panache will reformat paragraphs to fit within the
 number of columns specified by the `line-width` configuration option (default
-80). If `wrap` is set to `preserve`, Panache will keep existing line breaks and
-not reflow paragraphs. If `wrap` is set to `sentence`, Panache will break lines
-at sentence boundaries, ensuring that each sentence starts on a new line.
+80). Columns are Unicode display columns, not characters or bytes: East Asian
+wide characters count as two, so `x宮` is 3 columns wide (see [Line
+Width](configuration.qmd#line-width)). If `wrap` is set to `preserve`, Panache
+will keep existing line breaks and not reflow paragraphs. If `wrap` is set to
+`sentence`, Panache will break lines at sentence boundaries, ensuring that each
+sentence starts on a new line.
 
 If `wrap` is set to `semantic`, Panache enforces [semantic line
 breaks](https://sembr.org/): it keeps the line breaks you already placed (for
