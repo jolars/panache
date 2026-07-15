@@ -74,18 +74,6 @@ jobs:
         working-directory: editors/code
         run: npm run compile
 
-  cargo-audit:
-    name: Cargo Audit
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      checks: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
   cargo-deny:
     name: Cargo Deny
     runs-on: ubuntu-latest
@@ -98,7 +86,7 @@ jobs:
 
   versionary:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [cargo-audit, cargo-deny, test, extension]
+    needs: [cargo-deny, test, extension]
     runs-on: ubuntu-latest
     permissions:
       contents: write
