@@ -233,8 +233,8 @@
     "package": "vsce package"
   },
   "dependencies": {
-    "adm-zip": "^0.5.18",
-    "tar": "^7.5.19",
+    "adm-zip": "^0.6.0",
+    "tar": "^7.5.20",
     "vscode-languageclient": "^10.1.0"
   },
   "devDependencies": {
