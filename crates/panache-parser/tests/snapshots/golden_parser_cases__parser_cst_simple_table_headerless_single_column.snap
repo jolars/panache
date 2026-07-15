@@ -1,0 +1,31 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..58
+  PARAGRAPH@0..7
+    TEXT@0..6 "before"
+    NEWLINE@6..7 "\n"
+  BLANK_LINE@7..8
+    BLANK_LINE@7..8 "\n"
+  SIMPLE_TABLE@8..51
+    TABLE_SEPARATOR@8..19
+      TABLE_SEP_DASHES@8..18 "----------"
+      NEWLINE@18..19 "\n"
+    TABLE_ROW@19..29
+      TABLE_CELL@19..28
+        TEXT@19..28 "first row"
+      NEWLINE@28..29 "\n"
+    TABLE_ROW@29..40
+      TABLE_CELL@29..39
+        TEXT@29..39 "second row"
+      NEWLINE@39..40 "\n"
+    TABLE_ROW@40..51
+      TABLE_CELL@40..50
+        TEXT@40..50 "----------"
+      NEWLINE@50..51 "\n"
+  BLANK_LINE@51..52
+    BLANK_LINE@51..52 "\n"
+  PARAGRAPH@52..58
+    TEXT@52..57 "after"
+    NEWLINE@57..58 "\n"

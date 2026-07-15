@@ -171,6 +171,55 @@ fn extract_columns(separator: &str, offset: usize) -> Vec<Column> {
     columns
 }
 
+/// Parse a bare single dash run (`---`): at least two dashes, up to three
+/// leading spaces, optional trailing whitespace, nothing else. This is the
+/// shape a headerless single-column simple table's opener shares with a
+/// horizontal rule, so callers must additionally require the closing dash
+/// line (see `find_single_column_table_end`) before treating it as a table.
+/// Multi-column runs (`--- ---`) are `try_parse_table_separator`'s domain.
+fn parse_single_dash_run(line: &str) -> Option<Vec<Column>> {
+    let (content, _) = strip_newline(line);
+    let trimmed = content.trim_start();
+    let leading_spaces = content.len() - trimmed.len();
+
+    // Must have leading spaces <= 3 to not be a code block
+    if leading_spaces > 3 {
+        return None;
+    }
+
+    let dashes = trimmed.trim_end();
+    if dashes.len() < 2 || !dashes.chars().all(|c| c == '-') {
+        return None;
+    }
+
+    Some(vec![Column {
+        start: leading_spaces,
+        end: leading_spaces + dashes.len(),
+        alignment: Alignment::Default,
+    }])
+}
+
+/// Find the end of a headerless single-column simple table whose opener sits
+/// at `start - 1`: rows run until a closing line of dashes (single run or
+/// column separator), which pandoc requires before the first blank line —
+/// without it the opener is a horizontal rule, not a table. Returns the
+/// position just past the closer, which the caller emits as the final row
+/// (the all-dashes `TABLE_ROW` convention headerless tables already use).
+fn find_single_column_table_end(lines: &(impl LineView + ?Sized), start: usize) -> Option<usize> {
+    let mut saw_row = false;
+    for i in start..lines.line_count() {
+        let line = lines.line(i);
+        if line.trim().is_empty() {
+            return None;
+        }
+        if try_parse_table_separator(line).is_some() || parse_single_dash_run(line).is_some() {
+            return saw_row.then_some(i + 1);
+        }
+        saw_row = true;
+    }
+    None
+}
+
 /// Convert a display-column offset into a UTF-8 byte index for `line`.
 ///
 /// Simple- and multiline-table column boundaries come from ASCII separator
@@ -350,6 +399,17 @@ fn table_grid_starts_at(lines: &(impl LineView + ?Sized), pos: usize) -> bool {
 
     // Multiline table start (`----` or `---- ---- ----`).
     if is_multiline_table_start(line) {
+        return true;
+    }
+
+    // Bare dash run opening a headerless single-column simple table. Runs of
+    // three or more dashes already matched the multiline check above; this
+    // catches the two-dash opener pandoc also accepts. It is gated on the
+    // closing dash line the real parser requires (a scan bounded by the first
+    // blank line) so the probe stays in agreement with `try_parse_simple_table`.
+    if parse_single_dash_run(line).is_some()
+        && find_single_column_table_end(lines, pos + 1).is_some()
+    {
         return true;
     }
 
@@ -767,7 +827,13 @@ pub(crate) fn try_parse_simple_table(
         && start_pos + 1 < lines.len()
         && !gate_first.trim().is_empty()
         && try_parse_table_separator(window.strip_at(start_pos + 1)).is_some();
-    if !separator_here && !separator_next {
+    // A bare dash run can open a headerless *single-column* table (pandoc:
+    // `---` / rows / `---`), but only on the dispatch line — on the line
+    // after content it is a setext underline, which pandoc's header parser
+    // claims before its table parser runs.
+    let single_column_here =
+        !separator_here && !separator_next && parse_single_dash_run(gate_first).is_some();
+    if !separator_here && !separator_next && !single_column_here {
         return None;
     }
 
@@ -779,12 +845,25 @@ pub(crate) fn try_parse_simple_table(
     // bounded range is ever stripped. Emission re-emits the prefix bytes as
     // tokens via the window; captions/blank lines still read raw `lines`.
 
-    // Look for a separator line
-    let separator_pos = find_separator_line(window, start_pos)?;
+    // Look for a separator line. The single-column shape is ambiguous with a
+    // horizontal rule, so unlike the multi-column paths it also demands the
+    // closing dash line up front (pandoc rejects the table without one).
+    let (separator_pos, end_pos) = if single_column_here {
+        let end_pos = find_single_column_table_end(window, start_pos + 1)?;
+        (start_pos, end_pos)
+    } else {
+        let separator_pos = find_separator_line(window, start_pos)?;
+        // Find table end (blank line or end of input)
+        (separator_pos, find_table_end(window, separator_pos + 1))
+    };
     log::trace!("  found separator at line {}", separator_pos + 1);
 
     let separator_line = window.line(separator_pos);
-    let mut columns = try_parse_table_separator(separator_line)?;
+    let mut columns = if single_column_here {
+        parse_single_dash_run(separator_line)?
+    } else {
+        try_parse_table_separator(separator_line)?
+    };
 
     // Determine if there's a header (separator not at start)
     let has_header = separator_pos > start_pos;
@@ -796,9 +875,6 @@ pub(crate) fn try_parse_simple_table(
 
     // Determine alignments
     determine_alignments(&mut columns, separator_line, header_line);
-
-    // Find table end (blank line or end of input)
-    let end_pos = find_table_end(window, separator_pos + 1);
 
     // Must have at least one data row (or it's just a separator)
     let data_rows = end_pos - separator_pos - 1;
@@ -1534,6 +1610,61 @@ mod tests {
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 3); // sep + 2 rows
+    }
+
+    #[test]
+    fn single_dash_run_detection() {
+        assert!(parse_single_dash_run("---").is_some());
+        assert!(parse_single_dash_run("--").is_some()); // pandoc accepts two dashes
+        assert!(parse_single_dash_run("-").is_none()); // list marker territory
+        assert!(parse_single_dash_run("  ----------  ").is_some());
+        assert!(parse_single_dash_run("    ---").is_none()); // indented code
+        assert!(parse_single_dash_run("--- ---").is_none()); // multi-column separator
+        assert!(parse_single_dash_run("---x").is_none());
+        assert!(parse_single_dash_run("- - -").is_none()); // spaced thematic break
+    }
+
+    #[test]
+    fn headerless_single_column_simple_table() {
+        // Pandoc parses a bare dash run followed by rows and a closing dash
+        // run as a headerless single-column simple table (`---` / rows /
+        // `---`), e.g. when the YAML metadata gate rejects a non-mapping
+        // block.
+        let input = vec!["---", "- a", "- b", "---", ""];
+
+        let mut builder = GreenNodeBuilder::new();
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_simple_table(&window, &mut builder, &ParserOptions::default());
+
+        assert_eq!(result, Some(4)); // opener + 2 rows + closer
+    }
+
+    #[test]
+    fn headerless_single_column_requires_closer() {
+        // Without a closing dash line before the first blank line the dash
+        // run is a horizontal rule, not a table opener (matches pandoc).
+        let input = vec!["---", "just prose", "", "after"];
+
+        let mut builder = GreenNodeBuilder::new();
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_simple_table(&window, &mut builder, &ParserOptions::default());
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn headerless_single_column_requires_rows() {
+        // Two adjacent dash runs are two horizontal rules, not an empty table.
+        let input = vec!["---", "---", ""];
+
+        let mut builder = GreenNodeBuilder::new();
+        let prefix = ContainerPrefix::default();
+        let window = StrippedLines::new(&input, 0, &prefix);
+        let result = try_parse_simple_table(&window, &mut builder, &ParserOptions::default());
+
+        assert!(result.is_none());
     }
 
     #[test]

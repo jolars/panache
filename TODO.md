@@ -549,13 +549,31 @@ setext marker, so compact rules add no new risk there.
   to emission (no re-parse); gated on flavors with an asserted frontmatter
   YAML consumer (Pandoc/Quarto/RMarkdown).
 
-- [ ] **Headerless simple table not detected in YAML-gate fallback.** When the
+- [x] **Headerless simple table not detected in YAML-gate fallback.** When the
   metadata gate rejects a non-mapping block (e.g. `---`, prose, `---`),
   pandoc parses the whole span as a *headerless simple table* (dashed line,
   rows, dashed line); panache falls back to HR + setext heading or HR + list
   instead (see `yaml_metadata_nonmapping_*` parser fixtures). Lossless but
   not pandoc-native; needs headerless single-column simple-table detection
-  to start at a bare `---` line.
+  to start at a bare `---` line. Fixed: `try_parse_simple_table` accepts a
+  bare single dash run (>= 2 dashes) as a headerless single-column opener,
+  gated on the closing dash line pandoc requires before the first blank line
+  (without a closer the run stays an HR). Registry order (setext before
+  tables, tables before HR) gives pandoc's precedence for free.
+
+- [ ] **Headerless single-column *multiline* table not detected.** With
+  blank-separated rows (`---`, `foo`, blank, `bar`, `---`) pandoc parses a
+  headerless multiline table; panache's multiline path rejects
+  single-dash-run openers (`is_column_separator` requires >= 2 dash groups),
+  so the span falls back to HR + paragraphs. Rarer sibling of the
+  simple-table case above.
+
+- [ ] **Headerless simple table accepted without a closing dash line.** Pandoc
+  requires headerless simple tables (multi-column too) to end with a line of
+  dashes; `--- ---`, `foo bar`, blank parses as HR + paragraph in pandoc,
+  but panache's `find_table_end` accepts the blank line alone and emits a
+  table. The new single-column path already requires the closer; the
+  multi-column path predates it and diverges.
 
 - [x] **GFM flavor enables mid-document YAML metadata blocks.** Pandoc's `gfm`
   reader has no mid-document YAML: it parses `---`, `key: value`, `---` in

@@ -802,6 +802,10 @@ Headerless simple tables (delimited by a dash run above and below the data) have
 no header row, so each column's alignment is read from the **first data row's**
 position relative to the dash runs, matching how Pandoc parses them.
 
+A single continuous dash run also opens a headerless *single-column* table when
+a closing dash run follows before the next blank line (`---`, rows, `---`),
+matching Pandoc. Without the closing run, the dashes are a horizontal rule.
+
 Input
 
 :   ```markdown
