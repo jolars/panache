@@ -14,7 +14,8 @@ and provides a minimal set of options to configure the formatting behavior.
 
 The golden rule is that a markdown document should be readable in its raw form,
 which for instance has guided the decision to convert `---` horizontal rules to
-a full line of hyphens.
+a full line of hyphens by default (configurable via `horizontal-rule-style`, see
+[Horizontal Rulers](#horizontal-rulers)).
 
 Another important principle is that Panache's formatter is *idempotent*: running
 the formatter multiple times on the same document should not produce different
@@ -1300,7 +1301,8 @@ Output
 
 ## Horizontal Rulers
 
-Horizontal rulers are normalized to hyphens and extend to `line-width`.
+Horizontal rulers are normalized to hyphens and, by default, extend to
+`line-width`.
 
 Input
 
@@ -1319,6 +1321,23 @@ Output (`line-width = 60`):
 
     -----------------------------------------------------------
     ```
+
+Set `horizontal-rule-style = "compact"` under `[format]` to emit a three-dash
+`---` instead:
+
+Output (`horizontal-rule-style = "compact"`):
+
+:   ```markdown
+    ---
+
+    ---
+
+    ---
+    ```
+
+Panache always keeps blank lines around horizontal rules, so a compact `---`
+cannot be misread as a YAML metadata delimiter or a setext heading underline
+when the document is parsed again.
 
 ## Blank Lines
 

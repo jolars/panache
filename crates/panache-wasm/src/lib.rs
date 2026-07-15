@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 
 use panache_formatter::config::{
-    BlankLines, Flavor, LineEnding, MathDelimiterStyle, TabStopMode, WrapMode,
+    BlankLines, Flavor, HorizontalRuleStyle, LineEnding, MathDelimiterStyle, TabStopMode, WrapMode,
 };
 
 fn parse_flavor(value: &str) -> Option<Flavor> {
@@ -53,6 +53,14 @@ fn parse_math_delimiter_style(value: &str) -> Option<MathDelimiterStyle> {
     }
 }
 
+fn parse_horizontal_rule_style(value: &str) -> Option<HorizontalRuleStyle> {
+    match value.to_ascii_lowercase().as_str() {
+        "line-width" => Some(HorizontalRuleStyle::LineWidth),
+        "compact" => Some(HorizontalRuleStyle::Compact),
+        _ => None,
+    }
+}
+
 fn parse_tab_stops(value: &str) -> Option<TabStopMode> {
     match value.to_ascii_lowercase().as_str() {
         "normalize" => Some(TabStopMode::Normalize),
@@ -82,6 +90,7 @@ pub fn format_qmd_with_options(
     tab_stops: Option<String>,
     tab_width: Option<usize>,
     math_indent: Option<usize>,
+    horizontal_rule_style: Option<String>,
 ) -> Result<String, JsValue> {
     let mut cfg = panache_formatter::Config::default();
 
@@ -140,6 +149,15 @@ pub fn format_qmd_with_options(
 
     if let Some(math_indent) = math_indent {
         cfg.math_indent = math_indent;
+    }
+
+    if let Some(horizontal_rule_style) = horizontal_rule_style {
+        cfg.horizontal_rule_style = parse_horizontal_rule_style(&horizontal_rule_style)
+            .ok_or_else(|| {
+                JsValue::from_str(&format!(
+                    "Unsupported horizontal rule style: {horizontal_rule_style}"
+                ))
+            })?;
     }
 
     Ok(panache_formatter::format(input, Some(cfg), None))

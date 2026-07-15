@@ -63,6 +63,18 @@ pub enum WrapMode {
     Semantic,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum HorizontalRuleStyle {
+    /// Expand horizontal rules to the configured line width (Pandoc-style).
+    #[default]
+    LineWidth,
+    /// Emit a compact three-dash rule (`---`).
+    Compact,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
@@ -193,6 +205,9 @@ pub struct Config {
     pub tab_width: usize,
     pub wrap: Option<WrapMode>,
     pub blank_lines: BlankLines,
+    /// How horizontal rules are rendered: expanded to the line width
+    /// (default) or as a compact `---`.
+    pub horizontal_rule_style: HorizontalRuleStyle,
     /// Document-language fallback used by sentence wrapping when the document
     /// has no YAML `lang:`. Normalized lowercase code (e.g. `de`, `pt-br`).
     pub lang: Option<String>,
@@ -230,6 +245,7 @@ impl Default for Config {
             tab_width: 4,
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
+            horizontal_rule_style: HorizontalRuleStyle::default(),
             lang: None,
             no_break_abbreviations: std::collections::BTreeMap::new(),
             formatters: HashMap::new(), // Opt-in: empty by default
@@ -302,6 +318,11 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn horizontal_rule_style(mut self, style: HorizontalRuleStyle) -> Self {
+        self.config.horizontal_rule_style = style;
+        self
+    }
+
     pub fn build(self) -> Config {
         self.config
     }
@@ -350,5 +371,15 @@ mod schema_tests {
     #[test]
     fn blank_lines_values_are_lowercase() {
         assert_wire_values::<BlankLines>(&["preserve", "collapse"]);
+    }
+
+    #[test]
+    fn horizontal_rule_style_values_are_kebab_case() {
+        assert_wire_values::<HorizontalRuleStyle>(&["line-width", "compact"]);
+        let s = serde_json::to_string(&schemars::schema_for!(HorizontalRuleStyle)).unwrap();
+        assert!(
+            !s.contains("\"LineWidth\""),
+            "PascalCase variant leaked: {s}"
+        );
     }
 }

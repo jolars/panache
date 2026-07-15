@@ -283,6 +283,22 @@ Unix line endings, and `crlf` forces Windows line endings. As with `line-width`,
 a top-level `line-ending` is still accepted as a deprecated alias and `[format]`
 wins when both are set.
 
+### Horizontal Rules
+
+Control how horizontal rules are rendered under `[format]`:
+
+```toml
+[format]
+horizontal-rule-style = "line-width"
+```
+
+`line-width` (the default) expands every rule to a full line of hyphens,
+matching Pandoc's Markdown writer and keeping rules visually distinct from YAML
+metadata delimiters. `compact` emits a three-dash `---` instead, which keeps
+long-form source lightweight and avoids soft-wrapping in narrow editor
+viewports. Panache always surrounds rules with blank lines, so a compact `---`
+is never reparsed as a YAML delimiter or setext heading underline.
+
 ### Flavor Overrides
 
 Use `flavor-overrides` to pick flavor by path pattern for Markdown-family files

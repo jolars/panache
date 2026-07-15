@@ -9,6 +9,7 @@ pub mod yaml_engine;
 pub use config::BlankLines;
 pub use config::Config;
 pub use config::ConfigBuilder;
+pub use config::HorizontalRuleStyle;
 pub use config::LineEnding;
 pub use config::MathDelimiterStyle;
 pub use config::ParserOptions;

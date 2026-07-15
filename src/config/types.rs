@@ -321,6 +321,8 @@ pub struct StyleConfig {
     pub tab_stops: TabStopMode,
     /// Tab width for expanding tabs when normalizing
     pub tab_width: usize,
+    /// Horizontal rule rendering: expanded to the line width or compact `---`
+    pub horizontal_rule_style: HorizontalRuleStyle,
     /// Use panache-native greedy wrapping instead of textwrap.
     pub built_in_greedy_wrap: bool,
     /// Extra abbreviations whose trailing period must not end a sentence (used
@@ -343,6 +345,7 @@ impl Default for StyleConfig {
             table_indent: DEFAULT_TABLE_INDENT,
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
+            horizontal_rule_style: HorizontalRuleStyle::LineWidth,
             built_in_greedy_wrap: true,
             no_break_abbreviations: None,
             lang: None,
@@ -830,6 +833,7 @@ impl RawConfig {
             line_width,
             wrap: style.wrap,
             blank_lines,
+            horizontal_rule_style: style.horizontal_rule_style,
             math_delimiter_style: style.math_delimiter_style,
             math_indent: style.math_indent,
             table_indent: style.table_indent,
@@ -959,6 +963,8 @@ pub struct Config {
     pub tab_width: usize,
     pub wrap: Option<WrapMode>,
     pub blank_lines: BlankLines,
+    /// Horizontal rule rendering: expanded to the line width or compact `---`.
+    pub horizontal_rule_style: HorizontalRuleStyle,
     /// Language → Formatter(s) mapping (supports multiple formatters per language)
     pub formatters: HashMap<String, Vec<FormatterConfig>>,
     pub linters: HashMap<String, String>,
@@ -1029,6 +1035,7 @@ impl Default for Config {
             tab_width: 4,
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
+            horizontal_rule_style: HorizontalRuleStyle::LineWidth,
             formatters: HashMap::new(), // Opt-in: empty by default
             linters: HashMap::new(),    // Opt-in: empty by default
             external_max_parallel: default_external_max_parallel(),
@@ -1094,6 +1101,11 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn horizontal_rule_style(mut self, style: HorizontalRuleStyle) -> Self {
+        self.config.horizontal_rule_style = style;
+        self
+    }
+
     pub fn blank_lines(mut self, mode: BlankLines) -> Self {
         self.config.blank_lines = mode;
         self
@@ -1111,6 +1123,15 @@ pub enum WrapMode {
     Reflow,
     Sentence,
     Semantic,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum HorizontalRuleStyle {
+    /// Expand horizontal rules to the configured line width (Pandoc-style)
+    LineWidth,
+    /// Emit a compact three-dash rule (`---`)
+    Compact,
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema, PartialEq)]

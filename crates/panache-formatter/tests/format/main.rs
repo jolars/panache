@@ -11,6 +11,7 @@ mod fenced_divs;
 mod frontmatter;
 mod header_attributes;
 mod headings;
+mod horizontal_rules;
 mod ignore_directives;
 mod image_attributes;
 mod inline_code_attributes;

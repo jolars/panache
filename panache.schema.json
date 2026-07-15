@@ -151,6 +151,20 @@
         }
       ]
     },
+    "HorizontalRuleStyle": {
+      "oneOf": [
+        {
+          "const": "line-width",
+          "description": "Expand horizontal rules to the configured line width (Pandoc-style)",
+          "type": "string"
+        },
+        {
+          "const": "compact",
+          "description": "Emit a compact three-dash rule (`---`)",
+          "type": "string"
+        }
+      ]
+    },
     "LineEnding": {
       "enum": [
         "auto",
@@ -241,6 +255,10 @@
           "default": true,
           "description": "Use panache-native greedy wrapping instead of textwrap.",
           "type": "boolean"
+        },
+        "horizontal-rule-style": {
+          "$ref": "#/$defs/HorizontalRuleStyle",
+          "description": "Horizontal rule rendering: expanded to the line width or compact `---`"
         },
         "lang": {
           "default": null,

@@ -263,6 +263,7 @@ golden_test_cases!(
     horizontal_rule_div_fence,
     horizontal_rule_in_list_item,
     horizontal_rules,
+    horizontal_rules_compact,
     html_block,
     html_block_div_fenced_div_body,
     html_block_commonmark_type6_type7,

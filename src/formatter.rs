@@ -35,6 +35,14 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
         crate::config::BlankLines::Preserve => panache_formatter::BlankLines::Preserve,
         crate::config::BlankLines::Collapse => panache_formatter::BlankLines::Collapse,
     };
+    let horizontal_rule_style = match config.horizontal_rule_style {
+        crate::config::HorizontalRuleStyle::LineWidth => {
+            panache_formatter::HorizontalRuleStyle::LineWidth
+        }
+        crate::config::HorizontalRuleStyle::Compact => {
+            panache_formatter::HorizontalRuleStyle::Compact
+        }
+    };
     // Collapse the user-facing flat/per-language shapes into a single
     // language-keyed map; the formatter normalizes the entries at resolution
     // time. Keys are lowercased so they match the resolved language code.
@@ -90,6 +98,7 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
         tab_width: config.tab_width,
         wrap,
         blank_lines,
+        horizontal_rule_style,
         lang: config.lang.clone(),
         no_break_abbreviations,
         formatters,

@@ -26,6 +26,7 @@ pub use types::ConfigBuilder;
 pub use types::FormatterConfig;
 pub use types::FormatterDefinition;
 pub use types::FormatterValue;
+pub use types::HorizontalRuleStyle;
 pub use types::LineEnding;
 pub use types::LintConfig;
 pub use types::MathDelimiterStyle;
@@ -1606,6 +1607,29 @@ mod tests {
         let toml = "blank-lines = \"collapse\"\n";
         parse_config_str(toml, Path::new("panache.toml"))
             .expect("top-level blank-lines key must still parse");
+    }
+
+    #[test]
+    fn horizontal_rule_style_parses_and_defaults_to_line_width() {
+        let cfg = parse_config_str(
+            "[format]\nhorizontal-rule-style = \"compact\"\n",
+            Path::new("panache.toml"),
+        )
+        .expect("[format] horizontal-rule-style must parse");
+        assert_eq!(cfg.horizontal_rule_style, HorizontalRuleStyle::Compact);
+
+        let cfg = parse_config_str("[format]\n", Path::new("panache.toml"))
+            .expect("empty [format] section must parse");
+        assert_eq!(cfg.horizontal_rule_style, HorizontalRuleStyle::LineWidth);
+    }
+
+    #[test]
+    fn horizontal_rule_style_rejects_unknown_value() {
+        let toml = "[format]\nhorizontal-rule-style = \"full\"\n";
+        assert!(
+            parse_config_str(toml, Path::new("panache.toml")).is_err(),
+            "unknown horizontal-rule-style value must be rejected"
+        );
     }
 
     #[test]

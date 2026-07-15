@@ -1,4 +1,4 @@
-use crate::config::{Config, WrapMode};
+use crate::config::{Config, HorizontalRuleStyle, WrapMode};
 use crate::directives::{DirectiveTracker, extract_directive_from_node};
 use crate::syntax::{BlockQuote, DefinitionItem, DisplayMath, FencedDiv, SyntaxKind, SyntaxNode};
 use panache_parser::parser::blocks::headings::try_parse_atx_heading;
@@ -191,7 +191,13 @@ impl Formatter {
     }
 
     fn horizontal_rule_text(&self, available_width: usize) -> String {
-        "-".repeat(available_width.max(3))
+        match self.config.horizontal_rule_style {
+            HorizontalRuleStyle::LineWidth => "-".repeat(available_width.max(3)),
+            // Safe only because rules are always emitted with blank-line
+            // separation; a `---` tight against following text would read as
+            // a YAML metadata delimiter or setext underline on reparse.
+            HorizontalRuleStyle::Compact => "---".to_string(),
+        }
     }
 
     fn starts_with_list_marker(text: &str) -> bool {
