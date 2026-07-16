@@ -28,6 +28,24 @@ fn consecutive_atx_headings_without_blank_lines_stay_separate() {
 }
 
 #[test]
+fn atx_heading_interrupting_paragraph_keeps_document_order() {
+    let mut cfg = panache_formatter::Config::default();
+    cfg.parser_extensions.blank_before_header = false;
+    cfg.formatter_extensions.blank_before_header = false;
+
+    let input = "Text\n## Title\nMore\n";
+    let expected = "Text\n\n## Title\n\nMore\n";
+    let out = format(input, Some(cfg.clone()), None);
+
+    assert_eq!(out, expected);
+    assert_eq!(
+        format(&out, Some(cfg), None),
+        expected,
+        "must be idempotent"
+    );
+}
+
+#[test]
 fn horizontal_rule_before_setext_like_paragraph_stays_idempotent() {
     let input = "---\nSIL OPEN FONT LICENSE Version 1.1 - 26 February 2007\n-----------------------------------------------------------\n";
     let first = format(input, None, None);

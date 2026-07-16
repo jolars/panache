@@ -97,12 +97,23 @@ fn parses_empty_atx_heading_before_table_caption_table() {
 fn parses_heading_without_blank_line_when_extension_disabled() {
     let mut config = ParserOptions::default();
     config.extensions.blank_before_header = false;
-    let node = Parser::new("text\n# Heading\n", &config).parse();
-    let headings: Vec<_> = node
-        .descendants()
-        .filter(|n| n.kind() == SyntaxKind::HEADING)
-        .collect();
-    assert_eq!(headings.len(), 1);
+    let input = "Text\n# Heading\nMore\n";
+    let node = Parser::new(input, &config).parse();
+    let blocks: Vec<_> = node.children().map(|node| node.kind()).collect();
+
+    assert_eq!(
+        node.text().to_string(),
+        input,
+        "parser must remain lossless"
+    );
+    assert_eq!(
+        blocks,
+        vec![
+            SyntaxKind::PARAGRAPH,
+            SyntaxKind::HEADING,
+            SyntaxKind::PARAGRAPH
+        ]
+    );
 }
 
 #[test]
