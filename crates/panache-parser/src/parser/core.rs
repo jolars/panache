@@ -2831,6 +2831,16 @@ impl<'a> Parser<'a> {
                 let interrupts_via_hr = is_commonmark && try_parse_horizontal_rule(line).is_some();
                 let interrupts_via_fence = is_commonmark
                     && code_blocks::try_parse_fence_open(line, self.config.dialect).is_some();
+                // An ATX heading interrupts a paragraph under CommonMark §4.2,
+                // and under Pandoc when `blank_before_header` is disabled
+                // (`markdown-blank_before_header`) — the same predicate as
+                // `can_interrupt` in `AtxHeadingParser::detect_prepared`. A
+                // heading-shaped lazy line then ends the quote instead of
+                // being swallowed as paragraph text (issue #428).
+                let heading_can_interrupt =
+                    is_commonmark || !self.config.extensions.blank_before_header;
+                let interrupts_via_heading =
+                    heading_can_interrupt && try_parse_atx_heading(line).is_some();
                 // A fenced-div closing fence terminates the blockquote rather
                 // than being swallowed as lazy paragraph text — but only while
                 // we're actually inside an open div. At the top level a lone
@@ -2838,7 +2848,11 @@ impl<'a> Parser<'a> {
                 let interrupts_via_div_close = self.config.extensions.fenced_divs
                     && self.in_fenced_div()
                     && fenced_divs::is_div_closing_fence(line);
-                if !interrupts_via_hr && !interrupts_via_fence && !interrupts_via_div_close {
+                if !interrupts_via_hr
+                    && !interrupts_via_fence
+                    && !interrupts_via_heading
+                    && !interrupts_via_div_close
+                {
                     if bq_depth > 0 {
                         // Buffer the explicit `>` markers we have into the
                         // paragraph (it's at the deeper blockquote level, so
@@ -2898,7 +2912,14 @@ impl<'a> Parser<'a> {
                 let interrupts_via_hr = is_commonmark && try_parse_horizontal_rule(line).is_some();
                 let interrupts_via_fence = is_commonmark
                     && code_blocks::try_parse_fence_open(line, self.config.dialect).is_some();
-                if !interrupts_via_hr && !interrupts_via_fence {
+                // Same heading-interruption rule as the paragraph gate above
+                // (CommonMark, or Pandoc with `blank_before_header` disabled);
+                // see `AtxHeadingParser::detect_prepared` (issue #428).
+                let heading_can_interrupt =
+                    is_commonmark || !self.config.extensions.blank_before_header;
+                let interrupts_via_heading =
+                    heading_can_interrupt && try_parse_atx_heading(line).is_some();
+                if !interrupts_via_hr && !interrupts_via_fence && !interrupts_via_heading {
                     if bq_depth > 0 {
                         let marker_info = self.marker_info_for_line(
                             blockquote_payload.as_ref(),

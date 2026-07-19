@@ -1,5 +1,5 @@
 use super::helpers::{find_first, parse_blocks};
-use crate::options::ParserOptions;
+use crate::options::{Dialect, Extensions, Flavor, ParserOptions};
 use crate::parser::Parser;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
@@ -113,6 +113,94 @@ fn parses_heading_without_blank_line_when_extension_disabled() {
             SyntaxKind::HEADING,
             SyntaxKind::PARAGRAPH
         ]
+    );
+}
+
+#[test]
+fn atx_interrupts_lazy_blockquote_line_when_extension_disabled() {
+    // pandoc -f markdown-blank_before_header: BlockQuote [Para "para"],
+    // Header 1 "head" — the heading ends the quote instead of being
+    // swallowed as lazy continuation text (issue #428).
+    let mut config = ParserOptions::default();
+    config.extensions.blank_before_header = false;
+    let input = "> para\n# head\n";
+    let node = Parser::new(input, &config).parse();
+
+    assert_eq!(
+        node.text().to_string(),
+        input,
+        "parser must remain lossless"
+    );
+    assert_eq!(
+        node.children().map(|node| node.kind()).collect::<Vec<_>>(),
+        vec![SyntaxKind::BLOCK_QUOTE, SyntaxKind::HEADING]
+    );
+}
+
+#[test]
+fn atx_interrupts_lazy_blockquote_line_commonmark() {
+    // pandoc -f commonmark agrees: an ATX heading is never paragraph
+    // continuation text, so the lazy line ends the quote (CommonMark §5.1).
+    let config = ParserOptions {
+        flavor: Flavor::CommonMark,
+        dialect: Dialect::for_flavor(Flavor::CommonMark),
+        extensions: Extensions::for_flavor(Flavor::CommonMark),
+        ..Default::default()
+    };
+    let input = "> para\n# head\n";
+    let node = Parser::new(input, &config).parse();
+
+    assert_eq!(
+        node.text().to_string(),
+        input,
+        "parser must remain lossless"
+    );
+    assert_eq!(
+        node.children().map(|node| node.kind()).collect::<Vec<_>>(),
+        vec![SyntaxKind::BLOCK_QUOTE, SyntaxKind::HEADING]
+    );
+}
+
+#[test]
+fn atx_on_lazy_blockquote_line_stays_text_by_default() {
+    // Default pandoc (blank_before_header on) keeps the heading-shaped line
+    // as lazy paragraph text: BlockQuote [Para "para SoftBreak # head"].
+    let config = ParserOptions::default();
+    let input = "> para\n# head\n";
+    let node = Parser::new(input, &config).parse();
+
+    assert_eq!(
+        node.text().to_string(),
+        input,
+        "parser must remain lossless"
+    );
+    assert_eq!(
+        node.children().map(|node| node.kind()).collect::<Vec<_>>(),
+        vec![SyntaxKind::BLOCK_QUOTE]
+    );
+    assert!(
+        node.descendants().all(|n| n.kind() != SyntaxKind::HEADING),
+        "heading-shaped lazy line must stay paragraph text by default"
+    );
+}
+
+#[test]
+fn atx_interrupts_lazy_blockquote_list_when_extension_disabled() {
+    // pandoc -f markdown-blank_before_header: BlockQuote [BulletList],
+    // Header 1 "head" — same interruption for a list item's lazy line.
+    let mut config = ParserOptions::default();
+    config.extensions.blank_before_header = false;
+    let input = "> - item\n# head\n";
+    let node = Parser::new(input, &config).parse();
+
+    assert_eq!(
+        node.text().to_string(),
+        input,
+        "parser must remain lossless"
+    );
+    assert_eq!(
+        node.children().map(|node| node.kind()).collect::<Vec<_>>(),
+        vec![SyntaxKind::BLOCK_QUOTE, SyntaxKind::HEADING]
     );
 }
 
