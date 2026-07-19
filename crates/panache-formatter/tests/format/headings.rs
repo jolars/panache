@@ -30,8 +30,9 @@ fn consecutive_atx_headings_without_blank_lines_stay_separate() {
 #[test]
 fn atx_heading_interrupting_paragraph_keeps_document_order() {
     let mut cfg = panache_formatter::Config::default();
+    // Only the parser extension drives this behavior; the formatter's
+    // `blank_before_header` consumer never fires for this input.
     cfg.parser_extensions.blank_before_header = false;
-    cfg.formatter_extensions.blank_before_header = false;
 
     let input = "Text\n## Title\nMore\n";
     let expected = "Text\n\n## Title\n\nMore\n";
