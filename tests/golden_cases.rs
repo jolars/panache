@@ -233,6 +233,7 @@ golden_test_cases!(
     four_space_rule_wide_marker,
     four_space_rule_wrapping,
     atx_interrupts_paragraph_commonmark,
+    atx_interrupts_paragraph_no_blank_before_header,
     list_interrupts_paragraph_commonmark,
     list_item_blockquote_inner_list_siblings,
     list_item_blockquote_nested_list_issue_292,
