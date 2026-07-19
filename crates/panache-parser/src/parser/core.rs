@@ -4123,6 +4123,21 @@ impl<'a> Parser<'a> {
                         );
                         return LineDispatch::consumed(1);
                     }
+
+                    // Contract: a `Yes` detection in this no-blank-before
+                    // branch must not reach emission while a paragraph is
+                    // open — the fall-through below emits the block before
+                    // the buffered paragraph text, silently reordering bytes
+                    // in the CST. Detectors must gate themselves (return
+                    // `None` to stay paragraph text, like setext under
+                    // Pandoc) or return `YesCanInterrupt` (which flushes the
+                    // paragraph first), or be special-cased above.
+                    debug_assert!(
+                        !self.is_paragraph_open(),
+                        "block parser `{parser_name}` returned `Yes` while a paragraph is \
+                         open; this reorders bytes — gate the detection or return \
+                         `YesCanInterrupt`"
+                    );
                 }
                 BlockDetectionResult::No => unreachable!(),
             }
