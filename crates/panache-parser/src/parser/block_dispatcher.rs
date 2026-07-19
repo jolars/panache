@@ -315,16 +315,18 @@ impl BlockParser for AtxHeadingParser {
         }
 
         let level = try_parse_atx_heading(lines.first())?;
-        // CommonMark §4.2 allows an ATX heading to interrupt a paragraph.
+        // CommonMark §4.2 allows an ATX heading to interrupt a paragraph, and
         // Pandoc does the same when its `blank_before_header` extension is
         // disabled. `YesCanInterrupt` closes and flushes the open paragraph
-        // before the heading is emitted, preserving source order.
-        let can_interrupt = ctx.config.dialect == crate::options::Dialect::CommonMark
-            || !ctx.config.extensions.blank_before_header;
-        let detection = if can_interrupt {
-            BlockDetectionResult::YesCanInterrupt
-        } else {
+        // before the heading is emitted, preserving source order. No dialect
+        // check needed: with the extension on, the guard above already
+        // requires a blank line before the heading, so no paragraph can be
+        // open and `Yes` vs `YesCanInterrupt` is moot (CommonMark defaults
+        // the extension off).
+        let detection = if ctx.config.extensions.blank_before_header {
             BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::YesCanInterrupt
         };
         Some((detection, Some(Box::new(level))))
     }
