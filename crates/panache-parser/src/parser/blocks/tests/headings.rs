@@ -205,6 +205,139 @@ fn atx_interrupts_lazy_blockquote_list_when_extension_disabled() {
 }
 
 #[test]
+fn atx_interrupts_reduced_marker_lazy_line_commonmark() {
+    // pandoc -f commonmark: BlockQuote [BlockQuote [Para "para"], Header 1] —
+    // a `> # head` line under an open depth-2 quote is not lazy continuation;
+    // the inner quote closes and the heading forms in the outer quote
+    // (issue #429).
+    let config = ParserOptions {
+        flavor: Flavor::CommonMark,
+        dialect: Dialect::for_flavor(Flavor::CommonMark),
+        extensions: Extensions::for_flavor(Flavor::CommonMark),
+        ..Default::default()
+    };
+    let input = ">> para\n> # head\n";
+    let node = Parser::new(input, &config).parse();
+
+    assert_eq!(
+        node.text().to_string(),
+        input,
+        "parser must remain lossless"
+    );
+    assert_eq!(
+        node.children().map(|node| node.kind()).collect::<Vec<_>>(),
+        vec![SyntaxKind::BLOCK_QUOTE]
+    );
+    let outer = node.children().next().unwrap();
+    assert_eq!(
+        outer.children().map(|node| node.kind()).collect::<Vec<_>>(),
+        vec![SyntaxKind::BLOCK_QUOTE, SyntaxKind::HEADING]
+    );
+}
+
+#[test]
+fn atx_interrupts_reduced_marker_lazy_line_when_extension_disabled() {
+    // pandoc -f markdown-blank_before_header agrees with commonmark on the
+    // reduced-marker shape: BlockQuote [BlockQuote [Para], Header 1].
+    let mut config = ParserOptions::default();
+    config.extensions.blank_before_header = false;
+    let input = ">> para\n> # head\n";
+    let node = Parser::new(input, &config).parse();
+
+    assert_eq!(
+        node.text().to_string(),
+        input,
+        "parser must remain lossless"
+    );
+    assert_eq!(
+        node.children().map(|node| node.kind()).collect::<Vec<_>>(),
+        vec![SyntaxKind::BLOCK_QUOTE]
+    );
+    let outer = node.children().next().unwrap();
+    assert_eq!(
+        outer.children().map(|node| node.kind()).collect::<Vec<_>>(),
+        vec![SyntaxKind::BLOCK_QUOTE, SyntaxKind::HEADING]
+    );
+}
+
+#[test]
+fn atx_on_reduced_marker_lazy_line_stays_text_by_default() {
+    // Default pandoc (blank_before_header on) keeps the reduced-marker
+    // heading-shaped line as lazy paragraph text, same as the zero-marker
+    // form: BlockQuote [BlockQuote [Para "para SoftBreak # head"]].
+    let config = ParserOptions::default();
+    let input = ">> para\n> # head\n";
+    let node = Parser::new(input, &config).parse();
+
+    assert_eq!(
+        node.text().to_string(),
+        input,
+        "parser must remain lossless"
+    );
+    assert!(
+        node.descendants().all(|n| n.kind() != SyntaxKind::HEADING),
+        "heading-shaped reduced-marker lazy line must stay paragraph text by default"
+    );
+}
+
+#[test]
+fn atx_interrupts_reduced_marker_lazy_line_depth3() {
+    // pandoc -f commonmark on `>>> para\n>> # head`: the heading forms at
+    // the two-marker level — BlockQuote [BlockQuote [BlockQuote [Para],
+    // Header 1]].
+    let config = ParserOptions {
+        flavor: Flavor::CommonMark,
+        dialect: Dialect::for_flavor(Flavor::CommonMark),
+        extensions: Extensions::for_flavor(Flavor::CommonMark),
+        ..Default::default()
+    };
+    let input = ">>> para\n>> # head\n";
+    let node = Parser::new(input, &config).parse();
+
+    assert_eq!(
+        node.text().to_string(),
+        input,
+        "parser must remain lossless"
+    );
+    let outer = node.children().next().unwrap();
+    assert_eq!(outer.kind(), SyntaxKind::BLOCK_QUOTE);
+    let middle = outer.children().next().unwrap();
+    assert_eq!(
+        middle
+            .children()
+            .map(|node| node.kind())
+            .collect::<Vec<_>>(),
+        vec![SyntaxKind::BLOCK_QUOTE, SyntaxKind::HEADING]
+    );
+}
+
+#[test]
+fn atx_interrupts_reduced_marker_lazy_list_when_extension_disabled() {
+    // pandoc -f markdown-blank_before_header: BlockQuote [BlockQuote
+    // [BulletList], Header 1] — the reduced-marker heading line also ends a
+    // list item's lazy continuation (issue #429).
+    let mut config = ParserOptions::default();
+    config.extensions.blank_before_header = false;
+    let input = ">> - item\n> # head\n";
+    let node = Parser::new(input, &config).parse();
+
+    assert_eq!(
+        node.text().to_string(),
+        input,
+        "parser must remain lossless"
+    );
+    assert_eq!(
+        node.children().map(|node| node.kind()).collect::<Vec<_>>(),
+        vec![SyntaxKind::BLOCK_QUOTE]
+    );
+    let outer = node.children().next().unwrap();
+    assert_eq!(
+        outer.children().map(|node| node.kind()).collect::<Vec<_>>(),
+        vec![SyntaxKind::BLOCK_QUOTE, SyntaxKind::HEADING]
+    );
+}
+
+#[test]
 fn setext_underline_mid_paragraph_stays_text_when_extension_disabled() {
     // Pandoc never forms a setext heading mid-paragraph, even with
     // `blank_before_header` disabled: `markdown-blank_before_header` keeps

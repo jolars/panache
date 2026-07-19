@@ -2827,10 +2827,17 @@ impl<'a> Parser<'a> {
                 // any open blockquotes close, and the line opens that
                 // block at the outer level. Pandoc keeps the lazy text
                 // append in this case.
+                // The interrupt checks run on `inner_content` (markers
+                // stripped; identical to `line` for zero-marker lines): a
+                // reduced-marker line like `> # head` under a depth-2 quote
+                // is not lazy at its own level, so the stripped content
+                // decides the interruption (issue #429).
                 let is_commonmark = self.config.dialect == crate::options::Dialect::CommonMark;
-                let interrupts_via_hr = is_commonmark && try_parse_horizontal_rule(line).is_some();
+                let interrupts_via_hr =
+                    is_commonmark && try_parse_horizontal_rule(inner_content).is_some();
                 let interrupts_via_fence = is_commonmark
-                    && code_blocks::try_parse_fence_open(line, self.config.dialect).is_some();
+                    && code_blocks::try_parse_fence_open(inner_content, self.config.dialect)
+                        .is_some();
                 // An ATX heading interrupts a paragraph under CommonMark §4.2,
                 // and under Pandoc when `blank_before_header` is disabled
                 // (`markdown-blank_before_header`) — the same predicate as
@@ -2840,11 +2847,14 @@ impl<'a> Parser<'a> {
                 let heading_can_interrupt =
                     is_commonmark || !self.config.extensions.blank_before_header;
                 let interrupts_via_heading =
-                    heading_can_interrupt && try_parse_atx_heading(line).is_some();
+                    heading_can_interrupt && try_parse_atx_heading(inner_content).is_some();
                 // A fenced-div closing fence terminates the blockquote rather
                 // than being swallowed as lazy paragraph text — but only while
                 // we're actually inside an open div. At the top level a lone
                 // `:::` is just text, which is what pandoc does (issue #310).
+                // This one stays on the raw `line`: the #310 shape was
+                // calibrated against zero-marker lines and the reduced-marker
+                // form is unverified against pandoc.
                 let interrupts_via_div_close = self.config.extensions.fenced_divs
                     && self.in_fenced_div()
                     && fenced_divs::is_div_closing_fence(line);
@@ -2908,17 +2918,19 @@ impl<'a> Parser<'a> {
                 )
                 .is_none()
             {
+                // Same interrupt rules as the paragraph gate above, including
+                // the `inner_content` check for reduced-marker lines (issues
+                // #428, #429); see `AtxHeadingParser::detect_prepared`.
                 let is_commonmark = self.config.dialect == crate::options::Dialect::CommonMark;
-                let interrupts_via_hr = is_commonmark && try_parse_horizontal_rule(line).is_some();
+                let interrupts_via_hr =
+                    is_commonmark && try_parse_horizontal_rule(inner_content).is_some();
                 let interrupts_via_fence = is_commonmark
-                    && code_blocks::try_parse_fence_open(line, self.config.dialect).is_some();
-                // Same heading-interruption rule as the paragraph gate above
-                // (CommonMark, or Pandoc with `blank_before_header` disabled);
-                // see `AtxHeadingParser::detect_prepared` (issue #428).
+                    && code_blocks::try_parse_fence_open(inner_content, self.config.dialect)
+                        .is_some();
                 let heading_can_interrupt =
                     is_commonmark || !self.config.extensions.blank_before_header;
                 let interrupts_via_heading =
-                    heading_can_interrupt && try_parse_atx_heading(line).is_some();
+                    heading_can_interrupt && try_parse_atx_heading(inner_content).is_some();
                 if !interrupts_via_hr && !interrupts_via_fence && !interrupts_via_heading {
                     if bq_depth > 0 {
                         let marker_info = self.marker_info_for_line(

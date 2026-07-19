@@ -1,0 +1,18 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 99
+expression: cst_output
+---
+DOCUMENT@0..17
+  BLOCK_QUOTE@0..17
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    BLOCK_QUOTE@1..17
+      BLOCK_QUOTE_MARKER@1..2 ">"
+      WHITESPACE@2..3 " "
+      PARAGRAPH@3..17
+        TEXT@3..7 "para"
+        NEWLINE@7..8 "\n"
+        BLOCK_QUOTE_MARKER@8..9 ">"
+        WHITESPACE@9..10 " "
+        TEXT@10..16 "# head"
+        NEWLINE@16..17 "\n"
