@@ -3475,7 +3475,15 @@ impl BlockParser for SetextHeadingParser {
             false
         };
 
-        if ctx.config.extensions.blank_before_header
+        // Pandoc never forms a setext heading mid-paragraph, even with
+        // `blank_before_header` disabled (`markdown-blank_before_header` keeps
+        // `Text\nTitle\n-----` a single Para) — only ATX headings interrupt.
+        // So under the Pandoc dialect the blank-before requirement holds
+        // unconditionally; CommonMark instead folds the open paragraph into
+        // the heading via the dialect-gated branch in the parser core.
+        let requires_blank_before = ctx.config.extensions.blank_before_header
+            || ctx.config.dialect == crate::options::Dialect::Pandoc;
+        if requires_blank_before
             && !ctx.has_blank_before
             && !ctx.at_document_start
             && !follows_setext_heading

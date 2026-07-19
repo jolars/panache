@@ -117,15 +117,42 @@ fn parses_heading_without_blank_line_when_extension_disabled() {
 }
 
 #[test]
-fn parses_setext_heading_without_blank_line_when_extension_disabled() {
+fn setext_underline_mid_paragraph_stays_text_when_extension_disabled() {
+    // Pandoc never forms a setext heading mid-paragraph, even with
+    // `blank_before_header` disabled: `markdown-blank_before_header` keeps
+    // `Text\nTitle\n-----\nMore` a single Para. Only ATX interrupts.
     let mut config = ParserOptions::default();
     config.extensions.blank_before_header = false;
-    let node = Parser::new("text\nHeading\n---\n", &config).parse();
-    let headings: Vec<_> = node
-        .descendants()
-        .filter(|n| n.kind() == SyntaxKind::HEADING)
-        .collect();
-    assert_eq!(headings.len(), 1);
+    let input = "Text\nTitle\n-----\nMore\n";
+    let node = Parser::new(input, &config).parse();
+
+    assert_eq!(
+        node.text().to_string(),
+        input,
+        "parser must remain lossless"
+    );
+    assert_eq!(
+        node.children().map(|node| node.kind()).collect::<Vec<_>>(),
+        vec![SyntaxKind::PARAGRAPH]
+    );
+    assert!(
+        node.descendants().all(|n| n.kind() != SyntaxKind::HEADING),
+        "setext underline after paragraph text must not form a heading"
+    );
+}
+
+#[test]
+fn setext_heading_at_document_start_when_extension_disabled() {
+    let mut config = ParserOptions::default();
+    config.extensions.blank_before_header = false;
+    let input = "Title\n=====\n";
+    let node = Parser::new(input, &config).parse();
+
+    assert_eq!(node.text().to_string(), input);
+    assert_eq!(
+        node.children().map(|node| node.kind()).collect::<Vec<_>>(),
+        vec![SyntaxKind::HEADING]
+    );
 }
 
 #[test]

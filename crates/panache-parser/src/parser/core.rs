@@ -4073,11 +4073,11 @@ impl<'a> Parser<'a> {
                     // setext at the line *before* the underline (the last text
                     // line); fold the buffered paragraph + this line into a
                     // single HEADING. Pandoc-markdown disagrees (it never
-                    // forms a multi-line setext), so this branch is dialect-
-                    // gated; under Pandoc, a setext detection while a
-                    // paragraph is open never reaches this point because
-                    // `blank_before_header` is on by default and gates out the
-                    // detection earlier in `SetextHeadingParser::detect_prepared`.
+                    // forms a setext heading mid-paragraph, even with
+                    // `blank_before_header` disabled), so this branch is
+                    // dialect-gated; under Pandoc the unconditional
+                    // blank-before gate in `SetextHeadingParser::detect_prepared`
+                    // keeps the detection from reaching this point.
                     if parser_name == "setext_heading"
                         && self.is_paragraph_open()
                         && self.config.dialect == crate::options::Dialect::CommonMark
