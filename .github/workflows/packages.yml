@@ -304,4 +304,4 @@ jobs:
           rm -f SHA256SUMS
           sha256sum * > SHA256SUMS
           cat SHA256SUMS
-          gh release upload --clobber "$TAG" SHA256SUMS
+          gh release upload --repo "$GITHUB_REPOSITORY" --clobber "$TAG" SHA256SUMS
