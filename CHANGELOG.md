@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+This is a major release with breaking changes. Most importantly, `snake_case`
+style configurations keys, which have been deprecated since a few months back,
+are now removed. Please update your configuration files to use `kebab-case`
+keys instead. It also brings a breaking change to the linter, which now exits
+non-zero on lint violations. The `--check` CLI flag no longer has any effect on
+`panache lint` and has been removed.
+
+Other than that, this release brings major performance improvements to the
+language server, a new style configuration for horizontal rules (`horizontal-rule-style`)
+and a number of bug fixes.
+
 ## [2.61.0](https://github.com/jolars/panache/compare/v2.60.0...v2.61.0) (2026-07-04)
 
 ### Features
