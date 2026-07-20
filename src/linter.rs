@@ -82,6 +82,7 @@ fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(rules::undefined_anchor::UndefinedAnchorRule),
         Box::new(rules::unused_definitions::UnusedDefinitionsRule),
         Box::new(rules::citation_keys::CitationKeysRule),
+        Box::new(rules::citation_nonbreaking_space::CitationNonbreakingSpaceRule),
         Box::new(rules::crossref_as_link_target::CrossrefAsLinkTargetRule),
         Box::new(rules::chunk_label_spaces::ChunkLabelSpacesRule),
         Box::new(rules::missing_chunk_labels::MissingChunkLabelsRule),

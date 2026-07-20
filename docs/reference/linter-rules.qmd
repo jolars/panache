@@ -667,6 +667,54 @@ quiet about the ambient manifest.
 Emitted when an inline bibliography entry collides with another inline entry or
 with a key from a loaded bibliography file.
 
+### `citation-nonbreaking-space` {#citation-nonbreaking-space}
+
+Detects a breakable space (or a source line break) between text and a bracketed
+citation (`[@key]`), where line wrapping can strand the rendered citation --- a
+lone `[1]` or `(Smith 2020)` --- at the start of a line.
+
+Severity
+:   Warning
+
+Auto-fix
+:   Yes (replaces the space with a non-breaking one)
+
+Requirements
+:   Requires `extensions.citations = true` in configuration (default for the
+    Pandoc, Quarto, and R Markdown flavors).
+
+Diagnostic codes
+:   [`citation-nonbreaking-space`](#citation-nonbreaking-space)
+
+Description
+
+:   Pandoc renders the space before `[@key]` as an ordinary breakable space in
+    every output format, so whether the citation lands at the start of a line is
+    left to the final typesetting --- and the author usually cannot know at
+    writing time whether the document will render with a numeric or an
+    author-year citation style. Tying the citation to the preceding word with a
+    non-breaking space is safe under both. The rule flags a plain space, tab, or
+    source line break directly before a bracketed citation (including
+    suppressed-author citations like `[-@key]`). A citation that starts a
+    paragraph, follows a hard line break, or is already tied with `\` or a
+    literal U+00A0 is not flagged. In-text citations (`@key`) are out of scope.
+
+    The auto-fix rewrites the gap to `\` (Pandoc's non-breaking space escape). When
+    `all-symbols-escapable` is disabled, `\` would not parse as an escape, so the
+    fix inserts a literal U+00A0 character instead.
+
+**Example violation:**
+
+```markdown
+Some important fact [@smith2020].
+```
+
+**Auto-fix output:**
+
+```markdown
+Some important fact\ [@smith2020].
+```
+
 ### `crossref-as-link-target` {#crossref-as-link-target}
 
 Detects link destinations that begin with `@`, which is almost always a typo for

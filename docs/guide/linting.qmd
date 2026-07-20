@@ -291,6 +291,7 @@ duplicate-reference-labels = true
 undefined-references = true
 unused-definitions = true
 citation-keys = true
+citation-nonbreaking-space = true
 chunk-label-spaces = true
 missing-chunk-labels = true
 figure-crossref-captions = true

@@ -1022,3 +1022,23 @@ fn test_empty_values() {
             .is_some_and(|f| f.safety == panache::linter::FixSafety::Unsafe)
     }));
 }
+
+#[test]
+fn test_citation_nonbreaking_space() {
+    let diagnostics = lint_file("citation_nonbreaking_space.md");
+    let flagged: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "citation-nonbreaking-space")
+        .collect();
+
+    // The plain-space citation on line 1 and the softbreak citation on
+    // lines 3-4; the tied, in-text, and paragraph-initial ones are clean.
+    assert_eq!(flagged.len(), 2, "got: {flagged:?}");
+    assert_eq!(flagged[0].location.line, 1);
+    assert_eq!(flagged[1].location.line, 3);
+    assert!(flagged.iter().all(|d| {
+        d.fix
+            .as_ref()
+            .is_some_and(|f| f.edits.len() == 1 && f.edits[0].replacement == "\\ ")
+    }));
+}

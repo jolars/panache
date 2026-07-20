@@ -8,6 +8,7 @@ use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 pub mod adjacent_footnote_refs;
 pub mod chunk_label_spaces;
 pub mod citation_keys;
+pub mod citation_nonbreaking_space;
 pub mod consumer_divergence;
 pub mod crossref_as_link_target;
 pub mod duplicate_references;
