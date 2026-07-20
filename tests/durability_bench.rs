@@ -13,7 +13,7 @@ struct VolatileInput {
 
 #[salsa::tracked]
 fn stable_only(db: &dyn Database, stable: StableInput) -> u32 {
-    let mut acc = stable.value(db);
+    let mut acc = *stable.value(db);
     for i in 0..200 {
         acc = acc.wrapping_mul(1_664_525).wrapping_add(i);
     }
@@ -34,11 +34,11 @@ fn run_scenario(stable_durability: Durability, iterations: u32) -> u128 {
         .with_durability(Durability::LOW)
         .to(0);
 
-    let baseline = stable_only(&db, stable);
+    let baseline = *stable_only(&db, stable);
     let start = Instant::now();
     for i in 0..iterations {
         volatile.set_value(&mut db).to(i);
-        assert_eq!(stable_only(&db, stable), baseline);
+        assert_eq!(*stable_only(&db, stable), baseline);
     }
     start.elapsed().as_micros()
 }

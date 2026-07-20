@@ -29,9 +29,9 @@ fn test_cancel_request_returns_request_cancelled() {
         })
         .expect("expected a response for the format request id");
     let err = response
-        .error
+        .response_result
         .as_ref()
-        .expect("cancelled request should produce an error response");
+        .expect_err("cancelled request should produce an error response");
     assert_eq!(
         err.code,
         ErrorCode::RequestCanceled as i32,

@@ -144,7 +144,7 @@ pub struct ParsedDocument {
     pub errors: Vec<crate::parser::SyntaxError>,
 }
 
-#[salsa::tracked(returns(ref), lru = 512, no_eq, unsafe(non_update_types))]
+#[salsa::tracked(returns(ref), lru = 512, no_eq, unsafe(non_salsa_values))]
 pub fn parsed_document(db: &dyn Db, file: FileText, config: FileConfig) -> ParsedDocument {
     let refdefs = refdef_set(db, file, config).clone();
     let (tree, errors) = crate::parser::parse_with_refdefs_and_errors(
@@ -178,7 +178,7 @@ pub fn parsed_tree_root(db: &dyn Db, file: FileText, config: FileConfig) -> Synt
     SyntaxNode::new_root(parsed_tree(db, file, config).clone())
 }
 
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_salsa_values))]
 pub fn metadata(db: &dyn Db, file: FileText, config: FileConfig) -> DocumentMetadata {
     // Resolve the document's path from its `FileText` identity; an in-memory
     // buffer has no path, so relative bibliography/metadata paths simply don't
@@ -245,7 +245,7 @@ pub fn metadata(db: &dyn Db, file: FileText, config: FileConfig) -> DocumentMeta
     metadata
 }
 
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_salsa_values))]
 pub fn yaml_metadata_parse_result(
     db: &dyn Db,
     file: FileText,
@@ -260,7 +260,7 @@ pub fn yaml_metadata_parse_result(
 /// frontmatter — no project-manifest (`_quarto.yml` etc.) reads. Project-file
 /// errors are surfaced on the manifest's own URI via
 /// [`project_manifest_diagnostics`], not misattributed to the open document.
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_salsa_values))]
 pub fn doc_frontmatter_metadata_result(
     db: &dyn Db,
     file: FileText,
@@ -281,7 +281,7 @@ pub fn doc_frontmatter_metadata_result(
 /// Manifest text is read through `db.file_text` (a tracked input loaded by
 /// `load_referenced_files`), so editing a manifest re-runs this query — the same
 /// invalidation path the bibliography reads use (audit §3.3 / G3).
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_salsa_values))]
 pub fn project_manifest_diagnostics(
     db: &dyn Db,
     file: FileText,
@@ -344,7 +344,7 @@ pub fn project_manifest_diagnostics(
 /// are validated. Bookdown manifests have no Quarto schema and are skipped (no
 /// root). Manifest text is read through `db.file_text`, so editing a manifest
 /// re-runs this query.
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_salsa_values))]
 pub fn project_manifest_schema_diagnostics(
     db: &dyn Db,
     file: FileText,
@@ -401,7 +401,7 @@ pub fn project_manifest_schema_diagnostics(
     diagnostics
 }
 
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_salsa_values))]
 pub fn yaml_regions_for_file(db: &dyn Db, file: FileText, config: FileConfig) -> Vec<YamlRegion> {
     parsed_yaml_regions_for_file(db, file, config)
         .iter()
@@ -409,7 +409,7 @@ pub fn yaml_regions_for_file(db: &dyn Db, file: FileText, config: FileConfig) ->
         .collect()
 }
 
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_salsa_values))]
 pub fn parsed_yaml_regions_for_file(
     db: &dyn Db,
     file: FileText,
@@ -419,7 +419,7 @@ pub fn parsed_yaml_regions_for_file(
     collect_parsed_yaml_region_snapshots(&tree)
 }
 
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_salsa_values))]
 pub fn yaml_embedded_regions_in_host_range(
     db: &dyn Db,
     file: FileText,
@@ -439,7 +439,7 @@ pub fn yaml_embedded_regions_in_host_range(
         .collect()
 }
 
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_salsa_values))]
 pub fn yaml_frontmatter_is_valid(db: &dyn Db, file: FileText, config: FileConfig) -> bool {
     let frontmatter = parsed_yaml_regions_for_file(db, file, config)
         .iter()
@@ -457,7 +457,7 @@ pub fn yaml_frontmatter_is_valid(db: &dyn Db, file: FileText, config: FileConfig
     doc_frontmatter_metadata_result(db, file, config).is_ok()
 }
 
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types), lru = 512)]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_salsa_values), lru = 512)]
 pub fn built_in_lint_plan(db: &dyn Db, file: FileText, config: FileConfig) -> BuiltInLintPlan {
     let text = file.content_or_empty(db);
     let cfg = config.config(db).clone();
@@ -1210,7 +1210,7 @@ impl CitationDefinitionIndex {
     }
 }
 
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types), lru = 512)]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_salsa_values), lru = 512)]
 pub fn citation_definition_index(
     db: &dyn Db,
     file: FileText,
@@ -1256,7 +1256,7 @@ pub fn citation_definition_index(
     out
 }
 
-#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_salsa_values))]
 pub fn bibliography_index(db: &dyn Db, file: FileText, path: PathBuf) -> crate::bib::BibIndex {
     crate::bib::load_bibliography_from_text(file.content_or_empty(db), &path)
 }
@@ -2149,7 +2149,7 @@ pub fn project_structure(db: &dyn Db, root_file: FileText, config: FileConfig) -
             graph.add_document(db, &path);
             let loaded = db
                 .file_text(path.clone())
-                .filter(|include_file| file_is_present(db, *include_file));
+                .filter(|include_file| *file_is_present(db, *include_file));
             if let Some(include_file) = loaded {
                 visit_structure(db, include_file, config, &path, &mut graph, &mut visited);
             }
@@ -2179,7 +2179,7 @@ fn visit_structure<'db>(
         }
         let loaded = db
             .file_text(include.clone())
-            .filter(|include_file| file_is_present(db, *include_file));
+            .filter(|include_file| *file_is_present(db, *include_file));
         if let Some(include_file) = loaded {
             visit_structure(db, include_file, config, include, graph, visited);
         }
@@ -2688,7 +2688,7 @@ mod tests {
 
     #[salsa::tracked]
     fn volatile_probe(db: &dyn Db, volatile: VolatileInput) -> u32 {
-        volatile.value(db)
+        *volatile.value(db)
     }
 
     static PROBE_WITH_SET_RUNS: AtomicUsize = AtomicUsize::new(0);
@@ -3614,15 +3614,15 @@ mod tests {
         let volatile = VolatileInput::new(&db, 0);
         let noisy_path = unique_temp_path("durability-noisy-high", ".qmd");
 
-        let baseline = stable_file_len(&db, stable_file);
+        let baseline = *stable_file_len(&db, stable_file);
         let baseline_runs = STABLE_QUERY_RUNS.load(Ordering::Relaxed);
         assert!(baseline_runs >= 1);
 
         for i in 1..=20 {
             db.update_file_text(noisy_path.clone(), format!("noisy-{i}"));
             volatile.set_value(&mut db).to(i);
-            assert_eq!(volatile_probe(&db, volatile), i);
-            assert_eq!(stable_file_len(&db, stable_file), baseline);
+            assert_eq!(*volatile_probe(&db, volatile), i);
+            assert_eq!(*stable_file_len(&db, stable_file), baseline);
         }
 
         assert_eq!(
