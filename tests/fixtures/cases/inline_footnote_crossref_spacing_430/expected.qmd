@@ -1,0 +1,4 @@
+Text^[@eq-key is related to stuff [@Efron2016, chap. 7].] to note.
+
+There are a few aspects of this equation^[@eq-effect-posterior is related to the
+well-known James-Stein estimator [@EfronHastie2016a, chap. 7].] to note.

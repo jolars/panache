@@ -1332,7 +1332,7 @@ fn process_node_recursive(
                         sink.push_verbatim_block(verbatim);
                     }
                 }
-                SyntaxKind::CITATION => {
+                SyntaxKind::CITATION | SyntaxKind::CROSSREF => {
                     skip_marker_whitespace = false;
                     if in_inline_footnote && sink.skip_next_leading_whitespace() {
                         sink.set_skip_next_leading_whitespace(false);
