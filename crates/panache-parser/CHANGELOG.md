@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.22.0](https://github.com/jolars/panache/compare/panache-parser-v0.21.0...panache-parser-v0.22.0) (2026-07-20)
+
+### Breaking changes
+- remove long-deprecated config, CLI, and API surface ([`6af736d`](https://github.com/jolars/panache/commit/6af736d8ab38ecebfaa62d40fbfbe83a2a300adf))
+
+### Features
+- remove long-deprecated config, CLI, and API surface ([`6af736d`](https://github.com/jolars/panache/commit/6af736d8ab38ecebfaa62d40fbfbe83a2a300adf))
+- **parser:** lift later-line HTML block in def/footnote body ([`21d448a`](https://github.com/jolars/panache/commit/21d448a3972261d6ec8472a0ccc74cd37f75688b))
+- **parser:** fuse comment trailing softbreak in def body ([`1a2c8b9`](https://github.com/jolars/panache/commit/1a2c8b9728dae63989d7eddc3b348b85f8ae1f71))
+- **parser:** lift HTML block on footnote marker line ([`cab5f61`](https://github.com/jolars/panache/commit/cab5f6125e51c22a07d7cfe3768885f3d4299b45))
+- **parser:** dispatch HTML block on definition marker line ([`8eb6f6a`](https://github.com/jolars/panache/commit/8eb6f6a4657e807df5da154f169b50dbe9d4beb0))
+- **parser:** fuse comment softbreak in blockquote ([`8a29570`](https://github.com/jolars/panache/commit/8a295706c62421157c59ea4282e49a2c15c4660b))
+- **parser:** fuse comment softbreak in fenced div ([`baccde0`](https://github.com/jolars/panache/commit/baccde0247c1344c49a97c809c26f4a067a8728c))
+
+### Bug Fixes
+- **parser:** let blocks end reduced-marker lazy lines ([`edd18ee`](https://github.com/jolars/panache/commit/edd18eeeac33f2dcfd5d443192d387e6d3e27231)), closes [#429](https://github.com/jolars/panache/issues/429)
+- **parser:** let ATX heading end a lazy blockquote line ([`71f46a4`](https://github.com/jolars/panache/commit/71f46a4bd8d971ec9d73d09d8bbcb220827d7779)), closes [#428](https://github.com/jolars/panache/issues/428)
+- **parser:** keep setext from interrupting a paragraph ([`a1b9fa1`](https://github.com/jolars/panache/commit/a1b9fa1ff82c5f0d4f953413a08eaa3b12695e68))
+- **parser:** preserve order for interrupting ATX headings ([`6620829`](https://github.com/jolars/panache/commit/662082943cd049aba7427d20975a383abe929839))
+- **parser:** detect headerless single-column simple tables ([`0de4afc`](https://github.com/jolars/panache/commit/0de4afcbe0ecb23b1d5581078b2107dafa7a9a7b))
+- **parser:** gate YAML metadata on top-level mapping ([`8f135bc`](https://github.com/jolars/panache/commit/8f135bc760e0961f89d8b6d7735e1f4526005ae0))
+- **parser:** restrict mid-document YAML to pandoc dialect ([`53fabd9`](https://github.com/jolars/panache/commit/53fabd92e163272212fc9387bd82fc6e54b886aa))
+- **parser:** detect rules and headings in nested list items ([`4de51b7`](https://github.com/jolars/panache/commit/4de51b78a4ae7235c6307383f870518e42862e0f))
+- **parser:** lift multi-line `<div>` body on definition marker line ([`9a78ab8`](https://github.com/jolars/panache/commit/9a78ab893532143cbefd69c74042b01d01241eb6))
+
 ## [0.21.0](https://github.com/jolars/panache/compare/panache-parser-v0.20.0...panache-parser-v0.21.0) (2026-07-04)
 
 ### Features

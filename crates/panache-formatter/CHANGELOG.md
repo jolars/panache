@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.20.0](https://github.com/jolars/panache/compare/panache-formatter-v0.19.0...panache-formatter-v0.20.0) (2026-07-20)
+
+### Breaking changes
+- remove long-deprecated config, CLI, and API surface ([`6af736d`](https://github.com/jolars/panache/commit/6af736d8ab38ecebfaa62d40fbfbe83a2a300adf))
+
+### Features
+- **formatter:** add `horizontal-rule-style` format option ([`e2b0abe`](https://github.com/jolars/panache/commit/e2b0abe51cfe62514defa4c476ca4be175ba216b)), closes [#417](https://github.com/jolars/panache/issues/417)
+- remove long-deprecated config, CLI, and API surface ([`6af736d`](https://github.com/jolars/panache/commit/6af736d8ab38ecebfaa62d40fbfbe83a2a300adf))
+- **parser:** lift HTML block on footnote marker line ([`cab5f61`](https://github.com/jolars/panache/commit/cab5f6125e51c22a07d7cfe3768885f3d4299b45))
+
+### Bug Fixes
+- **formatter:** keep space after crossref in footnote ([`bfa9da0`](https://github.com/jolars/panache/commit/bfa9da007ac7c43ac8480abeee0ed28af6fffed7)), closes [#430](https://github.com/jolars/panache/issues/430)
+- **parser:** preserve order for interrupting ATX headings ([`6620829`](https://github.com/jolars/panache/commit/662082943cd049aba7427d20975a383abe929839))
+- **formatter:** blank line between trailing rule and div fence ([`1abf3f8`](https://github.com/jolars/panache/commit/1abf3f8f35d58e5ccfafe66e0b88b7ca003f6e71))
+- **formatter:** indent headings in list items ([`7690f1d`](https://github.com/jolars/panache/commit/7690f1ddf36be642eeeffe04952379e597524504))
+- **formatter:** indent horizontal rules in list items ([`2033e2b`](https://github.com/jolars/panache/commit/2033e2b98256e5d8892fa8ff4b218f069570b65b))
+- **formatter:** collapse newline inside inline math ([`28266ed`](https://github.com/jolars/panache/commit/28266ed461bc4e551224aa985f40f47cbf3ebd36))
+- **formatter:** anchor LHS binary math breaks flush ([`a4a86ec`](https://github.com/jolars/panache/commit/a4a86ec454a7bb564ab6bbfec9c182778b5a433e))
+
+### Dependencies
+- updated crates/panache-parser to v0.22.0
+
 ## [0.19.0](https://github.com/jolars/panache/compare/panache-formatter-v0.18.0...panache-formatter-v0.19.0) (2026-07-04)
 
 ### Features

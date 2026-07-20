@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [3.0.0](https://github.com/jolars/panache/compare/v2.61.0...v3.0.0) (2026-07-20)
 
 This is a major release with breaking changes. Most importantly, `snake_case`
 style configurations keys, which have been deprecated since a few months back,
@@ -12,6 +12,52 @@ non-zero on lint violations. The `--check` CLI flag no longer has any effect on
 Other than that, this release brings major performance improvements to the
 language server, a new style configuration for horizontal rules (`horizontal-rule-style`)
 and a number of bug fixes.
+
+### Breaking changes
+- remove long-deprecated config, CLI, and API surface ([`6af736d`](https://github.com/jolars/panache/commit/6af736d8ab38ecebfaa62d40fbfbe83a2a300adf))
+- **cli:** exit non-zero on lint violations by default ([`f31317a`](https://github.com/jolars/panache/commit/f31317a45147c6cb2982e328f38d59d1d74440d7))
+
+### Features
+- **linter:** add `citation-nonbreaking-space` rule ([`6f8fb28`](https://github.com/jolars/panache/commit/6f8fb28fb4f49384295a10cea9ae807debcc89d9))
+- **formatter:** add `horizontal-rule-style` format option ([`e2b0abe`](https://github.com/jolars/panache/commit/e2b0abe51cfe62514defa4c476ca4be175ba216b)), closes [#417](https://github.com/jolars/panache/issues/417)
+- remove long-deprecated config, CLI, and API surface ([`6af736d`](https://github.com/jolars/panache/commit/6af736d8ab38ecebfaa62d40fbfbe83a2a300adf))
+- **cli:** exit non-zero on lint violations by default ([`f31317a`](https://github.com/jolars/panache/commit/f31317a45147c6cb2982e328f38d59d1d74440d7))
+- **parser:** lift later-line HTML block in def/footnote body ([`21d448a`](https://github.com/jolars/panache/commit/21d448a3972261d6ec8472a0ccc74cd37f75688b))
+- **parser:** fuse comment trailing softbreak in def body ([`1a2c8b9`](https://github.com/jolars/panache/commit/1a2c8b9728dae63989d7eddc3b348b85f8ae1f71))
+- **parser:** lift HTML block on footnote marker line ([`cab5f61`](https://github.com/jolars/panache/commit/cab5f6125e51c22a07d7cfe3768885f3d4299b45))
+- **parser:** dispatch HTML block on definition marker line ([`8eb6f6a`](https://github.com/jolars/panache/commit/8eb6f6a4657e807df5da154f169b50dbe9d4beb0))
+- **parser:** fuse comment softbreak in blockquote ([`8a29570`](https://github.com/jolars/panache/commit/8a295706c62421157c59ea4282e49a2c15c4660b))
+- **parser:** fuse comment softbreak in fenced div ([`baccde0`](https://github.com/jolars/panache/commit/baccde0247c1344c49a97c809c26f4a067a8728c))
+
+### Bug Fixes
+- adapt to salsa 0.28 and lsp-server 0.10 APIs ([`54bd3ae`](https://github.com/jolars/panache/commit/54bd3ae83051a86850114ffc35aab179ed8a673f))
+- **formatter:** keep space after crossref in footnote ([`bfa9da0`](https://github.com/jolars/panache/commit/bfa9da007ac7c43ac8480abeee0ed28af6fffed7)), closes [#430](https://github.com/jolars/panache/issues/430)
+- **parser:** let blocks end reduced-marker lazy lines ([`edd18ee`](https://github.com/jolars/panache/commit/edd18eeeac33f2dcfd5d443192d387e6d3e27231)), closes [#429](https://github.com/jolars/panache/issues/429)
+- **parser:** let ATX heading end a lazy blockquote line ([`71f46a4`](https://github.com/jolars/panache/commit/71f46a4bd8d971ec9d73d09d8bbcb220827d7779)), closes [#428](https://github.com/jolars/panache/issues/428)
+- **parser:** detect headerless single-column simple tables ([`0de4afc`](https://github.com/jolars/panache/commit/0de4afcbe0ecb23b1d5581078b2107dafa7a9a7b))
+- **parser:** gate YAML metadata on top-level mapping ([`8f135bc`](https://github.com/jolars/panache/commit/8f135bc760e0961f89d8b6d7735e1f4526005ae0))
+- **parser:** restrict mid-document YAML to pandoc dialect ([`53fabd9`](https://github.com/jolars/panache/commit/53fabd92e163272212fc9387bd82fc6e54b886aa))
+- **formatter:** blank line between trailing rule and div fence ([`1abf3f8`](https://github.com/jolars/panache/commit/1abf3f8f35d58e5ccfafe66e0b88b7ca003f6e71))
+- **formatter:** indent headings in list items ([`7690f1d`](https://github.com/jolars/panache/commit/7690f1ddf36be642eeeffe04952379e597524504))
+- **formatter:** indent horizontal rules in list items ([`2033e2b`](https://github.com/jolars/panache/commit/2033e2b98256e5d8892fa8ff4b218f069570b65b))
+- **config:** add migration hints for removed 3.0 keys ([`aa35d17`](https://github.com/jolars/panache/commit/aa35d17cfad01a856c8e77af16bdeb88015c77b0))
+- **parser:** lift multi-line `<div>` body on definition marker line ([`9a78ab8`](https://github.com/jolars/panache/commit/9a78ab893532143cbefd69c74042b01d01241eb6))
+- **lsp:** report server name and version at initialize ([`79fe479`](https://github.com/jolars/panache/commit/79fe4798ac62cfe985bbffcf7b639129d9b9b64a))
+- **lsp:** drop global state before joining IO threads ([`df57721`](https://github.com/jolars/panache/commit/df57721e038576eb3ac577e44dbc0e60808e4334))
+- **formatter:** match `[formatters]` keys by language alias ([`08c39bc`](https://github.com/jolars/panache/commit/08c39bced6f90745dbfe47bd507020afe941bce6))
+- **formatter:** collapse newline inside inline math ([`28266ed`](https://github.com/jolars/panache/commit/28266ed461bc4e551224aa985f40f47cbf3ebd36))
+- **formatter:** anchor LHS binary math breaks flush ([`a4a86ec`](https://github.com/jolars/panache/commit/a4a86ec454a7bb564ab6bbfec9c182778b5a433e))
+- **lsp:** serve pull diagnostics off the event loop ([`b60c779`](https://github.com/jolars/panache/commit/b60c779274b17d78e4443fd801b28a52fb658a48))
+- **parser:** preserve order for interrupting ATX headings ([`6620829`](https://github.com/jolars/panache/commit/662082943cd049aba7427d20975a383abe929839))
+- **parser:** keep setext from interrupting a paragraph ([`a1b9fa1`](https://github.com/jolars/panache/commit/a1b9fa1ff82c5f0d4f953413a08eaa3b12695e68))
+- **parser:** detect rules and headings in nested list items ([`4de51b7`](https://github.com/jolars/panache/commit/4de51b78a4ae7235c6307383f870518e42862e0f))
+
+### Performance Improvements
+- **lsp:** share one `FileConfig` per config value ([`16ae29b`](https://github.com/jolars/panache/commit/16ae29b5bcb7c02c4dc14874340875670f704302))
+
+### Dependencies
+- updated crates/panache-formatter to v0.20.0
+- updated crates/panache-parser to v0.22.0
 
 ## [2.61.0](https://github.com/jolars/panache/compare/v2.60.0...v2.61.0) (2026-07-04)
 
