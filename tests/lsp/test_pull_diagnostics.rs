@@ -45,9 +45,9 @@ fn document_pull_is_answered_off_the_event_loop() {
     let drained = server.drain_client_messages();
     let response = response_for(&drained, &id).expect("expected an async response for the pull");
     assert!(
-        response.error.is_none(),
+        response.response_result.is_ok(),
         "the pull should succeed, got error: {:?}",
-        response.error
+        response.response_result.as_ref().err()
     );
 }
 
@@ -71,9 +71,9 @@ fn document_pull_is_cancellable() {
     let drained = server.drain_client_messages();
     let response = response_for(&drained, &id).expect("expected a response for the cancelled pull");
     let err = response
-        .error
+        .response_result
         .as_ref()
-        .expect("a cancelled pull should produce an error response");
+        .expect_err("a cancelled pull should produce an error response");
     assert_eq!(
         err.code,
         ErrorCode::RequestCanceled as i32,

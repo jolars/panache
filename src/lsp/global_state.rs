@@ -572,7 +572,7 @@ impl GlobalState {
     /// Handle a reply to one of our server→client requests.
     pub(crate) fn on_client_response(&mut self, response: Response) {
         if let Some(method) = self.outgoing.remove(&response.id)
-            && let Some(err) = response.error
+            && let Err(err) = response.response_result
         {
             log::warn!("server request {method} failed: {}", err.message);
         }

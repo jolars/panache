@@ -888,7 +888,9 @@ mod tests {
         match task {
             Task::Response(resp) => {
                 assert_eq!(resp.id, id);
-                let err = resp.error.expect("panic should produce an error response");
+                let err = resp
+                    .response_result
+                    .expect_err("panic should produce an error response");
                 assert_eq!(err.code, ErrorCode::InternalError as i32);
             }
             _ => panic!("expected a Task::Response"),
