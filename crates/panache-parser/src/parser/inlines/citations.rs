@@ -52,6 +52,17 @@ pub(crate) fn try_parse_bracketed_citation(text: &str) -> Option<(usize, &str)> 
                 }
                 bracket_depth -= 1;
                 pos += 1;
+                // A nested bracket group directly followed by `(dest)` is an
+                // inline link/image; its destination is verbatim, so `@`
+                // inside it must not count (pandoc parses
+                // `[![alt](https://x.io/@scope)](url)` as a link, not a
+                // citation).
+                if pos < bytes.len()
+                    && bytes[pos] == b'('
+                    && let Some(end) = inline_destination_end(bytes, pos)
+                {
+                    pos = end;
+                }
             }
             b'@' => {
                 // Found a citation marker - this is likely a citation
@@ -98,6 +109,14 @@ pub(crate) fn try_parse_bracketed_citation(text: &str) -> Option<(usize, &str)> 
                     return Some((pos + 1, content));
                 }
                 pos += 1;
+                // Skip nested link/image destinations so a `]` inside them
+                // does not terminate the citation bracket.
+                if pos < bytes.len()
+                    && bytes[pos] == b'('
+                    && let Some(end) = inline_destination_end(bytes, pos)
+                {
+                    pos = end;
+                }
             }
             _ => {
                 pos += 1;
@@ -376,6 +395,71 @@ fn code_span_end(bytes: &[u8], pos: usize) -> Option<usize> {
     }
 
     None
+}
+
+/// Given `bytes[pos] == b'('` immediately after a `]` that closed a nested
+/// bracket group, return the index just past the closing `)` when the group
+/// parses like an inline link/image destination: an optional angle-bracketed
+/// or bare (space-free, balanced-paren) destination followed by an optional
+/// quoted title. Returns `None` when the group is not destination-shaped, in
+/// which case its bytes stay visible to citation detection.
+fn inline_destination_end(bytes: &[u8], pos: usize) -> Option<usize> {
+    let mut i = pos + 1;
+    while i < bytes.len() && matches!(bytes[i], b' ' | b'\t') {
+        i += 1;
+    }
+    if i < bytes.len() && bytes[i] == b'<' {
+        // Angle-bracketed destination: runs to the closing `>`.
+        i += 1;
+        while i < bytes.len() && bytes[i] != b'>' {
+            i += if bytes[i] == b'\\' { 2 } else { 1 };
+        }
+        if i >= bytes.len() {
+            return None;
+        }
+        i += 1;
+    } else {
+        // Bare destination: no whitespace, balanced parens. A `]` is allowed
+        // here (pandoc links `[x](a]b)`).
+        let mut depth = 0usize;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'\\' => i += 2,
+                b'(' => {
+                    depth += 1;
+                    i += 1;
+                }
+                b')' if depth == 0 => break,
+                b')' => {
+                    depth -= 1;
+                    i += 1;
+                }
+                b' ' | b'\t' | b'\n' => break,
+                _ => i += 1,
+            }
+        }
+    }
+    // Optional whitespace, which must introduce a quoted title or end the
+    // group; a bare space inside the parens is not a valid destination.
+    let mut j = i;
+    while j < bytes.len() && matches!(bytes[j], b' ' | b'\t' | b'\n') {
+        j += 1;
+    }
+    if j < bytes.len() && (bytes[j] == b'"' || bytes[j] == b'\'') {
+        let quote = bytes[j];
+        j += 1;
+        while j < bytes.len() && bytes[j] != quote {
+            j += if bytes[j] == b'\\' { 2 } else { 1 };
+        }
+        if j >= bytes.len() {
+            return None;
+        }
+        j += 1;
+        while j < bytes.len() && matches!(bytes[j], b' ' | b'\t' | b'\n') {
+            j += 1;
+        }
+    }
+    (j < bytes.len() && bytes[j] == b')').then(|| j + 1)
 }
 
 /// Check if a character is valid internal punctuation in citation keys.
@@ -708,6 +792,36 @@ mod tests {
         assert_eq!(
             try_parse_bracketed_citation("[`@foo bar]"),
             Some((11, "`@foo bar"))
+        );
+    }
+
+    #[test]
+    fn test_bracketed_citation_ignores_at_in_nested_image_url() {
+        // The @ lives in the image destination, so the outer bracket is a link
+        // label, not a citation (matches pandoc's Link [ Image ... ] parse).
+        assert_eq!(
+            try_parse_bracketed_citation(
+                "[![npm version](https://badge.fury.io/js/@arity-cli%2Farity-cli.svg?icon=si%3Anpm)]"
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_bracketed_citation_ignores_at_in_nested_link_url() {
+        assert_eq!(
+            try_parse_bracketed_citation("[a [link](https://x.io/@scope) here]"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_bracketed_citation_marker_after_nested_link_url() {
+        // A nested link's destination is skipped, but a top-level @key after
+        // it still makes the bracket a citation (matches pandoc).
+        assert_eq!(
+            try_parse_bracketed_citation("[see [foo](url@x) and @bar]"),
+            Some((27, "see [foo](url@x) and @bar"))
         );
     }
 

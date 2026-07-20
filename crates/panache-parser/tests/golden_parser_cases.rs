@@ -219,6 +219,7 @@ golden_test_cases!(
     crlf_yaml_metadata,
     citations,
     citation_code_span_link,
+    citation_nested_link_url_at,
     citation_prefix_paren_escape_278,
     definition_list,
     definition_list_blockquote_continuation,

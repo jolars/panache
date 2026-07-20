@@ -1,0 +1,53 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..192
+  PARAGRAPH@0..125
+    LINK@0..124
+      LINK_START@0..1
+        LINK_START@0..1 "["
+      LINK_TEXT@1..82
+        IMAGE_LINK@1..82
+          IMAGE_LINK_START@1..3
+            IMAGE_LINK_START@1..3 "!["
+          IMAGE_ALT@3..14
+            TEXT@3..14 "npm version"
+          IMAGE_ALT_END@14..15 "]"
+          IMAGE_DEST_START@15..16 "("
+          LINK_DEST@16..81
+            TEXT@16..81 "https://badge.fury.io ..."
+          IMAGE_DEST_END@81..82 ")"
+      LINK_TEXT_END@82..83 "]"
+      LINK_DEST_START@83..84 "("
+      LINK_DEST@84..123
+        TEXT@84..123 "https://www.npmjs.com ..."
+      LINK_DEST_END@123..124 ")"
+    NEWLINE@124..125 "\n"
+  BLANK_LINE@125..126
+    BLANK_LINE@125..126 "\n"
+  PARAGRAPH@126..163
+    UNRESOLVED_REFERENCE@126..162
+      LINK_START@126..127
+        LINK_START@126..127 "["
+      LINK_TEXT@127..161
+        TEXT@127..149 "a [link](https://x.io/"
+        CITATION@149..155
+          CITATION_MARKER@149..150 "@"
+          CITATION_KEY@150..155 "scope"
+        TEXT@155..161 ") here"
+      TEXT@161..162 "]"
+    NEWLINE@162..163 "\n"
+  BLANK_LINE@163..164
+    BLANK_LINE@163..164 "\n"
+  PARAGRAPH@164..192
+    CITATION@164..191
+      LINK_START@164..165 "["
+      CITATION_CONTENT@165..178 "see [foo](url"
+      CITATION_MARKER@178..179 "@"
+      CITATION_KEY@179..180 "x"
+      CITATION_CONTENT@180..186 ") and "
+      CITATION_MARKER@186..187 "@"
+      CITATION_KEY@187..190 "bar"
+      LINK_DEST@190..191 "]"
+    NEWLINE@191..192 "\n"

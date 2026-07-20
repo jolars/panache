@@ -248,6 +248,16 @@ mod tests {
     }
 
     #[test]
+    fn badge_link_with_at_in_url_is_not_flagged() {
+        // An @ inside a nested image destination must not make the bracket a
+        // citation (pandoc parses this as Link [ Image ... ]).
+        let input = "[![PyPI](https://badge.fury.io/py/arity.svg)](https://pypi.org/project/arity/)\n\
+                     [![npm](https://badge.fury.io/js/@arity-cli%2Farity-cli.svg)](https://www.npmjs.com/package/arity-cli)\n";
+        let diagnostics = parse_and_lint(input);
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
     fn fix_is_idempotent() {
         let input = "Some fact [@smith2020] here.\n";
         let diagnostics = parse_and_lint(input);
