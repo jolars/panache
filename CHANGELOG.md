@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.1](https://github.com/jolars/panache/compare/v3.0.0...v3.0.1) (2026-07-23)
+
+### Bug Fixes
+- **parser:** skip link destinations in citation scan ([`46d2201`](https://github.com/jolars/panache/commit/46d220132e53a52dd164b291f360f9e979a765c9))
+
+### Dependencies
+- updated crates/panache-parser to v0.22.1
+
 ## [3.0.0](https://github.com/jolars/panache/compare/v2.61.0...v3.0.0) (2026-07-20)
 
 This is a major release with breaking changes. Most importantly, `snake_case`

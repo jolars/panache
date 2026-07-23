@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.22.1](https://github.com/jolars/panache/compare/panache-parser-v0.22.0...panache-parser-v0.22.1) (2026-07-23)
+
+### Bug Fixes
+- **parser:** skip link destinations in citation scan ([`46d2201`](https://github.com/jolars/panache/commit/46d220132e53a52dd164b291f360f9e979a765c9))
+
 ## [0.22.0](https://github.com/jolars/panache/compare/panache-parser-v0.21.0...panache-parser-v0.22.0) (2026-07-20)
 
 ### Breaking changes
