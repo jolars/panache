@@ -41,6 +41,14 @@ fn update_display_math_dollar_state(
     }
 }
 
+fn update_display_math_bracket_state(line_no_newline: &str, open_display_math_brackets: &mut bool) {
+    match line_no_newline.trim() {
+        "\\[" => *open_display_math_brackets = true,
+        "\\]" => *open_display_math_brackets = false,
+        _ => {}
+    }
+}
+
 fn extract_end_environment_name(line: &str) -> Option<&str> {
     let trimmed = line.trim_start();
     if !trimmed.starts_with("\\end{") {
@@ -71,6 +79,7 @@ pub(in crate::parser) fn start_paragraph_if_needed(
             buffer: ParagraphBuffer::new(),
             open_inline_math_envs: Vec::new(),
             open_display_math_dollar_count: None,
+            open_display_math_brackets: false,
             start_checkpoint,
         });
     }
@@ -89,6 +98,7 @@ pub(in crate::parser) fn append_paragraph_line(
         buffer,
         open_inline_math_envs,
         open_display_math_dollar_count,
+        open_display_math_brackets,
         ..
     }) = containers.stack.last_mut()
     {
@@ -100,6 +110,7 @@ pub(in crate::parser) fn append_paragraph_line(
         // This prevents `$$` + `\begin{...}` forms from being split into
         // PARAGRAPH + TEX_BLOCK across parse passes.
         update_display_math_dollar_state(line_no_newline, open_display_math_dollar_count);
+        update_display_math_bracket_state(line_no_newline, open_display_math_brackets);
         if let Some(env_name) = extract_environment_name(line_no_newline)
             && is_inline_math_environment(env_name)
         {
@@ -149,6 +160,16 @@ pub(in crate::parser) fn has_open_display_math_dollars(containers: &ContainerSta
             open_display_math_dollar_count,
             ..
         }) if open_display_math_dollar_count.is_some()
+    )
+}
+
+pub(in crate::parser) fn has_open_display_math_brackets(containers: &ContainerStack) -> bool {
+    matches!(
+        containers.last(),
+        Some(Container::Paragraph {
+            open_display_math_brackets: true,
+            ..
+        })
     )
 }
 

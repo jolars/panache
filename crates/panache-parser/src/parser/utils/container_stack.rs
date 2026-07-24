@@ -66,6 +66,7 @@ pub(crate) enum Container {
         buffer: ParagraphBuffer, // Interleaved buffer for paragraph content with markers
         open_inline_math_envs: Vec<String>,
         open_display_math_dollar_count: Option<usize>,
+        open_display_math_brackets: bool,
         // Checkpoint at the position the paragraph started; used to retroactively
         // wrap buffered content as PARAGRAPH (or HEADING for multi-line setext)
         // when the paragraph is closed.

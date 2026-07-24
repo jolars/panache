@@ -51,6 +51,16 @@ fn display_math_default_indent_multiline_idempotent() {
 }
 
 #[test]
+fn bracket_display_math_preserves_following_markdown_structure() {
+    let input = "Before\n\n\\[\n\\begin{bmatrix}1\\\\1\\\\0\\end{bmatrix}\n\\]\n\nAfter\n\n\n\n# Heading\nText\n";
+    let expected = "Before\n\n\\[ \\begin{bmatrix}1\\\\1\\\\0\\end{bmatrix} \\]\n\nAfter\n\n# Heading\n\nText\n";
+    let output = format(input, Some(math_config(false)), None);
+
+    similar_asserts::assert_eq!(output, expected);
+    similar_asserts::assert_eq!(format(&output, Some(math_config(false)), None), output);
+}
+
+#[test]
 fn display_math_indent_zero_stays_flush() {
     // Explicit `math-indent = 0` keeps the old flush-left behavior.
     let cfg = Config {

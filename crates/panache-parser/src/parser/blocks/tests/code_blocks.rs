@@ -710,6 +710,21 @@ fn standalone_dollar_math_delimiters_do_not_split_into_tex_block() {
     );
 }
 
+#[test]
+fn bracket_display_math_does_not_split_into_tex_block() {
+    let input = "Before\n\n\\[\nN(A)=\\operatorname{span}\n\\left\\{\n\\begin{bmatrix}1\\\\1\\\\0\\end{bmatrix},\n\\begin{bmatrix}0\\\\0\\\\1\\end{bmatrix}\n\\right\\}\n\\]\n\nAfter\n\n# Heading\n\nText\n";
+    let tree = parse_blocks(input);
+
+    assert!(
+        find_first(&tree, SyntaxKind::TEX_BLOCK).is_none(),
+        "display math delimited by standalone \\[ and \\] lines should stay paragraph-inline, not TEX_BLOCK"
+    );
+    assert!(
+        find_first(&tree, SyntaxKind::HEADING).is_some(),
+        "a heading after bracket-delimited display math should remain a HEADING"
+    );
+}
+
 // Indented code block tests
 
 #[test]
