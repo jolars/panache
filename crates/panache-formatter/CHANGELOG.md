@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.20.1](https://github.com/jolars/panache/compare/panache-formatter-v0.20.0...panache-formatter-v0.20.1) (2026-07-25)
+
+### Bug Fixes
+- **parser:** emit simple table closer as separator ([`0db2620`](https://github.com/jolars/panache/commit/0db2620eb1e34ac86c7e2c0eae070f4d9f39be30))
+- **formatter:** guard heading markers in reflow wrap ([`ad8b1a0`](https://github.com/jolars/panache/commit/ad8b1a01278510188faeff0e14e9d8b77b030a91))
+- **parser:** track display math inside list items ([`6708303`](https://github.com/jolars/panache/commit/67083031fa8f89429510ae5164b22c9ffc769152))
+- **parser:** track bracket display math across lines ([`cb6b70b`](https://github.com/jolars/panache/commit/cb6b70b55c25036415e29dfc4ab27c8e8c2c3f98)), closes [#437](https://github.com/jolars/panache/issues/437)
+
+### Dependencies
+- updated crates/panache-parser to v0.22.1
+
 ## [0.20.0](https://github.com/jolars/panache/compare/panache-formatter-v0.19.0...panache-formatter-v0.20.0) (2026-07-20)
 
 ### Breaking changes

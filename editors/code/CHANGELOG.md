@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.1](https://github.com/jolars/panache/compare/panache-code-v3.0.0...panache-code-v3.0.1) (2026-07-25)
+
+### Bug Fixes
+- **deps:** resolve npm security alerts in VS Code extension ([`2f99759`](https://github.com/jolars/panache/commit/2f9975910fae13cf64c5ff65d358d9682bf3a8d0))
+
+### Dependencies
+- updated panache to v3.0.1
+
 ## [3.0.0](https://github.com/jolars/panache/compare/panache-code-v2.54.0...panache-code-v3.0.0) (2026-07-20)
 
 ### Dependencies

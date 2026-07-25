@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.0.1](https://github.com/jolars/panache/compare/v3.0.0...v3.0.1) (2026-07-25)
+
+### Bug Fixes
+- **parser:** emit simple table closer as separator ([`0db2620`](https://github.com/jolars/panache/commit/0db2620eb1e34ac86c7e2c0eae070f4d9f39be30))
+- **parser:** require closer for headerless simple tables ([`83dd8c5`](https://github.com/jolars/panache/commit/83dd8c526325cab3a33caba9da6a01b3a16ad330))
+- **parser:** accept 2-dash multiline table borders ([`9be4e59`](https://github.com/jolars/panache/commit/9be4e597c4d45b4ccfc62e79e7df1852d8472d37))
+- **parser:** detect headerless single-column multiline tables ([`a573220`](https://github.com/jolars/panache/commit/a57322065d8ff3b26bde55c990f728a56a42aab7))
+- **formatter:** guard heading markers in reflow wrap ([`ad8b1a0`](https://github.com/jolars/panache/commit/ad8b1a01278510188faeff0e14e9d8b77b030a91))
+- **parser:** track display math inside list items ([`6708303`](https://github.com/jolars/panache/commit/67083031fa8f89429510ae5164b22c9ffc769152))
+- **parser:** skip link destinations in citation scan ([`46d2201`](https://github.com/jolars/panache/commit/46d220132e53a52dd164b291f360f9e979a765c9))
+- **parser:** track bracket display math across lines ([`cb6b70b`](https://github.com/jolars/panache/commit/cb6b70b55c25036415e29dfc4ab27c8e8c2c3f98)), closes [#437](https://github.com/jolars/panache/issues/437)
+- **parser:** reject simple tables with only a closer ([`b926900`](https://github.com/jolars/panache/commit/b9269008989d63edc3b406d587252c710f43a5e8))
+- **deps:** resolve npm security alerts in VS Code extension ([`2f99759`](https://github.com/jolars/panache/commit/2f9975910fae13cf64c5ff65d358d9682bf3a8d0))
+
+### Dependencies
+- updated crates/panache-formatter to v0.20.1
+- updated crates/panache-parser to v0.22.1
+
 ## [3.0.0](https://github.com/jolars/panache/compare/v2.61.0...v3.0.0) (2026-07-20)
 
 This is a major release with breaking changes. Most importantly, `snake_case`
