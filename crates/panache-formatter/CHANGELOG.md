@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.2](https://github.com/jolars/panache/compare/panache-formatter-v0.20.1...panache-formatter-v0.20.2) (2026-07-28)
+
+### Bug Fixes
+- stabilize divs and code blocks in list items ([`3c47658`](https://github.com/jolars/panache/commit/3c476588af1cbdcf1e9f002a5dc904373fbc800e)), closes [#439](https://github.com/jolars/panache/issues/439)
+
+### Dependencies
+- updated crates/panache-parser to v0.22.2
+
 ## [0.20.1](https://github.com/jolars/panache/compare/panache-formatter-v0.20.0...panache-formatter-v0.20.1) (2026-07-25)
 
 ### Bug Fixes

@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.0.2](https://github.com/jolars/panache/compare/v3.0.1...v3.0.2) (2026-07-28)
+
+### Bug Fixes
+- **cli:** scope deprecation quoting to `--check` ([`16742ee`](https://github.com/jolars/panache/commit/16742eeb863cee5383c2554e608965d61bf53103)), closes [#443](https://github.com/jolars/panache/issues/443)
+- **cli:** discover ancestor `panache.toml` for relative targets ([`3947284`](https://github.com/jolars/panache/commit/394728481ce30bbdfe34c937b39c4e441a1428be)), fixes [#441](https://github.com/jolars/panache/issues/441)
+- stabilize divs and code blocks in list items ([`3c47658`](https://github.com/jolars/panache/commit/3c476588af1cbdcf1e9f002a5dc904373fbc800e)), closes [#439](https://github.com/jolars/panache/issues/439)
+- **parser:** inline-parse single-column multiline table cells ([`f69d2bb`](https://github.com/jolars/panache/commit/f69d2bbc7847a15f67c1b5322f9d529962fe0521)), closes [#438](https://github.com/jolars/panache/issues/438)
+
+### Dependencies
+- updated crates/panache-formatter to v0.20.2
+- updated crates/panache-parser to v0.22.2
+
 ## [3.0.1](https://github.com/jolars/panache/compare/v3.0.0...v3.0.1) (2026-07-25)
 
 ### Bug Fixes

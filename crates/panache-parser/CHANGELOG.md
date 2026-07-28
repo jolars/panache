@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.22.2](https://github.com/jolars/panache/compare/panache-parser-v0.22.1...panache-parser-v0.22.2) (2026-07-28)
+
+### Bug Fixes
+- stabilize divs and code blocks in list items ([`3c47658`](https://github.com/jolars/panache/commit/3c476588af1cbdcf1e9f002a5dc904373fbc800e)), closes [#439](https://github.com/jolars/panache/issues/439)
+- **parser:** inline-parse single-column multiline table cells ([`f69d2bb`](https://github.com/jolars/panache/commit/f69d2bbc7847a15f67c1b5322f9d529962fe0521)), closes [#438](https://github.com/jolars/panache/issues/438)
+
 ## [0.22.1](https://github.com/jolars/panache/compare/panache-parser-v0.22.0...panache-parser-v0.22.1) (2026-07-25)
 
 ### Bug Fixes
