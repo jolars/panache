@@ -70,4 +70,4 @@ jobs:
         run: cargo run -- format --check docs/
 
       - name: Panache lint check (docs)
-        run: cargo run -- lint --check docs/
+        run: cargo run -- lint docs/
