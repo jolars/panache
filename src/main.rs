@@ -1522,7 +1522,7 @@ fn main() -> io::Result<()> {
         } => {
             if check {
                 eprintln!(
-                    "Warning: `panache lint --check` is deprecated; linting exits non-zero on \
+                    "Warning: the `--check` flag is deprecated; linting exits non-zero on \
                      violations by default. The flag is now a no-op."
                 );
             }
