@@ -963,3 +963,27 @@ fn test_format_global_xdg_config_exclude_anchors_at_traversal_dir() {
         .stdout(predicate::str::contains("1 file left unchanged"))
         .stdout(predicate::str::contains("snapshot.md").not());
 }
+
+#[test]
+fn test_format_discovers_parent_config_from_relative_target() {
+    // Issue #441: `panache format --check .` inside a subdirectory must
+    // discover a `panache.toml` in an ancestor directory. With the parent
+    // config's `wrap = "preserve"` the manual line break survives; without it
+    // the default reflow joins the lines and `--check` fails.
+    let temp_dir = TempDir::new().unwrap();
+    fs::create_dir(temp_dir.path().join(".git")).unwrap();
+    fs::write(
+        temp_dir.path().join("panache.toml"),
+        "[format]\nwrap = \"preserve\"\n",
+    )
+    .unwrap();
+    let subdir = temp_dir.path().join("subdir");
+    fs::create_dir(&subdir).unwrap();
+    fs::write(subdir.join("doc.md"), "Alpha\nbravo.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(&subdir)
+        .args(["format", "--no-cache", "--check", "."])
+        .assert()
+        .success();
+}

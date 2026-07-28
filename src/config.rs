@@ -598,6 +598,17 @@ fn project_boundary(start_dir: &Path) -> Option<PathBuf> {
     None
 }
 
+/// Resolve a possibly CWD-relative `start_dir` to an absolute path so that
+/// ancestor walks see the real filesystem parents. The empty path (the parent
+/// of a bare filename) means the working directory. Falls back to the path as
+/// given when the working directory is unavailable.
+fn absolutize_start_dir(start_dir: &Path) -> PathBuf {
+    if start_dir.as_os_str().is_empty() {
+        return env::current_dir().unwrap_or_else(|_| start_dir.to_path_buf());
+    }
+    std::path::absolute(start_dir).unwrap_or_else(|_| start_dir.to_path_buf())
+}
+
 fn xdg_config_path() -> Option<PathBuf> {
     if let Ok(xdg) = env::var("XDG_CONFIG_HOME") {
         let p = Path::new(&xdg).join("panache").join("config.toml");
@@ -679,6 +690,13 @@ pub fn load_with_chain(
     input_file: Option<&Path>,
     flavor_override: Option<Flavor>,
 ) -> io::Result<(Config, ConfigSource, Vec<PathBuf>)> {
+    // CLI callers derive `start_dir` from user-supplied targets, so it is
+    // often CWD-relative (`.`, `subdir`, or even empty for a bare filename).
+    // `Path::ancestors()` is purely lexical: a relative walk ends at the
+    // working directory and never reaches its real filesystem parents, so
+    // discovery and the `.git` boundary would miss ancestor configs (#441).
+    let start_dir = absolutize_start_dir(start_dir);
+    let start_dir = start_dir.as_path();
     let boundary = project_boundary(start_dir);
     let (mut cfg, source, extensions, chain) = if let Some(path) = explicit {
         let (cfg, ext, chain) = read_config_with_chain(path).map_err(io::Error::from)?;

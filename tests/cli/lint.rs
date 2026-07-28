@@ -1332,3 +1332,37 @@ fn test_lint_metadata_yml_validates_against_front_matter() {
         .failure()
         .stdout(predicate::str::contains("quarto-schema-type-mismatch"));
 }
+
+#[test]
+fn test_lint_discovers_parent_config_from_relative_target() {
+    // Issue #441: `panache lint .` inside a subdirectory must discover a
+    // `panache.toml` in an ancestor directory. Discovery walks
+    // `start_dir.ancestors()`, which for a relative start dir never climbs
+    // above the working directory.
+    let temp_dir = TempDir::new().unwrap();
+    fs::create_dir(temp_dir.path().join(".git")).unwrap();
+    fs::write(
+        temp_dir.path().join("panache.toml"),
+        "[lint.rules]\nheading-hierarchy = false\n",
+    )
+    .unwrap();
+    let subdir = temp_dir.path().join("subdir");
+    fs::create_dir(&subdir).unwrap();
+    fs::write(subdir.join("doc.md"), "# Title\n\n### Skipped level\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(&subdir)
+        .args(["lint", "--no-cache", "."])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No issues found"));
+
+    // A bare relative filename yields an empty start dir; it must resolve to
+    // the working directory and walk up from there.
+    cargo_bin_cmd!("panache")
+        .current_dir(&subdir)
+        .args(["lint", "--no-cache", "doc.md"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No issues found"));
+}
