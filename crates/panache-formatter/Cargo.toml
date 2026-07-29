@@ -44,6 +44,6 @@ pretty_yaml = "0.6.0"
 # the source of truth; this is a correctness signal, never a runtime dependency.
 # Revisit alongside the YAML oracle once the math formatter has been stable in
 # releases for a few months.
-pulldown-latex = "0.7.1"
+pulldown-latex = "0.8.0"
 similar-asserts = "2.0.0"
 toml = "1.1.2"
