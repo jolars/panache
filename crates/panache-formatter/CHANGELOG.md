@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.20.3](https://github.com/jolars/panache/compare/panache-formatter-v0.20.2...panache-formatter-v0.20.3) (2026-08-03)
+
+### Bug Fixes
+- **formatter:** preserve inline code-span whitespace ([`eea7b2e`](https://github.com/jolars/panache/commit/eea7b2ecfdff0fe0c178a757ff0cf0dab2819495))
+- **formatter:** keep blockquote definitions prefixed ([`1110029`](https://github.com/jolars/panache/commit/1110029153ecb21f90bc14a51350e9b9809948cf))
+- **formatter:** tidy bare-marker definition body ([`0ca8a0c`](https://github.com/jolars/panache/commit/0ca8a0ca12c0b17a38a05704a64e6e85eb5dcf9f))
+- **formatter:** keep display math inline in table cells ([`32f45b3`](https://github.com/jolars/panache/commit/32f45b34e4c9ff28d313a8b359b8805e65559713)), closes [#449](https://github.com/jolars/panache/issues/449)
+
+### Dependencies
+- updated crates/panache-parser to v0.23.0
+
 ## [0.20.2](https://github.com/jolars/panache/compare/panache-formatter-v0.20.1...panache-formatter-v0.20.2) (2026-07-28)
 
 ### Bug Fixes

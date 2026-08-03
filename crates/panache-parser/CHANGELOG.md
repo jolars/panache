@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.23.0](https://github.com/jolars/panache/compare/panache-parser-v0.22.2...panache-parser-v0.23.0) (2026-08-03)
+
+### Features
+- **parser:** recognize bare `:` definition marker ([`cfa9eec`](https://github.com/jolars/panache/commit/cfa9eec19c010a810e906424040736067d036192))
+- **linter:** add `unspaced-citation` rule ([`b36baed`](https://github.com/jolars/panache/commit/b36baedc4902c55f7bbfce151a3e0dcfde422c0e)), closes [#448](https://github.com/jolars/panache/issues/448)
+- **parser:** reject undeclared YAML alias ([`4dbdfe6`](https://github.com/jolars/panache/commit/4dbdfe6e6aa2f3f298221c2f4e3f19772608cf33))
+- **parser:** lift unclosed `<div>` as list-item body ([`4801192`](https://github.com/jolars/panache/commit/48011921ad9ec24041a9f647f7ecfaa086e4b8d4))
+- **parser:** lift unclosed `<div>` on later content-body line ([`151515d`](https://github.com/jolars/panache/commit/151515da464940007eb32a66055b3340ad9319a4))
+
+### Bug Fixes
+- **parser:** require a term before a definition marker ([`cc8a4fc`](https://github.com/jolars/panache/commit/cc8a4fc4b71eab6cd11a5760d66102ef6a6579cf))
+- **parser:** keep def-list para open across `>` line ([`cbb55c4`](https://github.com/jolars/panache/commit/cbb55c41021e289438e475b47751740c79d05a6c))
+- **parser:** suppress bare `@key` after emphasis closer ([`d6a3f87`](https://github.com/jolars/panache/commit/d6a3f8702e926769452bdd340616b3ed7f78bd15))
+- **parser:** don't cite bare `@key` after a word char ([`291efec`](https://github.com/jolars/panache/commit/291efec5d4d3a6f571e7e69f36181dd9ba3319aa))
+- **parser:** lift bq-nested def later-line HTML block ([`d4549fd`](https://github.com/jolars/panache/commit/d4549fd3ae66f52723df30e3a5772b97fd2f6cbb))
+- **parser:** don't retag `HTML_BLOCK_DIV` in bq content body ([`34d9a4a`](https://github.com/jolars/panache/commit/34d9a4aa75ccfdcc2a31328c6e28f69b7fe2a344))
+- **parser:** don't close top-level div on indented fence ([`3a603e1`](https://github.com/jolars/panache/commit/3a603e1870c48d7305cf279faaaa49e7edc27bb3))
+
 ## [0.22.2](https://github.com/jolars/panache/compare/panache-parser-v0.22.1...panache-parser-v0.22.2) (2026-07-28)
 
 ### Bug Fixes

@@ -1,5 +1,46 @@
 # Changelog
 
+## [3.1.0](https://github.com/jolars/panache/compare/v3.0.2...v3.1.0) (2026-08-03)
+
+### Features
+- **parser:** recognize bare `:` definition marker ([`cfa9eec`](https://github.com/jolars/panache/commit/cfa9eec19c010a810e906424040736067d036192))
+- **lsp:** pull settings via workspace/configuration ([`a40ed7f`](https://github.com/jolars/panache/commit/a40ed7fba0604967be92ae1a1f36bcb71f96e956))
+- **linter:** add `unspaced-citation` rule ([`b36baed`](https://github.com/jolars/panache/commit/b36baedc4902c55f7bbfce151a3e0dcfde422c0e)), closes [#448](https://github.com/jolars/panache/issues/448)
+- **linter:** warn on duplicate and unused YAML anchors ([`d234921`](https://github.com/jolars/panache/commit/d2349212289ef8129798e59e2dc710a3d75cb245)), closes [#385](https://github.com/jolars/panache/issues/385)
+- **parser:** reject undeclared YAML alias ([`4dbdfe6`](https://github.com/jolars/panache/commit/4dbdfe6e6aa2f3f298221c2f4e3f19772608cf33))
+- **parser:** lift unclosed `<div>` as list-item body ([`4801192`](https://github.com/jolars/panache/commit/48011921ad9ec24041a9f647f7ecfaa086e4b8d4))
+- **parser:** lift unclosed `<div>` on later content-body line ([`151515d`](https://github.com/jolars/panache/commit/151515da464940007eb32a66055b3340ad9319a4))
+
+### Bug Fixes
+- **formatter:** preserve inline code-span whitespace ([`eea7b2e`](https://github.com/jolars/panache/commit/eea7b2ecfdff0fe0c178a757ff0cf0dab2819495))
+- **formatter:** keep blockquote definitions prefixed ([`1110029`](https://github.com/jolars/panache/commit/1110029153ecb21f90bc14a51350e9b9809948cf))
+- **parser:** require a term before a definition marker ([`cc8a4fc`](https://github.com/jolars/panache/commit/cc8a4fc4b71eab6cd11a5760d66102ef6a6579cf))
+- **formatter:** tidy bare-marker definition body ([`0ca8a0c`](https://github.com/jolars/panache/commit/0ca8a0ca12c0b17a38a05704a64e6e85eb5dcf9f))
+- **parser:** keep def-list para open across `>` line ([`cbb55c4`](https://github.com/jolars/panache/commit/cbb55c41021e289438e475b47751740c79d05a6c))
+- **lsp:** key project symbol aggregate on raw path ([`5e18853`](https://github.com/jolars/panache/commit/5e1885318c7502d7bf531126f9207a0829499776))
+- **formatter:** keep display math inline in table cells ([`32f45b3`](https://github.com/jolars/panache/commit/32f45b34e4c9ff28d313a8b359b8805e65559713)), closes [#449](https://github.com/jolars/panache/issues/449)
+- **linter:** scope cross-doc label duplicates per render target ([`20c7335`](https://github.com/jolars/panache/commit/20c733528c8ef64805ff895450a9fe8db21f8e84))
+- **parser:** suppress bare `@key` after emphasis closer ([`d6a3f87`](https://github.com/jolars/panache/commit/d6a3f8702e926769452bdd340616b3ed7f78bd15))
+- **parser:** lift bq-nested def later-line HTML block ([`d4549fd`](https://github.com/jolars/panache/commit/d4549fd3ae66f52723df30e3a5772b97fd2f6cbb))
+- **parser:** don't retag `HTML_BLOCK_DIV` in bq content body ([`34d9a4a`](https://github.com/jolars/panache/commit/34d9a4aa75ccfdcc2a31328c6e28f69b7fe2a344))
+- **parser:** don't close top-level div on indented fence ([`3a603e1`](https://github.com/jolars/panache/commit/3a603e1870c48d7305cf279faaaa49e7edc27bb3))
+- **linter:** resolve cross-file refs via project aggregate ([`164e9aa`](https://github.com/jolars/panache/commit/164e9aaf3a91047cce8bf63c1f3aa2033ea879e0))
+- **cli:** report include-partial diagnostics once ([`f516fac`](https://github.com/jolars/panache/commit/f516facf9e1baa5e87c143448661050bc933e502))
+- **linter:** stop flagging inline references as duplicates ([`7a0f202`](https://github.com/jolars/panache/commit/7a0f2020f76261a0a0c4909258b9e1741c2c0dff))
+- **parser:** don't cite bare `@key` after a word char ([`291efec`](https://github.com/jolars/panache/commit/291efec5d4d3a6f571e7e69f36181dd9ba3319aa))
+
+### Performance Improvements
+- **cli:** compute project graph once per project ([`b8784bf`](https://github.com/jolars/panache/commit/b8784bf278e401d36cbeef20e66a1cf47b0062d1))
+- **linter:** reuse memoized symbol index across lint rules ([`30c7000`](https://github.com/jolars/panache/commit/30c70008fd2403be661041f26cdca97040e1dffc))
+- **lsp:** memoize `heading_outline` per top-level block ([`a3f135a`](https://github.com/jolars/panache/commit/a3f135a0b389a791abb0eb51b730586fb5ad4bf9))
+- **lsp:** memoize `symbol_usage_index` per top-level block ([`ba748e2`](https://github.com/jolars/panache/commit/ba748e248023797f21a5b10a1d7c7d471f7e7e57))
+- **lsp:** make VFS reads near-lock-free via copy-on-write ([`a1cadb8`](https://github.com/jolars/panache/commit/a1cadb85c3667062cd1a4978a1202f1f19894848))
+- **lsp:** cache a salsa `LineIndex` for position conversion ([`d1e4b27`](https://github.com/jolars/panache/commit/d1e4b27064142a559c983bd4ac6a824536b71bd1))
+
+### Dependencies
+- updated crates/panache-formatter to v0.20.3
+- updated crates/panache-parser to v0.23.0
+
 ## [3.0.2](https://github.com/jolars/panache/compare/v3.0.1...v3.0.2) (2026-07-28)
 
 ### Bug Fixes
