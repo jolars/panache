@@ -142,6 +142,7 @@ Enable external linters in your configuration file:
 [linters]
 r = "arity"
 julia = "fatou"
+latex = "badness"
 python = "ruff"
 sh = "shellcheck"
 js = "eslint"
@@ -156,6 +157,7 @@ Available external linters:
   | R                     | `arity`       | R linter with JSON diagnostics      |
   | R                     | `jarl`        | R linter with JSON diagnostics      |
   | Julia                 | `fatou`       | Julia linter with JSON diagnostics  |
+  | LaTeX                 | `badness`     | LaTeX linter with JSON diagnostics  |
   | Python                | `ruff`        | Python linter with JSON diagnostics |
   | Shell                 | `shellcheck`  | Shell linter with JSON diagnostics  |
   | JavaScript/TypeScript | `eslint`      | JS/TS linter with JSON diagnostics  |
@@ -224,9 +226,10 @@ Line accuracy
 
 Auto-fixes
 :   Supported for external linters that return fix edits with mappable ranges
-    (currently `arity`, `fatou`, `jarl`, `ruff`, and `eslint`). Fixes that the
-    linter marks as unsafe (`arity`, `fatou`) are only applied under
-    `--unsafe-fixes`.
+    (currently `arity`, `fatou`, `badness`, `jarl`, `ruff`, and `eslint`). Fixes
+    that the linter marks as unsafe (`arity`, `fatou`, `badness`) are only
+    applied under `--unsafe-fixes`. Requires badness 0.14+ for LaTeX (earlier
+    versions lack JSON output and are skipped).
 
 ### Where External Linters Run
 

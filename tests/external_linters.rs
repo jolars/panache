@@ -161,6 +161,62 @@ end
         assert_eq!(&input[start..end], "==");
     }
 
+    /// True when the installed badness supports `--output json` (added in
+    /// 0.14). The runner silently skips failing linters, so without this probe
+    /// an old binary would make the assertions below vacuous rather than
+    /// skipped.
+    fn badness_supports_json() -> bool {
+        std::process::Command::new("badness")
+            .args(["lint", "--help"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).contains("--output"))
+            .unwrap_or(false)
+    }
+
+    #[test]
+    fn test_badness_linter_integration() {
+        if which::which("badness").is_err() {
+            println!("Skipping badness test - badness not installed");
+            return;
+        }
+        if !badness_supports_json() {
+            println!("Skipping badness test - installed badness lacks --output json");
+            return;
+        }
+
+        let input = r#"# Test
+
+```latex
+Wait ... what
+```
+"#;
+
+        let mut config = Config::default();
+        let mut linters = HashMap::new();
+        linters.insert("latex".to_string(), "badness".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external_sync(&tree, input, &config);
+
+        let ellipsis_diags: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.code == "ellipsis")
+            .collect();
+        assert_eq!(ellipsis_diags.len(), 1, "Expected 1 ellipsis diagnostic");
+        assert_eq!(ellipsis_diags[0].location.line, 4); // Wait ... what is on line 4
+
+        let fix = ellipsis_diags[0]
+            .fix
+            .as_ref()
+            .expect("badness fixes should map through block mappings");
+        assert_eq!(fix.edits.len(), 1);
+        assert_eq!(fix.edits[0].replacement, "\\dots");
+        let start: usize = fix.edits[0].range.start().into();
+        let end: usize = fix.edits[0].range.end().into();
+        assert_eq!(&input[start..end], "...");
+    }
+
     #[test]
     fn test_fatou_quarto_cell_integration() {
         // A Quarto executable cell (```{julia}) should route to the julia linter.

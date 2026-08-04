@@ -108,6 +108,7 @@ pub(crate) fn file_suffix_for_language(language: &str) -> Option<&'static str> {
         "rust" | "rs" => Some(".rs"),
         "r" => Some(".R"),
         "julia" | "jl" => Some(".jl"),
+        "latex" | "tex" => Some(".tex"),
         "sh" | "bash" | "zsh" | "ksh" | "shell" => Some(".sh"),
         _ => None,
     }
@@ -156,6 +157,17 @@ impl ExternalLinterRegistry {
                 command: "arity",
                 args: vec!["lint", "--no-config", "--output", "json"],
                 supported_languages: vec!["r"],
+            },
+        );
+        linters.insert(
+            "badness".to_string(),
+            LinterInfo {
+                name: "badness",
+                description: "A language server, formatter, and linter for LaTeX built on a lossless concrete syntax tree.",
+                url: "https://github.com/jolars/badness",
+                command: "badness",
+                args: vec!["lint", "--no-config", "--output", "json"],
+                supported_languages: vec!["latex", "tex"],
             },
         );
         linters.insert(
@@ -309,6 +321,9 @@ pub fn parse_linter_output(
     if linter_name == jolars::FatouParser::NAME {
         return jolars::FatouParser::parse(&ctx);
     }
+    if linter_name == jolars::BadnessParser::NAME {
+        return jolars::BadnessParser::parse(&ctx);
+    }
     if linter_name == ruff::RuffParser::NAME {
         return ruff::RuffParser::parse(&ctx);
     }
@@ -376,6 +391,7 @@ mod tests {
         assert!(registry.get("jarl").is_some());
         assert!(registry.get("arity").is_some());
         assert!(registry.get("fatou").is_some());
+        assert!(registry.get("badness").is_some());
         assert!(registry.get("ruff").is_some());
         assert!(registry.get("eslint").is_some());
         assert!(registry.get("staticcheck").is_some());
@@ -393,6 +409,9 @@ mod tests {
         assert_eq!(registry.supports_language("fatou", "julia"), Some(true));
         assert_eq!(registry.supports_language("fatou", "jl"), Some(true));
         assert_eq!(registry.supports_language("fatou", "r"), Some(false));
+        assert_eq!(registry.supports_language("badness", "latex"), Some(true));
+        assert_eq!(registry.supports_language("badness", "tex"), Some(true));
+        assert_eq!(registry.supports_language("badness", "r"), Some(false));
         assert_eq!(registry.supports_language("ruff", "python"), Some(true));
         assert_eq!(registry.supports_language("eslint", "js"), Some(true));
         assert_eq!(
@@ -426,6 +445,13 @@ mod tests {
         assert_eq!(file_suffix_for_language("julia"), Some(".jl"));
         assert_eq!(file_suffix_for_language("jl"), Some(".jl"));
         assert_eq!(file_suffix_for_language("Julia"), Some(".jl"));
+    }
+
+    #[test]
+    fn test_file_suffix_for_language_covers_latex() {
+        assert_eq!(file_suffix_for_language("latex"), Some(".tex"));
+        assert_eq!(file_suffix_for_language("tex"), Some(".tex"));
+        assert_eq!(file_suffix_for_language("LaTeX"), Some(".tex"));
     }
 
     #[test]

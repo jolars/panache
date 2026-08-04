@@ -15,6 +15,22 @@ Command
 `args`
 :   `[lint, --no-config, --output, json]`
 
+## `badness`
+
+A language server, formatter, and linter for LaTeX built on a lossless concrete syntax tree.
+
+Homepage
+:   <https://github.com/jolars/badness>
+
+Supported Languages
+:   `latex`, `tex`
+
+Command
+:   `badness`
+
+`args`
+:   `[lint, --no-config, --output, json]`
+
 ## `clippy`
 
 Rust lints to catch mistakes and improve style.

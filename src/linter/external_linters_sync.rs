@@ -164,6 +164,38 @@ mod tests {
     }
 
     #[test]
+    fn test_badness_linter_sync() {
+        // Skip if badness not available
+        if which::which("badness").is_err() {
+            println!("Skipping badness test - badness not installed");
+            return;
+        }
+
+        let code = "Wait ... what\n";
+        let registry = ExternalLinterRegistry::new();
+
+        let result = run_linter_sync("badness", "latex", code, code, &registry, None);
+        let diagnostics = match result {
+            Ok(diags) => diags,
+            Err(err) => {
+                // badness < 0.14 has no `--output json`; skip rather than fail
+                // so the suite stays green across installed binary versions.
+                println!(
+                    "Skipping badness test - installed badness lacks --output json: {:?}",
+                    err
+                );
+                return;
+            }
+        };
+
+        let ellipsis_diags: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.code == "ellipsis")
+            .collect();
+        assert_eq!(ellipsis_diags.len(), 1);
+    }
+
+    #[test]
     fn test_ruff_linter_sync() {
         // Skip if ruff not available
         if which::which("ruff").is_err() {

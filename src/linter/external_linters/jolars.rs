@@ -1,10 +1,13 @@
-//! Shared parser for the jolars family of linters (arity, fatou).
+//! Shared parser for the jolars family of linters (arity, fatou, badness).
 //!
-//! Both tools emit a top-level JSON array of diagnostics with 0-indexed byte
-//! ranges into the linted file plus optional fix data. The schemas differ only
-//! in severity casing (arity: `Warning`, fatou: `warning`) and fix shape
-//! (arity: single optional `fix` object, fatou: `fixes` array), so one parser
-//! handles both.
+//! All three tools emit a top-level JSON array of diagnostics with 0-indexed
+//! byte ranges into the linted file plus optional fix data. arity and fatou
+//! share one schema modulo severity casing (arity: `Warning`, fatou:
+//! `warning`) and fix shape (arity: single optional `fix` object, fatou:
+//! `fixes` array). badness diverges slightly: flat `start`/`end` keys instead
+//! of a `range` object, a plain-string `message`, and a fix carrying an
+//! `edits` array whose entries may target *other* files (cross-file fixes,
+//! which are meaningless inside a code block and therefore skipped).
 
 use rowan::TextRange;
 use serde::Deserialize;
@@ -53,6 +56,35 @@ struct FamilyFix {
     description: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct BadnessDiagnostic {
+    rule: String,
+    severity: String,
+    start: usize,
+    end: usize,
+    message: String,
+    #[serde(default)]
+    fix: Option<BadnessFix>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BadnessFix {
+    edits: Vec<BadnessEdit>,
+    applicability: String,
+    description: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct BadnessEdit {
+    content: String,
+    start: usize,
+    end: usize,
+    /// Present only for cross-file edits (targeting a file other than the
+    /// linted one).
+    #[serde(default)]
+    path: Option<String>,
+}
+
 /// Map a byte offset in the linted (possibly concatenated) input back to the
 /// original document, clamped to the input like the other parsers do.
 fn map_diagnostic_offset(offset: usize, ctx: &ParseContext<'_>) -> usize {
@@ -63,16 +95,42 @@ fn map_diagnostic_offset(offset: usize, ctx: &ParseContext<'_>) -> usize {
     }
 }
 
+/// Map the diagnostic's byte range and resolve it to a `Location` in the
+/// original document.
+fn diagnostic_location(start: usize, end: usize, ctx: &ParseContext<'_>) -> Location {
+    let start_offset = map_diagnostic_offset(start, ctx);
+    let end_offset = map_diagnostic_offset(end, ctx).max(start_offset);
+    let range = TextRange::new((start_offset as u32).into(), (end_offset as u32).into());
+    Location::from_range(range, ctx.original_input)
+}
+
+/// Build an external diagnostic with the family's case-insensitive severity
+/// words (`hint` folds into info, like the other parsers' fallback arm).
+fn build_diagnostic(severity: &str, location: Location, rule: String, body: String) -> Diagnostic {
+    match severity.to_ascii_lowercase().as_str() {
+        "error" => Diagnostic::error(location, rule, body),
+        "warning" => Diagnostic::warning(location, rule, body),
+        _ => Diagnostic::info(location, rule, body),
+    }
+    .with_origin(DiagnosticOrigin::External)
+}
+
+/// Build a panache fix honoring the family's `safe`/`unsafe` applicability.
+fn build_fix(applicability: &str, description: String, edits: Vec<Edit>) -> Fix {
+    if applicability.eq_ignore_ascii_case("unsafe") {
+        Fix::unsafe_fix(description, edits)
+    } else {
+        Fix::safe(description, edits)
+    }
+}
+
 fn parse_family(ctx: &ParseContext<'_>, tool: &str) -> Result<Vec<Diagnostic>, LinterError> {
     let output: Vec<FamilyDiagnostic> = serde_json::from_str(ctx.output)
         .map_err(|e| LinterError::ParseError(format!("invalid {} JSON: {}", tool, e)))?;
 
     let mut diagnostics = Vec::new();
     for family_diag in output {
-        let start_offset = map_diagnostic_offset(family_diag.range.start, ctx);
-        let end_offset = map_diagnostic_offset(family_diag.range.end, ctx).max(start_offset);
-        let range = TextRange::new((start_offset as u32).into(), (end_offset as u32).into());
-        let location = Location::from_range(range, ctx.original_input);
+        let location = diagnostic_location(family_diag.range.start, family_diag.range.end, ctx);
 
         let fix = if let Some(mappings) = ctx.mappings {
             family_diag
@@ -92,29 +150,83 @@ fn parse_family(ctx: &ParseContext<'_>, tool: &str) -> Result<Vec<Diagnostic>, L
                         range: TextRange::new((fix_start as u32).into(), (fix_end as u32).into()),
                         replacement: family_fix.content.clone(),
                     }];
-                    Some(if family_fix.applicability.eq_ignore_ascii_case("unsafe") {
-                        Fix::unsafe_fix(family_fix.description.clone(), edits)
-                    } else {
-                        Fix::safe(family_fix.description.clone(), edits)
-                    })
+                    Some(build_fix(
+                        &family_fix.applicability,
+                        family_fix.description.clone(),
+                        edits,
+                    ))
                 })
         } else {
             None
         };
 
-        let severity = family_diag.severity.to_ascii_lowercase();
-        let mut diagnostic = match severity.as_str() {
-            "error" => Diagnostic::error(location, family_diag.rule, family_diag.message.body),
-            "warning" => Diagnostic::warning(location, family_diag.rule, family_diag.message.body),
-            _ => Diagnostic::info(location, family_diag.rule, family_diag.message.body),
-        }
-        .with_origin(DiagnosticOrigin::External);
+        let mut diagnostic = build_diagnostic(
+            &family_diag.severity,
+            location,
+            family_diag.rule,
+            family_diag.message.body,
+        );
 
         if let Some(suggestion) = family_diag.message.suggestion.as_ref()
             && !suggestion.trim().is_empty()
         {
             diagnostic = diagnostic.with_note(DiagnosticNoteKind::Help, suggestion.clone());
         }
+        diagnostics.push(if let Some(fix) = fix {
+            diagnostic.with_fix(fix)
+        } else {
+            diagnostic
+        });
+    }
+    Ok(diagnostics)
+}
+
+fn parse_badness(ctx: &ParseContext<'_>) -> Result<Vec<Diagnostic>, LinterError> {
+    let output: Vec<BadnessDiagnostic> = serde_json::from_str(ctx.output)
+        .map_err(|e| LinterError::ParseError(format!("invalid badness JSON: {}", e)))?;
+
+    let mut diagnostics = Vec::new();
+    for badness_diag in output {
+        let location = diagnostic_location(badness_diag.start, badness_diag.end, ctx);
+
+        let fix = if let Some(mappings) = ctx.mappings {
+            badness_diag.fix.as_ref().and_then(|badness_fix| {
+                // A cross-file edit targets a file outside the linted code
+                // blocks, so the fix as a whole cannot apply to this document.
+                if badness_fix.edits.iter().any(|edit| edit.path.is_some()) {
+                    return None;
+                }
+                let mut edits = Vec::new();
+                for edit in &badness_fix.edits {
+                    let start = map_concatenated_offset_to_original_with_end_boundary(
+                        edit.start, mappings,
+                    )?;
+                    let end =
+                        map_concatenated_offset_to_original_with_end_boundary(edit.end, mappings)?;
+                    edits.push(Edit {
+                        range: TextRange::new((start as u32).into(), (end as u32).into()),
+                        replacement: edit.content.clone(),
+                    });
+                }
+                if edits.is_empty() {
+                    return None;
+                }
+                Some(build_fix(
+                    &badness_fix.applicability,
+                    badness_fix.description.clone(),
+                    edits,
+                ))
+            })
+        } else {
+            None
+        };
+
+        let diagnostic = build_diagnostic(
+            &badness_diag.severity,
+            location,
+            badness_diag.rule,
+            badness_diag.message,
+        );
         diagnostics.push(if let Some(fix) = fix {
             diagnostic.with_fix(fix)
         } else {
@@ -141,6 +253,16 @@ impl ExternalLinterParser for FatouParser {
 
     fn parse(ctx: &ParseContext<'_>) -> Result<Vec<Diagnostic>, LinterError> {
         parse_family(ctx, Self::NAME)
+    }
+}
+
+pub(crate) struct BadnessParser;
+
+impl ExternalLinterParser for BadnessParser {
+    const NAME: &'static str = "badness";
+
+    fn parse(ctx: &ParseContext<'_>) -> Result<Vec<Diagnostic>, LinterError> {
+        parse_badness(ctx)
     }
 }
 
@@ -453,6 +575,153 @@ mod tests {
         assert_eq!(
             diagnostics[0].location.range,
             TextRange::new(14.into(), 27.into())
+        );
+    }
+
+    // Captured from `badness lint --no-config --output json` on
+    // `Wait ... what\n` (path key omitted here; the parser ignores it).
+    const BADNESS_OUTPUT: &str = r#"[
+  {
+    "rule": "ellipsis",
+    "severity": "warning",
+    "path": "input.tex",
+    "start": 5,
+    "end": 8,
+    "message": "literal `...` ellipsis; use `\\dots`",
+    "fix": {
+      "edits": [
+        {
+          "content": "\\dots",
+          "start": 5,
+          "end": 8
+        }
+      ],
+      "applicability": "safe",
+      "description": "Replace `...` with `\\dots`"
+    },
+    "related": []
+  }
+]"#;
+
+    #[test]
+    fn parses_badness_diagnostics_and_maps_fix() {
+        // Document: heading, blank line, then a latex code block on line 4.
+        let original = "# Title\n\n```latex\nWait ... what\n```\n";
+        let linted = "\n\n\nWait ... what\n";
+        let mappings = vec![BlockMapping {
+            concatenated_range: 3..17,
+            original_range: 18..32,
+            start_line: 4,
+        }];
+        // Offsets shifted into the concatenated file (block starts at 3).
+        let output = BADNESS_OUTPUT
+            .replace(r#""start": 5"#, r#""start": 8"#)
+            .replace(r#""end": 8"#, r#""end": 11"#);
+        let ctx = ParseContext {
+            output: &output,
+            linted_input: linted,
+            original_input: original,
+            mappings: Some(&mappings),
+        };
+        let diagnostics = BadnessParser::parse(&ctx).unwrap();
+        assert_eq!(diagnostics.len(), 1);
+
+        let diag = &diagnostics[0];
+        assert_eq!(diag.code, "ellipsis");
+        assert_eq!(diag.severity, Severity::Warning);
+        assert_eq!(diag.origin, DiagnosticOrigin::External);
+        assert_eq!(diag.message, "literal `...` ellipsis; use `\\dots`");
+        assert_eq!(diag.location.range, TextRange::new(23.into(), 26.into()));
+        assert_eq!(diag.location.line, 4);
+        assert_eq!(diag.location.column, 6);
+
+        let fix = diag.fix.as_ref().expect("fix should map");
+        assert_eq!(fix.safety, FixSafety::Safe);
+        assert_eq!(fix.message, "Replace `...` with `\\dots`");
+        assert_eq!(fix.edits.len(), 1);
+        assert_eq!(fix.edits[0].range, TextRange::new(23.into(), 26.into()));
+        assert_eq!(fix.edits[0].replacement, "\\dots");
+    }
+
+    #[test]
+    fn badness_multi_edit_fix_maps_all_edits() {
+        let input = "aa bb\n";
+        let output = r#"[
+  {
+    "rule": "some-rule",
+    "severity": "warning",
+    "path": "input.tex",
+    "start": 0,
+    "end": 5,
+    "message": "m",
+    "fix": {
+      "edits": [
+        { "content": "x", "start": 0, "end": 2 },
+        { "content": "y", "start": 3, "end": 5 }
+      ],
+      "applicability": "unsafe",
+      "description": "d"
+    },
+    "related": []
+  }
+]"#;
+        let mappings = vec![BlockMapping {
+            concatenated_range: 0..6,
+            original_range: 0..6,
+            start_line: 1,
+        }];
+        let ctx = ParseContext {
+            output,
+            linted_input: input,
+            original_input: input,
+            mappings: Some(&mappings),
+        };
+        let diagnostics = BadnessParser::parse(&ctx).unwrap();
+        let fix = diagnostics[0].fix.as_ref().expect("fix expected");
+        assert_eq!(fix.safety, FixSafety::Unsafe);
+        assert_eq!(fix.edits.len(), 2);
+        assert_eq!(fix.edits[1].range, TextRange::new(3.into(), 5.into()));
+        assert_eq!(fix.edits[1].replacement, "y");
+    }
+
+    #[test]
+    fn badness_cross_file_fix_is_skipped() {
+        let input = "aa bb\n";
+        let output = r#"[
+  {
+    "rule": "some-rule",
+    "severity": "warning",
+    "path": "input.tex",
+    "start": 0,
+    "end": 5,
+    "message": "m",
+    "fix": {
+      "edits": [
+        { "content": "x", "start": 0, "end": 2 },
+        { "content": "y", "start": 0, "end": 2, "path": "other.tex" }
+      ],
+      "applicability": "safe",
+      "description": "d"
+    },
+    "related": []
+  }
+]"#;
+        let mappings = vec![BlockMapping {
+            concatenated_range: 0..6,
+            original_range: 0..6,
+            start_line: 1,
+        }];
+        let ctx = ParseContext {
+            output,
+            linted_input: input,
+            original_input: input,
+            mappings: Some(&mappings),
+        };
+        let diagnostics = BadnessParser::parse(&ctx).unwrap();
+        assert_eq!(diagnostics.len(), 1);
+        assert!(
+            diagnostics[0].fix.is_none(),
+            "cross-file fixes cannot apply inside a code block"
         );
     }
 

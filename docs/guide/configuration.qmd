@@ -1481,6 +1481,7 @@ Enable linters for specific languages:
 [linters]
 r = "arity"
 julia = "fatou"
+latex = "badness"
 python = "ruff"
 sh = "shellcheck"
 js = "eslint"
@@ -1490,16 +1491,17 @@ rust = "clippy"
 
 Available linters:
 
-  | Language              | Linter        | Command         | Notes                               |
-  | --------------------- | ------------- | --------------- | ----------------------------------- |
-  | R                     | `arity`       | `arity`         | R linter with JSON diagnostics      |
-  | R                     | `jarl`        | `jarl`          | R linter with JSON diagnostics      |
-  | Julia                 | `fatou`       | `fatou`         | Julia linter with JSON diagnostics  |
-  | Python                | `ruff`        | `ruff`          | Python linter with JSON diagnostics |
-  | Shell                 | `shellcheck`  | `shellcheck`    | Shell linter with JSON diagnostics  |
-  | JavaScript/TypeScript | `eslint`      | `eslint`        | JS/TS linter with JSON diagnostics  |
-  | Go                    | `staticcheck` | `staticcheck`   | Go linter with JSON diagnostics     |
-  | Rust                  | `clippy`      | `clippy-driver` | Rust linter with JSON diagnostics   |
+  | Language              | Linter        | Command         | Notes                                      |
+  | --------------------- | ------------- | --------------- | ------------------------------------------ |
+  | R                     | `arity`       | `arity`         | R linter with JSON diagnostics             |
+  | R                     | `jarl`        | `jarl`          | R linter with JSON diagnostics             |
+  | Julia                 | `fatou`       | `fatou`         | Julia linter with JSON diagnostics         |
+  | LaTeX                 | `badness`     | `badness`       | LaTeX linter with JSON diagnostics (0.14+) |
+  | Python                | `ruff`        | `ruff`          | Python linter with JSON diagnostics        |
+  | Shell                 | `shellcheck`  | `shellcheck`    | Shell linter with JSON diagnostics         |
+  | JavaScript/TypeScript | `eslint`      | `eslint`        | JS/TS linter with JSON diagnostics         |
+  | Go                    | `staticcheck` | `staticcheck`   | Go linter with JSON diagnostics            |
+  | Rust                  | `clippy`      | `clippy-driver` | Rust linter with JSON diagnostics          |
 
 ### How It Works
 
@@ -1548,9 +1550,10 @@ Line-accurate
 
 Auto-fixes
 :   Supported for external linters that provide fix edits with mappable ranges
-    (currently `arity`, `fatou`, `jarl`, `ruff`, and `eslint`). Fixes that the
-    linter marks as unsafe (`arity`, `fatou`) are only applied under
-    `--unsafe-fixes`.
+    (currently `arity`, `fatou`, `badness`, `jarl`, `ruff`, and `eslint`). Fixes
+    that the linter marks as unsafe (`arity`, `fatou`, `badness`) are only
+    applied under `--unsafe-fixes`. Requires badness 0.14+ for LaTeX (earlier
+    versions lack JSON output and are skipped).
 
 ### Example
 
