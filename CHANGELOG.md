@@ -1,5 +1,27 @@
 # Changelog
 
+## [3.2.0](https://github.com/jolars/panache/compare/v3.1.0...v3.2.0) (2026-08-05)
+
+### Features
+- **linter:** add `footnote-swallowed-by-bracket` rule ([`9b3014a`](https://github.com/jolars/panache/commit/9b3014afbb0032d5f78f35121c4bf4879f73251d)), closes [#455](https://github.com/jolars/panache/issues/455)
+- **linter:** add `unsupported-metadata-key` rule ([`8056ffe`](https://github.com/jolars/panache/commit/8056ffe28cc165df52a9f29d62e75586f8a5f9c0))
+- **linter:** add `footnote-after-image` rule ([`a30e9ac`](https://github.com/jolars/panache/commit/a30e9ac94a65620877173037883ba7f30faec8b1)), closes [#456](https://github.com/jolars/panache/issues/456)
+- **linter:** add `swallowed-list-marker` rule ([`2d9b260`](https://github.com/jolars/panache/commit/2d9b26090c64f69e28af35e75f75f0c152d78196)), closes [#457](https://github.com/jolars/panache/issues/457)
+- **linter:** add `arity` and `fatou` external linters ([`8295ac3`](https://github.com/jolars/panache/commit/8295ac3cc30aaecb53affb0860c655bd8730f9ad))
+
+### Bug Fixes
+- **cli:** don't panic on overlapping lint fixes ([`e5da643`](https://github.com/jolars/panache/commit/e5da64356e37859c9ad47e507b00c5923d2d54f8))
+- **installer:** detect libc/glib in installation script ([`934db6a`](https://github.com/jolars/panache/commit/934db6af2b561058d84e247bcec20f514552800b))
+- **parser:** reword the empty YAML key diagnostic ([`73cc983`](https://github.com/jolars/panache/commit/73cc983be4d105b4e270e8d8e8db2bb595049bb8))
+- **parser:** promote figures in list items and definitions ([`05a6358`](https://github.com/jolars/panache/commit/05a63584682ae6dee6319610b589ffb2e5780b33))
+- **parser:** promote figures only at paragraph close ([`70d8cbe`](https://github.com/jolars/panache/commit/70d8cbe7ded58ff66f99f8b96955aad25e3edf0b))
+- **npm:** fall back to musl when glibc build fails ([`bcab702`](https://github.com/jolars/panache/commit/bcab7020f1ca2281bfd88c9660b7ad188a6ad782))
+- **parser:** stop reading `^[note][`/`(` as a footnote ([`e69e8c7`](https://github.com/jolars/panache/commit/e69e8c7172f7cf5b4996a80ea75d39477ba4c4b2)), refs [#455](https://github.com/jolars/panache/issues/455)
+
+### Dependencies
+- updated crates/panache-formatter to v0.20.4
+- updated crates/panache-parser to v0.24.0
+
 ## [3.1.0](https://github.com/jolars/panache/compare/v3.0.2...v3.1.0) (2026-08-03)
 
 ### Features

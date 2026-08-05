@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.4](https://github.com/jolars/panache/compare/panache-formatter-v0.20.3...panache-formatter-v0.20.4) (2026-08-05)
+
+### Bug Fixes
+- **parser:** promote figures in list items and definitions ([`05a6358`](https://github.com/jolars/panache/commit/05a63584682ae6dee6319610b589ffb2e5780b33))
+
+### Dependencies
+- updated crates/panache-parser to v0.24.0
+
 ## [0.20.3](https://github.com/jolars/panache/compare/panache-formatter-v0.20.2...panache-formatter-v0.20.3) (2026-08-03)
 
 ### Bug Fixes

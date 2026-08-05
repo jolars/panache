@@ -522,9 +522,9 @@ dependencies = [
 
 [[package]]
 name = "fancy-regex"
-version = "0.18.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1e1dacd0d2082dfcf1351c4bdd566bbe89a2b263235a2b50058f1e130a47277"
+checksum = "476de73bddf2ef8490aa4ee8f1cf40b430bf1d56c48c22080e5186952cd580e6"
 dependencies = [
  "bit-set",
  "regex-automata",
@@ -654,9 +654,9 @@ dependencies = [
 
 [[package]]
 name = "globset"
-version = "0.4.19"
+version = "0.4.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e47d37d2ae4464254884b60ab7071be2b876a9c35b696bd018ddcc76847309cd"
+checksum = "07c34a9410465b45bd9787443bc7370f37735bad04b0f0cd57ff1a3186c98988"
 dependencies = [
  "aho-corasick",
  "bstr",
@@ -814,9 +814,9 @@ dependencies = [
 
 [[package]]
 name = "ignore"
-version = "0.4.32"
+version = "0.4.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b17771570a2b94107741a7b033f19132c2eee21d59d21b24d2ced26500bd66e"
+checksum = "00b69833ed729dc5aa7d19541d96d6cf8e9137194207a04916d658e43168402f"
 dependencies = [
  "crossbeam-deque",
  "globset",
@@ -853,12 +853,9 @@ dependencies = [
 
 [[package]]
 name = "intrusive-collections"
-version = "0.10.2"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b719c59241cfaac1042a6d26787e28ed7ee4a4e21a5a907786f54222d1b0062"
-dependencies = [
- "memoffset",
-]
+checksum = "4275b20e6057cd7733fd8df8a5a31701e4fe44497dad0f3fa0e1c4fb971506be"
 
 [[package]]
 name = "inventory"
@@ -930,9 +927,9 @@ dependencies = [
 
 [[package]]
 name = "jsonschema"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "508004a5500f2e1f68af048f70feea2de86d35ab115d85716530860822aef397"
+checksum = "8da60094fc1968bbd091e2cfa004415cb7b19e25e592376e66a64aa832bb6039"
 dependencies = [
  "ahash",
  "bytecount",
@@ -959,18 +956,18 @@ dependencies = [
 
 [[package]]
 name = "jsonschema-regex"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a8b30cafa78358ae6cd1494a7d6410b89530e28bf567f862c869c667e900d9f"
+checksum = "36539f34ef9e5da418433fbbf7294522d8f930ecf6a540ccd1ec6481c9ff9056"
 dependencies = [
  "regex-syntax",
 ]
 
 [[package]]
 name = "jsonschema-value"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5526bd381d230af94908d07e6835a33fd82a465e12f5f1e9c81f5c2aa23b3c21"
+checksum = "8bc513dfee68c6fe29498451df95a32951ea227801b476f4a1f236433986c891"
 dependencies = [
  "ahash",
  "bytecount",
@@ -1059,15 +1056,6 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
-
-[[package]]
-name = "memoffset"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
-dependencies = [
- "autocfg",
-]
 
 [[package]]
 name = "micromap"
@@ -1205,7 +1193,7 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "panache"
-version = "3.1.0"
+version = "3.2.0"
 dependencies = [
  "annotate-snippets",
  "assert_cmd",
@@ -1237,7 +1225,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "similar 3.1.1",
+ "similar 3.1.2",
  "similar-asserts",
  "tempfile",
  "toml",
@@ -1249,7 +1237,7 @@ dependencies = [
 
 [[package]]
 name = "panache-formatter"
-version = "0.20.3"
+version = "0.20.4"
 dependencies = [
  "insta",
  "log",
@@ -1267,7 +1255,7 @@ dependencies = [
 
 [[package]]
 name = "panache-parser"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "entities",
  "insta",
@@ -1516,9 +1504,9 @@ dependencies = [
 
 [[package]]
 name = "referencing"
-version = "0.49.3"
+version = "0.49.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7af3eb523cce0df0af3c30d624b829b2dabd233172b5bc2615fcd03ceae8f746"
+checksum = "05915176d843da9ec5c925e5e2631be9aa61b27430acfdd562e79cae8f559725"
 dependencies = [
  "ahash",
  "fluent-uri 0.4.1",
@@ -1545,9 +1533,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.16"
+version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fcfdb36bda0c880c5931cdc7a2bcdc8ba4556847b9d912bca70bc94708711ad"
+checksum = "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -1780,9 +1768,9 @@ checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
 
 [[package]]
 name = "similar"
-version = "3.1.1"
+version = "3.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6505efef05804732ed8a3f2d4f279429eb485bd69d5b0cc6b19cc02005cda16"
+checksum = "85ee016af5d736b69fc89e19254540fa4b5f5492853fb5503920f084011c78b6"
 dependencies = [
  "bstr",
  "unicode-segmentation",
@@ -1795,7 +1783,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "997e6ca38e97437973fc9f7f50a50d1274cacd874341a4960fea90067291038c"
 dependencies = [
  "console",
- "similar 3.1.1",
+ "similar 3.1.2",
 ]
 
 [[package]]

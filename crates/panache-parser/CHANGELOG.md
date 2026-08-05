@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.24.0](https://github.com/jolars/panache/compare/panache-parser-v0.23.0...panache-parser-v0.24.0) (2026-08-05)
+
+### Features
+- **linter:** add `unsupported-metadata-key` rule ([`8056ffe`](https://github.com/jolars/panache/commit/8056ffe28cc165df52a9f29d62e75586f8a5f9c0))
+
+### Bug Fixes
+- **parser:** stop reading `^[note][`/`(` as a footnote ([`e69e8c7`](https://github.com/jolars/panache/commit/e69e8c7172f7cf5b4996a80ea75d39477ba4c4b2)), refs [#455](https://github.com/jolars/panache/issues/455)
+- **parser:** reword the empty YAML key diagnostic ([`73cc983`](https://github.com/jolars/panache/commit/73cc983be4d105b4e270e8d8e8db2bb595049bb8))
+- **parser:** promote figures in list items and definitions ([`05a6358`](https://github.com/jolars/panache/commit/05a63584682ae6dee6319610b589ffb2e5780b33))
+- **parser:** promote figures only at paragraph close ([`70d8cbe`](https://github.com/jolars/panache/commit/70d8cbe7ded58ff66f99f8b96955aad25e3edf0b))
+
 ## [0.23.0](https://github.com/jolars/panache/compare/panache-parser-v0.22.2...panache-parser-v0.23.0) (2026-08-03)
 
 ### Features
