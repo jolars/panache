@@ -20,7 +20,7 @@ categories = ["text-processing"]
 [dependencies]
 panache-parser = { path = "../panache-parser", version = "0.24.0" }
 log = { version = "0.4.31", features = ["release_max_level_debug"] }
-rowan = "0.16.1"
+rowan = "0.17.0"
 serde = { version = "1.0.228", features = ["derive"], optional = true }
 schemars = { version = "1.2.1", optional = true }
 unicode-width = "0.2.2"
