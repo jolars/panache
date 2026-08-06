@@ -181,14 +181,17 @@ records any deviation or discovered follow-up as an indented bullet under the
 phase. Never leave a phase half-landed: partial work is noted in the status line
 with the exact next step.
 
-**Current status / next step:** roadmap landed --- begin Phase 1 (oracle +
-structural tests).
+**Current status / next step:** Phase 1 done (oracle live, whole workspace green
+under it) --- begin Phase 2 (fuzz harness).
 
-- [ ] Phase 1: oracle --- `pub fn fingerprint` + debug
+- [x] Phase 1: oracle --- `pub fn fingerprint` + debug
   `assert_matches_full_parse` on every non-fallback reparse; RA-style
   `do_check` structural tests (full `{:#?}` equality, pinned strategy +
   reparse-range length); delete the dead `src/range_utils.rs` copy of
   `find_incremental_restart_offset`.
+  - Oracle lives in `crates/panache-parser/src/parser/verify.rs`; the existing
+    suite (parser + LSP integration) already runs clean under it, so no
+    divergence surfaced from the current strategies' happy paths.
 - [ ] Phase 2: seeded fuzz harness
   (`crates/panache-parser/tests/incremental_fuzz.rs`) with hazard-biased
   alphabet (setext, lazy continuation, fences, `:::` divs, list markers,
