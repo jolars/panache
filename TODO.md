@@ -181,8 +181,11 @@ records any deviation or discovered follow-up as an indented bullet under the
 phase. Never leave a phase half-landed: partial work is noted in the status line
 with the exact next step.
 
-**Current status / next step:** Phase 1 done (oracle live, whole workspace green
-under it) --- begin Phase 2 (fuzz harness).
+**Current status / next step:** Phases 1--2 done; fuzz harness clean at 30x
+iterations. Phase 3 partially done ahead of schedule (see its bullet); next step
+is the remainder of Phase 3: error carrying in `IncrementalParseResult` plus the
+three-bucket merge, error equality in the oracle and fuzz harness, and
+error-matrix tests. The host-level refdef-set comparison folds into Phase 4.
 
 - [x] Phase 1: oracle --- `pub fn fingerprint` + debug
   `assert_matches_full_parse` on every non-fallback reparse; RA-style
@@ -192,13 +195,29 @@ under it) --- begin Phase 2 (fuzz harness).
   - Oracle lives in `crates/panache-parser/src/parser/verify.rs`; the existing
     suite (parser + LSP integration) already runs clean under it, so no
     divergence surfaced from the current strategies' happy paths.
-- [ ] Phase 2: seeded fuzz harness
+- [x] Phase 2: seeded fuzz harness
   (`crates/panache-parser/tests/incremental_fuzz.rs`) with hazard-biased
   alphabet (setext, lazy continuation, fences, `:::` divs, list markers,
   table pipes, refdefs, YAML delimiters, HTML blocks, `$$`, footnotes) +
   commented hazard snippets + `benches/documents/` corpus;
   `PANACHE_FUZZ_ITERS` scaling. The known refdef-reuse bug is expected to
   surface here; capture divergences as minimized `#[ignore]`d red tests.
+  - Delivered with deviations. The harness skips (and counts) inputs where the
+    *full parser* itself is lossy or panics --- with a broken oracle the splice
+    cannot be judged; those inputs are pinned as ignored red tests in
+    `crates/panache-parser/tests/incremental_regressions.rs` and tracked as
+    parser bugs under "Full-parser bugs found by the incremental fuzzer" in the
+    Parser section below.
+  - Several incremental divergences the harness found were fixed in-session
+    instead of parked (Phase 3 work pulled forward): restart-past-edit guard,
+    textual + structural seam decoupling, fence-pairing parity over the prefix
+    (heuristic; precise old-tree check deferred to Phase 8), list/blockquote
+    continuation guard, and a refdef-proximity guard (`edit_may_touch_refdefs`,
+    textual; the precise set comparison lands with the host layer in Phase 4).
+    The section-window strategy was redesigned: it parses from the window start
+    to EOF (list-item buffering depends on unbounded lookahead, so a bounded
+    standalone window parse is untrustworthy) and re-adopts the old suffix
+    children only on structural equality, else degrades to a suffix splice.
 - [ ] Phase 3: refdef-set-change guard (cheap bail to full parse); error
   carrying in the incremental result + three-bucket merge (RA recipe);
   oracle/fuzz extended to error equality; un-ignore red tests; error-matrix
