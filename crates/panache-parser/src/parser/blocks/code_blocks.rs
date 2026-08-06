@@ -1286,7 +1286,7 @@ pub(crate) fn parse_fenced_code_block(
                     // `emit_yaml_block` validate→splice→fallback pattern.
                     let stream = parse_stream_with_prefix(&content, marker)
                         .green()
-                        .into_owned();
+                        .to_owned();
                     copy_green_children(builder, &stream);
                 }
                 // Whether spliced or fallback, the preamble lines are consumed.

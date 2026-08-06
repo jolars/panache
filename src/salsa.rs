@@ -158,7 +158,7 @@ pub fn parsed_document(db: &dyn Db, file: FileText, config: FileConfig) -> Parse
         refdefs,
     );
     ParsedDocument {
-        green: tree.green().into_owned(),
+        green: tree.green().to_owned(),
         errors,
     }
 }

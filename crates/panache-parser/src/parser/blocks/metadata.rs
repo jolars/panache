@@ -83,7 +83,7 @@ pub(crate) fn prepare_yaml_content(content: &str, flavor: Flavor) -> Option<Yaml
         return None;
     }
     Some(YamlContentOutcome::Valid {
-        stream: stream.green().into_owned(),
+        stream: stream.green().to_owned(),
     })
 }
 

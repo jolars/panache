@@ -17,7 +17,6 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DidSaveTextDocumentParams, MessageType, TextDocumentContentChangeEvent,
 };
-use rowan::GreenNode;
 use salsa::{Durability, Setter};
 
 use super::conversions::{apply_content_change, apply_content_change_with_edit_ranges};
@@ -176,7 +175,7 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     let config = gs.load_config_notifying(&uri);
     let tree = {
         let syntax_tree = crate::parse(&text, Some(config.clone()));
-        GreenNode::from(syntax_tree.green())
+        syntax_tree.green().to_owned()
     };
 
     let doc_path = uri.to_file_path().map(|p| p.into_owned());
@@ -311,7 +310,7 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
             (_, "suffix_window") => "suffix_incremental_multi_change_coalesced_experimental",
             (_, _) => "full_reparse_multi_change_incremental_fallback",
         };
-        (GreenNode::from(updated.tree.green()), label)
+        (updated.tree.green().to_owned(), label)
     } else {
         let parsed = parse_with_refdefs(&updated_text, Some(config.clone()), refdefs);
         let label = if !incremental_enabled {
@@ -325,7 +324,7 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
         } else {
             "full_reparse_multi_change_incremental_fallback"
         };
-        (GreenNode::from(parsed.green()), label)
+        (parsed.green().to_owned(), label)
     };
 
     log::debug!("did_change parse strategy={strategy} changes={change_count}");

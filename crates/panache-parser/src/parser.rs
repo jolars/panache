@@ -209,7 +209,7 @@ fn parse_incremental_suffix_inner(
     // (rowan's structural sharing keeps their `Arc` identity) and replace
     // everything from the restart boundary onward with the reparsed suffix.
     let old_green = old_tree.green();
-    let split = first_child_ending_after(&old_green, old_restart);
+    let split = first_child_ending_after(old_green, old_restart);
     let suffix_green = suffix_tree.green();
     let new_green = old_green.splice_children(
         split..,
@@ -396,8 +396,8 @@ fn reparse_section_window(
     // Replace exactly the children overlapping the section window with the
     // reparsed window, keeping the surrounding children by `Arc` identity.
     let old_green = old_tree.green();
-    let start_idx = first_child_ending_after(&old_green, section_window.old_start);
-    let end_idx = first_child_starting_at_or_after(&old_green, section_window.old_end);
+    let start_idx = first_child_ending_after(old_green, section_window.old_start);
+    let end_idx = first_child_starting_at_or_after(old_green, section_window.old_end);
     let window_green = reparsed_window.green();
     let new_green = old_green.splice_children(
         start_idx..end_idx,
