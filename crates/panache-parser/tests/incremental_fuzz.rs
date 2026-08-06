@@ -216,11 +216,12 @@ fn random_edit(rng: &mut Lcg, text: &str) -> ((usize, usize), &'static str) {
 /// Apply one edit incrementally against `old_tree` and check the invariants.
 /// Returns the spliced tree so chains can build on it, or `None` when the
 /// case must be skipped because the *full parser* is lossy on the edited
-/// text: with a broken oracle the splice cannot be judged. Those inputs are
-/// pinned as red tests in `incremental_regressions.rs` (currently the
-/// refdef-in-list-item reorder and the `---`-after-blockquote marker
-/// duplication); when the block-parser fixes land, the skip counter drops
-/// and this branch stops firing.
+/// text: with a broken oracle the splice cannot be judged. Every skip prints
+/// its reproducing input, because a skip is a *full-parser* bug worth
+/// minimizing into a red test in `incremental_regressions.rs` (that is where
+/// the refdef-in-list-item reorder, the `---`-after-blockquote marker
+/// duplication, and the line-block panic came from); when a block-parser fix
+/// lands, the skip counter drops.
 fn check_edit(
     context: &str,
     before: &str,
@@ -247,7 +248,12 @@ fn check_edit(
             return None;
         }
     };
-    if full.text().to_string() != updated {
+    let round_tripped = full.text().to_string();
+    if round_tripped != updated {
+        eprintln!(
+            "full parse is lossy (known-bug class, skipped): {context}\n  \
+             input:  {updated:?}\n  output: {round_tripped:?}"
+        );
         *skipped_lossy += 1;
         return None;
     }

@@ -1,14 +1,13 @@
 //! Minimized reproducers for divergences found by the incremental fuzz
-//! harness (`incremental_fuzz.rs`). Red tests are `#[ignore]`d until their
-//! fix lands (see the "Incremental Parsing" roadmap in `TODO.md`); each
-//! comment names the trap and the fuzz case that found it.
+//! harness (`incremental_fuzz.rs`). Each comment names the trap and the
+//! fuzz case that found it; a red test here is `#[ignore]`d only until its
+//! fix lands (see the "Incremental Parsing" roadmap in `TODO.md`).
 //!
-//! Two of the finds turned out to be **full-parser losslessness bugs**, not
-//! incremental bugs: the spliced tree faithfully matched the full parse
-//! (the debug oracle passed), and the full parse itself reorders or
-//! duplicates input bytes. Those are pinned here too because this harness
-//! found them, but their fix is in the block parser, not the incremental
-//! machinery. They corrupt documents through `panache format` today.
+//! Three of the finds turned out to be **full-parser bugs**, not incremental
+//! ones: the spliced tree faithfully matched the full parse (the debug
+//! oracle passed) and the full parse itself reordered bytes or panicked.
+//! They are pinned here because this harness found them, but they were
+//! fixed in the block parser, not in the incremental machinery.
 
 use panache_parser::parser::{fingerprint, parse, parse_incremental_suffix};
 
@@ -34,9 +33,9 @@ fn assert_full_parse_lossless(input: &str) {
 // A reference definition on the line after a list item's text is emitted
 // *before* the buffered item text, reordering the document's bytes:
 // "- a\n[x]: /url\n" round-trips as "- [x]: /url\na\n". Through
-// `panache format` the refdef line and the item text swap places.
+// `panache format` the refdef line and the item text swap places. Fixed by
+// `fix(parser): keep refdefs from interrupting list items`.
 #[test]
-#[ignore = "full-parser losslessness bug: refdef line inside a list item is reordered"]
 fn full_parse_lossless_refdef_after_list_item_line() {
     assert_full_parse_lossless("- a\n[x]: /url\n");
 }
@@ -44,9 +43,9 @@ fn full_parse_lossless_refdef_after_list_item_line() {
 // Fuzz find: small.qmd, seed 12648430, single edit #75 (minimized).
 // A line-block marker (`| `) as indented list-item continuation, followed
 // by a lazy line with a trailing pipe, panics the block parser outright:
-// "marker presence verified upstream" in `blocks/line_blocks.rs`.
+// "marker presence verified upstream" in `blocks/line_blocks.rs`. Fixed by
+// `fix(parser): match line-block peek to emitted prefix`.
 #[test]
-#[ignore = "full-parser panic: line block inside list item with lazy pipe line hits an `expect` in `line_blocks.rs`"]
 fn full_parse_must_not_panic_on_line_block_in_list_item() {
     let input = "- x\n\n  | a\n b |\n";
     let tree = parse(input, None);
@@ -57,9 +56,10 @@ fn full_parse_must_not_panic_on_line_block_in_list_item() {
 // A `---` line directly after a blockquote line duplicates the quote
 // marker: "> a\n---\nb\n" round-trips as "> > a\n---\nb\n". Through
 // `panache format` the input becomes "> ## > a\nb" - marker duplicated and
-// the thematic break folded into a setext heading.
+// the thematic break folded into a setext heading. Fixed by
+// `fix(parser): let setext claim a quoted line at top level`; pandoc reads
+// the input as a top-level `Header 2 [Str ">", Space, Str "a"]`.
 #[test]
-#[ignore = "full-parser losslessness bug: `---` after a blockquote duplicates the `>` marker"]
 fn full_parse_lossless_thematic_break_after_blockquote() {
     assert_full_parse_lossless("> a\n---\nb\n");
 }

@@ -187,6 +187,29 @@ is the remainder of Phase 3: error carrying in `IncrementalParseResult` plus the
 three-bucket merge, error equality in the oracle and fuzz harness, and
 error-matrix tests. The host-level refdef-set comparison folds into Phase 4.
 
+The four full-parser bugs the fuzzer found were fixed on `main` and this branch
+rebased on top, so `incremental_regressions.rs` has no ignored tests left. Two
+findings to fold into Phase 3 when it is picked up:
+
+- Phase 3 must add a **document-start-only construct guard**. A window is parsed
+  as a standalone document, so `at_document_start` is true at its first line and
+  three constructs can be manufactured that a full parse would never produce:
+  mid-document YAML metadata under `Dialect::CommonMark` (`block_dispatcher.rs`,
+  the `!at_document_start && dialect == CommonMark` refusal), pandoc `%` title
+  blocks, and MultiMarkdown title blocks. The YAML one is directly
+  error-relevant --- a spurious metadata block manufactures spurious YAML
+  errors, and YAML is the only source of `SyntaxError` there is. The default
+  fuzz tier is pandoc-flavored and cannot reach any of them, so parameterize the
+  harness over parser options (commonmark + quarto tiers) while adding the
+  guards.
+
+- The error merge is simpler than the RA three-bucket recipe: both strategies
+  parse their window to EOF and both window starts are `<= edit.0`, so the seam
+  offset is identical in the old and new text. That leaves "prefix errors with
+  `end <= seam`, kept verbatim" ++ "window errors shifted by `+seam`", with the
+  straddling bucket a `debug_assert!`. The real third bucket only appears with
+  the bounded region tier in Phase 8 --- say so in the module doc.
+
 - [x] Phase 1: oracle --- `pub fn fingerprint` + debug
   `assert_matches_full_parse` on every non-fallback reparse; RA-style
   `do_check` structural tests (full `{:#?}` equality, pinned strategy +
@@ -195,6 +218,7 @@ error-matrix tests. The host-level refdef-set comparison folds into Phase 4.
   - Oracle lives in `crates/panache-parser/src/parser/verify.rs`; the existing
     suite (parser + LSP integration) already runs clean under it, so no
     divergence surfaced from the current strategies' happy paths.
+
 - [x] Phase 2: seeded fuzz harness
   (`crates/panache-parser/tests/incremental_fuzz.rs`) with hazard-biased
   alphabet (setext, lazy continuation, fences, `:::` divs, list markers,
@@ -204,9 +228,9 @@ error-matrix tests. The host-level refdef-set comparison folds into Phase 4.
   surface here; capture divergences as minimized `#[ignore]`d red tests.
   - Delivered with deviations. The harness skips (and counts) inputs where the
     *full parser* itself is lossy or panics --- with a broken oracle the splice
-    cannot be judged; those inputs are pinned as ignored red tests in
-    `crates/panache-parser/tests/incremental_regressions.rs` and tracked as
-    parser bugs under "Full-parser bugs found by the incremental fuzzer" in the
+    cannot be judged; every skip prints its reproducer, and the minimized cases
+    are pinned in `crates/panache-parser/tests/incremental_regressions.rs` and
+    tracked under "Full-parser bugs found by the incremental fuzzer" in the
     Parser section below.
   - Several incremental divergences the harness found were fixed in-session
     instead of parked (Phase 3 work pulled forward): restart-past-edit guard,
@@ -218,19 +242,23 @@ error-matrix tests. The host-level refdef-set comparison folds into Phase 4.
     to EOF (list-item buffering depends on unbounded lookahead, so a bounded
     standalone window parse is untrustworthy) and re-adopts the old suffix
     children only on structural equality, else degrades to a suffix splice.
+
 - [ ] Phase 3: refdef-set-change guard (cheap bail to full parse); error
   carrying in the incremental result + three-bucket merge (RA recipe);
   oracle/fuzz extended to error equality; un-ignore red tests; error-matrix
   tests {unchanged/fixed/introduced} x strategy.
+
 - [ ] Phase 4: salsa unification --- reparse moves into `parsed_document` with a
   side-channel reparse base (fatou model, no staged edit chain: whole-text
   `diff_edit` recovers the single combined edit); base keyed on config +
   refdef set; admission-gated by the runtime flag; delete
   `DocumentState.tree` and the edit-range coalescing helpers; new
   `tests/salsa_incremental.rs`. Staged commits S1-S4, each green.
+
 - [ ] Phase 5: benchmark repair --- fix `benches/lsp_incremental.rs`
   multi-change path (currently degenerates to full reparse), add
   fallback-rate + bail-cost accounting, commit results table in module doc.
+
 - [ ] Phase 6: default flip --- `panache.incrementalParsing` default true,
   `experimental.incrementalParsing` kept as deprecated alias (LSP-only, no
   panache.toml/schema key); VS Code setting migration with
@@ -240,15 +268,18 @@ error-matrix tests. The host-level refdef-set comparison folds into Phase 4.
   and off; bench thresholds (fallback < 20%, >= 2x medium / >= 5x
   pandoc_manual, bail cost <= 20% of full parse); 1 week oracle-live
   dogfooding with zero panics.
+
 - [ ] Phase 7: token tier --- edit inside plain `TEXT`; newline ban,
   construct-character ban list kept honest by a grammar-grepping test, relex
   kind stability, join probes, error non-touch; extract
   `parser/incremental.rs`; char-by-char typing test.
+
 - [ ] Phase 8: region tier over top-level `DOCUMENT` children replacing
   section/suffix windows --- symmetric newline-decoupling scans in old and
   new text, `no_straddle` seam primitive, too-wide bail, fence/div balance,
   setext/lazy-continuation/list-tightness/HTML-block coupling guards. Fixes
   the suffix-window reparse-to-EOF gap.
+
 - [ ] Phase 9: closeout --- architecture docs, dead-path pruning, record
   deferrals.
 
