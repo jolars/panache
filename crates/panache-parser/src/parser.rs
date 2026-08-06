@@ -17,10 +17,14 @@ pub mod yaml;
 
 mod block_dispatcher;
 mod core;
+mod verify;
 
 // Re-export main parser
 pub use core::Parser;
 pub use diagnostics::{Diagnostics, SyntaxError, SyntaxErrorSource};
+pub use verify::fingerprint;
+
+use verify::assert_matches_full_parse;
 
 /// Parses a Quarto document string into a syntax tree.
 ///
@@ -187,6 +191,7 @@ fn parse_incremental_suffix_inner(
         find_top_level_heading_section_window(old_tree, old_edit, new_edit, input_len)
         && let Some(result) = reparse_section_window(input, &config, old_tree, section_window)
     {
+        assert_matches_full_parse(&result, input, &config);
         return result;
     }
 
@@ -219,11 +224,13 @@ fn parse_incremental_suffix_inner(
     let tree = SyntaxNode::new_root(new_green);
     let len: usize = tree.text_range().end().into();
 
-    IncrementalParseResult {
+    let result = IncrementalParseResult {
         tree,
         reparse_range: (new_restart, len),
         strategy: "suffix_window",
-    }
+    };
+    assert_matches_full_parse(&result, input, &config);
+    result
 }
 
 fn normalize_range(range: (usize, usize)) -> Option<(usize, usize)> {

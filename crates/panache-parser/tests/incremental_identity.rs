@@ -176,6 +176,116 @@ fn unchanged_blocks_compare_equal_across_edit() {
     );
 }
 
+/// Extract the `$0...$0`-marked range from `marked`, returning the unmarked
+/// text and the byte range the markers delimited.
+fn extract_range(marked: &str) -> (String, (usize, usize)) {
+    let start = marked.find("$0").expect("opening $0 marker");
+    let rest = &marked[start + 2..];
+    let end_rel = rest.find("$0").expect("closing $0 marker");
+    let mut text = String::with_capacity(marked.len() - 4);
+    text.push_str(&marked[..start]);
+    text.push_str(&rest[..end_rel]);
+    text.push_str(&rest[end_rel + 2..]);
+    (text, (start, start + end_rel))
+}
+
+/// rust-analyzer-style structural check. `before_marked` holds `$0...$0`
+/// markers around the deleted range; `insert` replaces it. Asserts:
+///
+/// 1. the incremental parse engaged `expected_strategy` (not a silent
+///    fallback),
+/// 2. it reparsed exactly `reparsed_len` bytes — a pinned granularity that
+///    fails when a change silently widens the reparse window (a perf
+///    regression correctness tests cannot see),
+/// 3. the incremental tree's full `{:#?}` dump equals a from-scratch parse
+///    of the edited text — structural identity, not text equality.
+fn do_check(before_marked: &str, insert: &str, expected_strategy: &str, reparsed_len: usize) {
+    let (before, old_edit) = extract_range(before_marked);
+    let updated = apply_edit(&before, old_edit, insert);
+    let new_edit = (old_edit.0, old_edit.0 + insert.len());
+
+    let old_tree = parse(&before, None);
+    let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+    let full = parse(&updated, None);
+
+    assert_eq!(
+        inc.strategy, expected_strategy,
+        "wrong strategy for edit {old_edit:?} -> {insert:?} in {before:?}"
+    );
+    assert_eq!(
+        inc.reparse_range.1 - inc.reparse_range.0,
+        reparsed_len,
+        "reparsed window has wrong length (range {:?}) for edit {old_edit:?} in {before:?}",
+        inc.reparse_range
+    );
+    assert_eq!(
+        format!("{:#?}", inc.tree),
+        format!("{full:#?}"),
+        "incremental tree diverged structurally from full parse"
+    );
+}
+
+#[test]
+fn do_check_suffix_window_tail_edit() {
+    // Heading-free document: the suffix strategy restarts at a safe
+    // top-level block boundary and reparses to EOF.
+    do_check(
+        "para one\n\npara two\n\npara three\n\npara four\n\npara $0five$0\n",
+        "FIVE",
+        "suffix_window",
+        10,
+    );
+}
+
+#[test]
+fn do_check_suffix_window_reparses_to_eof_from_middle_edit() {
+    // Documents the suffix-window gap: an edit in the middle of a
+    // heading-free document reparses everything from the restart to EOF.
+    // The region tier (roadmap Phase 8) should shrink this window; when it
+    // does, this pinned length must go down, not up.
+    do_check(
+        "para one\n\npara $0two$0\n\npara three\n\npara four\n\npara five\n",
+        "TWO",
+        "suffix_window",
+        43,
+    );
+}
+
+#[test]
+fn do_check_section_window_between_headings() {
+    // Edit strictly inside a section body bounded by top-level headings:
+    // only the enclosing section (previous heading to next heading) is
+    // reparsed.
+    do_check(
+        "# Intro\n\nalpha\n\n# Middle\n\nbeta $0section$0\n\n# End\n\nomega\n",
+        "SECTION",
+        "section_window",
+        24,
+    );
+}
+
+#[test]
+fn do_check_section_window_last_section_runs_to_eof() {
+    do_check(
+        "# Intro\n\nalpha\n\n# End\n\nom$0eg$0a\n",
+        "EG",
+        "section_window",
+        13,
+    );
+}
+
+#[test]
+fn do_check_fallback_on_edit_at_document_start() {
+    // The restart boundary lands inside the edited range, so the parser
+    // falls back to a full reparse of the whole document.
+    do_check(
+        "$0p$0ara one\n\npara two\n\npara three\n",
+        "P",
+        "full_reparse",
+        31,
+    );
+}
+
 #[test]
 fn incremental_reparse_is_lossless() {
     let input = "para one\n\npara two\n\npara three\n\npara four\n\npara five\n";

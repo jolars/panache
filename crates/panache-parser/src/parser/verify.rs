@@ -1,0 +1,119 @@
+//! Incremental-reparse verification helpers.
+//!
+//! [`fingerprint`] renders every element of a tree as a `kind@range "text"`
+//! line; two trees with equal fingerprints are structurally identical, token
+//! boundaries included. It is `pub` so the in-crate debug oracle
+//! ([`assert_matches_full_parse`]) and external test harnesses share one
+//! definition of "identical" and can never diverge on it.
+//!
+//! The oracle enforces the governing incremental-parsing invariant: a
+//! successful incremental reparse must be byte-for-byte structurally
+//! identical to a full parse of the edited text. It runs on every
+//! non-fallback reparse in debug builds and is compiled out of release
+//! builds.
+
+use std::fmt::Write;
+
+use crate::syntax::SyntaxNode;
+
+/// Render every element (nodes and tokens) of `node` as one line of
+/// `kind@range "text"`, in preorder.
+///
+/// Structural equality of two trees is equality of their fingerprints:
+/// every kind, every range, and every token's text participates.
+pub fn fingerprint(node: &SyntaxNode) -> String {
+    let mut out = String::new();
+    for element in node.descendants_with_tokens() {
+        let text = element
+            .as_token()
+            .map(|token| token.text().to_string())
+            .unwrap_or_default();
+        let _ = writeln!(
+            out,
+            "{:?}@{:?} {:?}",
+            element.kind(),
+            element.text_range(),
+            text
+        );
+    }
+    out
+}
+
+/// Debug-build oracle: a successful incremental reparse must equal a full
+/// parse of the same input under the same options.
+///
+/// Panics (debug builds only) when the incrementally spliced tree diverges
+/// from a from-scratch parse. Every failure here is an incremental-parser
+/// bug whose fix is a new bail-to-full-parse condition, never a relaxation
+/// of this assert.
+#[cfg(debug_assertions)]
+pub(crate) fn assert_matches_full_parse(
+    result: &super::IncrementalParseResult,
+    input: &str,
+    options: &crate::options::ParserOptions,
+) {
+    let full = super::Parser::new(input, options).parse();
+    assert_eq!(
+        fingerprint(&result.tree),
+        fingerprint(&full),
+        "incremental reparse (strategy {:?}, reparse_range {:?}) diverged from full parse",
+        result.strategy,
+        result.reparse_range,
+    );
+}
+
+#[cfg(not(debug_assertions))]
+#[inline]
+pub(crate) fn assert_matches_full_parse(
+    _result: &super::IncrementalParseResult,
+    _input: &str,
+    _options: &crate::options::ParserOptions,
+) {
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::{IncrementalParseResult, parse};
+
+    #[test]
+    fn fingerprint_distinguishes_structural_difference() {
+        let paragraph = parse("plain text\n", None);
+        let heading = parse("# plain text\n", None);
+        assert_ne!(fingerprint(&paragraph), fingerprint(&heading));
+    }
+
+    #[test]
+    fn fingerprint_equal_for_identical_parses() {
+        let a = parse("# Title\n\nBody with `code`.\n", None);
+        let b = parse("# Title\n\nBody with `code`.\n", None);
+        assert_eq!(fingerprint(&a), fingerprint(&b));
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "diverged from full parse")]
+    fn oracle_panics_on_injected_divergence() {
+        // A tree parsed from different text stands in for a bad splice.
+        let input = "# Title\n\nParagraph.\n";
+        let wrong = IncrementalParseResult {
+            tree: parse("# Title\n\n> quoted\n", None),
+            reparse_range: (0, input.len()),
+            strategy: "suffix_window",
+        };
+        assert_matches_full_parse(&wrong, input, &crate::options::ParserOptions::default());
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn oracle_accepts_identical_tree() {
+        let input = "# Title\n\nParagraph.\n";
+        let options = crate::options::ParserOptions::default();
+        let result = IncrementalParseResult {
+            tree: crate::parser::Parser::new(input, &options).parse(),
+            reparse_range: (0, input.len()),
+            strategy: "suffix_window",
+        };
+        assert_matches_full_parse(&result, input, &options);
+    }
+}
