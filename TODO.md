@@ -187,8 +187,9 @@ is the remainder of Phase 3: error carrying in `IncrementalParseResult` plus the
 three-bucket merge, error equality in the oracle and fuzz harness, and
 error-matrix tests. The host-level refdef-set comparison folds into Phase 4.
 
-The four full-parser bugs the fuzzer found were fixed on `main` and this branch
-rebased on top, so `incremental_regressions.rs` has no ignored tests left. Two
+The five full-parser bugs the fuzzer found were fixed on `main` and this branch
+rebased on top, so `incremental_regressions.rs` has no ignored tests left; what
+the harness still trips over is tracked in the Parser section below. Two
 findings to fold into Phase 3 when it is picked up:
 
 - Phase 3 must add a **document-start-only construct guard**. A window is parsed
@@ -230,8 +231,8 @@ findings to fold into Phase 3 when it is picked up:
     *full parser* itself is lossy or panics --- with a broken oracle the splice
     cannot be judged; every skip prints its reproducer, and the minimized cases
     are pinned in `crates/panache-parser/tests/incremental_regressions.rs` and
-    tracked under "Full-parser bugs found by the incremental fuzzer" in the
-    Parser section below.
+    tracked under "Parser bugs found by the incremental fuzzer" in the Parser
+    section below.
   - Several incremental divergences the harness found were fixed in-session
     instead of parked (Phase 3 work pulled forward): restart-past-edit guard,
     textual + structural seam decoupling, fence-pairing parity over the prefix
