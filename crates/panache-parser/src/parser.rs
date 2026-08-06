@@ -187,6 +187,16 @@ fn parse_incremental_suffix_inner(
         return full_reparse_result(input, &config);
     }
 
+    // Reference definitions are document-scoped: retained blocks keep the
+    // resolution they were parsed with, so an edit that can add, remove, or
+    // alter a refdef (or footnote definition) invalidates them at a
+    // distance. Bail on cheap textual evidence near the edit; the precise
+    // old-set-vs-new-set comparison belongs to the host layer, which caches
+    // both sets.
+    if edit_may_touch_refdefs(old_tree, old_edit, input, new_edit) {
+        return full_reparse_result(input, &config);
+    }
+
     if let Some(section_window) =
         find_top_level_heading_section_window(old_tree, old_edit, new_edit, input_len)
         && let Some(result) = reparse_section_window(input, &config, old_tree, section_window)
@@ -198,7 +208,12 @@ fn parse_incremental_suffix_inner(
     let restart = find_incremental_restart_offset(old_tree, old_edit.0, old_edit.1);
     let old_restart = align_to_document_child_start(old_tree, restart);
 
-    if (old_edit.0..old_edit.1).contains(&old_restart) {
+    // The retained prefix is `old_tree`'s bytes up to the restart, so the
+    // restart must not lie past the edit start: a later restart would keep
+    // stale pre-edit bytes and drop the edit from the spliced tree. (An
+    // edit at a blank line between blocks can produce such a restart — the
+    // enclosing-block lookup resolves to the *following* block.)
+    if old_restart > old_edit.0 {
         return full_reparse_result(input, &config);
     }
 
@@ -207,7 +222,38 @@ fn parse_incremental_suffix_inner(
         return full_reparse_result(input, &config);
     }
 
+    // Seam decoupling: the suffix is parsed as a standalone document, so
+    // nothing may couple across the splice seam in the edited text.
+    // Backward: the retained prefix must end at a blank line (or the seam
+    // is the document start), else the suffix's first line could continue
+    // a prefix paragraph, turn it into a setext heading, or attach lazily
+    // to a prefix container. Forward-into-prefix: an indented suffix start
+    // can be absorbed by a trailing prefix list, footnote definition, or
+    // indented code block even across blank lines, so it also bails.
+    if !seam_is_decoupled(input, new_restart)
+        || !prefix_ends_structurally_decoupled(old_tree, old_restart)
+    {
+        return full_reparse_result(input, &config);
+    }
+
+    // Fence pairing is global: an edit in the suffix can pair with (or
+    // orphan) a fence-capable line retained in the prefix, flipping the
+    // prefix's interpretation.
+    if !prefix_fence_state_is_stable(&input[..new_restart]) {
+        return full_reparse_result(input, &config);
+    }
+
     let suffix_text = &input[new_restart..];
+
+    // A list (or definition-list) block continues across blank lines when
+    // the next non-blank line carries a compatible marker, so a suffix
+    // whose first line looks like a list continuation must not be parsed
+    // standalone after a retained trailing list.
+    if last_retained_block_can_absorb_marker(old_tree, old_restart)
+        && first_nonblank_line_is_container_marker(suffix_text)
+    {
+        return full_reparse_result(input, &config);
+    }
     let suffix_tree = Parser::new(suffix_text, &config).parse();
 
     // Splice on the green tree directly: retain the prefix children verbatim
@@ -235,6 +281,174 @@ fn parse_incremental_suffix_inner(
 
 fn normalize_range(range: (usize, usize)) -> Option<(usize, usize)> {
     (range.0 <= range.1).then_some(range)
+}
+
+/// How far around an edit the refdef guard scans. Refdef and footnote
+/// definition lines are short; a label whose `]:` sits further than this
+/// from the edit is not worth the precision.
+const REFDEF_SCAN_WINDOW: usize = 512;
+
+/// Whether the edit could add, remove, or alter a reference or footnote
+/// definition, judged by cheap textual evidence: a `]:` occurrence within a
+/// bounded window around the edit, in the old text or the new. False
+/// positives (a literal `]:` in prose) only cost a full reparse.
+fn edit_may_touch_refdefs(
+    old_tree: &SyntaxNode,
+    old_edit: (usize, usize),
+    input: &str,
+    new_edit: (usize, usize),
+) -> bool {
+    let old_len: usize = old_tree.text_range().end().into();
+    let old_start = old_edit.0.saturating_sub(REFDEF_SCAN_WINDOW);
+    let old_end = old_edit.1.saturating_add(REFDEF_SCAN_WINDOW).min(old_len);
+    if old_start < old_end {
+        let old_slice = old_tree
+            .text()
+            .slice(rowan::TextRange::new(
+                (old_start as u32).into(),
+                (old_end as u32).into(),
+            ))
+            .to_string();
+        if old_slice.contains("]:") {
+            return true;
+        }
+    }
+
+    let new_start = new_edit.0.saturating_sub(REFDEF_SCAN_WINDOW);
+    let new_end = new_edit
+        .1
+        .saturating_add(REFDEF_SCAN_WINDOW)
+        .min(input.len());
+    let new_start = floor_char_boundary(input, new_start);
+    let new_end = floor_char_boundary(input, new_end);
+    new_start < new_end && input[new_start..new_end].contains("]:")
+}
+
+fn floor_char_boundary(text: &str, mut pos: usize) -> usize {
+    while pos > 0 && !text.is_char_boundary(pos) {
+        pos -= 1;
+    }
+    pos
+}
+
+/// Whether the fence-pairing state of a retained prefix is visibly stable.
+///
+/// Fence-like delimiters (backtick/tilde code fences, `:::` div fences,
+/// `$$` display math, HTML comments) pair across blank lines, so their
+/// interpretation is global: an edit after the prefix can supply or remove
+/// a pairing partner and flip how prefix lines parse. This is a parity
+/// heuristic — every delimiter-capable line in the prefix must have a
+/// partner — not a proof; delimiter-looking lines in prose (e.g. docs
+/// about Markdown) can fool it in both directions. The debug oracle
+/// backstops false negatives; false positives only cost a full reparse.
+/// The precise check (asking the old tree whether each candidate line is a
+/// closed fence delimiter) is roadmap Phase 8 material.
+fn prefix_fence_state_is_stable(prefix: &str) -> bool {
+    let mut backtick = 0usize;
+    let mut tilde = 0usize;
+    let mut colon = 0usize;
+    let mut math = 0usize;
+    for line in prefix.lines() {
+        let trimmed = line.trim_start_matches(' ');
+        if line.len() - trimmed.len() > 3 {
+            continue;
+        }
+        if trimmed.starts_with("```") {
+            backtick += 1;
+        } else if trimmed.starts_with("~~~") {
+            tilde += 1;
+        } else if trimmed.starts_with(":::") {
+            colon += 1;
+        } else if trimmed.starts_with("$$") {
+            math += 1;
+        }
+    }
+    backtick.is_multiple_of(2)
+        && tilde.is_multiple_of(2)
+        && colon.is_multiple_of(2)
+        && math.is_multiple_of(2)
+        && prefix.matches("<!--").count() == prefix.matches("-->").count()
+}
+
+/// Whether the retained prefix is *structurally* decoupled at `boundary`:
+/// the last retained top-level child must be a `BLANK_LINE` node (or
+/// nothing is retained). The textual blank-line check in
+/// [`seam_is_decoupled`] is blind to containment — an unterminated
+/// container (open `:::` div, fence, comment) can hold the seam's blank
+/// line *inside* itself and still absorb anything appended after it, which
+/// this check catches because the blank line is then not a top-level
+/// child.
+fn prefix_ends_structurally_decoupled(old_tree: &SyntaxNode, boundary: usize) -> bool {
+    old_tree
+        .children_with_tokens()
+        .take_while(|child| usize::from(child.text_range().end()) <= boundary)
+        .last()
+        .is_none_or(|child| child.kind() == SyntaxKind::BLANK_LINE)
+}
+
+/// Whether the last retained top-level block before `boundary` is a
+/// container that absorbs marker-led lines across blank lines.
+fn last_retained_block_can_absorb_marker(old_tree: &SyntaxNode, boundary: usize) -> bool {
+    old_tree
+        .children()
+        .take_while(|child| usize::from(child.text_range().end()) <= boundary)
+        .filter(|child| child.kind() != SyntaxKind::BLANK_LINE)
+        .last()
+        .is_some_and(|child| {
+            matches!(
+                child.kind(),
+                SyntaxKind::LIST | SyntaxKind::DEFINITION_LIST | SyntaxKind::BLOCK_QUOTE
+            )
+        })
+}
+
+/// Whether the first non-blank line of `text` starts with a marker that
+/// could continue a preceding container: bullet or ordered list markers
+/// (including pandoc's fancy single-letter forms), a definition-list `:`,
+/// or a blockquote `>`.
+fn first_nonblank_line_is_container_marker(text: &str) -> bool {
+    let Some(line) = text.lines().find(|line| !line.trim().is_empty()) else {
+        return false;
+    };
+    let trimmed = line.trim_start();
+    // A blockquote marker needs no following space.
+    if trimmed.starts_with('>') {
+        return true;
+    }
+    if let Some(rest) = trimmed.strip_prefix(['-', '*', '+', ':']) {
+        return rest.is_empty() || rest.starts_with(' ') || rest.starts_with('\t');
+    }
+    if trimmed.starts_with('(') {
+        return true;
+    }
+    let marker_len = trimmed
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric())
+        .count();
+    if marker_len > 0 && marker_len <= 9 {
+        let rest = &trimmed[marker_len..];
+        if let Some(rest) = rest.strip_prefix(['.', ')']) {
+            return rest.is_empty() || rest.starts_with(' ');
+        }
+    }
+    false
+}
+
+/// Whether a splice seam at `seam` is structurally decoupled in `text`:
+/// the prefix before it ends with a blank line (or is empty), and the
+/// suffix's first non-blank line is not indented. Blank separation kills
+/// paragraph/lazy continuation and setext underlines; the indentation check
+/// covers list, footnote, and indented-code continuation, which absorb
+/// indented lines even across blank lines.
+fn seam_is_decoupled(text: &str, seam: usize) -> bool {
+    if seam != 0 && !text[..seam].ends_with("\n\n") {
+        return false;
+    }
+    let first_nonblank_indented = text[seam..]
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .is_some_and(|line| line.starts_with(' ') || line.starts_with('\t'));
+    !first_nonblank_indented
 }
 
 fn full_reparse_result(input: &str, config: &ParserOptions) -> IncrementalParseResult {
@@ -394,28 +608,89 @@ fn reparse_section_window(
         return None;
     }
 
-    let reparsed_window = Parser::new(
-        &input[section_window.new_start..section_window.new_end],
-        config,
-    )
-    .parse();
+    // Backward seam: the reparsed region is parsed without its prefix, so
+    // the retained prefix must be blank-line separated from it (see
+    // `seam_is_decoupled`), and the prefix's fence-pairing state must not
+    // be flippable by the reparsed content (`prefix_fence_state_is_stable`).
+    if !seam_is_decoupled(input, section_window.new_start)
+        || !prefix_ends_structurally_decoupled(old_tree, section_window.old_start)
+        || !prefix_fence_state_is_stable(&input[..section_window.new_start])
+    {
+        return None;
+    }
 
-    // Replace exactly the children overlapping the section window with the
-    // reparsed window, keeping the surrounding children by `Arc` identity.
+    // Parse from the window start TO EOF, not just to the window end: block
+    // decisions inside the window (list-item buffering, tightness, div and
+    // fence pairing) can depend on unbounded lookahead past the window, so
+    // a standalone parse of only the window text is not trustworthy. This
+    // costs the same as the suffix strategy's parse; the win over it is
+    // below, where the unchanged tail is re-adopted by `Arc` identity.
+    let tail_tree = Parser::new(&input[section_window.new_start..], config).parse();
+    let tail_green = tail_tree.green();
+    let window_len = section_window.new_end - section_window.new_start;
+
     let old_green = old_tree.green();
     let start_idx = first_child_ending_after(old_green, section_window.old_start);
     let end_idx = first_child_starting_at_or_after(old_green, section_window.old_end);
-    let window_green = reparsed_window.green();
-    let new_green = old_green.splice_children(
-        start_idx..end_idx,
-        window_green.children().map(|child| child.to_owned()),
-    );
 
+    // Try to re-adopt the old tree's suffix: if the freshly parsed tail has
+    // a top-level boundary exactly at the window end and its beyond-window
+    // children are structurally equal to the old suffix children, splice
+    // only the window portion so the retained suffix keeps its `Arc`
+    // identity (which downstream per-block memoization relies on).
+    let mut offset = 0usize;
+    let mut boundary_idx = None;
+    for (index, child) in tail_green.children().enumerate() {
+        if offset == window_len {
+            boundary_idx = Some(index);
+            break;
+        }
+        if offset > window_len {
+            break;
+        }
+        offset += usize::from(child.text_len());
+    }
+    if boundary_idx.is_none() && offset == window_len {
+        boundary_idx = Some(tail_green.children().count());
+    }
+
+    if let Some(boundary_idx) = boundary_idx {
+        let tail_matches_old_suffix = tail_green.children().count() - boundary_idx
+            == old_green.children().count() - end_idx
+            && tail_green
+                .children()
+                .skip(boundary_idx)
+                .zip(old_green.children().skip(end_idx))
+                .all(|(new_child, old_child)| new_child == old_child);
+        if tail_matches_old_suffix {
+            let new_green = old_green.splice_children(
+                start_idx..end_idx,
+                tail_green
+                    .children()
+                    .take(boundary_idx)
+                    .map(|child| child.to_owned()),
+            );
+            return Some(IncrementalParseResult {
+                tree: SyntaxNode::new_root(new_green),
+                reparse_range: (section_window.new_start, section_window.new_end),
+                strategy: "section_window",
+            });
+        }
+    }
+
+    // No adoptable boundary: the parsed tail is still a correct parse of
+    // everything from the window start, so splice it wholesale (this is the
+    // suffix strategy anchored at the section start).
+    let new_green = old_green.splice_children(
+        start_idx..,
+        tail_green.children().map(|child| child.to_owned()),
+    );
     let tree = SyntaxNode::new_root(new_green);
+    let len: usize = tree.text_range().end().into();
     Some(IncrementalParseResult {
         tree,
-        reparse_range: (section_window.new_start, section_window.new_end),
-        strategy: "section_window",
+        reparse_range: (section_window.new_start, len),
+        strategy: "suffix_window",
     })
 }
 

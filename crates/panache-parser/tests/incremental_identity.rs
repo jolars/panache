@@ -275,15 +275,24 @@ fn do_check_section_window_last_section_runs_to_eof() {
 }
 
 #[test]
-fn do_check_fallback_on_edit_at_document_start() {
-    // The restart boundary lands inside the edited range, so the parser
-    // falls back to a full reparse of the whole document.
+fn do_check_edit_at_document_start_reparses_whole_suffix() {
+    // The restart clamps to the document start, so the "suffix" is the
+    // whole document — correct, but no cheaper than a full reparse.
     do_check(
         "$0p$0ara one\n\npara two\n\npara three\n",
         "P",
-        "full_reparse",
+        "suffix_window",
         31,
     );
+}
+
+#[test]
+fn do_check_fallback_when_restart_would_pass_the_edit() {
+    // Inserting at the blank line after an unterminated fence resolves the
+    // enclosing block to the *following* paragraph, putting the restart
+    // past the edit start; the guard bails to a full reparse rather than
+    // retaining stale pre-edit bytes.
+    do_check("```\ncode\n$0$0\npara after\n", "\\", "full_reparse", 22);
 }
 
 #[test]
