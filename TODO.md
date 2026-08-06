@@ -154,6 +154,90 @@ analogue; do not re-audit them: call hierarchy, type hierarchy,
   user sees just `Error: invalid config <path>: ...`. Affects all
   `io::Error`s, not only config.
 
+## Incremental Parsing
+
+Multi-session effort to harden, unify, and graduate incremental reparsing to
+default-on, then add token/region tiers. Reference implementations audited for
+this plan: rust-analyzer (`reparsing.rs`), `../arity`
+(`crates/arity-parser/src/parser/reparse.rs`), and `../fatou`
+(`crates/fatou-parser/src/parser/reparse.rs`, `src/incremental.rs`) --- fatou is
+the primary model and both siblings are on disk for re-reading.
+
+**Governing invariant** (fatou "Tenet 4 strong form"): a successful incremental
+reparse must yield a green tree and syntax-error vector byte-identical to a full
+parse of the edited text, enforced by a `#[cfg(debug_assertions)]` oracle on
+every reparse. Every guard failure bails to full parse --- never an error.
+
+Work happens on the `feat/incremental-parsing-graduation` branch; the user files
+the PR themselves. Full design detail (phase entry/exit criteria, the
+salsa-unification design, flip acceptance criteria) lives in the plan document
+at `~/.claude/plans/i-want-to-promote-splendid-stardust.md`.
+
+**Handover protocol:** a fresh session reads this section, picks the first
+unchecked phase, verifies its entry criteria (previous phase's boxes checked,
+workspace green on the branch), and works TDD with atomic conventional commits.
+On completion it checks the phase box, updates the status line below, and
+records any deviation or discovered follow-up as an indented bullet under the
+phase. Never leave a phase half-landed: partial work is noted in the status line
+with the exact next step.
+
+**Current status / next step:** roadmap landed --- begin Phase 1 (oracle +
+structural tests).
+
+- [ ] Phase 1: oracle --- `pub fn fingerprint` + debug
+  `assert_matches_full_parse` on every non-fallback reparse; RA-style
+  `do_check` structural tests (full `{:#?}` equality, pinned strategy +
+  reparse-range length); delete the dead `src/range_utils.rs` copy of
+  `find_incremental_restart_offset`.
+- [ ] Phase 2: seeded fuzz harness
+  (`crates/panache-parser/tests/incremental_fuzz.rs`) with hazard-biased
+  alphabet (setext, lazy continuation, fences, `:::` divs, list markers,
+  table pipes, refdefs, YAML delimiters, HTML blocks, `$$`, footnotes) +
+  commented hazard snippets + `benches/documents/` corpus;
+  `PANACHE_FUZZ_ITERS` scaling. The known refdef-reuse bug is expected to
+  surface here; capture divergences as minimized `#[ignore]`d red tests.
+- [ ] Phase 3: refdef-set-change guard (cheap bail to full parse); error
+  carrying in the incremental result + three-bucket merge (RA recipe);
+  oracle/fuzz extended to error equality; un-ignore red tests; error-matrix
+  tests {unchanged/fixed/introduced} x strategy.
+- [ ] Phase 4: salsa unification --- reparse moves into `parsed_document` with a
+  side-channel reparse base (fatou model, no staged edit chain: whole-text
+  `diff_edit` recovers the single combined edit); base keyed on config +
+  refdef set; admission-gated by the runtime flag; delete
+  `DocumentState.tree` and the edit-range coalescing helpers; new
+  `tests/salsa_incremental.rs`. Staged commits S1-S4, each green.
+- [ ] Phase 5: benchmark repair --- fix `benches/lsp_incremental.rs`
+  multi-change path (currently degenerates to full reparse), add
+  fallback-rate + bail-cost accounting, commit results table in module doc.
+- [ ] Phase 6: default flip --- `panache.incrementalParsing` default true,
+  `experimental.incrementalParsing` kept as deprecated alias (LSP-only, no
+  panache.toml/schema key); VS Code setting migration with
+  `deprecationMessage`; client-neutral docs (`docs/guide/lsp.qmd`,
+  `docs/development/lsp.qmd`, `editors/code/README.md`). Gate: oracle-clean
+  fuzz at 10x iterations; workspace + LSP suite green with flag forced on
+  and off; bench thresholds (fallback < 20%, >= 2x medium / >= 5x
+  pandoc_manual, bail cost <= 20% of full parse); 1 week oracle-live
+  dogfooding with zero panics.
+- [ ] Phase 7: token tier --- edit inside plain `TEXT`; newline ban,
+  construct-character ban list kept honest by a grammar-grepping test, relex
+  kind stability, join probes, error non-touch; extract
+  `parser/incremental.rs`; char-by-char typing test.
+- [ ] Phase 8: region tier over top-level `DOCUMENT` children replacing
+  section/suffix windows --- symmetric newline-decoupling scans in old and
+  new text, `no_straddle` seam primitive, too-wide bail, fence/div balance,
+  setext/lazy-continuation/list-tightness/HTML-block coupling guards. Fixes
+  the suffix-window reparse-to-EOF gap.
+- [ ] Phase 9: closeout --- architecture docs, dead-path pruning, record
+  deferrals.
+
+**Deferred (explicit non-goals):** nested-container regions (inside list items,
+blockquotes, divs) are unsound without a context-parameterized fragment-parser
+entry point carrying container stack, open fences, and refdef scope --- fatou's
+recorded lesson (fatou `TODO.md`, "Incremental" section). Regions stay
+restricted to top-level `DOCUMENT` children until that exists. NodePtr
+re-anchoring across edits (arity's `map_range_through_edits`) is only needed if
+panache starts caching NodePtrs across edits.
+
 ## Parser
 
 ### Parser bugs found by the incremental fuzzer (2026-08)
