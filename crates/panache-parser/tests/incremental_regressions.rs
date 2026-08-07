@@ -9,7 +9,7 @@
 //! They are pinned here because this harness found them, but they were
 //! fixed in the block parser, not in the incremental machinery.
 
-use panache_parser::parser::{fingerprint, parse, parse_incremental_suffix};
+use panache_parser::parser::{fingerprint, parse, parse_incremental_suffix, parse_with_errors};
 
 fn apply_edit(text: &str, old: (usize, usize), insert: &str) -> String {
     let mut out = String::with_capacity(text.len() - (old.1 - old.0) + insert.len());
@@ -65,13 +65,14 @@ fn full_parse_lossless_thematic_break_after_blockquote() {
 }
 
 /// Incremental invariant: the spliced tree must equal a full parse of the
-/// edited text, structurally (fingerprint) and textually.
+/// edited text, structurally (fingerprint), textually, and in its syntax
+/// errors.
 fn check_incremental(before: &str, old_edit: (usize, usize), insert: &str) {
-    let old_tree = parse(before, None);
+    let (old_tree, old_errors) = parse_with_errors(before, None);
     let updated = apply_edit(before, old_edit, insert);
     let new_edit = (old_edit.0, old_edit.0 + insert.len());
-    let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
-    let full = parse(&updated, None);
+    let inc = parse_incremental_suffix(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
+    let (full, full_errors) = parse_with_errors(&updated, None);
     assert_eq!(
         inc.tree.text().to_string(),
         full.text().to_string(),
@@ -82,6 +83,11 @@ fn check_incremental(before: &str, old_edit: (usize, usize), insert: &str) {
         fingerprint(&inc.tree),
         fingerprint(&full),
         "structural divergence (strategy {})",
+        inc.strategy
+    );
+    assert_eq!(
+        inc.errors, full_errors,
+        "syntax errors diverged from full parse (strategy {})",
         inc.strategy
     );
 }

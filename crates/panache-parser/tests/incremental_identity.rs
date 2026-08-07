@@ -9,7 +9,7 @@
 //! these tests fail before the perf regression reaches salsa.
 
 use panache_parser::SyntaxNode;
-use panache_parser::parser::{parse, parse_incremental_suffix};
+use panache_parser::parser::{parse, parse_incremental_suffix, parse_with_errors};
 use rowan::{GreenNode, GreenNodeData, NodeOrToken};
 
 fn apply_edit(text: &str, old: (usize, usize), insert: &str) -> String {
@@ -198,15 +198,16 @@ fn extract_range(marked: &str) -> (String, (usize, usize)) {
 ///    fails when a change silently widens the reparse window (a perf
 ///    regression correctness tests cannot see),
 /// 3. the incremental tree's full `{:#?}` dump equals a from-scratch parse
-///    of the edited text — structural identity, not text equality.
+///    of the edited text — structural identity, not text equality,
+/// 4. the spliced syntax-error vector equals that parse's.
 fn do_check(before_marked: &str, insert: &str, expected_strategy: &str, reparsed_len: usize) {
     let (before, old_edit) = extract_range(before_marked);
     let updated = apply_edit(&before, old_edit, insert);
     let new_edit = (old_edit.0, old_edit.0 + insert.len());
 
-    let old_tree = parse(&before, None);
-    let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
-    let full = parse(&updated, None);
+    let (old_tree, old_errors) = parse_with_errors(&before, None);
+    let inc = parse_incremental_suffix(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
+    let (full, full_errors) = parse_with_errors(&updated, None);
 
     assert_eq!(
         inc.strategy, expected_strategy,
@@ -222,6 +223,10 @@ fn do_check(before_marked: &str, insert: &str, expected_strategy: &str, reparsed
         format!("{:#?}", inc.tree),
         format!("{full:#?}"),
         "incremental tree diverged structurally from full parse"
+    );
+    assert_eq!(
+        inc.errors, full_errors,
+        "incremental syntax errors diverged from full parse"
     );
 }
 

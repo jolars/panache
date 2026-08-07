@@ -10,9 +10,13 @@
 //!    parse of the edited text (in debug builds the in-crate oracle in
 //!    `parser/verify.rs` checks the same invariant before we ever see the
 //!    result; the comparison here also covers release runs).
+//! 3. **Error identity** — its spliced syntax errors equal that parse's.
+//!    Malformed YAML is the only error source there is, so the frontmatter
+//!    and hashpipe snippets carry this half of the invariant.
 //!
-//! Chained batches additionally feed each spliced tree back in as the next
-//! edit's base, mirroring how the LSP chains trees across keystrokes.
+//! Chained batches additionally feed each spliced tree *and its errors* back
+//! in as the next edit's base, mirroring how the LSP chains trees across
+//! keystrokes.
 //!
 //! The generator is a plain LCG (MMIX constants) with fixed per-test seeds:
 //! runs are fully deterministic, and every assertion message carries the
@@ -28,7 +32,9 @@
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use panache_parser::parser::{fingerprint, parse, parse_incremental_suffix};
+use panache_parser::parser::{
+    SyntaxError, fingerprint, parse_incremental_suffix, parse_with_errors,
+};
 
 /// Knuth's MMIX linear congruential generator. Deterministic, dependency-free.
 struct Lcg(u64);
@@ -214,22 +220,23 @@ fn random_edit(rng: &mut Lcg, text: &str) -> ((usize, usize), &'static str) {
 }
 
 /// Apply one edit incrementally against `old_tree` and check the invariants.
-/// Returns the spliced tree so chains can build on it, or `None` when the
-/// case must be skipped because the *full parser* is lossy on the edited
-/// text: with a broken oracle the splice cannot be judged. Every skip prints
-/// its reproducing input, because a skip is a *full-parser* bug worth
-/// minimizing into a red test in `incremental_regressions.rs` (that is where
-/// the refdef-in-list-item reorder, the `---`-after-blockquote marker
+/// Returns the spliced tree and its errors so chains can build on them, or
+/// `None` when the case must be skipped because the *full parser* is lossy on
+/// the edited text: with a broken oracle the splice cannot be judged. Every
+/// skip prints its reproducing input, because a skip is a *full-parser* bug
+/// worth minimizing into a red test in `incremental_regressions.rs` (that is
+/// where the refdef-in-list-item reorder, the `---`-after-blockquote marker
 /// duplication, and the line-block panic came from); when a block-parser fix
 /// lands, the skip counter drops.
 fn check_edit(
     context: &str,
     before: &str,
     old_tree: &panache_parser::SyntaxNode,
+    old_errors: &[SyntaxError],
     old_edit: (usize, usize),
     insert: &str,
     skipped_lossy: &mut usize,
-) -> Option<panache_parser::SyntaxNode> {
+) -> Option<(panache_parser::SyntaxNode, Vec<SyntaxError>)> {
     let updated = apply_edit(before, old_edit, insert);
     let new_edit = (old_edit.0, old_edit.0 + insert.len());
 
@@ -237,17 +244,18 @@ fn check_edit(
     // broken for this input: skip the case and count it. The known
     // instances are pinned as red tests in `incremental_regressions.rs`;
     // a growing skip count on unchanged seeds means a new parser bug.
-    let full = match catch_unwind(AssertUnwindSafe(|| parse(&updated, None))) {
-        Ok(full) => full,
-        Err(_) => {
-            eprintln!(
-                "full parser panicked (known-bug class, skipped): {context}\n  \
+    let (full, full_errors) =
+        match catch_unwind(AssertUnwindSafe(|| parse_with_errors(&updated, None))) {
+            Ok(full) => full,
+            Err(_) => {
+                eprintln!(
+                    "full parser panicked (known-bug class, skipped): {context}\n  \
                  before: {before:?}\n  edit {old_edit:?} insert {insert:?}"
-            );
-            *skipped_lossy += 1;
-            return None;
-        }
-    };
+                );
+                *skipped_lossy += 1;
+                return None;
+            }
+        };
     let round_tripped = full.text().to_string();
     if round_tripped != updated {
         eprintln!(
@@ -261,7 +269,7 @@ fn check_edit(
     // The in-crate debug oracle panics inside the call on divergence; catch
     // it so the failure report carries the reproducing case.
     let outcome = catch_unwind(AssertUnwindSafe(|| {
-        parse_incremental_suffix(&updated, None, old_tree, &[], old_edit, new_edit)
+        parse_incremental_suffix(&updated, None, old_tree, old_errors, old_edit, new_edit)
     }));
     let inc = match outcome {
         Ok(inc) => inc,
@@ -287,17 +295,32 @@ fn check_edit(
         inc.strategy
     );
 
-    Some(inc.tree)
+    assert_eq!(
+        inc.errors, full_errors,
+        "syntax-error divergence ({}): {context}\n  before: {before:?}\n  \
+         edit {old_edit:?} insert {insert:?}\n  after: {updated:?}",
+        inc.strategy
+    );
+
+    Some((inc.tree, inc.errors))
 }
 
 fn fuzz_single_edits(name: &str, text: &str, iters: usize, seed: u64) -> usize {
     let mut rng = Lcg(seed);
     let mut skipped = 0;
-    let old_tree = parse(text, None);
+    let (old_tree, old_errors) = parse_with_errors(text, None);
     for i in 0..iters {
         let (old_edit, insert) = random_edit(&mut rng, text);
         let context = format!("snippet {name}, seed {seed}, single edit #{i}");
-        check_edit(&context, text, &old_tree, old_edit, insert, &mut skipped);
+        check_edit(
+            &context,
+            text,
+            &old_tree,
+            &old_errors,
+            old_edit,
+            insert,
+            &mut skipped,
+        );
     }
     skipped
 }
@@ -307,19 +330,30 @@ fn fuzz_chained_edits(name: &str, text: &str, batches: usize, seed: u64) -> usiz
     let mut skipped = 0;
     for batch in 0..batches {
         let mut current = text.to_string();
-        let mut tree = parse(&current, None);
+        let (mut tree, mut errors) = parse_with_errors(&current, None);
         let chain_len = 2 + rng.below(3);
         for step in 0..chain_len {
             let (old_edit, insert) = random_edit(&mut rng, &current);
             let context =
                 format!("snippet {name}, seed {seed}, batch #{batch}, chain step #{step}");
-            let Some(next) = check_edit(&context, &current, &tree, old_edit, insert, &mut skipped)
-            else {
+            // The spliced errors feed the next step exactly as the spliced
+            // tree does: a chain that reset them to empty would never
+            // exercise the prefix-carry path past its first step.
+            let Some((next_tree, next_errors)) = check_edit(
+                &context,
+                &current,
+                &tree,
+                &errors,
+                old_edit,
+                insert,
+                &mut skipped,
+            ) else {
                 // The chain's text walked into full-parser-lossy territory;
                 // later steps would judge splices against a broken oracle.
                 break;
             };
-            tree = next;
+            tree = next_tree;
+            errors = next_errors;
             current = apply_edit(&current, old_edit, insert);
         }
     }

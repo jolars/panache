@@ -40,25 +40,32 @@ pub fn fingerprint(node: &SyntaxNode) -> String {
 }
 
 /// Debug-build oracle: a successful incremental reparse must equal a full
-/// parse of the same input under the same options.
+/// parse of the same input under the same options -- tree *and* syntax
+/// errors.
 ///
-/// Panics (debug builds only) when the incrementally spliced tree diverges
-/// from a from-scratch parse. Every failure here is an incremental-parser
-/// bug whose fix is a new bail-to-full-parse condition, never a relaxation
-/// of this assert.
+/// Panics (debug builds only) when the incrementally spliced tree or its
+/// error vector diverges from a from-scratch parse. Every failure here is an
+/// incremental-parser bug whose fix is a new bail-to-full-parse condition,
+/// never a relaxation of this assert.
 #[cfg(debug_assertions)]
 pub(crate) fn assert_matches_full_parse(
     result: &super::IncrementalParseResult,
     input: &str,
     options: &crate::options::ParserOptions,
 ) {
-    let full = super::Parser::new(input, options).parse();
+    let (full, full_errors) = super::Parser::new(input, options).parse_with_errors();
     assert_eq!(
         fingerprint(&result.tree),
         fingerprint(&full),
         "incremental reparse (strategy {:?}, reparse_range {:?}) diverged from full parse",
         result.strategy,
         result.reparse_range,
+    );
+    assert_eq!(
+        result.errors, full_errors,
+        "incremental reparse (strategy {:?}, reparse_range {:?}) diverged from full parse \
+         on syntax errors",
+        result.strategy, result.reparse_range,
     );
 }
 
@@ -103,6 +110,25 @@ mod tests {
             strategy: "suffix_window",
         };
         assert_matches_full_parse(&wrong, input, &crate::options::ParserOptions::default());
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "diverged from full parse on syntax errors")]
+    fn oracle_panics_when_only_the_error_vector_diverges() {
+        // Identical tree, dropped error: the shape of a splice that reuses a
+        // prefix without carrying the prefix's errors.
+        let input = "---\ntitle: [\n---\n\nParagraph.\n";
+        let options = crate::options::ParserOptions::default();
+        let (tree, errors) = crate::parser::Parser::new(input, &options).parse_with_errors();
+        assert_eq!(errors.len(), 1, "fixture must have exactly one error");
+        let wrong = IncrementalParseResult {
+            tree,
+            errors: Vec::new(),
+            reparse_range: (0, input.len()),
+            strategy: "suffix_window",
+        };
+        assert_matches_full_parse(&wrong, input, &options);
     }
 
     #[cfg(debug_assertions)]
