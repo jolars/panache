@@ -125,6 +125,47 @@ fn insertion_at_blank_line_after_unterminated_fence() {
     check_incremental("```\ncode\n\npara after\n", (9, 9), "\\");
 }
 
+// Fuzz find: snippet use_before_refdef, tier pandoc, seed 1374497537,
+// batch #43, chain step #1 (minimized). A suffix starting with a lone `:`
+// reaches *backward* across the seam's blank line and promotes the retained
+// paragraph into a definition-list `TERM`; parsed standalone it is only a
+// paragraph, so the splice had two blocks where a full parse has one
+// `DEFINITION_LIST`. Pandoc allows a blank line between term and definition,
+// which is why blank-line separation does not decouple them. Fixed by pairing
+// `last_retained_block_is_paragraph` with
+// `first_nonblank_line_is_definition_marker`.
+#[test]
+fn definition_marker_suffix_after_a_retained_paragraph() {
+    check_incremental("see [x] and [foo] here\n\nmore prose\n", (24, 35), ":");
+}
+
+// The `~` spelling of the same marker, which the list-continuation guard's
+// character set does not cover.
+#[test]
+fn tilde_definition_marker_suffix_after_a_retained_paragraph() {
+    check_incremental("term line\n\nmore prose\n", (11, 22), "~ definition\n");
+}
+
+// Fuzz find: snippet pipe_table, tier pandoc, seed 2654434233, single edit
+// #244 (minimized). The same `:` line after a *table* is that table's
+// caption rather than a definition term, so the retained table grows to
+// swallow the seam.
+#[test]
+fn caption_marker_suffix_after_a_retained_table() {
+    check_incremental("| a | b |\n|---|---|\n| 1 | 2 |\n\npara\n", (31, 35), ":");
+}
+
+// Fuzz find: snippet hr_vs_setext, tier pandoc, seed 1374499073, batch #72
+// (minimized). The mirror image of the two above: `---` is a multiline-table
+// border as well as a thematic break, so suffix content can turn the
+// *retained* rule into the top rule of a table spanning the seam.
+// `prefix_fence_state_is_stable` cannot carry this one -- dash runs are far
+// too common for a parity count -- so the guard is on the retained block kind.
+#[test]
+fn suffix_content_can_reinterpret_a_retained_thematic_break() {
+    check_incremental("- a\n\n---\n\n- b\n", (12, 13), "---\nk: v\n---\n");
+}
+
 // Fuzz find: medium_quarto.qmd, seed 12648174, single edit #15.
 // A 22-byte deletion inside a `:::` callout body (swallowing the
 // `{download="hello.qmd"}` attribute and the line break before the `:::`

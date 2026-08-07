@@ -266,6 +266,14 @@ fn parse_incremental_suffix_inner(
         return full_reparse_result(input, &config);
     }
 
+    // The edit is described in the *old* text's coordinates, so an edit range
+    // past the old tree's end means the caller's tree and text have gone out
+    // of sync. Bail rather than let the offset reach rowan, which panics on a
+    // range it cannot resolve.
+    if old_edit.1 > usize::from(old_tree.text_range().end()) {
+        return full_reparse_result(input, &config);
+    }
+
     // Reference definitions are document-scoped: retained blocks keep the
     // resolution they were parsed with, so an edit that can add, remove, or
     // alter a refdef (or footnote definition) invalidates them at a
@@ -340,6 +348,37 @@ fn parse_incremental_suffix_inner(
     {
         return full_reparse_result(input, &config);
     }
+
+    // Two backward couplings the seam's blank line does not break, because
+    // pandoc permits a blank line in both: a `:`/`~` line after a paragraph
+    // promotes it to a definition-list `TERM`, and the same line after a table
+    // becomes that table's caption. Parsed standalone the suffix is only a
+    // paragraph starting with a colon, so the splice keeps two blocks where a
+    // full parse has one.
+    //
+    // A retained thematic break is the mirror image: `---` is also a
+    // multiline-table border, so suffix content can turn the retained rule into
+    // the top rule of a table that swallows the seam. `prefix_fence_state_is_stable`
+    // cannot carry this one — dash runs are far too common for a parity count.
+    if last_retained_block_kind(old_tree, old_restart)
+        .is_some_and(last_retained_block_absorbs_colon_line)
+        && first_nonblank_line_is_definition_marker(suffix_text)
+    {
+        return full_reparse_result(input, &config);
+    }
+
+    // The mirror image: a bare dash run is a multiline-table rule as well as a
+    // thematic break, and table rules pair across blank lines like a fence. A
+    // dash run retained as a `HORIZONTAL_RULE` can therefore be re-read as the
+    // *top* rule of a table that swallows the seam once the window supplies a
+    // partner. `prefix_fence_state_is_stable` cannot carry this one: dash runs
+    // are far too common for a parity count, so the guard reads the old tree
+    // for a rule that actually parsed as one, and only bails when the window
+    // has a partner to offer.
+    if retained_prefix_has_thematic_break(old_tree, old_restart) && has_dash_rule_line(suffix_text)
+    {
+        return full_reparse_result(input, &config);
+    }
     let (suffix_tree, suffix_errors) = Parser::new(suffix_text, &config).parse_with_errors();
     let Some(errors) = merge_incremental_errors(old_errors, new_restart, suffix_errors) else {
         return full_reparse_result(input, &config);
@@ -389,8 +428,20 @@ fn edit_may_touch_refdefs(
     new_edit: (usize, usize),
 ) -> bool {
     let old_len: usize = old_tree.text_range().end().into();
-    let old_start = old_edit.0.saturating_sub(REFDEF_SCAN_WINDOW);
-    let old_end = old_edit.1.saturating_add(REFDEF_SCAN_WINDOW).min(old_len);
+    // Snap to token boundaries before slicing: a window edge landing inside a
+    // multi-byte token is not a char boundary, and `SyntaxText::slice` panics
+    // on one. Snapping outward also only ever widens the scan, which is the
+    // safe direction for a conservative guard.
+    let old_start = snap_out_to_token_boundary(
+        old_tree,
+        old_edit.0.saturating_sub(REFDEF_SCAN_WINDOW),
+        false,
+    );
+    let old_end = snap_out_to_token_boundary(
+        old_tree,
+        old_edit.1.saturating_add(REFDEF_SCAN_WINDOW).min(old_len),
+        true,
+    );
     if old_start < old_end {
         let old_slice = old_tree
             .text()
@@ -412,6 +463,26 @@ fn edit_may_touch_refdefs(
     let new_start = floor_char_boundary(input, new_start);
     let new_end = floor_char_boundary(input, new_end);
     new_start < new_end && input[new_start..new_end].contains("]:")
+}
+
+/// Move `offset` outward (down when `upward` is false, up when it is true) to
+/// the nearest token edge of `tree`.
+///
+/// Token edges are always char boundaries — a token's text is a whole `str` —
+/// so this is how an arbitrary byte offset is made safe to slice the tree
+/// with, without materializing the document's text.
+fn snap_out_to_token_boundary(tree: &SyntaxNode, offset: usize, upward: bool) -> usize {
+    let len: usize = tree.text_range().end().into();
+    let clamped = offset.min(len);
+    let at = tree.token_at_offset((clamped as u32).into());
+    let snapped = if upward {
+        at.right_biased()
+            .map(|token| usize::from(token.text_range().end()))
+    } else {
+        at.left_biased()
+            .map(|token| usize::from(token.text_range().start()))
+    };
+    snapped.unwrap_or(if upward { len } else { 0 }).min(len)
 }
 
 fn floor_char_boundary(text: &str, mut pos: usize) -> usize {
@@ -490,6 +561,67 @@ fn last_retained_block_can_absorb_marker(old_tree: &SyntaxNode, boundary: usize)
                 SyntaxKind::LIST | SyntaxKind::DEFINITION_LIST | SyntaxKind::BLOCK_QUOTE
             )
         })
+}
+
+/// The kind of the last retained top-level block before `boundary`, ignoring
+/// blank lines.
+fn last_retained_block_kind(old_tree: &SyntaxNode, boundary: usize) -> Option<SyntaxKind> {
+    old_tree
+        .children()
+        .take_while(|child| usize::from(child.text_range().end()) <= boundary)
+        .filter(|child| child.kind() != SyntaxKind::BLANK_LINE)
+        .last()
+        .map(|child| child.kind())
+}
+
+/// Whether a `:`/`~` marker line in the suffix would rewrite the last retained
+/// block: a paragraph becomes a definition-list `TERM`, and a table absorbs
+/// the line as its `TABLE_CAPTION`.
+fn last_retained_block_absorbs_colon_line(kind: SyntaxKind) -> bool {
+    matches!(
+        kind,
+        SyntaxKind::PARAGRAPH
+            | SyntaxKind::SIMPLE_TABLE
+            | SyntaxKind::MULTILINE_TABLE
+            | SyntaxKind::PIPE_TABLE
+            | SyntaxKind::GRID_TABLE
+    )
+}
+
+/// Whether any retained top-level block before `boundary` parsed as a
+/// thematic break — a dash run that a multiline table could claim as a rule.
+fn retained_prefix_has_thematic_break(old_tree: &SyntaxNode, boundary: usize) -> bool {
+    old_tree
+        .children()
+        .take_while(|child| usize::from(child.text_range().end()) <= boundary)
+        .any(|child| child.kind() == SyntaxKind::HORIZONTAL_RULE)
+}
+
+/// Whether `text` has a line that is nothing but a run of three or more
+/// dashes: a multiline-table rule candidate.
+fn has_dash_rule_line(text: &str) -> bool {
+    text.lines().any(|line| {
+        let trimmed = line.trim();
+        trimmed.len() >= 3 && trimmed.bytes().all(|b| b == b'-')
+    })
+}
+
+/// Whether the first non-blank line of `text` is a definition-list marker
+/// line (`:` or `~` followed by space or end of line).
+///
+/// Distinct from [`first_nonblank_line_is_container_marker`] in what it
+/// couples to: a container marker continues an open *container*, while a
+/// definition marker reaches back and rewrites the preceding *paragraph*.
+/// `:::` and `~~~` are fence openers, not markers, so the rest of the run must
+/// not be another delimiter character.
+fn first_nonblank_line_is_definition_marker(text: &str) -> bool {
+    let Some(line) = text.lines().find(|line| !line.trim().is_empty()) else {
+        return false;
+    };
+    let trimmed = line.trim_start();
+    trimmed
+        .strip_prefix([':', '~'])
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with(' ') || rest.starts_with('\t'))
 }
 
 /// Whether the first non-blank line of `text` starts with a marker that
@@ -968,6 +1100,50 @@ mod tests {
     // on one of them manufactures a block a full parse would never produce.
     // Each case is a plausible keystroke: finishing the marker of a
     // frontmatter-shaped block that is not at the document start.
+
+    #[test]
+    fn refdef_guard_survives_a_scan_window_edge_inside_a_multibyte_token() {
+        // Fuzz find (math.qmd, seed 12647662): the refdef guard sliced the old
+        // tree at `edit +/- REFDEF_SCAN_WINDOW`, and an edge landing inside a
+        // multi-byte token is not a char boundary, which `SyntaxText::slice`
+        // panics on. The emoji is placed so that one edge falls inside it.
+        let mut input = String::from("para one\n\n");
+        input.push_str(&"x".repeat(REFDEF_SCAN_WINDOW - 12));
+        input.push_str("\u{2705}\n\npara two\n");
+        let edit_at = input.find("para two").unwrap();
+
+        let (old_tree, old_errors) = parse_with_errors(&input, None);
+        let updated = apply_edit(&input, (edit_at, edit_at + 8), "para three");
+        let inc = parse_incremental_suffix(
+            &updated,
+            None,
+            &old_tree,
+            &old_errors,
+            (edit_at, edit_at + 8),
+            (edit_at, edit_at + 10),
+        );
+        assert_eq!(inc.tree.text().to_string(), updated);
+    }
+
+    #[test]
+    fn incremental_bails_when_the_edit_range_exceeds_the_old_tree() {
+        // A caller whose tree and text have drifted apart hands over an edit
+        // the old tree cannot resolve. The fuzz harness reached this with a
+        // lossy base parse, and rowan turns it into a panic; the parser must
+        // bail instead.
+        let input = "para one\n\npara two\n";
+        let (old_tree, old_errors) = parse_with_errors(input, None);
+        let past_end = usize::from(old_tree.text_range().end()) + 5;
+        let inc = parse_incremental_suffix(
+            input,
+            None,
+            &old_tree,
+            &old_errors,
+            (past_end, past_end + 4),
+            (0, 0),
+        );
+        assert_eq!(inc.strategy, "full_reparse");
+    }
 
     #[test]
     fn suffix_window_must_not_manufacture_a_pandoc_title_block() {

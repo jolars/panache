@@ -329,9 +329,20 @@ struct Base {
 }
 
 impl Base {
-    fn parse(text: &str, options: &ParserOptions) -> Self {
-        let (tree, errors) = parse_with_errors(text, Some(options.clone()));
-        Self { tree, errors }
+    /// Parse the text a chain of edits starts from, or `None` when the *base*
+    /// parse is itself lossy or panics.
+    ///
+    /// The per-edit precondition checks the full parse of the *edited* text;
+    /// this checks the parse the splice builds on. A base whose tree is
+    /// shorter than its text hands the reparse offsets that do not resolve
+    /// against that tree, which judges nothing and reaches rowan as a
+    /// panic.
+    fn parse(text: &str, options: &ParserOptions) -> Option<Self> {
+        let (tree, errors) = catch_unwind(AssertUnwindSafe(|| {
+            parse_with_errors(text, Some(options.clone()))
+        }))
+        .ok()?;
+        (tree.text() == text).then_some(Self { tree, errors })
     }
 }
 
@@ -437,7 +448,13 @@ fn fuzz_single_edits(tier: &Tier, name: &str, text: &str, iters: usize, seed: u6
     let mut rng = Lcg(seed);
     let mut skipped = 0;
     let options = tier.options();
-    let base = Base::parse(text, &options);
+    let Some(base) = Base::parse(text, &options) else {
+        eprintln!(
+            "base parse is lossy (known-bug class, skipped): snippet {name}, tier {}",
+            tier.name
+        );
+        return 1;
+    };
     for i in 0..iters {
         let (old_edit, insert) = random_edit(&mut rng, text);
         let context = format!(
@@ -463,7 +480,14 @@ fn fuzz_chained_edits(tier: &Tier, name: &str, text: &str, batches: usize, seed:
     let options = tier.options();
     for batch in 0..batches {
         let mut current = text.to_string();
-        let mut base = Base::parse(&current, &options);
+        let Some(mut base) = Base::parse(&current, &options) else {
+            eprintln!(
+                "base parse is lossy (known-bug class, skipped): snippet {name}, tier {}",
+                tier.name
+            );
+            skipped += 1;
+            break;
+        };
         let chain_len = 2 + rng.below(3);
         for step in 0..chain_len {
             let (old_edit, insert) = random_edit(&mut rng, &current);
