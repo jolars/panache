@@ -1,5 +1,51 @@
 # Changelog
 
+## [3.3.0](https://github.com/jolars/panache/compare/v3.2.0...v3.3.0) (2026-08-07)
+
+### Features
+- **linter:** add `reversed-footnote-marker` rule ([`1487eca`](https://github.com/jolars/panache/commit/1487ecaea8ed15fd1d094f709505c059027f0e98)), closes [#460](https://github.com/jolars/panache/issues/460)
+- **linter:** add `badness` external linter for LaTeX ([`86f9059`](https://github.com/jolars/panache/commit/86f9059561b32819c58278baca50e61fd4295a17))
+- **cli:** suppress `format --check` diff under `--quiet` ([`688cd5f`](https://github.com/jolars/panache/commit/688cd5ff3a35b6d01fccbd30cc2bb2397c46a8cc))
+- **parser:** decode entities in HTML attributes ([`88103d6`](https://github.com/jolars/panache/commit/88103d64871ad4767916546c529f5f38c8f72eda))
+
+### Bug Fixes
+- **parser:** gobble a footnote body's indent ([`6ec04f5`](https://github.com/jolars/panache/commit/6ec04f57851382e2c0c356a6dbac3c3598e8529d))
+- **parser:** gobble a definition body's indent ([`f7cdf8a`](https://github.com/jolars/panache/commit/f7cdf8a21c45328c7801c2a247c9623760b47133))
+- **parser:** expand a code span's tabs by source column ([`33a5e4a`](https://github.com/jolars/panache/commit/33a5e4a8d02d722e150c055f2454c81382a3fcd0))
+- **parser:** gobble a list item's continuation indent ([`42429b0`](https://github.com/jolars/panache/commit/42429b0bb70df7b721b52496fd8bde50790f881b))
+- **linter:** make `missing-bibliography-key` more precise ([`362d183`](https://github.com/jolars/panache/commit/362d18317e6a10129b35df7733595519106a0401))
+- **parser:** keep an over-indented fence lazy ([`00f5f44`](https://github.com/jolars/panache/commit/00f5f441fb7a104e77b64602863e652c8c2e2e73))
+- strip a fenced block's own indent from its payload ([`290e3ab`](https://github.com/jolars/panache/commit/290e3abb1f04dbad29451c3abe70aa6a6f8738e0))
+- **formatter:** drop a quoted fence's container indent ([`a7d4d4c`](https://github.com/jolars/panache/commit/a7d4d4c490d1d79a7772134a0ea3273855daaef6))
+- **parser:** open a lazy fence in a quoted list item ([`ee3167c`](https://github.com/jolars/panache/commit/ee3167ceb37acc3631acc9d723ef45f3482ed740))
+- **parser:** strip container prefix from code payloads ([`e31f0b9`](https://github.com/jolars/panache/commit/e31f0b9489619d24783ddb4642d7c6f79bafe084))
+- **parser:** loosen a list on a para-breaking block ([`fc14e4f`](https://github.com/jolars/panache/commit/fc14e4f826da2d5d22a582f7f66c484e7042eeaf))
+- **parser:** gobble every lazy line in a blockquote ([`354eafe`](https://github.com/jolars/panache/commit/354eafe33086cc0a101e89b085b5760cb999767c))
+- **parser:** open a line block on a list-marker line ([`5f55d89`](https://github.com/jolars/panache/commit/5f55d89ab91d29ebfa41a9facf6fb469ed05e1ed))
+- **parser:** fold an indented line-block marker ([`e564273`](https://github.com/jolars/panache/commit/e56427397b26ff6d67def2fca15d7b6629b278c6))
+- **parser:** gate the setext-after-setext escape ([`729098f`](https://github.com/jolars/panache/commit/729098f4c0a2055560e4a0df39ac2a4f6dbcd098))
+- **parser:** fold a lazy line into its blockquote ([`03d1339`](https://github.com/jolars/panache/commit/03d13398d0ead663bad983b7e02ef6e8e6d38575))
+- **parser:** fold a lazy line into its line block ([`7d732b9`](https://github.com/jolars/panache/commit/7d732b91ab4cecb48d6868edb73d78c0b7b6bf5c))
+- **formatter:** keep a line block inside its blockquote ([`8bdf53c`](https://github.com/jolars/panache/commit/8bdf53cbed1f296c3e978cbfeb87903facb5b560))
+- **formatter:** indent a line block inside a list item ([`35db18a`](https://github.com/jolars/panache/commit/35db18a5e8e2d135355355524057b2cd0e2ed1cc))
+- **parser:** keep a quoted definition list intact ([`b361fe0`](https://github.com/jolars/panache/commit/b361fe04a4377ea0c1f5861e687d735e8b3aa82e))
+- **parser:** accept a pipe table with no body rows ([`070f20a`](https://github.com/jolars/panache/commit/070f20a5981bcea6689ac7d02a3f37533d70f717))
+- **parser:** cap blockquote depth by registry rank ([`fcc0f9f`](https://github.com/jolars/panache/commit/fcc0f9f4ca87d8b277654eb0f3c30f2109aee9e4))
+- **parser:** apply the setext same-container rule to pandoc ([`489510e`](https://github.com/jolars/panache/commit/489510e4059922aa234e04df20a3beee1af5ad30))
+- **parser:** count underline markers on the raw line ([`7f9e9c3`](https://github.com/jolars/panache/commit/7f9e9c3a91b25af5b3e04d342aeb1e0e4bfafca1))
+- **parser:** let the registry's verdict outrank `>` count ([`5d97a32`](https://github.com/jolars/panache/commit/5d97a32b2fc4f1d2e172fded2e0ee1dfa3d9a8a0))
+- **parser:** keep div opener whitespace before label ([`864cc90`](https://github.com/jolars/panache/commit/864cc903e6625b48e93f5e8e693596b3540dfa3f))
+- **parser:** stop dropping surplus display-math dollars ([`33b6404`](https://github.com/jolars/panache/commit/33b64047b5e39f53f46602942234c61e36d95ec3))
+- **parser:** keep `:::` openers from interrupting list items ([`37d95e1`](https://github.com/jolars/panache/commit/37d95e1106bcde0f6e20588f167bec6268f7128f))
+- **parser:** match line-block peek to emitted prefix ([`f7d50ee`](https://github.com/jolars/panache/commit/f7d50eeb7b2889072e2b0fa2a5e793457353c768))
+- **parser:** emit blockquote setext from stripped lines ([`985aba2`](https://github.com/jolars/panache/commit/985aba26f812dbb2a75a4d1129a1a5ca13b2d79b))
+- **parser:** let setext claim a quoted line at top level ([`c60043c`](https://github.com/jolars/panache/commit/c60043cb290958c9d7c7a2bd0dd6a2826f4cb024))
+- **parser:** keep refdefs from interrupting list items ([`6f36287`](https://github.com/jolars/panache/commit/6f3628743614dfdbbb078e2161284c21c18ca469))
+
+### Dependencies
+- updated crates/panache-formatter to v0.20.5
+- updated crates/panache-parser to v0.25.0
+
 ## [3.2.0](https://github.com/jolars/panache/compare/v3.1.0...v3.2.0) (2026-08-05)
 
 ### Features

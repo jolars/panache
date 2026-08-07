@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.20.5](https://github.com/jolars/panache/compare/panache-formatter-v0.20.4...panache-formatter-v0.20.5) (2026-08-07)
+
+### Bug Fixes
+- strip a fenced block's own indent from its payload ([`290e3ab`](https://github.com/jolars/panache/commit/290e3abb1f04dbad29451c3abe70aa6a6f8738e0))
+- **formatter:** drop a quoted fence's container indent ([`a7d4d4c`](https://github.com/jolars/panache/commit/a7d4d4c490d1d79a7772134a0ea3273855daaef6))
+- **parser:** open a line block on a list-marker line ([`5f55d89`](https://github.com/jolars/panache/commit/5f55d89ab91d29ebfa41a9facf6fb469ed05e1ed))
+- **parser:** fold a lazy line into its line block ([`7d732b9`](https://github.com/jolars/panache/commit/7d732b91ab4cecb48d6868edb73d78c0b7b6bf5c))
+- **formatter:** keep a line block inside its blockquote ([`8bdf53c`](https://github.com/jolars/panache/commit/8bdf53cbed1f296c3e978cbfeb87903facb5b560))
+- **formatter:** indent a line block inside a list item ([`35db18a`](https://github.com/jolars/panache/commit/35db18a5e8e2d135355355524057b2cd0e2ed1cc))
+
+### Dependencies
+- updated crates/panache-parser to v0.25.0
+
 ## [0.20.4](https://github.com/jolars/panache/compare/panache-formatter-v0.20.3...panache-formatter-v0.20.4) (2026-08-05)
 
 ### Bug Fixes

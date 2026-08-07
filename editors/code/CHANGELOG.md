@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.3.0](https://github.com/jolars/panache/compare/panache-code-v3.2.0...panache-code-v3.3.0) (2026-08-07)
+
+### Dependencies
+- updated panache to v3.3.0
+
 ## [3.2.0](https://github.com/jolars/panache/compare/panache-code-v3.1.0...panache-code-v3.2.0) (2026-08-05)
 
 ### Dependencies
