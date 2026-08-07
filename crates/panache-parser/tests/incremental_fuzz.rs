@@ -35,6 +35,79 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use panache_parser::parser::{
     SyntaxError, fingerprint, parse_incremental_suffix, parse_with_errors,
 };
+use panache_parser::{Dialect, Extensions, Flavor, ParserOptions};
+
+/// One parser-option configuration to fuzz under, with its share of the
+/// per-snippet budget.
+struct Tier {
+    name: &'static str,
+    flavor: Flavor,
+    /// Single edits per snippet.
+    singles: usize,
+    /// Chained batches per snippet.
+    batches: usize,
+    /// Single edits per real corpus document (0 = skip that corpus).
+    real_docs: usize,
+}
+
+impl Tier {
+    fn options(&self) -> ParserOptions {
+        ParserOptions {
+            flavor: self.flavor,
+            extensions: Extensions::for_flavor(self.flavor),
+            dialect: Dialect::for_flavor(self.flavor),
+            ..Default::default()
+        }
+    }
+}
+
+/// The option tiers, chosen for *reach* rather than popularity — each brings
+/// a hazard the others cannot express:
+///
+/// - `Pandoc` is the default and the baseline, and the only tier with
+///   `pandoc_title_block`;
+/// - `Gfm` is the CommonMark-dialect flavor that still enables
+///   `yaml_metadata_block`, so it is the one that can reach the
+///   mid-document-YAML refusal (plain `CommonMark` leaves the extension off
+///   and cannot);
+/// - `Quarto` brings hashpipe `#|` YAML, the only source of syntax errors
+///   besides frontmatter;
+/// - `MultiMarkdown` brings `mmd_title_block`.
+///
+/// The budgets **split** the old pandoc-only per-snippet counts rather than
+/// multiplying them, so a default `cargo test` costs about what it did
+/// before. `PANACHE_FUZZ_ITERS` multiplies every tier together, so the
+/// graduation gate exercises all four deeply.
+const TIERS: &[Tier] = &[
+    Tier {
+        name: "pandoc",
+        flavor: Flavor::Pandoc,
+        singles: 80,
+        batches: 12,
+        real_docs: 12,
+    },
+    Tier {
+        name: "gfm",
+        flavor: Flavor::Gfm,
+        singles: 30,
+        batches: 5,
+        real_docs: 0,
+    },
+    Tier {
+        name: "quarto",
+        flavor: Flavor::Quarto,
+        singles: 30,
+        batches: 5,
+        real_docs: 8,
+    },
+    Tier {
+        name: "multimarkdown",
+        flavor: Flavor::MultiMarkdown,
+        singles: 20,
+        batches: 3,
+        real_docs: 0,
+    },
+];
 
 /// Knuth's MMIX linear congruential generator. Deterministic, dependency-free.
 struct Lcg(u64);
@@ -106,6 +179,15 @@ const INSERTS: &[&str] = &[
     "-->",
     "α",
     "παρά",
+    // Document-start-only shapes: a window is parsed standalone, so its first
+    // line is a document's first line to the block dispatcher.
+    "%",
+    "% Title\n",
+    ":",
+    "Key: value\n",
+    "---\nk: v\n---\n",
+    // Hashpipe with malformed YAML: the only error source besides frontmatter.
+    "#| echo: [\n",
 ];
 
 /// Hand-written hazard snippets. Each comment names the trap the snippet
@@ -185,6 +267,26 @@ const HAZARD_SNIPPETS: &[(&str, &str)] = &[
         "atx_sections",
         "# One\n\nbody one\n\n## Two\n\nbody two\n\n# Three\n\nbody three\n",
     ),
+    // Pandoc `%` title block: recognized only on the document's first line,
+    // so a window starting on one manufactures it.
+    ("pandoc_title", "% Title\n% Author\n% Date\n\nbody para\n"),
+    // Same trap for MultiMarkdown's `Key: Value` title block.
+    ("mmd_title", "Title: Doc\nAuthor: Me\n\nbody para\n"),
+    // A frontmatter-shaped block in the *body*: pandoc metadata, but a
+    // thematic break plus a setext heading under CommonMark-family dialects.
+    (
+        "mid_document_yaml",
+        "intro para\n\n---\nkey: value\n---\n\ntail para\n",
+    ),
+    // Malformed frontmatter: puts a syntax error in the retained prefix, so
+    // the splice must carry it rather than re-derive it.
+    ("bad_frontmatter", "---\ntitle: [\n---\n\nbody para\n"),
+    // Hashpipe options: a second error site, and one that can sit anywhere in
+    // the document rather than only at its start.
+    (
+        "hashpipe",
+        "intro\n\n```{r}\n#| echo: false\n1 + 1\n```\n\ntail\n",
+    ),
 ];
 
 fn iterations(default: usize) -> usize {
@@ -219,7 +321,21 @@ fn random_edit(rng: &mut Lcg, text: &str) -> ((usize, usize), &'static str) {
     ((start, end), insert)
 }
 
-/// Apply one edit incrementally against `old_tree` and check the invariants.
+/// The parse a splice builds on: the previous tree and the syntax errors that
+/// go with it. Chains carry both forward, because both are spliced.
+struct Base {
+    tree: panache_parser::SyntaxNode,
+    errors: Vec<SyntaxError>,
+}
+
+impl Base {
+    fn parse(text: &str, options: &ParserOptions) -> Self {
+        let (tree, errors) = parse_with_errors(text, Some(options.clone()));
+        Self { tree, errors }
+    }
+}
+
+/// Apply one edit incrementally against `base` and check the invariants.
 /// Returns the spliced tree and its errors so chains can build on them, or
 /// `None` when the case must be skipped because the *full parser* is lossy on
 /// the edited text: with a broken oracle the splice cannot be judged. Every
@@ -231,12 +347,13 @@ fn random_edit(rng: &mut Lcg, text: &str) -> ((usize, usize), &'static str) {
 fn check_edit(
     context: &str,
     before: &str,
-    old_tree: &panache_parser::SyntaxNode,
-    old_errors: &[SyntaxError],
+    options: &ParserOptions,
+    base: &Base,
     old_edit: (usize, usize),
     insert: &str,
     skipped_lossy: &mut usize,
-) -> Option<(panache_parser::SyntaxNode, Vec<SyntaxError>)> {
+) -> Option<Base> {
+    let (old_tree, old_errors) = (&base.tree, &base.errors[..]);
     let updated = apply_edit(before, old_edit, insert);
     let new_edit = (old_edit.0, old_edit.0 + insert.len());
 
@@ -244,18 +361,19 @@ fn check_edit(
     // broken for this input: skip the case and count it. The known
     // instances are pinned as red tests in `incremental_regressions.rs`;
     // a growing skip count on unchanged seeds means a new parser bug.
-    let (full, full_errors) =
-        match catch_unwind(AssertUnwindSafe(|| parse_with_errors(&updated, None))) {
-            Ok(full) => full,
-            Err(_) => {
-                eprintln!(
-                    "full parser panicked (known-bug class, skipped): {context}\n  \
+    let (full, full_errors) = match catch_unwind(AssertUnwindSafe(|| {
+        parse_with_errors(&updated, Some(options.clone()))
+    })) {
+        Ok(full) => full,
+        Err(_) => {
+            eprintln!(
+                "full parser panicked (known-bug class, skipped): {context}\n  \
                  before: {before:?}\n  edit {old_edit:?} insert {insert:?}"
-                );
-                *skipped_lossy += 1;
-                return None;
-            }
-        };
+            );
+            *skipped_lossy += 1;
+            return None;
+        }
+    };
     let round_tripped = full.text().to_string();
     if round_tripped != updated {
         eprintln!(
@@ -269,7 +387,14 @@ fn check_edit(
     // The in-crate debug oracle panics inside the call on divergence; catch
     // it so the failure report carries the reproducing case.
     let outcome = catch_unwind(AssertUnwindSafe(|| {
-        parse_incremental_suffix(&updated, None, old_tree, old_errors, old_edit, new_edit)
+        parse_incremental_suffix(
+            &updated,
+            Some(options.clone()),
+            old_tree,
+            old_errors,
+            old_edit,
+            new_edit,
+        )
     }));
     let inc = match outcome {
         Ok(inc) => inc,
@@ -302,21 +427,28 @@ fn check_edit(
         inc.strategy
     );
 
-    Some((inc.tree, inc.errors))
+    Some(Base {
+        tree: inc.tree,
+        errors: inc.errors,
+    })
 }
 
-fn fuzz_single_edits(name: &str, text: &str, iters: usize, seed: u64) -> usize {
+fn fuzz_single_edits(tier: &Tier, name: &str, text: &str, iters: usize, seed: u64) -> usize {
     let mut rng = Lcg(seed);
     let mut skipped = 0;
-    let (old_tree, old_errors) = parse_with_errors(text, None);
+    let options = tier.options();
+    let base = Base::parse(text, &options);
     for i in 0..iters {
         let (old_edit, insert) = random_edit(&mut rng, text);
-        let context = format!("snippet {name}, seed {seed}, single edit #{i}");
+        let context = format!(
+            "snippet {name}, tier {}, seed {seed}, single edit #{i}",
+            tier.name
+        );
         check_edit(
             &context,
             text,
-            &old_tree,
-            &old_errors,
+            &options,
+            &base,
             old_edit,
             insert,
             &mut skipped,
@@ -325,25 +457,28 @@ fn fuzz_single_edits(name: &str, text: &str, iters: usize, seed: u64) -> usize {
     skipped
 }
 
-fn fuzz_chained_edits(name: &str, text: &str, batches: usize, seed: u64) -> usize {
+fn fuzz_chained_edits(tier: &Tier, name: &str, text: &str, batches: usize, seed: u64) -> usize {
     let mut rng = Lcg(seed);
     let mut skipped = 0;
+    let options = tier.options();
     for batch in 0..batches {
         let mut current = text.to_string();
-        let (mut tree, mut errors) = parse_with_errors(&current, None);
+        let mut base = Base::parse(&current, &options);
         let chain_len = 2 + rng.below(3);
         for step in 0..chain_len {
             let (old_edit, insert) = random_edit(&mut rng, &current);
-            let context =
-                format!("snippet {name}, seed {seed}, batch #{batch}, chain step #{step}");
+            let context = format!(
+                "snippet {name}, tier {}, seed {seed}, batch #{batch}, chain step #{step}",
+                tier.name
+            );
             // The spliced errors feed the next step exactly as the spliced
             // tree does: a chain that reset them to empty would never
             // exercise the prefix-carry path past its first step.
-            let Some((next_tree, next_errors)) = check_edit(
+            let Some(next) = check_edit(
                 &context,
                 &current,
-                &tree,
-                &errors,
+                &options,
+                &base,
                 old_edit,
                 insert,
                 &mut skipped,
@@ -352,30 +487,46 @@ fn fuzz_chained_edits(name: &str, text: &str, batches: usize, seed: u64) -> usiz
                 // later steps would judge splices against a broken oracle.
                 break;
             };
-            tree = next_tree;
-            errors = next_errors;
+            base = next;
             current = apply_edit(&current, old_edit, insert);
         }
     }
     skipped
 }
 
+/// Per-tier seed: the tier index must participate, or every tier would
+/// replay the identical edit sequence and the extra work would buy nothing.
+fn seed(base: u64, snippet_index: usize, tier_index: usize) -> u64 {
+    base ^ ((snippet_index as u64) << 8) ^ ((tier_index as u64) << 24)
+}
+
 #[test]
 fn hazard_snippets_single_edits() {
-    let iters = iterations(200);
     let mut skipped = 0;
-    for (index, (name, text)) in HAZARD_SNIPPETS.iter().enumerate() {
-        skipped += fuzz_single_edits(name, text, iters, 0x9E3779B9 ^ (index as u64) << 8);
+    for (tier_index, tier) in TIERS.iter().enumerate() {
+        let iters = iterations(tier.singles);
+        for (index, (name, text)) in HAZARD_SNIPPETS.iter().enumerate() {
+            skipped +=
+                fuzz_single_edits(tier, name, text, iters, seed(0x9E3779B9, index, tier_index));
+        }
     }
     eprintln!("single edits: skipped {skipped} cases with a lossy full parse");
 }
 
 #[test]
 fn hazard_snippets_chained_edits() {
-    let batches = iterations(30);
     let mut skipped = 0;
-    for (index, (name, text)) in HAZARD_SNIPPETS.iter().enumerate() {
-        skipped += fuzz_chained_edits(name, text, batches, 0x51ED2701 ^ (index as u64) << 8);
+    for (tier_index, tier) in TIERS.iter().enumerate() {
+        let batches = iterations(tier.batches);
+        for (index, (name, text)) in HAZARD_SNIPPETS.iter().enumerate() {
+            skipped += fuzz_chained_edits(
+                tier,
+                name,
+                text,
+                batches,
+                seed(0x51ED2701, index, tier_index),
+            );
+        }
     }
     eprintln!("chained edits: skipped {skipped} cases with a lossy full parse");
 }
@@ -384,19 +535,29 @@ fn hazard_snippets_chained_edits() {
 /// random edits at random offsets. Iteration counts are low by default
 /// (each check costs multiple full parses of a large document); scale with
 /// `PANACHE_FUZZ_ITERS` for the graduation gate.
+///
+/// The corpus is `.qmd`, so only the tiers that would actually be used on it
+/// (`pandoc`, `quarto`) get a budget here; the option holes the other tiers
+/// exist for are covered by the hazard snippets, which are cheap.
 #[test]
 fn real_documents_random_edits() {
     let docs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benches/documents");
     let names = ["small.qmd", "medium_quarto.qmd", "tables.qmd", "math.qmd"];
-    let iters = iterations(20);
     let mut skipped = 0;
-    for (index, name) in names.iter().enumerate() {
-        let path = docs_dir.join(name);
-        let Ok(text) = std::fs::read_to_string(&path) else {
-            eprintln!("skipping absent corpus document {}", path.display());
+    for (tier_index, tier) in TIERS.iter().enumerate() {
+        if tier.real_docs == 0 {
             continue;
-        };
-        skipped += fuzz_single_edits(name, &text, iters, 0xC0FFEE ^ (index as u64) << 8);
+        }
+        let iters = iterations(tier.real_docs);
+        for (index, name) in names.iter().enumerate() {
+            let path = docs_dir.join(name);
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                eprintln!("skipping absent corpus document {}", path.display());
+                continue;
+            };
+            skipped +=
+                fuzz_single_edits(tier, name, &text, iters, seed(0xC0FFEE, index, tier_index));
+        }
     }
     eprintln!("real documents: skipped {skipped} cases with a lossy full parse");
 }
