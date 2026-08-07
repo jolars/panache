@@ -64,6 +64,29 @@ fn full_parse_lossless_thematic_break_after_blockquote() {
     assert_full_parse_lossless("> a\n---\nb\n");
 }
 
+// Fuzz finds: snippets mid_document_yaml / hashpipe / fenced_code, pandoc and
+// quarto tiers (minimized). A setext underline directly after a setext
+// heading takes the `follows_setext_heading` escape in
+// `SetextHeadingParser::detect_prepared` and returns `Yes` while the next
+// paragraph is still buffered, which breaks the block-dispatch contract at
+// `core.rs`: the heading is emitted *before* the buffered bytes, reordering
+// the CST. Debug builds trip the contract's `debug_assert!`; release builds
+// silently produce the reordering, so both shapes are pinned as losslessness
+// failures. Pandoc-dialect only -- CommonMark folds the open paragraph into
+// the heading instead. Not an incremental bug; needs the detector to return
+// `YesCanInterrupt` (which flushes the buffers) or to gate itself.
+#[test]
+#[ignore = "known full-parser bug: setext-after-setext breaks the open-paragraph contract"]
+fn full_parse_lossless_setext_underline_after_setext_heading() {
+    assert_full_parse_lossless("a\nb\n---\nc\n---\n");
+}
+
+#[test]
+#[ignore = "known full-parser bug: setext-after-setext breaks the open-paragraph contract"]
+fn full_parse_lossless_setext_pair_after_unterminated_fence() {
+    assert_full_parse_lossless("```\nx\n---\ny\n---\n");
+}
+
 /// Incremental invariant: the spliced tree must equal a full parse of the
 /// edited text, structurally (fingerprint), textually, and in its syntax
 /// errors.
