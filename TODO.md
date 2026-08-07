@@ -181,35 +181,16 @@ records any deviation or discovered follow-up as an indented bullet under the
 phase. Never leave a phase half-landed: partial work is noted in the status line
 with the exact next step.
 
-**Current status / next step:** Phases 1--2 done; fuzz harness clean at 30x
-iterations. Phase 3 partially done ahead of schedule (see its bullet); next step
-is the remainder of Phase 3: error carrying in `IncrementalParseResult` plus the
-three-bucket merge, error equality in the oracle and fuzz harness, and
-error-matrix tests. The host-level refdef-set comparison folds into Phase 4.
+**Current status / next step:** Phases 1--3 done; fuzz harness clean at 30x
+iterations across all four option tiers, errors included. Next step is Phase 4
+(salsa unification), whose entry criteria are met: the reparse now carries
+errors, so `parsed_document` has something to return. The host-level refdef-set
+comparison is Phase 4 work.
 
-The five full-parser bugs the fuzzer found were fixed on `main` and this branch
-rebased on top, so `incremental_regressions.rs` has no ignored tests left; what
-the harness still trips over is tracked in the Parser section below. Two
-findings to fold into Phase 3 when it is picked up:
-
-- Phase 3 must add a **document-start-only construct guard**. A window is parsed
-  as a standalone document, so `at_document_start` is true at its first line and
-  three constructs can be manufactured that a full parse would never produce:
-  mid-document YAML metadata under `Dialect::CommonMark` (`block_dispatcher.rs`,
-  the `!at_document_start && dialect == CommonMark` refusal), pandoc `%` title
-  blocks, and MultiMarkdown title blocks. The YAML one is directly
-  error-relevant --- a spurious metadata block manufactures spurious YAML
-  errors, and YAML is the only source of `SyntaxError` there is. The default
-  fuzz tier is pandoc-flavored and cannot reach any of them, so parameterize the
-  harness over parser options (commonmark + quarto tiers) while adding the
-  guards.
-
-- The error merge is simpler than the RA three-bucket recipe: both strategies
-  parse their window to EOF and both window starts are `<= edit.0`, so the seam
-  offset is identical in the old and new text. That leaves "prefix errors with
-  `end <= seam`, kept verbatim" ++ "window errors shifted by `+seam`", with the
-  straddling bucket a `debug_assert!`. The real third bucket only appears with
-  the bounded region tier in Phase 8 --- say so in the module doc.
+`incremental_regressions.rs` carries no ignored *incremental* tests; the two
+`#[ignore]`d tests there pin one full-parser bug (setext-after-setext), tracked
+and fixed on `main` like the five the fuzzer found earlier. They go green when
+this branch rebases onto that fix.
 
 - [x] Phase 1: oracle --- `pub fn fingerprint` + debug
   `assert_matches_full_parse` on every non-fallback reparse; RA-style
@@ -244,10 +225,46 @@ findings to fold into Phase 3 when it is picked up:
     standalone window parse is untrustworthy) and re-adopts the old suffix
     children only on structural equality, else degrades to a suffix splice.
 
-- [ ] Phase 3: refdef-set-change guard (cheap bail to full parse); error
+- [x] Phase 3: refdef-set-change guard (cheap bail to full parse); error
   carrying in the incremental result + three-bucket merge (RA recipe);
   oracle/fuzz extended to error equality; un-ignore red tests; error-matrix
   tests {unchanged/fixed/introduced} x strategy.
+  - The merge has **two** buckets, not RA's three, as predicted when the phase
+    was scoped: both strategies parse their window to EOF and both window starts
+    are `<= edit.0`, where `map_old_offset_to_new` is the identity, so the seam
+    sits at the same offset in the old and new text and nothing can straddle it.
+    That case is a `debug_assert!` plus a bail. The real third bucket waits for
+    the bounded region tier in Phase 8; the module doc says so.
+  - `parse_incremental_suffix[_with_refdefs]` gained an `old_errors` parameter
+    (the shape Phase 4's `reparse` already wanted), and `DocumentState` carries
+    the errors beside its tree so `did_change` can feed the prefix's share to
+    the next reparse. Both retire with `DocumentState.tree` in Phase 4. The LSP
+    still serves diagnostics from salsa's independent full parse, so this is
+    plumbing for the oracle, not a behavior change.
+  - The **document-start-only construct guard** landed as a cheap textual bail
+    on the window's first line (pandoc `%` title block, MultiMarkdown title
+    block, CommonMark-dialect `---`). Splitting "byte 0 of the document" from
+    "blank-line separated fragment start" in `BlockContext` is the principled
+    fix and belongs with Phase 8 --- every other `at_document_start` consumer is
+    `||`-ed with `has_blank_before`, which the seam guard already guarantees.
+  - The fuzz harness runs four option tiers (pandoc, gfm, quarto,
+    multimarkdown), chosen for reach: plain `commonmark` leaves
+    `yaml_metadata_block` off and cannot reach the mid-document-YAML hazard at
+    all, so `gfm` carries it. Budgets **split** the old pandoc-only counts
+    rather than multiplying them, so a default `cargo test` costs about what it
+    did before; `PANACHE_FUZZ_ITERS` scales every tier together.
+  - The tiers found four more splice bugs, all fixed with regression tests:
+    definition-marker and table-caption lines reaching back across the seam, a
+    retained thematic break re-read as a multiline-table rule, a refdef-guard
+    slice landing inside a multi-byte token, and an `old_edit` past the old
+    tree's end. The last two were rowan panics, not divergences. The harness now
+    also checks that the *base* parse round-trips, not only the parse of the
+    edited text.
+  - Nothing to un-ignore: the earlier red tests were fixed on `main` before the
+    phase started. The tiers did surface one *new* full-parser bug
+    (setext-after-setext), pinned `#[ignore]`d here and tracked on `main` under
+    "Parser bugs found by the incremental fuzzer", where the fix belongs; it is
+    not an incremental bug.
 
 - [ ] Phase 4: salsa unification --- reparse moves into `parsed_document` with a
   side-channel reparse base (fatou model, no staged edit chain: whole-text
