@@ -98,6 +98,7 @@ mod tests {
         let input = "# Title\n\nParagraph.\n";
         let wrong = IncrementalParseResult {
             tree: parse("# Title\n\n> quoted\n", None),
+            errors: Vec::new(),
             reparse_range: (0, input.len()),
             strategy: "suffix_window",
         };
@@ -111,6 +112,7 @@ mod tests {
         let options = crate::options::ParserOptions::default();
         let result = IncrementalParseResult {
             tree: crate::parser::Parser::new(input, &options).parse(),
+            errors: Vec::new(),
             reparse_range: (0, input.len()),
             strategy: "suffix_window",
         };

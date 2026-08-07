@@ -18,6 +18,13 @@ pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
     panache_parser::parser::parse(input, parser_config)
 }
 
+/// Parse, also returning the embedded-sublanguage syntax errors (host-ranged
+/// malformed YAML). See [`panache_parser::parser::parse_with_errors`].
+pub fn parse_with_errors(input: &str, config: Option<Config>) -> (SyntaxNode, Vec<SyntaxError>) {
+    let parser_config = config.map(|c| c.parser_options());
+    panache_parser::parser::parse_with_errors(input, parser_config)
+}
+
 /// Parse with a caller-supplied refdef set, skipping the
 /// `collect_refdef_labels` scan. See
 /// [`panache_parser::parse_with_refdefs`].
@@ -42,6 +49,7 @@ pub fn parse_incremental_suffix(
     input: &str,
     config: Option<Config>,
     old_tree: &SyntaxNode,
+    old_errors: &[SyntaxError],
     old_edit_range: (usize, usize),
     new_edit_range: (usize, usize),
 ) -> IncrementalParseResult {
@@ -50,6 +58,7 @@ pub fn parse_incremental_suffix(
         input,
         parser_config,
         old_tree,
+        old_errors,
         old_edit_range,
         new_edit_range,
     )
@@ -62,6 +71,7 @@ pub fn parse_incremental_suffix_with_refdefs(
     config: Option<Config>,
     refdefs: RefdefMap,
     old_tree: &SyntaxNode,
+    old_errors: &[SyntaxError],
     old_edit_range: (usize, usize),
     new_edit_range: (usize, usize),
 ) -> IncrementalParseResult {
@@ -71,6 +81,7 @@ pub fn parse_incremental_suffix_with_refdefs(
         parser_config,
         refdefs,
         old_tree,
+        old_errors,
         old_edit_range,
         new_edit_range,
     )

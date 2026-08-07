@@ -261,7 +261,7 @@ fn check_edit(
     // The in-crate debug oracle panics inside the call on divergence; catch
     // it so the failure report carries the reproducing case.
     let outcome = catch_unwind(AssertUnwindSafe(|| {
-        parse_incremental_suffix(&updated, None, old_tree, old_edit, new_edit)
+        parse_incremental_suffix(&updated, None, old_tree, &[], old_edit, new_edit)
     }));
     let inc = match outcome {
         Ok(inc) => inc,

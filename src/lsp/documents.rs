@@ -23,7 +23,7 @@ use super::conversions::{apply_content_change, apply_content_change_with_edit_ra
 use super::global_state::GlobalState;
 use super::uri_ext::UriExt;
 use crate::lsp::DocumentState;
-use crate::parser::{parse_incremental_suffix_with_refdefs, parse_with_refdefs};
+use crate::parser::{parse_incremental_suffix_with_refdefs, parse_with_refdefs_and_errors};
 use crate::syntax::SyntaxNode;
 
 type CombinedEditRanges = (String, (usize, usize), (usize, usize));
@@ -173,9 +173,9 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     let start = Instant::now();
 
     let config = gs.load_config_notifying(&uri);
-    let tree = {
-        let syntax_tree = crate::parse(&text, Some(config.clone()));
-        syntax_tree.green().to_owned()
+    let (tree, errors) = {
+        let (syntax_tree, errors) = crate::parser::parse_with_errors(&text, Some(config.clone()));
+        (syntax_tree.green().to_owned(), errors)
     };
 
     let doc_path = uri.to_file_path().map(|p| p.into_owned());
@@ -210,6 +210,7 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
             salsa_file,
             salsa_config,
             tree,
+            errors,
         },
     );
 
@@ -240,10 +241,15 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
     let config = gs.load_config_notifying(&uri);
     let incremental_enabled = gs.runtime_settings.experimental_incremental_parsing;
 
-    let Some((salsa_file, salsa_config, original_tree_green)) = gs
-        .document_map
-        .get(&uri_string)
-        .map(|doc| (doc.salsa_file, doc.salsa_config, doc.tree.clone()))
+    let Some((salsa_file, salsa_config, original_tree_green, original_errors)) =
+        gs.document_map.get(&uri_string).map(|doc| {
+            (
+                doc.salsa_file,
+                doc.salsa_config,
+                doc.tree.clone(),
+                doc.errors.clone(),
+            )
+        })
     else {
         return;
     };
@@ -292,13 +298,14 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
     }
     let refdefs = crate::salsa::refdef_set(&gs.salsa, salsa_file, salsa_config).clone();
 
-    let (green, strategy) = if let Some((old_edit, new_edit)) = edit_ranges {
+    let (green, errors, strategy) = if let Some((old_edit, new_edit)) = edit_ranges {
         let old_tree = SyntaxNode::new_root(original_tree_green);
         let updated = parse_incremental_suffix_with_refdefs(
             &updated_text,
             Some(config.clone()),
             refdefs.clone(),
             &old_tree,
+            &original_errors,
             old_edit,
             new_edit,
         );
@@ -310,9 +317,10 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
             (_, "suffix_window") => "suffix_incremental_multi_change_coalesced_experimental",
             (_, _) => "full_reparse_multi_change_incremental_fallback",
         };
-        (updated.tree.green().to_owned(), label)
+        (updated.tree.green().to_owned(), updated.errors, label)
     } else {
-        let parsed = parse_with_refdefs(&updated_text, Some(config.clone()), refdefs);
+        let (parsed, errors) =
+            parse_with_refdefs_and_errors(&updated_text, Some(config.clone()), refdefs);
         let label = if !incremental_enabled {
             if change_count == 1 {
                 "full_reparse_single_change_incremental_disabled"
@@ -324,7 +332,7 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
         } else {
             "full_reparse_multi_change_incremental_fallback"
         };
-        (parsed.green().to_owned(), label)
+        (parsed.green().to_owned(), errors, label)
     };
 
     log::debug!("did_change parse strategy={strategy} changes={change_count}");
@@ -337,6 +345,7 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
     let interned_config = gs.intern_config(config.clone());
     if let Some(doc_state) = gs.document_map_mut().get_mut(&uri_string) {
         doc_state.tree = green;
+        doc_state.errors = errors;
         // `file_id`/`salsa_file` are invariant across a content edit (the same
         // path resolves to the same interned input), so only the tree and the
         // (possibly re-interned) config handle need refreshing.

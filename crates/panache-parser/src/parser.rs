@@ -123,8 +123,65 @@ fn populate_refdef_labels(input: &str, config: &mut ParserOptions) {
 
 pub struct IncrementalParseResult {
     pub tree: SyntaxNode,
+    /// Embedded-sublanguage syntax errors for the **whole** document, not just
+    /// the reparsed window: the retained prefix's errors are carried over from
+    /// the caller-supplied `old_errors` and the window's are shifted into host
+    /// coordinates. The governing invariant covers this vector as much as the
+    /// tree — it must equal a full parse's, byte for byte.
+    pub errors: Vec<SyntaxError>,
     pub reparse_range: (usize, usize),
     pub strategy: &'static str,
+}
+
+/// Splice the syntax errors of a reparse the same way the green children are
+/// spliced: prefix kept, everything from `seam` onward re-derived.
+///
+/// Two buckets, not rust-analyzer's three. Both strategies parse their window
+/// to EOF and both window starts are `<= edit.0`, where `map_old_offset_to_new`
+/// is the identity — so the seam sits at the same offset in the old and the new
+/// text and no error can straddle it. The straddling case is a
+/// `debug_assert!` plus a `None` (which the caller turns into a bail) rather
+/// than a guess. A real third bucket only appears once a *bounded* window
+/// leaves a live suffix to shift by the edit delta, which is the region tier in
+/// roadmap Phase 8.
+///
+/// Old errors that start at or after the seam are dropped: the window parse
+/// re-derives them.
+fn merge_incremental_errors(
+    old_errors: &[SyntaxError],
+    seam: usize,
+    window_errors: Vec<SyntaxError>,
+) -> Option<Vec<SyntaxError>> {
+    let seam = rowan::TextSize::new(seam as u32);
+    let mut merged = Vec::with_capacity(old_errors.len() + window_errors.len());
+
+    for error in old_errors {
+        if error.range.end() <= seam {
+            merged.push(error.clone());
+        } else if error.range.start() < seam {
+            debug_assert!(
+                false,
+                "syntax error {:?} straddles the splice seam at {seam:?}",
+                error.range
+            );
+            return None;
+        }
+    }
+
+    for error in window_errors {
+        merged.push(SyntaxError {
+            range: rowan::TextRange::new(error.range.start() + seam, error.range.end() + seam),
+            ..error
+        });
+    }
+
+    debug_assert!(
+        merged
+            .windows(2)
+            .all(|w| w[0].range.start() <= w[1].range.start()),
+        "merged syntax errors are out of document order: {merged:?}"
+    );
+    Some(merged)
 }
 
 /// Incrementally update a syntax tree by reparsing either a bounded section
@@ -134,16 +191,29 @@ pub struct IncrementalParseResult {
 /// [`collect_refdef_labels`] before reparsing. Callers that already have
 /// a precomputed [`RefdefMap`] (e.g. salsa-cached) should use
 /// [`parse_incremental_suffix_with_refdefs`] to skip the scan.
+///
+/// `old_errors` are the syntax errors of the *old* parse (the one that
+/// produced `old_tree`); the retained prefix's share of them is carried into
+/// the result. Pass `&[]` only when the old parse genuinely had none —
+/// under-reporting here is a divergence the debug oracle will catch.
 pub fn parse_incremental_suffix(
     input: &str,
     config: Option<ParserOptions>,
     old_tree: &SyntaxNode,
+    old_errors: &[SyntaxError],
     old_edit_range: (usize, usize),
     new_edit_range: (usize, usize),
 ) -> IncrementalParseResult {
     let mut config = config.unwrap_or_default();
     populate_refdef_labels(input, &mut config);
-    parse_incremental_suffix_inner(input, config, old_tree, old_edit_range, new_edit_range)
+    parse_incremental_suffix_inner(
+        input,
+        config,
+        old_tree,
+        old_errors,
+        old_edit_range,
+        new_edit_range,
+    )
 }
 
 /// Incremental reparse with a caller-supplied refdef set.
@@ -156,18 +226,27 @@ pub fn parse_incremental_suffix_with_refdefs(
     options: Option<ParserOptions>,
     refdefs: RefdefMap,
     old_tree: &SyntaxNode,
+    old_errors: &[SyntaxError],
     old_edit_range: (usize, usize),
     new_edit_range: (usize, usize),
 ) -> IncrementalParseResult {
     let mut options = options.unwrap_or_default();
     options.refdef_labels = Some(refdefs);
-    parse_incremental_suffix_inner(input, options, old_tree, old_edit_range, new_edit_range)
+    parse_incremental_suffix_inner(
+        input,
+        options,
+        old_tree,
+        old_errors,
+        old_edit_range,
+        new_edit_range,
+    )
 }
 
 fn parse_incremental_suffix_inner(
     input: &str,
     config: ParserOptions,
     old_tree: &SyntaxNode,
+    old_errors: &[SyntaxError],
     old_edit_range: (usize, usize),
     new_edit_range: (usize, usize),
 ) -> IncrementalParseResult {
@@ -199,7 +278,8 @@ fn parse_incremental_suffix_inner(
 
     if let Some(section_window) =
         find_top_level_heading_section_window(old_tree, old_edit, new_edit, input_len)
-        && let Some(result) = reparse_section_window(input, &config, old_tree, section_window)
+        && let Some(result) =
+            reparse_section_window(input, &config, old_tree, old_errors, section_window)
     {
         assert_matches_full_parse(&result, input, &config);
         return result;
@@ -254,7 +334,10 @@ fn parse_incremental_suffix_inner(
     {
         return full_reparse_result(input, &config);
     }
-    let suffix_tree = Parser::new(suffix_text, &config).parse();
+    let (suffix_tree, suffix_errors) = Parser::new(suffix_text, &config).parse_with_errors();
+    let Some(errors) = merge_incremental_errors(old_errors, new_restart, suffix_errors) else {
+        return full_reparse_result(input, &config);
+    };
 
     // Splice on the green tree directly: retain the prefix children verbatim
     // (rowan's structural sharing keeps their `Arc` identity) and replace
@@ -272,6 +355,7 @@ fn parse_incremental_suffix_inner(
 
     let result = IncrementalParseResult {
         tree,
+        errors,
         reparse_range: (new_restart, len),
         strategy: "suffix_window",
     };
@@ -452,10 +536,11 @@ fn seam_is_decoupled(text: &str, seam: usize) -> bool {
 }
 
 fn full_reparse_result(input: &str, config: &ParserOptions) -> IncrementalParseResult {
-    let tree = Parser::new(input, config).parse();
+    let (tree, errors) = Parser::new(input, config).parse_with_errors();
     let len: usize = tree.text_range().end().into();
     IncrementalParseResult {
         tree,
+        errors,
         reparse_range: (0, len),
         strategy: "full_reparse",
     }
@@ -600,6 +685,7 @@ fn reparse_section_window(
     input: &str,
     config: &ParserOptions,
     old_tree: &SyntaxNode,
+    old_errors: &[SyntaxError],
     section_window: SectionWindow,
 ) -> Option<IncrementalParseResult> {
     if !input.is_char_boundary(section_window.new_start)
@@ -625,7 +711,12 @@ fn reparse_section_window(
     // a standalone parse of only the window text is not trustworthy. This
     // costs the same as the suffix strategy's parse; the win over it is
     // below, where the unchanged tail is re-adopted by `Arc` identity.
-    let tail_tree = Parser::new(&input[section_window.new_start..], config).parse();
+    let (tail_tree, tail_errors) =
+        Parser::new(&input[section_window.new_start..], config).parse_with_errors();
+    // The tail parse covers everything from the window start to EOF, so it
+    // re-derives the errors of the re-adopted suffix too — which is sound
+    // precisely because that suffix is only re-adopted on structural equality.
+    let errors = merge_incremental_errors(old_errors, section_window.new_start, tail_errors)?;
     let tail_green = tail_tree.green();
     let window_len = section_window.new_end - section_window.new_start;
 
@@ -672,6 +763,7 @@ fn reparse_section_window(
             );
             return Some(IncrementalParseResult {
                 tree: SyntaxNode::new_root(new_green),
+                errors,
                 reparse_range: (section_window.new_start, section_window.new_end),
                 strategy: "section_window",
             });
@@ -689,6 +781,7 @@ fn reparse_section_window(
     let len: usize = tree.text_range().end().into();
     Some(IncrementalParseResult {
         tree,
+        errors,
         reparse_range: (section_window.new_start, len),
         strategy: "suffix_window",
     })
@@ -744,6 +837,89 @@ mod tests {
         );
     }
 
+    fn yaml_error(start: u32, end: u32) -> SyntaxError {
+        SyntaxError {
+            range: rowan::TextRange::new(start.into(), end.into()),
+            message: format!("error at {start}"),
+            source: SyntaxErrorSource::Yaml,
+        }
+    }
+
+    #[test]
+    fn merge_keeps_prefix_errors_and_shifts_window_errors() {
+        let old = vec![yaml_error(3, 9)];
+        let merged = merge_incremental_errors(&old, 20, vec![yaml_error(2, 5)]).unwrap();
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0], old[0]);
+        assert_eq!(merged[1].range, rowan::TextRange::new(22.into(), 25.into()));
+        assert_eq!(merged[1].message, "error at 2");
+    }
+
+    #[test]
+    fn merge_drops_old_errors_the_window_reparses() {
+        // The window parse re-derives everything from the seam onward, so an
+        // old error there must not be carried over as well (it would double).
+        let old = vec![yaml_error(3, 9), yaml_error(30, 40)];
+        let merged = merge_incremental_errors(&old, 20, vec![yaml_error(10, 20)]).unwrap();
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0], old[0]);
+        assert_eq!(merged[1].range, rowan::TextRange::new(30.into(), 40.into()));
+    }
+
+    #[test]
+    fn merge_of_error_free_parses_is_empty() {
+        assert!(
+            merge_incremental_errors(&[], 12, Vec::new())
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "straddles the splice seam")]
+    fn merge_refuses_an_error_straddling_the_seam() {
+        merge_incremental_errors(&[yaml_error(15, 25)], 20, Vec::new());
+    }
+
+    #[test]
+    fn incremental_suffix_carries_prefix_yaml_errors() {
+        // The malformed frontmatter sits in the retained prefix, so its error
+        // exists only in `old_errors` — nothing in the reparsed window can
+        // re-derive it.
+        let input = "---\ntitle: [\n---\n\npara one\n\npara two\n";
+        let (old_tree, old_errors) = parse_with_errors(input, None);
+        assert_eq!(old_errors.len(), 1);
+
+        let old_edit = (input.find("para two").unwrap(), input.len() - 1);
+        let updated = apply_edit(input, old_edit, "para three");
+        let new_edit = (old_edit.0, old_edit.0 + "para three".len());
+
+        let inc =
+            parse_incremental_suffix(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
+        assert_eq!(inc.strategy, "suffix_window");
+        assert_eq!(inc.errors, parse_with_errors(&updated, None).1);
+        assert_eq!(inc.errors.len(), 1);
+    }
+
+    #[test]
+    fn incremental_suffix_reports_a_yaml_error_the_edit_introduces() {
+        let input = "para one\n\n---\ntitle: ok\n---\n\npara two\n";
+        let (old_tree, old_errors) = parse_with_errors(input, None);
+        assert!(old_errors.is_empty());
+
+        let broken = input.find("ok").unwrap();
+        let old_edit = (broken, broken + "ok".len());
+        let updated = apply_edit(input, old_edit, "[");
+        let new_edit = (old_edit.0, old_edit.0 + 1);
+
+        let inc =
+            parse_incremental_suffix(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
+        assert_eq!(inc.errors, parse_with_errors(&updated, None).1);
+        assert_eq!(inc.errors.len(), 1);
+        assert_eq!(usize::from(inc.errors[0].range.start()), new_edit.0);
+    }
+
     #[test]
     fn incremental_suffix_matches_full_parse_for_tail_edit() {
         let input = "# H\n\npara one\n\npara two\n\npara three\n";
@@ -752,7 +928,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "tail section");
         let new_edit = (30, 42);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit).tree;
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit).tree;
         let full = parse(&updated, None);
         assert_eq!(inc.to_string(), full.to_string());
     }
@@ -765,7 +941,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "alpha");
         let new_edit = (10, 15);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit).tree;
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit).tree;
         let full = parse(&updated, None);
         assert_eq!(inc.to_string(), full.to_string());
     }
@@ -778,7 +954,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "\n-----");
         let new_edit = (5, 11);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit).tree;
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit).tree;
         let full = parse(&updated, None);
         assert_eq!(inc.to_string(), full.to_string());
     }
@@ -791,7 +967,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "> line");
         let new_edit = (9, 15);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit).tree;
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit).tree;
         let full = parse(&updated, None);
         assert_eq!(inc.to_string(), full.to_string());
     }
@@ -805,7 +981,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "BETA");
         let new_edit = (start, start + 4);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert!(
@@ -827,7 +1003,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "BETA");
         let new_edit = (start, start + 4);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert!(
@@ -852,7 +1028,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "#");
         let new_edit = (middle_start, middle_start + 1);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert_eq!(
@@ -872,7 +1048,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "beta\n\n# ");
         let new_edit = (beta_start, beta_start + 8);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert_eq!(
@@ -891,7 +1067,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "QUOTE");
         let new_edit = (quote_start, quote_start + 5);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert!(
@@ -909,7 +1085,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "\n");
         let new_edit = (two_start, two_start + 1);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert!(
@@ -927,7 +1103,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "> ");
         let new_edit = (lazy_start, lazy_start + 2);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert!(
@@ -945,7 +1121,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "BODY");
         let new_edit = (body_start, body_start + 4);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert!(
@@ -963,7 +1139,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "## Inserted\n\n");
         let new_edit = (beta_start, beta_start + "## Inserted\n\n".len());
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert_eq!(
@@ -981,7 +1157,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "");
         let new_edit = (end_start, end_start);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert_ne!(
@@ -1002,7 +1178,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "");
         let new_edit = (blank_line_start, blank_line_start);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert_ne!(
@@ -1020,7 +1196,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "Updated Demo");
         let new_edit = (title_start, title_start + "Updated Demo".len());
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert_ne!(
@@ -1038,7 +1214,7 @@ mod tests {
         let updated = apply_edit(input, old_edit, "----");
         let new_edit = (first_delim_start, first_delim_start + 4);
 
-        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
         assert_ne!(

@@ -70,7 +70,7 @@ fn check_incremental(before: &str, old_edit: (usize, usize), insert: &str) {
     let old_tree = parse(before, None);
     let updated = apply_edit(before, old_edit, insert);
     let new_edit = (old_edit.0, old_edit.0 + insert.len());
-    let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+    let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
     let full = parse(&updated, None);
     assert_eq!(
         inc.tree.text().to_string(),

@@ -191,6 +191,7 @@ fn suffix_incremental_runtime_strategy(
             &updated_text,
             Some(config.clone()),
             old_tree,
+            &[],
             old_edit,
             new_edit,
         );
@@ -319,6 +320,7 @@ fn assert_case_tree_equivalence(
                 &updated_text,
                 Some(config.clone()),
                 old_tree,
+                &[],
                 old_edit,
                 new_edit,
             )
