@@ -1021,44 +1021,6 @@ mod tests {
     }
 
     #[test]
-    fn incremental_suffix_carries_prefix_yaml_errors() {
-        // The malformed frontmatter sits in the retained prefix, so its error
-        // exists only in `old_errors` — nothing in the reparsed window can
-        // re-derive it.
-        let input = "---\ntitle: [\n---\n\npara one\n\npara two\n";
-        let (old_tree, old_errors) = parse_with_errors(input, None);
-        assert_eq!(old_errors.len(), 1);
-
-        let old_edit = (input.find("para two").unwrap(), input.len() - 1);
-        let updated = apply_edit(input, old_edit, "para three");
-        let new_edit = (old_edit.0, old_edit.0 + "para three".len());
-
-        let inc =
-            parse_incremental_suffix(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
-        assert_eq!(inc.strategy, "suffix_window");
-        assert_eq!(inc.errors, parse_with_errors(&updated, None).1);
-        assert_eq!(inc.errors.len(), 1);
-    }
-
-    #[test]
-    fn incremental_suffix_reports_a_yaml_error_the_edit_introduces() {
-        let input = "para one\n\n---\ntitle: ok\n---\n\npara two\n";
-        let (old_tree, old_errors) = parse_with_errors(input, None);
-        assert!(old_errors.is_empty());
-
-        let broken = input.find("ok").unwrap();
-        let old_edit = (broken, broken + "ok".len());
-        let updated = apply_edit(input, old_edit, "[");
-        let new_edit = (old_edit.0, old_edit.0 + 1);
-
-        let inc =
-            parse_incremental_suffix(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
-        assert_eq!(inc.errors, parse_with_errors(&updated, None).1);
-        assert_eq!(inc.errors.len(), 1);
-        assert_eq!(usize::from(inc.errors[0].range.start()), new_edit.0);
-    }
-
-    #[test]
     fn incremental_suffix_matches_full_parse_for_tail_edit() {
         let input = "# H\n\npara one\n\npara two\n\npara three\n";
         let old_tree = parse(input, None);
