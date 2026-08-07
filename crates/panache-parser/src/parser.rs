@@ -3,7 +3,7 @@
 //! This module implements a single-pass parser that constructs a lossless syntax tree (CST) for
 //! Quarto documents.
 
-use crate::options::ParserOptions;
+use crate::options::{Dialect, ParserOptions};
 use crate::parser::inlines::refdef_map::{RefdefMap, collect_refdef_labels};
 use crate::range_utils::find_incremental_restart_offset;
 use crate::syntax::{SyntaxKind, SyntaxNode};
@@ -325,6 +325,12 @@ fn parse_incremental_suffix_inner(
 
     let suffix_text = &input[new_restart..];
 
+    // The window is parsed standalone, so its first line looks like the
+    // document's first line to the block dispatcher.
+    if new_restart > 0 && window_start_manufactures_document_start_construct(suffix_text, &config) {
+        return full_reparse_result(input, &config);
+    }
+
     // A list (or definition-list) block continues across blank lines when
     // the next non-blank line carries a compatible marker, so a suffix
     // whose first line looks like a list continuation must not be parsed
@@ -518,6 +524,43 @@ fn first_nonblank_line_is_container_marker(text: &str) -> bool {
     false
 }
 
+/// Whether the first line of a window would be read as a construct only a
+/// document's *first* line can produce.
+///
+/// A window is parsed as a standalone document, so `at_document_start` is true
+/// at its first line. Three constructs test that flag with no
+/// `|| ctx.has_blank_before` escape, and each would therefore be manufactured
+/// where a full parse refuses:
+///
+/// - a pandoc `%` title block (`PandocTitleBlockParser::detect_prepared`),
+/// - a MultiMarkdown title block (`MmdTitleBlockParser::detect_prepared`),
+/// - under the CommonMark dialect, a YAML metadata block: those readers
+///   recognize YAML only as frontmatter, and read a body `---` as a thematic
+///   break. This one also manufactures *syntax errors*, malformed YAML being
+///   the only source of them.
+///
+/// Every other `at_document_start` consumer is `||`-ed with `has_blank_before`,
+/// which the seam guard already guarantees, so they agree either way. Textual
+/// and deliberately over-eager: a false positive costs one full parse. The
+/// principled fix is to separate "byte 0 of the document" from "blank-line
+/// separated fragment start" in `BlockContext`, which belongs with the region
+/// tier in roadmap Phase 8.
+fn window_start_manufactures_document_start_construct(
+    window: &str,
+    config: &ParserOptions,
+) -> bool {
+    let Some(first) = window.lines().next() else {
+        return false;
+    };
+    if config.extensions.pandoc_title_block && first.trim_start().starts_with('%') {
+        return true;
+    }
+    if config.extensions.mmd_title_block && !first.trim().is_empty() && first.contains(':') {
+        return true;
+    }
+    config.dialect == Dialect::CommonMark && first.trim() == "---"
+}
+
 /// Whether a splice seam at `seam` is structurally decoupled in `text`:
 /// the prefix before it ends with a blank line (or is empty), and the
 /// suffix's first non-blank line is not indented. Blank separation kills
@@ -705,6 +748,19 @@ fn reparse_section_window(
         return None;
     }
 
+    // Defensive: a section window starts at a top-level `HEADING`, which is
+    // none of these shapes, so this cannot fire today. It is here because that
+    // is a property of how the window is *chosen*, not of the splice, and the
+    // region tier will choose differently.
+    if section_window.new_start > 0
+        && window_start_manufactures_document_start_construct(
+            &input[section_window.new_start..],
+            config,
+        )
+    {
+        return None;
+    }
+
     // Parse from the window start TO EOF, not just to the window end: block
     // decisions inside the window (list-item buffering, tightness, div and
     // fence pairing) can depend on unbounded lookahead past the window, so
@@ -799,12 +855,36 @@ mod tests {
         out
     }
 
-    fn quarto_options() -> crate::options::ParserOptions {
-        crate::options::ParserOptions {
-            flavor: crate::options::Flavor::Quarto,
-            extensions: crate::options::Extensions::for_flavor(crate::options::Flavor::Quarto),
+    fn flavor_options(flavor: crate::options::Flavor) -> ParserOptions {
+        ParserOptions {
+            flavor,
+            extensions: crate::options::Extensions::for_flavor(flavor),
+            dialect: crate::options::Dialect::for_flavor(flavor),
             ..Default::default()
         }
+    }
+
+    fn quarto_options() -> ParserOptions {
+        flavor_options(crate::options::Flavor::Quarto)
+    }
+
+    /// Apply `insert` at `at` (a pure insertion) and reparse incrementally.
+    fn insert_incrementally(
+        input: &str,
+        at: usize,
+        insert: &str,
+        options: ParserOptions,
+    ) -> IncrementalParseResult {
+        let (old_tree, old_errors) = parse_with_errors(input, Some(options.clone()));
+        let updated = apply_edit(input, (at, at), insert);
+        parse_incremental_suffix(
+            &updated,
+            Some(options),
+            &old_tree,
+            &old_errors,
+            (at, at),
+            (at, at + insert.len()),
+        )
     }
 
     #[test]
@@ -880,6 +960,64 @@ mod tests {
     #[should_panic(expected = "straddles the splice seam")]
     fn merge_refuses_an_error_straddling_the_seam() {
         merge_incremental_errors(&[yaml_error(15, 25)], 20, Vec::new());
+    }
+
+    // A window is parsed as a standalone document, so `at_document_start` is
+    // true at its first line. These three constructs are the only ones that
+    // test it *without* an `|| has_blank_before` escape, so a window starting
+    // on one of them manufactures a block a full parse would never produce.
+    // Each case is a plausible keystroke: finishing the marker of a
+    // frontmatter-shaped block that is not at the document start.
+
+    #[test]
+    fn suffix_window_must_not_manufacture_a_pandoc_title_block() {
+        let input = "intro para\n\n Title\n% Author\n\ntail para\n";
+        let at = input.find(" Title").unwrap();
+        let inc = insert_incrementally(
+            input,
+            at,
+            "%",
+            flavor_options(crate::options::Flavor::Pandoc),
+        );
+        assert_eq!(inc.strategy, "full_reparse");
+    }
+
+    #[test]
+    fn suffix_window_must_not_manufacture_mid_document_yaml_under_commonmark() {
+        // Under a CommonMark-family dialect `---`/`key: value`/`---` in the
+        // body is a thematic break plus a setext heading, never metadata.
+        let input = "intro para\n\n--\nkey: value\n---\n\ntail para\n";
+        let at = input.find("--\nkey").unwrap() + 2;
+        let inc = insert_incrementally(input, at, "-", flavor_options(crate::options::Flavor::Gfm));
+        assert_eq!(inc.strategy, "full_reparse");
+    }
+
+    #[test]
+    fn suffix_window_must_not_manufacture_an_mmd_title_block() {
+        let input = "intro para\n\nKey value\nOther: thing\n\ntail para\n";
+        let at = input.find("Key value").unwrap() + 3;
+        let inc = insert_incrementally(
+            input,
+            at,
+            ":",
+            flavor_options(crate::options::Flavor::MultiMarkdown),
+        );
+        assert_eq!(inc.strategy, "full_reparse");
+    }
+
+    #[test]
+    fn suffix_window_still_reuses_when_the_construct_is_not_live() {
+        // The same edit under Pandoc, where `mmd_title_block` is off: the
+        // guard must key on the extension, not on the line's shape.
+        let input = "intro para\n\nKey value\nOther: thing\n\ntail para\n";
+        let at = input.find("Key value").unwrap() + 3;
+        let inc = insert_incrementally(
+            input,
+            at,
+            ":",
+            flavor_options(crate::options::Flavor::Pandoc),
+        );
+        assert_eq!(inc.strategy, "suffix_window");
     }
 
     #[test]
