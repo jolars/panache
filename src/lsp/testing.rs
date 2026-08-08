@@ -591,11 +591,16 @@ impl LspTester {
         )
     }
 
+    /// The authoritative parse for `uri` — salsa's, the one every handler and
+    /// the linter read. Tests asserting over an edited document are therefore
+    /// oracles over the tree the server actually serves.
     pub fn get_document_tree(&self, uri: &str) -> Option<crate::SyntaxNode> {
-        self.gs
-            .document_map
-            .get(uri)
-            .map(|state| crate::SyntaxNode::new_root(state.tree.clone()))
+        let state = self.gs.document_map.get(uri)?;
+        Some(crate::salsa::parsed_tree_root(
+            &self.gs.salsa,
+            state.salsa_file,
+            state.salsa_config,
+        ))
     }
 
     /// The `FileConfig` salsa input backing `uri`'s document. Two documents that

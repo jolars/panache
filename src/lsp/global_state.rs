@@ -254,15 +254,6 @@ impl StateSnapshot {
         Some(crate::lsp::line_index::line_index(self.db(), state.salsa_file).clone())
     }
 
-    /// The current text and a freshly-rooted syntax tree for `uri`.
-    pub(crate) fn document_content_and_tree(&self, uri: &Uri) -> Option<(String, SyntaxNode)> {
-        let state = self.document_map.get(&uri.to_string())?;
-        Some((
-            state.salsa_file.content_or_empty(self.db()).to_string(),
-            SyntaxNode::new_root(state.tree.clone()),
-        ))
-    }
-
     /// The salsa-cached syntax tree for `uri`, freshly rooted.
     ///
     /// This is the same parse hover/symbols read, so callers (e.g. formatting)

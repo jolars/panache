@@ -31,12 +31,16 @@ pub(crate) fn get_open_document_context(
     let state = snap.document_map.get(&uri.to_string())?.clone();
     let content = state.salsa_file.content_or_empty(snap.db()).to_string();
     let line_index = crate::lsp::line_index::line_index(snap.db(), state.salsa_file).clone();
+    // The tree comes from salsa, not from `DocumentState`: salsa's is the
+    // authoritative parse (diagnostics and the linter already read it), and
+    // taking it here keeps every handler on the same tree as the text above.
+    let tree = crate::salsa::parsed_tree(snap.db(), state.salsa_file, state.salsa_config).clone();
 
     Some(OpenDocumentContext {
         salsa_file: state.salsa_file,
         salsa_config: state.salsa_config,
         path: crate::salsa::Db::path_of_id(snap.db(), state.file_id),
-        tree: state.tree,
+        tree,
         content,
         line_index,
     })

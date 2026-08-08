@@ -44,7 +44,11 @@ pub struct DocumentState {
     pub salsa_file: crate::salsa::FileText,
     /// Salsa input for this document's config.
     pub salsa_config: crate::salsa::FileConfig,
-    /// Cached syntax tree for incremental parsing.
+    /// The previous parse, kept solely as `did_change`'s incremental-splice
+    /// base. Nothing *reads* it as a tree any more: handlers, the linter, and
+    /// diagnostics all go through salsa's `parsed_document`, which is the
+    /// authoritative parse. Retired when the reparse moves into that query
+    /// (roadmap Phase 4).
     pub tree: GreenNode,
     /// The embedded-sublanguage syntax errors that go with [`Self::tree`].
     ///

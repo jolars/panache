@@ -57,7 +57,8 @@ pub(crate) fn completion(
     let position = params.text_document_position.position;
     let config = snap.config(uri);
 
-    let (text, root) = snap.document_content_and_tree(uri)?;
+    let text = snap.document_content(uri)?;
+    let root = snap.parsed_tree(uri)?;
     let line_index = snap.line_index(uri)?;
     let offset = super::super::conversions::position_to_offset(&line_index, position)?;
     let link_ctx_opt = link_dest_context(&root, &text, offset);

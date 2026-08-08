@@ -32,7 +32,8 @@ pub(crate) fn workspace_symbol(
     let mut candidate_paths: HashSet<PathBuf> = HashSet::new();
     let mut path_configs: HashMap<PathBuf, crate::salsa::FileConfig> = HashMap::new();
     let mut path_uris: HashMap<PathBuf, Uri> = HashMap::new();
-    let mut memory_states: Vec<(Uri, crate::salsa::FileText, GreenNode)> = Vec::new();
+    let mut memory_states: Vec<(Uri, crate::salsa::FileText, crate::salsa::FileConfig)> =
+        Vec::new();
     let mut memory_docs: Vec<(Uri, String, GreenNode)> = Vec::new();
 
     for (uri_str, state) in &open_documents {
@@ -57,12 +58,13 @@ pub(crate) fn workspace_symbol(
                 path_configs.entry(graph_path).or_insert(state.salsa_config);
             }
         } else if let Ok(uri) = uri_str.parse::<Uri>() {
-            memory_states.push((uri, state.salsa_file, state.tree.clone()));
+            memory_states.push((uri, state.salsa_file, state.salsa_config));
         }
     }
 
-    for (uri, file, tree) in memory_states {
+    for (uri, file, config) in memory_states {
         let content = file.content_or_empty(snap.db()).to_string();
+        let tree = crate::salsa::parsed_tree(snap.db(), file, config).clone();
         memory_docs.push((uri, content, tree));
     }
 
