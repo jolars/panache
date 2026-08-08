@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.20.6](https://github.com/jolars/panache/compare/panache-formatter-v0.20.5...panache-formatter-v0.20.6) (2026-08-08)
+
+### Bug Fixes
+- **formatter:** keep blank after leading list-item block ([`3226741`](https://github.com/jolars/panache/commit/322674199284c19f3a7108b8afc9e2908a1baeab))
+- **formatter:** expand code-span tabs from source column ([`ff7dafa`](https://github.com/jolars/panache/commit/ff7dafa924e80cc04e8b2c271151c0bbb7173e7d))
+
+### Dependencies
+- updated crates/panache-parser to v0.25.1
+
 ## [0.20.5](https://github.com/jolars/panache/compare/panache-formatter-v0.20.4...panache-formatter-v0.20.5) (2026-08-07)
 
 ### Bug Fixes

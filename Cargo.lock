@@ -916,9 +916,9 @@ dependencies = [
 
 [[package]]
 name = "js-sys"
-version = "0.3.103"
+version = "0.3.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53b44bfcdb3f8d5837a46dae1ca9660a837176eee74a28b229bc626816589102"
+checksum = "0e0c1080212aad755ea003d18543e8768dd432c48819efd73a7bf1e39b7a5a3a"
 dependencies = [
  "cfg-if",
  "futures-util",
@@ -927,9 +927,9 @@ dependencies = [
 
 [[package]]
 name = "jsonschema"
-version = "0.49.6"
+version = "0.49.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e17384278234b10419a63c93fc85695ac9fc2da0833e3c59167f9986499590c"
+checksum = "ca4b985be36e5b3d15162b16ca94ac18c2a0514f5598b23b9d769895cb56bc3c"
 dependencies = [
  "ahash",
  "bytecount",
@@ -956,18 +956,18 @@ dependencies = [
 
 [[package]]
 name = "jsonschema-regex"
-version = "0.49.6"
+version = "0.49.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac634e339e73bf9629f6fb207f7b064d872253ae3b3f5c6e0ce8fd762b16e40f"
+checksum = "614c05e01260d4532d9ad28d66185fa1d93d015c5d610cde70d4b7143d7fb98f"
 dependencies = [
  "regex-syntax",
 ]
 
 [[package]]
 name = "jsonschema-value"
-version = "0.49.6"
+version = "0.49.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92b8e258eb4515a3fc912a9c46e3987040dc07280592280097ea2085527870b8"
+checksum = "8602a6850f24cf05c518f58c9b8d08e32a28b9848115c8e193693db0952353f6"
 dependencies = [
  "ahash",
  "bytecount",
@@ -1202,7 +1202,7 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "panache"
-version = "3.3.0"
+version = "3.3.1"
 dependencies = [
  "annotate-snippets",
  "assert_cmd",
@@ -1246,7 +1246,7 @@ dependencies = [
 
 [[package]]
 name = "panache-formatter"
-version = "0.20.5"
+version = "0.20.6"
 dependencies = [
  "insta",
  "log",
@@ -1264,7 +1264,7 @@ dependencies = [
 
 [[package]]
 name = "panache-parser"
-version = "0.25.0"
+version = "0.25.1"
 dependencies = [
  "entities",
  "insta",
@@ -1513,9 +1513,9 @@ dependencies = [
 
 [[package]]
 name = "referencing"
-version = "0.49.6"
+version = "0.49.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42902112f88a27e9afd5683e2ba31956fed2a5d43395f166dd26775ae9c0dedb"
+checksum = "0753550862a089302b186486dfb843f2d547415257d78c32ae0d169e4d6784d1"
 dependencies = [
  "ahash",
  "fluent-uri 0.4.1",
@@ -1925,18 +1925,18 @@ checksum = "79def32ffcd477db1ff26f76dab9e3a91f0bd42a85ca96577089b24623056f9d"
 
 [[package]]
 name = "thiserror"
-version = "2.0.19"
+version = "2.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09a43598840e33d5b0331f38c5e30d13bb11c11210a4b58f0d9b18a5a5eefcd9"
+checksum = "ec86235f5fcc2a73650310756d2ac5b138a5780bbbdfae3eeccec992c435ba4f"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.19"
+version = "2.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43cbfe0cf76104d42a574802844187e84a305e531ed54455f11fbde0f10541cd"
+checksum = "bc04cd3e1236dd4a98afca4569f2deb3f120e5422a4023be2cb683f8486292af"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2128,9 +2128,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.126"
+version = "0.2.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b067c0c11094aef6b7a801c1e34a26affafdf3d051dba08456b868789aaf9a4"
+checksum = "1b70935747edd64d89de3efa29d73789b806c15798f8e7dca4d8ac356b50ce70"
 dependencies = [
  "cfg-if",
  "once_cell",
@@ -2141,9 +2141,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.126"
+version = "0.2.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "167ce5e579f6bcf889c4f7175a8a5a585de84e8ff93976ce393efa5f2837aab1"
+checksum = "77775f8f3f7217702089053b94958f8f54061a3f663417df76e19cbdcca29bc1"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -2151,9 +2151,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.126"
+version = "0.2.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3997c7839262f4ef12cf90b818d6340c18e80f263f1a94bf157d0ec4420380e"
+checksum = "e11d33f857dc2fb11b8bc75aee111aa9cbeb12cd9f25efd3d4c2a3dd4e235284"
 dependencies = [
  "bumpalo",
  "proc-macro2",
@@ -2164,9 +2164,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.126"
+version = "0.2.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc1b4cb0cc549fcf58d7dfc081778139b3d283a081644e833e84682ad71cea24"
+checksum = "7ef64dbcc55df09c7e5a46182d181c2cfa3e925f3da937ea764728b4bbb9dcbf"
 dependencies = [
  "unicode-ident",
 ]
