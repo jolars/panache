@@ -49,13 +49,13 @@ pub fn fingerprint(node: &SyntaxNode) -> String {
 /// never a relaxation of this assert.
 #[cfg(debug_assertions)]
 pub(crate) fn assert_matches_full_parse(
-    result: &super::IncrementalParseResult,
+    result: &super::Reparsed,
     input: &str,
     options: &crate::options::ParserOptions,
 ) {
     let (full, full_errors) = super::Parser::new(input, options).parse_with_errors();
     assert_eq!(
-        fingerprint(&result.tree),
+        fingerprint(&SyntaxNode::new_root(result.green.clone())),
         fingerprint(&full),
         "incremental reparse (strategy {:?}, reparse_range {:?}) diverged from full parse",
         result.strategy,
@@ -72,7 +72,7 @@ pub(crate) fn assert_matches_full_parse(
 #[cfg(not(debug_assertions))]
 #[inline]
 pub(crate) fn assert_matches_full_parse(
-    _result: &super::IncrementalParseResult,
+    _result: &super::Reparsed,
     _input: &str,
     _options: &crate::options::ParserOptions,
 ) {
@@ -81,7 +81,7 @@ pub(crate) fn assert_matches_full_parse(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::{IncrementalParseResult, parse};
+    use crate::parser::{ReparseStrategy, Reparsed, parse};
 
     #[test]
     fn fingerprint_distinguishes_structural_difference() {
@@ -103,11 +103,11 @@ mod tests {
     fn oracle_panics_on_injected_divergence() {
         // A tree parsed from different text stands in for a bad splice.
         let input = "# Title\n\nParagraph.\n";
-        let wrong = IncrementalParseResult {
-            tree: parse("# Title\n\n> quoted\n", None),
+        let wrong = Reparsed {
+            green: parse("# Title\n\n> quoted\n", None).green().to_owned(),
             errors: Vec::new(),
             reparse_range: (0, input.len()),
-            strategy: "suffix_window",
+            strategy: ReparseStrategy::SuffixWindow,
         };
         assert_matches_full_parse(&wrong, input, &crate::options::ParserOptions::default());
     }
@@ -122,11 +122,11 @@ mod tests {
         let options = crate::options::ParserOptions::default();
         let (tree, errors) = crate::parser::Parser::new(input, &options).parse_with_errors();
         assert_eq!(errors.len(), 1, "fixture must have exactly one error");
-        let wrong = IncrementalParseResult {
-            tree,
+        let wrong = Reparsed {
+            green: tree.green().to_owned(),
             errors: Vec::new(),
             reparse_range: (0, input.len()),
-            strategy: "suffix_window",
+            strategy: ReparseStrategy::SuffixWindow,
         };
         assert_matches_full_parse(&wrong, input, &options);
     }
@@ -136,11 +136,14 @@ mod tests {
     fn oracle_accepts_identical_tree() {
         let input = "# Title\n\nParagraph.\n";
         let options = crate::options::ParserOptions::default();
-        let result = IncrementalParseResult {
-            tree: crate::parser::Parser::new(input, &options).parse(),
+        let result = Reparsed {
+            green: crate::parser::Parser::new(input, &options)
+                .parse()
+                .green()
+                .to_owned(),
             errors: Vec::new(),
             reparse_range: (0, input.len()),
-            strategy: "suffix_window",
+            strategy: ReparseStrategy::SuffixWindow,
         };
         assert_matches_full_parse(&result, input, &options);
     }

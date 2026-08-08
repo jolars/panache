@@ -12,6 +12,7 @@ pub mod blocks;
 pub mod diagnostics;
 pub mod inlines;
 pub mod math;
+pub mod reparse;
 pub mod utils;
 pub mod yaml;
 
@@ -22,6 +23,7 @@ mod verify;
 // Re-export main parser
 pub use core::Parser;
 pub use diagnostics::{Diagnostics, SyntaxError, SyntaxErrorSource};
+pub use reparse::{Edit, ReparseStrategy, Reparsed, diff_edit, reparse};
 pub use verify::fingerprint;
 
 use verify::assert_matches_full_parse;
@@ -250,20 +252,47 @@ fn parse_incremental_suffix_inner(
     old_edit_range: (usize, usize),
     new_edit_range: (usize, usize),
 ) -> IncrementalParseResult {
+    match reparse_ranges(
+        input,
+        &config,
+        old_tree,
+        old_errors,
+        old_edit_range,
+        new_edit_range,
+    ) {
+        Some(reparsed) => IncrementalParseResult {
+            tree: SyntaxNode::new_root(reparsed.green),
+            errors: reparsed.errors,
+            reparse_range: reparsed.reparse_range,
+            strategy: reparsed.strategy.as_str(),
+        },
+        None => full_reparse_result(input, &config),
+    }
+}
+
+/// The guard cascade and splice behind [`reparse`], expressed over the old and
+/// new edit ranges rather than an [`Edit`].
+///
+/// Refusal-first: every guard returns [`None`] and leaves the full parse to the
+/// caller. Never returns a best-effort tree.
+fn reparse_ranges(
+    input: &str,
+    config: &ParserOptions,
+    old_tree: &SyntaxNode,
+    old_errors: &[SyntaxError],
+    old_edit_range: (usize, usize),
+    new_edit_range: (usize, usize),
+) -> Option<Reparsed> {
     let input_len = input.len();
 
-    let Some(old_edit) = normalize_range(old_edit_range) else {
-        return full_reparse_result(input, &config);
-    };
-    let Some(new_edit) = normalize_range(new_edit_range) else {
-        return full_reparse_result(input, &config);
-    };
+    let old_edit = normalize_range(old_edit_range)?;
+    let new_edit = normalize_range(new_edit_range)?;
     if new_edit.1 > input_len {
-        return full_reparse_result(input, &config);
+        return None;
     }
 
     if old_tree.kind() != SyntaxKind::DOCUMENT {
-        return full_reparse_result(input, &config);
+        return None;
     }
 
     // The edit is described in the *old* text's coordinates, so an edit range
@@ -271,7 +300,7 @@ fn parse_incremental_suffix_inner(
     // of sync. Bail rather than let the offset reach rowan, which panics on a
     // range it cannot resolve.
     if old_edit.1 > usize::from(old_tree.text_range().end()) {
-        return full_reparse_result(input, &config);
+        return None;
     }
 
     // Reference definitions are document-scoped: retained blocks keep the
@@ -281,16 +310,16 @@ fn parse_incremental_suffix_inner(
     // old-set-vs-new-set comparison belongs to the host layer, which caches
     // both sets.
     if edit_may_touch_refdefs(old_tree, old_edit, input, new_edit) {
-        return full_reparse_result(input, &config);
+        return None;
     }
 
     if let Some(section_window) =
         find_top_level_heading_section_window(old_tree, old_edit, new_edit, input_len)
         && let Some(result) =
-            reparse_section_window(input, &config, old_tree, old_errors, section_window)
+            reparse_section_window(input, config, old_tree, old_errors, section_window)
     {
-        assert_matches_full_parse(&result, input, &config);
-        return result;
+        assert_matches_full_parse(&result, input, config);
+        return Some(result);
     }
 
     let restart = find_incremental_restart_offset(old_tree, old_edit.0, old_edit.1);
@@ -302,12 +331,12 @@ fn parse_incremental_suffix_inner(
     // edit at a blank line between blocks can produce such a restart — the
     // enclosing-block lookup resolves to the *following* block.)
     if old_restart > old_edit.0 {
-        return full_reparse_result(input, &config);
+        return None;
     }
 
     let new_restart = map_old_offset_to_new(old_restart, old_edit, new_edit, input_len);
     if !input.is_char_boundary(new_restart) {
-        return full_reparse_result(input, &config);
+        return None;
     }
 
     // Seam decoupling: the suffix is parsed as a standalone document, so
@@ -321,22 +350,22 @@ fn parse_incremental_suffix_inner(
     if !seam_is_decoupled(input, new_restart)
         || !prefix_ends_structurally_decoupled(old_tree, old_restart)
     {
-        return full_reparse_result(input, &config);
+        return None;
     }
 
     // Fence pairing is global: an edit in the suffix can pair with (or
     // orphan) a fence-capable line retained in the prefix, flipping the
     // prefix's interpretation.
     if !prefix_fence_state_is_stable(&input[..new_restart]) {
-        return full_reparse_result(input, &config);
+        return None;
     }
 
     let suffix_text = &input[new_restart..];
 
     // The window is parsed standalone, so its first line looks like the
     // document's first line to the block dispatcher.
-    if new_restart > 0 && window_start_manufactures_document_start_construct(suffix_text, &config) {
-        return full_reparse_result(input, &config);
+    if new_restart > 0 && window_start_manufactures_document_start_construct(suffix_text, config) {
+        return None;
     }
 
     // A list (or definition-list) block continues across blank lines when
@@ -346,7 +375,7 @@ fn parse_incremental_suffix_inner(
     if last_retained_block_can_absorb_marker(old_tree, old_restart)
         && first_nonblank_line_is_container_marker(suffix_text)
     {
-        return full_reparse_result(input, &config);
+        return None;
     }
 
     // Two backward couplings the seam's blank line does not break, because
@@ -364,7 +393,7 @@ fn parse_incremental_suffix_inner(
         .is_some_and(last_retained_block_absorbs_colon_line)
         && first_nonblank_line_is_definition_marker(suffix_text)
     {
-        return full_reparse_result(input, &config);
+        return None;
     }
 
     // The mirror image: a bare dash run is a multiline-table rule as well as a
@@ -377,12 +406,10 @@ fn parse_incremental_suffix_inner(
     // has a partner to offer.
     if retained_prefix_has_thematic_break(old_tree, old_restart) && has_dash_rule_line(suffix_text)
     {
-        return full_reparse_result(input, &config);
+        return None;
     }
-    let (suffix_tree, suffix_errors) = Parser::new(suffix_text, &config).parse_with_errors();
-    let Some(errors) = merge_incremental_errors(old_errors, new_restart, suffix_errors) else {
-        return full_reparse_result(input, &config);
-    };
+    let (suffix_tree, suffix_errors) = Parser::new(suffix_text, config).parse_with_errors();
+    let errors = merge_incremental_errors(old_errors, new_restart, suffix_errors)?;
 
     // Splice on the green tree directly: retain the prefix children verbatim
     // (rowan's structural sharing keeps their `Arc` identity) and replace
@@ -395,17 +422,15 @@ fn parse_incremental_suffix_inner(
         suffix_green.children().map(|child| child.to_owned()),
     );
 
-    let tree = SyntaxNode::new_root(new_green);
-    let len: usize = tree.text_range().end().into();
-
-    let result = IncrementalParseResult {
-        tree,
+    let len: usize = new_green.text_len().into();
+    let result = Reparsed {
+        green: new_green,
         errors,
         reparse_range: (new_restart, len),
-        strategy: "suffix_window",
+        strategy: ReparseStrategy::SuffixWindow,
     };
-    assert_matches_full_parse(&result, input, &config);
-    result
+    assert_matches_full_parse(&result, input, config);
+    Some(result)
 }
 
 fn normalize_range(range: (usize, usize)) -> Option<(usize, usize)> {
@@ -862,7 +887,7 @@ fn reparse_section_window(
     old_tree: &SyntaxNode,
     old_errors: &[SyntaxError],
     section_window: SectionWindow,
-) -> Option<IncrementalParseResult> {
+) -> Option<Reparsed> {
     if !input.is_char_boundary(section_window.new_start)
         || !input.is_char_boundary(section_window.new_end)
     {
@@ -949,11 +974,11 @@ fn reparse_section_window(
                     .take(boundary_idx)
                     .map(|child| child.to_owned()),
             );
-            return Some(IncrementalParseResult {
-                tree: SyntaxNode::new_root(new_green),
+            return Some(Reparsed {
+                green: new_green,
                 errors,
                 reparse_range: (section_window.new_start, section_window.new_end),
-                strategy: "section_window",
+                strategy: ReparseStrategy::SectionWindow,
             });
         }
     }
@@ -965,13 +990,12 @@ fn reparse_section_window(
         start_idx..,
         tail_green.children().map(|child| child.to_owned()),
     );
-    let tree = SyntaxNode::new_root(new_green);
-    let len: usize = tree.text_range().end().into();
-    Some(IncrementalParseResult {
-        tree,
+    let len: usize = new_green.text_len().into();
+    Some(Reparsed {
+        green: new_green,
         errors,
         reparse_range: (section_window.new_start, len),
-        strategy: "suffix_window",
+        strategy: ReparseStrategy::SuffixWindow,
     })
 }
 
