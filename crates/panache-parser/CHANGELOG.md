@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.25.1](https://github.com/jolars/panache/compare/panache-parser-v0.25.0...panache-parser-v0.25.1) (2026-08-08)
+
+### Bug Fixes
+- **parser:** let a closed bare fence interrupt a para ([`6504857`](https://github.com/jolars/panache/commit/6504857ca528e3a3afdcaf8cec9539c1886bca97))
+- **parser:** end fence closer scan at list item end ([`edf05b4`](https://github.com/jolars/panache/commit/edf05b4d1f34b05a41f4bdd2509a5cff40ecb4a0))
+- **formatter:** expand code-span tabs from source column ([`ff7dafa`](https://github.com/jolars/panache/commit/ff7dafa924e80cc04e8b2c271151c0bbb7173e7d))
+- **parser:** gobble list indent per container level ([`94a7eaf`](https://github.com/jolars/panache/commit/94a7eaf8567af8c73ff9a7ee4d2eb654f2503f0e))
+- **parser:** fold lazy `>` into list-item text ([`0041501`](https://github.com/jolars/panache/commit/00415013a1d1dcb6e4e49a25ce2ad3580af10e30))
+- **parser:** implement pandoc's `compactify` for lists ([`f015f78`](https://github.com/jolars/panache/commit/f015f782b1aee9d1a2ffb0554e40cb81fdaf5769))
+- **parser:** require content after a task checkbox ([`4153014`](https://github.com/jolars/panache/commit/4153014477850f8810a52cd57c99d6dde4f2ac9a))
+- **parser:** open a footnote def at a list item's column ([`1d0270d`](https://github.com/jolars/panache/commit/1d0270da87d9fcfd685da65ce361fa07861f5920))
+
 ## [0.25.0](https://github.com/jolars/panache/compare/panache-parser-v0.24.0...panache-parser-v0.25.0) (2026-08-07)
 
 ### Features
