@@ -90,8 +90,9 @@
 //!   guard cascade and splice on top. `full_replace` is the extreme at 0.2x: a
 //!   27-byte replacement still walks the old 1.6 KB tree first. The surcharge
 //!   runs 5-10% of a full parse, which caps how much the feature can cost --- but
-//!   it is not zero, and a window-size cutoff is the obvious cheap win (roadmap
-//!   Phase 8).
+//!   it is not zero, and declining up front on a too-wide window turns every
+//!   one of these shapes into a clean ~1.0x fallback (roadmap Phase 5b, which
+//!   this measurement is what promoted ahead of the default flip).
 //! * **Clustering matters; change count does not.** The two medium
 //!   multi-change cases carry the same four changes. Scattering them over 150
 //!   lines takes `diff_edit`'s span from one line to most of the document: 16%

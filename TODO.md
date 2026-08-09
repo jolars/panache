@@ -329,12 +329,30 @@ this branch rebases onto that fix.
   - Headline: speedup is a function of window share and nothing else --- 5.6x on
     a late edit or a typing stream in the pandoc manual (7% window), 1.0x where
     the window is \~98%. A *successful* wide reparse is 5-10% slower than a full
-    parse (`pandoc_manual_early_edit` at 0.9x, `full_replace` at 0.2x), so the
-    window-size cutoff belongs on the Phase 8 list. Guard-cascade bail cost is
-    15.7% of a full parse; a host-side decline costs one refdef scan.
-  - For Phase 6's gate: `>= 2x medium` holds for `typing_stream_medium` (2.7x)
-    but not for a scattered multi-change edit (1.1x), so the threshold has to
-    name the case it applies to.
+    parse (`pandoc_manual_early_edit` at 0.9x, `full_replace` at 0.2x).
+    Guard-cascade bail cost is 15.7% of a full parse; a host-side decline costs
+    one refdef scan.
+  - Three consequences for the phases below, folded into them: the window-size
+    cutoff is promoted out of Phase 8 into its own phase *ahead of the flip*
+    (5b), Phase 6's gate grows a regression ceiling and names its cases, and
+    Phase 7's exit criterion is restated in the harness's terms.
+
+- [ ] Phase 5b: window-size cutoff --- decline in `reparse_ranges` when the
+  window start leaves more than a threshold share of the document
+  downstream, before the guard cascade and the window parse run. Threshold
+  picked from the bench (the crossover is around 85-90% window, where the
+  5-10% splice surcharge stops being repaid); a bench case per side of it.
+  - Promoted out of Phase 8 and ahead of Phase 6 because the flip is what makes
+    the losing shapes the *default*. Today a whole-document replace measures
+    0.2x and an early edit in the pandoc manual 0.9x; the cutoff turns both into
+    a clean \~1.0x fallback, so the flip ships something that is never worse
+    than the status quo. `full_replace` is not an exotic shape: a client that
+    answers format-on-save with a whole-document replace takes that path on
+    every save.
+  - Independent of the region tier --- it compares `reparse_range.0` against a
+    fraction of the document length and returns `None`, which is the existing
+    refusal-first contract. Phase 8 keeps the cutoff and re-tunes the threshold
+    once regions change what a window costs.
 
 - [ ] Phase 6: default flip --- `panache.incrementalParsing` default true,
   `experimental.incrementalParsing` kept as deprecated alias (LSP-only, no
@@ -342,21 +360,56 @@ this branch rebases onto that fix.
   `deprecationMessage`; client-neutral docs (`docs/guide/lsp.qmd`,
   `docs/development/lsp.qmd`, `editors/code/README.md`). Gate: oracle-clean
   fuzz at 10x iterations; workspace + LSP suite green with flag forced on
-  and off; bench thresholds (fallback < 20%, >= 2x medium / >= 5x
-  pandoc_manual, bail cost <= 20% of full parse); 1 week oracle-live
-  dogfooding with zero panics.
+  and off; 1 week oracle-live dogfooding with zero panics; and the bench
+  thresholds below.
+  - **Bench thresholds, named per case** (Phase 5 measured 1.1x and 2.7x on the
+    same document under the same tier, so an unqualified ">= 2x medium" is not a
+    criterion): `typing_stream_medium` >= 2x, `pandoc_manual_typing_stream` and
+    `pandoc_manual_late_edit` >= 5x, fallback rate < 20% on every case except
+    the two that exist to price a decline (`bail_refdef_edit`,
+    `pandoc_manual_refdef_label_edit`), bail cost <= 20% of a full parse.
+  - **Regression ceiling: no case below 0.95x.** Every threshold the phase
+    originally carried was a floor on the cases that win; nothing in it would
+    have caught `full_replace` at 0.2x. This is the criterion Phase 5b exists to
+    satisfy, and the reason it comes first. Note that the wide-window surcharge
+    (5-10%), not the bail cost (15.7% of one full parse, on the rare declining
+    shapes), is the overhead real edits actually pay.
+  - Make the thresholds mechanical rather than eyeballed --- the numbers are
+    printed and the JSON is emitted, but nothing asserts them. A
+    `PANACHE_LSP_BENCH_ASSERT=1` mode over the existing `CaseResult` fields is
+    enough, and it is what lets the gate run in CI.
 
 - [ ] Phase 7: token tier --- edit inside plain `TEXT`; newline ban,
   construct-character ban list kept honest by a grammar-grepping test, relex
   kind stability, join probes, error non-touch; char-by-char typing test.
   (The module extraction this phase also carried landed early, in Phase 4's
   S4: `crates/panache-parser/src/parser/reparse.rs`.)
+  - Phase 5's typing-stream numbers *raise* this phase's value rather than
+    lowering it. The section window already gets streams to 2.7x/5.6x, but
+    `pandoc_manual_typing_stream` still costs 1.9 ms per keystroke, because a 7%
+    window on a 300 KB document is still 21 KB re-parsed for a one-character
+    insert. This tier is O(token) instead of O(document tail) and is the only
+    thing that removes that.
+  - Exit criterion in the harness's terms: the typing-stream cases must show a
+    step change, not an improvement. And the tier has to skip the *fixed*
+    overhead too, not only the block parse --- `full_replace` puts a \~10 us
+    floor on a 1.6 KB document for machinery that ultimately parsed 27 bytes
+    (materializing the root from green, walking the cascade).
 
 - [ ] Phase 8: region tier over top-level `DOCUMENT` children replacing
   section/suffix windows --- symmetric newline-decoupling scans in old and
-  new text, `no_straddle` seam primitive, too-wide bail, fence/div balance,
+  new text, `no_straddle` seam primitive, fence/div balance,
   setext/lazy-continuation/list-tightness/HTML-block coupling guards. Fixes
-  the suffix-window reparse-to-EOF gap.
+  the suffix-window reparse-to-EOF gap. (The too-wide bail this phase used
+  to carry is Phase 5b; re-tune its threshold here.)
+  - Phase 5 confirms the premise: window share is the only lever on speedup, and
+    the current tier gets 92-98% windows on all three real documents, so it wins
+    nothing on early or mid-document edits in real files.
+  - The payoff depends on top-level *child* granularity, not on headings.
+    `tables_single_edit` edits line 40, the section window fires, and the window
+    still starts \~450 bytes in, because that is where the nearest top-level
+    heading sits. More headings would not help; regions over `DOCUMENT` children
+    are what does.
 
 - [ ] Phase 9: closeout --- architecture docs, dead-path pruning, record
   deferrals.
