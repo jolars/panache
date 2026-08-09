@@ -294,7 +294,16 @@ Optional extension settings:
 ```
 
 `panache.experimental.incrementalParsing` enables an experimental incremental
-parse path for `textDocument/didChange`. It is disabled by default.
+parse path: instead of reparsing the whole document after every edit, the server
+splices the edited region into the previous syntax tree. It is disabled by
+default. A successful splice is required to be byte-identical to a full parse,
+and the server falls back to a full parse whenever it cannot guarantee that, so
+the setting changes speed rather than results.
+
+The environment variable `PANACHE_INCREMENTAL_PARSING` overrides the setting for
+the whole server process --- `1` forces it on, `0` forces it off --- which is
+the escape hatch if a client cannot be reconfigured, or if you need to rule the
+feature out while diagnosing something.
 
 ### Open VSX (Positron, Cursor, VSCodium, etc.)
 

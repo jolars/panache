@@ -1,6 +1,5 @@
 //! Compatibility wrapper around the internal panache-parser crate.
 
-pub use panache_parser::parser::IncrementalParseResult;
 pub use panache_parser::parser::Parser;
 pub use panache_parser::parser::blocks;
 pub use panache_parser::parser::inlines;
@@ -60,46 +59,4 @@ pub fn reparse_with_refdefs(
     let mut options = config.map(|c| c.parser_options()).unwrap_or_default();
     options.refdef_labels = Some(refdefs);
     panache_parser::parser::reparse(prev_green, prev_errors, edit, new_text, &options)
-}
-
-pub fn parse_incremental_suffix(
-    input: &str,
-    config: Option<Config>,
-    old_tree: &SyntaxNode,
-    old_errors: &[SyntaxError],
-    old_edit_range: (usize, usize),
-    new_edit_range: (usize, usize),
-) -> IncrementalParseResult {
-    let parser_config = config.map(|c| c.parser_options());
-    panache_parser::parser::parse_incremental_suffix(
-        input,
-        parser_config,
-        old_tree,
-        old_errors,
-        old_edit_range,
-        new_edit_range,
-    )
-}
-
-/// Incremental reparse with a caller-supplied refdef set. See
-/// [`panache_parser::parser::parse_incremental_suffix_with_refdefs`].
-pub fn parse_incremental_suffix_with_refdefs(
-    input: &str,
-    config: Option<Config>,
-    refdefs: RefdefMap,
-    old_tree: &SyntaxNode,
-    old_errors: &[SyntaxError],
-    old_edit_range: (usize, usize),
-    new_edit_range: (usize, usize),
-) -> IncrementalParseResult {
-    let parser_config = config.map(|c| c.parser_options());
-    panache_parser::parser::parse_incremental_suffix_with_refdefs(
-        input,
-        parser_config,
-        refdefs,
-        old_tree,
-        old_errors,
-        old_edit_range,
-        new_edit_range,
-    )
 }

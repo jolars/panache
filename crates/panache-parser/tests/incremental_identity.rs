@@ -9,7 +9,10 @@
 //! these tests fail before the perf regression reaches salsa.
 
 use panache_parser::SyntaxNode;
-use panache_parser::parser::{parse, parse_incremental_suffix, parse_with_errors};
+use panache_parser::parser::{parse, parse_with_errors};
+
+mod common;
+use common::reparse_or_full;
 use rowan::{GreenNode, GreenNodeData, NodeOrToken};
 
 fn apply_edit(text: &str, old: (usize, usize), insert: &str) -> String {
@@ -50,7 +53,7 @@ fn incremental_suffix_retains_prefix_block_identity() {
     let updated = apply_edit(input, old_edit, "FIVE");
     let new_edit = (start, start + 4);
 
-    let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
+    let inc = reparse_or_full(&updated, None, &old_tree, &[], old_edit, new_edit);
     assert_eq!(
         inc.strategy, "suffix_window",
         "expected the suffix strategy"
@@ -83,7 +86,7 @@ fn section_window_retains_surrounding_block_identity() {
     let updated = apply_edit(input, old_edit, "BETA");
     let new_edit = (start, start + 4);
 
-    let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
+    let inc = reparse_or_full(&updated, None, &old_tree, &[], old_edit, new_edit);
     assert_eq!(
         inc.strategy, "section_window",
         "expected the section strategy"
@@ -126,7 +129,7 @@ fn incremental_and_full_reparse_agree_block_for_block() {
     let updated = apply_edit(input, old_edit, "BETA");
     let new_edit = (start, start + 4);
 
-    let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
+    let inc = reparse_or_full(&updated, None, &old_tree, &[], old_edit, new_edit);
     let full = parse(&updated, None);
 
     let inc_blocks = blocks(&inc.tree);
@@ -206,7 +209,7 @@ fn do_check(before_marked: &str, insert: &str, expected_strategy: &str, reparsed
     let new_edit = (old_edit.0, old_edit.0 + insert.len());
 
     let (old_tree, old_errors) = parse_with_errors(&before, None);
-    let inc = parse_incremental_suffix(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
+    let inc = reparse_or_full(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
     let (full, full_errors) = parse_with_errors(&updated, None);
 
     assert_eq!(
@@ -310,7 +313,7 @@ fn incremental_reparse_is_lossless() {
     let updated = apply_edit(input, old_edit, "THREE!!");
     let new_edit = (start, start + 7);
 
-    let inc = parse_incremental_suffix(&updated, None, &old_tree, &[], old_edit, new_edit);
+    let inc = reparse_or_full(&updated, None, &old_tree, &[], old_edit, new_edit);
     assert_eq!(
         inc.tree.text().to_string(),
         updated,

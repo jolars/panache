@@ -15,7 +15,10 @@
 //! The strategy is pinned in every case: an error assertion that silently
 //! started running against a full-parse fallback would prove nothing.
 
-use panache_parser::parser::{parse_incremental_suffix, parse_with_errors};
+use panache_parser::parser::parse_with_errors;
+
+mod common;
+use common::reparse_or_full;
 
 fn apply_edit(text: &str, old: (usize, usize), insert: &str) -> String {
     let mut out = String::with_capacity(text.len() - (old.1 - old.0) + insert.len());
@@ -37,7 +40,7 @@ fn check(input: &str, find: &str, insert: &str, expected_strategy: &str, expecte
     let updated = apply_edit(input, old_edit, insert);
     let new_edit = (old_edit.0, old_edit.0 + insert.len());
 
-    let inc = parse_incremental_suffix(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
+    let inc = reparse_or_full(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
     let (_, full_errors) = parse_with_errors(&updated, None);
 
     assert_eq!(

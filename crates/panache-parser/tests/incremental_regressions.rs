@@ -9,7 +9,10 @@
 //! They are pinned here because this harness found them, but they were
 //! fixed in the block parser, not in the incremental machinery.
 
-use panache_parser::parser::{fingerprint, parse, parse_incremental_suffix, parse_with_errors};
+use panache_parser::parser::{fingerprint, parse, parse_with_errors};
+
+mod common;
+use common::reparse_or_full;
 
 fn apply_edit(text: &str, old: (usize, usize), insert: &str) -> String {
     let mut out = String::with_capacity(text.len() - (old.1 - old.0) + insert.len());
@@ -94,7 +97,7 @@ fn check_incremental(before: &str, old_edit: (usize, usize), insert: &str) {
     let (old_tree, old_errors) = parse_with_errors(before, None);
     let updated = apply_edit(before, old_edit, insert);
     let new_edit = (old_edit.0, old_edit.0 + insert.len());
-    let inc = parse_incremental_suffix(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
+    let inc = reparse_or_full(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
     let (full, full_errors) = parse_with_errors(&updated, None);
     assert_eq!(
         inc.tree.text().to_string(),

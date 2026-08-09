@@ -181,11 +181,11 @@ records any deviation or discovered follow-up as an indented bullet under the
 phase. Never leave a phase half-landed: partial work is noted in the status line
 with the exact next step.
 
-**Current status / next step:** Phases 1--3 done; fuzz harness clean at 30x
-iterations across all four option tiers, errors included. Next step is Phase 4
-(salsa unification), whose entry criteria are met: the reparse now carries
-errors, so `parsed_document` has something to return. The host-level refdef-set
-comparison is Phase 4 work.
+**Current status / next step:** Phases 1--4 done; there is now one authoritative
+tree, and the reparse lives inside salsa's `parsed_document`. Next step is Phase
+5 (benchmark repair), whose entry criteria are met: the bench compiles against
+the new `reparse` entry point but its multi-change path still degenerates to a
+full reparse, and it has no fallback-rate or bail-cost accounting.
 
 `incremental_regressions.rs` carries no ignored *incremental* tests; the two
 `#[ignore]`d tests there pin one full-parser bug (setext-after-setext), tracked
@@ -266,12 +266,37 @@ this branch rebases onto that fix.
     "Parser bugs found by the incremental fuzzer", where the fix belongs; it is
     not an incremental bug.
 
-- [ ] Phase 4: salsa unification --- reparse moves into `parsed_document` with a
+- [x] Phase 4: salsa unification --- reparse moves into `parsed_document` with a
   side-channel reparse base (fatou model, no staged edit chain: whole-text
   `diff_edit` recovers the single combined edit); base keyed on config +
   refdef set; admission-gated by the runtime flag; delete
   `DocumentState.tree` and the edit-range coalescing helpers; new
   `tests/salsa_incremental.rs`. Staged commits S1-S4, each green.
+  - The design doc's three-bucket section-window error splice was already
+    obsolete: Phase 3 shipped `merge_incremental_errors` with **two** buckets
+    (both strategies parse to EOF), so S2 reused it unchanged.
+  - `ReparseCache` has no admitted-set beside its map: presence *is* admission,
+    so the two cannot drift apart. Fatou's hot/cold eviction classes are
+    unnecessary here for the same reason --- a sweep or a sibling-config parse
+    never enters the cache at all, so plain LRU over admitted entries suffices.
+  - The parser's textual `edit_may_touch_refdefs` guard stays even though the
+    host now compares the sets exactly: it is cheap, and it is the only refdef
+    protection the parser-crate entry point has (it holds no refdef history).
+  - The host oracle is gated on `cfg(debug_assertions)` +
+    `PANACHE_REPARSE_ORACLE=1`, not `cfg(test)` as designed --- integration
+    tests link the library built *without* `cfg(test)`, so a `cfg(test)` gate
+    would have excluded exactly the suites (`tests/lsp.rs`,
+    `tests/salsa_incremental.rs`) it exists to cover.
+  - New: `PANACHE_INCREMENTAL_PARSING=1|0` overrides the client setting for the
+    whole server process. Phase 6 wanted an escape hatch anyway, and it is what
+    lets the suite run green with the feature forced on *and* forced off (the
+    handful of tests that assert the setting's own plumbing skip under it).
+  - Phase 7's `parser/incremental.rs` extraction was pulled forward into S4 as
+    `parser/reparse.rs`, since S4 was already moving the surrounding code. The
+    retired `parse_incremental_suffix*` fallback policy now lives with the
+    callers that want it: `crates/panache-parser/tests/common/mod.rs` for the
+    suites, a `#[cfg(test)]` shim in `reparse.rs` for the in-crate tests, and
+    `try_reparse` in `benches/lsp_incremental.rs`.
 
 - [ ] Phase 5: benchmark repair --- fix `benches/lsp_incremental.rs`
   multi-change path (currently degenerates to full reparse), add
@@ -289,8 +314,9 @@ this branch rebases onto that fix.
 
 - [ ] Phase 7: token tier --- edit inside plain `TEXT`; newline ban,
   construct-character ban list kept honest by a grammar-grepping test, relex
-  kind stability, join probes, error non-touch; extract
-  `parser/incremental.rs`; char-by-char typing test.
+  kind stability, join probes, error non-touch; char-by-char typing test.
+  (The module extraction this phase also carried landed early, in Phase 4's
+  S4: `crates/panache-parser/src/parser/reparse.rs`.)
 
 - [ ] Phase 8: region tier over top-level `DOCUMENT` children replacing
   section/suffix windows --- symmetric newline-decoupling scans in old and

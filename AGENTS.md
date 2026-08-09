@@ -305,9 +305,16 @@ read the release asset hygiene invariant before touching release workflows.
   `DiagnosticCollection`. Salsa's `Cancelled` unwind (`catch_cancelled` in
   `src/lsp/helpers.rs`) is the concurrency fence --- a main-thread write cancels
   in-flight worker reads.
-- Per-document state is represented by `DocumentState` (path, salsa inputs, CST
-  `GreenNode` --- stored as `GreenNode` because it is `Send + Sync`, unlike the
-  cursor-carrying `SyntaxNode`, which workers materialize per request).
+- Per-document state is represented by `DocumentState`, which is *only* salsa
+  input handles (`file_id`, `salsa_file`, `salsa_config`). It holds no tree: the
+  notification handlers write inputs and never parse, and every consumer derives
+  the tree from `crate::salsa::parsed_document`. Salsa caches `GreenNode`
+  (`Send + Sync`) rather than the cursor-carrying `SyntaxNode`, which workers
+  materialize per request.
+- Incremental reparsing lives inside `parsed_document`, splicing off a base kept
+  in a side channel (`src/incremental.rs`) that only LSP-admitted documents
+  enter. See `docs/development/lsp.qmd`; with `experimental.incrementalParsing`
+  off, nothing is admitted and every parse is a full parse.
 - Incremental sync mode with UTF-16/UTF-8 position conversion
   (`src/lsp/conversions.rs`, `src/lsp/line_index.rs`).
 - Request handlers live in `src/lsp/handlers/`, routed by `src/lsp/dispatch.rs`.
@@ -456,5 +463,6 @@ pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode
 
 `format` and `parse` accept optional config to respect flavor-specific
 extensions and formatting preferences. Lower-level entry points (`format_tree`,
-`format_with_tree`, `parse_with_refdefs`, `parse_incremental_suffix`) exist for
-the LSP and incremental paths.
+`format_with_tree`, `parse_with_refdefs`, `reparse_with_refdefs`) exist for the
+LSP and incremental paths. `reparse_with_refdefs` is refusal-first: `None` means
+"no reuse available", and the caller full-parses.

@@ -32,10 +32,11 @@
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use panache_parser::parser::{
-    SyntaxError, fingerprint, parse_incremental_suffix, parse_with_errors,
-};
+use panache_parser::parser::{SyntaxError, fingerprint, parse_with_errors};
 use panache_parser::{Dialect, Extensions, Flavor, ParserOptions};
+
+mod common;
+use common::reparse_or_full;
 
 /// One parser-option configuration to fuzz under, with its share of the
 /// per-snippet budget.
@@ -398,7 +399,7 @@ fn check_edit(
     // The in-crate debug oracle panics inside the call on divergence; catch
     // it so the failure report carries the reproducing case.
     let outcome = catch_unwind(AssertUnwindSafe(|| {
-        parse_incremental_suffix(
+        reparse_or_full(
             &updated,
             Some(options.clone()),
             old_tree,

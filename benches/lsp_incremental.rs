@@ -1,5 +1,5 @@
 use panache::Config;
-use panache::parser::parse_incremental_suffix;
+use panache::parser::{Edit, Reparsed, reparse_with_refdefs};
 use serde::Serialize;
 use std::env;
 use std::fs;
@@ -187,27 +187,33 @@ fn suffix_incremental_runtime_strategy(
     if let Some((updated_text, old_edit, new_edit)) =
         apply_change_strict_with_offsets(input, change)
     {
-        let incremental = parse_incremental_suffix(
-            &updated_text,
-            Some(config.clone()),
-            old_tree,
-            &[],
-            old_edit,
-            new_edit,
-        );
-        let reparsed_range = incremental.reparse_range;
-        let updated_tree = incremental.tree;
-        let strategy_used = incremental.strategy;
-        let used_suffix_path =
-            strategy_used == "suffix_window" || strategy_used == "section_window";
-        return StrategyRun {
-            updated_text,
-            tree_end_offset: updated_tree.text_range().end().into(),
-            reparsed_range,
-            used_suffix_path,
-            fallback_reason: (!used_suffix_path).then_some("incremental_fallback_full_reparse"),
-            strategy_used,
-        };
+        match try_reparse(&updated_text, old_tree, config, old_edit, new_edit) {
+            Some(reparsed) => {
+                let strategy_used = reparsed.strategy.as_str();
+                return StrategyRun {
+                    tree_end_offset: usize::from(reparsed.green.text_len()),
+                    updated_text,
+                    reparsed_range: reparsed.reparse_range,
+                    used_suffix_path: true,
+                    fallback_reason: None,
+                    strategy_used,
+                };
+            }
+            None => {
+                // A declined reparse still costs its guard cascade, and that
+                // cost is what the bench is measuring on this path.
+                let end = updated_text.len();
+                let tree = panache::parse(&updated_text, Some(config.clone()));
+                return StrategyRun {
+                    updated_text,
+                    tree_end_offset: tree.text_range().end().into(),
+                    reparsed_range: (0, end),
+                    used_suffix_path: false,
+                    fallback_reason: Some("incremental_fallback_full_reparse"),
+                    strategy_used: "full_reparse",
+                };
+            }
+        }
     }
 
     let mut run = full_reparse_strategy(input, changes, config);
@@ -302,6 +308,38 @@ fn run_case(
     }
 }
 
+/// One reparse attempt in the shape the bench's callers want: `None` when the
+/// guard cascade declines, which is the fallback path the fallback-rate numbers
+/// are counting.
+fn try_reparse(
+    updated_text: &str,
+    old_tree: &panache::SyntaxNode,
+    config: &Config,
+    old_edit: (usize, usize),
+    new_edit: (usize, usize),
+) -> Option<Reparsed> {
+    let insert = updated_text.get(new_edit.0..new_edit.1)?;
+    if new_edit.0 != old_edit.0 {
+        return None;
+    }
+    let edit = Edit {
+        range: old_edit.0..old_edit.1,
+        insert: insert.to_string(),
+    };
+    let refdefs = panache::parser::collect_refdef_labels(
+        updated_text,
+        panache_parser::Dialect::for_flavor(config.flavor),
+    );
+    reparse_with_refdefs(
+        &old_tree.green().to_owned(),
+        &[],
+        &edit,
+        updated_text,
+        Some(config.clone()),
+        refdefs,
+    )
+}
+
 fn assert_case_tree_equivalence(
     input: &str,
     changes: &[BenchChange],
@@ -316,15 +354,10 @@ fn assert_case_tree_equivalence(
         if let Some((updated_text, old_edit, new_edit)) =
             apply_change_strict_with_offsets(input, change)
         {
-            parse_incremental_suffix(
-                &updated_text,
-                Some(config.clone()),
-                old_tree,
-                &[],
-                old_edit,
-                new_edit,
-            )
-            .tree
+            match try_reparse(&updated_text, old_tree, config, old_edit, new_edit) {
+                Some(reparsed) => panache::SyntaxNode::new_root(reparsed.green),
+                None => panache::parse(&updated_text, Some(config.clone())),
+            }
         } else {
             panache::parse(&baseline.updated_text, Some(config.clone()))
         }
