@@ -12,6 +12,11 @@ use tempfile::TempDir;
 /// runtime setting live (it was previously only read once at `initialize`).
 #[test]
 fn did_change_configuration_updates_runtime_setting() {
+    // This asserts the client-settings plumbing, which the environment
+    // override deliberately bypasses.
+    if incremental_parsing_forced_by_env() {
+        return;
+    }
     let mut server = TestLspServer::new();
     server.initialize("file:///workspace");
     server.open_document("file:///workspace/doc.qmd", "# Title\n", "quarto");

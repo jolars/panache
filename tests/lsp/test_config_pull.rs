@@ -51,6 +51,11 @@ fn initialized_pulls_panache_configuration() {
 /// `experimental.incrementalParsing = true` flips the flag live.
 #[test]
 fn configuration_reply_applies_runtime_setting() {
+    // This asserts the client-settings plumbing, which the environment
+    // override deliberately bypasses.
+    if incremental_parsing_forced_by_env() {
+        return;
+    }
     let mut server = TestLspServer::new();
     server.initialize_pull_configuration("file:///workspace");
     server.initialized();
@@ -113,6 +118,11 @@ fn no_capability_means_no_pull() {
 /// runtime settings.
 #[test]
 fn empty_configuration_reply_is_noop() {
+    // This asserts the client-settings plumbing, which the environment
+    // override deliberately bypasses.
+    if incremental_parsing_forced_by_env() {
+        return;
+    }
     let mut server = TestLspServer::new();
     server.initialize_pull_configuration("file:///workspace");
     server.initialized();

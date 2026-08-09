@@ -9,6 +9,7 @@ pub mod external_formatters_sync;
 mod external_tools_common;
 pub mod formatter;
 pub mod includes;
+pub mod incremental;
 pub mod linter;
 #[cfg(feature = "lsp")]
 pub mod lsp;

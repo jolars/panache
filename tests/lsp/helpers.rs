@@ -8,6 +8,26 @@ use lsp_types::*;
 
 pub use panache::lsp::{LspTester as TestLspServer, UriExt};
 
+/// Whether `PANACHE_INCREMENTAL_PARSING` is forcing the incremental-parsing
+/// flag, which makes assertions about the *client settings* plumbing moot.
+///
+/// Only tests that assert the flag's value, or that need it in a particular
+/// state, use these guards; every test that asserts document *behavior* must
+/// pass either way, which is the whole point of running the suite with the
+/// override set.
+pub fn incremental_parsing_forced_by_env() -> bool {
+    std::env::var("PANACHE_INCREMENTAL_PARSING").is_ok()
+}
+
+/// Whether the environment override is forcing incremental parsing *off*, so a
+/// test that needs it on cannot run.
+pub fn incremental_parsing_forced_off() -> bool {
+    matches!(
+        std::env::var("PANACHE_INCREMENTAL_PARSING").as_deref(),
+        Ok("0") | Ok("false")
+    )
+}
+
 /// Helper to create a simple text change event (full document replacement).
 pub fn full_document_change(text: &str) -> TextDocumentContentChangeEvent {
     TextDocumentContentChangeEvent {

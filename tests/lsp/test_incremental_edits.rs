@@ -30,6 +30,11 @@ fn test_incremental_edit_simple() {
 
 #[test]
 fn test_experimental_incremental_parsing_setting_defaults_to_off() {
+    // This asserts the client-settings plumbing, which the environment
+    // override deliberately bypasses.
+    if incremental_parsing_forced_by_env() {
+        return;
+    }
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root_uri = Uri::from_file_path(temp_dir.path()).unwrap();
     let mut server = TestLspServer::new();
@@ -40,6 +45,11 @@ fn test_experimental_incremental_parsing_setting_defaults_to_off() {
 
 #[test]
 fn test_experimental_incremental_parsing_setting_can_be_enabled() {
+    // Needs the incremental flag on; the environment override can force it
+    // off for a flag-off suite run.
+    if incremental_parsing_forced_off() {
+        return;
+    }
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root_uri = Uri::from_file_path(temp_dir.path()).unwrap();
     let mut server = TestLspServer::new();
@@ -245,7 +255,7 @@ fn test_incremental_edit_multiple_changes_with_utf16_positions() {
 }
 
 #[test]
-fn test_incremental_edit_multiple_changes_use_full_reparse() {
+fn test_incremental_edit_many_changes_in_one_notification_match_full_parse() {
     let mut server = TestLspServer::new();
 
     server.open_document("file:///cap.qmd", "aaaaaaaaaa\n", "quarto");
@@ -276,7 +286,7 @@ fn test_incremental_edit_multiple_changes_use_full_reparse() {
 }
 
 #[test]
-fn test_incremental_edit_multiple_changes_descending_coalesces_experimental() {
+fn test_incremental_edit_multiple_descending_changes_match_full_parse() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root_uri = Uri::from_file_path(temp_dir.path()).unwrap();
     let mut server = TestLspServer::new();
@@ -362,6 +372,11 @@ fn test_incremental_edit_lazy_blockquote_transition_matches_full_parse() {
 
 #[test]
 fn test_incremental_edit_frontmatter_delimiter_with_experimental_mode() {
+    // Needs the incremental flag on; the environment override can force it
+    // off for a flag-off suite run.
+    if incremental_parsing_forced_off() {
+        return;
+    }
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root_uri = Uri::from_file_path(temp_dir.path()).unwrap();
     let mut server = TestLspServer::new();
@@ -404,6 +419,11 @@ fn test_incremental_edit_frontmatter_delimiter_with_experimental_mode() {
 
 #[test]
 fn test_incremental_edit_deleting_heading_boundary_with_experimental_mode() {
+    // Needs the incremental flag on; the environment override can force it
+    // off for a flag-off suite run.
+    if incremental_parsing_forced_off() {
+        return;
+    }
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root_uri = Uri::from_file_path(temp_dir.path()).unwrap();
     let mut server = TestLspServer::new();
@@ -439,4 +459,90 @@ fn test_incremental_edit_deleting_heading_boundary_with_experimental_mode() {
         .expect("tree after heading boundary deletion");
     let expected = panache::parse(expected_text, None);
     assert_eq!(tree_after.to_string(), expected.to_string());
+}
+
+/// End to end: with the setting on, a keystroke splices against the parse the
+/// server already served, and the spliced tree is the one every handler sees.
+///
+/// The two `get_document_tree` calls are what make this an incremental test at
+/// all -- the first demands the parse that becomes the base, the second the
+/// parse that reuses it. Without the demand in between, an edit only ever meets
+/// a cold cache.
+#[test]
+fn test_incremental_edit_reuses_the_served_tree_when_enabled() {
+    // Needs the incremental flag on; the environment override can force it
+    // off for a flag-off suite run.
+    if incremental_parsing_forced_off() {
+        return;
+    }
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root_uri = Uri::from_file_path(temp_dir.path()).unwrap();
+    let mut server = TestLspServer::new();
+
+    server.initialize_with_options(
+        root_uri.as_str(),
+        Some(json!({
+            "settings": {
+                "panache": {
+                    "experimental": {
+                        "incrementalParsing": true
+                    }
+                }
+            }
+        })),
+    );
+
+    let initial = "# One\n\nalpha\n\n# Two\n\nbeta\n\n# Three\n\ngamma\n";
+    server.open_document("file:///reuse.qmd", initial, "quarto");
+
+    let before = server
+        .get_document_tree("file:///reuse.qmd")
+        .expect("tree on open");
+    // Own the block so its allocation cannot be freed and its address reused;
+    // identity is the only observable that distinguishes a splice from a full
+    // parse, because the two produce equal values by construction.
+    let first_block = before
+        .green()
+        .children()
+        .next()
+        .and_then(|child| child.into_node().map(|node| node.to_owned()))
+        .expect("document starts with a block");
+    let first_block_addr = green_addr(&first_block);
+
+    server.edit_document(
+        "file:///reuse.qmd",
+        vec![incremental_change(10, 0, 10, 5, "GAMMA")],
+    );
+
+    let expected_text = "# One\n\nalpha\n\n# Two\n\nbeta\n\n# Three\n\nGAMMA\n";
+    assert_eq!(
+        server.get_document_content("file:///reuse.qmd"),
+        Some(expected_text.to_string())
+    );
+
+    let after = server
+        .get_document_tree("file:///reuse.qmd")
+        .expect("tree after edit");
+    assert_eq!(
+        after.to_string(),
+        panache::parse(expected_text, None).to_string(),
+    );
+    let after_first = after
+        .green()
+        .children()
+        .next()
+        .and_then(|child| child.into_node().map(|node| node.to_owned()))
+        .expect("document starts with a block");
+    assert_eq!(
+        green_addr(&after_first),
+        first_block_addr,
+        "the untouched first block must survive the splice by identity",
+    );
+}
+
+/// The address of a green node's shared allocation: two handles onto the same
+/// allocation report the same address, two independent parses do not.
+fn green_addr(node: &rowan::GreenNode) -> usize {
+    let data: &rowan::GreenNodeData = node;
+    data as *const rowan::GreenNodeData as usize
 }

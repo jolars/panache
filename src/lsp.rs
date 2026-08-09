@@ -9,7 +9,6 @@ use crossbeam_channel::select;
 use lsp_server::{Connection, Message};
 use lsp_types::InitializeParams;
 use lsp_types::notification::Notification as _;
-use rowan::GreenNode;
 
 mod config;
 mod context;
@@ -44,21 +43,6 @@ pub struct DocumentState {
     pub salsa_file: crate::salsa::FileText,
     /// Salsa input for this document's config.
     pub salsa_config: crate::salsa::FileConfig,
-    /// The previous parse, kept solely as `did_change`'s incremental-splice
-    /// base. Nothing *reads* it as a tree any more: handlers, the linter, and
-    /// diagnostics all go through salsa's `parsed_document`, which is the
-    /// authoritative parse. Retired when the reparse moves into that query
-    /// (roadmap Phase 4).
-    pub tree: GreenNode,
-    /// The embedded-sublanguage syntax errors that go with [`Self::tree`].
-    ///
-    /// Carried purely so the next incremental reparse can splice the retained
-    /// prefix's errors into its result: a reparse that under-reports them
-    /// diverges from a full parse, which the parser crate's debug oracle
-    /// treats as a bug. LSP diagnostics come from salsa's `parse_syntax_errors`,
-    /// not from here. Retired together with [`Self::tree`] when the reparse
-    /// moves into salsa (roadmap Phase 4).
-    pub errors: Vec<crate::parser::SyntaxError>,
 }
 
 #[derive(Debug, Clone, Default)]

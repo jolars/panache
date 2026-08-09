@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use crate::config::Config;
+use crate::incremental::{PrevParse, ReparseAdmission, ReparseCache};
 use crate::linter::diagnostics::Diagnostic;
 use crate::metadata::DocumentMetadata;
 use crate::syntax::{
@@ -149,18 +150,115 @@ pub struct ParsedDocument {
     pub errors: Vec<crate::parser::SyntaxError>,
 }
 
+/// The document's parse, incrementally when the side channel can supply a
+/// usable base and a full parse otherwise.
+///
+/// The result is the same either way: a successful reparse is byte-identical
+/// to a full parse of the same text, tree *and* errors (the governing
+/// invariant, asserted by the parser crate's debug oracle on every splice and,
+/// under `PANACHE_REPARSE_ORACLE=1`, again here against a real full parse
+/// before anything is stored). So this stays a pure function of `(file,
+/// config)` and salsa still sees only input changes.
+///
+/// Reuse is refused unless the base was recorded under the *same* config and
+/// the *same* refdef set: retained blocks keep the reference resolution and
+/// parser options they were parsed with, so either changing invalidates the
+/// whole prefix at a distance.
 #[salsa::tracked(returns(ref), lru = 512, no_eq, unsafe(non_salsa_values))]
 pub fn parsed_document(db: &dyn Db, file: FileText, config: FileConfig) -> ParsedDocument {
     let refdefs = refdef_set(db, file, config).clone();
-    let (tree, errors) = crate::parser::parse_with_refdefs_and_errors(
-        file.content_or_empty(db),
-        Some(config.config(db).clone()),
-        refdefs,
-    );
-    ParsedDocument {
-        green: tree.green().to_owned(),
-        errors,
+    let text = file.text(db).clone().unwrap_or_else(|| Arc::from(""));
+    let cfg = config.config(db);
+
+    let admission = db.reparse_base(file, config);
+    let prev = match &admission {
+        ReparseAdmission::Refused => None,
+        ReparseAdmission::Admitted(prev) => prev.clone(),
+    };
+
+    // Text unchanged: the base already holds what a full parse would return.
+    // Salsa usually spares us the call entirely, so this is the cold path --
+    // an LRU eviction, or a write that set the text back to what the base
+    // holds. Nothing is stored; the base has not moved.
+    if let Some(prev) = prev
+        .as_ref()
+        .filter(|prev| prev.text == text && prev.config == *cfg && prev.refdefs == refdefs)
+    {
+        return ParsedDocument {
+            green: prev.green.clone(),
+            errors: prev.errors.clone(),
+        };
     }
+
+    let reused = prev.and_then(|prev| {
+        // `RefdefMap` is an `Arc<HashSet<_>>` and `refdef_set` backdates on
+        // set-equality, so an unchanged set is literally the same allocation
+        // and this comparison short-circuits on the pointer.
+        if prev.config != *cfg || prev.refdefs != refdefs {
+            return None;
+        }
+        let edit = crate::parser::diff_edit(&prev.text, &text);
+        crate::parser::reparse_with_refdefs(
+            &prev.green,
+            &prev.errors,
+            &edit,
+            &text,
+            Some(cfg.clone()),
+            refdefs.clone(),
+        )
+    });
+
+    let parsed = match reused {
+        Some(reparsed) => {
+            debug_assert_eq!(
+                usize::from(reparsed.green.text_len()),
+                text.len(),
+                "spliced tree disagrees with the text it was spliced from"
+            );
+            let parsed = ParsedDocument {
+                green: reparsed.green,
+                errors: reparsed.errors,
+            };
+            crate::incremental::assert_reuse_matches_full_parse(&parsed, &text, cfg, &refdefs);
+            log::trace!(
+                "parsed_document: {} splice over {:?}",
+                reparsed.strategy.as_str(),
+                reparsed.reparse_range
+            );
+            parsed
+        }
+        None => {
+            let (tree, errors) = crate::parser::parse_with_refdefs_and_errors(
+                &text,
+                Some(cfg.clone()),
+                refdefs.clone(),
+            );
+            ParsedDocument {
+                green: tree.green().to_owned(),
+                errors,
+            }
+        }
+    };
+
+    // Store last, after every fallible step, so a panic or a salsa `Cancelled`
+    // unwind mid-query can never leave a base whose text and tree disagree. A
+    // cancelled query simply stores nothing and the next one diffs from the
+    // older base -- a wider edit, still a correct one.
+    if matches!(admission, ReparseAdmission::Admitted(_)) {
+        db.reparse_store(
+            file,
+            config,
+            PrevParse {
+                text,
+                green: parsed.green.clone(),
+                errors: parsed.errors.clone(),
+                refdefs,
+                config: cfg.clone(),
+            },
+        );
+    }
+
+    parsed
 }
 
 /// The cached green tree for `(file, config)`.
@@ -2574,6 +2672,24 @@ pub trait Db: salsa::Database {
     /// The shared [`FileSet`] input. `project_graph` reads it to depend on the
     /// set of interned files; the writer adds ids as it discovers references.
     fn file_set(&self) -> FileSet;
+
+    /// The incremental-reparse side channel's view of `(file, config)`.
+    ///
+    /// The default refuses, which is what makes every throwaway or test
+    /// database (and every `Db` impl that never opts in) full-parse with no
+    /// side-channel activity at all. Only [`SalsaDb`] overrides it, and only
+    /// for documents the LSP has admitted.
+    ///
+    /// This does not make [`parsed_document`] impure: a successful reparse is
+    /// byte-identical to a full parse, so the channel changes computation time
+    /// and nothing else. See [`crate::incremental`].
+    fn reparse_base(&self, _file: FileText, _config: FileConfig) -> ReparseAdmission {
+        ReparseAdmission::Refused
+    }
+
+    /// Record `prev` as the reparse base for `(file, config)`. No-op by
+    /// default, and no-op in [`SalsaDb`] for a pair that was never admitted.
+    fn reparse_store(&self, _file: FileText, _config: FileConfig, _prev: PrevParse) {}
 }
 
 #[salsa::db]
@@ -2583,6 +2699,10 @@ pub struct SalsaDb {
     /// The single owner of file identity: the path<->id<->input interner and the
     /// structural [`FileSet`] input handle (see [`crate::vfs::Vfs`]).
     vfs: Vfs,
+    /// The incremental-reparse side channel, shared across cloned handles the
+    /// same way [`Vfs`] is, so a worker's snapshot splices against the same
+    /// bases the writer records. See [`crate::incremental`].
+    reparse: Arc<Mutex<ReparseCache>>,
 }
 
 impl Default for SalsaDb {
@@ -2590,6 +2710,7 @@ impl Default for SalsaDb {
         let db = Self {
             storage: salsa::Storage::default(),
             vfs: Vfs::default(),
+            reparse: Arc::default(),
         };
         // Mint the `FileSet` input now (on the constructing thread) so the VFS's
         // `OnceLock` is populated before any cloned worker handle reads it.
@@ -2599,6 +2720,35 @@ impl Default for SalsaDb {
 }
 
 impl SalsaDb {
+    /// The reparse side channel, recovering from a poisoned lock rather than
+    /// propagating the panic: losing the cache costs a full parse, never a
+    /// wrong answer.
+    ///
+    /// Callers must never hold this guard across a salsa call. The lock order
+    /// is strictly salsa -> side channel, so a `salsa::Cancelled` unwind can
+    /// never pass through a held lock and no deadlock is reachable.
+    fn reparse_state(&self) -> MutexGuard<'_, ReparseCache> {
+        self.reparse.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Admit `(file, config)` to the reparse side channel, so its parses start
+    /// keeping a base. Writer-only, and the LSP's only gate on incremental
+    /// parsing: nothing else in the process admits anything.
+    pub fn reparse_admit(&mut self, file: FileText, config: FileConfig) {
+        self.reparse_state().admit((file, config));
+    }
+
+    /// Drop every base for `file`. Writer-only; called when a document closes.
+    pub fn reparse_retire_file(&mut self, file: FileText) {
+        self.reparse_state().retire_file(file);
+    }
+
+    /// Empty the side channel. Writer-only; called when incremental parsing is
+    /// switched off at runtime.
+    pub fn reparse_clear(&mut self) {
+        self.reparse_state().clear();
+    }
+
     pub fn file_text_if_cached(&self, path: &Path) -> Option<FileText> {
         self.vfs.input_for_path(path)
     }
@@ -2935,12 +3085,19 @@ impl Db for SalsaDb {
         // worker handles share the same `OnceLock` and only ever read it back.
         self.vfs.file_set(self)
     }
+
+    fn reparse_base(&self, file: FileText, config: FileConfig) -> ReparseAdmission {
+        self.reparse_state().base((file, config))
+    }
+
+    fn reparse_store(&self, file: FileText, config: FileConfig, prev: PrevParse) {
+        self.reparse_state().store((file, config), prev);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -4140,6 +4297,7 @@ mod tests {
         let db = SalsaDb {
             storage,
             vfs: Vfs::default(),
+            reparse: Arc::default(),
         };
         db.file_set();
         (db, log)

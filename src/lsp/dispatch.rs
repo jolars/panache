@@ -188,6 +188,22 @@ fn legacy_root_uri(params: &InitializeParams) -> Option<Uri> {
 /// that different clients use for both `initializationOptions` and
 /// `workspace/didChangeConfiguration`. Returns `None` when the key is absent so
 /// callers can distinguish "unset" from "explicitly false".
+/// Environment override for the incremental-parsing flag, winning over
+/// whatever the client asked for.
+///
+/// `PANACHE_INCREMENTAL_PARSING=1` forces it on and `=0` forces it off. This is
+/// the escape hatch for running the whole suite (or a dogfooding session) both
+/// ways without a client that can be reconfigured, and for switching the
+/// feature off in the field without editing editor settings. Unset means "let
+/// the client decide", which is the normal path.
+pub(crate) fn incremental_parsing_env_override() -> Option<bool> {
+    match std::env::var("PANACHE_INCREMENTAL_PARSING").ok()?.as_str() {
+        "1" | "true" => Some(true),
+        "0" | "false" => Some(false),
+        _ => None,
+    }
+}
+
 pub(crate) fn runtime_incremental_parsing_from_value(value: &Value) -> Option<bool> {
     fn get_bool(value: &Value, path: &[&str]) -> Option<bool> {
         let mut current = value;
@@ -206,11 +222,13 @@ pub(crate) fn runtime_incremental_parsing_from_value(value: &Value) -> Option<bo
 }
 
 fn experimental_incremental_parsing_from_initialize(params: &InitializeParams) -> bool {
-    params
-        .initialization_options
-        .as_ref()
-        .and_then(runtime_incremental_parsing_from_value)
-        .unwrap_or(false)
+    incremental_parsing_env_override().unwrap_or_else(|| {
+        params
+            .initialization_options
+            .as_ref()
+            .and_then(runtime_incremental_parsing_from_value)
+            .unwrap_or(false)
+    })
 }
 
 impl GlobalState {

@@ -51,13 +51,33 @@ pub(crate) fn apply_pulled_configuration(gs: &mut GlobalState, value: Value) {
 /// (`settings.panache.*`) and a section-scoped pull reply (bare `experimental.*`)
 /// — both handled by [`runtime_incremental_parsing_from_value`].
 fn apply_runtime_settings(gs: &mut GlobalState, value: &Value) {
-    if let Some(incremental) = runtime_incremental_parsing_from_value(value)
+    // The environment override wins over the client, so a suite (or a
+    // dogfooding session) forced one way stays that way across a
+    // `didChangeConfiguration`.
+    if let Some(incremental) = crate::lsp::dispatch::incremental_parsing_env_override()
+        .or_else(|| runtime_incremental_parsing_from_value(value))
         && gs.runtime_settings.experimental_incremental_parsing != incremental
     {
         log::debug!(
             "lsp runtime setting experimental.incrementalParsing={incremental} (client settings)"
         );
         gs.runtime_settings.experimental_incremental_parsing = incremental;
+        if incremental {
+            // Admit what is already open; a document opened before the toggle
+            // would otherwise never get a base.
+            let open: Vec<(crate::salsa::FileText, crate::salsa::FileConfig)> = gs
+                .document_map
+                .values()
+                .map(|state| (state.salsa_file, state.salsa_config))
+                .collect();
+            for (file, config) in open {
+                gs.salsa.reparse_admit(file, config);
+            }
+        } else {
+            // Switching off empties the side channel, so the flag-off path is
+            // not merely unused but demonstrably inert.
+            gs.salsa.reparse_clear();
+        }
     }
 }
 

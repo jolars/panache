@@ -4,9 +4,6 @@ use crate::linter;
 use crate::linter::Severity as PanacheSeverity;
 use crate::lsp::line_index::LineIndex;
 
-pub(crate) type ByteEditRange = (usize, usize);
-pub(crate) type AppliedEditChange = (String, ByteEditRange, ByteEditRange);
-
 /// Convert an LSP UTF-16 position to a byte offset via the cached [`LineIndex`].
 pub(crate) fn position_to_offset(index: &LineIndex, position: Position) -> Option<usize> {
     index.position_to_offset(position)
@@ -73,28 +70,6 @@ pub(crate) fn apply_content_change(text: &str, change: &TextDocumentContentChang
             change.text.clone()
         }
     }
-}
-
-pub(crate) fn apply_content_change_with_edit_ranges(
-    text: &str,
-    change: &TextDocumentContentChangeEvent,
-) -> Option<AppliedEditChange> {
-    let range = change.range?;
-    let index = LineIndex::new(text);
-    let start_offset = position_to_offset(&index, range.start)?;
-    let end_offset = position_to_offset(&index, range.end)?;
-    if start_offset > end_offset || end_offset > text.len() {
-        return None;
-    }
-
-    let mut result =
-        String::with_capacity(text.len() - (end_offset - start_offset) + change.text.len());
-    result.push_str(&text[..start_offset]);
-    result.push_str(&change.text);
-    result.push_str(&text[end_offset..]);
-    let new_end = start_offset + change.text.len();
-
-    Some((result, (start_offset, end_offset), (start_offset, new_end)))
 }
 
 #[cfg(test)]

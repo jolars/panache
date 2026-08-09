@@ -115,6 +115,11 @@ fn test_did_change_publishes_diagnostics_to_client() {
 
 #[test]
 fn test_bibliography_load_error_span_updates_after_ranged_edit() {
+    // Needs the incremental flag on; the environment override can force it
+    // off for a flag-off suite run.
+    if incremental_parsing_forced_off() {
+        return;
+    }
     let mut server = TestLspServer::new();
     server.initialize_with_options(
         "file:///workspace",

@@ -1,11 +1,14 @@
 //! Document lifecycle notifications (`didOpen`/`didChange`/`didSave`/`didClose`).
 //!
 //! These run synchronously on the main-loop thread with `&mut GlobalState`: they
-//! are the sole writers of the salsa database and the document map. Parsing and
-//! state updates happen inline so interactive requests always see the latest
-//! tree; the expensive lint (project-graph recompute + diagnostics) is deferred
-//! to the debounced workspace settle, which re-lints every open document over one
-//! snapshot. Every salsa-input write here arms that settle (directly or via
+//! are the sole writers of the salsa database and the document map. They write
+//! *inputs* only -- no parsing happens here. The tree is derived on demand from
+//! `crate::salsa::parsed_document`, which splices incrementally off its own
+//! side-channel base for documents these handlers have admitted, so the main
+//! loop pays no parse time per keystroke. The expensive lint (project-graph
+//! recompute + diagnostics) is deferred to the debounced workspace settle,
+//! which re-lints every open document over one snapshot. Every salsa-input
+//! write here arms that settle (directly or via
 //! [`GlobalState::arm_settle_external`]) so a write that cancels an in-flight
 //! pass also schedules its recomputation.
 
@@ -15,65 +18,14 @@ use std::time::Instant;
 
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, MessageType, TextDocumentContentChangeEvent,
+    DidSaveTextDocumentParams, MessageType,
 };
 use salsa::{Durability, Setter};
 
-use super::conversions::{apply_content_change, apply_content_change_with_edit_ranges};
+use super::conversions::apply_content_change;
 use super::global_state::GlobalState;
 use super::uri_ext::UriExt;
 use crate::lsp::DocumentState;
-use crate::parser::{parse_incremental_suffix_with_refdefs, parse_with_refdefs_and_errors};
-use crate::syntax::SyntaxNode;
-
-type CombinedEditRanges = (String, (usize, usize), (usize, usize));
-
-fn apply_changes_descending_with_combined_ranges(
-    original_text: &str,
-    changes: &[TextDocumentContentChangeEvent],
-) -> Option<CombinedEditRanges> {
-    if changes.is_empty() {
-        return None;
-    }
-
-    let mut updated_text = original_text.to_owned();
-    let mut combined_old_start = usize::MAX;
-    let mut combined_old_end = 0usize;
-    let mut previous_start: Option<usize> = None;
-
-    for change in changes {
-        let (next_text, old_edit, _) =
-            apply_content_change_with_edit_ranges(&updated_text, change)?;
-
-        if let Some(prev_start) = previous_start
-            && (old_edit.0 >= prev_start || old_edit.1 > prev_start)
-        {
-            return None;
-        }
-        previous_start = Some(old_edit.0);
-
-        combined_old_start = combined_old_start.min(old_edit.0);
-        combined_old_end = combined_old_end.max(old_edit.1);
-        updated_text = next_text;
-    }
-
-    if combined_old_start == usize::MAX {
-        return None;
-    }
-
-    let net_delta = updated_text.len() as isize - original_text.len() as isize;
-    let combined_new_start = combined_old_start;
-    let combined_new_end = combined_old_end.saturating_add_signed(net_delta);
-    if combined_new_end < combined_new_start || combined_new_end > updated_text.len() {
-        return None;
-    }
-
-    Some((
-        updated_text,
-        (combined_old_start, combined_old_end),
-        (combined_new_start, combined_new_end),
-    ))
-}
 
 /// Discover and load every file the project graph references for `root_path`,
 /// on the writer. Thin wrapper over [`crate::salsa::SalsaDb::load_referenced_files`]
@@ -173,11 +125,6 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     let start = Instant::now();
 
     let config = gs.load_config_notifying(&uri);
-    let (tree, errors) = {
-        let (syntax_tree, errors) = crate::parser::parse_with_errors(&text, Some(config.clone()));
-        (syntax_tree.green().to_owned(), errors)
-    };
-
     let doc_path = uri.to_file_path().map(|p| p.into_owned());
     // On-disk documents register under their path; an in-memory buffer gets a
     // distinct `FileId` with no backing path (retires the `<memory>` sentinel,
@@ -203,14 +150,20 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
         .file_id_for_input(salsa_file)
         .expect("just-registered document input has a FileId");
 
+    // Admit the document to the incremental side channel, so the first parse
+    // (demanded by the settle armed below, on a pool thread) records a base for
+    // the next keystroke to splice against. With the flag off nothing is
+    // admitted and every parse stays a full parse.
+    if gs.runtime_settings.experimental_incremental_parsing {
+        gs.salsa.reparse_admit(salsa_file, salsa_config);
+    }
+
     gs.document_map_mut().insert(
         uri_string.clone(),
         DocumentState {
             file_id,
             salsa_file,
             salsa_config,
-            tree,
-            errors,
         },
     );
 
@@ -239,128 +192,59 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
     let start = Instant::now();
 
     let config = gs.load_config_notifying(&uri);
-    let incremental_enabled = gs.runtime_settings.experimental_incremental_parsing;
 
-    let Some((salsa_file, salsa_config, original_tree_green, original_errors)) =
-        gs.document_map.get(&uri_string).map(|doc| {
-            (
-                doc.salsa_file,
-                doc.salsa_config,
-                doc.tree.clone(),
-                doc.errors.clone(),
-            )
-        })
-    else {
+    let Some(salsa_file) = gs.document_map.get(&uri_string).map(|doc| doc.salsa_file) else {
         return;
     };
 
-    let original_text = salsa_file.content_or_empty(&gs.salsa).to_string();
+    // Any shape, any order: the changes are applied in the order the client
+    // sent them, each against the text its predecessors produced, which is what
+    // the protocol specifies. Nothing here needs to derive an edit range --
+    // `parsed_document` recovers the one it needs by diffing the whole texts.
+    let mut updated_text = salsa_file.content_or_empty(&gs.salsa).to_string();
+    for change in params.content_changes.iter() {
+        updated_text = apply_content_change(&updated_text, change);
+    }
 
-    // Compute the post-edit text and (when incremental parsing is enabled and
-    // edit ranges can be derived) the old/new edit ranges.
-    let (updated_text, edit_ranges) = if !incremental_enabled {
-        let mut text = original_text.clone();
-        for change in params.content_changes.iter() {
-            text = apply_content_change(&text, change);
-        }
-        (text, None)
-    } else if change_count == 1 {
-        let change = &params.content_changes[0];
-        match apply_content_change_with_edit_ranges(&original_text, change) {
-            Some((text, old_edit, new_edit)) => (text, Some((old_edit, new_edit))),
-            None => (apply_content_change(&original_text, change), None),
-        }
-    } else {
-        match apply_changes_descending_with_combined_ranges(&original_text, &params.content_changes)
-        {
-            Some((text, old_edit, new_edit)) => (text, Some((old_edit, new_edit))),
-            None => {
-                let mut text = original_text.clone();
-                for change in params.content_changes.iter() {
-                    text = apply_content_change(&text, change);
-                }
-                (text, None)
-            }
-        }
-    };
-
-    // Push the new text into salsa first so `refdef_set` reflects it; the parser
-    // then reuses the cached refdef map and downstream queries hit the same cache.
     let doc_path_for_salsa = uri.to_file_path().map(|p| p.into_owned());
     if let Some(path) = doc_path_for_salsa.as_ref() {
-        gs.salsa
-            .update_file_text(path.clone(), updated_text.clone());
+        gs.salsa.update_file_text(path.clone(), updated_text);
     } else {
         salsa_file
             .set_text(&mut gs.salsa)
             .with_durability(Durability::LOW)
-            .to(Some(std::sync::Arc::from(updated_text.clone())));
+            .to(Some(std::sync::Arc::from(updated_text)));
     }
-    let refdefs = crate::salsa::refdef_set(&gs.salsa, salsa_file, salsa_config).clone();
-
-    let (green, errors, strategy) = if let Some((old_edit, new_edit)) = edit_ranges {
-        let old_tree = SyntaxNode::new_root(original_tree_green);
-        let updated = parse_incremental_suffix_with_refdefs(
-            &updated_text,
-            Some(config.clone()),
-            refdefs.clone(),
-            &old_tree,
-            &original_errors,
-            old_edit,
-            new_edit,
-        );
-        let label = match (change_count, updated.strategy) {
-            (1, "section_window") => "section_window_single_change_experimental",
-            (1, "suffix_window") => "suffix_incremental_single_change_experimental",
-            (1, _) => "full_reparse_single_change_incremental_fallback",
-            (_, "section_window") => "section_window_multi_change_coalesced_experimental",
-            (_, "suffix_window") => "suffix_incremental_multi_change_coalesced_experimental",
-            (_, _) => "full_reparse_multi_change_incremental_fallback",
-        };
-        (updated.tree.green().to_owned(), updated.errors, label)
-    } else {
-        let (parsed, errors) =
-            parse_with_refdefs_and_errors(&updated_text, Some(config.clone()), refdefs);
-        let label = if !incremental_enabled {
-            if change_count == 1 {
-                "full_reparse_single_change_incremental_disabled"
-            } else {
-                "full_reparse_multi_change"
-            }
-        } else if change_count == 1 {
-            "full_reparse_single_change_fallback"
-        } else {
-            "full_reparse_multi_change_incremental_fallback"
-        };
-        (parsed.green().to_owned(), errors, label)
-    };
-
-    log::debug!("did_change parse strategy={strategy} changes={change_count}");
 
     // Re-point the document at the shared handle for its (possibly reloaded)
     // config value. When the config is unchanged this is the same interned
     // handle the document already held, so it is a no-op; when it changed, the
     // document moves to the value's shared handle rather than mutating a handle
     // other documents may share (see `GlobalState::intern_config`).
-    let interned_config = gs.intern_config(config.clone());
+    let interned_config = gs.intern_config(config);
     if let Some(doc_state) = gs.document_map_mut().get_mut(&uri_string) {
-        doc_state.tree = green;
-        doc_state.errors = errors;
         // `file_id`/`salsa_file` are invariant across a content edit (the same
-        // path resolves to the same interned input), so only the tree and the
-        // (possibly re-interned) config handle need refreshing.
+        // path resolves to the same interned input), so only the (possibly
+        // re-interned) config handle needs refreshing.
         doc_state.salsa_config = interned_config;
     } else {
         return;
     }
 
-    // Defer the expensive re-lint to the debounced settle so a burst of
-    // keystrokes collapses into one pass and a save's formatting request never
-    // queues behind per-keystroke work. No external linters — they wait for save.
+    // Re-admit under whatever config handle the document now holds: a config
+    // reload mints a new one, and the base recorded under the old handle can
+    // never be hit again.
+    if gs.runtime_settings.experimental_incremental_parsing {
+        gs.salsa.reparse_admit(salsa_file, interned_config);
+    }
+
+    // No parse here at all. The settle demands it within the debounce window,
+    // on a pool thread, and salsa's per-key claim dedupes concurrent demands --
+    // so the main loop stops paying parse time per keystroke.
     gs.arm_settle();
 
     log::debug!(
-        "did_change complete (parse+state) in {:?}; settle armed",
+        "did_change complete (state) in {:?}; settle armed",
         start.elapsed()
     );
 }
@@ -396,6 +280,12 @@ pub(crate) fn did_save(gs: &mut GlobalState, params: DidSaveTextDocumentParams) 
 pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams) {
     let uri = params.text_document.uri.clone();
     let uri_string = uri.to_string();
+    // Retire the reparse base before the map entry goes: after the removal
+    // there is no way left to recover the document's salsa input.
+    if let Some(state) = gs.document_map.get(&uri_string) {
+        let salsa_file = state.salsa_file;
+        gs.salsa.reparse_retire_file(salsa_file);
+    }
     gs.document_map_mut().remove(&uri_string);
 
     // Drop the closed document's own diagnostics immediately so a pull issued
@@ -427,69 +317,4 @@ pub(crate) fn did_close(gs: &mut GlobalState, params: DidCloseTextDocumentParams
     // in-flight pass. Arm the settle so the remaining docs are re-linted over the
     // post-close snapshot.
     gs.arm_settle();
-}
-
-#[cfg(test)]
-mod tests {
-    use super::apply_changes_descending_with_combined_ranges;
-    use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
-
-    fn change(
-        start_line: u32,
-        start_char: u32,
-        end_line: u32,
-        end_char: u32,
-        text: &str,
-    ) -> TextDocumentContentChangeEvent {
-        TextDocumentContentChangeEvent {
-            range: Some(Range {
-                start: Position {
-                    line: start_line,
-                    character: start_char,
-                },
-                end: Position {
-                    line: end_line,
-                    character: end_char,
-                },
-            }),
-            range_length: None,
-            text: text.to_owned(),
-        }
-    }
-
-    #[test]
-    fn coalesces_multiple_descending_changes() {
-        let original = "abcdef\n";
-        let changes = vec![change(0, 3, 0, 4, "X"), change(0, 1, 0, 2, "Y")];
-
-        let (updated, old_range, new_range) =
-            apply_changes_descending_with_combined_ranges(original, &changes)
-                .expect("descending changes should coalesce");
-
-        assert_eq!(updated, "aYcXef\n");
-        assert_eq!(old_range, (1, 4));
-        assert_eq!(new_range, (1, 4));
-    }
-
-    #[test]
-    fn rejects_non_descending_overlapping_changes() {
-        let original = "abcdef\n";
-        let changes = vec![change(0, 1, 0, 3, "XX"), change(0, 2, 0, 4, "YY")];
-
-        assert!(apply_changes_descending_with_combined_ranges(original, &changes).is_none());
-    }
-
-    #[test]
-    fn computes_net_delta_for_insert_and_delete_mix() {
-        let original = "abcdef\n";
-        let changes = vec![change(0, 5, 0, 5, "ZZ"), change(0, 1, 0, 3, "Q")];
-
-        let (updated, old_range, new_range) =
-            apply_changes_descending_with_combined_ranges(original, &changes)
-                .expect("descending mixed changes should coalesce");
-
-        assert_eq!(updated, "aQdeZZf\n");
-        assert_eq!(old_range, (1, 5));
-        assert_eq!(new_range, (1, 6));
-    }
 }
