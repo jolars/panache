@@ -397,7 +397,56 @@ this branch rebases onto that fix.
     and each driver now asserts a floor on its splice rate so a future guard
     cannot silently empty the harness again.
 
-- [ ] Phase 6: default flip --- incremental parsing is **always on**, with no
+- [x] Phase 6a: mechanize the gate --- the thresholds Phase 6b is gated on were
+  printed but never checked, so "the gate passed" was an eyeball judgement.
+  `PANACHE_LSP_BENCH_ASSERT=1` now checks every case and exits non-zero on a
+  violation; `task bench:incremental-gate` fetches the corpus and runs it.
+  - **The fallback-rate criterion was stale and had to be replaced, not
+    implemented.** It read "< 20% on every case except the two that price a
+    decline", which was written before Phase 5b: the window-size cutoff makes a
+    decline the *correct* outcome for a wide-window edit, and ten of the
+    eighteen cases now fall back on every step by design. A global rate rule
+    cannot express that. Each case instead declares an `Expect` (`Reuse::Always`
+    or `Reuse::Never`, plus an optional speedup floor), so the old exemption
+    list is gone: the exempted cases are simply the ones that declare `Never`,
+    and a new case cannot be added without saying what it is for.
+  - Every ratio rule carries an absolute-microsecond escape
+    (`MAX_ABSOLUTE_OVERHEAD_US = 20`), because a ratio on a 2 us baseline is
+    noise. That retires the by-name exemptions Phase 5b recorded for
+    `full_replace` (+0.3 us) and `multi_change_utf16_4` (+1.7 us, 44% bail on a
+    3.7 us parse) and puts them on a stated principle, and it lets
+    `bail_refdef_edit` (+15.8 us) pass the ceiling without the carve-out the
+    roadmap reserved for it. Presence is checked too: the real-document corpus
+    is gitignored and `load_document` skips silently, so without it a gate run
+    on a fresh checkout passes by not measuring exactly the strictest cases.
+  - **`multi_change_large_8`'s \~95 us is profiled, and Phase 5b's guess at it
+    was wrong.** It is not host-side per-step work: measured directly on the
+    case, `diff_edit` is 7.1 us, the config clone 0.1 us, and the declined
+    attempt 0.2 us --- under 8 us of the \~95, and the base text copy the guess
+    also named was never inside the timed region at all. The rest is the
+    *fallback full parse itself* running \~5% slower on the incremental path
+    (1861 us vs 1963 us for the same call on the same text), with the previous
+    green tree and the 64 KB edit buffer resident across it. That residual sits
+    inside the run-to-run spread of the same parse, which is why the case
+    straddles 0.95x rather than failing outright; it carries a documented 0.90
+    ceiling naming the profile, and the printed reason keeps the exemption
+    visible on every run.
+    - A real mis-attribution *was* found and fixed on the way, but it is not
+      this one. The bench modelled `refdef_set` as a bare scan and then compared
+      whole `RefdefMap`s on the incremental path only, while in production the
+      comparison happens inside the query, is charged to both paths, and hands
+      back the same `Arc` when the set is unchanged --- which is what makes
+      `parsed_document`'s check a pointer compare. `refdef_query` now models the
+      backdating. It moves this case by nothing measurable (its synthetic
+      document has no reference definitions, so the sets are empty and the
+      comparison was free); it matters for refdef-carrying documents, and for
+      the harness continuing to mirror the query it claims to mirror.
+  - Deferred deliberately: no CI workflow yet. The gate needs
+    `benches/documents/download.sh` and a release build, and a timing-assert job
+    on shared runners would land flaky next to the flip. The mode and the task
+    target are what make wiring it a later one-liner.
+
+- [ ] Phase 6b: default flip --- incremental parsing is **always on**, with no
   new setting. `panache.experimental.incrementalParsing` stays exactly where
   it is and keeps working, but inverts its meaning: absent means on, and the
   only reason to write it is `false`, which turns the side channel off for
@@ -418,6 +467,16 @@ this branch rebases onto that fix.
     `tests/lsp/test_config_pull.rs`, `tests/lsp/test_config_reload.rs`).
     `PANACHE_INCREMENTAL_PARSING=1|0` keeps overriding the setting in both
     directions and needs no change.
+  - The server-side default is only *one* of three:
+    `editors/code/src/extension.ts` passes its own hard-coded `false` fallback
+    into `initializationOptions`, and `editors/code/README.md` documents
+    `default: false`. Both need flipping with `package.json`, or VS Code keeps
+    sending an explicit `false` and the server default never governs that client
+    at all.
+  - `apply_runtime_settings` in `src/lsp/handlers/configuration.rs` applies no
+    default: an absent key keeps the current value rather than resetting. That
+    is correct and stays, but it means the flip cannot be made there --- only
+    the initialize path decides the default.
   - The `experimental.` prefix becomes a misnomer the day this lands. Renaming
     it is deliberately declined: a rename needs precisely the alias and
     migration this phase drops, and the cost of a stale prefix on a debug-only
@@ -426,30 +485,21 @@ this branch rebases onto that fix.
     impact and can be renamed freely --- Phase 9 material.
   - Gate: oracle-clean fuzz at 10x iterations; workspace + LSP suite green with
     the flag forced on and off; 1 week oracle-live dogfooding with zero panics;
-    and the bench thresholds below.
-  - **Bench thresholds, named per case** (Phase 5 measured 1.1x and 2.7x on the
-    same document under the same tier, so an unqualified ">= 2x medium" is not a
-    criterion): `typing_stream_medium` >= 2x, `pandoc_manual_typing_stream` and
-    `pandoc_manual_late_edit` >= 5x, fallback rate < 20% on every case except
-    the two that exist to price a decline (`bail_refdef_edit`,
-    `pandoc_manual_refdef_label_edit`), bail cost <= 20% of a full parse.
-  - **Regression ceiling: no case below 0.95x.** Every threshold the phase
-    originally carried was a floor on the cases that win; nothing in it would
-    have caught `full_replace` at 0.2x. This is the criterion Phase 5b exists to
-    satisfy, and the reason it comes first. Note that the wide-window surcharge
-    (5-10%), not the bail cost (15.7% of one full parse, on the rare declining
-    shapes), is the overhead real edits actually pay.
-    - Phase 5b removed the surcharge and left three cases under the ceiling for
-      unrelated reasons (see its notes). `bail_refdef_edit` needs an explicit
-      exemption --- it exists to price a decline, so its speedup is not a
-      measurement of anything. `multi_change_utf16_4` is 74 bytes against a
-      fixed attempt cost and belongs to Phase 7. `multi_change_large_8` is \~100
-      us of *host-side* per-step work on a 76 KB document, which is worth
-      profiling here: it is charged to every incremental step, winners included.
-  - Make the thresholds mechanical rather than eyeballed --- the numbers are
-    printed and the JSON is emitted, but nothing asserts them. A
-    `PANACHE_LSP_BENCH_ASSERT=1` mode over the existing `CaseResult` fields is
-    enough, and it is what lets the gate run in CI.
+    and `task bench:incremental-gate` green.
+  - **The bench thresholds are no longer restated here.** Phase 6a moved them
+    into the cases themselves (`Expect` in `benches/lsp_incremental.rs`), which
+    is the only copy: a number in this file could not be checked and drifted
+    from the harness within one phase. The floors the roadmap named survive
+    verbatim as declarations --- `typing_stream_medium` >= 2x,
+    `pandoc_manual_late_edit` and `pandoc_manual_typing_stream` >= 5x --- as
+    does the 0.95x regression ceiling and the 20%-of-a-full-parse bail budget.
+    Read the gate's output, not this bullet.
+    - Both 5x floors measure 5.4-5.7x, run to run. That is a thin margin by
+      design: the floors are the roadmap's, and the margin printed on every run
+      is what makes drift visible before it fails.
+    - Run the gate at the default iteration count. `multi_change_large_8` fails
+      at 4 iterations and passes at 80 --- its margin is a few percent on a 1.9
+      ms parse, so a shortened run measures the sampling noise, not the feature.
 
 - [ ] Phase 7: token tier --- edit inside plain `TEXT`; newline ban,
   construct-character ban list kept honest by a grammar-grepping test, relex

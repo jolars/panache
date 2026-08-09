@@ -75,6 +75,14 @@ tasks:
     cmds:
       - bash benches/compare_all.sh --json --out docs/guide/performance_data.json
 
+  bench:incremental-gate:
+    desc: Run the LSP incremental bench with every case checked against its declared contract
+    cmds:
+      # The real-document cases are the ones carrying the strictest thresholds
+      # and their documents are gitignored, so fetch before measuring.
+      - bash benches/documents/download.sh
+      - PANACHE_LSP_BENCH_ASSERT=1 cargo bench --bench lsp_incremental
+
   refresh-benchmarks:
     desc: Re-run benchmarks and rebuild the performance page (invalidates freeze cache)
     cmds:

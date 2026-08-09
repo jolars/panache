@@ -14,6 +14,9 @@ cargo bench --bench formatting
 # Run LSP incremental didChange benchmarks
 cargo bench --bench lsp_incremental
 
+# Same run, with every case checked against the contract it declares
+task bench:incremental-gate
+
 # Run interned key impact benchmark
 cargo bench --bench interned_keys
 
@@ -51,6 +54,7 @@ PANACHE_BENCH_DOC=pandoc_manual.md PANACHE_BENCH_ITERATIONS=3 \
 # LSP incremental benchmark knobs
 # PANACHE_LSP_BENCH_ITERATIONS=80 (default)
 # PANACHE_LSP_BENCH_OUTPUT_JSON=benches/lsp_incremental_results.json
+# PANACHE_LSP_BENCH_ASSERT=1 (check thresholds; exit 1 on a violation)
 ```
 
 For more detailed profiling:

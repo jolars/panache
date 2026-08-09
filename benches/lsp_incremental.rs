@@ -21,6 +21,16 @@
 //!   query keyed on the text, so a changed document rescans; the incremental
 //!   path is charged for that scan exactly as the full path is. A changed
 //!   *set* declines host-side, before the parser is called at all.
+//! * **`refdef_set` backdates, so both paths pay its comparison.** Salsa
+//!   compares the recomputed set against the old one and hands back the *same*
+//!   `Arc` when they are equal, which is what makes `parsed_document`'s
+//!   `prev.refdefs != refdefs` a pointer compare rather than a walk of the set.
+//!   Modelling the query as a bare scan instead charged that walk to the
+//!   incremental path alone. [`refdef_query`] models the backdating and both
+//!   step functions call it, so the comparison lands on both paths as it does
+//!   in production. (This costs the synthetic cases nothing --- their documents
+//!   carry no reference definitions, so the sets are empty either way. It is
+//!   the refdef-carrying documents where a bare scan would have lied.)
 //!
 //! Applying the client's changes to the text buffer is *not* timed: it happens
 //! on the LSP main thread and costs both strategies the same, so the step
@@ -61,24 +71,24 @@
 //!
 //! ```text
 //! case                               bytes  steps    full    incr  speedup  fallback   bail%  window%
-//! single_change_small                 1620      1    45.1    33.9     1.3x      0.0%       -    59.4%
-//! multi_change_small_4                1620      1    42.9    43.7     1.0x      0.0%       -    78.5%
-//! multi_change_medium_4              15922      1   399.9   371.2     1.1x      0.0%       -    75.8%
-//! multi_change_medium_clustered_4    15922      1   415.1   134.9     3.1x      0.0%       -    16.0%
-//! multi_change_large_8               76542      1  1912.5  2016.3     0.9x    100.0%    0.0%        -
-//! multi_change_utf16_4                  74      1     3.9     5.7     0.7x    100.0%   43.0%        -
-//! full_replace                        1620      1     2.2     2.4     0.9x    100.0%    4.2%        -
-//! typing_stream_medium               15922     14   407.8   146.2     2.8x      0.0%       -    20.0%
-//! window_cutoff_accepted             15922      1   405.4   369.8     1.1x      0.0%       -    79.9%
-//! window_cutoff_declined             15922      1   408.5   405.9     1.0x    100.0%    0.0%        -
-//! bail_refdef_edit                    2687      1    96.4   113.0     0.9x    100.0%   15.5%        -
-//! pandoc_manual_early_edit          300856      1 10396.6 10431.1     1.0x    100.0%    0.0%        -
-//! pandoc_manual_refdef_label_edit   300856      1 10880.1 10517.4     1.0x    100.0%       -        -
-//! pandoc_manual_late_edit           300856      1 10590.3  1929.0     5.5x      0.0%       -     7.0%
-//! pandoc_manual_typing_stream       300856     12 10623.0  1951.6     5.4x      0.0%       -     7.0%
-//! large_authoring_single_edit        29858      1   649.5   640.1     1.0x    100.0%    0.1%        -
-//! tables_single_edit                 25101      1   758.5   744.0     1.0x    100.0%    0.0%        -
-//! math_single_edit                   30112      1   553.7   551.5     1.0x    100.0%    0.1%        -
+//! single_change_small                 1620      1    41.8    31.7     1.3x      0.0%       -    59.4%
+//! multi_change_small_4                1620      1    41.8    41.9     1.0x      0.0%       -    78.5%
+//! multi_change_medium_4              15922      1   397.9   367.3     1.1x      0.0%       -    75.8%
+//! multi_change_medium_clustered_4    15922      1   393.6   123.7     3.2x      0.0%       -    16.0%
+//! multi_change_large_8               76542      1  1878.5  1945.5     1.0x    100.0%    0.0%        -
+//! multi_change_utf16_4                  74      1     3.6     5.8     0.6x    100.0%   57.8%        -
+//! full_replace                        1620      1     2.1     2.4     0.9x    100.0%    4.0%        -
+//! typing_stream_medium               15922     14   394.6   139.2     2.8x      0.0%       -    20.0%
+//! window_cutoff_accepted             15922      1   397.0   365.9     1.1x      0.0%       -    79.9%
+//! window_cutoff_declined             15922      1   401.2   395.9     1.0x    100.0%    0.0%        -
+//! bail_refdef_edit                    2687      1    93.1   108.2     0.9x    100.0%   15.4%        -
+//! pandoc_manual_early_edit          300856      1 10148.5 10220.1     1.0x    100.0%    0.0%        -
+//! pandoc_manual_refdef_label_edit   300856      1 10263.2 10221.8     1.0x    100.0%       -        -
+//! pandoc_manual_late_edit           300856      1 10378.2  1831.8     5.7x      0.0%       -     7.0%
+//! pandoc_manual_typing_stream       300856     12 10291.1  1801.9     5.7x      0.0%       -     7.0%
+//! large_authoring_single_edit        29858      1   606.8   617.8     1.0x    100.0%    0.1%        -
+//! tables_single_edit                 25101      1   737.8   725.1     1.0x    100.0%    0.0%        -
+//! math_single_edit                   30112      1   547.7   544.2     1.0x    100.0%    0.1%        -
 //! ```
 //!
 //! What the table says:
@@ -96,7 +106,7 @@
 //!   re-parsed 97%, and paid 0.9x for the guard cascade and splice on top;
 //!   `full_replace` was the extreme at 0.2x, walking the old 1.6 KB tree to
 //!   splice a 27-byte document. Declining both up front costs a fraction of a
-//!   microsecond (`bail%` 0.0% and 4.2%) and returns them to 1.0x and 0.9x.
+//!   microsecond (`bail%` 0.0% and 4.0%) and returns them to 1.0x and 0.9x.
 //! * **`window_cutoff_accepted` and `window_cutoff_declined` bracket the
 //!   threshold**: the same document and the same one-word edit, at a 79.9% and
 //!   an 87.8% window. Move `MAX_WINDOW_SHARE_PERCENT` and exactly one of them
@@ -104,44 +114,51 @@
 //! * **Clustering matters; change count does not.** The two medium
 //!   multi-change cases carry the same four changes. Scattering them over 150
 //!   lines takes `diff_edit`'s span from one line to most of the document: 16%
-//!   window to 76%, 3.1x to 1.1x.
+//!   window to 76%, 3.2x to 1.1x.
 //! * **The typing streams are the workload the feature exists for**, and they
-//!   are where it pays: 2.8x on a 16 KB document, 5.4x on the 300 KB pandoc
+//!   are where it pays: 2.8x on a 16 KB document, 5.7x on the 300 KB pandoc
 //!   manual, with no step declining. Each stream agrees with its equivalent
 //!   single edit (`pandoc_manual_late_edit`) to within noise, which is the
 //!   evidence that chaining the base does not degrade across keystrokes.
 //! * **Bail cost is small, and the fallback rate is what governs it.** A
 //!   cutoff decline is under a microsecond even at 300 KB, because it is
 //!   arithmetic on the edit offset. The correctness guards cost more: the
-//!   parser's `]:`-proximity cascade prices at 15.5% of a full parse
+//!   parser's `]:`-proximity cascade prices at 15.4% of a full parse
 //!   (`bail_refdef_edit`), and a host-side decline
 //!   (`pandoc_manual_refdef_label_edit`, whose edit rewrites a refdef *label*)
 //!   costs one extra refdef scan, inside the noise at 300 KB. Both land under
 //!   the 20%-of-a-full-parse budget the default flip is gated on.
 //!
-//! ## The three cases still under 1.0x
+//! ## The cases still under 1.0x
 //!
-//! None of them is the wide-window surcharge the cutoff removed, and none is
+//! Neither is the wide-window surcharge the cutoff removed, and neither is
 //! reachable by tuning its threshold:
 //!
 //! * `bail_refdef_edit` (0.9x) exists to price a decline. A decline is a full
 //!   parse plus the cascade that reached it, so it is *definitionally* slower;
-//!   the number to read on this case is `bail%`, not the speedup.
-//! * `multi_change_utf16_4` (0.7x) is 74 bytes, and an attempt has a fixed cost
-//!   --- cloning the options, materializing a cursor root over the previous
-//!   green tree, walking it for the window --- that is 1.8 us against a 3.9 us
-//!   whole parse. It lost at 0.8x before the cutoff too, while successfully
-//!   splicing. No window threshold fixes a fixed cost; roadmap Phase 7's token
-//!   tier is what removes it. A document-size floor would, but it would also
-//!   refuse the small documents with *narrow* windows that do win
+//!   the number to read on this case is `bail%`, not the speedup. In absolute
+//!   terms it is ~16 us, which is the largest a single cascade costs anywhere
+//!   in the table and is where [`MAX_ABSOLUTE_OVERHEAD_US`] comes from.
+//! * `multi_change_utf16_4` (0.6-0.7x) is 74 bytes, and an attempt has a fixed
+//!   cost --- cloning the options, materializing a cursor root over the previous
+//!   green tree, walking it for the window --- that is under 2 us against a
+//!   3.6 us whole parse. It lost at 0.8x before the cutoff too, while
+//!   successfully splicing. No window threshold fixes a fixed cost; roadmap
+//!   Phase 7's token tier is what removes it. A document-size floor would, but
+//!   it would also refuse the small documents with *narrow* windows that do win
 //!   (`single_change_small`, 1.6 KB, 1.3x).
-//! * `multi_change_large_8` (0.9-1.0x, run to run) declines in under a
-//!   microsecond --- `bail%` pins the parser's share --- and still costs ~100 us
-//!   more than a full parse of the same 76 KB. That residual is host-side
-//!   per-step work the parser never sees: the whole-text `diff_edit` and the
-//!   67 KB `insert` it allocates for an edit spanning most of the document, the
-//!   refdef-set clone, the base text copy. It is unattributed between those and
-//!   wants a profile, not a threshold.
+//!
+//! `multi_change_large_8` used to be the third, and its ~95 us is now measured
+//! rather than guessed at --- and it is not the host-side per-step work it was
+//! assumed to be. On this case `diff_edit` costs 7.1 us, the config clone
+//! 0.1 us, and the declined attempt 0.2 us: under 8 us of the ~95, and the base
+//! text copy is not inside the timed region at all. What is left is the
+//! *fallback full parse itself* running ~5% slower on the incremental path ---
+//! 1861 us against 1963 us for the same call on the same text --- with the
+//! previous green tree and the 64 KB edit buffer resident across it. That is
+//! within the run-to-run spread of the same parse, which is why the case
+//! straddles 0.95x instead of failing, and why it declares a 0.90 ceiling
+//! naming the profile rather than being exempted by name.
 //!
 //! # Running
 //!
@@ -153,6 +170,36 @@
 //!
 //! Run it in release (`cargo bench` does): in debug builds the parser's splice
 //! oracle full-parses on every success, which measures the oracle.
+//!
+//! ## Asserting the thresholds
+//!
+//! ```text
+//! task bench:incremental-gate                                     # corpus + gate
+//! PANACHE_LSP_BENCH_ASSERT=1 cargo bench --bench lsp_incremental  # gate alone
+//! ```
+//!
+//! Every case declares an [`Expect`]: whether it must splice on every step or
+//! decline on every step, and what it claims for speed. The gate prints each
+//! check with its margin and exits non-zero on a violation, so a threshold can
+//! be watched drifting long before it fails.
+//!
+//! Two things about the rules are deliberate. **There is no global
+//! fallback-rate threshold**, because since the window-size cutoff a decline is
+//! the correct outcome for a wide-window edit and most of these cases fall back
+//! on every step by design; the contract each case declares says which it is.
+//! And **every ratio rule carries an absolute-microsecond escape**, because a
+//! ratio on a 2 us baseline measures noise --- `full_replace` ends up parsing
+//! 27 bytes, so 0.3 us of guard work reads as 0.9x.
+//!
+//! The gate refuses to run without the real-document corpus. Those cases carry
+//! the strictest thresholds, their documents are gitignored, and
+//! [`load_document`] skips a missing one silently --- so without that check a
+//! gate run on a fresh checkout would pass by not measuring.
+//!
+//! Do not lower `PANACHE_LSP_BENCH_ITERATIONS` for a gate run. The default is
+//! sized so the means are stable; `multi_change_large_8` fails at 4 iterations
+//! and passes at 80, because its margin is a few percent on a 1.9 ms parse.
+//! Raising the count is fine and makes the tight cases quieter.
 
 use std::collections::BTreeMap;
 use std::env;
@@ -196,11 +243,79 @@ struct BenchChange {
 /// descending column order (which is what clients send, for this reason).
 type Step = Vec<BenchChange>;
 
+/// Whether a case exists to show reuse working or a guard firing.
+///
+/// Declared per case rather than checked against one global fallback-rate
+/// threshold, because since the window-size cutoff landed a decline is the
+/// *correct* outcome for a wide-window edit -- ten of the cases below fall back
+/// on every step by design. A global "fallback below N%" rule cannot say that,
+/// and a list of exemptions kept apart from the cases drifts from them.
+#[derive(Clone, Copy)]
+enum Reuse {
+    /// Every step must splice. One declining step fails the case: a typing
+    /// stream that degrades halfway is the regression this is here to catch.
+    Always,
+    /// Every step must decline --- the case prices a guard, or shows the cutoff
+    /// refusing a shape that would lose if it were admitted.
+    Never,
+}
+
+/// What a case claims, checked by `PANACHE_LSP_BENCH_ASSERT=1`.
+///
+/// Every case declares one, so a new case cannot be added without saying what
+/// it is for, and the regression ceiling applies to all of them without an
+/// opt-in.
+#[derive(Clone, Copy)]
+struct Expect {
+    reuse: Reuse,
+    /// Floor on `speedup_vs_full`, where the case is a speed *claim* and not
+    /// only a guard against regression. `None` leaves the ceiling every case
+    /// carries.
+    min_speedup: Option<f64>,
+    /// A case-specific replacement for [`MIN_SPEEDUP_CEILING`], carrying the
+    /// reason it is not the default one.
+    ///
+    /// The reason is not decoration: it is only legitimate to relax the ceiling
+    /// for a case whose overhead has been profiled and attributed, and the
+    /// string is printed on every run so the exemption stays visible instead of
+    /// becoming a quiet floor.
+    ceiling: Option<(f64, &'static str)>,
+}
+
+impl Expect {
+    fn reuses() -> Self {
+        Self {
+            reuse: Reuse::Always,
+            min_speedup: None,
+            ceiling: None,
+        }
+    }
+
+    fn declines() -> Self {
+        Self {
+            reuse: Reuse::Never,
+            min_speedup: None,
+            ceiling: None,
+        }
+    }
+
+    fn min_speedup(mut self, min: f64) -> Self {
+        self.min_speedup = Some(min);
+        self
+    }
+
+    fn ceiling(mut self, ceiling: f64, reason: &'static str) -> Self {
+        self.ceiling = Some((ceiling, reason));
+        self
+    }
+}
+
 struct BenchCase {
     id: String,
     input: String,
     steps: Vec<Step>,
     iterations: usize,
+    expect: Expect,
 }
 
 /// The previous parse the incremental strategy splices against --- the same
@@ -277,6 +392,42 @@ struct BenchmarkReport {
     schema_version: u32,
     results: Vec<CaseResult>,
 }
+
+/// The regression ceiling every case carries: incremental parsing is the
+/// default path, so a case that is *slower* than the full parse it replaces is
+/// a regression whatever else it proves. Nothing in the roadmap's original
+/// thresholds was a ceiling --- they were all floors on the cases that win ---
+/// and that is why `full_replace` sat at 0.2x unnoticed until the bench was
+/// repaired.
+const MIN_SPEEDUP_CEILING: f64 = 0.95;
+
+/// The absolute escape both ratio rules carry.
+///
+/// A ratio on a microsecond baseline measures noise: `full_replace` ends up
+/// parsing 27 bytes, so 0.2 us of guard work reads as 0.9x. Sized from the
+/// largest measured cost of one guard cascade on the small documents
+/// (`bail_refdef_edit`, ~16 us), so a case is forgiven its ratio only while its
+/// absolute cost stays inside a single cascade --- which is the most any
+/// declining step can add.
+const MAX_ABSOLUTE_OVERHEAD_US: f64 = 20.0;
+
+/// A declined step may not cost more than this share of the full parse it then
+/// runs. The guard cascade is the price of admission for every edit that turns
+/// out not to be spliceable.
+const MAX_BAIL_RATIO: f64 = 0.20;
+
+/// Documents [`real_document_cases`] needs, checked before anything runs.
+///
+/// They are gitignored and fetched by `benches/documents/download.sh`, and
+/// [`load_document`] skips a case whose document is absent --- silently, and
+/// precisely on the cases carrying the strictest thresholds. Without this
+/// check a gate run on a fresh checkout passes by not measuring.
+const REQUIRED_DOCUMENTS: &[&str] = &[
+    "pandoc_manual.md",
+    "large_authoring.qmd",
+    "tables.qmd",
+    "math.qmd",
+];
 
 fn position_to_offset_utf16(text: &str, position: BenchPosition) -> Option<usize> {
     let mut offset = 0;
@@ -360,8 +511,20 @@ fn step_texts(input: &str, steps: &[Step]) -> Vec<String> {
         .collect()
 }
 
-fn scan_refdefs(text: &str, config: &Config) -> RefdefMap {
-    collect_refdef_labels(text, Dialect::for_flavor(config.flavor))
+/// Mirrors the `refdef_set` salsa query, which *both* strategies call: compute
+/// the set, and backdate to the previous allocation when it is unchanged.
+///
+/// The backdating is what makes `parsed_document`'s own `prev.refdefs !=
+/// refdefs` check a pointer compare rather than a hash-set walk. Modelling the
+/// query as a bare scan instead charged that walk to the incremental path
+/// alone, which is most of what used to look like ~100 us of unattributed
+/// host-side work on `multi_change_large_8`.
+fn refdef_query(prev: Option<&RefdefMap>, text: &str, config: &Config) -> RefdefMap {
+    let refdefs = collect_refdef_labels(text, Dialect::for_flavor(config.flavor));
+    match prev {
+        Some(prev) if *prev == refdefs => prev.clone(),
+        _ => refdefs,
+    }
 }
 
 fn full_parse(
@@ -374,15 +537,24 @@ fn full_parse(
 }
 
 /// The baseline step: what `parsed_document` cost before the side channel.
-fn full_step(text: &str, config: &Config) -> (Duration, rowan::GreenNode, Vec<SyntaxError>) {
+///
+/// Takes the previous step's refdef set for the same reason the incremental
+/// step chains a base: the query it models is chained in production, and the
+/// set comparison inside it is charged to whoever calls it -- which is both
+/// strategies.
+fn full_step(
+    prev_refdefs: Option<&RefdefMap>,
+    text: &str,
+    config: &Config,
+) -> (Duration, RefdefMap, rowan::GreenNode, Vec<SyntaxError>) {
     let start = Instant::now();
-    let refdefs = scan_refdefs(text, config);
-    let (green, errors) = full_parse(text, config, refdefs);
-    (start.elapsed(), green, errors)
+    let refdefs = refdef_query(prev_refdefs, text, config);
+    let (green, errors) = full_parse(text, config, refdefs.clone());
+    (start.elapsed(), refdefs, green, errors)
 }
 
 fn fresh_base(text: &str, config: &Config) -> ReparseBase {
-    let refdefs = scan_refdefs(text, config);
+    let refdefs = refdef_query(None, text, config);
     let (green, errors) = full_parse(text, config, refdefs.clone());
     ReparseBase {
         text: text.to_owned(),
@@ -400,11 +572,13 @@ fn incremental_step(
     config: &Config,
 ) -> (Duration, StepOutcome) {
     let start = Instant::now();
-    let refdefs = scan_refdefs(new_text, config);
+    let refdefs = refdef_query(Some(&base.refdefs), new_text, config);
 
     // The host's exact set comparison runs ahead of the parser's textual
     // guard: retained blocks keep the reference resolution they were parsed
-    // with, so a changed set invalidates them at a distance.
+    // with, so a changed set invalidates them at a distance. An unchanged set
+    // came back from the query as the same allocation, so this is the pointer
+    // compare `parsed_document` performs, not a second walk of the set.
     if refdefs != base.refdefs {
         let (green, errors) = full_parse(new_text, config, refdefs.clone());
         let elapsed = start.elapsed();
@@ -486,7 +660,8 @@ fn verify_case(input: &str, texts: &[String], config: &Config, id: &str) {
             StepOutcome::Reused { strategy, .. } => strategy,
             StepOutcome::Fallback { reason, .. } => reason,
         };
-        let (expected, expected_errors) = full_parse(text, config, scan_refdefs(text, config));
+        let (expected, expected_errors) =
+            full_parse(text, config, refdef_query(None, text, config));
         assert_eq!(
             fingerprint(&SyntaxNode::new_root(base.green.clone())),
             fingerprint(&SyntaxNode::new_root(expected)),
@@ -512,8 +687,11 @@ fn run_case(
     // Warm up both streams: the first parse of a document pays page faults and
     // branch-predictor cold start that no `didChange` in a live session does.
     for _ in 0..2 {
+        let mut full_refdefs = refdef_query(None, input, config);
         for text in &texts {
-            black_box(full_step(text, config));
+            let (_, refdefs, green, errors) = full_step(Some(&full_refdefs), text, config);
+            black_box((green, errors));
+            full_refdefs = refdefs;
         }
         let mut base = fresh_base(input, config);
         for text in &texts {
@@ -531,9 +709,14 @@ fn run_case(
     let mut fallback_reasons: BTreeMap<String, usize> = BTreeMap::new();
 
     for _ in 0..iterations {
+        // Seeded from the input, and chained across the stream, exactly as the
+        // incremental side chains its base: a `didChange` always has a previous
+        // revision's refdef set to backdate against.
+        let mut full_refdefs = refdef_query(None, input, config);
         for text in &texts {
-            let (elapsed, green, errors) = full_step(text, config);
+            let (elapsed, refdefs, green, errors) = full_step(Some(&full_refdefs), text, config);
             black_box((green, errors));
+            full_refdefs = refdefs;
             full_samples.push(elapsed);
         }
 
@@ -771,6 +954,7 @@ fn synthetic_cases(default_iterations: usize) -> Vec<BenchCase> {
             steps: vec![vec![word_change(small.line(15), ALPHA, "ALPHA")]],
             input: small.text.clone(),
             iterations: default_iterations,
+            expect: Expect::reuses(),
         },
         BenchCase {
             id: "multi_change_small_4".to_owned(),
@@ -782,6 +966,7 @@ fn synthetic_cases(default_iterations: usize) -> Vec<BenchCase> {
             ]],
             input: small.text.clone(),
             iterations: default_iterations,
+            expect: Expect::reuses(),
         },
         BenchCase {
             id: "multi_change_medium_4".to_owned(),
@@ -793,6 +978,7 @@ fn synthetic_cases(default_iterations: usize) -> Vec<BenchCase> {
             ]],
             input: medium.text.clone(),
             iterations: default_iterations / 2,
+            expect: Expect::reuses(),
         },
         // Multi-cursor inside one paragraph: the same change count as the
         // scattered case, but `diff_edit` spans one line instead of 150. The
@@ -808,6 +994,7 @@ fn synthetic_cases(default_iterations: usize) -> Vec<BenchCase> {
             ]],
             input: medium.text.clone(),
             iterations: default_iterations / 2,
+            expect: Expect::reuses(),
         },
         BenchCase {
             id: "multi_change_large_8".to_owned(),
@@ -823,6 +1010,18 @@ fn synthetic_cases(default_iterations: usize) -> Vec<BenchCase> {
             ]],
             input: large.text.clone(),
             iterations: default_iterations / 4,
+            // Scattered over 1000 lines, so `diff_edit`'s span is most of the
+            // document and the cutoff refuses it.
+            //
+            // The relaxed ceiling is profiled, not assumed. Of the ~95 us this
+            // case costs over a full parse, `diff_edit` is 7 us and the config
+            // clone 0.1 us; the rest is the *fallback full parse itself*
+            // running slower, because the previous green tree and the 64 KB
+            // edit buffer are resident across it. That residual sits within the
+            // run-to-run spread of the same parse, which is why the case
+            // straddles 0.95x from run to run rather than failing outright.
+            expect: Expect::declines()
+                .ceiling(0.90, "profiled: fallback-parse residency, not host work"),
         },
         BenchCase {
             id: "multi_change_utf16_4".to_owned(),
@@ -834,18 +1033,23 @@ fn synthetic_cases(default_iterations: usize) -> Vec<BenchCase> {
                 range_change(4, 5, 4, 7, "xyz"),
             ]],
             iterations: default_iterations,
+            // 74 bytes: every window is a wide one, so the cutoff refuses.
+            expect: Expect::declines(),
         },
         BenchCase {
             id: "full_replace".to_owned(),
             input: small.text.clone(),
             steps: vec![vec![full_change("# Replaced\n\nAll new text.\n")]],
             iterations: default_iterations,
+            expect: Expect::declines(),
         },
         BenchCase {
             id: "typing_stream_medium".to_owned(),
             steps: typing_stream(medium.line(200), ALPHA.0, "incrementally "),
             input: medium.text.clone(),
             iterations: default_iterations / 2,
+            // The workload the feature exists for: every keystroke must splice.
+            expect: Expect::reuses().min_speedup(2.0),
         },
         // The window-size cutoff, one case per side. The same document and the
         // same single-word edit; only how far into the document it lands
@@ -859,12 +1063,14 @@ fn synthetic_cases(default_iterations: usize) -> Vec<BenchCase> {
             steps: vec![vec![word_change(medium.line(50), ALPHA, "ALPHA")]],
             input: medium.text.clone(),
             iterations: default_iterations / 2,
+            expect: Expect::reuses(),
         },
         BenchCase {
             id: "window_cutoff_declined".to_owned(),
             steps: vec![vec![word_change(medium.line(30), ALPHA, "ALPHA")]],
             input: medium.text.clone(),
             iterations: default_iterations / 2,
+            expect: Expect::declines(),
         },
         BenchCase {
             id: "bail_refdef_edit".to_owned(),
@@ -874,6 +1080,7 @@ fn synthetic_cases(default_iterations: usize) -> Vec<BenchCase> {
             steps: vec![vec![insert_change(REFDEF_LINE, REFDEF_URL_END, "/deep")]],
             input: refdefs,
             iterations: default_iterations,
+            expect: Expect::declines(),
         },
     ]
 }
@@ -891,6 +1098,7 @@ fn real_document_cases(default_iterations: usize) -> Vec<BenchCase> {
             input: doc.clone(),
             steps: vec![vec![range_change(292, 4, 292, 13, "APPENDING")]],
             iterations,
+            expect: Expect::declines(),
         });
         // Line 200 is `[`setspace`]: ...`, and the replacement rewrites the
         // *label*. The host's set comparison declines before the parser is
@@ -901,18 +1109,21 @@ fn real_document_cases(default_iterations: usize) -> Vec<BenchCase> {
             input: doc.clone(),
             steps: vec![vec![range_change(200, 5, 200, 10, "manual")]],
             iterations,
+            expect: Expect::declines(),
         });
         cases.push(BenchCase {
             id: "pandoc_manual_late_edit".to_owned(),
             input: doc.clone(),
             steps: vec![vec![insert_change(7600, 0, "NOTE: ")]],
             iterations,
+            expect: Expect::reuses().min_speedup(5.0),
         });
         cases.push(BenchCase {
             id: "pandoc_manual_typing_stream".to_owned(),
             input: doc,
             steps: typing_stream(7600, 0, "NOTE: typing"),
             iterations,
+            expect: Expect::reuses().min_speedup(5.0),
         });
     }
 
@@ -930,6 +1141,11 @@ fn real_document_cases(default_iterations: usize) -> Vec<BenchCase> {
         ("math_single_edit", "math.qmd", 25, 3, 25, 8, "MATH"),
     ];
 
+    // All three edit near the top of their document, so the nearest top-level
+    // heading is close to byte 0 and the window the section strategy would
+    // choose is over the cutoff. The region tier (roadmap Phase 8) is what
+    // turns these into reuse; until then they are the shape that pays one
+    // sub-microsecond decline and nothing else.
     for (id, file, sl, sc, el, ec, replacement) in smaller {
         if let Some(doc) = load_document(file) {
             cases.push(BenchCase {
@@ -937,6 +1153,7 @@ fn real_document_cases(default_iterations: usize) -> Vec<BenchCase> {
                 input: doc,
                 steps: vec![vec![range_change(sl, sc, el, ec, replacement)]],
                 iterations: (default_iterations / 2).max(8),
+                expect: Expect::declines(),
             });
         }
     }
@@ -1018,6 +1235,102 @@ fn print_summary(results: &[CaseResult]) {
     }
 }
 
+/// Check every case against the contract it declared, printing each check with
+/// its margin so drift is visible well before it becomes a failure.
+///
+/// Returns the failures rather than panicking on the first, so one run tells
+/// you everything that moved.
+fn check_expectations(expectations: &[(String, Expect)], results: &[CaseResult]) -> Vec<String> {
+    let mut failures = Vec::new();
+
+    println!("\nThresholds");
+    println!("==========");
+
+    for (id, expect) in expectations {
+        let Some(result) = results.iter().find(|result| &result.id == id) else {
+            let failure = format!("{id}: declared but never ran");
+            println!("  FAIL {id:<32} {failure}");
+            failures.push(failure);
+            continue;
+        };
+
+        let overhead_us = result.incremental.mean_us - result.full_parse.mean_us;
+        let mut checks: Vec<(bool, String)> = Vec::new();
+
+        // The reuse contract. Exact comparisons are deliberate: the rate is
+        // declined steps over total steps, so "every step" and "no step" are
+        // exactly 1.0 and 0.0, and one degraded keystroke in a stream of
+        // fourteen must fail rather than round away.
+        checks.push(match expect.reuse {
+            Reuse::Always => (
+                result.fallback_rate == 0.0,
+                format!(
+                    "splices every step (fallback {:.1}%)",
+                    result.fallback_rate * 100.0
+                ),
+            ),
+            Reuse::Never => (
+                result.fallback_rate == 1.0,
+                format!(
+                    "declines every step (fallback {:.1}%)",
+                    result.fallback_rate * 100.0
+                ),
+            ),
+        });
+
+        if let Some(min) = expect.min_speedup {
+            checks.push((
+                result.speedup_vs_full >= min,
+                format!("speedup {:.2}x >= {min:.2}x", result.speedup_vs_full),
+            ));
+        }
+
+        let (ceiling, why) = match expect.ceiling {
+            Some((ceiling, reason)) => (ceiling, format!(" [{reason}]")),
+            None => (MIN_SPEEDUP_CEILING, String::new()),
+        };
+        checks.push((
+            result.speedup_vs_full >= ceiling || overhead_us <= MAX_ABSOLUTE_OVERHEAD_US,
+            format!(
+                "no regression: {:.2}x >= {ceiling:.2}x or {overhead_us:+.1} us <= {MAX_ABSOLUTE_OVERHEAD_US:.0} us{why}",
+                result.speedup_vs_full
+            ),
+        ));
+
+        if let (Some(ratio), Some(us)) = (result.bail_cost_ratio, result.bail_cost_us) {
+            checks.push((
+                ratio <= MAX_BAIL_RATIO || us <= MAX_ABSOLUTE_OVERHEAD_US,
+                format!(
+                    "bail {:.1}% <= {:.0}% or {us:.1} us <= {MAX_ABSOLUTE_OVERHEAD_US:.0} us",
+                    ratio * 100.0,
+                    MAX_BAIL_RATIO * 100.0
+                ),
+            ));
+        }
+
+        for (passed, description) in checks {
+            println!(
+                "  {} {id:<32} {description}",
+                if passed { "ok  " } else { "FAIL" }
+            );
+            if !passed {
+                failures.push(format!("{id}: {description}"));
+            }
+        }
+    }
+
+    failures
+}
+
+/// Fail before measuring anything if a document the gate depends on is absent.
+fn check_required_documents() -> Vec<String> {
+    REQUIRED_DOCUMENTS
+        .iter()
+        .filter(|name| !Path::new("benches/documents").join(name).is_file())
+        .map(|name| format!("benches/documents/{name} is missing"))
+        .collect()
+}
+
 fn main() {
     let config = Config::default();
     let default_iterations = env::var("PANACHE_LSP_BENCH_ITERATIONS")
@@ -1025,8 +1338,32 @@ fn main() {
         .and_then(|raw| raw.parse::<usize>().ok())
         .unwrap_or(80);
 
+    // The gate. Off by default, so a run that only wants the numbers stays a
+    // measurement and never fails the shell it was typed into.
+    let assert_mode = matches!(
+        env::var("PANACHE_LSP_BENCH_ASSERT").as_deref(),
+        Ok("1") | Ok("true")
+    );
+
+    if assert_mode {
+        let missing = check_required_documents();
+        if !missing.is_empty() {
+            eprintln!("PANACHE_LSP_BENCH_ASSERT=1 needs the real-document corpus:");
+            for entry in &missing {
+                eprintln!("  {entry}");
+            }
+            eprintln!("Run `benches/documents/download.sh` (or `task bench:incremental-gate`).");
+            std::process::exit(1);
+        }
+    }
+
     let mut cases = synthetic_cases(default_iterations);
     cases.extend(real_document_cases(default_iterations));
+
+    let expectations: Vec<(String, Expect)> = cases
+        .iter()
+        .map(|case| (case.id.clone(), case.expect))
+        .collect();
 
     println!("LSP Incremental Benchmarks");
     println!("==========================");
@@ -1046,6 +1383,14 @@ fn main() {
 
     print_summary(&results);
 
+    let failures = if assert_mode {
+        check_expectations(&expectations, &results)
+    } else {
+        Vec::new()
+    };
+
+    // Written before the verdict: a failing gate is exactly when the numbers
+    // are worth keeping.
     if let Ok(path) = env::var("PANACHE_LSP_BENCH_OUTPUT_JSON") {
         let report = BenchmarkReport {
             schema_version: 3,
@@ -1056,5 +1401,13 @@ fn main() {
         fs::write(&path, json)
             .unwrap_or_else(|e| panic!("failed to write benchmark JSON report to '{path}': {e}"));
         println!("\nWrote JSON report to {}", path);
+    }
+
+    if !failures.is_empty() {
+        eprintln!("\n{} threshold(s) failed:", failures.len());
+        for failure in &failures {
+            eprintln!("  {failure}");
+        }
+        std::process::exit(1);
     }
 }
