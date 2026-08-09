@@ -298,9 +298,43 @@ this branch rebases onto that fix.
     suites, a `#[cfg(test)]` shim in `reparse.rs` for the in-crate tests, and
     `try_reparse` in `benches/lsp_incremental.rs`.
 
-- [ ] Phase 5: benchmark repair --- fix `benches/lsp_incremental.rs`
+- [x] Phase 5: benchmark repair --- fix `benches/lsp_incremental.rs`
   multi-change path (currently degenerates to full reparse), add
   fallback-rate + bail-cost accounting, commit results table in module doc.
+  - The multi-change path is fixed by *mirroring* `parsed_document` rather than
+    approximating it: whole-text `diff_edit` per notification, a base chained
+    from step to step, and the host's refdef-set comparison ahead of the
+    parser's textual guard. A case is now a *stream* of notifications, which is
+    what makes a fallback rate mean anything --- the old per-case rate was 0 or
+    1 by construction.
+  - Three cases were measuring nothing. `synthetic_document` emitted adjacent
+    lines, so every "paragraph" was one giant paragraph with no blank line for
+    the seam guard to decouple at, and every synthetic edit got a window
+    starting at byte 0; it now separates paragraphs and emits a `##` heading
+    every ten, so the section-window strategy has something to find.
+    `pandoc_manual_single_edit` edited line 200, which is ``[`setspace`]: ...``,
+    and rewrote the *label* --- it is kept, renamed to
+    `pandoc_manual_refdef_label_edit`, as the host-side-decline case, and a
+    genuine early-prose edit was added beside it. `fallback_invalid_range` was
+    dropped: the server validates client ranges before touching its buffer, so
+    it modelled nothing, and with `diff_edit` it merely duplicated
+    `full_replace`.
+  - The accounting distinguishes **window** bytes (window start to EOF, what
+    both strategies actually re-parse) from **spliced** bytes (green children
+    replaced). Only the former predicts the speedup; printing the latter is what
+    made `tables_single_edit` look like "7% reparsed, 0.98x". The bench also
+    reports a per-strategy histogram and a fallback-reason histogram, and
+    verifies the governing invariant at every step of every case before timing
+    anything.
+  - Headline: speedup is a function of window share and nothing else --- 5.6x on
+    a late edit or a typing stream in the pandoc manual (7% window), 1.0x where
+    the window is \~98%. A *successful* wide reparse is 5-10% slower than a full
+    parse (`pandoc_manual_early_edit` at 0.9x, `full_replace` at 0.2x), so the
+    window-size cutoff belongs on the Phase 8 list. Guard-cascade bail cost is
+    15.7% of a full parse; a host-side decline costs one refdef scan.
+  - For Phase 6's gate: `>= 2x medium` holds for `typing_stream_medium` (2.7x)
+    but not for a scattered multi-change edit (1.1x), so the threshold has to
+    name the case it applies to.
 
 - [ ] Phase 6: default flip --- `panache.incrementalParsing` default true,
   `experimental.incrementalParsing` kept as deprecated alias (LSP-only, no

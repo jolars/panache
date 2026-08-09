@@ -49,7 +49,6 @@ PANACHE_BENCH_DOC=pandoc_manual.md PANACHE_BENCH_ITERATIONS=3 \
     cargo flamegraph --bench formatting
 
 # LSP incremental benchmark knobs
-# PANACHE_LSP_BENCH_CAP=8 (default)
 # PANACHE_LSP_BENCH_ITERATIONS=80 (default)
 # PANACHE_LSP_BENCH_OUTPUT_JSON=benches/lsp_incremental_results.json
 ```

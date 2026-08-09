@@ -1,11 +1,139 @@
-use panache::Config;
-use panache::parser::{Edit, Reparsed, reparse_with_refdefs};
-use serde::Serialize;
+//! Measurement harness for LSP incremental reparsing: what a `didChange`
+//! costs with the reparse side channel versus what it costs without one.
+//!
+//! # The model this mirrors
+//!
+//! The harness reproduces [`panache::salsa::parsed_document`] rather than
+//! approximating it, because the approximation is what made the old numbers
+//! wrong:
+//!
+//! * **One combined edit per notification.** The host keeps no staged edit
+//!   chain; it diffs whole texts (`diff_edit`) and hands the parser a single
+//!   contiguous edit. A notification carrying four content changes therefore
+//!   still gets an incremental *attempt*, over the span from the first change
+//!   to the last. The old harness declined outright on `changes.len() != 1`
+//!   and reported the resulting full parse as if it were the incremental
+//!   strategy, so every multi-change case measured full-parse-vs-full-parse.
+//! * **A chained base.** Step *n* splices against the tree step *n-1*
+//!   produced, not against the original parse. That is what makes a typing
+//!   stream a stream and not *n* independent one-shot edits.
+//! * **The host's refdef check, then the parser's.** `refdef_set` is a salsa
+//!   query keyed on the text, so a changed document rescans; the incremental
+//!   path is charged for that scan exactly as the full path is. A changed
+//!   *set* declines host-side, before the parser is called at all.
+//!
+//! Applying the client's changes to the text buffer is *not* timed: it happens
+//! on the LSP main thread and costs both strategies the same, so the step
+//! texts are precomputed and the timed region is parse work only.
+//!
+//! # What the numbers mean
+//!
+//! Per step (one `didChange`), for each of two strategies:
+//!
+//! * **full** --- refdef scan + full parse, i.e. what the query cost before
+//!   incremental parsing existed.
+//! * **incremental** --- refdef scan + diff + [`reparse_with_refdefs`], plus a
+//!   full parse when it declines. A declined step is strictly *more*
+//!   expensive than a full parse; that surcharge is the bail cost.
+//!
+//! and three accounting numbers the speedup alone hides:
+//!
+//! * **fallback rate** --- declined steps / total steps. Deterministic per
+//!   case, so it is a property of the edit shape, not noise.
+//! * **bail cost** --- mean wall time of a `reparse` call that returned
+//!   `None`, and that time as a fraction of a full parse. This is the guard
+//!   cascade's price, paid on top of the full parse the caller then runs.
+//! * **window vs spliced bytes** --- *both* strategies parse their window to
+//!   EOF (list-item buffering needs unbounded lookahead), so `window %` is the
+//!   share of the document actually re-parsed and is what predicts the
+//!   speedup. `spliced %` is the smaller region whose green children were
+//!   replaced; a section window's win over a suffix window is `Arc` identity
+//!   for the retained tail, not parse time. Reading `spliced %` as work done
+//!   is what made "7% reparsed, 0.98x speedup" look like a paradox.
+//!
+//! # Results
+//!
+//! `PANACHE_LSP_BENCH_ITERATIONS=80 cargo bench --bench lsp_incremental`, on an
+//! AMD Ryzen 9 7900, rustc 1.94.1, `Config::default()` (pandoc flavor).
+//! Microseconds per step; `full` and `incr` are means.
+//!
+//! ```text
+//! case                               bytes  steps    full    incr  speedup  fallback   bail%  window%
+//! single_change_small                 1620      1    44.1    33.3     1.3x      0.0%       -    59.4%
+//! multi_change_small_4                1620      1    41.5    41.5     1.0x      0.0%       -    78.5%
+//! multi_change_medium_4              15922      1   394.1   374.5     1.1x      0.0%       -    75.8%
+//! multi_change_medium_clustered_4    15922      1   395.0   125.4     3.2x      0.0%       -    16.0%
+//! multi_change_large_8               76542      1  1876.8  2079.2     0.9x      0.0%       -    87.5%
+//! multi_change_utf16_4                  74      1     3.6     4.8     0.8x      0.0%       -   100.0%
+//! full_replace                        1620      1     2.2    10.0     0.2x      0.0%       -   100.0%
+//! typing_stream_medium               15922     14   410.7   149.6     2.7x      0.0%       -    20.0%
+//! bail_refdef_edit                    2687      1    97.5   113.6     0.9x    100.0%   15.7%        -
+//! pandoc_manual_early_edit          300856      1 10405.0 11248.6     0.9x      0.0%       -    96.9%
+//! pandoc_manual_refdef_label_edit   300856      1 10466.5 10337.9     1.0x    100.0%       -        -
+//! pandoc_manual_late_edit           300856      1 10416.1  1864.1     5.6x      0.0%       -     7.0%
+//! pandoc_manual_typing_stream       300856     12 10568.9  1898.0     5.6x      0.0%       -     7.0%
+//! large_authoring_single_edit        29858      1   647.0   581.6     1.1x      0.0%       -    91.3%
+//! tables_single_edit                 25101      1   753.6   782.6     1.0x      0.0%       -    98.2%
+//! math_single_edit                   30112      1   556.4   513.3     1.1x      0.0%       -    97.8%
+//! ```
+//!
+//! What the table says:
+//!
+//! * **The speedup is a function of `window %` and nothing else.** Every case
+//!   at or above ~90% loses; every case below ~25% wins outright.
+//!   `tables_single_edit` edits line 40 of a 25 KB document, re-parses 98% of
+//!   it, and returns 1.0x while reporting a 7.5% *spliced* share --- the
+//!   number the old harness printed, and the reason "7% reparsed, 0.98x
+//!   speedup" used to look like a paradox.
+//! * **A wide reparse loses to a full parse even when it succeeds.**
+//!   `pandoc_manual_early_edit` accepts, re-parses 97%, and pays 0.9x for the
+//!   guard cascade and splice on top. `full_replace` is the extreme at 0.2x: a
+//!   27-byte replacement still walks the old 1.6 KB tree first. The surcharge
+//!   runs 5-10% of a full parse, which caps how much the feature can cost --- but
+//!   it is not zero, and a window-size cutoff is the obvious cheap win (roadmap
+//!   Phase 8).
+//! * **Clustering matters; change count does not.** The two medium
+//!   multi-change cases carry the same four changes. Scattering them over 150
+//!   lines takes `diff_edit`'s span from one line to most of the document: 16%
+//!   window to 76%, 3.2x to 1.1x.
+//! * **The typing streams are the workload the feature exists for**, and they
+//!   are where it pays: 2.7x on a 16 KB document, 5.6x on the 300 KB pandoc
+//!   manual, with no step declining. Each stream agrees with its equivalent
+//!   single edit (`pandoc_manual_late_edit`) to within noise, which is the
+//!   evidence that chaining the base does not degrade across keystrokes.
+//! * **Bail cost is small, and the fallback rate is what governs it.** The
+//!   parser's guard cascade prices at 15.7% of a full parse
+//!   (`bail_refdef_edit`); a host-side decline
+//!   (`pandoc_manual_refdef_label_edit`, whose edit rewrites a refdef *label*)
+//!   costs one extra refdef scan, inside the noise at 300 KB. Both land under
+//!   the 20%-of-a-full-parse budget the default flip is gated on.
+//!
+//! # Running
+//!
+//! ```text
+//! cargo bench --bench lsp_incremental
+//! PANACHE_LSP_BENCH_ITERATIONS=200 cargo bench --bench lsp_incremental
+//! PANACHE_LSP_BENCH_OUTPUT_JSON=/tmp/lsp.json cargo bench --bench lsp_incremental
+//! ```
+//!
+//! Run it in release (`cargo bench` does): in debug builds the parser's splice
+//! oracle full-parses on every success, which measures the oracle.
+
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::hint::black_box;
 use std::path::Path;
 use std::time::{Duration, Instant};
+
+use panache::parser::{
+    RefdefMap, SyntaxError, collect_refdef_labels, diff_edit, parse_with_refdefs_and_errors,
+    reparse_with_refdefs,
+};
+use panache::{Config, SyntaxNode};
+use panache_parser::Dialect;
+use panache_parser::parser::fingerprint;
+use serde::Serialize;
 
 #[derive(Clone, Copy)]
 struct BenchPosition {
@@ -19,23 +147,58 @@ struct BenchRange {
     end: BenchPosition,
 }
 
+/// One LSP content change. `range: None` is a whole-document replacement.
 #[derive(Clone)]
 struct BenchChange {
     range: Option<BenchRange>,
     text: String,
 }
 
-struct StrategyRun {
-    updated_text: String,
-    tree_end_offset: usize,
-    reparsed_range: OffsetRange,
-    used_suffix_path: bool,
-    fallback_reason: Option<&'static str>,
-    strategy_used: &'static str,
+/// One `didChange` notification: every content change the client sent in it.
+///
+/// Changes apply in order, each to the document as the previous ones left it,
+/// so a case with several changes on the *same* line must list them in
+/// descending column order (which is what clients send, for this reason).
+type Step = Vec<BenchChange>;
+
+struct BenchCase {
+    id: String,
+    input: String,
+    steps: Vec<Step>,
+    iterations: usize,
 }
 
-type OffsetRange = (usize, usize);
-type AppliedOffsets = (String, OffsetRange, OffsetRange);
+/// The previous parse the incremental strategy splices against --- the same
+/// four fields [`panache::incremental::PrevParse`] keeps, minus the config,
+/// which the bench never changes mid-stream.
+struct ReparseBase {
+    text: String,
+    green: rowan::GreenNode,
+    errors: Vec<SyntaxError>,
+    refdefs: RefdefMap,
+}
+
+/// What one incremental step did, beside taking time.
+enum StepOutcome {
+    /// The guard cascade accepted and the tree was spliced.
+    Reused {
+        strategy: &'static str,
+        /// Bytes actually re-parsed: the window start to EOF, for *both*
+        /// strategies.
+        window_bytes: usize,
+        /// Bytes whose green children were replaced. Smaller than
+        /// `window_bytes` only for a section window, which re-adopts the tail.
+        spliced_bytes: usize,
+    },
+    /// Declined; the step paid a full parse on top of whatever the decline
+    /// cost.
+    Fallback {
+        reason: &'static str,
+        /// Wall time of the declined `reparse` call. `None` when the decline
+        /// happened host-side and the parser was never called.
+        bail: Option<Duration>,
+    },
+}
 
 #[derive(Debug, Serialize)]
 struct StrategyStats {
@@ -48,17 +211,30 @@ struct StrategyStats {
 struct CaseResult {
     id: String,
     document_size_bytes: usize,
-    changes: usize,
+    steps: usize,
+    changes_total: usize,
     iterations: usize,
-    incremental_reparsed_bytes: usize,
-    incremental_reparsed_ratio: f64,
-    incremental_used_suffix_path: bool,
-    incremental_strategy_used: String,
-    incremental_fallback_reason: Option<String>,
-    incremental_fallback_rate: f64,
-    incremental_speedup_vs_full: f64,
-    strategy_full_reparse: StrategyStats,
-    strategy_suffix_incremental_runtime: StrategyStats,
+    /// Refdef scan + full parse, per step.
+    full_parse: StrategyStats,
+    /// Refdef scan + diff + reparse attempt (+ full parse when declined), per
+    /// step.
+    incremental: StrategyStats,
+    speedup_vs_full: f64,
+    /// Declined steps / total steps.
+    fallback_rate: f64,
+    /// Mean wall time of a declined `reparse` call, over the steps that
+    /// reached the parser at all.
+    bail_cost_us: Option<f64>,
+    /// [`Self::bail_cost_us`] as a fraction of a full parse.
+    bail_cost_ratio: Option<f64>,
+    /// Mean re-parsed share of the document, over accepted steps.
+    window_ratio: Option<f64>,
+    /// Mean spliced share of the document, over accepted steps.
+    spliced_ratio: Option<f64>,
+    /// Accepted steps by strategy.
+    strategy_counts: BTreeMap<String, usize>,
+    /// Declined steps by reason.
+    fallback_reasons: BTreeMap<String, usize>,
 }
 
 #[derive(Debug, Serialize)]
@@ -66,15 +242,6 @@ struct BenchmarkReport {
     schema_version: u32,
     results: Vec<CaseResult>,
 }
-
-struct BenchCase {
-    id: String,
-    input: String,
-    changes: Vec<BenchChange>,
-    iterations: usize,
-}
-
-type RealDocCaseDef<'a> = (&'a str, &'a str, u32, u32, u32, u32, &'a str, usize);
 
 fn position_to_offset_utf16(text: &str, position: BenchPosition) -> Option<usize> {
     let mut offset = 0;
@@ -116,175 +283,264 @@ fn position_to_offset_utf16(text: &str, position: BenchPosition) -> Option<usize
     None
 }
 
-fn apply_change_lenient(text: &str, change: &BenchChange) -> String {
-    match change.range {
-        Some(range) => {
-            let start_offset = position_to_offset_utf16(text, range.start).unwrap_or(0);
-            let end_offset = position_to_offset_utf16(text, range.end).unwrap_or(text.len());
-            let mut result =
-                String::with_capacity(text.len() - (end_offset - start_offset) + change.text.len());
-            result.push_str(&text[..start_offset]);
-            result.push_str(&change.text);
-            result.push_str(&text[end_offset..]);
-            result
-        }
-        None => change.text.clone(),
-    }
-}
+/// Apply one content change. Panics on a position the document cannot resolve:
+/// the real server validates client ranges before touching its buffer, so an
+/// unresolvable one here is a typo in a case definition, not a scenario.
+fn apply_change(text: &str, change: &BenchChange) -> String {
+    let Some(range) = change.range else {
+        return change.text.clone();
+    };
 
-fn apply_change_strict_with_offsets(text: &str, change: &BenchChange) -> Option<AppliedOffsets> {
-    let range = change.range?;
-    let start_offset = position_to_offset_utf16(text, range.start)?;
-    let end_offset = position_to_offset_utf16(text, range.end)?;
-    if start_offset > end_offset || end_offset > text.len() {
-        return None;
-    }
+    let resolve = |position: BenchPosition, what: &str| {
+        position_to_offset_utf16(text, position).unwrap_or_else(|| {
+            panic!(
+                "unresolvable {what} position {}:{}",
+                position.line, position.character
+            )
+        })
+    };
+    let start = resolve(range.start, "start");
+    let end = resolve(range.end, "end");
+    assert!(start <= end, "inverted change range {start}..{end}");
 
-    let mut result =
-        String::with_capacity(text.len() - (end_offset - start_offset) + change.text.len());
-    result.push_str(&text[..start_offset]);
+    let mut result = String::with_capacity(text.len() - (end - start) + change.text.len());
+    result.push_str(&text[..start]);
     result.push_str(&change.text);
-    result.push_str(&text[end_offset..]);
-
-    let new_start = start_offset;
-    let new_end = start_offset + change.text.len();
-    Some((result, (start_offset, end_offset), (new_start, new_end)))
+    result.push_str(&text[end..]);
+    result
 }
 
-fn full_reparse_strategy(input: &str, changes: &[BenchChange], config: &Config) -> StrategyRun {
-    let mut updated_text = input.to_owned();
-    for change in changes {
-        updated_text = apply_change_lenient(&updated_text, change);
-    }
-
-    let tree = panache::parse(&updated_text, Some(config.clone()));
-    let len = updated_text.len();
-    StrategyRun {
-        updated_text,
-        tree_end_offset: tree.text_range().end().into(),
-        reparsed_range: (0, len),
-        used_suffix_path: false,
-        fallback_reason: None,
-        strategy_used: "full_reparse",
-    }
+/// The document text after each notification, so the timed region is parse
+/// work only.
+fn step_texts(input: &str, steps: &[Step]) -> Vec<String> {
+    let mut current = input.to_owned();
+    steps
+        .iter()
+        .map(|changes| {
+            for change in changes {
+                current = apply_change(&current, change);
+            }
+            current.clone()
+        })
+        .collect()
 }
 
-fn suffix_incremental_runtime_strategy(
-    input: &str,
-    old_tree: &panache::SyntaxNode,
-    changes: &[BenchChange],
+fn scan_refdefs(text: &str, config: &Config) -> RefdefMap {
+    collect_refdef_labels(text, Dialect::for_flavor(config.flavor))
+}
+
+fn full_parse(
+    text: &str,
     config: &Config,
-) -> StrategyRun {
-    if changes.len() != 1 {
-        let mut run = full_reparse_strategy(input, changes, config);
-        run.fallback_reason = Some("multi_change_uses_full_reparse");
-        run.strategy_used = "full_reparse";
-        return run;
+    refdefs: RefdefMap,
+) -> (rowan::GreenNode, Vec<SyntaxError>) {
+    let (tree, errors) = parse_with_refdefs_and_errors(text, Some(config.clone()), refdefs);
+    (tree.green().to_owned(), errors)
+}
+
+/// The baseline step: what `parsed_document` cost before the side channel.
+fn full_step(text: &str, config: &Config) -> (Duration, rowan::GreenNode, Vec<SyntaxError>) {
+    let start = Instant::now();
+    let refdefs = scan_refdefs(text, config);
+    let (green, errors) = full_parse(text, config, refdefs);
+    (start.elapsed(), green, errors)
+}
+
+fn fresh_base(text: &str, config: &Config) -> ReparseBase {
+    let refdefs = scan_refdefs(text, config);
+    let (green, errors) = full_parse(text, config, refdefs.clone());
+    ReparseBase {
+        text: text.to_owned(),
+        green,
+        errors,
+        refdefs,
+    }
+}
+
+/// One incremental step, advancing `base` the way the side channel advances
+/// its stored `PrevParse`.
+fn incremental_step(
+    base: &mut ReparseBase,
+    new_text: &str,
+    config: &Config,
+) -> (Duration, StepOutcome) {
+    let start = Instant::now();
+    let refdefs = scan_refdefs(new_text, config);
+
+    // The host's exact set comparison runs ahead of the parser's textual
+    // guard: retained blocks keep the reference resolution they were parsed
+    // with, so a changed set invalidates them at a distance.
+    if refdefs != base.refdefs {
+        let (green, errors) = full_parse(new_text, config, refdefs.clone());
+        let elapsed = start.elapsed();
+        *base = ReparseBase {
+            text: new_text.to_owned(),
+            green,
+            errors,
+            refdefs,
+        };
+        return (
+            elapsed,
+            StepOutcome::Fallback {
+                reason: "refdef_set_changed",
+                bail: None,
+            },
+        );
     }
 
-    let change = &changes[0];
+    let edit = diff_edit(&base.text, new_text);
+    let attempt = Instant::now();
+    let reparsed = reparse_with_refdefs(
+        &base.green,
+        &base.errors,
+        &edit,
+        new_text,
+        Some(config.clone()),
+        refdefs.clone(),
+    );
+    let attempt_elapsed = attempt.elapsed();
 
-    if let Some((updated_text, old_edit, new_edit)) =
-        apply_change_strict_with_offsets(input, change)
-    {
-        match try_reparse(&updated_text, old_tree, config, old_edit, new_edit) {
-            Some(reparsed) => {
-                let strategy_used = reparsed.strategy.as_str();
-                return StrategyRun {
-                    tree_end_offset: usize::from(reparsed.green.text_len()),
-                    updated_text,
-                    reparsed_range: reparsed.reparse_range,
-                    used_suffix_path: true,
-                    fallback_reason: None,
-                    strategy_used,
-                };
-            }
-            None => {
-                // A declined reparse still costs its guard cascade, and that
-                // cost is what the bench is measuring on this path.
-                let end = updated_text.len();
-                let tree = panache::parse(&updated_text, Some(config.clone()));
-                return StrategyRun {
-                    updated_text,
-                    tree_end_offset: tree.text_range().end().into(),
-                    reparsed_range: (0, end),
-                    used_suffix_path: false,
-                    fallback_reason: Some("incremental_fallback_full_reparse"),
-                    strategy_used: "full_reparse",
-                };
-            }
+    match reparsed {
+        Some(reparsed) => {
+            let elapsed = start.elapsed();
+            let outcome = StepOutcome::Reused {
+                strategy: reparsed.strategy.as_str(),
+                window_bytes: new_text.len().saturating_sub(reparsed.reparse_range.0),
+                spliced_bytes: reparsed.reparse_range.1 - reparsed.reparse_range.0,
+            };
+            *base = ReparseBase {
+                text: new_text.to_owned(),
+                green: reparsed.green,
+                errors: reparsed.errors,
+                refdefs,
+            };
+            (elapsed, outcome)
+        }
+        None => {
+            let (green, errors) = full_parse(new_text, config, refdefs.clone());
+            let elapsed = start.elapsed();
+            *base = ReparseBase {
+                text: new_text.to_owned(),
+                green,
+                errors,
+                refdefs,
+            };
+            (
+                elapsed,
+                StepOutcome::Fallback {
+                    reason: "guard_declined",
+                    bail: Some(attempt_elapsed),
+                },
+            )
         }
     }
+}
 
-    let mut run = full_reparse_strategy(input, changes, config);
-    run.fallback_reason = Some("invalid_change_range_uses_full_reparse");
-    run.strategy_used = "full_reparse";
-    run
+/// The governing invariant, at every step of every case: a reused parse is
+/// byte-identical to a full parse of the same text, tree *and* errors.
+///
+/// Untimed, and run once per case before the measurement loop: a bench that
+/// reports a speedup for a splice that does not match a full parse is
+/// measuring the wrong thing entirely. (Losing *reuse* is not a failure here
+/// --- that shows up honestly in the fallback rate.)
+fn verify_case(input: &str, texts: &[String], config: &Config, id: &str) {
+    let mut base = fresh_base(input, config);
+    for (index, text) in texts.iter().enumerate() {
+        let (_, outcome) = incremental_step(&mut base, text, config);
+        let path = match outcome {
+            StepOutcome::Reused { strategy, .. } => strategy,
+            StepOutcome::Fallback { reason, .. } => reason,
+        };
+        let (expected, expected_errors) = full_parse(text, config, scan_refdefs(text, config));
+        assert_eq!(
+            fingerprint(&SyntaxNode::new_root(base.green.clone())),
+            fingerprint(&SyntaxNode::new_root(expected)),
+            "case {id} step {index} ({path}) diverged from a full parse"
+        );
+        assert_eq!(
+            base.errors, expected_errors,
+            "case {id} step {index} ({path}) diverged from a full parse on syntax errors"
+        );
+    }
 }
 
 fn run_case(
     id: &str,
     input: &str,
-    changes: &[BenchChange],
+    steps: &[Step],
     iterations: usize,
     config: &Config,
 ) -> CaseResult {
-    let old_tree = panache::parse(input, Some(config.clone()));
-    let baseline = full_reparse_strategy(input, changes, config);
-    let incremental_once = suffix_incremental_runtime_strategy(input, &old_tree, changes, config);
-    assert_eq!(
-        baseline.updated_text, incremental_once.updated_text,
-        "text mismatch in case {id}"
-    );
-    assert_eq!(
-        baseline.tree_end_offset, incremental_once.tree_end_offset,
-        "tree mismatch in case {id}"
-    );
+    let texts = step_texts(input, steps);
+    verify_case(input, &texts, config, id);
 
-    assert_case_tree_equivalence(input, changes, config, &old_tree, id);
-
-    for _ in 0..5 {
-        black_box(full_reparse_strategy(input, changes, config));
-        black_box(suffix_incremental_runtime_strategy(
-            input, &old_tree, changes, config,
-        ));
+    // Warm up both streams: the first parse of a document pays page faults and
+    // branch-predictor cold start that no `didChange` in a live session does.
+    for _ in 0..2 {
+        for text in &texts {
+            black_box(full_step(text, config));
+        }
+        let mut base = fresh_base(input, config);
+        for text in &texts {
+            black_box(incremental_step(&mut base, text, config));
+        }
     }
 
-    let mut full_samples = Vec::with_capacity(iterations);
-    let mut incremental_samples = Vec::with_capacity(iterations);
-    let mut fallback_count = 0usize;
+    let sample_count = iterations * texts.len();
+    let mut full_samples = Vec::with_capacity(sample_count);
+    let mut incremental_samples = Vec::with_capacity(sample_count);
+    let mut bail_samples = Vec::new();
+    let mut window_ratios = Vec::new();
+    let mut spliced_ratios = Vec::new();
+    let mut strategy_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut fallback_reasons: BTreeMap<String, usize> = BTreeMap::new();
 
     for _ in 0..iterations {
-        let start = Instant::now();
-        black_box(full_reparse_strategy(input, changes, config));
-        full_samples.push(start.elapsed());
-
-        let start = Instant::now();
-        let run = black_box(suffix_incremental_runtime_strategy(
-            input, &old_tree, changes, config,
-        ));
-        if run.fallback_reason.is_some() {
-            fallback_count += 1;
+        for text in &texts {
+            let (elapsed, green, errors) = full_step(text, config);
+            black_box((green, errors));
+            full_samples.push(elapsed);
         }
-        incremental_samples.push(start.elapsed());
+
+        let mut base = fresh_base(input, config);
+        for text in &texts {
+            let (elapsed, outcome) = incremental_step(&mut base, text, config);
+            incremental_samples.push(elapsed);
+            match outcome {
+                StepOutcome::Reused {
+                    strategy,
+                    window_bytes,
+                    spliced_bytes,
+                } => {
+                    *strategy_counts.entry(strategy.to_owned()).or_default() += 1;
+                    if !text.is_empty() {
+                        window_ratios.push(window_bytes as f64 / text.len() as f64);
+                        spliced_ratios.push(spliced_bytes as f64 / text.len() as f64);
+                    }
+                }
+                StepOutcome::Fallback { reason, bail } => {
+                    *fallback_reasons.entry(reason.to_owned()).or_default() += 1;
+                    if let Some(bail) = bail {
+                        bail_samples.push(bail);
+                    }
+                }
+            }
+        }
+        black_box(&base.green);
     }
 
     let full_stats = summarize_samples(&full_samples);
     let incremental_stats = summarize_samples(&incremental_samples);
-    let reparsed_bytes = incremental_once
-        .reparsed_range
-        .1
-        .saturating_sub(incremental_once.reparsed_range.0);
-    let reparsed_ratio = if input.is_empty() {
+    let declined: usize = fallback_reasons.values().sum();
+    let fallback_rate = if incremental_samples.is_empty() {
         0.0
     } else {
-        reparsed_bytes as f64 / input.len() as f64
+        declined as f64 / incremental_samples.len() as f64
     };
-    let fallback_rate = if iterations == 0 {
-        0.0
-    } else {
-        fallback_count as f64 / iterations as f64
-    };
+    let bail_cost_us = mean(&bail_samples.iter().map(duration_us).collect::<Vec<_>>());
+    let bail_cost_ratio = bail_cost_us
+        .filter(|_| full_stats.mean_us > 0.0)
+        .map(|us| us / full_stats.mean_us);
     let speedup_vs_full = if incremental_stats.mean_us > 0.0 {
         full_stats.mean_us / incremental_stats.mean_us
     } else {
@@ -294,87 +550,32 @@ fn run_case(
     CaseResult {
         id: id.to_owned(),
         document_size_bytes: input.len(),
-        changes: changes.len(),
+        steps: steps.len(),
+        changes_total: steps.iter().map(Vec::len).sum(),
         iterations,
-        incremental_reparsed_bytes: reparsed_bytes,
-        incremental_reparsed_ratio: reparsed_ratio,
-        incremental_used_suffix_path: incremental_once.used_suffix_path,
-        incremental_strategy_used: incremental_once.strategy_used.to_owned(),
-        incremental_fallback_reason: incremental_once.fallback_reason.map(str::to_owned),
-        incremental_fallback_rate: fallback_rate,
-        incremental_speedup_vs_full: speedup_vs_full,
-        strategy_full_reparse: full_stats,
-        strategy_suffix_incremental_runtime: incremental_stats,
+        full_parse: full_stats,
+        incremental: incremental_stats,
+        speedup_vs_full,
+        fallback_rate,
+        bail_cost_us,
+        bail_cost_ratio,
+        window_ratio: mean(&window_ratios),
+        spliced_ratio: mean(&spliced_ratios),
+        strategy_counts,
+        fallback_reasons,
     }
 }
 
-/// One reparse attempt in the shape the bench's callers want: `None` when the
-/// guard cascade declines, which is the fallback path the fallback-rate numbers
-/// are counting.
-fn try_reparse(
-    updated_text: &str,
-    old_tree: &panache::SyntaxNode,
-    config: &Config,
-    old_edit: (usize, usize),
-    new_edit: (usize, usize),
-) -> Option<Reparsed> {
-    let insert = updated_text.get(new_edit.0..new_edit.1)?;
-    if new_edit.0 != old_edit.0 {
-        return None;
-    }
-    let edit = Edit {
-        range: old_edit.0..old_edit.1,
-        insert: insert.to_string(),
-    };
-    let refdefs = panache::parser::collect_refdef_labels(
-        updated_text,
-        panache_parser::Dialect::for_flavor(config.flavor),
-    );
-    reparse_with_refdefs(
-        &old_tree.green().to_owned(),
-        &[],
-        &edit,
-        updated_text,
-        Some(config.clone()),
-        refdefs,
-    )
+fn duration_us(duration: &Duration) -> f64 {
+    duration.as_secs_f64() * 1_000_000.0
 }
 
-fn assert_case_tree_equivalence(
-    input: &str,
-    changes: &[BenchChange],
-    config: &Config,
-    old_tree: &panache::SyntaxNode,
-    id: &str,
-) {
-    let baseline = full_reparse_strategy(input, changes, config);
-
-    let incremental_tree = if changes.len() == 1 {
-        let change = &changes[0];
-        if let Some((updated_text, old_edit, new_edit)) =
-            apply_change_strict_with_offsets(input, change)
-        {
-            match try_reparse(&updated_text, old_tree, config, old_edit, new_edit) {
-                Some(reparsed) => panache::SyntaxNode::new_root(reparsed.green),
-                None => panache::parse(&updated_text, Some(config.clone())),
-            }
-        } else {
-            panache::parse(&baseline.updated_text, Some(config.clone()))
-        }
-    } else {
-        panache::parse(&baseline.updated_text, Some(config.clone()))
-    };
-
-    let baseline_tree = panache::parse(&baseline.updated_text, Some(config.clone()));
-    assert_eq!(
-        baseline_tree.to_string(),
-        incremental_tree.to_string(),
-        "tree mismatch in case {id}"
-    );
+fn mean(values: &[f64]) -> Option<f64> {
+    (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
 }
 
 fn summarize_samples(samples: &[Duration]) -> StrategyStats {
-    let mut micros: Vec<f64> = samples.iter().map(|d| d.as_micros() as f64).collect();
+    let mut micros: Vec<f64> = samples.iter().map(duration_us).collect();
     micros.sort_by(f64::total_cmp);
 
     let len = micros.len();
@@ -387,14 +588,9 @@ fn summarize_samples(samples: &[Duration]) -> StrategyStats {
     };
     let p95_index = ((len as f64 - 1.0) * 0.95).round() as usize;
     let p95 = micros.get(p95_index).copied().unwrap_or(0.0);
-    let mean = if len == 0 {
-        0.0
-    } else {
-        micros.iter().sum::<f64>() / len as f64
-    };
 
     StrategyStats {
-        mean_us: mean,
+        mean_us: mean(&micros).unwrap_or(0.0),
         median_us: median,
         p95_us: p95,
     }
@@ -422,6 +618,10 @@ fn range_change(
     }
 }
 
+fn insert_change(line: u32, character: u32, text: &str) -> BenchChange {
+    range_change(line, character, line, character, text)
+}
+
 fn full_change(text: &str) -> BenchChange {
     BenchChange {
         range: None,
@@ -429,15 +629,93 @@ fn full_change(text: &str) -> BenchChange {
     }
 }
 
-fn synthetic_document(paragraph_count: usize) -> String {
-    let mut out = String::from("# Benchmark Document\n\n");
-    for i in 0..paragraph_count {
-        out.push_str(&format!(
-            "Paragraph {:03} alpha beta gamma delta epsilon zeta eta theta.\n",
-            i
+/// Typing `text` one character at a time, left to right, from `character` on
+/// `line` --- one notification per keystroke, which is the workload the whole
+/// feature exists for.
+fn typing_stream(line: u32, character: u32, text: &str) -> Vec<Step> {
+    let mut column = character;
+    let mut steps = Vec::new();
+    for ch in text.chars() {
+        steps.push(vec![insert_change(line, column, &ch.to_string())]);
+        column += ch.len_utf16() as u32;
+    }
+    steps
+}
+
+/// A blank-line separated document with a `##` heading every ten paragraphs.
+///
+/// The separation is load-bearing: a run of adjacent lines is a *single*
+/// paragraph, and the seam guard needs a blank line to decouple at, so the
+/// old unseparated generator gave every edit a window starting at byte 0 and
+/// measured a full parse under an incremental name. The headings give the
+/// section-window strategy something to find.
+struct SyntheticDoc {
+    text: String,
+    /// Line index of each paragraph, so cases name paragraphs and never line
+    /// arithmetic.
+    paragraph_lines: Vec<u32>,
+}
+
+impl SyntheticDoc {
+    fn new(paragraph_count: usize) -> Self {
+        let mut text = String::from("# Benchmark Document\n\n");
+        let mut line = 2u32;
+        let mut paragraph_lines = Vec::with_capacity(paragraph_count);
+
+        for index in 0..paragraph_count {
+            if index.is_multiple_of(10) {
+                text.push_str(&format!("## Section {:03}\n\n", index / 10));
+                line += 2;
+            }
+            paragraph_lines.push(line);
+            text.push_str(&format!(
+                "Paragraph {index:03} alpha beta gamma delta epsilon zeta eta theta.\n\n"
+            ));
+            line += 2;
+        }
+
+        Self {
+            text,
+            paragraph_lines,
+        }
+    }
+
+    fn line(&self, paragraph: usize) -> u32 {
+        self.paragraph_lines[paragraph]
+    }
+}
+
+/// Columns of the words in a generated paragraph line, so a case can say
+/// "replace `beta`" without counting characters.
+const ALPHA: (u32, u32) = (14, 19);
+const BETA: (u32, u32) = (20, 24);
+const GAMMA: (u32, u32) = (25, 30);
+const DELTA: (u32, u32) = (31, 36);
+
+fn word_change(line: u32, word: (u32, u32), text: &str) -> BenchChange {
+    range_change(line, word.0, line, word.1, text)
+}
+
+/// Paragraphs in [`refdef_document`], and the line its first definition lands
+/// on: two lines of title, then two lines per paragraph.
+const REFDEF_PARAGRAPHS: usize = 40;
+const REFDEF_LINE: u32 = 2 + 2 * REFDEF_PARAGRAPHS as u32;
+/// End of `[one]: https://example.com/one`, where the edit appends.
+const REFDEF_URL_END: u32 = 30;
+
+/// A document whose reference definitions sit next to the edit, so the
+/// parser's `]:`-proximity guard declines every step. This is the bail-cost
+/// measurement: the case exists to price a decline, not to be fast.
+fn refdef_document() -> String {
+    let mut text = String::from("# Reference definitions\n\n");
+    for index in 0..REFDEF_PARAGRAPHS {
+        text.push_str(&format!(
+            "Paragraph {index:03} referring to [one] and [two] and more prose here.\n\n"
         ));
     }
-    out
+    text.push_str("[one]: https://example.com/one\n");
+    text.push_str("[two]: https://example.com/two\n");
+    text
 }
 
 fn load_document(name: &str) -> Option<String> {
@@ -445,28 +723,146 @@ fn load_document(name: &str) -> Option<String> {
     fs::read_to_string(path).ok()
 }
 
-fn add_real_document_cases(cases: &mut Vec<BenchCase>, default_iterations: usize) {
-    let real_docs: [RealDocCaseDef<'_>; 5] = [
-        (
-            "pandoc_manual_single_edit",
-            "pandoc_manual.md",
-            200,
-            5,
-            200,
-            10,
-            "manual",
-            (default_iterations / 4).max(5),
-        ),
-        (
-            "pandoc_manual_late_edit",
-            "pandoc_manual.md",
-            7600,
-            0,
-            7600,
-            0,
-            "NOTE: ",
-            (default_iterations / 4).max(5),
-        ),
+fn synthetic_cases(default_iterations: usize) -> Vec<BenchCase> {
+    let small = SyntheticDoc::new(25);
+    let medium = SyntheticDoc::new(250);
+    let large = SyntheticDoc::new(1200);
+    let utf16_doc = "# UTF16\n\nemoji: 😀 rocket: 🚀\nRésumé café\nmath αβγ\nclosing line\n";
+    let refdefs = refdef_document();
+
+    vec![
+        BenchCase {
+            id: "single_change_small".to_owned(),
+            steps: vec![vec![word_change(small.line(15), ALPHA, "ALPHA")]],
+            input: small.text.clone(),
+            iterations: default_iterations,
+        },
+        BenchCase {
+            id: "multi_change_small_4".to_owned(),
+            steps: vec![vec![
+                word_change(small.line(5), ALPHA, "ALPHA"),
+                word_change(small.line(10), BETA, "BETA"),
+                word_change(small.line(15), GAMMA, "GAMMA"),
+                word_change(small.line(20), DELTA, "DELTA"),
+            ]],
+            input: small.text.clone(),
+            iterations: default_iterations,
+        },
+        BenchCase {
+            id: "multi_change_medium_4".to_owned(),
+            steps: vec![vec![
+                word_change(medium.line(60), ALPHA, "ALPHA"),
+                word_change(medium.line(110), BETA, "BETA"),
+                word_change(medium.line(160), GAMMA, "GAMMA"),
+                word_change(medium.line(210), DELTA, "DELTA"),
+            ]],
+            input: medium.text.clone(),
+            iterations: default_iterations / 2,
+        },
+        // Multi-cursor inside one paragraph: the same change count as the
+        // scattered case, but `diff_edit` spans one line instead of 150. The
+        // pair is the whole argument that clustering, not count, is what the
+        // incremental path cares about.
+        BenchCase {
+            id: "multi_change_medium_clustered_4".to_owned(),
+            steps: vec![vec![
+                word_change(medium.line(210), DELTA, "DELTA"),
+                word_change(medium.line(210), GAMMA, "GAMMA"),
+                word_change(medium.line(210), BETA, "BETA"),
+                word_change(medium.line(210), ALPHA, "ALPHA"),
+            ]],
+            input: medium.text.clone(),
+            iterations: default_iterations / 2,
+        },
+        BenchCase {
+            id: "multi_change_large_8".to_owned(),
+            steps: vec![vec![
+                word_change(large.line(150), ALPHA, "A1"),
+                word_change(large.line(300), BETA, "B2"),
+                word_change(large.line(450), GAMMA, "C3"),
+                word_change(large.line(600), DELTA, "D4"),
+                word_change(large.line(750), ALPHA, "E5"),
+                word_change(large.line(900), BETA, "F6"),
+                word_change(large.line(1050), GAMMA, "G7"),
+                word_change(large.line(1150), DELTA, "H8"),
+            ]],
+            input: large.text.clone(),
+            iterations: default_iterations / 4,
+        },
+        BenchCase {
+            id: "multi_change_utf16_4".to_owned(),
+            input: utf16_doc.to_owned(),
+            steps: vec![vec![
+                range_change(2, 7, 2, 9, "😎"),
+                range_change(2, 18, 2, 20, "🛰️"),
+                range_change(3, 1, 3, 2, "e"),
+                range_change(4, 5, 4, 7, "xyz"),
+            ]],
+            iterations: default_iterations,
+        },
+        BenchCase {
+            id: "full_replace".to_owned(),
+            input: small.text.clone(),
+            steps: vec![vec![full_change("# Replaced\n\nAll new text.\n")]],
+            iterations: default_iterations,
+        },
+        BenchCase {
+            id: "typing_stream_medium".to_owned(),
+            steps: typing_stream(medium.line(200), ALPHA.0, "incrementally "),
+            input: medium.text.clone(),
+            iterations: default_iterations / 2,
+        },
+        BenchCase {
+            id: "bail_refdef_edit".to_owned(),
+            // Appended to the first definition's URL: the label set is
+            // unchanged, so the host admits the attempt and the parser's `]:`
+            // proximity guard is what declines.
+            steps: vec![vec![insert_change(REFDEF_LINE, REFDEF_URL_END, "/deep")]],
+            input: refdefs,
+            iterations: default_iterations,
+        },
+    ]
+}
+
+fn real_document_cases(default_iterations: usize) -> Vec<BenchCase> {
+    let mut cases = Vec::new();
+
+    if let Some(doc) = load_document("pandoc_manual.md") {
+        let iterations = (default_iterations / 16).max(3);
+        // Prose deep inside a definition-list item, a third of the way in:
+        // the worst shape for a suffix window at scale, since almost the whole
+        // document is still downstream of the seam.
+        cases.push(BenchCase {
+            id: "pandoc_manual_early_edit".to_owned(),
+            input: doc.clone(),
+            steps: vec![vec![range_change(292, 4, 292, 13, "APPENDING")]],
+            iterations,
+        });
+        // Line 200 is `[`setspace`]: ...`, and the replacement rewrites the
+        // *label*. The host's set comparison declines before the parser is
+        // called at all, so this prices the cheapest decline there is: one
+        // refdef scan, then the full parse that would have happened anyway.
+        cases.push(BenchCase {
+            id: "pandoc_manual_refdef_label_edit".to_owned(),
+            input: doc.clone(),
+            steps: vec![vec![range_change(200, 5, 200, 10, "manual")]],
+            iterations,
+        });
+        cases.push(BenchCase {
+            id: "pandoc_manual_late_edit".to_owned(),
+            input: doc.clone(),
+            steps: vec![vec![insert_change(7600, 0, "NOTE: ")]],
+            iterations,
+        });
+        cases.push(BenchCase {
+            id: "pandoc_manual_typing_stream".to_owned(),
+            input: doc,
+            steps: typing_stream(7600, 0, "NOTE: typing"),
+            iterations,
+        });
+    }
+
+    let smaller: [(&str, &str, u32, u32, u32, u32, &str); 3] = [
         (
             "large_authoring_single_edit",
             "large_authoring.qmd",
@@ -475,39 +871,96 @@ fn add_real_document_cases(cases: &mut Vec<BenchCase>, default_iterations: usize
             60,
             10,
             "AUTHORING",
-            (default_iterations / 2).max(8),
         ),
-        (
-            "tables_single_edit",
-            "tables.qmd",
-            40,
-            4,
-            40,
-            8,
-            "TABLES",
-            (default_iterations / 2).max(8),
-        ),
-        (
-            "math_single_edit",
-            "math.qmd",
-            25,
-            3,
-            25,
-            8,
-            "MATH",
-            (default_iterations / 2).max(8),
-        ),
+        ("tables_single_edit", "tables.qmd", 40, 4, 40, 8, "TABLES"),
+        ("math_single_edit", "math.qmd", 25, 3, 25, 8, "MATH"),
     ];
 
-    for (id, file, sl, sc, el, ec, replacement, iterations) in real_docs {
+    for (id, file, sl, sc, el, ec, replacement) in smaller {
         if let Some(doc) = load_document(file) {
             cases.push(BenchCase {
                 id: id.to_owned(),
                 input: doc,
-                changes: vec![range_change(sl, sc, el, ec, replacement)],
-                iterations,
+                steps: vec![vec![range_change(sl, sc, el, ec, replacement)]],
+                iterations: (default_iterations / 2).max(8),
             });
         }
+    }
+
+    cases
+}
+
+fn print_case(result: &CaseResult) {
+    println!("\nCase: {}", result.id);
+    println!("  Document size: {} bytes", result.document_size_bytes);
+    println!(
+        "  Steps: {} ({} content changes total)",
+        result.steps, result.changes_total
+    );
+    println!("  Iterations: {}", result.iterations);
+    println!(
+        "  Full parse per step mean/median/p95: {:.2} / {:.2} / {:.2} us",
+        result.full_parse.mean_us, result.full_parse.median_us, result.full_parse.p95_us
+    );
+    println!(
+        "  Incremental per step mean/median/p95: {:.2} / {:.2} / {:.2} us",
+        result.incremental.mean_us, result.incremental.median_us, result.incremental.p95_us
+    );
+    println!("  Speedup vs full: {:.2}x", result.speedup_vs_full);
+    println!("  Fallback rate: {:.2}%", result.fallback_rate * 100.0);
+    match (result.bail_cost_us, result.bail_cost_ratio) {
+        (Some(us), Some(ratio)) => println!(
+            "  Bail cost: {us:.2} us ({:.2}% of a full parse)",
+            ratio * 100.0
+        ),
+        _ => println!("  Bail cost: n/a (no step reached the guard cascade and declined)"),
+    }
+    match (result.window_ratio, result.spliced_ratio) {
+        (Some(window), Some(spliced)) => println!(
+            "  Reused steps re-parsed {:.2}% of the document, spliced {:.2}%",
+            window * 100.0,
+            spliced * 100.0
+        ),
+        _ => println!("  Reused steps: none"),
+    }
+    if !result.strategy_counts.is_empty() {
+        println!("  Strategies: {:?}", result.strategy_counts);
+    }
+    if !result.fallback_reasons.is_empty() {
+        println!("  Fallback reasons: {:?}", result.fallback_reasons);
+    }
+}
+
+/// The compact table the module doc carries. Printed last so a bench run can
+/// be pasted straight into it.
+fn print_summary(results: &[CaseResult]) {
+    println!("\nSummary");
+    println!("=======");
+    println!(
+        "{:<32} {:>7} {:>6} {:>7} {:>7} {:>8} {:>9} {:>7} {:>8}",
+        "case", "bytes", "steps", "full", "incr", "speedup", "fallback", "bail%", "window%"
+    );
+    for result in results {
+        let bail = match result.bail_cost_ratio {
+            Some(ratio) => format!("{:.1}%", ratio * 100.0),
+            None => "-".to_owned(),
+        };
+        let window = match result.window_ratio {
+            Some(ratio) => format!("{:.1}%", ratio * 100.0),
+            None => "-".to_owned(),
+        };
+        println!(
+            "{:<32} {:>7} {:>6} {:>7.1} {:>7.1} {:>7.1}x {:>8.1}% {:>7} {:>8}",
+            result.id,
+            result.document_size_bytes,
+            result.steps,
+            result.full_parse.mean_us,
+            result.incremental.mean_us,
+            result.speedup_vs_full,
+            result.fallback_rate * 100.0,
+            bail,
+            window
+        );
     }
 }
 
@@ -518,140 +971,30 @@ fn main() {
         .and_then(|raw| raw.parse::<usize>().ok())
         .unwrap_or(80);
 
-    let small = synthetic_document(25);
-    let medium = synthetic_document(250);
-    let large = synthetic_document(1200);
-    let utf16_doc = "# UTF16\nemoji: 😀 rocket: 🚀\nRésumé café\nmath αβγ\nclosing line\n";
-
-    let mut cases: Vec<BenchCase> = vec![
-        BenchCase {
-            id: "single_change_small".to_owned(),
-            input: small.clone(),
-            changes: vec![range_change(2, 14, 2, 19, "ALPHA")],
-            iterations: default_iterations,
-        },
-        BenchCase {
-            id: "multi_change_small_4".to_owned(),
-            input: small.clone(),
-            changes: vec![
-                range_change(2, 14, 2, 19, "ALPHA"),
-                range_change(4, 20, 4, 24, "BETA"),
-                range_change(6, 25, 6, 30, "GAMMA"),
-                range_change(8, 31, 8, 36, "DELTA"),
-            ],
-            iterations: default_iterations,
-        },
-        BenchCase {
-            id: "multi_change_medium_4".to_owned(),
-            input: medium,
-            changes: vec![
-                range_change(10, 14, 10, 19, "ALPHA"),
-                range_change(30, 20, 30, 24, "BETA"),
-                range_change(80, 25, 80, 30, "GAMMA"),
-                range_change(140, 31, 140, 36, "DELTA"),
-            ],
-            iterations: default_iterations / 2,
-        },
-        BenchCase {
-            id: "multi_change_large_8".to_owned(),
-            input: large,
-            changes: vec![
-                range_change(30, 14, 30, 19, "A1"),
-                range_change(60, 20, 60, 24, "B2"),
-                range_change(120, 25, 120, 30, "C3"),
-                range_change(180, 31, 180, 36, "D4"),
-                range_change(240, 14, 240, 19, "E5"),
-                range_change(300, 20, 300, 24, "F6"),
-                range_change(360, 25, 360, 30, "G7"),
-                range_change(420, 31, 420, 36, "H8"),
-            ],
-            iterations: default_iterations / 4,
-        },
-        BenchCase {
-            id: "multi_change_utf16_4".to_owned(),
-            input: utf16_doc.to_owned(),
-            changes: vec![
-                range_change(1, 7, 1, 9, "😎"),
-                range_change(1, 18, 1, 20, "🛰️"),
-                range_change(2, 1, 2, 2, "e"),
-                range_change(3, 5, 3, 7, "xyz"),
-            ],
-            iterations: default_iterations,
-        },
-        BenchCase {
-            id: "full_replace".to_owned(),
-            input: small.clone(),
-            changes: vec![full_change("# Replaced\n\nAll new text.\n")],
-            iterations: default_iterations,
-        },
-        BenchCase {
-            id: "fallback_invalid_range".to_owned(),
-            input: small,
-            changes: vec![range_change(999, 0, 999, 5, "oops")],
-            iterations: default_iterations,
-        },
-    ];
-
-    add_real_document_cases(&mut cases, default_iterations);
+    let mut cases = synthetic_cases(default_iterations);
+    cases.extend(real_document_cases(default_iterations));
 
     println!("LSP Incremental Benchmarks");
     println!("==========================");
 
     let mut results = Vec::new();
     for case in cases {
-        println!("\nCase: {}", case.id);
-        println!("  Document size: {} bytes", case.input.len());
-        println!("  Changes: {}", case.changes.len());
-        println!("  Iterations: {}", case.iterations);
-
-        let id = case.id;
         let result = run_case(
-            &id,
+            &case.id,
             &case.input,
-            &case.changes,
+            &case.steps,
             case.iterations.max(1),
             &config,
         );
-        println!(
-            "  Full reparse mean/median/p95: {:.2} / {:.2} / {:.2} us",
-            result.strategy_full_reparse.mean_us,
-            result.strategy_full_reparse.median_us,
-            result.strategy_full_reparse.p95_us
-        );
-        println!(
-            "  Suffix incremental mean/median/p95: {:.2} / {:.2} / {:.2} us",
-            result.strategy_suffix_incremental_runtime.mean_us,
-            result.strategy_suffix_incremental_runtime.median_us,
-            result.strategy_suffix_incremental_runtime.p95_us
-        );
-        println!(
-            "  Incremental reparsed: {} bytes ({:.2}%)",
-            result.incremental_reparsed_bytes,
-            result.incremental_reparsed_ratio * 100.0
-        );
-        println!(
-            "  Incremental speedup vs full: {:.2}x",
-            result.incremental_speedup_vs_full
-        );
-        println!(
-            "  Incremental suffix path used: {} (fallback rate {:.2}%)",
-            result.incremental_used_suffix_path,
-            result.incremental_fallback_rate * 100.0
-        );
-        println!(
-            "  Incremental strategy used: {}",
-            result.incremental_strategy_used
-        );
-        if let Some(reason) = &result.incremental_fallback_reason {
-            println!("  Incremental fallback reason: {}", reason);
-        }
-
+        print_case(&result);
         results.push(result);
     }
 
+    print_summary(&results);
+
     if let Ok(path) = env::var("PANACHE_LSP_BENCH_OUTPUT_JSON") {
         let report = BenchmarkReport {
-            schema_version: 2,
+            schema_version: 3,
             results,
         };
         let json = serde_json::to_string_pretty(&report)
