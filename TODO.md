@@ -397,14 +397,36 @@ this branch rebases onto that fix.
     and each driver now asserts a floor on its splice rate so a future guard
     cannot silently empty the harness again.
 
-- [ ] Phase 6: default flip --- `panache.incrementalParsing` default true,
-  `experimental.incrementalParsing` kept as deprecated alias (LSP-only, no
-  panache.toml/schema key); VS Code setting migration with
-  `deprecationMessage`; client-neutral docs (`docs/guide/lsp.qmd`,
-  `docs/development/lsp.qmd`, `editors/code/README.md`). Gate: oracle-clean
-  fuzz at 10x iterations; workspace + LSP suite green with flag forced on
-  and off; 1 week oracle-live dogfooding with zero panics; and the bench
-  thresholds below.
+- [ ] Phase 6: default flip --- incremental parsing is **always on**, with no
+  new setting. `panache.experimental.incrementalParsing` stays exactly where
+  it is and keeps working, but inverts its meaning: absent means on, and the
+  only reason to write it is `false`, which turns the side channel off for
+  debugging. No `panache.incrementalParsing` key, no alias, no
+  `deprecationMessage`, no setting migration --- a second key buys nothing
+  when the only value anyone would set is the one the existing key already
+  accepts.
+  - Work: default the setting to on where it is read
+    (`experimental_incremental_parsing_from_initialize` in
+    `src/lsp/dispatch.rs`, and the `workspace/configuration` pull and
+    `didChangeConfiguration` paths in `src/lsp/handlers/configuration.rs`, which
+    share `runtime_incremental_parsing_from_value`); flip the VS Code
+    `package.json` default to `true` and reword its description, which currently
+    sells it as an unstable experiment rather than a debug switch; update
+    `docs/guide/lsp.qmd` (opt-in -> opt-out), `docs/development/lsp.qmd`, and
+    the AGENTS.md admission sentence; flip the LSP tests that assert the default
+    is off (`tests/lsp/test_incremental_edits.rs`,
+    `tests/lsp/test_config_pull.rs`, `tests/lsp/test_config_reload.rs`).
+    `PANACHE_INCREMENTAL_PARSING=1|0` keeps overriding the setting in both
+    directions and needs no change.
+  - The `experimental.` prefix becomes a misnomer the day this lands. Renaming
+    it is deliberately declined: a rename needs precisely the alias and
+    migration this phase drops, and the cost of a stale prefix on a debug-only
+    switch is lower than the cost of carrying two keys forever. The *internal*
+    name (`runtime_settings.experimental_incremental_parsing`) has no wire
+    impact and can be renamed freely --- Phase 9 material.
+  - Gate: oracle-clean fuzz at 10x iterations; workspace + LSP suite green with
+    the flag forced on and off; 1 week oracle-live dogfooding with zero panics;
+    and the bench thresholds below.
   - **Bench thresholds, named per case** (Phase 5 measured 1.1x and 2.7x on the
     same document under the same tier, so an unqualified ">= 2x medium" is not a
     criterion): `typing_stream_medium` >= 2x, `pandoc_manual_typing_stream` and
