@@ -283,13 +283,16 @@ fn do_check_section_window_last_section_runs_to_eof() {
 }
 
 #[test]
-fn do_check_edit_at_document_start_reparses_whole_suffix() {
-    // The restart clamps to the document start, so the "suffix" is the
-    // whole document — correct, but no cheaper than a full reparse.
+fn do_check_edit_at_document_start_declines_on_window_size() {
+    // The restart clamps to the document start, so the "suffix" would be the
+    // whole document: correct, but strictly more expensive than the full parse
+    // it duplicates. The window-size cutoff declines before the guard cascade
+    // and the window parse run, so the caller pays that full parse and nothing
+    // else.
     do_check(
         "$0p$0ara one\n\npara two\n\npara three\n",
         "P",
-        "suffix_window",
+        "full_reparse",
         31,
     );
 }

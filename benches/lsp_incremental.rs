@@ -55,59 +55,93 @@
 //!
 //! `PANACHE_LSP_BENCH_ITERATIONS=80 cargo bench --bench lsp_incremental`, on an
 //! AMD Ryzen 9 7900, rustc 1.94.1, `Config::default()` (pandoc flavor).
-//! Microseconds per step; `full` and `incr` are means.
+//! Microseconds per step; `full` and `incr` are means. Measured with the
+//! window-size cutoff live (roadmap Phase 5b), which is why every case with a
+//! window over 85% now reports a 100% fallback rate and no `window %`.
 //!
 //! ```text
 //! case                               bytes  steps    full    incr  speedup  fallback   bail%  window%
-//! single_change_small                 1620      1    44.1    33.3     1.3x      0.0%       -    59.4%
-//! multi_change_small_4                1620      1    41.5    41.5     1.0x      0.0%       -    78.5%
-//! multi_change_medium_4              15922      1   394.1   374.5     1.1x      0.0%       -    75.8%
-//! multi_change_medium_clustered_4    15922      1   395.0   125.4     3.2x      0.0%       -    16.0%
-//! multi_change_large_8               76542      1  1876.8  2079.2     0.9x      0.0%       -    87.5%
-//! multi_change_utf16_4                  74      1     3.6     4.8     0.8x      0.0%       -   100.0%
-//! full_replace                        1620      1     2.2    10.0     0.2x      0.0%       -   100.0%
-//! typing_stream_medium               15922     14   410.7   149.6     2.7x      0.0%       -    20.0%
-//! bail_refdef_edit                    2687      1    97.5   113.6     0.9x    100.0%   15.7%        -
-//! pandoc_manual_early_edit          300856      1 10405.0 11248.6     0.9x      0.0%       -    96.9%
-//! pandoc_manual_refdef_label_edit   300856      1 10466.5 10337.9     1.0x    100.0%       -        -
-//! pandoc_manual_late_edit           300856      1 10416.1  1864.1     5.6x      0.0%       -     7.0%
-//! pandoc_manual_typing_stream       300856     12 10568.9  1898.0     5.6x      0.0%       -     7.0%
-//! large_authoring_single_edit        29858      1   647.0   581.6     1.1x      0.0%       -    91.3%
-//! tables_single_edit                 25101      1   753.6   782.6     1.0x      0.0%       -    98.2%
-//! math_single_edit                   30112      1   556.4   513.3     1.1x      0.0%       -    97.8%
+//! single_change_small                 1620      1    45.1    33.9     1.3x      0.0%       -    59.4%
+//! multi_change_small_4                1620      1    42.9    43.7     1.0x      0.0%       -    78.5%
+//! multi_change_medium_4              15922      1   399.9   371.2     1.1x      0.0%       -    75.8%
+//! multi_change_medium_clustered_4    15922      1   415.1   134.9     3.1x      0.0%       -    16.0%
+//! multi_change_large_8               76542      1  1912.5  2016.3     0.9x    100.0%    0.0%        -
+//! multi_change_utf16_4                  74      1     3.9     5.7     0.7x    100.0%   43.0%        -
+//! full_replace                        1620      1     2.2     2.4     0.9x    100.0%    4.2%        -
+//! typing_stream_medium               15922     14   407.8   146.2     2.8x      0.0%       -    20.0%
+//! window_cutoff_accepted             15922      1   405.4   369.8     1.1x      0.0%       -    79.9%
+//! window_cutoff_declined             15922      1   408.5   405.9     1.0x    100.0%    0.0%        -
+//! bail_refdef_edit                    2687      1    96.4   113.0     0.9x    100.0%   15.5%        -
+//! pandoc_manual_early_edit          300856      1 10396.6 10431.1     1.0x    100.0%    0.0%        -
+//! pandoc_manual_refdef_label_edit   300856      1 10880.1 10517.4     1.0x    100.0%       -        -
+//! pandoc_manual_late_edit           300856      1 10590.3  1929.0     5.5x      0.0%       -     7.0%
+//! pandoc_manual_typing_stream       300856     12 10623.0  1951.6     5.4x      0.0%       -     7.0%
+//! large_authoring_single_edit        29858      1   649.5   640.1     1.0x    100.0%    0.1%        -
+//! tables_single_edit                 25101      1   758.5   744.0     1.0x    100.0%    0.0%        -
+//! math_single_edit                   30112      1   553.7   551.5     1.0x    100.0%    0.1%        -
 //! ```
 //!
 //! What the table says:
 //!
 //! * **The speedup is a function of `window %` and nothing else.** Every case
-//!   at or above ~90% loses; every case below ~25% wins outright.
-//!   `tables_single_edit` edits line 40 of a 25 KB document, re-parses 98% of
-//!   it, and returns 1.0x while reporting a 7.5% *spliced* share --- the
-//!   number the old harness printed, and the reason "7% reparsed, 0.98x
-//!   speedup" used to look like a paradox.
-//! * **A wide reparse loses to a full parse even when it succeeds.**
-//!   `pandoc_manual_early_edit` accepts, re-parses 97%, and pays 0.9x for the
-//!   guard cascade and splice on top. `full_replace` is the extreme at 0.2x: a
-//!   27-byte replacement still walks the old 1.6 KB tree first. The surcharge
-//!   runs 5-10% of a full parse, which caps how much the feature can cost --- but
-//!   it is not zero, and declining up front on a too-wide window turns every
-//!   one of these shapes into a clean ~1.0x fallback (roadmap Phase 5b, which
-//!   this measurement is what promoted ahead of the default flip).
+//!   below ~25% wins outright; the ones that used to sit at or above ~90% no
+//!   longer appear in that column at all, because the cutoff declines them
+//!   before the window parse. `tables_single_edit` is the shape that made the
+//!   point: it edits line 40 of a 25 KB document, used to re-parse 98% of it
+//!   for 1.0x, and reported a 7.5% *spliced* share --- the number the old
+//!   harness printed, and the reason "7% reparsed, 0.98x speedup" used to look
+//!   like a paradox.
+//! * **A wide reparse loses to a full parse even when it succeeds**, which is
+//!   what the cutoff is for. Before it, `pandoc_manual_early_edit` accepted,
+//!   re-parsed 97%, and paid 0.9x for the guard cascade and splice on top;
+//!   `full_replace` was the extreme at 0.2x, walking the old 1.6 KB tree to
+//!   splice a 27-byte document. Declining both up front costs a fraction of a
+//!   microsecond (`bail%` 0.0% and 4.2%) and returns them to 1.0x and 0.9x.
+//! * **`window_cutoff_accepted` and `window_cutoff_declined` bracket the
+//!   threshold**: the same document and the same one-word edit, at a 79.9% and
+//!   an 87.8% window. Move `MAX_WINDOW_SHARE_PERCENT` and exactly one of them
+//!   flips its fallback rate between 0% and 100%.
 //! * **Clustering matters; change count does not.** The two medium
 //!   multi-change cases carry the same four changes. Scattering them over 150
 //!   lines takes `diff_edit`'s span from one line to most of the document: 16%
-//!   window to 76%, 3.2x to 1.1x.
+//!   window to 76%, 3.1x to 1.1x.
 //! * **The typing streams are the workload the feature exists for**, and they
-//!   are where it pays: 2.7x on a 16 KB document, 5.6x on the 300 KB pandoc
+//!   are where it pays: 2.8x on a 16 KB document, 5.4x on the 300 KB pandoc
 //!   manual, with no step declining. Each stream agrees with its equivalent
 //!   single edit (`pandoc_manual_late_edit`) to within noise, which is the
 //!   evidence that chaining the base does not degrade across keystrokes.
-//! * **Bail cost is small, and the fallback rate is what governs it.** The
-//!   parser's guard cascade prices at 15.7% of a full parse
-//!   (`bail_refdef_edit`); a host-side decline
+//! * **Bail cost is small, and the fallback rate is what governs it.** A
+//!   cutoff decline is under a microsecond even at 300 KB, because it is
+//!   arithmetic on the edit offset. The correctness guards cost more: the
+//!   parser's `]:`-proximity cascade prices at 15.5% of a full parse
+//!   (`bail_refdef_edit`), and a host-side decline
 //!   (`pandoc_manual_refdef_label_edit`, whose edit rewrites a refdef *label*)
 //!   costs one extra refdef scan, inside the noise at 300 KB. Both land under
 //!   the 20%-of-a-full-parse budget the default flip is gated on.
+//!
+//! ## The three cases still under 1.0x
+//!
+//! None of them is the wide-window surcharge the cutoff removed, and none is
+//! reachable by tuning its threshold:
+//!
+//! * `bail_refdef_edit` (0.9x) exists to price a decline. A decline is a full
+//!   parse plus the cascade that reached it, so it is *definitionally* slower;
+//!   the number to read on this case is `bail%`, not the speedup.
+//! * `multi_change_utf16_4` (0.7x) is 74 bytes, and an attempt has a fixed cost
+//!   --- cloning the options, materializing a cursor root over the previous
+//!   green tree, walking it for the window --- that is 1.8 us against a 3.9 us
+//!   whole parse. It lost at 0.8x before the cutoff too, while successfully
+//!   splicing. No window threshold fixes a fixed cost; roadmap Phase 7's token
+//!   tier is what removes it. A document-size floor would, but it would also
+//!   refuse the small documents with *narrow* windows that do win
+//!   (`single_change_small`, 1.6 KB, 1.3x).
+//! * `multi_change_large_8` (0.9-1.0x, run to run) declines in under a
+//!   microsecond --- `bail%` pins the parser's share --- and still costs ~100 us
+//!   more than a full parse of the same 76 KB. That residual is host-side
+//!   per-step work the parser never sees: the whole-text `diff_edit` and the
+//!   67 KB `insert` it allocates for an edit spanning most of the document, the
+//!   refdef-set clone, the base text copy. It is unattributed between those and
+//!   wants a profile, not a threshold.
 //!
 //! # Running
 //!
@@ -810,6 +844,25 @@ fn synthetic_cases(default_iterations: usize) -> Vec<BenchCase> {
         BenchCase {
             id: "typing_stream_medium".to_owned(),
             steps: typing_stream(medium.line(200), ALPHA.0, "incrementally "),
+            input: medium.text.clone(),
+            iterations: default_iterations / 2,
+        },
+        // The window-size cutoff, one case per side. The same document and the
+        // same single-word edit; only how far into the document it lands
+        // differs, and with it the share of the document left downstream of the
+        // window. `accepted` sits at ~80%, `declined` at ~88%, bracketing the
+        // 85% threshold. The pair is what stops a threshold change from being
+        // invisible: move it and exactly one of these two flips its fallback
+        // rate between 0% and 100%.
+        BenchCase {
+            id: "window_cutoff_accepted".to_owned(),
+            steps: vec![vec![word_change(medium.line(50), ALPHA, "ALPHA")]],
+            input: medium.text.clone(),
+            iterations: default_iterations / 2,
+        },
+        BenchCase {
+            id: "window_cutoff_declined".to_owned(),
+            steps: vec![vec![word_change(medium.line(30), ALPHA, "ALPHA")]],
             input: medium.text.clone(),
             iterations: default_iterations / 2,
         },

@@ -9,6 +9,13 @@
 //! `parsed_document` on the host side) treat the reparse as a pure
 //! optimization.
 //!
+//! One guard declines for *cost* rather than for soundness: the window-size
+//! cutoff ([`MAX_WINDOW_SHARE_PERCENT`]) refuses a window covering nearly
+//! the whole document, because a splice that re-parses 95% of a file is a
+//! slower way to reach the tree a full parse produces. It shares the refusal
+//! contract with the correctness guards, so the caller cannot tell them apart
+//! and does not need to.
+//!
 //! [`Edit`] is the currency the caller speaks. Conversion from LSP `didChange`
 //! content changes lives host-side; this crate only ever sees byte ranges.
 //! [`diff_edit`] recovers a single contiguous edit from two whole texts, which
@@ -146,6 +153,49 @@ pub fn reparse(
     new_text: &str,
     options: &ParserOptions,
 ) -> Option<Reparsed> {
+    reparse_with_cost_guards(
+        prev_green,
+        prev_errors,
+        edit,
+        new_text,
+        options,
+        CostGuards::Enforced,
+    )
+}
+
+/// Whether the *cost* guards apply to a reparse attempt --- today just the
+/// window-size cutoff ([`MAX_WINDOW_SHARE_PERCENT`]).
+///
+/// They are the only guards in the cascade that decline for cost rather than
+/// for soundness, which makes them the ones a correctness harness wants out of
+/// its way. `tests/incremental_fuzz.rs` works on hazard snippets tens of bytes
+/// long, where almost every window covers most of the document: enforcing the
+/// cutoff there declines two thirds of its edits before they reach a single
+/// correctness guard, and the harness quietly stops testing the splice at all.
+/// It therefore fuzzes the snippets with [`CostGuards::Ignored`] and its
+/// real-document corpus with the production setting.
+///
+/// Production has exactly one reparse caller and it uses
+/// [`CostGuards::Enforced`], which is what plain [`reparse`] passes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CostGuards {
+    /// Decline a window wider than [`MAX_WINDOW_SHARE_PERCENT`].
+    Enforced,
+    /// Attempt the splice however wide the window is. Test-only.
+    Ignored,
+}
+
+/// [`reparse`], with the cost guards under the caller's control.
+///
+/// See [`CostGuards`] for who wants the non-default and why.
+pub fn reparse_with_cost_guards(
+    prev_green: &rowan::GreenNode,
+    prev_errors: &[SyntaxError],
+    edit: &Edit,
+    new_text: &str,
+    options: &ParserOptions,
+    cost_guards: CostGuards,
+) -> Option<Reparsed> {
     let mut options = options.clone();
     populate_refdef_labels(new_text, &mut options);
     let prev_tree = SyntaxNode::new_root(prev_green.clone());
@@ -156,6 +206,7 @@ pub fn reparse(
         prev_errors,
         (edit.range.start, edit.range.end),
         edit.new_range(),
+        cost_guards,
     )
 }
 
@@ -222,12 +273,24 @@ fn reparse_ranges(
     old_errors: &[SyntaxError],
     old_edit_range: (usize, usize),
     new_edit_range: (usize, usize),
+    cost_guards: CostGuards,
 ) -> Option<Reparsed> {
     let input_len = input.len();
 
     let old_edit = normalize_range(old_edit_range)?;
     let new_edit = normalize_range(new_edit_range)?;
     if new_edit.1 > input_len {
+        return None;
+    }
+
+    // Window-size cutoff, cheap half. Every window this function can choose
+    // starts at or before the edit, so an edit that already leaves more than
+    // the threshold share of the document downstream cannot produce a narrow
+    // enough one -- and this is the only place the answer is known *before*
+    // touching the old tree at all. A whole-document replacement lands here,
+    // which is what keeps it at the price of the full parse the caller runs
+    // next instead of that plus a walk of the old tree.
+    if window_is_too_wide(cost_guards, new_edit.0, input_len) {
         return None;
     }
 
@@ -253,8 +316,13 @@ fn reparse_ranges(
         return None;
     }
 
+    // A section window is anchored at the previous top-level heading, which can
+    // sit far earlier than the edit's own block -- so a too-wide section window
+    // declines *this strategy* and falls through to the suffix window below,
+    // which starts at the enclosing block and may well be narrow enough.
     if let Some(section_window) =
         find_top_level_heading_section_window(old_tree, old_edit, new_edit, input_len)
+        && !window_is_too_wide(cost_guards, section_window.new_start, input_len)
         && let Some(result) =
             reparse_section_window(input, config, old_tree, old_errors, section_window)
     {
@@ -276,6 +344,15 @@ fn reparse_ranges(
 
     let new_restart = map_old_offset_to_new(old_restart, old_edit, new_edit, input_len);
     if !input.is_char_boundary(new_restart) {
+        return None;
+    }
+
+    // Window-size cutoff, precise half. The restart can land arbitrarily far
+    // before the edit -- one top-level block spanning most of the document is
+    // enough -- so the edit-start check above does not subsume this one.
+    // Ahead of the seam guards and the window parse, so a decline here costs
+    // the cascade it already walked and nothing more.
+    if window_is_too_wide(cost_guards, new_restart, input_len) {
         return None;
     }
 
@@ -375,6 +452,37 @@ fn reparse_ranges(
 
 fn normalize_range(range: (usize, usize)) -> Option<(usize, usize)> {
     (range.0 <= range.1).then_some(range)
+}
+
+/// The largest share of the document, as a percentage, that a window may leave
+/// downstream and still be worth splicing.
+///
+/// Both strategies parse their window to EOF, so this share *is* the parse work
+/// a splice does relative to a full parse, and the splice pays a 5-10%
+/// surcharge on top of it: walking the old tree, the guard cascade, and
+/// rebuilding the green root. Past roughly this point the surcharge stops being
+/// repaid and the incremental path is a slower way to reach the same tree.
+/// `benches/lsp_incremental.rs` prices the crossover -- 0.9x at an 87.5%
+/// window, 0.2x at 100% on a whole-document replace, against 2.7x-5.6x where
+/// the window is a fifth of the document or less.
+///
+/// Declining here is the ordinary refusal-first contract: the caller full-
+/// parses, which is exactly what it would have done before the feature existed.
+/// The region tier (roadmap Phase 8) changes what a window costs and will want
+/// this re-tuned, not removed.
+const MAX_WINDOW_SHARE_PERCENT: usize = 85;
+
+/// Whether a window starting at `window_start` leaves more than
+/// [`MAX_WINDOW_SHARE_PERCENT`] of the document downstream of it.
+///
+/// Widened to `u64` before multiplying: `usize` is 32 bits on the wasm target,
+/// where `input_len * 100` would otherwise overflow on a large document.
+fn window_is_too_wide(cost_guards: CostGuards, window_start: usize, input_len: usize) -> bool {
+    if cost_guards == CostGuards::Ignored {
+        return false;
+    }
+    let window = input_len.saturating_sub(window_start) as u64;
+    window * 100 > input_len as u64 * MAX_WINDOW_SHARE_PERCENT as u64
 }
 
 /// How far around an edit the refdef guard scans. Refdef and footnote
@@ -1028,6 +1136,108 @@ mod tests {
     }
 
     #[test]
+    fn window_share_cutoff_is_inclusive_at_the_threshold() {
+        // A window of exactly `MAX_WINDOW_SHARE_PERCENT` is accepted; one byte
+        // wider is not. Pinned arithmetically because every case below depends
+        // on which side of the boundary its document lands.
+        assert_eq!(MAX_WINDOW_SHARE_PERCENT, 85);
+        let enforced = |start, len| window_is_too_wide(CostGuards::Enforced, start, len);
+        assert!(!enforced(15, 100), "an 85% window is accepted");
+        assert!(enforced(14, 100), "an 86% window is declined");
+        assert!(enforced(0, 100), "a 100% window is declined");
+        // Degenerate inputs must not panic or divide by zero.
+        assert!(!enforced(0, 0));
+        assert!(!enforced(9, 4));
+        // The test-only opt-out accepts the widest window there is.
+        assert!(!window_is_too_wide(CostGuards::Ignored, 0, 100));
+    }
+
+    /// A whole-document replacement is the shape the cutoff exists for: the
+    /// edit starts at byte 0, so nothing of the old tree can be retained and
+    /// the splice would re-derive the entire document at a surcharge.
+    #[test]
+    fn reparse_declines_a_whole_document_replacement() {
+        let old_text = "# One\n\nAlpha.\n\n# Two\n\nBeta.\n";
+        let new_text = "# Replaced\n\nAll new text.\n";
+        let options = ParserOptions::default();
+        let (old_tree, old_errors) = Parser::new(old_text, &options).parse_with_errors();
+
+        assert!(
+            reparse(
+                &old_tree.green().to_owned(),
+                &old_errors,
+                &diff_edit(old_text, new_text),
+                new_text,
+                &options,
+            )
+            .is_none()
+        );
+    }
+
+    /// The same document and the same kind of edit on either side of the
+    /// cutoff: a section a fifth of the way in is declined, one four fifths of
+    /// the way in is spliced.
+    #[test]
+    fn reparse_declines_an_early_edit_and_accepts_a_late_one() {
+        let mut input = String::new();
+        for index in 0..20 {
+            input.push_str(&format!(
+                "## Section {index:02}\n\nbody {index:02} text\n\n"
+            ));
+        }
+        let options = ParserOptions::default();
+        let (old_tree, old_errors) = Parser::new(&input, &options).parse_with_errors();
+        let old_green = old_tree.green().to_owned();
+
+        let splice_at = |needle: &str| {
+            let at = input.find(needle).expect("marker in test input");
+            let updated = apply_edit(&input, (at, at + 4), "BODY");
+            let edit = diff_edit(&input, &updated);
+            reparse(&old_green, &old_errors, &edit, &updated, &options).map(|reparsed| {
+                let full = super::super::parse(&updated, Some(options.clone()));
+                assert_eq!(
+                    crate::parser::fingerprint(&SyntaxNode::new_root(reparsed.green.clone())),
+                    crate::parser::fingerprint(&full),
+                    "an accepted splice must match a full parse"
+                );
+                reparsed.reparse_range.0
+            })
+        };
+
+        assert!(
+            splice_at("body 02").is_none(),
+            "a window leaving ~90% of the document downstream must decline"
+        );
+        let late_start = splice_at("body 16").expect("a late edit must still splice");
+        assert!(
+            input.len() - late_start < input.len() * MAX_WINDOW_SHARE_PERCENT / 100,
+            "the accepted window must sit under the cutoff"
+        );
+    }
+
+    /// The section window is anchored at the previous top-level heading, which
+    /// can be much earlier than the edited block. When that anchor is too wide
+    /// the cutoff must decline *the strategy*, not the reparse: the suffix
+    /// window starts at the enclosing block and is narrower here.
+    #[test]
+    fn a_too_wide_section_window_falls_through_to_the_suffix_window() {
+        // One heading at byte 0 and none after it, so the section window would
+        // start at 0 (a 100% window) while the edited paragraph starts late.
+        let mut input = String::from("# Only heading\n\n");
+        for index in 0..20 {
+            input.push_str(&format!("paragraph {index:02} of the body text\n\n"));
+        }
+        let at = input.find("paragraph 17").expect("marker in test input");
+
+        let inc = insert_incrementally(&input, at + 10, "X", ParserOptions::default());
+        assert_eq!(inc.strategy, "suffix_window");
+        assert!(
+            inc.reparse_range.0 > 0,
+            "the suffix window must retain a real prefix"
+        );
+    }
+
+    #[test]
     fn reparse_declines_an_edit_past_the_previous_tree() {
         let old_text = "Alpha.\n";
         let options = ParserOptions::default();
@@ -1476,7 +1686,10 @@ mod tests {
 
     #[test]
     fn incremental_ignores_nested_headings_for_window_boundaries() {
-        let input = "# Intro\n\n> ## Nested\n> quote body\n\n# End\n\nomega\n";
+        // Three top-level sections, so the window anchors on `# Middle` rather
+        // than on byte 0, which the window-size cutoff would decline.
+        let input =
+            "# Intro\n\nprelude para\n\n# Middle\n\n> ## Nested\n> quote body\n\n# End\n\nomega\n";
         let old_tree = parse(input, None);
         let quote_start = input.find("quote body").expect("quote body in test input");
         let old_edit = (quote_start, quote_start + 5);
@@ -1486,6 +1699,13 @@ mod tests {
         let inc = reparse_or_full(&updated, None, &old_tree, &[], old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
+        assert_eq!(
+            inc.reparse_range.0,
+            updated
+                .find("# Middle")
+                .expect("middle heading in test input"),
+            "the window must anchor on the top-level heading, not the nested one"
+        );
         assert!(
             inc.reparse_range.1 < updated.len(),
             "window boundary should be the next top-level heading, not nested heading"

@@ -29,14 +29,28 @@
 //! `#[ignore]`d red test (see the roadmap in `TODO.md`, "Incremental
 //! Parsing") and fix it by adding a bail-to-full-parse condition — never by
 //! relaxing these asserts.
+//!
+//! The hazard snippets are fuzzed with the window-size cutoff *off*
+//! ([`CostGuards::Ignored`]). That cutoff declines any window covering more
+//! than 85% of the document, which on snippets tens of bytes long is almost
+//! every window: enforcing it here drops the share of edits that reach a splice
+//! from 78% to 23%, and the guards this harness exists to test stop being
+//! exercised. It is a *cost* guard with no soundness content, and the seams it
+//! hides on a 30-byte snippet are the same seams that occur mid-document in a
+//! real file, where the cutoff admits them. The real-document corpus below runs
+//! with the production setting, so the shipped configuration is fuzzed too.
+//!
+//! Every driver tallies how many edits actually spliced and asserts a floor on
+//! that share, because a harness whose edits all decline still passes every
+//! invariant above while exercising nothing.
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use panache_parser::parser::{SyntaxError, fingerprint, parse_with_errors};
+use panache_parser::parser::{CostGuards, SyntaxError, fingerprint, parse_with_errors};
 use panache_parser::{Dialect, Extensions, Flavor, ParserOptions};
 
 mod common;
-use common::reparse_or_full;
+use common::reparse_or_full_with_cost_guards;
 
 /// One parser-option configuration to fuzz under, with its share of the
 /// per-snippet budget.
@@ -313,6 +327,57 @@ fn clamp_to_char_boundary(text: &str, mut pos: usize) -> usize {
     pos
 }
 
+/// What a fuzz run exercised, beside passing.
+#[derive(Default)]
+struct FuzzStats {
+    /// Edits whose *full* parse was lossy or panicked, so the splice could not
+    /// be judged against it.
+    skipped_lossy: usize,
+    /// Edits the guard cascade accepted and spliced.
+    spliced: usize,
+    /// Edits it declined, which cost a full parse and prove nothing.
+    declined: usize,
+}
+
+impl FuzzStats {
+    fn splice_rate(&self) -> f64 {
+        let judged = self.spliced + self.declined;
+        if judged == 0 {
+            return 0.0;
+        }
+        self.spliced as f64 / judged as f64
+    }
+
+    /// Report the run and fail if too few edits reached the splice at all.
+    ///
+    /// The floor is deliberately far below the measured rates (78% and 76% on
+    /// the snippets, 60% on the real-document corpus): it is there to catch a
+    /// guard that turns the harness into full-parse-versus-full-parse, not to
+    /// pin the exact rate, which every new snippet moves.
+    fn assert_exercised_the_splice(&self, what: &str) {
+        eprintln!(
+            "{what}: {} spliced, {} declined ({:.1}% spliced), {} skipped with a lossy full parse",
+            self.spliced,
+            self.declined,
+            self.splice_rate() * 100.0,
+            self.skipped_lossy
+        );
+        assert!(
+            self.splice_rate() >= 0.25,
+            "{what}: only {:.1}% of edits reached the splice; the harness is \
+             judging full parses against full parses",
+            self.splice_rate() * 100.0
+        );
+    }
+}
+
+/// What a driver holds constant across the edits it generates.
+struct Run<'a> {
+    options: &'a ParserOptions,
+    cost_guards: CostGuards,
+    stats: &'a mut FuzzStats,
+}
+
 /// A pseudo-random `(delete_range, insert)` for `text`, char-boundary safe.
 fn random_edit(rng: &mut Lcg, text: &str) -> ((usize, usize), &'static str) {
     let start = clamp_to_char_boundary(text, rng.below(text.len() + 1));
@@ -359,11 +424,10 @@ impl Base {
 fn check_edit(
     context: &str,
     before: &str,
-    options: &ParserOptions,
+    run: &mut Run,
     base: &Base,
     old_edit: (usize, usize),
     insert: &str,
-    skipped_lossy: &mut usize,
 ) -> Option<Base> {
     let (old_tree, old_errors) = (&base.tree, &base.errors[..]);
     let updated = apply_edit(before, old_edit, insert);
@@ -374,7 +438,7 @@ fn check_edit(
     // instances are pinned as red tests in `incremental_regressions.rs`;
     // a growing skip count on unchanged seeds means a new parser bug.
     let (full, full_errors) = match catch_unwind(AssertUnwindSafe(|| {
-        parse_with_errors(&updated, Some(options.clone()))
+        parse_with_errors(&updated, Some(run.options.clone()))
     })) {
         Ok(full) => full,
         Err(_) => {
@@ -382,7 +446,7 @@ fn check_edit(
                 "full parser panicked (known-bug class, skipped): {context}\n  \
                  before: {before:?}\n  edit {old_edit:?} insert {insert:?}"
             );
-            *skipped_lossy += 1;
+            run.stats.skipped_lossy += 1;
             return None;
         }
     };
@@ -392,20 +456,21 @@ fn check_edit(
             "full parse is lossy (known-bug class, skipped): {context}\n  \
              input:  {updated:?}\n  output: {round_tripped:?}"
         );
-        *skipped_lossy += 1;
+        run.stats.skipped_lossy += 1;
         return None;
     }
 
     // The in-crate debug oracle panics inside the call on divergence; catch
     // it so the failure report carries the reproducing case.
     let outcome = catch_unwind(AssertUnwindSafe(|| {
-        reparse_or_full(
+        reparse_or_full_with_cost_guards(
             &updated,
-            Some(options.clone()),
+            Some(run.options.clone()),
             old_tree,
             old_errors,
             old_edit,
             new_edit,
+            run.cost_guards,
         )
     }));
     let inc = match outcome {
@@ -415,6 +480,12 @@ fn check_edit(
              edit {old_edit:?} insert {insert:?}\n  after: {updated:?}"
         ),
     };
+
+    if inc.strategy == "full_reparse" {
+        run.stats.declined += 1;
+    } else {
+        run.stats.spliced += 1;
+    }
 
     assert_eq!(
         inc.tree.text().to_string(),
@@ -445,16 +516,29 @@ fn check_edit(
     })
 }
 
-fn fuzz_single_edits(tier: &Tier, name: &str, text: &str, iters: usize, seed: u64) -> usize {
+fn fuzz_single_edits(
+    tier: &Tier,
+    name: &str,
+    text: &str,
+    iters: usize,
+    seed: u64,
+    cost_guards: CostGuards,
+    stats: &mut FuzzStats,
+) {
     let mut rng = Lcg(seed);
-    let mut skipped = 0;
     let options = tier.options();
     let Some(base) = Base::parse(text, &options) else {
         eprintln!(
             "base parse is lossy (known-bug class, skipped): snippet {name}, tier {}",
             tier.name
         );
-        return 1;
+        stats.skipped_lossy += 1;
+        return;
+    };
+    let mut run = Run {
+        options: &options,
+        cost_guards,
+        stats,
     };
     for i in 0..iters {
         let (old_edit, insert) = random_edit(&mut rng, text);
@@ -462,31 +546,34 @@ fn fuzz_single_edits(tier: &Tier, name: &str, text: &str, iters: usize, seed: u6
             "snippet {name}, tier {}, seed {seed}, single edit #{i}",
             tier.name
         );
-        check_edit(
-            &context,
-            text,
-            &options,
-            &base,
-            old_edit,
-            insert,
-            &mut skipped,
-        );
+        check_edit(&context, text, &mut run, &base, old_edit, insert);
     }
-    skipped
 }
 
-fn fuzz_chained_edits(tier: &Tier, name: &str, text: &str, batches: usize, seed: u64) -> usize {
+fn fuzz_chained_edits(
+    tier: &Tier,
+    name: &str,
+    text: &str,
+    batches: usize,
+    seed: u64,
+    cost_guards: CostGuards,
+    stats: &mut FuzzStats,
+) {
     let mut rng = Lcg(seed);
-    let mut skipped = 0;
     let options = tier.options();
+    let mut run = Run {
+        options: &options,
+        cost_guards,
+        stats,
+    };
     for batch in 0..batches {
         let mut current = text.to_string();
-        let Some(mut base) = Base::parse(&current, &options) else {
+        let Some(mut base) = Base::parse(&current, run.options) else {
             eprintln!(
                 "base parse is lossy (known-bug class, skipped): snippet {name}, tier {}",
                 tier.name
             );
-            skipped += 1;
+            run.stats.skipped_lossy += 1;
             break;
         };
         let chain_len = 2 + rng.below(3);
@@ -499,15 +586,8 @@ fn fuzz_chained_edits(tier: &Tier, name: &str, text: &str, batches: usize, seed:
             // The spliced errors feed the next step exactly as the spliced
             // tree does: a chain that reset them to empty would never
             // exercise the prefix-carry path past its first step.
-            let Some(next) = check_edit(
-                &context,
-                &current,
-                &options,
-                &base,
-                old_edit,
-                insert,
-                &mut skipped,
-            ) else {
+            let Some(next) = check_edit(&context, &current, &mut run, &base, old_edit, insert)
+            else {
                 // The chain's text walked into full-parser-lossy territory;
                 // later steps would judge splices against a broken oracle.
                 break;
@@ -516,7 +596,6 @@ fn fuzz_chained_edits(tier: &Tier, name: &str, text: &str, batches: usize, seed:
             current = apply_edit(&current, old_edit, insert);
         }
     }
-    skipped
 }
 
 /// Per-tier seed: the tier index must participate, or every tier would
@@ -527,33 +606,42 @@ fn seed(base: u64, snippet_index: usize, tier_index: usize) -> u64 {
 
 #[test]
 fn hazard_snippets_single_edits() {
-    let mut skipped = 0;
+    let mut stats = FuzzStats::default();
     for (tier_index, tier) in TIERS.iter().enumerate() {
         let iters = iterations(tier.singles);
         for (index, (name, text)) in HAZARD_SNIPPETS.iter().enumerate() {
-            skipped +=
-                fuzz_single_edits(tier, name, text, iters, seed(0x9E3779B9, index, tier_index));
+            fuzz_single_edits(
+                tier,
+                name,
+                text,
+                iters,
+                seed(0x9E3779B9, index, tier_index),
+                CostGuards::Ignored,
+                &mut stats,
+            );
         }
     }
-    eprintln!("single edits: skipped {skipped} cases with a lossy full parse");
+    stats.assert_exercised_the_splice("single edits");
 }
 
 #[test]
 fn hazard_snippets_chained_edits() {
-    let mut skipped = 0;
+    let mut stats = FuzzStats::default();
     for (tier_index, tier) in TIERS.iter().enumerate() {
         let batches = iterations(tier.batches);
         for (index, (name, text)) in HAZARD_SNIPPETS.iter().enumerate() {
-            skipped += fuzz_chained_edits(
+            fuzz_chained_edits(
                 tier,
                 name,
                 text,
                 batches,
                 seed(0x51ED2701, index, tier_index),
+                CostGuards::Ignored,
+                &mut stats,
             );
         }
     }
-    eprintln!("chained edits: skipped {skipped} cases with a lossy full parse");
+    stats.assert_exercised_the_splice("chained edits");
 }
 
 /// Real documents from `benches/documents/`: a second corpus tier with
@@ -568,7 +656,7 @@ fn hazard_snippets_chained_edits() {
 fn real_documents_random_edits() {
     let docs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benches/documents");
     let names = ["small.qmd", "medium_quarto.qmd", "tables.qmd", "math.qmd"];
-    let mut skipped = 0;
+    let mut stats = FuzzStats::default();
     for (tier_index, tier) in TIERS.iter().enumerate() {
         if tier.real_docs == 0 {
             continue;
@@ -580,9 +668,16 @@ fn real_documents_random_edits() {
                 eprintln!("skipping absent corpus document {}", path.display());
                 continue;
             };
-            skipped +=
-                fuzz_single_edits(tier, name, &text, iters, seed(0xC0FFEE, index, tier_index));
+            fuzz_single_edits(
+                tier,
+                name,
+                &text,
+                iters,
+                seed(0xC0FFEE, index, tier_index),
+                CostGuards::Enforced,
+                &mut stats,
+            );
         }
     }
-    eprintln!("real documents: skipped {skipped} cases with a lossy full parse");
+    stats.assert_exercised_the_splice("real documents");
 }

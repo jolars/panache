@@ -8,7 +8,9 @@
 
 use panache_parser::ParserOptions;
 use panache_parser::SyntaxNode;
-use panache_parser::parser::{Edit, SyntaxError, parse_with_errors, reparse};
+use panache_parser::parser::{
+    CostGuards, Edit, SyntaxError, parse_with_errors, reparse_with_cost_guards,
+};
 
 /// The outcome of a reparse attempt plus its full-parse fallback.
 ///
@@ -51,6 +53,32 @@ pub fn reparse_or_full(
     old_edit: (usize, usize),
     new_edit: (usize, usize),
 ) -> Spliced {
+    reparse_or_full_with_cost_guards(
+        input,
+        options,
+        old_tree,
+        old_errors,
+        old_edit,
+        new_edit,
+        CostGuards::Enforced,
+    )
+}
+
+/// [`reparse_or_full`], with the window-size cutoff under the caller's control.
+///
+/// Only the fuzz harness passes [`CostGuards::Ignored`], and only for its
+/// hazard snippets --- see the type's own documentation for why a correctness
+/// harness wants a *cost* guard out of its way.
+#[allow(dead_code)]
+pub fn reparse_or_full_with_cost_guards(
+    input: &str,
+    options: Option<ParserOptions>,
+    old_tree: &SyntaxNode,
+    old_errors: &[SyntaxError],
+    old_edit: (usize, usize),
+    new_edit: (usize, usize),
+    cutoff: CostGuards,
+) -> Spliced {
     let resolved = options.clone().unwrap_or_default();
     let Some(insert) = input
         .get(new_edit.0..new_edit.1)
@@ -62,12 +90,13 @@ pub fn reparse_or_full(
         range: old_edit.0..old_edit.1,
         insert: insert.to_string(),
     };
-    match reparse(
+    match reparse_with_cost_guards(
         &old_tree.green().to_owned(),
         old_errors,
         &edit,
         input,
         &resolved,
+        cutoff,
     ) {
         Some(reparsed) => Spliced {
             tree: SyntaxNode::new_root(reparsed.green),

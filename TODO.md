@@ -337,7 +337,7 @@ this branch rebases onto that fix.
     (5b), Phase 6's gate grows a regression ceiling and names its cases, and
     Phase 7's exit criterion is restated in the harness's terms.
 
-- [ ] Phase 5b: window-size cutoff --- decline in `reparse_ranges` when the
+- [x] Phase 5b: window-size cutoff --- decline in `reparse_ranges` when the
   window start leaves more than a threshold share of the document
   downstream, before the guard cascade and the window parse run. Threshold
   picked from the bench (the crossover is around 85-90% window, where the
@@ -353,6 +353,49 @@ this branch rebases onto that fix.
     fraction of the document length and returns `None`, which is the existing
     refusal-first contract. Phase 8 keeps the cutoff and re-tunes the threshold
     once regions change what a window costs.
+  - Landed as `MAX_WINDOW_SHARE_PERCENT = 85` and **two** checks, not one. The
+    cheap one runs before the old tree is touched at all: every window this
+    entry point can choose starts at or before the edit, so the edit offset is a
+    sound upper bound on the window start, and a whole-document replace declines
+    there for a tenth of a microsecond (0.2x -> 0.9x). The precise one runs
+    after the restart is known, because a single top-level block spanning most
+    of the document puts the restart arbitrarily far ahead of the edit.
+  - A too-wide *section* window declines the strategy, not the reparse: the
+    section anchor is the previous top-level heading, which can sit far earlier
+    than the edited block, so the suffix window below it is often narrower and
+    still admissible.
+  - Bench, before -> after: `full_replace` 0.2x -> 0.9x,
+    `pandoc_manual_early_edit` 0.9x -> 1.0x, `multi_change_large_8` 0.9x -> 0.9x
+    (see below), `tables_single_edit` / `math_single_edit` /
+    `large_authoring_single_edit` 1.0-1.1x -> 1.0x. Nothing that won lost: the
+    typing streams and `pandoc_manual_late_edit` are unchanged at 2.8x and 5.4x.
+    New cases `window_cutoff_accepted` (79.9% window) and
+    `window_cutoff_declined` (87.8%) bracket the threshold on one document.
+  - **Phase 6's 0.95x ceiling is not met by three cases, and none of them is a
+    wide-window splice.** `bail_refdef_edit` (0.9x) exists to price a decline,
+    which is definitionally slower than the full parse it wraps --- the ceiling
+    needs the same explicit exemption the fallback-rate threshold already gives
+    it. `multi_change_utf16_4` (0.7x) is a 74-byte document against a 1.8 us
+    fixed attempt cost; it lost at 0.8x *while splicing successfully* before
+    this phase, so it is Phase 7's fixed-overhead problem, not a threshold
+    problem. `multi_change_large_8` (0.9x) declines in under a microsecond and
+    still costs \~100 us more than a full parse of its 76 KB: that residual is
+    host-side per-step work (whole-text `diff_edit` plus the 67 KB `insert` it
+    allocates, the refdef-set clone, the base text copy), it is unattributed
+    between those, and it wants a profile in Phase 6 rather than a threshold.
+  - A document-size floor was tried for the 74-byte case and reverted: it would
+    also refuse small documents with *narrow* windows, which do win
+    (`single_change_small`, 1.6 KB, 1.3x), and it made every reuse assertion in
+    the suite untestable through the production entry point.
+  - The cutoff cost the fuzz harness two thirds of its coverage --- its hazard
+    snippets are tens of bytes, so nearly every window is a wide one, and the
+    share of edits reaching a splice fell from 78% to 23% while every assertion
+    still passed. `CostGuards::{Enforced,Ignored}` on a new
+    `reparse_with_cost_guards` is the opt-out: the snippets fuzz with the cost
+    guard off (the seams they encode occur mid-document in real files, where the
+    cutoff admits them), the real-document corpus keeps the production setting,
+    and each driver now asserts a floor on its splice rate so a future guard
+    cannot silently empty the harness again.
 
 - [ ] Phase 6: default flip --- `panache.incrementalParsing` default true,
   `experimental.incrementalParsing` kept as deprecated alias (LSP-only, no
@@ -374,6 +417,13 @@ this branch rebases onto that fix.
     satisfy, and the reason it comes first. Note that the wide-window surcharge
     (5-10%), not the bail cost (15.7% of one full parse, on the rare declining
     shapes), is the overhead real edits actually pay.
+    - Phase 5b removed the surcharge and left three cases under the ceiling for
+      unrelated reasons (see its notes). `bail_refdef_edit` needs an explicit
+      exemption --- it exists to price a decline, so its speedup is not a
+      measurement of anything. `multi_change_utf16_4` is 74 bytes against a
+      fixed attempt cost and belongs to Phase 7. `multi_change_large_8` is \~100
+      us of *host-side* per-step work on a 76 KB document, which is worth
+      profiling here: it is charged to every incremental step, winners included.
   - Make the thresholds mechanical rather than eyeballed --- the numbers are
     printed and the JSON is emitted, but nothing asserts them. A
     `PANACHE_LSP_BENCH_ASSERT=1` mode over the existing `CaseResult` fields is

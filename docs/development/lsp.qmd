@@ -46,6 +46,16 @@ pure query sound:
   before anything is stored.
 - Every guard declines to `None` rather than guessing, so the query's fallback
   is an ordinary full parse.
+- One guard declines for cost rather than correctness. Both reparse strategies
+  parse their window to the end of the document, so a window that starts near
+  the top of the file re-derives nearly all of it and then pays a splice on top:
+  measured, that is a 5-10% loss against simply parsing the file again. The
+  parser therefore refuses a window leaving more than 85% of the document
+  downstream, before running the rest of the cascade or the window parse. A
+  whole-document replacement, which some clients send on every format-on-save,
+  takes that path and costs the full parse it would have cost anyway.
+  `benches/lsp_incremental.rs` carries the measurements and a case on each side
+  of the threshold.
 - The base is stored last, after every fallible step, so a panic or a salsa
   cancellation mid-query can never leave a base whose text and tree disagree.
 

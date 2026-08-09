@@ -22,7 +22,9 @@ mod verify;
 // Re-export main parser
 pub use core::Parser;
 pub use diagnostics::{Diagnostics, SyntaxError, SyntaxErrorSource};
-pub use reparse::{Edit, ReparseStrategy, Reparsed, diff_edit, reparse};
+pub use reparse::{
+    CostGuards, Edit, ReparseStrategy, Reparsed, diff_edit, reparse, reparse_with_cost_guards,
+};
 pub use verify::fingerprint;
 
 /// Parses a Quarto document string into a syntax tree.
