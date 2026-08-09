@@ -122,7 +122,7 @@ fn check_incremental(before: &str, old_edit: (usize, usize), insert: &str) {
 // Inserting at the blank line between an unterminated fence and the next
 // paragraph produced a restart offset *after* the insertion point, so the
 // splice retained stale bytes and dropped the inserted `\`. Fixed by the
-// restart <= edit-start guard in `parse_incremental_suffix_inner`.
+// restart <= edit-start guard in `reparse_ranges`.
 #[test]
 fn insertion_at_blank_line_after_unterminated_fence() {
     check_incremental("```\ncode\n\npara after\n", (9, 9), "\\");
