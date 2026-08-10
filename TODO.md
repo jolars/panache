@@ -181,16 +181,32 @@ records any deviation or discovered follow-up as an indented bullet under the
 phase. Never leave a phase half-landed: partial work is noted in the status line
 with the exact next step.
 
-**Current status / next step:** Phases 1--4 done; there is now one authoritative
-tree, and the reparse lives inside salsa's `parsed_document`. Next step is Phase
-5 (benchmark repair), whose entry criteria are met: the bench compiles against
-the new `reparse` entry point but its multi-change path still degenerates to a
-full reparse, and it has no fallback-rate or bail-cost accounting.
+**Current status / next step:** Phases 1--6a done. There is one authoritative
+tree, the reparse lives inside salsa's `parsed_document`, the window-size cutoff
+keeps a losing shape from ever being slower than a full parse, and the bench
+thresholds are machine-checked (`task bench:incremental-gate`). Everything so
+far sits behind `experimental.incrementalParsing`, still default-*off*, so none
+of it has changed behavior for anyone --- which is what makes this the natural
+PR boundary, with the flip landing separately.
+
+Next step is Phase 6b (default flip). Its entry criteria are met; what it needs
+is the gate *run*, not more code: oracle-clean fuzz at 10x iterations, the suite
+green with the flag forced both ways, `task bench:incremental-gate` green, and
+the week of oracle-live dogfooding. Run the gate at the default iteration count
+(see the phase's own note on `multi_change_large_8`).
 
 `incremental_regressions.rs` carries no ignored *incremental* tests; the two
 `#[ignore]`d tests there pin one full-parser bug (setext-after-setext), tracked
-and fixed on `main` like the five the fuzzer found earlier. They go green when
-this branch rebases onto that fix.
+on `main` under "Parser bugs found by the incremental fuzzer" like the five the
+fuzzer found earlier. That fix has **not** landed on `main` yet --- the branch
+is rebased onto it and they are still ignored --- so they stay ignored until it
+does.
+
+No test in this section may read a document from `benches/documents/`: the
+corpus is gitignored, and `download.sh` does not even produce every name the
+repo still references (`medium_quarto.qmd` is gone). A corpus-reading test fails
+on every clean checkout, and a corpus-*skipping* one never runs in CI at all, so
+reproducers are synthetic and pin their strategy instead.
 
 - [x] Phase 1: oracle --- `pub fn fingerprint` + debug
   `assert_matches_full_parse` on every non-fallback reparse; RA-style
