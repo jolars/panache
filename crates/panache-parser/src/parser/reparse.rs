@@ -426,6 +426,17 @@ fn reparse_ranges(
         return None;
     }
 
+    // A trailing `:`/`~` line in the window's first block reaches back into a
+    // retained list and turns its lazy continuation into a definition term.
+    // That is a full-parser bug the splice would otherwise be *right* about;
+    // see `first_block_has_trailing_definition_marker`.
+    if last_retained_block_kind(old_tree, old_restart)
+        .is_some_and(last_retained_block_absorbs_trailing_colon)
+        && first_block_has_trailing_definition_marker(suffix_text)
+    {
+        return None;
+    }
+
     let (suffix_tree, suffix_errors) = Parser::new(suffix_text, config).parse_with_errors();
     let errors = merge_incremental_errors(old_errors, new_restart, suffix_errors)?;
 
@@ -669,6 +680,43 @@ fn retained_prefix_has_thematic_break(old_tree: &SyntaxNode, boundary: usize) ->
         .children()
         .take_while(|child| usize::from(child.text_range().end()) <= boundary)
         .any(|child| child.kind() == SyntaxKind::HORIZONTAL_RULE)
+}
+
+/// Whether the last retained block can be rewritten by a trailing-colon line
+/// in the window. See [`first_block_has_trailing_definition_marker`].
+fn last_retained_block_absorbs_trailing_colon(kind: SyntaxKind) -> bool {
+    matches!(kind, SyntaxKind::LIST | SyntaxKind::DEFINITION_LIST)
+}
+
+/// Whether the window's *first* block -- its leading run of non-blank lines --
+/// contains a line ending in ` :` or ` ~`.
+///
+/// This encodes a **full-parser bug**, not a pandoc rule. Pandoc reads such a
+/// line as ordinary prose (`Para [Str "c", Space, Str ":"]`), but panache's
+/// block parser reaches back across the seam's blank line: after a list item
+/// whose last line was a *lazy continuation*, a trailing-marker line in the
+/// next block promotes that continuation into a definition-list `TERM` inside
+/// the item and swallows the blank line. The splice, parsing the window
+/// standalone, produces pandoc's answer -- and so diverges from the full parse
+/// the governing invariant measures it against.
+///
+/// So this guard exists to keep the splice equal to a parse that is itself
+/// wrong. Delete it together with the parser bug, which is pinned as the
+/// `#[ignore]`d `full_parse_definition_list_from_trailing_colon_after_lazy_list_item`
+/// in `tests/incremental_regressions.rs` and tracked in `TODO.md` under
+/// "Parser bugs found by the incremental fuzzer".
+///
+/// Scoped to the first block because that is exactly how far the promotion
+/// reaches: an intervening paragraph, heading, or fence in the window stops it.
+fn first_block_has_trailing_definition_marker(text: &str) -> bool {
+    text.lines()
+        .skip_while(|line| line.trim().is_empty())
+        .take_while(|line| !line.trim().is_empty())
+        .any(|line| {
+            // A tab before the marker does not trigger it, matching the
+            // detector's 'space only' lookbehind.
+            matches!(line.trim_end().strip_suffix([':', '~']), Some(rest) if rest.ends_with(' '))
+        })
 }
 
 /// Whether `text` has a line that is nothing but a run of three or more
@@ -960,15 +1008,48 @@ fn reparse_section_window(
         return None;
     }
 
+    let window_text = &input[section_window.new_start..];
+
     // Defensive: a section window starts at a top-level `HEADING`, which is
     // none of these shapes, so this cannot fire today. It is here because that
     // is a property of how the window is *chosen*, not of the splice, and the
     // region tier will choose differently.
     if section_window.new_start > 0
-        && window_start_manufactures_document_start_construct(
-            &input[section_window.new_start..],
-            config,
-        )
+        && window_start_manufactures_document_start_construct(window_text, config)
+    {
+        return None;
+    }
+
+    // The suffix path's three backward-coupling guards apply here for the same
+    // reason: this function also retains a prefix and parses everything after
+    // it standalone, so nothing in the window may reach back and rewrite a
+    // retained block. Two of them cannot fire while the window is anchored at a
+    // top-level `HEADING` -- its first non-blank line is that heading, which is
+    // neither a container marker nor a `:`/`~` line -- but the thematic-break
+    // one *can*: it pairs a `---` anywhere in the retained prefix with a dash
+    // run anywhere in the window, and neither is constrained by the anchor.
+    // All three are kept rather than the reachable one alone, because "the
+    // window starts at a heading" is a property of how the window is chosen,
+    // and the region tier (roadmap Phase 8) chooses differently.
+    if last_retained_block_can_absorb_marker(old_tree, section_window.old_start)
+        && first_nonblank_line_is_container_marker(window_text)
+    {
+        return None;
+    }
+    if last_retained_block_kind(old_tree, section_window.old_start)
+        .is_some_and(last_retained_block_absorbs_colon_line)
+        && first_nonblank_line_is_definition_marker(window_text)
+    {
+        return None;
+    }
+    if retained_prefix_has_thematic_break(old_tree, section_window.old_start)
+        && has_dash_rule_line(window_text)
+    {
+        return None;
+    }
+    if last_retained_block_kind(old_tree, section_window.old_start)
+        .is_some_and(last_retained_block_absorbs_trailing_colon)
+        && first_block_has_trailing_definition_marker(window_text)
     {
         return None;
     }
@@ -1927,5 +2008,34 @@ mod tests {
                 crate::parser::fingerprint(&parse(&updated, None)),
             );
         }
+    }
+
+    /// The section window retains a prefix and parses everything after it
+    /// standalone, exactly as the suffix window does, so it runs the same
+    /// backward-coupling guards. This is the one of the three that its heading
+    /// anchor does not already make unreachable: a `---` in the retained prefix
+    /// is a multiline-table rule candidate, and the window can supply a partner
+    /// arbitrarily far below the heading.
+    #[test]
+    fn a_section_window_declines_a_retained_thematic_break_with_a_dash_partner() {
+        let mut input = String::from("intro para\n\n---\n\n");
+        for index in 0..20 {
+            input.push_str(&format!("filler {index:02} paragraph text\n\n"));
+        }
+        input.push_str("# Section\n\nbody text\n");
+        let at = input.find("body text").expect("marker in test input");
+
+        // Without a dash partner in the window the section window is taken.
+        let accepted = insert_incrementally(&input, at, "edited ", ParserOptions::default());
+        assert_eq!(accepted.strategy, "section_window");
+
+        // With one, the retained `---` could be re-read as a table's top rule,
+        // so the strategy must decline rather than re-adopt the prefix.
+        let declined =
+            insert_incrementally(&input, at, "a b\n---\n1 2\n", ParserOptions::default());
+        assert_ne!(
+            declined.strategy, "section_window",
+            "a dash-rule partner in the window must decline the section splice"
+        );
     }
 }

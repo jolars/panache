@@ -249,3 +249,53 @@ fn section_window_divergence_on_mangled_div_in_callout() {
     );
     check_incremental_strategy(&before, old_edit, "_", "suffix_window");
 }
+
+// Fuzz find: snippet lazy_list, tier pandoc, seed 1374496001, batch #66,
+// chain step #1 (minimized). A window whose first block has a line ending in
+// ` :` reaches *backward* past the seam's blank line and promotes the retained
+// list item's lazy continuation line into a definition-list `TERM`, swallowing
+// the blank line into the item. Parsed standalone the window is only a
+// paragraph, so the splice kept the list and the paragraph apart.
+//
+// The splice was **right** and the full parse wrong -- pandoc reads the input
+// as `BulletList [[Plain [item one, SoftBreak, continuat]]]` followed by
+// `Para [em, Space, :]` -- but the governing invariant measures the splice
+// against the full parse, so the guard declines the shape until the parser bug
+// below is fixed. The find is not CRLF-specific: it reproduces byte for byte
+// on LF, and predates the line-ending fix that reshuffled the corpus onto it.
+#[test]
+fn trailing_definition_marker_window_after_a_retained_lazy_list() {
+    check_incremental("- item one\ncontinuat\n\nem two\n", (25, 28), ":");
+}
+
+// The `~` spelling, and the CRLF twin of the case as the fuzzer found it.
+#[test]
+fn trailing_tilde_marker_window_after_a_retained_lazy_list() {
+    check_incremental("- item one\ncontinuat\n\nem two\n", (25, 28), "~");
+}
+
+#[test]
+fn trailing_definition_marker_window_under_crlf() {
+    check_incremental("- item one\ncontinuat\r\n\r\nem two\n", (27, 30), ":");
+}
+
+// The full-parser bug the guard above works around. Not an incremental bug and
+// not a losslessness failure (the tree round-trips), which is why the fuzz
+// harness's lossy-or-panic skip does not catch it: it is a *divergence from
+// pandoc*, so the harness sees a well-formed oracle and demands the splice
+// match it. Pandoc:
+//
+//   [ BulletList [[Plain [Str "a", SoftBreak, Str "b"]]]
+//   , Para [Str "c", Space, Str ":"] ]
+//
+// Fixing it belongs on `main` with the other block-parser finds; when it lands,
+// delete `first_block_has_trailing_definition_marker` and its two guards.
+#[test]
+#[ignore = "known full-parser bug: a trailing `:` line promotes a preceding lazy list continuation to a definition term"]
+fn full_parse_definition_list_from_trailing_colon_after_lazy_list_item() {
+    let tree = parse("- a\nb\n\nc :\n", None);
+    assert!(
+        !format!("{tree:#?}").contains("DEFINITION_LIST"),
+        "pandoc reads this as a bullet list plus a paragraph, with no definition list"
+    );
+}
