@@ -464,8 +464,8 @@ Ordered lists are handled similarly to [unordered lists].
 
 ### Task Lists
 
-GitHub-style task lists use the standardized `-` marker, and indent to the start
-of the text.
+GitHub-style task lists use the standardized `-` marker. Nested items align with
+the parent list item's content column, immediately before its checkbox.
 
 Input
 
@@ -480,8 +480,8 @@ Output
 
 :   ```markdown
     - [ ] Parent task
-           - [ ] Nested unchecked task
-           - [x] Nested checked task
+      - [ ] Nested unchecked task
+      - [x] Nested checked task
     - [x] Another parent task
     ```
 
