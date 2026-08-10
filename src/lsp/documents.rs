@@ -193,7 +193,11 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
 
     let config = gs.load_config_notifying(&uri);
 
-    let Some(salsa_file) = gs.document_map.get(&uri_string).map(|doc| doc.salsa_file) else {
+    let Some((salsa_file, previous_config)) = gs
+        .document_map
+        .get(&uri_string)
+        .map(|doc| (doc.salsa_file, doc.salsa_config))
+    else {
         return;
     };
 
@@ -233,8 +237,11 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
 
     // Re-admit under whatever config handle the document now holds: a config
     // reload mints a new one, and the base recorded under the old handle can
-    // never be hit again.
-    if gs.runtime_settings.experimental_incremental_parsing {
+    // never be hit again. Only when it actually moved -- `did_open` (or the
+    // runtime toggle) already admitted the handle the document arrived with,
+    // and re-admitting is a scan of the channel on a path that runs per
+    // keystroke.
+    if gs.runtime_settings.experimental_incremental_parsing && interned_config != previous_config {
         gs.salsa.reparse_admit(salsa_file, interned_config);
     }
 
