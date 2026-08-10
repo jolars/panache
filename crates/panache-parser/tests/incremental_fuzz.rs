@@ -354,6 +354,10 @@ struct FuzzStats {
     spliced: usize,
     /// Edits it declined, which cost a full parse and prove nothing.
     declined: usize,
+    /// Corpus documents that were not on disk. Counted rather than only
+    /// printed: the corpus is gitignored, so a run on a clean checkout skips
+    /// the strictest tier entirely and would otherwise report a full pass.
+    skipped_absent: usize,
 }
 
 impl FuzzStats {
@@ -373,11 +377,13 @@ impl FuzzStats {
     /// pin the exact rate, which every new snippet moves.
     fn assert_exercised_the_splice(&self, what: &str) {
         eprintln!(
-            "{what}: {} spliced, {} declined ({:.1}% spliced), {} skipped with a lossy full parse",
+            "{what}: {} spliced, {} declined ({:.1}% spliced), {} skipped with a lossy full \
+             parse, {} corpus documents absent",
             self.spliced,
             self.declined,
             self.splice_rate() * 100.0,
-            self.skipped_lossy
+            self.skipped_lossy,
+            self.skipped_absent
         );
         assert!(
             self.splice_rate() >= 0.25,
@@ -686,6 +692,7 @@ fn real_documents_random_edits() {
             let path = docs_dir.join(name);
             let Ok(text) = std::fs::read_to_string(&path) else {
                 eprintln!("skipping absent corpus document {}", path.display());
+                stats.skipped_absent += 1;
                 continue;
             };
             fuzz_single_edits(
