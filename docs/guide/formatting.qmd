@@ -35,10 +35,10 @@ controlled via the [configuration](configuration.qmd) file:
 wrap = "reflow" # or "preserve", "sentence", or "semantic"
 ```
 
-If `wrap` is set to `reflow`, Panache will reformat paragraphs to fit within the
-number of columns specified by the `line-width` configuration option (default
-80). Columns are Unicode display columns, not characters or bytes: East Asian
-wide characters count as two, so `x宮` is 3 columns wide (see [Line
+The default is `reflow`, which reformats paragraphs to fit within the number of
+columns specified by the `line-width` configuration option (default 80). Columns
+are Unicode display columns, not characters or bytes: East Asian wide characters
+count as two, so `x宮` is 3 columns wide (see [Line
 Width](configuration.qmd#line-width)). If `wrap` is set to `preserve`, Panache
 will keep existing line breaks and not reflow paragraphs. If `wrap` is set to
 `sentence`, Panache will break lines at sentence boundaries, ensuring that each
@@ -337,8 +337,9 @@ Output
 
 ### Tab Stops
 
-Tabs in regular text are always normalized to spaces. To preserve tabs in
-literal code spans and code blocks, set:
+By default, Panache normalizes all tabs to spaces using four-column tab stops.
+The `preserve` mode exempts tabs in literal code spans and code blocks; tabs in
+regular text are always normalized:
 
 ```toml
 [format]
