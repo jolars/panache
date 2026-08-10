@@ -195,12 +195,42 @@ green with the flag forced both ways, `task bench:incremental-gate` green, and
 the week of oracle-live dogfooding. Run the gate at the default iteration count
 (see the phase's own note on `multi_change_large_8`).
 
-`incremental_regressions.rs` carries no ignored *incremental* tests; the two
-`#[ignore]`d tests there pin one full-parser bug (setext-after-setext), tracked
-on `main` under "Parser bugs found by the incremental fuzzer" like the five the
-fuzzer found earlier. That fix has **not** landed on `main` yet --- the branch
-is rebased onto it and they are still ignored --- so they stay ignored until it
-does.
+`incremental_regressions.rs` carries no ignored *incremental* tests; the three
+`#[ignore]`d tests there pin two full-parser bugs (setext-after-setext, and a
+trailing-`:` line promoting a list item's lazy continuation to a definition
+term), both tracked on `main` under "Parser bugs found by the incremental
+fuzzer" like the five the fuzzer found earlier. Neither fix has landed on `main`
+yet --- the branch is rebased onto it and they are still ignored --- so they
+stay ignored until they do.
+
+Hardening applied after the phases above, from a review of the branch:
+
+- Line endings. Every seam test in the cascade is textual, and the blank-line
+  check was a `"\n\n"` suffix test, so a CRLF document (blank line `"\r\n\r\n"`)
+  was refused at the first guard and never spliced at all --- safe, and a total
+  loss of the feature for anything authored on Windows. `ends_with_blank_line`
+  now strips one terminator and looks for another, which is line-ending
+  agnostic. The fuzz corpus grew two CRLF snippets and two CRLF insert-alphabet
+  entries, so the gap is measured rather than accidental.
+- Guard parity. `reparse_section_window` ran a strictly weaker guard set than
+  the suffix path. Two of the missing three cannot fire while the window is
+  anchored at a top-level `HEADING`, but the thematic-break/dash-rule one can,
+  and "the window starts at a heading" is a property of how the window is
+  *chosen* --- which Phase 8 changes. All are applied on both paths now.
+- Release-build safety. Both oracles are `cfg(debug_assertions)` (the host one
+  also wants `PANACHE_REPARSE_ORACLE=1`), so a release build checked nothing,
+  while `parsed_document` now feeds LSP formatting, which writes the user's
+  file. `splice_length_agrees` in `src/salsa.rs` checks the one part of the
+  invariant that is `O(1)` --- the spliced tree spans exactly its text --- in
+  every build, and *falls back* to the full parse rather than panicking.
+- The reshuffled corpus found one more full-parser bug: a trailing `:`/`~` line
+  promoting a preceding list item's lazy continuation into a definition term,
+  where the *splice* matched pandoc and the full parse did not. Declined by
+  `first_block_has_trailing_definition_marker` so the splice keeps matching the
+  full parse, pinned `#[ignore]`d in `incremental_regressions.rs`, and tracked
+  on `main` under "Parser bugs found by the incremental fuzzer" (the entry says
+  to delete the guard with the fix). It is not CRLF-specific --- the CRLF
+  inserts only reshuffled the draws onto it --- and reproduces on LF.
 
 No test in this section may read a document from `benches/documents/`: the
 corpus is gitignored, and `download.sh` does not even produce every name the
