@@ -94,10 +94,42 @@ fn full_parse_lossless_setext_pair_after_unterminated_fence() {
 /// edited text, structurally (fingerprint), textually, and in its syntax
 /// errors.
 fn check_incremental(before: &str, old_edit: (usize, usize), insert: &str) {
+    check_incremental_via(before, old_edit, insert, None);
+}
+
+/// [`check_incremental`], asserting *which* strategy ran.
+///
+/// A reproducer whose document is small or whose window is wide gets declined
+/// by the guard cascade and falls back to a full parse, at which point the
+/// oracle compares a full parse against itself and the test passes without
+/// exercising anything. Any case pinning a *splice* bug names its strategy so
+/// that it fails loudly instead of going quiet.
+fn check_incremental_strategy(
+    before: &str,
+    old_edit: (usize, usize),
+    insert: &str,
+    strategy: &'static str,
+) {
+    check_incremental_via(before, old_edit, insert, Some(strategy));
+}
+
+fn check_incremental_via(
+    before: &str,
+    old_edit: (usize, usize),
+    insert: &str,
+    expect_strategy: Option<&'static str>,
+) {
     let (old_tree, old_errors) = parse_with_errors(before, None);
     let updated = apply_edit(before, old_edit, insert);
     let new_edit = (old_edit.0, old_edit.0 + insert.len());
     let inc = reparse_or_full(&updated, None, &old_tree, &old_errors, old_edit, new_edit);
+    if let Some(expected) = expect_strategy {
+        assert_eq!(
+            inc.strategy, expected,
+            "reparse took the {} path, so this case no longer exercises {expected}",
+            inc.strategy
+        );
+    }
     let (full, full_errors) = parse_with_errors(&updated, None);
     assert_eq!(
         inc.tree.text().to_string(),
@@ -176,10 +208,44 @@ fn suffix_content_can_reinterpret_a_retained_thematic_break() {
 // window was parsed as a standalone document, and the mangled div context
 // leaked across the window boundary. Fixed by parsing the section tail to
 // EOF and re-adopting the old suffix only on structural equality.
+//
+// The reproducer is *synthetic*, not the corpus bytes: `medium_quarto.qmd` is
+// gitignored and `benches/documents/download.sh` no longer produces it, so a
+// corpus-reading test fails on every clean checkout. What it reconstructs is
+// the shape from the fuzz case -- a deletion that glues a callout's closing
+// `:::` onto its content line, leaving the div unterminated so it swallows
+// everything below the window -- with enough prose above the section heading
+// to keep the window under the size cutoff. The strategy it pins is
+// `suffix_window`: the section window is *chosen*, and then the fix's
+// structural-equality check refuses to re-adopt the old suffix (the
+// unterminated div now swallows the section below it), degrading to a
+// wholesale suffix splice. Pinning that is what keeps the case honest --
+// a fallback to a full parse would compare a full parse against itself,
+// and a `section_window` result would mean the leak was re-adopted.
+fn callout_document() -> String {
+    let mut doc = String::from("---\ntitle: Callouts\n---\n\n# Overview\n\n");
+    for i in 0..40 {
+        doc.push_str(&format!(
+            "Paragraph {i} of the overview, here to keep the section below a\nsmall enough share of the document that the window is admitted.\n\n"
+        ));
+    }
+    doc.push_str("## Downloads\n\n::: {.callout-note}\nGrab the [example](hello.qmd){download=\"hello.qmd\"}\n:::\n\nTrailing prose inside the edited section.\n\n");
+    // A section *below* the window is what makes this case a leak rather than
+    // a reparse to EOF: the unterminated div has somewhere to escape to.
+    doc.push_str("## Afterword\n\nProse the mangled div must not swallow.\n");
+    doc
+}
+
 #[test]
 fn section_window_divergence_on_mangled_div_in_callout() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../benches/documents/medium_quarto.qmd");
-    let before = std::fs::read_to_string(&path).expect("corpus document present");
-    check_incremental(&before, (2415, 2437), "_");
+    let before = callout_document();
+    let attr = before.find("{download=").expect("attribute present");
+    // 22 bytes: all but the opening brace of `{download="hello.qmd"}`, plus
+    // the newline that separates it from the `:::` closer.
+    let old_edit = (attr + 1, attr + 1 + 22);
+    assert!(
+        before[old_edit.0..old_edit.1].ends_with("\"}\n"),
+        "edit must swallow the attribute and the line break before `:::`"
+    );
+    check_incremental_strategy(&before, old_edit, "_", "suffix_window");
 }

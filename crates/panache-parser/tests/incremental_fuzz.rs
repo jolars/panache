@@ -655,7 +655,10 @@ fn hazard_snippets_chained_edits() {
 #[test]
 fn real_documents_random_edits() {
     let docs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benches/documents");
-    let names = ["small.qmd", "medium_quarto.qmd", "tables.qmd", "math.qmd"];
+    // Every name here must be one `benches/documents/download.sh` produces
+    // (or a tracked file): an absent document is *skipped*, so a stale name
+    // silently shrinks this tier instead of failing.
+    let names = ["small.qmd", "configuration.qmd", "tables.qmd", "math.qmd"];
     let mut stats = FuzzStats::default();
     for (tier_index, tier) in TIERS.iter().enumerate() {
         if tier.real_docs == 0 {
