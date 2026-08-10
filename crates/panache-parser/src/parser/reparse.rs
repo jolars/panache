@@ -425,6 +425,7 @@ fn reparse_ranges(
     {
         return None;
     }
+
     let (suffix_tree, suffix_errors) = Parser::new(suffix_text, config).parse_with_errors();
     let errors = merge_incremental_errors(old_errors, new_restart, suffix_errors)?;
 
@@ -766,6 +767,23 @@ fn window_start_manufactures_document_start_construct(
     config.dialect == Dialect::CommonMark && first.trim() == "---"
 }
 
+/// Strip one trailing line terminator, CRLF before LF so a `\r\n` is not left
+/// half-consumed. `None` when `text` does not end with one.
+fn strip_line_ending(text: &str) -> Option<&str> {
+    text.strip_suffix("\r\n")
+        .or_else(|| text.strip_suffix('\n'))
+}
+
+/// Whether `prefix` ends with a blank line, under any line ending.
+///
+/// Two terminators back to back is what a blank line *is*, so stripping one
+/// and finding another is the whole test -- and it is line-ending agnostic,
+/// where a `"\n\n"` suffix check silently refuses every CRLF document (a
+/// blank line there ends `"\r\n\r\n"`, whose last two bytes are `\r\n`).
+fn ends_with_blank_line(prefix: &str) -> bool {
+    strip_line_ending(prefix).is_some_and(|rest| strip_line_ending(rest).is_some())
+}
+
 /// Whether a splice seam at `seam` is structurally decoupled in `text`:
 /// the prefix before it ends with a blank line (or is empty), and the
 /// suffix's first non-blank line is not indented. Blank separation kills
@@ -773,7 +791,7 @@ fn window_start_manufactures_document_start_construct(
 /// covers list, footnote, and indented-code continuation, which absorb
 /// indented lines even across blank lines.
 fn seam_is_decoupled(text: &str, seam: usize) -> bool {
-    if seam != 0 && !text[..seam].ends_with("\n\n") {
+    if seam != 0 && !ends_with_blank_line(&text[..seam]) {
         return false;
     }
     let first_nonblank_indented = text[seam..]
@@ -1857,5 +1875,57 @@ mod tests {
             inc.strategy, "section_window",
             "frontmatter delimiter edits should stay in conservative mode"
         );
+    }
+
+    #[test]
+    fn a_blank_line_is_recognized_under_every_line_ending() {
+        assert!(ends_with_blank_line("a\n\n"));
+        assert!(ends_with_blank_line("a\r\n\r\n"));
+        // Mixed endings, which an editor produces while converting a file.
+        assert!(ends_with_blank_line("a\n\r\n"));
+        assert!(ends_with_blank_line("a\r\n\n"));
+        // One terminator is a line end, not a blank line.
+        assert!(!ends_with_blank_line("a\n"));
+        assert!(!ends_with_blank_line("a\r\n"));
+        assert!(!ends_with_blank_line("a"));
+        assert!(!ends_with_blank_line(""));
+        // A lone `\r` is not a terminator, so it cannot complete a blank line.
+        assert!(!ends_with_blank_line("a\n\r"));
+    }
+
+    /// A CRLF document must reach the splice at all. Every seam test in the
+    /// cascade is textual, so a `"\n\n"`-only blank-line check refuses one
+    /// silently: correct, and a total loss of the feature for anything authored
+    /// on Windows.
+    #[test]
+    fn a_crlf_document_splices_like_its_lf_twin() {
+        let lf =
+            "# Intro\n\nalpha body here\n\n# Middle\n\nbeta body here\n\n# End\n\nomega body\n";
+        let crlf = lf.replace('\n', "\r\n");
+
+        for document in [lf.to_string(), crlf] {
+            let at = document.find("beta").expect("marker in test input");
+            let old_tree = parse(&document, None);
+            let updated = apply_edit(&document, (at, at + 4), "BETA");
+
+            let inc = reparse_or_full(
+                &updated,
+                None,
+                &old_tree,
+                &[],
+                (at, at + 4),
+                (at, at + "BETA".len()),
+            );
+            assert_eq!(
+                inc.strategy,
+                "section_window",
+                "line ending decided the strategy: {:?}",
+                &document[..8]
+            );
+            assert_eq!(
+                crate::parser::fingerprint(&inc.tree),
+                crate::parser::fingerprint(&parse(&updated, None)),
+            );
+        }
     }
 }

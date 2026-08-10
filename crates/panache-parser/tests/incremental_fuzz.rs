@@ -194,6 +194,10 @@ const INSERTS: &[&str] = &[
     "-->",
     "α",
     "παρά",
+    // CRLF terminators, so a mixed-ending document is reachable from every
+    // snippet rather than only from the two that start out that way.
+    "\r\n",
+    "\r\n\r\n",
     // Document-start-only shapes: a window is parsed standalone, so its first
     // line is a document's first line to the block dispatcher.
     "%",
@@ -301,6 +305,19 @@ const HAZARD_SNIPPETS: &[(&str, &str)] = &[
     (
         "hashpipe",
         "intro\n\n```{r}\n#| echo: false\n1 + 1\n```\n\ntail\n",
+    ),
+    // CRLF: every seam and blank-line test in the guard cascade is textual, so
+    // a line ending it does not recognize refuses the whole document silently.
+    // These two mirror `atx_sections` and `lazy_blockquote` byte for byte apart
+    // from the terminator, so a splice rate that collapses here is the line
+    // ending and nothing else.
+    (
+        "crlf_sections",
+        "# One\r\n\r\nbody one\r\n\r\n## Two\r\n\r\nbody two\r\n\r\n# Three\r\n\r\nbody three\r\n",
+    ),
+    (
+        "crlf_lazy_blockquote",
+        "> quoted\r\ncontinuation\r\n\r\ntail para\r\n",
     ),
 ];
 
