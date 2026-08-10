@@ -21,7 +21,7 @@ brew install panache
 Install `panache` with Cargo:
 
 ```bash
-cargo install panache
+cargo install --locked panache
 ```
 
 ### Aqua
@@ -123,7 +123,7 @@ npm install -g @panache-cli/panache
 To install the latest development version, run:
 
 ```bash
-cargo install --git https://github.com/jolars/panache.git panache
+cargo install --locked --git https://github.com/jolars/panache.git panache
 ```
 
 This presumes you have a working and up-to-date Rust toolchain (stable, 2024

@@ -21,7 +21,7 @@ linters on code blocks.
 
 Panache is available from several sources:
 
-- **crates.io**: `cargo install panache`
+- **crates.io**: `cargo install --locked panache`
 - **Homebrew**: `brew install panache`
 - **npm**: `npm install -g @panache-cli/panache` (or `npx @panache-cli/panache`)
 - **PyPI**: `uv tool install panache-cli`/`pipx install panache-cli`

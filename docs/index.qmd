@@ -69,7 +69,7 @@ brew install panache
 Or install with Cargo:
 
 ```bash
-cargo install panache
+cargo install --locked panache
 ```
 
 Format your first document:
