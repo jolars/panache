@@ -150,6 +150,40 @@ pub struct ParsedDocument {
     pub errors: Vec<crate::parser::SyntaxError>,
 }
 
+/// Whether a spliced tree spans exactly the text it was spliced from.
+///
+/// The governing invariant is checked in full by the oracles, but both are
+/// `cfg(debug_assertions)` and the host one additionally wants
+/// `PANACHE_REPARSE_ORACLE=1` -- they cost a full parse each, which is the
+/// thing the feature exists to avoid. This is the one part of the invariant
+/// cheap enough to check unconditionally: it is `O(1)`, and it catches the
+/// class that does real damage, a splice that drops or duplicates bytes.
+/// `parsed_document` feeds every consumer including LSP formatting, which
+/// writes the user's file.
+///
+/// A mismatch falls back to the full parse rather than panicking: refusal is
+/// the contract everywhere else in this path, and a release build should
+/// degrade to the behavior it had before the feature existed. Debug builds
+/// still assert, so a test cannot pass over one.
+fn splice_length_agrees(reparsed: &crate::parser::Reparsed, text: &str) -> bool {
+    let spliced_len = usize::from(reparsed.green.text_len());
+    if spliced_len == text.len() {
+        return true;
+    }
+    log::error!(
+        "incremental reparse produced {spliced_len} bytes for {} bytes of text \
+         ({} splice over {:?}); falling back to a full parse",
+        text.len(),
+        reparsed.strategy.as_str(),
+        reparsed.reparse_range,
+    );
+    debug_assert!(
+        false,
+        "spliced tree disagrees with the text it was spliced from"
+    );
+    false
+}
+
 /// The document's parse, incrementally when the side channel can supply a
 /// usable base and a full parse otherwise.
 ///
@@ -157,8 +191,9 @@ pub struct ParsedDocument {
 /// to a full parse of the same text, tree *and* errors (the governing
 /// invariant, asserted by the parser crate's debug oracle on every splice and,
 /// under `PANACHE_REPARSE_ORACLE=1`, again here against a real full parse
-/// before anything is stored). So this stays a pure function of `(file,
-/// config)` and salsa still sees only input changes.
+/// before anything is stored, plus [`splice_length_agrees`] in every build).
+/// So this stays a pure function of `(file, config)` and salsa still sees only
+/// input changes.
 ///
 /// Reuse is refused unless the base was recorded under the *same* config and
 /// the *same* refdef set: retained blocks keep the reference resolution and
@@ -190,31 +225,28 @@ pub fn parsed_document(db: &dyn Db, file: FileText, config: FileConfig) -> Parse
         };
     }
 
-    let reused = prev.and_then(|prev| {
-        // `RefdefMap` is an `Arc<HashSet<_>>` and `refdef_set` backdates on
-        // set-equality, so an unchanged set is literally the same allocation
-        // and this comparison short-circuits on the pointer.
-        if prev.config != *cfg || prev.refdefs != refdefs {
-            return None;
-        }
-        let edit = crate::parser::diff_edit(&prev.text, &text);
-        crate::parser::reparse_with_refdefs(
-            &prev.green,
-            &prev.errors,
-            &edit,
-            &text,
-            Some(cfg.clone()),
-            refdefs.clone(),
-        )
-    });
+    let reused = prev
+        .and_then(|prev| {
+            // `RefdefMap` is an `Arc<HashSet<_>>` and `refdef_set` backdates on
+            // set-equality, so an unchanged set is literally the same allocation
+            // and this comparison short-circuits on the pointer.
+            if prev.config != *cfg || prev.refdefs != refdefs {
+                return None;
+            }
+            let edit = crate::parser::diff_edit(&prev.text, &text);
+            crate::parser::reparse_with_refdefs(
+                &prev.green,
+                &prev.errors,
+                &edit,
+                &text,
+                Some(cfg.clone()),
+                refdefs.clone(),
+            )
+        })
+        .filter(|reparsed| splice_length_agrees(reparsed, &text));
 
     let parsed = match reused {
         Some(reparsed) => {
-            debug_assert_eq!(
-                usize::from(reparsed.green.text_len()),
-                text.len(),
-                "spliced tree disagrees with the text it was spliced from"
-            );
             let parsed = ParsedDocument {
                 green: reparsed.green,
                 errors: reparsed.errors,
@@ -244,6 +276,13 @@ pub fn parsed_document(db: &dyn Db, file: FileText, config: FileConfig) -> Parse
     // unwind mid-query can never leave a base whose text and tree disagree. A
     // cancelled query simply stores nothing and the next one diffs from the
     // older base -- a wider edit, still a correct one.
+    //
+    // Stores are *not* ordered across revisions: two cloned handles computing
+    // at different revisions can land theirs in either order, so an older
+    // `(text, green)` pair can overwrite a newer one. Each pair is internally
+    // consistent -- that is what the store-last rule buys -- and a stale base
+    // only widens the next `diff_edit`, so the channel needs no monotonicity
+    // and deliberately does not try for it.
     if matches!(admission, ReparseAdmission::Admitted(_)) {
         db.reparse_store(
             file,

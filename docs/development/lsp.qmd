@@ -37,13 +37,18 @@ reference-definition set are unchanged --- retained blocks keep the resolution
 and options they were parsed with, so either changing invalidates them at a
 distance.
 
-Three properties make reading and writing that channel from inside an otherwise
+Four properties make reading and writing that channel from inside an otherwise
 pure query sound:
 
 - A successful splice is byte-identical to a full parse, tree *and* syntax
   errors. The parser asserts this on every splice in debug builds; setting
   `PANACHE_REPARSE_ORACLE=1` adds a second check against a real full parse
-  before anything is stored.
+  before anything is stored. Both oracles cost a full parse each, so both are
+  compiled out of release builds; what survives there is the one part of the
+  invariant that is `O(1)` --- the spliced tree spans exactly the text it was
+  spliced from. That check runs in every build and *falls back* to a full parse
+  rather than panicking, because `parsed_document` feeds formatting, which
+  writes the user's file.
 - Every guard declines to `None` rather than guessing, so the query's fallback
   is an ordinary full parse.
 - One guard declines for cost rather than correctness. Both reparse strategies
@@ -58,6 +63,9 @@ pure query sound:
   of the threshold.
 - The base is stored last, after every fallible step, so a panic or a salsa
   cancellation mid-query can never leave a base whose text and tree disagree.
+  Stores are not ordered across revisions, so an older base can overwrite a
+  newer one; each is internally consistent, and a stale base only widens the
+  next diff.
 
 Only the LSP admits a document to the channel, and only while the setting is on.
 With it off nothing is admitted, so every parse is the full parse it was before.
