@@ -206,6 +206,7 @@ golden_test_cases!(
     definition_marker_promotes_definition_body_term_blank_line,
     definition_marker_ends_list_item_block,
     definition_term_requires_single_line_block,
+    definition_two_blank_lines_detach_term,
     definition_colon_ratio_idempotency_134,
     display_math,
     display_math_blank_line_termination,

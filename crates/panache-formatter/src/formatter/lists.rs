@@ -244,6 +244,9 @@ impl Formatter {
         let text = node.text().to_string();
         let line_width = self.config.line_width.saturating_sub(indent);
         let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
+        // This arm emits the paragraph's lines itself rather than going through
+        // `format_node_sync`, so it needs its own checkpoint for the guard below.
+        let para_start = self.output.len();
 
         match wrap_mode {
             WrapMode::Preserve => {
@@ -276,6 +279,8 @@ impl Formatter {
                 }
             }
         }
+
+        self.guard_definition_marker_start(para_start, indent);
     }
 
     /// Format a List node

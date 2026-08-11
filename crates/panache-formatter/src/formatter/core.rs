@@ -573,11 +573,22 @@ impl Formatter {
     /// Reads the emitted text rather than the source, because the reparse sees
     /// the emitted text — a paragraph that is still multi-line after wrapping
     /// cannot supply a term and is left alone.
-    fn guard_definition_marker_start(&mut self, start: usize) {
+    ///
+    /// `content_indent` is the content-container indent the calling arm
+    /// prepends to every line (a footnote body's four columns, a list item's
+    /// hanging column). The parser strips it before measuring the marker's own
+    /// 0-3 space allowance, so the guard must too, or a marker at a content
+    /// column of 4 reads as indented code and is never guarded.
+    pub(super) fn guard_definition_marker_start(&mut self, start: usize, content_indent: usize) {
         let Some(first) = self.output[start..].lines().next() else {
             return;
         };
-        let prefix_len = Self::block_prefix_len(first);
+        let container_indent = first
+            .bytes()
+            .take_while(|byte| *byte == b' ')
+            .count()
+            .min(content_indent);
+        let prefix_len = container_indent + Self::block_prefix_len(&first[container_indent..]);
         let Some((':', ..)) = try_parse_definition_marker(&first[prefix_len..]) else {
             return;
         };
@@ -624,10 +635,19 @@ impl Formatter {
     /// whether it could be promoted to a definition term.
     fn preceding_block_is_one_line(before: &str) -> bool {
         let is_blank = |line: &str| line[Self::block_prefix_len(line)..].trim().is_empty();
+        // A fenced-div opener ends whatever is above it, so the first line of
+        // a div's body is a block of its own even with no blank between them:
+        // `::: note\nT\n\n: b` promotes `T` on reparse just as `T\n\n: b` does.
+        let ends_the_block_above = |line: &str| {
+            is_blank(line)
+                || inline_layout::looks_like_div_fence_line(
+                    line[Self::block_prefix_len(line)..].trim_start(),
+                )
+        };
         let mut lines = before.lines().rev().skip_while(|l| is_blank(l));
-        // The candidate term line must exist, and the line above it must be
-        // blank or absent — otherwise the block has more than one line.
-        lines.next().is_some() && lines.next().is_none_or(is_blank)
+        // The candidate term line must exist, and the line above it must end
+        // the block above — otherwise the block has more than one line.
+        lines.next().is_some() && lines.next().is_none_or(ends_the_block_above)
     }
 
     /// True if `text` has a line that re-parses as a dash thematic break or a
@@ -905,6 +925,10 @@ impl Formatter {
                             // `format_node_sync` wraps to the full line width
                             // and only then prepends indent, so it would
                             // overflow here; reflow manually like footnotes.
+                            // Emitting the lines here rather than through
+                            // `format_node_sync` also means this arm needs its
+                            // own checkpoint for the guard below.
+                            let para_start = self.output.len();
                             let available_width =
                                 self.config.line_width.saturating_sub(child_indent);
                             let lines = match wrap_mode {
@@ -932,6 +956,7 @@ impl Formatter {
                                 self.output.push_str(line.trim_start_matches([' ', '\t']));
                                 self.output.push('\n');
                             }
+                            self.guard_definition_marker_start(para_start, child_indent);
                         }
                         SyntaxKind::CODE_BLOCK => {
                             self.format_indented_code_block(child, child_indent);
@@ -1077,7 +1102,11 @@ impl Formatter {
                     // Format blocks with indentation
                     match child.kind() {
                         SyntaxKind::PARAGRAPH => {
-                            // Handle paragraph with wrapping and indentation
+                            // Handle paragraph with wrapping and indentation.
+                            // This arm emits the lines itself rather than going
+                            // through `format_node_sync`, so it needs its own
+                            // checkpoint for the guard below.
+                            let para_start = self.output.len();
                             let available_width =
                                 self.config.line_width.saturating_sub(child_indent);
 
@@ -1119,6 +1148,7 @@ impl Formatter {
                                     }
                                 }
                             }
+                            self.guard_definition_marker_start(para_start, child_indent);
                         }
                         SyntaxKind::BLANK_LINE => {
                             // Normalize blank lines to just newlines
@@ -1406,7 +1436,7 @@ impl Formatter {
                                     }
                                 }
                             }
-                            self.guard_definition_marker_start(para_start);
+                            self.guard_definition_marker_start(para_start, 0);
                         }
                         SyntaxKind::ALERT => {
                             let marker = child
@@ -1906,7 +1936,7 @@ impl Formatter {
                 }
 
                 self.guard_dash_block_marker(para_start, node, indent);
-                self.guard_definition_marker_start(para_start);
+                self.guard_definition_marker_start(para_start, indent);
             }
 
             SyntaxKind::FIGURE => {

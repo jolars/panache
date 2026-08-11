@@ -679,7 +679,7 @@ parse that is wrong:
     across the whole series (the earlier note expecting a delta was wrong — both
     suites were already at 100%).
 
-Three further definition-list divergences fixed alongside it:
+Further definition-list divergences fixed alongside it:
 
 - [x] A term had to be a **one-line block**, as pandoc requires: `a\nb\n\n: def`
   is two `Para`s, not a definition list on `b`. Panache promoted the last
@@ -773,21 +773,33 @@ Three further definition-list divergences fixed alongside it:
   line. Both frames are absolute, so the promotion also fires inside a list
   item and a blockquote.
 
-Still open in the same area, and **independent of the frame refactor** — these
-touch blank-line policy and formatter stability, not the strip helpers, so they
-can land in any order and will not conflict with the container-frame
-consolidation under `Parser > Architecture`. The first two travel together (the
-formatter is already unstable on the two-blank shape), so they are roughly one
-session of definition-list formatter work plus one parser change:
+- [x] **Two** blank lines detach a term from its first definition marker, at
+  every level. Pandoc's `definitionListItem` reads the term and then
+  `option False $ blankline` — a *single* optional blank — so `T\n\n\n: b`
+  is two paragraphs, and the same rule recursing through a body's reparse
+  makes `T\n:   a\n\n\n    :   b\n` one definition holding
+  `Plain "a", Plain ": b"`. Three lookaheads had to learn the limit
+  (`next_line_is_definition_marker`, `first_content_line_term_lookahead`,
+  and — already correct — the blank-line promotion), and
+  `definition_marker_over_open_body_block` had to stop requiring an *open*
+  block: reaching the body's content column is the whole test, so a marker
+  over a closed or not-yet-started body is body text rather than a sibling
+  definition (`T\n:\n    : b`, `T\n:   a\n    b\n\n    : c`). Only a
+  *dedented* marker is a second definition, however many blanks precede it.
+  The formatter needed the escape guard on the paths that emit paragraph
+  lines themselves and so never ran it — list continuations, footnote and
+  admonition bodies — plus two fixes to the guard's own frame: a
+  content-container indent is prefix, not the marker's 0-3 space allowance,
+  and a fenced-div opener ends the block above it.
 
-- [ ] **Two** blank lines between the body block and the marker still open a
-  second definition (`T\n:   a\n\n\n    :   b\n`); pandoc detaches the term
-  and reads the marker line as a further body block, `Plain ": b"`. Same
-  root as the top-level case — `T\n\n\n: b` is two paragraphs for pandoc and
-  a definition list for panache — so `next_line_is_definition_marker`
-  accepting any number of blanks is the one place to fix it. The formatter
-  is already unstable on that shape (it emits both blank lines, which
-  reparse differently), so the two travel together.
+- [x] The same reflow-promotes-a-term idempotency failure across a **blank
+  line** (`- x\n\n  a\n  b\n\n  : def\n`, which reflowed to a term on `a b`)
+  came with the guard wiring above: `format_list_continuation_paragraph` now
+  runs `guard_definition_marker_start`, which escapes the marker instead.
+
+Still open in the same area, and **independent of the frame refactor** — this
+one is a formatter marker-width heuristic, not a strip helper, so it will not
+conflict with the container-frame consolidation under `Parser > Architecture`:
 
 - [ ] The formatter's marker-width heuristic is not stable for a definition list
   *nested in a list item* when a thematic break follows:
@@ -795,16 +807,6 @@ session of definition-list formatter work plus one parser change:
   `: def`, dropping the padding. Pre-existing (it reproduces on the
   pre-promotion parser given the same bytes) and unrelated to promotion, but
   it is why the blank-line golden case carries no thematic break.
-
-- [ ] The same reflow-promotes-a-term idempotency failure survives when a
-  **blank line** separates the two blocks: `- x\n\n  a\n  b\n\n  : def\n`
-  formats to `- x\n\n  a b\n\n  : def\n`, which reparses as a definition
-  list on `a b`. Pre-existing, and not what
-  `reflow_would_promote_a_definition_term` guards — it deliberately looks at
-  the *immediate* sibling only. Here a blank line already separates the
-  blocks, so escaping the marker is enough; the fix is to run
-  `guard_definition_marker_start` from `format_list_continuation_paragraph`,
-  which currently never calls it.
 
 Also still open, but **do not fix these individually** — they are input to
 "Consolidate container-frame resolution behind a single typed verdict" under

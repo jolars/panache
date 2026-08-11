@@ -1543,9 +1543,11 @@ fn paragraph_has_swept_fence_shape(config: &Config, node: &SyntaxNode) -> bool {
 }
 
 /// Minimal recognizer for pandoc fenced div opener / closer shapes; intended
-/// only for the heuristic above. Mirrors the parser's `try_parse_div_fence_open`
-/// + `is_div_closing_fence` for the line shapes that count as a fence.
-fn looks_like_div_fence_line(content: &str) -> bool {
+/// only for the heuristic above and for the block-boundary test in
+/// `preceding_block_is_one_line`. Mirrors the parser's
+/// `try_parse_div_fence_open` + `is_div_closing_fence` for the line shapes that
+/// count as a fence.
+pub(super) fn looks_like_div_fence_line(content: &str) -> bool {
     let colon_count = content.bytes().take_while(|b| *b == b':').count();
     if colon_count < 3 {
         return false;
