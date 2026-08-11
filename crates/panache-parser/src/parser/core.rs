@@ -92,9 +92,9 @@ enum BufferedBodyBlock {
     /// `T\n:   a\n    : def` is
     /// `DefinitionList [(T, [[DefinitionList [(a, [[Plain "def"]])]]])]`.
     Term,
-    /// A block longer than a line, which cannot be a term, so no term precedes
-    /// the marker. What is left is another block of the same body:
-    /// `T\n:   a\n    b\n    : def` is
+    /// No term precedes the marker — the block above it is longer than a line,
+    /// already closed by a blank, or not there at all — so what is left is
+    /// another block of the same body: `T\n:   a\n    b\n    : def` is
     /// `DefinitionList [(T, [[Plain "a b", Plain ": def"]])]`.
     Block,
 }
@@ -1067,8 +1067,9 @@ impl<'a> Parser<'a> {
             && super::blocks::tables::is_caption_followed_by_table(&self.lines[..], self.pos))
     }
 
-    /// What a definition marker on this line does to the open block of the
-    /// definition body it sits in, or `None` when it does nothing to it.
+    /// What a definition marker on this line does to the block of the
+    /// definition body it sits in, or `None` when the line is not such a
+    /// marker.
     ///
     /// This is the definition-body analogue of
     /// [`Self::definition_marker_breaks_open_list_item_block`]. Pandoc re-reads
@@ -1078,10 +1079,13 @@ impl<'a> Parser<'a> {
     /// soft nor a lazy continuation of the text above it. What is left depends
     /// on the shape of the block it stands over; see [`BufferedBodyBlock`].
     ///
-    /// One neighbouring shape is deliberately left to the `Definition` arm of
-    /// `DefinitionListParser::detect_prepared`: a marker *dedented* below the
-    /// content column, which is a second definition of the same term
-    /// (`T\n:   a\n  : def`).
+    /// Reaching the content column is the whole test: an indented marker is
+    /// *always* inside the body, so a body whose block is already closed (or
+    /// which has no block yet) still keeps it — as text, since there is no
+    /// one-line block below it to be its term. Only a marker *dedented* below
+    /// the content column is a second definition of the same term
+    /// (`T\n:   a\n  : def`), and that shape is deliberately left to the
+    /// `Definition` arm of `DefinitionListParser::detect_prepared`.
     ///
     /// `content_indent` is the body's content column, already stripped off
     /// `stripped_content`; `content` still carries it, so the dedent test reads
@@ -1096,7 +1100,7 @@ impl<'a> Parser<'a> {
             return None;
         }
         let Some(Container::Definition {
-            plain_open: true,
+            plain_open,
             plain_buffer,
             ..
         }) = self.containers.last()
@@ -1115,14 +1119,17 @@ impl<'a> Parser<'a> {
         {
             return None;
         }
-        let buffered = plain_buffer.raw_text();
+        // A closed block is not a term candidate: the blank line that closed
+        // it has already detached it from the marker (a term keeps at most one
+        // blank, and the one-blank case was promoted by lookahead before the
+        // flush). What is left is body text.
+        let buffered = if *plain_open {
+            plain_buffer.raw_text()
+        } else {
+            String::new()
+        };
         let buffered = buffered.trim_end_matches(['\r', '\n']);
-        if buffered.trim().is_empty() {
-            // Nothing buffered to be a term or a block: the body has not
-            // started yet, so the marker is left to the dispatcher.
-            return None;
-        }
-        if buffered.contains('\n') {
+        if buffered.trim().is_empty() || buffered.contains('\n') {
             Some(BufferedBodyBlock::Block)
         } else {
             Some(BufferedBodyBlock::Term)
@@ -6051,9 +6058,14 @@ fn emit_definition_plain_or_heading(
     builder.finish_node();
 }
 
-/// Look ahead from `pos+1` past blank lines for a definition marker line at
-/// `content_col` indent. Returns the blank-line count consumed before the
-/// marker, or `None` if no marker is found at the next non-blank line.
+/// Look ahead from `pos+1` past at most one blank line for a definition marker
+/// line at `content_col` indent. Returns the blank-line count consumed before
+/// the marker, or `None` if no marker is found at the next non-blank line.
+///
+/// The one-blank limit is the term rule
+/// [`next_line_is_definition_marker`](definition_lists::next_line_is_definition_marker)
+/// applies, in the container's own frame: `- T\n\n\n  : b` is a bullet item
+/// holding two paragraphs, not a term and its definition.
 ///
 /// Used by `handle_footnote_open_effect` and
 /// `maybe_open_definition_term_in_new_list_item` to decide whether a
@@ -6079,6 +6091,9 @@ fn first_content_line_term_lookahead(
         let (trimmed, _) = strip_newline(line);
         if trimmed.trim().is_empty() {
             blank_count += 1;
+            if blank_count > definition_lists::MAX_BLANKS_BEFORE_DEFINITION {
+                return None;
+            }
             check_pos += 1;
             continue;
         }

@@ -1,0 +1,74 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..63
+  PARAGRAPH@0..2
+    TEXT@0..1 "T"
+    NEWLINE@1..2 "\n"
+  BLANK_LINE@2..3
+    BLANK_LINE@2..3 "\n"
+  BLANK_LINE@3..4
+    BLANK_LINE@3..4 "\n"
+  PARAGRAPH@4..8
+    TEXT@4..7 ": b"
+    NEWLINE@7..8 "\n"
+  BLANK_LINE@8..9
+    BLANK_LINE@8..9 "\n"
+  LIST@9..21
+    LIST_ITEM@9..21
+      LIST_MARKER@9..10 "-"
+      WHITESPACE@10..11 " "
+      PLAIN@11..13
+        TEXT@11..12 "U"
+        NEWLINE@12..13 "\n"
+      BLANK_LINE@13..14
+        BLANK_LINE@13..14 "\n"
+      BLANK_LINE@14..15
+        BLANK_LINE@14..15 "\n"
+      PLAIN@15..21
+        TEXT@15..20 "  : c"
+        NEWLINE@20..21 "\n"
+  BLANK_LINE@21..22
+    BLANK_LINE@21..22 "\n"
+  DEFINITION_LIST@22..63
+    DEFINITION_ITEM@22..42
+      TERM@22..24
+        TEXT@22..23 "D"
+        NEWLINE@23..24 "\n"
+      DEFINITION@24..42
+        DEFINITION_MARKER@24..25 ":"
+        WHITESPACE@25..28 "   "
+        PLAIN@28..30
+          TEXT@28..29 "a"
+          NEWLINE@29..30 "\n"
+        BLANK_LINE@30..31
+          BLANK_LINE@30..31 "\n"
+        BLANK_LINE@31..32
+          BLANK_LINE@31..32 "\n"
+        PLAIN@32..42
+          WHITESPACE@32..36 "    "
+          TEXT@36..41 ":   b"
+          NEWLINE@41..42 "\n"
+    BLANK_LINE@42..43
+      BLANK_LINE@42..43 "\n"
+    DEFINITION_ITEM@43..63
+      TERM@43..45
+        TEXT@43..44 "E"
+        NEWLINE@44..45 "\n"
+      DEFINITION@45..51
+        DEFINITION_MARKER@45..46 ":"
+        WHITESPACE@46..49 "   "
+        PLAIN@49..51
+          TEXT@49..50 "a"
+          NEWLINE@50..51 "\n"
+      BLANK_LINE@51..52
+        BLANK_LINE@51..52 "\n"
+      BLANK_LINE@52..53
+        BLANK_LINE@52..53 "\n"
+      DEFINITION@53..63
+        DEFINITION_MARKER@53..54 ":"
+        WHITESPACE@54..55 " "
+        PLAIN@55..63
+          TEXT@55..62 "sibling"
+          NEWLINE@62..63 "\n"

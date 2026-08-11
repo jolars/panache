@@ -813,6 +813,11 @@ fn a_multi_line_body_block_across_a_blank_line_is_not_promoted() {
             "{input:?}"
         );
         assert_eq!(find_all(&tree, SyntaxKind::TERM).len(), 1, "{input:?}");
+        assert_eq!(
+            find_all(&tree, SyntaxKind::DEFINITION).len(),
+            1,
+            "the marker line is a further block of the same body: {input:?}"
+        );
         assert_eq!(tree.text().to_string(), input, "{input:?}");
     }
 }
@@ -844,15 +849,92 @@ fn a_marker_across_a_blank_line_promotes_inside_a_list_item_and_a_blockquote() {
 #[test]
 fn two_blank_lines_detach_the_marker_from_the_body_block_above_it() {
     // A term keeps at most one blank line between itself and its definition,
-    // so two blanks leave `a` a body block of its own. (Pandoc reads the
-    // marker line as a further body block rather than a second definition of
-    // `T`; that multi-blank divergence is tracked separately.)
-    let input = "T\n:   a\n\n\n    :   b\n";
-    let tree = parse_blocks(input);
+    // so two blanks leave `a` a body block of its own, and the marker line
+    // becomes a further block of the same body:
+    // `DefinitionList [(T, [[Plain "a", Plain ": b"]])]`.
+    for input in [
+        "T\n:   a\n\n\n    :   b\n",
+        "T\n:   a\n\n\n    :   b\n\n\n    :   c\n",
+    ] {
+        let tree = parse_blocks(input);
 
-    assert_eq!(find_all(&tree, SyntaxKind::DEFINITION_LIST).len(), 1);
-    assert_eq!(find_all(&tree, SyntaxKind::TERM).len(), 1);
-    assert_eq!(tree.text().to_string(), input);
+        assert_eq!(
+            find_all(&tree, SyntaxKind::DEFINITION_LIST).len(),
+            1,
+            "{input:?}"
+        );
+        assert_eq!(find_all(&tree, SyntaxKind::TERM).len(), 1, "{input:?}");
+        assert_eq!(
+            find_all(&tree, SyntaxKind::DEFINITION).len(),
+            1,
+            "the detached marker is body content, not a second definition: {input:?}"
+        );
+        assert_eq!(tree.text().to_string(), input, "{input:?}");
+    }
+}
+
+#[test]
+fn two_blank_lines_detach_a_term_from_its_definition_marker() {
+    // Pandoc's term parser allows one optional blank line before the first
+    // definition marker, so two blanks leave no term at all and the marker
+    // line is just a paragraph: `T\n\n\n: b` is `Para "T"` + `Para ": b"`.
+    for input in [
+        "T\n\n\n: b\n",
+        "T\n\n\n\n: b\n",
+        "> T\n>\n>\n> : b\n",
+        "- T\n\n\n  : b\n",
+    ] {
+        let tree = parse_blocks(input);
+        assert!(
+            find_first(&tree, SyntaxKind::DEFINITION_LIST).is_none(),
+            "{input:?}"
+        );
+        assert_eq!(tree.text().to_string(), input, "{input:?}");
+    }
+}
+
+#[test]
+fn a_marker_in_an_empty_definition_body_is_body_content() {
+    // A body that has not started yet is still a body: pandoc reads a marker
+    // at its content column as the body's first block, not as a second
+    // definition of the term. `T\n:\n    : b` is
+    // `DefinitionList [(T, [[Plain ": b"]])]`.
+    for input in ["T\n:\n    : b\n", "T\n:\n\n    : b\n"] {
+        let tree = parse_blocks(input);
+        assert_eq!(
+            find_all(&tree, SyntaxKind::DEFINITION).len(),
+            1,
+            "{input:?}"
+        );
+        assert_eq!(find_all(&tree, SyntaxKind::TERM).len(), 1, "{input:?}");
+        assert_eq!(tree.text().to_string(), input, "{input:?}");
+    }
+}
+
+#[test]
+fn a_dedented_marker_across_two_blank_lines_still_opens_a_sibling_definition() {
+    // Blank lines do not detach a *definition* from its list, only a term from
+    // its first marker: below the body's content column the marker is still a
+    // second definition of the same term, however many blanks precede it.
+    for input in [
+        "T\n:   a\n\n\n: b\n",
+        "T\n:   a\n\n\n  : b\n",
+        "T\n:   a\n\n\n    :   b\n\n  : d\n",
+    ] {
+        let tree = parse_blocks(input);
+        assert_eq!(
+            find_all(&tree, SyntaxKind::DEFINITION_LIST).len(),
+            1,
+            "{input:?}"
+        );
+        assert_eq!(
+            find_all(&tree, SyntaxKind::DEFINITION).len(),
+            2,
+            "{input:?}"
+        );
+        assert_eq!(find_all(&tree, SyntaxKind::TERM).len(), 1, "{input:?}");
+        assert_eq!(tree.text().to_string(), input, "{input:?}");
+    }
 }
 
 #[test]

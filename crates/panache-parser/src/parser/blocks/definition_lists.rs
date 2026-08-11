@@ -163,6 +163,11 @@ pub(crate) fn emit_definition_marker(
 use crate::parser::blocks::tables::{LineView, is_caption_followed_by_table};
 use crate::parser::utils::container_stack::{Container, ContainerStack};
 
+/// Blank lines a term may keep between itself and its first definition
+/// marker. Pandoc's `definitionListItem` reads the term, then `option False $
+/// blankline` — a single blank line — before the first `:`.
+pub(in crate::parser) const MAX_BLANKS_BEFORE_DEFINITION: usize = 1;
+
 /// Check if we're in a definition list.
 pub(in crate::parser) fn in_definition_list(containers: &ContainerStack) -> bool {
     containers
@@ -171,8 +176,15 @@ pub(in crate::parser) fn in_definition_list(containers: &ContainerStack) -> bool
         .any(|c| matches!(c, Container::DefinitionList { .. }))
 }
 
-/// Look ahead past blank lines to find a definition marker.
+/// Look ahead past at most one blank line to find a definition marker.
 /// Returns Some(blank_line_count) if found, None otherwise.
+///
+/// Pandoc's term parser takes an *optional single* `blankline` before the
+/// first definition marker (`option False $ blankline`), so a second blank
+/// detaches the term from the marker below it and neither is part of a
+/// definition list: `T\n\n\n: b` is `Para "T"` + `Para ": b"`. Blank lines
+/// between two *definitions* of the same term are a different rule — the
+/// preceding body consumes them — and are not this lookahead's business.
 ///
 /// `lines` is absolute-indexed. Pass a [`StrippedLines`] rather than a raw
 /// slice whenever a container prefix is open: the marker test only accepts
@@ -188,6 +200,9 @@ pub(in crate::parser) fn next_line_is_definition_marker(
         let line = lines.line(check_pos);
         if line.trim().is_empty() {
             blank_count += 1;
+            if blank_count > MAX_BLANKS_BEFORE_DEFINITION {
+                return None;
+            }
             check_pos += 1;
             continue;
         }
