@@ -8,7 +8,9 @@ use super::block_dispatcher::{
 };
 use super::blocks::blockquotes;
 use super::blocks::code_blocks;
-use super::blocks::container_prefix::{ContainerPrefix, StrippedLines, strip_content_indent};
+use super::blocks::container_prefix::{
+    ContainerPrefix, StrippedLines, resolve_content_indent, strip_content_indent,
+};
 use super::blocks::definition_lists;
 use super::blocks::fenced_divs;
 use super::blocks::figures::paragraph_is_standalone_image;
@@ -1107,7 +1109,7 @@ impl<'a> Parser<'a> {
         else {
             return None;
         };
-        if leading_indent(content).0 < content_indent {
+        if !resolve_content_indent(content, content_indent).reaches_frame() {
             return None;
         }
         let (marker, ..) = definition_lists::try_parse_definition_marker(stripped_content)?;
@@ -1185,10 +1187,7 @@ impl<'a> Parser<'a> {
         if definition_lists::next_line_is_definition_marker(&stripped, self.pos) != Some(0) {
             return false;
         }
-        // The strip cannot answer the dedent question on its own —
-        // `line_carries_list_indent` vets only the *list* component, and
-        // `strip_content_indent` degrades gracefully instead of reporting a
-        // short line — so measure the content column the way
+        // Measure the content column the way
         // `definition_marker_over_open_body_block` does: on the
         // blockquote-stripped line, against the summed content indent (which
         // is absolute, list indent included). A marker *below* that column is
@@ -1196,7 +1195,7 @@ impl<'a> Parser<'a> {
         // definition of the block above it.
         let marker_line =
             strip_n_blockquote_markers(self.lines[self.pos + 1], self.current_blockquote_depth());
-        leading_indent(marker_line).0 >= content_indent
+        resolve_content_indent(marker_line, content_indent).reaches_frame()
     }
 
     /// Turn the single buffered line of the open definition body into the term
@@ -4834,7 +4833,8 @@ impl<'a> Parser<'a> {
         // by column instead.
         let paragraph_held = {
             let append_line = line_to_append.unwrap_or(self.lines[self.pos]);
-            if content_indent > 0 && leading_indent(content).0 >= content_indent {
+            if content_indent > 0 && resolve_content_indent(content, content_indent).reaches_frame()
+            {
                 gobbled_indent_prefix_len(append_line, content_indent)
             } else {
                 0
@@ -4966,8 +4966,8 @@ impl<'a> Parser<'a> {
                     //
                     // A *lazy* line never reaches the content column and pandoc
                     // takes nothing off it, so its whitespace stays payload.
-                    let reaches_content_col =
-                        content_indent > 0 && leading_indent(content).0 >= content_indent;
+                    let reaches_content_col = content_indent > 0
+                        && resolve_content_indent(content, content_indent).reaches_frame();
                     let held = if reaches_content_col {
                         gobbled_indent_prefix_len(indent_prefix, content_indent)
                     } else {

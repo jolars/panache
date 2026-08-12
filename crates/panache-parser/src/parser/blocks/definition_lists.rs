@@ -2,6 +2,7 @@ use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use crate::parser::blocks::container_prefix::resolve_content_indent;
 use crate::parser::utils::container_stack::{
     byte_index_at_column, leading_indent, leading_indent_from,
 };
@@ -96,9 +97,12 @@ pub(in crate::parser) fn definition_marker_in_list_frame(
     line: &str,
     list_content_col: Option<usize>,
 ) -> Option<(char, usize, usize, usize)> {
+    // Only the reach answer is consumed here: a straddling tab reaches
+    // the frame, and `byte_index_at_column` below consumes it whole with
+    // the `base_col` re-read compensating for the overshoot.
     if let Some(content_col) = list_content_col
         && content_col > 0
-        && leading_indent(line).0 >= content_col
+        && resolve_content_indent(line, content_col).reaches_frame()
     {
         let base = byte_index_at_column(line, content_col);
         // A tab straddling the content column lands `base` past it, so read

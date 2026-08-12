@@ -660,7 +660,6 @@ impl<'a> FrameVerdict<'a> {
     /// replacement for the hand-rolled
     /// `leading_indent(line).0 >= content_col` tests, which are true
     /// for a straddling tab as well (tabs count in columns).
-    #[allow(dead_code)]
     pub fn reaches_frame(&self) -> bool {
         matches!(
             self,
@@ -821,7 +820,6 @@ impl ContainerPrefix {
 /// [`strip_content_indent`], for callers that hold a pre-stripped line
 /// and an absolute column (the `parse_inner_content` family) rather
 /// than a [`ContainerPrefix`].
-#[allow(dead_code)]
 pub(crate) fn resolve_content_indent(line: &str, content_indent: usize) -> FrameVerdict<'_> {
     if content_indent == 0 {
         return FrameVerdict::Inside { rest: line };
