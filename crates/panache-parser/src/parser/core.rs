@@ -6091,8 +6091,10 @@ fn first_content_line_term_lookahead(
             check_pos += 1;
             continue;
         }
-        let (line_indent_cols, _) = leading_indent(trimmed);
-        if line_indent_cols < content_col {
+        // Only the reach answer is consumed: `byte_index_at_column` below
+        // consumes a straddling tab whole, and the absolute marker test
+        // absorbs the overshoot.
+        if !resolve_content_indent(trimmed, content_col).reaches_frame() {
             return None;
         }
         let strip_bytes = byte_index_at_column(trimmed, content_col);

@@ -11,7 +11,7 @@ use crate::parser::utils::attributes::{
 use crate::parser::utils::helpers::{emit_line_tokens, emit_separator_tokens, strip_newline};
 use crate::parser::utils::inline_emission;
 
-use super::container_prefix::{ContainerPrefix, StrippedLines};
+use super::container_prefix::{ContainerPrefix, FrameVerdict, StrippedLines};
 
 /// Read-only indexed view over lines for table detection scans. Two
 /// backings:
@@ -32,28 +32,17 @@ pub(crate) trait LineView {
     fn line(&self, i: usize) -> &str;
     /// Total number of lines (absolute upper bound for indices).
     fn line_count(&self) -> usize;
-    /// Whether line `i` carries the enclosing list item's content indent as
-    /// real whitespace, so a block marker found on it opens a block *inside*
-    /// that item. False for an under-indented line whose indent
-    /// [`ContainerPrefix::strip`] had to fake by eating content characters.
+    /// Resolve line `i` against the container frame this view strips —
+    /// the typed answer to "is this line inside the frame, and what is
+    /// left of it?". Lookaheads read the marker text off
+    /// [`FrameVerdict::rest`] and the frame membership off the variant,
+    /// so neither can be consulted without the other.
     ///
-    /// Defaults to `true`: a raw line slice does no stripping at all, so it
-    /// can never fake an indent.
-    fn carries_container_prefix(&self, _i: usize) -> bool {
-        true
-    }
-    /// Whether line `i` still sits inside every container open at this view's
-    /// frame, rather than having dedented out of one.
-    ///
-    /// Stricter than [`Self::carries_container_prefix`], which vets only the
-    /// *list* component of the strip: a line at column 0 below a definition
-    /// or footnote body (a content-indent container with no list advance)
-    /// passes that test but has plainly left the body.
-    ///
-    /// Defaults to `true`: a raw line slice strips nothing, so it has no
-    /// container to leave.
-    fn stays_inside_container(&self, _i: usize) -> bool {
-        true
+    /// Defaults to [`FrameVerdict::Inside`] over [`Self::line`]: a raw
+    /// line slice strips nothing, so it can neither fake an indent nor
+    /// leave a container.
+    fn frame_verdict(&self, i: usize) -> FrameVerdict<'_> {
+        FrameVerdict::Inside { rest: self.line(i) }
     }
 }
 
@@ -73,13 +62,18 @@ impl<'a, 'p> LineView for StrippedLines<'a, 'p> {
     fn line_count(&self) -> usize {
         self.raw().len()
     }
-    fn carries_container_prefix(&self, i: usize) -> bool {
-        // The dispatch line's list marker was emitted upstream, so its
-        // "indent" is the marker text itself, which is not whitespace.
-        i == self.dispatch_pos() || self.prefix().line_carries_list_indent(self.raw()[i])
-    }
-    fn stays_inside_container(&self, i: usize) -> bool {
-        i == self.dispatch_pos() || self.prefix().line_reaches_content_column(self.raw()[i])
+    fn frame_verdict(&self, i: usize) -> FrameVerdict<'_> {
+        // The dispatch line's container prefix was consumed and
+        // validated upstream — its "indent" is the marker text itself,
+        // which is not whitespace — so it is inside its frame by
+        // construction.
+        if i == self.dispatch_pos() {
+            FrameVerdict::Inside {
+                rest: self.strip_at(i),
+            }
+        } else {
+            self.prefix().resolve(self.raw()[i])
+        }
     }
 }
 
@@ -391,12 +385,12 @@ pub(crate) fn is_caption_followed_by_table(
     // silently demotes a nested definition marker to paragraph text.
     //
     // Blank lines are exempt: they carry no container indent by construction,
-    // so `stays_inside_container` is false for them. Raw line slices and
-    // `UniformStripView` strip nothing and report `true` throughout, so this
-    // bound only engages for a real container prefix.
+    // so their verdict never reaches the frame. Raw line slices and
+    // `UniformStripView` strip nothing and resolve as `Inside` throughout, so
+    // this bound only engages for a real container prefix.
     let inside_container = |i: usize| {
         let line = lines.line(i);
-        line.trim().is_empty() || lines.stays_inside_container(i)
+        line.trim().is_empty() || lines.frame_verdict(i).reaches_frame()
     };
 
     // Skip continuation lines of caption (non-blank lines).

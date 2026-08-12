@@ -10,7 +10,9 @@ use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry};
 use crate::parser::blocks::blockquotes::{
     self, count_blockquote_markers, strip_n_blockquote_markers,
 };
-use crate::parser::blocks::container_prefix::{ContainerPrefix, StrippedLines};
+use crate::parser::blocks::container_prefix::{
+    ContainerPrefix, StrippedLines, resolve_content_indent,
+};
 use crate::parser::blocks::{definition_lists, html_blocks, lists, raw_blocks};
 use crate::parser::utils::container_stack::{ContainerStack, leading_indent};
 use crate::parser::utils::helpers::is_blank_line;
@@ -75,23 +77,39 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         // in a definition body only keeps that body open while the term reaches
         // the body's own content column. `content_indent` is that running sum,
         // and a list item's column is already cumulative within it.
-        let next_line_opens_definition = !is_blank_line(next_inner)
-            && definition_lists::next_line_is_definition_marker(lines, next_line_pos).is_some();
-        let next_is_definition_term_below = |level: usize, content_indent: usize| -> bool {
+        let next_line_opens_definition = !is_blank_line(next_inner) && {
+            // Read the marker lookahead through the open containers'
+            // frame. A raw line slice resolves every line as inside the
+            // frame, so a `:` whose indent the strip would have to fake
+            // from content bytes used to slip through here, and a marker
+            // behind a container's content indent (which fails the raw
+            // 0-3-space test) was invisible.
+            let prefix = ContainerPrefix::from_stack(&containers.stack, false, self.config.dialect);
+            let window = StrippedLines::new(lines, next_line_pos, &prefix);
+            definition_lists::next_line_is_definition_marker(&window, next_line_pos).is_some()
+        };
+        let next_is_definition_term_below = |level: usize| -> bool {
+            // The frame enclosing the container being tested: the
+            // content-container column of the sub-stack below it, plus
+            // the innermost enclosing item's (cumulative) content
+            // column. This is the scalar approximation of resolving
+            // against `stack[..level]` — outer-section list columns are
+            // not represented (same approximation `from_ctx` makes).
             next_line_opens_definition
                 && raw_indent_cols
-                    >= content_indent
-                        + containers.stack[..level]
-                            .iter()
-                            .rev()
-                            .find_map(|c| match c {
-                                crate::parser::utils::container_stack::Container::ListItem {
-                                    content_col,
-                                    ..
-                                } => Some(*content_col),
-                                _ => None,
-                            })
-                            .unwrap_or(0)
+                    >= crate::parser::utils::container_stack::content_container_indent(
+                        &containers.stack[..level],
+                    ) + containers.stack[..level]
+                        .iter()
+                        .rev()
+                        .find_map(|c| match c {
+                            crate::parser::utils::container_stack::Container::ListItem {
+                                content_col,
+                                ..
+                            } => Some(*content_col),
+                            _ => None,
+                        })
+                        .unwrap_or(0)
         };
 
         // Re-detect the definition marker after stripping a content-container
@@ -100,7 +118,13 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         // and the parent DefinitionList/DefinitionItem incorrectly closes
         // across blank lines, splitting one logical item into many.
         let stripped_is_definition_marker = |content_indent_so_far: usize| -> bool {
-            if content_indent_so_far == 0 || raw_indent_cols < content_indent_so_far {
+            // Only the reach answer is consumed: `byte_index_at_column`
+            // below consumes a straddling tab whole, so a marker behind
+            // one is still found (the overshoot is absorbed by the
+            // absolute marker test).
+            if content_indent_so_far == 0
+                || !resolve_content_indent(next_inner, content_indent_so_far).reaches_frame()
+            {
                 return false;
             }
             let strip_bytes = crate::parser::utils::container_stack::byte_index_at_column(
@@ -177,7 +201,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                 }
                 crate::parser::utils::container_stack::Container::DefinitionList { .. }
                     if next_is_definition_marker
-                        || next_is_definition_term_below(i, content_indent_so_far)
+                        || next_is_definition_term_below(i)
                         || stripped_is_definition_marker(content_indent_so_far) =>
                 {
                     keep_level = i + 1;

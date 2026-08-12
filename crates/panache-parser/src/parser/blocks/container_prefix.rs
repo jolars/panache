@@ -419,6 +419,11 @@ impl ContainerPrefix {
     ///
     /// Mirrors the `line_indent_cols < content_col` gate in
     /// `Parser::footnote_first_line_term_lookahead`.
+    ///
+    /// No production callers since `LineView::frame_verdict` subsumed
+    /// it; kept for the pinning corpus until the emission op-walk
+    /// commit deletes it.
+    #[allow(dead_code)]
     pub fn line_carries_list_indent(&self, line: &str) -> bool {
         let ops = self.ops();
         let mut s = line;
@@ -456,6 +461,11 @@ impl ContainerPrefix {
     /// vetted too: a `----` at column 0 below a definition body has left that
     /// body, but a body contributes a `ContentIndent` op and no
     /// `ListAdvance`, so `line_carries_list_indent` waves it through.
+    ///
+    /// No production callers since `LineView::frame_verdict` subsumed
+    /// it; kept for the pinning corpus until the emission op-walk
+    /// commit deletes it.
+    #[allow(dead_code)]
     pub fn line_reaches_content_column(&self, line: &str) -> bool {
         let ops = self.ops();
         let mut s = line;

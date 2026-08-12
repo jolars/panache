@@ -2,7 +2,7 @@ use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
-use crate::parser::blocks::container_prefix::resolve_content_indent;
+use crate::parser::blocks::container_prefix::{FrameVerdict, resolve_content_indent};
 use crate::parser::utils::container_stack::{
     byte_index_at_column, leading_indent, leading_indent_from,
 };
@@ -210,16 +210,25 @@ pub(in crate::parser) fn next_line_is_definition_marker(
             check_pos += 1;
             continue;
         }
-        if let Some((marker, ..)) = try_parse_definition_marker(line) {
-            // A marker on a line that does not carry the enclosing item's
-            // content indent is not inside the item: the strip faked that
-            // indent by eating content characters, so the `:` it landed on is
-            // preceded by text on its own line. Pandoc folds such a line into
-            // the paragraph above (`- a\nb\n\nc :` is `BulletList` + `Para "c
-            // :"`), so it must not promote the term line above it.
-            if !lines.carries_container_prefix(check_pos) {
-                return None;
-            }
+        // Read the marker off the line's frame verdict, so the marker
+        // text and the frame membership come from the same resolution.
+        let rest = match lines.frame_verdict(check_pos) {
+            // A dedent out of a content container is not this
+            // lookahead's business: a marker below a definition body's
+            // content column is a second definition of the outer term,
+            // and the marker test itself still applies to the tail.
+            FrameVerdict::Inside { rest } | FrameVerdict::Dedented { rest, .. } => rest,
+            // A marker whose indent the column-blind strip would have
+            // faked from content bytes is not inside the item: the `:`
+            // is preceded by text on its own line, and pandoc folds the
+            // line into the paragraph above (`- a\nb\n\nc :` is
+            // `BulletList` + `Para "c :"`), so it must not promote the
+            // term line above it. A marker behind a tab straddling the
+            // content column stays invisible too — there is no byte
+            // boundary to strip on (pinned to flip in `frame_pinning`).
+            FrameVerdict::FakedIndent { .. } | FrameVerdict::StraddlingTab { .. } => return None,
+        };
+        if let Some((marker, ..)) = try_parse_definition_marker(rest) {
             if marker == ':' && is_caption_followed_by_table(lines, check_pos) {
                 return None;
             }
