@@ -1,0 +1,70 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..65
+  LIST@0..29
+    LIST_ITEM@0..29
+      LIST_MARKER@0..1 "-"
+      WHITESPACE@1..2 " "
+      DEFINITION_LIST@2..29
+        DEFINITION_ITEM@2..29
+          TERM@2..5
+            TEXT@2..4 "T1"
+            NEWLINE@4..5 "\n"
+          BLANK_LINE@5..6
+            BLANK_LINE@5..6 "\n"
+          DEFINITION@6..29
+            WHITESPACE@6..8 "  "
+            DEFINITION_MARKER@8..9 ":"
+            WHITESPACE@9..12 "   "
+            DEFINITION_LIST@12..29
+              DEFINITION_ITEM@12..29
+                TERM@12..14
+                  TEXT@12..13 "a"
+                  NEWLINE@13..14 "\n"
+                BLANK_LINE@14..15
+                  BLANK_LINE@14..15 "\n"
+                DEFINITION@15..29
+                  WHITESPACE@15..21 "      "
+                  DEFINITION_MARKER@21..22 ":"
+                  WHITESPACE@22..25 "   "
+                  PLAIN@25..29
+                    TEXT@25..28 "def"
+                    NEWLINE@28..29 "\n"
+  BLANK_LINE@29..30
+    BLANK_LINE@29..30 "\n"
+  HORIZONTAL_RULE@30..35
+    HORIZONTAL_RULE@30..34 "----"
+    NEWLINE@34..35 "\n"
+  BLANK_LINE@35..36
+    BLANK_LINE@35..36 "\n"
+  DEFINITION_LIST@36..59
+    DEFINITION_ITEM@36..59
+      TERM@36..39
+        TEXT@36..38 "T2"
+        NEWLINE@38..39 "\n"
+      BLANK_LINE@39..40
+        BLANK_LINE@39..40 "\n"
+      DEFINITION@40..59
+        DEFINITION_MARKER@40..41 ":"
+        WHITESPACE@41..44 "   "
+        DEFINITION_LIST@44..59
+          DEFINITION_ITEM@44..59
+            TERM@44..46
+              TEXT@44..45 "a"
+              NEWLINE@45..46 "\n"
+            BLANK_LINE@46..47
+              BLANK_LINE@46..47 "\n"
+            DEFINITION@47..59
+              WHITESPACE@47..51 "    "
+              DEFINITION_MARKER@51..52 ":"
+              WHITESPACE@52..55 "   "
+              PLAIN@55..59
+                TEXT@55..58 "def"
+                NEWLINE@58..59 "\n"
+  BLANK_LINE@59..60
+    BLANK_LINE@59..60 "\n"
+  HORIZONTAL_RULE@60..65
+    HORIZONTAL_RULE@60..64 "----"
+    NEWLINE@64..65 "\n"

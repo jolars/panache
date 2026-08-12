@@ -426,6 +426,46 @@ impl ContainerPrefix {
         true
     }
 
+    /// Whether `line` reaches the content column of *every* container this
+    /// prefix opens — content indents as well as list indents.
+    ///
+    /// The stricter twin of [`Self::line_carries_list_indent`], which vets
+    /// only the `ListAdvance` ops because [`strip_content_indent`] degrades
+    /// gracefully on a short line instead of reporting one. A lookahead that
+    /// must not read *past* the innermost container needs the content indent
+    /// vetted too: a `----` at column 0 below a definition body has left that
+    /// body, but a body contributes a `ContentIndent` op and no
+    /// `ListAdvance`, so `line_carries_list_indent` waves it through.
+    pub fn line_reaches_content_column(&self, line: &str) -> bool {
+        let ops = self.ops();
+        let mut s = line;
+        let mut i = 0;
+        while i < ops.len() {
+            match ops[i] {
+                StripOp::ListAdvance(n) => {
+                    if leading_indent(s).0 < n as usize {
+                        return false;
+                    }
+                    s = strip_list_indent(s, n as usize);
+                    i += 1;
+                }
+                StripOp::BlockQuoteMarker => {
+                    let run = blockquote_run_len(&ops[i..]);
+                    s = strip_bq_with_gobble(s, run, self.lazy_blockquote_gobble);
+                    i += run;
+                }
+                StripOp::ContentIndent(n) => {
+                    if leading_indent(s).0 < n as usize {
+                        return false;
+                    }
+                    s = strip_content_indent(s, n as usize).0;
+                    i += 1;
+                }
+            }
+        }
+        true
+    }
+
     /// Strip semantics for the dispatch line (line 0). Identical to
     /// [`Self::strip`] except that the *innermost* (last)
     /// `ListAdvance` op is skipped when

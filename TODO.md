@@ -797,16 +797,50 @@ Further definition-list divergences fixed alongside it:
   came with the guard wiring above: `format_list_continuation_paragraph` now
   runs `guard_definition_marker_start`, which escapes the marker instead.
 
-Still open in the same area, and **independent of the frame refactor** — this
-one is a formatter marker-width heuristic, not a strip helper, so it will not
-conflict with the container-frame consolidation under `Parser > Architecture`:
+- [x] A definition list followed by a **thematic break** dropped the nested
+  marker's padding (`- T\n\n  :   a\n\n      :   def\n\n---\n` reformatting
+  to `: def`). Filed as a formatter marker-width heuristic; it was not one.
+  The formatter emits `:   ` unconditionally, so the `: def` was literal
+  paragraph text: the *parser* had demoted the nested marker, and
+  `next_line_is_definition_marker`'s table-caption escape
+  (`is_caption_followed_by_table`) was what demoted it. That probe scanned
+  forward out of the container it was called in, so a dash run at column 0 —
+  the thematic break *closing* the definition body — read as the multiline
+  table a `:` line inside the body could caption. Pandoc nests a definition
+  list on `a` in both shapes; the trailing break is a `HorizontalRule`
+  either way. The bound is `ContainerPrefix::line_reaches_content_column`,
+  the stricter twin of `line_carries_list_indent`: the latter vets only the
+  `ListAdvance` ops, because `strip_content_indent` degrades gracefully
+  rather than reporting a short line, so a definition or footnote body (a
+  `ContentIndent` op with no list advance) had no boundary at all — which is
+  why the unnested shape broke on a bare `---` while the list-nested one
+  needed four dashes. Exposed on `LineView` as `stays_inside_container`,
+  defaulting to `true` so raw line slices and `UniformStripView` are
+  unaffected. Covered by
+  `definition_marker_caption_probe_container_boundary` in both golden
+  suites; the suppression side (a dash run that really is at the body's
+  content column) is pinned by
+  `caption_probe_still_fires_inside_the_container`.
 
-- [ ] The formatter's marker-width heuristic is not stable for a definition list
-  *nested in a list item* when a thematic break follows:
-  `- T\n\n  :   a\n\n      :   def\n\n---\n` reformats the nested marker to
-  `: def`, dropping the padding. Pre-existing (it reproduces on the
-  pre-promotion parser given the same bytes) and unrelated to promotion, but
-  it is why the blank-line golden case carries no thematic break.
+Still open in the same area, found while fixing the above and **pre-existing**
+(both reproduce at `4fedf093`, unchanged by the caption-probe bound). These are
+losslessness failures, so they outrank the cosmetic issues above:
+
+- [ ] A table **caption inside a container** loses bytes on the round trip.
+  `T\n\n:   a\n\n    :   def\n\n    ----\n    x\n    ----\n` — a caption
+  plus simple table at a definition body's content column — reparses with
+  the caption line duplicated and the table's indent dropped
+  (`panache debug format --checks losslessness` shows `-    ----` /
+  `+    :   def\n+\n+----`). The parse matches pandoc structurally apart
+  from a spurious extra `Para [Str ":", Space, Str "def"]` alongside the
+  `Table`, so the caption line is being consumed twice: once by the caption
+  and once as body text.
+
+- [ ] The same shape in a **list item** parses to pandoc's AST exactly, but the
+  *formatter* mangles the round trip: it rewrites the `----` rules to `--`
+  and re-emits the caption below the table. Parser-side is clean here, so
+  this one is genuinely a formatter bug, unlike the item above it. Repro:
+  `- item\n\n  : cap\n\n  ----\n  x\n  ----\n`
 
 Also still open, but **do not fix these individually** — they are input to
 "Consolidate container-frame resolution behind a single typed verdict" under

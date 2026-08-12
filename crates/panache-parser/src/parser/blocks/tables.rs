@@ -42,6 +42,19 @@ pub(crate) trait LineView {
     fn carries_container_prefix(&self, _i: usize) -> bool {
         true
     }
+    /// Whether line `i` still sits inside every container open at this view's
+    /// frame, rather than having dedented out of one.
+    ///
+    /// Stricter than [`Self::carries_container_prefix`], which vets only the
+    /// *list* component of the strip: a line at column 0 below a definition
+    /// or footnote body (a content-indent container with no list advance)
+    /// passes that test but has plainly left the body.
+    ///
+    /// Defaults to `true`: a raw line slice strips nothing, so it has no
+    /// container to leave.
+    fn stays_inside_container(&self, _i: usize) -> bool {
+        true
+    }
 }
 
 impl LineView for [&str] {
@@ -64,6 +77,9 @@ impl<'a, 'p> LineView for StrippedLines<'a, 'p> {
         // The dispatch line's list marker was emitted upstream, so its
         // "indent" is the marker text itself, which is not whitespace.
         i == self.dispatch_pos() || self.prefix().line_carries_list_indent(self.raw()[i])
+    }
+    fn stays_inside_container(&self, i: usize) -> bool {
+        i == self.dispatch_pos() || self.prefix().line_reaches_content_column(self.raw()[i])
     }
 }
 
@@ -366,6 +382,23 @@ pub(crate) fn is_caption_followed_by_table(
 
     let mut pos = caption_pos + 1;
 
+    // A caption captions a table in its *own* container. A line that does not
+    // reach the open container's content column has left that container, so
+    // nothing below it can be this caption's table: a dash run at column 0
+    // under a definition body is the thematic break that closes the body, not
+    // a multiline-table opener the body's `:` line could caption. Without this
+    // bound the probe reads through the container wall and a trailing `----`
+    // silently demotes a nested definition marker to paragraph text.
+    //
+    // Blank lines are exempt: they carry no container indent by construction,
+    // so `stays_inside_container` is false for them. Raw line slices and
+    // `UniformStripView` strip nothing and report `true` throughout, so this
+    // bound only engages for a real container prefix.
+    let inside_container = |i: usize| {
+        let line = lines.line(i);
+        line.trim().is_empty() || lines.stays_inside_container(i)
+    };
+
     // Skip continuation lines of caption (non-blank lines).
     // Stop at fenced-div fences (`:::`) — those close the enclosing div and
     // must not be folded into the caption.
@@ -373,6 +406,9 @@ pub(crate) fn is_caption_followed_by_table(
         && !lines.line(pos).trim().is_empty()
         && !line_is_fenced_div_fence(lines.line(pos))
     {
+        if !inside_container(pos) {
+            return false;
+        }
         // If we hit a table separator, we found a table
         if try_parse_table_separator(lines.line(pos)).is_some() {
             return true;
@@ -383,6 +419,10 @@ pub(crate) fn is_caption_followed_by_table(
     // Skip one blank line
     if pos < lines.line_count() && lines.line(pos).trim().is_empty() {
         pos += 1;
+    }
+
+    if pos < lines.line_count() && !inside_container(pos) {
+        return false;
     }
 
     // Check for a table grid at the next position.

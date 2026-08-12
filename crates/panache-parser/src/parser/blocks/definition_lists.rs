@@ -301,6 +301,54 @@ mod tests {
         assert_eq!(next_line_is_definition_marker(&lines[..], 0), None);
     }
 
+    /// The caption probe must stay inside the container the caption sits in.
+    ///
+    /// A dash run at column 0 below the list is a thematic break that closes
+    /// the definition body; it is not the table a `:   def` marker *inside*
+    /// that body could caption. Pandoc reads both shapes as a definition list
+    /// nested on `a`, plus a `HorizontalRule`, so the trailing break must not
+    /// change how the marker line above it is classified.
+    #[test]
+    fn caption_probe_stops_at_the_container_boundary() {
+        for input in [
+            // Unnested: the body's content column is 4.
+            "T\n\n:   a\n\n    :   def\n\n----\n",
+            // Nested in a list item: the body's content column is 6.
+            "- T\n\n  :   a\n\n      :   def\n\n----\n",
+        ] {
+            let tree = crate::parse(input, Some(crate::ParserOptions::default()));
+            assert_eq!(tree.text().to_string(), input, "lossless: {input:?}");
+            let lists = tree
+                .descendants()
+                .filter(|n| n.kind() == crate::syntax::SyntaxKind::DEFINITION_LIST)
+                .count();
+            assert_eq!(
+                lists, 2,
+                "`:   def` should nest a definition list on `a`, not read as a \
+                 caption for the thematic break below the container: {input:?}"
+            );
+        }
+    }
+
+    /// The other side of the bound: a table that really is *inside* the body
+    /// still makes the `:` line above it a caption, so the marker must not
+    /// nest a definition list. Guards against widening
+    /// `caption_probe_stops_at_the_container_boundary` into "never a caption".
+    #[test]
+    fn caption_probe_still_fires_inside_the_container() {
+        let input = "T\n\n:   a\n\n    :   def\n\n    ----\n    x\n    ----\n";
+        let tree = crate::parse(input, Some(crate::ParserOptions::default()));
+        let lists = tree
+            .descendants()
+            .filter(|n| n.kind() == crate::syntax::SyntaxKind::DEFINITION_LIST)
+            .count();
+        assert_eq!(
+            lists, 1,
+            "the dash run sits at the body's content column, so `:   def` \
+             captions it and nests nothing"
+        );
+    }
+
     #[test]
     fn test_definition_list_preserves_first_content_line_losslessly() {
         let input = "[`--reference-doc=`*FILE*]{#option--reference-doc}\n\n:   Use the specified file as a style reference in producing a\n    docx or ODT file.\n\n    Docx\n\n    :   For best results, the reference docx should be a modified\n        version of a docx file produced using pandoc.\n";
