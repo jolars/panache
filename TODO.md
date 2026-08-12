@@ -828,13 +828,13 @@ losslessness failures, so they outrank the cosmetic issues above:
 
 - [ ] A table **caption inside a container** loses bytes on the round trip.
   `T\n\n:   a\n\n    :   def\n\n    ----\n    x\n    ----\n` — a caption
-  plus simple table at a definition body's content column — reparses with
-  the caption line duplicated and the table's indent dropped
-  (`panache debug format --checks losslessness` shows `-    ----` /
-  `+    :   def\n+\n+----`). The parse matches pandoc structurally apart
-  from a spurious extra `Para [Str ":", Space, Str "def"]` alongside the
-  `Table`, so the caption line is being consumed twice: once by the caption
-  and once as body text.
+  plus simple table at a definition body's content column. Before the
+  container-frame consolidation it reparsed with the caption line duplicated
+  and the table's indent dropped; since the caption probe reads the true
+  frame, the symptom has shifted (the round trip now drops the nested
+  marker's indent, `-    :   def` / `+:   def`, plus an idempotency failure
+  escaping the marker) but the shape still fails
+  `panache debug format --checks all`.
 
 - [ ] The same shape in a **list item** parses to pandoc's AST exactly, but the
   *formatter* mangles the round trip: it rewrites the `----` rules to `--`
