@@ -534,9 +534,11 @@ impl ContainerPrefix {
 ///   whitespace leaves. Callers gate blanks with `is_blank_line` first,
 ///   as every current lookahead already does.
 ///
-/// The walk stops at the first op the line fails, so `rest` is measured
-/// in the frame of the ops applied up to that point and `op_index`
-/// names the failing op.
+/// The walk stops at the first op the line fails — a straddling tab
+/// included, though it is not a failure — so `rest` is measured in the
+/// frame of the ops applied up to that point, `op_index` names the
+/// failing op, and any ops after the stop were never applied (see
+/// [`Self::reaches_frame`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum FrameVerdict<'a> {
     /// Every op's columns and markers are covered by real prefix bytes,
@@ -570,10 +572,20 @@ pub(crate) enum FrameVerdict<'a> {
 }
 
 impl<'a> FrameVerdict<'a> {
-    /// Whether the line reaches every op's column — the typed
+    /// Whether the walk consumed every op it applied — the typed
     /// replacement for the hand-rolled
     /// `leading_indent(line).0 >= content_col` tests, which are true
     /// for a straddling tab as well (tabs count in columns).
+    ///
+    /// Caveat for multi-op frames: a straddle ends the walk, so for
+    /// [`FrameVerdict::StraddlingTab`] this vouches only for the ops
+    /// *up to* the straddled one — ops after it (an inner blockquote
+    /// marker, say) were never applied. Current callers tolerate the
+    /// overclaim: the caption probe's container bound uses it as a
+    /// suppression gate, and the definition lookahead re-reads the
+    /// straddle's `rest` with the marker test, which fails on any
+    /// unconsumed marker byte. A caller needing the inner ops settled
+    /// must read the variant instead of this shortcut.
     pub fn reaches_frame(&self) -> bool {
         matches!(
             self,
@@ -649,7 +661,6 @@ impl ContainerPrefix {
     /// counterpart of [`Self::strip`], for continuation lines and
     /// lookahead. Reports whether every consumed column was real
     /// whitespace instead of guessing.
-    #[allow(dead_code)]
     pub fn resolve<'a>(&self, line: &'a str) -> FrameVerdict<'a> {
         self.resolve_with_skip(line, None)
     }
