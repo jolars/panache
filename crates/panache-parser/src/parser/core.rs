@@ -707,17 +707,14 @@ impl<'a> Parser<'a> {
         let content_col = *content_col;
 
         // Confirm a caption-led table actually follows, reading the marker line
-        // and its lookahead through the list-content strip (`content_col`).
-        // Bail otherwise, leaving the line buffered for paragraph handling.
-        let bq_depth = self.current_blockquote_depth();
-        let prefix = ContainerPrefix::from_scalars(
-            bq_depth,
-            content_col,
-            bq_depth > 0,
-            0,
-            true,
-            self.config.dialect,
-        );
+        // and its lookahead through the true container frame — the just-pushed
+        // item is the stack top, so `from_stack` reproduces the old
+        // bq-then-list scalar recipe and additionally makes any enclosing
+        // footnote/definition content indent visible to the probe's container
+        // bound. Bail otherwise, leaving the line buffered for paragraph
+        // handling.
+        let prefix = ContainerPrefix::from_stack(&self.containers.stack, true, self.config.dialect);
+        debug_assert_eq!(prefix.list_content_col(), content_col);
         let window = StrippedLines::new(&self.lines, self.pos, &prefix);
         if !tables::is_caption_followed_by_table(&window, self.pos) {
             return None;
@@ -810,15 +807,11 @@ impl<'a> Parser<'a> {
         }
         let content_col = *content_col;
 
-        let bq_depth = self.current_blockquote_depth();
-        let prefix = ContainerPrefix::from_scalars(
-            bq_depth,
-            content_col,
-            bq_depth > 0,
-            0,
-            true,
-            self.config.dialect,
-        );
+        // Same frame as the sibling caption-led probe: the just-pushed item is
+        // the stack top, so `from_stack` reproduces the old bq-then-list
+        // scalar recipe with any content-container indent visible.
+        let prefix = ContainerPrefix::from_stack(&self.containers.stack, true, self.config.dialect);
+        debug_assert_eq!(prefix.list_content_col(), content_col);
         let window = StrippedLines::new(&self.lines, self.pos, &prefix);
 
         // A caption-led table (`- : cap` / `- Table: cap` then table) is the
@@ -1063,10 +1056,17 @@ impl<'a> Parser<'a> {
             return false;
         };
         // Same table-caption escape the term lookaheads take: a `:` line that
-        // introduces a table is not a definition marker at all.
-        !(marker == ':'
-            && self.config.extensions.table_captions
-            && super::blocks::tables::is_caption_followed_by_table(&self.lines[..], self.pos))
+        // introduces a table is not a definition marker at all. Read the probe
+        // through the open containers' frame — a raw slice resolves every line
+        // as inside the frame, so the probe could scan out of the item and a
+        // dash run below it read as the caption's table.
+        if marker == ':' && self.config.extensions.table_captions {
+            let prefix =
+                ContainerPrefix::from_stack(&self.containers.stack, false, self.config.dialect);
+            let window = StrippedLines::new(&self.lines, self.pos, &prefix);
+            return !super::blocks::tables::is_caption_followed_by_table(&window, self.pos);
+        }
+        true
     }
 
     /// What a definition marker on this line does to the block of the
@@ -1114,12 +1114,17 @@ impl<'a> Parser<'a> {
         }
         let (marker, ..) = definition_lists::try_parse_definition_marker(stripped_content)?;
         // Same table-caption escape the term lookaheads take: a `:` line that
-        // introduces a table is not a definition marker at all.
-        if marker == ':'
-            && self.config.extensions.table_captions
-            && super::blocks::tables::is_caption_followed_by_table(&self.lines[..], self.pos)
-        {
-            return None;
+        // introduces a table is not a definition marker at all. Read the probe
+        // through the open containers' frame — a raw slice resolves every line
+        // as inside the frame, so the probe could scan out of the body and a
+        // dash run below it read as the caption's table.
+        if marker == ':' && self.config.extensions.table_captions {
+            let prefix =
+                ContainerPrefix::from_stack(&self.containers.stack, false, self.config.dialect);
+            let window = StrippedLines::new(&self.lines, self.pos, &prefix);
+            if super::blocks::tables::is_caption_followed_by_table(&window, self.pos) {
+                return None;
+            }
         }
         // A closed block is not a term candidate: the blank line that closed
         // it has already detached it from the marker (a term keeps at most one

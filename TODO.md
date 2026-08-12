@@ -864,10 +864,13 @@ behavior-pinning table test) and let the verdict close them:
   needed no change. Pinned by the `definition_marker_tab_straddle` golden
   case and the `frame_pinning` corpus.
 
-- [ ] `is_caption_followed_by_table` runs on the same over-stripping view as the
-  term lookahead and has the same latent asymmetry. It is a *suppression*
-  gate, so an over-strip can only fail to open a definition list, and it is
-  shared with the table parsers — no reproducer yet.
+- [x] `is_caption_followed_by_table` ran on the same over-stripping view as the
+  term lookahead (raw line slices at two `core.rs` call sites,
+  `from_scalars` windows with the content indent hard-coded to 0 at two
+  more), with the same latent asymmetry; no reproducer ever materialized
+  because it is a suppression gate. Closed structurally: the probe's
+  container bound reads `LineView::frame_verdict`, and all four blind
+  callers now feed it the true frame (`from_stack` windows).
 
 - [ ] `StrippedLines::peek_prefix_at` is not equivalent to
   `ContainerPrefix::strip` for the
