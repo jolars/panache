@@ -263,7 +263,7 @@ impl ContainerPrefix {
     /// advance are present (it picks which leads); with at most one of the
     /// two, the op order is forced and `bq_outer_of_list` reconstructs it
     /// faithfully. The content indent is always last, matching
-    /// [`emit_content_line_prefixes`]'s emission order.
+    /// [`content_line_prefix_tail`]'s scalar strip order.
     pub fn from_scalars(
         bq_depth: usize,
         list_content_col: usize,
@@ -398,102 +398,6 @@ impl ContainerPrefix {
             list_marker_consumed_on_line_0: self.list_marker_consumed_on_line_0,
             lazy_blockquote_gobble: self.lazy_blockquote_gobble,
         }
-    }
-
-    /// Whether `line` carries every `ListAdvance` op's columns as real
-    /// leading whitespace — i.e. the line sits *inside* the list item rather
-    /// than being folded into it as an under-indented continuation.
-    ///
-    /// [`Self::strip`] walks list indent with [`advance_columns`], which counts
-    /// any character as a column, so on a short line it slices off content as
-    /// if it were container indent: inside a two-column item `"c :"` becomes
-    /// `":"`. Emission never does that ([`strip_list_indent`] stops at the
-    /// first non-whitespace byte), so a classification that has to hold at
-    /// emission time must first ask this.
-    ///
-    /// Only the list component is checked. Blockquote markers and content
-    /// indent are still stripped, because the answer for an inner
-    /// `ListAdvance` depends on what the outer ops consumed, but their own
-    /// absence is not reported — `strip_content_indent` already degrades
-    /// gracefully and the blockquote strip cannot eat non-marker bytes.
-    ///
-    /// Mirrors the `line_indent_cols < content_col` gate in
-    /// `Parser::footnote_first_line_term_lookahead`.
-    ///
-    /// No production callers since `LineView::frame_verdict` subsumed
-    /// it; kept for the pinning corpus until the emission op-walk
-    /// commit deletes it.
-    #[allow(dead_code)]
-    pub fn line_carries_list_indent(&self, line: &str) -> bool {
-        let ops = self.ops();
-        let mut s = line;
-        let mut i = 0;
-        while i < ops.len() {
-            match ops[i] {
-                StripOp::ListAdvance(n) => {
-                    if leading_indent(s).0 < n as usize {
-                        return false;
-                    }
-                    s = strip_list_indent(s, n as usize);
-                    i += 1;
-                }
-                StripOp::BlockQuoteMarker => {
-                    let run = blockquote_run_len(&ops[i..]);
-                    s = strip_bq_with_gobble(s, run, self.lazy_blockquote_gobble);
-                    i += run;
-                }
-                StripOp::ContentIndent(n) => {
-                    s = strip_content_indent(s, n as usize).0;
-                    i += 1;
-                }
-            }
-        }
-        true
-    }
-
-    /// Whether `line` reaches the content column of *every* container this
-    /// prefix opens — content indents as well as list indents.
-    ///
-    /// The stricter twin of [`Self::line_carries_list_indent`], which vets
-    /// only the `ListAdvance` ops because [`strip_content_indent`] degrades
-    /// gracefully on a short line instead of reporting one. A lookahead that
-    /// must not read *past* the innermost container needs the content indent
-    /// vetted too: a `----` at column 0 below a definition body has left that
-    /// body, but a body contributes a `ContentIndent` op and no
-    /// `ListAdvance`, so `line_carries_list_indent` waves it through.
-    ///
-    /// No production callers since `LineView::frame_verdict` subsumed
-    /// it; kept for the pinning corpus until the emission op-walk
-    /// commit deletes it.
-    #[allow(dead_code)]
-    pub fn line_reaches_content_column(&self, line: &str) -> bool {
-        let ops = self.ops();
-        let mut s = line;
-        let mut i = 0;
-        while i < ops.len() {
-            match ops[i] {
-                StripOp::ListAdvance(n) => {
-                    if leading_indent(s).0 < n as usize {
-                        return false;
-                    }
-                    s = strip_list_indent(s, n as usize);
-                    i += 1;
-                }
-                StripOp::BlockQuoteMarker => {
-                    let run = blockquote_run_len(&ops[i..]);
-                    s = strip_bq_with_gobble(s, run, self.lazy_blockquote_gobble);
-                    i += run;
-                }
-                StripOp::ContentIndent(n) => {
-                    if leading_indent(s).0 < n as usize {
-                        return false;
-                    }
-                    s = strip_content_indent(s, n as usize).0;
-                    i += 1;
-                }
-            }
-        }
-        true
     }
 
     /// Strip semantics for the dispatch line (line 0). Identical to
@@ -1083,36 +987,24 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
     /// emission with `strip_list_indent` (whitespace only); on an
     /// under-indented lazy line such as `" b |"` inside a two-column list
     /// item they return `" |"` and `"b |"` respectively.
+    ///
+    /// Equals [`Self::emit_prefix_at`]'s tail by construction: both are
+    /// the same faithful walk of [`ContainerPrefix::ops`], one with a
+    /// builder and one without.
     pub fn peek_prefix_at(&self, i: usize) -> &'a str {
-        content_line_prefix_tail(
-            self.raw[i],
-            self.prefix.bq_depth(),
-            self.prefix.list_content_col(),
-            bq_outer_of_list(self.prefix),
-            self.prefix.content_indent(),
-            self.prefix.lazy_blockquote_gobble,
-        )
+        walk_content_line_prefix(self.prefix, self.raw[i], None)
     }
 
     /// Emit the continuation-line container prefix for the line at
     /// ABSOLUTE index `i` as kind-tagged tokens, returning the
-    /// post-prefix tail. Thin wrapper over [`emit_content_line_prefixes`]
-    /// using the prefix's derived scalars; it therefore preserves that
-    /// function's `content_indent`-last ordering and is NOT a faithful
-    /// per-op walk of [`ContainerPrefix::ops`] (the divergence is dormant
-    /// while `content_indent == 0`, as in every current fixture). Use for
-    /// continuation lines only; for the dispatch line use
-    /// [`Self::dispatch_tail`].
+    /// post-prefix tail. A faithful walk of [`ContainerPrefix::ops`] in
+    /// stack order (list/content indent as coalesced `WHITESPACE`,
+    /// blockquote prefix byte-by-byte); [`Self::peek_prefix_at`] is the
+    /// same walk without the builder, so classify-then-emit callers get
+    /// their invariant by construction. Use for continuation lines only;
+    /// for the dispatch line use [`Self::dispatch_tail`].
     pub fn emit_prefix_at(&self, builder: &mut GreenNodeBuilder<'static>, i: usize) -> &'a str {
-        emit_content_line_prefixes(
-            builder,
-            self.raw[i],
-            self.prefix.bq_depth(),
-            self.prefix.list_content_col(),
-            bq_outer_of_list(self.prefix),
-            self.prefix.content_indent(),
-            self.prefix.lazy_blockquote_gobble,
-        )
+        walk_content_line_prefix(self.prefix, self.raw[i], Some(builder))
     }
 
     /// Dispatch-line tail for emission — emits no prefix tokens (the core
@@ -1188,15 +1080,17 @@ pub(crate) fn emit_blockquote_prefix_tokens(builder: &mut GreenNodeBuilder<'stat
     }
 }
 
-/// Non-emitting twin of [`emit_content_line_prefixes`]: the tail that
-/// function would return, computed without touching a builder.
+/// Scalar-driven continuation-line strip, in the fixed order
+/// `bq_outer ? bq → list → content-indent : list → bq → content-indent`.
 ///
-/// Block parsers that classify a continuation line before emitting it must
-/// peek with *this*, not with [`ContainerPrefix::strip`] — the latter walks
-/// list indent with `advance_columns`, which counts any character as a
-/// column, while emission strips whitespace only. On an under-indented lazy
-/// line the two disagree, and a classification made against the wrong tail
-/// cannot be honoured at emission time.
+/// Retained only for the marker-line (line 0) scalar emitters in
+/// `code_blocks.rs` / `line_blocks.rs` (`prepare_fence_open_line`,
+/// `emit_open_line_prefixes`, the hashpipe preamble helpers), which
+/// derive the same scalars and must stay byte-identical to this strip.
+/// Continuation lines go through [`StrippedLines::peek_prefix_at`] /
+/// [`StrippedLines::emit_prefix_at`], which walk
+/// [`ContainerPrefix::ops`] in true stack order instead of collapsing
+/// them to scalars.
 pub(crate) fn content_line_prefix_tail<'a>(
     content_line: &'a str,
     bq_depth: usize,
@@ -1236,119 +1130,117 @@ pub(crate) fn content_line_prefix_tail<'a>(
     s
 }
 
-pub(crate) fn emit_content_line_prefixes<'a>(
-    builder: &mut GreenNodeBuilder<'static>,
+/// Strip a continuation line's container prefix by walking
+/// [`ContainerPrefix::ops`] in stack order, optionally emitting the
+/// consumed bytes as kind-tagged tokens.
+///
+/// Tokenization (matching the legacy scalar emitters): list indent and
+/// content indent become `WHITESPACE`, with adjacent runs coalesced
+/// into one token for byte-range-equivalent CST stability; blockquote
+/// prefix bytes are emitted one by one (`>` as `BLOCK_QUOTE_MARKER`,
+/// anything else as 1-byte `WHITESPACE`). With no builder the walk is
+/// pure detection, and the tail equals the emitting walk's by
+/// construction.
+///
+/// Every strip is the graceful emission-side one (`strip_list_indent`,
+/// `strip_content_indent`, the counted bq strip), so nothing here can
+/// eat content bytes as indent; a caller that needs to *know* whether
+/// the frame was reached asks [`ContainerPrefix::resolve`] instead.
+fn walk_content_line_prefix<'a>(
+    prefix: &ContainerPrefix,
     content_line: &'a str,
-    bq_depth: usize,
-    list_content_col: usize,
-    bq_outer: bool,
-    content_indent: usize,
-    lazy_gobble: bool,
+    mut builder: Option<&mut GreenNodeBuilder<'static>>,
 ) -> &'a str {
-    // Strip and emit content-line (1+) prefixes in container-stack
-    // order:
-    //   bq_outer=true  → bq markers → list_content_col → content_indent
-    //   bq_outer=false → list_content_col → bq markers → content_indent
-    // Bq markers emit granular tokens (BLOCK_QUOTE_MARKER + WHITESPACE);
-    // list_content_col and content_indent emit WHITESPACE. Adjacent
-    // WHITESPACE emissions are coalesced into one token for
-    // byte-range-equivalent CST stability.
-    let mut s = content_line;
-    let mut pending_ws_start: Option<usize> = None;
-
-    let flush_ws = |builder: &mut GreenNodeBuilder<'static>,
-                    pending: &mut Option<usize>,
-                    current_offset: usize| {
+    fn flush_ws(
+        builder: &mut Option<&mut GreenNodeBuilder<'static>>,
+        content_line: &str,
+        pending: &mut Option<usize>,
+        current_offset: usize,
+    ) {
         if let Some(start) = *pending
             && current_offset > start
         {
-            builder.token(
-                SyntaxKind::WHITESPACE.into(),
-                &content_line[start..current_offset],
-            );
+            if let Some(b) = builder.as_deref_mut() {
+                b.token(
+                    SyntaxKind::WHITESPACE.into(),
+                    &content_line[start..current_offset],
+                );
+            }
             *pending = None;
         }
-    };
-
-    let strip_and_remember_list =
-        |s: &mut &'a str, pending: &mut Option<usize>, list_content_col: usize| {
-            if list_content_col == 0 {
-                return;
-            }
-            let stripped = strip_list_indent(s, list_content_col);
-            let consumed = s.len() - stripped.len();
-            if consumed > 0 {
-                let start = content_line.len() - s.len();
-                if pending.is_none() {
-                    *pending = Some(start);
-                }
-                *s = stripped;
-            }
-        };
-
-    let strip_and_emit_bq = |builder: &mut GreenNodeBuilder<'static>,
-                             s: &mut &'a str,
-                             pending: &mut Option<usize>,
-                             bq_depth: usize| {
-        if bq_depth == 0 {
-            return;
-        }
-        let current_offset = content_line.len() - s.len();
-        flush_ws(builder, pending, current_offset);
-        let (stripped, consumed) = strip_blockquote_markers_counted(s, bq_depth);
-        let prefix_len = s.len() - stripped.len();
-        if prefix_len > 0 {
-            emit_blockquote_prefix_tokens(builder, &s[..prefix_len]);
-        }
-        *s = stripped;
-        // Pandoc's gobble: a lazy line loses its indent to the quote's raw
-        // content. Hand the bytes to the pending WHITESPACE run rather than
-        // leaving them in the construct's content — that is what keeps the
-        // tree lossless while the block sees a de-indented line.
-        if lazy_gobble && consumed < bq_depth {
-            let gobbled = lazy_gobble_trim(stripped);
-            if gobbled.len() < stripped.len() {
-                let start = content_line.len() - stripped.len();
-                if pending.is_none() {
-                    *pending = Some(start);
-                }
-                *s = gobbled;
-            }
-        }
-    };
-
-    if bq_outer {
-        strip_and_emit_bq(builder, &mut s, &mut pending_ws_start, bq_depth);
-        strip_and_remember_list(&mut s, &mut pending_ws_start, list_content_col);
-    } else {
-        strip_and_remember_list(&mut s, &mut pending_ws_start, list_content_col);
-        strip_and_emit_bq(builder, &mut s, &mut pending_ws_start, bq_depth);
     }
 
-    if content_indent > 0 {
-        let indent_bytes = byte_index_at_column(s, content_indent);
-        if s.len() >= indent_bytes && indent_bytes > 0 {
-            let start = content_line.len() - s.len();
-            if pending_ws_start.is_none() {
-                pending_ws_start = Some(start);
+    let ops = prefix.ops();
+    let mut s = content_line;
+    let mut pending_ws_start: Option<usize> = None;
+    let mut i = 0;
+    while i < ops.len() {
+        match ops[i] {
+            StripOp::ListAdvance(n) => {
+                let stripped = strip_list_indent(s, n as usize);
+                if stripped.len() < s.len() {
+                    let start = content_line.len() - s.len();
+                    if pending_ws_start.is_none() {
+                        pending_ws_start = Some(start);
+                    }
+                    s = stripped;
+                }
+                i += 1;
             }
-            s = &s[indent_bytes..];
+            StripOp::BlockQuoteMarker => {
+                let run = blockquote_run_len(&ops[i..]);
+                let current_offset = content_line.len() - s.len();
+                flush_ws(
+                    &mut builder,
+                    content_line,
+                    &mut pending_ws_start,
+                    current_offset,
+                );
+                let (stripped, consumed) = strip_blockquote_markers_counted(s, run);
+                let prefix_len = s.len() - stripped.len();
+                if prefix_len > 0
+                    && let Some(b) = builder.as_deref_mut()
+                {
+                    emit_blockquote_prefix_tokens(b, &s[..prefix_len]);
+                }
+                s = stripped;
+                // Pandoc's gobble: a lazy line loses its indent to the
+                // quote's raw content. Hand the bytes to the pending
+                // WHITESPACE run rather than leaving them in the
+                // construct's content — that is what keeps the tree
+                // lossless while the block sees a de-indented line.
+                if prefix.lazy_blockquote_gobble && consumed < run {
+                    let gobbled = lazy_gobble_trim(s);
+                    if gobbled.len() < s.len() {
+                        let start = content_line.len() - s.len();
+                        if pending_ws_start.is_none() {
+                            pending_ws_start = Some(start);
+                        }
+                        s = gobbled;
+                    }
+                }
+                i += run;
+            }
+            StripOp::ContentIndent(n) => {
+                let (stripped, consumed) = strip_content_indent(s, n as usize);
+                if consumed.is_some() {
+                    let start = content_line.len() - s.len();
+                    if pending_ws_start.is_none() {
+                        pending_ws_start = Some(start);
+                    }
+                    s = stripped;
+                }
+                i += 1;
+            }
         }
     }
 
     let final_offset = content_line.len() - s.len();
-    flush_ws(builder, &mut pending_ws_start, final_offset);
-    debug_assert_eq!(
-        s,
-        content_line_prefix_tail(
-            content_line,
-            bq_depth,
-            list_content_col,
-            bq_outer,
-            content_indent,
-            lazy_gobble
-        ),
-        "the peek twin must strip exactly what emission strips"
+    flush_ws(
+        &mut builder,
+        content_line,
+        &mut pending_ws_start,
+        final_offset,
     );
     s
 }
@@ -1748,44 +1640,34 @@ mod tests {
         builder.finish_node();
         // `  > ` stripped (list-col 2, then one bq marker) → "hello".
         assert_eq!(tail, "hello");
-        assert_eq!(
-            tail,
-            emit_content_line_prefixes(
-                &mut GreenNodeBuilder::new(),
-                raw[1],
-                prefix.bq_depth(),
-                prefix.list_content_col(),
-                bq_outer_of_list(&prefix),
-                prefix.content_indent(),
-                prefix.lazy_blockquote_gobble,
-            )
-        );
+        assert_eq!(tail, lines.peek_prefix_at(1));
     }
 
     #[test]
-    fn line_carries_list_indent_rejects_faked_indent() {
+    fn resolve_rejects_faked_indent() {
         let p = ContainerPrefix::from_ops(&[StripOp::ListAdvance(2)], false);
         // `strip` would return `":\n"` here by counting `c` and the space as
         // columns; the line never reaches the item's content column.
         assert_eq!(p.strip("c :\n"), ":\n");
-        assert!(!p.line_carries_list_indent("c :\n"));
-        assert!(!p.line_carries_list_indent(" c :\n"));
+        assert!(!p.resolve("c :\n").reaches_frame());
+        assert!(!p.resolve(" c :\n").reaches_frame());
         // Real indent reaching the content column is accepted.
-        assert!(p.line_carries_list_indent("  : def\n"));
-        assert!(p.line_carries_list_indent("    : def\n"));
-        // A tab reaches column 4, which covers a two-column item.
-        assert!(p.line_carries_list_indent("\t: def\n"));
+        assert!(p.resolve("  : def\n").reaches_frame());
+        assert!(p.resolve("    : def\n").reaches_frame());
+        // A tab reaches column 4, which covers a two-column item — as a
+        // straddle, since column 2 has no byte boundary.
+        assert!(p.resolve("\t: def\n").reaches_frame());
         // An empty prefix has nothing to fake.
-        assert!(ContainerPrefix::default().line_carries_list_indent("c :\n"));
+        assert!(ContainerPrefix::default().resolve("c :\n").reaches_frame());
     }
 
     #[test]
-    fn line_carries_list_indent_applies_after_outer_ops() {
+    fn resolve_measures_list_advance_after_outer_ops() {
         // The list advance is measured against what the blockquote strip left.
         let p =
             ContainerPrefix::from_ops(&[StripOp::BlockQuoteMarker, StripOp::ListAdvance(2)], false);
-        assert!(!p.line_carries_list_indent("> c :\n"));
-        assert!(p.line_carries_list_indent(">   : def\n"));
+        assert!(!p.resolve("> c :\n").reaches_frame());
+        assert!(p.resolve(">   : def\n").reaches_frame());
     }
 
     #[test]

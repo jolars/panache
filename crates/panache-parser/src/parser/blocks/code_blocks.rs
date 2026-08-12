@@ -1221,18 +1221,10 @@ pub(crate) fn parse_fenced_code_block(
             break;
         }
 
-        // Detection only (emits nothing): the same 2-bucket container
-        // strip the emission path applies via `emit_content_line_prefixes`
-        // / `emit_prefix_at`, kept here rather than `strip_at` (a per-op
-        // walk) to stay byte-identical in interleaved nesting.
-        let inner_stripped = content_line_prefix_tail(
-            line,
-            bq_depth,
-            list_content_col,
-            bq_outer,
-            content_indent,
-            lazy_gobble,
-        );
+        // Detection only (emits nothing): the same faithful op walk the
+        // emission path applies via `emit_prefix_at`, so the closing-fence
+        // classification holds at emission time by construction.
+        let inner_stripped = window.peek_prefix_at(current_pos);
 
         if is_closing_fence(inner_stripped, &fence) {
             found_closing = true;
@@ -1408,7 +1400,6 @@ pub(crate) fn parse_fenced_math_block(
     let list_marker_consumed_on_line_0 = prefix.list_marker_consumed_on_line_0;
     let bq_outer = bq_outer_of_list(prefix);
     let content_indent = prefix.content_indent();
-    let lazy_gobble = prefix.lazy_blockquote_gobble;
 
     builder.start_node(SyntaxKind::DISPLAY_MATH.into());
 
@@ -1452,15 +1443,9 @@ pub(crate) fn parse_fenced_math_block(
             break;
         }
 
-        // Detection only (emits nothing): same 2-bucket strip as emission.
-        let inner_stripped = content_line_prefix_tail(
-            line,
-            bq_depth,
-            list_content_col,
-            bq_outer,
-            content_indent,
-            lazy_gobble,
-        );
+        // Detection only (emits nothing): the same faithful op walk the
+        // emission path applies via `emit_prefix_at`.
+        let inner_stripped = window.peek_prefix_at(current_pos);
 
         if is_closing_fence(inner_stripped, &fence) {
             found_closing = true;

@@ -872,12 +872,19 @@ behavior-pinning table test) and let the verdict close them:
   container bound reads `LineView::frame_verdict`, and all four blind
   callers now feed it the true frame (`from_stack` windows).
 
-- [ ] `StrippedLines::peek_prefix_at` is not equivalent to
+- [x] `StrippedLines::peek_prefix_at` was not equivalent to
   `ContainerPrefix::strip` for the
   `[ContentIndent, ListAdvance, BlockQuoteMarker]` shape (the `issue_209`
-  fixture). Its doc claims the divergence is dormant while
-  `content_indent == 0`, which does not hold for definition-list lookaheads,
-  where the definition container contributes the content indent.
+  fixture): it collapsed the ops to four scalars applied in a fixed
+  list-bq-content order, and its dormancy claim (`content_indent == 0`) was
+  false for every definition-list lookahead. Closed by making
+  `peek_prefix_at` and `emit_prefix_at` one faithful walk of
+  `ContainerPrefix::ops` in true stack order (one with a builder, one
+  without), so peek == emit holds by construction; the fenced code/math
+  closing-fence peeks moved onto the same walk. The scalar strip
+  (`content_line_prefix_tail`) survives only for the marker-line (line 0)
+  emitters that derive the same scalars. Pinned by the `issue_209` row in
+  `frame_pinning`, where peek, strip, and the verdict now agree.
 
 Adjacent, found while fixing the losslessness bugs the same harness turned up:
 
@@ -1436,11 +1443,23 @@ Adjacent, found while fixing the losslessness bugs the same harness turned up:
   verified against pandoc-native + CommonMark (both must stay byte-identical
   or improve).
 
-- [ ] Consolidate container-frame resolution behind a single typed verdict.
-  There is no authoritative answer to "which container frame is this line
-  in, and does it reach the content column?", so every lookahead site picks
-  one of several overlapping helpers and a wrong pick fails only under a
+- [x] Consolidate container-frame resolution behind a single typed verdict.
+  There was no authoritative answer to "which container frame is this line
+  in, and does it reach the content column?", so every lookahead site picked
+  one of several overlapping helpers and a wrong pick failed only under a
   specific container nesting.
+
+  Landed as `FrameVerdict` (`Inside` / `Dedented` / `FakedIndent` /
+  `StraddlingTab`) produced by `ContainerPrefix::resolve` / `resolve_line_0` /
+  `resolve_content_indent`, plus `LineView::frame_verdict` for the lookaheads,
+  with the behavior-pinning corpus in `blocks/tests/frame_pinning.rs`.
+  Deliberately left out: `from_ctx` and the dispatcher hot path keep their
+  documented scalar approximation (pinned by the corpus); the marker-line (line 0)
+  scalar emitters in `code_blocks.rs` / `line_blocks.rs` still consume
+  `content_line_prefix_tail` and the 5-scalar recipe; and
+  `next_is_definition_term_below` keeps the innermost-item scalar sum (now
+  sourced from `content_container_indent`), which underestimates the frame for
+  multi-section stacks --- fixing that needs its own pandoc-verified fixtures.
 
   The bug stream says this is where the defects are. Of the last 300 commits,
   120 are fixes and 77 of those are `fix(parser)`; 44 of the 77 (57%) name a
@@ -1488,7 +1507,7 @@ Adjacent, found while fixing the losslessness bugs the same harness turned up:
 
   Bounded steps, each landable on its own:
 
-  - [ ] Pin the current behavior of all eight paths as a table test over one
+  - [x] Pin the current behavior of all eight paths as a table test over one
     corpus of `(container stack, line)` pairs, including the shapes where
     they disagree today. This is the safety net; nothing else starts without
     it. Seed the corpus from the three deferred items under
@@ -1496,15 +1515,22 @@ Adjacent, found while fixing the losslessness bugs the same harness turned up:
     `is_caption_followed_by_table` over-strip, and the `peek_prefix_at`
     non-equivalence are known disagreement shapes held back for exactly
     this.
-  - [ ] Settle the `content_col` convention (absolute or relative) and make
-    `from_stack` and `content_container_indent_to_strip` agree.
-  - [ ] Introduce the typed verdict alongside the existing API and migrate the
+  - [x] Settle the `content_col` convention (absolute or relative) and make
+    `from_stack` and `content_container_indent_to_strip` agree. (Stated once
+    on `Container`: content containers are relative-to-parent, item columns
+    cumulative within the innermost content container's frame; the absolute
+    is `ContainerStack::content_container_indent`, asserted against
+    `from_stack`'s ops.)
+  - [x] Introduce the typed verdict alongside the existing API and migrate the
     five hand-rolled `leading_indent` sites first --- they are the smallest
     and each has existing coverage.
-  - [ ] Migrate the lookahead callers (`next_line_is_definition_marker`,
+  - [x] Migrate the lookahead callers (`next_line_is_definition_marker`,
     `next_is_definition_term_below`, the caption and term probes), then
     delete whichever of `peek_prefix_at` / `line_carries_list_indent` the
-    verdict subsumes. Closes the `peek_prefix_at` item below.
+    verdict subsumes. (Deleted `line_carries_list_indent` and
+    `line_reaches_content_column`; `peek_prefix_at` became the faithful op
+    walk instead, equal to emission by construction.) Closes the
+    `peek_prefix_at` item below.
 
   Secondary, and worth folding in once the above lands: containers hold text in
   `ParagraphBuffer` / `ListItemBuffer` *outside* the green builder, and a

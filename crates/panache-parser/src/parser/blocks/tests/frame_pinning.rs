@@ -32,11 +32,10 @@ use crate::syntax::SyntaxKind;
 /// One `(ops, line)` shape pinned across every prefix-level helper.
 ///
 /// The columns have deliberately different semantics — that is the
-/// point. `strip` walks list indent column-blind (`advance_columns`),
-/// `peek_prefix` goes through the scalar-projection path
-/// (`content_line_prefix_tail`), `carries_list_indent` vets only the
-/// `ListAdvance` ops, and `reaches_content_column` also vets
-/// `ContentIndent`.
+/// point. `strip` walks list indent column-blind (`advance_columns`);
+/// `peek_prefix` is the emission-side walk of the ops (graceful,
+/// whitespace-only strips); the verdict is the authoritative answer,
+/// carrying both the tail and whether the frame was reached.
 struct PinRow {
     name: &'static str,
     ops: &'static [StripOp],
@@ -45,8 +44,6 @@ struct PinRow {
     /// `strip_line_0_for_emission` with `list_marker_consumed_on_line_0`
     /// false (the innermost `ListAdvance` is preserved).
     strip_line_0_unmarked: &'static str,
-    carries_list_indent: bool,
-    reaches_content_column: bool,
     peek_prefix: &'static str,
     /// `(content_col, expected)` for `gobbled_indent_prefix_len`, where
     /// meaningful for the row's innermost content column.
@@ -73,16 +70,13 @@ const PINS: &[PinRow] = &[
         line: "\t: def",
         strip: "\t: def",
         strip_line_0_unmarked: "\t: def",
-        carries_list_indent: true,
-        reaches_content_column: true,
         peek_prefix: ": def",
         gobbled_len: Some((2, 0)),
         verdict: FrameVerdict::StraddlingTab {
             rest: "\t: def",
             cols_before_tab: 0,
         },
-        expected_to_change: "peek column converges on the op walk when emission becomes \
-                             a faithful op walk",
+        expected_to_change: "",
     },
     // DISAGREES: `strip` fakes the indent by eating `c ` as two columns;
     // emission-side strips (peek) stop at the first non-whitespace byte.
@@ -92,8 +86,6 @@ const PINS: &[PinRow] = &[
         line: "c :",
         strip: ":",
         strip_line_0_unmarked: "c :",
-        carries_list_indent: false,
-        reaches_content_column: false,
         peek_prefix: "c :",
         gobbled_len: Some((2, 0)),
         verdict: FrameVerdict::FakedIndent {
@@ -108,21 +100,19 @@ const PINS: &[PinRow] = &[
         line: "  : def",
         strip: ": def",
         strip_line_0_unmarked: "  : def",
-        carries_list_indent: true,
-        reaches_content_column: true,
         peek_prefix: ": def",
         gobbled_len: Some((2, 2)),
         verdict: FrameVerdict::Inside { rest: ": def" },
         expected_to_change: "",
     },
-    // DISAGREES: the issue_209 shape ([ContentIndent, ListAdvance,
+    // The issue_209 shape ([ContentIndent, ListAdvance,
     // BlockQuoteMarker], a definition body holding a list item holding a
-    // blockquote). `strip` walks the ops in true stack order; the peek
-    // path collapses to scalars applied list → bq → content-indent, so
-    // the bq marker still sits behind four spaces when the bq strip
-    // runs (only 3 allowed) and the marker survives into the tail. The
-    // doc on `emit_prefix_at` claims the divergence is dormant while
-    // `content_indent == 0`; this row is the counterexample.
+    // blockquote). The peek/emit pair used to collapse the ops to
+    // scalars applied list → bq → content-indent, leaving the bq marker
+    // behind four spaces when the bq strip ran (only 3 allowed) — the
+    // counterexample to the old "dormant while content_indent == 0"
+    // claim. Both now walk the ops in true stack order, so peek, strip,
+    // and the verdict agree here.
     PinRow {
         name: "issue_209_content_indent_list_bq",
         ops: &[
@@ -133,26 +123,21 @@ const PINS: &[PinRow] = &[
         line: "      > b",
         strip: "b",
         strip_line_0_unmarked: "b",
-        carries_list_indent: true,
-        reaches_content_column: true,
-        peek_prefix: "> b",
+        peek_prefix: "b",
         gobbled_len: None,
         verdict: FrameVerdict::Inside { rest: "b" },
-        expected_to_change: "peek converges on the op walk in refactor(parser): make \
-                             emission a faithful op walk",
+        expected_to_change: "",
     },
-    // The documented `line_carries_list_indent` gap: a dash run at
-    // column 0 below a definition body has left the body, but a body
-    // contributes only a `ContentIndent` op, which that helper does not
-    // vet. `line_reaches_content_column` exists precisely for this.
+    // A dash run at column 0 below a definition body has left the body
+    // (a `----` there is the thematic break that closes it): a body
+    // contributes only a `ContentIndent` op, whose shortfall the
+    // graceful strips wave through — only the verdict reports it.
     PinRow {
         name: "short_content_indent_waved_through",
         ops: &[StripOp::ContentIndent(4)],
         line: "----",
         strip: "----",
         strip_line_0_unmarked: "----",
-        carries_list_indent: true,
-        reaches_content_column: false,
         peek_prefix: "----",
         gobbled_len: Some((4, 0)),
         verdict: FrameVerdict::Dedented {
@@ -170,8 +155,6 @@ const PINS: &[PinRow] = &[
         line: "  x",
         strip: "x",
         strip_line_0_unmarked: "x",
-        carries_list_indent: true,
-        reaches_content_column: false,
         peek_prefix: "x",
         gobbled_len: Some((4, 2)),
         verdict: FrameVerdict::Dedented {
@@ -192,18 +175,6 @@ fn pinned_prefix_helper_matrix() {
             prefix.strip_line_0_for_emission(row.line),
             row.strip_line_0_unmarked,
             "{}: strip_line_0_for_emission (unmarked)",
-            row.name
-        );
-        assert_eq!(
-            prefix.line_carries_list_indent(row.line),
-            row.carries_list_indent,
-            "{}: line_carries_list_indent",
-            row.name
-        );
-        assert_eq!(
-            prefix.line_reaches_content_column(row.line),
-            row.reaches_content_column,
-            "{}: line_reaches_content_column",
             row.name
         );
         let raw = [row.line];
