@@ -31,7 +31,9 @@ use crate::options::Dialect;
 use crate::syntax::SyntaxKind;
 
 use super::super::block_dispatcher::BlockContext;
-use super::super::utils::container_stack::{Container, byte_index_at_column, leading_indent};
+use super::super::utils::container_stack::{
+    Container, byte_index_at_column, content_container_indent, leading_indent,
+};
 use super::blockquotes::{strip_blockquote_markers_counted, strip_n_blockquote_markers};
 
 /// A single strip operation applied during the dispatcher's
@@ -48,7 +50,10 @@ pub(crate) enum StripOp {
     BlockQuoteMarker,
     /// Advance N columns when leading indent ≥ N; otherwise lazy-strip
     /// whatever leading whitespace exists. Mirrors the footnote/definition
-    /// `content_indent` strip in `parse_inner_content`.
+    /// `content_indent` strip in `parse_inner_content`. `N` is the
+    /// container's own relative width (see the `content_col` convention
+    /// on [`Container`]); nested content containers contribute one op
+    /// each, applied sequentially, summing to the absolute column.
     ContentIndent(u32),
 }
 
@@ -147,6 +152,21 @@ impl ContainerPrefix {
         if let Some(la) = pending_list_advance {
             ops.push(StripOp::ListAdvance(la));
         }
+        // The `content_col` convention (see `Container`): content
+        // containers carry relative widths, so the ContentIndent ops --
+        // applied sequentially -- must sum to the absolute column the
+        // scalar consumers (`ContainerStack::content_container_indent`)
+        // compute from the same stack.
+        debug_assert_eq!(
+            ops.iter()
+                .map(|op| match op {
+                    StripOp::ContentIndent(n) => *n as usize,
+                    _ => 0,
+                })
+                .sum::<usize>(),
+            content_container_indent(stack),
+            "from_stack's ContentIndent ops must mirror the stack's content-container sum"
+        );
         Self {
             ops,
             list_marker_consumed_on_line_0,

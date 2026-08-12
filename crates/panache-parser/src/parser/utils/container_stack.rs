@@ -19,6 +19,30 @@ pub(crate) enum OpenDisplayMath {
     DoubleBrackets,
 }
 
+/// An open container on the parse stack.
+///
+/// ## The `content_col` convention
+///
+/// Two conventions coexist, by design, and are stated once, here:
+///
+/// - Content containers ([`Container::FootnoteDefinition`],
+///   [`Container::Definition`], [`Container::Admonition`]) record a
+///   `content_col` **relative to their own parent frame** — the width of
+///   their own indent gobble, measured after every enclosing container
+///   has taken its share.
+/// - [`Container::ListItem`] records a content **column cumulative
+///   within the innermost enclosing content container's frame**: a
+///   nested item contributes only its delta over the item holding it,
+///   and the counter resets at each content container.
+///
+/// [`ContainerStack::gobble_chain`] is the only conversion to pure
+/// per-container widths. The **absolute** content column of the open
+/// content containers (in the blockquote-stripped frame) is the sum of
+/// their relative widths, computed by [`content_container_indent`];
+/// `ContainerPrefix::from_stack`'s `ContentIndent` ops mirror that sum
+/// op-by-op (asserted there). Comparing a line's indent against a
+/// `ListItem::content_col` is only valid in the frame the enclosing
+/// content containers leave behind — never against the raw line.
 #[derive(Debug, Clone)]
 pub(crate) enum Container {
     BlockQuote {
@@ -171,6 +195,35 @@ impl ContainerStack {
         }
         chain
     }
+
+    /// The absolute content column contributed by the open content
+    /// containers (footnote definitions, definition bodies,
+    /// admonitions), in the blockquote-stripped frame. See the
+    /// `content_col` convention on [`Container`].
+    pub(crate) fn content_container_indent(&self) -> usize {
+        content_container_indent(&self.stack)
+    }
+}
+
+/// Slice form of [`ContainerStack::content_container_indent`], for
+/// callers holding a sub-stack or a bare `&[Container]`.
+///
+/// Content containers record widths relative to their own parent, so
+/// their sum is the absolute column (each width is measured in the
+/// residue frame the previous one left). List items are deliberately
+/// excluded: a `ListItem::content_col` is already cumulative within the
+/// enclosing content container's frame, so adding it here would double
+/// count.
+pub(crate) fn content_container_indent(stack: &[Container]) -> usize {
+    stack
+        .iter()
+        .filter_map(|c| match c {
+            Container::FootnoteDefinition { content_col, .. } => Some(*content_col),
+            Container::Definition { content_col, .. } => Some(*content_col),
+            Container::Admonition { content_col } => Some(*content_col),
+            _ => None,
+        })
+        .sum()
 }
 
 /// Expand tabs to columns (tab stop = 4) and return (cols, byte_offset).

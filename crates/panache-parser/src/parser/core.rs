@@ -4762,18 +4762,12 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Get the total indentation to strip from content containers (footnotes + definitions).
+    /// Get the total indentation to strip from content containers
+    /// (footnotes + definitions). Delegates to
+    /// [`ContainerStack::content_container_indent`], where the
+    /// `content_col` convention is documented.
     fn content_container_indent_to_strip(&self) -> usize {
-        self.containers
-            .stack
-            .iter()
-            .filter_map(|c| match c {
-                Container::FootnoteDefinition { content_col, .. } => Some(*content_col),
-                Container::Definition { content_col, .. } => Some(*content_col),
-                Container::Admonition { content_col } => Some(*content_col),
-                _ => None,
-            })
-            .sum()
+        self.containers.content_container_indent()
     }
 
     /// Walk the container stack from top (innermost) toward bottom and

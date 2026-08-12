@@ -25,7 +25,7 @@ use crate::parser::blocks::definition_lists::{
 };
 use crate::parser::blocks::tables::is_caption_followed_by_table;
 use crate::parser::utils::container_stack::{
-    Container, byte_index_at_column, gobbled_indent_prefix_len,
+    Container, byte_index_at_column, content_container_indent, gobbled_indent_prefix_len,
 };
 use crate::syntax::SyntaxKind;
 
@@ -257,38 +257,114 @@ fn from_stack_and_from_scalars_orderings_diverge() {
     assert_eq!(scalar_order.strip(line), "x");
 }
 
+// Container builders for the stack-shaped tests. `Paragraph` is
+// deliberately absent: it needs a live `rowan::Checkpoint`, so
+// paragraph-bearing stacks are exercised end to end instead.
+
+fn definition(content_col: usize) -> Container {
+    use crate::parser::utils::text_buffer::ParagraphBuffer;
+    Container::Definition {
+        content_col,
+        plain_open: false,
+        plain_buffer: ParagraphBuffer::new(),
+    }
+}
+
+fn footnote(content_col: usize) -> Container {
+    Container::FootnoteDefinition { content_col }
+}
+
+fn admonition(content_col: usize) -> Container {
+    Container::Admonition { content_col }
+}
+
+fn list() -> Container {
+    use crate::parser::blocks::lists::ListMarker;
+    Container::List {
+        marker: ListMarker::Bullet('-'),
+        base_indent_cols: 0,
+        has_blank_between_items: false,
+    }
+}
+
+fn list_item(content_col: usize) -> Container {
+    use crate::parser::utils::list_item_buffer::ListItemBuffer;
+    Container::ListItem {
+        content_col,
+        buffer: ListItemBuffer::new(),
+        marker_only: false,
+        virtual_marker_space: false,
+    }
+}
+
 /// `from_stack` over a real container stack produces the stack-order
 /// ops the scalar path cannot express: [Definition, List, ListItem]
 /// yields `[ContentIndent(4), ListAdvance(2)]`, content indent first.
 #[test]
 fn from_stack_definition_above_list_orders_content_indent_first() {
-    use crate::parser::blocks::lists::ListMarker;
-    use crate::parser::utils::list_item_buffer::ListItemBuffer;
-    use crate::parser::utils::text_buffer::ParagraphBuffer;
-    let stack = vec![
-        Container::Definition {
-            content_col: 4,
-            plain_open: false,
-            plain_buffer: ParagraphBuffer::new(),
-        },
-        Container::List {
-            marker: ListMarker::Bullet('-'),
-            base_indent_cols: 0,
-            has_blank_between_items: false,
-        },
-        Container::ListItem {
-            content_col: 2,
-            buffer: ListItemBuffer::new(),
-            marker_only: false,
-            virtual_marker_space: false,
-        },
-    ];
+    let stack = vec![definition(4), list(), list_item(2)];
     let p = ContainerPrefix::from_stack(&stack, false, Dialect::CommonMark);
     assert!(matches!(
         p.ops(),
         [StripOp::ContentIndent(4), StripOp::ListAdvance(2)]
     ));
     assert_eq!(p.strip("      a"), "a");
+}
+
+/// The `content_col` convention (documented on `Container`): the sum of
+/// `from_stack`'s per-container `ContentIndent` ops equals the absolute
+/// column `ContainerStack::content_container_indent` computes from the
+/// same stack, for every corpus stack shape.
+#[test]
+fn from_stack_content_indent_ops_sum_to_the_stack_accessor() {
+    let stacks: Vec<Vec<Container>> = vec![
+        vec![definition(4)],
+        vec![footnote(4), definition(4)],
+        vec![list(), list_item(2), definition(4)],
+        vec![
+            definition(4),
+            list(),
+            list_item(2),
+            Container::BlockQuote {},
+        ],
+        vec![admonition(4), footnote(4)],
+        vec![Container::BlockQuote {}, footnote(4), list(), list_item(6)],
+    ];
+    for stack in &stacks {
+        let p = ContainerPrefix::from_stack(stack, false, Dialect::CommonMark);
+        assert_eq!(
+            p.content_indent(),
+            content_container_indent(stack),
+            "ContentIndent ops must sum to the content-container column for {stack:?}"
+        );
+    }
+}
+
+/// DISAGREES (undocumented `from_ctx` divergence, third of its kind):
+/// `paragraphs::current_content_col` scans for the innermost `ListItem`
+/// *or* `FootnoteDefinition`, so with no list item on the stack it hands
+/// callers a footnote's content width in the "list content column"
+/// slot, while the content-container accessor reports the same width as
+/// content indent -- the one quantity lands in two different frames
+/// depending on which resolver a caller picked. The weak caller is
+/// expected to be retired in refactor(parser): route the caption probe
+/// through the true container frame.
+#[test]
+fn current_content_col_puts_a_footnote_width_in_the_list_slot() {
+    use crate::parser::blocks::paragraphs::current_content_col;
+    use crate::parser::utils::container_stack::ContainerStack;
+
+    let mut containers = ContainerStack::new();
+    containers.push(footnote(4));
+    assert_eq!(current_content_col(&containers), 4);
+    assert_eq!(containers.content_container_indent(), 4);
+
+    // With a list item above the footnote both resolvers keep their own
+    // lane: the item column is relative to the footnote frame.
+    containers.push(list());
+    containers.push(list_item(2));
+    assert_eq!(current_content_col(&containers), 2);
+    assert_eq!(containers.content_container_indent(), 4);
 }
 
 /// The Pandoc lazy-blockquote gobble is dialect-gated: a lazy line
