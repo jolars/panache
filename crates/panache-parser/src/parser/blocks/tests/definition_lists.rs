@@ -1080,3 +1080,29 @@ fn blank_line_between_items_stays_at_the_list_level() {
          definition list inside the first item"
     );
 }
+
+#[test]
+fn definition_marker_behind_a_straddling_tab_promotes_the_term() {
+    // A tab straddling the item's content column is container indent
+    // with no byte boundary to split on, but the line does reach the
+    // column: pandoc reads a definition list on `b`
+    // (`pandoc -f markdown -t native`). The dispatch side always saw
+    // this marker; the lookahead reads it via
+    // `FrameVerdict::StraddlingTab`.
+    let input = "- a\n\n  b\n\n\t: def\n";
+    let tree = parse_blocks(input);
+    let item = find_first(&tree, SyntaxKind::LIST_ITEM).expect("list item");
+    assert_eq!(
+        find_all(&item, SyntaxKind::DEFINITION_LIST).len(),
+        1,
+        "the definition list nests inside the bullet item"
+    );
+    assert_eq!(find_all(&item, SyntaxKind::TERM).len(), 1);
+    assert_eq!(tree.text().to_string(), input, "losslessness");
+
+    // The no-blank variant promotes the same way.
+    let input = "- a\n\n  b\n\t: def\n";
+    let tree = parse_blocks(input);
+    assert_eq!(find_all(&tree, SyntaxKind::DEFINITION_LIST).len(), 1);
+    assert_eq!(tree.text().to_string(), input, "losslessness");
+}

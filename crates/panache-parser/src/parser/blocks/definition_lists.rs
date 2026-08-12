@@ -212,23 +212,40 @@ pub(in crate::parser) fn next_line_is_definition_marker(
         }
         // Read the marker off the line's frame verdict, so the marker
         // text and the frame membership come from the same resolution.
-        let rest = match lines.frame_verdict(check_pos) {
+        let found = match lines.frame_verdict(check_pos) {
             // A dedent out of a content container is not this
             // lookahead's business: a marker below a definition body's
             // content column is a second definition of the outer term,
             // and the marker test itself still applies to the tail.
-            FrameVerdict::Inside { rest } | FrameVerdict::Dedented { rest, .. } => rest,
+            FrameVerdict::Inside { rest } | FrameVerdict::Dedented { rest, .. } => {
+                try_parse_definition_marker(rest)
+            }
             // A marker whose indent the column-blind strip would have
             // faked from content bytes is not inside the item: the `:`
             // is preceded by text on its own line, and pandoc folds the
             // line into the paragraph above (`- a\nb\n\nc :` is
             // `BulletList` + `Para "c :"`), so it must not promote the
-            // term line above it. A marker behind a tab straddling the
-            // content column stays invisible too — there is no byte
-            // boundary to strip on (pinned to flip in `frame_pinning`).
-            FrameVerdict::FakedIndent { .. } | FrameVerdict::StraddlingTab { .. } => return None,
+            // term line above it.
+            FrameVerdict::FakedIndent { .. } => return None,
+            // The line reaches the content column, but a tab straddles
+            // it: the tab byte is container indent with no boundary to
+            // split on. Read the marker from behind the tab, in the
+            // frame the tab's stop lands on — the same frame
+            // `definition_marker_in_list_frame` reads a dispatch-line
+            // marker in. Pandoc reads `- a\n\n  b\n\n\t: def` as a
+            // definition list on `b`; emission already carries literal
+            // indent bytes (`emit_definition_marker`), so a tab needs
+            // no byte boundary there either.
+            FrameVerdict::StraddlingTab {
+                rest,
+                cols_before_tab,
+            } => {
+                // The tab stop is 4 columns, as everywhere in the parser.
+                let tab_end_col = (cols_before_tab as usize / 4 + 1) * 4;
+                try_parse_definition_marker_at(&rest[1..], tab_end_col)
+            }
         };
-        if let Some((marker, ..)) = try_parse_definition_marker(rest) {
+        if let Some((marker, ..)) = found {
             if marker == ':' && is_caption_followed_by_table(lines, check_pos) {
                 return None;
             }

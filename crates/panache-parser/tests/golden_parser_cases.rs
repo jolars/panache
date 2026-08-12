@@ -259,6 +259,7 @@ golden_test_cases!(
     definition_list_pandoc_loose_compact,
     definition_list_wrapping,
     definition_marker_at_deep_content_col,
+    definition_marker_tab_straddle,
     definition_term_not_item_content_continuation,
     definition_term_not_paragraph_continuation_blockquote,
     definition_term_requires_list_indent,

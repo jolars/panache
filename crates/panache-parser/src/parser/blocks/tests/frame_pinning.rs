@@ -64,9 +64,9 @@ const PINS: &[PinRow] = &[
     // DISAGREES: three primitives give three different tails for a tab
     // straddling the item's content column (see also the dedicated
     // primitive test below). The line *does* reach column 2 — a tab has
-    // no byte boundary to split on. `next_line_is_definition_marker`
-    // reads through `strip`, so the marker behind the tab is invisible
-    // to it today.
+    // no byte boundary to split on. The verdict reports the straddle,
+    // and `next_line_is_definition_marker` reads the marker behind the
+    // tab off it; `strip` stays column-blind by design.
     PinRow {
         name: "tab_straddles_list_content_col",
         ops: &[StripOp::ListAdvance(2)],
@@ -81,8 +81,8 @@ const PINS: &[PinRow] = &[
             rest: "\t: def",
             cols_before_tab: 0,
         },
-        expected_to_change: "verdict reports StraddlingTab; lookahead flip lands in \
-                             fix(parser): recognize definition markers behind a straddling tab",
+        expected_to_change: "peek column converges on the op walk when emission becomes \
+                             a faithful op walk",
     },
     // DISAGREES: `strip` fakes the indent by eating `c ` as two columns;
     // emission-side strips (peek) stop at the first non-whitespace byte.
@@ -456,19 +456,18 @@ fn definition_marker_frame_depends_on_callers_content_col() {
     );
 }
 
-/// DISAGREES with the dispatch side pinned above: the *lookahead*
-/// (`next_line_is_definition_marker`) reads lines through
-/// `ContainerPrefix::strip`, where the straddling tab survives the list
-/// strip and then fails the 0-3 space marker gate. The marker behind
-/// the tab is invisible to the lookahead while the dispatcher would
-/// parse it. Expected to flip to `Some(0)` in fix(parser): recognize
-/// definition markers behind a straddling tab.
+/// The lookahead agrees with the dispatch side pinned above: a marker
+/// behind a tab straddling the content column is read off the
+/// `StraddlingTab` verdict, in the frame the tab's stop lands on.
+/// (Flipped from `None` by fix(parser): recognize definition markers
+/// behind a straddling tab; pandoc reads the shape as a definition
+/// list.)
 #[test]
-fn definition_lookahead_cannot_see_marker_behind_straddling_tab() {
+fn definition_lookahead_sees_marker_behind_straddling_tab() {
     let prefix = ContainerPrefix::from_ops(&[StripOp::ListAdvance(2)], true);
     let raw = ["- a", "\t: def"];
     let lines = StrippedLines::new(&raw, 0, &prefix);
-    assert_eq!(next_line_is_definition_marker(&lines, 0), None);
+    assert_eq!(next_line_is_definition_marker(&lines, 0), Some(0));
 }
 
 // --- End-to-end pins for the Parser-coupled paths -------------------------
@@ -485,18 +484,18 @@ fn assert_lossless(input: &str) {
 }
 
 /// The tab-straddle shape end to end: pandoc reads a definition list
-/// (`- a` item, `b` term, `: def` definition); panache's lookahead
-/// cannot see the marker behind the tab, so no definition list forms.
-/// DISAGREES with pandoc. Expected to flip in fix(parser): recognize
-/// definition markers behind a straddling tab.
+/// (`- a` item, `b` term, `: def` definition), and so does panache
+/// since the lookahead reads the marker off the `StraddlingTab`
+/// verdict. (Flipped from three paragraphs by fix(parser): recognize
+/// definition markers behind a straddling tab.)
 #[test]
 fn tab_straddle_definition_marker_end_to_end() {
     let input = "- a\n\n  b\n\n\t: def\n";
     let tree = parse_blocks(input);
     assert_eq!(
         find_all(&tree, SyntaxKind::DEFINITION_LIST).len(),
-        0,
-        "pinned: no definition list forms today"
+        1,
+        "the marker behind the straddling tab defines `b` (matches pandoc)"
     );
     assert_lossless(input);
 }

@@ -850,17 +850,19 @@ means making the same judgment three times in three different helpers, which is
 the pathology performed once more. Feed them to that item's step 1 (the
 behavior-pinning table test) and let the verdict close them:
 
-- [ ] `next_line_is_definition_marker` still cannot see a marker whose indent is
-  a **tab straddling** the item's content column: `- a\n\n  b\n\n\t: def\n`
-  yields three paragraphs where pandoc yields a definition list. The strip,
-  not the detection frame, is what fails — `advance_columns`
-  (`container_prefix.rs:1050`) hits `next > target` on the tab and returns
-  the slice *starting at* it rather than reporting the straddle.
-  `emit_definition_marker` already emits literal indent bytes, so the
-  emission side is ready for it. Design input for the verdict enum: a
-  straddling tab is its own case, distinct from a genuinely short line,
-  since the line *does* reach the content column — there is just no byte
-  boundary to split on.
+- [x] `next_line_is_definition_marker` could not see a marker whose indent is a
+  **tab straddling** the item's content column: `- a\n\n  b\n\n\t: def\n`
+  yielded three paragraphs where pandoc yields a definition list. The strip,
+  not the detection frame, was what failed — `advance_columns` hits
+  `next > target` on the tab and returns the slice *starting at* it rather
+  than reporting the straddle. Closed by the typed verdict:
+  `FrameVerdict::StraddlingTab` reports the straddle as its own case
+  (distinct from a genuinely short line — the line *does* reach the content
+  column, there is just no byte boundary to split on), and the lookahead
+  reads the marker from behind the tab in the frame the tab's stop lands on.
+  `emit_definition_marker` already emitted literal indent bytes, so emission
+  needed no change. Pinned by the `definition_marker_tab_straddle` golden
+  case and the `frame_pinning` corpus.
 
 - [ ] `is_caption_followed_by_table` runs on the same over-stripping view as the
   term lookahead and has the same latent asymmetry. It is a *suppression*
