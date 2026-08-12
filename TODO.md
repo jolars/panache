@@ -842,6 +842,19 @@ losslessness failures, so they outrank the cosmetic issues above:
   this one is genuinely a formatter bug, unlike the item above it. Repro:
   `- item\n\n  : cap\n\n  ----\n  x\n  ----\n`
 
+One more in the caption probe, latent rather than failing (review finding on the
+container-frame PR, no reproducer yet):
+
+- [ ] The probe's container bound vets only the line the grid check *starts* on:
+  `is_caption_followed_by_table` runs `inside_container` on `pos`, but
+  `table_grid_starts_at` also reads `pos + 1` (the header-plus-separator
+  shape) and `find_single_column_table_end` scans further down, all
+  unvetted. A header at the content column with a dedented separator below
+  it could still read as the caption's table. Finding a repro needs a line
+  that is a valid table separator *and* a plausible block at the outer
+  level, so treat this as a bound-tightening refactor and verify any
+  candidate against `pandoc -f markdown -t native` first.
+
 Also still open, but **do not fix these individually** — they are input to
 "Consolidate container-frame resolution behind a single typed verdict" under
 `Parser > Architecture`, not competition for it. Each is one of the shapes where
