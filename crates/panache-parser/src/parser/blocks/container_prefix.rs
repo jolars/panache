@@ -600,6 +600,249 @@ impl ContainerPrefix {
     }
 }
 
+/// The authoritative answer to "which container frame is this line in,
+/// and does it reach the content column?".
+///
+/// The guiding principle: a strip must not be able to report *what is
+/// left of a line* without also reporting *whether the container indent
+/// it consumed was real*. Every variant carries the residual tail, so a
+/// caller cannot read one without seeing the other.
+///
+/// Scope bounds, by design:
+///
+/// - Blockquote laziness is not classified here. The Pandoc gobble
+///   (`lazy_blockquote_gobble`) is applied exactly as `strip` applies
+///   it; a line lazy at some quote depth still resolves relative to
+///   whatever the bq strip left. Room is left for a `LazyInQuote`
+///   variant if a caller ever needs the distinction.
+/// - Blank lines are not special-cased: an all-whitespace line short of
+///   a column reports `Dedented`/`FakedIndent` with whatever tail its
+///   whitespace leaves. Callers gate blanks with `is_blank_line` first,
+///   as every current lookahead already does.
+///
+/// The walk stops at the first op the line fails, so `rest` is measured
+/// in the frame of the ops applied up to that point and `op_index`
+/// names the failing op.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FrameVerdict<'a> {
+    /// Every op's columns and markers are covered by real prefix bytes,
+    /// with the content column on a byte boundary. `rest` is the tail
+    /// in the innermost frame — what emission-side strips produce.
+    Inside { rest: &'a str },
+    /// Real whitespace fell short of a `ContentIndent` op: the line has
+    /// dedented out of that content container. `rest` is the byte-honest
+    /// lazily trimmed tail (what [`strip_content_indent`] degrades to);
+    /// `cols_short` is the shortfall against that op's width.
+    Dedented {
+        rest: &'a str,
+        op_index: usize,
+        cols_short: u32,
+    },
+    /// A `ListAdvance` op not covered by real whitespace: the
+    /// column-blind strip would have faked the indent by eating content
+    /// bytes. The line is an under-indented lazy continuation, not
+    /// inside the item. `rest` is the byte-honest whitespace-only tail.
+    FakedIndent { rest: &'a str, op_index: usize },
+    /// The line *does* reach the op's column, but a tab straddles it:
+    /// there is no byte boundary to split on. Distinct from a genuinely
+    /// short line — the columns are all there. `rest` starts at the
+    /// straddling tab; `cols_before_tab` is the column where the tab
+    /// begins, so `line.len() - rest.len()` matches
+    /// [`gobbled_indent_prefix_len`]'s stop-before-the-tab byte count
+    /// when the straddled op is the first.
+    ///
+    /// [`gobbled_indent_prefix_len`]: super::super::utils::container_stack::gobbled_indent_prefix_len
+    StraddlingTab { rest: &'a str, cols_before_tab: u32 },
+}
+
+impl<'a> FrameVerdict<'a> {
+    /// Whether the line reaches every op's column — the typed
+    /// replacement for the hand-rolled
+    /// `leading_indent(line).0 >= content_col` tests, which are true
+    /// for a straddling tab as well (tabs count in columns).
+    #[allow(dead_code)]
+    pub fn reaches_frame(&self) -> bool {
+        matches!(
+            self,
+            FrameVerdict::Inside { .. } | FrameVerdict::StraddlingTab { .. }
+        )
+    }
+
+    /// The residual tail, whichever frame the walk ended in.
+    #[allow(dead_code)]
+    pub fn rest(&self) -> &'a str {
+        match self {
+            FrameVerdict::Inside { rest }
+            | FrameVerdict::Dedented { rest, .. }
+            | FrameVerdict::FakedIndent { rest, .. }
+            | FrameVerdict::StraddlingTab { rest, .. } => rest,
+        }
+    }
+}
+
+/// Outcome of advancing over whitespace-only bytes toward a column
+/// target. Private engine shared by the `ListAdvance` and
+/// `ContentIndent` arms of the verdict walk.
+enum ColumnAdvance<'a> {
+    /// The target column falls on a byte boundary; holds the tail.
+    Reached(&'a str),
+    /// A tab spans the target column; holds the tail starting at the
+    /// tab and the column where the tab begins.
+    Straddled { rest: &'a str, cols_before_tab: u32 },
+    /// The leading whitespace ends short of the target; holds the
+    /// columns it does cover.
+    Short { cols_have: u32 },
+}
+
+/// Advance up to `target` columns over spaces and tabs only (tab stop
+/// 4, matching [`leading_indent`]). Unlike [`advance_columns`], content
+/// bytes never count as columns, and a straddling tab is reported
+/// rather than silently kept or consumed.
+fn advance_ws_columns(s: &str, target: u32) -> ColumnAdvance<'_> {
+    let mut col = 0u32;
+    let mut bytes = 0usize;
+    for &b in s.as_bytes() {
+        if col >= target {
+            break;
+        }
+        match b {
+            b' ' => {
+                col += 1;
+                bytes += 1;
+            }
+            b'\t' => {
+                let next = (col / 4 + 1) * 4;
+                if next > target {
+                    return ColumnAdvance::Straddled {
+                        rest: &s[bytes..],
+                        cols_before_tab: col,
+                    };
+                }
+                col = next;
+                bytes += 1;
+            }
+            _ => break,
+        }
+    }
+    if col >= target {
+        ColumnAdvance::Reached(&s[bytes..])
+    } else {
+        ColumnAdvance::Short { cols_have: col }
+    }
+}
+
+impl ContainerPrefix {
+    /// Resolve `line` against this prefix's frame: the typed
+    /// counterpart of [`Self::strip`], for continuation lines and
+    /// lookahead. Reports whether every consumed column was real
+    /// whitespace instead of guessing.
+    #[allow(dead_code)]
+    pub fn resolve<'a>(&self, line: &'a str) -> FrameVerdict<'a> {
+        self.resolve_with_skip(line, None)
+    }
+
+    /// Resolve the dispatch line (line 0): the typed counterpart of
+    /// [`Self::strip_line_0_for_emission`]. The innermost `ListAdvance`
+    /// is skipped when `list_marker_consumed_on_line_0` is false, since
+    /// those bytes are the upstream-emitted marker, not indent.
+    #[allow(dead_code)]
+    pub fn resolve_line_0<'a>(&self, line: &'a str) -> FrameVerdict<'a> {
+        let skip = if self.list_marker_consumed_on_line_0 {
+            None
+        } else {
+            self.ops()
+                .iter()
+                .rposition(|op| matches!(op, StripOp::ListAdvance(_)))
+        };
+        self.resolve_with_skip(line, skip)
+    }
+
+    fn resolve_with_skip<'a>(&self, line: &'a str, skip_op: Option<usize>) -> FrameVerdict<'a> {
+        let ops = self.ops();
+        let mut s = line;
+        let mut i = 0;
+        while i < ops.len() {
+            match ops[i] {
+                StripOp::BlockQuoteMarker => {
+                    let run = blockquote_run_len(&ops[i..]);
+                    s = strip_bq_with_gobble(s, run, self.lazy_blockquote_gobble);
+                    i += run;
+                    continue;
+                }
+                StripOp::ListAdvance(n) => {
+                    if skip_op != Some(i) {
+                        match advance_ws_columns(s, n) {
+                            ColumnAdvance::Reached(rest) => s = rest,
+                            ColumnAdvance::Straddled {
+                                rest,
+                                cols_before_tab,
+                            } => {
+                                return FrameVerdict::StraddlingTab {
+                                    rest,
+                                    cols_before_tab,
+                                };
+                            }
+                            ColumnAdvance::Short { .. } => {
+                                return FrameVerdict::FakedIndent {
+                                    rest: strip_list_indent(s, n as usize),
+                                    op_index: i,
+                                };
+                            }
+                        }
+                    }
+                }
+                StripOp::ContentIndent(n) => match advance_ws_columns(s, n) {
+                    ColumnAdvance::Reached(rest) => s = rest,
+                    ColumnAdvance::Straddled {
+                        rest,
+                        cols_before_tab,
+                    } => {
+                        return FrameVerdict::StraddlingTab {
+                            rest,
+                            cols_before_tab,
+                        };
+                    }
+                    ColumnAdvance::Short { cols_have } => {
+                        return FrameVerdict::Dedented {
+                            rest: strip_content_indent(s, n as usize).0,
+                            op_index: i,
+                            cols_short: n - cols_have,
+                        };
+                    }
+                },
+            }
+            i += 1;
+        }
+        FrameVerdict::Inside { rest: s }
+    }
+}
+
+/// Resolve a bare content-indent column: the typed twin of
+/// [`strip_content_indent`], for callers that hold a pre-stripped line
+/// and an absolute column (the `parse_inner_content` family) rather
+/// than a [`ContainerPrefix`].
+#[allow(dead_code)]
+pub(crate) fn resolve_content_indent(line: &str, content_indent: usize) -> FrameVerdict<'_> {
+    if content_indent == 0 {
+        return FrameVerdict::Inside { rest: line };
+    }
+    match advance_ws_columns(line, content_indent as u32) {
+        ColumnAdvance::Reached(rest) => FrameVerdict::Inside { rest },
+        ColumnAdvance::Straddled {
+            rest,
+            cols_before_tab,
+        } => FrameVerdict::StraddlingTab {
+            rest,
+            cols_before_tab,
+        },
+        ColumnAdvance::Short { cols_have } => FrameVerdict::Dedented {
+            rest: strip_content_indent(line, content_indent).0,
+            op_index: 0,
+            cols_short: content_indent as u32 - cols_have,
+        },
+    }
+}
+
 fn apply_op(line: &str, op: StripOp) -> &str {
     match op {
         StripOp::ListAdvance(n) => advance_columns(line, n as usize),
@@ -1656,6 +1899,115 @@ mod tests {
         let p = ContainerPrefix::from_stack(&stack, false, Dialect::CommonMark);
         // Only the innermost (content_col=4) is applied.
         assert_eq!(p.strip("- - foo"), "foo");
+    }
+
+    #[test]
+    fn resolve_agrees_with_strip_when_indent_is_real() {
+        // On lines whose prefix bytes are all real, the verdict's tail
+        // is exactly what `strip` returns.
+        let p = ContainerPrefix::from_ops(
+            &[
+                StripOp::ContentIndent(4),
+                StripOp::ListAdvance(2),
+                StripOp::BlockQuoteMarker,
+            ],
+            false,
+        );
+        for line in ["      > b", "      >b", "       > b"] {
+            assert_eq!(
+                p.resolve(line),
+                FrameVerdict::Inside {
+                    rest: p.strip(line)
+                },
+                "resolve vs strip on {line:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_line_0_skips_the_unconsumed_marker_advance() {
+        // Mirrors `strip_line_0_for_emission`: with the marker not
+        // upstream-emitted, the innermost ListAdvance is not applied,
+        // so its columns are neither required nor consumed.
+        let p = ContainerPrefix::from_ops(&[StripOp::ListAdvance(2)], false);
+        assert_eq!(
+            p.resolve_line_0("continuation"),
+            FrameVerdict::Inside {
+                rest: "continuation"
+            }
+        );
+        // With the marker consumed, line 0 resolves like any line.
+        let p = ContainerPrefix::from_ops(&[StripOp::ListAdvance(2)], true);
+        assert_eq!(
+            p.resolve_line_0("c :"),
+            FrameVerdict::FakedIndent {
+                rest: "c :",
+                op_index: 0
+            }
+        );
+    }
+
+    #[test]
+    fn resolve_reports_the_first_failing_op() {
+        // [ContentIndent(4), ListAdvance(2)]: a line covering only the
+        // content indent fails the list advance, in the content frame.
+        let p =
+            ContainerPrefix::from_ops(&[StripOp::ContentIndent(4), StripOp::ListAdvance(2)], false);
+        assert_eq!(
+            p.resolve("    x"),
+            FrameVerdict::FakedIndent {
+                rest: "x",
+                op_index: 1
+            }
+        );
+        // A line short of the content indent never reaches the list op.
+        assert_eq!(
+            p.resolve("  x"),
+            FrameVerdict::Dedented {
+                rest: "x",
+                op_index: 0,
+                cols_short: 2
+            }
+        );
+    }
+
+    #[test]
+    fn resolve_content_indent_matches_the_leading_indent_gate() {
+        // The migration contract for the hand-rolled
+        // `leading_indent(line).0 >= content_col` sites:
+        // `reaches_frame()` is equivalent, straddling tabs included
+        // (leading_indent counts tab *columns*).
+        for (line, col) in [
+            ("    x", 4),
+            ("   x", 4),
+            ("\tx", 4),
+            ("\t: def", 2),
+            ("  \t x", 8),
+            ("x", 4),
+            ("", 4),
+            ("  x", 0),
+        ] {
+            let verdict = resolve_content_indent(line, col);
+            assert_eq!(
+                verdict.reaches_frame(),
+                leading_indent(line).0 >= col,
+                "reaches_frame vs leading_indent gate on ({line:?}, {col})"
+            );
+        }
+        // The straddle carries the byte-honest tail and stop column.
+        assert_eq!(
+            resolve_content_indent("\t: def", 2),
+            FrameVerdict::StraddlingTab {
+                rest: "\t: def",
+                cols_before_tab: 0
+            }
+        );
+        // Reached and short tails match `strip_content_indent`.
+        assert_eq!(resolve_content_indent("    x", 4).rest(), "x");
+        assert_eq!(
+            resolve_content_indent("  x", 4).rest(),
+            strip_content_indent("  x", 4).0
+        );
     }
 
     #[test]

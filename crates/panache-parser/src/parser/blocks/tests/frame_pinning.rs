@@ -17,7 +17,7 @@
 use super::helpers::*;
 use crate::options::Dialect;
 use crate::parser::blocks::container_prefix::{
-    ContainerPrefix, StripOp, StrippedLines, advance_columns, strip_content_indent,
+    ContainerPrefix, FrameVerdict, StripOp, StrippedLines, advance_columns, strip_content_indent,
     strip_list_indent,
 };
 use crate::parser::blocks::definition_lists::{
@@ -51,6 +51,10 @@ struct PinRow {
     /// `(content_col, expected)` for `gobbled_indent_prefix_len`, where
     /// meaningful for the row's innermost content column.
     gobbled_len: Option<(usize, usize)>,
+    /// What `ContainerPrefix::resolve` reports for the row — the typed
+    /// verdict every migrated caller reads. Documents, per disagreement
+    /// row, which legacy helper the verdict sides with.
+    verdict: FrameVerdict<'static>,
     /// Which commit of the consolidation is expected to flip which
     /// column. Empty = frozen: these values must survive the refactor.
     expected_to_change: &'static str,
@@ -73,6 +77,10 @@ const PINS: &[PinRow] = &[
         reaches_content_column: true,
         peek_prefix: ": def",
         gobbled_len: Some((2, 0)),
+        verdict: FrameVerdict::StraddlingTab {
+            rest: "\t: def",
+            cols_before_tab: 0,
+        },
         expected_to_change: "verdict reports StraddlingTab; lookahead flip lands in \
                              fix(parser): recognize definition markers behind a straddling tab",
     },
@@ -88,6 +96,10 @@ const PINS: &[PinRow] = &[
         reaches_content_column: false,
         peek_prefix: "c :",
         gobbled_len: Some((2, 0)),
+        verdict: FrameVerdict::FakedIndent {
+            rest: "c :",
+            op_index: 0,
+        },
         expected_to_change: "",
     },
     PinRow {
@@ -100,6 +112,7 @@ const PINS: &[PinRow] = &[
         reaches_content_column: true,
         peek_prefix: ": def",
         gobbled_len: Some((2, 2)),
+        verdict: FrameVerdict::Inside { rest: ": def" },
         expected_to_change: "",
     },
     // DISAGREES: the issue_209 shape ([ContentIndent, ListAdvance,
@@ -124,6 +137,7 @@ const PINS: &[PinRow] = &[
         reaches_content_column: true,
         peek_prefix: "> b",
         gobbled_len: None,
+        verdict: FrameVerdict::Inside { rest: "b" },
         expected_to_change: "peek converges on the op walk in refactor(parser): make \
                              emission a faithful op walk",
     },
@@ -141,6 +155,11 @@ const PINS: &[PinRow] = &[
         reaches_content_column: false,
         peek_prefix: "----",
         gobbled_len: Some((4, 0)),
+        verdict: FrameVerdict::Dedented {
+            rest: "----",
+            op_index: 0,
+            cols_short: 4,
+        },
         expected_to_change: "",
     },
     // `strip_content_indent` degrades gracefully on a short line: it
@@ -155,6 +174,11 @@ const PINS: &[PinRow] = &[
         reaches_content_column: false,
         peek_prefix: "x",
         gobbled_len: Some((4, 2)),
+        verdict: FrameVerdict::Dedented {
+            rest: "x",
+            op_index: 0,
+            cols_short: 2,
+        },
         expected_to_change: "",
     },
 ];
@@ -198,6 +222,12 @@ fn pinned_prefix_helper_matrix() {
                 row.name
             );
         }
+        assert_eq!(
+            prefix.resolve(row.line),
+            row.verdict,
+            "{}: resolve",
+            row.name
+        );
         // Documentation only; asserted nothing so a planned flip is an
         // expected-value edit on the row, not a driver change.
         let _ = row.expected_to_change;
