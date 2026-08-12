@@ -1474,6 +1474,17 @@ Adjacent, found while fixing the losslessness bugs the same harness turned up:
   sourced from `content_container_indent`), which underestimates the frame for
   multi-section stacks --- fixing that needs its own pandoc-verified fixtures.
 
+  Measured cost of the consolidation (`benches/formatting`, alternating runs vs
+  `main`, medians): about 2% on the definition-heavy `pandoc_manual.md` (parse
+  +2.0%, pre-built-CST format +1.6%), 0-1% on the other corpus docs. Prime
+  suspects, if it ever matters: the continuation policy now builds a
+  `ContainerPrefix::from_stack` plus `StrippedLines` window per non-blank
+  lookahead line (an ops `Vec` allocation on a warm path --- cache it per policy
+  evaluation, or make `ops` a `SmallVec`), and the formatter now runs
+  `guard_definition_marker_start` on list-continuation, footnote, and admonition
+  paragraphs. Accepted as the price of the correctness wins; not worth a fix
+  until a profile says so.
+
   The bug stream says this is where the defects are. Of the last 300 commits,
   120 are fixes and 77 of those are `fix(parser)`; 44 of the 77 (57%) name a
   frame concept (indent, column, list, item, blockquote, definition, lazy,
