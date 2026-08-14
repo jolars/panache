@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.21.0](https://github.com/jolars/panache/compare/panache-formatter-v0.20.5...panache-formatter-v0.21.0) (2026-08-14)
+
+### Features
+- **parser:** tag container prefix as `LINE_PREFIX` ([`1d4ac7c`](https://github.com/jolars/panache/commit/1d4ac7c1720dd51328917b6747f84628d8637bcd))
+
+### Bug Fixes
+- **formatter:** strip source container indent from code ([`b6304a5`](https://github.com/jolars/panache/commit/b6304a52959b12fa5bab958d626c66b14c395fc8)), closes [#498](https://github.com/jolars/panache/issues/498)
+- **formatter:** collapse pipe-table cell whitespace ([`69c5282`](https://github.com/jolars/panache/commit/69c52825edeeb3a7fabfed0332d1ef53741b6d1b))
+- **formatter:** collapse simple-table cell whitespace ([`840562c`](https://github.com/jolars/panache/commit/840562c6a3d9fe50bea4fb3cc52952b91da04d47))
+- **parser:** split row bands at hybrid sep lines ([`712fee3`](https://github.com/jolars/panache/commit/712fee3fd3fc2fca3c3323fe66d10dd4e9ab1297))
+- **formatter:** align simple tables like pandoc ([`488fa81`](https://github.com/jolars/panache/commit/488fa810f3dfa8c6bf751fe0f094c3b41f2b451c))
+- **parser:** nest ordered marker at content column ([`0f50724`](https://github.com/jolars/panache/commit/0f507241a08fbb117d87e2014d4978a6c1cdcadc))
+- **formatter:** keep literal `>` in quoted list items ([`d16000d`](https://github.com/jolars/panache/commit/d16000d4cdfc69f07668d7c58c81163e5ab562ee))
+- **formatter:** stop quote depth at list item ([`54a6059`](https://github.com/jolars/panache/commit/54a6059cc58c9ed090c3603e9de74d0207bdaba8))
+- **formatter:** keep nested list indent in quotes ([`d16845e`](https://github.com/jolars/panache/commit/d16845ef2d10d49b0627ca720ece4b2add1afc3b))
+- **parser:** apply table footer rule at run ends ([`89bc3cd`](https://github.com/jolars/panache/commit/89bc3cdb7403fea2fcd53ae06a7abd8dfc1c0e9e))
+- **parser:** keep rowspan grids whole in containers ([`2e5ac3b`](https://github.com/jolars/panache/commit/2e5ac3b1f5aec13e97b7a7d26358ee0f54a57124))
+- **linter:** dedent code sent to external linters ([`9e374a6`](https://github.com/jolars/panache/commit/9e374a6811a89133c7cb8cb00c8b888e15169395))
+- **formatter:** dedent table verbatim fallbacks ([`a5a026d`](https://github.com/jolars/panache/commit/a5a026da5b857e5c81f533e251f53d368374966c))
+- **formatter:** lay out grid tables on dedented lines ([`ba20f86`](https://github.com/jolars/panache/commit/ba20f8605f6e942d3f5896cb2508646dd744a1bf))
+- **parser:** take pipe table columns from the delimiter row ([`d194da2`](https://github.com/jolars/panache/commit/d194da21162ba97d4a98fec598e69a6d4f097849))
+- **parser:** open a container body with a pipe table ([`0e11028`](https://github.com/jolars/panache/commit/0e11028bde7eb5ce82ca0c0fcfa3f32a56e079d7))
+- **formatter:** measure table columns past quote prefix ([`2b9f223`](https://github.com/jolars/panache/commit/2b9f223f39b6e5c5e3049d4700165b21c923bef1))
+- **formatter:** keep unhandled blocks inside the blockquote ([`82041d5`](https://github.com/jolars/panache/commit/82041d52ef586f45b45d5a8e4ba3e93093fda136))
+- **formatter:** prefix `PLAIN` children in quotes ([`fb8b610`](https://github.com/jolars/panache/commit/fb8b61066aa42ccc36da5a5e9e4efa8b74ccaaeb))
+- **formatter:** indent nested container tables ([`71d2df9`](https://github.com/jolars/panache/commit/71d2df955b18f5964d22a46b1e76b7d0034c10e2))
+- **formatter:** guard definition markers in container bodies ([`8c1535d`](https://github.com/jolars/panache/commit/8c1535d2aa566ebda7d796a012d5fbd1adddd4df))
+- **parser:** promote a one-line body to a term ([`952007e`](https://github.com/jolars/panache/commit/952007ecfff515f1ee111d68dc22900ca3c15f8e))
+- **parser:** end a definition body block at a `:` marker ([`928af1a`](https://github.com/jolars/panache/commit/928af1a0c1f774995812c15069bcd09a166d0bc1))
+- **parser:** end a list item block at a `:` marker ([`d2ed198`](https://github.com/jolars/panache/commit/d2ed1984203d5b8be1ba3fa033ef0b2607a3e4fb))
+- **formatter:** drop over-broad citation reflow guard ([`531fb80`](https://github.com/jolars/panache/commit/531fb803841e8b9de334a0fe25e93814fc8b223e))
+- **math:** keep `:=` glued as one relation ([`a65bb40`](https://github.com/jolars/panache/commit/a65bb4035a29a31d648f6d041763c60c53a5da47)), closes [#487](https://github.com/jolars/panache/issues/487)
+- **formatter:** join a lazy fence run into its code span ([`7081c0c`](https://github.com/jolars/panache/commit/7081c0cd75904b390738be5f5b87a8ce1fa33ce9)), closes [#485](https://github.com/jolars/panache/issues/485)
+- **parser:** support `-` as `.unnumbered` shorthand ([`f8f6e67`](https://github.com/jolars/panache/commit/f8f6e67515c4b10a3a4de16c8a8d54d7b8325a47)), closes [#467](https://github.com/jolars/panache/issues/467)
+- **parser:** nest a definition list inside its list item ([`c143a96`](https://github.com/jolars/panache/commit/c143a96c9d2fd20292a6c663deca9c061e6aad14))
+- **parser:** require a definition term to be a one-line block ([`9ff8596`](https://github.com/jolars/panache/commit/9ff85960fbdd8919e5c8f60acb4b76272ec88c91))
+- **formatter:** keep blank after leading list-item block ([`3226741`](https://github.com/jolars/panache/commit/322674199284c19f3a7108b8afc9e2908a1baeab))
+- **formatter:** expand code-span tabs from source column ([`ff7dafa`](https://github.com/jolars/panache/commit/ff7dafa924e80cc04e8b2c271151c0bbb7173e7d))
+
+### Dependencies
+- updated crates/panache-parser to v0.26.0
+
 ## [0.20.5](https://github.com/jolars/panache/compare/panache-formatter-v0.20.4...panache-formatter-v0.20.5) (2026-08-07)
 
 ### Bug Fixes
