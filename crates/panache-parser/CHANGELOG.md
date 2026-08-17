@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.27.0](https://github.com/jolars/panache/compare/panache-parser-v0.26.0...panache-parser-v0.27.0) (2026-08-17)
+
+### Features
+- **parser:** add a bounded region tier, tried last ([`be854b2`](https://github.com/jolars/panache/commit/be854b2bcc4d6dbbe2c739b65f69a88d111ea898))
+- **parser:** add a fragment parse entry point ([`c0c1df4`](https://github.com/jolars/panache/commit/c0c1df4b6d051877ccacbfcf3351853b36aa0c0a))
+- **parser:** splice a single prose `TEXT` token in place ([`4f020ff`](https://github.com/jolars/panache/commit/4f020ff2abd01991357d58c82f5deb3eb1d4e052))
+
+### Bug Fixes
+- **parser:** decline splices below a retained definition list ([`c60535c`](https://github.com/jolars/panache/commit/c60535c2617cea92b4faddda7d5be32c4131290e))
+- **pandoc-ast:** gate smart typography on the flavor ([`23bb54a`](https://github.com/jolars/panache/commit/23bb54a47ca784c5af28389dc58b021dd50cb1ee))
+- **parser:** anchor yaml metadata delimiters at column 0 ([`55e3999`](https://github.com/jolars/panache/commit/55e3999730d4987bc37f369733ed0f420d9e6c40))
+- **config:** disable `auto-identifiers` for `mdsvex` ([`21818ec`](https://github.com/jolars/panache/commit/21818ec918c55d8b38005e2cd279e844dd25891d))
+- gate heading auto-ids on `auto_identifiers` ([`efd4ae0`](https://github.com/jolars/panache/commit/efd4ae053acdad06f0f559ffdff803fd77348bf8))
+- **parser:** gate heading attrs on `header_attributes` ([`1291394`](https://github.com/jolars/panache/commit/1291394ee4edce57b65766119eacd4afd9e509c2))
+- **parser:** close headings on a spaceless `#` run ([`16ce2a0`](https://github.com/jolars/panache/commit/16ce2a0fa9cddd7b3ef39e8041929078dabfe5d8))
+- **parser:** read heading attrs after `#` run ([`52147de`](https://github.com/jolars/panache/commit/52147de9874eea75020ebcfd8cbbf5c301745731))
+- **parser:** enable `escaped_line_breaks` for `gfm` ([`6a9c0f6`](https://github.com/jolars/panache/commit/6a9c0f6cd29579158b5c4e429167f393f183df09))
+- **parser:** keep an escaped space out of the attribute gap ([`241310e`](https://github.com/jolars/panache/commit/241310ec9355c4f5ea058f66441015881730e6e7))
+- **parser:** fold whitespace into a backslash line break ([`eaf42a0`](https://github.com/jolars/panache/commit/eaf42a00e77fe3bfda14a01e1568605f5b9c2785))
+- **parser:** read a heading's trailing `\` as a line break ([`3ba1faf`](https://github.com/jolars/panache/commit/3ba1faf1624453560778175341ce6ae9e44f5c27))
+- **parser:** keep trailing `\` literal in CommonMark ([`cab28d3`](https://github.com/jolars/panache/commit/cab28d3a857eb7a85640dc264a95c2c5ab8f9be9))
+- **parser:** tighten whitespace hard-break rule ([`338743c`](https://github.com/jolars/panache/commit/338743c4c72e364e17802557eccda7e13167955b))
+
+### Performance Improvements
+- **parser:** promote the region tier ahead of the windows ([`1868fb0`](https://github.com/jolars/panache/commit/1868fb0509ffdeecc713349cabff0bb297e691a9))
+- **parser:** stop reading the old text through the whole tree ([`cd1a769`](https://github.com/jolars/panache/commit/cd1a769dcba94dbb8faa96307e479aba32aed363))
+- **bench:** measure the token tier, and keep the cutoff pair honest ([`6bedeb3`](https://github.com/jolars/panache/commit/6bedeb3e61abf377a02caac725472e0e0c6964bd))
+- **parser:** serve backtick and space runs from a static pool ([`050f809`](https://github.com/jolars/panache/commit/050f809fe4ffd6d2e1e53eaa983a097331ab1368))
+- **parser:** reuse the validator's YAML tree in `prepare_yaml_content` ([`7a1533b`](https://github.com/jolars/panache/commit/7a1533bb9293a272bb4f6b3e9626d89f35c0d406))
+- **parser:** byte-gate `try_parse_horizontal_rule` before trim ([`1b7b417`](https://github.com/jolars/panache/commit/1b7b4178bd822c0b680da9b7da2d8723ee3db775))
+
 ## [0.26.0](https://github.com/jolars/panache/compare/panache-parser-v0.25.0...panache-parser-v0.26.0) (2026-08-14)
 
 ### Features

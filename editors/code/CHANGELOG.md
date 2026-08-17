@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.5.0](https://github.com/jolars/panache/compare/panache-code-v3.4.0...panache-code-v3.5.0) (2026-08-17)
+
+### Features
+- **editors:** mark incremental parsing setting deprecated ([`f0b1935`](https://github.com/jolars/panache/commit/f0b1935daa466842a033961875e8f03bcb94ee91))
+- **editors:** default incremental parsing to on ([`a8b7a3b`](https://github.com/jolars/panache/commit/a8b7a3bf5337118bb93df1349a3b5d6e9769678c))
+
+### Dependencies
+- updated panache to v3.5.0
+
 ## [3.4.0](https://github.com/jolars/panache/compare/panache-code-v3.3.0...panache-code-v3.4.0) (2026-08-14)
 
 ### Dependencies

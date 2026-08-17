@@ -1,8 +1,50 @@
 # Changelog
 
-## Unreleased
+## [3.5.0](https://github.com/jolars/panache/compare/v3.4.0...v3.5.0) (2026-08-17)
 
 The major new change in this version is that incremental parsing is on by default. It was previously opt-in and controlled by `experimental.incrementalParsing`, but that setting is now true by default and deprecated. Please let me know if you encounter any issues with this change.
+
+### Features
+- **parser:** add a bounded region tier, tried last ([`be854b2`](https://github.com/jolars/panache/commit/be854b2bcc4d6dbbe2c739b65f69a88d111ea898))
+- **lsp:** deprecate `experimental.incrementalParsing` ([`81520e8`](https://github.com/jolars/panache/commit/81520e880bc84c9f96e3caecd7563a2d978530fb))
+- **lsp:** parse incrementally by default ([`72eb2da`](https://github.com/jolars/panache/commit/72eb2da0256887f1badf727211bfb7684ca78ad6))
+
+### Bug Fixes
+- **parser:** decline splices below a retained definition list ([`c60535c`](https://github.com/jolars/panache/commit/c60535c2617cea92b4faddda7d5be32c4131290e))
+- **lsp:** clamp and normalize out-of-range `didChange` ranges ([`4ff7dc0`](https://github.com/jolars/panache/commit/4ff7dc03f937b7c2c37e40152fd58744c1e9f2c2))
+- **lsp:** re-admit the reparse base when config reloads ([`749c3ae`](https://github.com/jolars/panache/commit/749c3aeea01a48a526c24dbfdd770f5afc8b7bc7))
+- **cli:** name the offending file in `io::Error`s ([`70f79db`](https://github.com/jolars/panache/commit/70f79db21a6631c2402e1f6feeede4c5b5a03f52))
+- **cli:** print top-level errors via `Display` ([`f631502`](https://github.com/jolars/panache/commit/f631502487cc67fbacd36591535ee03858d3eceb))
+- **pandoc-ast:** gate smart typography on the flavor ([`23bb54a`](https://github.com/jolars/panache/commit/23bb54a47ca784c5af28389dc58b021dd50cb1ee))
+- **parser:** anchor yaml metadata delimiters at column 0 ([`55e3999`](https://github.com/jolars/panache/commit/55e3999730d4987bc37f369733ed0f420d9e6c40))
+- **config:** disable `auto-identifiers` for `mdsvex` ([`21818ec`](https://github.com/jolars/panache/commit/21818ec918c55d8b38005e2cd279e844dd25891d))
+- gate heading auto-ids on `auto_identifiers` ([`efd4ae0`](https://github.com/jolars/panache/commit/efd4ae053acdad06f0f559ffdff803fd77348bf8))
+- **parser:** gate heading attrs on `header_attributes` ([`1291394`](https://github.com/jolars/panache/commit/1291394ee4edce57b65766119eacd4afd9e509c2))
+- **formatter:** stop trimming heading content hashes ([`cee2dbf`](https://github.com/jolars/panache/commit/cee2dbfe3efa3a240b838aa5dbd4e1f2dba3d1d6))
+- **parser:** read heading attrs after `#` run ([`52147de`](https://github.com/jolars/panache/commit/52147de9874eea75020ebcfd8cbbf5c301745731))
+- **parser:** enable `escaped_line_breaks` for `gfm` ([`6a9c0f6`](https://github.com/jolars/panache/commit/6a9c0f6cd29579158b5c4e429167f393f183df09))
+- **parser:** keep an escaped space out of the attribute gap ([`241310e`](https://github.com/jolars/panache/commit/241310ec9355c4f5ea058f66441015881730e6e7))
+- **parser:** fold whitespace into a backslash line break ([`eaf42a0`](https://github.com/jolars/panache/commit/eaf42a00e77fe3bfda14a01e1568605f5b9c2785))
+- **parser:** read a heading's trailing `\` as a line break ([`3ba1faf`](https://github.com/jolars/panache/commit/3ba1faf1624453560778175341ce6ae9e44f5c27))
+- **parser:** keep trailing `\` literal in CommonMark ([`cab28d3`](https://github.com/jolars/panache/commit/cab28d3a857eb7a85640dc264a95c2c5ab8f9be9))
+- **formatter:** drop trailing whitespace under `wrap = preserve` ([`d3fdd9f`](https://github.com/jolars/panache/commit/d3fdd9fc1e259112462709cbad91e3135010eb63)), closes [#496](https://github.com/jolars/panache/issues/496)
+
+### Performance Improvements
+- **lsp:** publish diagnostics with one line index ([`7b1bb0d`](https://github.com/jolars/panache/commit/7b1bb0da91e60d0c1339df3a8e9503afdfad4e3b))
+- **lsp:** serve one line index to both phases ([`86bea8f`](https://github.com/jolars/panache/commit/86bea8f1a355fdb3e556f2cebc16652766a02bc0))
+- **lsp:** reuse the write phase's line index ([`56beaf5`](https://github.com/jolars/panache/commit/56beaf522bc31607738749f5796f68095ce94f7e))
+- **parser:** promote the region tier ahead of the windows ([`1868fb0`](https://github.com/jolars/panache/commit/1868fb0509ffdeecc713349cabff0bb297e691a9))
+- **bench:** measure the region tier and calibrate its floors ([`9e47933`](https://github.com/jolars/panache/commit/9e479338bd97963244ae149d7548af713e204487))
+- **bench:** calibrate the token tier's floors from a measured gate ([`b5dd291`](https://github.com/jolars/panache/commit/b5dd29149ea5ae65f851f000c4215a3eb9fbf643))
+- **bench:** measure the token tier, and keep the cutoff pair honest ([`6bedeb3`](https://github.com/jolars/panache/commit/6bedeb3e61abf377a02caac725472e0e0c6964bd))
+- **lsp:** splice once through one index per `didChange` ([`4a3588f`](https://github.com/jolars/panache/commit/4a3588ffaec0757dfc32d6e2b9aa381be5d0abe7))
+- **lsp:** index lines over the text instead of a wide-char table ([`0c82fa0`](https://github.com/jolars/panache/commit/0c82fa0ec27b491c87694b045628cd21fbd42b6a))
+- **salsa:** skip writes that store what is already there ([`f44edd9`](https://github.com/jolars/panache/commit/f44edd9f5e65a31424febad6ff4b34c141581d5e))
+- **lsp:** stop resolving config on every keystroke ([`fea6d54`](https://github.com/jolars/panache/commit/fea6d544632c3e4fe9bebe41d176fc2aa96bcacc))
+
+### Dependencies
+- updated crates/panache-formatter to v0.21.1
+- updated crates/panache-parser to v0.27.0
 
 ## [3.4.0](https://github.com/jolars/panache/compare/v3.3.0...v3.4.0) (2026-08-14)
 

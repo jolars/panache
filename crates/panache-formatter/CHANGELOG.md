@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.21.1](https://github.com/jolars/panache/compare/panache-formatter-v0.21.0...panache-formatter-v0.21.1) (2026-08-17)
+
+### Bug Fixes
+- **parser:** anchor yaml metadata delimiters at column 0 ([`55e3999`](https://github.com/jolars/panache/commit/55e3999730d4987bc37f369733ed0f420d9e6c40))
+- gate heading auto-ids on `auto_identifiers` ([`efd4ae0`](https://github.com/jolars/panache/commit/efd4ae053acdad06f0f559ffdff803fd77348bf8))
+- **formatter:** stop trimming heading content hashes ([`cee2dbf`](https://github.com/jolars/panache/commit/cee2dbfe3efa3a240b838aa5dbd4e1f2dba3d1d6))
+- **formatter:** keep a load-bearing heading `#` run ([`be48179`](https://github.com/jolars/panache/commit/be481798358fc2722da2a3dbb1241bdb4d27bb80))
+- **parser:** fold whitespace into a backslash line break ([`eaf42a0`](https://github.com/jolars/panache/commit/eaf42a00e77fe3bfda14a01e1568605f5b9c2785))
+- **formatter:** drop trailing whitespace under `wrap = preserve` ([`d3fdd9f`](https://github.com/jolars/panache/commit/d3fdd9fc1e259112462709cbad91e3135010eb63)), closes [#496](https://github.com/jolars/panache/issues/496)
+
+### Dependencies
+- updated crates/panache-parser to v0.27.0
+
 ## [0.21.0](https://github.com/jolars/panache/compare/panache-formatter-v0.20.5...panache-formatter-v0.21.0) (2026-08-14)
 
 ### Features

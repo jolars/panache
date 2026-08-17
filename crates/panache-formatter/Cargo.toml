@@ -1,6 +1,6 @@
 [package]
 name = "panache-formatter"
-version = "0.21.0"
+version = "0.21.1"
 edition.workspace = true
 rust-version.workspace = true
 include = [
@@ -19,7 +19,7 @@ keywords = ["quarto", "pandoc", "markdown", "formatter"]
 categories = ["text-processing"]
 
 [dependencies]
-panache-parser = { path = "../panache-parser", version = "0.26.0" }
+panache-parser = { path = "../panache-parser", version = "0.27.0" }
 log = { version = "0.4.31", features = ["release_max_level_debug"] }
 rowan = "0.17.0"
 serde = { version = "1.0.228", features = ["derive"], optional = true }
