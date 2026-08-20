@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.27.2](https://github.com/jolars/panache/compare/panache-parser-v0.27.1...panache-parser-v0.27.2) (2026-08-20)
+
+### Bug Fixes
+- **parser:** disambiguate citations from links ([`f12dd2a`](https://github.com/jolars/panache/commit/f12dd2a25575e14dfafe0d7b10c0801ec33c2d40))
+
 ## [0.27.1](https://github.com/jolars/panache/compare/panache-parser-v0.27.0...panache-parser-v0.27.1) (2026-08-20)
 
 ### Bug Fixes

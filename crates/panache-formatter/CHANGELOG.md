@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.21.3](https://github.com/jolars/panache/compare/panache-formatter-v0.21.2...panache-formatter-v0.21.3) (2026-08-20)
+
+### Bug Fixes
+- **formatter:** keep trailing citations with sentences ([`9accb4f`](https://github.com/jolars/panache/commit/9accb4f5e7a7db2960ab5787d4be536a5e4b54fc)), fixes [#505](https://github.com/jolars/panache/issues/505)
+- **formatter:** compose embedded math environments ([`43a3b80`](https://github.com/jolars/panache/commit/43a3b801dd463d9f76f7bf759315d2f54f0b2061))
+- **formatter:** preserve starred math commands ([`8e73a5c`](https://github.com/jolars/panache/commit/8e73a5c2ab642d5268825f1c456b3ddd3b491f9c))
+- **formatter:** escape tildes contextually ([`74d82ad`](https://github.com/jolars/panache/commit/74d82ad309869a79d7b0ce96aed0ad0948ccac10)), fixes [#501](https://github.com/jolars/panache/issues/501)
+
+### Dependencies
+- updated crates/panache-parser to v0.27.2
+
 ## [0.21.2](https://github.com/jolars/panache/compare/panache-formatter-v0.21.1...panache-formatter-v0.21.2) (2026-08-20)
 
 ### Bug Fixes
