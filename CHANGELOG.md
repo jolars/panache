@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.6.0](https://github.com/jolars/panache/compare/v3.5.0...v3.6.0) (2026-08-20)
+
+### Features
+- **linter:** flag split inline footnotes ([`36429c0`](https://github.com/jolars/panache/commit/36429c00b5dc6a55b532195a15d32806cb1bc6db))
+
+### Bug Fixes
+- **formatter:** preserve R T and F aliases ([`153ea95`](https://github.com/jolars/panache/commit/153ea957138f7be00f3634ec13864da4217fb858))
+- **parser:** trim bare URI punctuation ([`1c468d6`](https://github.com/jolars/panache/commit/1c468d6a3c46a71807726fe7404668f30807cd27))
+- regenerate panache schema ([`d97818d`](https://github.com/jolars/panache/commit/d97818d953fb2b7c82a04441df8aafa0025c68ab))
+
+### Performance Improvements
+- **parser:** share block parser registry ([`7681de4`](https://github.com/jolars/panache/commit/7681de440923900c9ad7805bc63694f7f00c0181))
+- **lsp:** carry edits into reparsing ([`72d86cf`](https://github.com/jolars/panache/commit/72d86cfbbbbe3e2bed4d84fd17a8c0cef5018ab6))
+- **lsp:** defer refdef scans until fallback ([`f0be83a`](https://github.com/jolars/panache/commit/f0be83a1cbd0722cf19b77f42457c442bf148eaa))
+
+### Dependencies
+- updated crates/panache-formatter to v0.21.2
+- updated crates/panache-parser to v0.27.1
+
 ## [3.5.0](https://github.com/jolars/panache/compare/v3.4.0...v3.5.0) (2026-08-17)
 
 The major new change in this version is that incremental parsing is on by default. It was previously opt-in and controlled by `experimental.incrementalParsing`, but that setting is now true by default and deprecated. Please let me know if you encounter any issues with this change.

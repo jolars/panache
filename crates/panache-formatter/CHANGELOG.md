@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.2](https://github.com/jolars/panache/compare/panache-formatter-v0.21.1...panache-formatter-v0.21.2) (2026-08-20)
+
+### Bug Fixes
+- **formatter:** preserve R T and F aliases ([`153ea95`](https://github.com/jolars/panache/commit/153ea957138f7be00f3634ec13864da4217fb858))
+
+### Dependencies
+- updated crates/panache-parser to v0.27.1
+
 ## [0.21.1](https://github.com/jolars/panache/compare/panache-formatter-v0.21.0...panache-formatter-v0.21.1) (2026-08-17)
 
 ### Bug Fixes

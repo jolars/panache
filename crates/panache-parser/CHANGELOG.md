@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.27.1](https://github.com/jolars/panache/compare/panache-parser-v0.27.0...panache-parser-v0.27.1) (2026-08-20)
+
+### Bug Fixes
+- **formatter:** preserve R T and F aliases ([`153ea95`](https://github.com/jolars/panache/commit/153ea957138f7be00f3634ec13864da4217fb858))
+- **parser:** trim bare URI punctuation ([`1c468d6`](https://github.com/jolars/panache/commit/1c468d6a3c46a71807726fe7404668f30807cd27))
+
+### Performance Improvements
+- **parser:** share block parser registry ([`7681de4`](https://github.com/jolars/panache/commit/7681de440923900c9ad7805bc63694f7f00c0181))
+
 ## [0.27.0](https://github.com/jolars/panache/compare/panache-parser-v0.26.0...panache-parser-v0.27.0) (2026-08-17)
 
 ### Features
