@@ -10,7 +10,7 @@ authors = ["Johan Larsson <johan@jolars.co>"]
 
 [package]
 name = "panache"
-version = "3.6.1"
+version = "3.6.2"
 edition.workspace = true
 rust-version.workspace = true
 # `distill_quarto_schema` is a dev-only vendoring bin (src/bin/); keep bare

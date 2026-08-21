@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.6.2](https://github.com/jolars/panache/compare/v3.6.1...v3.6.2) (2026-08-21)
+
+### Performance Improvements
+- **lsp:** stop interning definition labels ([`15fbe12`](https://github.com/jolars/panache/commit/15fbe124a2ccbddd9f863fecf9d999314fda443f))
+
 ## [3.6.1](https://github.com/jolars/panache/compare/v3.6.0...v3.6.1) (2026-08-20)
 
 ### Bug Fixes
