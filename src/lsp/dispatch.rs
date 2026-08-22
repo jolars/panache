@@ -221,6 +221,31 @@ pub(crate) fn runtime_incremental_parsing_from_value(value: &Value) -> Option<bo
     .or_else(|| get_bool(value, &["experimental", "incrementalParsing"]))
 }
 
+/// Read the document-symbol mode from client initialization or workspace
+/// settings. `all` preserves the full Panache outline, while `headings` omits
+/// frontmatter, tables, and figures for clients that present an outline as a
+/// heading navigator.
+pub(crate) fn runtime_document_symbol_mode_from_value(
+    value: &Value,
+) -> Option<crate::lsp::DocumentSymbolMode> {
+    fn get_str<'a>(value: &'a Value, path: &[&str]) -> Option<&'a str> {
+        let mut current = value;
+        for key in path {
+            current = current.get(key)?;
+        }
+        current.as_str()
+    }
+
+    let value = get_str(value, &["settings", "panache", "documentSymbols"])
+        .or_else(|| get_str(value, &["panache", "documentSymbols"]))
+        .or_else(|| get_str(value, &["documentSymbols"]))?;
+    match value {
+        "all" => Some(crate::lsp::DocumentSymbolMode::All),
+        "headings" => Some(crate::lsp::DocumentSymbolMode::Headings),
+        _ => None,
+    }
+}
+
 /// Incremental parsing is on unless something turns it off: the environment
 /// override first, then the client setting, then the default.
 ///
@@ -274,6 +299,14 @@ impl GlobalState {
         log::debug!(
             "lsp runtime setting experimental.incrementalParsing={experimental} (initialize options)"
         );
+
+        let document_symbols = params
+            .initialization_options
+            .as_ref()
+            .and_then(runtime_document_symbol_mode_from_value)
+            .unwrap_or_default();
+        self.runtime_settings.document_symbols = document_symbols;
+        log::debug!("lsp runtime setting documentSymbols={document_symbols:?}");
 
         // Pull diagnostics mode-switch: a client that advertises
         // `textDocument.diagnostic` is served via pull only (push is suppressed).
@@ -949,6 +982,31 @@ mod tests {
             }
             _ => panic!("expected a Task::Response"),
         }
+    }
+
+    #[test]
+    fn document_symbol_mode_reads_supported_initialization_shapes() {
+        for value in [
+            serde_json::json!({"documentSymbols": "headings"}),
+            serde_json::json!({"panache": {"documentSymbols": "headings"}}),
+            serde_json::json!({"settings": {"panache": {"documentSymbols": "headings"}}}),
+        ] {
+            assert_eq!(
+                runtime_document_symbol_mode_from_value(&value),
+                Some(crate::lsp::DocumentSymbolMode::Headings)
+            );
+        }
+
+        assert_eq!(
+            runtime_document_symbol_mode_from_value(&serde_json::json!({"documentSymbols": "all"})),
+            Some(crate::lsp::DocumentSymbolMode::All)
+        );
+        assert_eq!(
+            runtime_document_symbol_mode_from_value(
+                &serde_json::json!({"documentSymbols": "unknown"})
+            ),
+            None
+        );
     }
 
     fn uri(s: &str) -> Uri {

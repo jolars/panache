@@ -555,6 +555,22 @@ Tables and figures nest under their enclosing heading. The outline appears in:
 
 The outline updates automatically as you edit.
 
+By default, Panache returns all four symbol types. Clients that use the outline
+as a heading navigator can request headings only through LSP initialization
+options:
+
+```json
+{
+  "documentSymbols": "headings"
+}
+```
+
+The accepted values are `all` (default) and `headings`. In both modes, a
+heading's symbol range covers its complete section, while its selection range
+continues to identify only the heading line. This lets clients associate body
+text with the enclosing heading without changing where outline navigation
+places the cursor.
+
 ### Code Actions
 
 Quick fixes and refactorings available at the cursor position:

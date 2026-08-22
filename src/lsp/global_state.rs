@@ -221,6 +221,7 @@ pub(crate) struct StateSnapshot {
     /// Client capabilities the pull handler needs, copied so it runs off-thread.
     pub(crate) supports_pull_diagnostics: bool,
     pub(crate) supports_related_documents: bool,
+    pub(crate) runtime_settings: LspRuntimeSettings,
     /// The same line-index cache the writer patches, shared by handle. This is
     /// what lets a worker read find the index the last keystroke left behind
     /// instead of rebuilding it: the cache is not part of the salsa revision, so
@@ -671,6 +672,7 @@ impl GlobalState {
             diagnostics: self.diagnostics.shared(),
             supports_pull_diagnostics: self.supports_pull_diagnostics,
             supports_related_documents: self.supports_related_documents,
+            runtime_settings: self.runtime_settings.clone(),
         }
     }
 

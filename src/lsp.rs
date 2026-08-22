@@ -45,9 +45,17 @@ pub struct DocumentState {
     pub salsa_config: crate::salsa::FileConfig,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum DocumentSymbolMode {
+    #[default]
+    All,
+    Headings,
+}
+
 #[derive(Debug, Clone)]
 pub struct LspRuntimeSettings {
     pub experimental_incremental_parsing: bool,
+    pub document_symbols: DocumentSymbolMode,
 }
 
 impl Default for LspRuntimeSettings {
@@ -57,6 +65,7 @@ impl Default for LspRuntimeSettings {
     fn default() -> Self {
         Self {
             experimental_incremental_parsing: true,
+            document_symbols: DocumentSymbolMode::default(),
         }
     }
 }

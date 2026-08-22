@@ -10,7 +10,9 @@
 use lsp_types::DidChangeConfigurationParams;
 use serde_json::Value;
 
-use crate::lsp::dispatch::runtime_incremental_parsing_from_value;
+use crate::lsp::dispatch::{
+    runtime_document_symbol_mode_from_value, runtime_incremental_parsing_from_value,
+};
 use crate::lsp::documents;
 use crate::lsp::global_state::GlobalState;
 
@@ -51,6 +53,10 @@ pub(crate) fn apply_pulled_configuration(gs: &mut GlobalState, value: Value) {
 /// (`settings.panache.*`) and a section-scoped pull reply (bare `experimental.*`)
 /// — both handled by [`runtime_incremental_parsing_from_value`].
 fn apply_runtime_settings(gs: &mut GlobalState, value: &Value) {
+    if let Some(mode) = runtime_document_symbol_mode_from_value(value) {
+        gs.runtime_settings.document_symbols = mode;
+    }
+
     // The environment override wins over the client, so a suite (or a
     // dogfooding session) forced one way stays that way across a
     // `didChangeConfiguration`.

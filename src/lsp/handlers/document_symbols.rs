@@ -27,7 +27,12 @@ pub(crate) fn document_symbol(
         .find(|region| region.is_frontmatter());
 
     // Build symbols synchronously (SyntaxNode is not Send).
-    let symbols = build_document_symbols(&syntax_tree, &index, yaml_frontmatter_region);
+    let symbols = build_document_symbols_with_mode(
+        &syntax_tree,
+        &index,
+        yaml_frontmatter_region,
+        snap.runtime_settings.document_symbols,
+    );
 
     log::debug!("Found {} top-level symbols", symbols.len());
     if symbols.is_empty() {
@@ -37,10 +42,25 @@ pub(crate) fn document_symbol(
     }
 }
 
+#[cfg(test)]
 fn build_document_symbols(
     root: &SyntaxNode,
     index: &LineIndex,
     yaml_frontmatter_region: Option<&crate::syntax::ParsedYamlRegionSnapshot>,
+) -> Vec<DocumentSymbol> {
+    build_document_symbols_with_mode(
+        root,
+        index,
+        yaml_frontmatter_region,
+        crate::lsp::DocumentSymbolMode::All,
+    )
+}
+
+fn build_document_symbols_with_mode(
+    root: &SyntaxNode,
+    index: &LineIndex,
+    yaml_frontmatter_region: Option<&crate::syntax::ParsedYamlRegionSnapshot>,
+    mode: crate::lsp::DocumentSymbolMode,
 ) -> Vec<DocumentSymbol> {
     let mut symbols = Vec::new();
     let mut heading_stack: Vec<(usize, DocumentSymbol)> = Vec::new();
@@ -55,27 +75,24 @@ fn build_document_symbols(
         log::warn!("Root is not a DOCUMENT node: {:?}", root.kind());
         return symbols;
     };
-    symbols.extend(
-        yaml_frontmatter_region.and_then(|region| extract_yaml_region_symbol(region, index)),
-    );
+    if mode == crate::lsp::DocumentSymbolMode::All {
+        symbols.extend(
+            yaml_frontmatter_region.and_then(|region| extract_yaml_region_symbol(region, index)),
+        );
+    }
 
     for node in document.blocks() {
         match node.kind() {
             SyntaxKind::HEADING => {
                 if let Some(symbol) = extract_heading_symbol(&node, index) {
                     let level = heading_levels.get(&node.text_range()).copied().unwrap_or(1);
+                    let section_end = offset_to_position(index, node.text_range().start().into());
 
                     while let Some((stack_level, _)) = heading_stack.last() {
                         if *stack_level < level {
                             break;
                         }
-                        let (_, completed) = heading_stack.pop().unwrap();
-
-                        if let Some((_, parent)) = heading_stack.last_mut() {
-                            parent.children.get_or_insert_with(Vec::new).push(completed);
-                        } else {
-                            symbols.push(completed);
-                        }
+                        finish_heading(&mut heading_stack, &mut symbols, section_end);
                     }
 
                     heading_stack.push((level, symbol));
@@ -84,7 +101,9 @@ fn build_document_symbols(
             SyntaxKind::SIMPLE_TABLE
             | SyntaxKind::PIPE_TABLE
             | SyntaxKind::GRID_TABLE
-            | SyntaxKind::MULTILINE_TABLE => {
+            | SyntaxKind::MULTILINE_TABLE
+                if mode == crate::lsp::DocumentSymbolMode::All =>
+            {
                 if let Some(table) = Table::cast(node.clone())
                     && let Some(symbol) = extract_table_symbol(&table, index)
                 {
@@ -96,7 +115,7 @@ fn build_document_symbols(
                     }
                 }
             }
-            SyntaxKind::FIGURE => {
+            SyntaxKind::FIGURE if mode == crate::lsp::DocumentSymbolMode::All => {
                 if let Some(figure) = crate::syntax::Figure::cast(node.clone())
                     && let Some(image) = figure.image()
                     && let Some(symbol) = extract_figure_symbol(image.syntax(), index)
@@ -114,15 +133,26 @@ fn build_document_symbols(
     }
 
     // Flush remaining headings from stack
-    while let Some((_, completed)) = heading_stack.pop() {
-        if let Some((_, parent)) = heading_stack.last_mut() {
-            parent.children.get_or_insert_with(Vec::new).push(completed);
-        } else {
-            symbols.push(completed);
-        }
+    let document_end = offset_to_position(index, index.len());
+    while !heading_stack.is_empty() {
+        finish_heading(&mut heading_stack, &mut symbols, document_end);
     }
 
     symbols
+}
+
+fn finish_heading(
+    heading_stack: &mut Vec<(usize, DocumentSymbol)>,
+    symbols: &mut Vec<DocumentSymbol>,
+    section_end: Position,
+) {
+    let (_, mut completed) = heading_stack.pop().expect("non-empty heading stack");
+    completed.range.end = section_end;
+    if let Some((_, parent)) = heading_stack.last_mut() {
+        parent.children.get_or_insert_with(Vec::new).push(completed);
+    } else {
+        symbols.push(completed);
+    }
 }
 
 fn extract_yaml_region_symbol(
@@ -247,6 +277,7 @@ fn node_to_range(node: &SyntaxNode, index: &LineIndex) -> Option<Range> {
 mod tests {
     use super::*;
     use crate::config::Config;
+    use crate::lsp::DocumentSymbolMode;
 
     #[test]
     fn test_heading_hierarchy() {
@@ -274,6 +305,53 @@ mod tests {
 
         let h1_second = &symbols[1];
         assert_eq!(h1_second.name, "H1 Again");
+    }
+
+    #[test]
+    fn test_heading_ranges_cover_section_bodies() {
+        let content = "# H1\n\nIntro.\n\n## H2\n\nDetails.\n\n# Next\n";
+        let config = Config::default();
+        let tree = crate::parser::parse(content, Some(config));
+        let symbols = build_document_symbols(&tree, &LineIndex::new(content), None);
+
+        let h1 = &symbols[0];
+        assert_eq!(h1.selection_range.start, Position::new(0, 0));
+        assert_eq!(h1.selection_range.end, Position::new(1, 0));
+        assert_eq!(h1.range.start, Position::new(0, 0));
+        assert_eq!(h1.range.end, Position::new(8, 0));
+
+        let h2 = &h1.children.as_ref().unwrap()[0];
+        assert_eq!(h2.selection_range.start, Position::new(4, 0));
+        assert_eq!(h2.selection_range.end, Position::new(5, 0));
+        assert_eq!(h2.range.start, Position::new(4, 0));
+        assert_eq!(h2.range.end, Position::new(8, 0));
+
+        let next = &symbols[1];
+        assert_eq!(next.selection_range.start, Position::new(8, 0));
+        assert_eq!(next.selection_range.end, Position::new(9, 0));
+        assert_eq!(next.range.start, Position::new(8, 0));
+        assert_eq!(next.range.end, Position::new(9, 0));
+    }
+
+    #[test]
+    fn test_headings_mode_omits_non_heading_symbols() {
+        let content = "---\ntitle: Test\n---\n\n# Heading\n\n![Figure caption](image.png)\n";
+        let config = Config::default();
+        let tree = crate::parser::parse(content, Some(config));
+        let parsed = crate::syntax::collect_parsed_yaml_region_snapshots(&tree);
+        let yaml_frontmatter_region = parsed.iter().find(|region| region.is_frontmatter());
+        let symbols = build_document_symbols_with_mode(
+            &tree,
+            &LineIndex::new(content),
+            yaml_frontmatter_region,
+            DocumentSymbolMode::Headings,
+        );
+
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0].name, "Heading");
+        assert!(symbols[0].children.as_ref().unwrap().is_empty());
+        assert_eq!(symbols[0].range.start, Position::new(4, 0));
+        assert_eq!(symbols[0].range.end, Position::new(7, 0));
     }
 
     #[test]
