@@ -50,6 +50,27 @@ pub struct MathAtom {
     pub delimiter: Option<DelimiterRole>,
 }
 
+/// Relative preference for breaking before a semantic math atom.
+///
+/// Layout consumers still decide whether a break is allowed at the atom's
+/// delimiter depth and whether the surrounding line is wide enough to need it.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MathBreakPriority {
+    #[default]
+    None,
+    Binary,
+    Relation,
+}
+
+/// One source-ordered math atom after contextual operator interpretation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SemanticMathAtom {
+    pub range: TextRange,
+    pub class: MathClass,
+    pub delimiter: Option<DelimiterRole>,
+    pub break_priority: MathBreakPriority,
+}
+
 const fn atom_info(class: MathClass, delimiter: Option<DelimiterRole>) -> MathAtomInfo {
     MathAtomInfo { class, delimiter }
 }
@@ -149,6 +170,116 @@ impl Iterator for MathAtoms<'_> {
             }
         }
     }
+}
+
+/// Source-ordered semantic atoms in one `MATH_CONTENT` list.
+///
+/// Trivia and formatter-level separators are not atoms. Coalesced `MATH_WORD`
+/// tokens are sliced at Unicode-scalar boundaries, except that consecutive
+/// relation scalars remain one surface atom. Structural nodes stay indivisible.
+/// A binary atom is contextually ordinary at list start, after another binary
+/// or relation, or after a genuine opening delimiter, matching Badness's math
+/// sequencer.
+pub fn semantic_math_atoms(content: &SyntaxNode) -> SemanticMathAtoms {
+    let mut interpreted = Vec::new();
+    let mut previous_role = MathRole::Relation;
+    let mut previous_opener = false;
+    for element in content.children_with_tokens() {
+        if !is_semantic_math_element(&element) {
+            continue;
+        }
+
+        let merge_relations = element.kind() == SyntaxKind::MATH_WORD;
+        let mut element_atoms: Vec<MathAtom> = Vec::new();
+        for raw in math_atoms(&element) {
+            if merge_relations
+                && raw.class == MathClass::Rel
+                && let Some(previous) = element_atoms.last_mut()
+                && previous.class == MathClass::Rel
+                && previous.range.end() == raw.range.start()
+            {
+                previous.range = TextRange::new(previous.range.start(), raw.range.end());
+                continue;
+            }
+            element_atoms.push(raw);
+        }
+        for atom in element_atoms {
+            let raw_role = MathRole::from_class(atom.class);
+            let role = if raw_role == MathRole::Binary
+                && (previous_role != MathRole::Operand || previous_opener)
+            {
+                MathRole::Operand
+            } else {
+                raw_role
+            };
+            let class = if atom.class == MathClass::Bin && role == MathRole::Operand {
+                MathClass::Ord
+            } else {
+                atom.class
+            };
+            let break_priority = match role {
+                MathRole::Operand => MathBreakPriority::None,
+                MathRole::Binary => MathBreakPriority::Binary,
+                MathRole::Relation => MathBreakPriority::Relation,
+            };
+            previous_role = role;
+            previous_opener = atom.delimiter == Some(DelimiterRole::Open);
+            interpreted.push(SemanticMathAtom {
+                range: atom.range,
+                class,
+                delimiter: atom.delimiter,
+                break_priority,
+            });
+        }
+    }
+
+    SemanticMathAtoms {
+        inner: interpreted.into_iter(),
+    }
+}
+
+/// Iterator returned by [`semantic_math_atoms`].
+pub struct SemanticMathAtoms {
+    inner: std::vec::IntoIter<SemanticMathAtom>,
+}
+
+impl Iterator for SemanticMathAtoms {
+    type Item = SemanticMathAtom;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MathRole {
+    Operand,
+    Binary,
+    Relation,
+}
+
+impl MathRole {
+    fn from_class(class: MathClass) -> Self {
+        match class {
+            MathClass::Bin => Self::Binary,
+            MathClass::Rel => Self::Relation,
+            _ => Self::Operand,
+        }
+    }
+}
+
+fn is_semantic_math_element(element: &SyntaxElement) -> bool {
+    !matches!(
+        element.kind(),
+        SyntaxKind::MATH_SPACE
+            | SyntaxKind::MATH_NEWLINE
+            | SyntaxKind::MATH_COMMENT
+            | SyntaxKind::MATH_ALIGN
+            | SyntaxKind::MATH_EQUATION_LABEL
+            | SyntaxKind::MATH_LINE_BREAK
+            | SyntaxKind::LINE_PREFIX
+            | SyntaxKind::NEWLINE
+    )
 }
 
 fn atom(range: TextRange, value: MathAtomInfo) -> MathAtom {

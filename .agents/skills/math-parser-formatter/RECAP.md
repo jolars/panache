@@ -65,32 +65,37 @@ still-relevant trap into Persistent traps. Keep it short.
   arguments split at Unicode-scalar boundaries; comments and blank lines stop
   attachment. Formatter interpretation must inherit the base atom's class
   across the script—especially for scripted relation and assignment breaks.
+- **Contextual coercion follows Badness's role model, not full Appendix G.** A
+  `Bin` becomes `Ord` at list start, after an effective binary or relation, or
+  after an atom with `DelimiterRole::Open`. `Punct`, `Op`, and an `Open` class
+  without a genuine delimiter role remain operands for this purpose.
 
 --------------------------------------------------------------------------------
 
 ## Latest session
 
-**Generated Unicode math baseline.** Added Panache-owned, zero-parse runtime
-lookups without introducing a runtime Badness dependency.
+**Contextual semantic atom stream.** Added the parser-owned interpretation that
+formatter and LSP consumers can share without changing the CST.
 
-- Vendored the normalized unicode-math v0.8r table at the Badness-pinned
-  revision, together with its LPPL notice and license.
-- Added a reproducible sync/check script and build-time command PHF plus sorted
-  character table; curated Panache overrides retain precedence.
-- Exhaustive differential coverage matches Badness for all 2,448 commands and
-  2,437 unique Unicode scalars, including non-BMP and duplicate-code-point
-  cases.
+- Added host-ranged semantic atoms with contextual Bin-to-Ord coercion and
+  `None < Binary < Relation` break priorities.
+- Kept structural nodes indivisible, inherited scripted-base metadata, and
+  coalesced relation scalars only within one lexical word.
+- Added focused Badness differentials, blockquote host-range coverage, and a
+  narrow-width formatter-oracle regression for relation/binary/unary breaks.
 
 ### Suggested next sub-targets
 
-1. Add contextual Bin-to-Ord coercion and break-priority semantics.
-2. Add explicit configured command signatures.
-3. Lock conservative formatting for unknown and redefined arguments.
+1. Add explicit configured command signatures.
+2. Lock conservative formatting for unknown and redefined arguments.
+3. Move Bookdown equation labels out of `MATH_CONTENT`.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Generated Unicode math baseline.** Added reproducible Panache-owned command
+  and scalar tables with exhaustive Badness lookup parity.
 - **Native math atoms—first semantic slice.** Added the Badness-shaped atom API,
   curated lookup tier, Unicode-scalar iterator, structural atoms, and
   scripted-base inheritance.

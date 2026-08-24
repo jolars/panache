@@ -40,11 +40,19 @@ impl OracleContext {
 }
 
 fn badness_body(body: &str, context: OracleContext) -> Result<String, String> {
+    badness_body_with_width(body, context, 80)
+}
+
+fn badness_body_with_width(
+    body: &str,
+    context: OracleContext,
+    line_width: usize,
+) -> Result<String, String> {
     let (wrapped, prefix, suffix) = context.wrapper(body);
     let formatted = format_with_style(
         &wrapped,
         FormatStyle {
-            line_width: 80,
+            line_width,
             indent_width: 2,
             math_wrap: MathWrap::Break,
             line_ending: LineEnding::Lf,
@@ -98,4 +106,50 @@ fn oracle_compares_formatter_output_byte_for_byte() {
     for context in OracleContext::ALL {
         assert_formatter_parity("a+b", context);
     }
+}
+
+#[test]
+fn oracle_ranks_relations_above_binaries_and_never_breaks_at_unary_signs() {
+    let formatted = badness_body_with_width(
+        "aaaaaaaa = -bbbbbbbb + cccccccc = dddddddd",
+        OracleContext::Display,
+        24,
+    )
+    .expect("Badness display-math oracle");
+    let indented_operators = formatted
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim_start();
+            let operator = trimmed.chars().next()?;
+            matches!(operator, '=' | '+' | '-').then_some((line.len() - trimmed.len(), operator))
+        })
+        .collect::<Vec<_>>();
+
+    assert!(
+        indented_operators
+            .iter()
+            .any(|(_, operator)| *operator == '='),
+        "expected a relation break in {formatted:?}",
+    );
+    assert!(
+        indented_operators
+            .iter()
+            .any(|(_, operator)| *operator == '+'),
+        "expected a binary break in {formatted:?}",
+    );
+    assert!(
+        indented_operators
+            .iter()
+            .all(|(_, operator)| *operator != '-'),
+        "unary sign became a break site in {formatted:?}",
+    );
+    let relation_indent = indented_operators
+        .iter()
+        .find_map(|(indent, operator)| (*operator == '=').then_some(*indent))
+        .unwrap();
+    let binary_indent = indented_operators
+        .iter()
+        .find_map(|(indent, operator)| (*operator == '+').then_some(*indent))
+        .unwrap();
+    assert!(relation_indent < binary_indent, "{formatted:?}");
 }

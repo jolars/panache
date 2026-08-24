@@ -250,7 +250,7 @@ formatter-off output byte-identical.
      by the Badness oracle. Add a reproducible generation command and
      exhaustive lookup-parity tests; unknown scalars must remain
      conservative.
-   - [ ] Add a source-ordered semantic atom stream with Badness-equivalent
+   - [x] Add a source-ordered semantic atom stream with Badness-equivalent
      contextual Bin-to-Ord coercion and break priorities. Cover unary signs,
      relations, delimiters, punctuation, commands, groups, and scripted-base
      inheritance with differential tests.

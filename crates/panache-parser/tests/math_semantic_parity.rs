@@ -11,8 +11,9 @@ use badness_parser::semantic::{
 use badness_parser::syntax::SyntaxKind as BadnessKind;
 use panache_parser::parser::math::{MathParseOptions, parse_math_content};
 use panache_parser::semantic::math::{
-    ArgKind, ArgumentDomain, DelimiterRole, MathClass, SignatureScope, argument_domain,
-    builtin_command_signature, math_atoms, math_char_info, math_command_info,
+    ArgKind, ArgumentDomain, DelimiterRole, MathBreakPriority, MathClass, SignatureScope,
+    argument_domain, builtin_command_signature, math_atoms, math_char_info, math_command_info,
+    semantic_math_atoms,
 };
 use panache_parser::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
 use panache_parser::{ParserOptions, parse};
@@ -396,4 +397,228 @@ fn math_atoms_match_badness_for_words_and_structural_atoms() {
             .collect::<Vec<_>>();
         assert_eq!(panache, badness, "{}", panache_element);
     }
+}
+
+type SemanticProjection<T> = (T, MathClass, Option<DelimiterRole>, MathBreakPriority);
+type RangedSemanticProjection = (
+    u32,
+    u32,
+    MathClass,
+    Option<DelimiterRole>,
+    MathBreakPriority,
+);
+type RawRangedProjection = (u32, u32, MathClass, Option<DelimiterRole>);
+
+fn semantic_atoms(body: &str) -> Vec<SemanticProjection<String>> {
+    let root = SyntaxNode::new_root(parse_math_content(body, MathParseOptions::default()));
+    semantic_math_atoms(&root)
+        .map(|atom| {
+            let start = usize::from(atom.range.start());
+            let end = usize::from(atom.range.end());
+            (
+                body[start..end].to_owned(),
+                atom.class,
+                atom.delimiter,
+                atom.break_priority,
+            )
+        })
+        .collect()
+}
+
+fn badness_semantic_atoms(body: &str) -> Vec<RangedSemanticProjection> {
+    let parsed = parse_badness(&format!("${body}$"));
+    let content = parsed
+        .syntax()
+        .descendants()
+        .find(|node| node.kind() == BadnessKind::MATH)
+        .expect("Badness math content");
+    let content_start = content.text_range().start();
+    let mut raw: Vec<RawRangedProjection> = Vec::new();
+    for element in content.children_with_tokens().filter(|element| {
+        !matches!(
+            element.kind(),
+            BadnessKind::WHITESPACE
+                | BadnessKind::NEWLINE
+                | BadnessKind::COMMENT
+                | BadnessKind::AMPERSAND
+                | BadnessKind::LINE_BREAK
+        )
+    }) {
+        let merge_relations = element.kind() == BadnessKind::WORD;
+        let mut element_atoms: Vec<RawRangedProjection> = Vec::new();
+        for atom in badness_math_atoms(&element) {
+            let atom = (
+                u32::from(atom.range.start() - content_start),
+                u32::from(atom.range.end() - content_start),
+                class_from_badness(atom.class),
+                atom.delimiter.map(delimiter_from_badness),
+            );
+            if merge_relations
+                && atom.2 == MathClass::Rel
+                && let Some(previous) = element_atoms.last_mut()
+                && previous.2 == MathClass::Rel
+                && previous.1 == atom.0
+            {
+                previous.1 = atom.1;
+            } else {
+                element_atoms.push(atom);
+            }
+        }
+        raw.extend(element_atoms);
+    }
+
+    let mut previous_is_operand = false;
+    let mut previous_opener = false;
+    raw.into_iter()
+        .map(|(start, end, raw_class, delimiter)| {
+            let is_binary = raw_class == MathClass::Bin;
+            let class = if is_binary && (!previous_is_operand || previous_opener) {
+                MathClass::Ord
+            } else {
+                raw_class
+            };
+            let priority = match class {
+                MathClass::Bin => MathBreakPriority::Binary,
+                MathClass::Rel => MathBreakPriority::Relation,
+                _ => MathBreakPriority::None,
+            };
+            previous_is_operand = !matches!(class, MathClass::Bin | MathClass::Rel);
+            previous_opener = delimiter == Some(DelimiterRole::Open);
+            (start, end, class, delimiter, priority)
+        })
+        .collect()
+}
+
+fn panache_semantic_atoms(body: &str) -> Vec<RangedSemanticProjection> {
+    let root = SyntaxNode::new_root(parse_math_content(body, MathParseOptions::default()));
+    let content_start = root.text_range().start();
+    semantic_math_atoms(&root)
+        .map(|atom| {
+            (
+                u32::from(atom.range.start() - content_start),
+                u32::from(atom.range.end() - content_start),
+                atom.class,
+                atom.delimiter,
+                atom.break_priority,
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn semantic_atom_stream_matches_badness_differentially() {
+    for body in [
+        "-x",
+        "a+-b",
+        "x=-y",
+        "f(-x)",
+        "a,-b",
+        r"a\leq b",
+        r"a\cdot b",
+        "{a}+b",
+        r"\leq_i x",
+        r"\langle-x\rangle",
+        "a<≤b",
+    ] {
+        assert_eq!(
+            panache_semantic_atoms(body),
+            badness_semantic_atoms(body),
+            "{body}",
+        );
+    }
+}
+
+#[test]
+fn semantic_atom_stream_matches_badness_contextual_roles() {
+    use MathBreakPriority::{Binary, None as NoBreak, Relation};
+    use MathClass::{Bin, Close, Inner, Open, Ord, Punct, Rel};
+
+    assert_eq!(
+        semantic_atoms(r"-a + -b = -c, -d {x} \cdot \langle -y \rangle \leq_i z≤w",),
+        vec![
+            ("-".into(), Ord, None, NoBreak),
+            ("a".into(), Ord, None, NoBreak),
+            ("+".into(), Bin, None, Binary),
+            ("-".into(), Ord, None, NoBreak),
+            ("b".into(), Ord, None, NoBreak),
+            ("=".into(), Rel, None, Relation),
+            ("-".into(), Ord, None, NoBreak),
+            ("c".into(), Ord, None, NoBreak),
+            (",".into(), Punct, None, NoBreak),
+            ("-".into(), Bin, None, Binary),
+            ("d".into(), Ord, None, NoBreak),
+            ("{x}".into(), Inner, None, NoBreak),
+            (r"\cdot".into(), Bin, None, Binary),
+            (r"\langle".into(), Open, Some(DelimiterRole::Open), NoBreak,),
+            ("-".into(), Ord, None, NoBreak),
+            ("y".into(), Ord, None, NoBreak),
+            (
+                r"\rangle".into(),
+                Close,
+                Some(DelimiterRole::Close),
+                NoBreak,
+            ),
+            (r"\leq_i".into(), Rel, None, Relation),
+            ("z".into(), Ord, None, NoBreak),
+            ("≤".into(), Rel, None, Relation),
+            ("w".into(), Ord, None, NoBreak),
+        ],
+    );
+}
+
+#[test]
+fn semantic_atom_stream_coalesces_compound_relations_and_keeps_utf8_ranges() {
+    assert_eq!(
+        semantic_atoms("α<≤β"),
+        vec![
+            ("α".into(), MathClass::Ord, None, MathBreakPriority::None,),
+            (
+                "<≤".into(),
+                MathClass::Rel,
+                None,
+                MathBreakPriority::Relation,
+            ),
+            ("β".into(), MathClass::Ord, None, MathBreakPriority::None,),
+        ],
+    );
+
+    assert_eq!(
+        semantic_atoms(r"a\leq=b")
+            .into_iter()
+            .map(|(text, class, _, priority)| (text, class, priority))
+            .collect::<Vec<_>>(),
+        vec![
+            ("a".into(), MathClass::Ord, MathBreakPriority::None),
+            (r"\leq".into(), MathClass::Rel, MathBreakPriority::Relation,),
+            ("=".into(), MathClass::Rel, MathBreakPriority::Relation),
+            ("b".into(), MathClass::Ord, MathBreakPriority::None),
+        ],
+    );
+}
+
+#[test]
+fn semantic_atom_stream_ignores_host_trivia_and_keeps_host_ranges() {
+    let source = "> $$\n> α + β\n> $$\n";
+    let root = parse(source, Some(ParserOptions::default()));
+    let content = root
+        .descendants()
+        .find(|node| node.kind() == SyntaxKind::MATH_CONTENT)
+        .expect("embedded math content");
+
+    let atoms = semantic_math_atoms(&content)
+        .map(|atom| {
+            let start = usize::from(atom.range.start());
+            let end = usize::from(atom.range.end());
+            (&source[start..end], atom.class, atom.break_priority)
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        atoms,
+        vec![
+            ("α", MathClass::Ord, MathBreakPriority::None),
+            ("+", MathClass::Bin, MathBreakPriority::Binary),
+            ("β", MathClass::Ord, MathBreakPriority::None),
+        ],
+    );
 }
